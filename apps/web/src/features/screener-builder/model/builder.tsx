@@ -9,7 +9,9 @@ import {
   criteriaOf,
   criterionOfError,
   criterionIds,
+  mergeNotes,
   newCriterionId,
+  notesOf,
   previewDocument,
   tieBreakOf,
   toCriterion,
@@ -18,6 +20,7 @@ import {
   useScreenerVersions,
   useScreenPreview,
   withCriterion,
+  withNotes,
   withoutCriterion,
   withTieBreak,
   type Criterion,
@@ -111,6 +114,14 @@ export interface ScreenerBuilder {
   acceptFormula: (formula: Formula, field: string) => void;
   /** The trader chose Skip: the pending row goes and `formula_skipped` is recorded. */
   skipFormula: (name: string) => void;
+  /**
+   * What the screen does not cover (ADR 0066): the notes saved in the screen's document, each a
+   * missing feature the trader asked for. Finalising does not wait on them.
+   */
+  notes: readonly string[];
+  /** Join notes (repeats left out, the list capped); one edit, safe next to `loadDocument`. */
+  addNotes: (notes: readonly string[]) => void;
+  removeNote: (note: string) => void;
   /** A new answer replaced the proposals: none is decided yet. */
   setFormulas: (formulas: readonly Formula[]) => void;
   save: () => Promise<void>;
@@ -210,6 +221,14 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
 
   const edit = (next: ScreenDocument) => {
     setEdited(next);
+    startCopy();
+  };
+  // A change built on the document as it is when it applies: two edits in one event keep both.
+  const editWith = (change: (current: ScreenDocument) => ScreenDocument) => {
+    setEdited((prev) => change(prev ?? source ?? { id }));
+    startCopy();
+  };
+  const startCopy = () => {
     if (preset && copying.current === null) {
       copying.current = copy.mutateAsync().catch(() => {
         // The toast says why; the edit is dropped so the next one tries again.
@@ -259,7 +278,12 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
       edit(withTieBreak(document, field, order));
     },
     loadDocument: (next) => {
-      edit(toDocument(next, id));
+      // A drafted document carries no notes: the ones the screen has stay.
+      editWith((cur) => {
+        const kept = notesOf(base, cur);
+        const loaded = toDocument(next, id);
+        return kept.length > 0 && loaded['notes'] === undefined ? withNotes(loaded, kept) : loaded;
+      });
     },
     draftSessionId,
     setDraftSessionId: (next) => {
@@ -296,6 +320,20 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
         formulas: { ...r.formulas, [name]: 'skipped' },
       }));
       choose({ event: 'formula_skipped', subject: name });
+    },
+    notes: notesOf(base, document),
+    addNotes: (added) => {
+      const known = notesOf(base, document);
+      if (mergeNotes(known, added).length === known.length) return; // nothing new: not an edit
+      editWith((cur) => withNotes(cur, mergeNotes(notesOf(base, cur), added)));
+    },
+    removeNote: (note) => {
+      editWith((cur) =>
+        withNotes(
+          cur,
+          notesOf(base, cur).filter((n) => n !== note),
+        ),
+      );
     },
     setFormulas: (formulas) => {
       updateReview((r) => ({ ...r, formulas: {}, proposed: formulas, reviewing: null }));

@@ -90,6 +90,8 @@ function setup(over: Partial<DraftReviewProps> = {}) {
     text: SENTENCE,
     document: DOCUMENT,
     formulaStates: {},
+    notes: [],
+    onRemoveNote: vi.fn(),
     onReviewFormula: vi.fn(),
     onSkipFormula: vi.fn(),
     onPickReading: vi.fn(),
@@ -137,6 +139,15 @@ describe('DraftReview', () => {
     expect(screen.getByText('Left out draft_dup: equals f.x')).toBeInTheDocument();
     expect(screen.getByText('assumed US listings')).toBeInTheDocument();
     expect(screen.getByText('Loaded in the Builder')).toBeInTheDocument();
+  });
+
+  it('lists the notes kept with the screen, each removable', async () => {
+    const { props } = setup({ notes: ['A moat score that rises over time'] });
+    expect(screen.getByText('help describe_not_covered')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove note: A moat score that rises over time' }),
+    );
+    expect(props.onRemoveNote).toHaveBeenCalledWith('A moat score that rises over time');
   });
 
   it('shows the formula with its dry run, and Review and add / Skip call the Builder', async () => {

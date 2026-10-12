@@ -44,7 +44,18 @@ body = """
 Each card names one missing field, what it would be used for, and how hard it is to add. A missing field is not applied and does not block you from finalising: the screen runs on the criteria it does have.
 The app keeps a log of what you ask for that is missing. The card shows when you asked for it before. It shows your own history only, never what other traders asked.
 """
-see_also = ["describe_requested_not_applied", "describe_feasibility_rollup", "describe_feasibility_source", "describe_feasibility_unclear"]
+see_also = ["describe_not_covered", "describe_requested_not_applied", "describe_feasibility_rollup", "describe_feasibility_source", "describe_feasibility_unclear"]
+
+[[term]]
+id = "describe_not_covered"
+term = "Not covered"
+short = "Something your screen was asked to test but does not, kept with the screen."
+body = """
+When a sentence asks for a field the catalogue cannot compute, the screen is saved without it and a short note of what is missing is saved with it. The note is shown in the plain-English reading of the screen, so nobody mistakes a partial screen for a full one.
+You can remove a note at any time. Removing it does not add the field and does not change which instruments pass.
+"""
+see_also = ["describe_not_available_yet", "describe_requested_not_applied"]
+next = "Remove the note if the screen is meant to be partial, or add a criterion by hand from the nearest field."
 
 [[term]]
 id = "describe_requested_not_applied"

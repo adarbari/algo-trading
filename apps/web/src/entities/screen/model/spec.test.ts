@@ -7,11 +7,14 @@ import {
   criterionOfError,
   isComplete,
   isScreenId,
+  mergeNotes,
   newCriterionId,
+  notesOf,
   previewDocument,
   tieBreakOf,
   toDocument,
   withCriterion,
+  withNotes,
   withoutCriterion,
   withTieBreak,
   type Criterion,
@@ -178,5 +181,20 @@ describe('documents and ids', () => {
     expect(isScreenId('My')).toBe(false);
     expect(isScreenId('')).toBe(false);
     expect(isScreenId('a'.repeat(65))).toBe(false);
+  });
+
+  it('reads the notes of the draft, else of the base, and an empty list clears them', () => {
+    const base = { notes: ['from preset'] };
+    expect(notesOf(base, { id: 'my' })).toEqual(['from preset']);
+    expect(notesOf(base, withNotes({ id: 'my' }, ['own']))).toEqual(['own']);
+    expect(notesOf(base, withNotes({ id: 'my' }, []))).toEqual([]);
+    expect(notesOf(null, { id: 'my' })).toEqual([]);
+  });
+
+  it('merges notes without blanks or repeats, cut and capped like the server', () => {
+    expect(mergeNotes(['a'], ['a', ' b ', ''])).toEqual(['a', 'b']);
+    expect(mergeNotes([], ['x'.repeat(250)])[0]).toHaveLength(200);
+    const many = Array.from({ length: 15 }, (_, i) => `note ${String(i)}`);
+    expect(mergeNotes([], many)).toHaveLength(10);
   });
 });

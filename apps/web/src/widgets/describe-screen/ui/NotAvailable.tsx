@@ -5,7 +5,17 @@
  * only their own rows: never another trader's, never a count across users). Nothing here changes
  * the screen.
  */
-import { Mono, Panel, Stack, StatusBadge, Surface, Text, formatValue } from '@algotrade/ui';
+import {
+  Button,
+  Divider,
+  Mono,
+  Panel,
+  Stack,
+  StatusBadge,
+  Surface,
+  Text,
+  formatValue,
+} from '@algotrade/ui';
 import type { ReactNode } from 'react';
 
 import { GuideHelp, termHelp } from '@/features/guide-help';
@@ -20,6 +30,9 @@ import {
 
 export interface NotAvailableProps {
   missing: readonly MissingFeature[];
+  /** The screen's "not covered" notes: saved with it, each removable. */
+  notes: readonly string[];
+  onRemoveNote: (note: string) => void;
   /** The help for a catalogue field named as the closest one (null: the Guide does not know it). */
   renderFieldHelp?: ((field: string) => ReactNode) | undefined;
 }
@@ -79,7 +92,7 @@ function MissingCard({
   );
 }
 
-export function NotAvailable({ missing, renderFieldHelp }: NotAvailableProps) {
+export function NotAvailable({ missing, notes, onRemoveNote, renderFieldHelp }: NotAvailableProps) {
   // The history is a nicety: a failed read leaves the cards without it.
   const history = useMyFeatureRequests(missing.length > 0);
   const mine = history.data ?? [];
@@ -99,6 +112,32 @@ export function NotAvailable({ missing, renderFieldHelp }: NotAvailableProps) {
             renderFieldHelp={renderFieldHelp}
           />
         ))}
+        {notes.length > 0 && (
+          <Stack gap={2}>
+            <Divider tone="soft" />
+            <Stack direction="row" gap={1} align="center">
+              <Text size="sm" weight="semibold">
+                Not covered
+              </Text>
+              {termHelp('describe_not_covered')}
+            </Stack>
+            {notes.map((note) => (
+              <Stack key={note} direction="row" gap={2} align="center" wrap>
+                <Text size="sm">{note}</Text>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Remove note: ${note}`}
+                  onClick={() => {
+                    onRemoveNote(note);
+                  }}
+                >
+                  Remove
+                </Button>
+              </Stack>
+            ))}
+          </Stack>
+        )}
       </Stack>
     </Panel>
   );

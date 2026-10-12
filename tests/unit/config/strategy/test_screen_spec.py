@@ -289,3 +289,27 @@ def test_an_empty_tie_break_clears_one() -> None:
     doc = spec_doc(rank={"tie_break": "", "tie_break_order": "asc"})
     spec = parse_screen_spec("vrp", doc, "vrp")
     assert spec.tie_break is None
+
+
+def test_notes_parse_and_default_to_none() -> None:
+    assert parse_screen_spec("vrp", spec_doc(), "vrp").notes == ()
+    spec = parse_screen_spec("vrp", spec_doc(notes=["doesn't test support lines"]), "vrp")
+    assert spec.notes == ("doesn't test support lines",)
+
+
+@pytest.mark.parametrize(
+    "notes",
+    ["a string", ["x"] * 11, [""], [3], ["x" * 201]],
+)
+def test_notes_are_validated(notes: Any) -> None:
+    with pytest.raises(ConfigurationError, match=r"vrp\.notes"):
+        parse_screen_spec("vrp", spec_doc(notes=notes), "vrp")
+
+
+def test_a_screen_without_notes_hashes_as_before_and_notes_join_the_hash() -> None:
+    site = resolve("vrp", UserContext(SITE_USER), _store().load, catalog=CATALOG)
+    assert "notes" not in site.canonical()
+    doc = {"id": "mine", "extends": "vrp", "notes": ["no support lines"]}
+    mine = resolve("mine", UserContext("u1"), _store(doc).load, catalog=CATALOG)
+    assert mine.screen_spec.notes == ("no support lines",)
+    assert mine.hash != site.hash

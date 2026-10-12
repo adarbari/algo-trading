@@ -62,17 +62,20 @@ describe('DescribeScreen', () => {
 
   it('hands the form what resets the formulas on a new answer, and the Guide help of a term', () => {
     const setFormulas = vi.fn();
+    const addNotes = vi.fn();
     state.builder = {
       status: 'ready',
       id: 'mine',
       document: {},
       loadDocument: vi.fn(),
       setFormulas,
+      addNotes,
     };
     render(<DescribeScreen />);
     const onAnswer = probe.props['onAnswer'] as (answer: unknown) => void;
-    onAnswer({ formulas: [{ name: 'draft_x' }] });
+    onAnswer({ formulas: [{ name: 'draft_x' }], missing: [{ description: 'support lines' }] });
     expect(setFormulas).toHaveBeenCalledWith([{ name: 'draft_x' }]);
+    expect(addNotes).toHaveBeenCalledWith(['support lines']);
     onAnswer({});
     expect(setFormulas).toHaveBeenLastCalledWith([]);
     const help = probe.props['renderTermHelp'] as (term: string) => ReactNode;

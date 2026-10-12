@@ -25,7 +25,7 @@ export function CriteriaTable() {
   const catalogue = useFeatureCatalogue();
   const [formula, setFormula] = useState(false);
   const features = catalogue.data ?? [];
-  const sentence = plainEnglish(builder.criteria, features);
+  const sentence = plainEnglish(builder.criteria, features, builder.notes);
   const waiting = builder.pendingFormulas.flatMap((formula) => {
     const line = pendingLine(formula);
     return line ? [{ formula, line }] : [];

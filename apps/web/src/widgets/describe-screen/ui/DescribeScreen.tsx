@@ -38,6 +38,8 @@ export function DescribeScreen() {
           onSession={builder.setDraftSessionId}
           onAnswer={(answer) => {
             builder.setFormulas(answer.formulas ?? []);
+            // The gap stays with the screen (finalising does not wait on it).
+            builder.addNotes((answer.missing ?? []).map((item) => item.description));
           }}
           renderTermHelp={termHelp}
           renderReview={({ answer, text, serial }) => (
@@ -48,6 +50,8 @@ export function DescribeScreen() {
                 text={text}
                 document={builder.document}
                 formulaStates={builder.formulaStates}
+                notes={builder.notes}
+                onRemoveNote={builder.removeNote}
                 onReviewFormula={builder.reviewFormula}
                 onSkipFormula={builder.skipFormula}
                 onPickReading={(criterion, choice) => {

@@ -233,3 +233,36 @@ export function withTieBreak(
   }
   return { ...document, rank };
 }
+
+/** What the server accepts as a screen's notes (`ScreenSpec`): at most this many, this long. */
+export const MAX_NOTES = 10;
+export const MAX_NOTE_LENGTH = 200;
+
+const listOf = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+
+/** What the screen does not cover (a missing feature the trader asked for): the draft's own list, else the base's. */
+export function notesOf(
+  base: Readonly<Record<string, unknown>> | null | undefined,
+  document: ScreenDocument,
+): string[] {
+  return listOf(document['notes'] ?? base?.['notes']);
+}
+
+/**
+ * `notes` joined to `current`, in order: blanks and repeats left out, each cut to the length the
+ * server accepts, the list capped.
+ */
+export function mergeNotes(current: readonly string[], added: readonly string[]): string[] {
+  const out = [...current];
+  for (const raw of added) {
+    const note = raw.trim().slice(0, MAX_NOTE_LENGTH);
+    if (note !== '' && !out.includes(note)) out.push(note);
+  }
+  return out.slice(0, MAX_NOTES);
+}
+
+/** The document with its notes set (an empty list clears the ones a preset carries). */
+export function withNotes(document: ScreenDocument, notes: readonly string[]): ScreenDocument {
+  return { ...document, notes: [...notes] };
+}

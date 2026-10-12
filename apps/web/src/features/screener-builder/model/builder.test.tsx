@@ -185,6 +185,22 @@ function Probe() {
       >
         skip gap
       </Button>
+      <Text>{`notes ${b.notes.join('|')}`}</Text>
+      <Button
+        onClick={() => {
+          b.addNotes(['no support lines', 'no support lines', '  ']);
+          b.loadDocument({ id: 'my', criteria: { iv30: { field: 'f.iv', op: 'gte', value: 1 } } });
+        }}
+      >
+        note and load
+      </Button>
+      <Button
+        onClick={() => {
+          b.removeNote('no support lines');
+        }}
+      >
+        remove note
+      </Button>
     </>
   );
 }
@@ -291,6 +307,23 @@ describe('ScreenerBuilderProvider', () => {
       </ToastProvider>,
     );
     expect(await screen.findByText('session none')).toBeInTheDocument();
+  });
+
+  it('keeps the notes a drafted document replaces, saves them, and lets one be removed', async () => {
+    setup();
+    await screen.findByText('criteria iv30=0.5,close=5');
+    expect(screen.getByText('notes')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'note and load' }));
+    expect(screen.getByText('notes no support lines')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      expect(PUT).toHaveBeenCalledTimes(1);
+    });
+    expect(PUT.mock.calls[0]?.[1]).toMatchObject({
+      body: { document: { notes: ['no support lines'] } },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'remove note' }));
+    expect(screen.getByText('notes')).toBeInTheDocument();
   });
 
   it('keeps the latest decision per option, sends them with the save, and clears them with the session', async () => {

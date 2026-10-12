@@ -42,6 +42,9 @@ export interface DraftReviewProps {
   /** The Builder's working document (the swap finds the row of a reading in it). */
   document: ScreenDocument;
   formulaStates: Readonly<Record<string, FormulaState>>;
+  /** The screen's "not covered" notes (kept with the screen) and removing one. */
+  notes: readonly string[];
+  onRemoveNote: (note: string) => void;
   onReviewFormula: (formula: DraftFormula) => void;
   onSkipFormula: (name: string) => void;
   /** A reading was picked: the criterion that replaces the row, and the choice to record. */
@@ -85,6 +88,8 @@ export default function DraftReview({
   text,
   document,
   formulaStates,
+  notes,
+  onRemoveNote,
   onReviewFormula,
   onSkipFormula,
   onPickReading,
@@ -192,7 +197,14 @@ export default function DraftReview({
           </Stack>
         </Panel>
       )}
-      {missing.length > 0 && <NotAvailable missing={missing} renderFieldHelp={renderFieldHelp} />}
+      {missing.length > 0 && (
+        <NotAvailable
+          missing={missing}
+          notes={notes}
+          onRemoveNote={onRemoveNote}
+          renderFieldHelp={renderFieldHelp}
+        />
+      )}
     </Stack>
   );
 }

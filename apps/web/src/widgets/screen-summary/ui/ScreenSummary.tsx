@@ -19,7 +19,7 @@ import { missText } from '../model/summary';
 
 const SHOWN_PER_CRITERION = 5;
 
-function Summary({ preview }: { preview: ScreenPreview }) {
+function Summary({ preview, notes }: { preview: ScreenPreview; notes: readonly string[] }) {
   const { summary, coverage } = preview;
   const symbols = new Map(preview.rows.map((row) => [row.instrument_id, row.symbol]));
   const groups = narrowMissGroups(summary.narrow_misses);
@@ -63,6 +63,7 @@ function Summary({ preview }: { preview: ScreenPreview }) {
           Some rows could not be evaluated.
         </Banner>
       )}
+      {notes.length > 0 && <Banner tone="info">{`Not covered: ${notes.join('; ')}`}</Banner>}
       <UnavailableNote gaps={fromRest(coverage.unavailable)} titleOf={featureTitle} />
       {reasons.length > 0 && (
         <Disclosure
@@ -106,7 +107,7 @@ function Summary({ preview }: { preview: ScreenPreview }) {
 }
 
 export function ScreenSummary() {
-  const { preview } = useScreenerBuilder();
+  const { preview, notes } = useScreenerBuilder();
   const state = previewPanelState(preview);
   return (
     <Panel
@@ -117,7 +118,7 @@ export function ScreenSummary() {
       emptyMessage="Add a complete criterion to see the run summary."
       errorMessage={preview.error ?? 'The preview failed.'}
     >
-      {preview.data && <Summary preview={preview.data} />}
+      {preview.data && <Summary preview={preview.data} notes={notes} />}
     </Panel>
   );
 }
