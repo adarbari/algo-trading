@@ -3,10 +3,15 @@ whose criteria the model keeps unless the sentence changes them) in; the draft d
 criteria dropped with their reasons and the model's notes out, plus the A / B / C contract
 (ADR 0041, amended 2026-10-11): pending formulas with their dry run, the formulas dropped, the
 missing features and the unresolved terms, and the suggested checks (soft or score, offered
-not applied) with those dropped. Pending formulas and suggestions are never in ``document``."""
+not applied) with those dropped. Pending formulas and suggestions are never in ``document``.
+The explained parts (same amendment, 2026-10-11): ``sentence`` (the whitespace-normalised text the
+parts' offsets count in) and ``parts``, each the trader's own words (the server's slice of the
+sentence), the model's reading when it checks out, the kind the server decided and the ids of the
+items of this draft that belong to it; ``parts`` is null when the model gave none (the panel then
+shows the draft as before)."""
 
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -92,6 +97,7 @@ class Unresolved(Schema):
 
 
 class Suggestion(Schema):
+    id: str = Field(description="the server's id (s1, s2...), what a part's suggestions name")
     criterion: dict[str, Any] = Field(
         description="a soft or score criterion, never in the document"
     )
@@ -102,6 +108,37 @@ class Suggestion(Schema):
 class DroppedSuggestion(Schema):
     field: str
     reason: str
+
+
+class Part(Schema):
+    id: str = Field(
+        description="p1... from the model; g1... a gap; kept / unplaced: catch-alls with no words"
+    )
+    words: str = Field(description="the sentence's own words for this part; empty for a catch-all")
+    start: int = Field(description="offset of words in sentence, in UTF-16 code units (JS slice)")
+    end: int = Field(description="end offset of words in sentence, in UTF-16 code units")
+    reading: str | None = Field(
+        description="what the words were read as: the model's line (reading_source model), or "
+        "the server's own, built from the part's phrasebook entry (a draft made without the "
+        "model); null when the model gave none or its numbers disagree with the part's "
+        "criteria (then reading_source is server)"
+    )
+    reading_source: Literal["model", "server"]
+    kind: Literal["applied", "formula", "needs_choice", "not_available", "not_understood"] = Field(
+        description="decided by the server from what the part holds, never by the model"
+    )
+    origin: Literal["words", "gap", "kept", "unplaced"] = Field(
+        description="words: a part of the model, located in the sentence; gap: words no part "
+        "covers; kept: criteria carried over from the Builder's document; unplaced: items tied "
+        "to no words (kept and unplaced have no words)"
+    )
+    criteria: list[str] = Field(description="ids of criteria in the draft document")
+    dropped: list[str] = Field(description="ids of the criteria dropped")
+    formulas: list[str] = Field(description="names of pending formulas")
+    unresolved: list[str] = Field(description="terms of the unresolved readings")
+    missing: list[str] = Field(description="keys (or new slugs) of the missing-feature requests")
+    suggestions: list[str] = Field(description="ids of suggestions")
+    rank: bool = Field(description="true when the document's tie-break belongs to this part")
 
 
 class ScreenDraft(Schema):
@@ -123,6 +160,15 @@ class ScreenDraft(Schema):
         "trader accepts or skips each",
     )
     suggestions_dropped: list[DroppedSuggestion] = Field(default_factory=list)
+    sentence: str = Field(
+        default_factory=str,  # not a literal default: the web client types those as required
+        description="the whitespace-normalised sentence the parts' offsets count in",
+    )
+    parts: list[Part] | None = Field(
+        None,
+        description="the explained parts, in sentence order (catch-alls last); null when the "
+        "model gave none: show the draft without them",
+    )
     draft_session_id: str | None = Field(
         None,
         description="ties this draft to the screen later saved from it (ADR 0066); send it back "

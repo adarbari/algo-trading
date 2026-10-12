@@ -322,3 +322,86 @@ def test_an_item_the_server_drops_is_not_recorded(
         "held_two_years_score", "short_squeeze_score",
     ]  # fmt: skip
     assert "dropped_one" not in [r["ref"] for r in sink.rows] and len(sink.rows) == 2
+
+
+PARTS_ANSWER = {
+    **ANSWER,
+    "criteria": [
+        {**ANSWER["criteria"][0], "part": "p1"},
+        {**ANSWER["criteria"][1], "part": "p2"},
+        {**ANSWER["criteria"][2], "part": "p3"},
+    ],
+    "parts": [
+        {"id": "p1", "words": "active", "reading": "Listed instruments"},
+        {"id": "p2", "words": "over $5", "reading": "Price above $5"},
+        {"id": "p3", "words": "IV rank above 50%", "reading": "IV rank of 50% or more"},
+    ],
+}
+
+
+def test_the_explained_parts_are_served_beside_the_sentence_and_recorded(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    sink = Keep()
+    client = app_with(api_golden[0], Canned(PARTS_ANSWER), sink)
+    body = client.post(
+        "/screeners/my_screen/draft-from-text",
+        json={"text": " active  over $5 \n IV rank above 50% 🚀"},
+    ).json()
+    assert body["sentence"] == "active over $5 IV rank above 50% 🚀"
+    parts = {p["id"]: p for p in body["parts"]}
+    assert parts["p2"]["words"] == "over $5" and parts["p2"]["reading_source"] == "model"
+    assert (parts["p2"]["kind"], parts["p2"]["origin"], parts["p2"]["criteria"]) == (
+        "applied",
+        "words",
+        ["price"],
+    )
+    assert parts["p3"]["dropped"] == ["iv_rank"] and parts["p3"]["kind"] == "not_available"
+    assert parts["unplaced"]["rank"] is True  # the tie-break names no part: the catch-all holds it
+    assert parts["unplaced"]["words"] == "" and parts["unplaced"]["kind"] == "applied"
+    p2 = parts["p2"]
+    units = body["sentence"].encode("utf-16-le")
+    assert units[2 * p2["start"] : 2 * p2["end"]].decode("utf-16-le") == "over $5"
+    assert '"part"' not in json.dumps(body["document"])  # the tag is not in the saved spec
+    payload = json.loads(sink.rows[1]["payload"])
+    assert [p["id"] for p in payload["parts"]] == ["p1", "p2", "p3", "unplaced"]
+
+
+def test_an_answer_without_parts_serves_none_and_the_panel_degrades(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    body = (
+        app_with(api_golden[0], Canned(ANSWER))
+        .post("/screeners/s/draft-from-text", json={"text": "over $5"})
+        .json()
+    )
+    assert body["parts"] is None and body["sentence"] == "over $5"
+
+
+class Forbidden:
+    names = ("forbidden",)
+
+    def names_for(self, user: str | None) -> tuple[str, ...]:
+        return self.names
+
+    def complete(self, system: str, user: str, **_: object) -> Completion:
+        raise AssertionError("the phrasebook resolves this sentence: no model call")
+
+
+def test_a_sentence_the_phrasebook_resolves_is_served_and_logged_without_a_model_call(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    sink = Keep()
+    client = app_with(api_golden[0], Forbidden(), sink)
+    response = client.post(
+        "/screeners/my_screen/draft-from-text", json={"text": "oversold stocks in an uptrend"}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["document"]["criteria"]["rsi_14"]["value"] == 30
+    assert body["parts"] and {p["reading_source"] for p in body["parts"]} == {"server"}
+    assert [r["event"] for r in sink.rows] == ["draft_requested", "draft_returned"]
+    returned = sink.rows[1]  # written as for a model draft, with no call id to point at
+    assert not returned["call_ids"] and returned["sentence"] == "oversold stocks in an uptrend"
+    assert json.loads(returned["payload"])["stage"] == "phrasebook"
+    assert returned["prompt_version"].startswith("phrasebook:")  # survives the payload's erasure

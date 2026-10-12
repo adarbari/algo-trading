@@ -1,0 +1,74 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "listed",
+      "part": "p1"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks",
+      "part": "p1"
+    },
+    {
+      "id": "month",
+      "field": "rollup.price_stats@v2.ret_20d",
+      "op": "gt",
+      "value": 0.05,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "gained over 5% in the last 20 days",
+      "part": "p2"
+    },
+    {
+      "id": "volume",
+      "field": "rollup.volume@v1.volume_ratio_5d_20d",
+      "op": "gt",
+      "value": 1.05,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "volume up over 5%",
+      "part": "p3"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": null,
+  "parts": [
+    {
+      "id": "p1",
+      "words": "stocks",
+      "reading": "Active stocks and ADRs"
+    },
+    {
+      "id": "p2",
+      "words": "gained over 5% in the last 20 days",
+      "reading": "20-day return above 5%"
+    },
+    {
+      "id": "p3",
+      "words": "volume up over 5% against their average",
+      "reading": "5-day volume more than 1.05 times its 20-day average"
+    }
+  ]
+}

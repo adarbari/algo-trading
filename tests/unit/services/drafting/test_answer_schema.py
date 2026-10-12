@@ -8,8 +8,13 @@ import pytest
 
 from algotrade.services.drafting.answer_schema import (
     ANSWER_SCHEMA,
+    CRITERION,
     FORMULA,
+    MISSING,
+    PART,
     SUGGESTION,
+    TIE_BREAK,
+    UNRESOLVED,
     check_answer,
     check_criterion,
     check_item,
@@ -164,3 +169,20 @@ def test_suggestions_are_optional_nullable_and_typed() -> None:
     assert check_item({**SUGGESTION_ITEM, "why": None}, SUGGESTION, "suggestion") is not None
     why = check_answer({**GOOD, "suggestions": [{"field": "x"}]}, ANSWER_SCHEMA)
     assert why is not None and "suggestions[0]: missing" in why
+
+
+def test_the_explained_parts_are_optional_nullable_and_a_part_tag_is_read_leniently() -> None:
+    assert "parts" in ANSWER_SCHEMA["required"]
+    for schema in (CRITERION, FORMULA, MISSING, UNRESOLVED, SUGGESTION):
+        assert "part" in schema["properties"] and "part" in schema["required"]
+    assert "part" in TIE_BREAK["anyOf"][0]["required"]
+    alternative = UNRESOLVED["properties"]["alternatives"]["items"]["properties"]["criterion"]
+    assert "part" not in alternative["properties"]  # the term has the part, not its readings
+    assert PART["required"] == ["id", "words", "reading"]
+    part = {"id": "p1", "words": "over $5", "reading": None}
+    assert check_answer({**GOOD, "parts": [part]}, ANSWER_SCHEMA) is None
+    assert check_answer({**GOOD, "parts": None}, ANSWER_SCHEMA) is None
+    # a malformed tag never refuses its item: the server reads it with ``part_tag``
+    odd = {"field": "x.y", "op": "gt", "value": 5, "part": 7}
+    assert check_criterion(odd) is None
+    assert check_item({**SUGGESTION_ITEM, "part": ["p1"]}, SUGGESTION, "suggestion") is None

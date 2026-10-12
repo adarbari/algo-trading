@@ -293,6 +293,11 @@ purpose = "use case: a rule screen drafted from a sentence (ADR 0041): the promp
 contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
 
 [[dir]]
+path = "src/algotrade/services/drafting/parts"
+purpose = "use case: the explained parts of a draft (ADR 0041): the sentence's parts located by the server, every item attributed to one, the kind decided from what it holds, the reading checked against its numbers (split from services/drafting, at its module cap)"
+contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
+
+[[dir]]
 path = "src/algotrade/services/drafting/phrasebook"
 purpose = "use case: the phrasebook's structured thresholds in use (ADR 0041): their check against a catalogue and the match of a sentence to them, resolving it without the model when they cover every word (split from services/drafting, at its module cap)"
 contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]

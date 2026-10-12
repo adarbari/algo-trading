@@ -17,6 +17,7 @@
 import ast
 import fnmatch
 import importlib.util
+import subprocess
 import tomllib
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
@@ -258,3 +259,17 @@ def test_shared_modules_are_task_domain_modules() -> None:
     for module in SHARED:
         assert (REPO_ROOT / module).is_file(), f"[[shared]] {module} does not exist"
         assert any(module.startswith(d + "/") for d in domains), module
+
+
+def test_no_declared_directory_is_git_ignored() -> None:
+    """A folder that exists and is declared must be tracked: a broad ``.gitignore`` pattern
+    (``parts/``) once kept a whole package out of a PR. Wildcard declarations are skipped."""
+
+    paths = [d["path"] for d in DIRS if "*" not in d["path"] and (REPO_ROOT / d["path"]).is_dir()]
+    done = subprocess.run(
+        ["git", "check-ignore", "--no-index", "--stdin"],
+        input="\n".join(f"{p}/__probe__" for p in paths),
+        capture_output=True, text=True, cwd=REPO_ROOT, check=False,
+    )  # fmt: skip
+    ignored = [line.split("/__probe__")[0] for line in done.stdout.splitlines()]
+    assert not ignored, f"declared directories matched by .gitignore: {ignored}"

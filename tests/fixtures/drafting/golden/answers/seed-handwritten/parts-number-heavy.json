@@ -1,0 +1,106 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "listed",
+      "part": "p1"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks",
+      "part": "p1"
+    },
+    {
+      "id": "price",
+      "field": "rollup.price_stats@v2.close",
+      "op": "gt",
+      "value": 10,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "over $10",
+      "part": "p2"
+    },
+    {
+      "id": "month",
+      "field": "rollup.price_stats@v2.ret_20d",
+      "op": "gt",
+      "value": 0.05,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "gained over 5% in the last 20 days",
+      "part": "p3"
+    },
+    {
+      "id": "rsi",
+      "field": "rollup.momentum@v1.rsi_14",
+      "op": "lt",
+      "value": 40,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "14-day RSI under 40",
+      "part": "p4"
+    },
+    {
+      "id": "liquid",
+      "field": "rollup.price_stats@v2.adv_usd_20d",
+      "op": "gte",
+      "value": 25000000,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "$25M or more traded a day",
+      "part": "p5"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": null,
+  "parts": [
+    {
+      "id": "p1",
+      "words": "stocks",
+      "reading": "Active stocks and ADRs"
+    },
+    {
+      "id": "p2",
+      "words": "over $10",
+      "reading": "Price above $10"
+    },
+    {
+      "id": "p3",
+      "words": "gained over 5% in the last 20 days",
+      "reading": "20-day return above 6%"
+    },
+    {
+      "id": "p4",
+      "words": "14-day RSI under 40",
+      "reading": "14-day RSI below 40"
+    },
+    {
+      "id": "p5",
+      "words": "$25M or more traded a day",
+      "reading": "At least $25M traded a day"
+    }
+  ]
+}

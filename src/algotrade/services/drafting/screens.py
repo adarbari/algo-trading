@@ -15,18 +15,23 @@ accepts), ``missing`` and ``unresolved`` (``gaps.py``). The document holds only 
 existing-field rewrite of a duplicate formula and the default reading of each unresolved term
 among them); a pending formula and its criterion travel beside it and are never auto-applied,
 nor are the ``suggestions`` (protective soft / score checks the sentence did not ask for,
-``suggestions.py``).
+``suggestions.py``). A sentence the structured phrasebook entries resolve in full
+(``phrasebook/resolve.py``) is drafted with no model call (``phrasebook/shortcut.py``, ADR 0041
+amended 2026-10-12): its answer, in the model's own shape, goes through the same ``_draft`` and
+``_finished``, so the validators, the ``current`` criteria and the parts are the same; any
+doubt (a criterion dropped or refused, a field ``current`` has) falls through to the model.
 Reads the catalogue, the configs and, for the dry run of a formula, the request's session;
 writes nothing."""
 
 import json
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
 from algotrade.config.site.drafting.backlog import open_keys
+from algotrade.config.site.llm import Phrase
 from algotrade.config.site.settings import (
     load_feature_backlog,
     load_field_guide,
@@ -48,6 +53,15 @@ from algotrade.services.drafting.formulas import (
     dry_run_all,
 )
 from algotrade.services.drafting.gaps import MissingFeature, Unresolved, missing_of, unresolved_of
+from algotrade.services.drafting.parts.build import build_parts
+from algotrade.services.drafting.parts.items import items_of
+from algotrade.services.drafting.parts.model import Part, PartsStats, part_tag
+from algotrade.services.drafting.phrasebook.resolve import resolve
+from algotrade.services.drafting.phrasebook.shortcut import (
+    phrasebook_version,
+    served,
+    shortcut,
+)
 from algotrade.services.drafting.prompt import (
     PROMPT_VERSION,
     index_group,
@@ -107,12 +121,17 @@ class ScreenDraft:
     dropped: tuple[DroppedCriterion, ...]
     notes: tuple[str, ...]
     call_id: str | None = None  # the text-model call that made it (usage/llm_calls, ADR 0066)
+    stage: str = "model"  # what made it: "model", or "phrasebook" (no call, no call_id, no cost)
+    prompt_version: str = PROMPT_VERSION  # "phrasebook:<hash of the book>" for a no-model draft
     formulas: tuple[DraftFormula, ...] = ()  # B1: pending, not in the document
     formulas_dropped: tuple[DroppedFormula, ...] = ()
     missing: tuple[MissingFeature, ...] = ()  # B2 / C: asked for, not buildable here
     unresolved: tuple[Unresolved, ...] = ()  # ambiguous terms; the document has the default
     suggestions: tuple[Suggestion, ...] = ()  # soft / score checks offered, never in the document
     suggestions_dropped: tuple[DroppedSuggestion, ...] = ()
+    sentence: str = ""  # the whitespace-normalised sentence the parts' offsets count in
+    parts: tuple[Part, ...] | None = None  # explained parts; None: the model gave none
+    parts_stats: PartsStats | None = None  # how they were made (golden scoring; never served)
 
 
 def draft_screen(
@@ -133,6 +152,10 @@ def draft_screen(
         raise ConfigurationError(f"{screener_id}: the sentence is over {MAX_TEXT} characters")
     infos = feature_infos(ctx.features)
     phrasebook = load_phrasebook(ctx.configs).phrases
+    if (
+        quick := _from_phrasebook(ctx, screener_id, sentence, infos, phrasebook, current)
+    ) is not None:
+        return quick
     guide = load_field_guide(ctx.configs)
     backlog = load_feature_backlog(ctx.configs)
     system = sliced_system_prompt(
@@ -143,7 +166,7 @@ def draft_screen(
     drafted: list[tuple[str, ScreenDraft]] = []  # the answers accepted: text and its draft
 
     def check(text: str) -> None:
-        drafted.append((text, _draft(ctx, screener_id, text, infos)))
+        drafted.append((text, _draft(ctx, screener_id, text, infos, sentence, phrasebook, current)))
 
     def accept(text: str) -> None:
         """The chain's check of an answer: a draft we can use, else ``InvalidAnswerError``."""
@@ -157,15 +180,15 @@ def draft_screen(
 
     try:
         completion = model.complete(system, user, tag=tag, schema=ANSWER_SCHEMA, accept=accept)
-    except ModelUnavailableError:
+    except ModelUnavailableError as unavailable:
         # every attempt refused for a bare entry name only: keep the good criteria, show the
-        # bare ones dropped with their candidates (no completion, so no call id)
+        # bare ones dropped with their candidates (the refused attempts' call id, for their cost)
         if (
             drafted
             and drafted[-1][1].dropped
             and all("; did you mean " in d.reason for d in drafted[-1][1].dropped)
         ):
-            return _finished(ctx, drafted[-1][1], None)
+            return _finished(ctx, drafted[-1][1], unavailable.call_id)
         raise
     try:
         if not drafted or drafted[-1][0] != completion.text:  # a model that did not check
@@ -176,6 +199,46 @@ def draft_screen(
     return _finished(ctx, drafted[-1][1], completion.call_id)
 
 
+def _from_phrasebook(
+    ctx: ReadContext,
+    screener_id: str,
+    sentence: str,
+    infos: Mapping[str, Any],
+    phrasebook: Sequence[Phrase],
+    current: Mapping[str, Any] | None,
+) -> ScreenDraft | None:
+    """The draft of a sentence the structured phrasebook entries resolve in full, made without
+    the model (stage ``phrasebook``: no call id, so no ledger row to point at); ``None`` when the
+    model should answer. The entries' answer takes the model's own path (``_draft``): a field
+    outside this caller's catalogue or a criterion the validator refuses is not served from the
+    phrasebook, the model is asked."""
+    resolution = resolve(sentence, phrasebook)
+    quick = None if resolution is None else shortcut(resolution, sentence, current, phrasebook)
+    if quick is None:
+        return None
+    try:
+        draft = _draft(
+            ctx, screener_id, json.dumps(quick.answer), infos, sentence, phrasebook, current
+        )
+    except (ConfigurationError, ModelUnavailableError) as exc:  # not a draft we can serve
+        log.info("phrasebook draft refused (%s): the model answers", exc)
+        return None
+    parts = None if draft.dropped or not draft.parts else served(draft.parts, quick)
+    if parts is None:
+        return None
+    return _finished(
+        ctx,
+        replace(
+            draft,
+            parts=parts,
+            parts_stats=None,
+            stage="phrasebook",
+            prompt_version=phrasebook_version(phrasebook),
+        ),
+        None,
+    )
+
+
 def _finished(ctx: ReadContext, final: ScreenDraft, call_id: str | None) -> ScreenDraft:
     formulas, dry_notes = dry_run_all(ctx, final.formulas)  # once, on the draft we keep
     return replace(
@@ -183,10 +246,19 @@ def _finished(ctx: ReadContext, final: ScreenDraft, call_id: str | None) -> Scre
     )  # one id: every attempt of the call
 
 
-def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, Any]) -> ScreenDraft:
+def _draft(
+    ctx: ReadContext,
+    screener_id: str,
+    text: str,
+    infos: Mapping[str, Any],
+    sentence: str = "",
+    phrasebook: Sequence[Phrase] = (),
+    current: Mapping[str, Any] | None = None,
+) -> ScreenDraft:
     proposal = parse_answer(text)
     catalogue = set(infos)
-    criteria, dropped = criteria_of(proposal, catalogue)
+    tags: dict[str, str | None] = {}  # criterion id -> the part the model tagged it with
+    criteria, dropped = criteria_of(proposal, catalogue, tags)
     formulas = check_formulas(
         ctx, proposal, lambda raw, name: _criterion(raw, name, catalogue | {name})
     )
@@ -194,17 +266,23 @@ def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, An
         proposal, catalogue, lambda raw, name: _alternative(ctx, screener_id, raw, name, catalogue)
     )
     missing, missing_notes = missing_of(proposal, load_feature_backlog(ctx.configs), catalogue)
-    for criterion in formulas.rewritten.values():  # a duplicate formula: the existing field
-        criteria[_criterion_id(None, criterion["field"], len(criteria) + 1, criteria)] = criterion
+    for name, criterion in formulas.rewritten.items():  # a duplicate formula: the existing field
+        key = _criterion_id(None, criterion["field"], len(criteria) + 1, _spent(criteria, dropped))
+        criteria[key] = criterion
+        tags[key] = formulas.rewritten_parts.get(name)
     placed: dict[str, str] = {}  # unresolved term -> the id of its default in the criteria
+    spans: dict[str, str] = {}  # that criterion id -> the words of the term it stands for
     for term in unresolved:  # the reading the draft starts with
         default = term.alternatives[term.default_index].criterion
         same = [k for k, c in criteria.items() if _reading(c) == _reading(default)]
         if same:  # the model also listed it in criteria: not twice
             placed[term.term] = same[0]
             continue
-        key = _criterion_id(term.term.lower().replace(" ", "_"), default["field"], 0, criteria)
+        key = _criterion_id(
+            term.term.lower().replace(" ", "_"), default["field"], 0, _spent(criteria, dropped)
+        )
         criteria[key] = default
+        tags[key], spans[key] = term.part, term.span
         placed[term.term] = key
     document: dict[str, Any] = {
         "id": screener_id,
@@ -226,11 +304,20 @@ def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, An
     notes = (
         *notes_of(proposal), *formulas.notes, *unresolved_notes, *missing_notes, *reset_notes
     )  # fmt: skip
+    tie = proposal.get("tie_break")
+    items = items_of(
+        document["criteria"], tags, current, [(d.id, d.field) for d in dropped],
+        formulas.formulas, unresolved, missing, suggestions,
+        (part_tag(tie), document["rank"]["tie_break"]) if document.get("rank") else None, spans,
+    )  # fmt: skip
+    explained = build_parts(sentence, proposal.get("parts"), items, phrasebook)
     return ScreenDraft(
         screener_id, document, dropped, notes,
         formulas=formulas.formulas, formulas_dropped=formulas.dropped,
         missing=missing, unresolved=unresolved,
         suggestions=suggestions, suggestions_dropped=suggestions_dropped,
+        sentence=sentence, parts=explained[0] if explained else None,
+        parts_stats=explained[1] if explained else None,
     )  # fmt: skip
 
 
@@ -291,17 +378,21 @@ def parse_answer(answer: str) -> Mapping[str, Any]:
 
 
 def criteria_of(
-    proposal: Mapping[str, Any], catalogue: set[str]
+    proposal: Mapping[str, Any], catalogue: set[str], tags: dict[str, str | None] | None = None
 ) -> tuple[dict[str, dict[str, Any]], tuple[DroppedCriterion, ...]]:
     """The proposed criteria as the draft's ``criteria`` table, and the ones dropped (a field
-    outside the catalogue, an unknown op or mode, a value of the wrong shape)."""
+    outside the catalogue, an unknown op or mode, a value of the wrong shape). ``tags``, when
+    given, is filled with the part id the model gave each criterion id (explained parts); the
+    ``part`` never enters the criterion, so never the saved spec or its hash."""
     kept: dict[str, dict[str, Any]] = {}
     dropped: list[DroppedCriterion] = []
     for n, raw in enumerate(proposal["criteria"], 1):
         item = raw if isinstance(raw, Mapping) else {}
         raw_field = item.get("field")
         field_name: str = raw_field if isinstance(raw_field, str) else ""
-        cid = _criterion_id(item.get("id"), field_name, n, kept)
+        cid = _criterion_id(item.get("id"), field_name, n, _spent(kept, dropped))
+        if tags is not None:
+            tags[cid] = part_tag(item)
         why = f" ({item['why']})" if isinstance(item.get("why"), str) and item["why"] else ""
         try:
             if (shape := check_criterion(item)) is not None:
@@ -313,6 +404,12 @@ def criteria_of(
                 DroppedCriterion(cid, field_name, f"{exc}{why}", kind, f"{kind}: criteria[{n - 1}]")
             )
     return kept, tuple(dropped)
+
+
+def _spent(kept: Mapping[str, Any], dropped: Sequence[DroppedCriterion]) -> dict[str, Any]:
+    """The ids no new criterion may take: the kept ones and the dropped ones (a part's refs and
+    the Builder's rows name a criterion by id)."""
+    return {**kept, **dict.fromkeys(d.id for d in dropped)}
 
 
 def _criterion_id(given: Any, field_name: str, n: int, taken: Mapping[str, Any]) -> str:

@@ -9,7 +9,6 @@ sentence); neither ever fails the request."""
 from fastapi import APIRouter
 
 from algotrade.services.drafting import screens
-from algotrade.services.drafting.prompt import PROMPT_VERSION
 from algotrade_api import feedback
 from algotrade_api.deps import Context, Drafts, Feedback, Requests, TextModelDep
 from algotrade_api.schemas.drafting.screeners import DraftFromTextBody, ScreenDraft
@@ -36,8 +35,9 @@ def draft_from_text(
         sink, drafts, session_id, user, screener_id, body.text, result.document,
         [{"id": d.id, "field": d.field, "reason": d.reason} for d in result.dropped],
         (result.call_id,) if result.call_id else (), ctx.features,
-        PROMPT_VERSION, seq, result.notes,
+        result.prompt_version, seq, result.notes,
         [u.term for u in result.unresolved], [f.name for f in result.formulas],
+        feedback.parts_payload(result.parts), result.stage,
     )  # fmt: skip
     feedback.record_requests(
         requests, user, result.missing, body.text, result.call_id, session_id

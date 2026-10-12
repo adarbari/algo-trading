@@ -36,6 +36,7 @@ from algotrade.services.drafting.golden_run import (
     slug,
     write_recordings,
 )
+from algotrade.services.drafting.parts.model import PartsStats
 from algotrade.services.drafting.screens import ScreenDraft, criteria_of, parse_answer
 from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.model import TextModel
@@ -404,6 +405,30 @@ def test_suggestions_are_counted_per_call_and_never_change_the_score() -> None:
     assert measure(result.results)["suggestions"] == 2
 
 
+def test_the_explained_parts_measures_are_reported_apart_and_never_score_a_case() -> None:
+    stats = PartsStats(
+        items=4, by_model=3, by_fallback=1, spans=2, located=2, readings=2, readings_kept=1
+    )
+
+    def drafting(model: TextModel, sentence: str, current: Mapping[str, Any] | None = None) -> Any:
+        return replace(draft(model, sentence), parts_stats=stats)
+
+    costs = CostTap()
+    result = evaluate(plan_of([case()], repeat=1), {"paid": Scripted([GOOD], costs)}, drafting,
+                      costs, budget_usd=1.0, max_calls=5)  # fmt: skip
+    (call,) = result.results
+    assert call.passed and call.parts == stats
+    assert measure(result.results)["parts"] == {
+        "with_parts": 1, "model_share": 0.75, "located_share": 1.0, "not_understood": 0,
+        "readings_kept": 0.5,
+    }  # fmt: skip
+    plain = evaluate(plan_of([case()], repeat=1), {"paid": Scripted([GOOD], CostTap())}, draft,
+                     costs, budget_usd=1.0, max_calls=5)  # fmt: skip
+    assert measure(plain.results)["parts"]["with_parts"] == 0
+    rep = report(result, plan_of([case()], repeat=1))
+    assert any("parts: 1 drafts, model placed 75%" in line for line in report_lines(rep))
+
+
 # ------------------------------------------------------------------------ drops, pacing, 429
 
 LIMITED = ModelUnavailableError("HTTP 429: slow down")
@@ -543,3 +568,21 @@ def test_json_never_carries_a_text_value_or_a_non_string_why(tmp_path: Path) -> 
     assert h.go(RunArgs(("c1",), "all", (), 1, False, False, True, 60, 1.0, True)) == 0
     out = "".join(h.out)
     assert secret not in out and "criteria[" in out
+
+
+def test_a_draft_made_without_the_model_is_scored_and_costs_nothing() -> None:
+    """A draft the phrasebook made (``stage``, not the absence of a completion, says so) is still
+    scored, with no tokens and a zero cost, never silently failed."""
+    costs = CostTap()
+    scripted = Scripted([GOOD], costs)
+
+    def phrasebook_draft(model: TextModel, sentence: str, current: Any = None) -> ScreenDraft:
+        kept, _ = criteria_of(parse_answer(GOOD), CATALOGUE)
+        return ScreenDraft("g", {"criteria": kept}, (), (), stage="phrasebook")
+
+    result = evaluate(plan_of([case()]), {"paid": scripted}, phrasebook_draft, costs,
+                      budget_usd=1.0, max_calls=60)  # fmt: skip
+    (one,) = result.results
+    assert scripted.n == 0
+    assert (one.status, one.passed, one.model, one.cost_usd) == ("ok", True, "phrasebook", 0.0)
+    assert one.input_tokens is None and one.fields == {"f.a"}
