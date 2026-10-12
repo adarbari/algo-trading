@@ -12,6 +12,7 @@ from algotrade.services.drafting.phrasebook.check import (
     criterion_problem,
     phrase_criteria,
     problems,
+    shared_wordings,
 )
 from algotrade.services.drafting.phrasebook.resolve import is_structured
 from algotrade.services.read.context import open_context
@@ -64,3 +65,33 @@ def test_the_liquid_entry_has_three_readings_and_a_default(site) -> None:
 def test_a_criterion_the_catalogue_refuses_says_why(site, criterion, message) -> None:
     infos, _ = site
     assert message in (criterion_problem(criterion, infos) or "")
+
+
+@pytest.mark.parametrize(
+    ("criterion", "text", "message"),
+    [
+        (PhraseCriterion("feature.atr_pct", "gte", 3), "", "not a fraction"),  # 3%, written 3
+        (PhraseCriterion("feature.iv_rank", "gte", 50), "", "outside the field's range"),
+        (PhraseCriterion("rollup.momentum@v1.rsi_14", "lt", 130), "", "outside the field's range"),
+        (PhraseCriterion("feature.pct_from_high_52w", "gte", 0.1), "", "outside the field's range"),
+        (PhraseCriterion("rollup.momentum@v1.rsi_14", "lt", 0.3), "30%", "percentage points"),
+    ],
+)
+def test_an_impossible_magnitude_is_refused(site, criterion, text, message) -> None:
+    infos, _ = site
+    assert message in (criterion_problem(criterion, infos, text) or "")
+
+
+def test_a_small_percentage_points_value_passes_without_a_percent_in_the_text(site) -> None:
+    infos, _ = site
+    assert criterion_problem(PhraseCriterion("rollup.momentum@v1.rsi_14", "lt", 0.3), infos) is None
+
+
+def test_no_two_shipped_entries_share_a_stemmed_wording(site) -> None:
+    _, book = site
+    assert shared_wordings(book) == []
+
+
+def test_a_plural_of_another_entrys_wording_is_a_shared_wording() -> None:
+    a, b = Phrase(("covered call",), ("f",), "x"), Phrase(("Covered  calls",), ("f",), "y")
+    assert len(shared_wordings([a, b])) == 1

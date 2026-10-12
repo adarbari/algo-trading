@@ -75,3 +75,50 @@ def test_structured_matches_are_the_structured_entries_the_sentence_says() -> No
     said = structured_matches("liquid stocks that are oversold, plus momentum", BOOK)
     assert [p.say[0] for p in said] == ["oversold", "liquid", "stocks"]
     assert structured_matches("momentum", BOOK) == ()  # a free-text entry
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "uptrend stocks without earnings this week",  # "without" flips "earnings this week"
+        "less volatile stocks",  # a comparative: not "atr_pct gte 0.03"
+        "small cap or large cap",  # "or": both would apply and select nothing
+        "stocks not in an uptrend",  # negation
+        "non optionable ETFs",
+        "uptrend stocks except oversold ones",
+        "more volatile stocks",
+        "small caps excluding ETFs",
+        "oversold or in an uptrend",
+        "stocks never in a downtrend",
+    ],
+)
+def test_negation_comparatives_and_or_are_never_filler(sentence: str) -> None:
+    assert resolves_fully(sentence, BOOK) is None
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "oversold and overbought stocks",  # rsi lt 30 and gt 70: no value
+        "large caps that are small caps",
+        "uptrend and downtrend stocks",
+        "ETFs and stocks",  # two disjoint security types
+        "earnings soon and avoid earnings",
+    ],
+)
+def test_criteria_that_cannot_both_hold_are_not_resolved(sentence: str) -> None:
+    assert structured_matches(sentence, BOOK)
+    assert resolves_fully(sentence, BOOK) is None
+
+
+def test_a_flipping_word_a_wording_covers_does_not_block() -> None:
+    got = fields("stocks with no earnings coming")  # "no" is part of the entry's own wording
+    assert ("rollup.earnings@v1.days_to_earnings", "gt", 10) in got
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    ["oversold then breakout", "oversold followed by a breakout", "oversold after a breakout"],
+)
+def test_a_sequence_is_not_two_simultaneous_gates(sentence: str) -> None:
+    assert resolves_fully(sentence, BOOK) is None
