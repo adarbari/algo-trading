@@ -5,7 +5,7 @@
  * design system never imports the router). One row that scrolls sideways when the sections do
  * not fit, the current link scrolled into view. For switching views inside a page use Tabs.
  */
-import { useEffect, useRef, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, type ReactNode } from 'react';
 
 import styles from './NavTabs.module.css';
 
@@ -55,7 +55,7 @@ export function NavTabs({
       {items.map((item) => {
         const active = item.href === activeHref;
         return (
-          <span key={item.href} className={styles.item}>
+          <Fragment key={item.href}>
             {renderLink({
               href: item.href,
               className: styles.link ?? '',
@@ -63,7 +63,7 @@ export function NavTabs({
               'data-active': active || undefined,
               children: item.label,
             })}
-          </span>
+          </Fragment>
         );
       })}
     </nav>
