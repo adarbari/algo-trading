@@ -168,7 +168,9 @@ class TableStore(Protocol):
     def sweep_orphans(self, table: str, session_date: date) -> int:
         """Delete the data files of one partition that no run of its index names (what a crash
         between rewriting the index and deleting a file leaves); a pending run's files are never
-        touched. Raises ``PartitionBusyError`` when a pending run has written to the partition.
+        touched, nor a file younger than a minute (a direct write about to be indexed). Raises
+        ``PartitionBusyError`` when a pending run has written to the partition. The caller must
+        hold the table's writers lock (``storage.locks.FEEDBACK_WRITERS``).
         -> files deleted (a backend that keeps no loose files: 0)."""
         ...
 

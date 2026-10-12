@@ -3,6 +3,7 @@ show it at once, the superseded Parquet files are gone, a dry run writes nothing
 changes nothing, and the audit line holds counts only (ADR 0066)."""
 
 import json
+import os
 import threading
 from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime
@@ -555,6 +556,7 @@ def test_a_file_no_index_names_is_swept_by_the_next_run_and_referenced_ones_stay
     young = next((tmp_path / "data").rglob("date=2026-09-02/run=drafting_feedback*.parquet"))
     ghost = young.parent / "run=drafting_feedback-ghost.parquet"
     ghost.write_bytes(young.read_bytes())  # text left on disk by a crash inside a purge
+    os.utime(ghost, (0, 0))
     named = {p.name for p in young.parent.glob("run=*.parquet")} - {ghost.name}
     done = retention.retain(local, NOW, apply=True)
     assert done.orphans == 1 and not ghost.exists()

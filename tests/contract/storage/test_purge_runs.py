@@ -3,6 +3,7 @@ every backend; a run not named is never touched, a busy partition raises and los
 (ADR 0066: an erase must remove the data, not only hide it behind a newer run)."""
 
 import contextlib
+import os
 import threading
 from collections.abc import Callable, Iterator
 from datetime import date, timedelta
@@ -11,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from algotrade.storage.backends import local_index
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.interfaces import Backend, PartitionBusyError
@@ -119,10 +121,14 @@ def test_sweep_removes_only_files_no_index_entry_names(backend: Backend, tmp_pat
     put(backend, "r2", "EQ:B", 1)
     if isinstance(backend, LocalBackend):
         keep = next((tmp_path / "data").rglob("run=r1.parquet"))
-        (keep.parent / "run=ghost.parquet").write_bytes(keep.read_bytes())  # a crashed purge
-    assert backend.tables.sweep_orphans(TABLE, DAY) == (
-        1 if isinstance(backend, LocalBackend) else 0
-    )
+        ghost = keep.parent / "run=ghost.parquet"
+        ghost.write_bytes(keep.read_bytes())  # a crashed purge
+        os.utime(ghost, (0, 0))
+        young = keep.parent / "run=young.parquet"
+        young.write_bytes(keep.read_bytes())  # maybe a direct write about to be indexed
+        assert backend.tables.sweep_orphans(TABLE, DAY) == 1 and young.exists()
+        young.unlink()
+    assert backend.tables.sweep_orphans(TABLE, DAY) == 0  # the ghost went in the first pass
     assert backend.tables.sweep_orphans(TABLE, DAY) == 0
     assert backend.tables.partition_runs(TABLE, DAY) == ["r1", "r2"] and ids(backend) == [
         "EQ:A",
@@ -140,3 +146,27 @@ def test_sweep_leaves_a_pending_runs_files_and_raises_when_busy(backend: Backend
         backend.tables.sweep_orphans(TABLE, DAY)
     backend.tables.commit_run("busy", T0 + timedelta(days=2))
     assert ids(backend) == ["EQ:A", "EQ:Z"]
+
+
+def test_a_run_staged_between_the_busy_check_and_the_glob_is_not_deleted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local = LocalBackend(tmp_path / "data")
+    put(local, "r1", "EQ:A", 0)
+    real = local_index.read_index
+    staged: list[str] = []
+
+    def stage_then_read(directory: Path) -> object:
+        if not staged:  # after the busy check, before the glob
+            staged.append("late")
+            frame = stamped(rows_of("EQ:Z"), DAY, "late", T0 + timedelta(hours=5))
+            local.tables.write(TABLE, DAY, "late", frame, pending=True)
+            for p in directory.glob("run=late*.parquet"):
+                os.utime(p, (0, 0))  # old enough: only the pending journal protects it
+        return real(directory)
+
+    monkeypatch.setattr(local_index, "read_index", stage_then_read)
+    assert local.tables.sweep_orphans(TABLE, DAY) == 0
+    monkeypatch.setattr(local_index, "read_index", real)
+    local.tables.commit_run("late", T0 + timedelta(days=2))
+    assert ids(local) == ["EQ:A", "EQ:Z"]

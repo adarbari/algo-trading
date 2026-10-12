@@ -28,6 +28,7 @@ import secrets
 import shutil
 import tempfile
 import threading
+import time
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -43,6 +44,7 @@ from algotrade.storage.tables.interfaces import PartitionBusyError
 INDEX = "_runs.json"
 INDEX_LOCK = ".runs.lock"
 TXN = "_txn"
+ORPHAN_GRACE_S = 60.0  # a loose file younger than this may be a write about to be indexed
 
 
 def atomic_write(path: Path, data: bytes) -> None:
@@ -327,7 +329,15 @@ class Commits:
                     for version in (entry, entry.prev):
                         if version is not None:
                             named.add(run_file(run, version))
-                orphans = [p for p in directory.glob("run=*.parquet") if p.name not in named]
+                found = [p for p in directory.glob("run=*.parquet") if p.name not in named]
+                staged = {  # read after the glob: a run staged since the busy check is spared
+                    item["file"]
+                    for run_id in self.pending_runs()
+                    for item in self.journal(run_id).values()
+                    if self._dir(item["table"], item["date"]) == directory
+                }
+                cutoff = time.time() - ORPHAN_GRACE_S  # a direct write puts its file first
+                orphans = [p for p in found if p.name not in staged and p.stat().st_mtime < cutoff]
                 for path in orphans:
                     path.unlink(missing_ok=True)
             return len(orphans)
