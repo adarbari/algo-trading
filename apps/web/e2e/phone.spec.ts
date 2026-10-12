@@ -329,6 +329,16 @@ test('Describe it: the review fits the screen and the formula dialog fills it', 
   const row = await pending.boundingBox();
   expect((row?.x ?? 0) + (row?.width ?? 0)).toBeLessThanOrEqual(width);
   await expectAccessible(page);
+  // Retype opens in the card and fits the screen, Redraft and Cancel in reach
+  const card = page.getByRole('article', { name: 'and above 50%' });
+  await card.getByRole('button', { name: 'Retype this part' }).tap();
+  await expect(card.getByRole('textbox', { name: 'Retype this part' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Redraft' })).toBeInViewport();
+  await expect(card.getByRole('button', { name: 'Cancel' })).toBeInViewport();
+  expect(await pageWidth()).toBeLessThanOrEqual(width);
+  await expectAccessible(page);
+  await card.getByRole('button', { name: 'Cancel' }).tap();
+  await expect(card.getByRole('button', { name: 'Retype this part' })).toBeFocused();
   await page.getByRole('button', { name: 'Review and add' }).first().tap();
   const dialog = page.getByRole('dialog', { name: 'Add formula feature' });
   await expect(dialog).toBeVisible();

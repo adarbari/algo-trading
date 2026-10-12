@@ -1,4 +1,4 @@
-import { Text } from '@algotrade/ui';
+import { Button, Text } from '@algotrade/ui';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
@@ -181,6 +181,39 @@ describe('DescribeForm', () => {
     expect(onSession).not.toHaveBeenCalled();
     expect(screen.queryByText(/review of/)).not.toBeInTheDocument();
     expect(screen.queryByText('The model could not answer')).not.toBeInTheDocument();
+  });
+
+  it('replaceAnswer swaps the answer the review shows, keeps the same review and reports its session', async () => {
+    POST.mockResolvedValue({ data: { ...ANSWER, draft_session_id: 'sess-1' }, ...OK });
+    const onSession = vi.fn();
+    const serials: number[] = [];
+    render(
+      <TestQueryProvider>
+        <DescribeForm
+          screenerId="mine"
+          document={DOCUMENT}
+          onDraft={vi.fn()}
+          onSession={onSession}
+          renderReview={({ answer, serial, replaceAnswer }): ReactNode => {
+            serials.push(serial);
+            return (
+              <Button
+                onClick={() => {
+                  replaceAnswer({ ...answer, notes: ['redrafted'], draft_session_id: 'sess-1' });
+                }}
+              >
+                {`notes ${answer.notes.join('|')}`}
+              </Button>
+            );
+          }}
+        />
+      </TestQueryProvider>,
+    );
+    await type('price over 5{Enter}');
+    await userEvent.click(await screen.findByRole('button', { name: /^notes no IV rank/ }));
+    expect(screen.getByRole('button', { name: 'notes redrafted' })).toBeInTheDocument();
+    expect(new Set(serials).size).toBe(1);
+    expect(onSession).toHaveBeenLastCalledWith('sess-1');
   });
 
   describe('when the session ends (finalised, discarded)', () => {

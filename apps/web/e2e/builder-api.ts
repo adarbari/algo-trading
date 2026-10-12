@@ -473,10 +473,46 @@ const PARTS = [
 export interface DescribeMock {
   /** The body of every draft-from-text POST. */
   sentences: Json[];
+  /** The body of every draft-part POST (a retyped part). */
+  redrafts: Json[];
 }
 
+/** What the server answers for the retyped second part: its words and its row changed. */
+export const RETYPED_WORDS = 'and above 60%';
+
 export async function mockDescribeApi(page: Page): Promise<DescribeMock> {
-  const mock: DescribeMock = { sentences: [] };
+  const mock: DescribeMock = { sentences: [], redrafts: [] };
+  await page.route('**/api/screeners/*/draft-part', async (route: Route) => {
+    const body = (route.request().postDataJSON() ?? {}) as Json;
+    mock.redrafts.push(body);
+    const id = decodeURIComponent(/screeners\/([^/]+)\//.exec(route.request().url())?.[1] ?? '');
+    await route.fulfill({
+      status: 200,
+      json: {
+        replaced_part_id: 'p2',
+        draft: {
+          screener_id: id,
+          document: {
+            id,
+            criteria: {
+              iv30: { field: 'rollup.iv30@v1.iv30', op: 'gte', value: 0.6, mode: 'hard' },
+            },
+          },
+          dropped: [],
+          notes: [],
+          formulas: [FORMULA],
+          suggestions: [SUGGESTION],
+          sentence: body['sentence'],
+          parts: PARTS.map((part) =>
+            part.id === 'p2'
+              ? { ...part, words: RETYPED_WORDS, reading: 'implied volatility at least 0.6' }
+              : part,
+          ),
+          draft_session_id: 'sess-e2e',
+        },
+      },
+    });
+  });
   await page.route('**/api/screeners/*/draft-from-text', async (route: Route) => {
     const body = (route.request().postDataJSON() ?? {}) as Json;
     mock.sentences.push(body);

@@ -157,7 +157,16 @@ fixed locally (another reading, edit rows) or by retyping its words (one scoped 
   holds (the answer must carry the other parts' pending items, which the server keeps nowhere) and the answer is
   `{draft, replaced_part_id}`.
 - PR C1, web: `PartCard` and the local fixes (after A).
-- PR C2, web: retype a part (after B); asks before replacing hand-edited rows.
+- PR C2, web: retype a part (built, after B and C1; `widgets/describe-screen/ui/RetypePart.tsx`,
+  `features/screener-describe/api/redraft.ts`): a Retype button on each card with words turns them into
+  an input (200 characters), Redraft sends the draft the browser holds with the Builder's document;
+  that card alone shows the wait, the others stay usable but cannot start a retype; a part the trader
+  edited asks first ("This replaces your edits to this part."); the merged draft returned replaces
+  the answer shown and the working document, the other parts' formula decisions, picks and edited
+  marks stay; a failure is an inline message with Try again, the daily limit (429 code
+  `part_redraft_limit`) its own state with no retry (the other cards' Retype turn off), and an answer
+  that arrives after the trader changed the screen is dropped as stale (Try again). Guide terms
+  `describe_part_retype`, `describe_part_limit`, `describe_part_stale`.
 
 ## PR order (state 2026-10-12)
 

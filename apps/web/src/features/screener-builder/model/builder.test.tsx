@@ -52,6 +52,7 @@ const GAP = FORMULA('draft_gap', {
   mode: 'hard',
 });
 const BARE = FORMULA('draft_bare', null);
+const OTHER = FORMULA('draft_other', null);
 const PREVIEW = { rows: [], summary: {}, funnel: [], decisions: {}, coverage: {}, total: 0 };
 const V1 = [{ version: 1, document: { id: 'my', version: 1 } }];
 
@@ -156,6 +157,13 @@ function Probe() {
         }}
       >
         propose
+      </Button>
+      <Button
+        onClick={() => {
+          b.replaceFormulas([BARE, OTHER], ['draft_gap']);
+        }}
+      >
+        redraft gap part
       </Button>
       <Button
         onClick={() => {
@@ -436,6 +444,15 @@ describe('ScreenerBuilderProvider', () => {
       expect(screen.getByText('pending draft_bare reviewing none')).toBeInTheDocument();
       expect(screen.getByText('criteria iv30=0.5,close=5')).toBeInTheDocument();
       expect(screen.getByText('choices formula_skipped:draft_gap:')).toBeInTheDocument();
+    });
+
+    it('redrafting one part swaps its proposals and keeps what was decided on the others', async () => {
+      await open();
+      await userEvent.click(screen.getByRole('button', { name: 'accept bare' }));
+      await userEvent.click(screen.getByRole('button', { name: 'review gap' }));
+      await userEvent.click(screen.getByRole('button', { name: 'redraft gap part' }));
+      expect(screen.getByText('pending draft_other reviewing none')).toBeInTheDocument();
+      expect(screen.getByText('formulas {"draft_bare":"accepted"}')).toBeInTheDocument();
     });
 
     it('a new answer replaces the proposals and forgets the decisions', async () => {

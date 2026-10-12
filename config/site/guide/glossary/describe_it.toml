@@ -160,6 +160,41 @@ Add puts it in the screen as a new row you can edit. Skip leaves it out. Nothing
 see_also = ["describe_applied", "describe_part_reading"]
 next = "Add a suggestion to try it in the preview, or Skip it to keep the screen as you wrote it."
 
+[[term]]
+id = "describe_part_retype"
+term = "Describe it: Retype this part"
+short = "Replace the words of one part of your sentence and have the draft redo only that part."
+body = """
+Retype changes the words of one card and asks the model again for that card alone. The other parts, and the rows you set for them, stay as they are. The answer takes a few seconds, and each retype counts against a daily limit.
+If you edited this part's rows by hand, the app asks first, because the new answer replaces them. When another part already sets the same field, that part wins and the new row is left out with a reason.
+Retyped words are kept under the same retention rule as the sentence you first typed.
+Do not retype to change one number: edit the row, or pick another reading, which needs no model call.
+"""
+see_also = ["describe_part_reading", "describe_part_edited", "describe_part_limit"]
+next = "Type the new words and choose Redraft, or Cancel to keep the part as it is."
+
+[[term]]
+id = "describe_part_limit"
+term = "Describe it: Daily limit of part redrafts reached"
+short = "You have used today's part redrafts; retyping a part works again when the exchange day turns."
+body = """
+Each retype is one model call, so each person gets a fixed number a day. Only a retype that returned a draft counts: a failed one gives its place back. The day is the exchange's calendar day, not midnight where you are.
+Everything that needs no model call still works: pick another reading of a term, edit a row, add or skip a suggestion.
+"""
+see_also = ["describe_part_retype", "describe_suggested"]
+next = "Fix the part by hand with its rows or readings, or retype again after the exchange day turns."
+
+[[term]]
+id = "describe_part_stale"
+term = "Describe it: Your screen changed while this redrafted"
+short = "You changed the screen while the model redrafted a part, so its answer was not applied."
+body = """
+The model's answer was built from the screen as it was when you chose Redraft. Applying it would have undone the changes you made since, so the app drops it and keeps your screen. The retype still counts against your daily limit.
+Wait for a redraft to finish before you edit rows, to avoid this.
+"""
+see_also = ["describe_part_retype", "describe_part_limit"]
+next = "Choose Try again to redraft the part from the screen as it is now, or Cancel to keep it as it is."
+
 # ---------------------------------------------------------------- how hard a missing field is to add
 
 [[term]]

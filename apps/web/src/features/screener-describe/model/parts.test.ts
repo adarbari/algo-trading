@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { partEdited, partsOf, suggestionsOf, type DraftPart } from './parts';
+import { baselineAfter, partEdited, partsOf, suggestionsOf, type DraftPart } from './parts';
 import type { ScreenDraft } from './review';
 
 const answer = (extra: Partial<ScreenDraft>): ScreenDraft => ({
@@ -103,5 +103,38 @@ describe('partEdited', () => {
   it('is false for a part with no criteria, and for an answer with no original rows', () => {
     expect(partEdited({ ...PART, criteria: [] }, original, {}, terms)).toBe(false);
     expect(partEdited(PART, undefined, {}, undefined)).toBe(false);
+  });
+});
+
+describe('baselineAfter', () => {
+  const was = { dv: { field: 'f.dv', value: 50 }, opt: { field: 'f.o', value: 1 } };
+  const redrafted = (criteria: Record<string, unknown>) => answer({ document: { criteria } });
+
+  it('takes the redrafted part rows from the new answer and every other row as first shown', () => {
+    const next = redrafted({
+      dv: { field: 'f.dv', value: 10 }, // the trader had edited this one (other part)
+      opt: { field: 'f.o', value: 2 }, // the redrafted part
+      fresh: { field: 'f.n' },
+    });
+    const baseline = baselineAfter(was, next, { ...PART, criteria: ['opt'] });
+    expect(baseline).toEqual({
+      dv: { field: 'f.dv', value: 50 },
+      opt: { field: 'f.o', value: 2 },
+      fresh: { field: 'f.n' },
+    });
+  });
+
+  it('keeps an edit of another part visible against the new answer', () => {
+    const next = redrafted({ dv: { field: 'f.dv', value: 10 }, opt: { field: 'f.o', value: 2 } });
+    const baseline = baselineAfter(was, next, { ...PART, criteria: ['opt'] });
+    const other = { ...PART, id: 'p2', criteria: ['dv'], unresolved: [] };
+    expect(partEdited(other, baseline, next.document['criteria'], undefined)).toBe(true);
+    const redone = { ...PART, criteria: ['opt'], unresolved: [] };
+    expect(partEdited(redone, baseline, next.document['criteria'], undefined)).toBe(false);
+  });
+
+  it('is the new answer rows when the old baseline is unknown', () => {
+    const next = redrafted({ a: { field: 'f.a' } });
+    expect(baselineAfter(undefined, next, PART)).toEqual({ a: { field: 'f.a' } });
   });
 });

@@ -61,3 +61,15 @@ export function partEdited(
     return !same(without(tableOf(was), readingKeys), without(tableOf(now), readingKeys));
   });
 }
+
+/**
+ * The rows `partEdited` compares against once `replaced` was redrafted and `next` is the answer:
+ * the redrafted part's rows (and any new ones) as `next` has them, every other row as the trader
+ * first saw it, so an edit to another part still shows (and still asks before it is replaced).
+ */
+export function baselineAfter(before: unknown, next: ScreenDraft, replaced: DraftPart): unknown {
+  return {
+    ...tableOf(next.document['criteria']),
+    ...without(tableOf(before), new Set(replaced.criteria)),
+  };
+}
