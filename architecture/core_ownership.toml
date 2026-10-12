@@ -26,10 +26,6 @@ owner = [
     "src/algotrade/features/expressions/feature_set.py",
     "src/algotrade/features/site.py",
 ]
-allowed = [
-    "src/algotrade/services/feedback/formulas/payload.py",  # types the saved feature to fingerprint it
-    "src/algotrade/services/read/formulas/accepted.py",  # the site features a formula may duplicate
-]
 section = "docs/adr/0023-feature-store.md#step-3-expression-features-virtual-by-default"
 detect = [
     { call = "load_features" },

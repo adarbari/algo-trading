@@ -18,14 +18,16 @@ import logging
 import threading
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 
+from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.services.authoring.scope import ConfigWriter
 from algotrade.services.feedback import events
 from algotrade.services.feedback.diff import criteria_diff, criteria_snapshot, document_diff
 from algotrade.services.feedback.events import FeedbackSink, NoFeedback
 from algotrade.services.feedback.formulas.payload import accepted_payload
+from algotrade.services.feedback.formulas.saved import saved_features
 from algotrade.services.feedback.recorder import open_recorder
 from algotrade.services.feedback.request_recorder import open_request_recorder
 from algotrade.services.feedback.requests import MissingLike, record_missing
@@ -54,9 +56,10 @@ class Remembered:
     seq: int = 1  # the ordinal of the latest draft request of the session
     closed: bool = False  # finalised: a later description starts a new session
     terms: frozenset[str] = frozenset()  # the answer's unresolved terms: ``choice_made`` subjects
-    formulas: frozenset[str] = (
-        frozenset()
-    )  # its proposed formula names: accepted / skipped subjects
+    formulas: Mapping[str, str] = field(
+        default_factory=dict
+    )  # its proposed formula names -> fingerprints: accepted / skipped subjects
+    accepted_full: frozenset[str] = frozenset()  # event ids already recorded with the formula
 
 
 class DraftMemory:
@@ -201,7 +204,7 @@ def record_returned(
     seq: int = 1,
     notes: Sequence[str] = (),
     terms: Sequence[str] = (),
-    formulas: Sequence[str] = (),
+    formulas: Mapping[str, str] | None = None,
 ) -> None:
     """``draft_returned`` (the model's criteria after validation, what it dropped and its
     notes) and the draft remembered for the save that follows, with the answer's unresolved
@@ -214,7 +217,7 @@ def record_returned(
             Remembered(
                 user, screener_id, copy.deepcopy(dict(document)), draft_hash, sentence,
                 tuple(call_ids), version, prompt_version, seq=seq,
-                terms=frozenset(terms), formulas=frozenset(formulas),
+                terms=frozenset(terms), formulas=dict(formulas or {}),
             ),
         )  # fmt: skip
         raw = document.get("criteria")
@@ -346,7 +349,7 @@ def record_choices(
         draft = memory.get(session_id, user, screener_id)
         if draft is None:
             return
-        saved: dict[str, Any] | None = None  # the user's feature documents, read once
+        saved: list[FeatureDefinition] | None = None  # the user's features, read once
         for choice in choices:
             try:
                 known = draft.terms if choice.event == events.CHOICE_MADE else draft.formulas
@@ -358,7 +361,9 @@ def record_choices(
                 if choice.event == events.FORMULA_ACCEPTED and feature and writer is not None:
                     if saved is None:
                         saved = _saved_features(writer, user)
-                    payload = accepted_payload(choice.subject, user, feature, saved)
+                    payload = accepted_payload(
+                        choice.subject, feature, saved, draft.formulas.get(choice.subject)
+                    )
                 row = events.row_of(
                     choice.event, session_id, user, KIND, screener_id,
                     call_ids=draft.call_ids, catalogue_version=draft.catalogue_version,
@@ -368,20 +373,26 @@ def record_choices(
                 )  # fmt: skip
                 key = f"{session_id}|{choice.event}|{choice.subject}|{picked}"
                 row["event_id"] = hashlib.sha256(key.encode()).hexdigest()[:32]
+                full = "fingerprint" in payload
+                if not full and row["event_id"] in draft.accepted_full:
+                    continue  # a resend that cannot carry the formula must not replace the row
                 sink.submit(row)
+                if full:
+                    draft = replace(draft, accepted_full=draft.accepted_full | {row["event_id"]})
+                    memory.put(session_id, draft)
             except Exception:
                 log.exception("%s not recorded", choice.event)
     except Exception:
         log.exception("choices not recorded")
 
 
-def _saved_features(writer: ConfigWriter, user: str) -> dict[str, Any]:
-    """``user``'s own feature documents by theme; empty when they cannot be read."""
+def _saved_features(writer: ConfigWriter, user: str) -> list[FeatureDefinition]:
+    """``user``'s own expression features; empty when they cannot be read."""
     try:
-        return {t: writer.load(user, "features", t) for t in writer.names(user, "features")}
+        return saved_features(writer, user)
     except Exception:
         log.exception("the user's features were not read for the accepted formula")
-        return {}
+        return []
 
 
 def record_edge_revised(

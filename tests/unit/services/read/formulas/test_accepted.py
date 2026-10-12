@@ -24,9 +24,9 @@ from algotrade.services.read.formulas.accepted import (
 )
 from algotrade.services.read.users.viewer import Viewer
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.feedback_writer import FeedbackWriter
 from algotrade.storage.tables.readers import StoreReader
+from tests.helpers.api_store import site_only_store
 
 TODAY = date(2026, 10, 8)
 NOON = datetime(2026, 10, 8, 16, tzinfo=UTC)
@@ -55,11 +55,30 @@ BACKLOG = {
 }  # fmt: skip
 
 
+class Overlay:
+    """The repo's site presets with this test's backlog and one extra site feature theme on top
+    (the catalogue the loader builds needs every real group)."""
+
+    def __init__(self, docs: dict[tuple[str, str, str], dict[str, Any]]) -> None:
+        self._base = site_only_store()
+        self._docs = docs
+
+    def load(self, scope: str, kind: str, name: str) -> Any:
+        return self._docs.get((scope, kind, name)) or self._base.load(scope, kind, name)
+
+    def names(self, scope: str, kind: str) -> list[str]:
+        extra = [n for (s, k, n) in self._docs if (s, k) == (scope, kind)]
+        return sorted({*self._base.names(scope, kind), *extra})
+
+    def overrides(self, name: str) -> list[dict[str, str]]:
+        return self._base.overrides(name)
+
+
 def accepted(
     user: str, feature: str, expr: str, days_ago: int = 0, event_id: str | None = None
 ) -> dict[str, Any]:
-    docs = {"builder": {feature: section(expr)}}
-    payload = accepted_payload("draft_" + feature, user, feature, docs)
+    docs = list(feature_definitions({"builder": {feature: section(expr)}}, user))
+    payload = accepted_payload("draft_" + feature, feature, docs, fingerprint(docs[0]).hash)
     row = row_of(
         "formula_accepted", "s-" + user, user, "screen", "s",
         at=NOON - timedelta(days=days_ago), payload=payload,
@@ -78,7 +97,7 @@ def stores(rows: list[dict[str, Any]]) -> Stores:
     recorder.close()
     # the loader reads only the reader and the configs: not the whole catalogue (a site document
     # of its own would replace the real one the catalogue needs)
-    ctx = SimpleNamespace(reader=StoreReader(backend), configs=MemoryConfigStore(BACKLOG))
+    ctx = SimpleNamespace(reader=StoreReader(backend), configs=Overlay(BACKLOG))
     return cast(Stores, ctx)
 
 

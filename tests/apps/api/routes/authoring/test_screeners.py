@@ -9,7 +9,9 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from algotrade.config.site.features.definitions import feature_definitions
 from algotrade.core.model.completion import Completion
+from algotrade.features.expressions.fingerprint import fingerprint
 
 ALICE = {"X-Act-For": "alice"}  # an admin writing for another declared user
 
@@ -209,7 +211,7 @@ def _describe_it(c: TestClient) -> tuple[Keep, str]:
         replace(
             kept,
             terms=frozenset({"liquid"}),
-            formulas=frozenset({"draft_near_high", "draft_other"}),
+            formulas={"draft_near_high": FINGERPRINT, "draft_other": "ffffffffffff"},
         ),
     )
     return sink, session
@@ -402,6 +404,13 @@ FEATURE = {
 }
 
 
+FINGERPRINT = fingerprint(
+    feature_definitions(
+        {"t": {FEATURE["name"]: {k: v for k, v in FEATURE.items() if k != "name"}}}, "local"
+    )[0]
+).hash  # what the canned answer "proposed" for draft_near_high
+
+
 def test_an_accepted_formula_carries_the_saved_features_formula_and_fingerprint(
     writer_client: TestClient,
 ) -> None:
@@ -439,3 +448,39 @@ def test_an_accepted_formula_whose_feature_is_missing_records_the_subject_only(
     c.put("/screeners/mine/draft", json=body | {"choices": [skipped]})
     (row,) = [r for r in sink.rows if r["event"] == "formula_skipped"]
     assert json.loads(row["payload"]) == {"subject": "draft_other", "picked": None}
+
+
+def test_a_feature_that_is_not_the_proposed_formula_records_the_subject_only(
+    writer_client: TestClient,
+) -> None:
+    c = writer_client
+    sink, session = _describe_it(c)
+    other = FEATURE | {"name": "other_pct", "expr": "price_stats.hv20 * 7"}
+    assert c.post("/features/user", json=other).status_code == 201
+    wrong = {"event": "formula_accepted", "subject": "draft_near_high", "feature": "other_pct"}
+    body = {"document": OWN, "draft_session_id": session, "choices": [wrong]}
+    assert c.put("/screeners/mine/draft", json=body).status_code == 200
+    (row,) = [r for r in sink.rows if r["event"] == "formula_accepted"]
+    assert json.loads(row["payload"]) == {"subject": "draft_near_high", "picked": None}
+
+
+def test_a_choice_resent_at_finalise_keeps_the_formula_the_save_recorded(
+    writer_client: TestClient,
+) -> None:
+    c = writer_client
+    sink, session = _describe_it(c)
+    assert c.post("/features/user", json=FEATURE).status_code == 201
+    accepted = {
+        "event": "formula_accepted",
+        "subject": "draft_near_high",
+        "feature": "near_high_pct",
+    }
+    c.put(
+        "/screeners/mine/draft",
+        json={"document": OWN, "draft_session_id": session, "choices": [accepted]},
+    )
+    bare = {"event": "formula_accepted", "subject": "draft_near_high"}  # the client lost the name
+    c.post("/screeners/mine/finalise", json={"draft_session_id": session, "choices": [bare]})
+    rows = [r for r in sink.rows if r["event"] == "formula_accepted"]
+    assert len(rows) == 1  # a subject-only resend (keep="last" on event_id) would replace the row
+    assert json.loads(rows[0]["payload"])["fingerprint"] == FINGERPRINT

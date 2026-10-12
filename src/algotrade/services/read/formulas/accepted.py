@@ -21,12 +21,13 @@ from typing import Any
 import pandas as pd
 
 from algotrade.config.site.drafting.backlog import BacklogItem
-from algotrade.config.site.settings import load_feature_backlog, load_features
+from algotrade.config.site.settings import load_feature_backlog
 from algotrade.config.site.users import Role
-from algotrade.core.model.errors import PermissionDeniedError
+from algotrade.core.model.errors import ConfigurationError, PermissionDeniedError
 from algotrade.core.time.calendar import exchange_date
 from algotrade.data.feedback import read_drafting_events
-from algotrade.features.expressions.fingerprint import Fingerprint, find_duplicate
+from algotrade.features.expressions.fingerprint import fingerprint
+from algotrade.features.site import site_features
 from algotrade.services.feedback.events import FORMULA_ACCEPTED
 from algotrade.services.read.context import Stores
 from algotrade.services.read.users.viewer import Viewer
@@ -95,6 +96,20 @@ def _backlog_key(names: set[str], duplicate_of: str, items: tuple[BacklogItem, .
     return ""
 
 
+def _site_by_fingerprint(ctx: Stores) -> dict[str, str]:
+    """The site's expression features by fingerprint (the first of equal ones), fingerprinted
+    once; one that does not parse is skipped."""
+    found: dict[str, str] = {}
+    for expression in site_features(ctx.configs).expressions.values():
+        if expression.scope != "site":
+            continue
+        try:
+            found.setdefault(fingerprint(expression.definition).hash, expression.definition.name)
+        except ConfigurationError:
+            continue
+    return found
+
+
 def load_accepted_formulas(
     ctx: Stores, viewer: Viewer, since: date, today: date | None = None
 ) -> tuple[AcceptedFormula, ...]:
@@ -117,18 +132,18 @@ def load_accepted_formulas(
         groups[str(payload["fingerprint"])].append(
             (payload, str(row["event_id"]), str(row["user"]), _day(row["session_date"]))
         )
-    site = load_features(ctx.configs)
+    site = _site_by_fingerprint(ctx)
     items = load_feature_backlog(ctx.configs).items
     out = []
-    for fingerprint, rows in groups.items():
+    for key, rows in groups.items():
         newest = rows[-1][0]
         canonical = str(newest.get("canonical") or "")
-        duplicate = find_duplicate(Fingerprint(fingerprint, canonical), site, []) or ""
+        duplicate = site.get(key, "")
         names = {str(p["feature"]) for p, *_ in rows if p.get("feature")}
         days = [d for *_, d in rows]
         out.append(
             AcceptedFormula(
-                fingerprint=fingerprint,
+                fingerprint=key,
                 canonical=canonical,
                 expression=str(newest.get("expression") or ""),
                 unit=str(newest.get("unit") or ""),
