@@ -186,6 +186,49 @@ describe('DescribeScreen', () => {
     expect(field('rollup.nope@v1.y')).toBeNull();
   });
 
+  it('a retyped part swaps the answer and loads the merged draft, keeping the other parts decisions and notes', async () => {
+    const builder = {
+      status: 'ready',
+      id: 'mine',
+      document: { id: 'mine' },
+      loadDocument: vi.fn(),
+      replaceFormulas: vi.fn(),
+      addNotes: vi.fn(),
+      removeNote: vi.fn(),
+    };
+    state.builder = builder;
+    render(<DescribeScreen />);
+    const replaceAnswer = vi.fn();
+    const renderReview = probe.props['renderReview'] as (r: unknown) => ReactNode;
+    render(<>{renderReview({ answer: {}, text: 's', serial: 1, replaceAnswer })}</>);
+    await screen.findByText('review');
+    const redrafted = review.props['onRedrafted'] as (...args: unknown[]) => void;
+    const prior = {
+      missing: [
+        { key: 'moat', description: 'old gap' },
+        { key: 'kept', description: 'unchanged gap' },
+      ],
+    };
+    const next = {
+      document: { criteria: { weekly: {} } },
+      formulas: [{ name: 'draft_new' }],
+      missing: [
+        { key: 'kept', description: 'unchanged gap' },
+        { new_key_slug: 'support', description: 'new gap' },
+      ],
+    };
+    redrafted(next, prior, { id: 'p2', formulas: ['draft_old'] });
+    expect(replaceAnswer).toHaveBeenCalledWith(next);
+    expect(builder.loadDocument).toHaveBeenCalledWith(next.document);
+    expect(builder.replaceFormulas).toHaveBeenCalledWith([{ name: 'draft_new' }], ['draft_old']);
+    expect(builder.removeNote).toHaveBeenCalledTimes(1);
+    expect(builder.removeNote).toHaveBeenCalledWith('old gap');
+    expect(builder.addNotes).toHaveBeenCalledWith(['new gap']);
+    // a draft with no criteria is still the draft: a retype may leave its part with none
+    redrafted({ document: { criteria: {} } }, prior, { id: 'p2', formulas: [] });
+    expect(builder.loadDocument).toHaveBeenLastCalledWith({ criteria: {} });
+  });
+
   it('opens the Guide drawer only for a catalogue field', () => {
     state.builder = { status: 'ready', id: 'mine', document: {}, loadDocument: vi.fn() };
     render(<DescribeScreen />);

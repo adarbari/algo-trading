@@ -33,8 +33,18 @@ export interface DescribeFormProps {
   onAnswer?: (answer: ScreenDraft) => void;
   /** The help button of a Guide term (the failure message's explanation); features never import each other. */
   renderTermHelp?: (term: string) => ReactNode;
-  /** The review of an answer: what was understood, what the draft proposes, what is missing. */
-  renderReview?: (review: { answer: ScreenDraft; text: string; serial: number }) => ReactNode;
+  /**
+   * The review of an answer: what was understood, what the draft proposes, what is missing.
+   * `replaceAnswer` swaps the shown answer for the one a part's retype returned (the same
+   * review, not a new one: nothing the trader decided on the other parts is reset) and keeps
+   * its session id.
+   */
+  renderReview?: (review: {
+    answer: ScreenDraft;
+    text: string;
+    serial: number;
+    replaceAnswer: (answer: ScreenDraft) => void;
+  }) => ReactNode;
 }
 
 const HINT =
@@ -100,6 +110,10 @@ export function DescribeForm({
     flight.current?.abort();
     draft.reset();
   };
+  const replaceAnswer = (next: ScreenDraft) => {
+    setResult((now) => (now ? { ...now, answer: next } : now));
+    onSession?.(next.draft_session_id ?? null);
+  };
 
   const failure =
     draft.isError && !wasCancelled(draft.error) ? draftFailure(draft.error) : undefined;
@@ -156,7 +170,7 @@ export function DescribeForm({
           }
         />
       )}
-      {!waiting && result && renderReview?.(result)}
+      {!waiting && result && renderReview?.({ ...result, replaceAnswer })}
     </Stack>
   );
 }

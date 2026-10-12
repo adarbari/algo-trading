@@ -3,7 +3,9 @@
  * draft the model proposes replaces it as an unsaved edit (save, preview and finalise as usual).
  * What the model understood is the review panel under the input, loaded as one lazy chunk when an
  * answer arrives. A field the draft names that the catalogue has opens its Guide drawer. The
- * Builder owns what the trader decides on the answer's options (readings, formulas). Review and
+ * Builder owns what the trader decides on the answer's options (readings, formulas). Retyping one
+ * part of the sentence returns the whole merged draft, which becomes the working document and the
+ * answer shown (the other parts' decisions and notes stay). Review and
  * add on a proposed formula (here or on its pending row) opens the formula dialog filled in with
  * it; saving goes through the formula feature's own save, then the Builder adds the pending
  * criterion as an active row. Shown once the screen is loaded.
@@ -16,6 +18,8 @@ import { FormulaFeatureDialog } from '@/features/formula-feature';
 import { GuideHelp, termHelp } from '@/features/guide-help';
 import { useScreenerBuilder } from '@/features/screener-builder';
 import { DescribeForm, hasCriteria } from '@/features/screener-describe';
+
+import { missingDelta } from './NotAvailable';
 
 const DraftReview = lazy(() => import('./DraftReview'));
 
@@ -44,7 +48,7 @@ export function DescribeScreen() {
             builder.addNotes((answer.missing ?? []).map((item) => item.description));
           }}
           renderTermHelp={termHelp}
-          renderReview={({ answer, serial }) => (
+          renderReview={({ answer, serial, replaceAnswer }) => (
             <Suspense fallback={<Skeleton lines={3} label="Loading the review" />}>
               <DraftReview
                 key={serial}
@@ -61,6 +65,18 @@ export function DescribeScreen() {
                 }}
                 onAcceptSuggestion={(criterion) => {
                   builder.addSuggested(criterion);
+                }}
+                onRedrafted={(next, prior, replaced) => {
+                  // One part was retyped: the merged draft is the working document and the
+                  // answer shown; the other parts' formula decisions and notes stay.
+                  replaceAnswer(next);
+                  builder.loadDocument(next.document);
+                  builder.replaceFormulas(next.formulas ?? [], replaced.formulas);
+                  const { gone, added } = missingDelta(prior, next);
+                  gone.forEach((note) => {
+                    builder.removeNote(note);
+                  });
+                  builder.addNotes(added);
                 }}
                 renderFieldHelp={renderFieldHelp}
               />

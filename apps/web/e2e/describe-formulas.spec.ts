@@ -11,6 +11,7 @@ import { expectAccessible } from './a11y';
 import {
   FORMULA_EXPR,
   FORMULA_NAME,
+  RETYPED_WORDS,
   SUGGESTION_FIELD,
   mockBuilderApi,
   mockDescribeApi,
@@ -143,4 +144,31 @@ test('Skip on a suggestion adds no row', async ({ page }) => {
   await page.getByRole('button', { name: `Skip ${SUGGESTION_FIELD}` }).click();
   await expect(page.getByText('Skipped', { exact: true })).toBeVisible();
   await expect(rows).toHaveCount(before);
+});
+
+test('Retype this part sends the draft it holds, then shows the merged draft with the other part untouched', async ({
+  page,
+}) => {
+  await mockBuilderApi(page);
+  const mock = await mockDescribeApi(page);
+  await describeIt(page);
+  const part = page.getByRole('article', { name: 'and above 50%' });
+  await part.getByRole('button', { name: 'Retype this part' }).click();
+  const input = part.getByRole('textbox', { name: 'Retype this part' });
+  await expect(input).toBeFocused();
+  await input.fill(RETYPED_WORDS);
+  await part.getByRole('button', { name: 'Redraft' }).click();
+  await expect(page.getByRole('article', { name: RETYPED_WORDS })).toBeVisible();
+  expect(mock.redrafts).toHaveLength(1);
+  expect(mock.redrafts[0]).toMatchObject({
+    part_id: 'p2',
+    new_words: RETYPED_WORDS,
+    draft_session_id: 'sess-e2e',
+  });
+  // the other part and its pending formula are as they were
+  await expect(page.getByRole('article', { name: 'IV above HV' })).toBeVisible();
+  await expect(
+    page.getByRole('group', { name: `Waiting on formula: feature.${FORMULA_NAME}` }),
+  ).toBeVisible();
+  await expectAccessible(page);
 });
