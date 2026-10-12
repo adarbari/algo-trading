@@ -227,8 +227,11 @@ Quality is not traded for tokens: the cheaper model never decides design, CI's f
 gates every change whatever wrote it, a change in an `architect` area (new responsibility /
 folder / table / ADR, layer boundaries, point-in-time, `quant/` maths, atomic publish, locks
 and jobs, the IBKR read-only boundary, a bug that survived two fixes) gets an `architect`
-review of the diff before it is finished, and an agent that hits ambiguity or fails the same
-check twice escalates one tier instead of retrying.
+review of the diff before it is finished (the reviewer ends its report with `Re-review: yes | no`;
+on yes the orchestrator sends the fixes and the implementer's per-finding list back to the same
+reviewer with SendMessage before the PR leaves draft / `no-automerge`, and records the outcome in
+the PR description), and an agent that hits ambiguity or fails the same check twice escalates one
+tier instead of retrying.
 
 Shared machine: at most 2 agents at once. Rule 9 keeps full checks off the machine, so nobody
 passes `WORKERS=2` / `WEB_WORKERS=2` any more (the cap dated from overloads on #94 / #95 / #98,

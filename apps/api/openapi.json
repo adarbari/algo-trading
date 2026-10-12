@@ -437,6 +437,19 @@
             "description": "the Builder's current document (its criteria are kept unless changed)",
             "title": "Document"
           },
+          "draft_session_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the id of the previous answer for this screen, so successive descriptions of one screen stay in one session (ADR 0066); an unknown, foreign or already saved session starts a new one",
+            "title": "Draft Session Id"
+          },
           "text": {
             "description": "the screen in plain English",
             "maxLength": 1000,

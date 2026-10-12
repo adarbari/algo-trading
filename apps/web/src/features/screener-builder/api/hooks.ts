@@ -18,11 +18,18 @@ export function useSaveDraft(id: string) {
   const refresh = useRefresh();
   const toast = useToast();
   return useMutation({
-    mutationFn: (document: ScreenDocument) =>
+    mutationFn: ({
+      document,
+      draftSessionId,
+    }: {
+      document: ScreenDocument;
+      /** The Describe-it session this screen came from (ADR 0066), if any. */
+      draftSessionId?: string | null;
+    }) =>
       unwrap(
         api.PUT('/screeners/{screener_id}/draft', {
           params: { path: { screener_id: id } },
-          body: { document },
+          body: { document, ...(draftSessionId ? { draft_session_id: draftSessionId } : {}) },
         }),
       ),
     onSuccess: () => refresh(),

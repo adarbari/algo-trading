@@ -17,13 +17,17 @@ function useRefresh() {
     ]);
 }
 
+/** `draftSessionId`: the Describe-it session this screen came from (ADR 0066), if any. */
 export function useFinalise(id: string) {
   const refresh = useRefresh();
   const toast = useToast();
   return useMutation({
-    mutationFn: () =>
+    mutationFn: (draftSessionId?: string | null) =>
       unwrap(
-        api.POST('/screeners/{screener_id}/finalise', { params: { path: { screener_id: id } } }),
+        api.POST('/screeners/{screener_id}/finalise', {
+          params: { path: { screener_id: id } },
+          ...(draftSessionId ? { body: { draft_session_id: draftSessionId } } : {}),
+        }),
       ),
     onSuccess: async (done) => {
       await refresh();

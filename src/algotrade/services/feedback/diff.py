@@ -40,3 +40,9 @@ def criteria_diff(returned: Mapping[str, Any], saved: Mapping[str, Any]) -> dict
     if returned.get("rank") != saved.get("rank"):
         diff["rank"] = {"from": returned.get("rank"), "to": saved.get("rank")}
     return diff
+
+
+def criteria_snapshot(document: Mapping[str, Any]) -> dict[str, Any]:
+    """The criteria table of ``document`` with its tie-break / rank, as stored in an event: what
+    was in force then (the whole of it, not a diff), so a golden case can be read from the rows."""
+    return {"criteria": dict(_criteria(document)), "rank": document.get("rank")}

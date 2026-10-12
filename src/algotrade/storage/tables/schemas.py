@@ -334,7 +334,9 @@ USAGE_LLM_CALLS = fixed(
 # saved from it; ``call_ids`` is a comma-delimited list of ``usage/llm_calls.call_id``;
 # ``draft_hash`` / ``saved_hash`` are content hashes (the draft the model returned, the document
 # saved); ``sentence`` is the trader's text (<= 1,000 characters, personal data: ADR 0066 has the
-# retention) and ``payload`` a small JSON object (the server-side diff of a save, the choices).
+# retention) and ``payload`` a JSON object (the server-side diff of a save, the criteria in
+# force: ``current_criteria`` / ``draft_criteria`` / ``saved_criteria``, each <= 8,000 characters;
+# the choices); ``seq`` is the 1-based ordinal of the draft request in its session.
 # Only the columns that are not the event's identity are nullable. Written only through
 # ``FeedbackWriter`` (``feedback/*``); read across a date range by ``data.feedback``.
 FEEDBACK_DRAFTING_EVENTS = fixed(
@@ -355,6 +357,7 @@ FEEDBACK_DRAFTING_EVENTS = fixed(
     "saved_hash string",
     "sentence string",
     "payload string",
+    "seq int64",
     runs="merge",
     key=("draft_session_id", "event_id", "event"),
 )

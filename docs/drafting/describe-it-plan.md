@@ -88,8 +88,18 @@ server diffs the last returned draft against the saved document; choices and ski
 request body. Written only after the config write succeeded; a dropped event never fails a save. Traders
 see only their own rows. Raw sentences are kept 12 months, then nulled unless curated.
 
-Golden pipeline: an owner-run `golden candidates` builds cases (sentence, catalogue version, final saved
-criteria): saved unchanged is a positive, saved with edits a correction, abandoned unlabelled;
+A session is one screen's iteration (ADR 0066, amendment 2026-10-11): successive descriptions of the
+same screen share a `draft_session_id` until it is finalised or discarded, each draft request has its `seq`, and the
+events carry the criteria in force (`current_criteria` on a request: the trader's edits between
+descriptions; `draft_criteria` on a return; `saved_criteria` on a save). A **golden case** is
+`(all sentences of one session in order by `ts`, with the criteria in force at each, the final
+criteria = `saved_criteria` of its `screen_finalised`)`; only a session with a `screen_finalised` is
+labelled: saved-only, discarded (not detectable from the rows) and never-saved sessions are
+unlabelled (`chains.golden_candidates`); `source_event` of a curated case is
+the session's final event id; the public-repo paraphrase rule applies to every sentence of the chain.
+
+Golden pipeline: an owner-run `golden candidates` builds cases (sentence, catalogue version, final
+criteria): finalised unchanged is a positive, finalised with edits a correction, anything else unlabelled;
 `golden curate` writes accepted cases to `tests/fixtures/drafting/golden/` with recorded answers per model
 for CI replay, scored structurally (fields, operators, thresholds within a tolerance). Anti-leak: train /
 held-out split; train cases may grow the phrasebook; a fitness test fails if a held-out sentence appears in

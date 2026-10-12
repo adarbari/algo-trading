@@ -59,6 +59,11 @@ these is true (these need the `architect` agent or the main session):
   `architect` review of the diff in the hand-back and the PR.
 - The same check has failed twice after your fixes.
 
+After `architect` review findings: fix them, then hand back a per-finding list (finding ->
+commit or `path:line` -> test added) so the reviewer verifies without rereading the PR. Never
+mark the PR ready or drop `no-automerge` yourself; the orchestrator does after the reviewer's
+last `Re-review: no`.
+
 Foreground rule: every check (`make check`, a gate, a test run) runs in the foreground, never
 as a background command. The hand-back is your last action, exactly one per run, and no
 command may still be running when you hand back.

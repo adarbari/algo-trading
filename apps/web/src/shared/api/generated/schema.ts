@@ -604,6 +604,11 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             /**
+             * Draft Session Id
+             * @description the id of the previous answer for this screen, so successive descriptions of one screen stay in one session (ADR 0066); an unknown, foreign or already saved session starts a new one
+             */
+            draft_session_id?: string | null;
+            /**
              * Text
              * @description the screen in plain English
              */

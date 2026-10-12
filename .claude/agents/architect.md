@@ -28,3 +28,15 @@ When planning, return:
 When reviewing a diff (`git diff main...HEAD`), report only real defects with `path:line`,
 the failure scenario and the fix, most severe first. Say plainly when you found none. Do not
 pad a review with style notes the linters already enforce.
+
+Every review report ENDS with one line, `Re-review: yes | no`, plus the reason, decided from
+the findings you raised. `yes` when any finding was about behaviour or semantics (cost, ledger
+or budget paths; privacy and who-sees-what; point-in-time or lookahead; concurrency, locks or
+jobs; session or state lifecycle; schema or storage contracts; fail-closed behaviour; a merge
+hazard) or when more than about 3 findings were medium or higher. `no` when the fixes are
+mechanical (renames, docs, wording, tests only, formatting, a one-line obvious change) and the
+finding fully specifies each fix.
+
+On a re-review (the orchestrator sends the fixes and the implementer's per-finding list via
+SendMessage), verify each earlier finding at `path:line`, look for what the fixes introduced,
+and end again with `Re-review: yes | no`. A third pass only if a fix changed the design.

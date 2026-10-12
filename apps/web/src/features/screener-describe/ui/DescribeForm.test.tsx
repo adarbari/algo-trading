@@ -41,19 +41,22 @@ const ANSWER = {
   notes: ['no IV rank field in the catalogue'],
 };
 
-function setup(renderFieldHelp?: (field: string) => ReactNode) {
+function setup(renderFieldHelp?: (field: string) => ReactNode, draftSessionId?: string) {
   const onDraft = vi.fn();
+  const onSession = vi.fn();
   const view = render(
     <TestQueryProvider>
       <DescribeForm
         screenerId="mine"
         document={DOCUMENT}
         onDraft={onDraft}
+        onSession={onSession}
+        {...(draftSessionId ? { draftSessionId } : {})}
         {...(renderFieldHelp ? { renderFieldHelp } : {})}
       />
     </TestQueryProvider>,
   );
-  return { onDraft, ...view };
+  return { onDraft, onSession, ...view };
 }
 
 beforeEach(() => {
@@ -79,6 +82,25 @@ describe('DescribeForm', () => {
     expect(screen.getByText('Kept price:')).toBeInTheDocument();
     expect(screen.getByText('no IV rank field in the catalogue')).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it("sends the previous answer's session id with the next sentence and reports the new one", async () => {
+    POST.mockResolvedValue({
+      data: { ...ANSWER, draft_session_id: 'sess-2' },
+      response: new Response(null, { status: 200 }),
+    });
+    const { onSession } = setup(undefined, 'sess-1');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Describe the screen' }),
+      'and liquid{Enter}',
+    );
+    await waitFor(() => {
+      expect(onSession).toHaveBeenCalledWith('sess-2');
+    });
+    expect(POST).toHaveBeenCalledWith('/screeners/{screener_id}/draft-from-text', {
+      params: { path: { screener_id: 'mine' } },
+      body: { text: 'and liquid', document: DOCUMENT, draft_session_id: 'sess-1' },
+    });
   });
 
   it('gives every field the draft names (left out or kept) the help the widget supplies', async () => {

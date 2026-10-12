@@ -10,6 +10,10 @@ export interface FinaliseButtonProps {
   /** Saves the unsaved edits first (a draft finalises as saved). */
   prepare: () => Promise<void>;
   disabled?: boolean;
+  /** The Describe-it session this screen came from (ADR 0066), sent with the finalise. */
+  draftSessionId?: string | null;
+  /** The version was written: the session is over. */
+  onFinalised?: () => void;
 }
 
 export function FinaliseButton({
@@ -17,6 +21,8 @@ export function FinaliseButton({
   version,
   prepare,
   disabled = false,
+  draftSessionId = null,
+  onFinalised,
 }: FinaliseButtonProps) {
   const finalise = useFinalise(screenerId);
   return (
@@ -26,7 +32,8 @@ export function FinaliseButton({
       loading={finalise.isPending}
       onClick={() => {
         void prepare()
-          .then(() => finalise.mutateAsync())
+          .then(() => finalise.mutateAsync(draftSessionId))
+          .then(() => onFinalised?.())
           .catch(() => undefined);
       }}
     >
