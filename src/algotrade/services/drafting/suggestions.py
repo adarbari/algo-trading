@@ -61,17 +61,20 @@ def suggestions_of(
     proposal: Mapping[str, Any],
     build: Build,
     held: list[Mapping[str, Any]],
+    offered: list[Mapping[str, Any]] | None = None,
 ) -> tuple[tuple[Suggestion, ...], tuple[DroppedSuggestion, ...]]:
     """The proposed ``suggestions`` checked, and the ones dropped with a reason. ``build``
     validates one as a criterion (``screens._alternative``); ``held`` are the criteria of the
-    draft (a suggestion repeating one, or with the same field and op, is dropped quietly: it would
-    rewrite what the sentence asked; the opposite direction is kept)."""
+    draft (a suggestion repeating one, or on the same field in the same direction (``gt`` /
+    ``gte`` above, ``lt`` / ``lte`` below), is dropped quietly: it would rewrite what the sentence
+    asked; the opposite direction is kept); ``offered`` are criteria shown elsewhere (the
+    alternatives of an unresolved term): a suggestion repeating one is dropped quietly too."""
     raw = proposal.get("suggestions")
     items = raw if isinstance(raw, list) else []
     kept: list[Suggestion] = []
     dropped: list[DroppedSuggestion] = []
-    seen = {_reading(c) for c in held}
-    asked = {(c["field"], c["op"]) for c in held}  # a threshold the sentence set
+    seen = {_reading(c) for c in [*held, *(offered or [])]}
+    asked = {(c["field"], _direction(c["op"])) for c in held}  # a threshold the sentence set
     for n, item in enumerate(items):
         mapping = item if isinstance(item, Mapping) else {}
         name = mapping.get("field")
@@ -85,7 +88,9 @@ def suggestions_of(
             )
             continue
         reading = _reading(suggestion.criterion)
-        if reading in seen or reading[:2] in asked:  # a repeat, or a rewrite of an asked threshold
+        if (
+            reading in seen or (reading[0], _direction(reading[1])) in asked
+        ):  # a repeat, or a rewrite of an asked threshold
             continue
         if len(kept) >= MAX_SUGGESTIONS:
             dropped.append(
@@ -130,6 +135,11 @@ def _detail(kind: str, n: int, message: str) -> str:
     model's words or values."""
     part = ".tolerance" if kind == "bad_value" and message.startswith("tolerance") else None
     return f"{kind}: suggestions[{n}]{part or _PATH.get(kind, '')}"
+
+
+def _direction(op: str) -> str:
+    """``above`` for gt / gte, ``below`` for lt / lte, else the op itself."""
+    return {"gt": "above", "gte": "above", "lt": "below", "lte": "below"}.get(op, op)
 
 
 def _reading(criterion: Mapping[str, Any]) -> tuple[Any, Any, Any]:

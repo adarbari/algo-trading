@@ -716,3 +716,19 @@ def test_a_soft_suggestion_without_a_tolerance_is_refused_by_the_criterion_valid
 def test_an_answer_without_suggestions_offers_none(ctx: ReadContext) -> None:
     draft = draft_screen(ctx, Canned(proposal(ACTIVE)), "my_screen", "active")
     assert (draft.suggestions, draft.suggestions_dropped) == ((), ())
+
+
+def test_a_suggestion_equal_to_a_non_default_alternative_is_not_offered_twice(
+    ctx: ReadContext,
+) -> None:
+    other = {"label": "price", "criterion": {"id": None, "field": PRICE, "op": "gt", "value": 50}}
+    term = {**READINGS, "alternatives": [READINGS["alternatives"][1], other], "default_index": 0}
+    answer = proposal(
+        ACTIVE, unresolved=[term],
+        suggestions=[
+            sug(field=PRICE, op="gt", value=50, mode="score"), sug(field=OI, op="lt", value=9),
+        ],
+    )  # fmt: skip
+    draft = draft_screen(ctx, Canned(answer), "my_screen", "deep")
+    assert [(s.criterion["field"], s.criterion["op"]) for s in draft.suggestions] == [(OI, "lt")]
+    assert draft.suggestions_dropped == ()

@@ -221,6 +221,7 @@ def _draft(ctx: ReadContext, screener_id: str, text: str, infos: Mapping[str, An
         proposal,
         lambda raw, name: _alternative(ctx, screener_id, raw, name, catalogue),
         list(document["criteria"].values()),
+        [alt.criterion for term in unresolved for alt in term.alternatives],
     )
     notes = (
         *notes_of(proposal), *formulas.notes, *unresolved_notes, *missing_notes, *reset_notes

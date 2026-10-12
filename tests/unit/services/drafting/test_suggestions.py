@@ -81,6 +81,24 @@ def test_a_suggestion_that_rewrites_an_asked_threshold_is_dropped_quietly() -> N
     assert dropped == ()
 
 
+def test_the_direction_not_the_exact_op_decides_a_rewrite() -> None:
+    held = [{"field": "feature.div_yield", "op": "gt", "value": 0.05}]
+    same = one(field="feature.div_yield", op="gte", value=0.08)
+    below = one(field="feature.div_yield", op="lt", value=0.12)
+    kept, dropped = got(same, below, held=held)
+    assert [s.criterion["op"] for s in kept] == ["lt"] and dropped == ()
+    held_in = [{"field": "feature.t", "op": "eq", "value": "UP"}]
+    assert got(one(field="feature.t", op="eq", value="DOWN"), held=held_in)[0] == ()
+
+
+def test_a_suggestion_shown_as_an_unresolved_alternative_is_not_offered_twice() -> None:
+    alt = {"field": "feature.rsi", "op": "lt", "value": 70}
+    kept, dropped = suggestions_of(
+        {"suggestions": [one(field="feature.rsi", op="lt", value=70), one()]}, build, [], [alt]
+    )
+    assert [s.criterion["field"] for s in kept] == ["feature.trend_state"] and dropped == ()
+
+
 def test_a_malformed_suggestion_is_dropped_and_never_breaks_the_draft() -> None:
     kept, dropped = got(one(value={"a": 1}), one(field=["x"]), one(value=[[1], [2]]), one())
     assert len(kept) == 1
