@@ -78,7 +78,8 @@ export interface ScreenerBuilder {
   addCriterion: (field?: string) => string;
   /**
    * Add the criterion of an accepted suggestion (a soft or score check the draft offered, never
-   * applied on its own) as a new row under a fresh id; returns the id. One edit.
+   * applied on its own) as a new row under a fresh id; returns the id. One edit. A hard one is
+   * refused: no edit, returns ''.
    */
   addSuggested: (criterion: Readonly<Record<string, unknown>>) => string;
   setTieBreak: (field: string | null, order: 'asc' | 'desc') => void;
@@ -297,6 +298,8 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
       return created;
     },
     addSuggested: (table) => {
+      // Only a soft or score check is ever a suggestion: never a hard filter.
+      if (table['mode'] !== 'soft' && table['mode'] !== 'score') return '';
       const field = typeof table['field'] === 'string' ? table['field'] : '';
       const created = newCriterionId(criterionIds(base, document), field);
       edit(withCriterion(document, toCriterion(created, { ...table })));

@@ -105,6 +105,13 @@ function Probe() {
       </Button>
       <Button
         onClick={() => {
+          b.addSuggested({ field: 'f.spread', op: 'lte', value: 0.01, mode: 'hard' });
+        }}
+      >
+        add hard
+      </Button>
+      <Button
+        onClick={() => {
           b.removeCriterion('close');
         }}
       >
@@ -297,6 +304,14 @@ describe('ScreenerBuilderProvider', () => {
     await userEvent.click(screen.getByRole('button', { name: 'add suggested' }));
     expect(screen.getByText(/criteria iv30=0.5,close=5,spread=0.01/)).toBeInTheDocument();
     expect(screen.getByText(/dirty true/)).toBeInTheDocument();
+  });
+
+  it('refuses a hard criterion as a suggestion: no row, no edit', async () => {
+    setup();
+    await screen.findByText('criteria iv30=0.5,close=5');
+    await userEvent.click(screen.getByRole('button', { name: 'add hard' }));
+    expect(screen.getByText('criteria iv30=0.5,close=5')).toBeInTheDocument();
+    expect(screen.getByText(/dirty false/)).toBeInTheDocument();
   });
 
   it('saves the edited draft, then is clean', async () => {

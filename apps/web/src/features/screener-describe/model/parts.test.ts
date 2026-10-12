@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { toCriterion } from '@/entities/screen';
+
 import { baselineAfter, partEdited, partsOf, suggestionsOf, type DraftPart } from './parts';
+import { readingSwap } from './readings';
 import type { ScreenDraft } from './review';
 
 const answer = (extra: Partial<ScreenDraft>): ScreenDraft => ({
@@ -85,6 +88,11 @@ describe('partEdited', () => {
     expect(partEdited(PART, original, current, terms)).toBe(false);
   });
 
+  it('is true for a typed value that is none of the offered readings', () => {
+    const current = { ...original, dv: { ...original.dv, value: 37 } };
+    expect(partEdited(PART, original, current, terms)).toBe(true);
+  });
+
   it('is true when a key outside the readings changed', () => {
     const current = { ...original, dv: { ...original.dv, mode: 'soft' } };
     expect(partEdited(PART, original, current, terms)).toBe(true);
@@ -136,5 +144,37 @@ describe('baselineAfter', () => {
   it('is the new answer rows when the old baseline is unknown', () => {
     const next = redrafted({ a: { field: 'f.a' } });
     expect(baselineAfter(undefined, next, PART)).toEqual({ a: { field: 'f.a' } });
+  });
+});
+
+describe('partEdited on server-shaped rows (no mode)', () => {
+  const FIFTY = { field: 'f.dv', op: 'gte', value: 50 };
+  const TEN = { field: 'f.dv', op: 'gte', value: 10 };
+  const term = {
+    term: 'liquid',
+    span: 'liquid',
+    default_index: 0,
+    alternatives: [
+      { text: 'a', criterion: FIFTY },
+      { text: 'b', criterion: TEN },
+    ],
+  };
+  const original = { dv: { ...FIFTY } };
+  const swapped = (from: number, to: number, document: Record<string, Record<string, unknown>>) => {
+    const swap = readingSwap({ id: 's', criteria: document }, term, from, to);
+    if (!swap) throw new Error('no swap');
+    const { id: _id, ...table } = swap;
+    return { dv: table };
+  };
+
+  it('is false after a pick, and after picking the default back', () => {
+    const picked = swapped(0, 1, original);
+    expect(partEdited(PART, original, picked, [term])).toBe(false);
+    expect(partEdited(PART, original, swapped(1, 0, picked), [term])).toBe(false);
+    expect(toCriterion('dv', picked.dv).mode).toBe('hard');
+  });
+
+  it('is true for a typed 37', () => {
+    expect(partEdited(PART, original, { dv: { ...FIFTY, value: 37 } }, [term])).toBe(true);
   });
 });
