@@ -96,6 +96,7 @@ def test_all_failed_names_every_provider_with_its_reason() -> None:
     with pytest.raises(ModelUnavailableError) as exc:
         chain(claude, gemini).complete("s", "u")
     message = str(exc.value)
+    assert exc.value.call_id  # the id the failed attempts were noted under
     assert "claude: claude-model: HTTP 401 bad key" in message
     assert "gemini: gemini-model: timed out" in message
 
