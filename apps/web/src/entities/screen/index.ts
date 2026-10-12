@@ -44,20 +44,15 @@ export {
   criterionOfError,
   isComplete,
   isScreenId,
-  MAX_NOTE_LENGTH,
-  MAX_NOTES,
-  mergeNotes,
   MISS_DECISIONS,
   MODES,
   newCriterionId,
   NO_VALUE_OPS,
-  notesOf,
   previewDocument,
   tieBreakOf,
   toCriterion,
   toDocument,
   withCriterion,
-  withNotes,
   withoutCriterion,
   withTieBreak,
   type Criterion,
@@ -70,6 +65,7 @@ export {
   type ScreenerSummary,
   type Tolerance,
 } from './model/spec';
+export { MAX_NOTE_LENGTH, MAX_NOTES, mergeNotes, notesOf, withNotes } from './model/notes';
 export { DecisionBadge } from './ui/DecisionBadge';
 export {
   decisionLabel,

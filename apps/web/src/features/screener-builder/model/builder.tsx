@@ -200,6 +200,14 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
       ],
     }));
   };
+  const decide = (name: string, state: 'accepted' | 'skipped') => {
+    updateReview((r) => ({
+      ...r,
+      reviewing: r.reviewing === name ? null : r.reviewing,
+      formulas: { ...r.formulas, [name]: state },
+    }));
+    choose({ event: `formula_${state}`, subject: name });
+  };
   const save = useSaveDraft(id);
   const discard = useDiscardDraft(id);
   const copy = useCopyOwnPreset(id);
@@ -310,20 +318,10 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
         const created = newCriterionId(criterionIds(base, document), field);
         edit(withCriterion(document, toCriterion(created, { ...formula.criterion, field })));
       }
-      updateReview((r) => ({
-        ...r,
-        reviewing: null,
-        formulas: { ...r.formulas, [formula.name]: 'accepted' },
-      }));
-      choose({ event: 'formula_accepted', subject: formula.name });
+      decide(formula.name, 'accepted');
     },
     skipFormula: (name) => {
-      updateReview((r) => ({
-        ...r,
-        reviewing: r.reviewing === name ? null : r.reviewing,
-        formulas: { ...r.formulas, [name]: 'skipped' },
-      }));
-      choose({ event: 'formula_skipped', subject: name });
+      decide(name, 'skipped');
     },
     notes: notesOf(base, document),
     addNotes: (added) => {
