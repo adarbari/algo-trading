@@ -49,6 +49,10 @@ class Remembered:
     last_saved: str | None = None  # the content hash of the last save recorded: autosave is quiet
     seq: int = 1  # the ordinal of the latest draft request of the session
     closed: bool = False  # finalised: a later description starts a new session
+    terms: frozenset[str] = frozenset()  # the answer's unresolved terms: ``choice_made`` subjects
+    formulas: frozenset[str] = (
+        frozenset()
+    )  # its proposed formula names: accepted / skipped subjects
 
 
 class DraftMemory:
@@ -192,9 +196,12 @@ def record_returned(
     prompt_version: str,
     seq: int = 1,
     notes: Sequence[str] = (),
+    terms: Sequence[str] = (),
+    formulas: Sequence[str] = (),
 ) -> None:
     """``draft_returned`` (the model's criteria after validation, what it dropped and its
-    notes) and the draft remembered for the save that follows."""
+    notes) and the draft remembered for the save that follows, with the answer's unresolved
+    ``terms`` and proposed ``formulas`` (the only subjects a later choice may name)."""
     try:
         version = events.catalogue_version(list(feature_infos(features)))  # the caller's fields
         draft_hash = events.document_hash(document)
@@ -203,6 +210,7 @@ def record_returned(
             Remembered(
                 user, screener_id, copy.deepcopy(dict(document)), draft_hash, sentence,
                 tuple(call_ids), version, prompt_version, seq=seq,
+                terms=frozenset(terms), formulas=frozenset(formulas),
             ),
         )  # fmt: skip
         raw = document.get("criteria")
@@ -319,7 +327,8 @@ def record_choices(
     choices: Sequence[Any],
 ) -> None:
     """One ``choice_made`` / ``formula_accepted`` / ``formula_skipped`` row per choice
-    (``subject``, ``picked`` in the payload), for a session that is ``user``'s and
+    (``subject``, ``picked`` in the payload) whose subject the session's last answer offered (an
+    unresolved term, a proposed formula), for a session that is ``user``'s and
     ``screener_id``'s only (a session not remembered or not theirs records nothing). The
     ``event_id`` is a hash of the session, event, subject and pick, so a choice sent again with a
     later save is the same row. Call after the config write succeeded; never raises."""
@@ -331,6 +340,9 @@ def record_choices(
             return
         for choice in choices:
             try:
+                known = draft.terms if choice.event == events.CHOICE_MADE else draft.formulas
+                if choice.subject not in known:
+                    continue  # not something this answer offered: never a row under its session
                 picked = choice.picked if choice.event == events.CHOICE_MADE else None
                 row = events.row_of(
                     choice.event, session_id, user, KIND, screener_id,

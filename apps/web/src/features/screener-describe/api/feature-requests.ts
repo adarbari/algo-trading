@@ -21,6 +21,7 @@ const MyFeatureRequests = graphql(`
       promotedTo
       feasibility
       span
+      askedBeforeToday
     }
   }
 `);

@@ -28,22 +28,34 @@ function same(a: unknown, b: unknown): boolean {
   return keys.length === Object.keys(right).length && keys.every((k) => same(left[k], right[k]));
 }
 
-/** The id of the row of `document` that holds `reading`'s keys (the first one), else null. */
+/** The rows of `document` (id, table) that hold `reading`'s keys. */
+function rowsOfReading(
+  document: ScreenDocument,
+  reading: Readonly<Record<string, unknown>>,
+): [string, Table][] {
+  return Object.entries(document.criteria ?? {}).filter(([, table]) =>
+    Object.entries(reading).every(([key, value]) => same(table[key], value)),
+  );
+}
+
+/**
+ * The id of the row of `document` that holds `reading`'s keys, else null: also null when more than
+ * one row does (two rows with the same reading: which one the pick is for is not known).
+ */
 export function rowOfReading(
   document: ScreenDocument,
   reading: Readonly<Record<string, unknown>>,
 ): string | null {
-  const rows = Object.entries(document.criteria ?? {});
-  const found = rows.find(([, table]) =>
-    Object.entries(reading).every(([key, value]) => same(table[key], value)),
-  );
-  return found?.[0] ?? null;
+  const found = rowsOfReading(document, reading);
+  return found.length === 1 ? (found[0]?.[0] ?? null) : null;
 }
 
 /**
  * The criterion that replaces the row holding reading `from` of `term` with reading `to`: the row's
- * id, the new reading's keys. Null when the row is not there any more (the trader removed or
- * rewrote it) or an index is out of range: the swap is then not offered.
+ * id, the new reading's keys, and the keys the row has that the old reading did not (a mode or
+ * near-miss rule the trader set) unless the new reading sets them. Null when the row is not there
+ * any more (the trader removed or rewrote it), is not the only one holding the reading, or an
+ * index is out of range: the swap is then not offered.
  */
 export function readingSwap(
   document: ScreenDocument,
@@ -54,6 +66,11 @@ export function readingSwap(
   const current = term.alternatives[from];
   const next = term.alternatives[to];
   if (!current || !next) return null;
-  const id = rowOfReading(document, current.criterion);
-  return id === null ? null : toCriterion(id, next.criterion);
+  const rows = rowsOfReading(document, current.criterion);
+  const row = rows.length === 1 ? rows[0] : undefined;
+  if (!row) return null;
+  const own = Object.fromEntries(
+    Object.entries(row[1]).filter(([key]) => !(key in current.criterion)),
+  );
+  return toCriterion(row[0], { ...own, ...next.criterion });
 }

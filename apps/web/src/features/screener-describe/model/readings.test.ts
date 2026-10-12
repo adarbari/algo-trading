@@ -46,6 +46,12 @@ describe('rowOfReading', () => {
     expect(rowOfReading(held, reading)).toBe('vol');
   });
 
+  it('is null when more than one row holds it', () => {
+    const twice = doc({ again: { ...LIQUID.alternatives[0]?.criterion } });
+    expect(rowOfReading(twice, LIQUID.alternatives[0]?.criterion ?? {})).toBeNull();
+    expect(readingSwap(twice, LIQUID, 0, 1)).toBeNull();
+  });
+
   it('is null when no row holds it', () => {
     expect(rowOfReading(doc(), LIQUID.alternatives[1]?.criterion ?? {})).toBeNull();
   });
@@ -60,6 +66,39 @@ describe('readingSwap', () => {
       value: 10_000_000,
       mode: 'hard',
     });
+  });
+
+  it('keeps what the row has that the readings lack (a near-miss rule, a mode)', () => {
+    const held = doc();
+    held.criteria = {
+      ...held.criteria,
+      dollar_volume: {
+        ...LIQUID.alternatives[0]?.criterion,
+        on_miss: 'warn',
+        tolerance: { pct: 10 },
+      },
+    };
+    const lean = {
+      ...LIQUID,
+      alternatives: LIQUID.alternatives.map((a) => ({
+        text: a.text,
+        criterion: {
+          field: a.criterion['field'],
+          op: a.criterion['op'],
+          value: a.criterion['value'],
+        },
+      })),
+    };
+    held.criteria['dollar_volume'] = { ...held.criteria['dollar_volume'], mode: 'soft' };
+    const swapped = readingSwap(held, lean, 0, 1);
+    expect(swapped).toMatchObject({
+      value: 10_000_000,
+      mode: 'soft',
+      on_miss: 'warn',
+      tolerance: { pct: 10 },
+    });
+    // a key the new reading sets wins
+    expect(readingSwap(doc(), LIQUID, 0, 2)).toMatchObject({ mode: 'soft', op: 'in' });
   });
 
   it('is null when the row was removed or the index is out of range', () => {

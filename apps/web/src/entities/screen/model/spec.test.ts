@@ -187,8 +187,15 @@ describe('documents and ids', () => {
     const base = { notes: ['from preset'] };
     expect(notesOf(base, { id: 'my' })).toEqual(['from preset']);
     expect(notesOf(base, withNotes({ id: 'my' }, ['own']))).toEqual(['own']);
-    expect(notesOf(base, withNotes({ id: 'my' }, []))).toEqual([]);
+    expect(notesOf(base, withNotes({ id: 'my' }, [], base))).toEqual([]);
+    expect(withNotes({ id: 'my' }, [], base)).toEqual({ id: 'my', notes: [] }); // clears the preset's
     expect(notesOf(null, { id: 'my' })).toEqual([]);
+  });
+
+  it('drops the notes key when the list is empty and the base had none (no `notes: []`)', () => {
+    expect(withNotes({ id: 'my', notes: ['a'] }, [], {})).toEqual({ id: 'my' });
+    expect(withNotes({ id: 'my', notes: ['a'] }, [], null)).not.toHaveProperty('notes');
+    expect(withNotes({ id: 'my' }, ['a'], {})).toEqual({ id: 'my', notes: ['a'] });
   });
 
   it('merges notes without blanks or repeats, cut and capped like the server', () => {

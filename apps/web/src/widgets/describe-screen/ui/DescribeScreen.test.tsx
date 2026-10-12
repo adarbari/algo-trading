@@ -31,6 +31,8 @@ vi.mock('@/features/screener-builder', () => ({ useScreenerBuilder: () => state.
 vi.mock('@/features/screener-describe', async () => {
   const { Text } = await import('@algotrade/ui');
   return {
+    hasCriteria: (d: { criteria?: Record<string, unknown> }) =>
+      Object.keys(d.criteria ?? {}).length > 0,
     DescribeForm: (props: Record<string, unknown>) => {
       probe.props = props;
       return <Text>form</Text>;
@@ -73,11 +75,19 @@ describe('DescribeScreen', () => {
     };
     render(<DescribeScreen />);
     const onAnswer = probe.props['onAnswer'] as (answer: unknown) => void;
-    onAnswer({ formulas: [{ name: 'draft_x' }], missing: [{ description: 'support lines' }] });
+    onAnswer({
+      document: { criteria: { price: {} } },
+      formulas: [{ name: 'draft_x' }],
+      missing: [{ description: 'support lines' }],
+    });
     expect(setFormulas).toHaveBeenCalledWith([{ name: 'draft_x' }]);
     expect(addNotes).toHaveBeenCalledWith(['support lines']);
-    onAnswer({});
+    onAnswer({ document: {} });
     expect(setFormulas).toHaveBeenLastCalledWith([]);
+    // a notes-only answer loads no draft: the screen is not dirtied (nor an uncopied preset)
+    addNotes.mockClear();
+    onAnswer({ document: { criteria: {} }, missing: [{ description: 'only a gap' }] });
+    expect(addNotes).not.toHaveBeenCalled();
     const help = probe.props['renderTermHelp'] as (term: string) => ReactNode;
     render(<>{help('describe_failure_off')}</>);
     expect(screen.getByText('term describe_failure_off')).toBeInTheDocument();

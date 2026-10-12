@@ -15,7 +15,7 @@ import { useFeatureCatalogue } from '@/entities/feature';
 import { FormulaFeatureDialog } from '@/features/formula-feature';
 import { GuideHelp, termHelp } from '@/features/guide-help';
 import { useScreenerBuilder } from '@/features/screener-builder';
-import { DescribeForm } from '@/features/screener-describe';
+import { DescribeForm, hasCriteria } from '@/features/screener-describe';
 
 const DraftReview = lazy(() => import('./DraftReview'));
 
@@ -38,7 +38,9 @@ export function DescribeScreen() {
           onSession={builder.setDraftSessionId}
           onAnswer={(answer) => {
             builder.setFormulas(answer.formulas ?? []);
-            // The gap stays with the screen (finalising does not wait on it).
+            // The gap stays with the screen (finalising does not wait on it), once the draft
+            // loaded: an answer with no criteria leaves the screen (and an uncopied preset) alone.
+            if (!hasCriteria(answer.document)) return;
             builder.addNotes((answer.missing ?? []).map((item) => item.description));
           }}
           renderTermHelp={termHelp}

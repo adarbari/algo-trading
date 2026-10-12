@@ -4,6 +4,7 @@ export { useDraftFromText, type ScreenDraft } from './api/hooks';
 export { useMyFeatureRequests, type MyFeatureRequest } from './api/feature-requests';
 export { draftFailure, type DraftFailure } from './model/failure';
 export { earlierAsk, ownRequest, requestStatus, type MissingFeature } from './model/history';
+export { hasCriteria } from './model/review';
 export { readingSwap, type Unresolved } from './model/readings';
 export { appliedRows, dryRunStats, inputsLine, sampleOf, type DraftFormula } from './model/review';
 export { tagSentence, type SpanTag } from './model/tagging';

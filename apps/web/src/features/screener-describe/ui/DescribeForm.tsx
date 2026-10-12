@@ -7,7 +7,7 @@
  * a failure is a trader-facing message with Try again, never the API's raw text.
  */
 import { Banner, Button, Field, Input, Skeleton, Stack, Text } from '@algotrade/ui';
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import type { ScreenDocument } from '@/entities/screen';
 
@@ -84,6 +84,18 @@ export function DescribeForm({
       },
     );
   };
+  // The session ended (finalised, discarded, another screen): the answer and its review go with it,
+  // and a request still in flight is ignored (its answer would start a session on a finished screen).
+  const hadSession = useRef(draftSessionId !== null);
+  const reset = draft.reset;
+  useEffect(() => {
+    if (hadSession.current && draftSessionId === null) {
+      flight.current?.abort();
+      reset();
+      setResult(null);
+    }
+    hadSession.current = draftSessionId !== null;
+  }, [draftSessionId, reset]);
   const cancel = () => {
     flight.current?.abort();
     draft.reset();

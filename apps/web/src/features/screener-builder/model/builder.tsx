@@ -239,8 +239,12 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
   };
   const saved = async () => {
     await copying.current;
-    if (edited)
-      await save.mutateAsync({ document: edited, draftSessionId, choices: current.choices });
+    if (edited) {
+      const sent = current.choices;
+      await save.mutateAsync({ document: edited, draftSessionId, choices: sent });
+      // Recorded with that save: not sent again with every autosave (a choice made since stays).
+      updateReview((r) => ({ ...r, choices: r.choices.filter((c) => !sent.includes(c)) }));
+    }
     setEdited(null);
   };
 
@@ -325,13 +329,14 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     addNotes: (added) => {
       const known = notesOf(base, document);
       if (mergeNotes(known, added).length === known.length) return; // nothing new: not an edit
-      editWith((cur) => withNotes(cur, mergeNotes(notesOf(base, cur), added)));
+      editWith((cur) => withNotes(cur, mergeNotes(notesOf(base, cur), added), base));
     },
     removeNote: (note) => {
       editWith((cur) =>
         withNotes(
           cur,
           notesOf(base, cur).filter((n) => n !== note),
+          base,
         ),
       );
     },

@@ -81,7 +81,7 @@ type Documents = {
     "\n  query Viewer {\n    viewer {\n      id\n      name\n      role\n      workspaces\n    }\n  }\n": typeof types.ViewerDocument,
     "\n  query GuideHelpField($name: FeatureName!) {\n    guideField(name: $name) {\n      info {\n        name\n        unit\n        guide {\n          theme\n          reads\n          summary\n          caveats\n          uses {\n            intent\n            op\n            value\n            mode\n            tolerance\n            onMiss\n            note\n          }\n        }\n      }\n    }\n  }\n": typeof types.GuideHelpFieldDocument,
     "\n  query GuideSearch($q: String!, $limit: Int!) {\n    guideSearch(q: $q, limit: $limit) {\n      query\n      groups {\n        kind\n        hits {\n          kind\n          id\n          title\n          snippet\n        }\n      }\n    }\n  }\n": typeof types.GuideSearchDocument,
-    "\n  query MyFeatureRequests {\n    myFeatureRequests {\n      ref\n      description\n      status\n      unmapped\n      firstAsked\n      lastAsked\n      timesAsked\n      promotedTo\n      feasibility\n      span\n    }\n  }\n": typeof types.MyFeatureRequestsDocument,
+    "\n  query MyFeatureRequests {\n    myFeatureRequests {\n      ref\n      description\n      status\n      unmapped\n      firstAsked\n      lastAsked\n      timesAsked\n      promotedTo\n      feasibility\n      span\n      askedBeforeToday\n    }\n  }\n": typeof types.MyFeatureRequestsDocument,
     "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      sort\n      decisions\n      names\n    }\n  }\n": typeof types.TableViewDocument,
 };
 const documents: Documents = {
@@ -150,7 +150,7 @@ const documents: Documents = {
     "\n  query Viewer {\n    viewer {\n      id\n      name\n      role\n      workspaces\n    }\n  }\n": types.ViewerDocument,
     "\n  query GuideHelpField($name: FeatureName!) {\n    guideField(name: $name) {\n      info {\n        name\n        unit\n        guide {\n          theme\n          reads\n          summary\n          caveats\n          uses {\n            intent\n            op\n            value\n            mode\n            tolerance\n            onMiss\n            note\n          }\n        }\n      }\n    }\n  }\n": types.GuideHelpFieldDocument,
     "\n  query GuideSearch($q: String!, $limit: Int!) {\n    guideSearch(q: $q, limit: $limit) {\n      query\n      groups {\n        kind\n        hits {\n          kind\n          id\n          title\n          snippet\n        }\n      }\n    }\n  }\n": types.GuideSearchDocument,
-    "\n  query MyFeatureRequests {\n    myFeatureRequests {\n      ref\n      description\n      status\n      unmapped\n      firstAsked\n      lastAsked\n      timesAsked\n      promotedTo\n      feasibility\n      span\n    }\n  }\n": types.MyFeatureRequestsDocument,
+    "\n  query MyFeatureRequests {\n    myFeatureRequests {\n      ref\n      description\n      status\n      unmapped\n      firstAsked\n      lastAsked\n      timesAsked\n      promotedTo\n      feasibility\n      span\n      askedBeforeToday\n    }\n  }\n": types.MyFeatureRequestsDocument,
     "\n  query TableView($scope: String!, $name: String) {\n    view(scope: $scope, name: $name) {\n      scope\n      name\n      saved\n      columns\n      narrowColumns\n      sort\n      decisions\n      names\n    }\n  }\n": types.TableViewDocument,
 };
 
@@ -417,7 +417,7 @@ export function graphql(source: "\n  query GuideSearch($q: String!, $limit: Int!
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query MyFeatureRequests {\n    myFeatureRequests {\n      ref\n      description\n      status\n      unmapped\n      firstAsked\n      lastAsked\n      timesAsked\n      promotedTo\n      feasibility\n      span\n    }\n  }\n"): typeof import('./graphql').MyFeatureRequestsDocument;
+export function graphql(source: "\n  query MyFeatureRequests {\n    myFeatureRequests {\n      ref\n      description\n      status\n      unmapped\n      firstAsked\n      lastAsked\n      timesAsked\n      promotedTo\n      feasibility\n      span\n      askedBeforeToday\n    }\n  }\n"): typeof import('./graphql').MyFeatureRequestsDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

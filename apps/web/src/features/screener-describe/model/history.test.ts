@@ -22,6 +22,7 @@ const request = (over: Partial<MyFeatureRequest> = {}): MyFeatureRequest => ({
   firstAsked: '2026-10-03',
   lastAsked: '2026-10-11',
   timesAsked: 2,
+  askedBeforeToday: true,
   promotedTo: '',
   feasibility: 'NEEDS_SOURCE',
   span: null,
@@ -34,7 +35,11 @@ describe('earlierAsk', () => {
   });
 
   it('is null when the only ask is the one that just ran', () => {
-    expect(earlierAsk(item(), [request({ timesAsked: 1 })])).toBeNull();
+    expect(earlierAsk(item(), [request({ askedBeforeToday: false })])).toBeNull();
+  });
+
+  it('reads an earlier-day ask even when the background write left the count at 1', () => {
+    expect(earlierAsk(item(), [request({ timesAsked: 1, askedBeforeToday: true })])).not.toBeNull();
   });
 
   it('matches an unmapped request by its slug and ignores other refs', () => {

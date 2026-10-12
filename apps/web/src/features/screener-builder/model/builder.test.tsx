@@ -353,6 +353,28 @@ describe('ScreenerBuilderProvider', () => {
     expect(screen.getByText('formulas {}')).toBeInTheDocument();
   });
 
+  it('sends the choices with the save that follows them once, not with every autosave', async () => {
+    setup();
+    await screen.findByText('criteria iv30=0.5,close=5');
+    await userEvent.click(screen.getByRole('button', { name: 'describe' }));
+    await userEvent.click(screen.getByRole('button', { name: 'decide' }));
+    await userEvent.click(screen.getByRole('button', { name: 'edit' }));
+    await userEvent.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      expect(PUT).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(screen.getByText('choices')).toBeInTheDocument(); // sent: dropped
+    });
+    expect(screen.getByText('formulas {"draft_x":"skipped"}')).toBeInTheDocument(); // still decided
+    await userEvent.click(screen.getByRole('button', { name: 'edit' }));
+    await userEvent.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      expect(PUT).toHaveBeenCalledTimes(2);
+    });
+    expect(JSON.stringify(PUT.mock.calls[1]?.[1])).not.toContain('choices');
+  });
+
   describe('proposed formulas', () => {
     const open = async () => {
       setup();

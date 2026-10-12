@@ -182,4 +182,46 @@ describe('DescribeForm', () => {
     expect(screen.queryByText(/review of/)).not.toBeInTheDocument();
     expect(screen.queryByText('The model could not answer')).not.toBeInTheDocument();
   });
+
+  describe('when the session ends (finalised, discarded)', () => {
+    const form = (draftSessionId: string | null) => (
+      <TestQueryProvider>
+        <DescribeForm
+          screenerId="mine"
+          document={DOCUMENT}
+          onDraft={vi.fn()}
+          draftSessionId={draftSessionId}
+          renderReview={({ text }): ReactNode => <Text>{`review of "${text}"`}</Text>}
+        />
+      </TestQueryProvider>
+    );
+
+    it('drops the review of the last answer', async () => {
+      POST.mockResolvedValue({ data: { ...ANSWER, draft_session_id: 'sess-1' }, ...OK });
+      const view = render(form('sess-1'));
+      await type('price over 5{Enter}');
+      expect(await screen.findByText(/review of/)).toBeInTheDocument();
+      view.rerender(form(null)); // the Builder cleared the session
+      expect(screen.queryByText(/review of/)).not.toBeInTheDocument();
+    });
+
+    it('ignores a draft still in flight', async () => {
+      let answer: (value: unknown) => void = () => undefined;
+      POST.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            answer = resolve;
+          }) as never,
+      );
+      const view = render(form('sess-1'));
+      await type('stocks{Enter}');
+      await screen.findByText('Drafting your screen');
+      const signal = (POST.mock.calls[0]?.[1] as { signal?: AbortSignal } | undefined)?.signal;
+      view.rerender(form(null));
+      expect(signal?.aborted).toBe(true);
+      answer({ data: ANSWER, ...OK });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(screen.queryByText(/review of/)).not.toBeInTheDocument();
+    });
+  });
 });

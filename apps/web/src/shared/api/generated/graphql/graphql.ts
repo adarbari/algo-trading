@@ -595,7 +595,7 @@ export type GuideSearchQuery = { guideSearch: { query: string, groups: Array<{ k
 export type MyFeatureRequestsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MyFeatureRequestsQuery = { myFeatureRequests: Array<{ ref: string, description: string, status: string, unmapped: boolean, firstAsked: string, lastAsked: string, timesAsked: number, promotedTo: string, feasibility: string, span: string | null }> };
+export type MyFeatureRequestsQuery = { myFeatureRequests: Array<{ ref: string, description: string, status: string, unmapped: boolean, firstAsked: string, lastAsked: string, timesAsked: number, promotedTo: string, feasibility: string, span: string | null, askedBeforeToday: boolean }> };
 
 export type TableViewQueryVariables = Exact<{
   scope: string;
@@ -3510,6 +3510,7 @@ export const MyFeatureRequestsDocument = new TypedDocumentString(`
     promotedTo
     feasibility
     span
+    askedBeforeToday
   }
 }
     `) as unknown as TypedDocumentString<MyFeatureRequestsQuery, MyFeatureRequestsQueryVariables>;

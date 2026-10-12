@@ -45,6 +45,7 @@ class MyRequest:
     promoted_to: str = ""
     feasibility: str = "UNCLEAR"  # of the latest ask (the backlog item's when it has one)
     span: str | None = None  # the piece of the viewer's own sentence of the latest ask
+    asked_before_today: bool = False  # an ask on an earlier exchange date than ``today``
 
 
 def _stored(ctx: Stores, since: date, today: date) -> pd.DataFrame:
@@ -107,6 +108,7 @@ def load_my_requests(
                 promoted_to=item.promoted_to if item else "",
                 feasibility=item.feasibility if item else feasibility,
                 span=span,
+                asked_before_today=min(asked) < today,
             )
         )
     return tuple(sorted(out, key=lambda r: (-r.last_asked.toordinal(), r.ref)))

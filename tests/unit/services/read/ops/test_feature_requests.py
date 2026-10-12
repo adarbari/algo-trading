@@ -98,6 +98,20 @@ def test_my_history_carries_the_latest_span_and_feasibility() -> None:
     assert backlog["fcf_yield"].feasibility == "NEEDS_SOURCE"  # the backlog item's
 
 
+def test_asked_before_today_is_an_ask_on_an_earlier_exchange_date() -> None:
+    ctx = stores(
+        [
+            ask("alice", "fcf_yield", 3),
+            ask("alice", "fcf_yield", 0),
+            ask("alice", "gamma_squeeze", 0),
+        ]
+    )
+    by = {r.ref: r for r in load_my_requests(ctx, ALICE, TODAY)}
+    assert by["fcf_yield"].asked_before_today  # an earlier day, however many rows came today
+    assert not by["gamma_squeeze"].asked_before_today  # only the ask that just ran
+    assert by["gamma_squeeze"].times_asked == 1
+
+
 def test_an_admin_own_history_is_their_own_too() -> None:
     ctx = stores([*ledger(), ask("abhi", "treasury_level", 3)])
     assert [r.ref for r in load_my_requests(ctx, ADMIN, TODAY)] == ["treasury_level"]

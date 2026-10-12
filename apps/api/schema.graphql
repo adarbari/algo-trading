@@ -1921,7 +1921,7 @@ type MarketRegime {
 }
 
 """
-A feature the viewer asked for: `ref` the backlog key (an alias counts under its key) or the slug of a request not yet mapped (`unmapped`); `status` the backlog's; `firstAsked` / `lastAsked` the days it was asked and `timesAsked` how many distinct days; `span` the piece of the viewer's own sentence of the latest ask (null: not stored); `feasibility` the backlog item's, else the latest ask's
+A feature the viewer asked for: `ref` the backlog key (an alias counts under its key) or the slug of a request not yet mapped (`unmapped`); `status` the backlog's; `firstAsked` / `lastAsked` the days it was asked and `timesAsked` how many distinct days; `span` the piece of the viewer's own sentence of the latest ask (null: not stored); `feasibility` the backlog item's, else the latest ask's; `askedBeforeToday` whether an ask falls on an earlier exchange date than today
 """
 type MyFeatureRequest {
   ref: String!
@@ -1934,6 +1934,7 @@ type MyFeatureRequest {
   promotedTo: String!
   feasibility: String!
   span: String
+  askedBeforeToday: Boolean!
 }
 
 """

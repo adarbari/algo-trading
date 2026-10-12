@@ -262,7 +262,19 @@ export function mergeNotes(current: readonly string[], added: readonly string[])
   return out.slice(0, MAX_NOTES);
 }
 
-/** The document with its notes set (an empty list clears the ones a preset carries). */
-export function withNotes(document: ScreenDocument, notes: readonly string[]): ScreenDocument {
+/**
+ * The document with its notes set. An empty list is written as `notes: []` only to clear the ones
+ * `base` (the preset it extends) carries; when the base has none the key goes (an empty list
+ * would change the document's hash for nothing).
+ */
+export function withNotes(
+  document: ScreenDocument,
+  notes: readonly string[],
+  base?: Readonly<Record<string, unknown>> | null,
+): ScreenDocument {
+  if (notes.length === 0 && listOf(base?.['notes']).length === 0) {
+    const { notes: _dropped, ...rest } = document;
+    return rest;
+  }
   return { ...document, notes: [...notes] };
 }

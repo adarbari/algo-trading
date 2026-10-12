@@ -37,6 +37,7 @@ def draft_from_text(
         [{"id": d.id, "field": d.field, "reason": d.reason} for d in result.dropped],
         (result.call_id,) if result.call_id else (), ctx.features,
         PROMPT_VERSION, seq, result.notes,
+        [u.term for u in result.unresolved], [f.name for f in result.formulas],
     )  # fmt: skip
     feedback.record_requests(
         requests, user, result.missing, body.text, result.call_id, session_id

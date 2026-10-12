@@ -14,7 +14,8 @@ from algotrade.services.read.ops import feature_requests
     "key) or the slug of a request not yet mapped (`unmapped`); `status` the backlog's; "
     "`firstAsked` / `lastAsked` the days it was asked and `timesAsked` how many distinct days; "
     "`span` the piece of the viewer's own sentence of the latest ask (null: not stored); "
-    "`feasibility` the backlog item's, else the latest ask's"
+    "`feasibility` the backlog item's, else the latest ask's; "
+    "`askedBeforeToday` whether an ask falls on an earlier exchange date than today"
 )
 class MyFeatureRequest:
     ref: str
@@ -27,6 +28,7 @@ class MyFeatureRequest:
     promoted_to: str
     feasibility: str
     span: str | None
+    asked_before_today: bool
 
     @classmethod
     def of(cls, d: feature_requests.MyRequest) -> Self:
@@ -41,4 +43,5 @@ class MyFeatureRequest:
             promoted_to=d.promoted_to,
             feasibility=d.feasibility,
             span=d.span,
+            asked_before_today=d.asked_before_today,
         )
