@@ -29,7 +29,11 @@ class MissingDataError(AlgoTradeError):
 class ModelUnavailableError(AlgoTradeError):
     """The text model (ADR 0041: screener drafts, regime explanations) cannot answer now: it is
     off in the site settings, the provider refused or timed out, or its answer was not text. The
-    message says which; it never carries a credential."""
+    message says which; it never carries a credential. ``call_id``: the chain's id of the call
+    whose attempts all failed (set by the chain, else ``None``), so a caller that falls back can
+    still link its rows to the cost of the refused attempts."""
+
+    call_id: str | None = None
 
 
 class InvalidAnswerError(ModelUnavailableError):

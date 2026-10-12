@@ -202,7 +202,11 @@ class FallbackTextModel:
                     continue
                 call.failures.append(f"{provider}: {refusal} (after one repair)")
                 call.first_failed, call.escalating = call.first_failed or provider, True
-        raise ModelUnavailableError("no text model could answer: " + "; ".join(call.failures))
+        unavailable = ModelUnavailableError(
+            "no text model could answer: " + "; ".join(call.failures)
+        )
+        unavailable.call_id = call.call_id
+        raise unavailable
 
     def _late(self, call: "_Call") -> bool:
         return self.clock() - call.started > self.deadline_s
