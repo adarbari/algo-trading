@@ -9,6 +9,11 @@ from pathlib import Path
 import pytest
 
 from algotrade.config.site.users import UsersSettings
+from algotrade.services.feedback import retention
+from algotrade.services.feedback.events import row_of
+from algotrade.services.feedback.recorder import FeedbackRecorder
+from algotrade.storage.backends.local import LocalBackend
+from algotrade.storage.tables.feedback_writer import FeedbackWriter
 from algotrade_api import cli
 from algotrade_api.ops.build import STAMP
 from algotrade_api.ops.schedule import OPEN_FILES
@@ -84,6 +89,41 @@ def test_golden_run_parses_its_flags_and_exits_with_the_command_code(
     assert (ns.record, ns.as_json, ns.yes, ns.max_calls, ns.budget_usd) == (  # type: ignore[attr-defined]
         True, True, True, 60, 1.0,
     )  # fmt: skip
+
+
+def test_feedback_commands_are_a_dry_run_until_yes_and_audit_only_what_they_applied(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    url = f"file://{tmp_path / 'data'}"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "load_dotenv", lambda: None)
+    monkeypatch.setattr(cli, "data_url", lambda: url)
+    rec = FeedbackRecorder(FeedbackWriter(LocalBackend(tmp_path / "data")))
+    rec.submit(row_of("draft_requested", "s", "abhi", "screen", "x", sentence="private"))
+    rec.flush()
+    rec.close()
+    audit = tmp_path / "audit" / "feedback-retention.log"
+    monkeypatch.setattr(retention, "AUDIT_LOG", audit)  # the real one is the repo's
+    for argv in (
+        ["feedback", "erase", "--user", "abhi"],
+        ["feedback", "erase", "--user", "abhi", "--dry-run"],
+    ):
+        with pytest.raises(SystemExit) as stop:
+            cli.main(argv)
+        assert stop.value.code == 0 and not audit.exists()
+    assert "dry run" in capsys.readouterr().out
+    with pytest.raises(SystemExit) as stop:
+        cli.main(["feedback", "erase", "--user", "abhi", "--dry-run", "--yes"])
+    assert stop.value.code == 2 and not audit.exists()
+    with pytest.raises(SystemExit) as stop:
+        cli.main(["feedback", "erase", "--user", "abhi", "--yes"])
+    out = capsys.readouterr().out
+    assert (
+        stop.value.code == 0 and "reminder: backups" in out and "private" not in audit.read_text()
+    )
+    with pytest.raises(SystemExit) as stop:
+        cli.main(["feedback", "retain", "--older-than-days", "30", "--yes"])
+    assert stop.value.code == 0 and len(audit.read_text().splitlines()) == 2
 
 
 def test_golden_candidates_and_curate_parse_and_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -119,26 +119,29 @@ def feedback_sink(given: FeedbackSink | None, live: bool, data_url: str) -> Feed
 
 
 def request_sink(given: FeedbackSink | None, live: bool, data_url: str) -> FeedbackSink:
-    """``feedback_sink`` for the missing-feature requests (``feedback/feature_requests``)."""
+    """The sink of the missing-feature request log: ``given`` (tests), else the recorder of
+    ``feedback/feature_requests`` when the app is the served one, else one that records nothing."""
     if given is not None:
         return given
     return open_request_recorder(data_url) if live else NoFeedback()
 
 
-def record_missing_requests(
+def record_requests(
     sink: FeedbackSink,
     user: str,
-    items: Sequence[MissingLike],
+    missing: Sequence[MissingLike],
     sentence: str,
     call_id: str | None,
     session_id: str,
 ) -> None:
-    """Queue a draft's ``missing`` items as the user's requests (the span only, never the
-    sentence); never raises."""
+    """The draft's ``missing`` items (as the server kept them) in the request log; nothing for a
+    draft with none. Swallows its own failure, like every function here."""
+    if not missing:
+        return
     try:
-        record_missing(sink, user, items, sentence, call_id=call_id, draft_session_id=session_id)
+        record_missing(sink, user, missing, sentence, call_id=call_id, draft_session_id=session_id)
     except Exception:
-        log.exception("missing-feature requests not recorded")
+        log.exception("the missing-feature requests were not recorded")
 
 
 def record_requested(
@@ -276,6 +279,37 @@ def _saved(
         log.exception("%s not recorded", event)
 
 
+def record_draft_saved(
+    sink: FeedbackSink,
+    memory: DraftMemory,
+    session_id: str | None,
+    user: str,
+    screener_id: str,
+    document: Mapping[str, Any],
+) -> None:
+    """``draft_saved``: call after the draft was stored; ``document`` is what was stored."""
+    _saved(sink, memory, events.DRAFT_SAVED, session_id, user, screener_id, document, None)
+
+
+def record_finalised(
+    sink: FeedbackSink,
+    memory: DraftMemory,
+    session_id: str | None,
+    user: str,
+    screener_id: str,
+    document: Mapping[str, Any] | None,
+    finalised_hash: str,
+) -> None:
+    """``screen_finalised``: call after the version was written; ``document`` the draft that
+    became it (``None``: unreadable, nothing is recorded), ``finalised_hash`` ``Finalised.hash``."""
+    if document is None:
+        return
+    _saved(
+        sink, memory, events.SCREEN_FINALISED, session_id, user, screener_id, document,
+        finalised_hash,
+    )  # fmt: skip
+
+
 def record_choices(
     sink: FeedbackSink,
     memory: DraftMemory,
@@ -312,34 +346,3 @@ def record_choices(
                 log.exception("%s not recorded", choice.event)
     except Exception:
         log.exception("choices not recorded")
-
-
-def record_draft_saved(
-    sink: FeedbackSink,
-    memory: DraftMemory,
-    session_id: str | None,
-    user: str,
-    screener_id: str,
-    document: Mapping[str, Any],
-) -> None:
-    """``draft_saved``: call after the draft was stored; ``document`` is what was stored."""
-    _saved(sink, memory, events.DRAFT_SAVED, session_id, user, screener_id, document, None)
-
-
-def record_finalised(
-    sink: FeedbackSink,
-    memory: DraftMemory,
-    session_id: str | None,
-    user: str,
-    screener_id: str,
-    document: Mapping[str, Any] | None,
-    finalised_hash: str,
-) -> None:
-    """``screen_finalised``: call after the version was written; ``document`` the draft that
-    became it (``None``: unreadable, nothing is recorded), ``finalised_hash`` ``Finalised.hash``."""
-    if document is None:
-        return
-    _saved(
-        sink, memory, events.SCREEN_FINALISED, session_id, user, screener_id, document,
-        finalised_hash,
-    )  # fmt: skip

@@ -3,8 +3,8 @@ over the caller's catalogue (the document, what was dropped and why, the model's
 ``draft_session_id`` that ties it to the screen later saved from it (the body may carry the
 previous one, so the descriptions of one screen are one session). An empty or over-long
 sentence: 400; the model off or not answering: 503. The feedback events of the draft are recorded
-in the background (ADR 0066) and never fail the request; what the draft lists as missing is
-queued as the user's own feature requests (the span, never the sentence)."""
+in the background (ADR 0066), and so are its missing-feature requests (the span, never the
+sentence); neither ever fails the request."""
 
 from fastapi import APIRouter
 
@@ -22,8 +22,8 @@ def draft_from_text(
     ctx: Context,
     model: TextModelDep,
     sink: Feedback,
-    drafts: Drafts,
     requests: Requests,
+    drafts: Drafts,
     screener_id: str,
     body: DraftFromTextBody,
 ) -> ScreenDraft:
@@ -38,7 +38,7 @@ def draft_from_text(
         (result.call_id,) if result.call_id else (), ctx.features,
         PROMPT_VERSION, seq, result.notes,
     )  # fmt: skip
-    feedback.record_missing_requests(
+    feedback.record_requests(
         requests, user, result.missing, body.text, result.call_id, session_id
-    )  # what the trader asked for and the catalogue lacks (ADR 0066 amendment)
+    )  # what the sentence asks and no field answers
     return ScreenDraft.model_validate(result).model_copy(update={"draft_session_id": session_id})

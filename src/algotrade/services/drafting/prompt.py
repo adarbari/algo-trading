@@ -32,8 +32,9 @@ from algotrade.services.drafting.retrieval import FIELD_REF, select_slice
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
 # Bump with any change to the prompt: the usage log records it (ADR 0058). 2: index + slice;
-# 3: formulas, missing and unresolved in the answer, and the open backlog keys.
-PROMPT_VERSION = "3"
+# 3: formulas, missing and unresolved in the answer, and the open backlog keys; 4: a phrasebook
+# entry shows its structured thresholds.
+PROMPT_VERSION = "4"
 
 TASK = """\
 You turn a trader's sentence into the criteria of a rule screen over a catalogue of stored
@@ -263,7 +264,29 @@ def phrase_line(phrase: Phrase, catalogue: set[str]) -> str | None:
     if not fields:
         return None
     hint = " ".join(phrase.hint.split())
-    return f"{' / '.join(phrase.say)} | {', '.join(fields)} | {hint or '-'}"
+    line = f"{' / '.join(phrase.say)} | {', '.join(fields)} | {hint or '-'}"
+    exact = _structured_text(phrase, catalogue)
+    return f"{line} | = {exact}" if exact else line
+
+
+def _structured_text(phrase: Phrase, catalogue: set[str]) -> str:
+    """The entry's structured meaning, compact: ``field op value`` joined by `` and `` (every
+    criterion applies), or the readings of an ambiguous word (``label: criterion``, the default
+    first); empty without one or when a field is not in this catalogue."""
+    if phrase.criteria:
+        if all(c.field in catalogue for c in phrase.criteria):
+            return " and ".join(c.short() for c in phrase.criteria)
+        return ""
+    if not phrase.alternatives or any(
+        a.criterion.field not in catalogue for a in phrase.alternatives
+    ):
+        return ""
+    order = [
+        phrase.default_index,
+        *(i for i in range(len(phrase.alternatives)) if i != phrase.default_index),
+    ]
+    readings = (phrase.alternatives[i] for i in order)
+    return "one of " + "; ".join(f"{a.label}: {a.criterion.short()}" for a in readings)
 
 
 def _value(value: Any) -> str:

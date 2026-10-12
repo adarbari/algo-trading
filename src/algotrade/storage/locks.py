@@ -17,6 +17,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Protocol
 
+# Held by the API's feedback and usage recorders for each flush and by the owner-run retention
+# for a whole rewrite (``services/feedback/retention.py``), so a batch never commits inside one.
+FEEDBACK_WRITERS = "feedback-writers"
+
 
 class Lock(Protocol):
     def acquire(self, wait: bool = True) -> bool:

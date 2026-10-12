@@ -151,6 +151,33 @@ class TableStore(Protocol):
         the edge ledger, whose kept runs' partitions are spared); -> partitions deleted."""
         ...
 
+    def partition_runs(self, table: str, session_date: date) -> list[str]:
+        """The committed runs of one partition, oldest commit first (runs with no commit
+        sequence, from before ADR 0022, first). Empty: no such partition."""
+        ...
+
+    def purge_runs(self, table: str, session_date: date, runs: Collection[str]) -> int:
+        """Delete these committed runs of one partition, files included (an unknown id is
+        ignored; a run not named is never touched, so a commit that landed meanwhile is kept);
+        committed like ``purge_before`` (the published sequence moves on; a read pinned to an
+        older one retries). Raises ``PartitionBusyError`` when a pending run has written to the
+        partition (nothing is deleted: try again). -> runs deleted. An admin rewrite
+        (``services/feedback/retention.py``), never part of a run."""
+        ...
+
+    def sweep_orphans(self, table: str, session_date: date) -> int:
+        """Delete the data files of one partition that no run of its index names (what a crash
+        between rewriting the index and deleting a file leaves); a pending run's files are never
+        touched, nor a file younger than a minute (a direct write about to be indexed). Raises
+        ``PartitionBusyError`` when a pending run has written to the partition. The caller must
+        hold the table's writers lock (``storage.locks.FEEDBACK_WRITERS``).
+        -> files deleted (a backend that keeps no loose files: 0)."""
+        ...
+
+
+class PartitionBusyError(RuntimeError):
+    """A pending run is writing to the partition: ``purge_runs`` deleted nothing."""
+
 
 class RawStore(Protocol):
     """Vendor responses exactly as received (ADR 0006), kept for a retention window."""

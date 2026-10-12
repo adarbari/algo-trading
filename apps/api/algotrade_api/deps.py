@@ -307,14 +307,14 @@ def get_feedback(request: Request) -> FeedbackSink:
     return cast(FeedbackSink, request.app.state.feedback)
 
 
+def get_requests(request: Request) -> FeedbackSink:
+    """Where the missing-feature requests of a draft go (ADR 0066 amendment)."""
+    return cast(FeedbackSink, request.app.state.requests)
+
+
 def get_drafts(request: Request) -> DraftMemory:
     """The drafts the model returned, remembered for the save that follows (ADR 0066)."""
     return cast(DraftMemory, request.app.state.drafts)
-
-
-def get_requests(request: Request) -> FeedbackSink:
-    """Where the missing-feature requests of a draft go (``feedback/feature_requests``)."""
-    return cast(FeedbackSink, request.app.state.requests)
 
 
 Feedback = Annotated[FeedbackSink, Depends(get_feedback)]
