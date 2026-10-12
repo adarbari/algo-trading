@@ -10,7 +10,7 @@ term = "Describe it: Applied"
 short = "The criteria the draft loaded into the Builder from fields the catalogue already has."
 body = """
 Every row in this group reads a stored field, so the screen can run on it as soon as you save. The rows are an unsaved edit: change or remove any of them before you save.
-The words in your sentence that became these rows are underlined with a solid line.
+Each part of your sentence that became rows has its own card, headed by your words.
 A sentence can name a field the catalogue does not have. It is then left out of this group and listed under not available yet.
 """
 see_also = ["describe_needs_your_call", "describe_not_available_yet", "draft"]
@@ -90,6 +90,75 @@ The draft wrote the criterion for you, but it reads a formula that is still pend
 """
 see_also = ["describe_pending_formula", "describe_proposed_formulas"]
 next = "Accept the formula to switch the row on, or remove the row."
+
+# ---------------------------------------------------------------- the parts of a sentence
+
+[[term]]
+id = "describe_part_reading"
+term = "Describe it: We read this as"
+short = "The plain-language meaning the draft gave one part of your sentence, shown under your own words."
+body = """
+Each card quotes your words, then says how the draft read them, then lists the rows it built. The rows are what the screen runs on. The reading is only a summary of them.
+A reading marked "check this reading" was not written by the model, or could not be matched to the rows (a number in the text that no row holds). Trust the rows, not the sentence, and fix whichever is wrong.
+Example: "liquid" read as "over $50M traded a day" has a row on dollar volume at 50,000,000. If the row says 10,000,000, the reading is the one to distrust.
+"""
+see_also = ["describe_applied", "describe_needs_your_call"]
+next = "Compare the reading with the rows under it, and edit a row or pick another reading if they differ."
+
+[[term]]
+id = "describe_part_not_understood"
+term = "Describe it: Not understood"
+short = "Words in your sentence that the draft could not turn into any row, formula or missing feature."
+body = """
+The draft found no field, formula or missing feature for these words, so nothing in the screen comes from them. They are shown so you can see what was skipped, instead of a screen that looks complete.
+This happens with vague words ("good", "blue skies") and with words about something the app does not measure at all.
+Do not assume the screen covers them: it does not.
+"""
+see_also = ["describe_applied", "describe_not_available_yet"]
+next = "Reword the sentence with a measurable idea and draft again, or add a criterion by hand."
+
+[[term]]
+id = "describe_part_kept"
+term = "Describe it: Kept from your screen"
+short = "Criteria already in your screen that none of the words in your sentence asked for."
+body = """
+A draft replaces the criteria it understood and keeps the ones you had that the sentence did not mention. They sit in this card so every row in the screen has a place on the page.
+A card marked "not tied to your words" holds rows the draft added that no part of the sentence explains. Check each one before you save.
+"""
+see_also = ["describe_applied", "describe_part_reading"]
+next = "Keep the rows you still want and remove the others from the criteria list."
+
+[[term]]
+id = "describe_part_edited"
+term = "Describe it: Edited"
+short = "You changed or removed a row of this part after the draft loaded it."
+body = """
+The mark appears when a row of the card is no longer the one the draft produced. Picking another reading the draft offered is not an edit: it is one of the draft's own options.
+The reading shown on the card is the draft's, not yours. After an edit it may no longer match the rows, so read the rows.
+"""
+see_also = ["describe_part_reading", "describe_needs_your_call"]
+next = "Read the rows under the card, and save the screen when they say what you mean."
+
+[[term]]
+id = "describe_part_rank"
+term = "Describe it: Ranked by"
+short = "The field your screen orders its results by, set by the words of this part."
+body = """
+When your sentence says how to order the results ("rank by momentum"), the draft sets the screen's tie-break to that field and shows it in the card for those words. The ranking decides the order of the instruments that pass, not which ones pass.
+Without a card, a ranking sentence would show as not understood.
+"""
+see_also = ["describe_part_reading", "describe_applied"]
+
+[[term]]
+id = "describe_suggested"
+term = "Describe it: Suggested"
+short = "A protective check the draft offers beside your own criteria, never added until you say so."
+body = """
+A suggestion is a soft or score criterion, such as a limit on the bid-ask spread, that the draft thinks a screen like yours should have. Each one says why it was raised.
+Add puts it in the screen as a new row you can edit. Skip leaves it out. Nothing is added on its own, and a suggestion never makes a hard filter.
+"""
+see_also = ["describe_applied", "describe_part_reading"]
+next = "Add a suggestion to try it in the preview, or Skip it to keep the screen as you wrote it."
 
 # ---------------------------------------------------------------- how hard a missing field is to add
 

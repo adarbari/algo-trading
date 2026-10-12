@@ -44,12 +44,11 @@ export function DescribeScreen() {
             builder.addNotes((answer.missing ?? []).map((item) => item.description));
           }}
           renderTermHelp={termHelp}
-          renderReview={({ answer, text, serial }) => (
+          renderReview={({ answer, serial }) => (
             <Suspense fallback={<Skeleton lines={3} label="Loading the review" />}>
               <DraftReview
                 key={serial}
                 answer={answer}
-                text={text}
                 document={builder.document}
                 formulaStates={builder.formulaStates}
                 notes={builder.notes}
@@ -59,6 +58,9 @@ export function DescribeScreen() {
                 onPickReading={(criterion, choice) => {
                   builder.setCriterion(criterion);
                   builder.recordChoice(choice);
+                }}
+                onAcceptSuggestion={(criterion) => {
+                  builder.addSuggested(criterion);
                 }}
                 renderFieldHelp={renderFieldHelp}
               />

@@ -393,8 +393,9 @@ export async function mockBuilderApi(
 }
 
 /*
- * Describe it: answers any sentence with one applied criterion and one proposed formula whose
- * criterion waits for the trader's decision, and records what the page sent. Register it after
+ * Describe it: answers any sentence with one applied criterion, one proposed formula whose
+ * criterion waits for the trader's decision and one suggested soft check, as explained parts (one
+ * card each), and records what the page sent. Register it after
  * `mockBuilderApi` (the later route is tried first; anything else falls through to it).
  */
 export const FORMULA_NAME = 'draft_iv_over_hv';
@@ -425,6 +426,50 @@ const FORMULA = {
   },
 };
 
+export const SUGGESTION_FIELD = 'rollup.price_stats@v2.hv30';
+
+const SUGGESTION = {
+  id: 'sg1',
+  criterion: { field: SUGGESTION_FIELD, op: 'lte', value: 0.8, mode: 'soft' },
+  source: 'hv30',
+  why: 'A very high realised volatility makes the premium easy to lose',
+};
+
+const PART = {
+  start: 0,
+  end: 0,
+  rank: false,
+  reading_source: 'model',
+  origin: 'words',
+  dropped: [],
+  missing: [],
+};
+
+const PARTS = [
+  {
+    ...PART,
+    id: 'p1',
+    words: 'IV above HV',
+    reading: 'implied volatility higher than realised volatility',
+    kind: 'formula',
+    criteria: [],
+    formulas: [FORMULA_NAME],
+    unresolved: [],
+    suggestions: [],
+  },
+  {
+    ...PART,
+    id: 'p2',
+    words: 'and above 50%',
+    reading: 'implied volatility at least 0.5',
+    kind: 'applied',
+    criteria: ['iv30'],
+    formulas: [],
+    unresolved: [],
+    suggestions: ['sg1'],
+  },
+];
+
 export interface DescribeMock {
   /** The body of every draft-from-text POST. */
   sentences: Json[];
@@ -449,6 +494,9 @@ export async function mockDescribeApi(page: Page): Promise<DescribeMock> {
         dropped: [],
         notes: [],
         formulas: [FORMULA],
+        suggestions: [SUGGESTION],
+        sentence: typeof body['text'] === 'string' ? body['text'] : '',
+        parts: PARTS,
         draft_session_id: 'sess-e2e',
       },
     });

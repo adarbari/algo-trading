@@ -129,7 +129,8 @@ export function criterionIds(
   return [...new Set([...baseIds(base), ...Object.keys(tableOf(document.criteria))])];
 }
 
-const tableFor = (criterion: Criterion): Record<string, unknown> => {
+/** The table the document holds for `criterion` (its keys but the id). */
+export const tableFor = (criterion: Criterion): Record<string, unknown> => {
   const { id: _id, ...keys } = criterion;
   return Object.fromEntries(Object.entries(keys).filter(([, v]) => v !== undefined));
 };
