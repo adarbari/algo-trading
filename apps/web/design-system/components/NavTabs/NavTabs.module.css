@@ -9,10 +9,6 @@
   scrollbar-width: none;
 }
 
-.item {
-  display: inline-flex;
-}
-
 .link {
   display: inline-flex;
   align-items: center;
