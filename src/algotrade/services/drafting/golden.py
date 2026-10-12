@@ -30,7 +30,10 @@ Layout (``root`` = ``tests/fixtures/drafting/golden``):
   ``"contract": true`` in ``expect`` marks a case written for the contract: CI replays its
   answer through the whole ``draft_screen``; its ``suggestions`` (``{offered, dropped, notes}``:
   fields offered, fields dropped, words a note must contain) are asserted by the replay, not
-  by ``score``.
+  by ``score``. ``expect.explained`` (``{parts: [{words, kind, origin, reading?}], model_share,
+  not_understood}``) is asserted by the replay through ``parts/scoring.py``: the served words,
+  kind and origin of each part (never the reading's text), the share of items the model placed
+  itself, how many parts were not understood.
 - ``answers/<model-slug>/<id>.json``: the model's raw answer text for that case, replayed in CI.
 
 To add a case: write ``cases/<id>.json``, record the model's raw answer into
@@ -80,6 +83,9 @@ class GoldenCase:
     suggested: Mapping[str, Any] = field(
         default_factory=dict
     )  # replay: offered / dropped fields, notes
+    explained: Mapping[str, Any] = field(
+        default_factory=dict
+    )  # replay: the parts expected (``parts/scoring.py``); empty: not checked
 
 
 @dataclass(frozen=True)
@@ -119,6 +125,7 @@ def load_cases(root: Path) -> tuple[GoldenCase, ...]:
                 raw.get("curated"),
                 bool(expect.get("contract", False)),
                 expect.get("suggestions", {}),
+                expect.get("explained", {}),
             )
         )
     return tuple(cases)

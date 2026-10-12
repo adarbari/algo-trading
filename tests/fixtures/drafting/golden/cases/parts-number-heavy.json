@@ -1,0 +1,97 @@
+{
+  "id": "parts-number-heavy",
+  "sentence": "stocks over $10 that gained over 5% in the last 20 days, with 14-day RSI under 40 and $25M or more traded a day",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "over $10",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.close"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 10,
+        "tolerance": 0
+      },
+      {
+        "span": "gained over 5% in the last 20 days",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.ret_20d"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.05,
+        "tolerance": 0
+      },
+      {
+        "span": "14-day RSI under 40",
+        "bucket": "A",
+        "fields": [
+          "rollup.momentum@v1.rsi_14"
+        ],
+        "op": [
+          "lt",
+          "lte"
+        ],
+        "value": 40,
+        "tolerance": 0
+      },
+      {
+        "span": "$25M or more traded a day",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.adv_usd_20d"
+        ],
+        "op": "gte",
+        "value": 25000000,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "stocks",
+          "kind": "applied",
+          "origin": "words"
+        },
+        {
+          "words": "over $10",
+          "kind": "applied",
+          "origin": "words",
+          "reading": "model"
+        },
+        {
+          "words": "gained over 5% in the last 20 days",
+          "kind": "applied",
+          "origin": "words",
+          "reading": "server"
+        },
+        {
+          "words": "14-day RSI under 40",
+          "kind": "applied",
+          "origin": "words",
+          "reading": "model"
+        },
+        {
+          "words": "$25M or more traded a day",
+          "kind": "applied",
+          "origin": "words",
+          "reading": "model"
+        }
+      ],
+      "model_share": 1.0
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "id": "parts-kept-from-current",
+  "sentence": "also require price above $25",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "price above $25",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.close"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 25,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type",
+      "instrument.optionable",
+      "feature.iv_rank"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "also require price above $25",
+          "kind": "applied",
+          "origin": "words",
+          "reading": "model"
+        },
+        {
+          "words": "",
+          "kind": "applied",
+          "origin": "kept"
+        }
+      ],
+      "model_share": 1.0
+    }
+  },
+  "criteria_in_force": [
+    {
+      "criteria": {
+        "optionable": {
+          "field": "instrument.optionable",
+          "op": "eq",
+          "value": true
+        },
+        "iv_rank": {
+          "field": "feature.iv_rank",
+          "op": "gte",
+          "value": 0.5
+        }
+      }
+    }
+  ]
+}

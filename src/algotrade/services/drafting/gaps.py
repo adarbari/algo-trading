@@ -29,6 +29,7 @@ from algotrade.services.drafting.answer_schema import (
     check_item,
 )
 from algotrade.services.drafting.formulas import Normalise
+from algotrade.services.drafting.parts.model import part_tag
 
 MAX_SLUG = 64
 MAX_MISSING = 5  # per answer, as are the lists below: the rest are cut, with a note
@@ -50,6 +51,7 @@ class MissingFeature:
     why_needed: str
     closest: tuple[str, ...]
     feasibility: str
+    part: str | None = None  # the part id the model tagged it with (explained parts)
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,7 @@ class Unresolved:
     span: str
     default_index: int
     alternatives: tuple[Alternative, ...]
+    part: str | None = None  # the part id the model tagged it with (explained parts)
 
 
 def missing_of(
@@ -111,6 +114,7 @@ def missing_of(
                     :MAX_CLOSEST
                 ],
                 feasibility=feasibility or (known.feasibility if known else "") or "UNCLEAR",
+                part=part_tag(item),
             )
         )
     return tuple(out), tuple(notes)
@@ -158,6 +162,7 @@ def unresolved_of(
                 _clean(item["span"]),
                 alternatives.index(default) if default else 0,
                 tuple(alternatives),
+                part_tag(item),
             )
         )
     return tuple(out), tuple(notes)

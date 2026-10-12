@@ -104,6 +104,23 @@ def parquet_files(backend: Backend) -> int:
     return len(list(backend.root.rglob("*.parquet")))
 
 
+def test_retain_nulls_the_explained_parts_with_the_payload_they_are_in(backend: Backend) -> None:
+    """``draft_returned.payload.parts`` holds the trader's words and the model's readings of them:
+    the same 12 months as the sentence, nulled with the payload (ADR 0066, explained parts)."""
+    parts = [{"id": "p1", "words": SECRET, "reading": "Stocks like " + SECRET, "kind": "applied"}]
+    old = feedback_row(OLD, "abhi", "draft_returned") | {"payload": json.dumps({"parts": parts})}
+    young = feedback_row(YOUNG, "abhi", "draft_returned") | {
+        "payload": json.dumps({"parts": parts})
+    }
+    record(backend, [old], [], OLD)
+    record(backend, [young], [], YOUNG)
+    retention.retain(backend, NOW, apply=True)
+    fb = events(backend)
+    assert fb.iloc[0]["payload"] is None or pd.isna(fb.iloc[0]["payload"])  # the old row: nulled
+    assert SECRET in str(fb.iloc[1]["payload"])  # the young one is kept
+    assert not any(SECRET in str(v) for v in fb.iloc[0].tolist())
+
+
 def test_retain_nulls_only_old_rows_and_keeps_the_skeleton(backend: Backend) -> None:
     seed(backend)
     done = retention.retain(backend, NOW, apply=True)

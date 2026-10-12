@@ -38,6 +38,7 @@ def draft_from_text(
         (result.call_id,) if result.call_id else (), ctx.features,
         PROMPT_VERSION, seq, result.notes,
         [u.term for u in result.unresolved], [f.name for f in result.formulas],
+        feedback.parts_payload(result.parts),
     )  # fmt: skip
     feedback.record_requests(
         requests, user, result.missing, body.text, result.call_id, session_id

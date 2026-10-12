@@ -1066,6 +1066,86 @@ export interface components {
             /** Value */
             value: unknown;
         };
+        /** Part */
+        Part: {
+            /**
+             * Criteria
+             * @description ids of criteria in the draft document
+             */
+            criteria: string[];
+            /**
+             * Dropped
+             * @description ids of the criteria dropped
+             */
+            dropped: string[];
+            /**
+             * End
+             * @description end offset of words in sentence, in UTF-16 code units
+             */
+            end: number;
+            /**
+             * Formulas
+             * @description names of pending formulas
+             */
+            formulas: string[];
+            /**
+             * Id
+             * @description p1... from the model; g1... a gap; kept / unplaced: catch-alls with no words
+             */
+            id: string;
+            /**
+             * Kind
+             * @description decided by the server from what the part holds, never by the model
+             * @enum {string}
+             */
+            kind: "applied" | "formula" | "needs_choice" | "not_available" | "not_understood";
+            /**
+             * Missing
+             * @description keys (or new slugs) of the missing-feature requests
+             */
+            missing: string[];
+            /**
+             * Origin
+             * @description words: a part of the model, located in the sentence; gap: words no part covers; kept: criteria carried over from the Builder's document; unplaced: items tied to no words (kept and unplaced have no words)
+             * @enum {string}
+             */
+            origin: "words" | "gap" | "kept" | "unplaced";
+            /**
+             * Rank
+             * @description true when the document's tie-break belongs to this part
+             */
+            rank: boolean;
+            /**
+             * Reading
+             * @description what the model read the words as; null when it gave none or its numbers disagree with the part's criteria (then reading_source is server)
+             */
+            reading: string | null;
+            /**
+             * Reading Source
+             * @enum {string}
+             */
+            reading_source: "model" | "server";
+            /**
+             * Start
+             * @description offset of words in sentence, in UTF-16 code units (JS slice)
+             */
+            start: number;
+            /**
+             * Suggestions
+             * @description ids of suggestions
+             */
+            suggestions: string[];
+            /**
+             * Unresolved
+             * @description terms of the unresolved readings
+             */
+            unresolved: string[];
+            /**
+             * Words
+             * @description the sentence's own words for this part; empty for a catch-all
+             */
+            words: string;
+        };
         /**
          * Period
          * @description Which trades: the backtest's in-sample or out-of-sample side, the live paper record, all.
@@ -1375,8 +1455,18 @@ export interface components {
              * @description what the model could not map or assumed
              */
             notes: string[];
+            /**
+             * Parts
+             * @description the explained parts, in sentence order (catch-alls last); null when the model gave none: show the draft without them
+             */
+            parts?: components["schemas"]["Part"][] | null;
             /** Screener Id */
             screener_id: string;
+            /**
+             * Sentence
+             * @description the whitespace-normalised sentence the parts' offsets count in
+             */
+            sentence?: string;
             /**
              * Suggestions
              * @description protective checks offered (soft or score), never in the document: the trader accepts or skips each
@@ -1474,6 +1564,11 @@ export interface components {
             criterion: {
                 [key: string]: unknown;
             };
+            /**
+             * Id
+             * @description the server's id (s1, s2...), what a part's suggestions name
+             */
+            id: string;
             /**
              * Source
              * @description the field guide entry or field that raised it

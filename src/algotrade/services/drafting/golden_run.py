@@ -57,6 +57,8 @@ from algotrade.config.site.llm import LlmSettings, ProviderSettings, Rate
 from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.drafting.golden import GoldenCase, load_cases, mark_recorded, score
+from algotrade.services.drafting.parts.model import PartsStats
+from algotrade.services.drafting.parts.scoring import aggregate
 from algotrade.services.drafting.screens import ScreenDraft, draft_screen
 from algotrade.services.read.context import ReadContext
 from algotrade.services.text_model.model import TextModel
@@ -268,6 +270,7 @@ class CallResult:
     answer_chars: int | None = None
     rate_limit_retries: int = 0
     suggestions: int = 0  # checks the draft offered (never scored: counted and reported)
+    parts: PartsStats | None = None  # how its explained parts were made (None: it had none)
 
 
 @dataclass
@@ -372,6 +375,7 @@ def _call(
         fields=fields,
         dropped=drops,
         suggestions=len(made.suggestions),
+        parts=made.parts_stats,
     )
 
 
@@ -387,13 +391,14 @@ def _result(
     error: str | None = None,
     dropped: tuple[Drop, ...] = (),
     suggestions: int = 0,
+    parts: PartsStats | None = None,
 ) -> CallResult:
     if got is None:
         return CallResult(provider, case_id, status, error=error)
     return CallResult(
         provider, case_id, status, passed, fields, got.model, got.input_tokens,
         got.output_tokens, got.cache_read_tokens, got.cache_write_tokens, got.latency_s,
-        costs.cost_of(got.call_id), got.text, error, dropped, len(got.text), 0, suggestions,
+        costs.cost_of(got.call_id), got.text, error, dropped, len(got.text), 0, suggestions, parts,
     )  # fmt: skip
 
 
@@ -447,6 +452,7 @@ def measure(results: Sequence[CallResult]) -> dict[str, Any]:
         "latency_p90_s": percentile(latencies, 0.9),
         "cost_usd": sum(costs) if costs else None,
         "suggestions": sum(r.suggestions for r in results),
+        "parts": aggregate(r.parts for r in answered),
         **drop_metrics(results),
     }
 
@@ -518,6 +524,17 @@ def _row(label: str, m: Mapping[str, Any]) -> str:
     )
 
 
+def _parts_line(parts: Mapping[str, Any]) -> str:
+    """The explained-parts measures of a provider: drafts with parts, the share of items the model
+    placed itself, of its parts located in the sentence, the parts not understood, and the share
+    of its readings that kept their numbers (never the text of a reading)."""
+    return (
+        f"  parts: {parts['with_parts']} drafts, model placed {_fmt(parts['model_share'], '.0%')}, "
+        f"located {_fmt(parts['located_share'], '.0%')}, not understood {parts['not_understood']}, "
+        f"readings kept {_fmt(parts['readings_kept'], '.0%')}"
+    )
+
+
 HEADER = (
     f"{'provider / case':<34} {'calls':>5} {'pass':>6} {'consis':>6} {'invalid':>7} {'unav.':>5} "
     f"{'in':>7} {'out':>6} {'c.read':>7} {'c.write':>7} {'p50 s':>6} {'p90 s':>6} {'USD':>8}"
@@ -532,6 +549,7 @@ def report_lines(rep: Mapping[str, Any]) -> list[str]:
         lines += ["", f"{provider} ({', '.join(data['models']) or 'no answer'})", HEADER]
         lines += [_row(f"  {cid}", m) for cid, m in data["cases"].items()]
         lines.append(_row("  TOTAL", data["summary"]))
+        lines.append(_parts_line(data["summary"]["parts"]))
     lines += ["", "summary", HEADER]
     lines += [_row(p, d["summary"]) for p, d in rep["providers"].items()]
     if rep["stopped"]:

@@ -9,8 +9,9 @@ timestamps or ids, so the same catalogue, phrasebook and guide give the same byt
 prompt cache hits and a recorded test stays valid). The prompt carries no market data, results
 or credentials.
 
-The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 7: the A / B / C answer contract, the
-open backlog keys most relevant to the sentence, the index grouped by prefix): the task, the
+The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 8: the A / B / C answer contract,
+the explained parts, the open backlog keys most relevant to the sentence, the index grouped by
+prefix): the task, the
 examples and an index of every field (grouped under one heading per prefix: type, unit) as a prefix
 no sentence changes, then in detail only the fields ``retrieval.select_slice`` picks for the
 sentence, capped by a token budget (``PROMPT_BUDGET_TOKENS``: text added to the prompt shrinks the
@@ -39,8 +40,9 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 # 3: formulas, missing and unresolved in the answer, and the open backlog keys; 4: a phrasebook
 # entry shows its structured thresholds; 5: the index grouped by prefix and the slice capped by a
 # token budget; 6: the phrasebook's last column is headed "exact default"; 7: protective checks
-# are ``suggestions``, never criteria, and no threshold is invented for a vague word.
-PROMPT_VERSION = "7"
+# are ``suggestions``, never criteria, and no threshold is invented for a vague word; 8: explained
+# parts (``parts`` and a ``part`` tag on every item, ``services/drafting/parts``).
+PROMPT_VERSION = "8"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 
@@ -64,6 +66,7 @@ Each criterion is an object with:
   for 20% of the threshold; omit for hard
 - "on_miss": for soft only: "WATCH" (default), "LIQUIDITY_RISK" or "EVENT_RISK"
 - "why": the words of the sentence this criterion comes from
+- "part": the id of its part (see "parts"); null only when kept from the current criteria
 
 Rules:
 - Use only catalogue fields. Never invent a field: when the sentence asks for something the
@@ -92,10 +95,17 @@ Rules:
   offer "unresolved" readings when fields fit, else a note.
 
 Answer shape:
-{"criteria": [ ... ], "tie_break": {"field": "...", "descending": true} or null,
+{"criteria": [ ... ], "tie_break": {"field": "...", "descending": true, "part": "p3"} or null,
  "notes": ["anything you could not map, or assumed"],
  "formulas": [ ... ] or null, "missing": [ ... ] or null, "unresolved": [ ... ] or null,
- "suggestions": [ ... ] or null}
+ "suggestions": [ ... ] or null, "parts": [ ... ]}
+
+"parts": the sentence split in order, 1 to 12 parts, one per thing the trader asks for:
+{"id": "p1", "words": their own words, copied exactly, "reading": one short line (160 characters at
+most), what we read this as, with only numbers its criteria hold (10% is 0.1)}. No overlaps; skip
+connectors. Words you cannot map are still a part, with no item. Every criterion, formula, missing,
+unresolved, suggestion and the tie_break carries "part"; scaffolding (status ACTIVE) goes with the
+part naming the kind of instrument.
 
 Each part of the sentence goes in one place. A: a criterion on a catalogue field (preferred). B: a
 formula, only when maths over fields says it and no field does. C: missing, when neither can. Never
@@ -103,22 +113,25 @@ guess a field to fill a gap.
 
 "formulas": [{"name": "draft_<slug>", "expr", "dtype": "float|bool|str|date", "unit", "description",
 "null_meaning", "inputs": [the names expr reads], "criterion": {"op", "value", "mode",
-"tolerance"} or null}]. A formula is maths on one session's values: "rollup.<group>@vN.<column>" is
-written <group>.<column>, "feature.<name>" is written <name> (no instrument.* fields); + - * /
+"tolerance"} or null, "part"}]. A formula is maths on one session's values:
+"rollup.<group>@vN.<column>" is written <group>.<column>, "feature.<name>" is written <name> (no
+instrument.* fields); + - * /
 comparisons and or not; if(c, a, b) abs min max log sqrt ncdf clip(x, lo, hi) coalesce is_null
 one_of(x, a, ...) exists(group). No lag, window, rolling or history: anything over time is
 "missing" with ROLLUP_FROM_STORED. A formula equal to a catalogue field is dropped: use the field.
 
 "missing": [{"key": an open key from "Open requests" below, else null, "new_key_slug" (a-z0-9_) when
 key is null, "span", "description", "why_needed", "closest": [catalogue fields], "feasibility":
-"ROLLUP_FROM_STORED" (a window over stored data) | "NEEDS_SOURCE" (new data) | "UNCLEAR"}].
+"ROLLUP_FROM_STORED" (a window over stored data) | "NEEDS_SOURCE" (new data) | "UNCLEAR", "part"}].
 
 "suggestions": [{"field", "op", "value", "mode": "soft"|"score", "tolerance" (soft needs it),
-"on_miss", "why": the caveat, "source": field or null}], at most 5, shown to the trader to accept.
+"on_miss", "why": the caveat, "source": field or null, "part": the part whose words raised it}], at
+most 5, shown to the trader to accept.
 
-"unresolved": [{"term", "span", "default_index", "alternatives": [{"label", "criterion": a complete
-criterion}, 2 or 3]}] for a term with several readings ("liquid"); the server adds the default to
-the criteria, so do not list it there. Not for a term the phrasebook or field guide settles.
+"unresolved": [{"term", "span", "default_index", "part", "alternatives": [{"label", "criterion": a
+complete criterion}, 2 or 3]}] for a term with several readings ("liquid"); the server adds the
+default to the criteria, so do not list it there. Not for a term the phrasebook or field guide
+settles.
 """
 
 # Two worked examples (sentence -> answer), rendered into the task so a smaller model sees the
@@ -130,6 +143,7 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
             "criteria": [
                 {
                     "id": "active",
+                    "part": "p1",
                     "field": "instrument.status",
                     "op": "eq",
                     "value": "ACTIVE",
@@ -137,6 +151,7 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                 },
                 {
                     "id": "stocks",
+                    "part": "p1",
                     "field": "instrument.security_type",
                     "op": "in",
                     "value": ["COMMON_STOCK", "ADR"],
@@ -144,6 +159,7 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                 },
                 {
                     "id": "near_low",
+                    "part": "p3",
                     "field": "feature.pct_from_low_52w",
                     "op": "lte",
                     "value": 0.10,
@@ -153,6 +169,7 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                 },
                 {
                     "id": "momentum",
+                    "part": "p2",
                     "field": "rollup.price_stats@v2.ret_20d",
                     "op": "gt",
                     "value": 0,
@@ -160,6 +177,7 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                 },
                 {
                     "id": "rsi",
+                    "part": "p2",
                     "field": "rollup.momentum@v1.rsi_14",
                     "op": "gte",
                     "value": 50,
@@ -168,8 +186,25 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                     "why": "upward momentum",
                 },
             ],
-            "tie_break": {"field": "rollup.price_stats@v2.ret_20d", "descending": True},
+            "tie_break": {
+                "field": "rollup.price_stats@v2.ret_20d",
+                "descending": True,
+                "part": "p2",
+            },
             "notes": ["momentum read as a positive 20-day return; RSI only scores"],
+            "parts": [
+                {"id": "p1", "words": "stocks", "reading": "Active stocks and ADRs"},
+                {
+                    "id": "p2",
+                    "words": "upward momentum",
+                    "reading": "A positive 20-day return; RSI 14 at 50 or more only scores",
+                },
+                {
+                    "id": "p3",
+                    "words": "close to their 52-week low",
+                    "reading": "Within 10% of the 52-week low, a near miss of 5% still shown",
+                },
+            ],
         },
     ),
     (
@@ -179,18 +214,21 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
             "criteria": [
                 {
                     "id": "active",
+                    "part": "p1",
                     "field": "instrument.status",
                     "op": "eq",
                     "value": "ACTIVE",
                 },
                 {
                     "id": "stocks",
+                    "part": "p1",
                     "field": "instrument.security_type",
                     "op": "in",
                     "value": ["COMMON_STOCK", "ADR"],
                 },
                 {
                     "id": "liquid",
+                    "part": "p1",
                     "field": "rollup.price_stats@v2.adv_usd_20d",
                     "op": "gte",
                     "value": 50000000,
@@ -201,6 +239,7 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                 },
                 {
                     "id": "iv_rank",
+                    "part": "p2",
                     "field": "feature.iv_rank",
                     "op": "gte",
                     "value": 0.5,
@@ -209,6 +248,7 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                 },
                 {
                     "id": "no_earnings",
+                    "part": "p3",
                     "field": "rollup.earnings@v1.days_to_earnings",
                     "op": "gt",
                     "value": 10,
@@ -217,8 +257,26 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                     "on_miss": "EVENT_RISK",
                 },
             ],
-            "tie_break": {"field": "feature.iv_rank", "descending": True},
+            "tie_break": {"field": "feature.iv_rank", "descending": True, "part": "p4"},
             "notes": ["liquid read as $50M a day traded (no amount given)"],
+            "parts": [
+                {
+                    "id": "p1",
+                    "words": "liquid stocks",
+                    "reading": "Active stocks and ADRs at about $50M a day; 20% under still shown",
+                },
+                {
+                    "id": "p2",
+                    "words": "IV rank above 50%",
+                    "reading": "IV rank of 50% or more; 0.1 less is still shown",
+                },
+                {
+                    "id": "p3",
+                    "words": "no earnings in the next 10 sessions",
+                    "reading": "More than 10 days to the next earnings, 2 days of slack",
+                },
+                {"id": "p4", "words": "rank by IV rank", "reading": "Highest IV rank first"},
+            ],
         },
     ),
 )
@@ -451,12 +509,18 @@ def slice_for(
     room = PROMPT_BUDGET_TOKENS - SECTION_TOKENS
     room -= _tokens(_render(infos, sentence, bare, guide, keys))
     chosen = select_slice(sentence, infos, book, guide, room, weigh)
-    for _ in range(8):
-        over = _tokens(_render(infos, sentence, chosen, guide, keys)) - PROMPT_BUDGET_TOKENS
-        if over <= 0 or room <= 0:
-            break
-        room -= over
-        chosen = select_slice(sentence, infos, book, guide, room, weigh)
+    if _tokens(_render(infos, sentence, chosen, guide, keys)) > PROMPT_BUDGET_TOKENS:
+        # the weigher counts a field's own lines, not the situations it brings: find by halving
+        # the largest room whose whole prompt fits (the fewest fields when none does)
+        low, high = 0, room
+        chosen = select_slice(sentence, infos, book, guide, 0, weigh)
+        while high - low > 8:
+            mid = (low + high) // 2
+            plan = select_slice(sentence, infos, book, guide, mid, weigh)
+            if _tokens(_render(infos, sentence, plan, guide, keys)) <= PROMPT_BUDGET_TOKENS:
+                chosen, low = plan, mid
+            else:
+                high = mid
     total = _tokens(_render(infos, sentence, chosen, guide, keys))
     if total > PROMPT_BUDGET_TOKENS:  # the phrasebook, core fields and own features alone
         log.warning("drafting prompt over budget: %d > %d tokens", total, PROMPT_BUDGET_TOKENS)

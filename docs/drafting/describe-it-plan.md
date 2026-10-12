@@ -74,7 +74,7 @@ description match plus ~15 always-included core fields) = 9-12k tokens; (2) prom
 prefix: static text, site catalogue index, variable slice, the caller's own features, the sentence;
 (3) skip the model when the phrasebook resolves every clause; (4) cheap model first, escalate on invalid
 output after the repair, not on missing or unresolved items; (5) two phases: a local `draft-resolve` returns
-the A rows and alternatives at once, then the model call; (6) caps: compact keys, ~800 answer tokens,
+the A rows and alternatives at once, then the model call; (6) caps: compact keys, ~1,000 answer tokens (was ~800 before the explained parts: about 40 more per part),
 `reasoning_effort = low`; (7) result cache (none for drafting today: `TextCache` serves only explaining; not added by PR 3). Measured through `usage/llm_calls` (cache tokens, call id,
 prompt version, stage first / repair / escalate).
 
@@ -135,11 +135,18 @@ part: the trader's quoted words, "We read this as...", then its criteria, formul
 unplaced words are a "not understood" part, criteria tied to no words a "Kept from your screen" card. A part is
 fixed locally (another reading, edit rows) or by retyping its words (one scoped model call).
 
-- PR A, backend contract: model-side nullable `part` id on criteria, formulas, missing, unresolved and
+- PR A, backend contract (built, `services/drafting/parts/`, ADR 0041 amended 2026-10-11): model-side nullable `part` id on criteria, formulas, missing, unresolved and
   suggestions, plus top-level `parts [{id, words, reading}]`. Server-side (new folder `services/drafting/parts/`):
   locates each part's words in the sentence, attributes deterministically, decides the kind (needs_choice >
   formula > not_available > applied; no refs = not_understood), checks a numeric reading against the criteria,
-  caps 12 parts / 200 chars / 160 reading. `PROMPT_VERSION` 8; ADR 0041 amendment.
+  caps 12 parts / 200 chars / 160 reading. `PROMPT_VERSION` 8; ADR 0041 amendment. Built as decided, with:
+  offsets in UTF-16 units (served as `start` / `end` beside `words`), `parts` null when the model gave
+  none, the tie-break carrying a `part` (`rank` on the part, so "rank by X" is not "not understood"), a
+  server-assigned id on each suggestion, `slice_for` searching (halving) for the largest slice that fits
+  the 13k budget (the fixed eight steps stalled; the largest golden prompt is 12,999 tokens with the worst
+  padding), `why` and `notes` kept (the Builder shows both), six golden cases with hand-written answers
+  (`parts-*`; scored structurally, never the reading's text) and the golden run's four parts measures. The
+  web reads it in C1.
 - PR B, per-part re-draft: `POST /screeners/{id}/draft-part`, scoped prompt under 4k tokens, server-side merge,
   ledger kind `screener-draft-part`, feedback through `draft_requested` / `draft_returned` with payload
   `scope=part`, ADR 0066 amendment, daily cap per user (30 by default, `config/site/llm.toml`).
