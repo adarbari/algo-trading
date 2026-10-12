@@ -161,12 +161,16 @@ def ask_for_draft(
     system: str,
     user: str,
     make: Callable[[str], ScreenDraft],
+    finish: Callable[[ScreenDraft], ScreenDraft] | None = None,
 ) -> ScreenDraft:
     """Ask ``model`` (``system``, ``user``, tagged ``tag``) and return the draft ``make`` builds
     from its answer: the model is asked with the answer schema and ``make`` as its ``accept``
     check (an answer ``make`` refuses is repaired once, then handed to the next provider), and
-    the kept draft has its formulas dry-run once. The one asking path of a whole sentence
-    (``draft_screen``) and of one part of it (``services/drafting/redraft``)."""
+    the kept draft has its formulas dry-run once; ``finish`` (a part's merge) is then applied to
+    it, and a ``ConfigurationError`` from it rejects the answer in the usage log like any answer
+    that cannot be used, so the call does not count as one that returned a draft. The one asking
+    path of a whole sentence (``draft_screen``) and of one part of it
+    (``services/drafting/redraft``)."""
     drafted: list[tuple[str, ScreenDraft]] = []  # the answers accepted: text and its draft
 
     def check(text: str) -> None:
@@ -197,10 +201,11 @@ def ask_for_draft(
     try:
         if not drafted or drafted[-1][0] != completion.text:  # a model that did not check
             check(completion.text)
+        done = _finished(ctx, drafted[-1][1], completion.call_id)
+        return finish(done) if finish is not None else done
     except (ModelUnavailableError, ConfigurationError) as exc:  # an answer we cannot use
         reject_answer(model, tag, completion, str(exc), user, len(system) + len(user))
         raise
-    return _finished(ctx, drafted[-1][1], completion.call_id)
 
 
 def draft_words(
@@ -213,6 +218,7 @@ def draft_words(
     tag: CallTag,
     infos: Mapping[str, Any],
     phrasebook: Sequence[Phrase],
+    finish: Callable[[ScreenDraft], ScreenDraft] | None = None,
 ) -> ScreenDraft:
     """The draft of one part's ``words`` (a part's re-draft, ``services/drafting/redraft``): the
     model's answer to ``system`` / ``user``, with every item in the one part that holds the
@@ -221,6 +227,7 @@ def draft_words(
     return ask_for_draft(
         ctx, model, tag, system, user,
         lambda text: _draft(ctx, screener_id, text, infos, words, phrasebook, None, whole=True),
+        finish,
     )  # fmt: skip
 
 

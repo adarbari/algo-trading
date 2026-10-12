@@ -414,7 +414,7 @@ retyping just that part's words, which re-drafts only that part. This is the sec
   does: a new criterion the validator refuses is dropped with its message; one of the trader's own that it refuses is a
   400 (the merge never drops what the trader has): their criteria and tie-break are validated **before** the prompt is
   built, so the model is never asked about a screen that cannot be saved, and the document is bounded (60 criteria, each
-  with a `field` and an `op`). What only grows (notes, the dropped formulas and suggestions) keeps its newest 40, and a
+  with a `field` and an `op`). What only grows (notes, the dropped criteria, formulas and suggestions) keeps its newest 40 (the parts stop pointing at a dropped criterion that went), and a
   merged draft never carries more than 40 of any list, so it can always be sent back; the other parts' readings come
   back from the browser, so the feedback payload marks them `prior: client`; the request log gets only the requests the
   draft did not already have. The new part's reading is the model's only when nothing it described
@@ -429,8 +429,13 @@ retyping just that part's words, which re-drafts only that part. This is the sec
   reserved when the request is admitted, under a lock, so requests in flight count and cannot all pass the last place,
   and given back when the call fails, is refused or the merge fails. The recorder writes in the background, so this
   process also remembers the calls it made and counts the union (a call is counted once when it reaches the log; the
-  place's token is swapped for the call's id as soon as the model has answered). The day is the exchange calendar date
-  (owner decision 2026-10-12). One API process is assumed, as the usage ledger
+  place's token is swapped for the call's id as soon as the model has answered). A merge that fails after the model
+  answered rejects the answer in the usage log (`reject_answer`, as for any answer the app cannot use), so the call nets
+  to nothing there too (a test runs the chain, its ledger, the recorder and the cap together). One case is not netted and
+  is accepted: the bare-name fallback of a whole description (`screens.ask_for_draft`) returns a draft under a call whose
+  every answer was refused, so in the log that call counts as none; that path is `draft-from-text` and not a part
+  re-draft, and a part re-draft that took it holds its place only in memory until a restart. The day is the exchange
+  calendar date (owner decision 2026-10-12). One API process is assumed, as the usage ledger
   does (ADR 0058). A count that cannot be read fails closed (503). At the limit: `DailyLimitError`, HTTP 429 with
   `{detail, code: "part_redraft_limit", limit, retry_after_s}` and `Retry-After` (seconds to the exchange day turning),
   which the web shows its "limit reached" state on; the model is not asked and no feedback event is recorded. The

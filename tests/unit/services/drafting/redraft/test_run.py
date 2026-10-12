@@ -437,3 +437,20 @@ def test_what_only_grows_stays_within_what_the_next_request_may_carry(
     assert len(prior.notes) == len(prior.suggestions_dropped) == MAX_ITEMS
     assert prior.notes[-1].startswith("note 44 two") and len(prior.notes[-1]) <= MAX_TEXT
     assert "note 0 one" not in prior.notes  # the oldest went first
+
+
+def test_dropped_criteria_are_bounded_and_the_parts_stop_pointing_at_the_ones_gone(
+    ctx: ReadContext,  # noqa: F811
+) -> None:
+    invented = [{"id": f"x{n}", "field": f"rollup.nope@v1.x{n}", "op": "gt", "value": 1}
+                for n in range(MAX_ITEMS + 10)]  # fmt: skip
+    answer = answer_for("many things", PRICE_80, *invented)
+    done, _ = redraft(ctx, Canned(answer), "p2", "many things")
+    draft, p2 = done.draft, by_id(done.draft)["p2"]
+    kept = {d.id for d in draft.dropped}
+    assert len(draft.dropped) == MAX_ITEMS and len(kept) == MAX_ITEMS
+    assert set(p2.dropped) == kept  # every one that stayed is this part's
+    assert all(ref in kept for p in draft.parts or () for ref in p.dropped)  # no dangling ref
+    assert "x0" not in kept and f"x{MAX_ITEMS + 9}" in kept  # the oldest went first
+    # and what comes back is a request that holds together
+    check_request("my_screen", body_of(draft, "p3", "deep oi"))

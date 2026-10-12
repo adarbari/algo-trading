@@ -66,11 +66,17 @@ def redraft_part(
         open_keys(backlog, limit=len(backlog.items)),
     )  # fmt: skip
     tag = CallTag(USE_CASE, ctx.user.user_id, PROMPT_VERSION)
-    sub = draft_words(
-        ctx, model, req.screener_id, req.new_words, system, user, tag, infos, phrasebook
+    answered: list[ScreenDraft] = []  # the draft of the new words alone, before the merge
+
+    def finish(sub: ScreenDraft) -> ScreenDraft:
+        answered.append(sub)
+        asked(sub.call_id)
+        return merge_part(ctx, req, sub)  # a ConfigurationError here rejects the answer in the log
+
+    merged = draft_words(
+        ctx, model, req.screener_id, req.new_words, system, user, tag, infos, phrasebook, finish
     )
-    asked(sub.call_id)
-    merged = merge_part(ctx, req, sub)
+    sub = answered[0]
     known = {missing_ref(m) for m in req.prior.missing}  # recorded when they were asked
     fresh = tuple(m for m in sub.missing if missing_ref(m) not in known)
     return Redrafted(merged, req.part.id, req.old_words, req.new_words, fresh)

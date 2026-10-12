@@ -110,15 +110,37 @@ def merge_part(ctx: ReadContext, req: PartRequest, sub: ScreenDraft) -> ScreenDr
         fresh_id = _unique("s", {s.id for s in suggestions}, numbered=True)
         suggestions.append(replace(suggestion, id=fresh_id, part=None))
         mine.suggestions.append(fresh_id)
-    suggestions_dropped = [*prior.suggestions_dropped, *sub.suggestions_dropped]
     notes += [*mine.notes, *(n for n in sub.notes if n not in notes)]
     parts = _parts(req, sub, document, mine, others)
+    dropped, parts = _bounded(dropped, parts)
     return ScreenDraft(
         req.screener_id, document, tuple(dropped), _newest(dict.fromkeys(_clip(n) for n in notes)),
         call_id=sub.call_id, formulas=tuple(formulas), formulas_dropped=_newest(formulas_dropped),
         missing=tuple(missing), unresolved=tuple(unresolved), suggestions=tuple(suggestions),
-        suggestions_dropped=_newest(suggestions_dropped), sentence=req.merged, parts=parts,
+        suggestions_dropped=_newest([*prior.suggestions_dropped, *sub.suggestions_dropped]),
+        sentence=req.merged, parts=parts,
     )  # fmt: skip
+
+
+def _bounded(
+    dropped: list[DroppedCriterion], parts: tuple[Part, ...]
+) -> tuple[list[DroppedCriterion], tuple[Part, ...]]:
+    """At most ``MAX_ITEMS`` dropped criteria, the oldest going first, and the parts no longer
+    pointing at the ones gone."""
+    if len(dropped) <= MAX_ITEMS:
+        return dropped, parts
+    dropped = dropped[-MAX_ITEMS:]
+    alive = {d.id for d in dropped}
+    return dropped, tuple(_without_dropped(p, alive) for p in parts)
+
+
+def _without_dropped(part: Part, alive: set[str]) -> Part:
+    """``part`` pointing only at the dropped criteria that are still in the draft, its kind decided
+    again."""
+    if all(i in alive for i in part.dropped):
+        return part
+    held = replace(part, dropped=tuple(i for i in part.dropped if i in alive))
+    return replace(held, kind=kind_of(_groups(held)))
 
 
 def _newest[T](items: Iterable[T]) -> tuple[T, ...]:
