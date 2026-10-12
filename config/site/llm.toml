@@ -123,3 +123,11 @@ retries = 2                      # a busy provider (429, 5xx: Gemini's "high dem
 # daily_usd = 1.0
 # monthly_usd = 15.0
 # over = "free"
+
+# Limits per user (ADR 0041, amended 2026-10-12). `part_redrafts_per_day`: how many times one
+# user may retype a single part of a Describe-it draft (one scoped model call each) per exchange
+# calendar day; the next is refused with a "limit reached" answer until the day turns. Counted
+# from the usage log (usage/llm_calls), so a restart does not reset it; only a call that returned
+# a draft counts (a failed one gives its place back). 0 turns part re-drafts off. Absent: 30.
+[limits]
+part_redrafts_per_day = 30

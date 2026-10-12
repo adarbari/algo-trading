@@ -13,7 +13,7 @@ criterion of the draft (same field, op and value) or another suggestion, or is o
 duplicate is dropped quietly: there is nothing to report). ``why`` is the short reason shown
 beside it and ``source`` the field guide entry or field that raised it. Pure; writes nothing."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -142,6 +142,14 @@ def _detail(kind: str, n: int, message: str) -> str:
     model's words or values."""
     part = ".tolerance" if kind == "bad_value" and message.startswith("tolerance") else None
     return f"{kind}: suggestions[{n}]{part or _PATH.get(kind, '')}"
+
+
+def rewrites(criterion: Mapping[str, Any], held: Sequence[Mapping[str, Any]]) -> bool:
+    """Whether a suggested ``criterion`` repeats one of the ``held`` criteria or sets another
+    threshold on its field in the same direction (what ``suggestions_of`` drops quietly); a part's
+    re-draft applies it to the criteria of the other parts."""
+    asked = {(c["field"], _direction(c["op"])) for c in held}
+    return (criterion["field"], _direction(criterion["op"])) in asked
 
 
 def _direction(op: str) -> str:

@@ -191,6 +191,17 @@ section = "docs/adr/0033-screeners-run-nightly-and-on-request.md#decision"
 detect = [{ call = "OnDemandScreens" }]
 
 [[responsibility]]
+id = "part-redraft-limit"
+description = "The per-user daily cap on part re-drafts of a Describe-it draft (ADR 0041, amended 2026-10-12; `[limits] part_redrafts_per_day` of llm.toml, 30 by default): a user's calls of use case screener-draft-part on the exchange day, counted from the usage log (never a counter a restart resets) plus the calls this process made that the background recorder has not written yet, admitted under a lock, failing closed when the count cannot be read; at the limit a DailyLimitError (429, code part_redraft_limit)"
+owner = ["src/algotrade/services/drafting/redraft/cap.py"]
+allowed = [
+    "apps/api/algotrade_api/main.py",  # builds the one cap of the app
+    "apps/api/algotrade_api/deps.py",  # hands it to the route
+]
+section = "docs/adr/0041-natural-language-screener-drafts.md#amended-2026-10-12-re-draft-one-part-scoped-call-merge-daily-cap"
+detect = [{ call = "PartRedraftCap" }]
+
+[[responsibility]]
 id = "regime-explaining"
 description = "The market regime explained in plain words on request (ADR 0041, amended 2026-10-06): the prompt of the regime's facts and the allowed links (no market data beyond them, no user data, no credentials), the answer cleaned (links outside the list dropped, markdown removed) and number-checked against the facts, the explanation cache keyed by session, signals, question and model (the API's one derived-cache write, ADR 0005 exception), and the per-user rate limit; nothing is asked of the model unasked"
 owner = [
@@ -251,6 +262,7 @@ owner = [
     "src/algotrade/services/drafting/golden/*",
     "src/algotrade/services/drafting/parts/*",
     "src/algotrade/services/drafting/phrasebook/*",
+    "src/algotrade/services/drafting/redraft/*",
 ]
 allowed = [
     "apps/api/algotrade_api/routes/drafting/*",  # the thin route calls the one use case
