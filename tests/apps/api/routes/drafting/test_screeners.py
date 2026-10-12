@@ -310,3 +310,15 @@ def test_the_request_recorder_is_closed_at_shutdown(
     with _with_requests(api_golden[0], ANSWER, sink):
         assert not sink.closed
     assert sink.closed
+
+
+def test_an_item_the_server_drops_is_not_recorded(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    malformed = {"new_key_slug": "dropped_one", "span": "a squeeze"}  # fields missing: not kept
+    sink = Keep()
+    body = _asked(_with_requests(api_golden[0], ANSWER | {"missing": [*MISSING, malformed]}, sink))
+    assert [m["new_key_slug"] for m in body.json()["missing"]] == [
+        "held_two_years_score", "short_squeeze_score",
+    ]  # fmt: skip
+    assert "dropped_one" not in [r["ref"] for r in sink.rows] and len(sink.rows) == 2

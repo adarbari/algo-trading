@@ -166,7 +166,7 @@ Owner policy decided 2026-10-11.
 
 **Note (2026-10-11): the route records requests.** `draft-from-text` now calls `record_missing` for the
 draft's post-validation `missing` (never the model's raw list) after the feedback events, for the user
-whose sentence it was (the trader under `acting_for`), through a second sink (`app.state.requests`, the
+the caller whose sentence it was (as the drafting events), through a second sink (`app.state.requests`, the
 `feature_requests` recorder started with the app and flushed at shutdown with the others); a raising
 or full sink never fails the draft, and a draft with no missing items writes nothing.
 
