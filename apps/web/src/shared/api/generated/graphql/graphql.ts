@@ -126,6 +126,11 @@ export type UnknownCode =
   | 'PRE_SNAPSHOT'
   | 'PRUNED';
 
+export type AcceptedFormulasQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type AcceptedFormulasQuery = { acceptedFormulas: { today: string, days: number, rows: Array<{ fingerprint: string, canonical: string, expression: string, unit: string, description: string, acceptedCount: number, users: number, firstAccepted: string, lastAccepted: string, duplicateOf: string, backlogKey: string }> } | null };
+
 export type OptionChainQueryVariables = Exact<{
   key: string;
   names: Array<string> | string;
@@ -629,6 +634,27 @@ export class TypedDocumentString<TResult, TVariables>
   }
 }
 
+export const AcceptedFormulasDocument = new TypedDocumentString(`
+    query AcceptedFormulas {
+  acceptedFormulas {
+    today
+    days
+    rows {
+      fingerprint
+      canonical
+      expression
+      unit
+      description
+      acceptedCount
+      users
+      firstAccepted
+      lastAccepted
+      duplicateOf
+      backlogKey
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<AcceptedFormulasQuery, AcceptedFormulasQueryVariables>;
 export const OptionChainDocument = new TypedDocumentString(`
     query OptionChain($key: String!, $names: [FeatureName!]!) {
   instrument(key: $key) {

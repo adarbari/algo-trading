@@ -464,7 +464,7 @@ allow_indirect_imports = true  # the API reaches it only through services.feedba
 name = "Feedback reads are quarantined: only the read model's feedback loader imports them (ADR 0066)"
 type = "protected"
 protected_modules = ["algotrade.data.feedback"]
-allowed_importers = ["algotrade.services.read.ops.feedback", "algotrade.services.read.ops.feature_requests"]
+allowed_importers = ["algotrade.services.read.ops.feedback", "algotrade.services.read.ops.feature_requests", "algotrade.services.read.formulas.accepted"]
 
 # ---- ADR 0019: ownership and boundaries. Every contract the restructure planned is enabled
 # (no `pending_contract` remains in architecture/*_ownership.toml; a fitness test keeps it so).

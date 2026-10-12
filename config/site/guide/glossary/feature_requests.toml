@@ -42,3 +42,45 @@ body = """
 Describe it files each missing feature under a short name. When that name is neither a backlog key nor one of its aliases, the row is unmapped and its name is shown as it was filed. Two names for the same feature stay two rows until someone merges them: the app never merges by guessing.
 """
 see_also = ["feature_request_status"]
+
+[[term]]
+id = "accepted_formula"
+term = "Accepted formula"
+short = "A formula a trader wrote in Describe it and saved as their own feature; the page counts users, never names them."
+body = """
+When Describe it proposes a formula and a trader reviews it and saves it as a feature, that is one acceptance. Equal formulas share one row, even when written two ways. Each row shows how many distinct users accepted it and how many acceptances there were. A trader who accepts the same formula twice counts once as a user.
+Admins see counts only. The page never shows who accepted a formula. The text shown is the newest acceptance's, as that trader named and worded it.
+Worked example: three users accepted close / sma_20 - 1, four times in all. The row says 3 users and 4 accepted. One acceptance, by one user, is a sample of one: read it as a hint, not a demand.
+Don't promote a formula only because it has many users. First check that the site does not already have it, in the Duplicates column.
+"""
+see_also = ["formula_fingerprint", "formula_duplicate", "formula_backlog_match"]
+
+[[term]]
+id = "formula_fingerprint"
+term = "Formula fingerprint"
+short = "The key that makes two differently written formulas one row: the formula in its canonical form, hashed."
+body = """
+The server rewrites each formula into a canonical form: spacing, bracket style and the order of terms that do not matter are normalised. The fingerprint is a hash of that form. Two formulas with the same fingerprint compute the same thing, so they are grouped in one row.
+Open a row to see its canonical form and its fingerprint. Two formulas that give the same numbers but are built from different features have different fingerprints: the app does not prove equivalence by guessing.
+"""
+see_also = ["accepted_formula", "formula_duplicate"]
+
+[[term]]
+id = "formula_duplicate"
+term = "Duplicates a site feature"
+short = "The formula has the same fingerprint as a feature the site already offers, so promoting it would add nothing."
+body = """
+The Duplicates column names the site feature whose formula has the same fingerprint as the row's, and links to its field page. An empty cell means no site feature has this fingerprint today.
+A duplicate is not a mistake by the trader: they may not have found the site feature. Check the field page before building anything, and prefer pointing traders at the site feature.
+"""
+see_also = ["accepted_formula", "formula_backlog_match"]
+
+[[term]]
+id = "formula_backlog_match"
+term = "Backlog match"
+short = "The backlog item whose feature name or alias is exactly this formula's site feature; empty when there is no exact match."
+body = """
+The Backlog column shows the key of the curated backlog item that was promoted to the site feature this formula duplicates. It is exact only: a similar name or a similar idea shows nothing, because the app never matches by guessing.
+An empty cell does not mean nobody asked for it. It means no backlog item is tied to this formula, so check the Feature requests table above for a similar request.
+"""
+see_also = ["formula_duplicate", "feature_request_status"]

@@ -8,6 +8,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { expectAccessible } from './a11y';
 import { FAIL, mockAdminApi, mockNoGuideEntries } from './admin-api';
 import { mockViewer } from './auth-api';
+import FORMULAS from './fixtures/accepted-formulas.json' with { type: 'json' };
 import REQUESTS from './fixtures/feature-requests.json' with { type: 'json' };
 import { mockRegimeApi } from './regime-api';
 
@@ -21,7 +22,7 @@ async function open(page: Page, overrides = {}) {
   await mockRegimeApi(page); // the top-bar chip reads the regime
   await mockViewer(page);
   await mockNoGuideEntries(page);
-  await mockAdminApi(page, { featureRequests: REQUESTS, ...overrides });
+  await mockAdminApi(page, { featureRequests: REQUESTS, acceptedFormulas: FORMULAS, ...overrides });
 }
 
 for (const theme of ['dark', 'light'] as const) {
@@ -55,4 +56,28 @@ test('a failed read shows its error with a retry', async ({ page }) => {
   await open(page, { featureRequests: FAIL });
   await page.goto('/admin/feature-requests');
   await expect(page.getByText('The feature requests failed to load.').first()).toBeVisible();
+});
+
+test('lists the accepted formulas, flags a duplicate and opens a row to its canonical form', async ({
+  page,
+}) => {
+  await open(page);
+  await page.goto('/admin/feature-requests');
+  const table = page.getByRole('table', { name: 'Accepted formulas' });
+  await expect(table).toContainText('close/sma_20 - 1');
+  await expect(table.getByRole('row', { name: /high - low/ })).toContainText('DUPLICATE');
+  await table.getByRole('button', { name: /close\/sma_20 - 1/ }).click();
+  await expect(table).toContainText('(close / sma_20) - 1');
+  await expectAccessible(page);
+});
+
+test('a failed accepted-formulas read shows its error and leaves the requests', async ({
+  page,
+}) => {
+  await open(page, { acceptedFormulas: FAIL });
+  await page.goto('/admin/feature-requests');
+  await expect(page.getByText('The accepted formulas failed to load.').first()).toBeVisible();
+  await expect(page.getByRole('grid', { name: 'Feature requests' })).toContainText(
+    'realised_vol_20d',
+  );
 });

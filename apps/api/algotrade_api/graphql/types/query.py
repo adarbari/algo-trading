@@ -24,6 +24,7 @@ from algotrade.services.read.evaluation import runs as edge_runs
 from algotrade.services.read.evaluation import versions
 from algotrade.services.read.events import event_calendar
 from algotrade.services.read.events.instrument_events import DEFAULT_DAYS
+from algotrade.services.read.formulas import accepted as accepted_formulas
 from algotrade.services.read.guide import entries as entries_page
 from algotrade.services.read.guide import field as field_page
 from algotrade.services.read.guide import index as guide_contents
@@ -77,6 +78,7 @@ from algotrade_api.graphql.types.instruments.instrument import Instrument
 from algotrade_api.graphql.types.instruments.table import FeatureTable
 from algotrade_api.graphql.types.market.market import Market
 from algotrade_api.graphql.types.market.regime import MarketRegime
+from algotrade_api.graphql.types.ops.accepted_formulas import AcceptedFormulaList
 from algotrade_api.graphql.types.ops.backtest import Backtest, BacktestDetail
 from algotrade_api.graphql.types.ops.config import Config
 from algotrade_api.graphql.types.ops.feature_requests import FeatureRequestList
@@ -704,6 +706,23 @@ class Query:
             else None
         )
         return FeatureRequestList.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The formulas traders accepted in Describe it, grouped by fingerprint, over "
+        "the last year up to today: a date range, not one session. Most users first; each says "
+        "the site feature it duplicates and the backlog item it exactly matches. Counts only, "
+        "never a user (ADR 0066)",
+        extensions=[AdminOnly()],
+    )
+    async def accepted_formulas(self, info: Ctx) -> AcceptedFormulaList | None:
+        ctx = await info.context.astores()
+        viewer = load_viewer(info.context.viewer)
+        found = (
+            await off_loop(accepted_formulas.load_accepted_formula_list, ctx, viewer)
+            if ctx is not None
+            else None
+        )
+        return AcceptedFormulaList.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The `limit` most recent edge evaluation runs of any status, newest first: "
