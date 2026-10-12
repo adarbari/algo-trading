@@ -110,3 +110,16 @@ def test_open_recorder_writes_to_the_store_at_the_url() -> None:
     recorder = open_recorder("memory://")
     assert recorder.submit(event(NEXT))
     recorder.close()
+
+
+def test_seq_is_stored_and_a_row_without_one_is_null() -> None:
+    backend = MemoryBackend()
+    recorder = FeedbackRecorder(FeedbackWriter(backend), clock=lambda: NEXT)
+    recorder.submit(row_of("draft_requested", "sess", "abhi", "screen", "mine", at=NEXT, seq=2))
+    recorder.submit(row_of("draft_saved", "sess", "abhi", "screen", "mine", at=NEXT))
+    recorder.flush()
+    frame = read_drafting_events(StoreReader(backend), *RANGE)
+    assert frame is not None
+    by = frame.set_index("event")["seq"]
+    assert by["draft_requested"] == 2 and by.isna()["draft_saved"]
+    recorder.close()

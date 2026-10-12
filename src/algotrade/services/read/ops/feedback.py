@@ -25,7 +25,7 @@ from algotrade.services.read.values import to_scalar
 MAX_LIMIT = 500
 COLUMNS = (
     "event_id", "draft_session_id", "ts", "user", "doc_kind", "doc_id", "event", "call_ids",
-    "catalogue_version", "prompt_version", "draft_hash", "saved_hash", "sentence", "payload",
+    "catalogue_version", "prompt_version", "draft_hash", "saved_hash", "sentence", "payload", "seq",
 )  # fmt: skip
 
 
@@ -48,6 +48,7 @@ class DraftingEvent:
     saved_hash: str | None
     sentence: str | None
     payload: str | None
+    seq: int | None  # the 1-based ordinal of the draft request in its session
 
 
 def load_drafting_events(
@@ -77,6 +78,7 @@ def _text(value: Any) -> str | None:
 
 def _event(row: Mapping[Any, Any]) -> DraftingEvent:
     calls = _text(row["call_ids"])
+    seq = row["seq"]
     return DraftingEvent(
         event_id=str(row["event_id"]),
         draft_session_id=str(row["draft_session_id"]),
@@ -92,4 +94,5 @@ def _event(row: Mapping[Any, Any]) -> DraftingEvent:
         saved_hash=_text(row["saved_hash"]),
         sentence=_text(row["sentence"]),
         payload=_text(row["payload"]),
+        seq=None if pd.isna(seq) else int(seq),
     )

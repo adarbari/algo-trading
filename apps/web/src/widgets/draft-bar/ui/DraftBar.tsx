@@ -105,6 +105,10 @@ export function DraftBar({ compact = false, onDeleted, onReturn }: DraftBarProps
             screenerId={builder.id}
             version={builder.nextVersion}
             prepare={builder.save}
+            draftSessionId={builder.draftSessionId}
+            onFinalised={() => {
+              builder.setDraftSessionId(null);
+            }}
             disabled={builder.criteria.length === 0 || (!builder.dirty && !detail?.draft)}
           />
         </Stack>

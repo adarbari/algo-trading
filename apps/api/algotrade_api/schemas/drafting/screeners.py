@@ -15,6 +15,13 @@ class DraftFromTextBody(BaseModel):
     document: dict[str, Any] | None = Field(
         None, description="the Builder's current document (its criteria are kept unless changed)"
     )
+    draft_session_id: str | None = Field(
+        None,
+        max_length=64,
+        description="the id of the previous answer for this screen, so successive descriptions "
+        "of one screen stay in one session (ADR 0066); an unknown, foreign or already saved "
+        "session starts a new one",
+    )
 
 
 class DroppedCriterion(Schema):
