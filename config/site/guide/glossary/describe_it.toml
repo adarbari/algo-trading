@@ -167,7 +167,7 @@ short = "Replace the words of one part of your sentence and have the draft redo 
 body = """
 Retype changes the words of one card and asks the model again for that card alone. The other parts, and the rows you set for them, stay as they are. The answer takes a few seconds, and each retype counts against a daily limit.
 If you edited this part's rows by hand, the app asks first, because the new answer replaces them. When another part already sets the same field, that part wins and the new row is left out with a reason.
-Retyped words are kept under the same retention rule as the sentence you first typed.
+Retyped words are kept for 12 months, like the sentence you first typed, then removed.
 Do not retype to change one number: edit the row, or pick another reading, which needs no model call.
 """
 see_also = ["describe_part_reading", "describe_part_edited", "describe_part_limit"]
@@ -179,7 +179,7 @@ term = "Describe it: Daily limit of part redrafts reached"
 short = "You have used today's part redrafts; retyping a part works again when the exchange day turns."
 body = """
 Each retype is one model call, so each person gets a fixed number a day. Only a retype that returned a draft counts: a failed one gives its place back. The day is the exchange's calendar day, not midnight where you are.
-Everything that needs no model call still works: pick another reading of a term, edit a row, add or skip a suggestion.
+Retype turns itself back on when the exchange day turns, with no reload. Everything that needs no model call still works meanwhile: pick another reading of a term, edit a row, add or skip a suggestion.
 """
 see_also = ["describe_part_retype", "describe_suggested"]
 next = "Fix the part by hand with its rows or readings, or retype again after the exchange day turns."
@@ -189,8 +189,8 @@ id = "describe_part_stale"
 term = "Describe it: Your screen changed while this redrafted"
 short = "You changed the screen while the model redrafted a part, so its answer was not applied."
 body = """
-The model's answer was built from the screen as it was when you chose Redraft. Applying it would have undone the changes you made since, so the app drops it and keeps your screen. The retype still counts against your daily limit.
-Wait for a redraft to finish before you edit rows, to avoid this.
+The model's answer was built from the screen as it was when you chose Redraft. Applying it would have undone the changes you made since, so the app drops it and keeps your screen. A retype you started and then left, by leaving the page, is dropped the same way.
+Either way the retype still counts against your daily limit, with no refund. Wait for a redraft to finish before you edit rows, to avoid this.
 """
 see_also = ["describe_part_retype", "describe_part_limit"]
 next = "Choose Try again to redraft the part from the screen as it is now, or Cancel to keep it as it is."

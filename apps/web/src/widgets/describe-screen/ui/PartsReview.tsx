@@ -10,7 +10,7 @@
  * criteria is not an error: the Builder's document stays.
  */
 import { Mono, PartCard, PartList, Stack, Text, type PartCardProps } from '@algotrade/ui';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { GuideHelp, termHelp } from '@/features/guide-help';
 import {
@@ -49,6 +49,9 @@ function tieBreakOf(document: Readonly<Record<string, unknown>>): string | null 
   return typeof field === 'string' && field !== '' ? field : null;
 }
 
+/** The longest a timer may run (setTimeout's own limit is 2^31 - 1 ms). */
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
 export function PartsReview({
   answer,
   document,
@@ -74,7 +77,22 @@ export function PartsReview({
   const [original, setOriginal] = useState<unknown>(answer.document['criteria']);
   // The part being redrafted (one at a time) and whether the daily limit was reached.
   const [redrafting, setRedrafting] = useState<string | null>(null);
-  const [limited, setLimited] = useState(false);
+  // The daily limit was reached: `seconds` until it clears (null: not limited; undefined seconds:
+  // the server did not say, so it stays until the page reloads). One timer lifts it for every card.
+  const [limit, setLimit] = useState<{ seconds: number | undefined } | null>(null);
+  const limited = limit !== null;
+  useEffect(() => {
+    if (limit?.seconds === undefined) return;
+    const timer = setTimeout(
+      () => {
+        setLimit(null);
+      },
+      Math.min(Math.max(limit.seconds, 0) * 1000, MAX_TIMER_MS),
+    );
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [limit]);
   // The history is a nicety: a failed read leaves the cards without it.
   const history = useMyFeatureRequests(missing.length > 0);
   const mine = history.data ?? [];
@@ -232,10 +250,13 @@ export function PartsReview({
           document={document}
           edited={edited}
           redrafting={redrafting}
-          onRedrafting={setRedrafting}
+          onRedrafting={(id, on) => {
+            // Cleared only by the card that set it: a late settle must not free another's turn.
+            setRedrafting((now) => (on ? id : now === id ? null : now));
+          }}
           limited={limited}
-          onLimited={() => {
-            setLimited(true);
+          onLimited={(seconds) => {
+            setLimit({ seconds });
           }}
           onRedrafted={redrafted}
         />

@@ -6,10 +6,11 @@ import { LIMIT_CODE, STALE, partFailure } from './redraft';
 
 describe('partFailure', () => {
   it('reads the coded 429 as the daily limit: no retry, its own Guide term', () => {
-    const failure = partFailure(new ApiError(429, 'daily limit of 30', LIMIT_CODE));
+    const failure = partFailure(new ApiError(429, 'daily limit of 30', LIMIT_CODE, 5400));
     expect(failure).toMatchObject({
       kind: 'limit',
       retry: false,
+      retryAfterS: 5400,
       help: { kind: 'term', id: 'describe_part_limit' },
     });
     expect(failure.title).not.toMatch(/30/); // the server's text is never shown

@@ -39,13 +39,26 @@ describe('unwrap with a coded refusal', () => {
   it('carries the machine-readable code of a refusal (a daily limit), none otherwise', async () => {
     const limited = unwrap(
       Promise.resolve({
-        error: { detail: 'daily limit', code: 'part_redraft_limit', limit: 30 },
+        error: {
+          detail: 'daily limit',
+          code: 'part_redraft_limit',
+          limit: 30,
+          retry_after_s: 3600,
+        },
         response: response(429),
       }),
     );
-    await expect(limited).rejects.toMatchObject({ status: 429, code: 'part_redraft_limit' });
+    await expect(limited).rejects.toMatchObject({
+      status: 429,
+      code: 'part_redraft_limit',
+      retryAfterS: 3600,
+    });
     const plain = unwrap(Promise.resolve({ error: { detail: 'busy' }, response: response(429) }));
-    await expect(plain).rejects.toMatchObject({ status: 429, code: undefined });
+    await expect(plain).rejects.toMatchObject({
+      status: 429,
+      code: undefined,
+      retryAfterS: undefined,
+    });
   });
 });
 

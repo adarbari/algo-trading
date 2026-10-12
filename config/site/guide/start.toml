@@ -168,7 +168,8 @@ body = """
 In the Builder's Describe it box, write what you want in your own words, such as optionable
 stocks over $5 with IV rank above 50%, and choose Draft it. A text model maps the sentence onto the field catalogue. It uses the app's phrasebook of trader vocabulary and the Guide's field entries (how to read each field and its usual criterion per intent). It sees the catalogue
 (each field's name, type, unit and description) and those texts, never market data, results
-or credentials.
+or credentials. Your sentence, and the words of any part you retype later, are kept for 12 months,
+then removed.
 """
 
 [[page.section]]

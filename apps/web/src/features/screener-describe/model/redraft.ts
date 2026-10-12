@@ -24,6 +24,8 @@ export interface PartFailure {
   help: TermRef;
   /** Asking again can work. */
   retry: boolean;
+  /** For the daily limit: seconds until it clears, when the server said. */
+  retryAfterS?: number | undefined;
 }
 
 const LIMIT: PartFailure = {
@@ -42,6 +44,7 @@ export const STALE: PartFailure = {
 };
 
 export function partFailure(error: unknown): PartFailure {
-  if (error instanceof ApiError && error.status === 429 && error.code === LIMIT_CODE) return LIMIT;
+  if (error instanceof ApiError && error.status === 429 && error.code === LIMIT_CODE)
+    return { ...LIMIT, retryAfterS: error.retryAfterS };
   return draftFailure(error);
 }

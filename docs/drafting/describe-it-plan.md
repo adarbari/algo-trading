@@ -164,7 +164,7 @@ fixed locally (another reading, edit rows) or by retyping its words (one scoped 
   edited asks first ("This replaces your edits to this part."); the merged draft returned replaces
   the answer shown and the working document, the other parts' formula decisions, picks and edited
   marks stay; a failure is an inline message with Try again, the daily limit (429 code
-  `part_redraft_limit`) its own state with no retry (the other cards' Retype turn off), and an answer
+  `part_redraft_limit`) its own state with no retry (every card's Retype turns off until the 429's `retry_after_s` elapses), and an answer
   that arrives after the trader changed the screen is dropped as stale (Try again). Guide terms
   `describe_part_retype`, `describe_part_limit`, `describe_part_stale`.
 

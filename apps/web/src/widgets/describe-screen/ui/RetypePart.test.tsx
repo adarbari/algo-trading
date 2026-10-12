@@ -10,6 +10,7 @@ import { api, ApiError, TestQueryProvider, type components } from '@/shared/api'
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import DraftReview from './DraftReview';
+import { RetypeCard } from './RetypePart';
 
 vi.mock('@/features/guide-help', () => ({
   termHelp: (id: string) => <Text>{`help ${id}`}</Text>,
@@ -287,8 +288,68 @@ describe('retyping one part', () => {
     });
     // the screen changed meanwhile: the answer was built on the old rows
     expect(await screen.findByText('Your screen changed while this redrafted')).toBeInTheDocument();
+    expect(
+      within(card('optionable stocks')).getByText('guide describe_part_stale'),
+    ).toBeInTheDocument();
     expect(card('optionable stocks')).toHaveAttribute('data-state', 'error');
     expect(retype('liquid')).toBeEnabled();
+  });
+
+  it('runs one retype at a time: a second input waits, and the first settling does not free a second turn early', async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    POST.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }) as never,
+    );
+    render(<Harness />);
+    await open('liquid', 'very liquid');
+    await open('optionable stocks', 'weekly options');
+    await userEvent.click(redraft('optionable stocks'));
+    // the other card's input is open, but its Redraft is off while this one waits
+    expect(redraft('liquid')).toBeDisabled();
+    await userEvent.type(within(card('liquid')).getByRole('textbox'), '!');
+    expect(redraft('liquid')).toBeDisabled();
+    await userEvent.keyboard('{Enter}');
+    expect(POST).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      answer({
+        data: { draft: NEXT, replaced_part_id: 'p2' },
+        response: new Response(null, { status: 200 }),
+      });
+      await Promise.resolve();
+    });
+    await screen.findByRole('article', { name: 'weekly options' });
+    expect(redraft('liquid')).toBeEnabled();
+  });
+
+  it('leaving mid-wait frees the one-at-a-time flag and abandons the call', async () => {
+    POST.mockImplementation(() => new Promise(() => undefined) as never);
+    const onRedrafting = vi.fn();
+    const view = render(
+      <TestQueryProvider>
+        <RetypeCard
+          card={{ kind: 'applied', kindLabel: 'Applied', words: 'liquid', redraftingLabel: 'Wait' }}
+          part={PARTS[0] as Part}
+          answer={ANSWER}
+          document={DOCUMENT}
+          edited={false}
+          redrafting={null}
+          onRedrafting={onRedrafting}
+          limited={false}
+          onLimited={vi.fn()}
+          onRedrafted={vi.fn()}
+        />
+      </TestQueryProvider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Retype this part' }));
+    await userEvent.type(screen.getByRole('textbox'), ' x{Enter}');
+    expect(onRedrafting).toHaveBeenLastCalledWith('p1', true);
+    const signal = (POST.mock.calls[0]?.[1] as { signal?: AbortSignal } | undefined)?.signal;
+    view.unmount();
+    expect(signal?.aborted).toBe(true);
+    expect(onRedrafting).toHaveBeenLastCalledWith('p1', false);
   });
 
   it('asks before replacing the edits of a hand-edited part, and does not call the model on Cancel', async () => {
@@ -394,6 +455,58 @@ describe('retyping one part', () => {
     await userEvent.click(within(part).getByRole('button', { name: 'Cancel' }));
     expect(retype('optionable stocks')).toBeDisabled();
     expect(POST).toHaveBeenCalledTimes(1);
+  });
+
+  it('the limit lifts for every card when the server retry-after elapses, with one timer', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      POST.mockReturnValue(
+        failed(429, {
+          detail: 'limit',
+          code: 'part_redraft_limit',
+          limit: 30,
+          retry_after_s: 3600,
+        }),
+      );
+      render(<Harness />);
+      await open('optionable stocks', 'weekly options');
+      await userEvent.click(redraft('optionable stocks'));
+      const part = card('optionable stocks');
+      expect(
+        await within(part).findByText('Daily limit of part redrafts reached'),
+      ).toBeInTheDocument();
+      expect(redraft('optionable stocks')).toBeDisabled();
+      expect(retype('liquid')).toBeDisabled();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3_599_000);
+      });
+      expect(retype('liquid')).toBeDisabled();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+      });
+      expect(retype('liquid')).toBeEnabled();
+      expect(within(part).queryByText('Daily limit of part redrafts reached')).toBeNull();
+      expect(redraft('optionable stocks')).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a limit with no retry-after stays until the page reloads', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      POST.mockReturnValue(failed(429, { detail: 'limit', code: 'part_redraft_limit' }));
+      render(<Harness />);
+      await open('optionable stocks', 'weekly options');
+      await userEvent.click(redraft('optionable stocks'));
+      await screen.findByText('Daily limit of part redrafts reached');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(86_400_000);
+      });
+      expect(retype('liquid')).toBeDisabled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('another 429 is the busy message with Try again, not the limit', async () => {

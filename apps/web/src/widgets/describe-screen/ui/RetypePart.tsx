@@ -8,7 +8,9 @@
  * merged draft the server returned (`onRedrafted`); it derives nothing (ADR 0038). A failure is an
  * inline message with Try again, the daily limit its own message with no retry, and an answer that
  * arrives after the trader changed the screen is dropped (it was built on the old rows) with the
- * same Try again. Cancel leaves with the words as they were; focus returns to the Retype button.
+ * same Try again. A wait cannot be cancelled (the spec makes only the whole draft cancellable): the
+ * card is inert until the answer or the failure comes. Cancel leaves the input with the words as
+ * they were; focus returns to the Retype button.
  */
 import { Button, Dialog, PartCard, Stack, type PartCardProps } from '@algotrade/ui';
 import { useEffect, useRef, useState } from 'react';
@@ -39,12 +41,12 @@ export interface RetypeCardProps {
   document: ScreenDocument;
   /** The trader changed this part's rows: replacing them asks first. */
   edited: boolean;
-  /** The part being redrafted now (any card), or null: only one retype at a time. */
+  /** The part being redrafted now (any card), or null: only one retype at a time. `on` false clears it only if it is this part's. */
   redrafting: string | null;
-  onRedrafting: (partId: string | null) => void;
+  onRedrafting: (partId: string, on: boolean) => void;
   /** The trader's daily limit of part redrafts was reached (known from any card). */
   limited: boolean;
-  onLimited: () => void;
+  onLimited: (retryAfterS: number | undefined) => void;
   /** The merged draft came back: the owner swaps it in. */
   onRedrafted: (next: ScreenDraft, replaced: DraftPart) => void;
 }
@@ -70,16 +72,23 @@ export function RetypeCard({
   const button = useRef<HTMLButtonElement>(null);
   const focusBack = useRef(false);
   const flight = useRef<AbortController | null>(null);
+  const inFlight = useRef(false);
+  const settle = useRef(onRedrafting);
   // The document the trader has now, read when the answer arrives (not the one it was asked on).
   const latest = useRef(document);
   useEffect(() => {
     latest.current = document;
   });
+  useEffect(() => {
+    settle.current = onRedrafting;
+  });
+  // Leaving the page mid-wait: the call is abandoned (still counted), the one-at-a-time flag freed.
   useEffect(
     () => () => {
       flight.current?.abort();
+      if (inFlight.current) settle.current(part.id, false);
     },
-    [],
+    [part.id],
   );
   useEffect(() => {
     if (mode === 'closed' && focusBack.current) {
@@ -90,7 +99,11 @@ export function RetypeCard({
 
   const words = squash(value);
   const pending = redraft.isPending;
-  const canApply = words !== '' && words !== part.words && !pending && !limited;
+  // Another card's retype is in flight: this one waits (one retype at a time).
+  const busy = redrafting !== null && redrafting !== part.id;
+  const canApply = words !== '' && words !== part.words && !pending && !limited && !busy;
+  // The limit cleared (its time elapsed): the message about it goes, Redraft works again.
+  const shown = failure?.kind === 'limit' && !limited ? null : failure;
 
   const open = () => {
     setValue(part.words);
@@ -98,19 +111,19 @@ export function RetypeCard({
     setMode('typing');
   };
   const leave = () => {
-    flight.current?.abort();
-    redraft.reset();
     setFailure(null);
     focusBack.current = true;
     setMode('closed');
   };
   const send = () => {
+    if (!canApply) return;
     const sent = document;
     const controller = new AbortController();
     flight.current = controller;
     setFailure(null);
     setMode('typing');
-    onRedrafting(part.id);
+    inFlight.current = true;
+    onRedrafting(part.id, true);
     redraft.mutate(
       { answer, document: sent, partId: part.id, newWords: words, signal: controller.signal },
       {
@@ -126,11 +139,12 @@ export function RetypeCard({
         onError: (error) => {
           if (controller.signal.aborted) return;
           const failed = partFailure(error);
-          if (failed.kind === 'limit') onLimited();
+          if (failed.kind === 'limit') onLimited(failed.retryAfterS);
           setFailure(failed);
         },
         onSettled: () => {
-          onRedrafting(null);
+          inFlight.current = false;
+          onRedrafting(part.id, false);
         },
       },
     );
@@ -142,8 +156,7 @@ export function RetypeCard({
   };
 
   const retyping = mode !== 'closed';
-  const busy = redrafting !== null && redrafting !== part.id;
-  const state = pending ? 'redrafting' : failure ? 'error' : 'idle';
+  const state = pending ? 'redrafting' : shown ? 'error' : 'idle';
   const retypeButton = (
     <Stack direction="row" gap={1} align="center">
       <Button size="sm" variant="ghost" ref={button} disabled={busy || limited} onClick={open}>
@@ -167,11 +180,11 @@ export function RetypeCard({
         info={
           <Stack direction="row" gap={1} align="center">
             {card.info}
-            {failure && <GuideHelp entry={failure.help} />}
+            {shown && <GuideHelp entry={shown.help} />}
           </Stack>
         }
-        {...(failure ? { errorMessage: failure.title } : {})}
-        {...(failure?.retry ? { retryLabel: PART_TEXT.tryAgain, onRetry: apply } : {})}
+        {...(shown ? { errorMessage: shown.title } : {})}
+        {...(shown?.retry ? { retryLabel: PART_TEXT.tryAgain, onRetry: apply } : {})}
         {...(retyping
           ? {
               retype: {
