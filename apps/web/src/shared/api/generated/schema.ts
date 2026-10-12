@@ -1090,7 +1090,7 @@ export interface components {
             formulas: string[];
             /**
              * Id
-             * @description p1... from the model; g1... a gap; kept / unplaced: catch-alls
+             * @description p1... from the model; g1... a gap; kept / unplaced: catch-alls with no words
              */
             id: string;
             /**
@@ -1106,10 +1106,10 @@ export interface components {
             missing: string[];
             /**
              * Origin
-             * @description words: located in the sentence; kept: criteria carried over from the Builder's document; unplaced: tied to no words
+             * @description words: a part of the model, located in the sentence; gap: words no part covers; kept: criteria carried over from the Builder's document; unplaced: items tied to no words (kept and unplaced have no words)
              * @enum {string}
              */
-            origin: "words" | "kept" | "unplaced";
+            origin: "words" | "gap" | "kept" | "unplaced";
             /**
              * Rank
              * @description true when the document's tie-break belongs to this part

@@ -250,7 +250,7 @@ def _draft(
     items = items_of(
         document["criteria"], tags, current, [(d.id, d.field) for d in dropped],
         formulas.formulas, unresolved, missing, suggestions,
-        (part_tag(tie), rank["tie_break"]) if rank else None, spans,
+        (part_tag(tie), document["rank"]["tie_break"]) if document.get("rank") else None, spans,
     )  # fmt: skip
     explained = build_parts(sentence, proposal.get("parts"), items, phrasebook)
     return ScreenDraft(
@@ -332,7 +332,8 @@ def criteria_of(
         item = raw if isinstance(raw, Mapping) else {}
         raw_field = item.get("field")
         field_name: str = raw_field if isinstance(raw_field, str) else ""
-        cid = _criterion_id(item.get("id"), field_name, n, kept)
+        taken = {**kept, **dict.fromkeys(d.id for d in dropped)}  # a dropped id is spent too
+        cid = _criterion_id(item.get("id"), field_name, n, taken)
         if tags is not None:
             tags[cid] = part_tag(item)
         why = f" ({item['why']})" if isinstance(item.get("why"), str) and item["why"] else ""

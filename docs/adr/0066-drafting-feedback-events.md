@@ -139,7 +139,7 @@ several times, all of the descriptions are stored.
   snapshot is cut at 8,000 characters of JSON into `{"truncated": true, "chars": n, "head": ...}`
   and the whole payload at 32,000: never a failed request. A diff, the dropped list and the notes
   are each cut at 4,000 characters first, so the `*_criteria` snapshot always survives the cap.
-- **The explained parts are in the payload** (ADR 0041, amended 2026-10-12). `draft_returned.payload.parts`
+- **The explained parts are in the payload** (ADR 0041, amended 2026-10-11). `draft_returned.payload.parts`
   is the draft's parts, each `{id, words, reading, kind, origin, items}` (cut at 4,000 characters like
   the notes): the trader's own words and the model's reading of them are personal text, so they sit in
   the payload and nowhere else, and the retention (12 months, then nulled with the payload) and the erase

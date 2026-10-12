@@ -10,7 +10,7 @@ stays with ``criteria_of`` (a wrong one is dropped with a reason, not a rejected
 A / B / C contract (PR 5, ADR 0041 amendment 2026-10-11) adds ``formulas`` (B1), ``missing``
 (B2 / C) and ``unresolved`` (an ambiguous term with ready alternatives); ``suggestions``
 (protective soft or score checks the sentence did not ask for, never applied silently,
-``suggestions.py``); the explained parts (2026-10-12) add ``parts`` (``{id, words, reading}``: the
+``suggestions.py``); the explained parts (2026-10-11) add ``parts`` (``{id, words, reading}``: the
 sentence split as the model read it) and a nullable ``part`` on every item, the id of the part it
 comes from; every one is nullable or optional, so answers recorded before it still pass
 (a new answer key must be the same). The

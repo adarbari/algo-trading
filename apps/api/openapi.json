@@ -1649,7 +1649,7 @@
             "type": "array"
           },
           "id": {
-            "description": "p1... from the model; g1... a gap; kept / unplaced: catch-alls",
+            "description": "p1... from the model; g1... a gap; kept / unplaced: catch-alls with no words",
             "title": "Id",
             "type": "string"
           },
@@ -1674,9 +1674,10 @@
             "type": "array"
           },
           "origin": {
-            "description": "words: located in the sentence; kept: criteria carried over from the Builder's document; unplaced: tied to no words",
+            "description": "words: a part of the model, located in the sentence; gap: words no part covers; kept: criteria carried over from the Builder's document; unplaced: items tied to no words (kept and unplaced have no words)",
             "enum": [
               "words",
+              "gap",
               "kept",
               "unplaced"
             ],

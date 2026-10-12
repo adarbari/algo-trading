@@ -135,7 +135,7 @@ part: the trader's quoted words, "We read this as...", then its criteria, formul
 unplaced words are a "not understood" part, criteria tied to no words a "Kept from your screen" card. A part is
 fixed locally (another reading, edit rows) or by retyping its words (one scoped model call).
 
-- PR A, backend contract (built, `services/drafting/parts/`, ADR 0041 amended 2026-10-12): model-side nullable `part` id on criteria, formulas, missing, unresolved and
+- PR A, backend contract (built, `services/drafting/parts/`, ADR 0041 amended 2026-10-11): model-side nullable `part` id on criteria, formulas, missing, unresolved and
   suggestions, plus top-level `parts [{id, words, reading}]`. Server-side (new folder `services/drafting/parts/`):
   locates each part's words in the sentence, attributes deterministically, decides the kind (needs_choice >
   formula > not_available > applied; no refs = not_understood), checks a numeric reading against the criteria,

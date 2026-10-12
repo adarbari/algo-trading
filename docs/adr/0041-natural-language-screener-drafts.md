@@ -309,7 +309,7 @@ notes that said "add" now say "suggest"). Largest golden prompt: 12,735 -> 12,87
 `EQUIVALENT_READINGS` names readings that select the same instruments (`is_etf eq true` /
 `security_type in [ETF]`), only `criteria` are scored, and the run reports the suggestions count.
 
-## Amended 2026-10-12: explained parts (the answer says which words each item comes from)
+## Amended 2026-10-11: explained parts (the answer says which words each item comes from)
 
 Owner decision 2026-10-11 (`docs/decisions/log.md`, "Explained parts"): the review shows one card per
 part of the sentence, the trader's quoted words, then "We read this as...", then that part's rows. The
@@ -347,7 +347,8 @@ derives nothing (ADR 0038) and a model's copy of the trader's words is not the t
 - **Kind** is the server's, from the refs only: `needs_choice` (an unresolved term) over `formula` over
   `not_available` (a missing request or a dropped criterion) over `applied` (a criterion or the
   tie-break); a part with none of these is `not_understood`. Suggestions never change the kind and
-  never make a part understood. `origin` is `words`, `kept` or `unplaced`.
+  never make a part understood. `origin` is `words` (a located part of the model), `gap` (words no part covers, always
+  `not_understood`), `kept` or `unplaced` (the two catch-alls, with no words).
 - **Reading** (the model's one line, clipped to 160 characters) is kept only when every number in it is
   one of the part's own: a criterion's value or tolerance, a formula's number, a number in the name of
   a field the part uses (the 20 of `ret_20d`), read with `%` as a fraction and `k` / `M` / `B` as their
@@ -361,7 +362,7 @@ derives nothing (ADR 0038) and a model's copy of the trader's words is not the t
   slice whose whole prompt fits, where its eight fixed steps had stalled on a plateau (two golden
   sentences were over 13,000 with the new text, 13,044 and 13,107). Every golden sentence is now at most
   12,999 tokens with a trader's three own features and a padded backlog (cap 15,000). Output grows by a
-  line per part (about 40 tokens); `why` and `notes` are kept (the Builder shows both: a dropped
+  line per part (about 40 tokens; the largest recorded answer plus 12 parts at their caps and the thinking allowance stays under 75% of the configured `answer_limit` of 8,000, a test; the 2,000 in `chat.py` is only a dataclass default the registry overrides); `why` and `notes` are kept (the Builder shows both: a dropped
   criterion's reason ends with its `why`, and the notes are saved with the screen).
 - **Feedback** (ADR 0066): `draft_returned.payload.parts` keeps id, words, reading, kind, origin and
   the item count of each part, clipped; the words and readings are personal text and go with the

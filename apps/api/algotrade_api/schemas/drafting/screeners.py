@@ -4,7 +4,7 @@ criteria dropped with their reasons and the model's notes out, plus the A / B / 
 (ADR 0041, amended 2026-10-11): pending formulas with their dry run, the formulas dropped, the
 missing features and the unresolved terms, and the suggested checks (soft or score, offered
 not applied) with those dropped. Pending formulas and suggestions are never in ``document``.
-The explained parts (same amendment, 2026-10-12): ``sentence`` (the whitespace-normalised text the
+The explained parts (same amendment, 2026-10-11): ``sentence`` (the whitespace-normalised text the
 parts' offsets count in) and ``parts``, each the trader's own words (the server's slice of the
 sentence), the model's reading when it checks out, the kind the server decided and the ids of the
 items of this draft that belong to it; ``parts`` is null when the model gave none (the panel then
@@ -111,7 +111,9 @@ class DroppedSuggestion(Schema):
 
 
 class Part(Schema):
-    id: str = Field(description="p1... from the model; g1... a gap; kept / unplaced: catch-alls")
+    id: str = Field(
+        description="p1... from the model; g1... a gap; kept / unplaced: catch-alls with no words"
+    )
     words: str = Field(description="the sentence's own words for this part; empty for a catch-all")
     start: int = Field(description="offset of words in sentence, in UTF-16 code units (JS slice)")
     end: int = Field(description="end offset of words in sentence, in UTF-16 code units")
@@ -123,9 +125,10 @@ class Part(Schema):
     kind: Literal["applied", "formula", "needs_choice", "not_available", "not_understood"] = Field(
         description="decided by the server from what the part holds, never by the model"
     )
-    origin: Literal["words", "kept", "unplaced"] = Field(
-        description="words: located in the sentence; kept: criteria carried over from the "
-        "Builder's document; unplaced: tied to no words"
+    origin: Literal["words", "gap", "kept", "unplaced"] = Field(
+        description="words: a part of the model, located in the sentence; gap: words no part "
+        "covers; kept: criteria carried over from the Builder's document; unplaced: items tied "
+        "to no words (kept and unplaced have no words)"
     )
     criteria: list[str] = Field(description="ids of criteria in the draft document")
     dropped: list[str] = Field(description="ids of the criteria dropped")
