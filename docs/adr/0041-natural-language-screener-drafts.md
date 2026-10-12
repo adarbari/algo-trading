@@ -304,7 +304,7 @@ response carry `suggestions` and `suggestions_dropped`; the Builder shows a "Sug
 trader accepts or skips (a later web PR). Prompt version 7 (6 is the phrasebook follow-up's): `criteria` holds only what the
 sentence asks for, a caveat's check goes to `suggestions`, and a vague word (`heavy`, `volatile`)
 with no threshold in the phrasebook or field guide is left out with a note (the three guide
-notes that said "add" now say "suggest"). Largest golden prompt: 12,735 -> 12,842 tokens (cap
+notes that said "add" now say "suggest"). Largest golden prompt: 12,735 -> 12,902 tokens (cap
 15,000). Golden scorer: a part may carry `equivalent_ops` (the same value, an immaterial boundary),
 `EQUIVALENT_READINGS` names readings that select the same instruments (`is_etf eq true` /
 `security_type in [ETF]`), only `criteria` are scored, and the run reports the suggestions count.
