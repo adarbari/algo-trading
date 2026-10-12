@@ -127,7 +127,9 @@ Done: #514 failure log; #521 usage meter (cache tokens, call ids); #522 stable p
 harness; #528 answer schema, repair, fall-through; #529 retrieval slice; #530 + #533 feedback events (one
 session per screen, the iteration chain); #531 live golden run command; #535 A / B / C contract; #523
 fingerprint and dry-run; #524 design-system components; #525 backlog config; #537 golden candidates and
-curate; #539 request log and ranking; #538 review-and-release; #536 promote-feature skill; prompt headroom (`PROMPT_VERSION` 4: grouped index, slice capped by a 13k-token budget).
+curate; #539 request log and ranking; #538 review-and-release; #536 promote-feature skill; prompt headroom (`PROMPT_VERSION` 5: grouped index, slice capped by a 13k-token budget).
+Phrasebook structured thresholds (`[[phrase.criterion]]`, `resolves_fully` in `services/drafting/phrasebook`,
+`PROMPT_VERSION` 4) are built but unwired; wiring lever 3 into `draft_screen` is next.
 
 In flight: #540 feedback retention / erase.
 

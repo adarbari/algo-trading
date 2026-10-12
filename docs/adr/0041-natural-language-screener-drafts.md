@@ -274,7 +274,7 @@ an answer of the old shape still passes): `formulas` (B1), `missing` (B2 / C) an
 
 ## Amended 2026-10-11: prompt headroom (index grouped, slice token-budgeted)
 
-`PROMPT_VERSION` 4. The field index is grouped: one `<prefix>.*` heading per prefix
+`PROMPT_VERSION` 5 (4 is the structured phrasebook thresholds). The field index is grouped: one `<prefix>.*` heading per prefix
 (`rollup.price_stats@v2.*`, `feature.*`, `instrument.*`) and `name|type|unit` entries under it, so
 the long prefix is not repeated on every line; a field is still named exactly (heading without the
 `*` + entry), so a retrieval miss never becomes a false "missing". The slice is capped by tokens,

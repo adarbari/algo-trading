@@ -9,7 +9,7 @@ timestamps or ids, so the same catalogue, phrasebook and guide give the same byt
 prompt cache hits and a recorded test stays valid). The prompt carries no market data, results
 or credentials.
 
-The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 4: the A / B / C answer contract, the
+The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 5: the A / B / C answer contract, the
 open backlog keys most relevant to the sentence, the index grouped by prefix): the task, the
 examples and an index of every field (grouped under one heading per prefix: type, unit) as a prefix
 no sentence changes, then in detail only the fields ``retrieval.select_slice`` picks for the
@@ -36,9 +36,10 @@ from algotrade.services.drafting.retrieval import FIELD_REF, Slice, select_slice
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
 # Bump with any change to the prompt: the usage log records it (ADR 0058). 2: index + slice;
-# 3: formulas, missing and unresolved in the answer, and the open backlog keys; 4: the index
-# grouped by prefix and the slice capped by a token budget.
-PROMPT_VERSION = "4"
+# 3: formulas, missing and unresolved in the answer, and the open backlog keys; 4: a phrasebook
+# entry shows its structured thresholds; 5: the index grouped by prefix and the slice capped by a
+# token budget.
+PROMPT_VERSION = "5"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 
@@ -272,7 +273,29 @@ def phrase_line(phrase: Phrase, catalogue: set[str]) -> str | None:
     if not fields:
         return None
     hint = " ".join(phrase.hint.split())
-    return f"{' / '.join(phrase.say)} | {', '.join(fields)} | {hint or '-'}"
+    line = f"{' / '.join(phrase.say)} | {', '.join(fields)} | {hint or '-'}"
+    exact = _structured_text(phrase, catalogue)
+    return f"{line} | = {exact}" if exact else line
+
+
+def _structured_text(phrase: Phrase, catalogue: set[str]) -> str:
+    """The entry's structured meaning, compact: ``field op value`` joined by `` and `` (every
+    criterion applies), or the readings of an ambiguous word (``label: criterion``, the default
+    first); empty without one or when a field is not in this catalogue."""
+    if phrase.criteria:
+        if all(c.field in catalogue for c in phrase.criteria):
+            return " and ".join(c.short() for c in phrase.criteria)
+        return ""
+    if not phrase.alternatives or any(
+        a.criterion.field not in catalogue for a in phrase.alternatives
+    ):
+        return ""
+    order = [
+        phrase.default_index,
+        *(i for i in range(len(phrase.alternatives)) if i != phrase.default_index),
+    ]
+    readings = (phrase.alternatives[i] for i in order)
+    return "one of " + "; ".join(f"{a.label}: {a.criterion.short()}" for a in readings)
 
 
 def _value(value: Any) -> str:
