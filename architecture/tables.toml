@@ -424,6 +424,11 @@ owner = "src/algotrade/services/feedback/recorder.py"
 note = "the API's sixth write (ADR 0066): one row per Describe-it event (draft requested / returned, choice, formula accepted / skipped, draft saved, screen finalised, edge revised) with the session id, the call ids, the hashes, the trader's sentence (clipped; personal data) and a small payload (a save's diff); read across a date range by data/feedback, only through the read model's loader (a trader sees their own rows)"
 
 [[table]]
+name = "feedback/feature_requests"
+owner = "src/algotrade/services/feedback/request_recorder.py"
+note = "the API's sixth write, second table (ADR 0066 amendment 2026-10-11): one row per (user, backlog key or new slug, exchange day) a Describe-it draft listed as missing, with the feasibility, the clipped span of the sentence the request covers (never the sentence; personal data), the closest catalogue names and the call and session ids; read across a date range by data/feedback, only through the read model's loader (a trader sees their own history only, an admin the ranked list)"
+
+[[table]]
 name = "verification/ibkr"
 owner = "apps/ingestion/algotrade_ingestion/tasks/verification/verify.py"
 

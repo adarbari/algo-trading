@@ -454,14 +454,17 @@ name = "Only the drafting-feedback recorder imports the feedback writer (ADR 006
 type = "forbidden"
 source_modules = ["algotrade", "algotrade_api", "algotrade_ingestion", "algotrade_backtest"]
 forbidden_modules = ["algotrade.storage.tables.feedback_writer"]
-ignore_imports = ["algotrade.services.feedback.recorder -> algotrade.storage.tables.feedback_writer"]
+ignore_imports = [
+    "algotrade.services.feedback.recorder -> algotrade.storage.tables.feedback_writer",
+    "algotrade.services.feedback.request_recorder -> algotrade.storage.tables.feedback_writer",
+]
 allow_indirect_imports = true  # the API reaches it only through services.feedback
 
 [[tool.importlinter.contracts]]
 name = "Feedback reads are quarantined: only the read model's feedback loader imports them (ADR 0066)"
 type = "protected"
 protected_modules = ["algotrade.data.feedback"]
-allowed_importers = ["algotrade.services.read.ops.feedback"]
+allowed_importers = ["algotrade.services.read.ops.feedback", "algotrade.services.read.ops.feature_requests"]
 
 # ---- ADR 0019: ownership and boundaries. Every contract the restructure planned is enabled
 # (no `pending_contract` remains in architecture/*_ownership.toml; a fitness test keeps it so).

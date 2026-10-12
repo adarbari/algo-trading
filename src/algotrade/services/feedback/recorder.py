@@ -13,7 +13,7 @@ keyed by its session, its id and its event, so a repeated submit of one event is
 ``feedback/*`` tables, only through ``FeedbackWriter``.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, date, datetime
 from typing import Any, cast
 
@@ -38,7 +38,60 @@ COLUMNS = (
 __all__ = ["FeedbackRecorder", "FeedbackSink", "open_recorder"]
 
 
-class FeedbackRecorder(BatchRecorder[Mapping[str, Any]]):
+class TableRecorder(BatchRecorder[Mapping[str, Any]]):
+    """The recorder of one ``feedback/*`` table, written once here: ``submit`` queues a mapping
+    of ``columns``; the thread writes a batch as one run, deduplicated by ``key`` (the later row
+    wins), one partition per exchange date, stamped as ADR 0007 says (``session_date`` the
+    exchange date of ``ts``, ``knowledge_ts`` = ``ts``, ``source``). A column a row lacks is null;
+    ``_typed`` lets a table cast its own columns."""
+
+    def __init__(
+        self,
+        writer: FeedbackWriter,
+        table: str,
+        job: str,
+        noun: str,
+        key: Sequence[str],
+        columns: Sequence[str],
+        maxsize: int,
+        clock: Callable[[], datetime],
+        source: str = SOURCE,
+    ) -> None:
+        self._writer, self._table, self._key = writer, table, list(key)
+        self._columns, self._source = list(columns), source
+        super().__init__(job, noun, BATCH, maxsize, clock)
+
+    def submit(self, row: Mapping[str, Any]) -> bool:
+        """Queue ``row`` for writing; ``False`` (dropped, logged) when the queue is full. Never
+        raises."""
+        return self._put(row)
+
+    def _typed(self, frame: pd.DataFrame) -> pd.DataFrame:
+        return frame
+
+    def _write(self, items: list[Mapping[str, Any]], now: datetime) -> None:
+        frame = self._frame(items).drop_duplicates(self._key, keep="last")
+        run_id = self.run_id(frame["session_date"].max(), now)
+        with self._writer.publishing(run_id, now):
+            for session, part in frame.groupby("session_date", sort=True):
+                rows = part.assign(run_id=run_id).reset_index(drop=True)
+                self._writer.write_feedback(self._table, cast(date, session), run_id, rows)
+
+    def _frame(self, rows: list[Mapping[str, Any]]) -> pd.DataFrame:
+        """The stamped frame of ``rows``."""
+        frame = pd.DataFrame(
+            [{c: r.get(c) for c in self._columns} for r in rows], columns=self._columns
+        )
+        ts = pd.to_datetime(frame["ts"], utc=True)
+        return self._typed(frame).assign(
+            ts=ts,
+            session_date=[exchange_date(t.to_pydatetime()) for t in ts],
+            knowledge_ts=ts,
+            source=self._source,
+        )
+
+
+class FeedbackRecorder(TableRecorder):
     """Writes submitted rows (a mapping of ``COLUMNS``) to ``feedback/drafting_events`` on its
     thread."""
 
@@ -48,34 +101,10 @@ class FeedbackRecorder(BatchRecorder[Mapping[str, Any]]):
         maxsize: int = 500,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
-        self._writer = writer
-        super().__init__(JOB, "events", BATCH, maxsize, clock)
+        super().__init__(writer, TABLE, JOB, "events", KEY, COLUMNS, maxsize, clock)
 
-    def submit(self, row: Mapping[str, Any]) -> bool:
-        """Queue ``row`` for writing; ``False`` (dropped, logged) when the queue is full. Never
-        raises."""
-        return self._put(row)
-
-    def _write(self, items: list[Mapping[str, Any]], now: datetime) -> None:
-        frame = _frame(items).drop_duplicates(KEY, keep="last")
-        run_id = self.run_id(frame["session_date"].max(), now)
-        with self._writer.publishing(run_id, now):
-            for session, part in frame.groupby("session_date", sort=True):
-                rows = part.assign(run_id=run_id).reset_index(drop=True)
-                self._writer.write_feedback(TABLE, cast(date, session), run_id, rows)
-
-
-def _frame(rows: list[Mapping[str, Any]]) -> pd.DataFrame:
-    """The stamped frame of ``rows``: a column a row lacks is null."""
-    frame = pd.DataFrame([{c: r.get(c) for c in COLUMNS} for r in rows], columns=list(COLUMNS))
-    frame["seq"] = frame["seq"].astype("Int64")
-    ts = pd.to_datetime(frame["ts"], utc=True)
-    return frame.assign(
-        ts=ts,
-        session_date=[exchange_date(t.to_pydatetime()) for t in ts],
-        knowledge_ts=ts,
-        source=SOURCE,
-    )
+    def _typed(self, frame: pd.DataFrame) -> pd.DataFrame:
+        return frame.assign(seq=frame["seq"].astype("Int64"))
 
 
 def open_recorder(data_url: str) -> FeedbackRecorder:
