@@ -118,8 +118,10 @@ class Part(Schema):
     start: int = Field(description="offset of words in sentence, in UTF-16 code units (JS slice)")
     end: int = Field(description="end offset of words in sentence, in UTF-16 code units")
     reading: str | None = Field(
-        description="what the model read the words as; null when it gave none or its numbers "
-        "disagree with the part's criteria (then reading_source is server)"
+        description="what the words were read as: the model's line (reading_source model), or "
+        "the server's own, built from the part's phrasebook entry (a draft made without the "
+        "model); null when the model gave none or its numbers disagree with the part's "
+        "criteria (then reading_source is server)"
     )
     reading_source: Literal["model", "server"]
     kind: Literal["applied", "formula", "needs_choice", "not_available", "not_understood"] = Field(

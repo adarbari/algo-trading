@@ -27,11 +27,12 @@ class Part:
     (never the model's copy), ``start`` / ``end`` its offsets in UTF-16 code units (what the
     browser counts), both 0 and ``words`` empty for a catch-all part (``origin`` ``kept`` or
     ``unplaced``); a gap (``origin`` ``gap``) has words and offsets and no refs.
-    ``reading_source`` is ``model`` when ``reading`` is the model's, ``server`` when it is absent
-    (the web shows the rows alone). The refs name items of the same draft: the
-    ids of criteria in the document and of the dropped ones, formula names, unresolved terms,
-    the key (or new slug) of missing requests and suggestion ids; ``rank`` is true when the
-    document's tie-break is this part's."""
+    ``reading_source`` is ``model`` when ``reading`` is the model's, ``server`` when the server
+    wrote it (a draft the phrasebook made, from its entries' criteria) or when it is absent
+    (the model's disagreed with the criteria: the web shows the rows alone). The refs name items
+    of the same draft: the ids of criteria in the document and of the dropped ones, formula
+    names, unresolved terms, the key (or new slug) of missing requests and suggestion ids;
+    ``rank`` is true when the document's tie-break is this part's."""
 
     id: str
     words: str

@@ -1117,7 +1117,7 @@ export interface components {
             rank: boolean;
             /**
              * Reading
-             * @description what the model read the words as; null when it gave none or its numbers disagree with the part's criteria (then reading_source is server)
+             * @description what the words were read as: the model's line (reading_source model), or the server's own, built from the part's phrasebook entry (a draft made without the model); null when the model gave none or its numbers disagree with the part's criteria (then reading_source is server)
              */
             reading: string | null;
             /**
