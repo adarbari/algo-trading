@@ -71,7 +71,9 @@ def golden_candidates(
     "final_criteria", "source_event", "source_events"}`` (``source_event``: the final event's id;
     ``source_events``: the ids of every event of the chain, in time order).
     ``truncated``: ``rows`` were cut at a row cap (the oldest were lost), so a chain whose first
-    event is at or before the oldest event loaded may be missing earlier ones and is dropped.
+    event is at or before the oldest event loaded may be missing earlier ones and is dropped. A
+    chain whose first request has a ``seq`` other than 1 began before the window and is dropped;
+    when that row has no ``seq`` (an old partition) the case says ``"partial": true``.
     A chain that starts before the window ``rows`` were
     read for (``since``) comes back partial: its early sentences are missing. Pass only rows from
     the viewer-filtered ``load_drafting_events``, never rows read around it."""
@@ -91,6 +93,9 @@ def golden_candidates(
             continue  # saved, discarded or abandoned: a working draft, unlabelled
         final = done[-1]
         asked = [r for r in members if r["event"] == STARTED and r["ts"] <= final["ts"]]
+        first = asked[0].get("seq") if asked else None
+        if first is not None and first != 1:
+            continue  # started before the window: its early sentences were never read
         cases.append({
             "chain_id": chain_id,
             "user": final["user"],
@@ -103,5 +108,6 @@ def golden_candidates(
             "final_criteria": _payload(final).get("saved_criteria"),
             "source_event": final["event_id"],
             "source_events": [r["event_id"] for r in members],
+            "partial": bool(asked) and first is None,  # an old row without ``seq``: cannot tell
         })  # fmt: skip
     return cases

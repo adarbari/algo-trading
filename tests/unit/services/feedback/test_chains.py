@@ -81,3 +81,14 @@ def test_a_chain_at_the_edge_of_a_truncated_read_is_dropped() -> None:
              saved_criteria=FINAL)]  # fmt: skip
     assert [c["chain_id"] for c in golden_candidates(edge + later, truncated=True)] == ["B"]
     assert len(golden_candidates(edge + later)) == 2
+
+
+def test_a_chain_that_began_before_the_window_is_dropped_and_a_seqless_one_is_flagged() -> None:
+    late_start = [ev("1", "A", "draft_requested", 1, 3), ev("2", "A", "screen_finalised", 2,
+                  saved_criteria=FINAL)]  # fmt: skip
+    old_rows = [ev("3", "B", "draft_requested", 1, None), ev("4", "B", "screen_finalised", 2,
+                saved_criteria=FINAL)]  # fmt: skip
+    whole = [ev("5", "C", "draft_requested", 1, 1), ev("6", "C", "screen_finalised", 2,
+             saved_criteria=FINAL)]  # fmt: skip
+    got = {c["chain_id"]: c["partial"] for c in golden_candidates(late_start + old_rows + whole)}
+    assert got == {"B": True, "C": False}

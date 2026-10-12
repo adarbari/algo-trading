@@ -238,6 +238,8 @@ def _plan_one(index: int, entry: Any, ctx: Setting) -> tuple[PlannedCase | None,
         "expect": expectation(final),
     }
     warned = holding_warnings(paras, final, *in_force)
+    if stored.get("partial"):
+        warned.append("chain may be partial: its first request has no seq to check")
     return PlannedCase(path, body, tuple(warned)), []
 
 

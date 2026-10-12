@@ -117,6 +117,7 @@ def _card(case: Mapping[str, Any]) -> dict[str, Any]:
         "sentences": sentences,
         "criteria_in_force": [s["current_criteria"] for s in case["sentences"]],
         "final_criteria": case["final_criteria"],
+        "partial": case["partial"],
         "groups": groups,
         "intents": sorted({o for _, o in pairs if o}),
         "holding_flags": sorted({f for s in sentences for f in holding_flags(s)}),
@@ -211,6 +212,8 @@ def render(
         ):
             lines += [f"  {n}. {sentence}", f"     in force: {brief(force)}"]
         lines.append(f"  final criteria: {brief(card['final_criteria'])}")
+        if card["partial"]:
+            lines.append("  WARNING may be partial: its first request has no seq to check")
         if card["holding_flags"]:
             lines.append(f"  WARNING looks like holdings: {', '.join(card['holding_flags'])}")
     lines += ["", "coverage by feature group: " + _counts(summary["groups"])]
