@@ -121,6 +121,10 @@ path = "tests/helpers"
 purpose = "test builders and fakes shared across suites, one module per thing built (stored frames, ingest fakes, rollup stores, domain objects)"
 
 [[test_dir]]
+path = "tests/helpers/drafting"
+purpose = "builders of the drafting tests shared across suites (a held draft, the request of a part's re-draft, the scoped model answer)"
+
+[[test_dir]]
 path = "tests/helpers/payloads"
 purpose = "synthetic payloads in a vendor's wire format, one module per vendor or feed"
 

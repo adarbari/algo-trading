@@ -12,7 +12,7 @@ of a part is the server's, so the one the browser sends is not read. Pure."""
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.drafting.formulas import DraftFormula, DroppedFormula
@@ -30,6 +30,8 @@ from algotrade.services.drafting.screens import MAX_TEXT, DroppedCriterion, Scre
 from algotrade.services.drafting.suggestions import DroppedSuggestion, Suggestion
 from algotrade.services.preview.expressions import DryRun, SampleValue
 
+MAX_ITEMS = 40  # of each list of a draft a request may carry back (the merge keeps within it)
+MAX_CRITERIA = 60  # criteria in the Builder's document
 CATCH_ALLS = (KEPT_ID, UNPLACED_ID)
 SHARED = ("missing",)  # a request may be named by two parts (one key, two spans)
 
@@ -70,9 +72,7 @@ def check_request(screener_id: str, body: Mapping[str, Any]) -> PartRequest:
         raise ConfigurationError(f"{screener_id}: the new words are empty")
     if len(new_words) > MAX_WORDS:
         raise ConfigurationError(f"{screener_id}: the new words are over {MAX_WORDS} characters")
-    document = body.get("document")
-    if not isinstance(document, Mapping) or not isinstance(document.get("criteria", {}), Mapping):
-        raise ConfigurationError(f"{screener_id}: the document has no criteria table")
+    document = _checked_document(screener_id, body.get("document"))
     parts = [_part(p) for p in body.get("parts") or ()]
     spans = _spans(screener_id, sentence, parts)
     prior = _prior(screener_id, sentence, document, parts, body)
@@ -91,6 +91,24 @@ def check_request(screener_id: str, body: Mapping[str, Any]) -> PartRequest:
             f"{screener_id}: the sentence with the new words is over {MAX_TEXT} characters"
         )
     return PartRequest(screener_id, sentence, prior, chosen, chosen.words, new_words, merged, spans)
+
+
+def _checked_document(screener_id: str, document: Any) -> Mapping[str, Any]:
+    """The Builder's document has a criteria table of at most ``MAX_CRITERIA`` criteria, each a
+    table with a ``field`` and an ``op`` (what the merge and the prompt read)."""
+    held = document.get("criteria", {}) if isinstance(document, Mapping) else None
+    if not isinstance(held, Mapping):
+        raise ConfigurationError(f"{screener_id}: the document has no criteria table")
+    if len(held) > MAX_CRITERIA:
+        raise ConfigurationError(f"{screener_id}: the document has over {MAX_CRITERIA} criteria")
+    for cid, criterion in held.items():
+        if (
+            not isinstance(criterion, Mapping)
+            or not isinstance(criterion.get("field"), str)
+            or not isinstance(criterion.get("op"), str)
+        ):
+            raise ConfigurationError(f"{screener_id}: criterion {cid!r} has no field and op")
+    return cast(Mapping[str, Any], document)
 
 
 def _part(raw: Mapping[str, Any]) -> Part:

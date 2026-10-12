@@ -9,10 +9,10 @@ from typing import Any
 import pytest
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.drafting.redraft.request import check_request
+from algotrade.services.drafting.redraft.request import MAX_CRITERIA, check_request
 from algotrade.services.drafting.screens import MAX_TEXT
 from algotrade.services.read.context import ReadContext
-from tests.unit.services.drafting.redraft.builders import body_of, held_draft
+from tests.helpers.drafting.redraft import body_of, held_draft
 from tests.unit.services.drafting.test_screens import ctx  # noqa: F401  (the fixture)
 
 SENTENCE = "café stocks 🚀 over $5 and more"  # é is one UTF-16 unit, 🚀 two: offsets differ
@@ -34,7 +34,7 @@ PARTS = [at("p1", "café stocks"), at("p2", "over $5")]  # the emoji is 1 code p
 
 def body(**over: Any) -> dict[str, Any]:
     return {
-        "sentence": SENTENCE, "document": {"criteria": {"c": {"field": "f"}}},
+        "sentence": SENTENCE, "document": {"criteria": {"c": {"field": "f", "op": "eq"}}},
         "parts": PARTS, "part_id": "p2", "new_words": "over $9", **over,
     }  # fmt: skip
 
@@ -174,3 +174,17 @@ def test_an_unresolved_term_whose_default_is_no_reading_is_refused(ctx: ReadCont
     sent["unresolved"] = [{**sent["unresolved"][0], "default_index": 9}]
     with pytest.raises(ConfigurationError, match="default_index is not a reading"):
         check_request("my_screen", sent)
+
+
+def test_a_criterion_with_no_field_or_op_is_a_400_not_a_key_error() -> None:
+    for criterion in ({"op": "eq"}, {"field": "f"}, {"field": 3, "op": "eq"}, "price > 5", None):
+        with pytest.raises(ConfigurationError, match="criterion 'c' has no field and op"):
+            check_request("s", body(document={"criteria": {"c": criterion}}))
+
+
+def test_the_document_has_at_most_sixty_criteria() -> None:
+    row = {"field": "f", "op": "eq"}
+    ok = {f"c{n}": row for n in range(MAX_CRITERIA)}
+    check_request("s", body(document={"criteria": ok}))
+    with pytest.raises(ConfigurationError, match="over 60 criteria"):
+        check_request("s", body(document={"criteria": {**ok, "one_more": row}}))

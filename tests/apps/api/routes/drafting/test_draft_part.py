@@ -16,6 +16,7 @@ from algotrade.services.drafting.redraft.cap import PartRedraftCap
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.feedback import DraftMemory
 from algotrade_api.main import create_app
+from algotrade_api.schemas.drafting.screeners import DraftPartBody
 from tests.apps.api.routes.drafting.test_screeners import (
     PARTS_ANSWER,
     PRICE,
@@ -238,3 +239,73 @@ def test_the_default_cap_reads_the_limit_from_llm_toml(
 ) -> None:
     app = create_app(ApiSettings("memory://", "config"), api_golden[0], authenticator=as_user("u1"))
     assert app.state.part_cap._limit() == 30
+
+
+def test_thirty_chained_re_drafts_each_feed_back_through_the_request_body(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    """What only grows (notes, dropped checks) is kept within what the body accepts, so the draft
+    the browser holds can always be sent back (a 422 here would strand the trader's retype)."""
+    rounds = 30
+    dropped = {
+        "field": "nope.x", "op": "gte", "value": 1, "mode": "score", "tolerance": None,
+        "on_miss": None, "why": "w", "source": None, "part": "p1",
+    }  # fmt: skip
+    answers = [
+        PART_ANSWER
+        | {
+            "criteria": [{**PART_ANSWER["criteria"][0], "value": n + 10}],
+            "parts": [{"id": "p1", "words": f"over ${n + 10}", "reading": None}],
+            "notes": [f"note {n} a", f"note {n} b"], "suggestions": [dropped],
+        }
+        for n in range(rounds)
+    ]  # fmt: skip
+    cap = PartRedraftCap(api_golden[0].reader, lambda: 100)
+    client = client_for(api_golden[0], Sequence(PARTS_ANSWER, *answers), cap=cap)
+    draft = first_draft(client)
+    for n in range(rounds):
+        body = retype(draft, words=f"over ${n + 10}")
+        DraftPartBody.model_validate(body)  # the draft as the browser holds it is a valid body
+        response = client.post(PATH, json=body)
+        assert response.status_code == 200, (n, response.text)
+        draft = response.json()["draft"]
+    assert len(draft["notes"]) == 40 and len(draft["suggestions_dropped"]) == rounds
+    assert draft["notes"][-1] == "note 29 b" and "note 0 a" not in draft["notes"]
+    DraftPartBody.model_validate(retype(draft))
+
+
+def test_the_parts_other_than_the_replaced_one_are_noted_as_the_clients_in_the_payload(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    sink = Keep()
+    client = client_for(api_golden[0], Sequence(PARTS_ANSWER, PART_ANSWER), sink)
+    draft = first_draft(client)
+    client.post(PATH, json=retype(draft))
+    first, part = (
+        json.loads(r["payload"])["parts"] for r in sink.rows if r["event"] == "draft_returned"
+    )
+    assert not any("prior" in p for p in first)  # the whole draft's parts are the model's
+    assert {p["id"]: p.get("prior") for p in part}["p2"] is None
+    assert {p.get("prior") for p in part if p["id"] != "p2"} == {"client"}
+
+
+def test_a_request_the_draft_already_had_is_not_logged_again(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    old = _item("held_two_years_score", "over $5", "ROLLUP_FROM_STORED") | {"part": "p2"}
+    again = _item("held_two_years_score", "IV rank", "ROLLUP_FROM_STORED") | {"part": "p1"}
+    answer = {**PART_ANSWER, "parts": [{"id": "p1", "words": "IV rank 70%", "reading": None}]}
+    requests = Keep()
+    client = client_for(
+        api_golden[0],
+        Sequence(
+            {**PARTS_ANSWER, "missing": [old]}, {**answer, "criteria": [], "missing": [again]}
+        ),
+        requests=requests,
+    )
+    draft = first_draft(client)
+    assert len(requests.rows) == 1
+    done = client.post(PATH, json=retype(draft, part="p3", words="IV rank 70%"))
+    assert done.status_code == 200, done.text
+    assert len(requests.rows) == 1  # held_two_years_score was recorded when it was first asked
+    assert done.json()["draft"]["missing"][0]["new_key_slug"] == "held_two_years_score"

@@ -41,8 +41,11 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 # entry shows its structured thresholds; 5: the index grouped by prefix and the slice capped by a
 # token budget; 6: the phrasebook's last column is headed "exact default"; 7: protective checks
 # are ``suggestions``, never criteria, and no threshold is invented for a vague word; 8: explained
-# parts (``parts`` and a ``part`` tag on every item, ``services/drafting/parts``).
-PROMPT_VERSION = "8"
+# parts (``parts`` and a ``part`` tag on every item, ``services/drafting/parts``); 9: the scoped ask
+# of a part's re-draft (``redraft/prompt.py``). One version serves both prompts (the usage log
+# records it for ``screener-draft`` and ``screener-draft-part``): bump it on any change to ``TASK``
+# or to the scoped ``ASK`` (``redraft/test_prompt.py`` in the tests pins their hashes).
+PROMPT_VERSION = "9"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 

@@ -13,10 +13,11 @@ from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.drafting.prompt import PROMPT_VERSION
 from algotrade.services.drafting.redraft.merge import OTHER_PART, TAKEN_FORMULA
-from algotrade.services.drafting.redraft.request import check_request
+from algotrade.services.drafting.redraft.request import MAX_ITEMS, check_request
 from algotrade.services.drafting.redraft.run import redraft_part
+from algotrade.services.drafting.screens import MAX_TEXT
 from algotrade.services.read.context import ReadContext
-from tests.unit.services.drafting.redraft.builders import (
+from tests.helpers.drafting.redraft import (
     OI,
     PRICE,
     Canned,
@@ -216,7 +217,7 @@ def test_an_item_another_part_already_offers_is_not_offered_twice(ctx: ReadConte
         ("draft_oi_per_dollar", TAKEN_FORMULA)
     ]
     assert [u.term for u in draft.unresolved] == ["deep"]
-    assert any("deep: already offered for another part" in n for n in draft.notes)
+    assert any("deep: not offered again" in n for n in draft.notes)
     assert [m.new_key_slug for m in draft.missing] == ["oi_history"]  # one request, two parts
     assert (p2.missing, by_id(draft)["p5"].missing) == (("oi_history",), ("oi_history",))
 
@@ -338,12 +339,101 @@ def test_the_call_is_told_to_the_cap_as_soon_as_the_model_has_answered(
     assert told == ["call-7"] and done.draft.call_id == "call-7"
 
 
-def test_a_document_the_validator_refuses_is_named_not_silently_rewritten(
+def test_a_criterion_of_the_trader_the_validator_refuses_is_named_before_the_model_is_asked(
     ctx: ReadContext,  # noqa: F811
 ) -> None:
     prior = held_draft(ctx)
     broken = {**prior.document, "criteria": {**prior.document["criteria"]}}
     broken["criteria"]["active"] = {"field": "rollup.nope@v1.x", "op": "gt", "value": 1}
     body = body_of(prior, "p2", "over $80", document=broken)
+    model = Canned(answer_for("over $80", PRICE_80))
     with pytest.raises(ConfigurationError, match="the criterion 'active' of your screen"):
-        redraft_part(ctx, Canned(answer_for("over $80", PRICE_80)), check_request("s", body))
+        redraft_part(ctx, model, check_request("my_screen", body))
+    assert model.asked == []  # nothing was spent on a screen that cannot be saved
+
+
+def test_the_part_being_retyped_may_hold_a_refused_criterion_it_is_replaced_anyway(
+    ctx: ReadContext,  # noqa: F811
+) -> None:
+    prior = held_draft(ctx)
+    broken = {**prior.document, "criteria": {**prior.document["criteria"]}}
+    broken["criteria"]["price"] = {"field": "rollup.nope@v1.x", "op": "gt", "value": 1}  # p2's own
+    body = body_of(prior, "p2", "over $80", document=broken)
+    done = redraft_part(ctx, Canned(answer_for("over $80", PRICE_80)), check_request("s", body))
+    assert done.draft.document["criteria"]["price"] == ROW_80
+
+
+def test_a_tie_break_of_the_trader_the_validator_would_remove_is_refused_before_the_model_is_asked(
+    ctx: ReadContext,  # noqa: F811
+) -> None:
+    prior = held_draft(ctx)  # p2 owns the tie-break; p3 is retyped
+    bad = {**prior.document, "rank": {"tie_break": "rollup.nope@v1.x"}}
+    model = Canned(answer_for("deep oi", {"id": "oi", "field": OI, "op": "gt", "value": 5}))
+    with pytest.raises(ConfigurationError, match="the tie-break of your screen is not valid"):
+        redraft_part(ctx, model, check_request("s", body_of(prior, "p3", "deep oi", document=bad)))
+    assert model.asked == []
+
+
+def test_a_reading_is_dropped_when_the_merge_discarded_a_formula_a_term_or_the_rank(
+    ctx: ReadContext,  # noqa: F811
+) -> None:
+    """The reading described what the model proposed; if the merge left part of it out, the
+    reading would claim more than the rows hold."""
+    said = "Price above $80 with a formula"
+    formula = answer_for(
+        "over $80", PRICE_80, reading=said, formulas=[{**FORMULA, "part": "p1"}]
+    )  # p4 already offers it
+    done, _ = redraft(ctx, Canned(formula), "p2", "over $80")
+    assert (by_id(done.draft)["p2"].reading, by_id(done.draft)["p2"].reading_source) == (
+        None, "server",
+    )  # fmt: skip
+    term = answer_for("over $80", PRICE_80, reading=said, unresolved=[{**READINGS, "part": "p1"}])
+    done, _ = redraft(ctx, Canned(term), "p2", "over $80")  # p3 already has "deep"
+    assert by_id(done.draft)["p2"].reading is None
+    rank = answer_for(
+        "deep oi", {"id": "oi", "field": OI, "op": "gt", "value": 5},
+        reading="Open interest above 5",
+        tie_break={"field": OI, "descending": True, "part": "p1"},
+    )  # fmt: skip
+    done, _ = redraft(ctx, Canned(rank), "p3", "deep oi")  # p2 owns the tie-break
+    assert by_id(done.draft)["p3"].reading is None
+    assert any(
+        n.startswith("rank: the tie-break another part sets stays") for n in done.draft.notes
+    )
+    kept = answer_for(
+        "deep oi",
+        {"id": "oi", "field": OI, "op": "gt", "value": 5},
+        reading="Open interest above 5",
+    )
+    done, _ = redraft(ctx, Canned(kept), "p3", "deep oi")  # nothing discarded: the reading stays
+    assert by_id(done.draft)["p3"].reading == "Open interest above 5"
+
+
+def test_the_requests_of_the_new_words_are_only_those_the_draft_did_not_have(
+    ctx: ReadContext,  # noqa: F811
+) -> None:
+    again = {**GAP, "part": "p1"}  # oi_history: p5 asked for it already
+    new = {**GAP, "new_key_slug": "held_two_years", "span": "held two years", "part": "p1"}
+    done, _ = redraft(
+        ctx, Canned(answer_for("held two years", missing=[again, new])), "p3", "held two years"
+    )
+    assert [m.new_key_slug for m in done.missing] == ["held_two_years"]
+    assert by_id(done.draft)["p3"].missing == ("oi_history", "held_two_years")  # it still points
+
+
+def test_what_only_grows_stays_within_what_the_next_request_may_carry(
+    ctx: ReadContext,  # noqa: F811
+) -> None:
+    prior = held_draft(ctx)
+    for n in range(45):  # forty-five retypes, each leaving two notes and a dropped check behind
+        answer = answer_for(
+            f"over ${n + 80}",
+            {**PRICE_80, "value": n + 80},
+            notes=[f"note {n} one", f"note {n} two " + "x" * 2000],
+            suggestions=[sug(field="nope.x", part="p1")],
+        )
+        req = check_request("my_screen", body_of(prior, "p2", f"over ${n + 80}"))
+        prior = redraft_part(ctx, Canned(answer), req).draft
+    assert len(prior.notes) == len(prior.suggestions_dropped) == MAX_ITEMS
+    assert prior.notes[-1].startswith("note 44 two") and len(prior.notes[-1]) <= MAX_TEXT
+    assert "note 0 one" not in prior.notes  # the oldest went first

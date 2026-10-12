@@ -304,3 +304,29 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: owner decision in the session, 2026-10-11 (source: owner); the rows are not the trader's words and are not "not understood".
+
+## 2026-10-12 | Describe it part re-draft | Day of the cap
+- Question: which day does the daily cap on part re-drafts count?
+- Options: the exchange calendar date (as the usage log partitions) / the trader's local day.
+- Decision: the exchange calendar date (America/New_York), as built; the 429 says how many seconds until it turns.
+- decided by: owner
+- confirmed: owner 2026-10-12
+- status: final
+- Reasoning: owner answer in the session (PR #561 review); the usage log the count is read from is partitioned that way.
+
+## 2026-10-12 | Describe it part re-draft | What uses up a place
+- Question: does a part re-draft that fails use up one of the user's daily places?
+- Options: every call asked counts / only a call that returned a draft counts.
+- Decision: only a call that returned a draft counts. A failed, invalid or unavailable call gives its place back (the place is reserved under a lock while the call is in flight, released when it raises); the usage log counts only answered calls (more `ok` / `fell_back` attempts than `rejected` rows); the cap still fails closed when the count cannot be read. Changes the first build of PR #561, which counted failed calls.
+- decided by: owner
+- confirmed: owner 2026-10-12
+- status: final
+- Reasoning: owner answer in the session (PR #561 review): a trader should not lose a place to the system's failure.
+
+## 2026-10-12 | Describe it drafting | One prompt version for both prompts
+- Question: does the scoped re-draft prompt have its own `PROMPT_VERSION`?
+- Options: a second version constant / one shared `PROMPT_VERSION`.
+- Decision: one shared `PROMPT_VERSION` (now 9: the scoped re-draft ask is new); it is bumped on any change to `TASK` or to the scoped `ASK`, and a test pins the hashes of both against the version, so an edit without a bump fails.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the usage log records one version per call whichever prompt made it; two constants could drift, a pinned hash cannot.

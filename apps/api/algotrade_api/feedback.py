@@ -201,15 +201,18 @@ def part_note(part_id: str, old_words: str, new_words: str) -> dict[str, Any]:
     }  # fmt: skip
 
 
-def parts_payload(parts: Sequence[Any] | None) -> list[dict[str, Any]]:
+def parts_payload(parts: Sequence[Any] | None, replaced: str | None = None) -> list[dict[str, Any]]:
     """The explained parts of a draft as the ``draft_returned`` payload keeps them: id, words,
     the model's reading (null when the server dropped it), kind and origin, and how many items
-    each holds; never the sentence again."""
+    each holds; never the sentence again. ``replaced``: the id of the part a re-draft replaced:
+    the other parts came back from the browser, so their readings are the client's word, not the
+    model's, and each says ``prior`` ``client``."""
     return [
         {
             "id": p.id, "words": p.words, "reading": p.reading, "kind": p.kind, "origin": p.origin,
             "items": len(p.criteria) + len(p.dropped) + len(p.formulas) + len(p.unresolved)
             + len(p.missing) + len(p.suggestions) + int(p.rank),
+            **({"prior": "client"} if replaced is not None and p.id != replaced else {}),
         }
         for p in parts or ()
     ]  # fmt: skip

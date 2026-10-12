@@ -3,11 +3,19 @@ the whole draft's (so the provider's cache hits), a slice retrieved for the new 
 other parts' criteria as compact fixed rows, and under 4,000 tokens that are not the prefix, for
 every golden sentence as the new words, with a trader's own features and the open keys padded."""
 
+import hashlib
+
 import pytest
 
 from algotrade.services.drafting.golden import GoldenCase
-from algotrade.services.drafting.prompt import prefix_text, sliced_system_prompt
+from algotrade.services.drafting.prompt import (
+    PROMPT_VERSION,
+    TASK,
+    prefix_text,
+    sliced_system_prompt,
+)
 from algotrade.services.drafting.redraft.prompt import (
+    ASK,
     MAX_ROWS,
     ROW_CHARS,
     fixed_rows,
@@ -107,3 +115,22 @@ def test_the_user_prompt_says_what_is_asked(site) -> None:  # noqa: F811
     assert "\nnone\n" in user  # no other criteria
     for rule in ('"p1"', "discarded", "no scaffolding"):
         assert rule.lower() in user.lower()
+
+
+PINNED = {"9": ("43cf49adfc7573ca", "cb03fbc5eba3b5b0")}  # PROMPT_VERSION -> (TASK, ASK) hashes
+
+
+def _hash(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+def test_one_prompt_version_serves_both_prompts_so_an_edit_of_either_needs_a_bump() -> None:
+    """The usage log records ``PROMPT_VERSION`` for ``screener-draft`` and for
+    ``screener-draft-part`` (orchestrator design call 2026-10-12). Editing ``TASK`` or the scoped
+    ``ASK`` changes what the model is asked, so the version must move with it: this fails until
+    ``PROMPT_VERSION`` is bumped to a number that has its hashes pinned here."""
+    assert PROMPT_VERSION in PINNED, f"bump PROMPT_VERSION and pin {_hash(TASK)}, {_hash(ASK)}"
+    assert (_hash(TASK), _hash(ASK)) == PINNED[PROMPT_VERSION], (
+        f"TASK or ASK changed under PROMPT_VERSION {PROMPT_VERSION}: bump it and pin "
+        f"{_hash(TASK)}, {_hash(ASK)}"
+    )

@@ -19,7 +19,7 @@ draft again, the browser swaps it in whole:
 The reading of the new part is the model's only while nothing it said was dropped by the merge.
 Pure but for the validator and the dry run of formulas, which were done already."""
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import replace
 from typing import Any
 
@@ -29,8 +29,9 @@ from algotrade.services.drafting.gaps import Unresolved
 from algotrade.services.drafting.parts.build import kind_of
 from algotrade.services.drafting.parts.model import KEPT_ID, UNPLACED_ID, Part
 from algotrade.services.drafting.parts.spans import utf16
-from algotrade.services.drafting.redraft.request import PartRequest, missing_ref
+from algotrade.services.drafting.redraft.request import MAX_ITEMS, PartRequest, missing_ref
 from algotrade.services.drafting.screens import (
+    MAX_TEXT,
     DroppedCriterion,
     ScreenDraft,
     reading_of,
@@ -41,6 +42,7 @@ from algotrade.services.read.context import ReadContext
 
 OTHER_PART = "set by another part"
 TAKEN_FORMULA = "already offered for another part"
+OVER_CAP = "over the number a draft may carry"
 
 
 def merge_part(ctx: ReadContext, req: PartRequest, sub: ScreenDraft) -> ScreenDraft:
@@ -57,8 +59,10 @@ def merge_part(ctx: ReadContext, req: PartRequest, sub: ScreenDraft) -> ScreenDr
     formulas = [f for f in prior.formulas if f.name not in old.formulas]
     formulas_dropped = [*prior.formulas_dropped, *sub.formulas_dropped]
     for formula in sub.formulas:
-        if formula.name in offered:
-            formulas_dropped.append(DroppedFormula(formula.name, TAKEN_FORMULA))
+        if formula.name in offered or len(formulas) >= MAX_ITEMS:
+            reason = TAKEN_FORMULA if formula.name in offered else OVER_CAP
+            formulas_dropped.append(DroppedFormula(formula.name, reason))
+            mine.lost = True  # its reading may have described it
             continue
         formulas.append(replace(formula, part=None))
         mine.formulas.append(formula.name)
@@ -67,8 +71,9 @@ def merge_part(ctx: ReadContext, req: PartRequest, sub: ScreenDraft) -> ScreenDr
     unresolved = [u for u in prior.unresolved if u.term not in old.unresolved]
     fresh: list[Unresolved] = []
     for term in sub.unresolved:
-        if term.term in asked:
-            notes.append(f"{term.term}: already offered for another part")
+        if term.term in asked or len(unresolved) + len(fresh) >= MAX_ITEMS:
+            notes.append(f"{term.term}: not offered again (another part has it, or too many)")
+            mine.lost = True
             continue
         fresh.append(term)
     held_readings = {reading_of(c) for c in criteria.values()}
@@ -93,26 +98,37 @@ def merge_part(ctx: ReadContext, req: PartRequest, sub: ScreenDraft) -> ScreenDr
         m for m in prior.missing if missing_ref(m) not in old.missing or missing_ref(m) in elsewhere
     ]
     have = {missing_ref(m) for m in missing}
-    missing += [m for m in sub.missing if missing_ref(m) not in have]
-    mine.missing += [missing_ref(m) for m in sub.missing]
+    missing += [m for m in sub.missing if missing_ref(m) not in have][: MAX_ITEMS - len(missing)]
+    present = {missing_ref(m) for m in missing}
+    mine.missing += [missing_ref(m) for m in sub.missing if missing_ref(m) in present]
     # suggestions: ids stay unique, the other parts' thresholds are never rewritten
     suggestions = [s for s in prior.suggestions if s.id not in old.suggestions]
     shown = [c for c in criteria.values() if isinstance(c, Mapping)]
     for suggestion in sub.suggestions:
-        if rewrites(suggestion.criterion, shown):
+        if rewrites(suggestion.criterion, shown) or len(suggestions) >= MAX_ITEMS:
             continue
         fresh_id = _unique("s", {s.id for s in suggestions}, numbered=True)
         suggestions.append(replace(suggestion, id=fresh_id, part=None))
         mine.suggestions.append(fresh_id)
     suggestions_dropped = [*prior.suggestions_dropped, *sub.suggestions_dropped]
-    notes += [n for n in sub.notes if n not in notes]
+    notes += [*mine.notes, *(n for n in sub.notes if n not in notes)]
     parts = _parts(req, sub, document, mine, others)
     return ScreenDraft(
-        req.screener_id, document, tuple(dropped), tuple(dict.fromkeys(notes)),
-        call_id=sub.call_id, formulas=tuple(formulas), formulas_dropped=tuple(formulas_dropped),
+        req.screener_id, document, tuple(dropped), _newest(dict.fromkeys(_clip(n) for n in notes)),
+        call_id=sub.call_id, formulas=tuple(formulas), formulas_dropped=_newest(formulas_dropped),
         missing=tuple(missing), unresolved=tuple(unresolved), suggestions=tuple(suggestions),
-        suggestions_dropped=tuple(suggestions_dropped), sentence=req.merged, parts=parts,
+        suggestions_dropped=_newest(suggestions_dropped), sentence=req.merged, parts=parts,
     )  # fmt: skip
+
+
+def _newest[T](items: Iterable[T]) -> tuple[T, ...]:
+    """The last ``MAX_ITEMS`` of ``items``: what only grows (notes, what was dropped) is kept to
+    the bound the next request's body may carry, the oldest going first."""
+    return tuple(items)[-MAX_ITEMS:]
+
+
+def _clip(note: str) -> str:
+    return note if len(note) <= MAX_TEXT else note[: MAX_TEXT - 1] + "…"
 
 
 class _Mine:
@@ -126,6 +142,7 @@ class _Mine:
         self.missing: list[str] = []
         self.suggestions: list[str] = []
         self.rank = False
+        self.notes: list[str] = []
         self.lost = False  # the merge dropped something the model said (its reading may lie)
 
 
@@ -178,9 +195,13 @@ def _document(ctx: ReadContext, req: PartRequest, sub: ScreenDraft, mine: _Mine)
     document = {k: v for k, v in req.prior.document.items() if k not in ("criteria", "rank")}
     document["criteria"] = criteria
     own = req.prior.document.get("rank")  # the document's tie-break: the part's, or another's
+    new = sub.document.get("rank")
     if own is not None and not old.rank:
         document["rank"] = own
-    elif (new := sub.document.get("rank")) is not None:
+        if new is not None:  # the other part wins; the reading may have described this one
+            mine.notes.append("rank: the tie-break another part sets stays")
+            mine.lost = True
+    elif new is not None:
         document["rank"] = new
         mine.rank = True
     document, refused = validated(ctx, req.screener_id, document, ())
@@ -194,6 +215,9 @@ def _document(ctx: ReadContext, req: PartRequest, sub: ScreenDraft, mine: _Mine)
         taken_dropped.add(mine.dropped[-1].id)
         mine.lost = True
     if "rank" not in document:
+        if mine.rank:
+            mine.notes.append("rank: the validator refused the tie-break of the new words")
+            mine.lost = True
         mine.rank = False
     mine.criteria = [cid for cid in added.values() if cid in document["criteria"]]
     return document

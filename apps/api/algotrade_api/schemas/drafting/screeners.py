@@ -21,10 +21,9 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, Field
 
 from algotrade.services.drafting.parts.model import MAX_PARTS, MAX_WORDS
+from algotrade.services.drafting.redraft.request import MAX_ITEMS
 from algotrade.services.drafting.screens import MAX_TEXT
 from algotrade_api.schemas.health import Schema
-
-MAX_ITEMS = 40  # of each list of a draft a re-draft request may carry back
 
 
 class DraftFromTextBody(BaseModel):

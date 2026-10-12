@@ -94,7 +94,7 @@ def draft_part(
         [{"id": d.id, "field": d.field, "reason": d.reason} for d in draft.dropped],
         (draft.call_id,) if draft.call_id else (), ctx.features, PROMPT_VERSION, seq, draft.notes,
         [u.term for u in draft.unresolved], [f.name for f in draft.formulas],
-        feedback.parts_payload(draft.parts), note,
+        feedback.parts_payload(draft.parts, done.replaced_part_id), note,
     )  # fmt: skip
     feedback.record_requests(
         requests, user, done.missing, draft.sentence, draft.call_id, session_id

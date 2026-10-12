@@ -64,16 +64,17 @@ def call_row(
         "use_case": use_case, "user": user, "outcome": outcome, "call_id": call_id}  # fmt: skip
 
 
-def test_calls_of_counts_one_per_call_of_a_user_and_use_case_on_a_day() -> None:
+def test_calls_of_counts_one_per_answered_call_of_a_user_and_use_case_on_a_day() -> None:
     backend = MemoryBackend()
     rows = [
         call_row(D1, 0, "c1", "screener-draft-part"),
-        call_row(D1, 1, "c1", "screener-draft-part", provider="gemini"),  # a fall-back: same call
-        call_row(D1, 2, "c2", "screener-draft-part", outcome="failed"),  # asked, may have billed
+        call_row(D1, 1, "c1", "screener-draft-part", provider="gemini"),  # a repair: same call
+        call_row(D1, 2, "c2", "screener-draft-part", outcome="failed"),  # never answered
         call_row(D1, 3, "c3", "screener-draft-part", outcome="skipped_budget"),  # never asked
         call_row(D1, 4, "c4", "screener-draft"),  # another use case
         call_row(D1, 5, "c5", "screener-draft-part", user="bea"),  # another user
         call_row(D1, 6, None, "screener-draft-part"),  # a row from before call ids
+        call_row(D1, 7, "c6", "screener-draft-part", outcome="fell_back"),  # answered after a miss
     ]
     StoreWriter(backend).write_table(LLM_CALLS, D1, "r1", stamped(rows, D1, "r1"))
     StoreWriter(backend).write_table(
@@ -81,10 +82,24 @@ def test_calls_of_counts_one_per_call_of_a_user_and_use_case_on_a_day() -> None:
     )
     reader = StoreReader(backend)
     mine = calls_of(reader, D1, "screener-draft-part", "abhi")
-    assert {"c1", "c2"} < mine and len(mine) == 3 and "c3" not in mine and "c5" not in mine
+    assert {"c1", "c6"} < mine and len(mine) == 3  # c1, c6 and the row without an id
+    assert not {"c2", "c3", "c4", "c5"} & mine  # a failed or skipped call uses up no place
     assert calls_of(reader, D1, "screener-draft-part", "bea") == {"c5"}
     assert calls_of(reader, D2, "screener-draft-part", "abhi") == {"c9"}  # the day's own
     assert calls_of(reader, D3, "screener-draft-part", "abhi") == set()  # no partition
+
+
+def test_a_call_whose_every_answer_was_refused_is_not_counted_but_a_repaired_one_is() -> None:
+    backend = MemoryBackend()
+    rows = [
+        call_row(D1, 0, "refused", "screener-draft-part"),  # answered ...
+        call_row(D1, 1, "refused", "screener-draft-part", outcome="rejected"),  # ... and unusable
+        call_row(D1, 2, "repaired", "screener-draft-part"),
+        call_row(D1, 3, "repaired", "screener-draft-part", outcome="rejected"),
+        call_row(D1, 4, "repaired", "screener-draft-part", provider="gemini"),  # the repair held
+    ]
+    StoreWriter(backend).write_table(LLM_CALLS, D1, "r1", stamped(rows, D1, "r1"))
+    assert calls_of(StoreReader(backend), D1, "screener-draft-part", "abhi") == {"repaired"}
 
 
 def test_calls_of_reads_a_store_with_no_call_id_column_and_an_empty_store() -> None:

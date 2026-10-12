@@ -397,7 +397,9 @@ retyping just that part's words, which re-drafts only that part. This is the sec
   byte for byte, so the provider's cache hits), a slice retrieved for the new words alone and capped at 1,200 tokens,
   the matched phrasebook entries and open keys; the user prompt asks for the same JSON with one part and lists the
   other parts' criteria as at most 24 fixed rows of at most 110 characters. Everything after the prefix is under 4,000
-  tokens for every golden sentence as the new words, with a trader's own features and padded keys (a test); the answer
+  tokens for every golden sentence as the new words, with a trader's own features and padded keys (a test); one
+  `PROMPT_VERSION` (9) serves both prompts and a test pins the hashes of `TASK` and the scoped `ASK` to it, so an edit of
+  either without a bump fails (design call 2026-10-12); the answer
   is the draft's shape for one part, short (a line of reading, no notes unless a word could not be mapped). The call
   is tagged use case `screener-draft-part` with the shared `PROMPT_VERSION`, so the usage log, the cost and the budget
   count it as they count a draft. It goes through the same asking path (`screens.ask_for_draft`: answer schema,
@@ -410,16 +412,25 @@ retyping just that part's words, which re-drafts only that part. This is the sec
   part owns it. What the document holds that no part names (added by hand) is the `kept` part. Ids stay unique (a new
   criterion, dropped criterion or suggestion that takes a held id is renamed). The document is validated as finalise
   does: a new criterion the validator refuses is dropped with its message; one of the trader's own that it refuses is a
-  400 (the merge never drops what the trader has). The new part's reading is the model's only when nothing it described
+  400 (the merge never drops what the trader has): their criteria and tie-break are validated **before** the prompt is
+  built, so the model is never asked about a screen that cannot be saved, and the document is bounded (60 criteria, each
+  with a `field` and an `op`). What only grows (notes, the dropped formulas and suggestions) keeps its newest 40, and a
+  merged draft never carries more than 40 of any list, so it can always be sent back; the other parts' readings come
+  back from the browser, so the feedback payload marks them `prior: client`; the request log gets only the requests the
+  draft did not already have. The new part's reading is the model's only when nothing it described
   was dropped by the merge. The other parts keep their ids, words and readings; the offsets of the words after the new
   ones move (UTF-16 units, tested with an accent and an emoji). Hand edits of the retyped part are replaced; the web
   asks first (the owner's decision).
 - **Daily cap** (`redraft/cap.py`, `llm.toml` `[limits] part_redrafts_per_day`, default 30, 0 turns it off): per user
   per exchange calendar day, **counted from the usage log**, not from a counter a restart resets: the calls of use case
-  `screener-draft-part` of that user on that day (`data.usage.calls_of`, one per call id, a failed call counts, a
-  budget-skipped attempt does not). The recorder writes in the background, so this process also remembers the calls it
-  made and is making and counts the union (a call is counted once when it reaches the log); admission is under a lock,
-  so requests that arrive together cannot all pass the last place. One API process is assumed, as the usage ledger
+  `screener-draft-part` of that user on that day **that returned an answer** (`data.usage.calls_of`, one per call id: more
+  `ok` / `fell_back` attempts than `rejected` rows, so a repaired call counts; a call that only failed or was skipped by
+  the budget does not). Only a call that returned a draft uses up a place (owner decision 2026-10-12): the place is
+  reserved when the request is admitted, under a lock, so requests in flight count and cannot all pass the last place,
+  and given back when the call fails, is refused or the merge fails. The recorder writes in the background, so this
+  process also remembers the calls it made and counts the union (a call is counted once when it reaches the log; the
+  place's token is swapped for the call's id as soon as the model has answered). The day is the exchange calendar date
+  (owner decision 2026-10-12). One API process is assumed, as the usage ledger
   does (ADR 0058). A count that cannot be read fails closed (503). At the limit: `DailyLimitError`, HTTP 429 with
   `{detail, code: "part_redraft_limit", limit, retry_after_s}` and `Retry-After` (seconds to the exchange day turning),
   which the web shows its "limit reached" state on; the model is not asked and no feedback event is recorded. The

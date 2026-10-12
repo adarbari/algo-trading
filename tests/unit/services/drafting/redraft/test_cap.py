@@ -1,9 +1,11 @@
-"""``PartRedraftCap`` (owner decision 2026-10-11, ADR 0041 amended 2026-10-12): a user's part
-re-drafts of the exchange day are counted from the usage log, so a restart does not reset them;
-the calls this process made that the background recorder has not written yet count too (once,
-when they reach the log); a request is admitted under a lock; a count that cannot be read
-refuses."""
+"""``PartRedraftCap`` (owner decisions 2026-10-11 and 2026-10-12, ADR 0041 amended 2026-10-12): a
+user's part re-drafts of the exchange day are counted from the usage log, so a restart does not
+reset them; only a call that returned a draft uses up a place (a failed, refused or unavailable
+one gives it back); the calls this process made that the background recorder has not written yet
+count too (once, when they reach the log); requests that arrive together cannot pass the last
+place; a count that cannot be read refuses."""
 
+import threading
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -85,12 +87,13 @@ def test_the_count_is_read_from_the_usage_log_so_a_restart_does_not_reset_it() -
     use(cap(store, limit=4))  # the limit is read for each request: a raised limit applies
 
 
-def test_every_attempt_of_a_call_is_one_call_and_a_skipped_attempt_none() -> None:
+def test_only_answered_calls_of_the_log_count_not_failed_or_skipped_attempts() -> None:
     store = Store()
     store.log(row("a"), row("a", second=1), row("b", outcome="failed", second=2),
               row("c", outcome="skipped_budget", second=3))  # fmt: skip
     c = cap(store, limit=3)
-    use(c, call_id="x")  # a, b and x: three; c was never asked
+    use(c, call_id="x")  # a and x: two; b failed and c was never asked
+    use(c, call_id="y")  # three
     with pytest.raises(DailyLimitError):
         use(c)
 
@@ -132,29 +135,73 @@ def test_a_failure_before_the_model_was_asked_gives_the_place_back() -> None:
     use(c, call_id="ok")  # the place was free again
 
 
-def test_a_failure_after_the_model_was_asked_stays_counted() -> None:
+def test_a_failure_after_the_model_answered_gives_the_place_back_too() -> None:
+    """Owner decision 2026-10-12: only a call that returned a draft counts."""
     c = cap(Store(), limit=1)
     with pytest.raises(ValueError), c.slot("abhi") as slot:
         slot.note("c1")
         raise ValueError("the merge failed")
+    assert c._made[("abhi", DAY)] == set()
+    use(c, call_id="c2")  # the place was free again
     with pytest.raises(DailyLimitError):
         use(c)
 
 
-def test_a_model_that_failed_with_a_call_id_stays_counted_one_without_is_not() -> None:
+def test_a_model_that_failed_even_with_a_call_id_gives_the_place_back() -> None:
     class FailedError(ModelUnavailableError):
         pass
 
     c = cap(Store(), limit=1)
-    nothing = FailedError("every provider refused")
-    with pytest.raises(FailedError), c.slot("abhi"):
-        raise nothing  # no call id: nothing is known to have been asked
     with_id = FailedError("every attempt failed")
-    with_id.call_id = "c9"
+    with_id.call_id = "c9"  # the failed attempts are in the log, which counts no failed call
     with pytest.raises(FailedError), c.slot("abhi"):
-        raise with_id  # the attempts are in the ledger under this id
+        raise with_id
+    use(c, call_id="c10")
+
+
+def test_noting_the_call_swaps_the_token_for_its_id_so_the_log_row_is_not_counted_twice() -> None:
+    store = Store()
+    c = cap(store, limit=2)
+    with c.slot("abhi") as slot:
+        assert len(c._made[("abhi", DAY)]) == 1 and slot.key.startswith("pending-")
+        slot.note("c1")
+        assert c._made[("abhi", DAY)] == {"c1"} and slot.key == "c1"
+        slot.note(None)  # a model that gives no id leaves it as it is
+        assert c._made[("abhi", DAY)] == {"c1"}
+    store.log(row("c1"))  # the recorder has now written it
+    use(c, call_id="c2")  # still room for one more: c1 was counted once, not twice
     with pytest.raises(DailyLimitError):
         use(c)
+
+
+def test_requests_that_arrive_together_cannot_pass_the_last_places() -> None:
+    limit, threads = 3, 10
+    c = cap(Store(), limit=limit)
+    start, done = threading.Barrier(threads), threading.Event()
+    admitted: list[int] = []
+    refused: list[int] = []
+    settled = threading.Semaphore(0)
+
+    def request(n: int) -> None:
+        start.wait()
+        try:
+            with c.slot("abhi"):
+                admitted.append(n)
+                settled.release()
+                done.wait(5)  # hold the place, as a model call in flight does
+        except DailyLimitError:
+            refused.append(n)
+            settled.release()
+
+    workers = [threading.Thread(target=request, args=(n,)) for n in range(threads)]
+    for w in workers:
+        w.start()
+    for _ in range(threads):
+        assert settled.acquire(timeout=5)  # every request has been admitted or refused
+    done.set()
+    for w in workers:
+        w.join(5)
+    assert len(admitted) == limit and len(refused) == threads - limit
 
 
 def test_the_day_is_the_exchange_date_and_yesterdays_calls_do_not_count() -> None:

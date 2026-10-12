@@ -8,8 +8,9 @@ replaced and the part's own missing-feature requests (what the request log recor
 parts' were recorded when they were asked). Reads the catalogue, the configs and, for the dry run
 of a formula, the session; writes nothing."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from algotrade.config.site.drafting.backlog import open_keys
 from algotrade.config.site.settings import (
@@ -18,13 +19,14 @@ from algotrade.config.site.settings import (
     load_phrasebook,
 )
 from algotrade.core.model.completion import CallTag
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.drafting.gaps import MissingFeature
 from algotrade.services.drafting.prompt import PROMPT_VERSION
 from algotrade.services.drafting.redraft.cap import USE_CASE
 from algotrade.services.drafting.redraft.merge import merge_part
 from algotrade.services.drafting.redraft.prompt import scoped_prompts
-from algotrade.services.drafting.redraft.request import PartRequest
-from algotrade.services.drafting.screens import ScreenDraft, draft_words
+from algotrade.services.drafting.redraft.request import PartRequest, missing_ref
+from algotrade.services.drafting.screens import ScreenDraft, draft_words, validated
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
 from algotrade.services.text_model.model import TextModel
@@ -58,6 +60,7 @@ def redraft_part(
     guide = load_field_guide(ctx.configs)
     backlog = load_feature_backlog(ctx.configs)
     others = {cid: c for cid, c in req.criteria.items() if cid not in req.part.criteria}
+    _check_own(ctx, req, others)  # before anything is asked: the trader's own rows must be valid
     system, user = scoped_prompts(
         infos.values(), req.screener_id, req.new_words, others, phrasebook, guide,
         open_keys(backlog, limit=len(backlog.items)),
@@ -68,4 +71,29 @@ def redraft_part(
     )
     asked(sub.call_id)
     merged = merge_part(ctx, req, sub)
-    return Redrafted(merged, req.part.id, req.old_words, req.new_words, sub.missing)
+    known = {missing_ref(m) for m in req.prior.missing}  # recorded when they were asked
+    fresh = tuple(m for m in sub.missing if missing_ref(m) not in known)
+    return Redrafted(merged, req.part.id, req.old_words, req.new_words, fresh)
+
+
+def _check_own(ctx: ReadContext, req: PartRequest, others: Mapping[str, Any]) -> None:
+    """The criteria of the other parts and the tie-break the part does not own are valid as
+    finalise sees them, or ``ConfigurationError`` (a 400) naming the first that is not: the merge
+    never drops what the trader has, and the model is not asked about a screen that cannot be
+    saved."""
+    document = {k: v for k, v in req.prior.document.items() if k not in ("criteria", "rank")}
+    document["criteria"] = dict(others)
+    rank = req.prior.document.get("rank")
+    if rank is not None and not req.part.rank:
+        document["rank"] = rank
+    checked, refused = validated(ctx, req.screener_id, document, ())
+    if refused:
+        raise ConfigurationError(
+            f"{req.screener_id}: the criterion {refused[0].id!r} of your screen is not valid: "
+            f"{refused[0].reason}; fix it before retyping a part"
+        )
+    if "rank" in document and "rank" not in checked:
+        raise ConfigurationError(
+            f"{req.screener_id}: the tie-break of your screen is not valid; fix it before "
+            "retyping a part"
+        )

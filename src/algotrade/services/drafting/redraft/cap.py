@@ -2,15 +2,17 @@
 2026-10-12: ``[limits] part_redrafts_per_day`` in ``llm.toml``, 30 by default).
 
 A part's re-draft is a model call a trader can repeat as often as they like, so each user gets
-a number a day (the exchange calendar date, as the usage log partitions). The count is **read
-from the usage log** (``usage/llm_calls``: the calls of ``USE_CASE`` by that user on that day,
-``data.usage.calls_of``), not kept in a counter that a restart resets (the API restarts at every
-deploy). The log is written in the background, so a call made a moment ago may not be in it yet:
-this process also remembers, until the day turns, the calls it made (their ids, so a call that
-reached the log is counted once) and the calls it is making now, and counts the union. One API
-process is assumed, as the usage ledger does (ADR 0058). A request is admitted under a lock, so
-requests that arrive together cannot all pass the last place. A count that cannot be read (the
-store fails) fails closed: no re-draft, never an unlimited one. At the limit the request is a
+a number a day (the exchange calendar date, as the usage log partitions). Only a call that
+returned a draft counts: a failed, refused or unavailable one gives its place back. The count is
+**read from the usage log** (``usage/llm_calls``: the answered calls of ``USE_CASE`` by that user
+on that day, ``data.usage.calls_of``), not kept in a counter that a restart resets (the API
+restarts at every deploy). The log is written in the background, so a call made a moment ago may
+not be in it yet: this process also remembers, until the day turns, the calls it made (their ids,
+so a call that reached the log is counted once) and the places held by the calls in flight, and
+counts the union. One API process is assumed, as the usage ledger does (ADR 0058). A request is
+admitted under a lock, so requests that arrive together cannot all pass the last place. A count
+that cannot be read (the store fails) fails closed: no re-draft, never an unlimited one. At the
+limit the request is a
 ``DailyLimitError`` (429, code ``CODE``, with the seconds until the exchange day turns)."""
 
 import logging
@@ -32,20 +34,25 @@ CODE = "part_redraft_limit"  # what the web keys its "limit reached" state on
 
 
 class Slot:
-    """One admitted re-draft: the use case tells it the call it made (``note``) as soon as the
-    model has answered, so that call counts even if what follows fails."""
+    """One admitted re-draft, holding one place until the block ends: the use case tells it the
+    call it made (``note``) as soon as the model has answered, which swaps the place's token for
+    the call's id under the cap's lock (the log's row for that call is then not counted twice)."""
 
-    def __init__(self) -> None:
-        self.asked = False
-        self.call_id: str | None = None
+    def __init__(self, cap: "PartRedraftCap", user: str, day: date, key: str) -> None:
+        self._cap, self._user, self._day = cap, user, day
+        self.key = key  # what the place is counted as: a token, then the call's id
 
     def note(self, call_id: str | None) -> None:
-        self.asked, self.call_id = True, call_id
+        if call_id:
+            self._cap._swap(self._user, self._day, self, call_id)
 
 
 class PartRedraftCap:
     """Counts a user's part re-drafts of the exchange day against ``limit()`` (called per
-    request, so a changed ``llm.toml`` applies without a restart)."""
+    request, so a changed ``llm.toml`` applies without a restart). Only a call that returned a
+    draft uses up a place (owner decision 2026-10-12): the place is reserved when the request is
+    admitted, so that requests in flight count, and given back when the block raises (a failed,
+    refused or unavailable call); the log counts only answered calls (``calls_of``)."""
 
     def __init__(
         self,
@@ -55,15 +62,14 @@ class PartRedraftCap:
     ) -> None:
         self._reader, self._limit, self._clock = reader, limit, clock
         self._lock = threading.Lock()
-        # (user, day) -> the calls made or being made: a call id, or a token while it is not known
+        # (user, day) -> the calls made or being made: a call id, or a token while not known
         self._made: dict[tuple[str, date], set[str]] = defaultdict(set)
         self._tokens = 0
 
     @contextmanager
     def slot(self, user: str) -> Iterator[Slot]:
-        """Admit one re-draft of ``user`` or raise ``DailyLimitError``; counted from here on.
-        What the block raises before the model was asked (``Slot.note``, or an error that names
-        its call) gives the place back; once asked, it stays counted."""
+        """Admit one re-draft of ``user`` or raise ``DailyLimitError``; a place is held from here
+        on. What the block raises gives the place back (what the log already holds stays)."""
         now = self._clock()
         day, limit = exchange_date(now), self._limit()
         with self._lock:
@@ -74,17 +80,21 @@ class PartRedraftCap:
             if len(stored | made) >= limit:
                 raise DailyLimitError("part re-drafts", CODE, limit, _until_tomorrow(now, day))
             self._tokens += 1
-            token = f"pending-{self._tokens}"
-            made.add(token)
-        slot = Slot()
+            slot = Slot(self, user, day, f"pending-{self._tokens}")
+            made.add(slot.key)
         try:
             yield slot
-        except BaseException as exc:
-            slot.asked = slot.asked or getattr(exc, "call_id", None) is not None
-            slot.call_id = slot.call_id or getattr(exc, "call_id", None)
-            self._settle(user, day, token, slot, keep=slot.asked)
+        except BaseException:
+            with self._lock:
+                self._made[(user, day)].discard(slot.key)
             raise
-        self._settle(user, day, token, slot, keep=True)
+
+    def _swap(self, user: str, day: date, slot: Slot, call_id: str) -> None:
+        with self._lock:
+            made = self._made[(user, day)]
+            made.discard(slot.key)
+            made.add(call_id)
+            slot.key = call_id
 
     def _stored(self, user: str, day: date) -> set[str]:
         try:
@@ -95,13 +105,6 @@ class PartRedraftCap:
                 "part re-drafts are paused: the usage log could not be read, so the daily "
                 "limit cannot be checked"
             ) from exc
-
-    def _settle(self, user: str, day: date, token: str, slot: Slot, keep: bool) -> None:
-        with self._lock:
-            made = self._made[(user, day)]
-            made.discard(token)
-            if keep:  # the call's id (counted once with the log's row), else a token of its own
-                made.add(slot.call_id or token)
 
 
 def _until_tomorrow(now: datetime, day: date) -> int:

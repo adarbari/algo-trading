@@ -152,8 +152,8 @@ fixed locally (another reading, edit rows) or by retyping its words (one scoped 
   criteria as fixed rows), server-side merge (the other parts win; hand-added rows stay in `kept`), ledger kind
   `screener-draft-part`, feedback through `draft_requested` / `draft_returned` with payload `scope=part` (ADR 0066
   amended; the retyped words go with the payload under the 12-month rule), daily cap per user (30 by default,
-  `[limits] part_redrafts_per_day` in `config/site/llm.toml`, counted from the usage log, a 429 with code
-  `part_redraft_limit`), four golden cases. Built as decided, with: the body carries the whole draft the browser
+  `[limits] part_redrafts_per_day` in `config/site/llm.toml`, counted from the usage log, only a call that
+  returned a draft counts, a 429 with code `part_redraft_limit`), four golden cases, one shared `PROMPT_VERSION` (9) pinned to the hashes of both prompts. Built as decided, with: the body carries the whole draft the browser
   holds (the answer must carry the other parts' pending items, which the server keeps nowhere) and the answer is
   `{draft, replaced_part_id}`.
 - PR C1, web: `PartCard` and the local fixes (after A).
