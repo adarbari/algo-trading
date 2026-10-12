@@ -5,7 +5,7 @@
 #   DRY_RUN=1 ...                                           report only, merge nothing
 #
 # A PR is merged only when all of these hold:
-#   - open, not a draft, not from a fork, not labelled "no-automerge"
+#   - open, not a draft, not from a fork, not labelled "no-automerge" or "needs-owner"
 #   - the latest CI run for its head commit concluded "success"
 #   - every other check run on that commit completed as success, skipped or neutral
 #     (checks of superseded CI runs for the same commit are ignored: a re-run or a renamed
@@ -26,6 +26,9 @@ try_merge() {
   if [ "$(jq -r .isDraft <<<"$pr")" = "true" ]; then echo "#$number: draft, skipped"; return; fi
   if jq -e '.labels | map(.name) | index("no-automerge")' <<<"$pr" >/dev/null; then
     echo "#$number: labelled no-automerge, skipped"; return
+  fi
+  if jq -e '.labels | map(.name) | index("needs-owner")' <<<"$pr" >/dev/null; then
+    echo "#$number: labelled needs-owner, skipped"; return
   fi
   sha=$(jq -r .headRefOid <<<"$pr")
   runs=$(gh api "repos/$REPO/actions/runs?head_sha=$sha&event=pull_request&per_page=50" \
