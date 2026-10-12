@@ -289,3 +289,16 @@ def test_a_failing_sink_does_not_fail_an_edge_save(client: TestClient) -> None:
         client.put("/edges/mine", json={"document": {"extends": "drift", "top_k": 2}}).status_code
         == 200
     )
+
+
+def test_an_unchanged_save_with_a_date_records_nothing_and_the_previous_is_the_saved_one(
+    client: TestClient,
+) -> None:
+    sink = _Keep()
+    client.app.state.feedback = sink  # type: ignore[attr-defined]
+    assert client.post("/edges/drift/copy", json={"new_id": "mine"}).status_code == 201
+    doc = {"extends": "drift", "frozen_from": "2026-01-05"}
+    for _ in range(2):
+        assert client.put("/edges/mine", json={"document": doc}).status_code == 200
+    assert [r["event"] for r in sink.rows] == ["edge_revised"]  # the second changed nothing
+    assert "frozen_from" in sink.rows[0]["payload"]

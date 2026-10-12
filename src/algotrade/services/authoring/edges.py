@@ -168,12 +168,21 @@ def copy_edge(
 def save_edge(
     writer: ConfigWriter, user: str, edge_id: str, document: Mapping[str, Any]
 ) -> dict[str, Any]:
+    """``save_edge_revision``'s stored document alone."""
+    return save_edge_revision(writer, user, edge_id, document)[1]
+
+
+def save_edge_revision(
+    writer: ConfigWriter, user: str, edge_id: str, document: Mapping[str, Any]
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """Replace (or create) the user's own edge document ``edge_id`` with ``document`` (its
     ``extends`` and settings; its ``status`` and ``[audit]`` are the stored ones: the status has
     its own call; a ``[follow]`` table is refused).
     A site edge's id is refused (a copy under a new id changes it). If the user had seen the
     copy's out-of-sample result and the save moves its ``frozen_from``, the label
-    ``split_moved_after_viewing`` is added. Returns the stored document."""
+    ``split_moved_after_viewing`` is added. Returns ``(previous, stored)``: the document the user
+    had stored (``None``: a first save), read once, in the same call as the write, and the one
+    stored."""
     who, edge_id = author(user).user_id, validate_id("edge", edge_id)
     if not isinstance(document, Mapping):
         raise ConfigurationError(f"{edge_id}: an edge document is a table")
@@ -203,13 +212,7 @@ def save_edge(
             after.audit, labels=_with(after.audit.labels, "split_moved_after_viewing")
         )
     writer.save_user_document(who, KIND, edge_id, stored)
-    return stored
-
-
-def stored_edge(writer: ConfigWriter, user: str, edge_id: str) -> dict[str, Any] | None:
-    """The document ``user`` has stored for their own edge ``edge_id`` (``None``: they have none);
-    what a save is compared with."""
-    return _own(writer, author(user).user_id, edge_id)
+    return previous, stored
 
 
 def delete_edge(writer: ConfigWriter, user: str, edge_id: str, now: datetime | None = None) -> None:

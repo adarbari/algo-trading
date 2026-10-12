@@ -80,6 +80,12 @@ def test_a_paraphrase_that_copies_a_real_sentence_is_refused(tmp_path: Path) -> 
         planned_of([copy], stored(), ok, tmp_path)
 
 
+def test_an_edge_chain_is_refused_whatever_its_shape(tmp_path: Path) -> None:
+    rows = [{**stored()[0], "doc_kind": "edge"}]
+    with pytest.raises(ConfigurationError, match="never a golden case"):
+        planned_of([entry()], rows, ok, tmp_path)
+
+
 def test_every_problem_is_reported_and_the_count_must_match(tmp_path: Path) -> None:
     bad = [entry(sentences=["just one"]), {"source_event": "nope", "sentences": ["x"]},
            entry(split="dev"), {"sentences": []}]  # fmt: skip

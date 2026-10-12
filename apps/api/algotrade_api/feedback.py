@@ -293,11 +293,12 @@ def record_edge_revised(
 ) -> None:
     """``edge_revised``: call after the edge document was stored. ``before`` is the user's last
     stored revision (``None``: the first save) and ``after`` what was stored; nothing is recorded
-    when they are equal (an autosave). An edge has no remembered draft, so a ``session_id`` the
-    client claims goes in the payload (``chains.py`` links it when it is the user's own for this
-    edge) and the row is filed under a fresh session."""
+    when their hashes are equal (an autosave; a TOML date and its string are the same). An edge
+    has no remembered draft, so a ``session_id`` the client claims goes in the payload and is not
+    linked (``chains.py`` never joins an edge claim to a screen), and the row is filed under a
+    fresh session."""
     try:
-        if before is not None and dict(before) == dict(after):
+        if before is not None and events.document_hash(before) == events.document_hash(after):
             return
         payload: dict[str, Any] = {
             "content_hash": events.document_hash(after),

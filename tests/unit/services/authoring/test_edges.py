@@ -412,3 +412,16 @@ def test_the_old_state_wins_over_a_stray_status_when_migrating(writer: MemoryCon
     assert seen(writer)["mine"].status == "live"  # read the same before the migration
     assert edges.migrate_follows(writer, "alice") == {"mine": "status live"}
     assert (writer.load("alice", "edges", "mine") or {})["status"] == "live"
+
+
+def test_save_edge_revision_returns_the_previous_stored_document_read_with_the_write(
+    writer: MemoryConfigWriter,
+) -> None:
+    edges.copy_edge(writer, "alice", "drift", "mine", today=TODAY)
+    before = writer.load("alice", "edges", "mine")
+    previous, stored = edges.save_edge_revision(
+        writer, "alice", "mine", {"extends": "drift", "top_k": 3}
+    )
+    assert previous == before and stored == {"extends": "drift", "top_k": 3}
+    first, _ = edges.save_edge_revision(writer, "alice", "fresh", {"extends": "drift"})
+    assert first is None

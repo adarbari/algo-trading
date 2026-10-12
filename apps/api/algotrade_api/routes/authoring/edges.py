@@ -6,8 +6,6 @@ publishing site-wide is an admin read (``Query.publishedEdgeDocument``), never a
 site's config.
 The write is for the caller; an admin names another user in the ``X-Act-For`` header (ADR 0040)."""
 
-from typing import Any
-
 from fastapi import APIRouter
 
 from algotrade.config.edges.loading import USER_STATUSES
@@ -49,18 +47,9 @@ def save(
     """Replace (or create) the user's own edge; validated as the harness reads it, nothing is
     written on an error (400). A site edge's id is 409: copy it. A revision is recorded as an
     ``edge_revised`` feedback event after the write (ADR 0066), never failing the save."""
-    previous = _stored(writer, user, edge_id)
-    stored = edges.save_edge(writer, user, edge_id, body.document)
+    previous, stored = edges.save_edge_revision(writer, user, edge_id, body.document)
     feedback.record_edge_revised(sink, body.draft_session_id, user, edge_id, previous, stored)
     return EdgeDocument(edge_id=edge_id, document=stored)
-
-
-def _stored(writer: Writer, user: str, edge_id: str) -> dict[str, Any] | None:
-    """The user's stored document before the save (what the feedback diff compares)."""
-    try:
-        return edges.stored_edge(writer, user, edge_id)
-    except Exception:
-        return None
 
 
 @router.delete("/{edge_id}", status_code=204)

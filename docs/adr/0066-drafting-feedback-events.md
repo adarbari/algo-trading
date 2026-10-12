@@ -178,6 +178,11 @@ succeeded (`apps/api/algotrade_api/feedback.py::record_edge_revised`, through th
 against the user's last stored revision, `services/feedback/diff.py::document_diff`), `saved_document`
 (the stored document, clipped at 8,000 characters) and `content_hash`; `first_revision` marks the first
 save. A save that changes nothing records nothing. An edge has no remembered draft, so the optional
-`draft_session_id` of the body goes in the payload as `claimed_session_id` (`chains.py` links it when it
-is the user's own for that edge) and the row is filed under a fresh session. Copy, status and delete
+`draft_session_id` of the body is recorded in the payload as `claimed_session_id` and not linked
+(`chains.py` links claims by user, `doc_kind` and `doc_id`, so an edge claim never joins a screen's chain);
+the row is filed under a fresh session. An edge's text never becomes a golden case: `golden_candidates`
+skips `doc_kind = edge` rows and `curate` refuses an edge chain. The previous revision is read once,
+inside `save_edge_revision`, with the write. Admins can read edge text and revisions with the same
+visibility as sentences (owner decision pending; the default is allow). Retention and erase (#540) null the
+payload as a whole; this change merges after #540 and wires nothing of it. Copy, status and delete
 calls record nothing. The table registry entry is unchanged by this note.
