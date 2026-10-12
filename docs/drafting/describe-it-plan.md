@@ -165,22 +165,20 @@ Phrasebook structured thresholds (`[[phrase.criterion]]`, `resolve` / `shortcut`
 model call (stage `phrasebook`, no call id, zero cost), through the same validation and parts as a model's answer;
 any doubt goes to the model. Lever 3 is done.
 
-In flight: #540 feedback retention / erase.
+Also done (2026-10-12): #540 retention / erase; #541-#543 decision log; #544 `edge_revised`; #545 request log route;
+#546 + #553 phrasebook thresholds; #547 prompt headroom; #548 + #551 golden run reporting; #549 admin feature requests;
+#550 Builder review panel; #552 harness; #554 protective suggestions; #555 explained-parts decisions; #556 `PartCard` /
+`PartList`; #558 refused attempts' call id; #559 parts contract (PR A); #560 phrasebook shortcut.
 
-Not started (owner in brackets):
-- Request-log route wiring, after #535 (implementer, API).
-- Builder panel wiring, PR 7 (implementer, web), then the admin accepted-formula list.
-- Admin feature-requests page, PR 8 (implementer, web).
-- Prompt headroom: a token-budgeted slice and a compact index; the largest golden prompt margin is about 77
-  tokens (architect decides, implementer builds).
-- `services/drafting` folder split (`contract/`, `golden/`) (implementer).
-- Enum values for index-only fields: measure after the live golden run (owner question).
-- The live golden run: approved by the owner, Gemini first, $3 cap, `--yes` (owner runs it).
-- "Notify me when available" (lowest priority); `edge_revised` event (reserved, only if a save route exists).
+In flight: #561 re-draft one part (PR B); #557 admin accepted formulas; the `services/drafting` folder split
+(`contract/`, `golden/`).
 
-Follow-up (owner question, not built): should index-only fields show their enum values? The model otherwise
-guesses a value and the validator drops a wrong guess; adding them to the prefix would exceed the 15k budget at
-the largest case, so measure it in the live golden run first.
+Not started:
+- Builder part cards on the review panel (C1) and retype a part (C2, after #561).
+- "Notify me when available" (lowest priority).
+- A Gemini free-tier rerun of the live golden run, to compare with Haiku.
+- Enum values for index-only fields: not built; the 2026-10-12 run shows no enum drops (below).
+- Weak spots from the live run: the twelve failing cases (below), consistency of 0.31 on repeats.
 
 ## Live evaluation (2026-10-12, Claude Haiku via the owner's login)
 
