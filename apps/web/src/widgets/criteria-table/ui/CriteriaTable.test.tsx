@@ -50,6 +50,8 @@ const setCriterion = vi.fn();
 const removeCriterion = vi.fn();
 const addCriterion = vi.fn();
 const setTieBreak = vi.fn();
+const reviewFormula = vi.fn();
+const skipFormula = vi.fn();
 const builder = (patch: Record<string, unknown> = {}) => ({
   status: 'ready',
   preset: null,
@@ -65,6 +67,9 @@ const builder = (patch: Record<string, unknown> = {}) => ({
   removeCriterion,
   addCriterion,
   setTieBreak,
+  pendingFormulas: [],
+  reviewFormula,
+  skipFormula,
   ...patch,
 });
 
@@ -77,7 +82,15 @@ function setup() {
 }
 
 beforeEach(() => {
-  for (const mock of [setCriterion, removeCriterion, addCriterion, setTieBreak]) mock.mockReset();
+  for (const mock of [
+    setCriterion,
+    removeCriterion,
+    addCriterion,
+    setTieBreak,
+    reviewFormula,
+    skipFormula,
+  ])
+    mock.mockReset();
   state.builder = builder();
   state.catalogue.mockReturnValue(fakeQuery(CATALOGUE));
   vi.mocked(api.POST).mockReset();
@@ -161,5 +174,41 @@ describe('CriteriaTable', () => {
       </TestQueryProvider>,
     );
     expect(screen.getByText('The screener failed to load.')).toBeInTheDocument();
+  });
+
+  describe('a formula the draft proposed and the trader has not decided', () => {
+    const FORMULA = {
+      name: 'draft_near_high',
+      criterion: { field: 'feature.draft_near_high', op: 'gte', value: -0.05, mode: 'hard' },
+    };
+
+    it('waits as a pending row that is not in the plain-English sentence', async () => {
+      state.builder = builder({ pendingFormulas: [FORMULA] });
+      const { container } = setup();
+      expect(
+        screen.getByRole('group', { name: 'Waiting on formula: feature.draft_near_high' }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole('radiogroup', { name: /Mode of/ })).toHaveLength(2);
+      expect(screen.queryByText(/draft_near_high/, { selector: 'p' })).toBeNull();
+      await expectNoA11yViolations(container);
+    });
+
+    it('opens the review or skips it from the row', async () => {
+      state.builder = builder({ pendingFormulas: [FORMULA] });
+      setup();
+      await userEvent.click(screen.getByRole('button', { name: 'Review and add' }));
+      expect(reviewFormula).toHaveBeenCalledWith(FORMULA);
+      await userEvent.click(screen.getByRole('button', { name: 'Skip' }));
+      expect(skipFormula).toHaveBeenCalledWith('draft_near_high');
+    });
+
+    it('shows no row for a formula with no criterion, and no empty state beside one', () => {
+      state.builder = builder({ pendingFormulas: [{ name: 'draft_x', criterion: null }] });
+      setup();
+      expect(screen.queryByRole('group', { name: /Waiting on formula/ })).toBeNull();
+      state.builder = builder({ criteria: [], pendingFormulas: [FORMULA] });
+      setup();
+      expect(screen.queryByText('No criteria yet')).toBeNull();
+    });
   });
 });

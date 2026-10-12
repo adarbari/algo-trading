@@ -58,7 +58,7 @@ purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, fiel
 
 [[config_dir]]
 path = "config/site/guide/glossary"
-purpose = "the Guide's glossary (ADR 0051), one <theme>.toml per theme (the 400-line aim per file; the day, the rule grammar, a screen's result, why a value is not available, edges, the evidence behind a verdict, the text model's cost): the app's own words, [[term]] each (loaded by config/site/guide/glossary.py in file-name order; fitness tests: ids and terms unique across the files)"
+purpose = "the Guide's glossary (ADR 0051), one <theme>.toml per theme (the 400-line aim per file; the day, the rule grammar, a screen's result, why a value is not available, edges, the evidence behind a verdict, the text model's cost, Describe it's review panel): the app's own words, [[term]] each (loaded by config/site/guide/glossary.py in file-name order; fitness tests: ids and terms unique across the files)"
 
 [[config_dir]]
 path = "config/site/guide/glossary/edges"

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
-import { FormulaFeatureDialog } from './FormulaFeatureDialog';
+import { FormulaFeatureDialog, type FormulaFeatureInitial } from './FormulaFeatureDialog';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -59,12 +59,17 @@ function fill(name: string, value: string) {
   fireEvent.change(screen.getByRole('textbox', { name }), { target: { value } });
 }
 
-function setup() {
+function setup(initial?: FormulaFeatureInitial) {
   const onSaved = vi.fn();
   const onOpenChange = vi.fn();
   const view = render(
     <TestQueryProvider>
-      <FormulaFeatureDialog open onOpenChange={onOpenChange} onSaved={onSaved} />
+      <FormulaFeatureDialog
+        open
+        onOpenChange={onOpenChange}
+        onSaved={onSaved}
+        {...(initial ? { initial } : {})}
+      />
     </TestQueryProvider>,
   );
   return { onSaved, onOpenChange, ...view };
@@ -124,5 +129,42 @@ describe('FormulaFeatureDialog', () => {
     fill('Name', 'Vol Gap');
     expect(screen.getByText(/Use lowercase letters, digits and _/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save feature' })).toBeDisabled();
+  });
+
+  it('starts with a proposed formula filled in, checks it at once and saves it as given', async () => {
+    const { onSaved } = setup({
+      name: 'draft_vol_gap',
+      expr: 'a - b',
+      unit: 'ratio',
+      description: 'IV minus HV',
+      nullMeaning: 'a vol is missing',
+    });
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('draft_vol_gap');
+    expect(screen.getByRole('textbox', { name: 'Formula' })).toHaveValue('a - b');
+    expect(screen.getByRole('textbox', { name: 'What it is' })).toHaveValue('IV minus HV');
+    expect(screen.getByRole('textbox', { name: 'When it is empty' })).toHaveValue(
+      'a vol is missing',
+    );
+    await screen.findByText('num (float32)', {}, { timeout: 4000 });
+    await userEvent.click(screen.getByRole('button', { name: 'Save feature' }));
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledWith('feature.vol_gap');
+    });
+    expect(POST).toHaveBeenCalledWith('/features/user', {
+      body: {
+        name: 'draft_vol_gap',
+        expr: 'a - b',
+        dtype: 'float32',
+        unit: 'ratio',
+        description: 'IV minus HV',
+        null_meaning: 'a vol is missing',
+        theme: 'builder',
+      },
+    });
+  });
+
+  it('fills the screen on a phone', () => {
+    setup();
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-phone', 'full');
   });
 });

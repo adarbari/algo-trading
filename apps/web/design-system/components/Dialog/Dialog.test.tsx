@@ -84,4 +84,13 @@ describe('Dialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Rename' }));
     await expectNoA11yViolations(document.body);
   });
+
+  it('marks a long form to fill a narrow screen only when asked', async () => {
+    const { rerender } = render(<Example />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    expect(screen.getByRole('dialog')).not.toHaveAttribute('data-phone');
+    rerender(<Example fullOnPhone />);
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-phone', 'full');
+  });
 });

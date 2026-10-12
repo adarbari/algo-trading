@@ -5,7 +5,8 @@
  * views saved and removed, a run on request, the live preview and the formula check / save,
  * answering from e2e/fixtures/builder/ (shaped from the API's schemas) with a little state so a
  * flow reads back what it wrote. Every call it records is exposed for assertions. Anything else
- * (other GraphQL operations too) falls through to the other mocks.
+ * (other GraphQL operations too) falls through to the other mocks. `mockDescribeApi` adds
+ * "Describe it" (draft-from-text, ADR 0041 and ADR 0066) on top of it.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -387,6 +388,70 @@ export async function mockBuilderApi(
       return json({ screener_id: id, document: draft }, 201);
     }
     return route.fallback();
+  });
+  return mock;
+}
+
+/*
+ * Describe it: answers any sentence with one applied criterion and one proposed formula whose
+ * criterion waits for the trader's decision, and records what the page sent. Register it after
+ * `mockBuilderApi` (the later route is tried first; anything else falls through to it).
+ */
+export const FORMULA_NAME = 'draft_iv_over_hv';
+export const FORMULA_EXPR = 'rollup.iv30@v1.iv30 - rollup.price_stats@v2.hv30';
+
+const FORMULA = {
+  name: FORMULA_NAME,
+  expr: FORMULA_EXPR,
+  dtype: 'float32',
+  unit: 'ratio',
+  description: 'IV30 minus HV30',
+  null_meaning: 'either volatility is missing',
+  inputs: ['rollup.iv30@v1.iv30', 'rollup.price_stats@v2.hv30'],
+  criterion: { field: `feature.${FORMULA_NAME}`, op: 'gte', value: 0.05, mode: 'hard' },
+  fingerprint: 'fp-1',
+  pending: true,
+  dry_run: {
+    rows: 11427,
+    no_value_rate: 0.31,
+    minimum: -0.4,
+    maximum: 0.9,
+    criterion_pass: 1204,
+    session: '2026-10-02',
+    sample: [
+      { instrument_id: 'EQ:AAA', value: 0.12 },
+      { instrument_id: 'EQ:BBB', value: -0.02 },
+    ],
+  },
+};
+
+export interface DescribeMock {
+  /** The body of every draft-from-text POST. */
+  sentences: Json[];
+}
+
+export async function mockDescribeApi(page: Page): Promise<DescribeMock> {
+  const mock: DescribeMock = { sentences: [] };
+  await page.route('**/api/screeners/*/draft-from-text', async (route: Route) => {
+    const body = (route.request().postDataJSON() ?? {}) as Json;
+    mock.sentences.push(body);
+    const id = decodeURIComponent(/screeners\/([^/]+)\//.exec(route.request().url())?.[1] ?? '');
+    await route.fulfill({
+      status: 200,
+      json: {
+        screener_id: id,
+        document: {
+          id,
+          criteria: {
+            iv30: { field: 'rollup.iv30@v1.iv30', op: 'gte', value: 0.5, mode: 'hard' },
+          },
+        },
+        dropped: [],
+        notes: [],
+        formulas: [FORMULA],
+        draft_session_id: 'sess-e2e',
+      },
+    });
   });
   return mock;
 }
