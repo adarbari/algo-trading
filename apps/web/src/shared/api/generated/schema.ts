@@ -337,6 +337,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/screeners/{screener_id}/draft-part": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Draft Part */
+        post: operations["draft_part_screeners__screener_id__draft_part_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/screeners/{screener_id}/finalise": {
         parameters: {
             query?: never;
@@ -409,20 +426,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** SampleValue */
-        algotrade_api__schemas__drafting__screeners__SampleValue: {
-            /** Instrument Id */
-            instrument_id: string;
-            /** Value */
-            value: unknown;
-        };
-        /** SampleValue */
-        algotrade_api__schemas__preview__features__SampleValue: {
-            /** Instrument Id */
-            instrument_id: string;
-            /** Value */
-            value: number | boolean | string | null;
-        };
         /** Alternative */
         Alternative: {
             /** Criterion */
@@ -643,6 +646,79 @@ export interface components {
              */
             text: string;
         };
+        /**
+         * DraftPartBody
+         * @description The draft the browser holds, and which part's words to retype. Nothing in it is trusted:
+         *     the server re-checks every part's words against the sentence and every id against the items
+         *     (``services.drafting.redraft.request``); a failed check is a 400.
+         */
+        DraftPartBody: {
+            /**
+             * Document
+             * @description the Builder's current document: the trader's edits included
+             */
+            document: {
+                [key: string]: unknown;
+            };
+            /**
+             * Draft Session Id
+             * @description the id of the draft being worked on (ADR 0066), so the re-draft is an event of the same session; an unknown or foreign id starts a new one
+             */
+            draft_session_id?: string | null;
+            /** Dropped */
+            dropped?: components["schemas"]["DroppedCriterion"][];
+            /** Formulas */
+            formulas?: components["schemas"]["DraftFormula"][];
+            /** Formulas Dropped */
+            formulas_dropped?: components["schemas"]["DroppedFormula"][];
+            /** Missing */
+            missing?: components["schemas"]["MissingFeature"][];
+            /**
+             * New Words
+             * @description what the part's words become
+             */
+            new_words: string;
+            /** Notes */
+            notes?: string[];
+            /**
+             * Part Id
+             * @description the part whose words are retyped
+             */
+            part_id: string;
+            /**
+             * Parts
+             * @description the draft's `parts`
+             */
+            parts: components["schemas"]["Part"][];
+            /**
+             * Sentence
+             * @description the draft's `sentence`, as served
+             */
+            sentence: string;
+            /** Suggestions */
+            suggestions?: components["schemas"]["Suggestion"][];
+            /** Suggestions Dropped */
+            suggestions_dropped?: components["schemas"]["DroppedSuggestion"][];
+            /** Unresolved */
+            unresolved?: components["schemas"]["Unresolved"][];
+        };
+        /** DraftPartResult */
+        DraftPartResult: {
+            /** @description the whole draft with the part re-drafted and every other part as it was; the browser replaces its draft with it (`sentence` has the new words in place) */
+            draft: components["schemas"]["ScreenDraft"];
+            /**
+             * Replaced Part Id
+             * @description the part that was re-drafted
+             */
+            replaced_part_id: string;
+        };
+        /** DraftSampleValue */
+        DraftSampleValue: {
+            /** Instrument Id */
+            instrument_id: string;
+            /** Value */
+            value: unknown;
+        };
         /** DroppedCriterion */
         DroppedCriterion: {
             /** Field */
@@ -748,7 +824,7 @@ export interface components {
             /** Rows */
             rows: number;
             /** Sample */
-            sample: components["schemas"]["algotrade_api__schemas__preview__features__SampleValue"][];
+            sample: components["schemas"]["SampleValue"][];
             /**
              * Session
              * @description the session sampled (None: an input has no partition for it, see missing)
@@ -803,7 +879,7 @@ export interface components {
             /** Rows */
             rows: number;
             /** Sample */
-            sample: components["schemas"]["algotrade_api__schemas__drafting__screeners__SampleValue"][];
+            sample: components["schemas"]["DraftSampleValue"][];
             /**
              * Session
              * @description the session read (null: not read: no data for it)
@@ -916,6 +992,30 @@ export interface components {
              * @description whose job: the caller, or the site
              */
             user: string;
+        };
+        /**
+         * LimitReached
+         * @description The 429 of a user at their daily limit of part re-drafts (not a rate limit: it clears
+         *     when the exchange day turns).
+         */
+        LimitReached: {
+            /**
+             * Code
+             * @constant
+             */
+            code: "part_redraft_limit";
+            /** Detail */
+            detail: string;
+            /**
+             * Limit
+             * @description part re-drafts a user may ask per exchange day
+             */
+            limit: number;
+            /**
+             * Retry After S
+             * @description seconds until the exchange day turns
+             */
+            retry_after_s: number;
         };
         /** LiveOptionChain */
         LiveOptionChain: {
@@ -1391,6 +1491,13 @@ export interface components {
             session: string;
             /** State */
             state: string;
+        };
+        /** SampleValue */
+        SampleValue: {
+            /** Instrument Id */
+            instrument_id: string;
+            /** Value */
+            value: number | boolean | string | null;
         };
         /** SavedFeature */
         SavedFeature: {
@@ -2456,6 +2563,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_part_screeners__screener_id__draft_part_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftPartBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftPartResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LimitReached"];
                 };
             };
         };

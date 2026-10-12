@@ -33,9 +33,12 @@ KEYS = (
     "provider",
     "price",
     "budget",
+    "limits",
 )
 PRICE_KEYS = ("model", "input_per_mtok", "output_per_mtok", "free")
 BUDGET_KEYS = ("daily_usd", "monthly_usd", "over", "reported_call_usd")
+LIMITS_KEYS = ("part_redrafts_per_day",)
+PART_REDRAFTS_PER_DAY = 30  # the default cap of one user's per-part re-drafts (owner decision)
 OVER = ("free", "refuse")
 PRICED, REPORTED, FREE = "price", "reported", "free"  # a rate's basis (usage/llm_calls cost_basis)
 PROVIDER_KEYS = (
@@ -155,6 +158,15 @@ class BudgetSettings:
 
 
 @dataclass(frozen=True)
+class LimitsSettings:
+    """``[limits]``: ``part_redrafts_per_day``, how many per-part re-drafts one user may ask per
+    exchange calendar day (``0``: none; ADR 0041, amended 2026-10-12). A count of calls, not of
+    dollars: ``[budget]`` caps the spend, this caps what one trader may use of it."""
+
+    part_redrafts_per_day: int = PART_REDRAFTS_PER_DAY
+
+
+@dataclass(frozen=True)
 class LlmSettings:
     """``llm.toml``: the text model behind screener drafts and regime explanations (ADR 0041,
     amended 2026-10-08). ``providers`` is the chain in the order tried: the ``[[provider]]``
@@ -173,6 +185,7 @@ class LlmSettings:
     legacy: bool = True
     prices: tuple[PriceSettings, ...] = ()
     budget: BudgetSettings = field(default_factory=BudgetSettings)
+    limits: LimitsSettings = field(default_factory=LimitsSettings)
 
     def rate(self, provider: ProviderSettings) -> Rate:
         """What ``provider``'s calls cost: ``reported`` for ``claude-cli``, ``free`` for a local
@@ -250,6 +263,7 @@ class LlmSettings:
             legacy=is_legacy,
             prices=_prices(t.raw("price"), where),
             budget=_budget(t.table("budget", BUDGET_KEYS)),
+            limits=_limits(t.table("limits", LIMITS_KEYS)),
         )
         if settings.enabled:
             for provider in providers:
@@ -297,6 +311,10 @@ def _budget(t: Table) -> BudgetSettings:
     if daily is not None and monthly is not None and daily > monthly:
         raise ConfigurationError(f"{t.where}: daily_usd {daily:g} is above monthly_usd {monthly:g}")
     return BudgetSettings(daily, monthly, over, t.number("reported_call_usd", 0.25, 0.0))
+
+
+def _limits(t: Table) -> LimitsSettings:
+    return LimitsSettings(t.integer("part_redrafts_per_day", PART_REDRAFTS_PER_DAY, 0))
 
 
 def _providers(raw: Any, shared: ProviderSettings, where: str) -> tuple[ProviderSettings, ...]:

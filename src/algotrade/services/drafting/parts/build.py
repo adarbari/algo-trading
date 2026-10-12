@@ -122,7 +122,7 @@ def _part(
     refs: dict[str, list[str]] = {}
     for item in mine:
         refs.setdefault(item.group, []).append(item.ref)
-    kind = _kind(refs)
+    kind = kind_of(refs)
     text, source = _reading(reading, mine, words, kind)
     start, end = (utf16(sentence, span.start), utf16(sentence, span.end)) if span else (0, 0)
     return Part(
@@ -133,7 +133,10 @@ def _part(
     )  # fmt: skip
 
 
-def _kind(refs: Mapping[str, list[str]]) -> str:
+def kind_of(refs: Mapping[str, Sequence[str]]) -> str:
+    """The kind of a part that holds ``refs`` (group -> ids, an empty one absent or empty): a
+    term to choose over a formula over a missing request or a dropped criterion over a plain
+    criterion or the tie-break; none of these is ``not_understood``."""
     if refs.get("unresolved"):
         return "needs_choice"
     if refs.get("formulas"):
