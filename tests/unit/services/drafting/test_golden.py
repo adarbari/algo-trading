@@ -1,7 +1,10 @@
 """The golden scorer: a part with its criterion passes within tolerance; a missing, wrong or
 extra criterion, or a field invented for a part that must stay empty, fails."""
 
-from algotrade.services.drafting.golden import GoldenCase, score
+import json
+from pathlib import Path
+
+from algotrade.services.drafting.golden import GoldenCase, load_cases, mark_recorded, score
 
 A = {
     "span": "p",
@@ -109,3 +112,26 @@ def test_a_c_part_without_a_key_tolerates_any_missing_item() -> None:
 def test_a_new_slug_never_passes_for_the_curated_key() -> None:
     wanted = case(MISSING)
     assert score(wanted, {}, missing_keys=["new:support_history"]).missing == ("m",)
+
+
+def test_a_curated_case_loads_the_criteria_in_force_and_its_recording_state(
+    tmp_path: Path,
+) -> None:
+    force = {"criteria": {"c1": {"field": "f.a", "op": "gt", "value": 1}}, "rank": None}
+    raw = {"id": "c", "sentence": "two", "sentences": ["one", "two"], "split": "train",
+           "criteria_in_force": [{"criteria": {}}, force], "recorded": False,
+           "curated": "2026-10-11", "expect": {"parts": []}}  # fmt: skip
+    (tmp_path / "cases").mkdir()
+    (tmp_path / "cases" / "c.json").write_text(json.dumps(raw))
+    (loaded,) = load_cases(tmp_path)
+    assert loaded.sentences == ("one", "two") and loaded.current == force
+    assert (loaded.recorded, loaded.curated) == (False, "2026-10-11")
+    mark_recorded(tmp_path, "c")
+    assert "recorded" not in json.loads((tmp_path / "cases" / "c.json").read_text())
+    assert load_cases(tmp_path)[0].recorded is True
+    mark_recorded(tmp_path, "missing")  # no case file: nothing to do
+
+
+def test_an_old_case_has_one_sentence_and_nothing_in_force() -> None:
+    old = case(A)
+    assert old.sentences == () and old.current is None and old.recorded

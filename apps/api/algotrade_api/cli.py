@@ -10,7 +10,10 @@ writes the auto-deploy agent; ``deploy-plan`` and ``deploy-verify`` are what
 open-files soft limit to ``OPEN_FILES`` and caps the connections served at once at
 ``MAX_CONNECTIONS`` (``ops/schedule.py``: launchd's 256 ran out on 2026-10-08).
 ``algotrade-api golden run`` is the owner-run live evaluation of the drafting prompt against
-the golden set (``services/drafting/golden_run.py``: real models and money, only with ``--yes``)."""
+the golden set (``services/drafting/golden_run.py``: real models and money, only with ``--yes``).
+``golden candidates`` lists the finalised sessions worth curating (real sentences, to this terminal
+only) and ``golden curate --from curation.json`` writes the owner's paraphrased cases
+(``services/feedback/{candidates,curate}.py``, ADR 0066): the logic is there; this parses."""
 
 import argparse
 import json
@@ -18,8 +21,11 @@ import os
 import resource
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import asdict
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 
@@ -32,9 +38,12 @@ from algotrade.config.env import (
     port_base,
     user_id,
 )
-from algotrade.config.site.settings import load_llm
+from algotrade.config.site.settings import load_llm, load_users
+from algotrade.config.site.users import Role
 from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.time.calendar import exchange_date
+from algotrade.services.configs import resolve_rule_draft
 from algotrade.services.drafting.golden_run import (
     DEFAULT_BUDGET_USD,
     DEFAULT_MAX_CALLS,
@@ -47,11 +56,20 @@ from algotrade.services.drafting.golden_run import (
     run_golden,
 )
 from algotrade.services.drafting.screens import ScreenDraft
-from algotrade.services.read.context import NotFoundError, ReadContext, open_context
+from algotrade.services.feedback import candidates, curate
+from algotrade.services.feedback.chains import golden_candidates
+from algotrade.services.read.context import (
+    NotFoundError,
+    ReadContext,
+    open_context,
+    open_stores,
+)
+from algotrade.services.read.ops.feedback import MAX_LIMIT, load_drafting_events
+from algotrade.services.read.users.viewer import Viewer
 from algotrade.services.text_model.model import TextModel
 from algotrade_api.auth.local import require_loopback
 from algotrade_api.auth.mode import AuthMode
-from algotrade_api.deps import open_store
+from algotrade_api.deps import ReadStore, open_store
 from algotrade_api.ops.build import Fetch, fetch_http, running_mismatches, write_web_stamp
 from algotrade_api.ops.deploy import CHECKS, actions, holds_ingest, verify
 from algotrade_api.ops.schedule import (
@@ -67,6 +85,8 @@ from algotrade_api.ops.schedule import (
 from algotrade_api.text_model import open_text_model
 
 APP = "algotrade_api.app:app"
+OWNER = Viewer("owner", "owner", Role.ADMIN.value, ())  # the owner's own terminal reads as admin
+WINDOW_DAYS = 365  # the sentences are kept 12 months (ADR 0066)
 
 
 def serve_port() -> int:
@@ -125,7 +145,96 @@ def _parser() -> argparse.ArgumentParser:
     gr.add_argument("--budget-usd", type=float, default=DEFAULT_BUDGET_USD)
     gr.add_argument("--user", default=None, help="user id asked as (default $ALGOTRADE_USER)")
     gr.add_argument("--yes", action="store_true", help="spend: without it only the plan is shown")
+    gc = gsub.add_parser("candidates", help="finalised sessions worth curating (real sentences)")
+    gc.add_argument("--since", default=None, help="YYYY-MM-DD (default: a year ago)")
+    gc.add_argument("--user", default=None, help="only this user's sessions")
+    gc.add_argument("--limit", type=int, default=candidates.DEFAULT_LIMIT)
+    gc.add_argument("--per-user-month", type=int, default=candidates.DEFAULT_PER_USER_MONTH)
+    gc.add_argument(
+        "--json", action="store_true", dest="as_json", help="to stdout only, never a file"
+    )
+    cu = gsub.add_parser("curate", help="write golden cases from your paraphrases")
+    cu.add_argument("--from", required=True, dest="source", type=Path, help="curation.json")
+    cu.add_argument("--since", default=None, help="YYYY-MM-DD (default: a year ago)")
+    cu.add_argument("--user", default=None, help="validate as this user (default $ALGOTRADE_USER)")
+    cu.add_argument("--dry-run", action="store_true", help="validate and show; write nothing")
+    cu.add_argument("--yes", action="store_true", help="write the case files")
     return parser
+
+
+def require_admin(store: ReadStore) -> None:
+    """The owner's terminal reads every user's sentences: only when ``$ALGOTRADE_USER`` is an
+    ``admin`` in ``users.toml``; ``ConfigurationError`` otherwise."""
+    me = user_id(DEFAULT_USER)
+    if load_users(store.configs).role_of(me) != Role.ADMIN:
+        raise ConfigurationError(f"golden candidates / curate need an admin: {me} is not one")
+
+
+def drafting_rows(since: str | None) -> tuple[list[dict[str, object]], bool]:
+    """The drafting events from ``since`` (default a year ago) as the admin viewer reads them
+    (``load_drafting_events``: never a row read around the viewer filter), as plain rows, and
+    whether the read hit its row cap (the oldest events are then missing)."""
+    store = open_store(data_url(), config_dir(), UserContext(user_id(DEFAULT_USER)))
+    require_admin(store)
+    start = (
+        date.fromisoformat(since)
+        if since
+        else exchange_date(datetime.now(UTC)) - timedelta(days=WINDOW_DAYS)
+    )
+    ctx = open_stores(store.reader, store.configs, store.user)
+    found = load_drafting_events(ctx, OWNER, start, MAX_LIMIT)
+    return [asdict(e) for e in found], len(found) >= MAX_LIMIT
+
+
+def golden_candidates_cmd(args: argparse.Namespace) -> int:
+    """``golden candidates``: print the sampled cards (real sentences, this terminal only: with
+    ``--json`` they go to stdout, never to a file; ``candidates*.json`` is git-ignored)."""
+    try:
+        rows, capped = drafting_rows(args.since)
+    except ConfigurationError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    if capped:
+        print(f"WARNING: read the newest {MAX_LIMIT} events only; narrow --since", file=sys.stderr)
+    cards = candidates.candidate_cards(
+        rows, args.user, args.per_user_month, args.limit, truncated=capped
+    )
+    summary = candidates.coverage(cards)
+    if args.as_json:
+        print(json.dumps({"candidates": cards, "coverage": summary}, indent=2, default=str))
+    else:
+        print("\n".join(candidates.render(cards, summary)))
+    return 0
+
+
+def golden_curate_cmd(args: argparse.Namespace) -> int:
+    """``golden curate``: check ``--from`` against the stored chains and the catalogue, show the
+    files, write them only with ``--yes``; the exit code."""
+    user = UserContext(args.user or user_id(DEFAULT_USER))
+    store = open_store(data_url(), config_dir(), user)
+
+    def validate(document: dict[str, object]) -> None:
+        resolve_rule_draft(store.configs, curate.SCREENER_ID, user, document)
+
+    try:
+        entries = json.loads(args.source.read_text())
+        rows, capped = drafting_rows(args.since)
+        if capped:  # chains would be partial: the verbatim guard would miss real sentences
+            raise ConfigurationError(f"read {MAX_LIMIT} events (the cap): narrow --since")
+        real = [str(r["sentence"]) for r in rows if r["sentence"]]
+        planned = curate.plan_cases(
+            entries, golden_candidates(rows), validate, Path.cwd() / GOLDEN_ROOT / "cases",
+            real, exchange_date(datetime.now(UTC)),
+        )  # fmt: skip
+    except (OSError, ValueError, ConfigurationError) as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    print("\n".join(curate.describe(planned)))
+    if args.dry_run or not args.yes:
+        print("nothing written" + ("" if args.dry_run else ": pass --yes to write these files"))
+        return 0 if args.dry_run else 2
+    print("wrote " + ", ".join(str(p) for p in curate.write_cases(planned)))
+    return 0
 
 
 def golden_run(args: argparse.Namespace) -> int:
@@ -150,8 +259,8 @@ def golden_run(args: argparse.Namespace) -> int:
             models.append(model)
         return out
 
-    def draft(model: TextModel, sentence: str) -> ScreenDraft:
-        return drafter(holder[0])(model, sentence)
+    def draft(model: TextModel, sentence: str, current: Mapping[str, Any] | None) -> ScreenDraft:
+        return drafter(holder[0])(model, sentence, current)
 
     def to_stderr(line: str) -> None:
         print(line, file=sys.stderr)
@@ -260,7 +369,10 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps(plan, indent=2))
         return
     if args.command == "golden":
-        sys.exit(golden_run(args))
+        run = {"candidates": golden_candidates_cmd, "curate": golden_curate_cmd}.get(
+            args.golden_command, golden_run
+        )
+        sys.exit(run(args))
     if args.command == "deploy-plan":
         paths = changed_paths(args.since, args.to)
         if args.locks:

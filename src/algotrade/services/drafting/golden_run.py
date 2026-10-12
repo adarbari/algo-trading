@@ -43,7 +43,7 @@ from typing import Any
 from algotrade.config.site.llm import LlmSettings, ProviderSettings, Rate
 from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
-from algotrade.services.drafting.golden import GoldenCase, load_cases, score
+from algotrade.services.drafting.golden import GoldenCase, load_cases, mark_recorded, score
 from algotrade.services.drafting.screens import ScreenDraft, draft_screen
 from algotrade.services.read.context import ReadContext
 from algotrade.services.text_model.model import TextModel
@@ -55,12 +55,12 @@ ESTIMATE_INPUT_TOKENS = 12_000  # the retrieval-slice target of the plan: what a
 UNAVAILABLE_STREAK = 3  # unavailable answers in a row after which a provider is given up on
 SPLITS = ("train", "held_out", "all")
 
-type Draft = Callable[[TextModel, str], ScreenDraft]
+type Draft = Callable[[TextModel, str, Mapping[str, Any] | None], ScreenDraft]
 
 
 def drafter(ctx: ReadContext) -> Draft:
     """The real ``draft_screen`` over ``ctx`` (the caller's catalogue), as ``evaluate`` calls it."""
-    return lambda model, sentence: draft_screen(ctx, model, SCREENER_ID, sentence)
+    return lambda model, sentence, current: draft_screen(ctx, model, SCREENER_ID, sentence, current)
 
 
 # ------------------------------------------------------------------------------ the plan
@@ -283,7 +283,7 @@ def _call(
 ) -> CallResult:
     model.last = None
     try:
-        made = draft(model, case.sentence)
+        made = draft(model, case.sentence, case.current)
     except (ModelUnavailableError, ConfigurationError) as exc:
         got = model.last
         status = "invalid" if got is not None else "unavailable"
@@ -456,6 +456,7 @@ def write_recordings(
         say(f"write: {path}")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text if text.endswith("\n") else text + "\n")
+        mark_recorded(path.parents[2], path.stem)  # answers/<slug>/<id>.json -> the case file
         written += 1
     return written
 

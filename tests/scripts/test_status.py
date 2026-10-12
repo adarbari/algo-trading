@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -114,3 +115,21 @@ def test_an_api_out_of_step_with_its_build_is_flagged(
     assert lines == ["API build: OUT OF STEP", f"  {stale[0]}"]
     assert status.api_build(probes(tmp_path, port_open=lambda port: False)) == []
     assert "does not answer" in status.api_build(probes(tmp_path, api_build=lambda url: None))[0]
+
+
+def test_unrecorded_golden_cases_older_than_14_days_are_listed(tmp_path: Path) -> None:
+    cases = tmp_path / "cases"
+    cases.mkdir()
+    for name, body in {
+        "old": {"recorded": False, "curated": "2026-09-20"},
+        "fresh": {"recorded": False, "curated": "2026-10-05"},
+        "done": {"curated": "2026-01-01"},
+        "undated": {"recorded": False},
+    }.items():
+        (cases / f"{name}.json").write_text(json.dumps(body))
+    p = probes(tmp_path, golden_cases=cases, today=lambda: date(2026, 10, 11))
+    lines = status.unrecorded_cases(p)
+    assert lines[0].startswith("Golden cases unrecorded > 14 days: 2")
+    assert [x.split(":")[0].strip() for x in lines[1:]] == ["old", "undated"]
+    assert status.unrecorded_cases(probes(tmp_path, golden_cases=tmp_path / "none")) == []
+    assert "Golden cases" in status.report(p)
