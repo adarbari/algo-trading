@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from algotrade.services.drafting.golden import recorded_answers
+from algotrade.services.drafting.golden.golden import recorded_answers
 from tests.conftest import REPO_ROOT
 
 ROOT = REPO_ROOT / "tests" / "fixtures" / "drafting" / "golden"

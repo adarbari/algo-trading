@@ -9,7 +9,7 @@ import pytest
 
 from algotrade.config.site.drafting.backlog import BacklogItem, FeatureBacklogSettings
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.drafting.gaps import missing_of, unresolved_of
+from algotrade.services.drafting.contract.gaps import missing_of, unresolved_of
 
 BACKLOG = FeatureBacklogSettings(
     (

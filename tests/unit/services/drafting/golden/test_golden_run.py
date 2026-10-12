@@ -13,8 +13,8 @@ import pytest
 from algotrade.config.site.llm import LlmSettings
 from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
-from algotrade.services.drafting.golden import GoldenCase
-from algotrade.services.drafting.golden_run import (
+from algotrade.services.drafting.golden.golden import GoldenCase
+from algotrade.services.drafting.golden.golden_run import (
     DEFAULT_RATE_WAIT_S,
     UNAVAILABLE_STREAK,
     CostTap,

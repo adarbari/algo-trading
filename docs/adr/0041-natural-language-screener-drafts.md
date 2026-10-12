@@ -222,7 +222,7 @@ or CI could have reached a model. The socket guard does not stop a child process
 
 ## Amended 2026-10-11: schema, validate-then-fall-through, one repair, order is tier
 An answer the model gives is no longer "text or unavailable":
-1. **Schema**: `services/drafting/answer_schema.py` holds the JSON Schema of the answer
+1. **Schema**: `services/drafting/contract/answer_schema.py` holds the JSON Schema of the answer
    (`{criteria, tie_break, notes}`, strict form). `TextModel.complete` takes an optional
    `schema`; a provider with `structured = "json_schema"` in `llm.toml` (top level or per
    `[[provider]]`, default `"none"`) is sent it (`response_format` json_schema, strict; the CLI's
@@ -294,7 +294,7 @@ Owner decision (2026-10-11, final; `docs/decisions/log.md`). The live Haiku gold
 `security_type in [ETF]`), 55% over-scaffolding (unrequested `atr_pct`, `trend_state`,
 `rel_volume`, `adv_usd`, ... that the task text asked for as "add that criterion"), 25% real model
 errors. The checks a caveat names are worth keeping but never applied silently, as with a formula
-or a missing feature. The answer gains `suggestions` (nullable; `services/drafting/suggestions.py`):
+or a missing feature. The answer gains `suggestions` (nullable; `services/drafting/contract/suggestions.py`):
 `{field, op, value, mode, tolerance, on_miss, why, source}` with `mode` soft or score only. The
 server checks one like a criterion (catalogue field, op, value, tolerance, the rule validator) plus
 the mode; a hard or modeless one, an invalid one, or one past 5 goes to `suggestions_dropped`

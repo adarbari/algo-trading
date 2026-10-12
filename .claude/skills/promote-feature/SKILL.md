@@ -110,6 +110,6 @@ maths, or adds a personal-licence source.
   `apps/api/algotrade_api/cli.py`, admin only): use them to turn a real session into a golden
   case instead of writing the file by hand.
 - The admin accepted-formula list (grouped by fingerprint) is not wired:
-  `features.expressions.fingerprint` is used by `services/drafting/formulas.py` (the dry run's
+  `features.expressions.fingerprint` is used by `services/drafting/contract/formulas.py` (the dry run's
   duplicate check) only, so list users' formulas by script.
 - No migration helper for users' copies (section 3).

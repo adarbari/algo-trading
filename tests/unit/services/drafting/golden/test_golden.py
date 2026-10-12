@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from algotrade.services.drafting.golden import GoldenCase, load_cases, mark_recorded, score
+from algotrade.services.drafting.golden.golden import GoldenCase, load_cases, mark_recorded, score
 
 A = {
     "span": "p",

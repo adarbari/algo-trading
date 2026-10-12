@@ -30,7 +30,7 @@ from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.features.expressions.fingerprint import find_duplicate, fingerprint
 from algotrade.features.expressions.nodes import ExpressionError, Ref
-from algotrade.services.drafting.answer_schema import FORMULA, check_item
+from algotrade.services.drafting.contract.answer_schema import FORMULA, check_item
 from algotrade.services.drafting.parts.model import part_tag
 from algotrade.services.preview.expressions import DryRun, dry_run
 from algotrade.services.read.context import ReadContext

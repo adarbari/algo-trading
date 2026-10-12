@@ -7,11 +7,11 @@ reading of its part may cite. Pure."""
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from algotrade.services.drafting.formulas import DraftFormula
-from algotrade.services.drafting.gaps import MissingFeature, Unresolved
+from algotrade.services.drafting.contract.formulas import DraftFormula
+from algotrade.services.drafting.contract.gaps import MissingFeature, Unresolved
+from algotrade.services.drafting.contract.suggestions import Suggestion
 from algotrade.services.drafting.parts.consistency import names_numbers, stated, values_of
 from algotrade.services.drafting.parts.model import Item
-from algotrade.services.drafting.suggestions import Suggestion
 
 
 def _frozen(value: Any) -> Any:

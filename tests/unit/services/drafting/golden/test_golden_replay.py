@@ -9,7 +9,7 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.core.model.completion import Completion
 from algotrade.services.configs import field_catalog
-from algotrade.services.drafting.golden import (
+from algotrade.services.drafting.golden.golden import (
     GoldenCase,
     load_cases,
     recorded_answers,

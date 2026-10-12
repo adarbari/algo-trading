@@ -22,13 +22,13 @@ from typing import Any
 
 from algotrade.config.site.drafting.backlog import FEASIBILITY, SLUG, FeatureBacklogSettings
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.drafting.answer_schema import (
+from algotrade.services.drafting.contract.answer_schema import (
     MISSING,
     UNRESOLVED,
     check_criterion,
     check_item,
 )
-from algotrade.services.drafting.formulas import Normalise
+from algotrade.services.drafting.contract.formulas import Normalise
 from algotrade.services.drafting.parts.model import part_tag
 
 MAX_SLUG = 64

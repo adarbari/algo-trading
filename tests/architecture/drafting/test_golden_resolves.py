@@ -5,7 +5,7 @@ into a test of the phrasebook. So no sentence of a held-out case resolves fully;
 phrasebook has grown to cover moves to ``train`` and is replaced by an unseen one."""
 
 from algotrade.config.site.settings import load_phrasebook
-from algotrade.services.drafting.golden import load_cases
+from algotrade.services.drafting.golden.golden import load_cases
 from algotrade.services.drafting.phrasebook.resolve import resolves_fully
 from algotrade.storage.factory import open_config_store
 from tests.conftest import REPO_ROOT
