@@ -1,7 +1,7 @@
 {
   "id": "volatile-small-caps",
   "sentence": "volatile small caps",
-  "split": "held_out",
+  "split": "train",
   "expect": {
     "parts": [
       {

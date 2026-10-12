@@ -71,7 +71,7 @@ class PhraseCriterion:
 
 @dataclass(frozen=True)
 class PhraseAlternative:
-    """One reading of an ambiguous word ("liquid": 10M, 50M or 100M a day): a ``label`` the
+    """One reading of an ambiguous word ("liquid": $5M, $50M or $100M a day): a ``label`` the
     trader sees and the criterion it stands for (the shape of an ``unresolved`` alternative)."""
 
     label: str

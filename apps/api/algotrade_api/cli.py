@@ -24,7 +24,7 @@ import os
 import resource
 import subprocess
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -322,10 +322,18 @@ def golden_run(args: argparse.Namespace) -> int:
         args.repeat, args.record, args.force, args.as_json, args.max_calls, args.budget_usd,
         args.yes, args.pace, args.batch, args.batch_pause,
     )  # fmt: skip
+    pausers: dict[str, Callable[[float], None]] = {}
+
+    def wait_for(provider: str, seconds: float) -> None:
+        # one limiter per provider (``llm-<id>``): the wait holds that provider, not the tool
+        if provider not in pausers:
+            pausers[provider] = build_pauser(f"llm-{provider}")
+        pausers[provider](seconds)
+
     try:
         return run_golden(
             run_args, load_llm(store.configs), llm_off(), Path.cwd() / GOLDEN_ROOT, open_models,
-            draft, print, to_stderr if args.as_json else print, build_pauser("golden-run"),
+            draft, print, to_stderr if args.as_json else print, wait_for,
         )  # fmt: skip
     finally:
         for model in models:

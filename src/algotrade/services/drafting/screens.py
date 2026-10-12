@@ -70,11 +70,23 @@ log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DroppedCriterion:
-    """A criterion the model proposed that the draft does not keep, and why."""
+    """A criterion the model proposed that the draft does not keep, and why. ``reason`` is what
+    the Builder shows (it may end with the model's free-text ``why``); ``kind`` and ``detail``
+    are structured and carry no model prose, so a report can use them without the sentence."""
 
     id: str
     field: str
     reason: str
+    kind: str = "other"  # not_in_catalogue / bad_op / bad_mode / bad_shape / bad_value / validator
+    detail: str = ""  # the check and the JSON path only, no model-written value
+
+
+class CriterionError(ConfigurationError):
+    """A proposed criterion that does not hold: ``kind`` says which check refused it."""
+
+    def __init__(self, kind: str, message: str) -> None:
+        super().__init__(message)
+        self.kind = kind
 
 
 @dataclass(frozen=True)
@@ -277,10 +289,13 @@ def criteria_of(
         why = f" ({item['why']})" if isinstance(item.get("why"), str) and item["why"] else ""
         try:
             if (shape := check_criterion(item)) is not None:
-                raise ConfigurationError(f"not the criterion shape ({shape})")
+                raise CriterionError("bad_shape", f"not the criterion shape ({shape})")
             kept[cid] = _criterion(item, field_name, catalogue)
         except ConfigurationError as exc:
-            dropped.append(DroppedCriterion(cid, field_name, f"{exc}{why}"))
+            kind = exc.kind if isinstance(exc, CriterionError) else "other"
+            dropped.append(
+                DroppedCriterion(cid, field_name, f"{exc}{why}", kind, f"{kind}: criteria[{n - 1}]")
+            )
     return kept, tuple(dropped)
 
 
@@ -311,15 +326,16 @@ def _did_you_mean(field_name: str, catalogue: set[str]) -> str:
 
 def _criterion(item: Mapping[str, Any], field_name: str, catalogue: set[str]) -> dict[str, Any]:
     if field_name not in catalogue:
-        raise ConfigurationError(
-            f"field {field_name!r} is not in the catalogue{_did_you_mean(field_name, catalogue)}"
+        raise CriterionError(
+            "not_in_catalogue",
+            f"field {field_name!r} is not in the catalogue{_did_you_mean(field_name, catalogue)}",
         )
     op = item.get("op")
     if op not in OPS:
-        raise ConfigurationError(f"unknown op {op!r}")
+        raise CriterionError("bad_op", f"unknown op {op!r}")
     mode = item.get("mode", "hard") or "hard"
     if mode not in MODES:
-        raise ConfigurationError(f"unknown mode {mode!r}")
+        raise CriterionError("bad_mode", f"unknown mode {mode!r}")
     out: dict[str, Any] = {"field": field_name, "op": op}
     if op not in NO_VALUE_OPS:
         out["value"] = _value(item.get("value"), op)
@@ -336,7 +352,7 @@ def _criterion(item: Mapping[str, Any], field_name: str, catalogue: set[str]) ->
 def _scalar(value: Any) -> Scalar:
     if isinstance(value, (str, int, float, bool)):
         return value
-    raise ConfigurationError(f"value {value!r} is not a number, text or boolean")
+    raise CriterionError("bad_value", f"value {value!r} is not a number, text or boolean")
 
 
 def _value(value: Any, op: str) -> Scalar | list[Scalar]:
@@ -345,10 +361,10 @@ def _value(value: Any, op: str) -> Scalar | list[Scalar]:
         return [_scalar(v) for v in values]
     if op == "between":
         if not isinstance(value, list) or len(value) != 2:
-            raise ConfigurationError("between needs a list of two numbers")
+            raise CriterionError("bad_value", "between needs a list of two numbers")
         return [_scalar(v) for v in value]
     if isinstance(value, list):
-        raise ConfigurationError(f"{op} takes one value, not a list")
+        raise CriterionError("bad_value", f"{op} takes one value, not a list")
     return _scalar(value)
 
 
@@ -357,7 +373,7 @@ def _tolerance(raw: Any) -> float | dict[str, float]:
         return float(raw)
     if isinstance(raw, Mapping) and isinstance(raw.get("relative"), (int, float)):
         return {"relative": float(raw["relative"])}
-    raise ConfigurationError(f"tolerance {raw!r} is not a number or {{relative = ...}}")
+    raise CriterionError("bad_value", f"tolerance {raw!r} is not a number or {{relative = ...}}")
 
 
 def rank_of(proposal: Mapping[str, Any], catalogue: set[str]) -> dict[str, Any]:
@@ -400,7 +416,12 @@ def validated(
             if named and named.group(1) in out["criteria"]:
                 cid = named.group(1)
                 criterion = out["criteria"].pop(cid)
-                gone.append(DroppedCriterion(cid, criterion["field"], _reason(str(exc))))
+                reason = _reason(str(exc))
+                gone.append(
+                    DroppedCriterion(
+                        cid, criterion["field"], reason, "validator", f"validator: criteria.{cid}"
+                    )
+                )
             elif ".rank" in str(exc) and "rank" in out:
                 del out["rank"]
             else:

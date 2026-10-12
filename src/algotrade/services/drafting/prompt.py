@@ -38,8 +38,8 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 # Bump with any change to the prompt: the usage log records it (ADR 0058). 2: index + slice;
 # 3: formulas, missing and unresolved in the answer, and the open backlog keys; 4: a phrasebook
 # entry shows its structured thresholds; 5: the index grouped by prefix and the slice capped by a
-# token budget.
-PROMPT_VERSION = "5"
+# token budget; 6: the phrasebook's last column is headed "exact default".
+PROMPT_VERSION = "6"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 
@@ -83,6 +83,9 @@ Rules:
 - The phrasebook and field guide (when given) say which fields a trader's words mean, how to
   read a field, the usual criterion per intent (op, value, mode, tolerance) and when the reading
   lies. Take thresholds from them, never from memory (say in "notes" when you had to choose one).
+  A phrasebook entry's last column, "exact default" (`field op value`), is the meaning to use as
+  given unless the sentence gives its own value;
+  for a word with several readings it lists them and the first is the default.
   When a caveat or situation names a field to check, add that criterion (soft or score, so it
   lists rather than rejects) and say why in "notes".
 
@@ -524,7 +527,7 @@ def _render(
     out += "\n".join(catalogue_line(i) for i in detail) + "\n"
     phrases = [line for p in chosen.phrases if (line := phrase_line(p, names)) is not None]
     if phrases:
-        out += "\nPhrasebook (what the trader says | fields | how to use them):\n"
+        out += "\nPhrasebook (what the trader says | fields | how to use them | exact default):\n"
         out += "\n".join(phrases) + "\n"
     if guide is not None:
         entries = [
