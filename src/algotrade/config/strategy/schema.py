@@ -44,9 +44,10 @@ MODEL_IMPL = "model"
 RULE_IMPLS = (RULES_IMPL, MODEL_IMPL)
 # The rule-screen part of a config (ADR 0029), kept raw here and parsed by
 # ``config.strategy.screen_spec`` after the layers are merged. ``tiers`` and ``classify`` are
-# legacy (ADR 0030): accepted so v1 / v2 presets parse, then ignored.
+# legacy (ADR 0030): accepted so v1 / v2 presets parse, then ignored. ``notes`` is what the
+# screen does not cover (a missing feature the trader asked for, Describe it).
 RULE_SCREEN_KEYS = frozenset(
-    {"version", "criteria", "tiers", "flags", "classify", "columns", "rank", "score"}
+    {"version", "criteria", "tiers", "flags", "classify", "columns", "rank", "score", "notes"}
 )
 
 

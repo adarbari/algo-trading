@@ -1,8 +1,8 @@
 """Retrieval (plan "Token and latency budget"): the slice of fields a sentence gets in the
 drafting prompt. The guard is RECALL over the golden set: a field a case expects that exists in
 the catalogue is always in the slice, so a missed field never becomes a false "missing". Also the
-token budget (<= 15k estimated tokens, chars / 4), the byte-identical prefix, determinism, own
-features, joined tokens and numbers."""
+token budget (<= 13k estimated tokens, chars / 4, a 2k margin to the 15k cap), the byte-identical
+prefix, determinism, own features, joined tokens and numbers."""
 
 import pytest
 
@@ -15,8 +15,14 @@ from algotrade.config.site.settings import (
     load_phrasebook,
 )
 from algotrade.config.user import UserContext
-from algotrade.services.drafting.golden import GoldenCase, load_cases
-from algotrade.services.drafting.prompt import prefix_text, sliced_system_prompt
+from algotrade.services.drafting.golden import GoldenCase, load_cases, recorded_answers
+from algotrade.services.drafting.prompt import (
+    PROMPT_BUDGET_TOKENS,
+    index_group,
+    prefix_text,
+    slice_for,
+    sliced_system_prompt,
+)
 from algotrade.services.drafting.retrieval import (
     CORE_FIELDS,
     MAX_FIELDS,
@@ -27,6 +33,7 @@ from algotrade.services.drafting.retrieval import (
     stem,
     words_of,
 )
+from algotrade.services.drafting.screens import parse_answer
 from algotrade.services.read.context import open_context
 from algotrade.services.read.instruments.catalogue import FeatureFormat, FeatureInfo, feature_infos
 from algotrade.storage.factory import open_config_store
@@ -35,7 +42,8 @@ from tests.unit.services.drafting.test_screens import ALICE, DAY, seeded
 
 ROOT = REPO_ROOT / "tests" / "fixtures" / "drafting" / "golden"
 CASES = load_cases(ROOT)
-BUDGET_TOKENS = 15_000
+CAP_TOKENS = 15_000
+BUDGET_TOKENS = 13_000
 
 
 @pytest.fixture(scope="module")
@@ -55,7 +63,10 @@ def ids(case: GoldenCase) -> str:
 def test_every_expected_field_that_exists_is_in_the_slice(case: GoldenCase, site) -> None:
     infos, book, guide = site
     names = {i.name for i in infos}
-    chosen = set(select_slice(case.sentence, infos, book, guide).fields)
+    # the slice the prompt renders: under the token budget, with the worst case around it
+    chosen = set(
+        slice_for([*infos, *own_features()], case.sentence, book, guide, padded_keys()).fields
+    )
     for part in case.parts:
         existing = [f for f in part["fields"] if f in names]
         if existing:
@@ -68,16 +79,51 @@ def test_the_golden_set_has_the_new_train_cases() -> None:
     assert {"above-sma50-wide-range"} <= train
 
 
+def own_features() -> list[FeatureInfo]:
+    """A trader with three expression features, descriptions at the length the Builder allows."""
+    return [
+        info(f"feature.my_{n}", scope="user", owner="alice", description="my score " * 20)
+        for n in range(3)
+    ]
+
+
+def padded_keys() -> tuple[tuple[str, str], ...]:
+    """The open keys the budget must hold with: the backlog grown to twice what the prompt shows,
+    each description at full length."""
+    real = open_keys(load_feature_backlog(open_config_store(REPO_ROOT / "config")))
+    return (*real, *((f"zz_pad_{n:03}", "x" * 200) for n in range(2 * PROMPT_LIMIT)))
+
+
 @pytest.mark.parametrize("case", CASES, ids=ids)
 def test_the_sliced_prompt_is_within_the_token_budget(case: GoldenCase, site) -> None:
     infos, book, guide = site
-    real = open_keys(load_feature_backlog(open_config_store(REPO_ROOT / "config")))
-    # the backlog may grow: the budget holds with more keys than the prompt shows, at full length
-    padding = tuple((f"zz_pad_{n:03}", "x" * 200) for n in range(2 * PROMPT_LIMIT))
-    prompt = sliced_system_prompt(infos, case.sentence, book, guide, (*real, *padding))
+    mine = own_features()
+    prompt = sliced_system_prompt([*infos, *mine], case.sentence, book, guide, padded_keys())
     assert len(prompt) // 4 <= BUDGET_TOKENS, f"{case.id}: {len(prompt) // 4} tokens"
-    assert prompt.count("zz_pad_") + len(real) >= min(PROMPT_LIMIT, len(real) + len(padding))
+    assert BUDGET_TOKENS + 2_000 <= CAP_TOKENS  # a margin of 2k to the cap, by construction
+    assert all(f"{m.name} | " in prompt for m in mine)  # the trader's own, in full
     assert prompt.startswith(prefix_text(infos))
+
+
+def test_text_added_to_the_prompt_shrinks_the_slice_not_the_margin(site) -> None:
+    infos, book, guide = site
+    case = max(CASES, key=lambda c: len(sliced_system_prompt(infos, c.sentence, book, guide)))
+    roomy = slice_for(infos, case.sentence, book, guide)
+    heavy = [
+        info(f"feature.mine_{n}", scope="user", owner="u", description="d " * 300)
+        for n in range(25)
+    ]
+    tight = slice_for([*infos, *heavy], case.sentence, book, guide)
+    assert len(tight.fields) + len(roomy.brief) < len(roomy.fields) + len(tight.brief)
+    prompt = sliced_system_prompt([*infos, *heavy], case.sentence, book, guide)
+    assert len(prompt) // 4 <= BUDGET_TOKENS + sum(len(h.description) for h in heavy) // 4 + 400
+    core = {f for f in CORE_FIELDS if f in {i.name for i in infos}}
+    assert core <= set(tight.fields)  # what is never dropped
+    assert tight == slice_for([*heavy, *infos[::-1]], case.sentence, book, guide)  # deterministic
+
+
+def test_the_budget_is_the_documented_one() -> None:
+    assert PROMPT_BUDGET_TOKENS == BUDGET_TOKENS
 
 
 def test_the_prefix_is_identical_across_sentences_and_the_slice_is_smaller(site) -> None:
@@ -86,8 +132,9 @@ def test_the_prefix_is_identical_across_sentences_and_the_slice_is_smaller(site)
     prompts = [sliced_system_prompt(infos, c.sentence, book, guide) for c in CASES]
     assert all(p.startswith(prefix) for p in prompts)
     assert len({p[len(prefix) :] for p in prompts}) == len(prompts)  # the slice is per sentence
-    for info in infos:
-        assert f"{info.name} | " in prefix  # every field is in the index
+    for field in infos:  # every field is in the index, nameable as heading + entry
+        head, local = index_group(field.name)
+        assert f"\n{head}*\n" in prefix and f"\n{local}|{field.dtype}|" in prefix, field.name
 
 
 def test_the_slice_is_deterministic_and_ignores_catalogue_order(site) -> None:
@@ -221,3 +268,52 @@ def test_a_number_after_a_comparison_word_names_no_field() -> None:
     # "above 20" must not pull in the fields named for 20; "sma 20" must
     assert not select_slice("price above 20", [sma20, other]).fields
     assert sma20.name in select_slice("sma 20 rising", [sma20, other]).fields
+
+
+def test_a_prompt_the_fixed_parts_alone_push_over_the_budget_warns_once_and_caps_descriptions(
+    site, caplog: pytest.LogCaptureFixture
+) -> None:
+    infos, book, guide = site
+    mine = [
+        info(f"feature.mine_{n:03}", scope="user", owner="u", description="long " * 100)
+        for n in range(400)
+    ]
+    sentence = CASES[0].sentence
+    with caplog.at_level("WARNING", logger="algotrade.services.drafting.prompt"):
+        prompt = sliced_system_prompt([*infos, *mine], sentence, book, guide)
+    warned = [r for r in caplog.records if "over budget" in r.getMessage()]
+    assert len(warned) == 1 and sentence not in warned[0].getMessage()
+    own = prompt.split("\nYour own features (")[1].splitlines()[1]
+    assert len(own.split(" | ")[3]) <= 160  # an own feature's description is capped like a site one
+    caplog.clear()
+    sliced_system_prompt(infos, sentence, book, guide)
+    assert not caplog.records  # a prompt inside the budget is silent
+
+
+def test_every_field_of_every_recorded_answer_is_reachable_from_the_grouped_index(site) -> None:
+    """Grouping never makes a recorded answer unreachable: heading + entry is the full name."""
+    infos, _, _ = site
+    reachable: set[str] = set()
+    heading = ""
+    in_index = False
+    for line in prefix_text(infos).splitlines():
+        if line.startswith("Field index"):
+            in_index = True
+        elif in_index and line.endswith(".*"):
+            heading = line[:-1]
+        elif in_index and "|" in line:
+            reachable.add(heading + line.split("|")[0])
+    assert reachable == {i.name for i in infos if i.scope == "site"}
+    names = {i.name for i in infos}
+    seen = 0
+    for case in CASES:
+        for text in recorded_answers(ROOT, case.id).values():
+            answer = parse_answer(text)
+            fields = [c.get("field") for c in answer.get("criteria", []) if isinstance(c, dict)]
+            tie = answer.get("tie_break") or {}
+            fields += [tie.get("field")] if isinstance(tie, dict) else []
+            for field in fields:
+                if field in names:
+                    seen += 1
+                    assert field in reachable, f"{case.id}: {field}"
+    assert seen > 50

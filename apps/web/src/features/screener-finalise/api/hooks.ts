@@ -6,7 +6,12 @@ import { useToast } from '@algotrade/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { refreshScreens } from '@/entities/screen';
-import { api, queryKeys, unwrap, errorDetail } from '@/shared/api';
+import { api, queryKeys, unwrap, errorDetail, type components } from '@/shared/api';
+
+export interface FinaliseInput {
+  draftSessionId?: string | null;
+  choices?: readonly components['schemas']['DraftChoice'][];
+}
 
 function useRefresh() {
   const client = useQueryClient();
@@ -17,16 +22,26 @@ function useRefresh() {
     ]);
 }
 
-/** `draftSessionId`: the Describe-it session this screen came from (ADR 0066), if any. */
+/**
+ * `draftSessionId`: the Describe-it session this screen came from (ADR 0066), if any, and
+ * `choices` what the trader decided on its options (sent only with a session).
+ */
 export function useFinalise(id: string) {
   const refresh = useRefresh();
   const toast = useToast();
   return useMutation({
-    mutationFn: (draftSessionId?: string | null) =>
+    mutationFn: ({ draftSessionId, choices = [] }: FinaliseInput) =>
       unwrap(
         api.POST('/screeners/{screener_id}/finalise', {
           params: { path: { screener_id: id } },
-          ...(draftSessionId ? { body: { draft_session_id: draftSessionId } } : {}),
+          ...(draftSessionId
+            ? {
+                body: {
+                  draft_session_id: draftSessionId,
+                  ...(choices.length > 0 ? { choices: [...choices] } : {}),
+                },
+              }
+            : {}),
         }),
       ),
     onSuccess: async (done) => {

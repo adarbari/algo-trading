@@ -9,14 +9,18 @@ import {
   criteriaOf,
   criterionOfError,
   criterionIds,
+  mergeNotes,
   newCriterionId,
+  notesOf,
   previewDocument,
   tieBreakOf,
+  toCriterion,
   toDocument,
   useScreener,
   useScreenerVersions,
   useScreenPreview,
   withCriterion,
+  withNotes,
   withoutCriterion,
   withTieBreak,
   type Criterion,
@@ -24,10 +28,16 @@ import {
   type ScreenerDetail,
   type ScreenPreview,
 } from '@/entities/screen';
-import { errorDetail } from '@/shared/api';
+import { errorDetail, type components } from '@/shared/api';
 import { useDebounced } from '@/shared/lib';
 
 import { useCopyOwnPreset, useDiscardDraft, useSaveDraft } from '../api/hooks';
+
+/** What the trader decided about one thing Describe it offered (ADR 0066), sent with the save. */
+export type DraftChoice = components['schemas']['DraftChoice'];
+/** A proposed formula: not yet decided, accepted or skipped. */
+export type FormulaState = 'proposed' | 'accepted' | 'skipped';
+type Formula = components['schemas']['DraftFormula'];
 
 /** The live preview waits this long after the last edit. */
 export const PREVIEW_DEBOUNCE_MS = 300;
@@ -76,6 +86,44 @@ export interface ScreenerBuilder {
    */
   draftSessionId: string | null;
   setDraftSessionId: (draftSessionId: string | null) => void;
+  /**
+   * The decisions made on the last answer's options (a reading picked, a formula accepted or
+   * skipped), sent with the save and the finalise and cleared with the session. One per event and
+   * subject: deciding again replaces it.
+   */
+  choices: readonly DraftChoice[];
+  recordChoice: (choice: DraftChoice) => void;
+  /** Each proposed formula's state by name; a name not listed is `proposed`. */
+  formulaStates: Readonly<Record<string, FormulaState>>;
+  /**
+   * The formulas the last answer proposed and the trader has neither accepted nor skipped: each
+   * shows as a pending row (when it has a criterion), and finalising waits until none is left.
+   */
+  pendingFormulas: readonly Formula[];
+  /** The formula whose review dialog is open (Review and add), else null. */
+  reviewing: Formula | null;
+  /** The trader chose Review and add: open the review of that formula. */
+  reviewFormula: (formula: Formula) => void;
+  /** The review dialog was closed without saving. */
+  closeReview: () => void;
+  /**
+   * The formula was saved as the trader's feature (`field`, `feature.<name>`): its pending
+   * criterion joins the screen as an active row on that field, the formula is accepted and
+   * `formula_accepted` is recorded. All one edit.
+   */
+  acceptFormula: (formula: Formula, field: string) => void;
+  /** The trader chose Skip: the pending row goes and `formula_skipped` is recorded. */
+  skipFormula: (name: string) => void;
+  /**
+   * What the screen does not cover (ADR 0066): the notes saved in the screen's document, each a
+   * missing feature the trader asked for. Finalising does not wait on them.
+   */
+  notes: readonly string[];
+  /** Join notes (repeats left out, the list capped); one edit, safe next to `loadDocument`. */
+  addNotes: (notes: readonly string[]) => void;
+  removeNote: (note: string) => void;
+  /** A new answer replaced the proposals: none is decided yet. */
+  setFormulas: (formulas: readonly Formula[]) => void;
   save: () => Promise<void>;
   discard: () => Promise<void>;
   saving: boolean;
@@ -124,6 +172,42 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
   // Keyed by screener, so opening another one starts without a session.
   const [session, setSession] = useState<{ id: string; draftSessionId: string } | null>(null);
   const draftSessionId = session?.id === id ? session.draftSessionId : null;
+  // The options' decisions, keyed by screener like the session; gone with it.
+  const [review, setReview] = useState<{
+    id: string;
+    choices: DraftChoice[];
+    formulas: Record<string, FormulaState>;
+    proposed: readonly Formula[];
+    reviewing: string | null;
+  } | null>(null);
+  const empty: NonNullable<typeof review> = {
+    id,
+    choices: [],
+    formulas: {},
+    proposed: [],
+    reviewing: null,
+  };
+  const current = review?.id === id ? review : empty;
+  const updateReview = (change: (r: NonNullable<typeof review>) => NonNullable<typeof review>) => {
+    setReview((prev) => change(prev?.id === id ? prev : empty));
+  };
+  const choose = (choice: DraftChoice) => {
+    updateReview((r) => ({
+      ...r,
+      choices: [
+        ...r.choices.filter((c) => !(c.event === choice.event && c.subject === choice.subject)),
+        choice,
+      ],
+    }));
+  };
+  const decide = (name: string, state: 'accepted' | 'skipped') => {
+    updateReview((r) => ({
+      ...r,
+      reviewing: r.reviewing === name ? null : r.reviewing,
+      formulas: { ...r.formulas, [name]: state },
+    }));
+    choose({ event: `formula_${state}`, subject: name });
+  };
   const save = useSaveDraft(id);
   const discard = useDiscardDraft(id);
   const copy = useCopyOwnPreset(id);
@@ -145,6 +229,14 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
 
   const edit = (next: ScreenDocument) => {
     setEdited(next);
+    startCopy();
+  };
+  // A change built on the document as it is when it applies: two edits in one event keep both.
+  const editWith = (change: (current: ScreenDocument) => ScreenDocument) => {
+    setEdited((prev) => change(prev ?? source ?? { id }));
+    startCopy();
+  };
+  const startCopy = () => {
     if (preset && copying.current === null) {
       copying.current = copy.mutateAsync().catch(() => {
         // The toast says why; the edit is dropped so the next one tries again.
@@ -155,7 +247,12 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
   };
   const saved = async () => {
     await copying.current;
-    if (edited) await save.mutateAsync({ document: edited, draftSessionId });
+    if (edited) {
+      const sent = current.choices;
+      await save.mutateAsync({ document: edited, draftSessionId, choices: sent });
+      // Recorded with that save: not sent again with every autosave (a choice made since stays).
+      updateReview((r) => ({ ...r, choices: r.choices.filter((c) => !sent.includes(c)) }));
+    }
     setEdited(null);
   };
 
@@ -193,11 +290,56 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
       edit(withTieBreak(document, field, order));
     },
     loadDocument: (next) => {
-      edit(toDocument(next, id));
+      // A drafted document carries no notes: the ones the screen has stay.
+      editWith((cur) => {
+        const kept = notesOf(base, cur);
+        const loaded = toDocument(next, id);
+        return kept.length > 0 && loaded['notes'] === undefined ? withNotes(loaded, kept) : loaded;
+      });
     },
     draftSessionId,
     setDraftSessionId: (next) => {
       setSession(next ? { id, draftSessionId: next } : null);
+      if (!next) setReview(null); // the session is over: so are its decisions
+    },
+    choices: current.choices,
+    recordChoice: choose,
+    formulaStates: current.formulas,
+    pendingFormulas: current.proposed.filter((f) => current.formulas[f.name] === undefined),
+    reviewing: current.proposed.find((f) => f.name === current.reviewing) ?? null,
+    reviewFormula: (formula) => {
+      updateReview((r) => ({ ...r, reviewing: formula.name }));
+    },
+    closeReview: () => {
+      updateReview((r) => ({ ...r, reviewing: null }));
+    },
+    acceptFormula: (formula, field) => {
+      if (formula.criterion) {
+        const created = newCriterionId(criterionIds(base, document), field);
+        edit(withCriterion(document, toCriterion(created, { ...formula.criterion, field })));
+      }
+      decide(formula.name, 'accepted');
+    },
+    skipFormula: (name) => {
+      decide(name, 'skipped');
+    },
+    notes: notesOf(base, document),
+    addNotes: (added) => {
+      const known = notesOf(base, document);
+      if (mergeNotes(known, added).length === known.length) return; // nothing new: not an edit
+      editWith((cur) => withNotes(cur, mergeNotes(notesOf(base, cur), added), base));
+    },
+    removeNote: (note) => {
+      editWith((cur) =>
+        withNotes(
+          cur,
+          notesOf(base, cur).filter((n) => n !== note),
+          base,
+        ),
+      );
+    },
+    setFormulas: (formulas) => {
+      updateReview((r) => ({ ...r, formulas: {}, proposed: formulas, reviewing: null }));
     },
     save: saved,
     discard: async () => {
@@ -207,6 +349,7 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
       copy.reset();
       setEdited(null);
       setSession(null); // a discarded screen is abandoned: a later description is a new session
+      setReview(null);
     },
     saving: save.isPending,
     discarding: discard.isPending,

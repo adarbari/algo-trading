@@ -321,6 +321,15 @@
       },
       "DraftBody": {
         "properties": {
+          "choices": {
+            "description": "the decisions the trader made on the draft's options, recorded with the save (ADR 0066); a re-sent one is the same event",
+            "items": {
+              "$ref": "#/components/schemas/DraftChoice"
+            },
+            "maxItems": 50,
+            "title": "Choices",
+            "type": "array"
+          },
           "document": {
             "additionalProperties": true,
             "description": "the screen's TOML keys as JSON (the version is managed)",
@@ -345,6 +354,46 @@
           "document"
         ],
         "title": "DraftBody",
+        "type": "object"
+      },
+      "DraftChoice": {
+        "description": "What the trader decided about one thing Describe it offered (ADR 0066): an unresolved\nterm's reading (``choice_made``, ``picked`` the alternative's index) or a proposed formula\n(``formula_accepted`` / ``formula_skipped``, ``subject`` its name).",
+        "properties": {
+          "event": {
+            "enum": [
+              "choice_made",
+              "formula_accepted",
+              "formula_skipped"
+            ],
+            "title": "Event",
+            "type": "string"
+          },
+          "picked": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the alternative's index (choice_made only)",
+            "title": "Picked"
+          },
+          "subject": {
+            "description": "the unresolved term, or the formula name",
+            "maxLength": 120,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event",
+          "subject"
+        ],
+        "title": "DraftChoice",
         "type": "object"
       },
       "DraftFormula": {
@@ -806,6 +855,15 @@
       },
       "FinaliseBody": {
         "properties": {
+          "choices": {
+            "description": "the decisions the trader made on the draft's options, recorded with the save (ADR 0066); a re-sent one is the same event",
+            "items": {
+              "$ref": "#/components/schemas/DraftChoice"
+            },
+            "maxItems": 50,
+            "title": "Choices",
+            "type": "array"
+          },
           "draft_session_id": {
             "anyOf": [
               {

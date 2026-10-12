@@ -422,7 +422,7 @@ Source: `design-system/components/DataTable`
 
 ### Dialog
 
-Dialog: a modal window for a short, focused task or a confirmation ("Delete screener?", "Save as…"). Controlled (`open` + `onOpenChange`). A title (its accessible name), an optional description, the body, and a footer of actions (the primary action last). Focus moves into the dialog (the first focusable element, or `initialFocus`), Tab stays inside, and focus returns to the opener on close; Escape, the close button and a click on the backdrop close it (`dismissible={false}` for a step that must be answered). Page scroll is locked behind it.
+Dialog: a modal window for a short, focused task or a confirmation ("Delete screener?", "Save as…"). Controlled (`open` + `onOpenChange`). A title (its accessible name), an optional description, the body, and a footer of actions (the primary action last). Focus moves into the dialog (the first focusable element, or `initialFocus`), Tab stays inside, and focus returns to the opener on close; Escape, the close button and a click on the backdrop close it (`dismissible={false}` for a step that must be answered). Page scroll is locked behind it. `fullOnPhone` makes a long form fill the whole screen when the screen is narrow (a phone), with the title and the footer still in place.
 
 Source: `design-system/components/Dialog`
 
@@ -435,6 +435,7 @@ Source: `design-system/components/Dialog`
 | `footer` | `ReactNode` | no | Actions, primary last: `<Button>Cancel</Button><Button variant="primary">Delete</Button>`. |
 | `size` | `'sm' \| 'md' \| 'lg'` | no | Width: `sm` (confirmations), `md` (default, a short form), `lg` (a table or a long form). |
 | `dismissible` | `boolean` | no | Escape and backdrop clicks close it (default true). |
+| `fullOnPhone` | `boolean` | no | On a narrow screen the dialog fills it (a long form); a short one keeps its card. |
 | `initialFocus` | `RefObject<HTMLElement \| null>` | no | The element focused on open; default the first focusable element. |
 | `children` | `ReactNode` | no |  |
 
@@ -1095,6 +1096,20 @@ Source: `design-system/components/Panel`
 | `headingLevel` | `2 \| 3` | no | Heading level in the page outline; 2 by default. |
 | `flush` | `boolean` | no | No body padding (a table or grid that runs edge to edge). |
 | `children` | `ReactNode` | no | Body content when ready. |
+
+### PendingRow
+
+PendingRow: a placeholder row for something that is not part of the screen yet, shown where it will go (a criterion that waits on a formula the trader has not accepted). A dashed, muted well, so it reads as "not active" by its border and its text label, never by colour alone: the status label (with an optional help slot), the name in monospace, an optional summary line and the actions that decide it (Review and add / Skip). It stacks at phone width. Every word arrives as a prop; this component writes none.
+
+Source: `design-system/components/PendingRow`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | The short status label ("Waiting on formula"). |
+| `help` | `ReactNode \| undefined` | no | The help button for the label (the app's Guide drawer). |
+| `name` | `string` | yes | What is waiting, in monospace (the field the criterion reads). |
+| `summary` | `string \| undefined` | no | One line about it (the operator and threshold the criterion will have). |
+| `actions` | `ReactNode \| undefined` | no | The decision: buttons, primary first. |
 
 ### Popover
 

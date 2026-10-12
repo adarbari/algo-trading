@@ -46,7 +46,12 @@ from algotrade.services.drafting.formulas import (
     dry_run_all,
 )
 from algotrade.services.drafting.gaps import MissingFeature, Unresolved, missing_of, unresolved_of
-from algotrade.services.drafting.prompt import PROMPT_VERSION, sliced_system_prompt, user_prompt
+from algotrade.services.drafting.prompt import (
+    PROMPT_VERSION,
+    index_group,
+    sliced_system_prompt,
+    user_prompt,
+)
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
 from algotrade.services.text_model.model import TextModel, reject_answer
@@ -54,6 +59,7 @@ from algotrade.services.text_model.model import TextModel, reject_answer
 MODES = ("hard", "soft", "score")
 MISSES = ("WATCH", "LIQUIDITY_RISK", "EVENT_RISK")
 MAX_TEXT = 1000  # characters of sentence (one request, synchronous: never a job)
+DID_YOU_MEAN = 5  # candidates named in a drop reason
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _NAMED_CRITERION = re.compile(r"\.criteria\.([A-Za-z0-9_-]+)")
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$")
@@ -136,18 +142,35 @@ def draft_screen(
             check(text)
         except ConfigurationError as exc:  # a draft the validator refuses
             raise InvalidAnswerError(str(exc)) from exc
+        named = [d for d in drafted[-1][1].dropped if "; did you mean " in d.reason]
+        if named:  # a bare entry name: the repair asks again with the full names
+            raise InvalidAnswerError("; ".join(f"{d.field}: {d.reason}" for d in named))
 
-    completion = model.complete(system, user, tag=tag, schema=ANSWER_SCHEMA, accept=accept)
+    try:
+        completion = model.complete(system, user, tag=tag, schema=ANSWER_SCHEMA, accept=accept)
+    except ModelUnavailableError:
+        # every attempt refused for a bare entry name only: keep the good criteria, show the
+        # bare ones dropped with their candidates (no completion, so no call id)
+        if (
+            drafted
+            and drafted[-1][1].dropped
+            and all("; did you mean " in d.reason for d in drafted[-1][1].dropped)
+        ):
+            return _finished(ctx, drafted[-1][1], None)
+        raise
     try:
         if not drafted or drafted[-1][0] != completion.text:  # a model that did not check
             check(completion.text)
     except (ModelUnavailableError, ConfigurationError) as exc:  # an answer we cannot use
         reject_answer(model, tag, completion, str(exc), user, len(system) + len(user))
         raise
-    final = drafted[-1][1]
+    return _finished(ctx, drafted[-1][1], completion.call_id)
+
+
+def _finished(ctx: ReadContext, final: ScreenDraft, call_id: str | None) -> ScreenDraft:
     formulas, dry_notes = dry_run_all(ctx, final.formulas)  # once, on the draft we keep
     return replace(
-        final, formulas=formulas, notes=(*final.notes, *dry_notes), call_id=completion.call_id
+        final, formulas=formulas, notes=(*final.notes, *dry_notes), call_id=call_id
     )  # one id: every attempt of the call
 
 
@@ -285,9 +308,26 @@ def _criterion_id(given: Any, field_name: str, n: int, taken: Mapping[str, Any])
     return cid
 
 
+def did_you_mean_candidates(field_name: str, catalogue: set[str]) -> list[str]:
+    """The catalogue fields whose index entry (the part after the prefix heading) is the bare
+    ``field_name`` (``iv30``): the full names a model that forgot the heading meant. Never
+    resolved silently: several fields can share an entry name under different headings."""
+    if "." in field_name:
+        return []
+    return sorted(n for n in catalogue if index_group(n)[1] == field_name)[:DID_YOU_MEAN]
+
+
+def _did_you_mean(field_name: str, catalogue: set[str]) -> str:
+    found = did_you_mean_candidates(field_name, catalogue)
+    return "" if not found else f"; did you mean {' or '.join(f'`{n}`' for n in found)}?"
+
+
 def _criterion(item: Mapping[str, Any], field_name: str, catalogue: set[str]) -> dict[str, Any]:
     if field_name not in catalogue:
-        raise CriterionError("not_in_catalogue", f"field {field_name!r} is not in the catalogue")
+        raise CriterionError(
+            "not_in_catalogue",
+            f"field {field_name!r} is not in the catalogue{_did_you_mean(field_name, catalogue)}",
+        )
     op = item.get("op")
     if op not in OPS:
         raise CriterionError("bad_op", f"unknown op {op!r}")

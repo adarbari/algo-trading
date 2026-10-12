@@ -50,6 +50,7 @@ export {
   NO_VALUE_OPS,
   previewDocument,
   tieBreakOf,
+  toCriterion,
   toDocument,
   withCriterion,
   withoutCriterion,
@@ -64,6 +65,7 @@ export {
   type ScreenerSummary,
   type Tolerance,
 } from './model/spec';
+export { MAX_NOTE_LENGTH, MAX_NOTES, mergeNotes, notesOf, withNotes } from './model/notes';
 export { DecisionBadge } from './ui/DecisionBadge';
 export {
   decisionLabel,

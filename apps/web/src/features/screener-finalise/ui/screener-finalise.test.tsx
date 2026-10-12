@@ -74,6 +74,43 @@ describe('FinaliseButton', () => {
     });
   });
 
+  it('sends the choices made on the draft with the session, and none without one', async () => {
+    POST.mockResolvedValue(ok({ screener_id: 'my', version: 3, hash: 'h' }));
+    const choices = [{ event: 'choice_made' as const, subject: 'liquid', picked: 1 }];
+    const first = wrap(
+      <FinaliseButton
+        screenerId="my"
+        version={3}
+        prepare={() => Promise.resolve()}
+        draftSessionId="sess-1"
+        choices={choices}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Finalize v3' }));
+    await waitFor(() => {
+      expect(POST).toHaveBeenCalledWith('/screeners/{screener_id}/finalise', {
+        params: { path: { screener_id: 'my' } },
+        body: { draft_session_id: 'sess-1', choices },
+      });
+    });
+    POST.mockClear();
+    first.unmount();
+    wrap(
+      <FinaliseButton
+        screenerId="my"
+        version={3}
+        prepare={() => Promise.resolve()}
+        choices={choices}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Finalize v3' }));
+    await waitFor(() => {
+      expect(POST).toHaveBeenCalledWith('/screeners/{screener_id}/finalise', {
+        params: { path: { screener_id: 'my' } },
+      });
+    });
+  });
+
   it('does not finalize when the save fails, and says why when finalising fails', async () => {
     const { rerender } = wrap(
       <FinaliseButton
