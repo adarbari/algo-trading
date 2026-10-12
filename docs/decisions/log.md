@@ -261,9 +261,8 @@ follow-up PR).
 - Question: how many part re-drafts per user per day?
 - Options: 10 / 30 / 100
 - Decision: 30 per user per day, a second entry in `config/site/llm.toml` (configurable).
-- decided by: orchestrator (owner present)
+- decided by: proposed by orchestrator; awaiting owner
 - status: pending owner confirmation
-- proposed by orchestrator; awaiting owner
 - Reasoning: the design default; the owner chose only the type.
 
 ## 2026-10-11 | Describe it feedback | Retention of retyped part words
