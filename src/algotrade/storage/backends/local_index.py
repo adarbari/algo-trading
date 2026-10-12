@@ -38,6 +38,7 @@ import pandas as pd
 
 from algotrade.storage.backends.run_selection import RunEntry, committed
 from algotrade.storage.locks import FileLock, held
+from algotrade.storage.tables.interfaces import PartitionBusyError
 
 INDEX = "_runs.json"
 INDEX_LOCK = ".runs.lock"
@@ -302,11 +303,16 @@ class Commits:
                 atomic_write(self.base / "seq", str(self.published() + 1).encode())
             return len(gone)
 
-    def supersede(self, directory: Path) -> int:
-        """Delete the runs of one partition the latest restating run supersedes (see
-        ``TableStore.purge_superseded``), committed like ``purge``: under the commit lock, the
-        index rewritten under its lock before the files go, then the sequence moves on. A
-        partition a pending run has written to is left for a later pass. -> runs deleted."""
+    def runs_of(self, directory: Path) -> list[str]:
+        """The committed runs of one partition, oldest commit first."""
+        entries = read_index(directory)
+        return sorted(entries, key=lambda r: (entries[r].seq or -1, r))
+
+    def remove_runs(self, directory: Path, runs: Iterable[str]) -> int:
+        """Delete committed runs of one partition (see ``TableStore.purge_runs``), committed like
+        ``purge``: under the commit lock, the index rewritten under its lock before the files go,
+        then the sequence moves on. ``PartitionBusyError`` when a pending run wrote to the
+        partition. -> runs deleted."""
         with held(self._commit_lock()):
             self._recover()
             busy = {
@@ -314,13 +320,11 @@ class Commits:
                 for run_id in self.pending_runs()
                 for item in self.journal(run_id).values()
             }
-            if directory in busy or not (directory / INDEX).exists():
-                return 0
+            if directory in busy:
+                raise PartitionBusyError(str(directory))
             with held(index_lock(directory)):
                 entries = read_index(directory)
-                order = sorted((e.knowledge_ts, run) for run, e in entries.items())
-                restating = [i for i, (_, run) in enumerate(order) if entries[run].restates]
-                gone = [run for _, run in order[: restating[-1]]] if restating else []
+                gone = [r for r in dict.fromkeys(runs) if r in entries]
                 if not gone:
                     return 0
                 write_index(directory, {r: e for r, e in entries.items() if r not in gone})

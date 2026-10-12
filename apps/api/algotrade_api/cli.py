@@ -160,6 +160,9 @@ def feedback_run(args: argparse.Namespace, now: datetime | None = None) -> int:
     except ConfigurationError as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
+    except (RuntimeError, OSError) as exc:  # a purge that left text behind, a busy partition
+        print(f"FAILED, text may remain on disk: rerun to finish: {exc}", file=sys.stderr)
+        return 1
     print("\n".join(done.lines()))
     if done.applied:
         retention.append_audit(retention.AUDIT_LOG, retention.audit_record(done, at, params))

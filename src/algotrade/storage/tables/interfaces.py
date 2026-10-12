@@ -151,15 +151,23 @@ class TableStore(Protocol):
         the edge ledger, whose kept runs' partitions are spared); -> partitions deleted."""
         ...
 
-    def purge_superseded(self, table: str, session_date: date) -> int:
-        """Delete the runs of one committed partition that its latest restating run supersedes
-        (every run ordered before it by ``(knowledge_ts, run)``: ``select_runs`` already stops
-        reading them) with their files, so the data they held is physically gone; -> runs
-        deleted (0: nothing superseded, or a pending run is writing to the partition, left for
-        a later pass). Committed like ``purge_before`` (the published sequence moves on; a read
-        pinned to an older one retries). An admin rewrite (``services/feedback/retention.py``),
-        never part of a run."""
+    def partition_runs(self, table: str, session_date: date) -> list[str]:
+        """The committed runs of one partition, oldest commit first (runs with no commit
+        sequence, from before ADR 0022, first). Empty: no such partition."""
         ...
+
+    def purge_runs(self, table: str, session_date: date, runs: Collection[str]) -> int:
+        """Delete these committed runs of one partition, files included (an unknown id is
+        ignored; a run not named is never touched, so a commit that landed meanwhile is kept);
+        committed like ``purge_before`` (the published sequence moves on; a read pinned to an
+        older one retries). Raises ``PartitionBusyError`` when a pending run has written to the
+        partition (nothing is deleted: try again). -> runs deleted. An admin rewrite
+        (``services/feedback/retention.py``), never part of a run."""
+        ...
+
+
+class PartitionBusyError(RuntimeError):
+    """A pending run is writing to the partition: ``purge_runs`` deleted nothing."""
 
 
 class RawStore(Protocol):

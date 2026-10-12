@@ -362,8 +362,11 @@ class LocalTables:
         ]
         return self.commits.purge(days)
 
-    def purge_superseded(self, table: str, session_date: date) -> int:
-        return self.commits.supersede(self._dir(table, session_date))
+    def partition_runs(self, table: str, session_date: date) -> list[str]:
+        return self.commits.runs_of(self._dir(table, session_date))
+
+    def purge_runs(self, table: str, session_date: date, runs: Collection[str]) -> int:
+        return self.commits.remove_runs(self._dir(table, session_date), runs)
 
     @staticmethod
     def _remove(days: list[Path]) -> None:

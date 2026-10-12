@@ -74,21 +74,36 @@ later: see the note below.
 the command is on the API's CLI, not ingestion's, because the API is the table's writer; the first
 cut of this section had named the ingestion CLI). Both are a dry run unless
 `--yes`, idempotent, and refuse while any run has pending writes or another retention command runs.
-- *retain* nulls `sentence` and `payload` of `feedback/drafting_events` and `sentence`, `answer`,
-  `error` of `usage/llm_calls` for partitions older than the window (exchange `session_date`), except
-  an event whose `event_id` is a golden case's `source_event` and the usage rows whose `call_id` such
-  an event lists.
+- *retain* nulls the personal text of every table in `retention.PERSONAL` (the registry: a test fails
+  when a `feedback/*` or `usage/*` table is added unregistered): `sentence` and `payload` of
+  `feedback/drafting_events`; `sentence`, `answer`, `error` of `usage/llm_calls`; `span` of
+  `feedback/feature_requests` (its `ref` key never holds personal text). It does so for partitions
+  older than the window (exchange `session_date`), except every event of a curated golden case (the
+  union of the case's `source_events` and `source_event`) and the usage rows those events' `call_ids`
+  list. The golden folder is found from the repository root, not the working directory; a missing
+  folder, or a curated case (`chain_id`) naming no event, refuses the command.
 - *erase* does the same for every row of one user on any date (a curated row too) and replaces the
-  user id: feedback `user` and `doc_id` by `erased`, usage `user` by a random token (per-user keys stay
-  distinct). The skeleton (`ts`, `event`, hashes, call ids, tokens, cost) stays, so counts add up.
-- *Mechanism*: one new run that restates each changed partition with the nulled merged view, all
-  partitions committed together (ADR 0022), then `TableStore.purge_superseded` deletes the runs the
-  restating run supersedes, files included: the old Parquet is physically rewritten away, not only
-  hidden by a newer run. A crash between the two leaves reads clean; the next run finishes the purge.
-  The API's recorder takes no lock and is never blocked; a row it adds meanwhile is a later run,
-  merged after the rewrite.
+  user column by a random per-erase token (per-user keys stay distinct) and `doc_id` by `erased`.
+  **What erase covers**: the text columns above, the user id and `doc_id`, in those three tables.
+  **What it leaves**: `ts`, `session_date`, `draft_session_id`, `event_id`, `call_ids`, the hashes,
+  versions, token counts and costs (counts add up; they can be joined by time to logs that name the
+  user), the criteria of a *saved* config (user configs are the user's own, ADR 0029), the nightly
+  and API logs, and everything outside the store. Wider erasure is a manual step until the owner
+  decides otherwise.
+- *Mechanism*: a new run, not restating, holds the merged view with the text nulled for every changed
+  partition (same keys, a run id that sorts after the recorders', committed together, ADR 0022); then
+  `TableStore.purge_runs` deletes the runs seen at plan time, files included: the old Parquet is
+  physically rewritten away, not only hidden by a newer run. Only the planned runs are deleted, so a
+  commit that lands meanwhile is never lost; a run that was restating would hide a later commit with
+  an older `ts`, which is why it is not. A crash between the commit and the purge leaves reads clean;
+  the next run (or a dry run, which reports them) finds the runs committed before the last retention
+  run and deletes them. After the purge the command checks that no planned run is on disk and no row
+  still holds text, else it exits non-zero.
+- *Concurrency*: the command holds `feedback-writers` (`storage.locks`) from plan to purge and both
+  recorders take it for each flush, so none commits in between; their queues absorb the wait and a
+  request never waits. It refuses while any run has pending writes or another retention command runs.
 - *Audit*: one JSON line of counts (no sentence, no user id) per applied run in
-  `var/logs/feedback-retention.log`.
+  `var/logs/feedback-retention.log` under the repository root.
 - *Backups*: copies of the store taken earlier (`docs/hosting.md`) still hold the text; erasing
   them is the owner's manual step and the command prints the reminder.
 

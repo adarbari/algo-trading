@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from algotrade.services.feedback import retention
 from algotrade.services.feedback.events import row_of
 from algotrade.services.feedback.recorder import FeedbackRecorder
 from algotrade.storage.backends.local import LocalBackend
@@ -99,7 +100,8 @@ def test_feedback_commands_are_a_dry_run_until_yes_and_audit_only_what_they_appl
     rec.submit(row_of("draft_requested", "s", "abhi", "screen", "x", sentence="private"))
     rec.flush()
     rec.close()
-    audit = tmp_path / "var" / "logs" / "feedback-retention.log"
+    audit = tmp_path / "audit" / "feedback-retention.log"
+    monkeypatch.setattr(retention, "AUDIT_LOG", audit)  # the real one is the repo's
     for argv in (
         ["feedback", "erase", "--user", "abhi"],
         ["feedback", "erase", "--user", "abhi", "--dry-run"],

@@ -59,7 +59,7 @@ class FeedbackRecorder(BatchRecorder[Mapping[str, Any]]):
     def _write(self, items: list[Mapping[str, Any]], now: datetime) -> None:
         frame = _frame(items).drop_duplicates(KEY, keep="last")
         run_id = self.run_id(frame["session_date"].max(), now)
-        with self._writer.publishing(run_id, now):
+        with self._writer.exclusive(), self._writer.publishing(run_id, now):
             for session, part in frame.groupby("session_date", sort=True):
                 rows = part.assign(run_id=run_id).reset_index(drop=True)
                 self._writer.write_feedback(TABLE, cast(date, session), run_id, rows)

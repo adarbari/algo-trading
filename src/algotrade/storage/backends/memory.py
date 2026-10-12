@@ -34,6 +34,7 @@ from algotrade.storage.backends.run_selection import (
 )
 from algotrade.storage.locks import ThreadLock
 from algotrade.storage.runs import RunRecord, run_session
+from algotrade.storage.tables.interfaces import PartitionBusyError
 from algotrade.storage.tables.schemas import require_retention
 
 Key = tuple[str, date]  # (table, session_date)
@@ -241,15 +242,18 @@ class MemoryTables:
                 self._seq += 1  # committed like a run: a read sees all of the purge or none
             return len(keys)
 
-    def purge_superseded(self, table: str, session_date: date) -> int:
+    def partition_runs(self, table: str, session_date: date) -> list[str]:
+        with self._index_lock:
+            entries = self._partitions.get((table, session_date), {})
+            return sorted(entries, key=lambda r: (entries[r].seq or -1, r))
+
+    def purge_runs(self, table: str, session_date: date, runs: Collection[str]) -> int:
         key = (table, session_date)
         with self._index_lock:
             if any(key in writes for writes in self._pending.values()):
-                return 0
+                raise PartitionBusyError(f"{table} {session_date}")
             entries = self._partitions.get(key, {})
-            order = sorted((e.knowledge_ts, run) for run, e in entries.items())
-            restating = [i for i, (_, run) in enumerate(order) if entries[run].restates]
-            gone = {run for _, run in order[: restating[-1]]} if restating else set()
+            gone = {r for r in runs if r in entries}
             for run in gone:
                 del entries[run]
             for frame_key in [f for f in self._frames if f[0] == key and f[1] in gone]:
