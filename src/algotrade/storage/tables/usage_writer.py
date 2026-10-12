@@ -12,6 +12,7 @@ from datetime import date, datetime
 import pandas as pd
 
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.storage.locks import FEEDBACK_WRITERS, held
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.result_writer import ResultWriter
 from algotrade.storage.tables.schemas import validate_frame
@@ -32,6 +33,11 @@ class UsageWriter:
             )
         validate_frame(table, frame)
         self._backend.tables.write(table, session_date, run_id, frame, pending=True)
+
+    def exclusive(self) -> AbstractContextManager[bool]:
+        """Held for one flush: the owner-run retention rewrite (``feedback-writers``) never
+        runs inside a batch, and a batch waits on it (its queue absorbs the wait)."""
+        return held(self._backend.lock(FEEDBACK_WRITERS))
 
     def publishing(self, run_id: str, at: datetime) -> AbstractContextManager[None]:
         """Writes inside the block are committed together when it ends, dropped if it raises."""
