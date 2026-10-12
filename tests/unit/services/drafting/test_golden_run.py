@@ -14,17 +14,20 @@ from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.drafting.golden import GoldenCase
 from algotrade.services.drafting.golden_run import (
+    DEFAULT_RATE_WAIT_S,
     UNAVAILABLE_STREAK,
     CostTap,
     Plan,
     RunArgs,
     RunResult,
     consistency,
+    drop_metrics,
     evaluate,
     make_plan,
     measure,
     percentile,
     recordings,
+    repeats_of,
     report,
     report_lines,
     run_golden,
@@ -380,3 +383,127 @@ def test_a_curated_case_is_drafted_with_the_criteria_in_force_and_record_clears_
     case_file.write_text(json.dumps({"id": "c1", "recorded": False}))
     write_recordings(recordings(result, tmp_path), force=False, say=lambda _: None)
     assert "recorded" not in json.loads(case_file.read_text())
+
+
+# ------------------------------------------------------------------------ drops, pacing, 429
+
+LIMITED = ModelUnavailableError("HTTP 429: slow down")
+SENTENCE_WHY = "my own sentence about low value stocks"
+
+
+def waits_run(
+    script: Sequence[str | Exception], *, repeat: int = 1, **kw: Any
+) -> tuple[RunResult, list[tuple[str, float]]]:
+    costs, waits = CostTap(), []
+    result = evaluate(
+        plan_of([case()], repeat=repeat), {"paid": Scripted(script, costs)}, draft, costs,
+        budget_usd=kw.pop("budget_usd", 1.0), max_calls=kw.pop("max_calls", 60),
+        sleep=lambda provider, seconds: waits.append((provider, seconds)), **kw,
+    )  # fmt: skip
+    return result, waits
+
+
+def test_a_429_waits_and_retries_the_same_call_twice_then_is_unavailable() -> None:
+    result, waits = waits_run([LIMITED], batch_pause_s=7.0)
+    (only,) = result.results
+    assert (only.status, only.rate_limit_retries) == ("unavailable", 2)
+    assert waits == [("paid", 7.0), ("paid", 7.0)]
+
+
+def test_a_429_that_clears_is_scored_and_the_wait_defaults_without_a_batch_pause() -> None:
+    result, waits = waits_run([LIMITED, GOOD])
+    (only,) = result.results
+    assert (only.status, only.rate_limit_retries) == ("ok", 1)
+    assert waits == [("paid", DEFAULT_RATE_WAIT_S)]
+
+
+def test_retries_count_as_calls_and_never_pass_max_calls() -> None:
+    costs = CostTap()
+    model = Scripted([LIMITED], costs)
+    result = evaluate(
+        plan_of([case()], repeat=3), {"paid": model}, draft, costs, budget_usd=1.0, max_calls=2
+    )
+    assert model.n == 2 and "--max-calls 2" in (result.stopped or "")
+    assert result.results[0].rate_limit_retries == 1  # the second try was the last allowed
+
+
+def test_only_a_429_is_retried() -> None:
+    result, waits = waits_run([ModelUnavailableError("HTTP 500")])
+    assert result.results[0].rate_limit_retries == 0 and waits == []
+
+
+def test_pace_waits_between_calls_not_before_the_first() -> None:
+    _, waits = waits_run([GOOD], repeat=3, pace_s=2.0)
+    assert waits == [("paid", 2.0)] * 2
+
+
+def test_a_batch_pause_comes_after_every_n_calls_counting_from_the_last_pause() -> None:
+    _, waits = waits_run([GOOD], repeat=7, batch=3, batch_pause_s=9.0)
+    assert waits == [("paid", 9.0)] * 2  # before the 4th and the 7th call
+    # a 429 wait is a pause: the batch count restarts after it
+    _, waits = waits_run([GOOD, LIMITED, GOOD, GOOD, GOOD, GOOD], repeat=5, batch=3,
+                         batch_pause_s=9.0)  # fmt: skip
+    assert [w for _, w in waits] == [9.0, 9.0]  # the 429 wait, then one batch pause
+
+
+def kinds_of(answer: dict[str, Any]) -> list[tuple[str, str]]:
+    _, dropped = criteria_of(answer, CATALOGUE)
+    return [(d.kind, d.field) for d in dropped]
+
+
+def test_drop_kinds_come_from_the_check_not_from_the_reason_text() -> None:
+    answer = {
+        "criteria": [
+            {"field": "iv30", "op": "gt", "value": 1},
+            {"field": "f.a", "op": "huh", "value": 1},
+            {"field": "f.a", "op": "gt", "value": [1], "why": "low value"},
+            {"field": "f.a", "op": "gt", "value": 1, "mode": "odd", "why": "low value"},
+        ]
+    }
+    assert kinds_of(answer) == [
+        ("not_in_catalogue", "iv30"),
+        ("bad_op", "f.a"),
+        ("bad_value", "f.a"),
+        ("bad_mode", "f.a"),  # not bad_value, though its why says "value"
+    ]
+
+
+def private_run() -> RunResult:
+    bad = json.dumps(
+        {
+            "criteria": [
+                {"field": "iv30", "op": "gt", "value": 1, "why": SENTENCE_WHY},
+                {"field": "f.a", "op": "gt", "value": [1], "why": SENTENCE_WHY},
+            ]
+        }
+    )
+    return run([bad, "not json", GOOD], repeat=3)[1]
+
+
+def test_drop_metrics_count_kinds_invented_fields_and_would_repair() -> None:
+    m = drop_metrics(private_run().results)
+    assert m["drops_total"] == 2
+    assert m["drops_by_kind"] == {"not_in_catalogue": 1, "bad_value": 1}
+    assert m["invented_field_drops"] == {"count": 1, "top": {"iv30": 1}}
+    assert m["would_repair"] == 1 and "repaired" not in m
+
+
+def test_repeats_of_lists_each_drop_without_the_models_free_text() -> None:
+    first, second, third = repeats_of(private_run().results)
+    assert [d["kind"] for d in first["dropped"]] == ["not_in_catalogue", "bad_value"]
+    assert (second["status"], third["dropped"]) == ("invalid", [])
+    assert SENTENCE_WHY not in json.dumps(repeats_of(private_run().results))
+
+
+def test_json_output_never_carries_the_models_why(tmp_path: Path) -> None:
+    bad = json.dumps({"criteria": [{"field": "iv30", "op": "gt", "value": 1, "why": SENTENCE_WHY}]})
+    h = Harness(tmp_path, [bad])
+    assert h.go(RunArgs(("c1",), "all", (), 1, False, False, True, 60, 1.0, True)) == 0
+    assert SENTENCE_WHY not in "".join(h.out) and "not_in_catalogue" in "".join(h.out)
+
+
+def test_the_builder_reason_keeps_the_why_while_detail_does_not() -> None:
+    _, (d,) = criteria_of(
+        {"criteria": [{"field": "iv30", "op": "gt", "value": 1, "why": SENTENCE_WHY}]}, CATALOGUE
+    )
+    assert d.reason.endswith(f"({SENTENCE_WHY})") and SENTENCE_WHY not in d.detail
