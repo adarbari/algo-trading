@@ -284,7 +284,8 @@ entries (caveats) by relevance; `PROMPT_BUDGET_TOKENS` is 13,000 (chars / 4) for
 so text added later (the task, open keys, a trader's own features) shrinks the slice, not the
 2,000-token margin to the 15,000 cap. Measured on the 24 golden sentences (open keys padded to the
 cap, a user with three expression features): the prefix 7,380 -> 5,184 tokens, the largest prompt
-(`heavy-put-call`) 14,930 -> 12,892; no case lost an expected field.
+(`heavy-put-call`) 14,930 -> 12,892; no case lost an expected field. A bare entry name (`iv30`, several headings share some) is never
+resolved silently: the draft is refused with the full candidate names, so the repair retry fixes it.
 
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a

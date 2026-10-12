@@ -15,7 +15,7 @@ from algotrade.config.site.settings import (
     load_phrasebook,
 )
 from algotrade.config.user import UserContext
-from algotrade.services.drafting.golden import GoldenCase, load_cases
+from algotrade.services.drafting.golden import GoldenCase, load_cases, recorded_answers
 from algotrade.services.drafting.prompt import (
     PROMPT_BUDGET_TOKENS,
     index_group,
@@ -33,6 +33,7 @@ from algotrade.services.drafting.retrieval import (
     stem,
     words_of,
 )
+from algotrade.services.drafting.screens import parse_answer
 from algotrade.services.read.context import open_context
 from algotrade.services.read.instruments.catalogue import FeatureFormat, FeatureInfo, feature_infos
 from algotrade.storage.factory import open_config_store
@@ -267,3 +268,52 @@ def test_a_number_after_a_comparison_word_names_no_field() -> None:
     # "above 20" must not pull in the fields named for 20; "sma 20" must
     assert not select_slice("price above 20", [sma20, other]).fields
     assert sma20.name in select_slice("sma 20 rising", [sma20, other]).fields
+
+
+def test_a_prompt_the_fixed_parts_alone_push_over_the_budget_warns_once_and_caps_descriptions(
+    site, caplog: pytest.LogCaptureFixture
+) -> None:
+    infos, book, guide = site
+    mine = [
+        info(f"feature.mine_{n:03}", scope="user", owner="u", description="long " * 100)
+        for n in range(400)
+    ]
+    sentence = CASES[0].sentence
+    with caplog.at_level("WARNING", logger="algotrade.services.drafting.prompt"):
+        prompt = sliced_system_prompt([*infos, *mine], sentence, book, guide)
+    warned = [r for r in caplog.records if "over budget" in r.getMessage()]
+    assert len(warned) == 1 and sentence not in warned[0].getMessage()
+    own = prompt.split("\nYour own features (")[1].splitlines()[1]
+    assert len(own.split(" | ")[3]) <= 160  # an own feature's description is capped like a site one
+    caplog.clear()
+    sliced_system_prompt(infos, sentence, book, guide)
+    assert not caplog.records  # a prompt inside the budget is silent
+
+
+def test_every_field_of_every_recorded_answer_is_reachable_from_the_grouped_index(site) -> None:
+    """Grouping never makes a recorded answer unreachable: heading + entry is the full name."""
+    infos, _, _ = site
+    reachable: set[str] = set()
+    heading = ""
+    in_index = False
+    for line in prefix_text(infos).splitlines():
+        if line.startswith("Field index"):
+            in_index = True
+        elif in_index and line.endswith(".*"):
+            heading = line[:-1]
+        elif in_index and "|" in line:
+            reachable.add(heading + line.split("|")[0])
+    assert reachable == {i.name for i in infos if i.scope == "site"}
+    names = {i.name for i in infos}
+    seen = 0
+    for case in CASES:
+        for text in recorded_answers(ROOT, case.id).values():
+            answer = parse_answer(text)
+            fields = [c.get("field") for c in answer.get("criteria", []) if isinstance(c, dict)]
+            tie = answer.get("tie_break") or {}
+            fields += [tie.get("field")] if isinstance(tie, dict) else []
+            for field in fields:
+                if field in names:
+                    seen += 1
+                    assert field in reachable, f"{case.id}: {field}"
+    assert seen > 50

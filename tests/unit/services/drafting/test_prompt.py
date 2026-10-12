@@ -222,8 +222,8 @@ def test_the_sliced_prompt_is_an_index_then_only_the_slice() -> None:
     text = sliced_system_prompt(infos, "oversold b names", (), guide)
     assert text.index("Field index") < text.index("Detail (") < text.index("Field guide (")
     index = text.split("Detail (")[0]
-    assert "rollup.b@v1.*\nx|float|-" in index and "feature.*\nc|float|-" in index
-    assert "feature.*\nc|float|-" in index and "other|float|-" in index  # one heading per prefix
+    assert "rollup.b@v1.*\nx|float|-" in index
+    assert "feature.*\nc|float|-\nother|float|-" in index  # one heading per prefix
     assert "feature.other | float | - | x" not in text  # but only the slice has detail
     assert "pending takeover" in text and "Phrasebook (" not in text
 

@@ -18,6 +18,7 @@ slice, never the margin to the 15k cap; was ~110k for the whole catalogue, phras
 then the caller's own features."""
 
 import json
+import logging
 import re
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -40,6 +41,8 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 PROMPT_VERSION = "4"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
+
+log = logging.getLogger(__name__)
 
 TASK = """\
 You turn a trader's sentence into the criteria of a rule screen over a catalogue of stored
@@ -451,6 +454,9 @@ def slice_for(
             break
         room -= over
         chosen = select_slice(sentence, infos, book, guide, room, weigh)
+    total = _tokens(_render(infos, sentence, chosen, guide, keys))
+    if total > PROMPT_BUDGET_TOKENS:  # the phrasebook, core fields and own features alone
+        log.warning("drafting prompt over budget: %d > %d tokens", total, PROMPT_BUDGET_TOKENS)
     return chosen
 
 
