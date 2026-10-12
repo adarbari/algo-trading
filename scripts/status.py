@@ -15,6 +15,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -30,6 +31,7 @@ def ports() -> dict[int, str]:
 
 JOB_MARKERS = ("algotrade-ingest", "var/logs/")
 MAX_PRS = 5
+GRACE_DAYS = 14  # a curated golden case may wait this long for its recorded answer
 
 
 def _run(cmd: list[str]) -> tuple[int, str]:
@@ -79,6 +81,10 @@ class Probes:
     store_facts: Callable[[], tuple[str, str]] = _store_facts
     api_build: Callable[[str], tuple[str, ...] | None] = _api_build
     logs: Path = field(default_factory=lambda: REPO / "var" / "logs")
+    golden_cases: Path = field(
+        default_factory=lambda: REPO / "tests" / "fixtures" / "drafting" / "golden" / "cases"
+    )
+    today: Callable[[], date] = date.today
 
 
 def prs(p: Probes) -> list[str]:
@@ -149,8 +155,30 @@ def api_build(p: Probes) -> list[str]:
     return ["API build: OUT OF STEP", *(f"  {m}" for m in found)]
 
 
+def unrecorded_cases(p: Probes) -> list[str]:
+    """Golden cases curated but still without a recorded answer for more than ``GRACE_DAYS``
+    (``golden run --record`` records one); nothing when there are none."""
+    late = []
+    for path in sorted(p.golden_cases.glob("*.json")) if p.golden_cases.exists() else []:
+        raw = json.loads(path.read_text())
+        try:
+            age = (p.today() - date.fromisoformat(raw["curated"])).days
+        except (KeyError, TypeError, ValueError):
+            age = GRACE_DAYS + 1  # unrecorded with no usable date counts as old
+        if raw.get("recorded", True) is False and age > GRACE_DAYS:
+            late.append(f"  {path.stem}: curated {raw.get('curated', '?')}, {age} days")
+    if not late:
+        return []
+    return [
+        f"Golden cases unrecorded > {GRACE_DAYS} days: {len(late)} (golden run --record)",
+        *late,
+    ]
+
+
 def report(p: Probes) -> str:
-    return "\n".join([*prs(p), *jobs(p), *store(p), *servers(p), *api_build(p)])
+    return "\n".join(
+        [*prs(p), *jobs(p), *store(p), *servers(p), *api_build(p), *unrecorded_cases(p)]
+    )
 
 
 def main() -> int:

@@ -65,3 +65,30 @@ def test_a_relinked_chain_is_ordered_by_time_not_seq() -> None:
     (case,) = golden_candidates(rows)
     assert [x["sentence"] for x in case["sentences"]] == ["s1", "s3", "s5"]
     assert case["source_event"] == "4"
+
+
+def test_a_case_names_every_event_of_its_chain_and_ties_keep_a_stable_order() -> None:
+    rows = [ev("2", "A", "draft_requested", 1, 1), ev("1", "A", "draft_requested", 1, 1),
+            ev("3", "A", "screen_finalised", 2, None, saved_criteria=FINAL)]  # fmt: skip
+    (case,) = golden_candidates(rows)
+    assert case["source_events"] == ["1", "2", "3"] and case["source_event"] == "3"
+
+
+def test_a_chain_at_the_edge_of_a_truncated_read_is_dropped() -> None:
+    edge = [ev("1", "A", "draft_requested", 1, 1), ev("2", "A", "screen_finalised", 2,
+            saved_criteria=FINAL)]  # fmt: skip
+    later = [ev("3", "B", "draft_requested", 5, 1), ev("4", "B", "screen_finalised", 6,
+             saved_criteria=FINAL)]  # fmt: skip
+    assert [c["chain_id"] for c in golden_candidates(edge + later, truncated=True)] == ["B"]
+    assert len(golden_candidates(edge + later)) == 2
+
+
+def test_a_chain_that_began_before_the_window_is_dropped_and_a_seqless_one_is_flagged() -> None:
+    late_start = [ev("1", "A", "draft_requested", 1, 3), ev("2", "A", "screen_finalised", 2,
+                  saved_criteria=FINAL)]  # fmt: skip
+    old_rows = [ev("3", "B", "draft_requested", 1, None), ev("4", "B", "screen_finalised", 2,
+                saved_criteria=FINAL)]  # fmt: skip
+    whole = [ev("5", "C", "draft_requested", 1, 1), ev("6", "C", "screen_finalised", 2,
+             saved_criteria=FINAL)]  # fmt: skip
+    got = {c["chain_id"]: c["partial"] for c in golden_candidates(late_start + old_rows + whole)}
+    assert got == {"B": True, "C": False}
