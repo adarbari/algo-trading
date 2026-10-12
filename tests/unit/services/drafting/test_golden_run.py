@@ -568,3 +568,21 @@ def test_json_never_carries_a_text_value_or_a_non_string_why(tmp_path: Path) -> 
     assert h.go(RunArgs(("c1",), "all", (), 1, False, False, True, 60, 1.0, True)) == 0
     out = "".join(h.out)
     assert secret not in out and "criteria[" in out
+
+
+def test_a_draft_made_without_the_model_is_scored_and_costs_nothing() -> None:
+    """A sentence the phrasebook resolves never reaches the model (``Recording.last`` stays
+    ``None``): the case is still scored, with no tokens and a zero cost, never silently failed."""
+    costs = CostTap()
+    scripted = Scripted([GOOD], costs)
+
+    def phrasebook_draft(model: TextModel, sentence: str, current: Any = None) -> ScreenDraft:
+        kept, _ = criteria_of(parse_answer(GOOD), CATALOGUE)
+        return ScreenDraft("g", {"criteria": kept}, (), (), stage="phrasebook")
+
+    result = evaluate(plan_of([case()]), {"paid": scripted}, phrasebook_draft, costs,
+                      budget_usd=1.0, max_calls=60)  # fmt: skip
+    (one,) = result.results
+    assert scripted.n == 0
+    assert (one.status, one.passed, one.model, one.cost_usd) == ("ok", True, "phrasebook", 0.0)
+    assert one.input_tokens is None and one.fields == {"f.a"}

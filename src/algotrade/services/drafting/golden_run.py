@@ -26,6 +26,10 @@ Drops: a criterion the server dropped carries the ``kind`` of the check that ref
 adds ``drops_total``, ``invented_field_drops`` (count and the top 20 invented names with counts)
 and ``would_repair`` (answers whose first answer was refused: the product's repair path would run).
 
+A case the structured phrasebook resolves in full (ADR 0041, lever 3) is drafted with no model
+call: it is scored as any draft, its model is ``phrasebook`` and its cost 0, so such a case says
+nothing about the provider; train cases may grow the phrasebook, held-out ones never do.
+
 Pacing: ``--pace`` sleeps between calls; ``--batch N`` pauses ``--batch-pause`` seconds every N
 calls. A rate-limited answer (HTTP 429) waits the pause (``DEFAULT_RATE_WAIT_S`` without one) and
 retries the same call up to ``RATE_LIMIT_RETRIES`` times before it counts as unavailable.
@@ -394,7 +398,12 @@ def _result(
     parts: PartsStats | None = None,
 ) -> CallResult:
     if got is None:
-        return CallResult(provider, case_id, status, error=error)
+        if status != "ok":
+            return CallResult(provider, case_id, status, error=error)
+        return CallResult(  # a draft the phrasebook made: no model was asked, nothing was spent
+            provider, case_id, status, passed, fields, "phrasebook", cost_usd=0.0,
+            dropped=dropped, suggestions=suggestions, parts=parts,
+        )  # fmt: skip
     return CallResult(
         provider, case_id, status, passed, fields, got.model, got.input_tokens,
         got.output_tokens, got.cache_read_tokens, got.cache_write_tokens, got.latency_s,

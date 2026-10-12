@@ -376,3 +376,31 @@ def test_an_answer_without_parts_serves_none_and_the_panel_degrades(
         .json()
     )
     assert body["parts"] is None and body["sentence"] == "over $5"
+
+
+class Forbidden:
+    names = ("forbidden",)
+
+    def names_for(self, user: str | None) -> tuple[str, ...]:
+        return self.names
+
+    def complete(self, system: str, user: str, **_: object) -> Completion:
+        raise AssertionError("the phrasebook resolves this sentence: no model call")
+
+
+def test_a_sentence_the_phrasebook_resolves_is_served_and_logged_without_a_model_call(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    sink = Keep()
+    client = app_with(api_golden[0], Forbidden(), sink)
+    response = client.post(
+        "/screeners/my_screen/draft-from-text", json={"text": "oversold stocks in an uptrend"}
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["document"]["criteria"]["rsi_14"]["value"] == 30
+    assert body["parts"] and {p["reading_source"] for p in body["parts"]} == {"server"}
+    assert [r["event"] for r in sink.rows] == ["draft_requested", "draft_returned"]
+    returned = sink.rows[1]  # written as for a model draft, with no call id to point at
+    assert not returned["call_ids"] and returned["sentence"] == "oversold stocks in an uptrend"
+    assert json.loads(returned["payload"])["stage"] == "phrasebook"

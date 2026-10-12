@@ -72,7 +72,7 @@ all fields `name|type|unit` ~4-5k) plus a per-sentence slice of ~25 fields (cata
 guide's "criterion per intent" only, matched phrasebook entries; chosen by deterministic phrasebook / name /
 description match plus ~15 always-included core fields) = 9-12k tokens; (2) prompt order for a stable cached
 prefix: static text, site catalogue index, variable slice, the caller's own features, the sentence;
-(3) skip the model when the phrasebook resolves every clause; (4) cheap model first, escalate on invalid
+(3) skip the model when the phrasebook resolves every clause (wired 2026-10-12); (4) cheap model first, escalate on invalid
 output after the repair, not on missing or unresolved items; (5) two phases: a local `draft-resolve` returns
 the A rows and alternatives at once, then the model call; (6) caps: compact keys, ~1,000 answer tokens (was ~800 before the explained parts: about 40 more per part),
 `reasoning_effort = low`; (7) result cache (none for drafting today: `TextCache` serves only explaining; not added by PR 3). Measured through `usage/llm_calls` (cache tokens, call id,
@@ -160,8 +160,10 @@ harness; #528 answer schema, repair, fall-through; #529 retrieval slice; #530 + 
 session per screen, the iteration chain); #531 live golden run command; #535 A / B / C contract; #523
 fingerprint and dry-run; #524 design-system components; #525 backlog config; #537 golden candidates and
 curate; #539 request log and ranking; #538 review-and-release; #536 promote-feature skill; prompt headroom (`PROMPT_VERSION` 5: grouped index, slice capped by a 13k-token budget).
-Phrasebook structured thresholds (`[[phrase.criterion]]`, `resolves_fully` in `services/drafting/phrasebook`,
-`PROMPT_VERSION` 4) are built but unwired; wiring lever 3 into `draft_screen` is next.
+Phrasebook structured thresholds (`[[phrase.criterion]]`, `resolve` / `shortcut` in `services/drafting/phrasebook`,
+`PROMPT_VERSION` 4) are wired into `draft_screen` (2026-10-12): a sentence they resolve in full is drafted with no
+model call (stage `phrasebook`, no call id, zero cost), through the same validation and parts as a model's answer;
+any doubt goes to the model. Lever 3 is done.
 
 In flight: #540 feedback retention / erase.
 
@@ -172,7 +174,6 @@ Not started (owner in brackets):
 - Prompt headroom: a token-budgeted slice and a compact index; the largest golden prompt margin is about 77
   tokens (architect decides, implementer builds).
 - `services/drafting` folder split (`contract/`, `golden/`) (implementer).
-- Structured phrasebook thresholds, then the skip-the-model short-cut (architect, then implementer).
 - Enum values for index-only fields: measure after the live golden run (owner question).
 - The live golden run: approved by the owner, Gemini first, $3 cap, `--yes` (owner runs it).
 - "Notify me when available" (lowest priority); `edge_revised` event (reserved, only if a save route exists).

@@ -8,7 +8,8 @@ criteria disagree (the same field read twice, or two that can never both hold:
 meaning (negation, a comparative, "or") is never filler: it is a gap unless a structured wording
 covers that very word, so "uptrend stocks without earnings this week" goes to the model.
 Longest wording first, so "breaking out to highs" is not also "breaking out".
-Not wired into ``draft_screen`` yet."""
+``resolve`` also says where each entry's wording is in the sentence (``Claimed``), for the
+shortcut ``draft_screen`` takes when the phrasebook resolves a sentence (``shortcut.py``)."""
 
 import re
 from collections.abc import Sequence
@@ -56,15 +57,34 @@ def structured_matches(sentence: str, phrasebook: Sequence[Phrase]) -> tuple[Phr
 
 @dataclass(frozen=True)
 class _Claim:
-    start: int
+    start: int  # token indices
     end: int
     order: int
     phrase: Phrase
 
 
-def _cover(tokens: list[str], phrasebook: Sequence[Phrase]) -> tuple[list[bool], list[Phrase]]:
+@dataclass(frozen=True)
+class Claimed:
+    """One entry's wording as the sentence says it: ``start`` / ``end`` are code-point offsets
+    into the sentence (the slice is the trader's own words)."""
+
+    phrase: Phrase
+    start: int
+    end: int
+
+
+@dataclass(frozen=True)
+class Resolution:
+    """What structured entries make of a whole sentence: the ``criteria`` (file order, answer
+    shape) and the ``claims`` behind them in sentence order."""
+
+    criteria: tuple[dict[str, Any], ...]
+    claims: tuple[Claimed, ...]
+
+
+def _cover(tokens: list[str], phrasebook: Sequence[Phrase]) -> tuple[list[bool], list[_Claim]]:
     """Which tokens structured wordings claim (longest first, then file order, no overlap) and
-    the entries that claimed them, in file order."""
+    the claims that took them, in token order."""
     claims: list[_Claim] = []
     for order, phrase in enumerate(phrasebook):
         for say in phrase.say if is_structured(phrase) else ():
@@ -73,12 +93,12 @@ def _cover(tokens: list[str], phrasebook: Sequence[Phrase]) -> tuple[list[bool],
                 if want and tokens[i : i + len(want)] == want:
                     claims.append(_Claim(i, i + len(want), order, phrase))
     taken = [False] * len(tokens)
-    chosen: dict[int, Phrase] = {}
+    chosen: list[_Claim] = []
     for c in sorted(claims, key=lambda c: (-(c.end - c.start), c.order, c.start)):
         if not any(taken[c.start : c.end]):
             taken[c.start : c.end] = [True] * (c.end - c.start)
-            chosen[c.order] = c.phrase
-    return taken, [chosen[o] for o in sorted(chosen)]
+            chosen.append(c)
+    return taken, sorted(chosen, key=lambda c: c.start)
 
 
 def _merged(phrases: Sequence[Phrase]) -> tuple[dict[str, Any], ...] | None:
@@ -98,14 +118,37 @@ def _merged(phrases: Sequence[Phrase]) -> tuple[dict[str, Any], ...] | None:
     return tuple(out) if compatible(out) else None
 
 
+def _resolution(sentence: str, phrasebook: Sequence[Phrase]) -> Resolution | None:
+    lowered = sentence.lower()
+    found = list(_WORD.finditer(lowered))
+    tokens = [stem(m.group()) for m in found]
+    taken, accepted = _cover(tokens, phrasebook)
+    gap = any(not t and w not in FILLER for t, w in zip(taken, tokens, strict=True))
+    by_order = {c.order: c.phrase for c in accepted}
+    chosen = [by_order[o] for o in sorted(by_order)]  # each entry once, file order
+    if not chosen or gap or any(p.alternatives for p in chosen):  # alternatives: ask
+        return None
+    merged = _merged(chosen)
+    if merged is None:
+        return None
+    claims = tuple(
+        Claimed(c.phrase, found[c.start].start(), found[c.end - 1].end()) for c in accepted
+    )
+    return Resolution(merged, claims)
+
+
 def resolves_fully(
     sentence: str, phrasebook: Sequence[Phrase]
 ) -> tuple[dict[str, Any], ...] | None:
     """The criteria (answer shape, ``PhraseCriterion.as_answer``) of the sentence when
     structured entries with exact thresholds cover every content word of it, else ``None``."""
-    tokens = [stem(w) for w in _WORD.findall(sentence.lower())]
-    taken, chosen = _cover(tokens, phrasebook)
-    gap = any(not t and w not in FILLER for t, w in zip(taken, tokens, strict=True))
-    if not chosen or gap or any(p.alternatives for p in chosen):  # alternatives: ask
+    resolution = _resolution(sentence, phrasebook)
+    return None if resolution is None else resolution.criteria
+
+
+def resolve(sentence: str, phrasebook: Sequence[Phrase]) -> Resolution | None:
+    """``resolves_fully`` with where each entry's wording is in ``sentence``; ``None`` also for a
+    sentence whose lower-casing changes its length (offsets would not point at its own words)."""
+    if len(sentence.lower()) != len(sentence):
         return None
-    return _merged(chosen)
+    return _resolution(sentence, phrasebook)
