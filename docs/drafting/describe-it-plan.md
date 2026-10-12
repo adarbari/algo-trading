@@ -127,7 +127,7 @@ statuses, pending formula, needs your call) ships its Guide entry in the same PR
 1. Meter fix: cache read / write tokens, `call_id`, `prompt_version`, `stage` on `usage/llm_calls`
    (ADR 0058 amendment; the CLI adapter drops cache tokens today, so input is under-reported ~10^5).
 2. Prompt reorder for a stable prefix; the guide trimmed to its criterion lines.
-3. Done: #529 retrieval slice (field index + per-sentence slice, `PROMPT_VERSION` 2) and the golden replay
+3. Done: prompt headroom (`PROMPT_VERSION` 4: grouped index, slice capped by a 13k-token budget); #529 retrieval slice (field index + per-sentence slice, `PROMPT_VERSION` 2) and the golden replay
    harness (#526). Not done: the phrasebook skip-the-model short-cut (lever 3): phrasebook hints are free text,
    so wiring it needs structured thresholds in the phrasebook first (a later PR).
 4. Cheap-model-first tiering, the repair retry, fall-through on invalid output, schema-constrained JSON.

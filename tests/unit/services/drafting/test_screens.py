@@ -156,7 +156,8 @@ def test_the_answer_becomes_a_valid_draft(ctx: ReadContext) -> None:
     assert doc["rank"] == {"tie_break": PRICE, "tie_break_order": "asc"}
     resolve_rule_draft(ctx.configs, "my_screen", ctx.user, doc)  # as finalise validates
     system, user = model.asked[0]
-    assert PRICE in system and "instrument.status" in system  # the catalogue
+    assert f"{LIQ}.*\n" in system and "\nunderlying_price|" in system  # the indexed catalogue
+    assert "instrument.*\n" in system and "\nstatus|" in system
     assert user.endswith("Sentence: active stocks over $50 with open interest\n")
 
 

@@ -272,6 +272,20 @@ an answer of the old shape still passes): `formulas` (B1), `missing` (B2 / C) an
   unresolved term). A formula and its criterion are pending and travel beside the document until the
   trader accepts the formula as their own feature; B and C are shown, never saved or run by the draft.
 
+## Amended 2026-10-11: prompt headroom (index grouped, slice token-budgeted)
+
+`PROMPT_VERSION` 4. The field index is grouped: one `<prefix>.*` heading per prefix
+(`rollup.price_stats@v2.*`, `feature.*`, `instrument.*`) and `name|type|unit` entries under it, so
+the long prefix is not repeated on every line; a field is still named exactly (heading without the
+`*` + entry), so a retrieval miss never becomes a false "missing". The slice is capped by tokens,
+not only by counts: `select_slice(budget, weigh)` keeps the phrasebook and core fields, adds the
+word matches' detail lines by relevance while the budget holds, then upgrades them to full guide
+entries (caveats) by relevance; `PROMPT_BUDGET_TOKENS` is 13,000 (chars / 4) for the whole prompt,
+so text added later (the task, open keys, a trader's own features) shrinks the slice, not the
+2,000-token margin to the 15,000 cap. Measured on the 24 golden sentences (open keys padded to the
+cap, a user with three expression features): the prefix 7,380 -> 5,184 tokens, the largest prompt
+(`heavy-put-call`) 14,930 -> 12,892; no case lost an expected field.
+
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
   dropped row with a reason, never a saved criterion.
