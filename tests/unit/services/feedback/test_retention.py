@@ -545,3 +545,18 @@ def test_purge_refuses_a_run_no_retention_run_supersedes(backend: Backend) -> No
     with pytest.raises(RuntimeError, match="refusing"):
         retention._purge(backend, retention.FEEDBACK, day, live[:-1])
     assert backend.tables.partition_runs(retention.FEEDBACK, day) == live
+
+
+def test_a_file_no_index_names_is_swept_by_the_next_run_and_referenced_ones_stay(
+    tmp_path: Path,
+) -> None:
+    local = LocalBackend(tmp_path / "data")
+    seed(local)
+    young = next((tmp_path / "data").rglob("date=2026-09-02/run=drafting_feedback*.parquet"))
+    ghost = young.parent / "run=drafting_feedback-ghost.parquet"
+    ghost.write_bytes(young.read_bytes())  # text left on disk by a crash inside a purge
+    named = {p.name for p in young.parent.glob("run=*.parquet")} - {ghost.name}
+    done = retention.retain(local, NOW, apply=True)
+    assert done.orphans == 1 and not ghost.exists()
+    assert {p.name for p in young.parent.glob("run=*.parquet")} == named  # referenced stay
+    assert retention.retain(local, NOW, apply=True).orphans == 0

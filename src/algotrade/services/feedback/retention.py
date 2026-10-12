@@ -138,6 +138,7 @@ class Outcome:
     changes: list[Change] = field(default_factory=list)
     scanned: int = 0  # partitions read
     superseded_runs: int = 0  # old runs (files) deleted after the rewrite
+    orphans: int = 0  # data files no index named, deleted
     to_purge: int = 0  # old runs still on disk (a dry run: what --yes would delete)
     run_id: str | None = None
     error: str | None = None  # the exception class of a run that failed after it started
@@ -388,6 +389,9 @@ def _finish_crashed(backend: Backend, outcome: Outcome) -> None:
     partition, so the plan reads one clean view."""
     for table, day, runs in _stale(backend):
         outcome.superseded_runs += _purge(backend, table, day, runs)
+    for t in PERSONAL:  # files a crash inside a purge left with no index entry (text on disk)
+        for day in backend.tables.dates(t.table):
+            outcome.orphans += backend.tables.sweep_orphans(t.table, day)
 
 
 def _rewrite(backend: Backend, changed: list[_Part], now: datetime) -> str:
@@ -469,6 +473,7 @@ def audit_record(outcome: Outcome, now: datetime, params: Mapping[str, Any]) -> 
         "partitions": len(outcome.changes),
         "rows": {t.table: outcome.rows(t.table) for t in PERSONAL},
         "superseded_runs": outcome.superseded_runs,
+        "orphans": outcome.orphans,
     }
 
 

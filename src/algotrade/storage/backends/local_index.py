@@ -308,6 +308,30 @@ class Commits:
         entries = read_index(directory)
         return sorted(entries, key=lambda r: (entries[r].seq or -1, r))
 
+    def sweep(self, directory: Path) -> int:
+        """Delete the ``run=*.parquet`` files of one partition its index does not name (see
+        ``TableStore.sweep_orphans``), under the commit lock. -> files deleted."""
+        with held(self._commit_lock()):
+            self._recover()
+            busy = {
+                self._dir(item["table"], item["date"])
+                for run_id in self.pending_runs()
+                for item in self.journal(run_id).values()
+            }
+            if directory in busy:
+                raise PartitionBusyError(str(directory))
+            with held(index_lock(directory)):
+                entries = read_index(directory)
+                named = set()
+                for run, entry in entries.items():
+                    for version in (entry, entry.prev):
+                        if version is not None:
+                            named.add(run_file(run, version))
+                orphans = [p for p in directory.glob("run=*.parquet") if p.name not in named]
+                for path in orphans:
+                    path.unlink(missing_ok=True)
+            return len(orphans)
+
     def remove_runs(self, directory: Path, runs: Iterable[str]) -> int:
         """Delete committed runs of one partition (see ``TableStore.purge_runs``), committed like
         ``purge``: under the commit lock, the index rewritten under its lock before the files go,

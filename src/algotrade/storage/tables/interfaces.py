@@ -165,6 +165,13 @@ class TableStore(Protocol):
         (``services/feedback/retention.py``), never part of a run."""
         ...
 
+    def sweep_orphans(self, table: str, session_date: date) -> int:
+        """Delete the data files of one partition that no run of its index names (what a crash
+        between rewriting the index and deleting a file leaves); a pending run's files are never
+        touched. Raises ``PartitionBusyError`` when a pending run has written to the partition.
+        -> files deleted (a backend that keeps no loose files: 0)."""
+        ...
+
 
 class PartitionBusyError(RuntimeError):
     """A pending run is writing to the partition: ``purge_runs`` deleted nothing."""

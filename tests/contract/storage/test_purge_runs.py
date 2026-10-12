@@ -112,3 +112,31 @@ def test_a_commit_racing_a_purge_is_never_lost(backend: Backend) -> None:
     backend.tables.purge_runs(TABLE, DAY, ["old"])
     assert backend.tables.partition_runs(TABLE, DAY) == landed
     assert ids(backend) == sorted(f"EQ:N{i}" for i in range(len(landed)))
+
+
+def test_sweep_removes_only_files_no_index_entry_names(backend: Backend, tmp_path: Path) -> None:
+    put(backend, "r1", "EQ:A", 0)
+    put(backend, "r2", "EQ:B", 1)
+    if isinstance(backend, LocalBackend):
+        keep = next((tmp_path / "data").rglob("run=r1.parquet"))
+        (keep.parent / "run=ghost.parquet").write_bytes(keep.read_bytes())  # a crashed purge
+    assert backend.tables.sweep_orphans(TABLE, DAY) == (
+        1 if isinstance(backend, LocalBackend) else 0
+    )
+    assert backend.tables.sweep_orphans(TABLE, DAY) == 0
+    assert backend.tables.partition_runs(TABLE, DAY) == ["r1", "r2"] and ids(backend) == [
+        "EQ:A",
+        "EQ:B",
+    ]
+    if isinstance(backend, LocalBackend):
+        assert files(tmp_path) == ["run=r1.parquet", "run=r2.parquet"]
+
+
+def test_sweep_leaves_a_pending_runs_files_and_raises_when_busy(backend: Backend) -> None:
+    put(backend, "r1", "EQ:A", 0)
+    frame = stamped(rows_of("EQ:Z"), DAY, "busy", T0 + timedelta(hours=5))
+    backend.tables.write(TABLE, DAY, "busy", frame, pending=True)
+    with pytest.raises(PartitionBusyError):
+        backend.tables.sweep_orphans(TABLE, DAY)
+    backend.tables.commit_run("busy", T0 + timedelta(days=2))
+    assert ids(backend) == ["EQ:A", "EQ:Z"]

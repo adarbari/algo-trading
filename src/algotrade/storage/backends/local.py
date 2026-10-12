@@ -365,6 +365,9 @@ class LocalTables:
     def partition_runs(self, table: str, session_date: date) -> list[str]:
         return self.commits.runs_of(self._dir(table, session_date))
 
+    def sweep_orphans(self, table: str, session_date: date) -> int:
+        return self.commits.sweep(self._dir(table, session_date))
+
     def purge_runs(self, table: str, session_date: date, runs: Collection[str]) -> int:
         return self.commits.remove_runs(self._dir(table, session_date), runs)
 
