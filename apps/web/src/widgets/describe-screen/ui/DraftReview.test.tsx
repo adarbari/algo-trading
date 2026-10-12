@@ -20,7 +20,6 @@ vi.mock('@/features/screener-describe', async (importOriginal) => ({
   useMyFeatureRequests: () => ({ data: history.data }),
 }));
 
-const SENTENCE = 'liquid optionable stocks with a rising moat score';
 const FIFTY = { field: 'f.dollar_volume', op: 'gte', value: 50_000_000, mode: 'hard' };
 const TEN = { field: 'f.dollar_volume', op: 'gte', value: 10_000_000, mode: 'hard' };
 const DOCUMENT: ScreenDocument = {
@@ -87,7 +86,6 @@ const ANSWER: ScreenDraft = {
 function setup(over: Partial<DraftReviewProps> = {}) {
   const props: DraftReviewProps = {
     answer: ANSWER,
-    text: SENTENCE,
     document: DOCUMENT,
     formulaStates: {},
     notes: [],
@@ -95,6 +93,7 @@ function setup(over: Partial<DraftReviewProps> = {}) {
     onReviewFormula: vi.fn(),
     onSkipFormula: vi.fn(),
     onPickReading: vi.fn(),
+    onAcceptSuggestion: vi.fn(),
     renderFieldHelp: (field) => <Text>{`field help ${field}`}</Text>,
     ...over,
   };
@@ -106,13 +105,10 @@ beforeEach(() => {
 });
 
 describe('DraftReview', () => {
-  it('echoes the sentence with the server-named spans tagged by words, not colour alone', async () => {
+  it('without parts shows the grouped panel, no part cards and no tagged sentence', async () => {
     const { container } = setup();
-    const sentence = screen.getByLabelText('What was understood');
-    expect(within(sentence).getByText('liquid')).toBeInTheDocument();
-    expect(within(sentence).getByText('needs your call')).toBeInTheDocument();
-    expect(within(sentence).getByText('rising moat score')).toBeInTheDocument();
-    expect(within(sentence).getByText('not available yet')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Parts of your sentence' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('What was understood')).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

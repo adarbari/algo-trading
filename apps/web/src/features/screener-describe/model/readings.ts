@@ -11,7 +11,8 @@ import type { components } from '@/shared/api';
 export type Unresolved = components['schemas']['Unresolved'];
 type Table = Record<string, unknown>;
 
-function same(a: unknown, b: unknown): boolean {
+/** Deep equality of two JSON values. */
+export function same(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
   if (Array.isArray(a) || Array.isArray(b)) {

@@ -59,3 +59,46 @@ export function feasibilityLabel(feasibility: string): BadgeLabel {
 export function statusLabel(status: string): BadgeLabel | null {
   return STATUS[status] ?? null;
 }
+
+/** The badge text of a part's kind and the Guide term that explains it. */
+const PART_KINDS: Record<string, { label: string; help: TermRef }> = {
+  applied: { label: 'Applied', help: { kind: 'term', id: 'describe_applied' } },
+  formula: { label: 'Formula to review', help: { kind: 'term', id: 'describe_proposed_formulas' } },
+  needs_choice: {
+    label: 'Needs your call',
+    help: { kind: 'term', id: 'describe_needs_your_call' },
+  },
+  not_available: {
+    label: 'Not available yet',
+    help: { kind: 'term', id: 'describe_not_available_yet' },
+  },
+  not_understood: {
+    label: 'Not understood',
+    help: { kind: 'term', id: 'describe_part_not_understood' },
+  },
+};
+
+export function partKindLabel(kind: string): { label: string; help: TermRef } {
+  return PART_KINDS[kind] ?? (PART_KINDS['not_understood'] as { label: string; help: TermRef });
+}
+
+/** The fixed words of a part card (labels; each has its Guide term beside it). */
+export const PART_TEXT = {
+  reading: 'We read this as',
+  checkReading: 'Check this reading',
+  readingHelp: { kind: 'term', id: 'describe_part_reading' } as TermRef,
+  keptTitle: 'Kept from your screen',
+  keptMark: 'Not from the sentence',
+  unplacedTitle: 'Not tied to your words',
+  keptHelp: { kind: 'term', id: 'describe_part_kept' } as TermRef,
+  edited: 'Edited',
+  editedHelp: { kind: 'term', id: 'describe_part_edited' } as TermRef,
+  redrafting: 'Redrafting this part',
+  list: 'Parts of your sentence',
+  suggested: 'Suggested',
+  suggestedHelp: { kind: 'term', id: 'describe_suggested' } as TermRef,
+  add: 'Add',
+  skip: 'Skip',
+  added: 'Added',
+  skipped: 'Skipped',
+} as const;

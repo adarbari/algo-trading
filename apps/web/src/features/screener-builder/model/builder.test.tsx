@@ -97,6 +97,13 @@ function Probe() {
       </Button>
       <Button
         onClick={() => {
+          b.addSuggested({ field: 'f.spread', op: 'lte', value: 0.01, mode: 'soft' });
+        }}
+      >
+        add suggested
+      </Button>
+      <Button
+        onClick={() => {
           b.removeCriterion('close');
         }}
       >
@@ -267,6 +274,14 @@ describe('ScreenerBuilderProvider', () => {
     expect(screen.getByText(/criteria iv30=0.5,close=5,criterion=undefined/)).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, PREVIEW_DEBOUNCE_MS + 50));
     expect(POST).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds an accepted suggestion as a new soft row under a fresh id, an edit', async () => {
+    setup();
+    await screen.findByText('criteria iv30=0.5,close=5');
+    await userEvent.click(screen.getByRole('button', { name: 'add suggested' }));
+    expect(screen.getByText(/criteria iv30=0.5,close=5,spread=0.01/)).toBeInTheDocument();
+    expect(screen.getByText(/dirty true/)).toBeInTheDocument();
   });
 
   it('saves the edited draft, then is clean', async () => {

@@ -8,7 +8,13 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { expectAccessible } from './a11y';
-import { FORMULA_EXPR, FORMULA_NAME, mockBuilderApi, mockDescribeApi } from './builder-api';
+import {
+  FORMULA_EXPR,
+  FORMULA_NAME,
+  SUGGESTION_FIELD,
+  mockBuilderApi,
+  mockDescribeApi,
+} from './builder-api';
 import { mockApi } from './mock-api';
 
 async function describeIt(page: Page) {
@@ -17,7 +23,7 @@ async function describeIt(page: Page) {
     .getByRole('textbox', { name: 'Describe the screen' })
     .fill('IV above HV and above 50%');
   await page.getByRole('button', { name: 'Draft it' }).click();
-  await expect(page.getByRole('heading', { level: 3, name: 'Proposed formulas' })).toBeVisible();
+  await expect(page.getByRole('article', { name: 'IV above HV' })).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -94,4 +100,47 @@ test('closing the review leaves the formula pending', async ({ page }) => {
     .click();
   await expect(page.getByRole('group', { name: /Waiting on formula/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Finalize v2' })).toBeDisabled();
+});
+
+test('the review is one card per part of the sentence, in order, with the formula inside its own card', async ({
+  page,
+}) => {
+  await mockBuilderApi(page);
+  await mockDescribeApi(page);
+  await describeIt(page);
+  const list = page.getByRole('list', { name: 'Parts of your sentence' });
+  await expect(list.getByRole('article')).toHaveCount(2);
+  const formula = page.getByRole('article', { name: 'IV above HV' });
+  await expect(formula.getByText('Formula to review')).toBeVisible();
+  await expect(formula.getByRole('button', { name: 'Review and add' })).toBeVisible();
+  const applied = page.getByRole('article', { name: 'and above 50%' });
+  await expect(applied.getByText(/We read this as/)).toBeVisible();
+  await expectAccessible(page);
+});
+
+test('Add on a suggestion puts a soft row in the screen and the save carries it', async ({
+  page,
+}) => {
+  const mock = await mockBuilderApi(page);
+  await mockDescribeApi(page);
+  await describeIt(page);
+  const rows = page.getByRole('radiogroup', { name: /Mode of/ });
+  const before = await rows.count();
+  await page.getByRole('button', { name: `Add ${SUGGESTION_FIELD}` }).click();
+  await expect(rows).toHaveCount(before + 1);
+  await expect(page.getByText('Added', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect.poll(() => mock.drafts.length).toBe(1);
+  expect(JSON.stringify(mock.drafts[0]?.document['criteria'])).toContain(SUGGESTION_FIELD);
+});
+
+test('Skip on a suggestion adds no row', async ({ page }) => {
+  await mockBuilderApi(page);
+  await mockDescribeApi(page);
+  await describeIt(page);
+  const rows = page.getByRole('radiogroup', { name: /Mode of/ });
+  const before = await rows.count();
+  await page.getByRole('button', { name: `Skip ${SUGGESTION_FIELD}` }).click();
+  await expect(page.getByText('Skipped', { exact: true })).toBeVisible();
+  await expect(rows).toHaveCount(before);
 });

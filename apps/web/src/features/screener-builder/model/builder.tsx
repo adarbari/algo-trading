@@ -76,6 +76,11 @@ export interface ScreenerBuilder {
   removeCriterion: (id: string) => void;
   /** A blank criterion row; returns its id. */
   addCriterion: (field?: string) => string;
+  /**
+   * Add the criterion of an accepted suggestion (a soft or score check the draft offered, never
+   * applied on its own) as a new row under a fresh id; returns the id. One edit.
+   */
+  addSuggested: (criterion: Readonly<Record<string, unknown>>) => string;
   setTieBreak: (field: string | null, order: 'asc' | 'desc') => void;
   /** Replace the working document with one drafted elsewhere (a sentence, ADR 0041): an unsaved edit. */
   loadDocument: (document: Readonly<Record<string, unknown>>) => void;
@@ -284,6 +289,12 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     addCriterion: (field = '') => {
       const created = newCriterionId(criterionIds(base, document), field);
       edit(withCriterion(document, { id: created, field, op: 'gte', mode: 'hard' }));
+      return created;
+    },
+    addSuggested: (table) => {
+      const field = typeof table['field'] === 'string' ? table['field'] : '';
+      const created = newCriterionId(criterionIds(base, document), field);
+      edit(withCriterion(document, toCriterion(created, { ...table })));
       return created;
     },
     setTieBreak: (field, order) => {

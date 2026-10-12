@@ -28,6 +28,62 @@ function StateBadge({ state }: { state: FormulaState }) {
   );
 }
 
+/** One proposed formula: its state, the dry run, and Review and add / Skip while it is undecided. */
+export function FormulaCard({
+  formula,
+  state,
+  onReview,
+  onSkip,
+}: {
+  formula: DraftFormula;
+  state: FormulaState;
+  onReview: (formula: DraftFormula) => void;
+  onSkip: (name: string) => void;
+}) {
+  return (
+    <Stack gap={2}>
+      <Stack direction="row" gap={2} align="center" wrap>
+        <StateBadge state={state} />
+        <Text size="sm" tone="muted">
+          {formula.description}
+        </Text>
+      </Stack>
+      <FormulaPreview
+        name={formula.name}
+        formula={formula.expr}
+        inputs={inputsLine(formula)}
+        stats={dryRunStats(formula)}
+        statsLabel={`Dry run of ${formula.name}`}
+        sample={sampleOf(formula)}
+        actions={
+          state === 'proposed' ? (
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  onReview(formula);
+                }}
+              >
+                Review and add
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  onSkip(formula.name);
+                }}
+              >
+                Skip
+              </Button>
+            </>
+          ) : undefined
+        }
+      />
+    </Stack>
+  );
+}
+
 export function ProposedFormulas({ formulas, states, onReview, onSkip }: ProposedFormulasProps) {
   return (
     <Panel
@@ -37,51 +93,15 @@ export function ProposedFormulas({ formulas, states, onReview, onSkip }: Propose
       actions={termHelp('describe_proposed_formulas')}
     >
       <Stack gap={4}>
-        {formulas.map((formula) => {
-          const state = states[formula.name] ?? 'proposed';
-          return (
-            <Stack key={formula.name} gap={2}>
-              <Stack direction="row" gap={2} align="center" wrap>
-                <StateBadge state={state} />
-                <Text size="sm" tone="muted">
-                  {formula.description}
-                </Text>
-              </Stack>
-              <FormulaPreview
-                name={formula.name}
-                formula={formula.expr}
-                inputs={inputsLine(formula)}
-                stats={dryRunStats(formula)}
-                statsLabel={`Dry run of ${formula.name}`}
-                sample={sampleOf(formula)}
-                actions={
-                  state === 'proposed' ? (
-                    <>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => {
-                          onReview(formula);
-                        }}
-                      >
-                        Review and add
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          onSkip(formula.name);
-                        }}
-                      >
-                        Skip
-                      </Button>
-                    </>
-                  ) : undefined
-                }
-              />
-            </Stack>
-          );
-        })}
+        {formulas.map((formula) => (
+          <FormulaCard
+            key={formula.name}
+            formula={formula}
+            state={states[formula.name] ?? 'proposed'}
+            onReview={onReview}
+            onSkip={onSkip}
+          />
+        ))}
       </Stack>
     </Panel>
   );

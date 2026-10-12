@@ -7,5 +7,19 @@ export { earlierAsk, ownRequest, requestStatus, type MissingFeature } from './mo
 export { hasCriteria } from './model/review';
 export { readingSwap, type Unresolved } from './model/readings';
 export { appliedRows, dryRunStats, inputsLine, sampleOf, type DraftFormula } from './model/review';
-export { tagSentence, type SpanTag } from './model/tagging';
-export { feasibilityLabel, statusLabel, type BadgeLabel, type TermRef } from './model/labels';
+export {
+  feasibilityLabel,
+  PART_TEXT,
+  partKindLabel,
+  statusLabel,
+  type BadgeLabel,
+  type TermRef,
+} from './model/labels';
+export {
+  partEdited,
+  partsOf,
+  suggestionsOf,
+  type DraftPart,
+  type DraftSuggestion,
+  type PartKind,
+} from './model/parts';
