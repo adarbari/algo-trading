@@ -674,6 +674,7 @@ def test_bare_names_in_every_attempt_keep_the_good_criteria_and_other_problems_s
     assert list(draft.document["criteria"]) == ["price"]
     assert [(d.id, d.field) for d in draft.dropped] == [("bare", BARE)]
     assert f"did you mean `{PRICE}`" in draft.dropped[0].reason
+    assert draft.call_id  # the refused attempts' id: feedback rows link to their cost
     other = {"id": "made", "field": "rollup.made_up@v9.x", "op": "gt", "value": 1}
     mixed = json.dumps(proposal(PRICE_GT, bare, other))
     with pytest.raises(ModelUnavailableError):

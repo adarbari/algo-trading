@@ -164,15 +164,15 @@ def draft_screen(
 
     try:
         completion = model.complete(system, user, tag=tag, schema=ANSWER_SCHEMA, accept=accept)
-    except ModelUnavailableError:
+    except ModelUnavailableError as unavailable:
         # every attempt refused for a bare entry name only: keep the good criteria, show the
-        # bare ones dropped with their candidates (no completion, so no call id)
+        # bare ones dropped with their candidates (the refused attempts' call id, for their cost)
         if (
             drafted
             and drafted[-1][1].dropped
             and all("; did you mean " in d.reason for d in drafted[-1][1].dropped)
         ):
-            return _finished(ctx, drafted[-1][1], None)
+            return _finished(ctx, drafted[-1][1], unavailable.call_id)
         raise
     try:
         if not drafted or drafted[-1][0] != completion.text:  # a model that did not check
