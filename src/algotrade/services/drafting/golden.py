@@ -10,9 +10,20 @@ Layout (``root`` = ``tests/fixtures/drafting/golden``):
   scope_fields: [...]}}``. A part is ``{span, bucket: "A" | "B" | "C" | "ask", fields, op, value,
   tolerance}``: an ``A`` part wants one criterion on one of ``fields`` (alternatives) with an
   ``op`` (one, or a list of acceptable ones) and a ``value`` within ``tolerance`` (a fraction of
-  the expected value; absolute when that is 0); a ``B`` / ``C`` / ``ask`` part wants none, so any
-  criterion that matches no ``A`` part is extra. ``scope_fields`` are tolerated scaffolding
-  (status, security type).
+  the expected value; absolute when that is 0); a ``B`` / ``C`` / ``ask`` part wants no criterion
+  of its own, so any criterion that matches no ``A`` part is extra. The A / B / C contract
+  (ADR 0041, amended 2026-10-11) adds expectations a part may carry: a ``B`` part with ``expr``
+  wants a kept formula with that fingerprint (``features.expressions.fingerprint``, so a
+  rewriting of it passes; any other kept formula is extra) and, with ``op`` / ``value``, that
+  criterion on it, a ``C`` part with ``key`` wants a
+  missing item of that curated backlog key (a new slug never matches; a missing item no part
+  names is extra unless a ``C`` part has no key), an ``ask`` part with ``term`` wants that term
+  unresolved (any other unresolved term is extra). A part without these keys expects nothing of
+  the new buckets, and a score given no
+  ``formulas`` / ``missing`` / ``unresolved`` leaves them unchecked (an answer of the old shape).
+  ``scope_fields`` are tolerated scaffolding (status, security type). ``"contract": true`` in
+  ``expect`` marks a case written for the contract: CI replays its answer through the whole
+  ``draft_screen``.
 - ``answers/<model-slug>/<id>.json``: the model's raw answer text for that case, replayed in CI.
 
 To add a case: write ``cases/<id>.json``, record the model's raw answer into
@@ -25,6 +36,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from algotrade.config.site.features.definitions import FeatureDefinition
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.features.expressions.fingerprint import fingerprint
 
 SPLITS = ("train", "held_out")
 
@@ -42,13 +57,14 @@ class GoldenCase:
     current: Mapping[str, Any] | None = None  # the criteria in force at the last description
     recorded: bool = True  # False: curated, no answer recorded yet (``golden run --record``)
     curated: str | None = None  # the date a curated case was written (ISO)
+    contract: bool = False  # the whole draft is replayed (formulas checked, gaps resolved)
 
 
 @dataclass(frozen=True)
 class GoldenScore:
     """How a draft measures against a case: spans of parts with no matching criterion
-    (``missing``), parts whose criterion has the wrong op or value (``wrong``), and fields kept
-    or dropped that no part asked for (``extra``)."""
+    (``missing``), parts whose criterion has the wrong op or value (``wrong``), and fields (and
+    formulas) kept or dropped that no part asked for (``extra``)."""
 
     missing: tuple[str, ...]
     wrong: tuple[str, ...]
@@ -78,6 +94,7 @@ def load_cases(root: Path) -> tuple[GoldenCase, ...]:
                 _in_force(raw),
                 raw.get("recorded", True),
                 raw.get("curated"),
+                bool(expect.get("contract", False)),
             )
         )
     return tuple(cases)
@@ -113,8 +130,14 @@ def score(
     case: GoldenCase,
     kept: Mapping[str, Mapping[str, Any]],
     dropped_fields: Sequence[str] = (),
+    formulas: Sequence[tuple[str, Mapping[str, Any] | None]] | None = None,
+    missing_keys: Sequence[str] | None = None,
+    terms: Sequence[str] | None = None,
 ) -> GoldenScore:
-    """Score the kept criteria (``criteria_of``'s table) and the fields it dropped as invented."""
+    """Score the kept criteria (``criteria_of``'s table) and the fields it dropped as invented.
+    ``formulas``: the kept formulas' ``(expr, criterion)``; ``missing_keys``: each missing
+    item's curated key (``new:<slug>`` for a new one); ``terms``: the unresolved terms (``None``:
+    that bucket is not scored)."""
     missing: list[str] = []
     wrong: list[str] = []
     used: set[str] = set()
@@ -138,7 +161,58 @@ def score(
         for cid, crit in kept.items()
         if cid not in used and crit["field"] not in case.scope_fields
     ]
+    extra += _bucket_scores(case, formulas, missing_keys, terms, missing, wrong)
     return GoldenScore(tuple(missing), tuple(wrong), tuple(extra) + tuple(dropped_fields))
+
+
+def _bucket_scores(
+    case: GoldenCase,
+    formulas: Sequence[tuple[str, Mapping[str, Any] | None]] | None,
+    missing_keys: Sequence[str] | None,
+    terms: Sequence[str] | None,
+    missing: list[str],
+    wrong: list[str],
+) -> list[str]:
+    """Score the B, C and unresolved buckets: spans not found go to ``missing``, a formula whose
+    criterion is not the expected one to ``wrong``; what was kept and nothing asked for is
+    returned (a missing item is tolerated when a ``C`` part names no key)."""
+    extra: list[str] = []
+    if formulas is not None:
+        got = [(_print(e), e, crit) for e, crit in formulas]
+        for part in (p for p in case.parts if p["bucket"] == "B" and "expr" in p):
+            found = next((g for g in got if g[0] == _print(part["expr"])), None)
+            if found is None:
+                missing.append(str(part["span"]))
+                continue
+            got.remove(found)  # a second part with the same formula needs its own
+            if "op" in part and (found[2] is None or not _fits(part, found[2])):
+                wrong.append(str(part["span"]))
+        extra += [f"formula {e}" for _, e, _ in got]
+    if missing_keys is not None:
+        wanted = {p["key"] for p in case.parts if "key" in p}
+        missing += [
+            str(p["span"]) for p in case.parts if "key" in p and p["key"] not in missing_keys
+        ]
+        open_ended = any(p["bucket"] == "C" and "key" not in p for p in case.parts)
+        if not open_ended:
+            extra += [f"missing {k}" for k in missing_keys if k not in wanted]
+    if terms is not None:
+        said = {t.lower() for t in terms}
+        wanted_terms = {p["term"].lower() for p in case.parts if "term" in p}
+        missing += [
+            str(p["span"]) for p in case.parts if "term" in p and p["term"].lower() not in said
+        ]
+        extra += [f"unresolved {t}" for t in terms if t.lower() not in wanted_terms]
+    return extra
+
+
+def _print(expr: str) -> str:
+    """The fingerprint of ``expr`` (a formula that does not parse is its own text)."""
+    try:
+        definition = FeatureDefinition("golden", "golden", expr, "float", "ratio", "x", "x")
+        return fingerprint(definition).hash
+    except ConfigurationError:  # an invalid formula never matches an expected one
+        return f"invalid:{expr}"
 
 
 def _fits(part: Mapping[str, Any], crit: Mapping[str, Any]) -> bool:

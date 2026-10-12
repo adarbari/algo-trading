@@ -11,9 +11,11 @@ from algotrade.core.model.completion import Completion
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
+from tests.conftest import REPO_ROOT
 from tests.helpers.api_store import as_user
 
 PRICE = "rollup.price_stats@v2.close"
+CONTRACT_CASE = "liquid-optionable-near-high-support.json"
 ANSWER = {
     "criteria": [
         {"id": "active", "field": "instrument.status", "op": "eq", "value": "ACTIVE"},
@@ -122,6 +124,26 @@ def test_a_sentence_becomes_a_draft_with_what_was_dropped(
     # Nothing was saved: the user's configs have no such screen.
     store = api_golden[0]
     assert store.configs.load(store.user.user_id, "screeners", "my_screen") is None
+
+
+def test_the_contract_fields_are_served_and_the_document_holds_only_a_criteria(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    recorded = REPO_ROOT / "tests/fixtures/drafting/golden/answers/seed-handwritten"
+    client = app_with(api_golden[0], Canned(json.loads((recorded / CONTRACT_CASE).read_text())))
+    response = client.post("/screeners/my_screen/draft-from-text", json={"text": "liquid"})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    (formula,) = body["formulas"]
+    assert formula["name"] == "draft_near_52w_high" and formula["pending"] is True
+    assert formula["criterion"]["field"] == "feature.draft_near_52w_high"
+    assert formula["dry_run"]["rows"] > 0 and formula["dry_run"]["no_value_rate"] is not None
+    assert body["formulas_dropped"] == []
+    assert [m["key"] for m in body["missing"]] == ["support_level_history"]
+    (term,) = body["unresolved"]
+    assert term["term"] == "liquid" and len(term["alternatives"]) == 3
+    assert "draft_near_52w_high" not in json.dumps(body["document"])
+    assert "liquid" in body["document"]["criteria"]  # the default reading
 
 
 def test_the_current_document_goes_along(api_golden: tuple[ReadStore, dict[str, str]]) -> None:

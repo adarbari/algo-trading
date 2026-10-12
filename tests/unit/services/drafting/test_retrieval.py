@@ -6,9 +6,14 @@ features, joined tokens and numbers."""
 
 import pytest
 
+from algotrade.config.site.drafting.backlog import PROMPT_LIMIT, open_keys
 from algotrade.config.site.field_guide import FieldGuideEntry, FieldGuideSettings
 from algotrade.config.site.llm import Phrase
-from algotrade.config.site.settings import load_field_guide, load_phrasebook
+from algotrade.config.site.settings import (
+    load_feature_backlog,
+    load_field_guide,
+    load_phrasebook,
+)
 from algotrade.config.user import UserContext
 from algotrade.services.drafting.golden import GoldenCase, load_cases
 from algotrade.services.drafting.prompt import prefix_text, sliced_system_prompt
@@ -66,8 +71,12 @@ def test_the_golden_set_has_the_new_train_cases() -> None:
 @pytest.mark.parametrize("case", CASES, ids=ids)
 def test_the_sliced_prompt_is_within_the_token_budget(case: GoldenCase, site) -> None:
     infos, book, guide = site
-    prompt = sliced_system_prompt(infos, case.sentence, book, guide)
+    real = open_keys(load_feature_backlog(open_config_store(REPO_ROOT / "config")))
+    # the backlog may grow: the budget holds with more keys than the prompt shows, at full length
+    padding = tuple((f"zz_pad_{n:03}", "x" * 200) for n in range(2 * PROMPT_LIMIT))
+    prompt = sliced_system_prompt(infos, case.sentence, book, guide, (*real, *padding))
     assert len(prompt) // 4 <= BUDGET_TOKENS, f"{case.id}: {len(prompt) // 4} tokens"
+    assert prompt.count("zz_pad_") + len(real) >= min(PROMPT_LIMIT, len(real) + len(padding))
     assert prompt.startswith(prefix_text(infos))
 
 

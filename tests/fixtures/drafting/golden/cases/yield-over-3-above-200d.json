@@ -1,0 +1,37 @@
+{
+  "id": "yield-over-3-above-200d",
+  "sentence": "stocks yielding more than 3% that trade above their 200 day average",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "yielding more than 3%",
+        "bucket": "A",
+        "fields": [
+          "feature.div_yield"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.03,
+        "tolerance": 0
+      },
+      {
+        "span": "above their 200 day average",
+        "bucket": "A",
+        "fields": [
+          "feature.pct_vs_sma_200"
+        ],
+        "op": "gt",
+        "value": 0,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true
+  }
+}

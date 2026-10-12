@@ -9,16 +9,18 @@ timestamps or ids, so the same catalogue, phrasebook and guide give the same byt
 prompt cache hits and a recorded test stays valid). The prompt carries no market data, results
 or credentials.
 
-The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 2): the task, the examples and an
-index of every field (name, type, unit) as a prefix no sentence changes, then in detail only the
-fields ``retrieval.select_slice`` picks for the sentence (~11-14k tokens, was ~110k for the
-whole catalogue, phrasebook and guide), then the caller's own features."""
+The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 3: the A / B / C answer contract and
+the open backlog keys most relevant to the sentence): the task, the
+examples and an index of every field (name, type, unit) as a prefix no sentence changes, then in
+detail only the fields ``retrieval.select_slice`` picks for the sentence (~11-15k tokens, was ~110k
+for the whole catalogue, phrasebook and guide), then the caller's own features."""
 
 import json
 import re
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from algotrade.config.site.drafting.backlog import PROMPT_LIMIT
 from algotrade.config.site.field_guide import (
     FieldGuideEntry,
     FieldGuideSettings,
@@ -29,8 +31,10 @@ from algotrade.config.site.llm import Phrase
 from algotrade.services.drafting.retrieval import FIELD_REF, select_slice
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
-# Bump with any change to the prompt: the usage log records it (ADR 0058). 2: index + slice.
-PROMPT_VERSION = "2"
+# Bump with any change to the prompt: the usage log records it (ADR 0058). 2: index + slice;
+# 3: formulas, missing and unresolved in the answer, and the open backlog keys; 4: a phrasebook
+# entry shows its structured thresholds.
+PROMPT_VERSION = "4"
 
 TASK = """\
 You turn a trader's sentence into the criteria of a rule screen over a catalogue of stored
@@ -67,17 +71,36 @@ Rules:
   first); otherwise "tie_break" is null.
 - When current criteria are given, keep every one the sentence does not change and answer
   with the complete new list.
-- The phrasebook (when given) says which fields a trader's words mean and how to
-  use them (the gate, a confirmation, a score; typical thresholds). Follow it; prefer its
-  thresholds to your own; say in "notes" when you had to choose one.
-- The field guide (when given) says how to read a field, the usual criterion for
-  each intent (op, value, mode, tolerance) and when the reading lies. Take thresholds from
-  it, never from memory. When a caveat or a situation names a field to check, add that
-  criterion (soft or score, so it lists rather than rejects) and say why in "notes".
+- The phrasebook and field guide (when given) say which fields a trader's words mean, how to
+  read a field, the usual criterion per intent (op, value, mode, tolerance) and when the reading
+  lies. Take thresholds from them, never from memory (say in "notes" when you had to choose one).
+  When a caveat or situation names a field to check, add that criterion (soft or score, so it
+  lists rather than rejects) and say why in "notes".
 
 Answer shape:
 {"criteria": [ ... ], "tie_break": {"field": "...", "descending": true} or null,
- "notes": ["anything you could not map, or assumed"]}
+ "notes": ["anything you could not map, or assumed"],
+ "formulas": [ ... ] or null, "missing": [ ... ] or null, "unresolved": [ ... ] or null}
+
+Each part of the sentence goes in one place. A: a criterion on a catalogue field (preferred). B: a
+formula, only when maths over fields says it and no field does. C: missing, when neither can. Never
+guess a field to fill a gap.
+
+"formulas": [{"name": "draft_<slug>", "expr", "dtype": "float|bool|str|date", "unit", "description",
+"null_meaning", "inputs": [the names expr reads], "criterion": {"op", "value", "mode",
+"tolerance"} or null}]. A formula is maths on one session's values: "rollup.<group>@vN.<column>" is
+written <group>.<column>, "feature.<name>" is written <name> (no instrument.* fields); + - * /
+comparisons and or not; if(c, a, b) abs min max log sqrt ncdf clip(x, lo, hi) coalesce is_null
+one_of(x, a, ...) exists(group). No lag, window, rolling or history: anything over time is
+"missing" with ROLLUP_FROM_STORED. A formula equal to a catalogue field is dropped: use the field.
+
+"missing": [{"key": an open key from "Open requests" below, else null, "new_key_slug" (a-z0-9_) when
+key is null, "span", "description", "why_needed", "closest": [catalogue fields], "feasibility":
+"ROLLUP_FROM_STORED" (a window over stored data) | "NEEDS_SOURCE" (new data) | "UNCLEAR"}].
+
+"unresolved": [{"term", "span", "default_index", "alternatives": [{"label", "criterion": a complete
+criterion}, 2 or 3]}] for a term with several readings ("liquid"); the server adds the default to
+the criteria, so do not list it there. Not for a term the phrasebook or field guide settles.
 """
 
 # Two worked examples (sentence -> answer), rendered into the task so a smaller model sees the
@@ -157,32 +180,24 @@ EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
                     "field": "instrument.status",
                     "op": "eq",
                     "value": "ACTIVE",
-                    "mode": "hard",
-                    "why": "stocks (listed)",
                 },
                 {
                     "id": "stocks",
                     "field": "instrument.security_type",
                     "op": "in",
                     "value": ["COMMON_STOCK", "ADR"],
-                    "mode": "hard",
-                    "why": "stocks",
                 },
                 {
                     "id": "optionable",
                     "field": "instrument.optionable",
                     "op": "eq",
                     "value": True,
-                    "mode": "hard",
-                    "why": "optionable",
                 },
                 {
                     "id": "price",
                     "field": "rollup.price_stats@v2.close",
                     "op": "gt",
                     "value": 10,
-                    "mode": "hard",
-                    "why": "over $10",
                 },
                 {
                     "id": "liquid",
@@ -249,7 +264,29 @@ def phrase_line(phrase: Phrase, catalogue: set[str]) -> str | None:
     if not fields:
         return None
     hint = " ".join(phrase.hint.split())
-    return f"{' / '.join(phrase.say)} | {', '.join(fields)} | {hint or '-'}"
+    line = f"{' / '.join(phrase.say)} | {', '.join(fields)} | {hint or '-'}"
+    exact = _structured_text(phrase, catalogue)
+    return f"{line} | = {exact}" if exact else line
+
+
+def _structured_text(phrase: Phrase, catalogue: set[str]) -> str:
+    """The entry's structured meaning, compact: ``field op value`` joined by `` and `` (every
+    criterion applies), or the readings of an ambiguous word (``label: criterion``, the default
+    first); empty without one or when a field is not in this catalogue."""
+    if phrase.criteria:
+        if all(c.field in catalogue for c in phrase.criteria):
+            return " and ".join(c.short() for c in phrase.criteria)
+        return ""
+    if not phrase.alternatives or any(
+        a.criterion.field not in catalogue for a in phrase.alternatives
+    ):
+        return ""
+    order = [
+        phrase.default_index,
+        *(i for i in range(len(phrase.alternatives)) if i != phrase.default_index),
+    ]
+    readings = (phrase.alternatives[i] for i in order)
+    return "one of " + "; ".join(f"{a.label}: {a.criterion.short()}" for a in readings)
 
 
 def _value(value: Any) -> str:
@@ -335,12 +372,31 @@ def slice_guide_line(
     return " | ".join(parts)
 
 
+KEY_CHARS = 60  # of an open key's description (PROMPT_LIMIT keys must stay inside the budget)
+_WORD = re.compile(r"[a-z0-9]{3,}")
+OPEN_HEADER = "Open requests (key | what it is); reuse one as a missing item's key when it fits:"
+
+
 def prefix_text(catalogue: Iterable[FeatureInfo]) -> str:
     """The part of the sliced prompt that no sentence changes: the task, the examples and the
     index of every SITE field (sorted by name)."""
     site = sorted((i for i in catalogue if i.scope == "site"), key=lambda i: i.name)
     index = "\n".join(index_line(i) for i in site)
-    return f"{TASK}\n{examples_text()}\n{INDEX_HEADER}\n{index}\n"
+    out = f"{TASK}\n{examples_text()}\n{INDEX_HEADER}\n{index}\n"
+    return out
+
+
+def relevant_keys(
+    sentence: str, open_keys: Iterable[tuple[str, str]], limit: int = PROMPT_LIMIT
+) -> list[tuple[str, str]]:
+    """At most ``limit`` of the open (key, description) pairs: those whose key or description
+    share the most words with the sentence first, then by key (deterministic)."""
+    said = set(_WORD.findall(sentence.lower()))
+
+    def score(pair: tuple[str, str]) -> int:
+        return len(said & set(_WORD.findall(f"{pair[0].replace('_', ' ')} {pair[1]}".lower())))
+
+    return sorted(open_keys, key=lambda p: (-score(p), p[0]))[:limit]
 
 
 def sliced_system_prompt(
@@ -348,6 +404,7 @@ def sliced_system_prompt(
     sentence: str,
     phrasebook: Iterable[Phrase] = (),
     guide: FieldGuideSettings | None = None,
+    open_keys: Iterable[tuple[str, str]] = (),
 ) -> str:
     """The prompt for one sentence (ADR 0041, plan "Token and latency budget"): ``prefix_text``
     (byte-identical across sentences), then the slice ``select_slice`` picks (catalogue lines,
@@ -362,6 +419,12 @@ def sliced_system_prompt(
     detail = [i for i in detail if i.scope == "site"]
     own = sorted((i for i in infos if i.scope != "site"), key=lambda i: i.name)
     out = prefix_text(infos)
+    keys = [
+        f"{key} | {' '.join(description.split())[:KEY_CHARS]}"
+        for key, description in relevant_keys(sentence, open_keys)
+    ]
+    if keys:
+        out += f"\n{OPEN_HEADER}\n" + "\n".join(keys) + "\n"
     out += "\nDetail (name | type | unit | description | values):\n"
     out += "\n".join(catalogue_line(i) for i in detail) + "\n"
     phrases = [line for p in chosen.phrases if (line := phrase_line(p, names)) is not None]

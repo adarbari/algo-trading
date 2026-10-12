@@ -76,7 +76,7 @@ contracts = ["Layout: site settings never import strategy configs (resolve layer
 
 [[dir]]
 path = "src/algotrade/config/site/drafting"
-purpose = "L3 Describe it drafting settings: the curated backlog of missing features (config/site/feature_backlog.toml), typed and validated (split from config/site, at its module cap)"
+purpose = "L3 Describe it drafting settings: the curated backlog of missing features (config/site/feature_backlog.toml) and the structured thresholds of phrasebook entries (criteria.py), typed and validated (split from config/site, at its module cap)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
@@ -290,6 +290,11 @@ contracts = ["Layout: use-case packages are independent (backtests, screening, a
 [[dir]]
 path = "src/algotrade/services/drafting"
 purpose = "use case: a rule screen drafted from a sentence (ADR 0041): the prompt over the caller's catalogue, strict parsing of the answer, invented fields dropped with a reason, the rest validated as finalise does; never a write, never a run"
+contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
+
+[[dir]]
+path = "src/algotrade/services/drafting/phrasebook"
+purpose = "use case: the phrasebook's structured thresholds in use (ADR 0041): their check against a catalogue and the match of a sentence to them, resolving it without the model when they cover every word (split from services/drafting, at its module cap)"
 contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
 
 [[dir]]

@@ -6,6 +6,7 @@ has; the worked examples; stable bytes for the same inputs; the sentence with th
 criteria. Fitness: every field the shipped phrasebook and the examples name is in the site
 catalogue."""
 
+from algotrade.config.site.drafting.backlog import PROMPT_LIMIT
 from algotrade.config.site.field_guide import (
     FieldGuideEntry,
     FieldGuideSettings,
@@ -18,10 +19,12 @@ from algotrade.services.configs import field_catalog
 from algotrade.services.drafting.prompt import (
     EXAMPLES,
     PROMPT_VERSION,
+    TASK,
     catalogue_line,
     index_line,
     phrase_line,
     prefix_text,
+    relevant_keys,
     situation_line,
     slice_guide_line,
     sliced_system_prompt,
@@ -185,7 +188,7 @@ def test_users_share_the_site_prefix_and_own_features_come_last() -> None:
 
 
 def test_the_sliced_prompt_is_an_index_then_only_the_slice() -> None:
-    assert PROMPT_VERSION == "2"
+    assert PROMPT_VERSION == "4"
     names = {"rollup.b@v1.x"}
     assert (
         index_line(info("instrument.a", "str", unit="category")) == "instrument.a | str | category"
@@ -243,3 +246,36 @@ def test_a_slice_keeps_every_caveat_sentence_that_says_how_to_use_the_field() ->
         "Never a one-sided upper bound. Use adv_usd_20d for a gate. "
         "Check market.market_trend@v2 first."
     )
+
+
+def test_the_task_states_the_contract_and_what_a_formula_can_express() -> None:
+    for word in ('"formulas"', '"missing"', '"unresolved"', "draft_<slug>", "ROLLUP_FROM_STORED"):
+        assert word in TASK
+    for function in ("if(", "abs", "min", "max", "log", "sqrt", "ncdf", "clip", "coalesce",
+                     "is_null", "one_of", "exists"):  # fmt: skip
+        assert function in TASK
+    assert "No lag, window" in TASK and "over time" in TASK
+
+
+def test_the_open_backlog_keys_are_in_the_prefix_every_sentence_shares() -> None:
+    site = [info("rollup.b@v1.x")]
+    keys = (("a_key", "what a is"), ("b_key", "what\nb   is"))
+    first = sliced_system_prompt(site, "b", open_keys=keys)
+    second = sliced_system_prompt(site, "something else", open_keys=keys)
+    prefix = prefix_text(site)
+    assert first.startswith(prefix) and second.startswith(prefix)  # the prefix has no keys
+    assert "Open requests (" not in prefix
+    assert "a_key | what a is\nb_key | what b is\n" in first  # equal relevance: by key
+    assert "Open requests (" not in sliced_system_prompt(site, "b")  # no keys, no section
+
+
+def test_open_keys_shown_are_the_most_relevant_then_by_key_and_capped() -> None:
+    keys = [(f"k{n:02}", "plain") for n in range(30)] + [
+        ("zz_support_history", "time near support")
+    ]
+    got = relevant_keys("held near support for years", keys)
+    assert got[0][0] == "zz_support_history"  # the sentence's words first
+    assert [k for k, _ in got[1:]] == [f"k{n:02}" for n in range(PROMPT_LIMIT - 1)]
+    assert len(got) == PROMPT_LIMIT
+    assert relevant_keys("x", keys, limit=2) == [("k00", "plain"), ("k01", "plain")]
+    assert relevant_keys("x", reversed(keys)) == relevant_keys("x", keys)  # deterministic

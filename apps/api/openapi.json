@@ -1,6 +1,25 @@
 {
   "components": {
     "schemas": {
+      "Alternative": {
+        "properties": {
+          "criterion": {
+            "additionalProperties": true,
+            "title": "Criterion",
+            "type": "object"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "criterion"
+        ],
+        "title": "Alternative",
+        "type": "object"
+      },
       "Build": {
         "properties": {
           "api": {
@@ -328,6 +347,81 @@
         "title": "DraftBody",
         "type": "object"
       },
+      "DraftFormula": {
+        "properties": {
+          "criterion": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the criterion on the formula, pending",
+            "title": "Criterion"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "dry_run": {
+            "$ref": "#/components/schemas/FormulaDryRun"
+          },
+          "dtype": {
+            "title": "Dtype",
+            "type": "string"
+          },
+          "expr": {
+            "title": "Expr",
+            "type": "string"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "inputs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "null_meaning": {
+            "title": "Null Meaning",
+            "type": "string"
+          },
+          "pending": {
+            "description": "true until the trader accepts it (never auto-applied)",
+            "title": "Pending",
+            "type": "boolean"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "expr",
+          "dtype",
+          "unit",
+          "description",
+          "null_meaning",
+          "inputs",
+          "criterion",
+          "fingerprint",
+          "dry_run",
+          "pending"
+        ],
+        "title": "DraftFormula",
+        "type": "object"
+      },
       "DraftFromTextBody": {
         "properties": {
           "document": {
@@ -391,6 +485,37 @@
           "reason"
         ],
         "title": "DroppedCriterion",
+        "type": "object"
+      },
+      "DroppedFormula": {
+        "properties": {
+          "existing": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the feature it duplicates, when it does",
+            "title": "Existing"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "reason",
+          "existing"
+        ],
+        "title": "DroppedFormula",
         "type": "object"
       },
       "EdgeDocument": {
@@ -632,7 +757,7 @@
           },
           "sample": {
             "items": {
-              "$ref": "#/components/schemas/SampleValue"
+              "$ref": "#/components/schemas/algotrade_api__schemas__preview__features__SampleValue"
             },
             "title": "Sample",
             "type": "array"
@@ -719,6 +844,90 @@
           "hash"
         ],
         "title": "Finalised",
+        "type": "object"
+      },
+      "FormulaDryRun": {
+        "properties": {
+          "criterion_pass": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "rows passing the formula's criterion",
+            "title": "Criterion Pass"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "no_value_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Value Rate"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "sample": {
+            "items": {
+              "$ref": "#/components/schemas/algotrade_api__schemas__drafting__screeners__SampleValue"
+            },
+            "title": "Sample",
+            "type": "array"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the session read (null: not read: no data for it)",
+            "title": "Session"
+          }
+        },
+        "required": [
+          "session",
+          "rows",
+          "no_value_rate",
+          "minimum",
+          "maximum",
+          "criterion_pass",
+          "sample"
+        ],
+        "title": "FormulaDryRun",
         "type": "object"
       },
       "FunnelStep": {
@@ -1202,6 +1411,68 @@
           "delta"
         ],
         "title": "LiveOptionQuote",
+        "type": "object"
+      },
+      "MissingFeature": {
+        "properties": {
+          "closest": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Closest",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "feasibility": {
+            "description": "ROLLUP_FROM_STORED, NEEDS_SOURCE or UNCLEAR",
+            "title": "Feasibility",
+            "type": "string"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "an open backlog key, else null with new_key_slug",
+            "title": "Key"
+          },
+          "new_key_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Key Slug"
+          },
+          "span": {
+            "title": "Span",
+            "type": "string"
+          },
+          "why_needed": {
+            "title": "Why Needed",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "new_key_slug",
+          "span",
+          "description",
+          "why_needed",
+          "closest",
+          "feasibility"
+        ],
+        "title": "MissingFeature",
         "type": "object"
       },
       "NarrowMiss": {
@@ -1721,40 +1992,6 @@
         "title": "RunRequest",
         "type": "object"
       },
-      "SampleValue": {
-        "properties": {
-          "instrument_id": {
-            "title": "Instrument Id",
-            "type": "string"
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
-          }
-        },
-        "required": [
-          "instrument_id",
-          "value"
-        ],
-        "title": "SampleValue",
-        "type": "object"
-      },
       "SaveEdgeBody": {
         "properties": {
           "document": {
@@ -1839,6 +2076,28 @@
             "title": "Dropped",
             "type": "array"
           },
+          "formulas": {
+            "description": "B1: formulas offered, pending, not in the document",
+            "items": {
+              "$ref": "#/components/schemas/DraftFormula"
+            },
+            "title": "Formulas",
+            "type": "array"
+          },
+          "formulas_dropped": {
+            "items": {
+              "$ref": "#/components/schemas/DroppedFormula"
+            },
+            "title": "Formulas Dropped",
+            "type": "array"
+          },
+          "missing": {
+            "items": {
+              "$ref": "#/components/schemas/MissingFeature"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
           "notes": {
             "description": "what the model could not map or assumed",
             "items": {
@@ -1850,6 +2109,14 @@
           "screener_id": {
             "title": "Screener Id",
             "type": "string"
+          },
+          "unresolved": {
+            "description": "ambiguous terms; the document has each default",
+            "items": {
+              "$ref": "#/components/schemas/Unresolved"
+            },
+            "title": "Unresolved",
+            "type": "array"
           }
         },
         "required": [
@@ -2198,6 +2465,37 @@
         "title": "Unavailable",
         "type": "object"
       },
+      "Unresolved": {
+        "properties": {
+          "alternatives": {
+            "items": {
+              "$ref": "#/components/schemas/Alternative"
+            },
+            "title": "Alternatives",
+            "type": "array"
+          },
+          "default_index": {
+            "title": "Default Index",
+            "type": "integer"
+          },
+          "span": {
+            "title": "Span",
+            "type": "string"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "span",
+          "default_index",
+          "alternatives"
+        ],
+        "title": "Unresolved",
+        "type": "object"
+      },
       "UserFeatureBody": {
         "properties": {
           "categories": {
@@ -2368,6 +2666,57 @@
           "names"
         ],
         "title": "ViewNames",
+        "type": "object"
+      },
+      "algotrade_api__schemas__drafting__screeners__SampleValue": {
+        "properties": {
+          "instrument_id": {
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "value"
+        ],
+        "title": "SampleValue",
+        "type": "object"
+      },
+      "algotrade_api__schemas__preview__features__SampleValue": {
+        "properties": {
+          "instrument_id": {
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "value"
+        ],
+        "title": "SampleValue",
         "type": "object"
       }
     }

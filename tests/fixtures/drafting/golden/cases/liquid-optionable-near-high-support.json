@@ -1,0 +1,69 @@
+{
+  "id": "liquid-optionable-near-high-support",
+  "sentence": "liquid optionable stocks over $5 within 5% of their 52-week high that held within support lines for two years",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "optionable",
+        "bucket": "A",
+        "fields": [
+          "instrument.optionable"
+        ],
+        "op": "eq",
+        "value": true,
+        "tolerance": 0
+      },
+      {
+        "span": "over $5",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.close",
+          "rollup.option_liquidity@v1.underlying_price"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 5,
+        "tolerance": 0
+      },
+      {
+        "span": "liquid (the default reading)",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.adv_usd_20d"
+        ],
+        "op": "gte",
+        "value": 50000000,
+        "tolerance": 0.2
+      },
+      {
+        "span": "liquid",
+        "bucket": "ask",
+        "fields": [],
+        "term": "liquid"
+      },
+      {
+        "span": "within 5% of their 52-week high",
+        "bucket": "B",
+        "fields": [],
+        "expr": "if(price_stats.high_52w > 0, price_stats.close / price_stats.high_52w, null)",
+        "op": "gte",
+        "value": 0.95,
+        "tolerance": 0.02
+      },
+      {
+        "span": "held within support lines for two years",
+        "bucket": "C",
+        "fields": [],
+        "key": "support_level_history"
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true
+  }
+}

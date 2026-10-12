@@ -11,6 +11,12 @@ from types import MappingProxyType
 from typing import Any
 from urllib.parse import urlsplit
 
+from algotrade.config.site.drafting.criteria import (
+    PHRASE_THRESHOLD_KEYS,
+    PhraseAlternative,
+    PhraseCriterion,
+    parse_threshold,
+)
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.core.model.errors import ConfigurationError
 
@@ -50,7 +56,7 @@ KINDS = ("openai", "claude-cli")
 CLAUDE_CLI = "claude-cli"
 RESERVED_REQUEST_KEYS = ("model", "messages", "temperature", "max_tokens", "response_format")
 LOOPBACK = ("localhost", "127.0.0.1", "::1")
-PHRASE_KEYS = ("say", "fields", "hint")
+PHRASE_KEYS = ("say", "fields", "hint", *PHRASE_THRESHOLD_KEYS)
 LEGACY_ID = "default"  # the one provider of a file without [[provider]]
 _ID = re.compile(r"[a-z][a-z0-9_]{0,31}")
 
@@ -418,11 +424,17 @@ def _endpoint(url: str, where: str) -> str:
 class Phrase:
     """One phrasebook entry: what the trader ``say``s (any of the words), the catalogue
     ``fields`` that express it (exact names) and a ``hint`` on how to use them (the gate, a
-    confirmation or a score, typical thresholds, what not to combine)."""
+    confirmation or a score, typical thresholds, what not to combine). The optional structured
+    form states the meaning as data: ``criteria`` (every one applies, thresholds exact) or
+    ``alternatives`` (the word has several readings, ``default_index`` the one a draft starts
+    with); the ``hint`` stays, the model reads it too."""
 
     say: tuple[str, ...]
     fields: tuple[str, ...]
     hint: str = ""
+    criteria: tuple[PhraseCriterion, ...] = ()
+    alternatives: tuple[PhraseAlternative, ...] = ()
+    default_index: int = 0
 
 
 @dataclass(frozen=True)
@@ -450,4 +462,12 @@ def _phrase(t: Table) -> Phrase:
         raise ConfigurationError(f"{t.where} say: expected one or more non-empty strings")
     if not fields or not all(f.strip() for f in fields):
         raise ConfigurationError(f"{t.where} fields: expected one or more catalogue field names")
-    return Phrase(tuple(s.strip() for s in say), tuple(fields), t.text("hint", "").strip())
+    criteria, alternatives, default = parse_threshold(t)
+    return Phrase(
+        tuple(s.strip() for s in say),
+        tuple(fields),
+        t.text("hint", "").strip(),
+        criteria,
+        alternatives,
+        default,
+    )
