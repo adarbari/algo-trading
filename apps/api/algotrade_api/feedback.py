@@ -21,9 +21,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
+from algotrade.services.authoring.scope import ConfigWriter
 from algotrade.services.feedback import events
 from algotrade.services.feedback.diff import criteria_diff, criteria_snapshot, document_diff
 from algotrade.services.feedback.events import FeedbackSink, NoFeedback
+from algotrade.services.feedback.formulas.payload import accepted_payload
 from algotrade.services.feedback.recorder import open_recorder
 from algotrade.services.feedback.request_recorder import open_request_recorder
 from algotrade.services.feedback.requests import MissingLike, record_missing
@@ -327,31 +329,42 @@ def record_choices(
     user: str,
     screener_id: str,
     choices: Sequence[Any],
+    writer: ConfigWriter | None = None,
 ) -> None:
     """One ``choice_made`` / ``formula_accepted`` / ``formula_skipped`` row per choice
     (``subject``, ``picked`` in the payload) whose subject the session's last answer offered (an
     unresolved term, a proposed formula), for a session that is ``user``'s and
     ``screener_id``'s only (a session not remembered or not theirs records nothing). The
     ``event_id`` is a hash of the session, event, subject and pick, so a choice sent again with a
-    later save is the same row. Call after the config write succeeded; never raises."""
+    later save is the same row. A ``formula_accepted`` that names the ``feature`` the trader saved
+    also carries that feature's formula, fingerprint, unit and description, read from the user's
+    own saved features through ``writer`` (``services.feedback.formulas``; a feature not found
+    records the subject only). Call after the config write succeeded; never raises."""
     if not session_id or not choices:
         return
     try:
         draft = memory.get(session_id, user, screener_id)
         if draft is None:
             return
+        saved: dict[str, Any] | None = None  # the user's feature documents, read once
         for choice in choices:
             try:
                 known = draft.terms if choice.event == events.CHOICE_MADE else draft.formulas
                 if choice.subject not in known:
                     continue  # not something this answer offered: never a row under its session
                 picked = choice.picked if choice.event == events.CHOICE_MADE else None
+                payload: dict[str, Any] = {"subject": choice.subject, "picked": picked}
+                feature = getattr(choice, "feature", None)
+                if choice.event == events.FORMULA_ACCEPTED and feature and writer is not None:
+                    if saved is None:
+                        saved = _saved_features(writer, user)
+                    payload = accepted_payload(choice.subject, user, feature, saved)
                 row = events.row_of(
                     choice.event, session_id, user, KIND, screener_id,
                     call_ids=draft.call_ids, catalogue_version=draft.catalogue_version,
                     prompt_version=draft.prompt_version, draft_hash=draft.draft_hash,
                     sentence=draft.sentence, seq=draft.seq,
-                    payload={"subject": choice.subject, "picked": picked},
+                    payload=payload,
                 )  # fmt: skip
                 key = f"{session_id}|{choice.event}|{choice.subject}|{picked}"
                 row["event_id"] = hashlib.sha256(key.encode()).hexdigest()[:32]
@@ -360,6 +373,15 @@ def record_choices(
                 log.exception("%s not recorded", choice.event)
     except Exception:
         log.exception("choices not recorded")
+
+
+def _saved_features(writer: ConfigWriter, user: str) -> dict[str, Any]:
+    """``user``'s own feature documents by theme; empty when they cannot be read."""
+    try:
+        return {t: writer.load(user, "features", t) for t in writer.names(user, "features")}
+    except Exception:
+        log.exception("the user's features were not read for the accepted formula")
+        return {}
 
 
 def record_edge_revised(

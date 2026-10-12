@@ -235,3 +235,20 @@ inside `save_edge_revision`, with the write. Admins can read edge text and revis
 visibility as sentences (owner decision 2026-10-11: allow). Retention and erase (#540) null the
 payload as a whole; this change merges after #540 and wires nothing of it. Copy, status and delete
 calls record nothing. The table registry entry is unchanged by this note.
+
+## Note 2026-10-11: accepted formulas, read across users by an admin
+A `formula_accepted` choice may carry `feature`, the name of the user feature the trader saved (they may
+rename the proposal). The save route reads that feature from the user's own saved features through the
+config writer (never a path) and adds to the payload `feature`, `expression`, `fingerprint` (the
+`features/expressions/fingerprint.py` hash, so the same formula written differently is one),
+`canonical`, `unit` and `description` (`services/feedback/formulas/payload.py`, pure). A feature that is
+not found or does not parse records the subject only; the request never fails on it, and the `event_id`
+dedupe is unchanged. `Query.acceptedFormulas` (`AdminOnly`; `services/read/formulas/accepted.py`) groups
+the rows by fingerprint across users for an admin: **counts only** (the distinct users and acceptances,
+never a user id), the newest row's formula, `duplicate_of` (the site feature with that fingerprint now)
+and `backlog_key` (an exact match of the feature name, `draft_` stripped, to a backlog key or alias, or
+the item promoted to `duplicate_of`; never fuzzy). A trader is refused (`PermissionDeniedError`). The
+formula is strategy content, held in `payload`, a registered personal column: `retain` nulls it past the
+window and `erase` nulls every row of a user (a curated event keeps it, like any criteria); a row without
+a fingerprint (older, or nulled) is skipped by the read. The user's TOML in `config/users/<id>/` stays
+outside erase, as for every user config (listed above).

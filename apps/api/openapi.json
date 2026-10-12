@@ -368,6 +368,19 @@
             "title": "Event",
             "type": "string"
           },
+          "feature": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the saved user feature's name, formula_accepted only (the trader may have renamed the proposed formula)",
+            "title": "Feature"
+          },
           "picked": {
             "anyOf": [
               {

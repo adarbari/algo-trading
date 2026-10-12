@@ -562,3 +562,30 @@ def test_a_file_no_index_names_is_swept_by_the_next_run_and_referenced_ones_stay
     assert done.orphans == 1 and not ghost.exists()
     assert {p.name for p in young.parent.glob("run=*.parquet")} == named  # referenced stay
     assert retention.retain(local, NOW, apply=True).orphans == 0
+
+
+def accepted_row(at: datetime, user: str) -> dict[str, Any]:
+    payload = {
+        "subject": "draft_hv", "picked": None, "feature": "hv_pct",
+        "expression": "price_stats.hv20 * 100", "fingerprint": "abc123def456",
+        "canonical": "(* 100 price_stats.hv20)", "unit": "pct_points", "description": "d",
+    }  # fmt: skip
+    return row_of("formula_accepted", "sess-" + user, user, "screen", "s", at=at, payload=payload)
+
+
+def test_an_accepted_formula_is_strategy_content_that_retain_and_erase_both_null(
+    backend: Backend,
+) -> None:
+    """The formula and its fingerprint live in ``payload``, a registered personal column."""
+    registered = {t.table: t for t in retention.PERSONAL}
+    assert "payload" in registered[retention.FEEDBACK].criteria
+    record(backend, [accepted_row(OLD, "abhi"), accepted_row(YOUNG, "abhi")], [], YOUNG)
+    retention.retain(backend, NOW, apply=True)
+    fb = events(backend)
+    old, young = fb[fb["ts"] < pd.Timestamp("2026-01-01", tz="UTC")], fb.drop(fb.index[:1])
+    assert old["payload"].isna().all()  # past the window: the formula is gone
+    assert "abc123def456" in young["payload"].iloc[0]  # inside it: still there
+    retention.erase(backend, "abhi", NOW, apply=True)
+    erased = events(backend)
+    assert erased["payload"].isna().all()  # erase: every formula of the user
+    assert not erased["user"].isin(["abhi"]).any()

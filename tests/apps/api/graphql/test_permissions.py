@@ -36,6 +36,7 @@ CALLS = {
     "leverage_review": "leverageReview",
     "llm_usage": "llmUsage",
     "feature_requests": "featureRequests",
+    "accepted_formulas": "acceptedFormulas",
     "harness_runs": "harnessRuns(limit: 1)",
     "harness_run": 'harnessRun(runId: "x")',
 }
