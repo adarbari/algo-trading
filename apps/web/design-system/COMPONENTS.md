@@ -843,6 +843,7 @@ Source: `design-system/components/Input`
 | `name` | `string` | no |  |
 | `id` | `string` | no |  |
 | `autoComplete` | `string` | no |  |
+| `maxLength` | `number \| undefined` | no | Longest text the box accepts, in characters. |
 | `spellCheck` | `boolean` | no |  |
 | `onKeyDown` | `KeyboardEventHandler<HTMLInputElement> \| undefined` | no |  |
 | `onFocus` | `FocusEventHandler<HTMLInputElement> \| undefined` | no |  |
@@ -1096,6 +1097,48 @@ Source: `design-system/components/Panel`
 | `headingLevel` | `2 \| 3` | no | Heading level in the page outline; 2 by default. |
 | `flush` | `boolean` | no | No body padding (a table or grid that runs edge to edge). |
 | `children` | `ReactNode` | no | Body content when ready. |
+
+### PartCard
+
+PartCard: one part of the trader's sentence in the Describe it review. The header quotes the trader's own words (highlighted) with a kind badge (applied, formula to review, needs your call, not available yet, not understood, kept from your screen); under it "We read this as: ..." in plain language, then the part's `rows` (criteria, formula, readings, suggestions) and its `actions` (pick another reading, retype this part). A reading the model did not write (a server-built text, or none) shows a muted "check this reading" note instead of claiming it. The card is a state machine of its own: `idle`, `redrafting` (this card only, the words stay visible), `error` (an inline retry), `disabled`; `edited` marks hand-edited rows; `retype` turns the words into an input with Apply / Cancel. The `kept` kind has no quoted words (a `title` names it). It holds callbacks and slots only: every label and sentence arrives as a prop, the rows component is composed by the caller, and nothing here calls an API.
+
+Source: `design-system/components/PartCard`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `kind` | `PartKind` | yes | How the part was understood: sets the badge tone and icon. |
+| `kindLabel` | `string` | yes | The badge text ("applied", "not understood"). |
+| `origin` | `PartOrigin \| undefined` | no | Where the part comes from; `kept` has no quoted words and shows `keptLabel`. |
+| `keptLabel` | `string \| undefined` | no | The marker for a kept part ("kept from your screen"); shown beside the badge. |
+| `words` | `string \| undefined` | no | The trader's own words, quoted and highlighted; omit for a kept part. |
+| `title` | `string \| undefined` | no | The card's name when it has no words (the kept card: "Kept from your screen"). |
+| `headingLevel` | `HeadingLevel \| undefined` | no | Outline level of the card's heading (default 3). |
+| `readingLabel` | `string \| undefined` | no | The lead-in to the reading ("We read this as"). |
+| `reading` | `ReactNode` | no | The part in plain language. |
+| `readingSource` | `'model' \| 'server' \| null \| undefined` | no | Who wrote the reading: `model` is shown as is; `server` or null shows the muted note. |
+| `checkReadingLabel` | `string \| undefined` | no | The muted note for a reading not written by the model ("check this reading"). |
+| `rows` | `ReactNode` | no | The part's criteria / formula / readings / suggestions, composed by the caller. |
+| `actions` | `ReactNode` | no | Pick another reading, retype this part: buttons or a picker, composed by the caller. |
+| `info` | `ReactNode` | no | A Guide InfoButton for the kind, shown beside the badge. |
+| `state` | `PartCardState \| undefined` | no | `idle`, `redrafting` (this card is being redrafted), `error` (inline retry), `disabled`. |
+| `redraftingLabel` | `string` | yes | What is happening while redrafting ("Redrafting this part"): announced and shown once. |
+| `errorMessage` | `string \| undefined` | no | What went wrong, shown inline in the `error` state. |
+| `retryLabel` | `string \| undefined` | no | The retry button's label ("Try again"). |
+| `onRetry` | `(() => void) \| undefined` | no |  |
+| `edited` | `boolean \| undefined` | no | The rows were edited by hand. |
+| `editedLabel` | `string \| undefined` | no | The mark's text ("edited"). |
+| `retype` | `PartRetype \| undefined` | no | Retype mode: the words become an input with Apply / Cancel. |
+
+### PartList
+
+PartList: the ordered PartCards of one sentence, in the order the trader wrote the parts, a token gap apart. A card for words that were not understood, or the "kept from your screen" card, sits in the list like any other. A list element, so assistive technology announces "list, N items"; its name arrives as a prop.
+
+Source: `design-system/components/PartList`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `'aria-label'` | `string` | yes | Accessible name of the list ("Parts of your sentence"). |
+| `children` | `ReactNode` | yes | The PartCards, in order. |
 
 ### PendingRow
 

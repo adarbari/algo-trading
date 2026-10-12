@@ -1,0 +1,170 @@
+/* PartCard: a bordered card; head (words + badge), body (reading, rows, actions). */
+.card {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-family: var(--font-sans);
+}
+
+.card[data-kind='not-understood'] {
+  border-color: var(--color-negative-border);
+}
+
+.card[data-kind='kept'] {
+  border-style: dashed;
+}
+
+.card[data-state='error'] {
+  border-color: var(--color-negative-border);
+}
+
+.card[data-state='disabled'] {
+  border-style: dotted;
+  background: var(--color-row);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.words {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.quote {
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+  overflow-wrap: anywhere;
+}
+
+.title {
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-md);
+}
+
+.marks {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.edited {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.body[data-disabled] {
+  pointer-events: none;
+}
+
+.reading {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+  overflow-wrap: anywhere;
+}
+
+.lead {
+  color: var(--color-muted);
+}
+
+.check,
+.muted {
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-style: italic;
+  line-height: var(--line-height-xs);
+}
+
+.error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--color-negative);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.rows {
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.retype {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.retype > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.retypeActions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* A narrow card stacks the badge under the words and lets actions fill the width. */
+@container (width < 480px) {
+  .head {
+    flex-direction: column;
+  }
+
+  .marks {
+    order: -1;
+  }
+
+  .actions > *,
+  .retype,
+  .retypeActions {
+    flex: 1 1 100%;
+  }
+}
+
+@media (pointer: coarse) {
+  .quote {
+    padding-block: var(--space-0-5);
+  }
+}
