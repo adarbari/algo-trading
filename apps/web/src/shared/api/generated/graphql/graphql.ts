@@ -592,6 +592,11 @@ export type GuideSearchQueryVariables = Exact<{
 
 export type GuideSearchQuery = { guideSearch: { query: string, groups: Array<{ kind: string, hits: Array<{ kind: string, id: string, title: string, snippet: string }> }> } | null };
 
+export type MyFeatureRequestsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MyFeatureRequestsQuery = { myFeatureRequests: Array<{ ref: string, description: string, status: string, unmapped: boolean, firstAsked: string, lastAsked: string, timesAsked: number, promotedTo: string, feasibility: string, span: string | null }> };
+
 export type TableViewQueryVariables = Exact<{
   scope: string;
   name?: string | null | undefined;
@@ -3492,6 +3497,22 @@ export const GuideSearchDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideSearchQuery, GuideSearchQueryVariables>;
+export const MyFeatureRequestsDocument = new TypedDocumentString(`
+    query MyFeatureRequests {
+  myFeatureRequests {
+    ref
+    description
+    status
+    unmapped
+    firstAsked
+    lastAsked
+    timesAsked
+    promotedTo
+    feasibility
+    span
+  }
+}
+    `) as unknown as TypedDocumentString<MyFeatureRequestsQuery, MyFeatureRequestsQueryVariables>;
 export const TableViewDocument = new TypedDocumentString(`
     query TableView($scope: String!, $name: String) {
   view(scope: $scope, name: $name) {

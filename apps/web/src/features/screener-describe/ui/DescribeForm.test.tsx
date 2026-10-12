@@ -1,9 +1,8 @@
+import { Text } from '@algotrade/ui';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { IconButton } from '@algotrade/ui';
 
 import { api, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
@@ -40,8 +39,14 @@ const ANSWER = {
   ],
   notes: ['no IV rank field in the catalogue'],
 };
+const OK = { response: new Response(null, { status: 200 }) };
 
-function setup(renderFieldHelp?: (field: string) => ReactNode, draftSessionId?: string) {
+interface Options {
+  draftSessionId?: string;
+  onAnswer?: () => void;
+}
+
+function setup({ draftSessionId, onAnswer }: Options = {}) {
   const onDraft = vi.fn();
   const onSession = vi.fn();
   const view = render(
@@ -51,89 +56,130 @@ function setup(renderFieldHelp?: (field: string) => ReactNode, draftSessionId?: 
         document={DOCUMENT}
         onDraft={onDraft}
         onSession={onSession}
+        {...(onAnswer ? { onAnswer } : {})}
         {...(draftSessionId ? { draftSessionId } : {})}
-        {...(renderFieldHelp ? { renderFieldHelp } : {})}
+        renderTermHelp={(term) => <Text>{`help ${term}`}</Text>}
+        renderReview={({ answer, text }): ReactNode => (
+          <Text>{`review of "${text}" with ${String(Object.keys(answer.document['criteria'] ?? {}).length)} criteria`}</Text>
+        )}
       />
     </TestQueryProvider>,
   );
   return { onDraft, onSession, ...view };
 }
 
+const type = (sentence: string) =>
+  userEvent.type(screen.getByRole('textbox', { name: 'Describe the screen' }), sentence);
+
 beforeEach(() => {
   POST.mockReset();
 });
 
 describe('DescribeForm', () => {
-  it('sends the sentence with the current document, loads the draft and says what was left out', async () => {
-    POST.mockResolvedValue({ data: ANSWER, response: new Response(null, { status: 200 }) });
-    const { onDraft, container } = setup();
-    const box = screen.getByRole('textbox', { name: 'Describe the screen' });
+  it('sends the sentence with the current document, loads the draft and hands the answer to the review', async () => {
+    POST.mockResolvedValue({ data: ANSWER, ...OK });
+    const onAnswer = vi.fn();
+    const { onDraft, container } = setup({ onAnswer });
     expect(screen.getByRole('button', { name: 'Draft it' })).toBeDisabled();
-    await userEvent.type(box, 'active stocks over $5 with IV rank above 50%{Enter}');
+    await type('active stocks over $5 with IV rank above 50%{Enter}');
     await waitFor(() => {
       expect(onDraft).toHaveBeenCalledWith(ANSWER.document);
     });
-    expect(POST).toHaveBeenCalledWith('/screeners/{screener_id}/draft-from-text', {
-      params: { path: { screener_id: 'mine' } },
-      body: { text: 'active stocks over $5 with IV rank above 50%', document: DOCUMENT },
-    });
-    expect(screen.getByText('Drafted 2 criteria; review and save')).toBeInTheDocument();
-    expect(screen.getByText(/Left out iv_rank/)).toBeInTheDocument();
-    expect(screen.getByText('Kept price:')).toBeInTheDocument();
-    expect(screen.getByText('no IV rank field in the catalogue')).toBeInTheDocument();
+    expect(POST).toHaveBeenCalledWith(
+      '/screeners/{screener_id}/draft-from-text',
+      expect.objectContaining({
+        params: { path: { screener_id: 'mine' } },
+        body: { text: 'active stocks over $5 with IV rank above 50%', document: DOCUMENT },
+      }),
+    );
+    expect(onAnswer).toHaveBeenCalledWith(ANSWER);
+    expect(
+      screen.getByText('review of "active stocks over $5 with IV rank above 50%" with 2 criteria'),
+    ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
   it("sends the previous answer's session id with the next sentence and reports the new one", async () => {
-    POST.mockResolvedValue({
-      data: { ...ANSWER, draft_session_id: 'sess-2' },
-      response: new Response(null, { status: 200 }),
-    });
-    const { onSession } = setup(undefined, 'sess-1');
-    await userEvent.type(
-      screen.getByRole('textbox', { name: 'Describe the screen' }),
-      'and liquid{Enter}',
-    );
+    POST.mockResolvedValue({ data: { ...ANSWER, draft_session_id: 'sess-2' }, ...OK });
+    const { onSession } = setup({ draftSessionId: 'sess-1' });
+    await type('and liquid{Enter}');
     await waitFor(() => {
       expect(onSession).toHaveBeenCalledWith('sess-2');
     });
-    expect(POST).toHaveBeenCalledWith('/screeners/{screener_id}/draft-from-text', {
-      params: { path: { screener_id: 'mine' } },
-      body: { text: 'and liquid', document: DOCUMENT, draft_session_id: 'sess-1' },
-    });
+    expect(POST).toHaveBeenCalledWith(
+      '/screeners/{screener_id}/draft-from-text',
+      expect.objectContaining({
+        body: { text: 'and liquid', document: DOCUMENT, draft_session_id: 'sess-1' },
+      }),
+    );
   });
 
-  it('gives every field the draft names (left out or kept) the help the widget supplies', async () => {
-    POST.mockResolvedValue({ data: ANSWER, response: new Response(null, { status: 200 }) });
-    const { container } = setup((field) => (
-      <IconButton icon="info" label={`What is ${field}?`} size="sm" />
-    ));
-    await userEvent.type(
-      screen.getByRole('textbox', { name: 'Describe the screen' }),
-      'stocks{Enter}',
-    );
+  it('keeps the Builder document when the answer has no criteria, and still shows the review', async () => {
+    POST.mockResolvedValue({
+      data: { ...ANSWER, document: { id: 'mine', criteria: {} }, dropped: [] },
+      ...OK,
+    });
+    const { onDraft } = setup();
+    await type('something nobody stores{Enter}');
     expect(
-      await screen.findByRole('button', { name: 'What is rollup.nope@v1.iv_rank?' }),
+      await screen.findByText(/review of "something nobody stores" with 0 criteria/),
     ).toBeVisible();
-    expect(screen.getByRole('button', { name: 'What is instrument.status?' })).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'What is rollup.price_stats@v2.close?' }),
-    ).toBeVisible();
-    expect(screen.getByText(/Left out iv_rank \(/)).toBeInTheDocument();
+    expect(onDraft).not.toHaveBeenCalled();
+  });
+
+  it("says drafting is off in the trader's words, never the API's text, with no Try again", async () => {
+    POST.mockResolvedValue({
+      error: { detail: 'the text model is off: enable it in config/site/llm.toml (ADR 0041)' },
+      response: new Response(null, { status: 503 }),
+    });
+    const { onDraft, container } = setup();
+    await type('stocks{Enter}');
+    expect(await screen.findByText('Drafting is off')).toBeInTheDocument();
+    expect(screen.getByText('help describe_failure_off')).toBeInTheDocument();
+    expect(screen.queryByText(/config\/site/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    expect(onDraft).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);
   });
 
-  it("shows the API's refusal as the field's error", async () => {
-    POST.mockResolvedValue({
-      error: {
-        detail: 'the text model is off: enable it in config/site/llm.toml (ADR 0041)',
-      },
+  it('never shows the raw "answer is not JSON"; Try again asks again and clears the message', async () => {
+    POST.mockResolvedValueOnce({
+      error: { detail: "the model's answer is not JSON" },
       response: new Response(null, { status: 503 }),
-    });
+    }).mockResolvedValue({ data: ANSWER, ...OK });
     const { onDraft } = setup();
-    await userEvent.type(screen.getByRole('textbox', { name: 'Describe the screen' }), 'stocks');
-    await userEvent.click(screen.getByRole('button', { name: 'Draft it' }));
-    expect(await screen.findByText(/text model is off/)).toBeInTheDocument();
+    await type('stocks{Enter}');
+    expect(await screen.findByText('The model could not answer')).toBeInTheDocument();
+    expect(screen.queryByText(/JSON/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => {
+      expect(onDraft).toHaveBeenCalledWith(ANSWER.document);
+    });
+    expect(screen.queryByText('The model could not answer')).not.toBeInTheDocument();
+    expect(POST).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows a waiting phase with Cancel, and ignores the answer that arrives after it', async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    POST.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }) as never,
+    );
+    const { onDraft, onSession } = setup();
+    await type('stocks{Enter}');
+    expect(await screen.findByText('Drafting your screen')).toBeInTheDocument();
+    const signal = (POST.mock.calls[0]?.[1] as { signal?: AbortSignal } | undefined)?.signal;
+    expect(signal?.aborted).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(signal?.aborted).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+    answer({ data: ANSWER, ...OK });
+    await new Promise((resolve) => setTimeout(resolve, 20));
     expect(onDraft).not.toHaveBeenCalled();
+    expect(onSession).not.toHaveBeenCalled();
+    expect(screen.queryByText(/review of/)).not.toBeInTheDocument();
+    expect(screen.queryByText('The model could not answer')).not.toBeInTheDocument();
   });
 });

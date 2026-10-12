@@ -1,18 +1,19 @@
 /**
  * "Describe it": a sentence ("optionable stocks over $5 with IV rank above 50%") sent for a
- * draft; the answer is handed to the Builder as unsaved rows, and what the model dropped (a field
- * the catalogue does not have, a value the validator refused) or could not map is shown so the
- * trader knows what to add by hand. Each field named (left out or kept) carries the widget's
- * help button (`renderFieldHelp`: the Guide's drawer; features never import each other). The
- * API's refusal (drafting off, the model down) is the field's error.
+ * draft. The answer's criteria are handed to the Builder as unsaved rows (an answer with none
+ * leaves the Builder's document alone) and what the model understood is shown by the owner's
+ * review panel (`renderReview`: the widget composes it, features never import each other). A
+ * draft takes 5 to 20 s, so the wait is visible and can be cancelled (the answer is then ignored);
+ * a failure is a trader-facing message with Try again, never the API's raw text.
  */
-import { Banner, Button, Field, Input, Mono, Stack, Text } from '@algotrade/ui';
-import { useState, type ReactNode } from 'react';
+import { Banner, Button, Field, Input, Skeleton, Stack, Text } from '@algotrade/ui';
+import { useRef, useState, type ReactNode } from 'react';
 
 import type { ScreenDocument } from '@/entities/screen';
-import { errorDetail } from '@/shared/api';
 
 import { useDraftFromText, type ScreenDraft } from '../api/hooks';
+import { draftFailure, wasCancelled } from '../model/failure';
+import { hasCriteria } from '../model/review';
 
 export interface DescribeFormProps {
   screenerId: string;
@@ -28,24 +29,22 @@ export interface DescribeFormProps {
   draftSessionId?: string | null;
   /** The answer's session id, to keep for the next sentence and the save. */
   onSession?: (draftSessionId: string | null) => void;
-  /** The help for a field the draft names (null for a field the Guide does not know). */
-  renderFieldHelp?: (field: string) => ReactNode;
+  /** An answer arrived (its options replace the last answer's): reset what was decided on them. */
+  onAnswer?: (answer: ScreenDraft) => void;
+  /** The help button of a Guide term (the failure message's explanation); features never import each other. */
+  renderTermHelp?: (term: string) => ReactNode;
+  /** The review of an answer: what was understood, what the draft proposes, what is missing. */
+  renderReview?: (review: { answer: ScreenDraft; text: string; serial: number }) => ReactNode;
 }
 
 const HINT =
   'Plain English, e.g. "optionable stocks over $5 with IV rank above 50% and $50M traded a day". The rows are a draft you review.';
 
-/** The criteria of a draft with the field each reads. */
-function keptFields(document: Readonly<Record<string, unknown>>): { id: string; field: string }[] {
-  const criteria = document['criteria'];
-  if (typeof criteria !== 'object' || criteria === null) return [];
-  return Object.entries(criteria as Record<string, unknown>).flatMap(([id, criterion]) => {
-    const field: unknown =
-      typeof criterion === 'object' && criterion !== null && 'field' in criterion
-        ? criterion.field
-        : null;
-    return typeof field === 'string' ? [{ id, field }] : [];
-  });
+interface Answered {
+  answer: ScreenDraft;
+  text: string;
+  /** Distinct per answer: the review starts afresh for a new one. */
+  serial: number;
 }
 
 export function DescribeForm({
@@ -54,31 +53,47 @@ export function DescribeForm({
   onDraft,
   draftSessionId = null,
   onSession,
-  renderFieldHelp,
+  onAnswer,
+  renderTermHelp,
+  renderReview,
 }: DescribeFormProps) {
   const [text, setText] = useState('');
-  const [result, setResult] = useState<ScreenDraft | null>(null);
+  const [result, setResult] = useState<Answered | null>(null);
+  const answers = useRef(0);
   const draft = useDraftFromText(screenerId);
-  const canSubmit = text.trim() !== '' && !draft.isPending;
+  const flight = useRef<AbortController | null>(null);
+  const waiting = draft.isPending;
+  const canSubmit = text.trim() !== '' && !waiting;
+
   const submit = () => {
     if (!canSubmit) return;
+    const sent = text.trim();
+    const controller = new AbortController();
+    flight.current = controller;
     draft.mutate(
-      { text: text.trim(), document, draftSessionId },
+      { text: sent, document, draftSessionId, signal: controller.signal },
       {
         onSuccess: (answer) => {
-          setResult(answer);
+          if (controller.signal.aborted) return; // cancelled: the answer is ignored
+          answers.current += 1;
+          setResult({ answer, text: sent, serial: answers.current });
           onSession?.(answer.draft_session_id ?? null);
-          onDraft(answer.document);
+          onAnswer?.(answer);
+          if (hasCriteria(answer.document)) onDraft(answer.document);
         },
       },
     );
   };
-  const error = draft.isError ? errorDetail(draft.error) : undefined;
-  const keptCriteria = result ? keptFields(result.document) : [];
-  const kept = keptCriteria.length;
+  const cancel = () => {
+    flight.current?.abort();
+    draft.reset();
+  };
+
+  const failure =
+    draft.isError && !wasCancelled(draft.error) ? draftFailure(draft.error) : undefined;
   return (
     <Stack gap={3}>
-      <Field label="Describe the screen" hint={HINT} error={error}>
+      <Field label="Describe the screen" hint={HINT}>
         <Input
           value={text}
           onValueChange={setText}
@@ -93,45 +108,43 @@ export function DescribeForm({
               size="sm"
               onClick={submit}
               disabled={!canSubmit}
-              loading={draft.isPending}
+              loading={waiting}
             >
               Draft it
             </Button>
           }
         />
       </Field>
-      {result && (
-        <Banner
-          tone={result.dropped.length > 0 ? 'warning' : 'info'}
-          title={`Drafted ${String(kept)} ${kept === 1 ? 'criterion' : 'criteria'}; review and save`}
-          onDismiss={() => {
-            setResult(null);
-          }}
-        >
-          <Stack gap={1}>
-            {result.dropped.map((d) => (
-              <Stack key={d.id} direction="row" gap={1} align="center" wrap>
-                <Text size="sm">{`Left out ${d.id} (`}</Text>
-                <Mono size="sm">{d.field}</Mono>
-                {renderFieldHelp?.(d.field)}
-                <Text size="sm">{`): ${d.reason}`}</Text>
-              </Stack>
-            ))}
-            {keptCriteria.map(({ id, field }) => (
-              <Stack key={id} direction="row" gap={1} align="center" wrap>
-                <Text size="sm" tone="muted">{`Kept ${id}:`}</Text>
-                <Mono size="sm">{field}</Mono>
-                {renderFieldHelp?.(field)}
-              </Stack>
-            ))}
-            {result.notes.map((note) => (
-              <Text key={note} size="sm" tone="muted">
-                {note}
-              </Text>
-            ))}
+      {waiting && (
+        <Stack gap={2}>
+          <Skeleton lines={2} label="Drafting your screen" />
+          <Stack direction="row" gap={2} align="center" wrap>
+            <Text size="sm" tone="muted">
+              Drafting, up to 20 seconds
+            </Text>
+            <Button variant="ghost" size="sm" onClick={cancel}>
+              Cancel
+            </Button>
           </Stack>
-        </Banner>
+        </Stack>
       )}
+      {failure && (
+        <Banner
+          tone="negative"
+          title={failure.title}
+          actions={
+            <Stack direction="row" gap={2} align="center">
+              {failure.retry && (
+                <Button variant="secondary" size="sm" onClick={submit} disabled={!canSubmit}>
+                  Try again
+                </Button>
+              )}
+              {renderTermHelp?.(failure.help.id)}
+            </Stack>
+          }
+        />
+      )}
+      {!waiting && result && renderReview?.(result)}
     </Stack>
   );
 }

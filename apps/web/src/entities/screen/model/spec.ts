@@ -81,7 +81,8 @@ export function blankDocument(id: string): ScreenDocument {
   return { id, kind: 'screener', impl: 'rules', criteria: structuredClone(BASE_CRITERIA) };
 }
 
-function toCriterion(id: string, table: Record<string, unknown>): Criterion {
+/** The criterion of a `[criteria.<id>]` table (unknown keys left out). */
+export function toCriterion(id: string, table: Record<string, unknown>): Criterion {
   const mode = MODES.find((m) => m === table['mode']) ?? 'hard';
   const criterion: Criterion = {
     id,

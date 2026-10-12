@@ -24,10 +24,16 @@ import {
   type ScreenerDetail,
   type ScreenPreview,
 } from '@/entities/screen';
-import { errorDetail } from '@/shared/api';
+import { errorDetail, type components } from '@/shared/api';
 import { useDebounced } from '@/shared/lib';
 
 import { useCopyOwnPreset, useDiscardDraft, useSaveDraft } from '../api/hooks';
+
+/** What the trader decided about one thing Describe it offered (ADR 0066), sent with the save. */
+export type DraftChoice = components['schemas']['DraftChoice'];
+/** A proposed formula: not yet decided, accepted or skipped. */
+export type FormulaState = 'proposed' | 'accepted' | 'skipped';
+type Formula = components['schemas']['DraftFormula'];
 
 /** The live preview waits this long after the last edit. */
 export const PREVIEW_DEBOUNCE_MS = 300;
@@ -76,6 +82,21 @@ export interface ScreenerBuilder {
    */
   draftSessionId: string | null;
   setDraftSessionId: (draftSessionId: string | null) => void;
+  /**
+   * The decisions made on the last answer's options (a reading picked, a formula accepted or
+   * skipped), sent with the save and the finalise and cleared with the session. One per event and
+   * subject: deciding again replaces it.
+   */
+  choices: readonly DraftChoice[];
+  recordChoice: (choice: DraftChoice) => void;
+  /** Each proposed formula's state by name; a name not listed is `proposed`. */
+  formulaStates: Readonly<Record<string, FormulaState>>;
+  /** The trader chose Review and add. (W1: marks it accepted; the review dialog replaces this.) */
+  reviewFormula: (formula: Formula) => void;
+  /** The trader chose Skip. */
+  skipFormula: (name: string) => void;
+  /** A new answer replaced the proposals: none is decided yet. */
+  resetFormulas: () => void;
   save: () => Promise<void>;
   discard: () => Promise<void>;
   saving: boolean;
@@ -124,6 +145,25 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
   // Keyed by screener, so opening another one starts without a session.
   const [session, setSession] = useState<{ id: string; draftSessionId: string } | null>(null);
   const draftSessionId = session?.id === id ? session.draftSessionId : null;
+  // The options' decisions, keyed by screener like the session; gone with it.
+  const [review, setReview] = useState<{
+    id: string;
+    choices: DraftChoice[];
+    formulas: Record<string, FormulaState>;
+  } | null>(null);
+  const current = review?.id === id ? review : { id, choices: [], formulas: {} };
+  const updateReview = (change: (r: NonNullable<typeof review>) => NonNullable<typeof review>) => {
+    setReview((prev) => change(prev?.id === id ? prev : { id, choices: [], formulas: {} }));
+  };
+  const choose = (choice: DraftChoice) => {
+    updateReview((r) => ({
+      ...r,
+      choices: [
+        ...r.choices.filter((c) => !(c.event === choice.event && c.subject === choice.subject)),
+        choice,
+      ],
+    }));
+  };
   const save = useSaveDraft(id);
   const discard = useDiscardDraft(id);
   const copy = useCopyOwnPreset(id);
@@ -155,7 +195,8 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
   };
   const saved = async () => {
     await copying.current;
-    if (edited) await save.mutateAsync({ document: edited, draftSessionId });
+    if (edited)
+      await save.mutateAsync({ document: edited, draftSessionId, choices: current.choices });
     setEdited(null);
   };
 
@@ -198,6 +239,21 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     draftSessionId,
     setDraftSessionId: (next) => {
       setSession(next ? { id, draftSessionId: next } : null);
+      if (!next) setReview(null); // the session is over: so are its decisions
+    },
+    choices: current.choices,
+    recordChoice: choose,
+    formulaStates: current.formulas,
+    reviewFormula: (formula) => {
+      updateReview((r) => ({ ...r, formulas: { ...r.formulas, [formula.name]: 'accepted' } }));
+      choose({ event: 'formula_accepted', subject: formula.name });
+    },
+    skipFormula: (name) => {
+      updateReview((r) => ({ ...r, formulas: { ...r.formulas, [name]: 'skipped' } }));
+      choose({ event: 'formula_skipped', subject: name });
+    },
+    resetFormulas: () => {
+      updateReview((r) => ({ ...r, formulas: {} }));
     },
     save: saved,
     discard: async () => {
@@ -207,6 +263,7 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
       copy.reset();
       setEdited(null);
       setSession(null); // a discarded screen is abandoned: a later description is a new session
+      setReview(null);
     },
     saving: save.isPending,
     discarding: discard.isPending,

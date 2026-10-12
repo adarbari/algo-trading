@@ -115,6 +115,24 @@ function Probe() {
         describe
       </Button>
       <Text>{`session ${b.draftSessionId ?? 'none'}`}</Text>
+      <Button
+        onClick={() => {
+          b.recordChoice({ event: 'choice_made', subject: 'liquid', picked: 0 });
+          b.recordChoice({ event: 'choice_made', subject: 'liquid', picked: 2 });
+          b.skipFormula('draft_x');
+        }}
+      >
+        decide
+      </Button>
+      <Button
+        onClick={() => {
+          b.setDraftSessionId(null);
+        }}
+      >
+        end session
+      </Button>
+      <Text>{`choices ${b.choices.map((c) => `${c.event}:${c.subject}:${String(c.picked ?? '')}`).join(',')}`}</Text>
+      <Text>{`formulas ${JSON.stringify(b.formulaStates)}`}</Text>
     </>
   );
 }
@@ -221,6 +239,33 @@ describe('ScreenerBuilderProvider', () => {
       </ToastProvider>,
     );
     expect(await screen.findByText('session none')).toBeInTheDocument();
+  });
+
+  it('keeps the latest decision per option, sends them with the save, and clears them with the session', async () => {
+    setup();
+    await screen.findByText('criteria iv30=0.5,close=5');
+    await userEvent.click(screen.getByRole('button', { name: 'describe' }));
+    await userEvent.click(screen.getByRole('button', { name: 'decide' }));
+    expect(
+      screen.getByText('choices choice_made:liquid:2,formula_skipped:draft_x:'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('formulas {"draft_x":"skipped"}')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'edit' }));
+    await userEvent.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      expect(PUT).toHaveBeenCalledTimes(1);
+    });
+    expect(PUT.mock.calls[0]?.[1]).toMatchObject({
+      body: {
+        choices: [
+          { event: 'choice_made', subject: 'liquid', picked: 2 },
+          { event: 'formula_skipped', subject: 'draft_x' },
+        ],
+      },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'end session' }));
+    expect(screen.getByText('choices')).toBeInTheDocument();
+    expect(screen.getByText('formulas {}')).toBeInTheDocument();
   });
 
   it('drops the Describe-it session when the draft is discarded', async () => {

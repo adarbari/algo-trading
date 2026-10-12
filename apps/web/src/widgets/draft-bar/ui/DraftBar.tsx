@@ -106,6 +106,7 @@ export function DraftBar({ compact = false, onDeleted, onReturn }: DraftBarProps
             version={builder.nextVersion}
             prepare={builder.save}
             draftSessionId={builder.draftSessionId}
+            choices={builder.choices}
             onFinalised={() => {
               builder.setDraftSessionId(null);
             }}

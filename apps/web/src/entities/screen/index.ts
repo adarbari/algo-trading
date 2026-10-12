@@ -50,6 +50,7 @@ export {
   NO_VALUE_OPS,
   previewDocument,
   tieBreakOf,
+  toCriterion,
   toDocument,
   withCriterion,
   withoutCriterion,
