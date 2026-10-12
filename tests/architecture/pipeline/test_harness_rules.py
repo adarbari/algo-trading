@@ -69,9 +69,12 @@ def test_decision_log_entries_have_date_status_and_decider() -> None:
     assert entries
     for entry in entries:
         assert re.match(r"\d{4}-\d{2}-\d{2} \| ", entry), entry[:60]
-        assert re.search(r"^- decided by: (owner|Fable on the owner's behalf)$", entry, re.M), (
-            entry[:60]
-        )
+        assert re.search(
+            r"^- decided by: (owner|Fable on the owner's behalf"
+            r"|orchestrator \((owner present|owner away)\))$",
+            entry,
+            re.M,
+        ), entry[:60]
         assert re.search(
             r"^- status: (final|pending owner confirmation|overruled)$", entry, re.M
         ), entry[:60]

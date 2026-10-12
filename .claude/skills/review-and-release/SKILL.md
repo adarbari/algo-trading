@@ -35,7 +35,9 @@ For a policy decision:
   with consequences, a recommendation. Keep working on other items meanwhile.
 - **Owner away** (said so, or no answer once all other work is done): brief a Fable agent
   (`model: "fable"`: the decision, the options, the constraints, the relevant ADRs), apply its
-  answer, and log it as `Fable on the owner's behalf`, status `pending owner confirmation`.
+  answer, and log it as `Fable on the owner's behalf`, status `pending owner confirmation`. A call the orchestrating session itself takes is logged
+  as `orchestrator (owner present)` or `orchestrator (owner away)`, status `pending owner
+  confirmation`; never label it Fable.
 - **Fable may not decide**: spending above existing caps, deleting or erasing data, security
   or permission settings, publishing outside the repo, merging with failing CI, overriding an
   ADR. Those wait for the owner (the PR stays `no-automerge`, plus `needs-owner`).

@@ -1,7 +1,7 @@
 # Decision log
 
 Append-only, newest last. One entry per product-direction or policy decision, whoever took it
-(`.claude/skills/review-and-release`). `decided by`: owner | Fable on the owner's behalf.
+(`.claude/skills/review-and-release`). `decided by`: owner | Fable on the owner's behalf | orchestrator (owner present) | orchestrator (owner away).
 `status`: final | pending owner confirmation | overruled. The owner confirms or overrules by
 telling the session, which updates the entry (an overrule means a follow-up PR).
 
@@ -113,38 +113,54 @@ telling the session, which updates the entry (an overrule means a follow-up PR).
 - Question: may a curated case with no recorded answer stay in the set?
 - Options: fail CI at once / skip forever / skip for 14 days then fail.
 - Decision: the replay test skips a case with `recorded: false` for 14 days; after that a fitness test fails.
-- decided by: Fable on the owner's behalf
+- decided by: orchestrator (owner present)
 - status: pending owner confirmation
-- Reasoning: taken by the orchestrating session with the owner present, not by a Fable agent; CI must not go red on the PR that adds a curated case, but cases must not stay unrecorded.
+- Reasoning: CI must not go red on the PR that adds a curated case, but cases must not stay unrecorded.
 
 ## 2026-10-11 | PR #535 | Prompt budget
 - Question: how does the drafting prompt stay inside its token budget?
 - Options: shorten field-detail descriptions / cap backlog keys and shorten examples.
 - Decision: field-detail descriptions stay at 160 chars (restored); open backlog keys in the prompt are capped at 8, relevance first; the second worked example is shortened; the budget test pads the keys to the cap. The margin is about 77 tokens, so a retrieval trim PR comes before any further prompt text.
-- decided by: Fable on the owner's behalf
+- decided by: orchestrator (owner away)
 - status: pending owner confirmation
-- Reasoning: taken by the orchestrating session following two Opus reviews, not by a Fable agent.
+- Reasoning: taken following two Opus reviews.
 
 ## 2026-10-11 | PR #535 | Split services/drafting
 - Question: when is the full `services/drafting` folder (9 of 10 modules) split?
 - Options: inside #535 / a separate refactor PR after #535 merges.
 - Decision: split into `contract/` and `golden/` subfolders in a separate refactor PR after #535 merges.
-- decided by: Fable on the owner's behalf
+- decided by: orchestrator (owner away)
 - status: pending owner confirmation
-- Reasoning: taken by the orchestrating session, not by a Fable agent; keeps #535 reviewable.
+- Reasoning: keeps #535 reviewable.
 
 ## 2026-10-11 | PR #540 | Retention of curated golden cases
 - Question: which events does a curated golden case spare from retention?
 - Options: only its final event / the whole chain.
 - Decision: a curated golden case spares the whole chain (every event id in `source_events`), not only its final event.
-- decided by: Fable on the owner's behalf
+- decided by: orchestrator (owner away)
 - status: pending owner confirmation
-- Reasoning: taken by the orchestrating session, not by a Fable agent; the stored iteration stays whole.
+- Reasoning: the stored iteration stays whole.
 
 ## 2026-10-11 | PR #535 | API shape of the formula dry run
 - Question: what does REST serve of `FormulaDryRun`, and which type is `Alternative.label`?
 - Options: serve `missing` / withhold it; `label` as enum / text.
 - Decision: `FormulaDryRun.missing` is not served over REST; `Alternative.label` is `text` in the API.
-- decided by: Fable on the owner's behalf
+- decided by: orchestrator (owner away)
 - status: pending owner confirmation
-- Reasoning: taken by the orchestrating session, not by a Fable agent; `missing` listed table names, an admin-only cause under ADR 0056, and label follows ADR 0038.
+- Reasoning: `missing` listed table names, an admin-only cause under ADR 0056, and label follows ADR 0038.
+
+## 2026-10-11 | Feature-request ranked list | PROMOTED and WONT_DO keys
+- Question: are PROMOTED and WONT_DO keys shown in the ranked list?
+- Options: keep, sorted last / hide.
+- Decision: they stay visible, sorted last with their status.
+- decided by: owner
+- status: final
+- Reasoning: traders see what was decided, not only what is open.
+
+## 2026-10-11 | Request log | Span cap
+- Question: how much of the sentence does the request log keep?
+- Options: 120 chars / 300 chars / key only.
+- Decision: 300 characters, a substring of the sentence.
+- decided by: owner
+- status: final
+- Reasoning: enough context to judge a request without storing whole sentences.
