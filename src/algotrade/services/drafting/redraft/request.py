@@ -15,8 +15,9 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.drafting.formulas import DraftFormula, DroppedFormula
-from algotrade.services.drafting.gaps import Alternative, MissingFeature, Unresolved
+from algotrade.services.drafting.contract.formulas import DraftFormula, DroppedFormula
+from algotrade.services.drafting.contract.gaps import Alternative, MissingFeature, Unresolved
+from algotrade.services.drafting.contract.suggestions import DroppedSuggestion, Suggestion
 from algotrade.services.drafting.parts.build import kind_of
 from algotrade.services.drafting.parts.model import (
     KEPT_ID,
@@ -27,7 +28,6 @@ from algotrade.services.drafting.parts.model import (
     Part,
 )
 from algotrade.services.drafting.screens import MAX_TEXT, DroppedCriterion, ScreenDraft
-from algotrade.services.drafting.suggestions import DroppedSuggestion, Suggestion
 from algotrade.services.preview.expressions import DryRun, SampleValue
 
 MAX_ITEMS = 40  # of each list of a draft a request may carry back (the merge keeps within it)
