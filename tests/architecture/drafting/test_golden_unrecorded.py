@@ -6,10 +6,13 @@ case has waited is not a CI failure (it would block unrelated PRs): ``make statu
 case unrecorded for more than 14 days."""
 
 import json
+import os
 import subprocess
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
+
+import pytest
 
 from algotrade.services.drafting.golden import recorded_answers
 from tests.conftest import REPO_ROOT
@@ -82,6 +85,22 @@ def test_the_check_names_each_way_a_case_can_hide_in_the_unrecorded_state(tmp_pa
         "backdated",
     }
     assert problems(tmp_path / "none", date(2026, 10, 11), lambda p: None) == []
+
+
+def is_shallow() -> bool:
+    done = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+    )  # fmt: skip
+    return done.stdout.strip() == "true"
+
+
+def test_ci_checks_out_the_full_history_for_the_commit_date_check() -> None:
+    """`added_on` cannot date a case in a shallow clone: locally that skips the date check, but
+    CI (`CI` is set) must fail instead, so a workflow that drops `fetch-depth: 0` is noticed
+    (ci.yml keeps it in step: tests/architecture/pipeline/test_ci_workflow.py)."""
+    if os.environ.get("CI") and is_shallow():
+        pytest.fail("shallow clone in CI: ci.yml must check out with fetch-depth: 0 here")
 
 
 def test_the_committed_unrecorded_cases_are_structurally_sound() -> None:

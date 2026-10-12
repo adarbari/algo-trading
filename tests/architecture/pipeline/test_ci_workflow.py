@@ -188,3 +188,38 @@ def test_the_screenshot_label_and_ci_dispatch_run_outside_the_playwright_contain
     inside = "\n".join(str(s.get("run", "")) for s in doc["jobs"]["update"]["steps"])
     assert "gh " not in inside.replace("github-actions", ""), "no gh call inside the container"
     assert "for attempt in 1 2 3" in inside and "git rebase" in inside, "rebase-safe push"
+
+
+def test_full_history_is_fetched_only_by_the_shard_that_runs_the_architecture_tests() -> None:
+    """`tests/architecture/drafting/test_golden_unrecorded.py` fails in a shallow clone in CI, so
+    the shard running tests/architecture (`apps` on a Python change, `rest` on a web-only or
+    docs-only one) checks out `fetch-depth: 0`; every other shard stays shallow."""
+    checkout = next(
+        step
+        for step in _jobs()["test"]["steps"]
+        if str(step.get("uses", "")).startswith("actions/checkout")
+    )
+    depth = str(checkout["with"]["fetch-depth"])
+    assert "'0'" in depth, "a bare 0 is falsy in a GitHub expression: quote it"
+
+    def full(shard: str, python: str) -> bool:
+        expr = depth.removeprefix("${{").removesuffix("}}").strip()
+        # evaluate the one expression shape the workflow uses
+        py = python == "true"
+        env = {"shard": shard, "py": py}
+        py_expr = (
+            expr.replace("matrix.shard", "shard")
+            .replace("needs.changes.outputs.python == 'true'", "py")
+            .replace("needs.changes.outputs.python != 'true'", "(not py)")
+            .replace("&&", " and ")
+            .replace("||", " or ")
+        )
+        return eval(py_expr, {}, env) == "0"
+
+    for shard in ("unit-a", "unit-b", "unit-c", "apps", "rest"):
+        for python in ("true", "false"):
+            runs_architecture = (shard == "apps") == (python == "true") and shard in {
+                "apps",
+                "rest",
+            }
+            assert full(shard, python) == runs_architecture, (shard, python)

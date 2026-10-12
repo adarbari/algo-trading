@@ -63,21 +63,61 @@ def test_only_the_orchestrator_releases_no_automerge() -> None:
     assert "never removes `needs-owner`" in implementer
 
 
-def test_decision_log_entries_have_date_status_and_decider() -> None:
-    text = REPO.joinpath("docs", "decisions", "log.md").read_text()
-    entries = text.split("\n## ")[1:]
+def _log_entries() -> list[str]:
+    entries = REPO.joinpath("docs", "decisions", "log.md").read_text().split("\n## ")[1:]
     assert entries
-    for entry in entries:
+    return entries
+
+
+def test_decision_log_entries_have_date_status_and_decider() -> None:
+    for entry in _log_entries():
         assert re.match(r"\d{4}-\d{2}-\d{2} \| ", entry), entry[:60]
         assert re.search(
-            r"^- decided by: (owner|Fable on the owner's behalf"
-            r"|orchestrator \((owner present|owner away)\))$",
+            r"^- decided by: (owner( \(confirmed \d{4}-\d{2}-\d{2}\))?"
+            r"|Fable on the owner's behalf|orchestrator \(design call\))$",
             entry,
             re.M,
         ), entry[:60]
         assert re.search(
             r"^- status: (final|pending owner confirmation|overruled)$", entry, re.M
         ), entry[:60]
+
+
+def test_only_the_owner_makes_a_log_entry_final() -> None:
+    """`final` needs `decided by: owner...` or a `- confirmed: owner YYYY-MM-DD` line."""
+    for entry in _log_entries():
+        if re.search(r"^- status: final$", entry, re.M):
+            assert re.search(r"^- decided by: owner\b", entry, re.M) or re.search(
+                r"^- confirmed: owner \d{4}-\d{2}-\d{2}$", entry, re.M
+            ), f"only the owner makes an entry final: {entry[:60]}"
+
+
+POLICY_WORDS = re.compile(
+    r"retention|retain|erase|erasure|personal data|privacy|who sees|sees all|visib|ADR \d{4}",
+    re.I,
+)
+
+
+def test_the_orchestrator_does_not_decide_policy_topics() -> None:
+    """Heuristic (the topic is free text): an `orchestrator (design call)` entry whose heading or
+    question names a policy word (retention, personal data, who sees, an ADR...) is rejected."""
+    for entry in _log_entries():
+        if "- decided by: orchestrator" in entry:
+            head = entry.split("\n- Decision:")[0]
+            assert not POLICY_WORDS.search(head), f"policy goes to the owner: {entry[:60]}"
+
+
+def test_one_policy_list_in_the_skill_is_cited_by_the_agents() -> None:
+    skill = _flat(".claude", "skills", "review-and-release", "SKILL.md")
+    assert "Owner only" in skill and "no `needs-owner` label" in skill
+    for name in ("architect", "implementer"):
+        assert "review-and-release" in _flat(".claude", "agents", f"{name}.md"), name
+    assert "docs/decisions/log.md" in _flat(".claude", "commands", "start.md")
+
+
+def test_auto_merge_skips_needs_owner_like_no_automerge() -> None:
+    script = REPO.joinpath("scripts", "auto_merge.sh").read_text()
+    assert '"no-automerge"' in script and '"needs-owner"' in script
 
 
 def test_claude_md_names_the_four_model_tiers() -> None:

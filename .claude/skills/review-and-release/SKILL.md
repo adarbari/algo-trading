@@ -23,11 +23,20 @@ session, else decided by a Fable agent on their behalf, and always logged.
 
 ## 2. The policy gate
 
-An item in any "Owner decisions" is **policy** when it concerns: who sees what; what personal
-data is stored or for how long; money or the budget; what the product does or shows users (a
-new screen, a behaviour choice, scope); a contradiction of an ADR; or anything the reviewer
-marks as the owner's. Everything else (design, naming, mechanics) the orchestrator and the
-reviewer settle themselves.
+**Who decides what** (owner decision 2026-10-11; this is the one list, `architect.md` and
+`implementer.md` cite it):
+
+- **Design and engineering calls** (thresholds, test structure, refactor order, naming,
+  mechanics): the orchestrating session and the reviewer settle them. Logged, when worth a
+  line, as `orchestrator (design call)`.
+- **Policy**: who sees what; what personal data is stored, for how long, its retention and
+  erasure rules; money or the budget; what the product does or shows users (a new screen, a
+  behaviour choice, scope); a contradiction of an ADR; anything the reviewer marks as the
+  owner's. The orchestrating session never decides these: the owner in the session, else (owner
+  away) a Fable agent on their behalf.
+- **Owner only** (Fable may not decide): spending above existing caps, deleting or erasing
+  data, security or permission settings, publishing outside the repo, merging with failing CI,
+  overriding an ADR. The PR stays `no-automerge` plus `needs-owner`.
 
 For a policy decision:
 
@@ -35,28 +44,24 @@ For a policy decision:
   with consequences, a recommendation. Keep working on other items meanwhile.
 - **Owner away** (said so, or no answer once all other work is done): brief a Fable agent
   (`model: "fable"`: the decision, the options, the constraints, the relevant ADRs), apply its
-  answer, and log it as `Fable on the owner's behalf`, status `pending owner confirmation`. A call the orchestrating session itself takes is logged
-  as `orchestrator (owner present)` or `orchestrator (owner away)`, status `pending owner
-  confirmation`; never label it Fable.
-- **Fable may not decide**: spending above existing caps, deleting or erasing data, security
-  or permission settings, publishing outside the repo, merging with failing CI, overriding an
-  ADR. Those wait for the owner (the PR stays `no-automerge`, plus `needs-owner`).
+  answer, and log it as `Fable on the owner's behalf`, status `pending owner confirmation`.
 
-Every decision, by the owner or Fable, is appended to `docs/decisions/log.md` (in this PR or
-a harness PR) and listed in the PR body with its source. `/start` shows entries pending
-confirmation; the owner confirms or overrules by telling the session, which updates the
-entry (an overrule means a follow-up PR).
+Every policy decision, by the owner or Fable, is appended to `docs/decisions/log.md` (in this
+PR or a harness PR) and listed in the PR body with its source. `/start` shows entries pending
+confirmation; the owner confirms or overrules by telling the session, which updates the entry's
+`status` line to `final` with `- confirmed: owner YYYY-MM-DD` (an overrule means a follow-up
+PR). Only the owner's word makes an entry `final`; an agent never does.
 
 ## 3. Release
 
-When the reviewer's last verdict is `Re-review: no`, CI on the head is green, no policy
-decision is unanswered, and the PR body lists the decisions taken (owner, or Fable on the
+When the reviewer's last verdict is `Re-review: no`, CI on the head is green, the PR has no
+`needs-owner` label, no policy decision is unanswered, and the PR body lists the decisions taken (owner, or Fable on the
 owner's behalf), the **orchestrating session** removes `no-automerge` from PRs created in its
 own flow (an implementer's label counts as its orchestrator's). The auto-merge workflow then
 merges on green; never `gh pr merge`. Post a short PR comment: reviewer rounds and decisions.
 
 - A PR with an open owner decision stays `no-automerge`.
 - `needs-owner` is the explicit "owner must look" label (e.g. a requested visual review);
-  never remove it.
+  never remove it. `scripts/auto_merge.sh` skips a PR carrying it, as it skips `no-automerge`.
 - Push rules are unchanged (rule 9: `make changed`, merge origin/main right before, never
   force-push).

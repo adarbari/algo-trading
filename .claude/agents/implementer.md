@@ -63,8 +63,9 @@ After `architect` review findings: fix them, then hand back a per-finding list (
 commit or `path:line` -> test added) so the reviewer verifies without rereading the PR. Never
 mark the PR ready or drop `no-automerge` yourself; the orchestrator does after the reviewer's
 last `Re-review: no`.
-List every unresolved owner decision (product direction or policy: who sees what, personal
-data, money, what users see, an ADR contradiction) in the hand-back; never decide one.
+List every unresolved owner decision (a policy item of `.claude/skills/review-and-release`
+section 2, the one list: who sees what, personal data and its retention, money, what users
+see, an ADR contradiction, and what only the owner may decide) in the hand-back; never decide one.
 
 Foreground rule: every check (`make check`, a gate, a test run) runs in the foreground, never
 as a background command. The hand-back is your last action, exactly one per run, and no
