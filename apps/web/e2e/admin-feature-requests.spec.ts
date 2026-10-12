@@ -1,6 +1,6 @@
 /**
  * Admin > Feature requests end to end against a mocked API: the ranked list with its counts and
- * statuses, a status filter that lives in the URL, accessible in dark and light; a failed read
+ * statuses, a status filter, accessible in dark and light; a failed read
  * shows its error.
  */
 import { expect, test, type Page } from '@playwright/test';
@@ -41,11 +41,10 @@ for (const theme of ['dark', 'light'] as const) {
   });
 }
 
-test('the status filter is in the URL and hides the other rows', async ({ page }) => {
+test('the status filter hides the other rows', async ({ page }) => {
   await open(page);
   await page.goto('/admin/feature-requests');
   await page.getByRole('radio', { name: 'Promoted' }).click();
-  await expect(page).toHaveURL(/status=PROMOTED/);
   const list = page.getByRole('grid', { name: 'Feature requests' });
   await expect(list).toContainText('rsi_14');
   await expect(list).not.toContainText('realised_vol_20d');

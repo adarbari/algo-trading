@@ -1,12 +1,11 @@
 /**
  * The requested features in the server's ranking, with a status filter (a view over the rows the
- * server sent: nothing is counted or re-ranked here). The chosen status lives in the URL.
+ * server sent: nothing is counted or re-ranked here).
  */
 import { DataTable, Panel, SegmentedControl } from '@algotrade/ui';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
-  isRequestStatus,
   START_PAGE,
   STATUS_LABEL,
   STATUSES,
@@ -18,20 +17,14 @@ import { GuideHelp } from '@/features/guide-help';
 
 import { requestColumns } from '../model/columns';
 
-export interface FeatureRequestListProps {
-  /** The status shown (from the URL); null, or one the server does not serve: every status. */
-  status?: string | null;
-  onStatusChange: (status: RequestStatus | null) => void;
-}
-
 type View = 'ALL' | RequestStatus;
 
-export function FeatureRequestList({ status, onStatusChange }: FeatureRequestListProps) {
+export function FeatureRequestList() {
+  const [status, setStatus] = useState<RequestStatus | null>(null);
   const requests = useFeatureRequests();
   const columns = useMemo(() => requestColumns(), []);
   const all = requests.data?.rows ?? [];
-  const shown = isRequestStatus(status) ? status : null;
-  const rows = shown ? all.filter((r) => r.status === shown) : all;
+  const rows = status ? all.filter((r) => r.status === status) : all;
   const state =
     requests.isError && !requests.data
       ? 'error'
@@ -56,9 +49,9 @@ export function FeatureRequestList({ status, onStatusChange }: FeatureRequestLis
           <SegmentedControl<View>
             aria-label="Status"
             size="sm"
-            value={shown ?? 'ALL'}
+            value={status ?? 'ALL'}
             onValueChange={(v) => {
-              onStatusChange(v === 'ALL' ? null : v);
+              setStatus(v === 'ALL' ? null : v);
             }}
             options={[
               { value: 'ALL', label: 'All' },

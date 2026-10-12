@@ -350,7 +350,7 @@ test('Feature requests: the ranked list fits a phone and a status filter narrows
   await page.goto('/admin/feature-requests');
   await expect(page.getByRole('row', { name: /realised_vol_20d/ })).toBeVisible();
   await page.getByRole('radio', { name: 'Promoted' }).tap();
-  await expect(page).toHaveURL(/status=PROMOTED/);
+  await expect(page.getByRole('row', { name: /realised_vol_20d/ })).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize()?.width ?? 0,
   );
