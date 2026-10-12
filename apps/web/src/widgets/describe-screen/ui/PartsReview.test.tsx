@@ -23,10 +23,10 @@ vi.mock('@/features/screener-describe', async (importOriginal) => ({
 
 type Part = components['schemas']['Part'];
 
-const FIFTY = { field: 'f.dollar_volume', op: 'gte', value: 50_000_000, mode: 'hard' };
-const TEN = { field: 'f.dollar_volume', op: 'gte', value: 10_000_000, mode: 'hard' };
-const OPTIONABLE = { field: 'f.optionable', op: 'eq', value: true, mode: 'hard' };
-const PRICE = { field: 'f.price', op: 'gte', value: 5, mode: 'hard' };
+const FIFTY = { field: 'f.dollar_volume', op: 'gte', value: 50_000_000 };
+const TEN = { field: 'f.dollar_volume', op: 'gte', value: 10_000_000 };
+const OPTIONABLE = { field: 'f.optionable', op: 'eq', value: true };
+const PRICE = { field: 'f.price', op: 'gte', value: 5 };
 const DOCUMENT: ScreenDocument = {
   id: 'mine',
   rank: { tie_break: 'f.volume' },

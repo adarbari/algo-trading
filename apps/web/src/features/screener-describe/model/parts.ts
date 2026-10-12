@@ -5,6 +5,7 @@
  * reference (ADR 0038); this module reads them (an older answer has none) and
  * compares the trader's own edits to the answer's original rows. Pure.
  */
+import { tableFor, toCriterion } from '@/entities/screen';
 import type { components } from '@/shared/api';
 
 import { same } from './readings';
@@ -50,16 +51,19 @@ export function partEdited(
   terms: ScreenDraft['unresolved'],
 ): boolean {
   const own = (terms ?? []).filter((term) => part.unresolved.includes(term.term));
+  // Both sides as the Builder writes a row (it adds the mode and op the server leaves off).
+  const written = (id: string, row: Table) => tableFor(toCriterion(id, row));
   return part.criteria.some((id) => {
     const was = tableOf(original)[id];
     if (was === undefined) return false;
-    const now = tableOf(current)[id];
-    if (now === undefined) return true;
-    if (same(was, now)) return false;
+    const rawNow = tableOf(current)[id];
+    if (rawNow === undefined) return true;
+    const now = written(id, tableOf(rawNow));
+    if (same(written(id, tableOf(was)), now)) return false;
     return !own.some((term) => {
       const readingKeys = new Set(term.alternatives.flatMap((alt) => Object.keys(alt.criterion)));
       const rest = without(tableOf(was), readingKeys);
-      return term.alternatives.some((alt) => same({ ...rest, ...alt.criterion }, now));
+      return term.alternatives.some((alt) => same(written(id, { ...rest, ...alt.criterion }), now));
     });
   });
 }
