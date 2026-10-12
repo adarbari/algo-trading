@@ -9,8 +9,8 @@ Layout (``root`` = ``tests/fixtures/drafting/golden``):
   feedback/curate.py``): ``{id, sentence, split: "train" | "held_out", expect: {parts: [...],
   scope_fields: [...]}}``. A part is ``{span, bucket: "A" | "B" | "C" | "ask", fields, op, value,
   tolerance}``: an ``A`` part wants one criterion on one of ``fields`` (alternatives) with an
-  ``op`` (one, or a list of acceptable ones; ``equivalent_ops``, default none, adds ops that
-  also pass at the same value, for a boundary that is immaterial: ``gt`` read as ``gte``) and a
+  ``op`` (one, or a list of acceptable ones; ``equivalent_ops``, default none, only the
+  boundary partner of ``op`` (``gt`` / ``gte``, ``lt`` / ``lte``), met at the exact value) and a
   ``value`` within ``tolerance`` (a fraction of the expected value; absolute when that is 0); a
   ``B`` / ``C`` / ``ask`` part wants no criterion of its own, so any criterion that matches no
   ``A`` part is extra. The A / B / C contract
@@ -49,6 +49,12 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.features.expressions.fingerprint import fingerprint
 
 SPLITS = ("train", "held_out")
+BOUNDARY_PARTNER = {
+    "gt": "gte",
+    "gte": "gt",
+    "lt": "lte",
+    "lte": "lt",
+}  # what ``equivalent_ops`` may name
 
 # Readings (field, op, value) that select the same instruments, so a part expecting one is met
 # by any of them: the scorer must not fail a draft for choosing between synonyms.
@@ -99,6 +105,7 @@ def load_cases(root: Path) -> tuple[GoldenCase, ...]:
         if raw["split"] not in SPLITS:
             raise ValueError(f"{path.name}: split must be one of {SPLITS}")
         expect = raw["expect"]
+        _check_equivalent_ops(path.name, expect["parts"])
         cases.append(
             GoldenCase(
                 raw["id"],
@@ -115,6 +122,18 @@ def load_cases(root: Path) -> tuple[GoldenCase, ...]:
             )
         )
     return tuple(cases)
+
+
+def _check_equivalent_ops(name: str, parts: Sequence[Mapping[str, Any]]) -> None:
+    """``equivalent_ops`` may only name the boundary partner of the part's ``op`` (``gt`` /
+    ``gte``, ``lt`` / ``lte``): a different direction is a different screen."""
+    for part in parts:
+        ops = part["op"] if isinstance(part.get("op"), list) else [part.get("op")]
+        for extra in part.get("equivalent_ops", ()):
+            if not any(BOUNDARY_PARTNER.get(str(op)) == extra for op in ops):
+                raise ValueError(
+                    f"{name}: equivalent_ops {extra!r} is not the boundary partner of {ops}"
+                )
 
 
 def _in_force(raw: Mapping[str, Any]) -> Mapping[str, Any] | None:
@@ -254,10 +273,12 @@ def _forms(crit: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 
 def _fits(part: Mapping[str, Any], crit: Mapping[str, Any]) -> bool:
     ops = part["op"] if isinstance(part["op"], list) else [part["op"]]
-    ops = [*ops, *part.get("equivalent_ops", ())]
+    tolerance = float(part.get("tolerance", 0))
+    if crit["op"] in part.get("equivalent_ops", ()):  # the boundary partner: the exact value
+        return _close(crit.get("value"), part["value"], 0.0)
     if crit["op"] not in ops:
         return False
-    return _close(crit.get("value"), part["value"], float(part.get("tolerance", 0)))
+    return _close(crit.get("value"), part["value"], tolerance)
 
 
 def _close(got: Any, want: Any, tolerance: float) -> bool:

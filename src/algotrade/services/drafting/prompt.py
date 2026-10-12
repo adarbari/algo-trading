@@ -9,7 +9,7 @@ timestamps or ids, so the same catalogue, phrasebook and guide give the same byt
 prompt cache hits and a recorded test stays valid). The prompt carries no market data, results
 or credentials.
 
-The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 6: the A / B / C answer contract, the
+The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 7: the A / B / C answer contract, the
 open backlog keys most relevant to the sentence, the index grouped by prefix): the task, the
 examples and an index of every field (grouped under one heading per prefix: type, unit) as a prefix
 no sentence changes, then in detail only the fields ``retrieval.select_slice`` picks for the
@@ -38,9 +38,9 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 # Bump with any change to the prompt: the usage log records it (ADR 0058). 2: index + slice;
 # 3: formulas, missing and unresolved in the answer, and the open backlog keys; 4: a phrasebook
 # entry shows its structured thresholds; 5: the index grouped by prefix and the slice capped by a
-# token budget; 6: protective checks are ``suggestions``, never criteria, and no threshold is
+# token budget; 7: protective checks are ``suggestions``, never criteria, and no threshold is
 # invented for a vague word.
-PROMPT_VERSION = "6"
+PROMPT_VERSION = "7"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 
@@ -86,7 +86,7 @@ Rules:
   lies. Take thresholds from them, never from memory (say in "notes" when you had to choose one).
 - "criteria" holds ONLY what the sentence asks for; a check a caveat names goes in "suggestions"
   (soft or score, never hard). A vague word ("heavy") with no threshold in the phrasebook or
-  field guide is left out, with a note.
+  field guide stays out of "criteria": offer readings in "unresolved" when fields fit, else a note.
 
 Answer shape:
 {"criteria": [ ... ], "tie_break": {"field": "...", "descending": true} or null,

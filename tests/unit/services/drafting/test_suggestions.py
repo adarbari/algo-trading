@@ -12,7 +12,9 @@ from algotrade.services.drafting.suggestions import MAX_SUGGESTIONS, suggestions
 
 def build(item: Mapping[str, Any], name: str) -> dict[str, Any]:
     if name == "nope":
-        raise ConfigurationError(f"field {name!r} is not in the catalogue")
+        err = ConfigurationError(f"field {name!r} is not in the catalogue")
+        err.kind = "not_in_catalogue"  # type: ignore[attr-defined]  # as screens.CriterionError
+        raise err
     return {"field": name, "op": item["op"], "value": item["value"], "mode": item["mode"]}
 
 
@@ -70,10 +72,19 @@ def test_a_repeat_of_a_criterion_of_the_draft_or_of_another_suggestion_is_droppe
     assert [s.criterion["field"] for s in kept] == ["feature.rsi"] and dropped == ()
 
 
-def test_a_repeat_is_dropped_before_it_is_checked_so_an_unfit_one_is_not_reported() -> None:
-    held = [{"field": "feature.trend_state", "op": "ne", "value": "DOWNTREND"}]
-    kept, dropped = got(one(mode="hard"), held=held)
-    assert kept == () and dropped == ()
+def test_a_suggestion_that_rewrites_an_asked_threshold_is_dropped_quietly() -> None:
+    held = [{"field": "feature.div_yield", "op": "gt", "value": 0.05}]
+    tighter = one(field="feature.div_yield", op="gt", value=0.08, mode="score")
+    cap = one(field="feature.div_yield", op="lt", value=0.12, mode="score")  # the other direction
+    kept, dropped = got(tighter, cap, held=held)
+    assert [(s.criterion["op"], s.criterion["value"]) for s in kept] == [("lt", 0.12)]
+    assert dropped == ()
+
+
+def test_a_malformed_suggestion_is_dropped_and_never_breaks_the_draft() -> None:
+    kept, dropped = got(one(value={"a": 1}), one(field=["x"]), one(value=[[1], [2]]), one())
+    assert len(kept) == 1
+    assert [d.kind for d in dropped] == ["bad_shape", "bad_shape", "bad_shape"]
 
 
 def test_at_most_five_are_offered_and_the_rest_are_said() -> None:
@@ -90,3 +101,38 @@ def test_no_suggestions_or_a_non_list_is_nothing() -> None:
     assert suggestions_of({"criteria": []}, build, []) == ((), ())
     assert suggestions_of({"criteria": [], "suggestions": None}, build, []) == ((), ())
     assert suggestions_of({"criteria": [], "suggestions": "x"}, build, []) == ((), ())
+
+
+def test_a_drop_has_a_kind_and_a_detail_of_the_check_and_json_path_only() -> None:
+    items = [
+        one(mode="hard", why="SECRET WORDS"), one(field="nope", why="SECRET WORDS"),
+        one(why=" "), "text", one(field="feature.a", value=1),
+        *[one(field=f"feature.f{n}", value=n + 10, why="SECRET WORDS") for n in range(6)],
+    ]  # fmt: skip
+    _, dropped = got(*items)
+    assert [(d.kind, d.detail) for d in dropped] == [
+        ("bad_mode", "bad_mode: suggestions[0].mode"),
+        ("not_in_catalogue", "not_in_catalogue: suggestions[1].field"),
+        ("missing_why", "missing_why: suggestions[2].why"),
+        ("bad_shape", "bad_shape: suggestions[3]"),
+        ("over_cap", "over_cap: suggestions[9]"),
+        ("over_cap", "over_cap: suggestions[10]"),
+    ]
+    assert not any("SECRET" in d.detail or "DOWNTREND" in d.detail for d in dropped)
+
+
+def test_a_check_error_from_the_criterion_validator_keeps_its_kind() -> None:
+    def refuse(item: Mapping[str, Any], name: str) -> dict[str, Any]:
+        err = ConfigurationError("tolerance 'x' is not a number")
+        err.kind = "bad_value"  # type: ignore[attr-defined]  # as screens.CriterionError
+        raise err
+
+    _, dropped = suggestions_of({"suggestions": [one()]}, refuse, [])
+    assert (dropped[0].kind, dropped[0].detail) == (
+        "bad_value",
+        "bad_value: suggestions[0].tolerance",
+    )
+    _, plain = suggestions_of(
+        {"suggestions": [one()]}, lambda i, n: (_ for _ in ()).throw(ConfigurationError("x: y")), []
+    )
+    assert (plain[0].kind, plain[0].detail) == ("validator", "validator: suggestions[0].criterion")

@@ -27,6 +27,14 @@ SUGGESTED_MODES = ("soft", "score")
 Build = Callable[[Mapping[str, Any], str], dict[str, Any]]
 
 
+class SuggestionError(ConfigurationError):
+    """A suggestion that does not hold: ``kind`` says which check refused it."""
+
+    def __init__(self, kind: str, message: str) -> None:
+        super().__init__(message)
+        self.kind = kind
+
+
 @dataclass(frozen=True)
 class Suggestion:
     """A protective check offered, never applied: a soft or score criterion with the reason."""
@@ -38,10 +46,15 @@ class Suggestion:
 
 @dataclass(frozen=True)
 class DroppedSuggestion:
-    """A suggestion the draft does not offer, and why."""
+    """A suggestion the draft does not offer, and why. ``reason`` is what the Builder shows;
+    ``kind`` (the check that refused it, as ``DroppedCriterion.kind``, plus ``over_cap``) and
+    ``detail`` (that check and the JSON path only, e.g. ``bad_value: suggestions[0].value``: no
+    quoted value, never the model's ``why``) carry no model prose, so a report can use them."""
 
     field: str
     reason: str
+    kind: str = "other"
+    detail: str = ""
 
 
 def suggestions_of(
@@ -51,28 +64,38 @@ def suggestions_of(
 ) -> tuple[tuple[Suggestion, ...], tuple[DroppedSuggestion, ...]]:
     """The proposed ``suggestions`` checked, and the ones dropped with a reason. ``build``
     validates one as a criterion (``screens._alternative``); ``held`` are the criteria of the
-    draft (a suggestion repeating one is dropped quietly)."""
+    draft (a suggestion repeating one, or with the same field and op, is dropped quietly: it would
+    rewrite what the sentence asked; the opposite direction is kept)."""
     raw = proposal.get("suggestions")
     items = raw if isinstance(raw, list) else []
     kept: list[Suggestion] = []
     dropped: list[DroppedSuggestion] = []
     seen = {_reading(c) for c in held}
-    for item in items:
+    asked = {(c["field"], c["op"]) for c in held}  # a threshold the sentence set
+    for n, item in enumerate(items):
         mapping = item if isinstance(item, Mapping) else {}
         name = mapping.get("field")
         field_name = name if isinstance(name, str) else ""
-        if mapping and _raw_reading(mapping) in seen:  # a repeat is dropped before it is checked
-            continue
         try:
             suggestion = _one(item, field_name, build)
         except ConfigurationError as exc:
-            dropped.append(DroppedSuggestion(field_name, str(exc)))
+            kind = getattr(exc, "kind", "validator")  # ``screens.CriterionError`` has one
+            dropped.append(
+                DroppedSuggestion(field_name, str(exc), kind, _detail(kind, n, str(exc)))
+            )
             continue
         reading = _reading(suggestion.criterion)
-        if reading in seen:
+        if reading in seen or reading[:2] in asked:  # a repeat, or a rewrite of an asked threshold
             continue
         if len(kept) >= MAX_SUGGESTIONS:
-            dropped.append(DroppedSuggestion(field_name, f"over the {MAX_SUGGESTIONS} allowed"))
+            dropped.append(
+                DroppedSuggestion(
+                    field_name,
+                    f"over the {MAX_SUGGESTIONS} allowed",
+                    "over_cap",
+                    _detail("over_cap", n, ""),
+                )
+            )
             continue
         seen.add(reading)
         kept.append(suggestion)
@@ -81,23 +104,32 @@ def suggestions_of(
 
 def _one(item: Any, field_name: str, build: Build) -> Suggestion:
     if (shape := check_item(item, SUGGESTION, "suggestion")) is not None:
-        raise ConfigurationError(f"not the suggestion shape ({shape})")
+        raise SuggestionError("bad_shape", f"not the suggestion shape ({shape})")
     mode = item.get("mode")
     if mode not in SUGGESTED_MODES:
-        raise ConfigurationError(
-            f"a suggestion is soft or score, never hard (got {mode if mode else 'no mode'!s})"
+        raise SuggestionError(
+            "bad_mode",
+            f"a suggestion is soft or score, never hard (got {mode if mode else 'no mode'!s})",
         )
     criterion = build(item, field_name)
     why = " ".join(str(item.get("why") or "").split())
     if not why:
-        raise ConfigurationError("a suggestion needs a short reason (why)")
+        raise SuggestionError("missing_why", "a suggestion needs a short reason (why)")
     source = item.get("source")
     return Suggestion(criterion, why, source if isinstance(source, str) and source else None)
 
 
-def _raw_reading(item: Mapping[str, Any]) -> tuple[Any, Any, Any]:
-    value = item.get("value")
-    return item.get("field"), item.get("op"), tuple(value) if isinstance(value, list) else value
+_PATH = {
+    "not_in_catalogue": ".field", "bad_op": ".op", "bad_mode": ".mode", "bad_value": ".value",
+    "missing_why": ".why", "validator": ".criterion",
+}  # fmt: skip
+
+
+def _detail(kind: str, n: int, message: str) -> str:
+    """``kind`` and the JSON path of the part that failed: built from the check, never from the
+    model's words or values."""
+    part = ".tolerance" if kind == "bad_value" and message.startswith("tolerance") else None
+    return f"{kind}: suggestions[{n}]{part or _PATH.get(kind, '')}"
 
 
 def _reading(criterion: Mapping[str, Any]) -> tuple[Any, Any, Any]:

@@ -65,9 +65,19 @@
       "op": "gt",
       "value": 0.06,
       "mode": "soft",
-      "tolerance": null,
+      "tolerance": 0.005,
       "on_miss": null,
       "why": "the same check as the criterion",
+      "source": null
+    },
+    {
+      "field": "feature.div_yield",
+      "op": "gt",
+      "value": 0.09,
+      "mode": "score",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "a tighter threshold than asked",
       "source": null
     }
   ]

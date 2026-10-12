@@ -104,9 +104,9 @@ def test_the_suggestions_of_a_contract_answer_are_offered_apart(ctx: ReadContext
     }  # fmt: skip
     for case, _, text in cases:
         draft = draft_screen(ctx, Recorded(text), "golden", case.sentence)
-        in_document = {c["field"] for c in draft.document["criteria"].values()}
         assert [s.criterion["field"] for s in draft.suggestions] == case.suggested["offered"]
-        assert not in_document & {s.criterion["field"] for s in draft.suggestions}
+        held = {(c["field"], c["op"]) for c in draft.document["criteria"].values()}
+        assert not held & {(s.criterion["field"], s.criterion["op"]) for s in draft.suggestions}
         assert all(s.criterion["mode"] in ("soft", "score") for s in draft.suggestions)
         assert [d.field for d in draft.suggestions_dropped] == case.suggested["dropped"]
         for word in case.suggested["notes"]:

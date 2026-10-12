@@ -46,10 +46,48 @@
   ],
   "tie_break": null,
   "notes": [
-    "'jumpy' has no threshold in the phrasebook or field guide, so it is left out; say how jumpy (for example ATR above 3% of price) to add it"
+    "'jumpy' has no threshold in the phrasebook or field guide, so it is not a criterion: the readings offered are for you to pick"
   ],
   "formulas": null,
   "missing": null,
-  "unresolved": null,
+  "unresolved": [
+    {
+      "term": "jumpy",
+      "span": "jumpy daily range",
+      "default_index": 0,
+      "alternatives": [
+        {
+          "label": "daily range 3% or more",
+          "criterion": {
+            "id": "jumpy",
+            "field": "feature.atr_pct",
+            "op": "gte",
+            "value": 0.03,
+            "mode": "soft",
+            "tolerance": {
+              "relative": 0.2
+            },
+            "on_miss": null,
+            "why": "jumpy daily range"
+          }
+        },
+        {
+          "label": "daily range 5% or more",
+          "criterion": {
+            "id": "jumpy",
+            "field": "feature.atr_pct",
+            "op": "gte",
+            "value": 0.05,
+            "mode": "soft",
+            "tolerance": {
+              "relative": 0.2
+            },
+            "on_miss": null,
+            "why": "jumpy daily range"
+          }
+        }
+      ]
+    }
+  ],
   "suggestions": []
 }

@@ -1,6 +1,6 @@
 {
   "id": "vague-word-no-threshold",
-  "sentence": "optionable stocks over $10 with a jumpy tape",
+  "sentence": "optionable stocks over $10 with a jumpy daily range",
   "split": "train",
   "expect": {
     "parts": [
@@ -26,6 +26,25 @@
         ],
         "value": 10,
         "tolerance": 0
+      },
+      {
+        "span": "jumpy daily range",
+        "bucket": "A",
+        "fields": [
+          "feature.atr_pct"
+        ],
+        "op": [
+          "gte",
+          "gt"
+        ],
+        "value": 0.03,
+        "tolerance": 0
+      },
+      {
+        "span": "jumpy daily range",
+        "bucket": "ask",
+        "fields": [],
+        "term": "jumpy"
       }
     ],
     "scope_fields": [

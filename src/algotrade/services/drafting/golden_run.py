@@ -17,12 +17,14 @@ drafted; ``-`` below two answered repeats), invalid-answer rate (the model answe
 could not be parsed or validated), unavailable count (no answer), mean tokens in / out / cache
 read / cache write, latency p50 / p90 and cost (from the usage ledger's rows of the call; the
 rows are written to ``usage/llm_calls`` as usual). ``--json`` prints the same as one object, with
-each repeat's ``dropped`` criteria (id, field, reason, kind: field names and reasons only) per case.
+each repeat's ``dropped`` criteria (id, field, reason, kind: the check's own message, never the
+model's free text) per case.
 
-Drops: a criterion the server dropped is classified ``not_in_catalogue`` (the model named a field
-the catalogue lacks, e.g. a bare ``iv30``), ``bad_op``, ``bad_value`` or ``other``. The summary
+Drops: a criterion the server dropped carries the ``kind`` of the check that refused it
+(``not_in_catalogue``: the model named a field the catalogue lacks, e.g. a bare ``iv30``;
+``bad_op``, ``bad_mode``, ``bad_shape``, ``bad_value``, ``validator``, ``other``). The summary
 adds ``drops_total``, ``invented_field_drops`` (count and the top 20 invented names with counts)
-and ``repaired`` (answers whose first answer was refused: the product's repair path would run).
+and ``would_repair`` (answers whose first answer was refused: the product's repair path would run).
 
 Pacing: ``--pace`` sleeps between calls; ``--batch N`` pauses ``--batch-pause`` seconds every N
 calls. A rate-limited answer (HTTP 429) waits the pause (``DEFAULT_RATE_WAIT_S`` without one) and
@@ -227,25 +229,14 @@ class Recording:
             reject(*args)
 
 
-def drop_kind(reason: str) -> str:
-    """``not_in_catalogue`` / ``bad_op`` / ``bad_value`` / ``other`` for a dropped criterion's
-    reason (the messages of ``screens._criterion``)."""
-    if "is not in the catalogue" in reason:
-        return "not_in_catalogue"
-    if reason.startswith("unknown op"):
-        return "bad_op"
-    if any(k in reason for k in ("value", "between needs", "takes one value", "tolerance")):
-        return "bad_value"
-    return "other"
-
-
 @dataclass(frozen=True)
 class Drop:
-    """One criterion the server dropped from a draft: no sentence, only the field and why."""
+    """One criterion the server dropped from a draft: no sentence and none of the model's
+    free text, only the field, the kind of check and that check's own message."""
 
     id: str
     field: str
-    reason: str
+    detail: str
     kind: str
 
 
@@ -296,15 +287,16 @@ def evaluate(
     pace_s: float = 0.0,
     batch: int = 0,
     batch_pause_s: float = 0.0,
-    sleep: Callable[[float], None] = lambda _seconds: None,
+    sleep: Callable[[str, float], None] = lambda _provider, _seconds: None,
 ) -> RunResult:
     """Run the plan: every provider, case and repeat in turn, scoring each draft. Stops (the
     reason in ``stopped``) at ``max_calls`` calls, when ``costs`` reaches ``budget_usd``, and
     gives up on a provider after ``UNAVAILABLE_STREAK`` unavailable answers in a row. ``pace_s``
-    sleeps between calls, ``batch_pause_s`` after every ``batch`` calls; a 429 waits
-    (``batch_pause_s`` or ``DEFAULT_RATE_WAIT_S``) and retries the same call (each try counts as
-    a call) up to ``RATE_LIMIT_RETRIES`` times."""
-    run, calls = RunResult(), 0
+    sleeps between calls, ``batch_pause_s`` after every ``batch`` calls since the last pause; a
+    429 waits (``batch_pause_s`` or ``DEFAULT_RATE_WAIT_S``, which counts as a pause) and retries
+    the same call up to ``RATE_LIMIT_RETRIES`` times (each try counts as a call against
+    ``max_calls``, since it is a request). ``sleep(provider, seconds)`` waits for that provider."""
+    run, calls, since_pause = RunResult(), 0, 0
     wait = batch_pause_s or DEFAULT_RATE_WAIT_S
     for provider in plan.providers:
         recording = Recording(models[provider])
@@ -321,10 +313,12 @@ def evaluate(
                     run.stopped = f"{provider} unavailable {UNAVAILABLE_STREAK} times in a row"
                     break
                 if calls and pace_s > 0:
-                    sleep(pace_s)
-                if calls and batch > 0 and batch_pause_s > 0 and calls % batch == 0:
-                    sleep(batch_pause_s)
+                    sleep(provider, pace_s)
+                if batch > 0 and batch_pause_s > 0 and since_pause >= batch:
+                    sleep(provider, batch_pause_s)
+                    since_pause = 0
                 calls += 1
+                since_pause += 1
                 result = _call(provider, case, recording, draft, costs)
                 retries = 0
                 while (
@@ -333,9 +327,11 @@ def evaluate(
                     and retries < RATE_LIMIT_RETRIES
                     and calls < max_calls
                 ):
-                    sleep(wait)
+                    sleep(provider, wait)
+                    since_pause = 0
                     retries += 1
                     calls += 1
+                    since_pause += 1
                     result = _call(provider, case, recording, draft, costs)
                 run.results.append(replace(result, rate_limit_retries=retries))
                 streak = streak + 1 if result.status == "unavailable" else 0
@@ -365,7 +361,7 @@ def _call(
         [u.term for u in made.unresolved],
     )
     fields = frozenset(c["field"] for c in made.document["criteria"].values())
-    drops = tuple(Drop(d.id, d.field, d.reason, drop_kind(d.reason)) for d in made.dropped)
+    drops = tuple(Drop(d.id, d.field, d.detail, d.kind) for d in made.dropped)
     return _result(
         provider,
         case.id,
@@ -457,7 +453,7 @@ def measure(results: Sequence[CallResult]) -> dict[str, Any]:
 
 def drop_metrics(results: Sequence[CallResult]) -> dict[str, Any]:
     """``drops_total``, ``drops_by_kind``, ``invented_field_drops`` (``count`` and the ``top``
-    ``TOP_INVENTED`` invented names with counts) and ``repaired`` (answers whose first answer
+    ``TOP_INVENTED`` invented names with counts) and ``would_repair`` (answers whose first answer
     was refused: ``invalid``)."""
     drops = [d for r in results for d in r.dropped]
     invented = Counter(d.field for d in drops if d.kind == "not_in_catalogue")
@@ -468,20 +464,20 @@ def drop_metrics(results: Sequence[CallResult]) -> dict[str, Any]:
             "count": sum(invented.values()),
             "top": dict(invented.most_common(TOP_INVENTED)),
         },
-        "repaired": sum(r.status == "invalid" for r in results),
+        "would_repair": sum(r.status == "invalid" for r in results),
     }
 
 
 def repeats_of(results: Sequence[CallResult]) -> list[dict[str, Any]]:
     """The per-repeat record ``--json`` carries: status, answer length and the dropped criteria
-    (field names and reasons only)."""
+    (the check kind and message, never the model's free text)."""
     return [
         {
             "status": r.status,
             "answer_chars": r.answer_chars,
             "rate_limit_retries": r.rate_limit_retries,
             "dropped": [
-                {"id": d.id, "field": d.field, "reason": d.reason, "kind": d.kind}
+                {"id": d.id, "field": d.field, "reason": d.detail, "kind": d.kind}
                 for d in r.dropped
             ],
         }
@@ -607,7 +603,7 @@ def run_golden(
     draft: Draft,
     say: Callable[[str], None],
     note: Callable[[str], None],
-    sleep: Callable[[float], None] = lambda _seconds: None,
+    sleep: Callable[[str, float], None] = lambda _provider, _seconds: None,
 ) -> int:
     """The command: refuse, plan, require ``--yes``, run, report, record. ``say`` gets the
     report (what ``--json`` makes machine-readable), ``note`` everything else (the CLI sends it
