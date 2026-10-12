@@ -301,6 +301,14 @@ follow-up PR).
 - Question: where do the accepted formulas go on the web, and do the perf budgets move?
 - Options: a section on the Feature requests page in its own lazy chunk / a new Admin section and route / inline in the page chunk.
 - Decision: a lazy section on the existing Feature requests page (no new workspace section, no new Start page). Budgets: the page chunk +370 B (the dynamic import and its Suspense fallback), the Screeners page chunk +304 B (the new operation joins the shared generated document map it carries), and a first budget of 3900 B for the section's own chunk. Reasons are in `apps/web/perf-budgets.json`.
-- decided by: proposed by orchestrator; awaiting owner
-- status: pending owner confirmation
+- decided by: owner (placement, confirmed in session 2026-10-11); orchestrator (the budget raises, with the written reasons; the Screeners page also makes one more request, 49 -> 50, as the section shares `ExpandableTable` as its own chunk)
+- status: final for placement; budgets pending owner confirmation
 - Reasoning: the brief allows a raise with a written reason; an inline section would have cost the page 3.9 kB.
+
+## 2026-10-11 | Admin accepted formulas | Erase and curated events
+- Question: does erasing a user also null the accepted-formula text on events curated into the golden set, and does an erased user still count in the admin `users` number?
+- Options: confirm the criteria rule (curated events keep their payload; erased users still counted) / erase curated formula payloads too.
+- Decision: confirm: the same rule as the criteria payloads.
+- decided by: owner
+- status: final
+- Reasoning: one rule for everything in a drafting-event payload.
