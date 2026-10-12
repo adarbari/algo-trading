@@ -148,7 +148,7 @@ function Probe() {
       >
         end session
       </Button>
-      <Text>{`choices ${b.choices.map((c) => `${c.event}:${c.subject}:${String(c.picked ?? '')}`).join(',')}`}</Text>
+      <Text>{`choices ${b.choices.map((c) => `${c.event}:${c.subject}:${String(c.picked ?? '')}${c.feature ? `>${c.feature}` : ''}`).join(',')}`}</Text>
       <Text>{`formulas ${JSON.stringify(b.formulaStates)}`}</Text>
       <Text>{`pending ${b.pendingFormulas.map((f) => f.name).join(',')} reviewing ${b.reviewing?.name ?? 'none'}`}</Text>
       <Button
@@ -185,6 +185,13 @@ function Probe() {
         }}
       >
         accept gap
+      </Button>
+      <Button
+        onClick={() => {
+          b.acceptFormula(GAP, 'feature.my_gap');
+        }}
+      >
+        accept gap renamed
       </Button>
       <Button
         onClick={() => {
@@ -427,8 +434,14 @@ describe('ScreenerBuilderProvider', () => {
       expect(screen.getByText('criteria iv30=0.5,close=5,draft_gap=0.1')).toBeInTheDocument();
       expect(screen.getByText('pending draft_bare reviewing none')).toBeInTheDocument();
       expect(screen.getByText('formulas {"draft_gap":"accepted"}')).toBeInTheDocument();
-      expect(screen.getByText('choices formula_accepted:draft_gap:')).toBeInTheDocument();
+      expect(screen.getByText('choices formula_accepted:draft_gap:>draft_gap')).toBeInTheDocument();
       expect(screen.getByText(/dirty true/)).toBeInTheDocument();
+    });
+
+    it('records the saved feature name when the trader renamed the proposal', async () => {
+      await open();
+      await userEvent.click(screen.getByRole('button', { name: 'accept gap renamed' }));
+      expect(screen.getByText('choices formula_accepted:draft_gap:>my_gap')).toBeInTheDocument();
     });
 
     it('accepting one with no criterion only accepts it', async () => {

@@ -45,14 +45,28 @@ from algotrade.core.model.errors import (
 )
 from algotrade.core.model.predicates import NO_VALUE_OPS, OPS
 from algotrade.services.configs import resolve_rule_draft
-from algotrade.services.drafting.answer_schema import ANSWER_SCHEMA, check_answer, check_criterion
-from algotrade.services.drafting.formulas import (
+from algotrade.services.drafting.contract.answer_schema import (
+    ANSWER_SCHEMA,
+    check_answer,
+    check_criterion,
+)
+from algotrade.services.drafting.contract.formulas import (
     DraftFormula,
     DroppedFormula,
     check_formulas,
     dry_run_all,
 )
-from algotrade.services.drafting.gaps import MissingFeature, Unresolved, missing_of, unresolved_of
+from algotrade.services.drafting.contract.gaps import (
+    MissingFeature,
+    Unresolved,
+    missing_of,
+    unresolved_of,
+)
+from algotrade.services.drafting.contract.suggestions import (
+    DroppedSuggestion,
+    Suggestion,
+    suggestions_of,
+)
 from algotrade.services.drafting.parts.build import build_parts
 from algotrade.services.drafting.parts.items import items_of
 from algotrade.services.drafting.parts.model import Part, PartsStats, part_tag
@@ -67,11 +81,6 @@ from algotrade.services.drafting.prompt import (
     index_group,
     sliced_system_prompt,
     user_prompt,
-)
-from algotrade.services.drafting.suggestions import (
-    DroppedSuggestion,
-    Suggestion,
-    suggestions_of,
 )
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos

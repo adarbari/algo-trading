@@ -58,7 +58,7 @@ def draft_from_text(
         [{"id": d.id, "field": d.field, "reason": d.reason} for d in result.dropped],
         (result.call_id,) if result.call_id else (), ctx.features,
         result.prompt_version, seq, result.notes,
-        [u.term for u in result.unresolved], [f.name for f in result.formulas],
+        [u.term for u in result.unresolved], {f.name: f.fingerprint for f in result.formulas},
         feedback.parts_payload(result.parts), result.stage,
     )  # fmt: skip
     feedback.record_requests(
@@ -93,7 +93,7 @@ def draft_part(
         [{"id": d.id, "field": d.field, "reason": d.reason} for d in draft.dropped],
         (draft.call_id,) if draft.call_id else (), ctx.features,
         draft.prompt_version, seq, draft.notes,
-        [u.term for u in draft.unresolved], [f.name for f in draft.formulas],
+        [u.term for u in draft.unresolved], {f.name: f.fingerprint for f in draft.formulas},
         feedback.parts_payload(draft.parts, done.replaced_part_id), part=note,
     )  # fmt: skip
     feedback.record_requests(

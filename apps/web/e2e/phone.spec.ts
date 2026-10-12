@@ -12,6 +12,7 @@ import { WORKSPACES } from '../src/app/workspaces/workspaces';
 import { expectAccessible, settled } from './a11y';
 import { mockAdminApi } from './admin-api';
 import { mockViewer } from './auth-api';
+import FORMULAS from './fixtures/accepted-formulas.json' with { type: 'json' };
 import REQUESTS from './fixtures/feature-requests.json' with { type: 'json' };
 import { mockBuilderApi, mockDescribeApi } from './builder-api';
 import { mockApi } from './mock-api';
@@ -389,14 +390,17 @@ test('Harness runs: a tapped run opens its rows as a sheet', async ({ page }) =>
   );
 });
 
-test('Feature requests: the ranked list fits a phone and a status filter narrows it', async ({
+test('Feature requests: the ranked list and the accepted formulas fit a phone and a status filter narrows it', async ({
   page,
 }) => {
-  await mockAdminApi(page, { featureRequests: REQUESTS });
+  await mockAdminApi(page, { featureRequests: REQUESTS, acceptedFormulas: FORMULAS });
   await page.goto('/admin/feature-requests');
   await expect(page.getByRole('row', { name: /realised_vol_20d/ })).toBeVisible();
   await page.getByRole('radio', { name: 'Promoted' }).tap();
   await expect(page).toHaveURL(/status=PROMOTED/);
+  await expect(page.getByRole('table', { name: 'Accepted formulas' })).toContainText(
+    'close/sma_20 - 1',
+  );
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize()?.width ?? 0,
   );

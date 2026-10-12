@@ -7,7 +7,7 @@ import hashlib
 
 import pytest
 
-from algotrade.services.drafting.golden import GoldenCase
+from algotrade.services.drafting.golden.golden import GoldenCase
 from algotrade.services.drafting.prompt import (
     PROMPT_VERSION,
     TASK,

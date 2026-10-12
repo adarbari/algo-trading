@@ -210,13 +210,13 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
       ],
     }));
   };
-  const decide = (name: string, state: 'accepted' | 'skipped') => {
+  const decide = (name: string, state: 'accepted' | 'skipped', feature?: string) => {
     updateReview((r) => ({
       ...r,
       reviewing: r.reviewing === name ? null : r.reviewing,
       formulas: { ...r.formulas, [name]: state },
     }));
-    choose({ event: `formula_${state}`, subject: name });
+    choose({ event: `formula_${state}`, subject: name, ...(feature ? { feature } : {}) });
   };
   const save = useSaveDraft(id);
   const discard = useDiscardDraft(id);
@@ -334,7 +334,8 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
         const created = newCriterionId(criterionIds(base, document), field);
         edit(withCriterion(document, toCriterion(created, { ...formula.criterion, field })));
       }
-      decide(formula.name, 'accepted');
+      // the saved feature's own name: the trader may have renamed the proposal
+      decide(formula.name, 'accepted', field.replace(/^feature\./, ''));
     },
     skipFormula: (name) => {
       decide(name, 'skipped');

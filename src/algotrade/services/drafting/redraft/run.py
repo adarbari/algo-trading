@@ -20,7 +20,7 @@ from algotrade.config.site.settings import (
 )
 from algotrade.core.model.completion import CallTag
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.drafting.gaps import MissingFeature
+from algotrade.services.drafting.contract.gaps import MissingFeature
 from algotrade.services.drafting.prompt import PROMPT_VERSION
 from algotrade.services.drafting.redraft.cap import USE_CASE
 from algotrade.services.drafting.redraft.merge import merge_part

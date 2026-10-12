@@ -32,6 +32,12 @@ class DraftChoice(BaseModel):
     picked: int | None = Field(
         None, ge=0, le=1000, description="the alternative's index (choice_made only)"
     )
+    feature: str | None = Field(
+        None,
+        max_length=120,
+        description="the saved user feature's name, formula_accepted only (the trader may have "
+        "renamed the proposed formula)",
+    )
 
 
 class DraftBody(BaseModel):

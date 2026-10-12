@@ -21,7 +21,7 @@ from typing import Any
 
 from algotrade.config.site.llm import Phrase
 from algotrade.core.model.predicates import NO_VALUE_OPS
-from algotrade.services.drafting.answer_schema import check_criterion
+from algotrade.services.drafting.contract.answer_schema import check_criterion
 from algotrade.services.drafting.parts.model import MAX_PARTS, MAX_READING, Part
 from algotrade.services.drafting.parts.spans import CONNECTORS
 from algotrade.services.drafting.phrasebook.consistency import compatible

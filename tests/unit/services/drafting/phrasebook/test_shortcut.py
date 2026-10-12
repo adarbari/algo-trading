@@ -17,7 +17,7 @@ from algotrade.config.site.settings import load_phrasebook
 from algotrade.config.user import UserContext
 from algotrade.core.model.completion import Completion
 from algotrade.services.drafting import screens
-from algotrade.services.drafting.golden import load_cases
+from algotrade.services.drafting.golden.golden import load_cases
 from algotrade.services.drafting.phrasebook.resolve import resolve
 from algotrade.services.drafting.phrasebook.shortcut import phrasebook_version, shortcut
 from algotrade.services.drafting.screens import draft_screen

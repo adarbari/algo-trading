@@ -11,8 +11,8 @@ For each case of ``tests/fixtures/drafting/golden`` and each provider (the chain
 ``llm.toml`` restricted to that one provider; default: every provider of the file), it runs the
 real ``draft_screen`` ``--repeat`` times as ``--user`` (default ``$ALGOTRADE_USER``; the owner,
 whose login a ``claude-cli`` provider answers) and scores each draft structurally
-(``services/drafting/golden.py``). Per provider and case, and per provider overall, it reports:
-pass rate, field agreement across the repeats (mean pairwise Jaccard of the sets of fields
+(``services/drafting/golden/golden.py``). Per provider and case, and per provider overall, it
+reports: pass rate, field agreement across the repeats (mean pairwise Jaccard of the sets of fields
 drafted; ``-`` below two answered repeats), invalid-answer rate (the model answered, the draft
 could not be parsed or validated), unavailable count (no answer), mean tokens in / out / cache
 read / cache write, latency p50 / p90 and cost (from the usage ledger's rows of the call; the
@@ -60,7 +60,7 @@ from typing import Any
 from algotrade.config.site.llm import LlmSettings, ProviderSettings, Rate
 from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
-from algotrade.services.drafting.golden import GoldenCase, load_cases, mark_recorded, score
+from algotrade.services.drafting.golden.golden import GoldenCase, load_cases, mark_recorded, score
 from algotrade.services.drafting.parts.model import PartsStats
 from algotrade.services.drafting.parts.scoring import aggregate
 from algotrade.services.drafting.screens import ScreenDraft, draft_screen

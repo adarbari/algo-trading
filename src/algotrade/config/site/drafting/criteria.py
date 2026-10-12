@@ -3,10 +3,10 @@
 file alone allows: a field name, a known op, a value of the shape the op takes, a mode,
 a tolerance only where the mode
 uses one, an ``on_miss`` only on a soft criterion. It is the same shape as one criterion of the
-drafting answer (``services/drafting/answer_schema.CRITERION``: ``field``, ``op``, ``value``,
-``mode``, ``tolerance``, ``on_miss``), so ``as_answer`` turns it into that dict. Whether the
-field is in the site catalogue and the op fits its type is checked against the catalogue by
-``services/drafting/phrasebook`` (the loader has no catalogue)."""
+drafting answer (``services/drafting/contract/answer_schema.CRITERION``: ``field``, ``op``,
+``value``, ``mode``, ``tolerance``, ``on_miss``), so ``as_answer`` turns it into that dict.
+Whether the field is in the site catalogue and the op fits its type is checked against the
+catalogue by ``services/drafting/phrasebook`` (the loader has no catalogue)."""
 
 import re
 from collections.abc import Mapping

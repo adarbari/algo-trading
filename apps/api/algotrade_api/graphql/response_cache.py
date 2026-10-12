@@ -147,7 +147,7 @@ CLOSED_SESSION_OPERATIONS: frozenset[str] = frozenset({"IngestionCompleteness", 
 # A new operation is never in this group by default: the classification test fails until it is
 # placed.
 NEVER_CACHED: frozenset[str] = frozenset(
-    {"FeatureRequests", "LlmUsage", "Viewer", "MyFeatureRequests"}
+    {"AcceptedFormulas", "FeatureRequests", "LlmUsage", "Viewer", "MyFeatureRequests"}
 )
 # The route packages whose endpoints write (configs, screen results, evaluations); a preview,
 # a draft or an explain POST writes nothing the cache keys on.

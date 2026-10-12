@@ -31,7 +31,8 @@ log = logging.getLogger(__name__)
 
 
 class MissingLike(Protocol):
-    """What ``record_missing`` reads of an item (``drafting.gaps.MissingFeature`` has them)."""
+    """What ``record_missing`` reads of an item (``drafting.contract.gaps.MissingFeature``: it has
+    them)."""
 
     @property
     def key(self) -> str | None: ...

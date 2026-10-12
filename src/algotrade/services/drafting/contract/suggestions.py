@@ -18,7 +18,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.drafting.answer_schema import SUGGESTION, check_item
+from algotrade.services.drafting.contract.answer_schema import SUGGESTION, check_item
 from algotrade.services.drafting.parts.model import part_tag
 
 MAX_SUGGESTIONS = 5

@@ -1,7 +1,7 @@
 /**
  * A mocked admin API for end-to-end tests: Playwright answers the Admin GraphQL reads
  * (`POST /api/graphql`: completeness, ingestionCell, chainCoverage, quality, verification, nightlyRuns, run,
- * runItems, figiReview, leverageReview, llmUsage, harnessRuns, harnessRun, featureRequests) from fixture JSON shaped from real responses
+ * runItems, figiReview, leverageReview, llmUsage, harnessRuns, harnessRun, featureRequests, acceptedFormulas) from fixture JSON shaped from real responses
  * (admin-ingestion.fixtures.json), keyed by the operation's Query field, or `field:<key>` for
  * a field read by key (`ingestionCell:<dataset>/<date>`, `run:<id>`, `runItems:<id>`). A field
  * with no fixture is null (nothing stored, no such thing); `FAIL` answers a GraphQL error.
@@ -32,6 +32,7 @@ const FIELDS = new Set([
   'harnessRuns',
   'harnessRun',
   'featureRequests',
+  'acceptedFormulas',
 ]);
 
 interface Operation {

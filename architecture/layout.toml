@@ -293,6 +293,16 @@ purpose = "use case: a rule screen drafted from a sentence (ADR 0041): the promp
 contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
 
 [[dir]]
+path = "src/algotrade/services/drafting/contract"
+purpose = "use case: the contract of the drafting model's answer (ADR 0041): its JSON Schema and local check, and what the server decides of each kind of item the model proposes (B1 formulas, missing features and unresolved terms, suggested checks) (split from services/drafting, at its module cap)"
+contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
+
+[[dir]]
+path = "src/algotrade/services/drafting/golden"
+purpose = "use case: the golden set of the drafting prompt: the recorded cases and their structural scoring, and the owner-run live evaluation against real models (`algotrade-api golden run`); CI never calls a model (split from services/drafting, at its module cap)"
+contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
+
+[[dir]]
 path = "src/algotrade/services/drafting/parts"
 purpose = "use case: the explained parts of a draft (ADR 0041): the sentence's parts located by the server, every item attributed to one, the kind decided from what it holds, the reading checked against its numbers (split from services/drafting, at its module cap)"
 contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
@@ -368,6 +378,13 @@ contracts = [
 ]
 
 [[dir]]
+path = "src/algotrade/services/feedback/formulas"
+purpose = "the payload of a formula_accepted event (ADR 0066 note 2026-10-11): the saved user feature's formula, fingerprint, unit and description, built pure from the user's feature documents"
+contracts = [
+    "Drafting feedback writes only feedback/* tables: no market-data writer, no jobs (ADR 0066)",
+]
+
+[[dir]]
 path = "src/algotrade/services/jobs"
 purpose = "long-running work as jobs: runner, models, handlers, exclusive runs and claims"
 contracts = ["The job runner is generic: it knows no use case, engine or market-data reader"]
@@ -427,6 +444,11 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 [[dir]]
 path = "src/algotrade/services/read/events"
 purpose = "read objects about events for one session (ADR 0050): the stored events list by event date, what is ahead of a name (own and reference earnings by catalogue name, the macro releases known by the session, the market-structure days by rule), its 8-K filings, the expiry ladder, a fund's reference (InstrumentEvents) and the cross-name EventCalendar"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/formulas"
+purpose = "read objects over the formulas traders accepted in Describe it (ADR 0066 note 2026-10-11): the admin's list grouped by fingerprint, counts only (the ops folder is at its cap)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

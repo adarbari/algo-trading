@@ -15,7 +15,7 @@ from algotrade.config.site.drafting.criteria import PhraseCriterion
 from algotrade.config.site.llm import Phrase
 from algotrade.core.model.fields import NUMERIC_TYPES
 from algotrade.core.model.predicates import NO_VALUE_OPS, NUMERIC_OPS
-from algotrade.services.drafting.answer_schema import check_criterion
+from algotrade.services.drafting.contract.answer_schema import check_criterion
 from algotrade.services.drafting.retrieval import stem
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 

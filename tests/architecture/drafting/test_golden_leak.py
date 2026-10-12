@@ -4,7 +4,7 @@ prompt's worked examples nor in the phrasebook (docs/drafting/describe-it-plan.m
 import json
 import re
 
-from algotrade.services.drafting.golden import load_cases
+from algotrade.services.drafting.golden.golden import load_cases
 from algotrade.services.drafting.prompt import examples_text
 from tests.conftest import REPO_ROOT
 

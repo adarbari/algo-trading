@@ -24,8 +24,9 @@ from dataclasses import replace
 from typing import Any
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.drafting.formulas import DroppedFormula
-from algotrade.services.drafting.gaps import Unresolved
+from algotrade.services.drafting.contract.formulas import DroppedFormula
+from algotrade.services.drafting.contract.gaps import Unresolved
+from algotrade.services.drafting.contract.suggestions import rewrites
 from algotrade.services.drafting.parts.build import kind_of
 from algotrade.services.drafting.parts.model import KEPT_ID, UNPLACED_ID, Part
 from algotrade.services.drafting.parts.spans import utf16
@@ -37,7 +38,6 @@ from algotrade.services.drafting.screens import (
     reading_of,
     validated,
 )
-from algotrade.services.drafting.suggestions import rewrites
 from algotrade.services.read.context import ReadContext
 
 OTHER_PART = "set by another part"

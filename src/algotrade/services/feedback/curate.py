@@ -21,7 +21,7 @@ criteria in force at each (the stored ``current_criteria``, held to the same che
 criteria, with ``source_event`` (the session's final event id), ``source_events`` (the id of every
 event of the chain, in time order: what the retention job must spare), ``chain_id`` (the session)
 and an expectation derived from the final criteria for the structural scorer
-(``services/drafting/golden.py``). No answers are recorded here: the case is written with
+(``services/drafting/golden/golden.py``). No answers are recorded here: the case is written with
 ``"recorded": false`` and its ``curated`` date, and ``golden run --record`` records one and clears
 the flag (a fitness test fails a case unrecorded for 14 days). A case file is never overwritten.
 All problems of a file are reported together and nothing is written unless there are none."""
