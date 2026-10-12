@@ -107,7 +107,7 @@ prompt examples or the phrasebook; the prompt never picks examples automatically
 Built (PR 8, `services/feedback/{candidates,curate}.py`): `algotrade-api golden candidates [--since --user --limit --json]` lists
 sampled finalised sessions (real sentences, owner's terminal only; per-user monthly cap, near-duplicates out, stratified by
 feature group, holdings flagged) and `golden curate --from curation.json [--dry-run] [--yes]` writes cases from the owner's
-paraphrases (verbatim guard, criteria validated, ~20% held out by hash, never overwrites); record answers with `golden run --record`.
+paraphrases (verbatim guard against every loaded sentence incl. 5-word runs, criteria validated, holding-like tokens warn only, ~20% held out by hash, never overwrites, case carries `source_events` for retention and `recorded: false` until `golden run --record`, 14-day fitness limit); both refuse a capped (500-event) read.
 near-duplicate removal, stratified sampling, a coverage report.
 
 ## Web

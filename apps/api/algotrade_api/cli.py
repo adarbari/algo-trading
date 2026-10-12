@@ -21,10 +21,11 @@ import os
 import resource
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 
@@ -37,7 +38,7 @@ from algotrade.config.env import (
     port_base,
     user_id,
 )
-from algotrade.config.site.settings import load_llm
+from algotrade.config.site.settings import load_llm, load_users
 from algotrade.config.site.users import Role
 from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
@@ -68,7 +69,7 @@ from algotrade.services.read.users.viewer import Viewer
 from algotrade.services.text_model.model import TextModel
 from algotrade_api.auth.local import require_loopback
 from algotrade_api.auth.mode import AuthMode
-from algotrade_api.deps import open_store
+from algotrade_api.deps import ReadStore, open_store
 from algotrade_api.ops.build import Fetch, fetch_http, running_mismatches, write_web_stamp
 from algotrade_api.ops.deploy import CHECKS, actions, holds_ingest, verify
 from algotrade_api.ops.schedule import (
@@ -149,7 +150,9 @@ def _parser() -> argparse.ArgumentParser:
     gc.add_argument("--user", default=None, help="only this user's sessions")
     gc.add_argument("--limit", type=int, default=candidates.DEFAULT_LIMIT)
     gc.add_argument("--per-user-month", type=int, default=candidates.DEFAULT_PER_USER_MONTH)
-    gc.add_argument("--json", action="store_true", dest="as_json")
+    gc.add_argument(
+        "--json", action="store_true", dest="as_json", help="to stdout only, never a file"
+    )
     cu = gsub.add_parser("curate", help="write golden cases from your paraphrases")
     cu.add_argument("--from", required=True, dest="source", type=Path, help="curation.json")
     cu.add_argument("--since", default=None, help="YYYY-MM-DD (default: a year ago)")
@@ -159,10 +162,20 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def drafting_rows(since: str | None) -> list[dict[str, object]]:
+def require_admin(store: ReadStore) -> None:
+    """The owner's terminal reads every user's sentences: only when ``$ALGOTRADE_USER`` is an
+    ``admin`` in ``users.toml``; ``ConfigurationError`` otherwise."""
+    me = user_id(DEFAULT_USER)
+    if load_users(store.configs).role_of(me) != Role.ADMIN:
+        raise ConfigurationError(f"golden candidates / curate need an admin: {me} is not one")
+
+
+def drafting_rows(since: str | None) -> tuple[list[dict[str, object]], bool]:
     """The drafting events from ``since`` (default a year ago) as the admin viewer reads them
-    (``load_drafting_events``: never a row read around the viewer filter), as plain rows."""
+    (``load_drafting_events``: never a row read around the viewer filter), as plain rows, and
+    whether the read hit its row cap (the oldest events are then missing)."""
     store = open_store(data_url(), config_dir(), UserContext(user_id(DEFAULT_USER)))
+    require_admin(store)
     start = (
         date.fromisoformat(since)
         if since
@@ -170,15 +183,21 @@ def drafting_rows(since: str | None) -> list[dict[str, object]]:
     )
     ctx = open_stores(store.reader, store.configs, store.user)
     found = load_drafting_events(ctx, OWNER, start, MAX_LIMIT)
-    if len(found) >= MAX_LIMIT:
-        print(f"WARNING: read the newest {MAX_LIMIT} events only; narrow --since", file=sys.stderr)
-    return [asdict(e) for e in found]
+    return [asdict(e) for e in found], len(found) >= MAX_LIMIT
 
 
 def golden_candidates_cmd(args: argparse.Namespace) -> int:
-    """``golden candidates``: print the sampled cards (real sentences, this terminal only)."""
+    """``golden candidates``: print the sampled cards (real sentences, this terminal only: with
+    ``--json`` they go to stdout, never to a file; ``candidates*.json`` is git-ignored)."""
+    try:
+        rows, capped = drafting_rows(args.since)
+    except ConfigurationError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    if capped:
+        print(f"WARNING: read the newest {MAX_LIMIT} events only; narrow --since", file=sys.stderr)
     cards = candidates.candidate_cards(
-        drafting_rows(args.since), args.user, args.per_user_month, args.limit
+        rows, args.user, args.per_user_month, args.limit, truncated=capped
     )
     summary = candidates.coverage(cards)
     if args.as_json:
@@ -199,9 +218,13 @@ def golden_curate_cmd(args: argparse.Namespace) -> int:
 
     try:
         entries = json.loads(args.source.read_text())
+        rows, capped = drafting_rows(args.since)
+        if capped:  # chains would be partial: the verbatim guard would miss real sentences
+            raise ConfigurationError(f"read {MAX_LIMIT} events (the cap): narrow --since")
+        real = [str(r["sentence"]) for r in rows if r["sentence"]]
         planned = curate.plan_cases(
-            entries, golden_candidates(drafting_rows(args.since)), validate,
-            Path.cwd() / GOLDEN_ROOT / "cases",
+            entries, golden_candidates(rows), validate, Path.cwd() / GOLDEN_ROOT / "cases",
+            real, exchange_date(datetime.now(UTC)),
         )  # fmt: skip
     except (OSError, ValueError, ConfigurationError) as exc:
         print(exc, file=sys.stderr)
@@ -236,8 +259,8 @@ def golden_run(args: argparse.Namespace) -> int:
             models.append(model)
         return out
 
-    def draft(model: TextModel, sentence: str) -> ScreenDraft:
-        return drafter(holder[0])(model, sentence)
+    def draft(model: TextModel, sentence: str, current: Mapping[str, Any] | None) -> ScreenDraft:
+        return drafter(holder[0])(model, sentence, current)
 
     def to_stderr(line: str) -> None:
         print(line, file=sys.stderr)

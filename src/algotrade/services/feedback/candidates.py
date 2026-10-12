@@ -20,6 +20,7 @@ from algotrade.services.feedback.chains import golden_candidates
 
 DEFAULT_PER_USER_MONTH = 5
 DEFAULT_LIMIT = 20
+GRAM = 5  # words of a run that may not be shared with a real sentence
 NEAR_DUPLICATE = 0.8  # token overlap (``overlap``) at or above which two sentences are one
 SCOPE_PREFIXES = ("instrument.status", "instrument.security_type")  # scaffolding, not coverage
 UNKNOWN_GROUP = "(unreadable criteria)"
@@ -47,12 +48,19 @@ def normalised(text: str) -> str:
 
 
 def overlap(a: str, b: str) -> float:
-    """Shared words over the words of the shorter sentence (0 when either has none): 1.0 when one
-    is contained in the other, however the two are cased or punctuated."""
+    """Shared words over the words of the longer sentence (0 when either has none): 1.0 when the
+    two have the same words, however cased or punctuated; a short sentence inside a long one
+    scores low (the 5-word runs of ``grams`` catch a partial copy)."""
     left, right = tokens(a), tokens(b)
     if not left or not right:
         return 0.0
-    return len(left & right) / min(len(left), len(right))
+    return len(left & right) / max(len(left), len(right))
+
+
+def grams(text: str, size: int = GRAM) -> set[tuple[str, ...]]:
+    """The runs of ``size`` consecutive words of ``text`` (the anti-leak rule of the golden set)."""
+    words = normalised(text).split()
+    return {tuple(words[i : i + size]) for i in range(len(words) - size + 1)}
 
 
 def feature_group(field: str) -> str:
@@ -101,8 +109,11 @@ def _card(case: Mapping[str, Any]) -> dict[str, Any]:
     sentences = [s["sentence"] or "" for s in case["sentences"]]
     return {
         "chain_id": case["source_event"],
+        "session_id": case["chain_id"],
+        "source_events": case["source_events"],
         "user": case["user"],
         "date": _when(case).date().isoformat(),
+        "when": _when(case).isoformat(),
         "sentences": sentences,
         "criteria_in_force": [s["current_criteria"] for s in case["sentences"]],
         "final_criteria": case["final_criteria"],
@@ -137,10 +148,14 @@ def _capped(cards: Iterable[dict[str, Any]], per_user_month: int) -> list[dict[s
 
 
 def _round_robin(cards: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-    """One card of each primary feature group in turn, so no group fills the list first."""
+    """One card of each primary feature group in turn, so no group fills the list first. A card's
+    primary group is the RAREST of its groups in this pool (ties by name), so a card that touches
+    a rare group is not filed under a common one."""
+    pool = Counter(g for card in cards for g in card["groups"])
     buckets: dict[str, list[dict[str, Any]]] = {}
     for card in cards:
-        buckets.setdefault(card["groups"][0], []).append(card)
+        primary = min(card["groups"], key=lambda g: (pool[g], g))
+        buckets.setdefault(primary, []).append(card)
     out: list[dict[str, Any]] = []
     while any(buckets.values()):
         for bucket in buckets.values():
@@ -155,13 +170,17 @@ def candidate_cards(
     per_user_month: int = DEFAULT_PER_USER_MONTH,
     limit: int = DEFAULT_LIMIT,
     similarity: float = NEAR_DUPLICATE,
+    truncated: bool = False,
 ) -> list[dict[str, Any]]:
     """The cards of ``rows`` (viewer-filtered drafting events) worth curating: finalised chains
     with a sentence and readable final criteria, of ``user`` when given, newest first, then
-    de-duplicated, capped per user and month, stratified by feature group, at most ``limit``."""
-    cases = [c for c in golden_candidates(rows) if _usable(c) and user in (None, c["user"])]
+    de-duplicated, capped per user and month, stratified by feature group, at most ``limit``.
+    ``truncated``: the rows hit a read cap (``chains.golden_candidates``)."""
+    cases = [
+        c for c in golden_candidates(rows, truncated) if _usable(c) and user in (None, c["user"])
+    ]
     cards = sorted(
-        (_card(c) for c in cases), key=lambda c: (c["date"], c["chain_id"]), reverse=True
+        (_card(c) for c in cases), key=lambda c: (c["when"], c["chain_id"]), reverse=True
     )
     return _round_robin(_capped(_distinct(cards, similarity), per_user_month))[: max(0, limit)]
 
@@ -187,8 +206,11 @@ def render(
             f"chain {card['chain_id']}  user {card['user']}  {card['date']}  "
             f"{len(card['sentences'])} sentence(s)",
         ]
-        lines += [f"  {n}. {s}" for n, s in enumerate(card["sentences"], 1)]
-        lines.append(f"  final criteria: {_brief(card['final_criteria'])}")
+        for n, (sentence, force) in enumerate(
+            zip(card["sentences"], card["criteria_in_force"], strict=True), 1
+        ):
+            lines += [f"  {n}. {sentence}", f"     in force: {brief(force)}"]
+        lines.append(f"  final criteria: {brief(card['final_criteria'])}")
         if card["holding_flags"]:
             lines.append(f"  WARNING looks like holdings: {', '.join(card['holding_flags'])}")
     lines += ["", "coverage by feature group: " + _counts(summary["groups"])]
@@ -200,9 +222,13 @@ def _counts(counts: Mapping[str, int]) -> str:
     return ", ".join(f"{k} {v}" for k, v in counts.items()) or "-"
 
 
-def _brief(snapshot: Any) -> str:
-    return "; ".join(
-        f"{c.get('field')} {c.get('op')} {c.get('value')}"
-        for c in criteria_table(snapshot).values()
-        if isinstance(c, Mapping)
+def brief(snapshot: Any) -> str:
+    """A criteria snapshot as ``field op value`` lines joined by ``;`` (``-`` when none)."""
+    return (
+        "; ".join(
+            f"{c.get('field')} {c.get('op')} {c.get('value')}"
+            for c in criteria_table(snapshot).values()
+            if isinstance(c, Mapping)
+        )
+        or "-"
     )

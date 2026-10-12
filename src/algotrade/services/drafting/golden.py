@@ -39,6 +39,9 @@ class GoldenCase:
     parts: tuple[Mapping[str, Any], ...]
     scope_fields: frozenset[str]
     sentences: tuple[str, ...] = ()  # a curated case: every description of one session, in order
+    current: Mapping[str, Any] | None = None  # the criteria in force at the last description
+    recorded: bool = True  # False: curated, no answer recorded yet (``golden run --record``)
+    curated: str | None = None  # the date a curated case was written (ISO)
 
 
 @dataclass(frozen=True)
@@ -72,9 +75,30 @@ def load_cases(root: Path) -> tuple[GoldenCase, ...]:
                 tuple(expect["parts"]),
                 frozenset(expect.get("scope_fields", ())),
                 tuple(raw.get("sentences", ())) or (raw["sentence"],),
+                _in_force(raw),
+                raw.get("recorded", True),
+                raw.get("curated"),
             )
         )
     return tuple(cases)
+
+
+def _in_force(raw: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """The criteria in force at the last description of a curated case, when it had any."""
+    forces = raw.get("criteria_in_force") or []
+    last = forces[-1] if forces else None
+    return last if isinstance(last, Mapping) and last.get("criteria") else None
+
+
+def mark_recorded(root: Path, case_id: str) -> None:
+    """Clear ``"recorded": false`` from a case file once an answer is recorded for it."""
+    path = root / "cases" / f"{case_id}.json"
+    if not path.exists():
+        return
+    raw = json.loads(path.read_text())
+    if raw.get("recorded", True) is False:
+        del raw["recorded"]
+        path.write_text(json.dumps(raw, indent=2) + "\n")
 
 
 def recorded_answers(root: Path, case_id: str) -> dict[str, str]:

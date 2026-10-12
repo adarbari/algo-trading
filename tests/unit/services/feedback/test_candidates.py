@@ -10,6 +10,7 @@ from algotrade.services.feedback.candidates import (
     candidate_cards,
     coverage,
     feature_group,
+    grams,
     holding_flags,
     overlap,
     render,
@@ -41,7 +42,8 @@ def chain(
 def test_feature_groups_and_overlap() -> None:
     assert feature_group(RSI) == "rollup.momentum@v1"
     assert feature_group(PE) == "feature" and feature_group("instrument.sector") == "instrument"
-    assert overlap("Cheap on sales!", "cheap on sales, high margin") == 1.0
+    assert overlap("Cheap on sales!", "cheap on sales") == 1.0
+    assert overlap("cheap on sales", "cheap on sales, high margin") == 3 / 5
     assert overlap("", "x") == 0.0
 
 
@@ -91,3 +93,27 @@ def test_holdings_flags_catch_share_counts_cashtags_and_tickers_not_jargon() -> 
     assert "$AAPL" in holding_flags("like $AAPL")
     assert "NVDA" in holding_flags("something like NVDA 120 but cheaper")
     assert "NVDA 120" in holding_flags("something like NVDA 120 but cheaper")
+
+
+def test_a_card_is_filed_under_the_rarest_of_its_groups() -> None:
+    both = {"criteria": {"a": {"field": RSI, "op": "gt", "value": 1},
+                         "b": {"field": PE, "op": "lt", "value": 2}}}  # fmt: skip
+    rows = chain(1, "uno dos tres", day=1) + chain(2, "cuatro cinco seis", day=2)
+    rows += chain(3, "siete ocho nueve", day=3)
+    rows[-1]["payload"] = json.dumps({"saved_criteria": both})  # touches momentum and feature
+    cards = candidate_cards(rows, limit=2)
+    # momentum is in 3 cards, feature in 1: the two-group card is filed under feature, so the
+    # round robin takes it first, then one momentum card
+    assert cards[0]["chain_id"] == "f3" and len(cards) == 2
+
+
+def test_a_truncated_read_drops_the_chain_at_its_edge() -> None:
+    rows = chain(1, "oldest chain words", day=1) + chain(2, "newer chain words", day=5)
+    assert {c["chain_id"] for c in candidate_cards(rows, truncated=True)} == {"f2"}
+    assert len(candidate_cards(rows)) == 2
+
+
+def test_render_shows_the_criteria_in_force_at_each_sentence_and_grams_are_word_runs() -> None:
+    cards = candidate_cards(chain(1, "rsi low"))
+    assert "in force:" in "\n".join(render(cards, coverage(cards)))
+    assert grams("a b c d e f", 5) == {("a", "b", "c", "d", "e"), ("b", "c", "d", "e", "f")}
