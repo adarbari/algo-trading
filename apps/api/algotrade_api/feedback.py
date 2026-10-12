@@ -23,6 +23,8 @@ from algotrade.services.feedback import events
 from algotrade.services.feedback.diff import criteria_diff, criteria_snapshot
 from algotrade.services.feedback.events import FeedbackSink, NoFeedback
 from algotrade.services.feedback.recorder import open_recorder
+from algotrade.services.feedback.request_recorder import open_request_recorder
+from algotrade.services.feedback.requests import MissingLike, record_missing
 from algotrade.services.read.instruments.catalogue import feature_infos
 
 log = logging.getLogger(__name__)
@@ -113,6 +115,32 @@ def feedback_sink(given: FeedbackSink | None, live: bool, data_url: str) -> Feed
     if given is not None:
         return given
     return open_recorder(data_url) if live else NoFeedback()
+
+
+def request_sink(given: FeedbackSink | None, live: bool, data_url: str) -> FeedbackSink:
+    """The sink of the missing-feature request log: ``given`` (tests), else the recorder of
+    ``feedback/feature_requests`` when the app is the served one, else one that records nothing."""
+    if given is not None:
+        return given
+    return open_request_recorder(data_url) if live else NoFeedback()
+
+
+def record_requests(
+    sink: FeedbackSink,
+    user: str,
+    missing: Sequence[MissingLike],
+    sentence: str,
+    call_id: str | None,
+    session_id: str,
+) -> None:
+    """The draft's ``missing`` items (as the server kept them) in the request log; nothing for a
+    draft with none. Swallows its own failure, like every function here."""
+    if not missing:
+        return
+    try:
+        record_missing(sink, user, missing, sentence, call_id=call_id, draft_session_id=session_id)
+    except Exception:
+        log.exception("the missing-feature requests were not recorded")
 
 
 def record_requested(
