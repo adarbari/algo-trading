@@ -302,7 +302,7 @@ follow-up PR).
 - Options: a section on the Feature requests page in its own lazy chunk / a new Admin section and route / inline in the page chunk.
 - Decision: a lazy section on the existing Feature requests page (no new workspace section, no new Start page). Budgets: the page chunk +370 B (the dynamic import and its Suspense fallback), the Screeners page chunk +304 B (the new operation joins the shared generated document map it carries), and a first budget of 3900 B for the section's own chunk. Reasons are in `apps/web/perf-budgets.json`.
 - decided by: owner (confirmed 2026-10-11)
-- status: final (owner approved the budget raises 2026-10-11)
+- status: final
 - Reasoning: the owner confirmed the placement and approved the budget raises; the Screeners page also makes one more request (49 -> 50) because the section shares `ExpandableTable` as its own chunk. The brief allows a raise with a written reason; an inline section would have cost the page 3.9 kB.
 
 ## 2026-10-11 | Admin accepted formulas | Erase and curated events
