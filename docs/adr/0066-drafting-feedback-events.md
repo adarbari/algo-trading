@@ -183,6 +183,6 @@ save. A save that changes nothing records nothing. An edge has no remembered dra
 the row is filed under a fresh session. An edge's text never becomes a golden case: `golden_candidates`
 skips `doc_kind = edge` rows and `curate` refuses an edge chain. The previous revision is read once,
 inside `save_edge_revision`, with the write. Admins can read edge text and revisions with the same
-visibility as sentences (owner decision pending; the default is allow). Retention and erase (#540) null the
+visibility as sentences (owner decision 2026-10-11: allow). Retention and erase (#540) null the
 payload as a whole; this change merges after #540 and wires nothing of it. Copy, status and delete
 calls record nothing. The table registry entry is unchanged by this note.
