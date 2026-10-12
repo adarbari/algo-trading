@@ -27,7 +27,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from algotrade.config.site.features.definitions import FeatureDefinition
-from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.features.expressions.fingerprint import find_duplicate, fingerprint
 from algotrade.features.expressions.nodes import ExpressionError, Ref
 from algotrade.services.drafting.answer_schema import FORMULA, check_item
@@ -148,7 +148,7 @@ def dry_run_all(
         )  # fmt: skip
         try:
             stats = dry_run(ctx, definition, _count_criterion(f.criterion))
-        except Exception as exc:
+        except (OSError, AlgoTradeError, ValueError) as exc:  # the store's read errors
             log.warning("dry run of %s failed: %s: %s", f.name, type(exc).__name__, exc)
             notes.append(f"{f.name}: the dry run could not be made ({type(exc).__name__})")
             stats = UNSAMPLED
@@ -226,14 +226,15 @@ def _column(ctx: ReadContext, ref: str, inputs: tuple[str, ...]) -> _Repeat:
 def _rewrite(
     item: Mapping[str, Any], repeat: _Repeat, normalise: Normalise, notes: list[str], name: str
 ) -> dict[str, Any] | None:
-    """The proposed criterion on the existing field, unless its unit is a different scale."""
+    """The proposed criterion on the existing field, only when both are in the same unit: a
+    threshold in another unit would filter on the wrong scale, so it is dropped, with a note."""
     unit = item["unit"]
     if unit != repeat.unit:
-        scales = {unit, repeat.unit}
-        if scales == {"pct_points", "decimal"}:
-            notes.append(f"{name}: its criterion was dropped (a percent against a fraction)")
-            return None
-        notes.append(f"{name}: proposed in {unit}, {repeat.label} is in {repeat.unit}: check it")
+        notes.append(
+            f"{name}: its criterion was dropped (proposed in {unit}, {repeat.label} is in "
+            f"{repeat.unit})"
+        )
+        return None
     return _criterion_on(item, repeat.field, normalise)
 
 

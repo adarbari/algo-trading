@@ -189,6 +189,7 @@ def test_a_repeat_of_the_traders_own_feature_is_dropped(ctx: ReadContext) -> Non
         formula(
             expr="2 * price_stats.close",
             inputs=["price_stats.close"],
+            unit="usd",
             criterion={"op": "gt", "value": 10, "mode": None, "tolerance": None},
         ),
     )
@@ -206,6 +207,7 @@ def test_a_saved_formula_proposed_again_is_a_repeat_not_a_name_clash(ctx: ReadCo
         name="draft_mine",
         expr="price_stats.close * 2",
         inputs=["price_stats.close"],
+        unit="usd",
         criterion={"op": "gt", "value": 10, "mode": None, "tolerance": None},
     )
     out = check(own(ctx), again)
@@ -247,13 +249,14 @@ def repeat_with(unit: str) -> dict[str, Any]:
     )
 
 
-def test_a_repeat_in_another_unit_is_noted_and_a_percent_for_a_fraction_loses_its_criterion(
-    ctx: ReadContext,
+@pytest.mark.parametrize("unit", ["ratio", "pct_points", "usd"])
+def test_a_repeat_in_another_unit_loses_its_criterion_with_a_note(
+    ctx: ReadContext, unit: str
 ) -> None:
-    noted = check(ctx, repeat_with("ratio"))
-    assert "draft_below_high" in noted.rewritten and "check it" in noted.notes[-1]
-    dropped = check(ctx, repeat_with("pct_points"))
-    assert dropped.rewritten == {} and "percent against a fraction" in dropped.notes[-1]
+    out = check(ctx, repeat_with(unit))
+    assert out.rewritten == {}
+    assert f"proposed in {unit}, pct_from_high_52w is in decimal" in out.notes[-1]
+    assert "draft_below_high" in check(ctx, repeat_with("decimal")).rewritten  # the same unit
 
 
 def test_only_the_first_formulas_are_checked_and_the_cut_is_said(ctx: ReadContext) -> None:
@@ -275,3 +278,14 @@ def test_a_dry_run_that_breaks_leaves_the_formula_unsampled_with_a_note(
     kept, notes = dry_run_all(ctx, check(ctx, formula()).formulas)
     assert kept[0].dry_run is UNSAMPLED and kept[0].pending
     assert notes == ("draft_near_high: the dry run could not be made (OSError)",)
+
+
+def test_a_programming_error_in_a_dry_run_is_not_swallowed(
+    ctx: ReadContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def buggy(*_: object) -> None:
+        raise TypeError("a bug")
+
+    monkeypatch.setattr(formulas_module, "dry_run", buggy)
+    with pytest.raises(TypeError):
+        dry_run_all(ctx, check(ctx, formula()).formulas)

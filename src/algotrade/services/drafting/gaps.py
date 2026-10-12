@@ -93,9 +93,11 @@ def missing_of(
             continue
         slug = None if known else _slug(item.get("key")) or _slug(item.get("new_key_slug"))
         if known is None and not slug:
-            slug = _slug(item["span"]) or _slug(item["description"])
+            slug = _slug(item["description"])  # model-written: never the trader's own words
         if known is None and not slug:
-            notes.append(f"missing feature {n} has no key and no usable slug; not kept")
+            notes.append(
+                f"missing feature {n} has no key, slug or description to name it by; not kept"
+            )
             continue
         feasibility = item["feasibility"] if item["feasibility"] in FEASIBILITY else ""
         out.append(

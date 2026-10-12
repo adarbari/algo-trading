@@ -59,7 +59,10 @@ def test_an_alias_is_its_item_and_the_models_own_words_win() -> None:
         ({"key": "relative_strength_rank"}, "relative_strength_rank"),
         ({"key": "Relative Strength Rank!"}, "relative_strength_rank"),
         ({"key": None, "new_key_slug": "rs_rank"}, "rs_rank"),
-        ({"key": None, "new_key_slug": None}, "held_within_support"),
+        (
+            {"key": None, "new_key_slug": None, "description": "Time in the band"},
+            "time_in_the_band",
+        ),
         (
             {"key": None, "new_key_slug": None, "span": "", "description": "Buyer count"},
             "buyer_count",
@@ -75,6 +78,17 @@ def test_a_key_the_backlog_does_not_know_is_a_new_slug(changes: dict[str, Any], 
 def test_a_request_with_nothing_to_name_it_by_is_noted_not_kept() -> None:
     got, notes = missing(item(key=None, span="", description=""), {"key": 3}, "x")
     assert got == () and len(notes) == 3 and "no key" in notes[0]
+
+
+def test_the_traders_words_never_become_a_slug() -> None:
+    got, notes = missing(
+        item(key=None, new_key_slug=None, span="held within support", description="")
+    )
+    assert got == () and "no key, slug or description" in notes[0]
+    (kept,), _ = missing(
+        item(key=None, new_key_slug=None, span="my words", description="Band time")
+    )
+    assert kept.new_key_slug == "band_time"
 
 
 def test_no_missing_or_a_non_list_is_nothing() -> None:
