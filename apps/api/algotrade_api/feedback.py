@@ -235,6 +235,7 @@ def record_returned(
     terms: Sequence[str] = (),
     formulas: Sequence[str] = (),
     parts: Sequence[Mapping[str, Any]] = (),
+    stage: str = "model",
     part: Mapping[str, Any] | None = None,
 ) -> None:
     """``draft_returned`` (the model's criteria after validation, what it dropped and its
@@ -242,7 +243,8 @@ def record_returned(
     ``terms`` and proposed ``formulas`` (the only subjects a later choice may name). ``parts``
     (``parts_payload``) go in the payload, clipped: the trader's words and the model's readings
     of them are personal text, kept and nulled with the payload (ADR 0066). ``part``
-    (``part_note``): the draft is a part's re-draft, noted in the payload."""
+    (``part_note``): the draft is a part's re-draft, noted in the payload. A draft the phrasebook
+    made with no model call (``stage`` ``phrasebook``) says so in the payload; it has no call id."""
     try:
         version = events.catalogue_version(list(feature_infos(features)))  # the caller's fields
         draft_hash = events.document_hash(document)
@@ -266,6 +268,8 @@ def record_returned(
         }
         if parts:
             payload["parts"] = events.bounded(list(parts), events.MAX_PART)
+        if stage != "model":
+            payload["stage"] = stage
         if part:
             payload.update(part)
         events.emit(

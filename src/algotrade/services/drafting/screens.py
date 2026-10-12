@@ -15,7 +15,11 @@ accepts), ``missing`` and ``unresolved`` (``gaps.py``). The document holds only 
 existing-field rewrite of a duplicate formula and the default reading of each unresolved term
 among them); a pending formula and its criterion travel beside it and are never auto-applied,
 nor are the ``suggestions`` (protective soft / score checks the sentence did not ask for,
-``suggestions.py``).
+``suggestions.py``). A sentence the structured phrasebook entries resolve in full
+(``phrasebook/resolve.py``) is drafted with no model call (``phrasebook/shortcut.py``, ADR 0041
+amended 2026-10-12): its answer, in the model's own shape, goes through the same ``_draft`` and
+``_finished``, so the validators, the ``current`` criteria and the parts are the same; any
+doubt (a criterion dropped or refused, a field ``current`` has) falls through to the model.
 Reads the catalogue, the configs and, for the dry run of a formula, the request's session;
 writes nothing."""
 
@@ -52,6 +56,12 @@ from algotrade.services.drafting.gaps import MissingFeature, Unresolved, missing
 from algotrade.services.drafting.parts.build import build_parts
 from algotrade.services.drafting.parts.items import items_of
 from algotrade.services.drafting.parts.model import Part, PartsStats, part_tag
+from algotrade.services.drafting.phrasebook.resolve import resolve
+from algotrade.services.drafting.phrasebook.shortcut import (
+    phrasebook_version,
+    served,
+    shortcut,
+)
 from algotrade.services.drafting.prompt import (
     PROMPT_VERSION,
     index_group,
@@ -112,6 +122,8 @@ class ScreenDraft:
     dropped: tuple[DroppedCriterion, ...]
     notes: tuple[str, ...]
     call_id: str | None = None  # the text-model call that made it (usage/llm_calls, ADR 0066)
+    stage: str = "model"  # what made it: "model", or "phrasebook" (no call, no call_id, no cost)
+    prompt_version: str = PROMPT_VERSION  # "phrasebook:<hash of the book>" for a no-model draft
     formulas: tuple[DraftFormula, ...] = ()  # B1: pending, not in the document
     formulas_dropped: tuple[DroppedFormula, ...] = ()
     missing: tuple[MissingFeature, ...] = ()  # B2 / C: asked for, not buildable here
@@ -141,6 +153,10 @@ def draft_screen(
         raise ConfigurationError(f"{screener_id}: the sentence is over {MAX_TEXT} characters")
     infos = feature_infos(ctx.features)
     phrasebook = load_phrasebook(ctx.configs).phrases
+    if (
+        quick := _from_phrasebook(ctx, screener_id, sentence, infos, phrasebook, current)
+    ) is not None:
+        return quick
     guide = load_field_guide(ctx.configs)
     backlog = load_feature_backlog(ctx.configs)
     system = sliced_system_prompt(
@@ -229,6 +245,46 @@ def draft_words(
         lambda text: _draft(ctx, screener_id, text, infos, words, phrasebook, None, whole=True),
         finish,
     )  # fmt: skip
+
+
+def _from_phrasebook(
+    ctx: ReadContext,
+    screener_id: str,
+    sentence: str,
+    infos: Mapping[str, Any],
+    phrasebook: Sequence[Phrase],
+    current: Mapping[str, Any] | None,
+) -> ScreenDraft | None:
+    """The draft of a sentence the structured phrasebook entries resolve in full, made without
+    the model (stage ``phrasebook``: no call id, so no ledger row to point at); ``None`` when the
+    model should answer. The entries' answer takes the model's own path (``_draft``): a field
+    outside this caller's catalogue or a criterion the validator refuses is not served from the
+    phrasebook, the model is asked."""
+    resolution = resolve(sentence, phrasebook)
+    quick = None if resolution is None else shortcut(resolution, sentence, current, phrasebook)
+    if quick is None:
+        return None
+    try:
+        draft = _draft(
+            ctx, screener_id, json.dumps(quick.answer), infos, sentence, phrasebook, current
+        )
+    except (ConfigurationError, ModelUnavailableError) as exc:  # not a draft we can serve
+        log.info("phrasebook draft refused (%s): the model answers", exc)
+        return None
+    parts = None if draft.dropped or not draft.parts else served(draft.parts, quick)
+    if parts is None:
+        return None
+    return _finished(
+        ctx,
+        replace(
+            draft,
+            parts=parts,
+            parts_stats=None,
+            stage="phrasebook",
+            prompt_version=phrasebook_version(phrasebook),
+        ),
+        None,
+    )
 
 
 def _finished(ctx: ReadContext, final: ScreenDraft, call_id: str | None) -> ScreenDraft:

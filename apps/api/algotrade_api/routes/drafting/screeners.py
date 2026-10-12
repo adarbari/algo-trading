@@ -16,7 +16,6 @@ re-drafted part's missing items. A request that fails a check: 400; at the user'
 from fastapi import APIRouter
 
 from algotrade.services.drafting import screens
-from algotrade.services.drafting.prompt import PROMPT_VERSION
 from algotrade.services.drafting.redraft.request import check_request
 from algotrade.services.drafting.redraft.run import redraft_part
 from algotrade_api import feedback
@@ -58,9 +57,9 @@ def draft_from_text(
         sink, drafts, session_id, user, screener_id, body.text, result.document,
         [{"id": d.id, "field": d.field, "reason": d.reason} for d in result.dropped],
         (result.call_id,) if result.call_id else (), ctx.features,
-        PROMPT_VERSION, seq, result.notes,
+        result.prompt_version, seq, result.notes,
         [u.term for u in result.unresolved], [f.name for f in result.formulas],
-        feedback.parts_payload(result.parts),
+        feedback.parts_payload(result.parts), result.stage,
     )  # fmt: skip
     feedback.record_requests(
         requests, user, result.missing, body.text, result.call_id, session_id
@@ -92,9 +91,10 @@ def draft_part(
     feedback.record_returned(
         sink, drafts, session_id, user, screener_id, draft.sentence, draft.document,
         [{"id": d.id, "field": d.field, "reason": d.reason} for d in draft.dropped],
-        (draft.call_id,) if draft.call_id else (), ctx.features, PROMPT_VERSION, seq, draft.notes,
+        (draft.call_id,) if draft.call_id else (), ctx.features,
+        draft.prompt_version, seq, draft.notes,
         [u.term for u in draft.unresolved], [f.name for f in draft.formulas],
-        feedback.parts_payload(draft.parts, done.replaced_part_id), note,
+        feedback.parts_payload(draft.parts, done.replaced_part_id), part=note,
     )  # fmt: skip
     feedback.record_requests(
         requests, user, done.missing, draft.sentence, draft.call_id, session_id
