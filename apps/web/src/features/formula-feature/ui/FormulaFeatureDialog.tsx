@@ -17,19 +17,35 @@ import { guessUnit, isFeatureName, UNITS } from '../model/formula';
 
 const CHECK_DEBOUNCE_MS = 300;
 
+/** What the dialog starts with (a formula the draft proposed): the trader reviews it before saving. */
+export interface FormulaFeatureInitial {
+  name: string;
+  expr: string;
+  unit?: string;
+  description?: string;
+  nullMeaning?: string;
+}
+
 export interface FormulaFeatureDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The feature was saved: its field (`feature.<name>`). */
   onSaved: (field: string) => void;
+  /** Pre-fills the fields (the dialog mounts with them: a new formula is a new mount). */
+  initial?: FormulaFeatureInitial;
 }
 
-export function FormulaFeatureDialog({ open, onOpenChange, onSaved }: FormulaFeatureDialogProps) {
-  const [name, setName] = useState('');
-  const [expr, setExpr] = useState('');
-  const [unit, setUnit] = useState<string | null>(null);
-  const [description, setDescription] = useState('');
-  const [nullMeaning, setNullMeaning] = useState('');
+export function FormulaFeatureDialog({
+  open,
+  onOpenChange,
+  onSaved,
+  initial,
+}: FormulaFeatureDialogProps) {
+  const [name, setName] = useState(initial?.name ?? '');
+  const [expr, setExpr] = useState(initial?.expr ?? '');
+  const [unit, setUnit] = useState<string | null>(initial?.unit ?? null);
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [nullMeaning, setNullMeaning] = useState(initial?.nullMeaning ?? '');
   const check = useFormulaCheck(useDebounced(expr, CHECK_DEBOUNCE_MS));
   const save = useSaveFormulaFeature();
   const checked = check.data;
@@ -71,6 +87,7 @@ export function FormulaFeatureDialog({ open, onOpenChange, onSaved }: FormulaFea
       title="Add formula feature"
       description="A formula over catalogue features, saved as your own feature."
       size="lg"
+      fullOnPhone
       footer={
         <>
           <Button

@@ -1,0 +1,196 @@
+# L3 site setting: the Guide glossary, Describe it's review panel (ADR 0051, ADR 0066, docs/drafting/describe-it-plan.md "Web").
+# One [[term]] each: id, term, short (one sentence), body, see_also, next. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+# ---------------------------------------------------------------- the four groups of an answer
+
+[[term]]
+id = "describe_applied"
+term = "Describe it: Applied"
+short = "The criteria the draft loaded into the Builder from fields the catalogue already has."
+body = """
+Every row in this group reads a stored field, so the screen can run on it as soon as you save. The rows are an unsaved edit: change or remove any of them before you save.
+The words in your sentence that became these rows are underlined with a solid line.
+A sentence can name a field the catalogue does not have. It is then left out of this group and listed under not available yet.
+"""
+see_also = ["describe_needs_your_call", "describe_not_available_yet", "draft"]
+
+[[term]]
+id = "describe_proposed_formulas"
+term = "Describe it: Proposed formulas"
+short = "A formula over stored fields that the draft offers for a word the catalogue has no field for."
+body = """
+When your sentence needs a number the catalogue does not store, the draft may offer a formula over fields it does store. The app checks the formula and runs it on the latest session before showing it. The card lists the formula, its inputs, how many rows had no value, the range, and five sample rows.
+A proposed formula is never added on its own. Review and add keeps it as a draft feature of yours. Skip leaves it out and the screen runs without it.
+"""
+see_also = ["describe_pending_formula", "describe_waiting_on_formula"]
+next = "Review and add to keep the formula, or Skip to run the screen without it."
+
+[[term]]
+id = "describe_needs_your_call"
+term = "Describe it: Needs your call"
+short = "A word in your sentence that can mean more than one thing, with a reading chosen for you."
+body = """
+Words such as "liquid" or "large" have no single threshold. The draft picks the most common reading and loads it, and lists the other readings beside it.
+Picking another reading swaps that one criterion at once on your screen. It asks the model nothing and changes nothing else. Your pick is recorded with the screen when you save, so the draft can learn which reading traders choose.
+"""
+see_also = ["describe_applied"]
+
+[[term]]
+id = "describe_not_available_yet"
+term = "Describe it: Not available yet"
+short = "Something your sentence asked for that the catalogue cannot compute today."
+body = """
+Each card names one missing field, what it would be used for, and how hard it is to add. A missing field is not applied and does not block you from finalising: the screen runs on the criteria it does have.
+The app keeps a log of what you ask for that is missing. The card shows when you asked for it before. It shows your own history only, never what other traders asked.
+"""
+see_also = ["describe_not_covered", "describe_requested_not_applied", "describe_feasibility_rollup", "describe_feasibility_source", "describe_feasibility_unclear"]
+
+[[term]]
+id = "describe_not_covered"
+term = "Not covered"
+short = "Something your screen was asked to test but does not, kept with the screen."
+body = """
+When a sentence asks for a field the catalogue cannot compute, the screen is saved without it and a short note of what is missing is saved with it. The note is shown in the plain-English reading of the screen, so nobody mistakes a partial screen for a full one.
+You can remove a note at any time. Removing it does not add the field and does not change which instruments pass.
+"""
+see_also = ["describe_not_available_yet", "describe_requested_not_applied"]
+next = "Remove the note if the screen is meant to be partial, or add a criterion by hand from the nearest field."
+
+[[term]]
+id = "describe_requested_not_applied"
+term = "Requested, not applied"
+short = "The field you asked for is on the request list; the screen does not use it."
+body = """
+Describe it recorded that your sentence needed a field the catalogue lacks. The request does not change your screen and it does not add the field.
+Whether and when a field is built is decided by the site's owner, and the card shows where the request stands.
+"""
+see_also = ["describe_not_available_yet", "describe_status_open", "describe_status_promoted", "describe_status_wont_do"]
+next = "Add a criterion by hand from the nearest field, or leave the screen as it is."
+
+# ---------------------------------------------------------------- formulas waiting for a decision
+
+[[term]]
+id = "describe_pending_formula"
+term = "Pending formula"
+short = "A proposed formula you have not accepted yet, so no screen can depend on it."
+body = """
+A formula the draft offered stays pending until you press Review and add. While it is pending it is not a field of your catalogue, and a criterion built on it is held back from the screen.
+A screen with a pending formula cannot be finalised. Accept the formula or skip it first.
+"""
+see_also = ["describe_proposed_formulas", "describe_waiting_on_formula"]
+next = "Accept the formula or skip it, then finalise."
+
+[[term]]
+id = "describe_waiting_on_formula"
+term = "Waiting on formula"
+short = "A criterion row that uses a proposed formula you have not accepted yet."
+body = """
+The draft wrote the criterion for you, but it reads a formula that is still pending. The row is shown so you can see what the formula would do. It is not part of the screen's result until the formula is accepted.
+"""
+see_also = ["describe_pending_formula", "describe_proposed_formulas"]
+next = "Accept the formula to switch the row on, or remove the row."
+
+# ---------------------------------------------------------------- how hard a missing field is to add
+
+[[term]]
+id = "describe_feasibility_rollup"
+term = "Feasibility: buildable from stored data"
+short = "The missing field can be computed from data the app already stores, over a window of days."
+body = """
+Examples are a 20-day average or a change since the last quarter. No new vendor is needed.
+It still needs code to compute it every night and a row in the catalogue, so it is not available until the site adds it.
+"""
+see_also = ["describe_feasibility_source", "describe_feasibility_unclear"]
+next = "Nothing for you to do: the site decides when it is built."
+
+[[term]]
+id = "describe_feasibility_source"
+term = "Feasibility: needs a new source"
+short = "The missing field needs data the app does not collect from any vendor today."
+body = """
+Examples are analyst estimates or short interest, if no current source carries them. Adding it means choosing a vendor and a licence as well as writing code, so it takes longer than a field built from stored data.
+"""
+see_also = ["describe_feasibility_rollup", "describe_feasibility_unclear"]
+next = "Nothing for you to do: the site decides whether a source is worth adding."
+
+[[term]]
+id = "describe_feasibility_unclear"
+term = "Feasibility: unclear"
+short = "The draft could not tell whether the missing field can be built from stored data or needs a new source."
+body = """
+The words in your sentence did not say enough to judge. The site's owner checks the request before deciding.
+A sentence that names the exact measure and the window of days makes the request clearer.
+"""
+see_also = ["describe_feasibility_rollup", "describe_feasibility_source"]
+next = "Describe the measure more precisely to make the request clearer."
+
+# ---------------------------------------------------------------- where a request stands
+
+[[term]]
+id = "describe_status_open"
+term = "Request: open"
+short = "The field has been asked for and the site has not decided to build it."
+body = """
+An open request is on the list. Asking again on another day shows the site that the field is wanted, and counts once for each day.
+"""
+see_also = ["describe_status_promoted", "describe_status_wont_do"]
+next = "Your screen is unchanged; the card updates when the site decides."
+
+[[term]]
+id = "describe_status_promoted"
+term = "Request: promoted"
+short = "The site added the field to the catalogue; it can now be used in a criterion."
+body = """
+The card names the catalogue field that was built. A sentence that asks for the same thing now maps to that field and loads as an applied criterion.
+"""
+see_also = ["describe_status_open", "describe_status_wont_do"]
+next = "Describe the screen again, or add a criterion on the new field by hand."
+
+[[term]]
+id = "describe_status_wont_do"
+term = "Request: won't do"
+short = "The site decided not to build the field, for example because no source is licensed for it."
+body = """
+A request closed this way stays on the list so the answer is on record. Asking for it again does not reopen it.
+"""
+see_also = ["describe_status_open", "describe_status_promoted"]
+next = "Use the nearest field the catalogue has instead."
+
+# ---------------------------------------------------------------- why a draft did not arrive
+
+[[term]]
+id = "describe_failure_off"
+term = "Describe it: drafting is off"
+short = "The site has not turned on the text model, so a sentence cannot be turned into a draft."
+body = """
+Describe it needs a text model. It is off by default and the site's owner turns it on. Building a screen by hand in the Builder works as usual and nothing was saved or changed.
+"""
+next = "Build the screen by hand, or ask the site's owner to turn drafting on."
+
+[[term]]
+id = "describe_failure_unavailable"
+term = "Describe it: the model could not answer"
+short = "The text model was down, timed out or gave an answer the app could not use."
+body = """
+The app asks the text model for a draft and checks the answer before it shows anything. If the model was down, took too long, or answered in a form the app could not read, nothing is drafted. Your screen is unchanged and nothing was saved.
+"""
+next = "Try again; a second attempt often works."
+
+[[term]]
+id = "describe_failure_busy"
+term = "Describe it: too many drafts"
+short = "Describe it limits how often a draft can be asked for; wait a moment and ask again."
+body = """
+Each draft calls a paid or shared text model, so the app spaces the requests of one trader. Your screen is unchanged.
+"""
+next = "Wait a minute, then try again."
+
+[[term]]
+id = "describe_failure_refused"
+term = "Describe it: could not draft this"
+short = "The draft could not be made for this sentence or this screen."
+body = """
+The request was refused before a draft came back. It can happen when the sentence is empty or too long, or when the screen has changed. Your screen is unchanged and nothing was saved.
+"""
+next = "Shorten or reword the sentence, then try again."

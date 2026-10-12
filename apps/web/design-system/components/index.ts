@@ -159,6 +159,7 @@ export {
   type OutcomeTone,
 } from './OutcomeDots';
 export { Panel, type PanelProps, type PanelState } from './Panel';
+export { PendingRow, type PendingRowProps } from './PendingRow';
 export {
   Popover,
   type PopoverPlacement,

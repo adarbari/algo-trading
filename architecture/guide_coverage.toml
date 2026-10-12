@@ -337,6 +337,11 @@ exempt = "placeholder page, not built yet"
 path = "/admin/users"
 exempt = "placeholder page, not built yet"
 
+[[enum]]
+source = "graphql:MyFeatureRequest.status"
+values_from = "python:algotrade.config.site.drafting.backlog:STATUS"
+values = { OPEN = "term:describe_status_open", PROMOTED = "term:describe_status_promoted", WONT_DO = "term:describe_status_wont_do" }
+
 # ------------------------------------------------------------------ dynamic references
 
 [[dynamic_ref]]

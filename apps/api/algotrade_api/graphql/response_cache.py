@@ -141,10 +141,14 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
 # The run operations whose loader reads the clock (``load_completeness``: the last session the
 # exchange closed): the closed session is in their key too.
 CLOSED_SESSION_OPERATIONS: frozenset[str] = frozenset({"IngestionCompleteness", "StatusStrip"})
-# Never kept: the text model's usage (it reads the clock, unkeyed) and the caller's identity
-# (answered inline, no context opened). A new operation is never in this group by default: the
-# classification test fails until it is placed.
-NEVER_CACHED: frozenset[str] = frozenset({"FeatureRequests", "LlmUsage", "Viewer"})
+# Never kept: the text model's usage (it reads the clock, unkeyed), the caller's identity
+# (answered inline, no context opened) and the caller's own missing-feature requests (a draft
+# POST records them, and a draft writes nothing the cache keys on; the window reads the clock).
+# A new operation is never in this group by default: the classification test fails until it is
+# placed.
+NEVER_CACHED: frozenset[str] = frozenset(
+    {"FeatureRequests", "LlmUsage", "Viewer", "MyFeatureRequests"}
+)
 # The route packages whose endpoints write (configs, screen results, evaluations); a preview,
 # a draft or an explain POST writes nothing the cache keys on.
 WRITE_PACKAGES = (

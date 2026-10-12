@@ -15,7 +15,8 @@ from algotrade.services.authoring import edges
 from algotrade.services.authoring.edges import StatusChange
 from algotrade.services.read.context import open_stores
 from algotrade.services.read.evaluation import versions
-from algotrade_api.deps import Context, Store, User, Writer
+from algotrade_api import feedback
+from algotrade_api.deps import Context, Feedback, Store, User, Writer
 from algotrade_api.schemas.authoring.edges import (
     CopyEdgeBody,
     EdgeDocument,
@@ -40,12 +41,15 @@ def copy(
 
 
 @router.put("/{edge_id}")
-def save(writer: Writer, user: User, edge_id: str, body: SaveEdgeBody) -> EdgeDocument:
+def save(
+    writer: Writer, user: User, sink: Feedback, edge_id: str, body: SaveEdgeBody
+) -> EdgeDocument:
     """Replace (or create) the user's own edge; validated as the harness reads it, nothing is
-    written on an error (400). A site edge's id is 409: copy it."""
-    return EdgeDocument(
-        edge_id=edge_id, document=edges.save_edge(writer, user, edge_id, body.document)
-    )
+    written on an error (400). A site edge's id is 409: copy it. A revision is recorded as an
+    ``edge_revised`` feedback event after the write (ADR 0066), never failing the save."""
+    previous, stored = edges.save_edge_revision(writer, user, edge_id, body.document)
+    feedback.record_edge_revised(sink, body.draft_session_id, user, edge_id, previous, stored)
+    return EdgeDocument(edge_id=edge_id, document=stored)
 
 
 @router.delete("/{edge_id}", status_code=204)

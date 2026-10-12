@@ -49,6 +49,17 @@ def test_finalise_numbers_versions_and_removes_the_draft(writer: MemoryConfigWri
     assert writer.version("alice", "mine", 1) == {"id": "mine", **OWN, "version": 1}
 
 
+def test_notes_are_kept_through_save_and_finalise_and_checked(writer: MemoryConfigWriter) -> None:
+    noted = OWN | {"notes": ["doesn't test support lines"]}
+    assert screens.save_draft(writer, "alice", "mine", noted)["notes"] == noted["notes"]
+    assert screens.finalise(writer, "alice", "mine").version == 1
+    assert writer.version("alice", "mine", 1)["notes"] == noted["notes"]
+    screens.save_draft(writer, "alice", "mine", OWN | {"notes": ["x" * 201]})
+    with pytest.raises(ConfigurationError, match="notes"):
+        screens.finalise(writer, "alice", "mine")
+    assert writer.versions("alice", "mine") == [1]
+
+
 @pytest.mark.parametrize(
     "document",
     [

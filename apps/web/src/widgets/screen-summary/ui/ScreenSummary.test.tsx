@@ -6,11 +6,11 @@ import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { ScreenSummary } from './ScreenSummary';
 
-const state = vi.hoisted(() => ({ preview: {} }));
+const state = vi.hoisted((): { preview: object; notes: string[] } => ({ preview: {}, notes: [] }));
 
 vi.mock('@/features/screener-builder', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useScreenerBuilder: () => ({ preview: state.preview }),
+  useScreenerBuilder: () => ({ preview: state.preview, notes: state.notes }),
 }));
 
 const DATA = {
@@ -61,6 +61,13 @@ describe('ScreenSummary', () => {
     await userEvent.click(screen.getByRole('button', { name: /Narrow misses/ }));
     expect(screen.getByText('spread (1)')).toBeInTheDocument();
     expect(screen.getByText('KO 0.091 vs 0.100, short by 0.009')).toBeInTheDocument();
+  });
+
+  it('says what the screen does not cover next to the totals', async () => {
+    state.notes = ['support lines'];
+    render(<ScreenSummary />);
+    expect(await screen.findByText('Not covered: support lines')).toBeInTheDocument();
+    state.notes = [];
   });
 
   it('asks for a complete criterion while idle', () => {

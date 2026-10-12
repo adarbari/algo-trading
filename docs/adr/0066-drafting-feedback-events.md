@@ -218,4 +218,20 @@ or full sink never fails the draft, and a draft with no missing items writes not
 - Personal data is stored: one more reason the read is viewer-scoped and the sentence short.
 - The memory is per process (one API process is assumed, as 0058): after a restart a save records no
   diff for a draft made before it.
-- Edge revisions (`edge_revised`) are named but emitted nowhere yet.
+- Edge revisions (`edge_revised`): see the 2026-10-11 note below.
+
+## Note 2026-10-11: `edge_revised` is emitted by the edge save
+`PUT /edges/{id}` (the edge builder's save, ADR 0053) records `edge_revised` after the write
+succeeded (`apps/api/algotrade_api/feedback.py::record_edge_revised`, through the same sink; `doc_kind`
+`edge`, `doc_id` the edge id). The payload carries `diff` (added / removed / changed top-level keys
+against the user's last stored revision, `services/feedback/diff.py::document_diff`), `saved_document`
+(the stored document, clipped at 8,000 characters) and `content_hash`; `first_revision` marks the first
+save. A save that changes nothing records nothing. An edge has no remembered draft, so the optional
+`draft_session_id` of the body is recorded in the payload as `claimed_session_id` and not linked
+(`chains.py` links claims by user, `doc_kind` and `doc_id`, so an edge claim never joins a screen's chain);
+the row is filed under a fresh session. An edge's text never becomes a golden case: `golden_candidates`
+skips `doc_kind = edge` rows and `curate` refuses an edge chain. The previous revision is read once,
+inside `save_edge_revision`, with the write. Admins can read edge text and revisions with the same
+visibility as sentences (owner decision 2026-10-11: allow). Retention and erase (#540) null the
+payload as a whole; this change merges after #540 and wires nothing of it. Copy, status and delete
+calls record nothing. The table registry entry is unchanged by this note.

@@ -6,7 +6,7 @@ import { useToast } from '@algotrade/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { refreshScreens, type ScreenDocument } from '@/entities/screen';
-import { api, ApiError, queryKeys, unwrap, errorDetail } from '@/shared/api';
+import { api, ApiError, queryKeys, unwrap, errorDetail, type components } from '@/shared/api';
 
 /** Refresh everything cached about the screens (lists, detail, versions). */
 function useRefresh() {
@@ -21,15 +21,22 @@ export function useSaveDraft(id: string) {
     mutationFn: ({
       document,
       draftSessionId,
+      choices = [],
     }: {
       document: ScreenDocument;
       /** The Describe-it session this screen came from (ADR 0066), if any. */
       draftSessionId?: string | null;
+      /** What the trader decided on the draft's options, recorded with the save. */
+      choices?: readonly components['schemas']['DraftChoice'][];
     }) =>
       unwrap(
         api.PUT('/screeners/{screener_id}/draft', {
           params: { path: { screener_id: id } },
-          body: { document, ...(draftSessionId ? { draft_session_id: draftSessionId } : {}) },
+          body: {
+            document,
+            ...(draftSessionId ? { draft_session_id: draftSessionId } : {}),
+            ...(draftSessionId && choices.length > 0 ? { choices: [...choices] } : {}),
+          },
         }),
       ),
     onSuccess: () => refresh(),

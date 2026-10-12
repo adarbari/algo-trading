@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
 import { Text } from '../../primitives/Text';
+import { narrow } from '../../testing';
 import { Button } from '../Button';
 import { Field } from '../Field';
 import { Input } from '../Input';
@@ -77,4 +78,10 @@ export const Confirm: Story = {
       </>
     ),
   },
+};
+
+/** A long form: on a phone-wide screen it fills the whole screen, title and footer in place. */
+export const Narrow: Story = {
+  decorators: [narrow],
+  args: { size: 'lg', fullOnPhone: true, title: 'Add formula feature' },
 };

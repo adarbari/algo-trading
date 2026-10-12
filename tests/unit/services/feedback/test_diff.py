@@ -1,7 +1,7 @@
 """The diff of a saved screen against the draft the model returned (ADR 0066): criteria added,
 removed and changed by id (field, op, value), the unchanged count and a changed tie-break."""
 
-from algotrade.services.feedback.diff import criteria_diff
+from algotrade.services.feedback.diff import criteria_diff, document_diff
 
 P = {"field": "rollup.price@v1.close", "op": "gt", "value": 5}
 V = {"field": "rollup.vol@v1.hv20", "op": "lt", "value": 0.4}
@@ -34,3 +34,9 @@ def test_added_removed_and_changed_criteria() -> None:
 
 def test_a_malformed_document_is_an_empty_one() -> None:
     assert criteria_diff({"criteria": "no"}, {})["unchanged"] == 0
+
+
+def test_document_diff_lists_added_removed_and_changed_top_level_keys() -> None:
+    d = document_diff({"a": 1, "b": 2, "c": 3}, {"a": 1, "b": 5, "d": 4})
+    assert d == {"added": {"d": 4}, "removed": ["c"], "changed": {"b": {"from": 2, "to": 5}}}
+    assert document_diff(None, {"a": 1})["added"] == {"a": 1}

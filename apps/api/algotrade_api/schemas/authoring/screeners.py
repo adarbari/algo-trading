@@ -1,7 +1,7 @@
 """``/screeners``: the bodies and answers of a user's rule-screen writes (reading a screen is
 GraphQL)."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -19,6 +19,21 @@ class Draft(Schema):
     document: dict[str, Any]
 
 
+MAX_CHOICES = 50
+
+
+class DraftChoice(BaseModel):
+    """What the trader decided about one thing Describe it offered (ADR 0066): an unresolved
+    term's reading (``choice_made``, ``picked`` the alternative's index) or a proposed formula
+    (``formula_accepted`` / ``formula_skipped``, ``subject`` its name)."""
+
+    event: Literal["choice_made", "formula_accepted", "formula_skipped"]
+    subject: str = Field(max_length=120, description="the unresolved term, or the formula name")
+    picked: int | None = Field(
+        None, ge=0, le=1000, description="the alternative's index (choice_made only)"
+    )
+
+
 class DraftBody(BaseModel):
     document: dict[str, Any] = Field(
         description="the screen's TOML keys as JSON (the version is managed)"
@@ -29,6 +44,12 @@ class DraftBody(BaseModel):
         description="the id a draft-from-text answer returned, when this screen came from it "
         "(ADR 0066); a hand-built screen sends none",
     )
+    choices: list[DraftChoice] = Field(
+        default_factory=list,
+        max_length=MAX_CHOICES,
+        description="the decisions the trader made on the draft's options, recorded with the "
+        "save (ADR 0066); a re-sent one is the same event",
+    )
 
 
 class FinaliseBody(BaseModel):
@@ -37,6 +58,12 @@ class FinaliseBody(BaseModel):
         max_length=64,
         description="the id a draft-from-text answer returned, when this screen came from it "
         "(ADR 0066); a hand-built screen sends none",
+    )
+    choices: list[DraftChoice] = Field(
+        default_factory=list,
+        max_length=MAX_CHOICES,
+        description="the decisions the trader made on the draft's options, recorded with the "
+        "save (ADR 0066); a re-sent one is the same event",
     )
 
 
