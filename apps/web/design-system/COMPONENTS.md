@@ -1097,6 +1097,44 @@ Source: `design-system/components/Panel`
 | `flush` | `boolean` | no | No body padding (a table or grid that runs edge to edge). |
 | `children` | `ReactNode` | no | Body content when ready. |
 
+### PartCard
+
+PartCard: one part of the trader's sentence in the Describe it review. The header quotes the trader's own words (highlighted) with a kind badge (applied, formula to review, needs your call, not available yet, not understood, kept from your screen); under it "We read this as: ..." in plain language, then the part's `rows` (criteria, formula, readings, suggestions) and its `actions` (pick another reading, retype this part). A reading the model did not write (a server-built text, or none) shows a muted "check this reading" note instead of claiming it. The card is a state machine of its own: `idle`, `redrafting` (this card only, the words stay visible), `error` (an inline retry), `disabled`; `edited` marks hand-edited rows; `retype` turns the words into an input with Apply / Cancel. The `kept` kind has no quoted words (a `title` names it). It holds callbacks and slots only: every label and sentence arrives as a prop, the rows component is composed by the caller, and nothing here calls an API.
+
+Source: `design-system/components/PartCard`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `kind` | `PartKind` | yes | How the part was understood: sets the badge tone and icon. |
+| `kindLabel` | `string` | yes | The badge text ("applied", "not understood"). |
+| `words` | `string \| undefined` | no | The trader's own words, quoted and highlighted; omit for `kept`. |
+| `title` | `string \| undefined` | no | The card's name when it has no words (the `kept` card: "Kept from your screen"). |
+| `readingLabel` | `string \| undefined` | no | The lead-in to the reading ("We read this as"). |
+| `reading` | `ReactNode` | no | The part in plain language. |
+| `readingSource` | `'model' \| 'server' \| null \| undefined` | no | Who wrote the reading: `model` is shown as is; `server` or null shows the muted note. |
+| `checkReadingLabel` | `string \| undefined` | no | The muted note for a reading not written by the model ("check this reading"). |
+| `rows` | `ReactNode` | no | The part's criteria / formula / readings / suggestions, composed by the caller. |
+| `actions` | `ReactNode` | no | Pick another reading, retype this part: buttons or a picker, composed by the caller. |
+| `state` | `PartCardState \| undefined` | no | `idle`, `redrafting` (this card is being redrafted), `error` (inline retry), `disabled`. |
+| `redraftingLabel` | `string \| undefined` | no | Text while redrafting ("Redrafting this part"). |
+| `errorMessage` | `string \| undefined` | no | What went wrong, shown inline in the `error` state. |
+| `retryLabel` | `string \| undefined` | no | The retry button's label ("Try again"). |
+| `onRetry` | `(() => void) \| undefined` | no |  |
+| `edited` | `boolean \| undefined` | no | The rows were edited by hand. |
+| `editedLabel` | `string \| undefined` | no | The mark's text ("edited"). |
+| `retype` | `PartRetype \| undefined` | no | Retype mode: the words become an input with Apply / Cancel. |
+
+### PartList
+
+PartList: the ordered PartCards of one sentence, in the order the trader wrote the parts, a token gap apart. A card for words that were not understood, or the "kept from your screen" card, sits in the list like any other. A list element, so assistive technology announces "list, N items"; its name arrives as a prop.
+
+Source: `design-system/components/PartList`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `'aria-label'` | `string` | yes | Accessible name of the list ("Parts of your sentence"). |
+| `children` | `ReactNode` | yes | The PartCards, in order. |
+
 ### PendingRow
 
 PendingRow: a placeholder row for something that is not part of the screen yet, shown where it will go (a criterion that waits on a formula the trader has not accepted). A dashed, muted well, so it reads as "not active" by its border and its text label, never by colour alone: the status label (with an optional help slot), the name in monospace, an optional summary line and the actions that decide it (Review and add / Skip). It stacks at phone width. Every word arrives as a prop; this component writes none.
