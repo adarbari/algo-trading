@@ -26,7 +26,7 @@ writes nothing."""
 import json
 import logging
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -79,6 +79,7 @@ from algotrade.services.text_model.model import TextModel, reject_answer
 
 MODES = ("hard", "soft", "score")
 MISSES = ("WATCH", "LIQUIDITY_RISK", "EVENT_RISK")
+WHOLE = "p1"  # the one part of a part's re-draft: its words are the whole of the sentence
 MAX_TEXT = 1000  # characters of sentence (one request, synchronous: never a job)
 DID_YOU_MEAN = 5  # candidates named in a drop reason
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -163,10 +164,33 @@ def draft_screen(
     )
     user = user_prompt(screener_id, sentence, current)
     tag = CallTag("screener-draft", ctx.user.user_id, PROMPT_VERSION)
+    return ask_for_draft(
+        ctx, model, tag, system, user,
+        lambda text: _draft(ctx, screener_id, text, infos, sentence, phrasebook, current),
+    )  # fmt: skip
+
+
+def ask_for_draft(
+    ctx: ReadContext,
+    model: TextModel,
+    tag: CallTag,
+    system: str,
+    user: str,
+    make: Callable[[str], ScreenDraft],
+    finish: Callable[[ScreenDraft], ScreenDraft] | None = None,
+) -> ScreenDraft:
+    """Ask ``model`` (``system``, ``user``, tagged ``tag``) and return the draft ``make`` builds
+    from its answer: the model is asked with the answer schema and ``make`` as its ``accept``
+    check (an answer ``make`` refuses is repaired once, then handed to the next provider), and
+    the kept draft has its formulas dry-run once; ``finish`` (a part's merge) is then applied to
+    it, and a ``ConfigurationError`` from it rejects the answer in the usage log like any answer
+    that cannot be used, so the call does not count as one that returned a draft. The one asking
+    path of a whole sentence (``draft_screen``) and of one part of it
+    (``services/drafting/redraft``)."""
     drafted: list[tuple[str, ScreenDraft]] = []  # the answers accepted: text and its draft
 
     def check(text: str) -> None:
-        drafted.append((text, _draft(ctx, screener_id, text, infos, sentence, phrasebook, current)))
+        drafted.append((text, make(text)))
 
     def accept(text: str) -> None:
         """The chain's check of an answer: a draft we can use, else ``InvalidAnswerError``."""
@@ -193,10 +217,34 @@ def draft_screen(
     try:
         if not drafted or drafted[-1][0] != completion.text:  # a model that did not check
             check(completion.text)
+        done = _finished(ctx, drafted[-1][1], completion.call_id)
+        return finish(done) if finish is not None else done
     except (ModelUnavailableError, ConfigurationError) as exc:  # an answer we cannot use
         reject_answer(model, tag, completion, str(exc), user, len(system) + len(user))
         raise
-    return _finished(ctx, drafted[-1][1], completion.call_id)
+
+
+def draft_words(
+    ctx: ReadContext,
+    model: TextModel,
+    screener_id: str,
+    words: str,
+    system: str,
+    user: str,
+    tag: CallTag,
+    infos: Mapping[str, Any],
+    phrasebook: Sequence[Phrase],
+    finish: Callable[[ScreenDraft], ScreenDraft] | None = None,
+) -> ScreenDraft:
+    """The draft of one part's ``words`` (a part's re-draft, ``services/drafting/redraft``): the
+    model's answer to ``system`` / ``user``, with every item in the one part that holds the
+    words (``_draft`` with ``whole``) and no current criteria (the others are fixed in the
+    prompt and merged by the caller)."""
+    return ask_for_draft(
+        ctx, model, tag, system, user,
+        lambda text: _draft(ctx, screener_id, text, infos, words, phrasebook, None, whole=True),
+        finish,
+    )  # fmt: skip
 
 
 def _from_phrasebook(
@@ -254,7 +302,12 @@ def _draft(
     sentence: str = "",
     phrasebook: Sequence[Phrase] = (),
     current: Mapping[str, Any] | None = None,
+    whole: bool = False,
 ) -> ScreenDraft:
+    """The draft of one answer ``text`` to ``sentence``. ``whole``: the sentence is one part (a
+    part's re-draft, ``services/drafting/redraft``): every item belongs to the single part
+    ``WHOLE`` that holds all its words, whatever the model tagged, with the model's first
+    reading."""
     proposal = parse_answer(text)
     catalogue = set(infos)
     tags: dict[str, str | None] = {}  # criterion id -> the part the model tagged it with
@@ -274,7 +327,7 @@ def _draft(
     spans: dict[str, str] = {}  # that criterion id -> the words of the term it stands for
     for term in unresolved:  # the reading the draft starts with
         default = term.alternatives[term.default_index].criterion
-        same = [k for k, c in criteria.items() if _reading(c) == _reading(default)]
+        same = [k for k, c in criteria.items() if reading_of(c) == reading_of(default)]
         if same:  # the model also listed it in criteria: not twice
             placed[term.term] = same[0]
             continue
@@ -310,7 +363,13 @@ def _draft(
         formulas.formulas, unresolved, missing, suggestions,
         (part_tag(tie), document["rank"]["tie_break"]) if document.get("rank") else None, spans,
     )  # fmt: skip
-    explained = build_parts(sentence, proposal.get("parts"), items, phrasebook)
+    raw_parts = proposal.get("parts")
+    if whole:
+        first = raw_parts[0] if isinstance(raw_parts, list) and raw_parts else None
+        reading = first.get("reading") if isinstance(first, Mapping) else None
+        raw_parts = [{"id": WHOLE, "words": sentence, "reading": reading}]
+        items = [replace(item, tag=WHOLE) for item in items]
+    explained = build_parts(sentence, raw_parts, items, phrasebook)
     return ScreenDraft(
         screener_id, document, dropped, notes,
         formulas=formulas.formulas, formulas_dropped=formulas.dropped,
@@ -321,7 +380,7 @@ def _draft(
     )  # fmt: skip
 
 
-def _reading(criterion: Mapping[str, Any]) -> tuple[Any, Any, Any]:
+def reading_of(criterion: Mapping[str, Any]) -> tuple[Any, Any, Any]:
     value = criterion.get("value")
     return criterion["field"], criterion["op"], tuple(value) if isinstance(value, list) else value
 
@@ -338,9 +397,9 @@ def _defaults_kept(
         if placed.get(term.term) in criteria:
             out.append(term)
             continue
-        held = {_reading(c) for c in criteria.values()}
+        held = {reading_of(c) for c in criteria.values()}
         index = next(
-            (n for n, a in enumerate(term.alternatives) if _reading(a.criterion) in held), 0
+            (n for n, a in enumerate(term.alternatives) if reading_of(a.criterion) in held), 0
         )
         notes.append(f"{term.term}: the validator dropped its default reading")
         out.append(replace(term, default_index=index))

@@ -303,6 +303,11 @@ purpose = "use case: the phrasebook's structured thresholds in use (ADR 0041): t
 contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
 
 [[dir]]
+path = "src/algotrade/services/drafting/redraft"
+purpose = "use case: re-draft one explained part of a draft (ADR 0041, amended 2026-10-12): the browser's request re-validated, the scoped prompt over the same cached prefix, the answer merged into the draft with the other parts winning, and the per-user daily cap counted from the usage log (split from services/drafting, at its module cap)"
+contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
+
+[[dir]]
 path = "src/algotrade/services/evaluation"
 purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/); the forward paper record of the edges a user follows (forward/); learned edge scorers (training/); the winners study's discovery (discovery/)"
 

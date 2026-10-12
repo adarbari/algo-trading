@@ -121,6 +121,26 @@ def test_retain_nulls_the_explained_parts_with_the_payload_they_are_in(backend: 
     assert not any(SECRET in str(v) for v in fb.iloc[0].tolist())
 
 
+def test_the_retyped_words_of_a_part_redraft_go_with_the_payload_under_both_commands(
+    backend: Backend,
+) -> None:
+    """A part re-draft's events (ADR 0066, amended 2026-10-12) hold the words the trader replaced
+    and the words they typed in ``payload`` (``scope`` ``part``): the same 12 months as the
+    sentence and the erase command, so the registry needs no new column."""
+    note = {"scope": "part", "part_id": "p2", "old_words": SECRET, "new_words": "typed " + SECRET}
+    rows = [feedback_row(OLD, "abhi", event) | {"payload": json.dumps(note)}
+            for event in ("draft_requested", "draft_returned")]  # fmt: skip
+    young = feedback_row(YOUNG, "abhi", "draft_requested") | {"payload": json.dumps(note)}
+    record(backend, rows, [], OLD)
+    record(backend, [young], [], YOUNG)
+    retention.retain(backend, NOW, apply=True)
+    fb = events(backend)
+    assert fb.iloc[:2]["payload"].isna().all() and SECRET in str(fb.iloc[2]["payload"])
+    assert not any(SECRET in str(v) for row in fb.iloc[:2].values.tolist() for v in row)
+    retention.erase(backend, "abhi", NOW, apply=True)
+    assert events(backend)["payload"].isna().all()  # erase takes the young one's words too
+
+
 def test_retain_nulls_only_old_rows_and_keeps_the_skeleton(backend: Backend) -> None:
     seed(backend)
     done = retention.retain(backend, NOW, apply=True)

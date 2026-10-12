@@ -38,6 +38,7 @@ from algotrade.config.site.users import Role, UserRecord, UsersSettings
 from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.authoring.scope import ConfigWriter, author, open_writer
+from algotrade.services.drafting.redraft.cap import PartRedraftCap
 from algotrade.services.explaining.cache import TextCache
 from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.feedback.events import FeedbackSink
@@ -317,6 +318,13 @@ def get_drafts(request: Request) -> DraftMemory:
     return cast(DraftMemory, request.app.state.drafts)
 
 
+def get_part_cap(request: Request) -> PartRedraftCap:
+    """The per-user daily cap on part re-drafts ``create_app`` set up (ADR 0041, amended
+    2026-10-12), counted from the usage log."""
+    return cast(PartRedraftCap, request.app.state.part_cap)
+
+
+PartCap = Annotated[PartRedraftCap, Depends(get_part_cap)]
 Feedback = Annotated[FeedbackSink, Depends(get_feedback)]
 Requests = Annotated[FeedbackSink, Depends(get_requests)]
 Drafts = Annotated[DraftMemory, Depends(get_drafts)]

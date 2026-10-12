@@ -8,13 +8,20 @@ The explained parts (same amendment, 2026-10-11): ``sentence`` (the whitespace-n
 parts' offsets count in) and ``parts``, each the trader's own words (the server's slice of the
 sentence), the model's reading when it checks out, the kind the server decided and the ids of the
 items of this draft that belong to it; ``parts`` is null when the model gave none (the panel then
-shows the draft as before)."""
+shows the draft as before).
+``POST /screeners/{id}/draft-part`` (ADR 0041, amended 2026-10-12): the trader retypes the words of
+one part. The body is the draft the browser holds (its fields as served, ``document`` the Builder's
+current one) and which part's words become what; the answer is the whole merged draft and the id
+of the part it replaced, which the browser swaps in whole. At the per-user daily limit the answer
+is a 429 with ``LimitReached`` (its ``code`` is what the web shows the limit state on)."""
 
 from datetime import date
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
+from algotrade.services.drafting.parts.model import MAX_PARTS, MAX_WORDS
+from algotrade.services.drafting.redraft.request import MAX_ITEMS
 from algotrade.services.drafting.screens import MAX_TEXT
 from algotrade_api.schemas.health import Schema
 
@@ -39,7 +46,7 @@ class DroppedCriterion(Schema):
     reason: str
 
 
-class SampleValue(Schema):
+class DraftSampleValue(Schema):
     instrument_id: str
     value: Any
 
@@ -51,7 +58,7 @@ class FormulaDryRun(Schema):
     minimum: float | None
     maximum: float | None
     criterion_pass: int | None = Field(description="rows passing the formula's criterion")
-    sample: list[SampleValue]
+    sample: list[DraftSampleValue]
 
 
 class DraftFormula(Schema):
@@ -174,3 +181,58 @@ class ScreenDraft(Schema):
         description="ties this draft to the screen later saved from it (ADR 0066); send it back "
         "with the save; null when feedback is not recorded",
     )
+
+
+Line = Annotated[str, Field(max_length=MAX_TEXT)]
+
+
+class DraftPartBody(BaseModel):
+    """The draft the browser holds, and which part's words to retype. Nothing in it is trusted:
+    the server re-checks every part's words against the sentence and every id against the items
+    (``services.drafting.redraft.request``); a failed check is a 400."""
+
+    draft_session_id: str | None = Field(
+        None,
+        max_length=64,
+        description="the id of the draft being worked on (ADR 0066), so the re-draft is an "
+        "event of the same session; an unknown or foreign id starts a new one",
+    )
+    sentence: str = Field(
+        min_length=1, max_length=MAX_TEXT, description="the draft's `sentence`, as served"
+    )
+    document: dict[str, Any] = Field(
+        description="the Builder's current document: the trader's edits included"
+    )
+    parts: list[Part] = Field(max_length=MAX_PARTS + 2, description="the draft's `parts`")
+    part_id: str = Field(
+        min_length=1, max_length=16, description="the part whose words are retyped"
+    )
+    new_words: str = Field(
+        min_length=1, max_length=MAX_WORDS, description="what the part's words become"
+    )
+    dropped: list[DroppedCriterion] = Field(default_factory=list, max_length=MAX_ITEMS)
+    notes: list[Line] = Field(default_factory=list, max_length=MAX_ITEMS)
+    formulas: list[DraftFormula] = Field(default_factory=list, max_length=MAX_ITEMS)
+    formulas_dropped: list[DroppedFormula] = Field(default_factory=list, max_length=MAX_ITEMS)
+    missing: list[MissingFeature] = Field(default_factory=list, max_length=MAX_ITEMS)
+    unresolved: list[Unresolved] = Field(default_factory=list, max_length=MAX_ITEMS)
+    suggestions: list[Suggestion] = Field(default_factory=list, max_length=MAX_ITEMS)
+    suggestions_dropped: list[DroppedSuggestion] = Field(default_factory=list, max_length=MAX_ITEMS)
+
+
+class DraftPartResult(Schema):
+    draft: ScreenDraft = Field(
+        description="the whole draft with the part re-drafted and every other part as it was; "
+        "the browser replaces its draft with it (`sentence` has the new words in place)"
+    )
+    replaced_part_id: str = Field(description="the part that was re-drafted")
+
+
+class LimitReached(BaseModel):
+    """The 429 of a user at their daily limit of part re-drafts (not a rate limit: it clears
+    when the exchange day turns)."""
+
+    detail: str
+    code: Literal["part_redraft_limit"]
+    limit: int = Field(description="part re-drafts a user may ask per exchange day")
+    retry_after_s: int = Field(description="seconds until the exchange day turns")
