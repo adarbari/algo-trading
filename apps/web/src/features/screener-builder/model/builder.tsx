@@ -12,6 +12,7 @@ import {
   newCriterionId,
   previewDocument,
   tieBreakOf,
+  toCriterion,
   toDocument,
   useScreener,
   useScreenerVersions,
@@ -91,12 +92,27 @@ export interface ScreenerBuilder {
   recordChoice: (choice: DraftChoice) => void;
   /** Each proposed formula's state by name; a name not listed is `proposed`. */
   formulaStates: Readonly<Record<string, FormulaState>>;
-  /** The trader chose Review and add. (W1: marks it accepted; the review dialog replaces this.) */
+  /**
+   * The formulas the last answer proposed and the trader has neither accepted nor skipped: each
+   * shows as a pending row (when it has a criterion), and finalising waits until none is left.
+   */
+  pendingFormulas: readonly Formula[];
+  /** The formula whose review dialog is open (Review and add), else null. */
+  reviewing: Formula | null;
+  /** The trader chose Review and add: open the review of that formula. */
   reviewFormula: (formula: Formula) => void;
-  /** The trader chose Skip. */
+  /** The review dialog was closed without saving. */
+  closeReview: () => void;
+  /**
+   * The formula was saved as the trader's feature (`field`, `feature.<name>`): its pending
+   * criterion joins the screen as an active row on that field, the formula is accepted and
+   * `formula_accepted` is recorded. All one edit.
+   */
+  acceptFormula: (formula: Formula, field: string) => void;
+  /** The trader chose Skip: the pending row goes and `formula_skipped` is recorded. */
   skipFormula: (name: string) => void;
   /** A new answer replaced the proposals: none is decided yet. */
-  resetFormulas: () => void;
+  setFormulas: (formulas: readonly Formula[]) => void;
   save: () => Promise<void>;
   discard: () => Promise<void>;
   saving: boolean;
@@ -150,10 +166,19 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     id: string;
     choices: DraftChoice[];
     formulas: Record<string, FormulaState>;
+    proposed: readonly Formula[];
+    reviewing: string | null;
   } | null>(null);
-  const current = review?.id === id ? review : { id, choices: [], formulas: {} };
+  const empty: NonNullable<typeof review> = {
+    id,
+    choices: [],
+    formulas: {},
+    proposed: [],
+    reviewing: null,
+  };
+  const current = review?.id === id ? review : empty;
   const updateReview = (change: (r: NonNullable<typeof review>) => NonNullable<typeof review>) => {
-    setReview((prev) => change(prev?.id === id ? prev : { id, choices: [], formulas: {} }));
+    setReview((prev) => change(prev?.id === id ? prev : empty));
   };
   const choose = (choice: DraftChoice) => {
     updateReview((r) => ({
@@ -244,16 +269,36 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     choices: current.choices,
     recordChoice: choose,
     formulaStates: current.formulas,
+    pendingFormulas: current.proposed.filter((f) => current.formulas[f.name] === undefined),
+    reviewing: current.proposed.find((f) => f.name === current.reviewing) ?? null,
     reviewFormula: (formula) => {
-      updateReview((r) => ({ ...r, formulas: { ...r.formulas, [formula.name]: 'accepted' } }));
+      updateReview((r) => ({ ...r, reviewing: formula.name }));
+    },
+    closeReview: () => {
+      updateReview((r) => ({ ...r, reviewing: null }));
+    },
+    acceptFormula: (formula, field) => {
+      if (formula.criterion) {
+        const created = newCriterionId(criterionIds(base, document), field);
+        edit(withCriterion(document, toCriterion(created, { ...formula.criterion, field })));
+      }
+      updateReview((r) => ({
+        ...r,
+        reviewing: null,
+        formulas: { ...r.formulas, [formula.name]: 'accepted' },
+      }));
       choose({ event: 'formula_accepted', subject: formula.name });
     },
     skipFormula: (name) => {
-      updateReview((r) => ({ ...r, formulas: { ...r.formulas, [name]: 'skipped' } }));
+      updateReview((r) => ({
+        ...r,
+        reviewing: r.reviewing === name ? null : r.reviewing,
+        formulas: { ...r.formulas, [name]: 'skipped' },
+      }));
       choose({ event: 'formula_skipped', subject: name });
     },
-    resetFormulas: () => {
-      updateReview((r) => ({ ...r, formulas: {} }));
+    setFormulas: (formulas) => {
+      updateReview((r) => ({ ...r, formulas: {}, proposed: formulas, reviewing: null }));
     },
     save: saved,
     discard: async () => {

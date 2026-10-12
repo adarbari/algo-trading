@@ -43,6 +43,15 @@ const detail = (patch: Record<string, unknown> = {}) => ({
   working: WORKING,
   ...patch,
 });
+const FORMULA = (name: string, criterion: Record<string, unknown> | null) =>
+  ({ name, expr: 'a - b', criterion }) as never;
+const GAP = FORMULA('draft_gap', {
+  field: 'feature.draft_gap',
+  op: 'gte',
+  value: 0.1,
+  mode: 'hard',
+});
+const BARE = FORMULA('draft_bare', null);
 const PREVIEW = { rows: [], summary: {}, funnel: [], decisions: {}, coverage: {}, total: 0 };
 const V1 = [{ version: 1, document: { id: 'my', version: 1 } }];
 
@@ -133,6 +142,49 @@ function Probe() {
       </Button>
       <Text>{`choices ${b.choices.map((c) => `${c.event}:${c.subject}:${String(c.picked ?? '')}`).join(',')}`}</Text>
       <Text>{`formulas ${JSON.stringify(b.formulaStates)}`}</Text>
+      <Text>{`pending ${b.pendingFormulas.map((f) => f.name).join(',')} reviewing ${b.reviewing?.name ?? 'none'}`}</Text>
+      <Button
+        onClick={() => {
+          b.setFormulas([GAP, BARE]);
+        }}
+      >
+        propose
+      </Button>
+      <Button
+        onClick={() => {
+          b.reviewFormula(GAP);
+        }}
+      >
+        review gap
+      </Button>
+      <Button
+        onClick={() => {
+          b.closeReview();
+        }}
+      >
+        close review
+      </Button>
+      <Button
+        onClick={() => {
+          b.acceptFormula(GAP, 'feature.draft_gap');
+        }}
+      >
+        accept gap
+      </Button>
+      <Button
+        onClick={() => {
+          b.acceptFormula(BARE, 'feature.draft_bare');
+        }}
+      >
+        accept bare
+      </Button>
+      <Button
+        onClick={() => {
+          b.skipFormula('draft_gap');
+        }}
+      >
+        skip gap
+      </Button>
     </>
   );
 }
@@ -266,6 +318,63 @@ describe('ScreenerBuilderProvider', () => {
     await userEvent.click(screen.getByRole('button', { name: 'end session' }));
     expect(screen.getByText('choices')).toBeInTheDocument();
     expect(screen.getByText('formulas {}')).toBeInTheDocument();
+  });
+
+  describe('proposed formulas', () => {
+    const open = async () => {
+      setup();
+      await screen.findByText('criteria iv30=0.5,close=5');
+      await userEvent.click(screen.getByRole('button', { name: 'propose' }));
+    };
+
+    it('keeps every proposal pending, out of the criteria, until it is decided', async () => {
+      await open();
+      expect(screen.getByText('pending draft_gap,draft_bare reviewing none')).toBeInTheDocument();
+      expect(screen.getByText('criteria iv30=0.5,close=5')).toBeInTheDocument();
+      expect(screen.getByText('formulas {}')).toBeInTheDocument();
+    });
+
+    it('opens and closes the review of one without deciding it', async () => {
+      await open();
+      await userEvent.click(screen.getByRole('button', { name: 'review gap' }));
+      expect(screen.getByText(/reviewing draft_gap/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'close review' }));
+      expect(screen.getByText('pending draft_gap,draft_bare reviewing none')).toBeInTheDocument();
+    });
+
+    it('accepting adds its criterion as an active row on the saved field, once, and records it', async () => {
+      await open();
+      await userEvent.click(screen.getByRole('button', { name: 'review gap' }));
+      await userEvent.click(screen.getByRole('button', { name: 'accept gap' }));
+      expect(screen.getByText('criteria iv30=0.5,close=5,draft_gap=0.1')).toBeInTheDocument();
+      expect(screen.getByText('pending draft_bare reviewing none')).toBeInTheDocument();
+      expect(screen.getByText('formulas {"draft_gap":"accepted"}')).toBeInTheDocument();
+      expect(screen.getByText('choices formula_accepted:draft_gap:')).toBeInTheDocument();
+      expect(screen.getByText(/dirty true/)).toBeInTheDocument();
+    });
+
+    it('accepting one with no criterion only accepts it', async () => {
+      await open();
+      await userEvent.click(screen.getByRole('button', { name: 'accept bare' }));
+      expect(screen.getByText('criteria iv30=0.5,close=5')).toBeInTheDocument();
+      expect(screen.getByText('formulas {"draft_bare":"accepted"}')).toBeInTheDocument();
+    });
+
+    it('skipping removes it from the pending rows, adds no criterion and records it', async () => {
+      await open();
+      await userEvent.click(screen.getByRole('button', { name: 'skip gap' }));
+      expect(screen.getByText('pending draft_bare reviewing none')).toBeInTheDocument();
+      expect(screen.getByText('criteria iv30=0.5,close=5')).toBeInTheDocument();
+      expect(screen.getByText('choices formula_skipped:draft_gap:')).toBeInTheDocument();
+    });
+
+    it('a new answer replaces the proposals and forgets the decisions', async () => {
+      await open();
+      await userEvent.click(screen.getByRole('button', { name: 'skip gap' }));
+      await userEvent.click(screen.getByRole('button', { name: 'propose' }));
+      expect(screen.getByText('pending draft_gap,draft_bare reviewing none')).toBeInTheDocument();
+      expect(screen.getByText('formulas {}')).toBeInTheDocument();
+    });
   });
 
   it('drops the Describe-it session when the draft is discarded', async () => {

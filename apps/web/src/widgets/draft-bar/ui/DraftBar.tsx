@@ -6,13 +6,16 @@
  * site preset (or a copy of one) carries a link to its playbook in the Guide. A site
  * preset not yet copied is shown as it is (its live preview runs); the first edit makes the
  * user's copy, so there is no separate read-only mode. Opened from an edge's builder it also
- * offers "Save and return to edge".
+ * offers "Save and return to edge". Finalize waits while a formula Describe it proposed is
+ * neither accepted nor skipped (a badge with its Guide help says why); missing features do not
+ * block it.
  */
 import { Banner, Button, Heading, Mono, Stack, StatusBadge, Text, TextLink } from '@algotrade/ui';
 
 import { playbookPath } from '@/entities/guide';
 import { useScreenerBuilder } from '@/features/screener-builder';
 import { DeleteScreenerButton } from '@/features/screener-delete';
+import { GuideHelp } from '@/features/guide-help';
 import { FinaliseButton, RebaseBanner } from '@/features/screener-finalise';
 
 import { draftState } from '../model/state';
@@ -40,6 +43,7 @@ export function DraftBar({ compact = false, onDeleted, onReturn }: DraftBarProps
     : pin
       ? { id: pin.presetId, version: pin.pinned }
       : null;
+  const formulaPending = builder.pendingFormulas.length > 0;
   const version = (v: number | null) => (v === null ? '' : ` v${String(v)}`);
 
   return (
@@ -110,10 +114,18 @@ export function DraftBar({ compact = false, onDeleted, onReturn }: DraftBarProps
             onFinalised={() => {
               builder.setDraftSessionId(null);
             }}
-            disabled={builder.criteria.length === 0 || (!builder.dirty && !detail?.draft)}
+            disabled={
+              formulaPending || builder.criteria.length === 0 || (!builder.dirty && !detail?.draft)
+            }
           />
         </Stack>
       </Stack>
+      {formulaPending && (
+        <Stack direction="row" gap={2} align="center" justify="end" wrap>
+          <StatusBadge tone="warning">Formula pending</StatusBadge>
+          <GuideHelp entry={{ kind: 'term', id: 'describe_pending_formula' }} />
+        </Stack>
+      )}
       {untouched && (
         <Banner tone="info" title="Site preset">
           {`This is the site preset${version(builder.preset?.version ?? null)} with its live preview. Change anything and a copy of it becomes yours (pinned to this version); the preset itself changes only by pull request.`}
