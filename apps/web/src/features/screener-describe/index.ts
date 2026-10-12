@@ -1,6 +1,8 @@
 /** Feature: describe a screen in a sentence and get a draft to review (ADR 0041, ADR 0066). */
 export { DescribeForm, type DescribeFormProps } from './ui/DescribeForm';
 export { useDraftFromText, type ScreenDraft } from './api/hooks';
+export { useRedraftPart, type DraftPartResult } from './api/redraft';
+export { partFailure, STALE, type PartFailure } from './model/redraft';
 export { useMyFeatureRequests, type MyFeatureRequest } from './api/feature-requests';
 export { draftFailure, type DraftFailure } from './model/failure';
 export { earlierAsk, ownRequest, requestStatus, type MissingFeature } from './model/history';
@@ -16,6 +18,7 @@ export {
   type TermRef,
 } from './model/labels';
 export {
+  baselineAfter,
   partEdited,
   partsOf,
   suggestionsOf,

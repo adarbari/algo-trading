@@ -30,12 +30,18 @@ export class ApiError extends Error {
   readonly status: number;
   /** The server's message alone (what a user reads), without the status prefix. */
   readonly detail: string;
+  /** The machine-readable `code` some refusals carry (a daily limit: `part_redraft_limit`). */
+  readonly code: string | undefined;
+  /** Seconds until a limit clears (`retry_after_s` of a daily-limit 429), when the server says. */
+  readonly retryAfterS: number | undefined;
 
-  constructor(status: number, detail: string) {
+  constructor(status: number, detail: string, code?: string, retryAfterS?: number) {
     super(`API ${String(status)}: ${detail}`);
     this.name = 'ApiError';
     this.status = status;
     this.detail = detail;
+    this.code = code;
+    this.retryAfterS = retryAfterS;
   }
 }
 
@@ -55,8 +61,14 @@ interface FetchResult<T> {
 export async function unwrap<T>(request: Promise<FetchResult<T>>): Promise<T> {
   const { data, error, response } = await request;
   if (error !== undefined || data === undefined) {
-    const detail = (error as { detail?: unknown } | undefined)?.detail;
-    throw new ApiError(response.status, typeof detail === 'string' ? detail : response.statusText);
+    const body = error as { detail?: unknown; code?: unknown; retry_after_s?: unknown } | undefined;
+    const { detail, code, retry_after_s: retryAfter } = body ?? {};
+    throw new ApiError(
+      response.status,
+      typeof detail === 'string' ? detail : response.statusText,
+      typeof code === 'string' ? code : undefined,
+      typeof retryAfter === 'number' ? retryAfter : undefined,
+    );
   }
   return data;
 }

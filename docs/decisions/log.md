@@ -354,3 +354,35 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: one rule for everything in a drafting-event payload.
+
+## 2026-10-12 | PR #566 (Describe it retype) | Stale answer after the screen changed
+- Question: a retype's answer arrives after the trader changed the screen: apply it, or drop it, and does the call still count against the daily limit?
+- Options: apply the merged draft over the later edits / drop it and keep counting the call / block every edit during the wait.
+- Decision: drop it, keep the call counted; the card says "Your screen changed while this redrafted", with its Guide help and Try again.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: applying it would undo the trader's later edits; the model call did return a draft, and the cap counts answered calls.
+
+## 2026-10-12 | PR #566 (Describe it retype) | Lifting the daily limit in the browser
+- Question: after a retype hits the daily limit, when do the cards' Retype buttons work again?
+- Options: until the page reloads / when the server's `retry_after_s` elapses.
+- Decision: when `retry_after_s` of the 429 elapses (one timer for every card); with no `retry_after_s`, until reload.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the limit clears when the exchange day turns, which the server states; reload-only would keep the buttons off for a user who stays on the page.
+
+## 2026-10-12 | PR #566 (Describe it retype) | The Guide states the retention of retyped words
+- Question: does the Guide say how long retyped words are kept?
+- Options: refer to the sentence's rule / state the 12 months.
+- Decision: state it: "kept for 12 months, like the sentence you first typed, then removed", in the retype entry and the "Write the sentence" section of the Describe it Start page, so both agree.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the 12-month rule is the owner's (2026-10-11, "Raw sentence retention"); a user-facing text about stored personal text should carry the number.
+
+## 2026-10-12 | PR #566 (Describe it retype) | An abandoned retype is not refunded
+- Question: a retype the trader started and left (left the page, or the answer arrived stale) used a model call: does it count against the daily cap?
+- Options: refund it / count it.
+- Decision: it counts, no refund; the Guide's `describe_part_stale` entry says so.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the cap counts answered calls (`part_redraft_limit`, ADR 0041 amended 2026-10-12); the server cannot tell an unused answer from a used one, and a refund path would add state for a rare case.

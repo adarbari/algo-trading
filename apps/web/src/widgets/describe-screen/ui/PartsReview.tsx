@@ -9,13 +9,14 @@
  * reference; a card is marked edited when the trader changed its rows (ADR 0038). Zero applied
  * criteria is not an error: the Builder's document stays.
  */
-import { Mono, PartCard, PartList, Stack, Text } from '@algotrade/ui';
-import { useState, type ReactNode } from 'react';
+import { Mono, PartCard, PartList, Stack, Text, type PartCardProps } from '@algotrade/ui';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { GuideHelp, termHelp } from '@/features/guide-help';
 import {
   PART_TEXT,
   appliedRows,
+  baselineAfter,
   partEdited,
   partKindLabel,
   partsOf,
@@ -32,6 +33,7 @@ import {
 import { MissingCard, NotCovered, missingKey } from './NotAvailable';
 import { CriteriaRows, Readings, Suggested, type SuggestionState } from './PartRows';
 import { FormulaCard } from './ProposedFormulas';
+import { RetypeCard } from './RetypePart';
 import type { DraftReviewProps } from './props';
 
 /** The criteria the draft left out of a part, as the answer lists them. */
@@ -47,6 +49,9 @@ function tieBreakOf(document: Readonly<Record<string, unknown>>): string | null 
   return typeof field === 'string' && field !== '' ? field : null;
 }
 
+/** The longest a timer may run (setTimeout's own limit is 2^31 - 1 ms). */
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
 export function PartsReview({
   answer,
   document,
@@ -57,6 +62,7 @@ export function PartsReview({
   onSkipFormula,
   onPickReading,
   onAcceptSuggestion,
+  onRedrafted,
   renderFieldHelp,
 }: DraftReviewProps) {
   const parts = partsOf(answer);
@@ -66,6 +72,27 @@ export function PartsReview({
   const suggestions = suggestionsOf(answer);
   const [picked, setPicked] = useState<Readonly<Record<string, number>>>({});
   const [decided, setDecided] = useState<Readonly<Record<string, SuggestionState>>>({});
+  // What the answer's own rows were, to tell the trader's edits from them. A retype replaces the
+  // answer, so the rows of the parts it did not touch stay as first shown (their edits still show).
+  const [original, setOriginal] = useState<unknown>(answer.document['criteria']);
+  // The part being redrafted (one at a time) and whether the daily limit was reached.
+  const [redrafting, setRedrafting] = useState<string | null>(null);
+  // The daily limit was reached: `seconds` until it clears (null: not limited; undefined seconds:
+  // the server did not say, so it stays until the page reloads). One timer lifts it for every card.
+  const [limit, setLimit] = useState<{ seconds: number | undefined } | null>(null);
+  const limited = limit !== null;
+  useEffect(() => {
+    if (limit?.seconds === undefined) return;
+    const timer = setTimeout(
+      () => {
+        setLimit(null);
+      },
+      Math.min(Math.max(limit.seconds, 0) * 1000, MAX_TIMER_MS),
+    );
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [limit]);
   // The history is a nicety: a failed read leaves the cards without it.
   const history = useMyFeatureRequests(missing.length > 0);
   const mine = history.data ?? [];
@@ -88,9 +115,22 @@ export function PartsReview({
   const owned = new Set(parts.flatMap((part) => part.suggestions));
   const unowned = suggestions.filter((s) => !owned.has(s.id));
 
-  const original = answer.document['criteria'];
   const current = document['criteria'];
   const rowsNow = appliedRows(document);
+
+  const redrafted = (next: ScreenDraft, replaced: DraftPart) => {
+    setOriginal((before: unknown) => baselineAfter(before, next, replaced));
+    // What was decided on the redrafted part's own options is void: its readings and suggestions are new.
+    setPicked((now) =>
+      Object.fromEntries(
+        Object.entries(now).filter(([term]) => !replaced.unresolved.includes(term)),
+      ),
+    );
+    setDecided((now) =>
+      Object.fromEntries(Object.entries(now).filter(([id]) => !replaced.suggestions.includes(id))),
+    );
+    onRedrafted?.(next, answer, replaced);
+  };
 
   const rowsOf = (part: DraftPart): ReactNode => {
     const criteria = rowsNow.filter((row) => part.criteria.includes(row.id));
@@ -193,15 +233,38 @@ export function PartsReview({
         {edited && <GuideHelp entry={PART_TEXT.editedHelp} />}
       </Stack>
     );
-    return part.origin === 'words' || part.origin === 'gap' ? (
-      <PartCard
-        key={part.id}
-        {...common}
-        words={part.words}
-        actions={pickersOf(part)}
-        info={helps}
-      />
-    ) : (
+    if (part.origin === 'words' || part.origin === 'gap') {
+      const card: PartCardProps = {
+        ...common,
+        words: part.words,
+        actions: pickersOf(part),
+        info: helps,
+      };
+      // The sentence is needed to retype one part of it (an answer without it cannot).
+      return onRedrafted && answer.sentence ? (
+        <RetypeCard
+          key={part.id}
+          card={card}
+          part={part}
+          answer={answer}
+          document={document}
+          edited={edited}
+          redrafting={redrafting}
+          onRedrafting={(id, on) => {
+            // Cleared only by the card that set it: a late settle must not free another's turn.
+            setRedrafting((now) => (on ? id : now === id ? null : now));
+          }}
+          limited={limited}
+          onLimited={(seconds) => {
+            setLimit({ seconds });
+          }}
+          onRedrafted={redrafted}
+        />
+      ) : (
+        <PartCard key={part.id} {...card} />
+      );
+    }
+    return (
       <PartCard
         key={part.id}
         {...common}

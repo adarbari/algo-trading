@@ -26,6 +26,7 @@ import {
   statusLabel,
   useMyFeatureRequests,
   type MissingFeature,
+  type ScreenDraft,
 } from '@/features/screener-describe';
 
 export interface NotAvailableProps {
@@ -40,6 +41,22 @@ export interface NotAvailableProps {
 /** How a draft names a missing feature: the catalogue key, else the proposed slug, else its words. */
 export function missingKey(item: MissingFeature): string {
   return item.key ?? item.new_key_slug ?? item.span;
+}
+
+/**
+ * What a redraft changed in the missing features the screen keeps as notes: the descriptions of
+ * the ones the new draft no longer has (`gone`) and of the ones it adds (`added`), by their keys.
+ */
+export function missingDelta(
+  prior: ScreenDraft,
+  next: ScreenDraft,
+): { gone: string[]; added: string[] } {
+  const was = new Map((prior.missing ?? []).map((item) => [missingKey(item), item.description]));
+  const now = new Map((next.missing ?? []).map((item) => [missingKey(item), item.description]));
+  return {
+    gone: [...was].filter(([key]) => !now.has(key)).map(([, description]) => description),
+    added: [...now].filter(([key]) => !was.has(key)).map(([, description]) => description),
+  };
 }
 
 export function MissingCard({

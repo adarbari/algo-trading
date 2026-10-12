@@ -130,6 +130,11 @@ export interface ScreenerBuilder {
   removeNote: (note: string) => void;
   /** A new answer replaced the proposals: none is decided yet. */
   setFormulas: (formulas: readonly Formula[]) => void;
+  /**
+   * One part of the answer was redrafted: its proposals (`replaced`, by name) are gone and the
+   * new answer's are in, while what was decided on the other parts' formulas stays decided.
+   */
+  replaceFormulas: (formulas: readonly Formula[], replaced: readonly string[]) => void;
   save: () => Promise<void>;
   discard: () => Promise<void>;
   saving: boolean;
@@ -355,6 +360,17 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     },
     setFormulas: (formulas) => {
       updateReview((r) => ({ ...r, formulas: {}, proposed: formulas, reviewing: null }));
+    },
+    replaceFormulas: (formulas, replaced) => {
+      const gone = new Set(replaced);
+      updateReview((r) => ({
+        ...r,
+        formulas: Object.fromEntries(
+          Object.entries(r.formulas).filter(([name]) => !gone.has(name)),
+        ),
+        proposed: formulas,
+        reviewing: formulas.some((f) => f.name === r.reviewing) ? r.reviewing : null,
+      }));
     },
     save: saved,
     discard: async () => {
