@@ -181,6 +181,29 @@ Follow-up (owner question, not built): should index-only fields show their enum 
 guesses a value and the validator drops a wrong guess; adding them to the prefix would exceed the 15k budget at
 the largest case, so measure it in the live golden run first.
 
+## Live evaluation (2026-10-12, Claude Haiku via the owner's login)
+
+`golden run --provider claude_haiku --repeat 2` over 34 cases (68 calls, temporary one-provider config, not recorded),
+on the merged parts contract (#559), prompt version 8. Baseline: the #547 comments (Haiku, before the contract).
+
+| Measure | Baseline (#547) | Now |
+|---|---|---|
+| Pass rate, all | 0.35-0.40 | 0.68 |
+| Train (20 cases) | n/a | 0.75 |
+| Held-out (14 cases) | 0.19-0.23 | 0.57 |
+| Consistency (same answer on repeat) | n/a | 0.31 |
+| Invalid-answer rate | n/a | 0.015 (1 of 68; `would_repair` 1) |
+| Invented-field drops / any drop | 0 | 0 / 0 |
+| Suggestions per draft | n/a | 0.75 (51 in 68) |
+| Parts | n/a | 67 of 68 drafts carry parts; 98% model-made; 99% located; 9 "not understood"; 88% of readings kept |
+| Latency p50 / p90 | n/a | 9.0 s / 11.3 s |
+| Tokens per call | n/a | 2 fresh in, 10.0k cache read, 10.4k cache write, 1.8k out |
+| Notional cost | n/a | $0.21 for the run ($0.003 a call) |
+
+Twelve cases fail every or one repeat (for example `heavy-put-call`, `outperforming-spy-3m`, `volatile-small-caps`,
+`choppy-micro-caps`, and three of the adversarial `parts-*` cases). No drop in any run was a wrong enum value, so
+showing enum values for index-only fields is not built: re-measure if a drop of that kind appears.
+
 ## Risks
 
 Retrieval misses showing as false "missing" (keep the full field index in the prefix; replay test);
