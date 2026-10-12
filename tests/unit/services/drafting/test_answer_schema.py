@@ -8,8 +8,10 @@ import pytest
 
 from algotrade.services.drafting.answer_schema import (
     ANSWER_SCHEMA,
+    FORMULA,
     check_answer,
     check_criterion,
+    check_item,
 )
 
 GOOD = {
@@ -91,3 +93,56 @@ def test_one_criterion_is_checked_on_its_own() -> None:
     assert check_criterion({"field": "f", "op": "gt", "value": 1}) is None
     assert "tolerance" in (check_criterion({"field": "f", "op": "gt", "tolerance": "x"}) or "")
     assert "value" in (check_criterion({"field": "f", "op": "gt", "value": {"n": 1}}) or "")
+
+
+NEW = {
+    **GOOD,
+    "formulas": [
+        {
+            "name": "draft_x", "expr": "a.b + 1", "dtype": "float", "unit": "ratio",
+            "description": "d", "null_meaning": "n", "inputs": ["a.b"],
+            "criterion": {"op": "gt", "value": 1, "mode": None, "tolerance": None},
+        },
+        {"name": "draft_y", "expr": "a.b", "dtype": "float", "unit": "ratio", "description": "d",
+         "null_meaning": "n", "inputs": ["a.b"], "criterion": None},
+    ],
+    "missing": [
+        {"key": None, "new_key_slug": "s", "span": "x", "description": "d", "why_needed": "w",
+         "closest": [], "feasibility": "UNCLEAR"},
+    ],
+    "unresolved": [
+        {"term": "liquid", "span": "liquid", "default_index": 0,
+         "alternatives": [{"label": "a", "criterion": {"field": "f", "op": "gt", "value": 1}}]},
+    ],
+}  # fmt: skip
+
+
+def test_the_contract_keys_are_optional_and_nullable_so_an_old_answer_still_fits() -> None:
+    assert check_answer(NEW, ANSWER_SCHEMA) is None
+    for key in ("formulas", "missing", "unresolved"):
+        assert check_answer({**GOOD, key: None}, ANSWER_SCHEMA) is None
+        assert check_answer({"criteria": []}, ANSWER_SCHEMA) is None
+        assert key in ANSWER_SCHEMA["required"]  # strict form: listed, nullable
+    assert ANSWER_SCHEMA["additionalProperties"] is False
+
+
+@pytest.mark.parametrize(
+    ("answer", "named"),
+    [
+        ({**GOOD, "formulas": "x"}, "answer.formulas: expected array or null"),
+        ({**GOOD, "formulas": [{"name": "draft_x"}]}, "formulas[0]: missing 'expr'"),
+        ({**GOOD, "missing": [{"span": 1}]}, "answer.missing[0]"),
+        ({**GOOD, "unresolved": [{"term": "t", "span": "s", "default_index": "0",
+                                  "alternatives": []}]}, "default_index: expected integer"),
+        ({**GOOD, "unresolved": [{"term": "t", "span": "s", "default_index": True,
+                                  "alternatives": []}]}, "default_index"),
+    ],
+)  # fmt: skip
+def test_a_contract_key_of_the_wrong_shape_names_where(answer: dict[str, Any], named: str) -> None:
+    why = check_answer(answer, ANSWER_SCHEMA)
+    assert why is not None and named in why
+
+
+def test_check_item_types_one_item_with_its_name() -> None:
+    assert check_item(NEW["formulas"][0], FORMULA, "formula") is None
+    assert check_item({}, FORMULA, "formula") == "formula: missing 'name'"

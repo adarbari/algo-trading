@@ -1,0 +1,24 @@
+{
+  "id": "below-52w-high-by-4pct-duplicate",
+  "sentence": "stocks no more than 4% below their 52 week high",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "no more than 4% below their 52 week high",
+        "bucket": "A",
+        "fields": [
+          "feature.pct_from_high_52w"
+        ],
+        "op": "gte",
+        "value": -0.04,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true
+  }
+}

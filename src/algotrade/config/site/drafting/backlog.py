@@ -19,7 +19,7 @@ FEASIBILITY = ("ROLLUP_FROM_STORED", "NEEDS_SOURCE", "UNCLEAR")
 STATUS = ("OPEN", "PROMOTED", "WONT_DO")
 ITEM_KEYS = ("key", "description", "feasibility", "aliases", "status", "promoted_to", "closest")
 SLUG = re.compile(r"^[a-z0-9_]+$")
-PROMPT_LIMIT = 60
+PROMPT_LIMIT = 8  # open keys a prompt shows (the most relevant to the sentence)
 
 
 @dataclass(frozen=True)
@@ -102,7 +102,7 @@ def _check_unique(items: tuple[BacklogItem, ...], where: str) -> None:
 def open_keys(
     settings: FeatureBacklogSettings, limit: int = PROMPT_LIMIT
 ) -> tuple[tuple[str, str], ...]:
-    """The OPEN items as (key, description), sorted by key and capped at ``limit``: the list a
-    prompt may show."""
+    """The OPEN items as (key, description), sorted by key and capped at ``limit`` (the prompt
+    shows ``PROMPT_LIMIT`` of them, chosen per sentence from the whole list)."""
     open_items = sorted((i for i in settings.items if i.status == "OPEN"), key=lambda i: i.key)
     return tuple((i.key, i.description) for i in open_items[:limit])

@@ -245,6 +245,33 @@ The system prompt carries an index of every catalogue field (`name | type | unit
 the slice `services/drafting/retrieval.py` picks for the sentence (`PROMPT_VERSION` 2; ~12-14k tokens, was
 ~110k). A field with no detail is still valid; the golden set's recall test guards against a false "missing".
 
+## Amended 2026-10-11: the A / B / C answer contract
+
+The answer is additive over `{criteria, tie_break, notes}` (`PROMPT_VERSION` 3; every new key nullable, so
+an answer of the old shape still passes): `formulas` (B1), `missing` (B2 / C) and `unresolved`.
+
+- **B1 limits**: a formula is same-session, per-row maths over `group.column` names and other expression
+  features: the expression language's operators and `if abs min max log sqrt ncdf clip coalesce is_null
+  one_of exists`. No lag, window, rolling or history; anything over time is `missing` with
+  `ROLLUP_FROM_STORED`. The prompt says so, and the server enforces it by checking the formula as a
+  user feature (`FeatureSet.with_user`).
+- **The server decides, the model proposes**: a formula needs the `draft_` name, no shadowed feature, an
+  `inputs` list equal to the names it reads, and is dry-run once, on the accepted draft, on the request's session (no-value rate,
+  range, criterion pass count, samples; a formula whose inputs are missing for the session is kept
+  unsampled, and a dry run that fails never fails the draft). A formula that is a stored column or
+  repeats a saved one is a repeat (below). At most 3 formulas, 3 unresolved terms with 3
+  alternatives each and 5 missing items are read; the rest are cut with a note. The prompt shows the
+  8 open backlog keys most relevant to the sentence. Anything else is returned in `formulas_dropped` with its reason.
+  `missing` keys are matched to the backlog (`feature_backlog.toml`, by key or alias), else become new
+  slugs; `closest` keeps catalogue names only; each `unresolved` alternative carries a criterion
+  validated like any other.
+- **Dedupe by fingerprint**: a formula whose fingerprint (`features/expressions/fingerprint.py`) equals a
+  site feature or the trader's own is dropped and its criterion rewritten onto that field, with a note.
+  Structurally different equivalents are merged by an admin by hand.
+- **Never auto-applied**: the draft `document` holds only A criteria (and the default reading of each
+  unresolved term). A formula and its criterion are pending and travel beside the document until the
+  trader accepts the formula as their own feature; B and C are shown, never saved or run by the draft.
+
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
   dropped row with a reason, never a saved criterion.

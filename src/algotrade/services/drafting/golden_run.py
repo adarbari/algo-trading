@@ -289,7 +289,14 @@ def _call(
         status = "invalid" if got is not None else "unavailable"
         return _result(provider, case.id, status, got, costs, error=str(exc))
     got = model.last
-    graded = score(case, made.document["criteria"], [d.field for d in made.dropped])
+    graded = score(
+        case,
+        made.document["criteria"],
+        [d.field for d in made.dropped],
+        [(f.expr, f.criterion) for f in made.formulas],
+        [m.key or f"new:{m.new_key_slug}" for m in made.missing],
+        [u.term for u in made.unresolved],
+    )
     fields = frozenset(c["field"] for c in made.document["criteria"].values())
     return _result(provider, case.id, "ok", got, costs, passed=graded.passed, fields=fields)
 

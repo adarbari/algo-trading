@@ -1,0 +1,54 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "yield",
+      "field": "feature.div_yield",
+      "op": "gt",
+      "value": 0.03,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "yielding more than 3%"
+    },
+    {
+      "id": "above_sma200",
+      "field": "feature.pct_vs_sma_200",
+      "op": "gt",
+      "value": 0,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "above their 200 day average"
+    }
+  ],
+  "tie_break": null,
+  "notes": [
+    "yield read as a fraction (3% = 0.03)"
+  ],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null
+}

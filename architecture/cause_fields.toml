@@ -126,6 +126,21 @@ surface = "rest"
 reason = "why the drafting model dropped a criterion the caller asked for"
 
 [[fact]]
+name = "DraftFormula.criterion"
+surface = "rest"
+reason = "the criterion the drafting model proposed on the caller's own pending formula"
+
+[[fact]]
+name = "DroppedFormula.reason"
+surface = "rest"
+reason = "why a formula the drafting model proposed for the caller's sentence is not offered"
+
+[[fact]]
+name = "Alternative.criterion"
+surface = "rest"
+reason = "the criterion of one reading of a term in the caller's own sentence"
+
+[[fact]]
 name = "RegimeExplanation.note"
 surface = "rest"
 reason = "the text model's note on the regime explanation"
