@@ -14,7 +14,9 @@ import json
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-STARTED, FINALISED = "draft_requested", "screen_finalised"
+from algotrade.services.feedback import events
+
+STARTED, FINALISED = events.DRAFT_REQUESTED, events.SCREEN_FINALISED
 
 
 def _claimed(row: Mapping[str, Any]) -> str | None:
@@ -64,7 +66,10 @@ def _payload(row: Mapping[str, Any]) -> dict[str, Any]:
 def golden_candidates(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """The labelled cases of ``rows``: one per linked chain that ends in ``screen_finalised``,
     ``{"chain_id", "user", "doc_id", "sentences": [{"ts", "sentence", "current_criteria"}],
-    "final_criteria", "source_event"}`` (``source_event``: the final event's id)."""
+    "final_criteria", "source_event"}`` (``source_event``: the final event's id).
+    A chain that starts before the window ``rows`` were
+    read for (``since``) comes back partial: its early sentences are missing. Pass only rows from
+    the viewer-filtered ``load_drafting_events``, never rows read around it."""
     chains: dict[str, list[dict[str, Any]]] = {}
     for r in linked_sessions(rows):
         if r["chain_id"]:
