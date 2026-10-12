@@ -129,7 +129,9 @@ statuses, pending formula, needs your call) ships its Guide entry in the same PR
 2. Prompt reorder for a stable prefix; the guide trimmed to its criterion lines.
 3. Done: #529 retrieval slice (field index + per-sentence slice, `PROMPT_VERSION` 2) and the golden replay
    harness (#526). Not done: the phrasebook skip-the-model short-cut (lever 3): phrasebook hints are free text,
-   so wiring it needs structured thresholds in the phrasebook first (a later PR).
+   so wiring it needs structured thresholds in the phrasebook first. Done: `[[phrase.criterion]]` /
+   `[[phrase.alternative]]` and `resolves_fully` (`services/drafting/phrasebook`, `PROMPT_VERSION` 4), unwired;
+   wiring it into `draft_screen` is the next PR.
 4. Cheap-model-first tiering, the repair retry, fall-through on invalid output, schema-constrained JSON.
 5. The A / B / C contract: parsing, validation, dry run, fingerprint, `feature_backlog.toml` (ADR 0041
    amendment).
