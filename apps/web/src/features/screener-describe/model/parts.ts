@@ -38,9 +38,10 @@ function without(table: Table, keys: ReadonlySet<string>): Table {
 
 /**
  * Did the trader change this part's rows? True when a row the answer gave the part is gone from
- * `current`, or differs from the answer's own. Picking another reading of one of the part's
- * unresolved terms is the answer's own option, not an edit: the keys the readings set are left
- * out of the comparison. Compares the trader's own document to the answer's; no statistics.
+ * `current`, or is neither the answer's own row nor that row with one of the part's own
+ * alternative readings in place of the default (picking one is the answer's option, not an
+ * edit; a typed value that is none of them is). Compares the trader's own document to the
+ * answer's; no statistics.
  */
 export function partEdited(
   part: DraftPart,
@@ -48,16 +49,17 @@ export function partEdited(
   current: unknown,
   terms: ScreenDraft['unresolved'],
 ): boolean {
-  const readingKeys = new Set(
-    (terms ?? [])
-      .filter((term) => part.unresolved.includes(term.term))
-      .flatMap((term) => term.alternatives.flatMap((alt) => Object.keys(alt.criterion))),
-  );
+  const own = (terms ?? []).filter((term) => part.unresolved.includes(term.term));
   return part.criteria.some((id) => {
     const was = tableOf(original)[id];
     if (was === undefined) return false;
     const now = tableOf(current)[id];
     if (now === undefined) return true;
-    return !same(without(tableOf(was), readingKeys), without(tableOf(now), readingKeys));
+    if (same(was, now)) return false;
+    return !own.some((term) => {
+      const readingKeys = new Set(term.alternatives.flatMap((alt) => Object.keys(alt.criterion)));
+      const rest = without(tableOf(was), readingKeys);
+      return term.alternatives.some((alt) => same({ ...rest, ...alt.criterion }, now));
+    });
   });
 }

@@ -330,6 +330,27 @@ describe('DraftReview with parts', () => {
     expect(within(group).getByRole('radio', { name: 'over $10M traded a day' })).toBeChecked();
   });
 
+  it('an unplaced part with an unresolved term still offers its reading picker and swaps the row', async () => {
+    const parts: Part[] = [
+      {
+        ...PART,
+        id: 'unplaced',
+        words: '',
+        kind: 'needs_choice',
+        origin: 'unplaced',
+        criteria: ['dollar_volume'],
+        unresolved: ['liquid'],
+      },
+    ];
+    const { props } = setup({ answer: { ...ANSWER, parts } });
+    const group = screen.getByRole('radiogroup', { name: 'Reading of liquid' });
+    await userEvent.click(within(group).getByRole('radio', { name: 'over $10M traded a day' }));
+    expect(props.onPickReading).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'dollar_volume', value: 10_000_000 }),
+      { event: 'choice_made', subject: 'liquid', picked: 1 },
+    );
+  });
+
   it('offers no swap once the trader removed the row of the reading', () => {
     setup({ document: { id: 'mine', criteria: {} } });
     for (const radio of screen.getAllByRole('radio')) expect(radio).toBeDisabled();

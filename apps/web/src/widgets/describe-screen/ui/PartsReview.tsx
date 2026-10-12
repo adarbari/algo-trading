@@ -208,7 +208,8 @@ export function PartsReview({
         title={part.origin === 'kept' ? PART_TEXT.keptTitle : PART_TEXT.unplacedTitle}
         info={helps}
         actions={
-          <Stack direction="row" gap={1} align="center">
+          <Stack gap={2}>
+            {pickersOf(part)}
             {termHelp(PART_TEXT.keptHelp.id)}
           </Stack>
         }

@@ -85,6 +85,11 @@ describe('partEdited', () => {
     expect(partEdited(PART, original, current, terms)).toBe(false);
   });
 
+  it('is true for a typed value that is none of the offered readings', () => {
+    const current = { ...original, dv: { ...original.dv, value: 37 } };
+    expect(partEdited(PART, original, current, terms)).toBe(true);
+  });
+
   it('is true when a key outside the readings changed', () => {
     const current = { ...original, dv: { ...original.dv, mode: 'soft' } };
     expect(partEdited(PART, original, current, terms)).toBe(true);
