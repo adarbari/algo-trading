@@ -479,3 +479,69 @@ def test_close_does_not_wait_forever_on_a_full_queue(backend: Backend) -> None:
     rec.close(timeout_s=0.3)
     assert (datetime.now(UTC) - started).total_seconds() < 3
     lock.release()
+
+
+def two_recorder_runs(backend: Backend) -> None:
+    """Two live recorder runs in one partition each, no retention run anywhere."""
+    first = YOUNG.replace(hour=14)  # run ids have one-second resolution: never seed's own
+    record(backend, [feedback_row(first, "abhi")], [usage_row(first, "abhi")], first)
+    later = YOUNG.replace(hour=16)
+    record(backend, [feedback_row(later, "bea")], [usage_row(later, "bea")], later)
+
+
+def snapshot(backend: Backend) -> dict[str, object]:
+    runs = {
+        (t.table, day): backend.tables.partition_runs(t.table, day)
+        for t in retention.PERSONAL
+        for day in backend.tables.dates(t.table)
+    }
+    files: dict[str, bytes] = {}
+    if isinstance(backend, LocalBackend):
+        files = {str(p): p.read_bytes() for p in backend.root.rglob("*") if p.is_file()}
+        files = {k: v for k, v in files.items() if "/locks/" not in k and "_txn" not in k}
+    return {"runs": runs, "files": files}
+
+
+def test_a_partition_with_only_recorder_runs_keeps_every_run_and_row(backend: Backend) -> None:
+    two_recorder_runs(backend)
+    runs = backend.tables.partition_runs(retention.FEEDBACK, date(2026, 9, 2))
+    assert len(runs) == 2 and not any(r.startswith(retention.JOB) for r in runs)
+    assert retention.retain(backend, NOW).to_purge == 0  # (b) the dry run reports nothing
+    assert retention.erase(backend, "nobody", NOW).to_purge == 0
+    before = snapshot(backend)
+    done = retention.retain(backend, NOW, apply=True)  # (c) a no-op leaves every file alone
+    assert done.superseded_runs == 0 and snapshot(backend) == before
+    done = retention.erase(backend, "nobody", NOW, apply=True)
+    assert done.superseded_runs == 0 and snapshot(backend) == before
+    assert len(events(backend)) == 2 and len(calls(backend)) == 2  # (a) all rows
+    assert (events(backend)["sentence"] == SECRET).all()
+    retention.erase(backend, "abhi", NOW, apply=True)
+    assert len(events(backend)) == 2 and len(calls(backend)) == 2
+    (only,) = backend.tables.partition_runs(retention.FEEDBACK, date(2026, 9, 2))
+    assert only.startswith(retention.JOB)  # the erase of a real user supersedes both runs
+    assert (events(backend)["user"] == "bea").sum() == 1
+
+
+def test_after_a_real_retain_only_the_superseded_runs_of_rewritten_partitions_are_gone(
+    backend: Backend,
+) -> None:
+    seed(backend)
+    two_recorder_runs(backend)
+    young = date(2026, 9, 2)
+    young_runs = backend.tables.partition_runs(retention.FEEDBACK, young)
+    old_runs = backend.tables.partition_runs(retention.FEEDBACK, date(2025, 6, 2))
+    retention.retain(backend, NOW, apply=True)
+    assert backend.tables.partition_runs(retention.FEEDBACK, young) == young_runs  # untouched
+    now_old = backend.tables.partition_runs(retention.FEEDBACK, date(2025, 6, 2))
+    assert len(now_old) == 1 and now_old[0].startswith(retention.JOB)
+    assert not set(old_runs) & set(now_old)
+    assert len(events(backend)) == 6
+
+
+def test_purge_refuses_a_run_no_retention_run_supersedes(backend: Backend) -> None:
+    two_recorder_runs(backend)
+    day = date(2026, 9, 2)
+    live = backend.tables.partition_runs(retention.FEEDBACK, day)
+    with pytest.raises(RuntimeError, match="refusing"):
+        retention._purge(backend, retention.FEEDBACK, day, live[:-1])
+    assert backend.tables.partition_runs(retention.FEEDBACK, day) == live

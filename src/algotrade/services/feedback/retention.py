@@ -287,18 +287,34 @@ class _Part:
         return self.runs if self.frame is not None else []
 
 
+def _superseded(runs: list[str]) -> list[str]:
+    """The runs a retention run supersedes: those committed before the newest retention run
+    of the partition (by commit order), never any run when it holds none. The one place this
+    is decided: a recorder's live run is never in the answer."""
+    last = max((i for i, r in enumerate(runs) if r.startswith(JOB)), default=0)
+    return runs[:last] if last > 0 else []
+
+
 def _stale(backend: Backend) -> list[tuple[str, date, list[str]]]:
     """Per partition of EVERY personal table, whatever the command, the runs a crashed retention
-    run left: those committed before its last run, which holds their rows already rewritten (an
-    erase changes keys, so until they go a read sees both versions)."""
+    run left (an erase changes keys, so until they go a read sees both versions)."""
     found = []
     for t in PERSONAL:
         for day in backend.tables.dates(t.table):
-            runs = backend.tables.partition_runs(t.table, day)
-            last = max((i for i, r in enumerate(runs) if r.startswith(JOB)), default=-1)
-            if runs[:last]:
-                found.append((t.table, day, runs[:last]))
+            old = _superseded(backend.tables.partition_runs(t.table, day))
+            if old:
+                found.append((t.table, day, old))
     return found
+
+
+def _purge(backend: Backend, table: str, day: date, runs: list[str]) -> int:
+    """Delete ``runs`` of one partition, after checking against the store as it is now that every
+    one is superseded by a retention run there: a slicing bug can never delete live data."""
+    allowed = set(_superseded(backend.tables.partition_runs(table, day)))
+    live = set(runs) - allowed
+    if live:
+        raise RuntimeError(f"{table} {day}: refusing to purge run(s) no retention run supersedes")
+    return backend.tables.purge_runs(table, day, runs)
 
 
 def _plan(backend: Backend, redactions: list[Redaction], outcome: Outcome) -> list[_Part]:
@@ -354,8 +370,8 @@ def _run(
                     outcome.run_id = _rewrite(backend, changed, now)
                 for part in parts:
                     if part.doomed():
-                        outcome.superseded_runs += backend.tables.purge_runs(
-                            part.redaction.table, part.day, part.doomed()
+                        outcome.superseded_runs += _purge(
+                            backend, part.redaction.table, part.day, part.doomed()
                         )
                 _verify(backend, parts, outcome.run_id)
             except BaseException as exc:
@@ -371,7 +387,7 @@ def _finish_crashed(backend: Backend, outcome: Outcome) -> None:
     """Before planning: delete the runs a crashed retention run left, in every personal
     partition, so the plan reads one clean view."""
     for table, day, runs in _stale(backend):
-        outcome.superseded_runs += backend.tables.purge_runs(table, day, runs)
+        outcome.superseded_runs += _purge(backend, table, day, runs)
 
 
 def _rewrite(backend: Backend, changed: list[_Part], now: datetime) -> str:
