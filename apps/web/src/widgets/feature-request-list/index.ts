@@ -1,2 +1,2 @@
 /** Widget: the Admin feature requests list. */
-export { FeatureRequestList } from './ui/FeatureRequestList';
+export { FeatureRequestList, type FeatureRequestListProps } from './ui/FeatureRequestList';

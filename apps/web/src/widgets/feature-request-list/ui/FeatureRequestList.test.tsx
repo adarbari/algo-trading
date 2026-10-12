@@ -28,7 +28,7 @@ beforeEach(() => {
 
 describe('FeatureRequestList', () => {
   it('lists each request in the served order with its counts, status and Guide buttons', async () => {
-    const { container } = render(<FeatureRequestList />);
+    const { container } = render(<FeatureRequestList status={null} onStatusChange={vi.fn()} />);
     const table = screen.getByRole('grid', { name: 'Feature requests' });
     const first = within(table).getByRole('row', { name: /realised_vol_20d/ });
     expect(within(first).getByText('Open')).toBeInTheDocument();
@@ -44,25 +44,27 @@ describe('FeatureRequestList', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('shows only the chosen status, and every one again on All', async () => {
-    render(<FeatureRequestList />);
+  it('shows only the chosen status and reports a change of filter', async () => {
+    const onStatusChange = vi.fn();
+    render(<FeatureRequestList status="PROMOTED" onStatusChange={onStatusChange} />);
     const table = screen.getByRole('grid', { name: 'Feature requests' });
-    await userEvent.click(screen.getByRole('radio', { name: 'Promoted' }));
     expect(within(table).getByRole('row', { name: /rsi_14/ })).toBeInTheDocument();
     expect(within(table).queryByRole('row', { name: /moon_phase/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: "Won't do" }));
+    expect(onStatusChange).toHaveBeenCalledWith('WONT_DO');
     await userEvent.click(screen.getByRole('radio', { name: 'All' }));
-    expect(within(table).getByRole('row', { name: /moon_phase/ })).toBeInTheDocument();
+    expect(onStatusChange).toHaveBeenCalledWith(null);
   });
 
   it('shows the loading, error and empty states', () => {
     hooks.useFeatureRequests.mockReturnValue(fakeQuery(undefined));
-    const { rerender } = render(<FeatureRequestList />);
+    const { rerender } = render(<FeatureRequestList status={null} onStatusChange={vi.fn()} />);
     expect(screen.getByText('Loading feature requests…')).toBeInTheDocument();
     hooks.useFeatureRequests.mockReturnValue(fakeQuery(undefined, { isError: true }));
-    rerender(<FeatureRequestList />);
+    rerender(<FeatureRequestList status={null} onStatusChange={vi.fn()} />);
     expect(screen.getByText('The feature requests failed to load.')).toBeInTheDocument();
     hooks.useFeatureRequests.mockReturnValue(fakeQuery({ ...REQUESTS_FIXTURE, rows: [] }));
-    rerender(<FeatureRequestList />);
+    rerender(<FeatureRequestList status={null} onStatusChange={vi.fn()} />);
     expect(screen.getByText('No feature has been requested.')).toBeInTheDocument();
   });
 });

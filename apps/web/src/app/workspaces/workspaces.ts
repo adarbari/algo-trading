@@ -9,8 +9,8 @@ export interface Section {
   /** URL path of the section's route. */
   readonly path: string;
   readonly label: string;
-  /** What the section is for (shown by the placeholder page until it is built). */
-  readonly summary: string;
+  /** What the section is for: set only while it is a placeholder page; a built page has none. */
+  readonly summary?: string;
 }
 
 export interface Workspace {
@@ -32,32 +32,22 @@ export const TRADER: Workspace = {
     {
       path: '/screeners',
       label: 'Screeners',
-      summary:
-        'Builder: criteria with hard, soft or score mode, thresholds and tolerances, live preview, save and finalize.',
     },
     {
       path: '/edges',
       label: 'Edges',
-      summary:
-        'Each edge, a written reason a pattern should last, backtested out of sample and given a verdict.',
     },
     {
       path: '/explore',
       label: 'Explore',
-      summary:
-        'One page for universe, instruments, chains and features: a filterable ticker table with columns from the feature catalogue, multi-select compare, and detail tabs (Overview, Chart, Options, Features, Events, Screener hits).',
     },
     {
       path: '/regime',
       label: 'Regime',
-      summary:
-        'The market as weather: Clear, Clouds building, Storm or Severe storm, the slow and fast warning signs behind it in plain words, what changed this week and a reading list.',
     },
     {
       path: '/calendar',
       label: 'Calendar',
-      summary:
-        'What is coming across names for the next 90 days: earnings, macro releases and expiry days, for the scope list or the names a screener picked.',
     },
     { path: '/backtests', label: 'Backtests', summary: 'Run backtests and compare their results.' },
   ],
@@ -70,25 +60,18 @@ export const ADMIN: Workspace = {
     {
       path: '/admin/ingestion',
       label: 'Ingestion',
-      summary:
-        'Completeness grid (dataset x session) with drill-down, quality checks and open issues.',
     },
     {
       path: '/admin/llm-usage',
       label: 'LLM usage',
-      summary:
-        'What the text model spends: tokens and cost against the budget, by model, use case and user, and every recent call.',
     },
     {
       path: '/admin/harness-runs',
       label: 'Harness runs',
-      summary:
-        'Every edge evaluation run, newest first: whose, which split, what it measured and left out, and its stored rows.',
     },
     {
       path: '/admin/feature-requests',
       label: 'Feature requests',
-      summary: 'Missing features traders asked for, ranked.',
     },
     {
       path: '/admin/screener-runs',
