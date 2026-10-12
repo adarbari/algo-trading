@@ -22,6 +22,12 @@ class SaveEdgeBody(BaseModel):
         description="the edge's TOML keys as JSON: `extends` and the settings it changes "
         "(its status, `[follow]` and `[audit]` are ignored: the status has its own call)"
     )
+    draft_session_id: str | None = Field(
+        None,
+        max_length=64,
+        description="the id of the Describe-it session this edit continues, when it has one "
+        "(ADR 0066); recorded with the revision, never required",
+    )
 
 
 class EdgeDocument(Schema):

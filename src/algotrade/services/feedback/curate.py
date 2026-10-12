@@ -196,6 +196,8 @@ def _plan_one(index: int, entry: Any, ctx: Setting) -> tuple[PlannedCase | None,
     stored = ctx.stored.get(entry["source_event"])
     if stored is None:
         return None, [f"{name}: source_event {entry['source_event']} is not a candidate in range"]
+    if stored.get("doc_kind") == "edge":
+        return None, [f"{name}: an edge's text is never a golden case"]
     chain_real = [s["sentence"] or "" for s in stored["sentences"]]
     paras = entry.get("sentences")
     if not isinstance(paras, list) or not all(isinstance(p, str) and p.strip() for p in paras):

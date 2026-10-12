@@ -30,13 +30,14 @@ def _claimed(row: Mapping[str, Any]) -> str | None:
 
 def linked_sessions(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """``rows`` each with ``chain_id``: the session it belongs to, a claimed one when that
-    session has rows of the same ``user`` and ``doc_id``, else its own (``""`` stays unlinked)."""
+    session has rows of the same ``user``, ``doc_kind`` and ``doc_id``, else its own (``""`` stays
+    unlinked)."""
     rows = list(rows)
-    owners = {(r["draft_session_id"], r["user"], r["doc_id"]) for r in rows}
+    owners = {(r["draft_session_id"], r["user"], r.get("doc_kind"), r["doc_id"]) for r in rows}
     claim_of: dict[str, str] = {}
     for r in rows:
         claimed = _claimed(r)
-        if claimed and (claimed, r["user"], r["doc_id"]) in owners:
+        if claimed and (claimed, r["user"], r.get("doc_kind"), r["doc_id"]) in owners:
             claim_of.setdefault(r["draft_session_id"] or f"row:{r['event_id']}", claimed)
 
     def root(key: str) -> str:
@@ -77,7 +78,7 @@ def golden_candidates(
     A chain that starts before the window ``rows`` were
     read for (``since``) comes back partial: its early sentences are missing. Pass only rows from
     the viewer-filtered ``load_drafting_events``, never rows read around it."""
-    rows = list(rows)
+    rows = [r for r in rows if r.get("doc_kind") != "edge"]  # an edge's text is never a case
     oldest = min((r["ts"] for r in rows), default=None)
     chains: dict[str, list[dict[str, Any]]] = {}
     for r in linked_sessions(rows):
@@ -100,6 +101,7 @@ def golden_candidates(
             "chain_id": chain_id,
             "user": final["user"],
             "doc_id": final["doc_id"],
+            "doc_kind": final.get("doc_kind"),
             "sentences": [
                 {"ts": r["ts"], "sentence": r["sentence"],
                  "current_criteria": _payload(r).get("current_criteria")}
