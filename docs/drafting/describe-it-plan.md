@@ -113,6 +113,8 @@ near-duplicate removal, stratified sampling, a coverage report.
 
 ## Web
 
+(The tagged sentence below is superseded by Explained parts; see that section.)
+
 Describe it stays the panel at the top of the Builder; the draft loads into the criteria list at once
 (A live, B as a ghost row "waiting on formula", unresolved on the model's default). A review panel under
 the input explains what was understood: the sentence tagged applied / formula / needs your call / not
@@ -121,6 +123,24 @@ for C showing only the trader's own history, and choices that swap criteria loca
 pending formulas, not on missing features (the gap is saved in the screen's notes). Failure states: a
 trader-facing message with Try again; a visible waiting phase with Cancel. Every new term (buckets,
 statuses, pending formula, needs your call) ships its Guide entry in the same PR.
+
+## Explained parts
+
+Owner decisions are in `docs/decisions/log.md` (2026-10-11, "Describe it review"). The review shows one card per
+part: the trader's quoted words, "We read this as...", then its criteria, formula, readings and suggestions;
+unplaced words are a "not understood" part, criteria tied to no words a "Kept from your screen" card. A part is
+fixed locally (another reading, edit rows) or by retyping its words (one scoped model call).
+
+- PR A, backend contract: model-side nullable `part` id on criteria, formulas, missing, unresolved and
+  suggestions, plus top-level `parts [{id, words, reading}]`. Server-side (new folder `services/drafting/parts/`):
+  locates each part's words in the sentence, attributes deterministically, decides the kind (needs_choice >
+  formula > not_available > applied; no refs = not_understood), checks a numeric reading against the criteria,
+  caps 12 parts / 200 chars / 160 reading. `PROMPT_VERSION` 8; ADR 0041 amendment.
+- PR B, per-part re-draft: `POST /screeners/{id}/draft-part`, scoped prompt under 4k tokens, server-side merge,
+  ledger kind `screener-draft-part`, feedback through `draft_requested` / `draft_returned` with payload
+  `scope=part`, ADR 0066 amendment, daily cap per user (30 by default, `config/site/llm.toml`).
+- PR C1, web: `PartCard` and the local fixes (after A).
+- PR C2, web: retype a part (after B); asks before replacing hand-edited rows.
 
 ## PR order (state 2026-10-12)
 
