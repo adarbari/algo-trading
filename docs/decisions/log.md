@@ -354,3 +354,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: one rule for everything in a drafting-event payload.
+
+## 2026-10-12 | Describe it wrap-up | Phrasebook drafts, enum values, one contradiction accepted
+- Question: how are no-model drafts told apart in the stored events once a payload is erased; are enum values for index-only fields shown to the model; is "volatile squeeze" (ATR >= 3% and a Bollinger squeeze) served without the model?
+- Options: keep the prompt version on a no-model draft / stamp it `phrasebook:<hash of the structured entries>`; build enum values now / measure first; fall through to the model / serve it.
+- Decision: `draft_returned.prompt_version` is `phrasebook:<hash>` for a draft the phrasebook made (the Opus reviewer's finding on #560); enum values are not built (the live Haiku run of 2026-10-12 shows no wrong-enum drops: 0 drops of any kind); "volatile squeeze" is served (a squeeze is measured against the name's own history, ATR% is an absolute level, so the pair is a real screen, not a contradiction).
+- decided by: orchestrator (design call; the Opus architect reviewer agreed on the third)
+- status: pending owner confirmation
+- Reasoning: the stamp keeps phrasebook drafts out of the model's prompt-version numbers after retention nulls the payload; enum values would cost prompt budget the measurement does not justify.

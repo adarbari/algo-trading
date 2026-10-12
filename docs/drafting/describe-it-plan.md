@@ -174,13 +174,13 @@ any doubt goes to the model. Lever 3 is done.
 Also done (2026-10-12): #540 retention / erase; #541-#543 decision log; #544 `edge_revised`; #545 request log route;
 #546 + #553 phrasebook thresholds; #547 prompt headroom; #548 + #551 golden run reporting; #549 admin feature requests;
 #550 Builder review panel; #552 harness; #554 protective suggestions; #555 explained-parts decisions; #556 `PartCard` /
-`PartList`; #558 refused attempts' call id; #559 parts contract (PR A); #560 phrasebook shortcut.
+`PartList`; #558 refused attempts' call id; #559 parts contract (PR A); #560 phrasebook shortcut; #561 re-draft one part (PR B); #557 admin accepted formulas;
+#563 the `services/drafting` folder split.
 
-In flight: #561 re-draft one part (PR B); #557 admin accepted formulas; the `services/drafting` folder split
-(`contract/`, `golden/`).
+In flight: #564 Builder part cards (C1).
 
 Not started:
-- Builder part cards on the review panel (C1) and retype a part (C2, after #561).
+- Retype a part (C2, #561 is in).
 - "Notify me when available" (lowest priority).
 - A Gemini free-tier rerun of the live golden run, to compare with Haiku.
 - Enum values for index-only fields: not built; the 2026-10-12 run shows no enum drops (below).
