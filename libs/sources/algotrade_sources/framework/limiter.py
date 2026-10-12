@@ -190,6 +190,11 @@ class Limiter:
         self._update(claim)
         return waited[0]
 
+    def pause(self, seconds: float) -> None:
+        """Hold the key for ``seconds`` and wait them out (a tool's wait between its own calls)."""
+        self.hold(seconds)
+        self.wait()
+
     def hold(self, seconds: float) -> None:
         """Make the next request for this key (any process) wait ``seconds`` from now."""
         self._update(lambda s: _hold(s, self._clock() + seconds))

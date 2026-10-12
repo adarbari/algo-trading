@@ -22,6 +22,7 @@ from algotrade_sources.framework.registry import (
     RAW_SECTIONS,
     SESSION_SOURCES,
     SOURCES,
+    build_pauser,
     build_sources,
     limiter_keys,
     raw_sections,
@@ -304,3 +305,8 @@ def test_each_key_gets_adaptive_pacing_from_its_section_and_http(tmp_path: Path)
     bad = {**SITE_SOURCES, "massive": {"max_interval_s": 1.0}}  # below the default floor
     with pytest.raises(ConfigurationError, match=r"\[massive\]: max_interval_s 1.0 is below"):
         build_sources(settings(bad), ENV.get, ["massive_bars"], tmp_path)
+
+
+def test_a_pauser_holds_the_key_limiter_for_the_seconds(tmp_path: Path) -> None:
+    build_pauser("golden-run", tmp_path)(0.05)
+    assert (tmp_path / "golden-run.lock").exists()

@@ -61,6 +61,7 @@ Measured live, by the owner only (CI never calls a model): `algotrade-api golden
 [--split train|held_out|all] [--provider ID ...] [--repeat 3] [--record] [--json] --yes` runs the real
 `draft_screen` over the golden cases per provider and reports pass rate, consistency, invalid rate, tokens,
 cache, latency and cost, under `--max-calls` / `--budget-usd` caps (`src/algotrade/services/drafting/golden_run.py`).
+It also reports the criteria the server dropped (`drops_total`, `invented_field_drops` with the invented names, `repaired`; `--json` lists each repeat's drops) and paces a rate-limited free tier (`--pace`, `--batch N --batch-pause S`; a 429 waits and retries twice).
 
 ## Token and latency budget
 

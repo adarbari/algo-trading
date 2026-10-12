@@ -5,7 +5,7 @@ runs it (no network): tests drive it with fake models.
 
     algotrade-api golden run [--cases ID,...] [--split train|held_out|all] [--provider ID ...]
         [--repeat N=3] [--record [--force]] [--json] [--max-calls 60] [--budget-usd 1.00]
-        [--user ID] --yes
+        [--pace SECONDS=0] [--batch N --batch-pause SECONDS] [--user ID] --yes
 
 For each case of ``tests/fixtures/drafting/golden`` and each provider (the chain of the machine's
 ``llm.toml`` restricted to that one provider; default: every provider of the file), it runs the
@@ -16,7 +16,17 @@ pass rate, field agreement across the repeats (mean pairwise Jaccard of the sets
 drafted; ``-`` below two answered repeats), invalid-answer rate (the model answered, the draft
 could not be parsed or validated), unavailable count (no answer), mean tokens in / out / cache
 read / cache write, latency p50 / p90 and cost (from the usage ledger's rows of the call; the
-rows are written to ``usage/llm_calls`` as usual). ``--json`` prints the same as one object.
+rows are written to ``usage/llm_calls`` as usual). ``--json`` prints the same as one object, with
+each repeat's ``dropped`` criteria (id, field, reason, kind: field names and reasons only) per case.
+
+Drops: a criterion the server dropped is classified ``not_in_catalogue`` (the model named a field
+the catalogue lacks, e.g. a bare ``iv30``), ``bad_op``, ``bad_value`` or ``other``. The summary
+adds ``drops_total``, ``invented_field_drops`` (count and the top 20 invented names with counts)
+and ``repaired`` (answers whose first answer was refused: the product's repair path would run).
+
+Pacing: ``--pace`` sleeps between calls; ``--batch N`` pauses ``--batch-pause`` seconds every N
+calls. A rate-limited answer (HTTP 429) waits the pause (``DEFAULT_RATE_WAIT_S`` without one) and
+retries the same call up to ``RATE_LIMIT_RETRIES`` times before it counts as unavailable.
 
 Guard rails: refused while ``$ALGOTRADE_LLM=off`` or ``llm.toml`` is not enabled (the message
 says how to turn it on); the plan (calls, estimated cost) is printed first and nothing is spent
@@ -34,8 +44,9 @@ import json
 import re
 import statistics
 import threading
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import combinations
 from pathlib import Path
 from typing import Any
@@ -53,6 +64,9 @@ GOLDEN_ROOT = Path("tests") / "fixtures" / "drafting" / "golden"
 DEFAULT_REPEAT, DEFAULT_MAX_CALLS, DEFAULT_BUDGET_USD = 3, 60, 1.00
 ESTIMATE_INPUT_TOKENS = 12_000  # the retrieval-slice target of the plan: what a call is priced at
 UNAVAILABLE_STREAK = 3  # unavailable answers in a row after which a provider is given up on
+RATE_LIMIT_RETRIES = 2  # waits and retries of one call answered 429 before it is unavailable
+DEFAULT_RATE_WAIT_S = 30.0  # the wait after a 429 when no --batch-pause is given
+TOP_INVENTED = 20
 SPLITS = ("train", "held_out", "all")
 
 type Draft = Callable[[TextModel, str, Mapping[str, Any] | None], ScreenDraft]
@@ -213,6 +227,32 @@ class Recording:
             reject(*args)
 
 
+def drop_kind(reason: str) -> str:
+    """``not_in_catalogue`` / ``bad_op`` / ``bad_value`` / ``other`` for a dropped criterion's
+    reason (the messages of ``screens._criterion``)."""
+    if "is not in the catalogue" in reason:
+        return "not_in_catalogue"
+    if reason.startswith("unknown op"):
+        return "bad_op"
+    if any(k in reason for k in ("value", "between needs", "takes one value", "tolerance")):
+        return "bad_value"
+    return "other"
+
+
+@dataclass(frozen=True)
+class Drop:
+    """One criterion the server dropped from a draft: no sentence, only the field and why."""
+
+    id: str
+    field: str
+    reason: str
+    kind: str
+
+
+def is_rate_limited(error: str | None) -> bool:
+    return bool(error) and "HTTP 429" in str(error)
+
+
 @dataclass(frozen=True)
 class CallResult:
     """One ``draft_screen`` call: ``status`` ``ok`` (a draft), ``invalid`` (the model answered,
@@ -233,6 +273,9 @@ class CallResult:
     cost_usd: float | None = None
     answer: str | None = None
     error: str | None = None
+    dropped: tuple[Drop, ...] = ()
+    answer_chars: int | None = None
+    rate_limit_retries: int = 0
 
 
 @dataclass
@@ -249,11 +292,19 @@ def evaluate(
     *,
     budget_usd: float,
     max_calls: int,
+    pace_s: float = 0.0,
+    batch: int = 0,
+    batch_pause_s: float = 0.0,
+    sleep: Callable[[float], None] = lambda _seconds: None,
 ) -> RunResult:
     """Run the plan: every provider, case and repeat in turn, scoring each draft. Stops (the
     reason in ``stopped``) at ``max_calls`` calls, when ``costs`` reaches ``budget_usd``, and
-    gives up on a provider after ``UNAVAILABLE_STREAK`` unavailable answers in a row."""
+    gives up on a provider after ``UNAVAILABLE_STREAK`` unavailable answers in a row. ``pace_s``
+    sleeps between calls, ``batch_pause_s`` after every ``batch`` calls; a 429 waits
+    (``batch_pause_s`` or ``DEFAULT_RATE_WAIT_S``) and retries the same call (each try counts as
+    a call) up to ``RATE_LIMIT_RETRIES`` times."""
     run, calls = RunResult(), 0
+    wait = batch_pause_s or DEFAULT_RATE_WAIT_S
     for provider in plan.providers:
         recording = Recording(models[provider])
         streak = 0
@@ -268,9 +319,24 @@ def evaluate(
                 if streak >= UNAVAILABLE_STREAK:
                     run.stopped = f"{provider} unavailable {UNAVAILABLE_STREAK} times in a row"
                     break
+                if calls and pace_s > 0:
+                    sleep(pace_s)
+                if calls and batch > 0 and batch_pause_s > 0 and calls % batch == 0:
+                    sleep(batch_pause_s)
                 calls += 1
                 result = _call(provider, case, recording, draft, costs)
-                run.results.append(result)
+                retries = 0
+                while (
+                    result.status == "unavailable"
+                    and is_rate_limited(result.error)
+                    and retries < RATE_LIMIT_RETRIES
+                    and calls < max_calls
+                ):
+                    sleep(wait)
+                    retries += 1
+                    calls += 1
+                    result = _call(provider, case, recording, draft, costs)
+                run.results.append(replace(result, rate_limit_retries=retries))
                 streak = streak + 1 if result.status == "unavailable" else 0
             else:
                 continue
@@ -298,7 +364,10 @@ def _call(
         [u.term for u in made.unresolved],
     )
     fields = frozenset(c["field"] for c in made.document["criteria"].values())
-    return _result(provider, case.id, "ok", got, costs, passed=graded.passed, fields=fields)
+    drops = tuple(Drop(d.id, d.field, d.reason, drop_kind(d.reason)) for d in made.dropped)
+    return _result(
+        provider, case.id, "ok", got, costs, passed=graded.passed, fields=fields, dropped=drops
+    )
 
 
 def _result(
@@ -311,13 +380,14 @@ def _result(
     passed: bool = False,
     fields: frozenset[str] = frozenset(),
     error: str | None = None,
+    dropped: tuple[Drop, ...] = (),
 ) -> CallResult:
     if got is None:
         return CallResult(provider, case_id, status, error=error)
     return CallResult(
         provider, case_id, status, passed, fields, got.model, got.input_tokens,
         got.output_tokens, got.cache_read_tokens, got.cache_write_tokens, got.latency_s,
-        costs.cost_of(got.call_id), got.text, error,
+        costs.cost_of(got.call_id), got.text, error, dropped, len(got.text),
     )  # fmt: skip
 
 
@@ -370,7 +440,42 @@ def measure(results: Sequence[CallResult]) -> dict[str, Any]:
         "latency_p50_s": percentile(latencies, 0.5),
         "latency_p90_s": percentile(latencies, 0.9),
         "cost_usd": sum(costs) if costs else None,
+        **drop_metrics(results),
     }
+
+
+def drop_metrics(results: Sequence[CallResult]) -> dict[str, Any]:
+    """``drops_total``, ``drops_by_kind``, ``invented_field_drops`` (``count`` and the ``top``
+    ``TOP_INVENTED`` invented names with counts) and ``repaired`` (answers whose first answer
+    was refused: ``invalid``)."""
+    drops = [d for r in results for d in r.dropped]
+    invented = Counter(d.field for d in drops if d.kind == "not_in_catalogue")
+    return {
+        "drops_total": len(drops),
+        "drops_by_kind": dict(Counter(d.kind for d in drops)),
+        "invented_field_drops": {
+            "count": sum(invented.values()),
+            "top": dict(invented.most_common(TOP_INVENTED)),
+        },
+        "repaired": sum(r.status == "invalid" for r in results),
+    }
+
+
+def repeats_of(results: Sequence[CallResult]) -> list[dict[str, Any]]:
+    """The per-repeat record ``--json`` carries: status, answer length and the dropped criteria
+    (field names and reasons only)."""
+    return [
+        {
+            "status": r.status,
+            "answer_chars": r.answer_chars,
+            "rate_limit_retries": r.rate_limit_retries,
+            "dropped": [
+                {"id": d.id, "field": d.field, "reason": d.reason, "kind": d.kind}
+                for d in r.dropped
+            ],
+        }
+        for r in results
+    ]
 
 
 def report(run: RunResult, plan: Plan) -> dict[str, Any]:
@@ -383,6 +488,7 @@ def report(run: RunResult, plan: Plan) -> dict[str, Any]:
             "summary": measure(mine),
             "cases": {
                 c.id: measure([r for r in mine if r.case == c.id])
+                | {"repeats": repeats_of([r for r in mine if r.case == c.id])}
                 for c in plan.cases
                 if any(r.case == c.id for r in mine)
             },
@@ -476,6 +582,9 @@ class RunArgs:
     max_calls: int = DEFAULT_MAX_CALLS
     budget_usd: float = DEFAULT_BUDGET_USD
     yes: bool = False
+    pace_s: float = 0.0
+    batch: int = 0
+    batch_pause_s: float = 0.0
 
 
 def run_golden(
@@ -487,6 +596,7 @@ def run_golden(
     draft: Draft,
     say: Callable[[str], None],
     note: Callable[[str], None],
+    sleep: Callable[[float], None] = lambda _seconds: None,
 ) -> int:
     """The command: refuse, plan, require ``--yes``, run, report, record. ``say`` gets the
     report (what ``--json`` makes machine-readable), ``note`` everything else (the CLI sends it
@@ -517,7 +627,10 @@ def run_golden(
     except ConfigurationError as exc:
         note(f"refused: {exc}")
         return 2
-    run = evaluate(plan, models, draft, costs, budget_usd=args.budget_usd, max_calls=args.max_calls)
+    run = evaluate(
+        plan, models, draft, costs, budget_usd=args.budget_usd, max_calls=args.max_calls,
+        pace_s=args.pace_s, batch=args.batch, batch_pause_s=args.batch_pause_s, sleep=sleep,
+    )  # fmt: skip
     rep = report(run, plan)
     say(json.dumps(rep, indent=2) if args.as_json else "\n".join(report_lines(rep)))
     if args.record:

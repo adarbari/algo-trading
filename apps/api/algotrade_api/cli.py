@@ -83,6 +83,7 @@ from algotrade_api.ops.schedule import (
     deploy_plist,
 )
 from algotrade_api.text_model import open_text_model
+from algotrade_sources.framework.registry import build_pauser
 
 APP = "algotrade_api.app:app"
 OWNER = Viewer("owner", "owner", Role.ADMIN.value, ())  # the owner's own terminal reads as admin
@@ -143,6 +144,9 @@ def _parser() -> argparse.ArgumentParser:
     gr.add_argument("--json", action="store_true", dest="as_json")
     gr.add_argument("--max-calls", type=int, default=DEFAULT_MAX_CALLS)
     gr.add_argument("--budget-usd", type=float, default=DEFAULT_BUDGET_USD)
+    gr.add_argument("--pace", type=float, default=0.0, help="seconds to sleep between calls")
+    gr.add_argument("--batch", type=int, default=0, help="pause after every N calls")
+    gr.add_argument("--batch-pause", type=float, default=0.0, help="seconds paused per batch / 429")
     gr.add_argument("--user", default=None, help="user id asked as (default $ALGOTRADE_USER)")
     gr.add_argument("--yes", action="store_true", help="spend: without it only the plan is shown")
     gc = gsub.add_parser("candidates", help="finalised sessions worth curating (real sentences)")
@@ -268,12 +272,12 @@ def golden_run(args: argparse.Namespace) -> int:
     run_args = RunArgs(
         tuple(c for c in args.cases.split(",") if c), args.split, tuple(args.provider),
         args.repeat, args.record, args.force, args.as_json, args.max_calls, args.budget_usd,
-        args.yes,
+        args.yes, args.pace, args.batch, args.batch_pause,
     )  # fmt: skip
     try:
         return run_golden(
             run_args, load_llm(store.configs), llm_off(), Path.cwd() / GOLDEN_ROOT, open_models,
-            draft, print, to_stderr if args.as_json else print,
+            draft, print, to_stderr if args.as_json else print, build_pauser("golden-run"),
         )  # fmt: skip
     finally:
         for model in models:
