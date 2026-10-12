@@ -6,9 +6,10 @@ provider that ignores the schema costs nothing but a repair. The schema is in th
 providers accept (every property listed in ``required``, an optional one nullable); the check
 reads a missing nullable property as absent, so an answer that leaves out ``mode`` or ``why`` is
 as valid as one with ``null``. It types the shape only: whether an op, mode or field is known
-stays with ``criteria_of`` (a wrong one is dropped with a reason, not a rejected answer). A
-later contract (several drafts, PR 5) extends this module's schema: a new answer key must be
-nullable or optional (``["string", "null"]``), so answers recorded before it still pass. The
+stays with ``criteria_of`` (a wrong one is dropped with a reason, not a rejected answer). The
+A / B / C contract (PR 5, ADR 0041 amendment 2026-10-11) adds ``formulas`` (B1), ``missing``
+(B2 / C) and ``unresolved`` (an ambiguous term with ready alternatives); every one is nullable
+or optional, so answers recorded before it still pass (a new answer key must be the same). The
 check is a small subset of JSON Schema (``type``, ``properties``, ``required``, ``items``,
 ``anyOf``), enough for these shapes and no dependency; a key the schema does not list is
 tolerated (``additionalProperties = false`` is for the provider, strict mode needs it)."""
@@ -69,14 +70,83 @@ TIE_BREAK: Mapping[str, Any] = {
         {"type": "null"},
     ]
 }
+STRINGS: Mapping[str, Any] = {"type": "array", "items": {"type": "string"}}
+FORMULA: Mapping[str, Any] = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "expr": {"type": "string"},
+        "dtype": {"type": "string"},
+        "unit": {"type": "string"},
+        "description": {"type": "string"},
+        "null_meaning": {"type": "string"},
+        "inputs": STRINGS,
+        "criterion": {
+            "anyOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        key: CRITERION["properties"][key]
+                        for key in ("op", "value", "mode", "tolerance")
+                    },
+                    "required": ["op", "value", "mode", "tolerance"],
+                    "additionalProperties": False,
+                },
+                {"type": "null"},
+            ]
+        },
+    },
+    "required": [
+        "name", "expr", "dtype", "unit", "description", "null_meaning", "inputs", "criterion",
+    ],
+    "additionalProperties": False,
+}  # fmt: skip
+MISSING: Mapping[str, Any] = {
+    "type": "object",
+    "properties": {
+        "key": NULLABLE_STRING,
+        "new_key_slug": NULLABLE_STRING,
+        "span": {"type": "string"},
+        "description": {"type": "string"},
+        "why_needed": {"type": "string"},
+        "closest": STRINGS,
+        "feasibility": {"type": "string"},
+    },
+    "required": [
+        "key", "new_key_slug", "span", "description", "why_needed", "closest", "feasibility",
+    ],
+    "additionalProperties": False,
+}  # fmt: skip
+UNRESOLVED: Mapping[str, Any] = {
+    "type": "object",
+    "properties": {
+        "term": {"type": "string"},
+        "span": {"type": "string"},
+        "default_index": {"type": "integer"},
+        "alternatives": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"label": {"type": "string"}, "criterion": CRITERION},
+                "required": ["label", "criterion"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["term", "span", "default_index", "alternatives"],
+    "additionalProperties": False,
+}
 ANSWER_SCHEMA: Mapping[str, Any] = {
     "type": "object",
     "properties": {
         "criteria": {"type": "array", "items": CRITERION},
         "tie_break": TIE_BREAK,
         "notes": {"type": ["array", "null"], "items": {"type": "string"}},
+        "formulas": {"type": ["array", "null"], "items": FORMULA},
+        "missing": {"type": ["array", "null"], "items": MISSING},
+        "unresolved": {"type": ["array", "null"], "items": UNRESOLVED},
     },
-    "required": ["criteria", "tie_break", "notes"],
+    "required": ["criteria", "tie_break", "notes", "formulas", "missing", "unresolved"],
     "additionalProperties": False,
 }
 
@@ -94,6 +164,7 @@ _TYPES: Mapping[str, Any] = {
     "array": lambda v: isinstance(v, list),
     "string": lambda v: isinstance(v, str),
     "number": lambda v: isinstance(v, int | float) and not isinstance(v, bool),
+    "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
     "boolean": lambda v: isinstance(v, bool),
     "null": lambda v: v is None,
 }
@@ -109,6 +180,12 @@ def check_criterion(value: Any) -> str | None:
     """Why one proposed criterion does not fit ``CRITERION`` (it is dropped with this reason,
     the rest of the answer kept), else ``None``."""
     return _violation(value, CRITERION, "criterion")
+
+
+def check_item(value: Any, schema: Mapping[str, Any], name: str) -> str | None:
+    """Why one proposed formula / missing / unresolved item (``FORMULA``, ``MISSING``,
+    ``UNRESOLVED``) does not fit its schema (it is dropped with this reason), else ``None``."""
+    return _violation(value, schema, name)
 
 
 def _violation(value: Any, schema: Mapping[str, Any], path: str) -> str | None:

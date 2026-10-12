@@ -18,6 +18,7 @@ from algotrade.services.configs import field_catalog
 from algotrade.services.drafting.prompt import (
     EXAMPLES,
     PROMPT_VERSION,
+    TASK,
     catalogue_line,
     index_line,
     phrase_line,
@@ -185,7 +186,7 @@ def test_users_share_the_site_prefix_and_own_features_come_last() -> None:
 
 
 def test_the_sliced_prompt_is_an_index_then_only_the_slice() -> None:
-    assert PROMPT_VERSION == "2"
+    assert PROMPT_VERSION == "3"
     names = {"rollup.b@v1.x"}
     assert (
         index_line(info("instrument.a", "str", unit="category")) == "instrument.a | str | category"
@@ -243,3 +244,24 @@ def test_a_slice_keeps_every_caveat_sentence_that_says_how_to_use_the_field() ->
         "Never a one-sided upper bound. Use adv_usd_20d for a gate. "
         "Check market.market_trend@v2 first."
     )
+
+
+def test_the_task_states_the_contract_and_what_a_formula_can_express() -> None:
+    for word in ('"formulas"', '"missing"', '"unresolved"', "draft_<slug>", "ROLLUP_FROM_STORED"):
+        assert word in TASK
+    for function in ("if(", "abs", "min", "max", "log", "sqrt", "ncdf", "clip", "coalesce",
+                     "is_null", "one_of", "exists"):  # fmt: skip
+        assert function in TASK
+    assert "No lag, window" in TASK and "over time" in TASK
+
+
+def test_the_open_backlog_keys_are_in_the_prefix_every_sentence_shares() -> None:
+    site = [info("rollup.b@v1.x")]
+    keys = (("a_key", "what a is"), ("b_key", "what b is"))
+    first = sliced_system_prompt(site, "b", open_keys=keys)
+    second = sliced_system_prompt(site, "something else", open_keys=keys)
+    prefix = prefix_text(site, keys)
+    assert first.startswith(prefix) and second.startswith(prefix)
+    assert prefix.endswith("a_key | what a is\nb_key | what b is\n")
+    assert prefix.index("Field index (every") < prefix.index("Open requests (")
+    assert "Open requests (" not in prefix_text(site)  # no keys, no section

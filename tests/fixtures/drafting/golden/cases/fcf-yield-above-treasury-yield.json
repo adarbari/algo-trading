@@ -1,0 +1,26 @@
+{
+  "id": "fcf-yield-above-treasury-yield",
+  "sentence": "stocks whose free cash flow yield is higher than the 10 year treasury yield",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "free cash flow yield",
+        "bucket": "C",
+        "fields": [],
+        "key": "free_cash_flow_yield"
+      },
+      {
+        "span": "the 10 year treasury yield",
+        "bucket": "C",
+        "fields": [],
+        "key": "treasury_10y_level"
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true
+  }
+}

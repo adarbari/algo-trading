@@ -478,3 +478,85 @@ def test_a_draft_carries_the_one_call_id_of_every_attempt_repair_and_escalation_
     draft = draft_screen(ctx, model, "s", "over $50")
     ids = {a.call_id for a in ledger.attempts}
     assert len(ledger.attempts) == 5 and ids == {draft.call_id} and draft.call_id
+
+
+FORMULA = {
+    "name": "draft_oi_per_dollar",
+    "expr": "option_liquidity.chain_oi / option_liquidity.underlying_price",
+    "dtype": "float",
+    "unit": "ratio",
+    "description": "open interest per dollar of price",
+    "null_meaning": "no price",
+    "inputs": ["option_liquidity.chain_oi", "option_liquidity.underlying_price"],
+    "criterion": {"op": "gt", "value": 20, "mode": None, "tolerance": None},
+}
+READINGS = {
+    "term": "deep",
+    "span": "deep",
+    "default_index": 1,
+    "alternatives": [
+        {"label": "50", "criterion": {"id": None, "field": OI, "op": "gte", "value": 50}},
+        {"label": "1000", "criterion": {"id": None, "field": OI, "op": "gte", "value": 1000}},
+    ],
+}
+GAP = {
+    "key": None, "new_key_slug": "oi_history", "span": "for a year", "description": "d",
+    "why_needed": "w", "closest": [OI], "feasibility": "ROLLUP_FROM_STORED",
+}  # fmt: skip
+
+
+def test_the_contract_keys_come_through_and_the_document_holds_only_a_criteria() -> None:
+    reader, _ = seeded()
+    ctx = open_context(reader, configs(), UserContext(ALICE), DAY)
+    model = Canned(proposal(ACTIVE, formulas=[FORMULA], missing=[GAP], unresolved=[READINGS]))
+    draft = draft_screen(ctx, model, "my_screen", "deep oi per dollar for a year")
+    (formula,) = draft.formulas
+    assert formula.name == "draft_oi_per_dollar" and formula.pending
+    assert formula.dry_run.session == DAY and formula.dry_run.criterion_pass == 2
+    assert formula.criterion == {"field": "feature.draft_oi_per_dollar", "op": "gt", "value": 20}
+    assert draft.formulas_dropped == ()
+    assert [(m.key, m.new_key_slug, m.closest) for m in draft.missing] == [
+        (None, "oi_history", (OI,))
+    ]
+    (term,) = draft.unresolved
+    assert term.default_index == 1 and len(term.alternatives) == 2
+    criteria = draft.document["criteria"]
+    assert set(criteria) == {"active", "deep"}  # the default reading, no pending formula
+    assert criteria["deep"] == {"field": OI, "op": "gte", "value": 1000}
+    assert "draft_oi_per_dollar" not in json.dumps(draft.document)
+    resolve_rule_draft(ctx.configs, "my_screen", ctx.user, draft.document)  # a valid document
+
+
+def test_an_old_answer_has_no_contract_output(ctx: ReadContext) -> None:
+    draft = draft_screen(ctx, Canned(proposal(ACTIVE)), "my_screen", "active")
+    assert (draft.formulas, draft.formulas_dropped, draft.missing, draft.unresolved) == (
+        (),
+        (),
+        (),
+        (),
+    )
+
+
+def test_a_dropped_formula_and_an_unusable_alternative_are_said(ctx: ReadContext) -> None:
+    bad = {**FORMULA, "name": "no_prefix"}
+    one_alternative = {**READINGS, "alternatives": READINGS["alternatives"][:1]}
+    draft = draft_screen(
+        ctx, Canned(proposal(ACTIVE, formulas=[bad], unresolved=[one_alternative])), "s", "x"
+    )
+    assert draft.formulas == () and draft.formulas_dropped[0].name == "no_prefix"
+    assert "draft_" in draft.formulas_dropped[0].reason
+    assert draft.unresolved == () and "fewer than 2" in draft.notes[0]
+    assert set(draft.document["criteria"]) == {"active"}
+
+
+def test_an_alternative_the_validator_would_reject_is_not_offered(ctx: ReadContext) -> None:
+    wrong_type = {"id": None, "field": OI, "op": "gte", "value": "lots"}
+    first, last = READINGS["alternatives"]
+    reading = {
+        **READINGS,
+        "alternatives": [first, {"label": "x", "criterion": wrong_type}, last],
+        "default_index": 2,
+    }
+    draft = draft_screen(ctx, Canned(proposal(ACTIVE, unresolved=[reading])), "s", "x")
+    (term,) = draft.unresolved
+    assert [a.label for a in term.alternatives] == ["50", "1000"] and term.default_index == 1

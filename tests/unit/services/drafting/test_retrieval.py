@@ -6,9 +6,14 @@ features, joined tokens and numbers."""
 
 import pytest
 
+from algotrade.config.site.drafting.backlog import open_keys
 from algotrade.config.site.field_guide import FieldGuideEntry, FieldGuideSettings
 from algotrade.config.site.llm import Phrase
-from algotrade.config.site.settings import load_field_guide, load_phrasebook
+from algotrade.config.site.settings import (
+    load_feature_backlog,
+    load_field_guide,
+    load_phrasebook,
+)
 from algotrade.config.user import UserContext
 from algotrade.services.drafting.golden import GoldenCase, load_cases
 from algotrade.services.drafting.prompt import prefix_text, sliced_system_prompt
@@ -66,9 +71,10 @@ def test_the_golden_set_has_the_new_train_cases() -> None:
 @pytest.mark.parametrize("case", CASES, ids=ids)
 def test_the_sliced_prompt_is_within_the_token_budget(case: GoldenCase, site) -> None:
     infos, book, guide = site
-    prompt = sliced_system_prompt(infos, case.sentence, book, guide)
+    keys = open_keys(load_feature_backlog(open_config_store(REPO_ROOT / "config")))
+    prompt = sliced_system_prompt(infos, case.sentence, book, guide, keys)
     assert len(prompt) // 4 <= BUDGET_TOKENS, f"{case.id}: {len(prompt) // 4} tokens"
-    assert prompt.startswith(prefix_text(infos))
+    assert prompt.startswith(prefix_text(infos, keys))
 
 
 def test_the_prefix_is_identical_across_sentences_and_the_slice_is_smaller(site) -> None:

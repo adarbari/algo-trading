@@ -408,6 +408,29 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** SampleValue */
+        algotrade_api__schemas__drafting__screeners__SampleValue: {
+            /** Instrument Id */
+            instrument_id: string;
+            /** Value */
+            value: unknown;
+        };
+        /** SampleValue */
+        algotrade_api__schemas__preview__features__SampleValue: {
+            /** Instrument Id */
+            instrument_id: string;
+            /** Value */
+            value: number | boolean | string | null;
+        };
+        /** Alternative */
+        Alternative: {
+            /** Criterion */
+            criterion: {
+                [key: string]: unknown;
+            };
+            /** Label */
+            label: string;
+        };
         /** Build */
         Build: {
             api: components["schemas"]["BuildStamp"];
@@ -539,6 +562,38 @@ export interface components {
              */
             draft_session_id?: string | null;
         };
+        /** DraftFormula */
+        DraftFormula: {
+            /**
+             * Criterion
+             * @description the criterion on the formula, pending
+             */
+            criterion: {
+                [key: string]: unknown;
+            } | null;
+            /** Description */
+            description: string;
+            dry_run: components["schemas"]["FormulaDryRun"];
+            /** Dtype */
+            dtype: string;
+            /** Expr */
+            expr: string;
+            /** Fingerprint */
+            fingerprint: string;
+            /** Inputs */
+            inputs: string[];
+            /** Name */
+            name: string;
+            /** Null Meaning */
+            null_meaning: string;
+            /**
+             * Pending
+             * @description true until the trader accepts it (never auto-applied)
+             */
+            pending: boolean;
+            /** Unit */
+            unit: string;
+        };
         /** DraftFromTextBody */
         DraftFromTextBody: {
             /**
@@ -560,6 +615,18 @@ export interface components {
             field: string;
             /** Id */
             id: string;
+            /** Reason */
+            reason: string;
+        };
+        /** DroppedFormula */
+        DroppedFormula: {
+            /**
+             * Existing
+             * @description the feature it duplicates, when it does
+             */
+            existing: string | null;
+            /** Name */
+            name: string;
             /** Reason */
             reason: string;
         };
@@ -640,7 +707,7 @@ export interface components {
             /** Rows */
             rows: number;
             /** Sample */
-            sample: components["schemas"]["SampleValue"][];
+            sample: components["schemas"]["algotrade_api__schemas__preview__features__SampleValue"][];
             /**
              * Session
              * @description the session sampled (None: an input has no partition for it, see missing)
@@ -673,6 +740,34 @@ export interface components {
             screener_id: string;
             /** Version */
             version: number;
+        };
+        /** FormulaDryRun */
+        FormulaDryRun: {
+            /**
+             * Criterion Pass
+             * @description rows passing the formula's criterion
+             */
+            criterion_pass: number | null;
+            /** Maximum */
+            maximum: number | null;
+            /** Minimum */
+            minimum: number | null;
+            /**
+             * Missing
+             * @description the inputs' tables with no data for the session
+             */
+            missing: string[];
+            /** No Value Rate */
+            no_value_rate: number | null;
+            /** Rows */
+            rows: number;
+            /** Sample */
+            sample: components["schemas"]["algotrade_api__schemas__drafting__screeners__SampleValue"][];
+            /**
+             * Session
+             * @description the session read (null: not read, see missing)
+             */
+            session: string | null;
         };
         /** FunnelStep */
         FunnelStep: {
@@ -880,6 +975,29 @@ export interface components {
             strike: number;
             /** Volume */
             volume: number | null;
+        };
+        /** MissingFeature */
+        MissingFeature: {
+            /** Closest */
+            closest: string[];
+            /** Description */
+            description: string;
+            /**
+             * Feasibility
+             * @description ROLLUP_FROM_STORED, NEEDS_SOURCE or UNCLEAR
+             */
+            feasibility: string;
+            /**
+             * Key
+             * @description an open backlog key, else null with new_key_slug
+             */
+            key: string | null;
+            /** New Key Slug */
+            new_key_slug: string | null;
+            /** Span */
+            span: string;
+            /** Why Needed */
+            why_needed: string;
         };
         /** NarrowMiss */
         NarrowMiss: {
@@ -1153,13 +1271,6 @@ export interface components {
             /** State */
             state: string;
         };
-        /** SampleValue */
-        SampleValue: {
-            /** Instrument Id */
-            instrument_id: string;
-            /** Value */
-            value: number | boolean | string | null;
-        };
         /** SavedFeature */
         SavedFeature: {
             /** Dtype */
@@ -1205,12 +1316,26 @@ export interface components {
              */
             dropped: components["schemas"]["DroppedCriterion"][];
             /**
+             * Formulas
+             * @description B1: formulas offered, pending, not in the document
+             */
+            formulas?: components["schemas"]["DraftFormula"][];
+            /** Formulas Dropped */
+            formulas_dropped?: components["schemas"]["DroppedFormula"][];
+            /** Missing */
+            missing?: components["schemas"]["MissingFeature"][];
+            /**
              * Notes
              * @description what the model could not map or assumed
              */
             notes: string[];
             /** Screener Id */
             screener_id: string;
+            /**
+             * Unresolved
+             * @description ambiguous terms; the document has each default
+             */
+            unresolved?: components["schemas"]["Unresolved"][];
         };
         /** ScreenPreview */
         ScreenPreview: {
@@ -1377,6 +1502,17 @@ export interface components {
              * @description the kind in generic words
              */
             kind_text: string;
+        };
+        /** Unresolved */
+        Unresolved: {
+            /** Alternatives */
+            alternatives: components["schemas"]["Alternative"][];
+            /** Default Index */
+            default_index: number;
+            /** Span */
+            span: string;
+            /** Term */
+            term: string;
         };
         /** UserFeatureBody */
         UserFeatureBody: {
