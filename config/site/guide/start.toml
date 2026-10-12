@@ -513,6 +513,7 @@ links = [
   { kind = "term", id = "feature_request_score" },
   { kind = "term", id = "feature_request_status" },
   { kind = "term", id = "feature_request_feasibility" },
+  { kind = "term", id = "accepted_formula" },
 ]
 
 [[page.section]]
@@ -531,4 +532,11 @@ The score adds up the users who asked, each fading with the age of their latest 
 title = "What to do with a row"
 body = """
 Filter by status to see what is waiting. An open row is a candidate to promote to a site feature; a promoted row links to its field page. An unmapped row needs its name merged into a backlog item. All of these are changes to the backlog, reviewed like any other.
+"""
+
+[[page.section]]
+title = "Accepted formulas"
+body = """
+Below the requests, each row is one formula traders wrote in Describe it and saved as their own feature. Equal formulas are one row, grouped by their fingerprint. The row counts distinct users and acceptances and never names a user. Open a row to read its canonical form.
+The Duplicates column names the site feature that already computes the same thing, and the Backlog column the backlog item exactly tied to it. A formula with neither is a candidate to promote; promoting it is a reviewed change, like any other.
 """

@@ -207,3 +207,11 @@ follow-up PR).
 - decided by: proposed by orchestrator; awaiting owner
 - status: pending owner confirmation
 - Reasoning: the browser derives nothing (ADR 0038); a contract change is a separate PR.
+
+## 2026-10-11 | Admin accepted formulas | Web budgets and page placement
+- Question: where do the accepted formulas go on the web, and do the perf budgets move?
+- Options: a section on the Feature requests page in its own lazy chunk / a new Admin section and route / inline in the page chunk.
+- Decision: a lazy section on the existing Feature requests page (no new workspace section, no new Start page). Budgets: the page chunk +370 B (the dynamic import and its Suspense fallback), the Screeners page chunk +304 B (the new operation joins the shared generated document map it carries), and a first budget of 3900 B for the section's own chunk. Reasons are in `apps/web/perf-budgets.json`.
+- decided by: proposed by orchestrator; awaiting owner
+- status: pending owner confirmation
+- Reasoning: the brief allows a raise with a written reason; an inline section would have cost the page 3.9 kB.

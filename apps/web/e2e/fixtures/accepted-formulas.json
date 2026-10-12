@@ -1,0 +1,32 @@
+{
+  "today": "2026-10-11",
+  "days": 365,
+  "rows": [
+    {
+      "fingerprint": "a1b2c3d4e5f6",
+      "canonical": "(close / sma_20) - 1",
+      "expression": "close/sma_20 - 1",
+      "unit": "ratio",
+      "description": "Distance of the close from its 20-session average",
+      "acceptedCount": 4,
+      "users": 3,
+      "firstAccepted": "2026-09-02",
+      "lastAccepted": "2026-10-09",
+      "duplicateOf": "",
+      "backlogKey": ""
+    },
+    {
+      "fingerprint": "b2c3d4e5f6a1",
+      "canonical": "high - low",
+      "expression": "high - low",
+      "unit": "price",
+      "description": "Day range",
+      "acceptedCount": 2,
+      "users": 2,
+      "firstAccepted": "2026-09-20",
+      "lastAccepted": "2026-10-05",
+      "duplicateOf": "rollup.momentum@v1.rsi_14",
+      "backlogKey": "day_range"
+    }
+  ]
+}

@@ -581,6 +581,11 @@ export interface components {
              */
             event: "choice_made" | "formula_accepted" | "formula_skipped";
             /**
+             * Feature
+             * @description the saved user feature's name, formula_accepted only (the trader may have renamed the proposed formula)
+             */
+            feature?: string | null;
+            /**
              * Picked
              * @description the alternative's index (choice_made only)
              */
