@@ -191,6 +191,7 @@ the skill with the fix.
 | New REST endpoint (writes, jobs, live, files only) | `.claude/skills/add-api-endpoint` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
 | A lesson from this session (owner correction, rule-preventable error) | `.claude/skills/capture-learning` |
+| Promote an accepted formula or backlog item to a site feature | `.claude/skills/promote-feature` |
 | Start of day: what slowed the last sessions down, top 3 fixed before new work | `.claude/skills/review-sessions` (`/review-sessions`, `make friction`) |
 
 Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` off
