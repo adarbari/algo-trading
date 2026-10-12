@@ -1465,9 +1465,8 @@ export interface components {
             /**
              * Sentence
              * @description the whitespace-normalised sentence the parts' offsets count in
-             * @default
              */
-            sentence: string;
+            sentence?: string;
             /**
              * Suggestions
              * @description protective checks offered (soft or score), never in the document: the trader accepts or skips each

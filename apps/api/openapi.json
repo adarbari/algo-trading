@@ -2353,7 +2353,6 @@
             "type": "string"
           },
           "sentence": {
-            "default": "",
             "description": "the whitespace-normalised sentence the parts' offsets count in",
             "title": "Sentence",
             "type": "string"

@@ -156,7 +156,8 @@ class ScreenDraft(Schema):
     )
     suggestions_dropped: list[DroppedSuggestion] = Field(default_factory=list)
     sentence: str = Field(
-        "", description="the whitespace-normalised sentence the parts' offsets count in"
+        default_factory=str,  # not a literal default: the web client types those as required
+        description="the whitespace-normalised sentence the parts' offsets count in",
     )
     parts: list[Part] | None = Field(
         None,
