@@ -317,10 +317,14 @@ test('Describe it: the review fits the screen and the formula dialog fills it', 
   await page.goto('/screeners/my-vrp/edit');
   await page.getByRole('textbox', { name: 'Describe the screen' }).fill('IV above HV');
   await page.getByRole('button', { name: 'Draft it' }).tap();
-  await expect(page.getByRole('heading', { level: 3, name: 'Proposed formulas' })).toBeVisible();
+  await expect(page.getByRole('article', { name: 'IV above HV' })).toBeVisible();
   const width = page.viewportSize()?.width ?? 0;
   const pageWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
   expect(await pageWidth()).toBeLessThanOrEqual(width);
+  for (const card of await page.getByRole('article').all()) {
+    const cardBox = await card.boundingBox();
+    expect((cardBox?.x ?? 0) + (cardBox?.width ?? 0)).toBeLessThanOrEqual(width);
+  }
   const pending = page.getByRole('group', { name: /Waiting on formula/ });
   await expect(pending).toBeVisible();
   const row = await pending.boundingBox();

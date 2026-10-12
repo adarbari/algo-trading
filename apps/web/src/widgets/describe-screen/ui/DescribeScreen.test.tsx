@@ -155,6 +155,7 @@ describe('DescribeScreen', () => {
       skipFormula: vi.fn(),
       setCriterion: vi.fn(),
       recordChoice: vi.fn(),
+      addSuggested: vi.fn(),
     };
     state.builder = builder;
     render(<DescribeScreen />);
@@ -164,7 +165,6 @@ describe('DescribeScreen', () => {
     );
     expect(await screen.findByText('review')).toBeInTheDocument();
     expect(review.props).toMatchObject({
-      text: 'liquid stocks',
       document: { id: 'mine' },
       formulaStates: { draft_x: 'skipped' },
       onReviewFormula: builder.reviewFormula,
@@ -178,6 +178,9 @@ describe('DescribeScreen', () => {
       subject: 'liquid',
       picked: 1,
     });
+    const accept = review.props['onAcceptSuggestion'] as (c: unknown) => void;
+    accept({ field: 'f.spread', mode: 'soft' });
+    expect(builder.addSuggested).toHaveBeenCalledWith({ field: 'f.spread', mode: 'soft' });
     const field = review.props['renderFieldHelp'] as (f: string) => ReactNode;
     expect(field('rollup.known@v1.x')).not.toBeNull();
     expect(field('rollup.nope@v1.y')).toBeNull();

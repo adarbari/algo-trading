@@ -37,7 +37,12 @@ export interface NotAvailableProps {
   renderFieldHelp?: ((field: string) => ReactNode) | undefined;
 }
 
-function MissingCard({
+/** How a draft names a missing feature: the catalogue key, else the proposed slug, else its words. */
+export function missingKey(item: MissingFeature): string {
+  return item.key ?? item.new_key_slug ?? item.span;
+}
+
+export function MissingCard({
   item,
   mine,
   renderFieldHelp,
@@ -92,6 +97,43 @@ function MissingCard({
   );
 }
 
+/** The screen's "not covered" notes, each removable (nothing when there are none). */
+export function NotCovered({
+  notes,
+  onRemoveNote,
+}: {
+  notes: readonly string[];
+  onRemoveNote: (note: string) => void;
+}) {
+  if (notes.length === 0) return null;
+  return (
+    <Stack gap={2}>
+      <Divider tone="soft" />
+      <Stack direction="row" gap={1} align="center">
+        <Text size="sm" weight="semibold">
+          Not covered
+        </Text>
+        {termHelp('describe_not_covered')}
+      </Stack>
+      {notes.map((note) => (
+        <Stack key={note} direction="row" gap={2} align="center" wrap>
+          <Text size="sm">{note}</Text>
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={`Remove note: ${note}`}
+            onClick={() => {
+              onRemoveNote(note);
+            }}
+          >
+            Remove
+          </Button>
+        </Stack>
+      ))}
+    </Stack>
+  );
+}
+
 export function NotAvailable({ missing, notes, onRemoveNote, renderFieldHelp }: NotAvailableProps) {
   // The history is a nicety: a failed read leaves the cards without it.
   const history = useMyFeatureRequests(missing.length > 0);
@@ -106,38 +148,13 @@ export function NotAvailable({ missing, notes, onRemoveNote, renderFieldHelp }: 
       <Stack gap={3}>
         {missing.map((item) => (
           <MissingCard
-            key={item.key ?? item.new_key_slug ?? item.span}
+            key={missingKey(item)}
             item={item}
             mine={mine}
             renderFieldHelp={renderFieldHelp}
           />
         ))}
-        {notes.length > 0 && (
-          <Stack gap={2}>
-            <Divider tone="soft" />
-            <Stack direction="row" gap={1} align="center">
-              <Text size="sm" weight="semibold">
-                Not covered
-              </Text>
-              {termHelp('describe_not_covered')}
-            </Stack>
-            {notes.map((note) => (
-              <Stack key={note} direction="row" gap={2} align="center" wrap>
-                <Text size="sm">{note}</Text>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Remove note: ${note}`}
-                  onClick={() => {
-                    onRemoveNote(note);
-                  }}
-                >
-                  Remove
-                </Button>
-              </Stack>
-            ))}
-          </Stack>
-        )}
+        <NotCovered notes={notes} onRemoveNote={onRemoveNote} />
       </Stack>
     </Panel>
   );
