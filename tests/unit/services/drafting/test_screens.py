@@ -187,10 +187,20 @@ def test_invented_fields_bad_ops_and_bad_values_are_dropped_with_reasons(ctx: Re
             "iv",
             "rollup.made_up@v9.iv_rank",
             "field 'rollup.made_up@v9.iv_rank' is not in the catalogue (IV rank above 50%)",
+            "not_in_catalogue",
+            "not_in_catalogue: criteria[1]",
         ),
-        DroppedCriterion("weird", PRICE, "unknown op 'like'"),
-        DroppedCriterion("range", PRICE, "between needs a list of two numbers"),
-        DroppedCriterion("mode", PRICE, "unknown mode 'fuzzy'"),
+        DroppedCriterion("weird", PRICE, "unknown op 'like'", "bad_op", "bad_op: criteria[2]"),
+        DroppedCriterion(
+            "range",
+            PRICE,
+            "between needs a list of two numbers",
+            "bad_value",
+            "bad_value: criteria[3]",
+        ),
+        DroppedCriterion(
+            "mode", PRICE, "unknown mode 'fuzzy'", "bad_mode", "bad_mode: criteria[4]"
+        ),
     )
 
 
