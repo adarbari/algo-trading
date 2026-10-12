@@ -11,7 +11,7 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.core.model.completion import Attempt, CallTag, Completion
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
-from algotrade.services.configs import resolve_rule_draft
+from algotrade.services.configs import field_catalog, resolve_rule_draft
 from algotrade.services.drafting import formulas as formulas_module
 from algotrade.services.drafting import screens
 from algotrade.services.drafting.answer_schema import ANSWER_SCHEMA
@@ -19,6 +19,8 @@ from algotrade.services.drafting.prompt import PROMPT_VERSION
 from algotrade.services.drafting.screens import (
     MAX_TEXT,
     DroppedCriterion,
+    criteria_of,
+    did_you_mean_candidates,
     draft_screen,
     parse_answer,
 )
@@ -156,7 +158,8 @@ def test_the_answer_becomes_a_valid_draft(ctx: ReadContext) -> None:
     assert doc["rank"] == {"tie_break": PRICE, "tie_break_order": "asc"}
     resolve_rule_draft(ctx.configs, "my_screen", ctx.user, doc)  # as finalise validates
     system, user = model.asked[0]
-    assert PRICE in system and "instrument.status" in system  # the catalogue
+    assert f"{LIQ}.*\n" in system and "\nunderlying_price|" in system  # the indexed catalogue
+    assert "instrument.*\n" in system and "\nstatus|" in system
     assert user.endswith("Sentence: active stocks over $50 with open interest\n")
 
 
@@ -620,3 +623,48 @@ def test_a_default_the_validator_dropped_is_not_still_the_default(
     draft = draft_screen(ctx, Canned(proposal(ACTIVE, unresolved=[READINGS])), "s", "x")
     assert draft.unresolved[0].default_index == 0
     assert "the validator dropped its default reading" in draft.notes[-1]
+
+
+BARE = "underlying_price"  # the index entry under ``rollup.option_liquidity@v1.*``, no heading
+
+
+def test_a_bare_entry_name_is_dropped_with_the_full_candidates(ctx: ReadContext) -> None:
+    catalogue = set(field_catalog(ctx.configs).fields)
+    criteria, dropped = criteria_of(
+        {"criteria": [{"id": "p", "field": BARE, "op": "gt", "value": 50}]}, catalogue
+    )
+    assert not criteria and dropped[0].field == BARE
+    assert f"did you mean `{PRICE}`" in dropped[0].reason
+    assert (
+        "did you mean"
+        not in criteria_of(
+            {"criteria": [{"id": "p", "field": "made_up_thing", "op": "gt", "value": 5}]}, catalogue
+        )[1][0].reason
+    )  # no candidate: a plain drop
+    assert did_you_mean_candidates("rollup.made_up@v9.underlying_price", catalogue) == []
+
+
+def test_a_bare_entry_name_is_repaired_with_the_full_name_in_the_ask(ctx: ReadContext) -> None:
+    bare = json.dumps(proposal({"id": "price", "field": BARE, "op": "gt", "value": 50}))
+    cheap = Scripted("cheap", bare, GOOD)
+    draft = draft_screen(ctx, chained(Ledger(), cheap), "s", "over $50")
+    assert [s for _, s, _ in cheap.calls] == ["first", "repair"]
+    assert f"`{PRICE}`" in cheap.calls[1][0]  # the repair names the full field
+    assert draft.document["criteria"]["price"]["field"] == PRICE and not draft.dropped
+
+
+def test_bare_names_in_every_attempt_keep_the_good_criteria_and_other_problems_still_fail(
+    ctx: ReadContext,
+) -> None:
+    bare = {"id": "bare", "field": BARE, "op": "gt", "value": 50}
+    answer = json.dumps(proposal(PRICE_GT, bare))
+    only = Scripted("only", answer, answer)  # the first answer and the repair
+    draft = draft_screen(ctx, chained(Ledger(), only), "s", "over $50")
+    assert [s for _, s, _ in only.calls] == ["first", "repair"]
+    assert list(draft.document["criteria"]) == ["price"]
+    assert [(d.id, d.field) for d in draft.dropped] == [("bare", BARE)]
+    assert f"did you mean `{PRICE}`" in draft.dropped[0].reason
+    other = {"id": "made", "field": "rollup.made_up@v9.x", "op": "gt", "value": 1}
+    mixed = json.dumps(proposal(PRICE_GT, bare, other))
+    with pytest.raises(ModelUnavailableError):
+        draft_screen(ctx, chained(Ledger(), Scripted("m", mixed, mixed)), "s", "over $50")
