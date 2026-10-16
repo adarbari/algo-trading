@@ -5,7 +5,7 @@
  * backtest's usual range, its paper trades and a trial's forward test. Every figure, sentence
  * and bar is the server's; the cache holds the responses.
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, queryKeys, TypedDocumentString } from '@/shared/api';
 
@@ -34,11 +34,19 @@ const EdgePaper = new TypedDocumentString<{ edgePaper: EdgePaper | null }, { id:
 
 /** The signals of the edges the user follows (null: nothing stored for the session). */
 export function useEdgeDesk() {
-  return useQuery({
+  return useQuery({ ...edgeDeskQuery(), select: (data) => data.edgeDesk });
+}
+
+function edgeDeskQuery() {
+  return queryOptions({
     queryKey: queryKeys.gql('EdgeDesk', {}),
     queryFn: () => gql(EdgeDesk, {}),
-    select: (data) => data.edgeDesk,
   });
+}
+
+/** Start the desk's read before the page mounts (a route loader); the hooks then join it. */
+export function prefetchEdgeDesk(client: QueryClient): void {
+  void client.query(edgeDeskQuery()).catch(() => undefined);
 }
 
 /** One edge's paper record (null: no such edge, or nothing stored). */
@@ -53,8 +61,7 @@ export function useEdgePaper(id: string) {
 /** The live state of every edge with a record, the followed ones and the site's (the desk's own read: one load per page; empty when nothing is stored). */
 export function useEdgeLiveStates() {
   return useQuery({
-    queryKey: queryKeys.gql('EdgeDesk', {}),
-    queryFn: () => gql(EdgeDesk, {}),
+    ...edgeDeskQuery(),
     select: (data): LiveState[] => data.edgeDesk?.liveStates ?? [],
   });
 }

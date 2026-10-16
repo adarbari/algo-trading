@@ -11,6 +11,7 @@ the build identity it started with (``ops/build.py``) is taken here, once."""
 import asyncio
 import contextlib
 import json
+import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import date
@@ -63,7 +64,7 @@ from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
 from algotrade_api.feedback import DraftMemory, feedback_sink, request_sink
-from algotrade_api.graphql.offload import OverloadedError
+from algotrade_api.graphql.offload import OverloadedError, off_loop
 from algotrade_api.graphql.response_cache import CountWrites, WriteEpoch, served_token
 from algotrade_api.graphql.schema import graphql_router, sdl
 from algotrade_api.graphql.warm import CacheWarmer
@@ -73,6 +74,8 @@ from algotrade_api.routes import PUBLIC_ROUTERS, ROUTERS
 from algotrade_api.text_model import OFF as TEXT_MODEL_OFF
 from algotrade_api.text_model import open_text_model
 from algotrade_api.web import web_router
+
+log = logging.getLogger(__name__)
 
 TITLE = "algotrade API"
 # Each of the 6 read threads (``READ_THREADS``) otherwise decodes Parquet with up to one Arrow
@@ -147,6 +150,17 @@ def _overloaded(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def _start_warming(warmer: CacheWarmer | None) -> asyncio.Task[None] | None:
+    """The home page's reads first (no request meets a cold cache), then the warmer's task."""
+    if warmer is None:
+        return None
+    try:
+        await asyncio.wait_for(off_loop(warmer.warm_home), HOME_WARM_TIMEOUT_S)
+    except Exception:  # an empty store, or slow: serve anyway, the warmer retries
+        log.exception("warming the home page before serving failed")
+    return asyncio.create_task(warmer.run())
+
+
 async def _stop(task: asyncio.Task[None]) -> None:
     """Cancel ``task`` and wait for it, so its read-pool call is not left to outlive the app."""
     task.cancel()
@@ -192,7 +206,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         warmer = app.state.warmer  # the served app's: reads ahead of the regime page (warm.py)
-        warming = asyncio.create_task(warmer.run()) if warmer is not None else None
+        warming = await _start_warming(warmer)
         yield
         if warming is not None:
             await _stop(warming)
@@ -310,6 +324,7 @@ def create_app(
     return app
 
 
+HOME_WARM_TIMEOUT_S = 60.0  # the longest a start waits for the home page's reads
 READ_CACHE_SIZE = 64  # room for the warmed market tables (warm.py) beside the pages' entries
 
 

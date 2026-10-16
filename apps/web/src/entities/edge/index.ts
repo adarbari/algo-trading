@@ -22,7 +22,7 @@ export {
   useEdgeRollingStarts,
   useEdgeVariants,
 } from './api/edge-result';
-export { useEdgeDesk, useEdgeLiveStates, useEdgePaper } from './api/paper';
+export { prefetchEdgeDesk, useEdgeDesk, useEdgeLiveStates, useEdgePaper } from './api/paper';
 export { useTrackRecords } from './api/track-records';
 export {
   EDGE_VIEWS,

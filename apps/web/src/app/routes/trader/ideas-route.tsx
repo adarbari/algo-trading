@@ -5,14 +5,31 @@
  * a single ticker with `via`, the screener that surfaced it); a screener chip opens that
  * screener's results.
  */
+import type { QueryClient } from '@tanstack/react-query';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import { parseIdeasSearch, type IdeasSearch, type IdeasSearchPatch } from '@/entities/idea';
+
+import { prefetchEdgeDesk } from '@/entities/edge';
+import { prefetchIdeas } from '@/entities/idea';
+import { prefetchRegime } from '@/entities/regime';
 
 import { traderRoute } from './layout-route';
 import { lazyPage } from '@/shared/lib/lazy';
 
 const IdeasPage = lazyPage(() => import('@/pages/trader-ideas'), 'IdeasPage');
+
+/** The page's chunks load in the loader (so the page renders unsuspended) and its reads start
+ * with them, not when the widgets mount; the hooks join the requests in flight. */
+async function loadIdeas({ context }: { context: { queryClient: QueryClient } }) {
+  const { queryClient } = context;
+  prefetchRegime(queryClient);
+  prefetchIdeas(queryClient);
+  prefetchEdgeDesk(queryClient);
+  await IdeasPage.preload();
+  const page = await import('@/pages/trader-ideas');
+  await page.preloadEdgeSignals();
+}
 
 /** The search params after a patch: `undefined` removes a key. */
 function patched(previous: IdeasSearch, patch: IdeasSearchPatch): IdeasSearch {
@@ -48,5 +65,6 @@ export const ideasRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'ideas',
   validateSearch: parseIdeasSearch,
+  loader: loadIdeas,
   component: IdeasRoute,
 });

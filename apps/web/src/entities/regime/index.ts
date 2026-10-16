@@ -11,6 +11,7 @@ export {
   REGIME_EPISODES_OPERATION,
   REGIME_OPERATION,
   REGIME_SIGNALS_OPERATION,
+  prefetchRegime,
   useMarketHistory,
   useRegime,
   useRegimeBands,

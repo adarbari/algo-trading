@@ -16,7 +16,7 @@ from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import RuleValue
 from algotrade.services.configs import config_ids, resolve_config
-from algotrade.services.read.context import ReadContext
+from algotrade.services.read.context import ReadContext, catalogue_key
 
 SCREENER = "screener"
 SITE_SCOPE = "site"
@@ -106,14 +106,34 @@ def _resolved(ctx: ReadContext, config_id: str, owner: str) -> Screener | None:
     return _screener(config)
 
 
+def _stamp(ctx: ReadContext) -> tuple[object, ...]:
+    """What the resolved screeners depend on, cheaply: the screens and finalised versions each
+    scope holds (a version file is immutable, a new one is a save), and the user's catalogue
+    (their features join a screen's hash). Site files change only with a deploy, which restarts
+    the API."""
+    scopes = (SITE_USER,) if ctx.user.user_id == SITE_USER else (SITE_USER, ctx.user.user_id)
+    held = tuple(
+        (scope, name, tuple(ctx.configs.versions(scope, name)))
+        for scope in scopes
+        for name in sorted(config_ids(ctx.configs, scope))
+    )
+    return (ctx.user.user_id, held, catalogue_key(ctx))
+
+
 def load_screener(ctx: ReadContext, config_id: str) -> Screener | None:
     """``config_id`` as the user sees it; ``None`` when it is not a rule screen the user sees
     (unknown, another kind, or a config that does not resolve)."""
-    owner = _owners(ctx).get(config_id)
-    return None if owner is None else _resolved(ctx, config_id, owner)
+    return next((s for s in load_screeners(ctx) if s.id == config_id), None)
 
 
 def load_screeners(ctx: ReadContext) -> tuple[Screener, ...]:
-    """Every rule screen the user sees, one per id (sorted by id)."""
-    found = (_resolved(ctx, i, owner) for i, owner in sorted(_owners(ctx).items()))
-    return tuple(s for s in found if s is not None)
+    """Every rule screen the user sees, one per id (sorted by id). Resolving a config reads its
+    TOML layers and rebuilds the catalogue, so the answer is shared across requests (one page
+    load asks for it from the regime strip, the status strip and the ideas table) and keyed on
+    ``_stamp``: a saved version or an edited user feature is a new key."""
+
+    def compute() -> tuple[Screener, ...]:
+        found = (_resolved(ctx, i, owner) for i, owner in sorted(_owners(ctx).items()))
+        return tuple(s for s in found if s is not None)
+
+    return ctx.cache.get_or_compute(("screeners", _stamp(ctx)), compute)  # type: ignore[no-any-return]
