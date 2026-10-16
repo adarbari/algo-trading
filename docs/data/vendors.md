@@ -428,8 +428,10 @@ Financials, …; `sources/vendors/sec/sic.py`), falling back to one sector per S
 `https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`: every non-dimensional XBRL
 fact a company has filed (up to ~5 MB; requested gzip-compressed, ~10x smaller). Same contact
 `User-Agent`, `sec` limiter and `[sec_edgar]` section as the other SEC sources
-(`sources/vendors/sec/company_facts.py`, source `sec_company_facts`). We keep five concepts. The
-document is downloaded whole either way, so the three financial ones cost no extra request.
+(`sources/vendors/sec/company_facts.py`, source `sec_company_facts`). We keep five concepts in
+`instruments/shares` and the statement lines below in `instruments/statements` (ADR 0067). The
+document is downloaded whole either way, so neither the financial concepts nor the statement lines
+cost an extra request.
 
 | Concept | Short name | Kept per filing |
 |---|---|---|
@@ -450,12 +452,51 @@ differs (a restatement), per tag. A point-in-time read then sees exactly what wa
 at about 400 to 500 rows per company instead of several thousand (a full re-parse and an incremental store date every fact the same way). Facts in a currency other than USD
 are ignored, so those issuers have no financials (null, not an error).
 
+**Statement lines (`instruments/statements`, ADR 0067).** The same document, parsed a second time
+by `statement_concepts.py` + `company_facts.parse_statements`: 16 concepts, 35 us-gaap tags, USD only,
+periodic forms only. Every tag found is stored in `tag` (the first filing of a period plus later
+filings that changed the value, per tag), and no tag is chosen over another here: the roll-up that
+reads a concept ranks them. The list is best tag first; for alternatives of one figure it is the
+preference, for `debt`, `liabilities` and `current` (parts or related figures) it only orders the
+output.
+
+| Concept | Period | us-gaap tags |
+|---|---|---|
+| `cost_of_revenue` | duration | `CostOfRevenue`, `CostOfGoodsAndServicesSold`, `CostOfGoodsSold` |
+| `gross_profit` | duration | `GrossProfit` |
+| `operating_income` | duration | `OperatingIncomeLoss` |
+| `pretax_income` | duration | `IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest`, `IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments` |
+| `income_tax` | duration | `IncomeTaxExpenseBenefit` |
+| `interest_expense` | duration | `InterestExpense`, `InterestExpenseNonoperating`, `InterestExpenseDebt` |
+| `da` | duration | `DepreciationDepletionAndAmortization`, `DepreciationAndAmortization`, `DepreciationAmortizationAndAccretionNet` |
+| `ocf` | duration | `NetCashProvidedByUsedInOperatingActivities`, `NetCashProvidedByUsedInOperatingActivitiesContinuingOperations` |
+| `capex` | duration | `PaymentsToAcquirePropertyPlantAndEquipment`, `PaymentsToAcquireProductiveAssets` |
+| `cash` | instant | `CashAndCashEquivalentsAtCarryingValue`, `CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents` |
+| `sti` | instant | `ShortTermInvestments`, `MarketableSecuritiesCurrent` |
+| `debt` | instant | the parts: `LongTermDebt`, `LongTermDebtNoncurrent`, `LongTermDebtCurrent`, `DebtCurrent`, `ShortTermBorrowings`, `CommercialPaper` |
+| `assets` | instant | `Assets` |
+| `liabilities` | instant | `Liabilities`, `LiabilitiesAndStockholdersEquity` (stored so a roll-up can derive liabilities) |
+| `equity` | instant | `StockholdersEquity`, `StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest` |
+| `current` | instant | `AssetsCurrent`, `LiabilitiesCurrent` |
+
+A duration follows the flows' rule (spans of 3, 6, 9 and 12 months; cash flow lines are cumulative
+from the fiscal year start, so a quarter is a difference of two rows of one tag); an instant is a
+balance at `period_end` with no `period_start`, deduplicated per (tag, date). A filer that does not
+tag a concept has no row for it: a roll-up reports that as null with `NOT_TAGGED`, never as 0, and
+sums `debt` parts only within ONE `accn` (ADR 0067). Checked against the 1,975 company documents
+in the store on 2026-10-16: every tag above exists; about 600 statement rows per company on average
+(median 386, largest 1,815 of 114 sampled documents; Apple 1,726 over its full history). Banks have
+no `cost_of_revenue`, `gross_profit` or `operating_income` (US Bancorp: assets, liabilities, equity,
+pretax income, tax, operating cash flow and short-term borrowings only), and some issuers tag no debt
+at all (Power Integrations).
+
 Every row keeps `filed` (point in time), `period_end`, `form` and `accn`; amendments (10-K/A)
 are their own rows with a later `filed`. Zero counts are dropped; a 404 (no XBRL facts, most
 funds) is `NO_FACTS`, not a failure.
 
 `algotrade-ingest shares [--date D] [--force] [--limit N]` (nightly after company details)
-stores new facts in `instruments/shares` (docs/data/layers.md). The CIK comes from the latest
+stores new facts in `instruments/shares` and `instruments/statements` (docs/data/layers.md), from
+one fetch of each company's document; a CIK is fetched when either table is due. The CIK comes from the latest
 `instruments/company` snapshot, else the reference. **Classes:** companyfacts has no
 class-specific counts, so every instrument of a CIK (GOOGL and GOOG) gets the company total.
 Most multi-class issuers no longer tag the cover count, so they fall back to the weighted
@@ -476,7 +517,10 @@ Checked live 2026-10-03 (closes of 2026-10-02): AAPL 14.594B shares (dei, as of 
 **Backfill:** `algotrade-ingest shares` once (~6k CIKs at the 0.2 s `sec` pacing plus
 download: about 30 to 40 minutes, ~1 GB of gzip raw kept 7 days, `[sec_edgar] raw_retention_days`), then
 `algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v3`.
-A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks.
+A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks. The
+`instruments/statements` backlog (CIKs with share counts and no statements marker yet) is fetched
+`[sec_edgar] statements_backfill_per_night` (400) a night, so it finishes in about 15 to 20 nights
+by itself; the roll-up that reads it waits for the last of them.
 
 **Adding the financials to a store that already has share counts:** a CIK is refetched only
 on its 30-day slot, so run `algotrade-ingest shares --force` once (same cost; only facts not
