@@ -225,7 +225,7 @@ def response_key(
         viewer.role.value if name in SHARED_OPERATIONS else f"{viewer.role.value}:{viewer.user_id}"
     )
     text = json.dumps(variables, sort_keys=True, separators=(",", ":"), default=str)
-    licences = ",".join(sorted(viewer.licences))  # what a viewer may see differs (ADR 0068)
+    licences = ",".join(sorted(viewer.licences))  # what a viewer may see differs (ADR 0069)
     parts = [str(seq), str(epoch), who, hashlib.sha256(document.encode()).hexdigest(), text]
     parts.append(f"licences:{licences}")
     parts.append(f"session:{served}")

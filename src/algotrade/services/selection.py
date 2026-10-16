@@ -37,7 +37,7 @@ def fields_view(
     ``historical``: see ``services.features.field_view``. ``held``: the data licences of the
     user the values are for (``services.licences.held_by``); a field under another licence is
     not read. Required: a user's caller passes the user's, a caller that reads for no user
-    passes ``HARNESS_ALL`` (ADR 0068)."""
+    passes ``HARNESS_ALL`` (ADR 0069)."""
     hidden = (
         hidden_fields(features or site_features(), fields, held) if held != ALL_LICENCES else ()
     )

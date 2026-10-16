@@ -47,7 +47,7 @@ def cache_key(
 ) -> str:
     """``<session date>_<hash of the signals, the question, the model, the prompt and the
     asker's data licences>``: the text quotes the values the asker could see, so an answer
-    written for a holder of the personal licence is never read by one without it (ADR 0068)."""
+    written for a holder of the personal licence is never read by one without it (ADR 0069)."""
     document = json.dumps(
         [signals_hash(regime), question, model_name, prompt_id(), sorted(licences)],
         separators=(",", ":"),

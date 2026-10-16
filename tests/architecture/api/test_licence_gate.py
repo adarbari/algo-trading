@@ -129,7 +129,7 @@ def test_the_regime_label_a_screen_gate_reads_is_open() -> None:
 
 def test_callers_that_read_for_no_user_pass_the_named_harness_licences() -> None:
     """``held`` has no default (fail closed): the edge harness, backtests and training pass
-    ``HARNESS_ALL`` by name, so each is a line a reviewer can find (ADR 0068)."""
+    ``HARNESS_ALL`` by name, so each is a line a reviewer can find (ADR 0069)."""
     call = re.compile(r"(?<![\w.])(fields_view|select|screen_session)\(")
     bare = [
         _name(p)

@@ -74,7 +74,7 @@ def test_verification_shows_ibkr_values_only_to_a_holder_of_the_personal_licence
     api_golden: tuple[ReadStore, dict[str, str]],
 ) -> None:
     """The ``verification/ibkr`` rows are IBKR's values: an admin without the licence (a role
-    grants none, ADR 0040) sees LICENCE and no row (ADR 0068)."""
+    grants none, ADR 0040) sees LICENCE and no row (ADR 0069)."""
     store = api_golden[0]
     smoke = open_context(store.reader, store.configs, UserContext("smoke"))  # an admin, none
     found = load_verification(smoke)

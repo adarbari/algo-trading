@@ -179,18 +179,7 @@ with an HV of 0.55), and 0.0 for a history bar without a value.
   merge; reads as of an earlier time still see what was stored then (ADR 0007). `ibkr_iv@v1`
   keeps its version (its definition did not change, its input did) and is recomputed in place.
 
-## Amendment 2026-10-16: the licence gate, in every path that serves per-name values
+## Amendment 2026-10-16: enforced
 
-The "later change" is made (no new decision, the one above enforced). A feature whose licence
-the viewer does not hold (`config/site/users.toml` `licences`; `open` is held by everyone; a
-role grants none, so an admin without the licence is hidden too, ADR 0040) is never read and
-is UNKNOWN with the public kind `LICENCE` (Guide term `unavailable_licence`; the cause chain
-stays admin-only, ADR 0056), whatever is stored: GraphQL `features` / tables / distributions /
-series (`ReadContext.licences`), the stored criterion values of a screener run, the Builder's
-preview and a formula's sample. A screener run (the `screen` job) is evaluated for its user with
-the licences that user holds, so a hard criterion on a hidden field reads as missing and never
-passes (ADR 0015) and the results it stores (ADR 0033) carry none of its values. Consequence:
-the nightly runs of the `site` user (no licence listed) hide IBKR-derived fields; the owner's
-own runs are unchanged. The edge harness, backtests and training read all fields and record
-the licence of what they read (ADR 0064). One module owns the rule (`services/licences.py`);
-`tests/architecture/api/test_licence_gate.py` lists every path that reads values.
+The hiding recorded under "Licence tags" is made, in every path that serves per-name values:
+see [ADR 0069](0069-data-licence-gate.md).

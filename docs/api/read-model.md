@@ -233,9 +233,9 @@ vocabulary. `FeatureValue.value is None` always comes with `unknown` set.
 row, null; ADRs 0042, 0046). A name the caller's
 catalogue lacks is a request error (`UNKNOWN_FEATURE`, naming it) when the client asked for it;
 `NOT_IN_CATALOGUE` is for names the server reads on its own (a saved view's columns, PR 8).
-`LICENCE` (ADR 0028, amended 2026-10-16) hides a field the caller's licences do not cover from
+`LICENCE` (ADR 0069) hides a field the caller's licences do not cover from
 every read of per-name values (values, tables, distributions, series, a screener run's stored
-criterion values, the preview): UNKNOWN, kind `LICENCE`, no value; `FeatureSeries` /
+criterion values with their score, tie-break and reasons, the preview): UNKNOWN, kind `LICENCE`, no value; `FeatureSeries` /
 `SeriesHistory` carry it as `unavailable`. Identity is disclosed, not blanked: `PRE_SNAPSHOT` is reserved for the screens'
 universe (PR 5); `instrument.*` values and `Instrument` say which snapshot through
 `Session.preSnapshot` / `referenceSnapshot`.

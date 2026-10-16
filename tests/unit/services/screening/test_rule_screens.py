@@ -385,7 +385,7 @@ def _screen_job_values(user: str) -> Any:
 
 def test_the_site_run_keeps_the_picks_and_a_user_runs_with_the_licences_they_hold() -> None:
     """The nightly ``site`` run evaluates under every licence (the owner's Ideas keep the
-    ``vrp`` picks) and records them; each viewer is filtered at read (ADR 0068). A user's own
+    ``vrp`` picks) and records them; each viewer is filtered at read (ADR 0069). A user's own
     run holds what the registry gives that user: the owner (``personal``) stores the value,
     another user stores none."""
     site = _screen_job_values(SITE_USER)

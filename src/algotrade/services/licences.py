@@ -20,7 +20,7 @@ PERSONAL: Licence = "personal"
 ALL_LICENCES: frozenset[str] = frozenset(LICENCES)  # every licence held: no field is hidden
 # What a caller that reads for no user passes (``held`` has no default): the edge harness,
 # backtests and training record the licence of what they read themselves (ADR 0064), and the
-# scheduled site runs store every value and are filtered per viewer at read (ADR 0068).
+# scheduled site runs store every value and are filtered per viewer at read (ADR 0069).
 HARNESS_ALL = ALL_LICENCES
 
 

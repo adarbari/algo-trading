@@ -274,7 +274,7 @@ def run_screener(
     audit = {
         **run.audit(),
         "user": user,
-        "licences": sorted(held),  # the licences the run was evaluated under (ADR 0068)
+        "licences": sorted(held),  # the licences the run was evaluated under (ADR 0069)
         "config_id": config.config.id,
         "config_hash": config.hash,
         "config_version": rules.spec.version if rules else None,

@@ -86,6 +86,6 @@ def test_an_answer_written_for_a_licence_holder_is_not_the_key_of_one_without_it
     regime: MarketRegime,
 ) -> None:
     """The text quotes the values its asker could see (personal-licence market fields): the
-    asker's licence set is in the key (ADR 0068)."""
+    asker's licence set is in the key (ADR 0069)."""
     held = cache_key(regime, "what is happening?", "gemini", ALL_LICENCES)
     assert held != cache_key(regime, "what is happening?", "gemini", {"open"})

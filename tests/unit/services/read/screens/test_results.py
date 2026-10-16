@@ -258,7 +258,7 @@ def test_a_run_the_viewer_may_see_only_by_names_and_decisions_serves_no_value_sc
     """Fix for: a run recorded under a licence the viewer lacks (the scheduled site run holds
     every licence) served its stored values, score, tie-break and ``reasons`` (which embed the
     value: "0.83, needs >= 0.9") to any viewer. The viewer sees names and decisions, as the
-    ledger does (ADR 0064 decision 10, ADR 0068); the stored fields here do not resolve in the
+    ledger does (ADR 0064 decision 10, ADR 0069); the stored fields here do not resolve in the
     catalogue, so they count as personal (fail closed); a sort by rank or score is by symbol."""
     trader = context(reader, user="trader")
     run = latest_run(trader, "site", "alpha").run

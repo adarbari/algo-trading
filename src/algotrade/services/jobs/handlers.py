@@ -104,7 +104,7 @@ def screen_identity(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, 
 
 def _screen_licences(ctx: JobContext) -> frozenset[str]:
     """The licences a screen job evaluates under: the scheduled site run (``site``, no person)
-    reads every field and records its licences; each viewer is filtered at read (ADR 0068). A
+    reads every field and records its licences; each viewer is filtered at read (ADR 0069). A
     user's own run (on request) holds the licences the users registry gives that user."""
     if ctx.user.user_id == SITE_USER:
         return HARNESS_ALL

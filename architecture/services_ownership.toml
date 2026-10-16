@@ -18,7 +18,7 @@ detect = [{ call = "add_version" }, { call = "save_features" }]
 
 [[responsibility]]
 id = "data-licence-gate"
-description = "Which catalogue fields a user may see values of (ADR 0028 amendment 2026-10-16, ADR 0064 decision 10): the licences a user holds from the users registry (open for everyone, others only when config/site/users.toml lists them; a role grants none, ADR 0040), the licence of a field (a stored feature's own, an expression's strictest of what it reads) and the fields a user lacks the licence of; every path that serves per-name values removes those fields before it reads them (ReadContext.licences in the read model; `held` of fields_view / run_screener for a screener run and the Builder's preview), so they are UNKNOWN with the public kind LICENCE and a screen never passes a hard criterion on one (ADR 0015)"
+description = "Which catalogue fields a user may see values of (ADR 0069, ADR 0028, ADR 0064 decision 10): the licences a user holds from the users registry (open for everyone, others only when config/site/users.toml lists them; a role grants none, ADR 0040), the licence of a field (a stored feature's own, an expression's strictest of what it reads) and the fields a user lacks the licence of; every path that serves per-name values removes those fields before it reads them (ReadContext.licences in the read model; `held` of fields_view / run_screener for a screener run and the Builder's preview), so they are UNKNOWN with the public kind LICENCE and a screen never passes a hard criterion on one (ADR 0015)"
 owner = ["src/algotrade/services/licences.py"]
 allowed = [
     "src/algotrade/services/selection.py",  # fields_view: the screen's one read of values
@@ -28,7 +28,7 @@ allowed = [
     "src/algotrade/services/preview/frame.py",  # the Builder's frame, kept per licence set
     "src/algotrade/services/jobs/handlers.py",  # the screen job passes the user's licences
 ]
-section = "docs/adr/0028-ibkr-enrichment-source.md#licence-tags"
+section = "docs/adr/0069-data-licence-gate.md#decision"
 detect = [{ call = "hidden_fields" }, { call = "held_by" }, { call = "licence_of" }]
 
 [[responsibility]]
