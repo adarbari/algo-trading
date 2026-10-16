@@ -23,13 +23,21 @@ from datetime import date, datetime
 
 import pandas as pd
 
+from algotrade.data.shares import ALL_TIME, CHECKED, DATES, KEY, latest_versions
 from algotrade.storage.tables.readers import StoreReader
 
 TABLE = "instruments/statements"
-KEY = ["instrument_id", "concept", "tag", "period_start", "period_end", "filed"]
-CHECKED = "checked"  # the marker concept: "this CIK was fetched on fetched_on"
-DATES = ("period_start", "period_end", "filed", "fetched_on")
-ALL_TIME = (date(1900, 1, 1), date(9999, 12, 31))
+__all__ = [
+    "ALL_TIME",
+    "CHECKED",
+    "DATES",
+    "KEY",
+    "STAMPS",
+    "TABLE",
+    "light_statements",
+    "statement_facts",
+    "stored_statements",
+]
 STAMPS = ["session_date", "knowledge_ts", "source", "run_id"]
 
 
@@ -47,16 +55,7 @@ def stored_statements(
     frame = reader.table_range(TABLE, *ALL_TIME, as_of, instruments, wanted)
     if frame is None or frame.empty:
         return pd.DataFrame(columns=[*KEY, "cik", "value", "fetched_on"])
-    frame["tag"] = frame["tag"].astype(object).where(frame["tag"].notna(), None)
-    for column in DATES:
-        if column in frame.columns:
-            day = pd.to_datetime(frame[column]).dt.date
-            frame[column] = day.astype(object).where(frame[column].notna(), None)
-    # The latest stored version wins (run_id breaks a tie of stamps); the result is in key
-    # order, so it does not depend on the order the partitions or rows came in.
-    frame = frame.sort_values(["knowledge_ts", "run_id"], kind="stable")
-    frame = frame.drop_duplicates(KEY, keep="last")
-    return frame.sort_values(KEY, kind="stable", na_position="first").reset_index(drop=True)
+    return latest_versions(frame)
 
 
 def light_statements(reader: StoreReader) -> pd.DataFrame:
