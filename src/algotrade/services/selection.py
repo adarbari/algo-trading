@@ -27,7 +27,8 @@ def fields_view(
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
     historical: bool = False,
-    held: Collection[str] = ALL_LICENCES,
+    *,
+    held: Collection[str],
 ) -> tuple[FeatureView, InstrumentView]:
     """One row per instrument known on ``session`` (only ``ids``, each with a row even when
     nothing is known of it, when given), keyed by field name; missing values are left out
@@ -35,9 +36,8 @@ def fields_view(
     Also the ``InstrumentView`` it came from (``missing`` tables; ``pre_snapshot``).
     ``historical``: see ``services.features.field_view``. ``held``: the data licences of the
     user the values are for (``services.licences.held_by``); a field under another licence is
-    not read. Every user-facing caller (a screener run, the Builder's preview) passes it; the
-    default (all held) is for the edge harness, backtests and training, which record the
-    licence of what they read themselves (ADR 0064)."""
+    not read. Required: a user's caller passes the user's, a caller that reads for no user
+    passes ``HARNESS_ALL`` (ADR 0068)."""
     hidden = (
         hidden_fields(features or site_features(), fields, held) if held != ALL_LICENCES else ()
     )
@@ -63,7 +63,8 @@ def selection_view(
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
     historical: bool = False,
-    held: Collection[str] = ALL_LICENCES,
+    *,
+    held: Collection[str],
 ) -> tuple[FeatureView, InstrumentView]:
     """``fields_view`` of the fields ``selection`` reads, for every instrument known on
     ``session`` (``held``: see ``fields_view``)."""
@@ -88,12 +89,15 @@ def select(
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
     historical: bool = False,
-    held: Collection[str] = ALL_LICENCES,
+    *,
+    held: Collection[str],
 ) -> SelectionResult:
     """Point in time: the reference snapshot and rollups for ``session``, read ``as_of``.
     ``features``: the catalogue ``feature.<name>`` fields come from (default: the site's; a
     user's config: ``services.features.config_features``). ``held``: see ``fields_view``."""
-    view, source = selection_view(reader, selection, session, as_of, features, historical, held)
+    view, source = selection_view(
+        reader, selection, session, as_of, features, historical, held=held
+    )
     identity = source.identity
     return replace(
         evaluate_selection(selection, view),

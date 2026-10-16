@@ -32,6 +32,7 @@ from algotrade.services.evaluation.cross_section.hit import apply_outcome, needs
 from algotrade.services.evaluation.cross_section.measuring import BENCHMARK
 from algotrade.services.evaluation.cross_section.picks import eligible
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions, entry_session
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.selection import fields_view
 
 LABEL = "hit"
@@ -100,6 +101,7 @@ def training_frame(
             d,
             [str(i) for i in counted["instrument_id"]],
             historical=True,
+            held=HARNESS_ALL,
         )
         values = {
             f: [_number(view.get(i, f)) for i in counted["instrument_id"]]

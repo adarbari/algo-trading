@@ -33,7 +33,8 @@ def test_an_expression_inherits_the_strictest_licence_of_what_it_reads() -> None
     assert licence_of(features, OVER_IT) == "personal"
     assert licence_of(features, OPEN) == "open"
     assert licence_of(features, "instrument.sector") == "open"  # a reference fact
-    assert licence_of(features, "feature.no_such_feature") == "open"  # declares no licence
+    # a name the catalogue does not resolve (a run owner's own feature) fails closed
+    assert licence_of(features, "feature.no_such_feature") == "personal"
 
 
 def test_hidden_fields_are_those_outside_the_held_licences() -> None:

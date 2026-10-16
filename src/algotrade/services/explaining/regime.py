@@ -65,7 +65,7 @@ def explain_regime(
     # primary's, and a provider limited to some users (the owner's Claude login) never has its
     # answer served to anyone else.
     for name in model.names_for(user):
-        kept = cache.get(cache_key(regime, asked, name))
+        kept = cache.get(cache_key(regime, asked, name, ctx.licences))
         if kept is not None:
             explanation = verify(kept, facts)
             if explanation.checked:
@@ -83,5 +83,5 @@ def explain_regime(
         reason = explanation.note or "the answer was not verified"
         reject_answer(model, tag, answer, reason, user_prompt(asked), chars)
     if explanation.checked:
-        cache.put(cache_key(regime, asked, answer.model), answer.text)
+        cache.put(cache_key(regime, asked, answer.model, ctx.licences), answer.text)
     return Explained(explanation, False)

@@ -18,6 +18,10 @@ from algotrade.features.framework.feature import LICENCES, Licence
 OPEN: Licence = "open"
 PERSONAL: Licence = "personal"
 ALL_LICENCES: frozenset[str] = frozenset(LICENCES)  # every licence held: no field is hidden
+# What a caller that reads for no user passes (``held`` has no default): the edge harness,
+# backtests and training record the licence of what they read themselves (ADR 0064), and the
+# scheduled site runs store every value and are filtered per viewer at read (ADR 0068).
+HARNESS_ALL = ALL_LICENCES
 
 
 def held_by(users: UsersSettings, user_id: str) -> frozenset[str]:
@@ -27,11 +31,13 @@ def held_by(users: UsersSettings, user_id: str) -> frozenset[str]:
 
 def licence_of(features: FeatureSet, field: str) -> str:
     """The licence of a catalogue field (``rollup.<key>.<col>``, ``market.<key>.<col>``,
-    ``feature.<name>``); ``open`` for ``instrument.*`` reference facts and for a name the
-    catalogue does not resolve (it declares no licence: a stored value of a field since removed
-    from the catalogue is not gated)."""
+    ``feature.<name>``); ``open`` for ``instrument.*`` reference facts. A name the catalogue
+    does not resolve (a run owner's own expression feature, a field since removed) is
+    ``personal``: fail closed, its licence is unknown."""
     found = features.feature(field)
-    return OPEN if found is None else str(found.licence)
+    if found is not None:
+        return str(found.licence)
+    return OPEN if field.partition(".")[0] == "instrument" else PERSONAL
 
 
 def hidden_fields(

@@ -11,6 +11,7 @@ import pytest
 from algotrade.config.strategy.schema import parse_selection
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.data.reference import Universe
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.preview import frame as frames
 from algotrade.services.preview.frame import MAX_MEMO, FieldFrame, features_key, field_frame
 from algotrade.services.read.context import ResultCache
@@ -62,7 +63,7 @@ def test_a_frame_weighs_what_its_view_holds_and_the_cache_is_bounded_by_it(
     monkeypatch.setattr(frames, "fields_view", lambda *a, **k: read)
     monkeypatch.setattr(frames, "load_universe", lambda *a, **k: universe)
     reader = SimpleNamespace(visible_seq=lambda: 1)
-    built, _ = field_frame(reader, ResultCache(4), DAY, ["a", "b"], None, ())  # type: ignore[arg-type]
+    built, _ = field_frame(reader, ResultCache(4), DAY, ["a", "b"], None, (), held=HARNESS_ALL)  # type: ignore[arg-type]
     assert built.weight_bytes() == 100 * (frames.ROW_BYTES + 2 * frames.FIELD_BYTES)
     cache = ResultCache(size=24, max_bytes=2 * built.weight_bytes() + 1)
     for name in "xyz":
@@ -90,7 +91,7 @@ def test_a_frame_being_read_is_waited_for_not_read_twice(monkeypatch: pytest.Mon
     got: list[bool] = []
 
     def ask() -> None:
-        got.append(field_frame(reader, cache, DAY, ["a"], None, ())[1])  # type: ignore[arg-type]
+        got.append(field_frame(reader, cache, DAY, ["a"], None, (), held=HARNESS_ALL)[1])  # type: ignore[arg-type]
 
     first = threading.Thread(target=ask)
     first.start()

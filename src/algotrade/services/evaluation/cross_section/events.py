@@ -22,6 +22,7 @@ from datetime import date
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_to
 from algotrade.data import StoreReader
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.selection import fields_view
 
 DEDUPE_SESSIONS = 40  # one report per name in this many sessions
@@ -124,7 +125,9 @@ def read_events_for(
     last: dict[str, dict[str, date]] = {k: {} for k in eligible_of}  # name -> latest counted D
     for day in decisions:
         try:
-            view, _ = fields_view(reader, (spec.count, spec.date), day, historical=True)
+            view, _ = fields_view(
+                reader, (spec.count, spec.date), day, historical=True, held=HARNESS_ALL
+            )
         except MissingDataError as error:
             raise EventDayMissingError(error, day) from error
         reads = {i: _read(view.get(i, spec.count), view.get(i, spec.date)) for i in view}

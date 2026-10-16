@@ -11,6 +11,7 @@ from typing import Any
 
 import pandas as pd
 
+from algotrade.services.licences import PERSONAL
 from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import ReadContext, partition
 from algotrade.services.read.values import Unknown, UnknownCode, stored_values
@@ -94,6 +95,9 @@ def _counts(statuses: "pd.Series[Any]") -> dict[str, int]:
 def load_verification(ctx: ReadContext) -> Verification:
     """The ``verification/ibkr`` rows of ``ctx.session.date``: counts by status and by check,
     and the failing rows."""
+    if PERSONAL not in ctx.licences:  # IBKR's values: no role (an admin's included) grants them
+        why = run_cause(VERIFICATION, "IBKR's values are under a data licence the user lacks")
+        return Verification(ctx.session.date, (), 0, {}, (), (), Unknown(UnknownCode.LICENCE, why))
     frame = partition(ctx, VERIFICATION)
     if isinstance(frame, Unknown):
         return Verification(ctx.session.date, (), 0, {}, (), (), frame)

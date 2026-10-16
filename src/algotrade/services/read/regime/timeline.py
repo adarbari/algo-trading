@@ -157,9 +157,11 @@ def load_episode_signals(ctx: ReadContext, episode_key: str) -> EpisodeSignals |
     key the site has not declared, an episode the session does not know yet (its trough has
     not come). The same for every caller (site episodes and cards, stored market fields) until
     the next publish (in the key, read first, ADR 0022; the catalogue is not in it: the card
-    features and the label are site-only stored fields, the same for every user): kept in
+    features and the label are site-only stored fields) and licence set (some card inputs are
+    personal-licence fields: a viewer without the licence reads them as unknown, ADR 0068): kept in
     ``ctx.cache`` (the regime page's History asks for every episode at once, 1.2 s)."""
-    key = ("episode-signals", episode_key, ctx.session.date, ctx.reader.visible_seq())
+    held = tuple(sorted(ctx.licences))
+    key = ("episode-signals", episode_key, ctx.session.date, held, ctx.reader.visible_seq())
     cached: tuple[EpisodeSignals | None] = ctx.cache.get_or_compute(
         key, lambda: (_signals(ctx, episode_key),)
     )

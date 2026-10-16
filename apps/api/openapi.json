@@ -1512,7 +1512,7 @@
             "type": "string"
           },
           "status": {
-            "description": "LIVE, CACHED (a live answer under live_cache_s old), DISABLED, UNAVAILABLE (gateway down, busy or slow), ERROR: the last three serve the stored chain",
+            "description": "LIVE, CACHED (a live answer under live_cache_s old), DISABLED, UNAVAILABLE (gateway down, busy or slow), ERROR, LICENCE (IBKR quotes need the personal data licence): the last four serve the stored chain",
             "title": "Status",
             "type": "string"
           },

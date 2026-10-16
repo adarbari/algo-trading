@@ -11,6 +11,7 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import load_universe
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.services.configs import resolve_config
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.exports import LEGACY_COLUMNS, write_legacy_exports
 from algotrade.services.screening.run import run_screener
 from algotrade.services.views import to_value
@@ -89,7 +90,7 @@ def test_universe_keeps_every_row() -> None:
 
 def test_site_preset_reproduces_the_old_production_filter() -> None:
     reader, writer = seeded()
-    outcome = run_screener(reader, writer, preset(), DAY, now=T0)
+    outcome = run_screener(reader, writer, preset(), DAY, now=T0, held=HARNESS_ALL)
     selection = outcome.audit["selection"]
     assert [r.instrument_id for r in outcome.run.rows] == ["EQ:AAA", "EQ:BBB", "EQ:CCC", "EQ:ETF1"]
     assert selection["base"] == 6
@@ -98,7 +99,9 @@ def test_site_preset_reproduces_the_old_production_filter() -> None:
 
 def test_run_screener_saves_audited_result() -> None:
     reader, writer = seeded()
-    outcome = run_screener(reader, writer, preset(screening={"min_coverage": 0.7}), DAY, now=T0)
+    outcome = run_screener(
+        reader, writer, preset(screening={"min_coverage": 0.7}), DAY, now=T0, held=HARNESS_ALL
+    )
     assert outcome.run.coverage is RunCoverage.COMPLETE
     assert outcome.audit["decisions"] == {
         "QUALIFIED": 1,
@@ -116,11 +119,16 @@ def test_run_screener_saves_audited_result() -> None:
 
 def test_partial_and_stale_universe() -> None:
     reader, writer = seeded()
-    partial = run_screener(reader, writer, preset(), DAY, now=T0)
+    partial = run_screener(reader, writer, preset(), DAY, now=T0, held=HARNESS_ALL)
     assert partial.run.coverage is RunCoverage.PARTIAL  # 3/4 processed < 98%
     stale_reader, stale_writer = seeded(last_verified="2026-06-01")
     stale = run_screener(
-        stale_reader, stale_writer, preset(screening={"min_coverage": 0.5}), DAY, now=T0
+        stale_reader,
+        stale_writer,
+        preset(screening={"min_coverage": 0.5}),
+        DAY,
+        now=T0,
+        held=HARNESS_ALL,
     )
     assert stale.run.coverage is RunCoverage.UNIVERSE_INCOMPLETE
 
@@ -128,15 +136,19 @@ def test_partial_and_stale_universe() -> None:
 def test_missing_inputs_raise_with_hint() -> None:
     reader, writer = StoreReader(MemoryBackend()), StoreWriter(MemoryBackend())
     with pytest.raises(MissingDataError, match="universe import"):
-        run_screener(reader, writer, preset(), DAY)
+        run_screener(reader, writer, preset(), DAY, held=HARNESS_ALL)
     seeded_reader, seeded_writer = seeded()
     with pytest.raises(MissingDataError, match="ingest rollups"):
-        run_screener(seeded_reader, seeded_writer, preset(), DAY + timedelta(days=1))
+        run_screener(
+            seeded_reader, seeded_writer, preset(), DAY + timedelta(days=1), held=HARNESS_ALL
+        )
 
 
 def test_legacy_exports_match_original_layout(tmp_path: Path) -> None:
     reader, writer = seeded()
-    outcome = run_screener(reader, writer, preset(screening={"min_coverage": 0.5}), DAY, now=T0)
+    outcome = run_screener(
+        reader, writer, preset(screening={"min_coverage": 0.5}), DAY, now=T0, held=HARNESS_ALL
+    )
     full, candidates = write_legacy_exports(outcome, tmp_path, "2026-10")
     with full.open() as fh:
         rows = list(csv.DictReader(fh))
@@ -167,7 +179,7 @@ def test_to_value() -> None:
 def test_results_carry_user_and_config_hash() -> None:
     reader, writer = seeded()
     config = preset(screening={"min_coverage": 0.5})
-    run_screener(reader, writer, config, DAY, now=T0)
+    run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL)
     saved = reader.table("results/short_premium_liquidity", DAY)
     assert saved is not None
     assert set(saved["user_id"]) == {"site"}
@@ -181,7 +193,7 @@ def test_empty_selection_is_reported() -> None:
     narrowed = preset(
         selection_overrides={"all": [{"field": "instrument.symbol", "op": "eq", "value": "ZZZ"}]}
     )
-    outcome = run_screener(reader, writer, narrowed, DAY, now=T0)
+    outcome = run_screener(reader, writer, narrowed, DAY, now=T0, held=HARNESS_ALL)
     assert outcome.run.coverage is RunCoverage.EMPTY_SELECTION
     assert outcome.run.rows == ()
 
@@ -190,7 +202,7 @@ def test_wrong_kind_or_missing_selection_is_rejected() -> None:
     reader, writer = seeded()
     strategy = resolve_config(SITE_CONFIGS, "sma_trend", UserContext(SITE_USER))
     with pytest.raises(ConfigurationError, match="not a screener"):
-        run_screener(reader, writer, strategy, DAY)
+        run_screener(reader, writer, strategy, DAY, held=HARNESS_ALL)
     no_selection = ResolvedConfig(
         preset().config.__class__(id="x", kind="screener", impl="short_premium_liquidity"),
         None,
@@ -198,4 +210,4 @@ def test_wrong_kind_or_missing_selection_is_rejected() -> None:
         UserContext(),
     )
     with pytest.raises(ConfigurationError, match="needs a selection"):
-        run_screener(reader, writer, no_selection, DAY)
+        run_screener(reader, writer, no_selection, DAY, held=HARNESS_ALL)

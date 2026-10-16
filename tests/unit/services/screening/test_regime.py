@@ -10,6 +10,7 @@ from algotrade.config.user import SITE_USER, UserContext
 from algotrade.data import StoreReader
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.services.configs import resolve_config
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.regime import MARKET, session_market
 from algotrade.services.screening.run import ScreenOutcome, run_screener
 from algotrade.storage.tables.writers import StoreWriter
@@ -35,7 +36,7 @@ def screen(
         store_label(writer, label)
     extra = {"regime": regime} if regime is not None else {}
     config = resolve_config(configs(**extra), "big_liquid", UserContext(SITE_USER))
-    return run_screener(reader, writer, config, DAY, now=T0), reader
+    return run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL), reader
 
 
 def rows(reader: StoreReader) -> pd.DataFrame:
@@ -108,7 +109,9 @@ def test_a_coded_screener_is_gated_by_the_engine_too() -> None:
     reader, writer = legacy.seeded()
     regime = {"enabled": True, "pause_in": ["CRISIS"]}
     config = legacy.preset(screening={"min_coverage": 0.7}, regime=regime)
-    outcome = run_screener(reader, writer, config, DAY, now=T0)  # no regime row: unknown
+    outcome = run_screener(
+        reader, writer, config, DAY, now=T0, held=HARNESS_ALL
+    )  # no regime row: unknown
     assert outcome.run.coverage is RunCoverage.COMPLETE
     assert outcome.audit["decisions"] == {
         "PAUSED": 1,

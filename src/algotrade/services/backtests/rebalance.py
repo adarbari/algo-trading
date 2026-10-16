@@ -26,6 +26,7 @@ from algotrade.engines.selection.evaluate import SelectionResult
 from algotrade.engines.selection.schedule import Rebalance, diff, rebalance_sessions
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import site_features
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.selection import select, selection_fields
 
 ROLLUPS_HINT = "algotrade-ingest rollups --from <first rebalance session> --to <end>"
@@ -50,7 +51,9 @@ def evaluate_sessions(
     fields = selection_fields(selection)
     out = []
     for session in rebalance_sessions(start, sessions_between(start, end), frequency):
-        result = select(reader, selection, session, as_of=as_of, features=features)
+        result = select(
+            reader, selection, session, as_of=as_of, features=features, held=HARNESS_ALL
+        )
         if session != start and result.missing_tables:
             blocking, _ = catalogue.coverage(fields, result.missing_tables)
             if blocking:

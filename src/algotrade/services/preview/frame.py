@@ -105,7 +105,7 @@ def field_frame(
     fields: Sequence[str],
     features: FeatureSet,
     definitions: Sequence[FeatureDefinition],
-    held: Collection[str] = ALL_LICENCES,
+    held: Collection[str],
 ) -> tuple[FieldFrame, bool]:
     """The frame for ``fields`` on ``session`` and whether it came from the cache. ``held``: the
     caller's data licences (``ctx.licences``): a field under another is not read and the frame

@@ -15,37 +15,62 @@ from tests.conftest import REPO_ROOT
 SRC = REPO_ROOT / "src" / "algotrade" / "services"
 # The calls that read stored values of catalogue fields (a rollup, a reference fact, a formula).
 RAW = re.compile(
-    r"\b(field_view|entity_field_view|fields_view|selection_view|read_expressions|rollup_rows"
-    r"|group_view|instrument_view|feature_rows)\("
+    r"(?<![\w.])(field_view|entity_field_view|fields_view|selection_view|read_expressions"
+    r"|rollup_rows|group_view|instrument_view|feature_rows|partition|run_partition|load_series"
+    r"|load_feature_values|load_market_feature_values|market_frame|load_chains|load_quotes"
+    r"|underlying_quotes)\("
 )
 SCANNED = (
     SRC / "read",
     SRC / "preview",
     SRC / "screening",
     SRC / "jobs",
+    SRC / "live",
+    SRC / "explaining",
     REPO_ROOT / "apps" / "api" / "algotrade_api",
 )
 
-# module -> the text that applies the gate in it
+# module -> the text that applies the gate in it (a read that decides what a viewer sees)
 GATED = {
-    "services/read/instruments/features.py": "ctx.licences",  # features(names), cell codes, market
+    "services/read/instruments/features.py": "ctx.licences",  # features(names), cells, market
     "services/read/instruments/table.py": "ctx.licences",  # the table's filters and sort
-    "services/read/instruments/series.py": "ctx.licences",  # a field's history, instrument / market
+    "services/read/instruments/series.py": "ctx.licences",  # a field's history
+    "services/read/instruments/distribution.py": "ctx.licences",  # an aggregate of values
+    "services/read/screens/results.py": "run_withheld(",  # stored values, score, reasons, sorts
+    "services/read/ops/quality.py": "ctx.licences",  # verification/ibkr: IBKR's values
+    "services/read/regime/timeline.py": "ctx.licences",  # a shared cache keyed by the set
     "services/preview/frame.py": "hidden_fields(",  # the Builder's frame (kept per licence set)
     "services/preview/expressions.py": "ctx.licences",  # a formula's sample and dry run
     "services/screening/run.py": "held=held",  # a screener run, so the results it stores
+    "services/live/quotes.py": "ctx.licences",  # live IBKR quotes
 }
-# Callers that must hand the user's licences to a gated function.
+# Callers that must hand the user's licences to a gated function or key.
 CALLERS = {
-    "services/jobs/handlers.py": "held=held_by(",  # the screen job: run_screener
+    "services/jobs/handlers.py": "_screen_licences(",  # the screen job: run_screener
     "services/preview/screens.py": "ctx.licences",  # the preview's frame
-    "services/read/instruments/distribution.py": "ctx.licences",  # an aggregate of values
-    "services/read/screens/results.py": "hidden_fields(",  # stored criterion values and sorts
+    "services/read/screens/ideas.py": "run_withheld(",  # the ranking by score
+    "services/explaining/regime.py": "ctx.licences",  # the explanation cache key
 }
-# Readers that never serve a catalogue value to a user, and why.
+GATED_LOADERS = "reads through a gated loader (load_feature_values / load_series / ctx.licences)"
+STORED_OPEN = "stored open data (Cboe chains, chain status, Guide / config, run decisions)"
+# Readers that never serve a licensed value to a user, and why.
 EXEMPT = {
     "services/selection.py": "the gate itself: fields_view takes ``held`` (its callers pass it)",
     "services/screening/regime.py": "reads the regime label only (open: see the test below)",
+    "services/read/context.py": "the partition helper itself; ReadContext.licences lives here",
+    "services/read/events/ahead.py": GATED_LOADERS,
+    "services/read/events/reference.py": GATED_LOADERS,
+    "services/read/market/features.py": GATED_LOADERS,
+    "services/read/market/history.py": GATED_LOADERS,
+    "services/read/regime/fields.py": GATED_LOADERS,
+    "services/read/regime/history.py": GATED_LOADERS,
+    "services/read/events/instrument_events.py": STORED_OPEN,
+    "services/read/instruments/chains.py": STORED_OPEN,
+    "services/read/ops/ingestion.py": STORED_OPEN,
+    "services/read/screens/runs.py": "run rows: names and decisions; values are gated in results",
+    "services/read/screens/views.py": "saved views: configs, no values",
+    "services/read/evaluation/runs.py": "run results carry their recorded licence (ADR 0064)",
+    "services/read/ops/backtests.py": "backtest results of the user's own runs (ADR 0064)",
 }
 
 
@@ -100,3 +125,23 @@ def test_the_regime_label_a_screen_gate_reads_is_open() -> None:
     from algotrade.services.licences import licence_of  # noqa: PLC0415
 
     assert licence_of(site_features(), REGIME_LABEL) == "open"
+
+
+def test_callers_that_read_for_no_user_pass_the_named_harness_licences() -> None:
+    """``held`` has no default (fail closed): the edge harness, backtests and training pass
+    ``HARNESS_ALL`` by name, so each is a line a reviewer can find (ADR 0068)."""
+    call = re.compile(r"(?<![\w.])(fields_view|select|screen_session)\(")
+    bare = [
+        _name(p)
+        for root in (SRC / "evaluation", SRC / "backtests")
+        for p in sorted(root.rglob("*.py"))
+        if call.search(p.read_text()) and "HARNESS_ALL" not in p.read_text()
+    ]
+    assert bare == []
+
+
+def test_every_shared_cache_of_gated_values_carries_the_licence_set() -> None:
+    api = (REPO_ROOT / "apps/api/algotrade_api/graphql/response_cache.py").read_text()
+    assert "viewer.licences" in api  # the response key, SHARED operations included
+    assert "licences" in (SRC / "explaining/cache.py").read_text()  # the explanation key
+    assert "held" in (SRC / "read/regime/timeline.py").read_text()  # the episode-signals key

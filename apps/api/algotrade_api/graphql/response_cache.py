@@ -51,6 +51,7 @@ TTL_S = 300.0
 # Operations (by name) whose answer is the same for every caller of a role.
 SHARED_OPERATIONS: frozenset[str] = frozenset(
     {
+        "MarketHistory",  # per-name values: the key carries the viewer's licence set
         "RegimeEpisodes",
         "RegimeBands",
         "RegimeSignals",
@@ -75,7 +76,6 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "InstrumentFacts",
         "InstrumentFeatureValues",
         "InstrumentHistory",
-        "MarketHistory",  # a field under a data licence the viewer lacks has no values (ADR 0028)
         "ComparePrices",
         "Day",
         "EventCalendar",
@@ -225,7 +225,9 @@ def response_key(
         viewer.role.value if name in SHARED_OPERATIONS else f"{viewer.role.value}:{viewer.user_id}"
     )
     text = json.dumps(variables, sort_keys=True, separators=(",", ":"), default=str)
+    licences = ",".join(sorted(viewer.licences))  # what a viewer may see differs (ADR 0068)
     parts = [str(seq), str(epoch), who, hashlib.sha256(document.encode()).hexdigest(), text]
+    parts.append(f"licences:{licences}")
     parts.append(f"session:{served}")
     if name in RUN_OPERATIONS:
         parts.append(f"runs:{runs[0]}:{runs[1]}")

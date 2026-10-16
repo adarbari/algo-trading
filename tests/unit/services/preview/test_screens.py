@@ -14,6 +14,7 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import last_closed_session
 from algotrade.services.configs import resolve_config
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.preview import screens
 from algotrade.services.preview.screens import preview_screen
 from algotrade.services.read.context import open_context
@@ -51,7 +52,7 @@ def criterion(spec: dict[str, Any], cid: str, **changes: Any) -> dict[str, Any]:
 def test_preview_rows_equal_the_nightly_rows() -> None:
     reader, writer = seeded()
     nightly = resolve_config(configs(), "big_liquid", UserContext(ALICE))
-    run_screener(reader, writer, nightly, DAY, now=T0)
+    run_screener(reader, writer, nightly, DAY, now=T0, held=HARNESS_ALL)
     stored = reader.table("results/rule_screen", DAY)
     assert stored is not None
     store = ReadStore(reader, configs(), UserContext(ALICE))
@@ -79,7 +80,7 @@ def test_preview_rows_equal_the_nightly_rows() -> None:
 def test_changes_against_the_saved_run_of_the_session() -> None:
     reader, writer = seeded()
     preset = resolve_config(configs(), "big_liquid", UserContext("site"))  # presets run as site
-    run_screener(reader, writer, preset, DAY, now=T0)
+    run_screener(reader, writer, preset, DAY, now=T0, held=HARNESS_ALL)
     store = ReadStore(reader, configs(), UserContext(ALICE))
     same = preview(store, {**SCREEN, "id": "big_liquid"})
     assert same.changes is not None and (same.changes.entered, same.changes.left) == ([], [])
@@ -105,7 +106,7 @@ def test_the_saved_picks_are_read_once_per_publish(monkeypatch: pytest.MonkeyPat
     assert preview(store, spec).changes is None  # no run yet: cached as such
     assert preview(store, spec).changes is None
     preset = resolve_config(configs(), "big_liquid", UserContext("site"))
-    run_screener(reader, writer, preset, DAY, now=T0)  # a publish
+    run_screener(reader, writer, preset, DAY, now=T0, held=HARNESS_ALL)  # a publish
     assert preview(store, spec).changes is not None
     assert preview(store, criterion(spec, "price", value=1e9)).changes is not None  # an edit
     assert preview(store, spec).changes is not None
@@ -117,7 +118,7 @@ def test_the_warmed_preview_of_a_saved_screen_is_what_its_first_preview_asks_for
     (the draft the page opens on, unchanged) will ask: that preview then reads nothing."""
     reader, writer = seeded()
     preset = resolve_config(configs(), "big_liquid", UserContext("site"))
-    run_screener(reader, writer, preset, DAY, now=T0)
+    run_screener(reader, writer, preset, DAY, now=T0, held=HARNESS_ALL)
     store = ReadStore(reader, configs(), UserContext(ALICE))
     ctx = open_context(store.reader, store.configs, store.user, DAY, store.cache)
     screens.warm_preview(ctx, store.preview_cache, "big_liquid")

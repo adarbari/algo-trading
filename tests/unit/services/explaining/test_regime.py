@@ -13,6 +13,7 @@ from algotrade.services.explaining.cache import cache_key
 from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.explaining.prompt import PROMPT_VERSION, WHAT_IS_HAPPENING, user_prompt
 from algotrade.services.explaining.regime import explain_regime
+from algotrade.services.licences import ALL_LICENCES
 from algotrade.services.read.context import NotFoundError, ReadContext
 from algotrade.services.read.regime.regime import load_regime
 from algotrade.services.text_model.chain import FallbackTextModel
@@ -138,8 +139,8 @@ class Chain(Canned):
 
 def test_a_fallback_answer_is_never_cached_under_the_primary(ctx: ReadContext) -> None:
     regime = load_regime(ctx)
-    claude_key = cache_key(regime, WHAT_IS_HAPPENING, "claude")
-    gemini_key = cache_key(regime, WHAT_IS_HAPPENING, "gemini")
+    claude_key = cache_key(regime, WHAT_IS_HAPPENING, "claude", ALL_LICENCES)
+    gemini_key = cache_key(regime, WHAT_IS_HAPPENING, "gemini", ALL_LICENCES)
     cache, limiter = MemoryTextCache(), RateLimiter()
     chain = Chain(GOOD, ("claude", "gemini"), answers="gemini")
     assert not ask(ctx, chain, cache, limiter).cached
@@ -185,7 +186,7 @@ def test_the_owners_login_answer_is_never_served_to_another_user(ctx: ReadContex
         return explain_regime(ctx, model, cache, RateLimiter(), user, "What is happening?", None)
 
     assert not explain("abhi").cached  # answered by the owner's login, kept under "haiku"
-    assert cache.get(cache_key(regime, WHAT_IS_HAPPENING, "haiku")) == GOOD
+    assert cache.get(cache_key(regime, WHAT_IS_HAPPENING, "haiku", ALL_LICENCES)) == GOOD
     assert cli.tags == [CallTag("regime-explain", "abhi", str(PROMPT_VERSION))] and not gemini.tags
     assert explain("abhi").cached  # the owner reads it back
     other = explain("bob")  # another user never sees it: the model is asked, and it is gemini

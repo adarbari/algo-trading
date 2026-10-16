@@ -8,6 +8,7 @@ from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.data import StoreReader
 from algotrade.services.backtests.run import PORTFOLIO, run_configured_backtest
 from algotrade.services.configs import default_user, resolve_config
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.selection import select
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -80,7 +81,7 @@ def test_missing_rollup_is_unknown_not_an_error(backend: MemoryBackend) -> None:
         MemoryConfigStore({("u", "strategies", "bull_bh"): config}), "bull_bh", UserContext("u")
     )
     assert resolved.selection is not None
-    result = select(StoreReader(backend), resolved.selection, START)
+    result = select(StoreReader(backend), resolved.selection, START, held=HARNESS_ALL)
     assert result.empty
     assert result.unknown_excluded == result.base
     assert result.as_dict()["missing_tables"] == ["rollups/instrument/option_liquidity@v1"]

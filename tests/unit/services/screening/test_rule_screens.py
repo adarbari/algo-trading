@@ -12,6 +12,7 @@ from algotrade.engines.screening.runner import RunCoverage
 from algotrade.services.configs import nightly_screeners, resolve_config
 from algotrade.services.jobs import JobStatus, LocalJobRunner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening import run as run_module
 from algotrade.services.screening.run import run_screener, screen_session
 from algotrade.storage.backends.memory import MemoryBackend
@@ -91,7 +92,7 @@ def test_a_missing_rollup_table_is_a_partial_run_not_a_clean_one() -> None:
     must not come out COMPLETE (it used to, by skipping every row)."""
     reader, writer = seeded(features_stored=False)
     config = resolve_config(configs(), "big_liquid", UserContext(SITE_USER))
-    outcome = run_screener(reader, writer, config, DAY, now=T0)
+    outcome = run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL)
     assert outcome.run.coverage is RunCoverage.PARTIAL
     assert outcome.audit["missing_tables"] == ["rollups/instrument/option_liquidity@v1"]
     assert set(outcome.audit["decisions"]) == {"REJECT"}
@@ -100,7 +101,7 @@ def test_a_missing_rollup_table_is_a_partial_run_not_a_clean_one() -> None:
 def test_rule_screen_writes_both_tables_and_the_summary() -> None:
     reader, writer = seeded()
     config = resolve_config(configs(), "big_liquid", UserContext(SITE_USER))
-    outcome = run_screener(reader, writer, config, DAY, now=T0)
+    outcome = run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL)
     assert outcome.run.coverage is RunCoverage.COMPLETE  # every row is decided: none is skipped
     assert outcome.audit["decisions"] == {"QUALIFIED": 1, "WATCH": 1, "REJECT": 2}
     summary = outcome.audit["summary"]
@@ -148,7 +149,12 @@ def test_two_configs_share_the_tables_without_hiding_each_other() -> None:
     )
     for cid, at in (("big_liquid", T0), ("other", T0 + timedelta(minutes=1))):
         run_screener(
-            reader, writer, resolve_config(store, cid, UserContext(SITE_USER)), DAY, now=at
+            reader,
+            writer,
+            resolve_config(store, cid, UserContext(SITE_USER)),
+            DAY,
+            now=at,
+            held=HARNESS_ALL,
         )
     screen = reader.table("results/rule_screen", DAY)
     assert screen is not None
@@ -168,7 +174,7 @@ def test_failed_write_publishes_nothing(monkeypatch: pytest.MonkeyPatch) -> None
 
     monkeypatch.setattr(run_module, "rule_frames", broken)
     with pytest.raises(Exception, match="outcome"):
-        run_screener(reader, writer, config, DAY, now=T0)
+        run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL)
     assert reader.table("results/rule_screen", DAY) is None  # the first table rolled back too
 
 
@@ -219,7 +225,7 @@ def test_an_optional_table_read_through_a_coalescing_feature_is_complete_not_par
         {("site", "selections", "active"): ACTIVE, ("site", "strategies", "vrp_like"): VRP_SCREEN}
     )
     config = resolve_config(store, "vrp_like", UserContext(SITE_USER))
-    outcome = run_screener(reader, writer, config, DAY, now=T0)
+    outcome = run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL)
     assert outcome.run.coverage is RunCoverage.COMPLETE
     assert outcome.audit["missing_tables"] == []
     assert outcome.audit["missing_optional_tables"] == [IBKR]
@@ -235,7 +241,7 @@ def test_a_required_table_missing_beside_an_optional_one_is_still_partial() -> N
         {("site", "selections", "active"): ACTIVE, ("site", "strategies", "big_liquid"): screen}
     )
     config = resolve_config(store, "big_liquid", UserContext(SITE_USER))
-    outcome = run_screener(reader, writer, config, DAY, now=T0)
+    outcome = run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL)
     assert outcome.run.coverage is RunCoverage.PARTIAL
     # vrp_iv30 has no leg present either: IBKR's table is blocking too (ADR 0055 amendment)
     assert outcome.audit["missing_optional_tables"] == []
@@ -266,7 +272,7 @@ def test_ibkr_rows_without_iv30_cboe_is_complete_with_picks_and_the_table_tolera
     """ADR 0055 amendment: the history sessions before iv30@v1 existed (the screen graded
     PARTIAL and the edge harness dropped it)."""
     reader, config = _vrp_session(ibkr=True, cboe=False)
-    screened = screen_session(reader, config, DAY, now=T0)
+    screened = screen_session(reader, config, DAY, now=T0, held=HARNESS_ALL)
     assert screened.run.coverage is RunCoverage.COMPLETE
     assert screened.blocking == () and screened.tolerated == (CBOE,)
     assert screened.rules is not None and screened.rules.summary.passed == 1
@@ -280,7 +286,7 @@ def test_run_screener_audits_the_ran_without_table() -> None:
         {("site", "selections", "active"): ACTIVE, ("site", "strategies", "vrp_like"): VRP_SCREEN}
     )
     config = resolve_config(store, "vrp_like", UserContext(SITE_USER))
-    outcome = run_screener(reader, writer, config, DAY, now=T0)
+    outcome = run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL)
     assert outcome.run.coverage is RunCoverage.COMPLETE
     assert outcome.audit["missing_optional_tables"] == [CBOE]
     assert outcome.audit["missing_tables"] == []
@@ -288,7 +294,7 @@ def test_run_screener_audits_the_ran_without_table() -> None:
 
 def test_both_iv30_sources_missing_is_partial() -> None:
     reader, config = _vrp_session(ibkr=False, cboe=False)
-    screened = screen_session(reader, config, DAY, now=T0)
+    screened = screen_session(reader, config, DAY, now=T0, held=HARNESS_ALL)
     assert screened.run.coverage is RunCoverage.PARTIAL
     assert set(screened.blocking) == {IBKR, CBOE}
 
@@ -302,7 +308,7 @@ def test_an_empty_ibkr_partition_with_no_cboe_is_partial_not_a_zero_pick_complet
         {("site", "selections", "active"): ACTIVE, ("site", "strategies", "vrp_like"): VRP_SCREEN}
     )
     config = resolve_config(store, "vrp_like", UserContext(SITE_USER))
-    screened = screen_session(reader, config, DAY, now=T0)
+    screened = screen_session(reader, config, DAY, now=T0, held=HARNESS_ALL)
     assert screened.run.coverage is RunCoverage.PARTIAL
     assert set(screened.blocking) == {IBKR, CBOE}
 
@@ -355,9 +361,11 @@ def _screen_job_values(user: str) -> Any:
                 "user": [
                     {"id": "owner", "role": "admin", "licences": ["personal"]},
                     {"id": SITE_USER, "role": "admin"},
+                    {"id": "trader", "role": "trader"},
                 ]
             },
             ("owner", "strategies", "vrp_like"): VRP_SCREEN,
+            ("trader", "strategies", "vrp_like"): VRP_SCREEN,
         }
     )
     runner = LocalJobRunner(
@@ -375,10 +383,14 @@ def _screen_job_values(user: str) -> Any:
     return values
 
 
-def test_the_screen_job_runs_a_user_with_the_licences_the_registry_gives_them() -> None:
-    """``screen_job`` is the one caller that passes ``held``: ``site`` (no licence listed) runs
-    open-only and stores no personal value, a user the registry lists with ``personal`` does."""
-    assert set(_screen_job_values(SITE_USER)["outcome"]) == {"MISSING"}
+def test_the_site_run_keeps_the_picks_and_a_user_runs_with_the_licences_they_hold() -> None:
+    """The nightly ``site`` run evaluates under every licence (the owner's Ideas keep the
+    ``vrp`` picks) and records them; each viewer is filtered at read (ADR 0068). A user's own
+    run holds what the registry gives that user: the owner (``personal``) stores the value,
+    another user stores none."""
+    site = _screen_job_values(SITE_USER)
+    aaa = site[site["instrument_id"] == "EQ:AAA"].iloc[0]
+    assert aaa["outcome"] != "MISSING" and aaa["value_num"] == 0.3
     owner = _screen_job_values("owner")
-    aaa = owner[owner["instrument_id"] == "EQ:AAA"]
-    assert aaa.iloc[0]["outcome"] != "MISSING" and aaa.iloc[0]["value_num"] == 0.3
+    assert owner[owner["instrument_id"] == "EQ:AAA"].iloc[0]["value_num"] == 0.3
+    assert set(_screen_job_values("trader")["outcome"]) == {"MISSING"}

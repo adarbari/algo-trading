@@ -34,7 +34,6 @@ from algotrade.engines.screening.runner import RunCoverage, ScreenRun, audit_row
 from algotrade.engines.selection.evaluate import SelectionResult
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import config_features
-from algotrade.services.licences import ALL_LICENCES
 from algotrade.services.screening.regime import market_names, regime_gate, session_market
 from algotrade.services.screening.rule_results import Stamp, rule_frames
 from algotrade.services.selection import fields_view, select
@@ -99,7 +98,8 @@ def screen_rules(
     gate: RegimeGate | None = None,
     excluded: Mapping[str, str] | None = None,
     historical: bool = False,
-    held: Collection[str] = ALL_LICENCES,
+    *,
+    held: Collection[str],
 ) -> tuple[ScreenRun, RuleScreenResult, tuple[str, ...], tuple[str, ...]]:
     """A rule screen over the selected instruments: the spec's fields read for the session
     (missing values stay missing: a HARD criterion rejects the row), evaluated once, through
@@ -207,7 +207,7 @@ def screen_session(
     *,
     sources: SourcesSettings | None = None,
     historical: bool = False,
-    held: Collection[str] = ALL_LICENCES,
+    held: Collection[str],
 ) -> ScreenSession:
     """Select -> screen -> audit for one resolved screener config on what was known at
     ``session_date``: no run record, no write (``run_screener`` saves it; the edge harness
@@ -216,8 +216,7 @@ def screen_session(
     listing history alive then (``data.listings.identity``; the edge harness only). ``held``:
     the data licences of the user the screen runs for (``services.licences.held_by``): selection
     and criteria never read a field under another licence. The default (all) is the edge
-    harness's, which records the licence of what it read itself (ADR 0064); ``run_screener``'s
-    caller (the screen job) always passes the user's."""
+    harness's (``HARNESS_ALL``), which records the licence of what it read itself (ADR 0064)."""
     now = now or datetime.now(UTC)
     if config.config.kind != "screener":
         raise ConfigurationError(f"{config.config.id} is a {config.config.kind}, not a screener")
@@ -238,7 +237,7 @@ def screen_session(
     excluded = _tolerated_stale(reader, session_date, now, sources)
     if config.config.impl in RULE_IMPLS:
         run, rules, missing_tables, fields = screen_rules(
-            reader, config, session_date, selected, features, gate, excluded, historical, held
+            reader, config, session_date, selected, features, gate, excluded, historical, held=held
         )
     else:
         screener = create_screener(config.config.impl, params=config.config.params)
@@ -260,7 +259,7 @@ def run_screener(
     now: datetime | None = None,
     *,
     sources: SourcesSettings | None = None,
-    held: Collection[str] = ALL_LICENCES,
+    held: Collection[str],
 ) -> ScreenOutcome:
     """Select -> screen -> audit -> save, for one resolved screener config and user.
     ``held``: the user's data licences: the run is evaluated without the fields under any other,
@@ -275,6 +274,7 @@ def run_screener(
     audit = {
         **run.audit(),
         "user": user,
+        "licences": sorted(held),  # the licences the run was evaluated under (ADR 0068)
         "config_id": config.config.id,
         "config_hash": config.hash,
         "config_version": rules.spec.version if rules else None,

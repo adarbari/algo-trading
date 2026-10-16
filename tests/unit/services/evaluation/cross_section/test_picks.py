@@ -17,6 +17,7 @@ from algotrade.services.evaluation.cross_section.picks import (
     eligible,
     screen_variant,
 )
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.run import screen_session
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.unit.services.evaluation.cross_section.conftest import (
@@ -70,7 +71,7 @@ def test_the_eligible_names_are_the_edges_universe_and_pre_snapshot_is_flagged()
 
 def test_screen_session_writes_no_result_and_no_run_record(world: World) -> None:
     config = resolve_config(world.configs, "momo", USER)
-    screened = screen_session(world.reader, config, DAYS[0])
+    screened = screen_session(world.reader, config, DAYS[0], held=HARNESS_ALL)
     assert screened.rules is not None and len(screened.rules.rows) == N
     assert world.backend.runs.find("screen-momo-site", None) == []
     assert world.reader.table_names().count("results/rule_screen") == 0

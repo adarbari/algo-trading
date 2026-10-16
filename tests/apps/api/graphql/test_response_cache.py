@@ -417,12 +417,17 @@ def test_gzip_with_q0_is_refused() -> None:
     assert not _accepts_gzip("")
 
 
-def test_an_operation_serving_per_name_values_is_never_shared_across_users() -> None:
-    """What a viewer may see differs by data licence (ADR 0028), so every operation that reads
-    catalogue values is cached per user, never per role alone."""
-    from algotrade_api.graphql.response_cache import (  # noqa: PLC0415
-        SHARED_OPERATIONS,
-        USER_OPERATIONS,
-    )
-
-    assert "MarketHistory" in USER_OPERATIONS and "MarketHistory" not in SHARED_OPERATIONS
+def test_two_viewers_with_different_licence_sets_never_share_an_entry() -> None:
+    """What a viewer may see differs by data licence (ADR 0028, 0068): even a SHARED operation
+    (keyed by role) has the licence set in its key, so a holder's answer is never served to
+    a viewer without the licence."""
+    holder = UserRecord("a", Role.TRADER, licences=("personal",))
+    other = UserRecord("b", Role.TRADER)
+    args = (1, 0)
+    for name in ("MarketHistory", "FeatureTable"):
+        held = response_key(*args, holder, "{ a }", None, name)
+        assert held != response_key(*args, other, "{ a }", None, name)
+    same = UserRecord("c", Role.TRADER, licences=("personal",))
+    assert response_key(*args, holder, "{ a }", None, "MarketHistory") == response_key(
+        *args, same, "{ a }", None, "MarketHistory"
+    )  # a shared operation is still shared by viewers with the same set

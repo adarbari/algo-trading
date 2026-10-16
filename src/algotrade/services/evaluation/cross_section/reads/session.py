@@ -29,6 +29,7 @@ from algotrade.services.evaluation.cross_section.picks import (
     SelectionReads,
     screen_variant,
 )
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.regime import session_market
 from algotrade.services.selection import fields_view
 
@@ -195,7 +196,7 @@ def numbers_at(
     """The numeric field ``field_name`` of ``ids`` read at ``day`` (None: not stored or not a
     number)."""
     wanted = sorted(ids)
-    view, _ = fields_view(reader, (field_name,), day, wanted, historical=True)
+    view, _ = fields_view(reader, (field_name,), day, wanted, historical=True, held=HARNESS_ALL)
     values = {i: view.get(i, field_name) for i in wanted}
     return {
         i: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
