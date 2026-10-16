@@ -1,8 +1,9 @@
 """``explain``: the admin-only chain behind a gap (ADR 0056), from stored facts only.
 
 A construction site knows the leaf (a table with nothing for the session). ``explain`` walks
-upstream of it: the table's own writer step in the session's latest nightly run record (which
-records each step's ``tables`` since ADR 0056; an older record has none, so the chain stops at
+upstream of it: the table's own writer step in the session's latest nightly run record, or in
+its latest post-session record for the steps that run after it (ADR 0070: descriptions, verify;
+each step records its ``tables`` since ADR 0056; an older record has none, so the chain stops at
 the table), and, when that step is fine, the tables its feature group reads
 (``FeatureGroup.inputs``, a bounded depth). A step that is not SUCCEEDED becomes a STEP link,
 with a SOURCE link before it when it was SKIPPED because a source was down. Called only for
@@ -21,7 +22,8 @@ from algotrade.services.read.availability.cause import (
     CauseLink,
 )
 from algotrade.services.read.context import ResultCache, Stores
-from algotrade.services.read.session import NIGHTLY
+from algotrade.services.read.session import NIGHTLY, POST_SESSION
+from algotrade.storage.runs import RunRecord
 
 __all__ = ["explain", "failed_tables"]
 
@@ -44,8 +46,9 @@ def not_delivered(step: Mapping[str, Any]) -> bool:
 def _nightly(
     reader: StoreReader, session: date, cache: ResultCache | None = None
 ) -> tuple[str | None, Steps]:
-    """The run id and recorded steps of the session's latest nightly record (none: no record);
-    read once per published state of the store when a ``cache`` is given."""
+    """The run id and recorded steps of the session's latest nightly record (none: no record), with
+    the steps of its latest post-session record added (each carrying its own ``run_id``); read once
+    per published state of the store when a ``cache`` is given."""
     key = ("nightly-steps", session, reader.visible_seq())
     hit = cache.get(key) if cache is not None else None
     if hit is not None:
@@ -56,11 +59,25 @@ def _nightly(
         result: tuple[str | None, Steps] = (None, {})
     else:
         record = max(runs, key=lambda r: r.started_at)
-        steps = record.stats.get("steps")
-        result = (record.run_id, steps if isinstance(steps, dict) else {})
+        result = (record.run_id, {**_recorded(record), **_post_steps(reader, session)})
     if cache is not None:
         cache.put(key, result)
     return result
+
+
+def _recorded(record: RunRecord) -> Steps:
+    steps = record.stats.get("steps")
+    return steps if isinstance(steps, dict) else {}
+
+
+def _post_steps(reader: StoreReader, session: date) -> Steps:
+    """The steps of the session's latest post-session record, each tagged with that run's id (its
+    own record, not the nightly's, is what a cause link cites); none when it has not run."""
+    runs = reader.runs(POST_SESSION, session)
+    if not runs:
+        return {}
+    record = max(runs, key=lambda r: r.started_at)
+    return {n: {**s, "run_id": record.run_id} for n, s in _recorded(record).items()}
 
 
 def failed_tables(
@@ -110,6 +127,7 @@ def _step_links(
     """The SOURCE (when it was skipped) and STEP links of a step that did not deliver."""
     status = str(step.get("status", ""))
     words = str(step.get("error") or step.get("reason") or status)
+    run_id = str(step["run_id"]) if step.get("run_id") else run_id  # a post-session step's own run
     links: list[CauseLink] = []
     if status == "SKIPPED" and words.startswith(
         SKIPPED_PREFIX

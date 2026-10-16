@@ -55,6 +55,10 @@ path = "tests/architecture/guide"
 purpose = "fitness tests over the Guide's coverage (ADR 0051): enum values, sections, titled containers and web references covered by Guide entries, per architecture/guide_coverage.toml"
 
 [[test_dir]]
+path = "tests/architecture/ingestion"
+purpose = "fitness tests over the ingestion workflows: which steps stay in the nightly and which run in the post-session workflow (ADR 0070)"
+
+[[test_dir]]
 path = "tests/architecture/pipeline"
 purpose = "fitness tests over the delivery pipeline: the CI workflow's shape, the flaky-spec quarantine list, the local gates that keep a measured speed-up (docs/ci.md Pipeline)"
 

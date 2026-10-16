@@ -26,7 +26,6 @@ from algotrade_ingestion.tasks.maintenance.quality import Check, check_macro
 from algotrade_ingestion.workflows.nightly import nightly as nightly_module
 from algotrade_ingestion.workflows.nightly import screens as screens_module
 from algotrade_ingestion.workflows.nightly.nightly import (
-    EDGE_EVAL,
     EDGE_SIGNALS,
     FINALLY,
     NIGHTLY,
@@ -50,9 +49,7 @@ from tests.helpers.stored_frames import (
 D = date(2026, 10, 2)
 D1 = date(2026, 10, 1)
 AFTER_CLOSE = datetime(2026, 10, 2, 23, tzinfo=UTC)  # 19:00 New York: D has closed
-TASK_STEPS = [
-    s.name for s in (*NIGHTLY, *FINALLY) if s.name not in (SCREENS, EDGE_SIGNALS, EDGE_EVAL)
-]
+TASK_STEPS = [s.name for s in (*NIGHTLY, *FINALLY) if s.name not in (SCREENS, EDGE_SIGNALS)]
 
 
 class Calls:
@@ -187,7 +184,7 @@ def test_every_recorded_step_names_the_tables_its_task_writes(fake: Callable[...
 
 
 def test_an_optional_step_failing_is_a_warning(fake: Callable[..., Calls]) -> None:
-    fake(fail=("shares", "descriptions"))
+    fake(fail=("shares", "etf-holdings"))
     writer = store()
     summary = run_nightly(task_ctx(writer), Plan([D]))
     assert statuses(summary)["shares"] == "FAILED"
@@ -198,7 +195,7 @@ def test_an_optional_step_failing_is_a_warning(fake: Callable[..., Calls]) -> No
     details = [w["detail"] for w in summary["warnings"] if w["check"] == "optional_step"]
     assert details == [
         f"{D} shares: RuntimeError: shares broke",
-        f"{D} descriptions: RuntimeError: descriptions broke",
+        f"{D} etf-holdings: RuntimeError: etf-holdings broke",
     ]
 
 
@@ -886,8 +883,8 @@ def test_notifies_on_failure_and_always_writes_the_summary(
     # The notice carries the full report (the email body): subject, text and HTML.
     (note,) = notifier.notices
     assert (
-        note.subject == f"[algotrade] {D} nightly: FAILED · 9 steps with failures"
-    )  # bar-quality, outcomes, edge-signals, edge-eval and history-copy need bars
+        note.subject == f"[algotrade] {D} nightly: FAILED · 8 steps with failures"
+    )  # bar-quality, outcomes, edge-signals and history-copy need bars
     assert "bars FAILED: RuntimeError: bars broke" in note.text
     assert note.html.startswith("<!doctype html>") and "bars broke" in note.html
     assert summary["started_at"] <= summary["finished_at"]
@@ -950,10 +947,14 @@ def test_nightly_settings() -> None:
     doc = {
         "sessions": {"settle_minutes": 10, "max_catch_up": 2},
         "alerts": {"max_duration_minutes": 20},
+        "post": {"max_duration_minutes": 90},
         "notify": {"enabled": False, "desktop": False, "summary_path": "x.json"},
     }
     s = load_nightly(MemoryConfigStore({("site", "settings", "nightly"): doc}))
     assert (s.settle_minutes, s.max_catch_up, s.max_duration_minutes) == (10, 2, 20.0)
+    assert (
+        s.post_max_duration_minutes == 90.0 and NightlySettings().post_max_duration_minutes == 360.0
+    )
     assert (s.notify_enabled, s.notify_desktop, s.summary_path) == (False, False, "x.json")
     assert (s.email_enabled, s.smtp_host, s.smtp_port, s.email_max_examples) == (
         False,

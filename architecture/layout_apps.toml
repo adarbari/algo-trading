@@ -243,6 +243,10 @@ purpose = "workflows: ordered, isolated runs of registry tasks (no modules of it
 path = "apps/ingestion/algotrade_ingestion/workflows/nightly"
 purpose = "the nightly workflow: sessions, steps, screens, the summary report and notifications"
 
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/workflows/post_session"
+purpose = "the post-session workflow (ADR 0070): descriptions, verify and edge-eval after a session's nightly is done, with its own run record"
+
 # --------------------------------------------------------------------------- shared helpers
 
 [[shared]]

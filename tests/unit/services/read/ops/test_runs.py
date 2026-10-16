@@ -11,6 +11,7 @@ from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.services.read.ops.runs import (
     failure_groups,
     load_nightly_runs,
+    load_post_session_runs,
     load_run,
     load_run_items,
 )
@@ -98,3 +99,21 @@ def test_no_such_run_is_none(golden: StoreContext) -> None:
     for run_id in ("nope", ".hidden"):
         assert load_run(golden, run_id) is None
         assert load_run_items(golden, run_id) is None
+
+
+def test_post_session_runs_are_read_like_nightly_runs_and_apart_from_them() -> None:
+    backend = MemoryBackend()
+    day = date(2026, 10, 2)
+    nightly = start_run("nightly", day, NOW)
+    nightly.finish(NOW, stats={"steps": {"bars": {"status": "SUCCEEDED", "duration_s": 3.0}}})
+    post = start_run("post-session", day, NOW)
+    post.finish(NOW, stats={"steps": {"verify": {"status": "SKIPPED", "reason": "skipped: x"}}})
+    backend.runs.save(nightly)
+    backend.runs.save(post)
+    stores = _stores(backend)
+    [shown] = load_post_session_runs(stores, 5)
+    assert (shown.run_id, shown.session) == (post.run_id, day)
+    assert [(s.name, s.status, s.reason) for s in shown.steps] == [
+        ("verify", "SKIPPED", "skipped: x")
+    ]
+    assert [s.name for s in load_nightly_runs(stores, 5)[0].steps] == ["bars"]

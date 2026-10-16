@@ -3,7 +3,8 @@
 **Status:** accepted (2026-10-05; owner decision, including Massive's terms and staying on the
 free tier, so the 100 a night cap and the existing pacing stand). Extends
 [0012](0012-data-vendors.md) (Massive and SEC are used for a new dataset) and fills the
-planned `description` column of [layers.md](../data/layers.md) in a table of its own.
+planned `description` column of [layers.md](../data/layers.md) in a table of its own. The pull runs
+in the `post-session` workflow, after the nightly, since [0070](0070-post-session-workflow.md).
 
 ## Context
 The Explore Overview tab needs a short plain-text description of every ticker, stocks and ETFs

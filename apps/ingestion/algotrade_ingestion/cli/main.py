@@ -20,6 +20,11 @@
                               session resumes; --force reruns every step; --waive accepts a
                               step that cannot succeed, e.g. chains past their day: ADR 0039;
                               the owner only, never a session or agent: hook guard_waive)
+    algotrade-ingest post-session [--date D] [--force] [--wait]
+                              (descriptions, verify and edge-eval of the last session whose
+                              nightly is done, after it: ADR 0070; a quiet no-op when its
+                              post-session record exists; holds the ingest lock only for the
+                              first two)
     algotrade-ingest report   [--date D] [--out report.html] [--send] [--max-examples N]
                               (the nightly summary email for a past session; read-only)
     algotrade-ingest arrivals [--sessions N]
@@ -65,6 +70,8 @@ from algotrade.data import StoreReader
 from algotrade.services.configs import default_user
 from algotrade.services.jobs import RunLockedError, exclusive_run
 from algotrade.storage.factory import open_backend
+from algotrade.storage.runs import done_sessions
+from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.cli.commands import (
     arrivals_command,
@@ -83,15 +90,25 @@ from algotrade_ingestion.ops.schedule import (
     DEFAULT_WATCHDOG_MINUTES,
     LABEL,
     MONTHLY_LABEL,
+    POST_LABEL,
+    POST_WATCHDOG_MINUTES,
     WAKE_COMMAND,
     monthly_fill_plist,
     nightly_plist,
+    post_session_plist,
 )
 from algotrade_ingestion.tasks.framework.registry import TASKS, Task
 from algotrade_ingestion.tasks.framework.run import recover_unpublished
 from algotrade_ingestion.workflows.nightly.nightly import NIGHTLY
-from algotrade_ingestion.workflows.nightly.sessions import last_done
+from algotrade_ingestion.workflows.nightly.sessions import NIGHTLY_RUN, last_done
 from algotrade_ingestion.workflows.nightly.timing import DEFAULT_SESSIONS
+from algotrade_ingestion.workflows.post_session.post_session import (
+    BUSY,
+    POST_LOCK,
+    pending_session,
+    post_done,
+    target_session,
+)
 
 # Task commands kept under their own names (``algotrade-ingest bars ...``); every registry
 # task is also ``algotrade-ingest run <task>``. ``golden load`` runs the ``golden-load`` task.
@@ -118,7 +135,12 @@ def add_wait(parser: argparse.ArgumentParser) -> None:
 
 def writes(args: argparse.Namespace) -> bool:
     """Whether the command writes to the store (and so takes the run lock)."""
-    if args.command in ("schedule", "report", "arrivals"):
+    if args.command in (
+        "schedule",
+        "report",
+        "arrivals",
+        "post-session",
+    ):  # post-session: own locks
         return False
     return not (args.command == "golden" and args.action in ("build", "verify"))
 
@@ -146,6 +168,47 @@ def ingested_through(args: argparse.Namespace, writer: StoreWriter, now: datetim
 def nothing_to_do(session: date) -> int:
     print(f"nothing to do: {session} already ingested")
     return 0
+
+
+def post_session_refusal(
+    args: argparse.Namespace, writer: StoreWriter, session: date | None
+) -> int | None:
+    """The exit code when ``post-session`` has nothing to run (printed why), else ``None``."""
+    if session is None:
+        print("nothing to do: no session has a done nightly yet")
+        return 0
+    if args.date is None and not args.force and post_done(writer, session):
+        print(f"nothing to do: {session} already post-processed")
+        return 0
+    if args.date is not None and session not in done_sessions(writer.runs_for(NIGHTLY_RUN)):
+        print(f"error: no done nightly for {session}", file=sys.stderr)
+        return 2
+    return None
+
+
+def post_session(args: argparse.Namespace, backend: Backend) -> int:
+    """``post-session``: for ``--date`` (a session with a done nightly) or, without it, the last
+    session the nightly finished done; a no-op when its post-session record exists (``--force``
+    runs again). Holds the named ``post-session`` lock for the run; the ingest lock only for the
+    steps that write tables (``post_session.run_post_session``), so edge-eval runs outside it."""
+    writer = StoreWriter(backend)
+    session = args.date or target_session(writer)
+    refused = post_session_refusal(args, writer, session)
+    if session is None or refused is not None:
+        return refused or 0
+    try:
+        with exclusive_run(backend, POST_LOCK, wait=args.wait):
+            if args.date is None and not args.force and pending_session(writer) != session:
+                return 0  # finished by another run while this one queued
+            params = {"session": session.isoformat(), "wait": args.wait}
+            job = run_job(args, StoreReader(backend), writer, "post-session", params, SITE_USER)
+    except RunLockedError as exc:  # another post-session run: not an error when scheduled
+        print(f"busy: {exc}")
+        return LOCKED_EXIT
+    if job.result.get("status") == BUSY:  # the ingest lock is taken: a later start retries
+        print(f"busy: {job.result.get('reason')}")
+        return LOCKED_EXIT
+    return report(job)
 
 
 def add_task_arguments(parser: argparse.ArgumentParser, spec: Task) -> None:
@@ -194,6 +257,15 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
         else:
             s.add_argument("--config", default="short_premium_liquidity", help="config id")
             s.add_argument("--user", help="config owner (default: $ALGOTRADE_USER or site)")
+    ps = sub.add_parser(
+        "post-session",
+        help="descriptions, verify and edge-eval of the last nightly-done session (ADR 0070)",
+    )
+    ps.add_argument("--date", type=date.fromisoformat, help="session (default: last nightly-done)")
+    ps.add_argument(
+        "--force", action="store_true", help="run even when the session has a post-session record"
+    )
+    add_wait(ps)
     dh = sub.add_parser(
         "deploy-hold", help="run a command under the deploy and ingest locks (exit 75: busy)"
     )
@@ -201,8 +273,8 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
     dh.add_argument("cmd", nargs=argparse.REMAINDER)
     sc = sub.add_parser(
         "schedule",
-        help="write the launchd agents of the nightly job and the monthly Tiingo fill "
-        "(not installed)",
+        help="write the launchd agents of the nightly job, the post-session watchdog and the "
+        "monthly Tiingo fill (not installed)",
     )
     sc.add_argument(
         "--time",
@@ -216,8 +288,15 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
         help=f"also start every N minutes to heal missed runs; 0: off "
         f"(default {DEFAULT_WATCHDOG_MINUTES})",
     )
+    sc.add_argument(
+        "--post-watchdog-minutes",
+        type=positive,
+        default=POST_WATCHDOG_MINUTES,
+        help=f"the post-session agent starts every N minutes (default {POST_WATCHDOG_MINUTES})",
+    )
     sc.add_argument("--export-dir", type=Path, default=Path("out"))
     sc.add_argument("--out", type=Path, default=Path("var") / f"{LABEL}.plist")
+    sc.add_argument("--post-out", type=Path, default=Path("var") / f"{POST_LABEL}.plist")
     sc.add_argument(
         "--monthly-out", type=Path, default=Path("var") / f"{MONTHLY_LABEL}.plist",
         help="where to write the monthly `bars-history --fill` agent (2nd of the month, 19:00)",
@@ -265,13 +344,25 @@ def write_schedule(args: argparse.Namespace) -> int:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     watchdog_s = args.watchdog_minutes * 60
     args.out.write_bytes(nightly_plist(repo, hour, minute, export_dir, watchdog_s))
+    args.post_out.parent.mkdir(parents=True, exist_ok=True)
+    args.post_out.write_bytes(post_session_plist(repo, args.post_watchdog_minutes * 60))
     args.monthly_out.parent.mkdir(parents=True, exist_ok=True)
     args.monthly_out.write_bytes(monthly_fill_plist(repo))
     target = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
     monthly_target = Path.home() / "Library" / "LaunchAgents" / f"{MONTHLY_LABEL}.plist"
+    post_target = Path.home() / "Library" / "LaunchAgents" / f"{POST_LABEL}.plist"
     print_json(
         {
             "written": str(args.out),
+            "post_session_written": str(args.post_out),
+            "post_session_watchdog_minutes": args.post_watchdog_minutes,
+            "post_session_install": [
+                f"mkdir -p {repo / 'var' / 'logs'}",
+                f"launchctl unload {post_target} 2>/dev/null || true",
+                f"cp {args.post_out.resolve()} {post_target}",
+                f"launchctl load {post_target}",
+            ],
+            "post_session_uninstall": [f"launchctl unload {post_target}", f"rm {post_target}"],
             "monthly_written": str(args.monthly_out),
             "monthly_install": [
                 f"mkdir -p {repo / 'var' / 'logs'}",
@@ -308,8 +399,12 @@ def task_params(args: argparse.Namespace, session: date) -> dict[str, Any]:
 
 
 def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter) -> int:
-    if args.command == "schedule":
-        return write_schedule(args)
+    if args.command in ("schedule", "post-session"):  # no session of their own to resolve
+        return (
+            write_schedule(args)
+            if args.command == "schedule"
+            else post_session(args, writer.backend)
+        )
     explicit = getattr(args, "date", None) or getattr(args, "session", None)
     session = explicit or default_session(args, datetime.now(UTC))
     if args.command == "golden":
@@ -379,7 +474,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ingest=not args.deploy_only,
         )
     try:
-        if args.command == "nightly":  # never an unmerged branch against the real store
+        if args.command in ("nightly", "post-session"):  # never a branch against the real store
             ensure_main_checkout()
         if not writes(args):
             return _dispatch(args, StoreReader(backend), StoreWriter(backend))

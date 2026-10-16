@@ -268,6 +268,9 @@ def render_text(report: Report) -> str:
     out += [f"{k + ':':<21}{v}" for k, v in _header(report)]
     out += ["", "STATISTICS", "", *_table(STEP_HEAD, _step_rows(report))]
     out += _text_timing(report)
+    out += ["", f"POST-SESSION: {_post_heading(report)}"]
+    if report.post_steps:
+        out += ["", *_table(STEP_HEAD, _post_rows(report))]
     if report.screens:
         out += ["", "Screens"]
         for sc in report.screens:
@@ -294,6 +297,25 @@ def render_text(report: Report) -> str:
     if report.hints:
         out += ["", "WHAT TO DO", ""] + [f"- {h}" for h in report.hints]
     return "\n".join(out) + "\n"
+
+
+def _post_rows(report: Report) -> list[list[str]]:
+    rows = []
+    for s in report.post_steps:
+        detail = _pairs(s.counts)
+        if s.note:
+            detail = f"{detail}; {s.note}" if detail else s.note
+        rows.append([s.step, s.status, duration(s.duration_s), _pairs(s.items), detail])
+    return rows
+
+
+def _post_heading(report: Report) -> str:
+    """The post-session section's one line: its status and time, or that it has not run yet."""
+    if not report.post_status:
+        return "not run yet (it starts after the nightly, ADR 0070)"
+    limit = report.max_post_duration_s
+    slow = limit is not None and report.post_duration_s > limit
+    return f"{report.post_status}, {duration(report.post_duration_s)}" + (" (slow)" if slow else "")
 
 
 def _text_timing(report: Report) -> list[str]:
@@ -399,6 +421,9 @@ def render_html(report: Report) -> str:
         h2.format("Statistics"),
         _html_table(STEP_HEAD, _step_rows(report), status_col=1),
     ]
+    parts.append(h2.format(f"Post-session: {_post_heading(report)}"))
+    if report.post_steps:
+        parts.append(_html_table(STEP_HEAD, _post_rows(report), status_col=1))
     if report.timings:
         parts += [
             h2.format("Run timing (America/Los_Angeles)"),

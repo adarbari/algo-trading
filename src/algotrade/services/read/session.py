@@ -32,6 +32,9 @@ from algotrade.storage.tables.spec import SCHEMA_VERSION
 
 BARS = "bars/1d"
 NIGHTLY = "nightly"  # the job name of the nightly workflow's per-session run records
+# The post-session workflow's records (ADR 0070): descriptions, verify, edge-eval. Never read for
+# completeness or the cutoff (ADR 0062 reads ``NIGHTLY`` alone); only to explain a gap, for Admin.
+POST_SESSION = "post-session"
 # The architecture registry at the repo root (the workspace installs this package editable).
 TABLES = Path(__file__).resolve().parents[4] / "architecture" / "tables.toml"
 

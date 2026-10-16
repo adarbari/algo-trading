@@ -21,19 +21,19 @@ names in its result: nothing is pushed or sent. It needs ``screens`` (settlement
 open when its outcome is not stored) and is not critical: a failed job is a warning naming the
 user, never a hold on the session or a later one.
 
-The ``edge-eval`` step (``edge_eval_jobs``) runs one ``edge-eval`` job per open edge (not
-rejected or blocked, with screeners or baselines) as the edge's owner over the stored outcome
-sessions (ADR 0063), under the owner's evaluation claim: ``mode="incremental"`` (reuse the stored
-legs), or ``mode="audit"`` (recompute every leg, compare, rewrite the ones that differ, FAIL
-naming them) on the first night of the ISO week that runs the step (the edge has no audit run
-that week yet). It needs ``outcomes`` and ``screens`` and is not critical: a job that is not
-COMPLETE fails the step, a warning naming the edge, never a hold on the session or a later one.
+The ``edge-eval`` step (``edge_eval_jobs``) is the ``post-session`` workflow's (ADR 0070), not the
+nightly's: it runs one ``edge-eval`` job per open edge (not rejected or blocked, with screeners or
+baselines) as the edge's owner over the stored outcome sessions (ADR 0063), under the owner's
+evaluation claim: ``mode="incremental"`` (reuse the stored legs), or ``mode="audit"`` (recompute
+every leg, compare, rewrite the ones that differ, FAIL naming them) when ``audit_due`` (the week's
+last session, or the edge's last audit is over 9 days old). A job that is not COMPLETE fails the
+step, a warning naming the edge, never a hold on anything.
 """
 
 import logging
 from collections.abc import Callable
 from contextlib import nullcontext
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +41,7 @@ from algotrade.config.edges.document import CLOSED, Edge, job_name
 from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import AlgoTradeError
+from algotrade.core.time.calendar import last_session_of_week
 from algotrade.data import StoreReader
 from algotrade.services.configs import nightly_screeners
 from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
@@ -150,17 +151,23 @@ def signal_jobs(jobs: JobRunner, configs: ConfigStore, reader: StoreReader) -> S
     return run
 
 
-def audited_this_week(backend: Backend | None, edge: Edge, session: date) -> bool:
-    """The edge already has an audit run in the ISO week of ``session`` (ADR 0063 amendment 6):
-    the audit is due on the week's first night that runs the step, not on a fixed weekday, so a
-    catch-up night that skipped the Monday still audits on the Tuesday."""
+AUDIT_MAX_AGE = timedelta(days=9)  # an edge never goes longer than this without an audit
+
+
+def audit_due(backend: Backend | None, edge: Edge, session: date) -> bool:
+    """The edge's weekly audit is due (ADR 0063 amendment 6, moved by ADR 0070): on the last
+    session of the ISO week of ``session``, or when its last audit run is more than 9 days
+    older than ``session`` (none on record: due). Every other night is incremental."""
+    if session == last_session_of_week(session):
+        return True
     if backend is None:
-        return False
-    week = session.isocalendar()[:2]
-    return any(
-        r.stats.get("mode") == "audit" and r.started_at.isocalendar()[:2] == week
+        return True
+    audits = [
+        r.started_at
         for r in backend.runs.find(job_name(edge.id, edge.owner))
-    )
+        if r.stats.get("mode") == "audit"
+    ]
+    return not audits or session - max(audits).date() > AUDIT_MAX_AGE
 
 
 def edge_eval_jobs(
@@ -182,7 +189,7 @@ def edge_eval_jobs(
             return Outcome(StepStatus.SKIPPED, {"evaluations": []}, reason)
         summaries, short, warnings = [], [], []
         for edge in edges:
-            mode = "incremental" if audited_this_week(backend, edge, session) else "audit"
+            mode = "audit" if audit_due(backend, edge, session) else "incremental"
             params = {
                 "edge": edge.id,
                 "start": stored[0].isoformat(),

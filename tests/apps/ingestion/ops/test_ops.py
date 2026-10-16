@@ -12,7 +12,14 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.ops.schedule import LABEL, MONTHLY_LABEL, monthly_fill_plist, nightly_plist
+from algotrade_ingestion.ops.schedule import (
+    LABEL,
+    MONTHLY_LABEL,
+    POST_LABEL,
+    monthly_fill_plist,
+    nightly_plist,
+    post_session_plist,
+)
 from algotrade_ingestion.tasks.maintenance.quality import check_chains, run_quality
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import chain_status_rows, stamped, universe_rows
@@ -291,6 +298,24 @@ def test_nightly_plist() -> None:
         nightly_plist(Path("/repo"), 25, 0)
     with pytest.raises(ValueError, match="invalid watchdog"):
         nightly_plist(Path("/repo"), 15, 0, watchdog_s=-1)
+
+
+def test_post_session_plist() -> None:
+    """ADR 0070: a second agent, no calendar time: at login and every 30 minutes it starts the
+    command, which is a quiet no-op until the nightly is done and again once post-session is."""
+    plist = plistlib.loads(post_session_plist(Path("/repo")))
+    assert plist["Label"] == POST_LABEL != LABEL
+    assert plist["ProgramArguments"] == [
+        "/usr/bin/caffeinate", "-i", "-s", "/repo/.venv/bin/algotrade-ingest", "post-session",
+    ]  # fmt: skip
+    assert plist["RunAtLoad"] is True and plist["StartInterval"] == 1800
+    assert "StartCalendarInterval" not in plist  # the watchdog alone: it starts after the nightly
+    assert plist["WorkingDirectory"] == "/repo"
+    assert plist["StandardOutPath"] == "/repo/var/logs/post-session.log"
+    assert plist["StandardErrorPath"] == "/repo/var/logs/post-session.err.log"
+    assert plistlib.loads(post_session_plist(Path("/repo"), 600))["StartInterval"] == 600
+    with pytest.raises(ValueError, match="invalid watchdog"):
+        post_session_plist(Path("/repo"), 0)
 
 
 def test_monthly_fill_plist() -> None:

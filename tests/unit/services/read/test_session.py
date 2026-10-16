@@ -12,6 +12,7 @@ from algotrade.services.read.availability.cause import UnavailableKind
 from algotrade.services.read.session import (
     EXPECTED_TABLES,
     NIGHTLY,
+    POST_SESSION,
     Grain,
     NewerSession,
     NewerState,
@@ -22,6 +23,7 @@ from algotrade.services.read.session import (
     grain_of,
     latest_session,
     resolve_session,
+    session_cutoff,
 )
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord, RunStatus
@@ -298,3 +300,29 @@ def test_the_default_session_is_one_function_for_reads_and_runs() -> None:
     nightly(reader, D1, RunStatus.COMPLETE)
     nightly(reader, D2, RunStatus.FAILED)
     assert default_session(reader) == D1 == resolve_session(reader, None, EXPECTED).date
+
+
+def test_the_cutoff_is_the_nightlys_finish_even_when_post_session_finishes_later() -> None:
+    """ADR 0070: the post-session run (descriptions, verify, edge-eval) hours after the nightly
+    never moves a session's cutoff or its completeness (ADR 0062 reads the nightly alone)."""
+    writer, reader = store()
+    write_bar(writer, D3)
+    finished = datetime(2026, 10, 2, 21, tzinfo=UTC)
+    nightly = RunRecord("nightly-a", NIGHTLY, D3, datetime(2026, 10, 2, 20, tzinfo=UTC))
+    reader._backend.runs.save(nightly.finish(finished))
+    late = datetime(2026, 10, 3, 3, tzinfo=UTC)
+    post = RunRecord("post-a", POST_SESSION, D3, datetime(2026, 10, 2, 21, 30, tzinfo=UTC))
+    reader._backend.runs.save(post.finish(late))
+    found = resolve_session(reader, D3, EXPECTED)
+    assert found.cutoff == finished and found.complete is True
+    assert session_cutoff(reader.runs(POST_SESSION), D3) == late  # what it must not be read as
+    assert session_cutoff(reader.runs(NIGHTLY), D3) == finished
+
+
+def test_a_post_session_record_alone_does_not_make_a_session_complete() -> None:
+    writer, reader = store()
+    write_bar(writer, D3)
+    post = RunRecord("post-a", POST_SESSION, D3, datetime(2026, 10, 2, 22, tzinfo=UTC))
+    reader._backend.runs.save(post.finish(datetime(2026, 10, 2, 23, tzinfo=UTC)))
+    found = resolve_session(reader, D3, EXPECTED)
+    assert found.complete is False and found.cutoff is None

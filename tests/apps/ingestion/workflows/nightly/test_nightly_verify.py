@@ -1,7 +1,7 @@
-"""Nightly and IBKR: ``verify`` runs after the screens for the latest session only (optional);
-``ibkr-contracts`` and ``ibkr-iv`` run after the chains and before the rollups (latest session
-only); all are SKIPPED with a WARN (never FAILED) when ``[ibkr]`` is disabled or the gateway is
-not reachable; the email gets a "Verification vs IBKR" section and IBKR IV coverage."""
+"""Nightly and IBKR: ``ibkr-contracts`` and ``ibkr-iv`` run after the chains and before the rollups
+(latest session only); both are SKIPPED with a WARN (never FAILED) when ``[ibkr]`` is disabled or
+the gateway is not reachable; the email gets a "Verification vs IBKR" section (``verify`` itself
+is the post-session workflow's, ADR 0070) and IBKR IV coverage."""
 
 from collections.abc import Mapping
 from dataclasses import replace
@@ -17,7 +17,6 @@ from algotrade_ingestion.tasks.framework import registry
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.workflows.nightly import nightly as nightly_module
 from algotrade_ingestion.workflows.nightly.nightly import (
-    EDGE_EVAL,
     EDGE_SIGNALS,
     FINALLY,
     NIGHTLY,
@@ -33,7 +32,7 @@ from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import stamped, universe_rows
 
 D, BEFORE = date(2026, 10, 2), date(2026, 10, 1)
-IBKR_STEPS = ("verify", "ibkr-contracts", "ibkr-iv")
+IBKR_STEPS = ("ibkr-contracts", "ibkr-iv")
 
 
 def _complete(name: str) -> Any:
@@ -50,7 +49,7 @@ def others_fake(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every nightly task but the IBKR ones is a fake that completes; no acceptance checks."""
     monkeypatch.setattr(nightly_module, "NIGHTLY", tuple(replace(s, accept=()) for s in NIGHTLY))
     for step in (*NIGHTLY, *FINALLY):
-        if step.name not in (SCREENS, EDGE_SIGNALS, EDGE_EVAL, *IBKR_STEPS):
+        if step.name not in (SCREENS, EDGE_SIGNALS, *IBKR_STEPS):
             spec = registry.TASKS[step.name]
             fake = replace(spec, run=_complete(step.name), sources=(), skip=None)
             monkeypatch.setitem(registry.TASKS, step.name, fake)
@@ -62,11 +61,7 @@ def store() -> StoreWriter:
     return writer
 
 
-def test_verify_runs_after_screens_latest_only_and_optional() -> None:
-    names = [s.name for s in NIGHTLY]
-    assert names.index(SCREENS) < names.index("verify")
-    verify = next(s for s in NIGHTLY if s.name == "verify")
-    assert verify.latest_only and not verify.critical
+def test_the_ibkr_steps_are_optional() -> None:
     assert not any(s.critical for s in NIGHTLY if s.name.startswith("ibkr-"))
 
 
@@ -109,11 +104,7 @@ def test_an_unreachable_gateway_skips_verify_with_a_warn_and_a_hint() -> None:
         assert steps[name]["status"] == "SKIPPED", name
         assert steps[name]["reason"].startswith("skipped: WARN: IB Gateway not reachable on 12")
     report = build_report(summary, {})
-    [line] = report.verification
-    assert line.status == "SKIPPED" and "not reachable" in line.note
-    assert any("IB Gateway (Read-Only API" in h for h in report.hints)
-    assert "VERIFICATION VS IBKR" in render_text(report)
-    assert "Verification vs IBKR" in render_html(report)
+    assert report.verification == ()  # verify is the post-session workflow's (ADR 0070)
 
 
 def test_the_email_section_lists_counts_and_failing_examples() -> None:
