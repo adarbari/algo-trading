@@ -8,6 +8,7 @@ across tags); a TTM is the last four consecutive discrete quarters, else the lat
 Pure functions: no I/O, no pandas.
 """
 
+from dataclasses import dataclass
 from itertools import pairwise
 
 # Months of a reported period by its length in days (52 / 53-week fiscal years included).
@@ -15,6 +16,23 @@ SPANS = ((3, 75, 105), (6, 160, 200), (9, 250, 290), (12, 340, 380))
 QUARTER_GAP = (75, 105)  # days between the ends of consecutive quarters
 YEAR_GAP = (340, 380)  # days between a period end and the same period a year earlier
 DERIVE_GAP = 150  # days apart two year-to-date facts may be filed to be subtracted
+
+
+@dataclass(frozen=True)
+class TtmParams:
+    """How far back statement facts are read and when a trailing figure is stale; shared by
+    ``financials@v2`` and the statement groups so the two never drift apart."""
+
+    stale_days: int = 480  # a TTM whose period ended longer ago is STALE (still shown)
+    history_days: int = 1100  # facts whose period ended earlier than this are not read
+
+    def __post_init__(self) -> None:
+        if self.stale_days < 1:
+            raise ValueError(f"stale_days must be >= 1, got {self.stale_days}")
+        if self.history_days < 800:
+            raise ValueError(
+                f"history_days must be >= 800 (eight quarters), got {self.history_days}"
+            )
 
 
 type Fact = tuple[int, int, float, int, int]  # start, end (epoch days), value, filed, tag rank

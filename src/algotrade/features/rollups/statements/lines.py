@@ -13,13 +13,12 @@ Pure functions over frames: no storage.
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
 
-from algotrade.features.rollups.statements.ttm import Fact, Total, trailing
+from algotrade.features.rollups.statements.ttm import Fact, Total, TtmParams, trailing
 
 PRICE_STATS = "rollups/instrument/price_stats@v2"
 STATEMENTS = "instruments/statements"
@@ -34,18 +33,7 @@ type Ranks = Mapping[str, Mapping[str, int]]  # concept -> tag -> rank (0 is the
 type Lines = dict[str, dict[str, list[Fact]]]  # instrument -> concept -> facts
 
 
-@dataclass(frozen=True)
-class StatementParams:
-    stale_days: int = 480  # a TTM whose period ended longer ago is STALE (still shown)
-    history_days: int = 1100  # facts whose period ended earlier than this are not read
-
-    def __post_init__(self) -> None:
-        if self.stale_days < 1:
-            raise ValueError(f"stale_days must be >= 1, got {self.stale_days}")
-        if self.history_days < 800:
-            raise ValueError(
-                f"history_days must be >= 800 (eight quarters), got {self.history_days}"
-            )
+StatementParams = TtmParams
 
 
 def tag_ranks(concepts: Mapping[str, Sequence[str]]) -> Ranks:

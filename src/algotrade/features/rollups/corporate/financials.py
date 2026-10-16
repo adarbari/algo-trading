@@ -62,7 +62,6 @@ get no P/E.
     financials_status                              OK / PARTIAL / NO_TTM / NO_FACTS / STALE
 """
 
-from dataclasses import dataclass
 from datetime import date, timedelta
 
 import numpy as np
@@ -78,6 +77,7 @@ from algotrade.features.rollups.statements.ttm import (
     Fact,
     Quarters,
     Total,
+    TtmParams,
     annual,
     discrete_quarters,
     latest_quarter,
@@ -248,18 +248,7 @@ FEATURES = (
 COLUMNS = column_types(FEATURES)
 
 
-@dataclass(frozen=True)
-class FinancialsParams:
-    stale_days: int = 480  # a TTM whose period ended longer ago is STALE (EPS: eps_stale)
-    history_days: int = 1100  # facts whose period ended earlier than this are not read
-
-    def __post_init__(self) -> None:
-        if self.stale_days < 1:
-            raise ValueError(f"stale_days must be >= 1, got {self.stale_days}")
-        if self.history_days < 800:
-            raise ValueError(
-                f"history_days must be >= 800 (eight quarters), got {self.history_days}"
-            )
+FinancialsParams = TtmParams
 
 
 def split_lookback(p: FinancialsParams) -> int:
