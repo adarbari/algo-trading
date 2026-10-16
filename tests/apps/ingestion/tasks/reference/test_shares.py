@@ -8,15 +8,18 @@ import pandas as pd
 
 from algotrade.data import StoreReader
 from algotrade.data.shares import TABLE, share_facts, stored_shares
+from algotrade.data.statements.reading import TABLE as STATEMENTS
+from algotrade.data.statements.reading import statement_facts, stored_statements
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.reference.shares import SharesSources, _rows, ingest_shares
 from algotrade_sources.framework.http import HttpError, RetryPolicy
-from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
+from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts, parse_statements
 from tests.helpers.ingest_fakes import http_for, task_ctx
 from tests.helpers.stored_frames import stamped
 from tests.libs.sources.vendors.sec.test_company_facts import PAYLOAD
+from tests.libs.sources.vendors.sec.test_statement_concepts import AAPL as AAPL_STATEMENTS
 
 DAY = date(2026, 10, 2)
 CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731
@@ -30,9 +33,10 @@ GOOGL_FACTS = (
 
 
 class FakeFacts:
-    def __init__(self, broken: set[str] | None = None) -> None:
+    def __init__(self, broken: set[str] | None = None, aapl: bytes = PAYLOAD) -> None:
         self.urls: list[str] = []
         self.broken = broken or set()
+        self.aapl = aapl
 
     def __call__(self, url: str) -> bytes:
         self.urls.append(url)
@@ -40,7 +44,7 @@ class FakeFacts:
         if cik in self.broken:
             raise HttpError(500)
         if cik == "0000320193":
-            return PAYLOAD
+            return self.aapl
         if cik == GOOGL_CIK:
             return GOOGL_FACTS
         raise HttpError(404)  # SPY's trust: no XBRL facts
@@ -202,3 +206,76 @@ def test_the_writer_keeps_every_tag_of_a_period_and_collapses_a_same_tag_amendme
     assert sorted(revenue["value"]) == [100.0, 102.0]
     assert set(revenue["tag"]) == {"us-gaap:Revenues", "us-gaap:SalesRevenueNet"}
     assert list(rows[rows["concept"] == "checked"]["tag"]) == [None]
+
+
+def test_one_fetch_writes_the_shares_and_the_statements() -> None:
+    writer, reader = store()
+    feed = FakeFacts(aapl=AAPL_STATEMENTS)
+    record = ingest_shares(task_ctx(writer, reader, CLOCK), sources(feed), DAY)
+    assert record.status is RunStatus.COMPLETE
+    assert sorted(u.rsplit("CIK", 1)[1][:10] for u in feed.urls) == sorted(
+        {"0000320193", GOOGL_CIK, "0000884394"}
+    )  # the document of each CIK is fetched once, for both tables
+    expected = len(parse_statements(AAPL_STATEMENTS))
+    facts = statement_facts(reader, DAY)
+    assert len(facts) == expected > 0 and set(facts["instrument_id"]) == {"EQ:AAPL"}
+    assert record.stats["statement_rows"] == expected + 4  # + a marker per instrument of each CIK
+    stored = stored_statements(reader)
+    assert set(stored[stored["concept"] == "checked"]["instrument_id"]) == {
+        "EQ:AAPL", "EQ:GOOGL", "EQ:GOOG", "EQ:SPY",
+    }  # fmt: skip
+    assert len(share_facts(reader)) > 0  # the same document's share counts
+    assert writer.raw.get("sec_edgar", "companyfacts", DAY, record.run_id, "0000320193") == (
+        AAPL_STATEMENTS
+    )
+
+
+def test_a_statements_failure_after_the_shares_stored_leaves_the_statements_due() -> None:
+    """Fails if a CIK's due date came from the shares table alone: its marker there is fresh,
+    so the CIK would wait 30 days for statements that were never stored."""
+    writer, reader = store()
+    put = writer.staging.put
+
+    def put_unless_statements(run_id: str, table: str, key: str, frame: pd.DataFrame) -> None:
+        if table == STATEMENTS and key == "0000320193":
+            raise OSError("disk full")
+        put(run_id, table, key, frame)
+
+    writer.staging.put = put_unless_statements  # type: ignore[method-assign]
+    first = ingest_shares(
+        task_ctx(writer, reader, CLOCK), sources(FakeFacts(aapl=AAPL_STATEMENTS)), DAY
+    )
+    assert first.status is RunStatus.PARTIAL and first.stats["failed"][0].startswith("0000320193")
+    shares = stored_shares(reader)
+    assert "EQ:AAPL" in set(shares[shares["concept"] == "checked"]["instrument_id"])
+    stored = stored_statements(reader)
+    assert "EQ:AAPL" not in set(stored["instrument_id"])  # no statements, and no marker
+    writer.staging.put = put  # type: ignore[method-assign]
+    nxt = DAY + timedelta(days=1)  # far from the 30-day slot of the shares marker
+    feed = FakeFacts(aapl=AAPL_STATEMENTS)
+    second = ingest_shares(task_ctx(writer, reader, CLOCK), sources(feed), nxt)
+    assert "0000320193" in {u.rsplit("CIK", 1)[1][:10] for u in feed.urls}
+    assert second.status is RunStatus.COMPLETE
+    again = statement_facts(reader, nxt)
+    assert len(again) == len(parse_statements(AAPL_STATEMENTS))
+
+
+def test_a_new_class_gets_the_statements_of_its_ciks_stored_facts_too() -> None:
+    writer, reader = store()
+    kwargs = {"refresh_days": 100000}  # nothing is due again on the next day
+    ingest_shares(
+        task_ctx(writer, reader, CLOCK), sources(FakeFacts(aapl=AAPL_STATEMENTS), **kwargs), DAY
+    )
+    nxt = DAY + timedelta(days=1)
+    reference = reader.table("instruments/reference", DAY)
+    assert reference is not None
+    row = reference[reference["symbol"] == "AAPL"].assign(instrument_id="EQ:AAPL2", symbol="AAPL2")
+    writer.write_table("instruments/reference", nxt, "u2", pd.concat([reference, row]))
+    feed = FakeFacts(aapl=AAPL_STATEMENTS)
+    record = ingest_shares(task_ctx(writer, reader, CLOCK), sources(feed, **kwargs), nxt)
+    assert record.stats["requested"] == 0 and not feed.urls
+    expected = len(parse_statements(AAPL_STATEMENTS))
+    assert record.stats["statements_carried"] == expected
+    facts = statement_facts(reader, nxt)
+    assert len(facts[facts["instrument_id"] == "EQ:AAPL2"]) == expected
+    assert len(facts[facts["instrument_id"] == "EQ:AAPL"]) == expected

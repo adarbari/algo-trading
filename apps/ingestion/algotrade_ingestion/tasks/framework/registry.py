@@ -571,9 +571,9 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "shares",
-            "shares outstanding from SEC company facts (incremental)",
+            "shares, financials and statement lines from SEC company facts (incremental)",
             shares,
-            ("instruments/shares",),
+            ("instruments/shares", "instruments/statements"),
             _shares,
             sources=("sec_company_facts",),
             settings="sources.toml [sec_edgar] facts_refresh_days",
