@@ -91,7 +91,7 @@ class SignalJobs:
             user=user.user_id,
             submitted_at=datetime(2026, 10, 2, 22, tzinfo=UTC),
             status=JobStatus.FAILED if failed else JobStatus.COMPLETE,
-            result={} if failed else {"signalled": {"drift": 5}},
+            result={} if failed else {"signalled": {"drift": 5}, "mode": "full"},
             error="boom" if failed else None,
         )
 
@@ -295,3 +295,14 @@ def test_an_owner_with_an_evaluation_in_flight_is_a_busy_warning_not_a_crash(
     assert [e["status"] for e in step.result["evaluations"]] == ["complete", "busy"]
     (warning,) = step.checks
     assert warning["name"] == "edge_eval_busy" and warning["detail"].startswith("mine:")
+
+
+def test_edge_eval_summary_carries_the_mode_the_harness_ran_beside_the_requested_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A FULL fallback of an incremental request must show in the run record."""
+    _edges(monkeypatch, ("drift", "site", "evidenced", True))
+    backend = MemoryBackend()
+    _audited(backend, "drift", "site", MONDAY)
+    (summary,) = _eval_step(SignalJobs(), WEDNESDAY, backend).result["evaluations"]
+    assert (summary["mode"], summary["effective_mode"]) == ("incremental", "full")
