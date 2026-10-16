@@ -75,14 +75,15 @@ def instrument_ciks(reader: StoreReader, session: date) -> pd.DataFrame:
 def _rows(facts: pd.DataFrame, members: pd.DataFrame, fetched_on: date) -> pd.DataFrame:
     """One CIK's facts for each of its instruments, plus a ``checked`` marker each."""
     marker = pd.DataFrame(
-        [{"concept": CHECKED, "period_start": None, "period_end": None, "filed": None}]
+        [{"concept": CHECKED, "tag": None, "period_start": None, "period_end": None, "filed": None}]
     )
     out = pd.concat([facts.drop(columns=["cik"], errors="ignore"), marker], ignore_index=True)
     for column in DATES:
         if column in out.columns:
             day = pd.to_datetime(out[column]).dt.date
             out[column] = day.astype(object).where(out[column].notna(), None)
-    # Two filings on one day for one period (a same-day amendment): the later listed wins.
+    # Two filings on one day for one period and tag (a same-day amendment): the later listed
+    # wins; other tags of the period are kept (``financials@v2`` ranks them).
     out = out.drop_duplicates(KEY[1:], keep="last")
     out = members[["instrument_id", "symbol", "cik"]].merge(out, how="cross")
     out["fetched_on"] = fetched_on

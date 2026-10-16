@@ -8,7 +8,10 @@ The table holds two kinds of fact, told apart by ``concept``: share counts (``de
 The table is stored in increments: each run of the ``shares`` task adds the facts it found
 new plus one ``checked`` marker per instrument whose CIK it fetched (``fetched_on``). A read
 unions every partition and keeps the latest stored version of each row
-(``instrument_id``, ``concept``, ``period_start``, ``period_end``, ``filed``).
+(``instrument_id``, ``concept``, ``tag``, ``period_start``, ``period_end``, ``filed``): two
+us-gaap tags of one concept (``Revenues`` and ``SalesRevenueNet``) for the same period and
+filing are two rows, and a null in a key column (a marker's ``tag``, a share count's
+``period_start``) equals another null.
 
 Point in time is the FILING date, not the partition: a fact filed in 2025 that a backfill
 stored in 2026 was public in 2025, so ``share_facts`` returns every fact and consumers keep
@@ -22,7 +25,7 @@ import pandas as pd
 from algotrade.storage.tables.readers import StoreReader
 
 TABLE = "instruments/shares"
-KEY = ["instrument_id", "concept", "period_start", "period_end", "filed"]
+KEY = ["instrument_id", "concept", "tag", "period_start", "period_end", "filed"]
 CHECKED = "checked"  # the marker concept: "this CIK was fetched on fetched_on"
 DATES = ("period_start", "period_end", "filed", "fetched_on")
 ALL_TIME = (date(1900, 1, 1), date(9999, 12, 31))
@@ -34,13 +37,18 @@ def stored_shares(reader: StoreReader, as_of: datetime | None = None) -> pd.Data
     frame = reader.table_range(TABLE, *ALL_TIME, as_of)
     if frame is None or frame.empty:
         return pd.DataFrame(columns=[*KEY, "cik", "shares", "value", "fetched_on"])
+    if "tag" not in frame.columns:  # a partition written before the column: null, not a KeyError
+        frame["tag"] = None
+    frame["tag"] = frame["tag"].astype(object).where(frame["tag"].notna(), None)
     for column in DATES:
         if column in frame.columns:
             day = pd.to_datetime(frame[column]).dt.date
             frame[column] = day.astype(object).where(frame[column].notna(), None)
-    frame = frame.sort_values("knowledge_ts", kind="stable")
+    # The latest stored version wins (run_id breaks a tie of stamps); the result is in key
+    # order, so it does not depend on the order the partitions or rows came in.
+    frame = frame.sort_values(["knowledge_ts", "run_id"], kind="stable")
     frame = frame.drop_duplicates(KEY, keep="last")
-    return frame.sort_values(["instrument_id", "concept"], kind="stable").reset_index(drop=True)
+    return frame.sort_values(KEY, kind="stable", na_position="first").reset_index(drop=True)
 
 
 def share_facts(reader: StoreReader, as_of: datetime | None = None) -> pd.DataFrame:

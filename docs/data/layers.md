@@ -195,12 +195,12 @@ Reads (`data.reference.descriptions`) union every partition and keep the latest 
 instrument; markers are left out of `descriptions` and kept in `stored_descriptions`.
 
 **`instruments/shares`** (SEC company facts, phase 2b.4; increments merged across runs, one row
-per instrument, concept, period start, period end and filing date; `algotrade-ingest shares`)
+per instrument, concept, tag, period start, period end and filing date; `algotrade-ingest shares`)
 
 | Columns | Notes |
 |---|---|
 | `instrument_id`, `symbol`, `cik` | every instrument of a CIK gets the CIK's facts (company totals; companyfacts has no class-specific counts) |
-| `concept`, `tag` | share counts: `dei` (cover-page shares outstanding), `weighted_basic` (weighted average basic); financials: `revenue`, `net_income`, `eps_diluted` (`tag` is the us-gaap tag that supplied it); or `checked`: a marker that the CIK was fetched on `fetched_on` (no fact; keeps funds without facts from being refetched nightly) |
+| `concept`, `tag` | share counts: `dei` (cover-page shares outstanding), `weighted_basic` (weighted average basic); financials: `revenue`, `net_income`, `eps_diluted` (`tag` is the us-gaap tag that supplied it; it is part of the key, so the tags of one period and filing are separate rows, and a null `tag` equals another null); or `checked`: a marker that the CIK was fetched on `fetched_on` (no fact; keeps funds without facts from being refetched nightly) |
 | `period_start`, `period_end`, `filed`, `form`, `accn`, `fy`, `fp` | as filed; `filed` is the point-in-time date. `period_start` is part of the key: a year-to-date and a quarterly fact share an end date (null for `dei` and `checked`) |
 | `shares`, `class_values` | the count (share concepts only); `class_values` > 1 when several class values of one filing were summed |
 | `value`, `unit` | the amount of a financial fact and its unit, `usd` or `usd_per_share` (financial concepts only). A period appears once for the filing that first reported it, plus once per later filing that changed the value (a restatement) |
