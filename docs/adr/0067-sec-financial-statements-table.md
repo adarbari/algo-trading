@@ -30,8 +30,16 @@ second request). A CIK is fetched when **either** table is due (the older of the
 `fetched_on`s decides; a CIK with no marker in one table is new there), and each table carries its
 own `checked` marker. Consequence: a failure to stage the statements after the shares were stored
 leaves the statements due the next night instead of 30 days later. The first run after this ships
-therefore finds every CIK due for the statements: the backfill is `algotrade-ingest shares --limit N`
-over several nights or one detached run (docs/data/vendors.md, "Backfill").
+would therefore find every CIK due for the statements (~6k documents, about 15 GB of raw files kept
+7 days, one ~5M-row publish, an hour added before the critical steps), so the backlog is capped:
+`[sec_edgar] statements_backfill_per_night` (default 400, 0 = no cap) bounds the CIKs that have a
+shares marker but no statements marker fetched a night. A CIK new to both tables, or due for its
+shares by its slot, is never capped. Deferred CIKs count in `deferred_by_limit`; the backfill
+finishes by itself in about 15 to 20 nights with no manual run (`algotrade-ingest run shares --limit N`
+remains for a chunk by hand). What is due is worked out from `cik` and `fetched_on` alone (a
+maximum over the stored rows) and the key rows are read only for the instruments fetched that
+night. A document whose statements do not parse still stores its share counts and leaves the
+statements marker unwritten, so the CIK stays due for them.
 
 Reads are `data/statements/reading.py` (a new folder: `data/` is at its module cap): `stored_statements`
 for the producer, `statement_facts(reader, session)` the facts filed on or before a session.
@@ -53,8 +61,9 @@ carry no start. A figure in another currency is dropped: those issuers have no s
 ### Rollup rules this fixes (applied by the later `balance_sheet@v1`, not here)
 - **Null over zero.** A concept not tagged by a filer is null with a status (`NOT_TAGGED`), never 0.
 - **`total_debt` from the parts of ONE accession** (never a part from one filing and a part from
-  another), first rule that applies: (a) `LongTermDebt` + `ShortTermBorrowings` / `CommercialPaper`
-  (those present); (b) `LongTermDebtNoncurrent` + `LongTermDebtCurrent` + `ShortTermBorrowings`;
+  another), first rule that applies: (a) `LongTermDebt` + `ShortTermBorrowings`, else `CommercialPaper`
+  (short-term borrowings usually include commercial paper: never both); (b) `LongTermDebtNoncurrent` +
+  `LongTermDebtCurrent` + `ShortTermBorrowings`, else `CommercialPaper`;
   (c) `DebtCurrent` + `LongTermDebtNoncurrent`. No debt tag at all is null with `NOT_TAGGED`, not
   zero debt: a filer without the tags and a debt-free filer look the same in the document.
 - **Financial-sector gating.** `is_financial` is SIC 6000 to 6411 (`instruments/company`). For these

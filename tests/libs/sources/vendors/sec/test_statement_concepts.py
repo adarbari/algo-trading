@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from algotrade_sources.framework.base import FetchRequest
+from algotrade_sources.vendors.sec import company_facts
 from algotrade_sources.vendors.sec.company_facts import (
     STATEMENT_COLUMNS,
     SecCompanyFacts,
@@ -203,3 +204,11 @@ def test_one_fetch_feeds_both_tables() -> None:
     assert len(normalized.parsed["statements"]) == len(parse_statements(AAPL)) > 0
     assert len(normalized.parsed["shares"]) > 0
     assert Path(SEC / "statements_CIK0000320193.json").stat().st_size < 100_000  # a small recording
+
+
+def test_a_statements_parse_error_leaves_the_shares_and_is_noted(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(company_facts, "_statement_rows", lambda doc, cik: 1 / 0)
+    normalized = SecCompanyFacts(None).normalize(FetchRequest("320193"), AAPL)  # type: ignore[arg-type]
+    assert normalized is not None
+    assert set(normalized.parsed) == {"shares"} and len(normalized.parsed["shares"]) > 0
+    assert normalized.notes == {"statements_parse_error": 1}

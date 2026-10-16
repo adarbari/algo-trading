@@ -517,9 +517,10 @@ Checked live 2026-10-03 (closes of 2026-10-02): AAPL 14.594B shares (dei, as of 
 **Backfill:** `algotrade-ingest shares` once (~6k CIKs at the 0.2 s `sec` pacing plus
 download: about 30 to 40 minutes, ~1 GB of gzip raw kept 7 days, `[sec_edgar] raw_retention_days`), then
 `algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v3`.
-A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks. The first
-run after `instruments/statements` shipped finds every CIK due for it (no statements marker yet): run
-it the same way, in chunks or detached, before the roll-up that reads it.
+A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks. The
+`instruments/statements` backlog (CIKs with share counts and no statements marker yet) is fetched
+`[sec_edgar] statements_backfill_per_night` (400) a night, so it finishes in about 15 to 20 nights
+by itself; the roll-up that reads it waits for the last of them.
 
 **Adding the financials to a store that already has share counts:** a CIK is refetched only
 on its 30-day slot, so run `algotrade-ingest shares --force` once (same cost; only facts not

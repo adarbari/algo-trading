@@ -263,5 +263,10 @@ class SecCompanyFacts:
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
         doc, cik = _document(payload)
-        parsed = {"shares": _share_rows(doc, cik), "statements": _statement_rows(doc, cik)}
-        return Normalized(session_date=None, tables={}, parsed=parsed)
+        parsed = {"shares": _share_rows(doc, cik)}
+        notes: dict[str, int] = {}
+        try:  # a statements parse error must not lose the share counts of the same document
+            parsed["statements"] = _statement_rows(doc, cik)
+        except Exception:
+            notes["statements_parse_error"] = 1
+        return Normalized(session_date=None, tables={}, parsed=parsed, notes=notes)

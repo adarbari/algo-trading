@@ -6,7 +6,12 @@ read, whenever it was stored)."""
 from datetime import UTC, date, datetime
 
 from algotrade.data import StoreReader
-from algotrade.data.statements.reading import TABLE, statement_facts, stored_statements
+from algotrade.data.statements.reading import (
+    TABLE,
+    light_statements,
+    statement_facts,
+    stored_statements,
+)
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import stamped
@@ -100,3 +105,18 @@ def test_a_fact_is_read_only_from_its_filing_date_whenever_it_was_stored() -> No
     assert list(on_the_restatement["value"]) == [1.0, 2.0, 2.5]
     assert "run_id" not in on_the_restatement.columns
     assert "checked" not in set(on_the_restatement["concept"])
+
+
+def test_a_read_can_be_narrowed_to_instruments_and_columns() -> None:
+    writer = StoreWriter(MemoryBackend())
+    other = {**instant("us-gaap:Assets", 9.0, date(2026, 3, 31), date(2026, 5, 1), "assets"),
+             "instrument_id": "EQ:B"}  # fmt: skip
+    rows = [instant("us-gaap:Assets", 1.0, date(2026, 3, 31), date(2026, 5, 1), "assets"), other]
+    writer.write_table(TABLE, D2, "r1", stamped(rows, D2, "r1", STAMP2))
+    reader = StoreReader(writer._backend)
+    one = statement_facts(reader, D2, instruments=["EQ:B"], columns=["value"])
+    assert list(one["instrument_id"]) == ["EQ:B"] and list(one["value"]) == [9.0]
+    assert "form" not in one.columns and {"concept", "tag", "filed"} <= set(one.columns)
+    light = light_statements(reader)
+    assert list(light.columns) == ["instrument_id", "cik", "concept", "fetched_on"]
+    assert len(light) == 2

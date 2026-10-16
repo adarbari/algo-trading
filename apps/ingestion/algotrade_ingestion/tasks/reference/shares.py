@@ -36,7 +36,7 @@ from algotrade.data.reference import instruments, snapshot
 from algotrade.data.shares import CHECKED, DATES, KEY, TABLE, stored_shares
 from algotrade.data.statements.reading import KEY as STATEMENT_KEY
 from algotrade.data.statements.reading import TABLE as STATEMENTS
-from algotrade.data.statements.reading import stored_statements
+from algotrade.data.statements.reading import light_statements, stored_statements
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
@@ -52,6 +52,7 @@ CARRY = "carry"  # staging key for facts copied to instruments new to a CIK
 class SharesSources:
     facts: Source  # SecCompanyFacts
     refresh_days: int = 30
+    backfill_per_night: int = 400  # CIKs with shares but no statements fetched a night (0: no cap)
 
 
 @dataclass(frozen=True)
@@ -61,22 +62,33 @@ class Target:
     table: str
     parsed: str  # its frame in ``Normalized.parsed``
     key: list[str]
-    stored: Callable[[StoreReader], pd.DataFrame]  # every stored row: key, ``cik``, ``fetched_on``
+    # instrument_id, cik, concept, fetched_on of every stored row, nothing else (not deduplicated:
+    # what is due needs only a maximum per CIK)
+    light: Callable[[StoreReader], pd.DataFrame]
+    keys: Callable[[StoreReader, list[str]], pd.DataFrame]  # the key rows of instruments
     donors: Callable[[StoreReader, list[str]], pd.DataFrame]  # full stored rows of instruments
 
 
-def _share_donors(reader: StoreReader, ids: list[str]) -> pd.DataFrame:
+def _share_rows(reader: StoreReader, ids: list[str]) -> pd.DataFrame:
     stored = stored_shares(reader)
     return stored[stored["instrument_id"].isin(ids)]
 
 
 TARGETS = (
-    Target(TABLE, "shares", KEY, stored_shares, _share_donors),
+    Target(
+        TABLE,
+        "shares",
+        KEY,
+        lambda reader: stored_shares(reader)[["instrument_id", "cik", "concept", "fetched_on"]],
+        _share_rows,
+        _share_rows,
+    ),
     Target(
         STATEMENTS,
         "statements",
         STATEMENT_KEY,
-        lambda reader: stored_statements(reader, columns=["fetched_on"]),
+        light_statements,
+        lambda reader, ids: stored_statements(reader, instruments=ids, columns=["fetched_on"]),
         lambda reader, ids: stored_statements(reader, instruments=ids),
     ),
 )
@@ -137,6 +149,7 @@ def _fetch(
 ) -> str:
     """One document, both tables: each table's new rows are staged in turn, so a failure to
     stage the statements leaves the shares staged (and the statements due again)."""
+    normalized = None
     try:
         normalized = run.fetch(source, FetchRequest(cik, session_date=run.session))
     except NoResponseError:
@@ -150,6 +163,10 @@ def _fetch(
             status = "NO_SHARE_FACTS"
     for target in TARGETS:
         facts = parsed.get(target.parsed)
+        if facts is None and normalized is not None:
+            # A document that came but whose table did not parse: no marker (the CIK stays due
+            # for it), raised after the earlier tables staged.
+            raise ValueError(f"{target.parsed} could not be parsed from the document")
         facts = pd.DataFrame(columns=["concept"]) if facts is None else facts
         rows = _rows(facts, members, run.session, target.key)
         new = [tuple(r) for r in rows[target.key].astype(object).itertuples(index=False)]
@@ -167,12 +184,12 @@ def _typed(rows: pd.DataFrame) -> pd.DataFrame:
 
 
 def _carry(
-    reader: StoreReader, target: Target, stored: pd.DataFrame, ids: pd.DataFrame, fetched: set[str]
+    reader: StoreReader, target: Target, light: pd.DataFrame, ids: pd.DataFrame, fetched: set[str]
 ) -> pd.DataFrame:
     """Stored facts of a CIK copied to its instruments that have none (a new listing or
     class), for CIKs not fetched this run; only the rows of one stored instrument per CIK are
     read in full."""
-    stored = stored[stored["concept"] != CHECKED]
+    stored = light[light["concept"] != CHECKED]
     if stored.empty:
         return stored
     have = set(stored["instrument_id"].astype(str))
@@ -187,11 +204,34 @@ def _carry(
     return new[["instrument_id", "symbol", "cik"]].merge(by_cik, on="cik", how="inner")
 
 
-def _last_fetched(*stored: pd.DataFrame) -> Mapping[str, date]:
-    """Per CIK the older of the tables' latest fetch; a CIK one table never stored is absent
-    (new, so due): the CIK is due when either table is."""
-    per = [{} if s.empty else dict(s.groupby("cik")["fetched_on"].max()) for s in stored]
-    return {c: min(p[c] for p in per) for c in per[0] if all(c in p for p in per)}
+def _fetched(light: pd.DataFrame) -> dict[str, date]:
+    """Per CIK its latest ``fetched_on`` (a maximum over every stored row)."""
+    if light.empty:
+        return {}
+    latest = light.groupby("cik")["fetched_on"].max()
+    return {str(c): pd.Timestamp(v).date() for c, v in latest.items()}
+
+
+def _due(
+    ciks: list[str],
+    fetched: list[dict[str, date]],
+    session: date,
+    sources: SharesSources,
+    force: bool,
+) -> tuple[list[str], int]:
+    """The CIKs to fetch and how many of the statements backlog the nightly cap defers. A CIK
+    is due when either table is (the older latest fetch decides; one table's marker missing
+    makes it new there). Only the backlog (shares stored, statements never) is capped, in its
+    order: a CIK new to both or due for shares is never deferred."""
+    both = {c: min(f[c] for f in fetched) for c in fetched[0] if all(c in f for f in fetched)}
+    due = due_keys(ciks, both, session, sources.refresh_days, force)
+    cap = sources.backfill_per_night
+    if force or cap <= 0:
+        return due, 0
+    shares_due = set(due_keys(ciks, fetched[0], session, sources.refresh_days, force))
+    backlog = [c for c in due if c in fetched[0] and c not in fetched[1] and c not in shares_due]
+    deferred = set(backlog[cap:])
+    return [c for c in due if c not in deferred], len(deferred)
 
 
 def ingest_shares(
@@ -202,17 +242,23 @@ def ingest_shares(
     limit: int | None = None,
 ) -> RunRecord:
     ids = instrument_ciks(ctx.reader, session)
-    stored = {t.table: t.stored(ctx.reader) for t in TARGETS}
-    known = {
-        t.table: {tuple(r) for r in stored[t.table][t.key].astype(object).itertuples(index=False)}
-        for t in TARGETS
-    }
+    light = {t.table: t.light(ctx.reader) for t in TARGETS}
     with IngestRun(ctx, TASK, session, resume=True) as run:
         ciks = sorted(set(ids["cik"]))
-        fetched = _last_fetched(*(stored[t.table] for t in TARGETS))
-        due = due_keys(ciks, fetched, session, sources.refresh_days, force)
+        fetched = [_fetched(light[t.table]) for t in TARGETS]
+        due, backlog_deferred = _due(ciks, fetched, session, sources, force)
         todo = due if limit is None else due[: max(limit, 0)]
         members = dict(tuple(ids.groupby("cik")))
+        todo_ids = list(ids["instrument_id"][ids["cik"].isin(todo)])
+        known = {  # the stored keys of the instruments fetched now, not of the whole table
+            t.table: {
+                tuple(r)
+                for r in t.keys(ctx.reader, todo_ids)[t.key].astype(object).itertuples(index=False)
+            }
+            if todo_ids
+            else set()
+            for t in TARGETS
+        }
         for i, cik in enumerate(todo, start=1):
             if cik in run.items:
                 continue  # fetched before a resume
@@ -221,7 +267,7 @@ def ingest_shares(
                 run.checkpoint()
         carried = {}
         for target in TARGETS:
-            carried[target.table] = _carry(ctx.reader, target, stored[target.table], ids, set(todo))
+            carried[target.table] = _carry(ctx.reader, target, light[target.table], ids, set(todo))
             if not carried[target.table].empty:
                 frame = _typed(carried[target.table])
                 run.stage(target.table, CARRY, frame, sources.facts.name)
@@ -231,11 +277,11 @@ def ingest_shares(
         run.stats.update(
             instruments=len(ids),
             ciks=len(ciks),
-            due=len(due),
+            due=len(due) + backlog_deferred,
             requested=len(todo),
             with_facts=sum(n for s, n in counts.items() if s == "OK"),
             no_facts=counts.get("NO_FACTS", 0) + counts.get("NO_SHARE_FACTS", 0),
-            deferred_by_limit=len(due) - len(todo),
+            deferred_by_limit=len(due) - len(todo) + backlog_deferred,
             carried=len(carried[TABLE]),
             statements_carried=len(carried[STATEMENTS]),
             failed=failed[:20],

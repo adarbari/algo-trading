@@ -143,7 +143,12 @@ VENDOR_EXTRAS = {
     "cboe": ("workers", "priority_symbols"),
     "nasdaq_earnings": ("days", "lookback_days"),
     "massive": ("corporate_actions_window", "descriptions_per_night", "descriptions_refresh_days"),
-    "sec_edgar": ("refresh_days", "facts_refresh_days", "fund_quarters"),
+    "sec_edgar": (
+        "refresh_days",
+        "facts_refresh_days",
+        "statements_backfill_per_night",
+        "fund_quarters",
+    ),
     "treasury": ("lookback_days",),
     "fred": ("base_url",),
     "tiingo": ("licence", "monthly_symbol_budget"),
@@ -212,6 +217,7 @@ class SourcesSettings:
     actions_window: tuple[int, int] = (-7, 30)
     sec_refresh_days: int = 30
     sec_facts_refresh_days: int = 30
+    sec_statements_backfill_per_night: int = 400  # ADR 0067 (0: no cap)
     sec_fund_quarters: int = 6  # SEC prospectus data sets read for ETF descriptions (ADR 0034)
     descriptions_per_night: int = 100  # Massive ticker overviews the nightly requests (0: none)
     descriptions_refresh_days: int = 365  # refetch a stock's description after this many days
@@ -335,6 +341,9 @@ class SourcesSettings:
             ),
             sec_facts_refresh_days=_extra(vendors, "sec_edgar").integer(
                 "facts_refresh_days", d.sec_facts_refresh_days, 0
+            ),
+            sec_statements_backfill_per_night=_extra(vendors, "sec_edgar").integer(
+                "statements_backfill_per_night", d.sec_statements_backfill_per_night, 0
             ),
             sec_fund_quarters=_extra(vendors, "sec_edgar").integer(
                 "fund_quarters", d.sec_fund_quarters, 0

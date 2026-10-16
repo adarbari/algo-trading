@@ -59,12 +59,27 @@ def stored_statements(
     return frame.sort_values(KEY, kind="stable", na_position="first").reset_index(drop=True)
 
 
+def light_statements(reader: StoreReader) -> pd.DataFrame:
+    """``instrument_id``, ``cik``, ``concept`` and ``fetched_on`` of every stored row and
+    nothing else, not deduplicated: what the producer needs to know what is due (a maximum per
+    CIK) without reading the table's values."""
+    frame = reader.table_range(TABLE, *ALL_TIME, None, None, ["cik", "concept", "fetched_on"])
+    if frame is None or frame.empty:
+        return pd.DataFrame(columns=["instrument_id", "cik", "concept", "fetched_on"])
+    return frame[["instrument_id", "cik", "concept", "fetched_on"]]
+
+
 def statement_facts(
-    reader: StoreReader, session: date, as_of: datetime | None = None
+    reader: StoreReader,
+    session: date,
+    as_of: datetime | None = None,
+    instruments: list[str] | None = None,
+    columns: list[str] | None = None,
 ) -> pd.DataFrame:
     """The facts (no markers) filed on or before ``session``, sorted by ``filed``, without the
-    stamp columns; empty when none."""
-    frame = stored_statements(reader, as_of)
+    stamp columns; empty when none. ``instruments`` and ``columns`` narrow the read (the key
+    columns and ``cik`` are always returned): a consumer asks for the ids and fields it uses."""
+    frame = stored_statements(reader, as_of, columns, instruments)
     frame = frame[frame["concept"] != CHECKED]  # a marker has no filing date
     frame = frame[frame["filed"] <= session]
     frame = frame.drop(columns=[c for c in STAMPS if c in frame.columns])

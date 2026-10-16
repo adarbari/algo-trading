@@ -15,6 +15,7 @@ from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.reference.shares import SharesSources, _rows, ingest_shares
 from algotrade_sources.framework.http import HttpError, RetryPolicy
+from algotrade_sources.vendors.sec import company_facts
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts, parse_statements
 from tests.helpers.ingest_fakes import http_for, task_ctx
 from tests.helpers.stored_frames import stamped
@@ -279,3 +280,78 @@ def test_a_new_class_gets_the_statements_of_its_ciks_stored_facts_too() -> None:
     facts = statement_facts(reader, nxt)
     assert len(facts[facts["instrument_id"] == "EQ:AAPL2"]) == expected
     assert len(facts[facts["instrument_id"] == "EQ:AAPL"]) == expected
+
+
+def test_the_statements_backlog_is_fetched_a_few_ciks_a_night() -> None:
+    """Three CIKs have share counts and no statements (stored before the table existed): with
+    a cap of one, one is fetched each night, never one twice, and the deferred are counted."""
+    writer, reader = store()
+    markers = [
+        {"instrument_id": f"EQ:{sym}", "symbol": sym, "cik": cik, "concept": "checked",
+         "tag": None, "period_start": None, "period_end": None, "filed": None, "fetched_on": DAY}
+        for sym, cik in (("AAPL", "0000320193"), ("GOOGL", GOOGL_CIK), ("GOOG", GOOGL_CIK),
+                         ("SPY", "0000884394"))
+    ]  # fmt: skip
+    writer.write_table(TABLE, DAY, "old", stamped(markers, DAY, "old"))
+    assert stored_statements(reader).empty
+    seen: list[str] = []
+    for night, deferred in ((1, 2), (2, 1), (3, 0), (4, 0)):
+        feed = FakeFacts(aapl=AAPL_STATEMENTS)
+        capped = SharesSources(sources(feed, 100000).facts, 100000, backfill_per_night=1)
+        record = ingest_shares(task_ctx(writer, reader, CLOCK), capped, DAY + timedelta(days=night))
+        seen += [u.rsplit("CIK", 1)[1][:10] for u in feed.urls]
+        assert record.stats["deferred_by_limit"] == deferred
+    assert len(seen) == len(set(seen)) == 3  # each CIK once, the rest of the nights idle
+    last = stored_statements(reader)
+    assert set(last[last["concept"] == "checked"]["instrument_id"]) == {
+        "EQ:AAPL", "EQ:GOOGL", "EQ:GOOG", "EQ:SPY",
+    }  # fmt: skip
+
+
+def test_a_new_cik_is_never_capped_by_the_backlog_limit() -> None:
+    writer, reader = store()
+    capped = SharesSources(sources(FakeFacts()).facts, 30, backfill_per_night=1)
+    record = ingest_shares(task_ctx(writer, reader, CLOCK), capped, DAY)
+    assert record.stats["requested"] == 3 and record.stats["deferred_by_limit"] == 0
+
+
+def test_a_statements_parse_error_keeps_the_shares_and_the_cik_due(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Fails if the shares were lost with the statements, or if the missing table wrote a
+    marker (the CIK would then wait 30 days)."""
+    writer, reader = store()
+    with monkeypatch.context() as broken:
+        broken.setattr(company_facts, "_statement_rows", lambda doc, cik: 1 / 0)
+        first = ingest_shares(
+            task_ctx(writer, reader, CLOCK), sources(FakeFacts(aapl=AAPL_STATEMENTS)), DAY
+        )
+    assert first.status is RunStatus.PARTIAL
+    assert {f.split(":")[0] for f in first.stats["failed"]} >= {"0000320193"}
+    assert len(share_facts(reader)) > 0  # the share counts of the same document are stored
+    # no statements and no marker for a CIK whose document did not parse (the fund's 404 has one)
+    assert set(stored_statements(reader)["instrument_id"]) == {"EQ:SPY"}
+    feed = FakeFacts(aapl=AAPL_STATEMENTS)
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(feed), DAY + timedelta(days=1))
+    assert "0000320193" in {u.rsplit("CIK", 1)[1][:10] for u in feed.urls}
+    assert len(statement_facts(reader, DAY + timedelta(days=1))) > 0
+
+
+def test_a_restatement_filed_after_a_session_does_not_change_what_that_session_read() -> None:
+    writer, reader = store()
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(FakeFacts(aapl=AAPL_STATEMENTS)), DAY)
+    before = statement_facts(reader, DAY)
+    doc = json.loads(AAPL_STATEMENTS)
+    assets = doc["facts"]["us-gaap"]["Assets"]["units"]["USD"]
+    latest = max(assets, key=lambda r: r["filed"])
+    assets.append({**latest, "val": latest["val"] * 2, "filed": "2026-12-01", "form": "10-Q/A",
+                   "accn": "0000320193-26-000099"})  # fmt: skip
+    later = DAY + timedelta(days=2)
+    ingest_shares(
+        task_ctx(writer, reader, CLOCK),
+        sources(FakeFacts(aapl=json.dumps(doc).encode())),
+        later,
+        force=True,
+    )
+    pd.testing.assert_frame_equal(statement_facts(reader, DAY), before)
+    after = statement_facts(reader, date(2026, 12, 1))
+    assert len(after) == len(before) + 1
+    assert after.iloc[-1]["value"] == latest["val"] * 2
