@@ -82,9 +82,9 @@ i.e. 60 per 10 minutes) for every historical request, the live verification's in
 `personal` (derived from a personal-use market-data licence). Every `ibkr_iv@v1` feature is
 `personal`; an expression feature takes the most restrictive licence of its inputs, so
 `iv_rank`, `iv_percentile` and `iv_rank_source` are `personal`. The licence is in the feature
-catalogue (`docs/data/features.md`) and the API's `/features` output. Today there is one
-user (the account holder); when there are others, the API will hide `personal` features from
-users other than the owner (a later change, recorded here).
+catalogue (`docs/data/features.md`) and the API's `/features` output. Users who hold a
+licence are listed in `config/site/users.toml` (`licences`, ADR 0064); every other user is
+hidden `personal` values (enforced: see the amendment of 2026-10-16).
 
 ### Live option quotes in the API
 (Owner-approved 2026-10-03, PR B.) Screener candidates and the Explore chain show live
@@ -178,3 +178,19 @@ with an HV of 0.55), and 0.0 for a history bar without a value.
   rows, rewriting only those it rejects as a new run (no request to IB). The rewrite wins the
   merge; reads as of an earlier time still see what was stored then (ADR 0007). `ibkr_iv@v1`
   keeps its version (its definition did not change, its input did) and is recomputed in place.
+
+## Amendment 2026-10-16: the licence gate, in every path that serves per-name values
+
+The "later change" is made (no new decision, the one above enforced). A feature whose licence
+the viewer does not hold (`config/site/users.toml` `licences`; `open` is held by everyone; a
+role grants none, so an admin without the licence is hidden too, ADR 0040) is never read and
+is UNKNOWN with the public kind `LICENCE` (Guide term `unavailable_licence`; the cause chain
+stays admin-only, ADR 0056), whatever is stored: GraphQL `features` / tables / distributions /
+series (`ReadContext.licences`), the stored criterion values of a screener run, the Builder's
+preview and a formula's sample. A screener run (the `screen` job) is evaluated for its user with
+the licences that user holds, so a hard criterion on a hidden field reads as missing and never
+passes (ADR 0015) and the results it stores (ADR 0033) carry none of its values. Consequence:
+the nightly runs of the `site` user (no licence listed) hide IBKR-derived fields; the owner's
+own runs are unchanged. The edge harness, backtests and training read all fields and record
+the licence of what they read (ADR 0064). One module owns the rule (`services/licences.py`);
+`tests/architecture/api/test_licence_gate.py` lists every path that reads values.

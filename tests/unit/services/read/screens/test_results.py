@@ -249,3 +249,25 @@ def test_a_paused_pick_is_dropped_against_the_previous_run_and_filters_by_decisi
     assert [(r.instrument_id, r.decision) for r in page.results] == [
         ("EQ:BBB", "PAUSED"), ("EQ:DDD", "PAUSED")
     ]  # fmt: skip
+
+
+def test_a_stored_value_of_a_field_the_viewer_may_not_see_is_never_served(
+    reader: StoreReader,
+) -> None:
+    """Fix for: a run recorded under a licence the viewer lacks (a site run before the gate, or
+    a user whose licence was withdrawn) served its stored personal values to any viewer who
+    could open it. The criterion reads MISSING with no number; an open field is unchanged,
+    and a sort by the hidden criterion orders nothing by it."""
+    trader = context(reader, user="trader")
+    run = latest_run(trader, "site", "alpha").run
+    assert run is not None
+    found = load_results(trader, {"r1": ["EQ:AAA", "EQ:BBB"]}, [run])
+    aaa, bbb = found[("r1", "EQ:AAA")], found[("r1", "EQ:BBB")]
+    assert aaa.criteria == (
+        CriterionResult("iv30", "feature.vrp_iv30", "hard", "MISSING", None, None),
+    )
+    assert aaa.columns == (ResultColumn("spread", 0.05),)  # ``feature.spread`` is not licensed
+    assert bbb.criteria[0].value == 40.0  # ``rollup.x@v1.iv_rank`` resolves to no licence
+
+    holder = load_results(context(reader), {"r1": ["EQ:AAA"]}, [run])[("r1", "EQ:AAA")]
+    assert holder.criteria[0].value == "high" and holder.criteria[0].outcome == "PASS"

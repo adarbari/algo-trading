@@ -5,7 +5,7 @@ features read, ``StoreReader.visible_seq()``), so threshold / mode / tolerance e
 re-evaluate in memory and a new publish (ADR 0022) is never served stale."""
 
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date
 from functools import cached_property
@@ -17,6 +17,7 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import Universe, load_universe
 from algotrade.engines.selection.evaluate import SelectionResult, evaluate_selection
 from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.services.licences import ALL_LICENCES, hidden_fields
 from algotrade.services.read.context import ResultCache
 from algotrade.services.selection import fields_view
 from algotrade.services.views import to_value
@@ -38,6 +39,8 @@ class FieldFrame:
     universe: Universe
     missing: tuple[str, ...]  # tables read with no rows for the session (their fields UNKNOWN)
     pre_snapshot: bool  # the reference snapshot is after the session (survivorship)
+    # the fields under a data licence the caller lacks: not read, so missing (``services.licences``)
+    withheld: tuple[str, ...] = ()
     # Criterion results over ``view`` (``evaluate_screen``'s memo): an edit to one criterion
     # re-evaluates only that one. Bounded by ``MAX_MEMO`` criteria (``memo_for``).
     memo: ScreenMemo = field(default_factory=dict, compare=False, repr=False)
@@ -102,23 +105,37 @@ def field_frame(
     fields: Sequence[str],
     features: FeatureSet,
     definitions: Sequence[FeatureDefinition],
+    held: Collection[str] = ALL_LICENCES,
 ) -> tuple[FieldFrame, bool]:
-    """The frame for ``fields`` on ``session`` and whether it came from the cache. The commit
-    sequence is read before reading, so a publish landing meanwhile stores the frame under
+    """The frame for ``fields`` on ``session`` and whether it came from the cache. ``held``: the
+    caller's data licences (``ctx.licences``): a field under another is not read and the frame
+    is kept per licence set, so no value is served across users. The commit sequence is read
+    before reading, so a publish landing meanwhile stores the frame under
     the older key, which no later call asks for. A frame being read (by the warmer) is waited
     for, not read a second time (``ResultCache.get_or_compute``)."""
     wanted = tuple(sorted(set(fields)))
-    key = (PREVIEW, session, wanted, features_key(definitions), reader.visible_seq())
+    key = (
+        PREVIEW, session, wanted, features_key(definitions), tuple(sorted(held)),
+        reader.visible_seq(),
+    )  # fmt: skip
     read = False
 
     def build() -> FieldFrame:
         nonlocal read
         read = True
-        view, source = fields_view(reader, wanted, session, features=features)
+        view, source = fields_view(reader, wanted, session, features=features, held=held)
         # measured with tracemalloc: 7 MB for 7 fields, 21 MB for 44, over 11 000 instruments
         size = len(view.instruments) * (ROW_BYTES + FIELD_BYTES * len(wanted))
+        withheld = (
+            () if held == ALL_LICENCES else tuple(sorted(hidden_fields(features, wanted, held)))
+        )
         return FieldFrame(
-            view, load_universe(reader, session), source.missing, source.pre_snapshot, size=size
+            view,
+            load_universe(reader, session),
+            source.missing,
+            source.pre_snapshot,
+            withheld,
+            size=size,
         )
 
     frame: FieldFrame = cache.get_or_compute(key, build)

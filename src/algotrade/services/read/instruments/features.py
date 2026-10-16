@@ -22,10 +22,12 @@ and ``EXPLAINED`` (the null is itself the fact, a ``NullReason`` its status colu
 trade on the session, next earnings not announced, a new listing; ADR 0046).
 A present value wins over all three; they win over NO_ROW and NULL, in that order, so a
 non-optionable instrument with no option rows is n/a, not a gap (ADR 0042), and a stock with
-no bar on the session but a ``NO_TRADE`` status is "no trade", not a gap. ``LICENCE``
-waits for a second user (ADR 0028: personal-licence values are hidden from users other than
-the owner once there are any). A name outside the caller's catalogue is an error
-(``UnknownFeatureError``), not a value."""
+no bar on the session but a ``NO_TRADE`` status is "no trade", not a gap. ``LICENCE`` (ADR
+0028): a field under a data licence the caller does not hold (``ctx.licences``, from the users
+registry; a role grants none) is never read: its value is ``Unknown(LICENCE)`` for every
+instrument, whatever is stored, and takes precedence over every other code (an expression over
+a personal feature inherits its licence, ADR 0023). A name outside the caller's catalogue is an
+error (``UnknownFeatureError``), not a value."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -331,6 +333,12 @@ def _by_id(frame: pd.DataFrame) -> dict[str, Mapping[str, Any]]:
     return {str(r["instrument_id"]): cast(dict[str, Any], r) for r in frame.to_dict("records")}
 
 
+def unlicensed(info: FeatureInfo, day: date) -> Unknown:
+    """The ``LICENCE`` value of a field the caller does not hold (the chain: admins only)."""
+    detail = f"{info.name} is under the {info.licence} data licence, which the user does not hold"
+    return Unknown(UnknownCode.LICENCE, feature_cause(info.name, detail, "LICENCE", day))
+
+
 def load_feature_values(
     ctx: ReadContext,
     instrument_ids: Sequence[str] | None,
@@ -343,8 +351,11 @@ def load_feature_values(
     ``entity``: whose catalogue and rows (``market``: ``instrument_ids`` are market ids,
     ``market_id("US")``; ADR 0047). ``UnknownFeatureError`` when a name is not in the
     caller's catalogue of that entity."""
-    wanted = list(dict.fromkeys(names))
-    infos = feature_infos(ctx.features, wanted, entity)
+    asked = list(dict.fromkeys(names))
+    infos = feature_infos(ctx.features, asked, entity)
+    # The licence gate (``services.licences``): a field the caller may not see is not read.
+    withheld = {n for n in asked if infos[n].licence not in ctx.licences}
+    wanted = [n for n in asked if n not in withheld]
     tables = {n: _tables(ctx.features, n) for n in wanted}
     reasons = {
         n: ctx.features.applicability(n) if not n.startswith("instrument.") else (frozenset(), ())
@@ -352,17 +363,20 @@ def load_feature_values(
     }
     rows: Mapping[str, Mapping[str, Any]]
     missing: tuple[str, ...]
-    if entity == "instrument" and ctx.session.reference_snapshot is None:
+    if not wanted:
+        rows, missing = {}, ()  # everything asked is withheld: nothing to read
+    elif entity == "instrument" and ctx.session.reference_snapshot is None:
         rows, missing = {}, (REFERENCE_TABLE,)  # nothing stored to say who anything is
         tables = dict.fromkeys(wanted, (REFERENCE_TABLE,))
     else:
         rows, missing = _rows(ctx, entity, instrument_ids, wanted, tables, reasons)
     if instrument_ids is None:
         instrument_ids = list(rows)
-    return {
-        iid: tuple(
-            _value(infos[n], tables[n], rows.get(iid), missing, ctx, iid, reasons[n])
-            for n in wanted
-        )
-        for iid in instrument_ids
-    }
+    barred = {n: unlicensed(infos[n], ctx.session.date) for n in withheld}
+
+    def cell(n: str, iid: str) -> FeatureValue:
+        if n in barred:
+            return FeatureValue(n, None, barred[n], infos[n])
+        return _value(infos[n], tables[n], rows.get(iid), missing, ctx, iid, reasons[n])
+
+    return {iid: tuple(cell(n, iid) for n in asked) for iid in instrument_ids}

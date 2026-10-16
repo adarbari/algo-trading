@@ -26,6 +26,7 @@ import pandas as pd
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.features.framework.feature import NullReason
+from algotrade.services.licences import hidden_fields
 from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import ReadContext, at_session, catalogue_key, partition
@@ -232,27 +233,37 @@ def _read_values(
     return out
 
 
+MISSING = "MISSING"  # a criterion outcome: no value (here: one the viewer may not see)
+
+
+def _criterion(v: Mapping[str, Any], hidden: frozenset[str]) -> CriterionResult:
+    """What a criterion judged; a field under a licence the viewer does not hold has no value,
+    no distance and is MISSING to them (the stored value is never served)."""
+    if str(v["field"]) in hidden:
+        return CriterionResult(
+            str(v["criterion_id"]), str(v["field"]), str(v["mode"]), MISSING, None, None
+        )
+    return CriterionResult(
+        str(v["criterion_id"]),
+        str(v["field"]),
+        str(v["mode"]),
+        str(v["outcome"]),
+        _value(v),
+        _float(v.get("distance")),
+    )
+
+
 def _result(
     run: ScreenerRun,
     row: Mapping[str, Any],
     values: Sequence[Mapping[str, Any]],
     instrument: Instrument | None,
     change: Change,
+    hidden: frozenset[str] = frozenset(),
 ) -> ScreenResult:
-    criteria = tuple(
-        CriterionResult(
-            str(v["criterion_id"]),
-            str(v["field"]),
-            str(v["mode"]),
-            str(v["outcome"]),
-            _value(v),
-            _float(v.get("distance")),
-        )
-        for v in values
-        if not is_display_column(v["mode"])
-    )
+    criteria = tuple(_criterion(v, hidden) for v in values if not is_display_column(v["mode"]))
     columns = tuple(
-        ResultColumn(str(v["criterion_id"]), _value(v))
+        ResultColumn(str(v["criterion_id"]), None if str(v["field"]) in hidden else _value(v))
         for v in values
         if is_display_column(v["mode"])
     )
@@ -290,6 +301,12 @@ def load_results(
     if not ids:
         return {}
     values = _values(ctx, runs, ids, wanted)
+    # The licence gate on stored values: a run recorded while its user held a licence the
+    # viewer does not (or the user lost since) never serves that field's value (the stored
+    # rows are shared in the cache, so it is applied here, per viewer).
+    hidden = hidden_fields(
+        ctx.features, {str(v["field"]) for rows in values.values() for v in rows}, ctx.licences
+    )
     instruments = load_instruments(ctx, ids)
     out: dict[ResultKey, ScreenResult] = {}
     for run in runs:
@@ -302,7 +319,7 @@ def load_results(
             iid = str(row["instrument_id"])
             found = values.get((run.run_id, iid), [])
             change = moved.get(iid, (None, None))
-            out[(run.run_id, iid)] = _result(run, row, found, instruments.get(iid), change)
+            out[(run.run_id, iid)] = _result(run, row, found, instruments.get(iid), change, hidden)
     return out
 
 
@@ -368,7 +385,14 @@ def _check_sort(ctx: ReadContext, sort: str) -> str | None:
 def _stored_key(ctx: ReadContext, run: ScreenerRun, key: str) -> Mapping[str, Scalar]:
     """Each instrument's stored value of ``criterion:<id>`` or ``column:<name>`` in ``run``
     (one filtered read of the values partition, cached per run, key and published state)."""
-    cache_key = ("screen_sort_key", run.run_id, ctx.session.date, key, ctx.reader.visible_seq())
+    cache_key = (
+        "screen_sort_key",
+        run.run_id,
+        ctx.session.date,
+        key,
+        ctx.user.user_id,  # what a viewer may see differs by licence
+        ctx.reader.visible_seq(),
+    )
     found: Mapping[str, Scalar] | None = ctx.cache.get(cache_key)
     if found is not None:
         return found
@@ -384,7 +408,9 @@ def _stored_key(ctx: ReadContext, run: ScreenerRun, key: str) -> Mapping[str, Sc
             & (stored["criterion_id"] == name)
             & (column == (kind == "column"))
         ]
-        out = {str(r["instrument_id"]): _value(r) for r in _records(mine)}
+        seen = _records(mine)
+        hidden = hidden_fields(ctx.features, {str(r["field"]) for r in seen}, ctx.licences)
+        out = {str(r["instrument_id"]): _value(r) for r in seen if str(r["field"]) not in hidden}
     ctx.cache.put(cache_key, out)
     return out
 

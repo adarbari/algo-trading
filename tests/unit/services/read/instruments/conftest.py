@@ -83,3 +83,27 @@ def reader() -> StoreReader:
 def ctx(reader: StoreReader) -> ReadContext:
     """The read context for the latest session, D1."""
     return context(reader)
+
+
+IBKR = "rollups/instrument/ibkr_iv@v1"
+IBKR_IV30 = "rollup.ibkr_iv@v1.iv30_ibkr"  # personal licence (ADR 0028)
+VRP = "feature.vrp_iv30"  # coalesce(iv30_ibkr, iv30_cboe): inherits the personal licence
+USERS = {
+    "user": [
+        {"id": "owner", "role": "admin", "licences": ["personal"]},
+        {"id": "other_admin", "role": "admin"},  # a role grants no licence (ADR 0040)
+        {"id": "trader", "role": "trader"},
+    ]
+}
+
+
+def with_ibkr(writer: StoreWriter) -> None:
+    """``ibkr_iv@v1`` on D1: a personal-licence value for AAA."""
+    write_rows(writer, IBKR, D1, [{"instrument_id": "EQ:AAA", "iv30_ibkr": 0.42}])
+
+
+def context_as(reader: StoreReader, user: str, day: date | None = None) -> ReadContext:
+    """The read context of ``reader`` for ``user`` of ``USERS`` (the registry says who holds
+    the personal licence)."""
+    configs = MemoryConfigStore({("site", "settings", "users"): USERS})
+    return open_context(reader, configs, UserContext(user), day)

@@ -17,6 +17,21 @@ section = "docs/adr/0029-rule-screener.md#versioned-configs"
 detect = [{ call = "add_version" }, { call = "save_features" }]
 
 [[responsibility]]
+id = "data-licence-gate"
+description = "Which catalogue fields a user may see values of (ADR 0028 amendment 2026-10-16, ADR 0064 decision 10): the licences a user holds from the users registry (open for everyone, others only when config/site/users.toml lists them; a role grants none, ADR 0040), the licence of a field (a stored feature's own, an expression's strictest of what it reads) and the fields a user lacks the licence of; every path that serves per-name values removes those fields before it reads them (ReadContext.licences in the read model; `held` of fields_view / run_screener for a screener run and the Builder's preview), so they are UNKNOWN with the public kind LICENCE and a screen never passes a hard criterion on one (ADR 0015)"
+owner = ["src/algotrade/services/licences.py"]
+allowed = [
+    "src/algotrade/services/selection.py",  # fields_view: the screen's one read of values
+    "src/algotrade/services/read/context.py",  # ReadContext.licences: the request user's held set
+    "src/algotrade/services/read/instruments/table.py",  # a table's filters and sort
+    "src/algotrade/services/read/screens/results.py",  # stored criterion values and sorts
+    "src/algotrade/services/preview/frame.py",  # the Builder's frame, kept per licence set
+    "src/algotrade/services/jobs/handlers.py",  # the screen job passes the user's licences
+]
+section = "docs/adr/0028-ibkr-enrichment-source.md#licence-tags"
+detect = [{ call = "hidden_fields" }, { call = "held_by" }, { call = "licence_of" }]
+
+[[responsibility]]
 id = "drafting-feedback"
 description = "The events of a Describe-it session (ADR 0066): requested, returned, choices and formulas, saved, finalised, built as rows (clipped sentence, hashed documents, the server-side diff of a save against the draft the model returned) and recorded in the background to feedback/drafting_events, and a draft's missing features (the span, never the sentence) to feedback/feature_requests, ranked by decayed distinct users x feasibility (services/feedback/ranking.py; only through FeedbackWriter, atomic per run, a full queue or a failing write drops the event and never fails a request); read back across a date range through data.feedback, only by the read model's loader that filters by viewer; a formula_accepted event also carries the saved user feature's expression, fingerprint, unit and description (services/feedback/formulas/payload.py, pure; the API reads the user's own features through the config writer), grouped by fingerprint for the admin only (services/read/formulas/accepted.py, counts of users, never a user)"
 owner = [

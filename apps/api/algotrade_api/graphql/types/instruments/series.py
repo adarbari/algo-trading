@@ -9,6 +9,7 @@ import strawberry
 from strawberry.scalars import JSON
 
 from algotrade.services.read.instruments import prices, series
+from algotrade_api.graphql.types.availability import Unavailable
 
 strawberry.enum(prices.Adjustment, description="How bars are adjusted for corporate actions")
 
@@ -65,13 +66,17 @@ class SeriesPoint:
         return cls(session=d.session, values=[JSON(v) for v in d.values])
 
 
-@strawberry.type(description="Catalogue features per stored session of `start..end`")
+@strawberry.type(
+    description="Catalogue features per stored session of `start..end`; `unavailable`: the "
+    "names the viewer's data licence does not cover (no value at any session, kind LICENCE)"
+)
 class FeatureSeries:
     instrument_id: str
     names: list[str]
     start: dt.date
     end: dt.date
     points: list[SeriesPoint]
+    unavailable: list[Unavailable]
 
     @classmethod
     def of(cls, d: series.FeatureSeries) -> Self:
@@ -81,4 +86,5 @@ class FeatureSeries:
             start=d.start,
             end=d.end,
             points=[SeriesPoint.of(p) for p in d.points],
+            unavailable=[Unavailable.of(u) for u in d.unavailable],
         )

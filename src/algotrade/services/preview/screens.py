@@ -15,7 +15,7 @@ is cached (``preview.frame``), so an edit that keeps the field set re-evaluates 
 """
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from functools import partial
 from typing import Any
@@ -124,6 +124,7 @@ class PreviewCoverage:
     missing_tables: list[str]
     pre_snapshot: bool
     universe_snapshot: date
+    withheld_fields: list[str] = field(default_factory=list)  # the data licence withholds them
 
 
 @dataclass(frozen=True)
@@ -294,7 +295,13 @@ def screen_frame(
     if selection.order_by:
         fields.add(selection.order_by)
     return field_frame(
-        ctx.reader, frames, session, sorted(fields), config_features(config), config.features
+        ctx.reader,
+        frames,
+        session,
+        sorted(fields),
+        config_features(config),
+        config.features,
+        ctx.licences,
     )
 
 
@@ -384,6 +391,7 @@ def preview_screen(
             missing_tables=list(frame.missing),
             pre_snapshot=frame.pre_snapshot,
             universe_snapshot=frame.universe.snapshot_date,
+            withheld_fields=list(frame.withheld),
         ),
         total=len(result.rows),
         criteria=[

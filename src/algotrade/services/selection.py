@@ -1,7 +1,10 @@
 """Use case: evaluate a ``Selection`` against point-in-time L1 + rollup data, and expression
-features (``feature.<name>``) computed on read (``services.features``)."""
+features (``feature.<name>``) computed on read (``services.features``). ``fields_view`` is where
+a screen's per-name values are read, so it is where the data-licence gate applies
+(``services.licences``): a field whose licence the caller does not ``hold`` is never read,
+so it is missing (UNKNOWN) and a hard criterion on it never passes (ADR 0015, 0028)."""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import replace
 from datetime import date, datetime
 
@@ -11,7 +14,8 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import InstrumentView
 from algotrade.engines.selection.evaluate import SelectionResult, evaluate_selection
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.services.features import field_view
+from algotrade.services.features import field_view, site_features
+from algotrade.services.licences import ALL_LICENCES, hidden_fields
 from algotrade.services.views import to_value
 
 
@@ -23,14 +27,22 @@ def fields_view(
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
     historical: bool = False,
+    held: Collection[str] = ALL_LICENCES,
 ) -> tuple[FeatureView, InstrumentView]:
     """One row per instrument known on ``session`` (only ``ids``, each with a row even when
     nothing is known of it, when given), keyed by field name; missing values are left out
     (UNKNOWN). ``feature.<name>`` fields are computed from the stored features they need.
     Also the ``InstrumentView`` it came from (``missing`` tables; ``pre_snapshot``).
-    ``historical``: see ``services.features.field_view``."""
+    ``historical``: see ``services.features.field_view``. ``held``: the data licences of the
+    user the values are for (``services.licences.held_by``); a field under another licence is
+    not read. Every user-facing caller (a screener run, the Builder's preview) passes it; the
+    default (all held) is for the edge harness, backtests and training, which record the
+    licence of what they read themselves (ADR 0064)."""
+    hidden = (
+        hidden_fields(features or site_features(), fields, held) if held != ALL_LICENCES else ()
+    )
     view = field_view(
-        reader, session, sorted(set(fields)), ids, as_of=as_of, features=features,
+        reader, session, sorted(set(fields) - set(hidden)), ids, as_of=as_of, features=features,
         historical=historical,
     )  # fmt: skip
     columns = [c for c in view.frame.columns if c != "instrument_id"]
@@ -51,12 +63,13 @@ def selection_view(
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
     historical: bool = False,
+    held: Collection[str] = ALL_LICENCES,
 ) -> tuple[FeatureView, InstrumentView]:
     """``fields_view`` of the fields ``selection`` reads, for every instrument known on
-    ``session``."""
+    ``session`` (``held``: see ``fields_view``)."""
     return fields_view(
         reader, selection_fields(selection), session, as_of=as_of, features=features,
-        historical=historical,
+        historical=historical, held=held,
     )  # fmt: skip
 
 
@@ -75,11 +88,12 @@ def select(
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
     historical: bool = False,
+    held: Collection[str] = ALL_LICENCES,
 ) -> SelectionResult:
     """Point in time: the reference snapshot and rollups for ``session``, read ``as_of``.
     ``features``: the catalogue ``feature.<name>`` fields come from (default: the site's; a
-    user's config: ``services.features.config_features``)."""
-    view, source = selection_view(reader, selection, session, as_of, features, historical)
+    user's config: ``services.features.config_features``). ``held``: see ``fields_view``."""
+    view, source = selection_view(reader, selection, session, as_of, features, historical, held)
     identity = source.identity
     return replace(
         evaluate_selection(selection, view),

@@ -59,3 +59,20 @@ def test_instrument_frames_are_not_cached(monkeypatch: pytest.MonkeyPatch) -> No
     for _ in range(2):  # batches of instruments must not evict the session's entries
         load_series(ctx, ["EQ:AAA"], [CLOSE], D0)
     assert len(reads) == 2 and not [k for k in ctx.cache._items if k[0] == "series-frame"]
+
+
+def test_a_series_of_a_withheld_field_has_no_values_and_says_why() -> None:
+    from algotrade.services.read.availability.cause import UnavailableKind  # noqa: PLC0415
+    from tests.unit.services.read.instruments.conftest import (  # noqa: PLC0415
+        IBKR_IV30,
+        context_as,
+        with_ibkr,
+    )
+
+    reader = store_with(with_ibkr)
+    held = load_series(context_as(reader, "owner"), ["EQ:AAA"], [CLOSE, IBKR_IV30], D1)["EQ:AAA"]
+    assert held.points[-1].values == (51.0, 0.42) and held.unavailable == ()
+    barred = load_series(context_as(reader, "trader"), ["EQ:AAA"], [CLOSE, IBKR_IV30], D1)["EQ:AAA"]
+    assert barred.points[-1].values == (51.0, None)  # the open field beside it is unchanged
+    (why,) = barred.unavailable
+    assert why.kind is UnavailableKind.LICENCE and why.features == (IBKR_IV30,)

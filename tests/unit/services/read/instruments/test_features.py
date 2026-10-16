@@ -369,3 +369,48 @@ def test_fund_reference_applies_to_leveraged_and_inverse_funds_only() -> None:
         stock.unknown is not None and "not a leveraged or inverse fund" in stock.unknown.cause.text
     )
     assert values(ctx, "EQ:UNK", LINK)[LINK] == (None, UnknownCode.NO_ROW)  # unknown: never n/a
+
+
+# ---- the data-licence gate (ADR 0028, services.licences) ----
+
+from tests.unit.services.read.instruments.conftest import (  # noqa: E402
+    IBKR_IV30,
+    VRP,
+    context_as,
+    with_ibkr,
+)
+
+
+@pytest.mark.parametrize("name", [IBKR_IV30, VRP])
+@pytest.mark.parametrize("user", ["trader", "other_admin"])
+def test_a_personal_feature_is_unknown_with_the_public_kind_to_a_user_without_the_licence(
+    name: str, user: str
+) -> None:
+    """Fix for: a personal-licence value (IBKR-derived, or an expression over one) was served
+    to a user who does not hold the licence. An admin role grants none (ADR 0040)."""
+    ctx = context_as(store_with(with_ibkr), user)
+    (cell,) = load_feature_values(ctx, ["EQ:AAA"], [name])["EQ:AAA"]
+    assert cell.value is None and cell.unknown is not None
+    assert cell.unknown.code is UnknownCode.LICENCE
+    assert cell.unknown.kind is UnavailableKind.LICENCE
+    assert cell.unknown.guide_term == "unavailable_licence"
+    assert cell.info.licence == "personal"
+    assert cell_codes({"EQ:AAA": (cell,)}, ["EQ:AAA"])[2] == ((UnavailableKind.LICENCE,),)
+
+
+def test_the_holder_of_the_personal_licence_sees_the_value() -> None:
+    ctx = context_as(store_with(with_ibkr), "owner")
+    cell = load_feature_values(ctx, ["EQ:AAA"], [IBKR_IV30])["EQ:AAA"][0]
+    assert (cell.value, cell.unknown) == (0.42, None)
+
+
+def test_a_withheld_field_is_withheld_whatever_is_stored_and_beside_open_ones() -> None:
+    """Nothing is read for it: absent rows read the same, an open field beside it is unchanged,
+    and with every field withheld and no ids there is no population to list."""
+    for reader in (store_with(with_ibkr), store_with()):
+        ctx = context_as(reader, "trader")
+        found = load_feature_values(ctx, ["EQ:AAA"], [CLOSE, IBKR_IV30, SYMBOL])["EQ:AAA"]
+        assert [c.name for c in found] == [CLOSE, IBKR_IV30, SYMBOL]
+        assert found[0].value == 51.0 and found[2].value == "AAA"
+        assert found[1].unknown is not None and found[1].unknown.code is UnknownCode.LICENCE
+    assert load_feature_values(context_as(store_with(with_ibkr), "trader"), None, [IBKR_IV30]) == {}

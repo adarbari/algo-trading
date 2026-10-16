@@ -51,7 +51,6 @@ TTL_S = 300.0
 # Operations (by name) whose answer is the same for every caller of a role.
 SHARED_OPERATIONS: frozenset[str] = frozenset(
     {
-        "MarketHistory",
         "RegimeEpisodes",
         "RegimeBands",
         "RegimeSignals",
@@ -76,6 +75,7 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "InstrumentFacts",
         "InstrumentFeatureValues",
         "InstrumentHistory",
+        "MarketHistory",  # a field under a data licence the viewer lacks has no values (ADR 0028)
         "ComparePrices",
         "Day",
         "EventCalendar",

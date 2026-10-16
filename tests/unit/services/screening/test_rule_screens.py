@@ -305,3 +305,80 @@ def test_an_empty_ibkr_partition_with_no_cboe_is_partial_not_a_zero_pick_complet
     screened = screen_session(reader, config, DAY, now=T0)
     assert screened.run.coverage is RunCoverage.PARTIAL
     assert set(screened.blocking) == {IBKR, CBOE}
+
+
+# The data-licence gate (ADR 0028, services.licences): a screen runs for a user, with the
+# licences that user holds; a field under another is never read.
+OPEN_ONLY = frozenset({"open"})
+
+
+def test_a_hard_criterion_on_a_personal_feature_never_passes_for_a_user_without_the_licence() -> (
+    None
+):
+    """Fix for: a trader without the personal licence got picks decided on IBKR-derived values
+    (an expression over a personal feature inherits its licence, so ``vrp_iv30`` is hidden
+    even though Cboe's leg is open)."""
+    reader, config = _vrp_session(ibkr=True, cboe=True)
+    holder = screen_session(reader, config, DAY, now=T0, held=frozenset({"open", "personal"}))
+    assert holder.rules is not None and holder.rules.summary.passed == 1
+    hidden = screen_session(reader, config, DAY, now=T0, held=OPEN_ONLY)
+    assert hidden.rules is not None and hidden.rules.summary.passed == 0
+    assert {r.decision.value for r in hidden.rules.rows} == {"REJECT"}
+
+
+def test_a_run_for_a_user_without_the_licence_stores_no_value_of_a_personal_feature() -> None:
+    """The results the run writes (ADR 0033) carry no value read under a licence its user does
+    not hold: the criterion is MISSING with no number, whatever the store holds."""
+    reader, writer = seeded()
+    rows = [{"instrument_id": "EQ:AAA", "iv30_ibkr": 0.3}]
+    writer.write_table(IBKR, DAY, "f2", stamped(rows, DAY, "f2"))
+    store = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "vrp_like"): VRP_SCREEN}
+    )
+    config = resolve_config(store, "vrp_like", UserContext(SITE_USER))
+    run_screener(reader, writer, config, DAY, now=T0, held=OPEN_ONLY)
+    values = reader.table("results/rule_screen_values", DAY)
+    assert values is not None and not values.empty
+    assert set(values["outcome"]) == {"MISSING"} and values["value_num"].isna().all()
+
+
+def _screen_job_values(user: str) -> Any:
+    """The stored criterion values after the ``screen`` job of ``vrp_like`` ran as ``user``."""
+    reader, writer = seeded()
+    rows = [{"instrument_id": "EQ:AAA", "iv30_ibkr": 0.3}]
+    writer.write_table(IBKR, DAY, "f2", stamped(rows, DAY, "f2"))
+    store = MemoryConfigStore(
+        {
+            ("site", "selections", "active"): ACTIVE,
+            ("site", "strategies", "vrp_like"): VRP_SCREEN,
+            ("site", "settings", "users"): {
+                "user": [
+                    {"id": "owner", "role": "admin", "licences": ["personal"]},
+                    {"id": SITE_USER, "role": "admin"},
+                ]
+            },
+            ("owner", "strategies", "vrp_like"): VRP_SCREEN,
+        }
+    )
+    runner = LocalJobRunner(
+        writer.runs_backend,
+        LIBRARY_HANDLERS,
+        {"reader": reader, "writer": writer, "configs": store},
+        workers=1,
+    )
+    params = {"config": "vrp_like", "session": DAY.isoformat(), "export_dir": None}
+    job = runner.run("screen", params, UserContext(user), force=True)
+    runner.shutdown()
+    assert job.status is JobStatus.COMPLETE, job.error
+    values = reader.table("results/rule_screen_values", DAY)
+    assert values is not None
+    return values
+
+
+def test_the_screen_job_runs_a_user_with_the_licences_the_registry_gives_them() -> None:
+    """``screen_job`` is the one caller that passes ``held``: ``site`` (no licence listed) runs
+    open-only and stores no personal value, a user the registry lists with ``personal`` does."""
+    assert set(_screen_job_values(SITE_USER)["outcome"]) == {"MISSING"}
+    owner = _screen_job_values("owner")
+    aaa = owner[owner["instrument_id"] == "EQ:AAA"]
+    assert aaa.iloc[0]["outcome"] != "MISSING" and aaa.iloc[0]["value_num"] == 0.3
