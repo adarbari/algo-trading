@@ -72,6 +72,7 @@ def golden_shares(source: FixtureSource, resolver: SymbolResolver, first: date) 
                         "symbol": symbol,
                         "cik": f"{len(rows) // len(SHARES_FILINGS) + 1:010d}",
                         "concept": "dei",
+                        "tag": "dei:EntityCommonStockSharesOutstanding",
                         "period_start": None,
                         "period_end": period_end,
                         "filed": first + timedelta(days=days),

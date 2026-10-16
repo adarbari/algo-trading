@@ -211,8 +211,9 @@ INSTRUMENT_DESCRIPTION = fixed(
 # L1: share counts and basic financials (revenue, net income, diluted EPS: ``value`` in
 # ``unit``) from SEC company facts, per instrument (every class of a CIK gets the CIK's
 # facts). Runs are increments (new facts + a ``checked`` marker per fetched CIK), so they
-# merge; a fact is identified by (instrument, concept, period start, period end, filed date):
-# a year-to-date and a quarterly fact share an end date.
+# merge; a fact is identified by (instrument, concept, tag, period start, period end, filed
+# date): a year-to-date and a quarterly fact share an end date, and several us-gaap tags of one
+# concept report the same period (a null ``tag``, a ``checked`` marker's, equals a null).
 INSTRUMENT_SHARES = fixed(
     "instruments/shares",
     "reference",
@@ -230,7 +231,7 @@ INSTRUMENT_SHARES = fixed(
     "value float64",
     "fetched_on date!",
     runs="merge",
-    key=("instrument_id", "concept", "period_start", "period_end", "filed"),
+    key=("instrument_id", "concept", "tag", "period_start", "period_end", "filed"),
 )
 # L1: each instrument's IBKR stock contract (ADR 0028): conid and primary exchange from IB's
 # contract lookup, one full snapshot per run (rows not refreshed are carried forward).
