@@ -1,0 +1,11 @@
+[
+  {
+    "symbol": "AAPL",
+    "strongBuy": 1,
+    "buy": 70,
+    "hold": 32,
+    "sell": 9,
+    "strongSell": 0,
+    "consensus": "Buy"
+  }
+]

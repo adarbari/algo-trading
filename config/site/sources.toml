@@ -144,6 +144,18 @@ monthly_symbol_budget = 100_000  # distinct tickers `bars-history` fetches in a 
                                  # covers names a failed run asked for and a month-boundary skew). 0: fetch none.
                                  # `bars-history --fill N` (by hand, N = 12000, or the monthly agent) is capped by it.
 
+[fmp]                            # Financial Modeling Prep analyst data (ADR 0068): estimates, price targets, ratings; key in .env
+enabled = true                   # ALGOTRADE_FMP_API_KEY (free: site.financialmodelingprep.com); no key: the source is skipped
+min_interval_s = 1.0             # free tier: about 250 calls a day; the pace only keeps bursts polite
+licence = "personal"             # FMP's free terms: personal use; features derived from it inherit it
+daily_budget = 200               # FMP calls a UTC day the analyst tasks may spend (the plan allows ~250; the rest is
+                                 # headroom for a hand run); `analyst-probe` counts its own, later tasks add theirs
+
+[finnhub]                        # Finnhub analyst recommendation trends (ADR 0068); key in .env
+enabled = true                   # ALGOTRADE_FINNHUB_API_KEY (free: finnhub.io); no key: the source is skipped
+min_interval_s = 1.0             # free tier: 60 calls a minute
+licence = "personal"             # Finnhub's free terms: personal use; features derived from it inherit it
+
 [sp500_history]                  # S&P 500 membership intervals since 1996 (fja05680/sp500, MIT licence, GitHub):
 enabled = true                   # the `index-membership` task (in no workflow until the owner runs it), one 28 KB file
 min_interval_s = 1.0             # a static file on GitHub; one request, stay polite

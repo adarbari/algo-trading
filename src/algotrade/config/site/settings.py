@@ -152,6 +152,8 @@ VENDOR_EXTRAS = {
     "treasury": ("lookback_days",),
     "fred": ("base_url",),
     "tiingo": ("licence", "monthly_symbol_budget"),
+    "fmp": ("licence", "daily_budget"),
+    "finnhub": ("licence",),
     "etf_holdings": ETF_KEYS,
     **VENDOR_FLAGS,
     "ibkr": (
@@ -227,6 +229,11 @@ class SourcesSettings:
     tiingo_monthly_symbol_budget: int = (
         450  # [tiingo] monthly_symbol_budget: distinct tickers a month
     )
+    fmp_licence: str = "personal"  # [fmp] licence: what its analyst data is licensed for (ADR 0068)
+    fmp_daily_budget: int = (
+        200  # [fmp] daily_budget: FMP calls a UTC day the analyst tasks may spend
+    )
+    finnhub_licence: str = "personal"  # [finnhub] licence (ADR 0068)
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
     limits_dir: str = "var/run/limits"
@@ -361,6 +368,11 @@ class SourcesSettings:
             tiingo_licence=_extra(vendors, "tiingo").choice("licence", d.tiingo_licence, LICENCES),
             tiingo_monthly_symbol_budget=_extra(vendors, "tiingo").integer(
                 "monthly_symbol_budget", d.tiingo_monthly_symbol_budget, 0
+            ),
+            fmp_licence=_extra(vendors, "fmp").choice("licence", d.fmp_licence, LICENCES),
+            fmp_daily_budget=_extra(vendors, "fmp").integer("daily_budget", d.fmp_daily_budget, 0),
+            finnhub_licence=_extra(vendors, "finnhub").choice(
+                "licence", d.finnhub_licence, LICENCES
             ),
             http_max_retry_s=http.number("max_retry_s", d.http_max_retry_s, 0),
             http_breaker_failures=http.integer("breaker_failures", d.http_breaker_failures, 1),
