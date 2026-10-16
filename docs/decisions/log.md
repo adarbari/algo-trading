@@ -408,5 +408,5 @@ follow-up PR).
 - Options: report only / the same alert as a failed nightly step.
 - Decision: the same alert, through the nightly's notifier; also when `[post] max_duration_minutes` is exceeded.
 - decided by: owner
-- status: confirmed
+- status: final
 - Reasoning: these steps used to appear in the nightly's alert; moving them out must not silence failures.
