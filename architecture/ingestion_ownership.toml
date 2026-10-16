@@ -9,6 +9,20 @@
 scope = ["apps/ingestion/"]
 
 [[responsibility]]
+id = "analyst-access-probe"
+description = "Store which analyst endpoints each free vendor key may call (analyst/vendor_access): one probe request per FMP and Finnhub endpoint through the probe sources, one row per (vendor, endpoint), a vendor with no key skipped, FMP calls counted against [fmp] daily_budget (budget.py); run by hand, in no workflow (ADR 0068)"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/analyst/budget.py",
+    "apps/ingestion/algotrade_ingestion/tasks/analyst/probe.py",
+]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task
+    "src/algotrade/storage/tables/schemas.py",  # declares the table's schema
+]
+section = "docs/adr/0068-analyst-data-vendors.md#decision"
+detect = [{ string = "analyst/vendor_access" }, { call = "fmp_calls_today" }]
+
+[[responsibility]]
 id = "bad-bar-detection"
 description = "Decide which stored daily bars cannot be right (a close below the floor, high / low / close out of order, an unexplained jump cutting a series, the trusted segment being the one with the most Massive bars) and write them to events/bar_flag with a reason; raw bars are never edited (ADR 0061)"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/bar_quality.py"]

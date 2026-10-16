@@ -18,6 +18,7 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date
+from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 import pandas as pd
@@ -59,6 +60,32 @@ class Source(Protocol):
     def fetch(self, request: FetchRequest) -> bytes | None: ...
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None: ...
+
+
+class Access(StrEnum):
+    """What a vendor lets one key do with an endpoint (``framework/access.py`` classifies it)."""
+
+    ALLOWED = "ALLOWED"
+    DENIED = "DENIED"
+    LIMITED = "LIMITED"
+
+
+@dataclass(frozen=True)
+class Verdict:
+    access: Access
+    http_code: int
+    rows: int  # records in the payload (0 when there was none)
+    note: str  # why, in fixed words, never the vendor's body
+
+
+@runtime_checkable
+class ProbeSource(Source, Protocol):
+    """A vendor's access probe (``AccessProbe``): ``endpoints`` names what it asks (the name
+    stored in ``analyst/vendor_access``), ``probe`` makes ONE un-retried request for it."""
+
+    endpoints: Mapping[str, str]
+
+    def probe(self, endpoint: str) -> Verdict: ...
 
 
 @runtime_checkable

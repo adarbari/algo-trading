@@ -525,6 +525,27 @@ MACRO_SERIES = fixed(
     runs="merge",
     key=("instrument_id", "obs_date", "vintage_date"),
 )
+# L1: what each analyst-data vendor's key may call (ADR 0068), one row per (vendor, endpoint):
+# ``source`` is the vendor (``fmp``, ``finnhub``), ``endpoint`` the probe's name for the call
+# (``estimates_quarter``). ``status`` is ALLOWED / DENIED / LIMITED (``framework/access.py``);
+# ``http_code`` the answer's (200 for an empty payload); ``rows`` the records it held; ``note``
+# fixed words, never the vendor's body; ``checked_ts`` when the call was made. A probe run is a
+# window (it may skip a vendor with no key, or an endpoint over budget), so runs merge on the
+# key and the latest run's verdict wins; the partition is the run's session.
+ANALYST_VENDOR_ACCESS = fixed(
+    "analyst/vendor_access",
+    "reference",
+    ("source", "endpoint"),
+    "endpoint string!",
+    "status string!",
+    "http_code int64",
+    "rows int64",
+    "note string",
+    "checked_ts timestamp_utc!",
+    runs="merge",
+    key=("source", "endpoint"),
+)
+ACCESS_STATUSES = frozenset({"ALLOWED", "DENIED", "LIMITED"})
 # ``macro/series`` ``vintage_kind``: ALFRED's realtime_start, or obs_date + the release lag.
 ALFRED, LAGGED = "alfred", "lagged"
 VINTAGE_KINDS = frozenset({ALFRED, LAGGED})
@@ -637,6 +658,7 @@ KNOWN: dict[str, TableSpec] = {
         FEEDBACK_FEATURE_REQUESTS,
         ETF_HOLDINGS,
         MACRO_SERIES,
+        ANALYST_VENDOR_ACCESS,
         EARNINGS_EVENTS,
         MACRO_RELEASE_EVENTS,
         FILING_EVENTS,
@@ -742,10 +764,8 @@ def validate_frame(table: str, frame: pd.DataFrame) -> None:
             problems.append("duplicate rows for the table key")
         if spec.grain == "bar":
             problems.extend(bar_problems(frame))
-        if spec is MACRO_SERIES:
-            problems.extend(vintage_problems(frame))
-        if spec is MACRO_RELEASE_EVENTS:
-            problems.extend(release_status_problems(frame))
+        if spec.name in VALUE_CHECKS:
+            problems.extend(VALUE_CHECKS[spec.name](frame))
         if spec.grain == "outcome":
             bad = sorted({str(v) for v in frame["outcome_status"]} - OUTCOME_STATUSES)
             if bad:
@@ -805,6 +825,20 @@ def release_status_problems(frame: pd.DataFrame) -> list[str]:
     """``events/macro_release`` rows whose ``status`` is not one of ``RELEASE_STATUSES``."""
     bad = sorted({str(v) for v in frame["status"]} - RELEASE_STATUSES)
     return [f"status must be one of {sorted(RELEASE_STATUSES)}, got {bad}"] if bad else []
+
+
+def access_status_problems(frame: pd.DataFrame) -> list[str]:
+    """``analyst/vendor_access`` rows whose ``status`` is not one of ``ACCESS_STATUSES``."""
+    bad = sorted({str(v) for v in frame["status"]} - ACCESS_STATUSES)
+    return [f"status must be one of {sorted(ACCESS_STATUSES)}, got {bad}"] if bad else []
+
+
+# The value rules of the tables that restrict a column to a vocabulary, by table name.
+VALUE_CHECKS = {
+    MACRO_SERIES.name: vintage_problems,
+    MACRO_RELEASE_EVENTS.name: release_status_problems,
+    ANALYST_VENDOR_ACCESS.name: access_status_problems,
+}
 
 
 def require_retention(table: str) -> int:

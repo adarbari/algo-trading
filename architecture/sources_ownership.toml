@@ -9,6 +9,17 @@
 scope = ["libs/sources/"]
 
 [[responsibility]]
+id = "analyst-vendor-sources"
+description = "Fetch and normalise analyst data from FMP (analyst estimates, price targets, the ratings summary) and Finnhub (recommendation trends), and their access probes (one request per endpoint); the FMP key is added to the query by the registry's transport and never held here; nothing is stored from these sources yet (ADR 0068)"
+owner = [
+    "libs/sources/algotrade_sources/vendors/finnhub/*",
+    "libs/sources/algotrade_sources/vendors/fmp/*",
+]
+allowed = ["libs/sources/algotrade_sources/framework/registry.py"]  # builds the sources, their key header / query parameter and refusal tests
+section = "docs/adr/0068-analyst-data-vendors.md#decision"
+detect = [{ string_prefix = "https://financialmodelingprep.com" }, { string_prefix = "https://finnhub.io" }]
+
+[[responsibility]]
 id = "broker-read-only"
 description = "The only code that talks to a broker API (ib_async), READ-ONLY market data: the IbkrMarketData facade guards the IB object (market-data calls only) and never sends an order, account or position request; tests/libs/sources/vendors/ibkr/test_read_only_guard.py fails on any order / account API reference anywhere"
 owner = ["libs/sources/algotrade_sources/vendors/ibkr/gateway.py"]
@@ -62,6 +73,17 @@ detect = [
     { string = "otherlisted" },
     { string = "dividends" },
 ]
+
+[[responsibility]]
+id = "vendor-access-probe"
+description = "What a vendor lets one key do: classify one un-retried answer ALLOWED / DENIED (401 / 402 / 403 or an upgrade body) / LIMITED (429, a quota body, an empty payload for a covered name), and the AccessProbe base of a vendor's probe source (the Access / Verdict / ProbeSource vocabulary is in base.py, which tasks may import) (ADR 0068)"
+owner = ["libs/sources/algotrade_sources/framework/access.py"]
+allowed = [
+    "libs/sources/algotrade_sources/vendors/finnhub/probe.py",  # names Finnhub's endpoints
+    "libs/sources/algotrade_sources/vendors/fmp/probe.py",  # names FMP's endpoints
+]
+section = "docs/adr/0068-analyst-data-vendors.md#decision"
+detect = [{ import = "algotrade_sources.framework.access" }]
 
 [[responsibility]]
 id = "vendor-http"

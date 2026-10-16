@@ -21,6 +21,7 @@ from algotrade.config.site.events.releases import load_macro_releases
 from algotrade.config.site.settings import load_macro, load_universe
 from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.storage.runs import RunRecord
+from algotrade_ingestion.tasks.analyst import probe as analyst_probe
 from algotrade_ingestion.tasks.derived import history_copy, market_rollups, outcomes, rollups
 from algotrade_ingestion.tasks.events import filings
 from algotrade_ingestion.tasks.framework.run import TaskContext
@@ -310,21 +311,19 @@ def _chains(ctx: TaskContext, p: Params) -> RunRecord:
 
 
 def _rollups(ctx: TaskContext, p: Params) -> RunRecord:
-    return rollups.compute_rollups(ctx, session_of(p), p.get("start"), p.get("end"), _only(p))
+    return rollups.compute_rollups(
+        ctx, session_of(p), p.get("start"), p.get("end"), _symbols(p, "only")
+    )
 
 
 def _market_rollups(ctx: TaskContext, p: Params) -> RunRecord:
     return market_rollups.compute_market_rollups(
-        ctx, session_of(p), p.get("start"), p.get("end"), _only(p)
+        ctx, session_of(p), p.get("start"), p.get("end"), _symbols(p, "only")
     )
 
 
 def _outcomes(ctx: TaskContext, p: Params) -> RunRecord:
     return outcomes.compute_outcomes(ctx, session_of(p), p.get("start"), p.get("end"))
-
-
-def _only(p: Params) -> list[str]:
-    return [k.strip() for k in str(p.get("only") or "").split(",") if k.strip()]
 
 
 def _macro(ctx: TaskContext, p: Params) -> RunRecord:
@@ -539,6 +538,17 @@ TASKS: dict[str, Task] = {
             _listing_history,
             sources=("tiingo_listings", "tiingo_meta"),
             settings="sources.toml [tiingo]",
+            params=(SESSION,),
+        ),
+        Task(
+            "analyst-probe",
+            "which analyst endpoints the FMP and Finnhub keys may call (analyst/vendor_access); "
+            "one request per endpoint, in no workflow",
+            analyst_probe,
+            ("analyst/vendor_access",),
+            analyst_probe.run,
+            optional_sources=analyst_probe.SOURCES,
+            settings="sources.toml [fmp]",
             params=(SESSION,),
         ),
         Task(
