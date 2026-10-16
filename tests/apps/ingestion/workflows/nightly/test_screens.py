@@ -17,7 +17,7 @@ from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.locks import held
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.workflows.nightly import screens as screens_module
-from algotrade_ingestion.workflows.nightly.nightly import EDGE_EVAL, EDGE_SIGNALS, NIGHTLY
+from algotrade_ingestion.workflows.nightly.nightly import EDGE_EVAL, EDGE_SIGNALS, NIGHTLY, SNAPSHOT
 from algotrade_ingestion.workflows.nightly.steps import StepStatus
 
 D = date(2026, 10, 2)
@@ -47,6 +47,16 @@ def _nightly(*ids: str) -> Any:
         SimpleNamespace(config=SimpleNamespace(id=i), user=UserContext(SITE_USER)) for i in ids
     ]
     return lambda store: configs
+
+
+def test_only_snapshot_fetches_are_critical_and_latest_only() -> None:
+    # 2026-10-16: the screens were latest-only, skipped in a catch-up session as "the source
+    # serves the current snapshot", and the session was served complete without screener runs.
+    # A critical step skipped as latest-only leaves its session complete: only a fetch of a
+    # source that serves its current snapshot may be one (reads take the latest snapshot; a
+    # session without its chains fails the screens' coverage).
+    critical = {s.name: s.latest_only for s in NIGHTLY if s.critical and s.latest_only}
+    assert critical == {"universe-build": SNAPSHOT, "chains": SNAPSHOT}
 
 
 def test_an_optional_table_missed_by_a_complete_screen_is_a_warning(
