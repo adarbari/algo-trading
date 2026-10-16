@@ -7,8 +7,7 @@ A stored leg is reused only when all hold; the first that fails is its reason, c
 run record:
 
 - the run is not FULL: not asked (``--full``), not an ``as_of`` before a stored leg's computation
-  or outcome read (a historical run), not an edge whose report diagnostic needs the outcome rows
-  (``earnings_expected``), and every horizon has a closed window;
+  or outcome read (a historical run), and every horizon has a closed window;
 - ``entry``: the leg has the entry session the run derives, and ``events``: the event names
   (an event schedule is read over the whole range on every run) are those it was measured on;
 - ``inputs``: the session's reads log still matches the store: every partition it read exists
@@ -46,6 +45,7 @@ from algotrade.services.evaluation.cross_section.random_picks import RandomStat
 FULL = "full"
 INCREMENTAL = "incremental"
 Known = Mapping[tuple[date, int], datetime]  # (S, horizon) -> latest outcome knowledge_ts
+Names = Mapping[tuple[date, int], frozenset[str]]  # (S, horizon) -> names with an outcome row
 LegId = tuple[str, str, str, int, date]  # (leg key, edge variant, screener, horizon, D)
 Plan = tuple[tuple[str, int], str]  # ((edge variant, horizon), screener)
 
@@ -67,7 +67,10 @@ class Reuse:
     """What ``plan`` decided. ``days``: the decision sessions to compute (None: all); ``closed``:
     the entry sessions with a closed window by horizon (empty for a FULL run: the harness reads
     them); ``reused``: the stored legs kept (draws dropped where the run does not need them) and
-    ``reads`` their sessions' reads logs; ``invalidated``: stored legs recomputed, by reason."""
+    ``reads`` their sessions' reads logs; ``invalidated``: stored legs recomputed, by reason;
+    ``names``: the names with an outcome row at each (entry session, horizon) the run asked
+    about (empty for a FULL run: the harness reads them), which the report diagnostic needs for
+    the entry sessions whose legs are reused."""
 
     mode: str
     days: frozenset[date] | None = None
@@ -75,6 +78,7 @@ class Reuse:
     reused: dict[LegId, LegRecord] = field(default_factory=dict)
     reads: dict[date, DayReads] = field(default_factory=dict)
     invalidated: Counter[str] = field(default_factory=Counter)
+    names: dict[tuple[date, int], frozenset[str]] = field(default_factory=dict)
 
     def snapshots(self) -> set[date]:
         """The universe snapshots the reused legs' screens read."""
@@ -105,14 +109,14 @@ def plan_reuse(
     stored: StoredLegs,
     needs: Sequence[Need],
     as_of: datetime,
-    stamps: Callable[[Collection[date]], tuple[Known, Mapping[date, int]]],
+    stamps: Callable[[Collection[date]], tuple[Known, Names, Mapping[date, int]]],
     full: str | None = None,
 ) -> Reuse:
     """The run's reuse of ``stored`` over ``needs``; ``full``: why the run is FULL anyway (None:
     it is not, unless an ``as_of`` before a stored leg or a horizon without a closed window
     makes it so). ``stamps(entry sessions)``: the harness's read of the outcome partitions (it is
-    the one reader of outcomes): per (S, horizon) the latest ``knowledge_ts`` by ``as_of``, and
-    per S the partition's commit sequence."""
+    the one reader of outcomes): per (S, horizon) the latest ``knowledge_ts`` by ``as_of`` and the
+    names of those rows, and per S the partition's commit sequence."""
     if full is not None or not needs:
         return Reuse(FULL)
     keys = {n.leg[0] for n in needs}
@@ -121,7 +125,7 @@ def plan_reuse(
         leg.known is None or max(leg.known, leg.outcomes_as_of) > as_of for leg in mine.values()
     ):
         return Reuse(FULL)  # a leg computed after ``as_of`` may hold rows not known then
-    known, seqs = stamps({n.entry for n in needs})
+    known, names, seqs = stamps({n.entry for n in needs})
     closed: dict[int, set[date]] = {n.leg[3]: set() for n in needs}
     for day, horizon in known:
         if horizon in closed:
@@ -130,7 +134,7 @@ def plan_reuse(
         return Reuse(FULL)  # nothing stored for a horizon: the harness raises, as a FULL run does
     wanted = [n for n in needs if n.entry in closed[n.leg[3]]]
     sound = _sound_days(reader, stored.reads, sorted({n.leg[4] for n in wanted}))
-    reuse = Reuse(INCREMENTAL, closed=closed)
+    reuse = Reuse(INCREMENTAL, closed=closed, names=dict(names))
     todo: set[date] = set()
     reasons: dict[LegId, str | None] = {}
     for n in wanted:

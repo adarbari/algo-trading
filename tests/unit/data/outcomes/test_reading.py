@@ -8,7 +8,13 @@ import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.data.outcomes import OUTCOME_FIELDS, outcome_known, outcome_seqs, read_outcomes
+from algotrade.data.outcomes import (
+    OUTCOME_FIELDS,
+    outcome_known,
+    outcome_seqs,
+    outcome_stamps,
+    read_outcomes,
+)
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import FORWARD_RETURNS
@@ -118,3 +124,26 @@ def test_outcome_known_is_the_latest_known_row_of_each_closed_window_by_as_of() 
     assert outcome_known(reader, [S1, S2, S3], datetime(2026, 10, 3, tzinfo=UTC))[S1, 20] == early
     assert outcome_known(reader, [S1, S3], datetime(2026, 9, 1, tzinfo=UTC)) == {}
     assert outcome_known(reader, [S2], now) == {(S2, 20): early}
+
+
+def test_outcome_stamps_name_the_spy_rows_known_by_as_of_beside_their_stamps() -> None:
+    reader = _store()
+    now = datetime(2026, 10, 9, tzinfo=UTC)
+    known, names = outcome_stamps(reader, [S1, S2, S3], now, names_for=[6, 20])
+    assert known == outcome_known(reader, [S1, S2, S3], now)
+    assert names == {  # the benchmark SPY only (QQQ's row aside); r2's later row is a name too
+        (S1, 20): frozenset({"EQ:A", "EQ:B"}), (S1, 6): frozenset({"EQ:A"}),
+        (S2, 20): frozenset({"EQ:A"}), (S3, 20): frozenset({"EQ:A"}),
+    }  # fmt: skip
+    only20 = outcome_stamps(reader, [S1, S2], now, names_for=[20])[1]
+    assert set(only20) == {(S1, 20), (S2, 20)}  # horizon 6 asked for no names
+    _, early = outcome_stamps(reader, [S1], datetime(2026, 10, 3, tzinfo=UTC), names_for=[20])
+    assert early[S1, 20] == {"EQ:A", "EQ:B"}  # r2 (EQ:B again) is not known yet: the same names
+    assert outcome_stamps(reader, [S1, S3], datetime(2026, 9, 1, tzinfo=UTC)) == ({}, {})
+
+
+def test_no_name_set_is_built_unless_a_horizon_asks_for_names() -> None:
+    reader = _store()
+    now = datetime(2026, 10, 9, tzinfo=UTC)
+    known, names = outcome_stamps(reader, [S1, S2, S3], now)
+    assert names == {} and known == outcome_known(reader, [S1, S2, S3], now)

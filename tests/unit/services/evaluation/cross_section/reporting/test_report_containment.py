@@ -2,14 +2,18 @@
 real report fell outside it counts in the denominator, not the numerator, and the picks and hits
 are identical with and without the diagnostic (it is read after the outcomes, never an input)."""
 
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
+from algotrade.config.user import UserContext
+from algotrade.services.evaluation.cross_section.harness import evaluate_edge
+from algotrade.services.evaluation.cross_section.legs.reuse import FULL, INCREMENTAL
 from algotrade.services.evaluation.cross_section.reporting.report import render_edge_report
 from algotrade.services.evaluation.cross_section.results import (
     lost_sessions,
     report_containment,
+    write_edge_eval,
 )
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
@@ -86,3 +90,32 @@ def test_an_edge_without_the_expected_report_schedule_has_no_diagnostic() -> Non
     ev = run(build_world(), edge())
     assert [r.report_containment for r in ev.results] == [None]
     assert report_containment(ev) == []
+
+
+def test_an_earnings_expected_edge_run_incrementally_reuses_its_legs_and_keeps_the_diagnostic() -> (
+    None
+):
+    w = world_with({10: INSIDE, 11: OUTSIDE})
+
+    def go(at: datetime, *, full: bool = False):  # type: ignore[no-untyped-def]
+        ev = evaluate_edge(
+            w.reader, w.results, w.configs, UserContext("site"), expected_edge(),
+            DAYS[0], DAYS[-1], at, full=full,
+        )  # fmt: skip
+        if not full:
+            write_edge_eval(w.results, ev, at)
+        return ev
+
+    t1 = datetime(2026, 10, 6, 12, tzinfo=UTC)
+    first = go(t1)
+    again = go(t1)
+    assert (first.legs_computed, first.legs_reused) != (0, 0)
+    assert (again.mode, again.legs_computed) == (INCREMENTAL, 0) and again.legs_reused > 0
+    full = go(t1 + timedelta(hours=1), full=True)
+    assert full.mode == FULL
+    assert [r.report_containment for r in again.results] == [
+        r.report_containment for r in full.results
+    ]
+    assert next(r.report_containment for r in again.results) is not None
+    assert [r.stats for r in again.results] == [r.stats for r in full.results]
+    assert [r.measures for r in again.results] == [r.measures for r in full.results]

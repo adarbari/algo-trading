@@ -24,10 +24,11 @@ user, never a hold on the session or a later one.
 The ``edge-eval`` step (``edge_eval_jobs``) is the ``post-session`` workflow's (ADR 0070), not the
 nightly's: it runs one ``edge-eval`` job per open edge (not rejected or blocked, with screeners or
 baselines) as the edge's owner over the stored outcome sessions (ADR 0063), under the owner's
-evaluation claim: ``mode="incremental"`` (reuse the stored legs), or ``mode="audit"`` (recompute
-every leg, compare, rewrite the ones that differ, FAIL naming them) when ``audit_due`` (the week's
-last session, or the edge's last audit is over 9 days old). A job that is not COMPLETE fails the
-step, a warning naming the edge, never a hold on anything.
+evaluation claim (each summary carries ``mode``, the one requested, and ``effective_mode``, the
+one the harness ran, so a FULL fallback shows): ``mode="incremental"`` (reuse the stored legs), or
+``mode="audit"`` (recompute every leg, compare, rewrite the ones that differ, FAIL naming them)
+when ``audit_due`` (the week's last session, or the edge's last audit is over 9 days old). A job
+that is not COMPLETE fails the step, a warning naming the edge, never a hold on anything.
 """
 
 import logging
@@ -211,6 +212,7 @@ def edge_eval_jobs(
                 {**summary, "job_id": job.job_id, "status": job.status.value}
                 | ({"error": job.error} if job.error else {})
                 | {k: job.result[k] for k in ("run_id", "legs") if k in job.result}
+                | ({"effective_mode": job.result["mode"]} if "mode" in job.result else {})
             )
             if job.status is not JobStatus.COMPLETE:
                 short.append(f"{edge.owner}/{edge.id} {job.status.value}")
