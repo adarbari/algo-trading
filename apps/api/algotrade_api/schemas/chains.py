@@ -31,7 +31,8 @@ class LiveOptionChain(Schema):
     source: str = Field(description="ibkr: read live from IB Gateway; stored: the stored chain")
     status: str = Field(
         description="LIVE, CACHED (a live answer under live_cache_s old), DISABLED, "
-        "UNAVAILABLE (gateway down, busy or slow), ERROR: the last three serve the stored chain"
+        "UNAVAILABLE (gateway down, busy or slow), ERROR, LICENCE (IBKR quotes need the personal "
+        "data licence): the last four serve the stored chain"
     )
     detail: str | None = Field(
         description="why the stored chain was served (admins; anyone else: generic words)",

@@ -12,7 +12,8 @@ same strikes, with ``source = "stored"`` and a status saying why.
 
 Statuses: ``LIVE`` (just read), ``CACHED`` (read within the cache window), ``DISABLED`` (no
 feed configured), ``UNAVAILABLE`` (the gateway is down, busy or too slow), ``ERROR`` (the feed
-failed otherwise; logged).
+failed otherwise; logged), ``LICENCE`` (IBKR quotes are personal-licence data and the caller
+does not hold it: the stored chain, the feed never asked, ADR 0028 / 0068).
 """
 
 import logging
@@ -28,6 +29,7 @@ import pandas as pd
 from algotrade.config.site.settings import IbkrSettings
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.data.chains import underlying_quotes
+from algotrade.services.licences import PERSONAL
 from algotrade.services.live.recorder import Recorder
 from algotrade.services.read.context import NotFoundError, ReadContext
 from algotrade.services.read.instruments.chains import load_chains, load_quotes
@@ -37,6 +39,7 @@ from algotrade.services.read.values import records
 log = logging.getLogger(__name__)
 
 LIVE, CACHED, DISABLED, UNAVAILABLE, ERROR = "LIVE", "CACHED", "DISABLED", "UNAVAILABLE", "ERROR"
+LICENCE = "LICENCE"
 LIVE_TYPE = 1  # IB market data type 1 is real time; 2-4 are frozen or delayed
 QUOTE_COLUMNS = ("instrument_id", "expiry", "right", "strike", "listed", "bid", "ask", "last",
                  "close", "volume", "iv", "delta")  # fmt: skip
@@ -127,6 +130,8 @@ class LiveQuotes:
         has no such underlying or expiry; ``ConfigurationError`` for strikes it does not list."""
         stored = _stored(ctx, key, expiry)
         wanted = self._strikes(stored, strikes)
+        if PERSONAL not in ctx.licences:  # before the cache: a holder's answer is never shared
+            return _fallback(stored, expiry, wanted, LICENCE, "not available under your licence")
         cache_key = (stored.underlying_id, expiry, tuple(wanted))
         now = self._clock()
         with self._lock:

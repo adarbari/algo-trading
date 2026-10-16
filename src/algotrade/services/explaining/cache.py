@@ -11,6 +11,7 @@ configs, the live-quote log and screener runs (ADR 0005 exception)."""
 
 import hashlib
 import json
+from collections.abc import Collection
 from typing import Protocol
 
 from algotrade.services.explaining.prompt import PROMPT_VERSION, TASK
@@ -41,10 +42,15 @@ def prompt_id() -> str:
     return f"{PROMPT_VERSION}-{hashlib.sha256(TASK.encode()).hexdigest()[:12]}"
 
 
-def cache_key(regime: MarketRegime, question: str, model_name: str) -> str:
-    """``<session date>_<hash of the signals, the question, the model and the prompt>``."""
+def cache_key(
+    regime: MarketRegime, question: str, model_name: str, licences: Collection[str]
+) -> str:
+    """``<session date>_<hash of the signals, the question, the model, the prompt and the
+    asker's data licences>``: the text quotes the values the asker could see, so an answer
+    written for a holder of the personal licence is never read by one without it (ADR 0069)."""
     document = json.dumps(
-        [signals_hash(regime), question, model_name, prompt_id()], separators=(",", ":")
+        [signals_hash(regime), question, model_name, prompt_id(), sorted(licences)],
+        separators=(",", ":"),
     )
     digest = hashlib.sha256(document.encode()).hexdigest()[:32]
     return f"{regime.session.isoformat()}_{digest}"

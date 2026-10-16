@@ -24,6 +24,12 @@ from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, field_source, is_f
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.data.rollups import rollup_rows
 from algotrade.services.features import read_expressions
+from algotrade.services.read.availability.cause import (
+    Cause,
+    Unavailable,
+    UnavailableKind,
+    feature_cause,
+)
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
 from algotrade.services.read.values import to_scalar
@@ -41,13 +47,16 @@ class SeriesPoint:
 
 @dataclass(frozen=True)
 class FeatureSeries:
-    """``names`` for each stored session of ``start..end``, oldest first."""
+    """``names`` for each stored session of ``start..end``, oldest first. ``unavailable``: the
+    names the caller's data licence does not cover (``services.licences``): never read, no value
+    at any session, kind ``LICENCE`` (ADR 0028, 0056)."""
 
     instrument_id: str
     names: tuple[str, ...]
     start: date
     end: date
     points: tuple[SeriesPoint, ...]
+    unavailable: tuple[Unavailable, ...] = ()
 
 
 def _groups(
@@ -57,6 +66,8 @@ def _groups(
     infos = feature_infos(ctx.features, names, entity)  # UnknownFeatureError for a name not there
     groups: dict[str, list[tuple[str, str]]] = {}
     for name, info in infos.items():
+        if info.licence not in ctx.licences:  # never read: see ``load_series``
+            continue
         if is_feature_field(name):
             groups.setdefault(EXPRESSIONS, []).append(
                 (name, name.removeprefix(FEATURE_FIELD_PREFIX))
@@ -66,6 +77,13 @@ def _groups(
         else:
             groups.setdefault(field_source(name)[0], []).append((name, field_source(name)[1]))
     return groups
+
+
+def _barred_cause(names: Sequence[str], day: date) -> Cause:
+    """The admin-only chain of the names a data licence withholds."""
+    links = (feature_cause(n, f"{n} is under a data licence the user does not hold", "LICENCE", day)
+             for n in names)  # fmt: skip
+    return Cause(tuple(link for c in links for link in c.links))
 
 
 def _frame(
@@ -127,6 +145,15 @@ def load_series(
     if last > ctx.session.date:  # a window past the session would show what it did not know
         raise ConfigurationError(f"end {last} is after the session {ctx.session.date}")
     ids = list(dict.fromkeys(instrument_ids))
+    barred = tuple(
+        n for n, i in feature_infos(ctx.features, wanted, entity).items()
+        if i.licence not in ctx.licences
+    )  # fmt: skip
+    unavailable = (
+        (Unavailable(UnavailableKind.LICENCE, barred, _barred_cause(barred, last)),)
+        if barred
+        else ()
+    )
     by_day: dict[tuple[str, date], dict[str, Any]] = {}
     for table, fields in _groups(ctx, wanted, entity).items():
         frame = _frame(ctx, table, [c for _, c in fields], ids, start, last, entity)
@@ -140,5 +167,5 @@ def load_series(
     for iid in ids:
         days = sorted(d for i, d in by_day if i == iid)
         points = tuple(SeriesPoint(d, tuple(by_day[(iid, d)].get(n) for n in wanted)) for d in days)
-        out[iid] = FeatureSeries(iid, wanted, start, last, points)
+        out[iid] = FeatureSeries(iid, wanted, start, last, points, unavailable)
     return out

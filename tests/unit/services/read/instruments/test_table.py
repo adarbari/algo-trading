@@ -146,3 +146,23 @@ def test_one_order_per_query_until_the_next_publish(monkeypatch: pytest.MonkeyPa
     later = load_table(ctx, [CLOSE], sort=f"-{CLOSE}")
     assert [i.symbol for i in later.instruments] == ["ETFX", "AAA"]  # a publish: recomputed
     assert later.rows == ((99.0,), (51.0,))
+
+
+def test_a_sort_or_filter_on_a_withheld_field_orders_nothing_by_its_values() -> None:
+    """Fix for: sorting a table by a personal-licence column leaked the order of its values."""
+    from tests.unit.services.read.instruments.conftest import (  # noqa: PLC0415
+        IBKR_IV30,
+        context_as,
+        with_ibkr,
+    )
+
+    reader = store_with(_universe, with_ibkr)
+    sorted_by = lambda user: load_table(context_as(reader, user), [IBKR_IV30], sort=f"-{IBKR_IV30}")  # noqa: E731
+    holder, trader = sorted_by("owner"), sorted_by("trader")
+    assert holder.instruments[0].instrument_id == "EQ:AAA"  # the only value, first
+    assert [i.instrument_id for i in trader.instruments] == sorted(
+        i.instrument_id for i in trader.instruments
+    )  # ties by symbol: no value moved AAA
+    assert trader.rows == ((None,),) * len(trader.rows)
+    assert {u for row in trader.unknown for u in row} == {UnknownCode.LICENCE}
+    assert holder.rows[0] == (0.42,)

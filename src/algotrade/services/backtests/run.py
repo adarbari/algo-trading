@@ -25,6 +25,7 @@ from algotrade.engines.selection.schedule import Rebalance, turnover
 from algotrade.services.backtests.market import load_market_features
 from algotrade.services.backtests.rebalance import load_rebalanced
 from algotrade.services.features import config_features
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.selection import select
 from algotrade.storage.runs import start_run
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -186,7 +187,9 @@ def run_configured_backtest(
     schedule: Schedule | None = None
     history: tuple[Rebalance, ...] = ()
     if bt.rebalance_selection == "none":
-        selected = select(reader, config.selection, start, as_of=now, features=features)
+        selected = select(
+            reader, config.selection, start, as_of=now, features=features, held=HARNESS_ALL
+        )
         _check_selected(config, selected, start)
         data = load_price_data(
             reader, selected.instruments, start, end, as_of=now, adjustment=bt.price_adjustment

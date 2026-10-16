@@ -13,6 +13,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.configs import field_catalog
 from algotrade.services.features import read_expressions, site_features
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.selection import select
 from algotrade.services.views import feature_view
 from algotrade.storage.backends.memory import MemoryBackend
@@ -93,8 +94,8 @@ def test_a_narrowed_read_with_exists_reads_only_its_instruments(
 
 def test_selections_and_feature_views_name_expression_features(reader: StoreReader) -> None:
     near_high = Selection("t", Group("all", (Rule("feature.near_52w", "eq", "HIGH"),)))
-    assert select(reader, near_high, D1).instruments == ("EQ:BULL",)
-    result = select(reader, near_high, D2)
+    assert select(reader, near_high, D1, held=HARNESS_ALL).instruments == ("EQ:BULL",)
+    result = select(reader, near_high, D2, held=HARNESS_ALL)
     assert result.instruments == () and result.missing_tables == ()
     view = feature_view(reader, [PS], D1, ["EQ:BULL", "EQ:CHOP"], expressions=["near_52w"])
     assert view.get("EQ:BULL", "near_52w") == "HIGH" and view.get("EQ:BULL", "close") == 95.0

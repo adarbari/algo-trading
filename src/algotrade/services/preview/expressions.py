@@ -66,6 +66,8 @@ def _evaluate(ctx: Stores, checked: FeatureSet, name: str) -> tuple[date | None,
     missing: list[str] = sorted(checked.stored_columns([name]))
     if not isinstance(ctx, ReadContext):
         return None, missing, None
+    if checked.expressions[name].feature.licence not in ctx.licences:
+        return None, [], None  # values the user may not see are not sampled (services.licences)
     read = read_expressions(ctx.reader, [name], ctx.session.date, features=checked)
     missing = sorted(read.missing)
     if missing:

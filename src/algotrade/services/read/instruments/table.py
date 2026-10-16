@@ -29,6 +29,7 @@ from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.data.reference import load_universe
 from algotrade.features.framework.feature import NullReason
 from algotrade.services.features import field_view
+from algotrade.services.licences import hidden_fields
 from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import NotFoundError, ReadContext, catalogue_key
@@ -182,9 +183,16 @@ def catalogue_values(
     the session, one row per instrument indexed by id, and the tables with nothing for it (a
     field its table does not store, or a table with no partition, reads as null; a company
     snapshot taken after the session is not known on it). What a table's filters and sort
-    read over its whole population (the screen results' too)."""
+    read over its whole population (the screen results' too). A field under a data licence the
+    caller does not hold is not read: its column is null (``services.licences``), so a sort or
+    a filter on it orders and keeps nothing by a hidden value."""
+    hidden = hidden_fields(ctx.features, fields, ctx.licences)
     view = field_view(
-        ctx.reader, ctx.session.date, list(fields), instrument_ids, features=ctx.features
+        ctx.reader,
+        ctx.session.date,
+        [f for f in fields if f not in hidden],
+        instrument_ids,
+        features=ctx.features,
     )
     frame = view.frame.drop_duplicates("instrument_id").set_index("instrument_id")
     frame = frame.reindex(columns=list(fields))

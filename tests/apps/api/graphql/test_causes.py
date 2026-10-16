@@ -136,7 +136,7 @@ def test_every_listed_field_exists() -> None:
 @pytest.fixture(scope="module")
 def as_role(api_golden: tuple[ReadStore, dict[str, str]]) -> Callable[[Role], Graph]:
     def graph_for(role: Role) -> Graph:
-        user = "ana" if role is Role.ADMIN else "bob"
+        user = "ana" if role is Role.ADMIN else "local"  # ``local`` holds the personal licence
         app = create_app(
             ApiSettings("memory://", "config"), api_golden[0], authenticator=as_user(user, role)
         )
@@ -226,6 +226,30 @@ def test_a_gap_behind_a_skipped_step_is_system_not_not_stored(
     body = as_role(Role.TRADER)(KIND_QUERY, {"date": END.isoformat(), "names": [IBKR_IV, NAMES[1]]})
     gaps = {v["name"]: v["unknown"] for v in body["data"]["instrument"]["features"]}
     assert gaps[IBKR_IV]["kind"] == "SYSTEM", gaps
+
+
+@pytest.mark.parametrize(
+    ("user", "role", "kind"),
+    [
+        ("bob", Role.TRADER, "LICENCE"),  # not listed in the registry: holds only ``open``
+        ("smoke", Role.ADMIN, "LICENCE"),  # an admin without the licence is not bypassed
+        ("local", Role.ADMIN, "SYSTEM"),  # the owner holds it: the usual gap kinds apply
+    ],
+)
+def test_a_personal_feature_is_unknown_with_the_licence_kind_to_a_user_without_it(
+    api_golden: tuple[ReadStore, dict[str, str]], user: str, role: Role, kind: str
+) -> None:
+    """ADR 0028: never a value (whatever is stored), the public kind LICENCE, and for a user
+    with the licence the answer is the one they got before."""
+    app = create_app(
+        ApiSettings("memory://", "config"), api_golden[0], authenticator=as_user(user, role)
+    )
+    variables = {"date": END.isoformat(), "names": [IBKR_IV, "feature.vrp_iv30"]}
+    response = TestClient(app).post("/graphql", json={"query": KIND_QUERY, "variables": variables})
+    cells = response.json()["data"]["instrument"]["features"]
+    assert cells[0]["unknown"]["kind"] == kind, cells
+    if kind == "LICENCE":
+        assert [c["unknown"]["code"] for c in cells] == ["LICENCE", "LICENCE"]  # inherited too
 
 
 def test_a_table_cell_behind_a_skipped_step_is_drawn_by_kind_system(

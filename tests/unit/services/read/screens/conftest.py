@@ -51,6 +51,15 @@ CONFIGS: Docs = {
     ("site", "screeners", "beta@1"): _screen("beta"),
     ("me", "screeners", "beta@2"): _screen("beta", "My beta", version=2),
     ("me", "screeners", "gamma@1"): _screen("gamma"),
+    # ``me`` holds the personal data licence (the stored ``vrp_iv30`` value is theirs to see);
+    # ``trader`` does not (ADR 0028)
+    ("site", "settings", "users"): {
+        "user": [
+            {"id": "admin", "role": "admin"},
+            {"id": "me", "role": "trader", "licences": ["personal"]},
+            {"id": "trader", "role": "trader"},
+        ]
+    },
 }
 
 

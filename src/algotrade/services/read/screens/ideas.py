@@ -19,7 +19,7 @@ from typing import Any
 
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.identity import Instrument
-from algotrade.services.read.screens.results import ScreenResult, load_results
+from algotrade.services.read.screens.results import ScreenResult, load_results, run_withheld
 from algotrade.services.read.screens.runs import (
     PAUSED,
     ScreenerRun,
@@ -112,6 +112,8 @@ def _picks(
     for run in runs:
         rows = run_rows(ctx, run)
         picked = rows[picked_mask(rows["decision"])]
+        if run_withheld(ctx, run):  # a screen seen by names only: no order by hidden values
+            picked = picked.assign(score=None, tie_break=None)
         for iid, score, tie in zip(
             picked["instrument_id"].tolist(),
             picked["score"].tolist(),

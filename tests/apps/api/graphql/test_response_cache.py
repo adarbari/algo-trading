@@ -41,7 +41,7 @@ from tests.helpers.api_store import END, as_user
 
 SESSION = "query Day { session { date } }"  # a cached operation (USER_OPERATIONS)
 VIEWER = "query Day { viewer { id role } }"
-SHARED = "query MarketHistory { viewer { id role } }"  # a SHARED_OPERATIONS name
+SHARED = "query RegimeBands { viewer { id role } }"  # a SHARED_OPERATIONS name
 RUNS = "query LlmUsage { session { date } }"  # in NEVER_CACHED
 RUN_OP = "query NightlyRuns { session { date } viewer { id role } }"  # a RUN_OPERATIONS name
 CLOSED_OP = "query IngestionCompleteness { session { date } }"  # also CLOSED_SESSION_OPERATIONS
@@ -314,8 +314,8 @@ def test_the_key_holds_the_variables_and_the_document() -> None:
     # operations that read the clock; every key holds the default session (ADR 0062)
     assert base == response_key(1, 0, who, "{ a }", {"x": 1, "y": 2}, "Day", (1, 2))
     assert base != response_key(1, 0, who, "{ a }", {"x": 1, "y": 2}, None, served="2026-10-09")
-    shared = response_key(1, 0, who, "{ a }", None, "MarketHistory", (1, 2))
-    assert shared == response_key(1, 0, who, "{ a }", None, "MarketHistory", (1, 3))
+    shared = response_key(1, 0, who, "{ a }", None, "RegimeBands", (1, 2))
+    assert shared == response_key(1, 0, who, "{ a }", None, "RegimeBands", (1, 3))
     assert base == response_key(
         1, 0, who, "{ a }", {"x": 1, "y": 2}, None, (0, 0), date(2026, 1, 1)
     )
@@ -415,3 +415,19 @@ def test_gzip_with_q0_is_refused() -> None:
     assert _accepts_gzip("br, gzip;q=0.8") and _accepts_gzip("*")
     assert not _accepts_gzip("gzip;q=0") and not _accepts_gzip("identity")
     assert not _accepts_gzip("")
+
+
+def test_two_viewers_with_different_licence_sets_never_share_an_entry() -> None:
+    """What a viewer may see differs by data licence (ADR 0028, 0068): even a SHARED operation
+    (keyed by role) has the licence set in its key, so a holder's answer is never served to
+    a viewer without the licence."""
+    holder = UserRecord("a", Role.TRADER, licences=("personal",))
+    other = UserRecord("b", Role.TRADER)
+    args = (1, 0)
+    for name in ("MarketHistory", "FeatureTable"):
+        held = response_key(*args, holder, "{ a }", None, name)
+        assert held != response_key(*args, other, "{ a }", None, name)
+    same = UserRecord("c", Role.TRADER, licences=("personal",))
+    assert response_key(*args, holder, "{ a }", None, "MarketHistory") == response_key(
+        *args, same, "{ a }", None, "MarketHistory"
+    )  # a shared operation is still shared by viewers with the same set

@@ -17,6 +17,7 @@ from algotrade.config.user import SITE_USER, UserContext
 from algotrade.data.chains import chain_status, tolerated_stale
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.services.configs import resolve_config
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.run import run_screener
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.strategies.screeners.base import Decision
@@ -40,7 +41,9 @@ def screened(
 ):
     rows = chain_status_rows(50, core_stale, 50, rest_stale, chain_day=chain_day)
     reader, writer = seed_chain_screen(DAY, rows)
-    return reader, run_screener(reader, writer, preset(), DAY, now=T0, sources=sources)
+    return reader, run_screener(
+        reader, writer, preset(), DAY, now=T0, sources=sources, held=HARNESS_ALL
+    )
 
 
 def test_stale_names_at_the_gates_limits_are_excluded_and_the_run_is_complete() -> None:

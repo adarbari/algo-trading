@@ -20,6 +20,7 @@ from algotrade.services.read.screens.results import (
     load_result_page,
     load_results,
     load_run_changes,
+    run_withheld,
 )
 from algotrade.services.read.screens.runs import latest_run
 from algotrade.storage.backends.memory import MemoryBackend
@@ -249,3 +250,34 @@ def test_a_paused_pick_is_dropped_against_the_previous_run_and_filters_by_decisi
     assert [(r.instrument_id, r.decision) for r in page.results] == [
         ("EQ:BBB", "PAUSED"), ("EQ:DDD", "PAUSED")
     ]  # fmt: skip
+
+
+def test_a_run_the_viewer_may_see_only_by_names_and_decisions_serves_no_value_score_or_reasons(
+    reader: StoreReader,
+) -> None:
+    """Fix for: a run recorded under a licence the viewer lacks (the scheduled site run holds
+    every licence) served its stored values, score, tie-break and ``reasons`` (which embed the
+    value: "0.83, needs >= 0.9") to any viewer. The viewer sees names and decisions, as the
+    ledger does (ADR 0064 decision 10, ADR 0069); the stored fields here do not resolve in the
+    catalogue, so they count as personal (fail closed); a sort by rank or score is by symbol."""
+    trader = context(reader, user="trader")
+    run = latest_run(trader, "site", "alpha").run
+    assert run is not None
+    found = load_results(trader, {"r1": ["EQ:AAA", "EQ:BBB"]}, [run])
+    aaa, bbb = found[("r1", "EQ:AAA")], found[("r1", "EQ:BBB")]
+    assert aaa.decision == "QUALIFIED" and bbb.instrument is not None  # names and decisions
+    assert (aaa.score, aaa.tie_break, aaa.reasons) == (None, None, "")
+    assert aaa.rank is None and bbb.rank is None  # the order follows the hidden score
+    assert (bbb.score, bbb.tie_break, bbb.reasons) == (None, None, "")
+    assert aaa.criteria == (
+        CriterionResult("iv30", "feature.vrp_iv30", "hard", "MISSING", None, None),
+    )
+    assert aaa.columns == (ResultColumn("spread", None),)
+    assert bbb.criteria[0].value is None and bbb.criteria[0].outcome == "MISSING"
+    assert _sorted(trader, "-score") == ["CCC", "BBB", "AAA"]  # by symbol, not by score
+    assert run_withheld(trader, run) != frozenset()
+
+    holder = context(reader)  # ``me`` holds the licence
+    assert run_withheld(holder, run) == frozenset()
+    seen = load_results(holder, {"r1": ["EQ:AAA"]}, [run])[("r1", "EQ:AAA")]
+    assert seen.criteria[0].value == "high" and seen.score == 50.0 and seen.rank == 1

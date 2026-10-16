@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from algotrade.config.site.settings import IbkrSettings
+from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.data.chains import live_option_quotes
@@ -183,3 +184,20 @@ def test_a_live_answer_is_recorded_to_the_store(ctx: ReadContext) -> None:
     assert frame["conid"].tolist() == [7] * 4 and frame["iv"].isna().all()
     assert set(frame["source"]) == {"ibkr"} and set(frame["market_data_type"]) == {3}
     recorder.close()
+
+
+def test_live_ibkr_quotes_are_not_asked_for_a_user_without_the_personal_licence(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    """IBKR quotes are personal-licence data (ADR 0028): a caller without it gets the stored
+    chain with status LICENCE, the feed is never asked, and a holder's cached live answer is
+    not served to them."""
+    store = api_golden[0]
+    feed = FakeFeed()
+    quotes = live(feed)
+    owner = open_context(store.reader, store.configs, UserContext("local"), cache=store.cache)
+    assert quotes.chain(owner, "AAA", EXPIRY).status == "LIVE"
+    other = open_context(store.reader, store.configs, UserContext("arvinder"), cache=store.cache)
+    asked = len(feed.asked)
+    got = quotes.chain(other, "AAA", EXPIRY)
+    assert (got.source, got.status) == ("stored", "LICENCE") and len(feed.asked) == asked

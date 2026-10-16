@@ -82,9 +82,9 @@ i.e. 60 per 10 minutes) for every historical request, the live verification's in
 `personal` (derived from a personal-use market-data licence). Every `ibkr_iv@v1` feature is
 `personal`; an expression feature takes the most restrictive licence of its inputs, so
 `iv_rank`, `iv_percentile` and `iv_rank_source` are `personal`. The licence is in the feature
-catalogue (`docs/data/features.md`) and the API's `/features` output. Today there is one
-user (the account holder); when there are others, the API will hide `personal` features from
-users other than the owner (a later change, recorded here).
+catalogue (`docs/data/features.md`) and the API's `/features` output. Users who hold a
+licence are listed in `config/site/users.toml` (`licences`, ADR 0064); every other user is
+hidden `personal` values (enforced: see the amendment of 2026-10-16).
 
 ### Live option quotes in the API
 (Owner-approved 2026-10-03, PR B.) Screener candidates and the Explore chain show live
@@ -178,3 +178,8 @@ with an HV of 0.55), and 0.0 for a history bar without a value.
   rows, rewriting only those it rejects as a new run (no request to IB). The rewrite wins the
   merge; reads as of an earlier time still see what was stored then (ADR 0007). `ibkr_iv@v1`
   keeps its version (its definition did not change, its input did) and is recomputed in place.
+
+## Amendment 2026-10-16: enforced
+
+The hiding recorded under "Licence tags" is made, in every path that serves per-name values:
+see [ADR 0069](0069-data-licence-gate.md).

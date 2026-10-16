@@ -221,7 +221,7 @@ vocabulary. `FeatureValue.value is None` always comes with `unknown` set.
 | `NO_ROW` | the partition exists, the instrument has no row |
 | `NULL` | stored null: see `FeatureInfo.nullMeaning` |
 | `NOT_IN_CATALOGUE` | the name is not in the caller's catalogue |
-| `LICENCE` | a `personal`-licence feature and the caller is not its owner (ADR 0028) |
+| `LICENCE` | a feature under a data licence the caller does not hold (`ctx.licences`: `config/site/users.toml` `licences`; a role grants none; an expression inherits the strictest of its inputs): never read, whatever is stored (ADR 0028) |
 | `NOT_RUN` | a screener (or the nightly data-quality check) has no run for the session |
 | `PRE_SNAPSHOT` | identity came from a later snapshot (survivorship) |
 | `NOT_APPLICABLE` | the feature is not defined for this instrument (not optionable; an ETF has no earnings); shown "n/a" (ADR 0042) |
@@ -233,8 +233,10 @@ vocabulary. `FeatureValue.value is None` always comes with `unknown` set.
 row, null; ADRs 0042, 0046). A name the caller's
 catalogue lacks is a request error (`UNKNOWN_FEATURE`, naming it) when the client asked for it;
 `NOT_IN_CATALOGUE` is for names the server reads on its own (a saved view's columns, PR 8).
-`LICENCE` waits for a second user (ADR 0028: personal values are hidden from other users once
-there are any). Identity is disclosed, not blanked: `PRE_SNAPSHOT` is reserved for the screens'
+`LICENCE` (ADR 0069) hides a field the caller's licences do not cover from
+every read of per-name values (values, tables, distributions, series, a screener run's stored
+criterion values with their score, tie-break and reasons, the preview): UNKNOWN, kind `LICENCE`, no value; `FeatureSeries` /
+`SeriesHistory` carry it as `unavailable`. Identity is disclosed, not blanked: `PRE_SNAPSHOT` is reserved for the screens'
 universe (PR 5); `instrument.*` values and `Instrument` say which snapshot through
 `Session.preSnapshot` / `referenceSnapshot`.
 

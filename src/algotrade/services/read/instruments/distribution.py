@@ -27,7 +27,11 @@ from algotrade.core.model.predicates import Rule, passing
 from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
-from algotrade.services.read.instruments.features import FeatureValue, load_feature_values
+from algotrade.services.read.instruments.features import (
+    FeatureValue,
+    load_feature_values,
+    unlicensed,
+)
 from algotrade.services.read.values import Unknown, UnknownCode
 
 QUANTILES = (0.0, 0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99, 1.0)
@@ -142,6 +146,9 @@ def load_distribution(ctx: ReadContext, name: str) -> FeatureDistribution:
     """``name`` (a catalogue field) across every instrument for ``ctx.session``.
     ``UnknownFeatureError`` when the caller's catalogue has no such field."""
     info = feature_infos(ctx.features, [name])[name]
+    if info.licence not in ctx.licences:  # an aggregate of values the caller may not see
+        unknown = unlicensed(info, ctx.session.date)
+        return FeatureDistribution(name, ctx.session.date, info, 0, 0, (), (), (), unknown)
     found = [values[0] for values in load_feature_values(ctx, None, [name]).values()]
     absent = _absent(found)
     if absent is not None or not found:

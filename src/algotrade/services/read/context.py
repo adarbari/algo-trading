@@ -27,11 +27,13 @@ from typing import Any, Protocol, runtime_checkable
 import numpy as np
 import pandas as pd
 
+from algotrade.config.site.settings import load_users
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.data.reference import Snapshot, snapshot
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import catalogue
+from algotrade.services.licences import held_by
 from algotrade.services.read.availability.cause import UnavailableKind, table_cause
 from algotrade.services.read.session import Grain, NotFoundError, Session, grain_of, resolve_session
 from algotrade.services.read.values import KIND_OF_CODE, Unknown, UnknownCode
@@ -207,6 +209,13 @@ class ReadContext:
         from algotrade.services.read.availability.explain import failed_tables  # noqa: PLC0415
 
         return failed_tables(self.reader, self.session.date, self.session.missing, self.cache)
+
+    @cached_property
+    def licences(self) -> frozenset[str]:
+        """The data licences the request's user holds (``services.licences.held_by`` over the
+        users registry: ``open`` for everyone, anything else only when listed; a role grants
+        none, ADR 0040). Every read of per-name values hides a field under any other."""
+        return held_by(load_users(self.configs), self.user.user_id)
 
     def kind_of(self, code: UnknownCode, *tables: str) -> UnavailableKind:
         """The public kind of a gap of ``code`` in ``tables``: SYSTEM when a failure stands

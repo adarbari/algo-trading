@@ -19,6 +19,7 @@ from algotrade.core.model.fields import GROUP_FIELD_HEADS, field_source
 from algotrade.core.model.instruments import market_id
 from algotrade.core.time.calendar import sessions_between
 from algotrade.core.views.feature_view import FeatureValue as Scalar
+from algotrade.services.read.availability.cause import Unavailable
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
 from algotrade.services.read.instruments.series import load_series, market_frame
@@ -46,6 +47,7 @@ class SeriesHistory:
     bucket_sessions: int
     points: tuple[Point, ...]
     segments: tuple[Segment, ...]
+    unavailable: tuple[Unavailable, ...] = ()  # the data licence withholds the field (no values)
 
 
 def _state(value: Scalar, dtype: str) -> str:
@@ -57,14 +59,19 @@ def _state(value: Scalar, dtype: str) -> str:
 
 
 def _history(
-    name: str, dtype: str, sessions: list[date], values: list[Scalar], n: int
+    name: str,
+    dtype: str,
+    sessions: list[date],
+    values: list[Scalar],
+    n: int,
+    unavailable: tuple[Unavailable, ...] = (),
 ) -> SeriesHistory:
     if dtype in NUMBERS:
         numbers = [None if v is None else float(v) for v in values]
         size, points = bucket_numbers(sessions, numbers, n)
-        return SeriesHistory(name, size, points, ())
+        return SeriesHistory(name, size, points, (), unavailable)
     segments = merge_segments(sessions, [_state(v, dtype) for v in values])
-    return SeriesHistory(name, 1, (), segments)
+    return SeriesHistory(name, 1, (), segments, unavailable)
 
 
 def _checked(ctx: ReadContext, names: Sequence[str]) -> dict[str, str]:
@@ -114,6 +121,7 @@ def load_market_history(
             sessions,
             [stored[d][i] if d in stored else None for d in sessions],
             points,
+            tuple(u for u in found.unavailable if name in u.features) if found else (),
         )
         for i, name in enumerate(wanted)
     )

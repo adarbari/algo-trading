@@ -1108,13 +1108,16 @@ type FeatureRequestRow {
   unmapped: Boolean!
 }
 
-"""Catalogue features per stored session of `start..end`"""
+"""
+Catalogue features per stored session of `start..end`; `unavailable`: the names the viewer's data licence does not cover (no value at any session, kind LICENCE)
+"""
 type FeatureSeries {
   instrumentId: String!
   names: [String!]!
   start: Date!
   end: Date!
   points: [SeriesPoint!]!
+  unavailable: [Unavailable!]!
 }
 
 """
@@ -2834,7 +2837,7 @@ type ScreenResult {
   configId: String!
   instrumentId: String!
   instrument: Instrument
-  rank: Int!
+  rank: Int
   decision: String!
   score: Float
   tieBreak: Float
@@ -2968,13 +2971,14 @@ type ScreenerRun {
 }
 
 """
-One market field over a window. A number: `points` (oldest first), one bucket of `bucketSessions` consecutive sessions yielding its minimum and its maximum at their own sessions; a null `value` is a gap that breaks the line; `segments` is empty. A flag or a label: `segments`, `points` empty, `bucketSessions` 1
+One market field over a window. A number: `points` (oldest first), one bucket of `bucketSessions` consecutive sessions yielding its minimum and its maximum at their own sessions; a null `value` is a gap that breaks the line; `segments` is empty. A flag or a label: `segments`, `points` empty, `bucketSessions` 1. `unavailable` is set when the viewer's data licence does not cover the field: no values at all, kind LICENCE
 """
 type SeriesHistory {
   name: String!
   bucketSessions: Int!
   points: [HistoryPoint!]!
   segments: [HistorySegment!]!
+  unavailable: [Unavailable!]!
 }
 
 """One session's values, in the order of `FeatureSeries.names`"""

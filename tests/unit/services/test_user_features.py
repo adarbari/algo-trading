@@ -12,6 +12,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.configs import field_catalog, resolve_config
 from algotrade.services.features import catalogue, check_user_features, config_features
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.selection import select
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import FileConfigStore
@@ -83,7 +84,9 @@ def test_a_user_selection_names_user_features(root: Path, reader: StoreReader) -
     assert [d.name for d in resolved.features] == ["drawdown_pct", "shallow"]  # + what it reads
     assert resolved.canonical()["features"]["drawdown_pct"]["params"] == {"scale": 100}
     assert resolved.selection is not None
-    picked = select(reader, resolved.selection, D1, features=config_features(resolved))
+    picked = select(
+        reader, resolved.selection, D1, features=config_features(resolved), held=HARNESS_ALL
+    )
     assert picked.instruments == ("EQ:BULL",)
 
 

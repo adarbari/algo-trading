@@ -157,6 +157,25 @@ def test_the_preview_serves_a_trader_no_table_and_an_admin_the_chain(
     assert all(u["cause"] for u in admin["coverage"]["unavailable"])
 
 
+def test_the_preview_withholds_a_personal_field_from_a_user_without_the_licence(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    """ADR 0028: the draft's IBKR field is not read for ``arvinder`` (a trader) nor for
+    ``smoke`` (an admin: a role grants no licence, ADR 0040); both are told the public kind
+    LICENCE; the owner (``local``) is not."""
+
+    def kinds(user: str, role: Role) -> list[tuple[str, list[str]]]:
+        app = create_app(ApiSettings("memory://", "config"), api_golden[0],
+                         authenticator=as_user(user, role))  # fmt: skip
+        got = TestClient(app).post("/screeners/preview", json={"spec": DRAFT, "limit": 2}).json()
+        return [(u["kind"], u["features"]) for u in got["coverage"]["unavailable"]]
+
+    withheld = ("LICENCE", ["rollup.ibkr_iv@v1.iv30_ibkr"])
+    assert withheld in kinds("arvinder", Role.TRADER)
+    assert withheld in kinds("smoke", Role.ADMIN)
+    assert withheld not in kinds("local", Role.ADMIN)
+
+
 def test_a_failed_run_is_generic_for_a_trader() -> None:
     failed = RunRequest("failed", "x", date(2022, 11, 23), "j", None, "boom")
     assert redact(failed, Role.ADMIN).error == "boom"

@@ -15,7 +15,8 @@ from typing import Any
 
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.winners import load_winners
-from algotrade.config.site.settings import load_sources
+from algotrade.config.site.settings import load_sources, load_users
+from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.engines.screening.runner import RunCoverage
@@ -51,6 +52,7 @@ from algotrade.services.evaluation.training.fit import fit_scorer
 from algotrade.services.evaluation.training.frame import training_frame
 from algotrade.services.evaluation.training.render import render_scorer
 from algotrade.services.jobs.runner import JobContext, JobKind
+from algotrade.services.licences import HARNESS_ALL, held_by
 from algotrade.services.screening.exports import run_exports
 from algotrade.services.screening.run import run_screener
 
@@ -100,6 +102,15 @@ def screen_identity(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, 
     }
 
 
+def _screen_licences(ctx: JobContext) -> frozenset[str]:
+    """The licences a screen job evaluates under: the scheduled site run (``site``, no person)
+    reads every field and records its licences; each viewer is filtered at read (ADR 0069). A
+    user's own run (on request) holds the licences the users registry gives that user."""
+    if ctx.user.user_id == SITE_USER:
+        return HARNESS_ALL
+    return held_by(load_users(ctx.resources["configs"]), ctx.user.user_id)
+
+
 def screen_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     """params: ``config`` (id), ``session`` (ISO date), optional ``export_dir``."""
     config = resolve_config(ctx.resources["configs"], params["config"], ctx.user)
@@ -109,6 +120,7 @@ def screen_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
         config,
         date.fromisoformat(params["session"]),
         sources=load_sources(ctx.resources["configs"]),
+        held=_screen_licences(ctx),
     )
     exports = (
         run_exports(outcome, config, Path(params["export_dir"])) if params.get("export_dir") else ()

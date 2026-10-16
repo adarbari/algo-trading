@@ -20,6 +20,7 @@ from algotrade.data.reference import InstrumentView
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.engines.selection.evaluate import SelectionResult, evaluate_selection
 from algotrade.services.evaluation.cross_section.historical import require_liquidity_rule
+from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.run import screen_session
 from algotrade.services.selection import fields_view, select, selection_fields
 from algotrade.strategies.screeners.base import Decision
@@ -52,7 +53,7 @@ class Eligible:
 
 def screen_variant(reader: StoreReader, config: ResolvedConfig, session: date) -> RankedRun:
     """``config`` screened at ``session`` on what was known then."""
-    screened = screen_session(reader, config, session, historical=True)
+    screened = screen_session(reader, config, session, historical=True, held=HARNESS_ALL)
     if screened.selected.historical and config.selection is not None:
         require_liquidity_rule(config.selection)
     if screened.rules is not None:
@@ -101,7 +102,7 @@ def eligible(reader: StoreReader, universe: Selection, session: date) -> Eligibl
     """The ids ``universe`` selects at ``session`` (the edge's own, over the site's features).
     Before the first reference snapshot: the listing history's names alive then, with today's
     optionable flag or the universe's liquidity floor (``historical.py``)."""
-    chosen = select(reader, universe, session, historical=True)
+    chosen = select(reader, universe, session, historical=True, held=HARNESS_ALL)
     return _eligible(chosen, universe, chosen.pre_snapshot)
 
 
@@ -118,7 +119,9 @@ class SelectionReads:
     def eligible(self, universe: Selection, session: date) -> Eligible:
         key = (tuple(selection_fields(universe)), session)
         if self._last is None or self._last[0] != key:
-            view, source = fields_view(self._reader, key[0], session, historical=True)
+            view, source = fields_view(
+                self._reader, key[0], session, historical=True, held=HARNESS_ALL
+            )
             self._last = (key, view, source)
         _, view, source = self._last
         chosen = evaluate_selection(universe, view)

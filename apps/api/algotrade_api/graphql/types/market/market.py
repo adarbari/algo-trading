@@ -16,6 +16,7 @@ from algotrade.services.read.market import history as history_read
 from algotrade.services.read.market.features import load_market_feature_values
 from algotrade_api.graphql.limits import MAX_NAMES, MaxItems
 from algotrade_api.graphql.offload import off_loop
+from algotrade_api.graphql.types.availability import Unavailable
 from algotrade_api.graphql.types.instruments.feature import FeatureValue
 
 
@@ -48,13 +49,15 @@ class HistorySegment:
     description="One market field over a window. A number: `points` (oldest first), one "
     "bucket of `bucketSessions` consecutive sessions yielding its minimum and its maximum at "
     "their own sessions; a null `value` is a gap that breaks the line; `segments` is empty. A "
-    "flag or a label: `segments`, `points` empty, `bucketSessions` 1"
+    "flag or a label: `segments`, `points` empty, `bucketSessions` 1. `unavailable` is set when "
+    "the viewer's data licence does not cover the field: no values at all, kind LICENCE"
 )
 class SeriesHistory:
     name: str
     bucket_sessions: int
     points: list[HistoryPoint]
     segments: list[HistorySegment]
+    unavailable: list[Unavailable]
 
     @classmethod
     def of(cls, d: history_read.SeriesHistory) -> Self:
@@ -63,6 +66,7 @@ class SeriesHistory:
             bucket_sessions=d.bucket_sessions,
             points=[HistoryPoint.of(p) for p in d.points],
             segments=[HistorySegment.of(s) for s in d.segments],
+            unavailable=[Unavailable.of(u) for u in d.unavailable],
         )
 
 

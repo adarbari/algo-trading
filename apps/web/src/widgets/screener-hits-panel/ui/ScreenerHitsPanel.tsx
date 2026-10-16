@@ -65,7 +65,7 @@ export function ScreenerHitsPanel({ symbol, onOpenScreener, via = null }: Screen
                   .filter(Boolean)
                   .join(' · ') || undefined
               }
-              essential={`#${String(result.rank)}`}
+              essential={result.rank === null ? undefined : `#${String(result.rank)}`}
               open={openId === screener.id}
               onOpenChange={(open) => {
                 setOpenId(open ? screener.id : null);

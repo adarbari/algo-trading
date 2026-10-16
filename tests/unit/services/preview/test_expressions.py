@@ -106,3 +106,20 @@ def test_a_dry_run_rejects_a_bad_formula_and_operator(ctx: ReadContext) -> None:
         dry_run(ctx, _definition("price_stats.nope + 1"))
     with pytest.raises(ConfigurationError):
         dry_run(ctx, _definition("price_stats.close"), ("~", 1.0))
+
+
+def test_a_formula_over_a_personal_feature_is_not_sampled_for_a_user_without_the_licence() -> None:
+    """Fix for: ``POST /features/check`` showed sample values of IBKR-derived inputs to any user."""
+    from tests.unit.services.read.instruments.conftest import (  # noqa: PLC0415
+        context_as,
+        store_with,
+        with_ibkr,
+    )
+
+    reader = store_with(with_ibkr)
+    trader = check_expression(context_as(reader, "trader"), "ibkr_iv.iv30_ibkr * 2", user="trader")
+    assert trader.licence == "personal" and trader.session is None and trader.sample == []
+    owner = check_expression(context_as(reader, "owner"), "ibkr_iv.iv30_ibkr * 2", user="owner")
+    assert [s.value for s in owner.sample] == [0.84]
+    barred = dry_run(context_as(reader, "trader"), _definition("ibkr_iv.iv30_ibkr * 2"))
+    assert barred.session is None and barred.sample == [] and barred.rows == 0

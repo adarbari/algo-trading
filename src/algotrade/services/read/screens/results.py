@@ -26,6 +26,7 @@ import pandas as pd
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.features.framework.feature import NullReason
+from algotrade.services.licences import ALL_LICENCES, hidden_fields
 from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import ReadContext, at_session, catalogue_key, partition
@@ -93,7 +94,7 @@ class ScreenResult:
     config_id: str
     instrument_id: str
     instrument: Instrument | None
-    rank: int
+    rank: int | None  # None: withheld (the order follows values the viewer may not see)
     decision: str
     score: float | None
     tie_break: float | None
@@ -232,27 +233,68 @@ def _read_values(
     return out
 
 
+MISSING = "MISSING"  # a criterion outcome: no value (here: one the viewer may not see)
+
+
+def _criterion(v: Mapping[str, Any], hidden: frozenset[str]) -> CriterionResult:
+    """What a criterion judged; a field under a licence the viewer does not hold has no value,
+    no distance and is MISSING to them (the stored value is never served)."""
+    if str(v["field"]) in hidden:
+        return CriterionResult(
+            str(v["criterion_id"]), str(v["field"]), str(v["mode"]), MISSING, None, None
+        )
+    return CriterionResult(
+        str(v["criterion_id"]),
+        str(v["field"]),
+        str(v["mode"]),
+        str(v["outcome"]),
+        _value(v),
+        _float(v.get("distance")),
+    )
+
+
+def _run_fields(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
+    """The catalogue fields ``run``'s stored criteria and columns read (cached per run)."""
+    key = ("screen_run_fields", run.run_id, ctx.session.date, ctx.reader.visible_seq())
+
+    def read() -> frozenset[str]:
+        stored = partition(ctx, RULE_SCREEN_VALUES, VALUE_COLUMNS)
+        if isinstance(stored, Unknown) or stored.empty:
+            return frozenset()
+        mine = stored[
+            (stored["user_id"] == run.owner)
+            & (stored["config_id"] == run.config_id)
+            & (stored["run_id"] == run.run_id)
+        ]
+        return frozenset(str(f) for f in mine["field"].dropna().unique())
+
+    found: frozenset[str] = ctx.cache.get_or_compute(key, read)
+    return found
+
+
+def run_withheld(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
+    """The fields ``run`` read that the viewer's data licences do not cover (none for a viewer
+    who holds them all: nothing is read). A run with any is a screen the viewer sees by names
+    and decisions only: its ``score``, ``tie_break`` and ``reasons`` embed the hidden values
+    (``reasons`` says "0.83, needs >= 0.9") and its rank order follows them, so they and
+    the ``rank`` are withheld, and a sort by them is by symbol (ADR 0064 decision 10, ADR 0069)."""
+    if set(ctx.licences) >= ALL_LICENCES:
+        return frozenset()
+    return hidden_fields(ctx.features, _run_fields(ctx, run), ctx.licences)
+
+
 def _result(
     run: ScreenerRun,
     row: Mapping[str, Any],
     values: Sequence[Mapping[str, Any]],
     instrument: Instrument | None,
     change: Change,
+    hidden: frozenset[str] = frozenset(),
 ) -> ScreenResult:
-    criteria = tuple(
-        CriterionResult(
-            str(v["criterion_id"]),
-            str(v["field"]),
-            str(v["mode"]),
-            str(v["outcome"]),
-            _value(v),
-            _float(v.get("distance")),
-        )
-        for v in values
-        if not is_display_column(v["mode"])
-    )
+    withheld = bool(hidden)
+    criteria = tuple(_criterion(v, hidden) for v in values if not is_display_column(v["mode"]))
     columns = tuple(
-        ResultColumn(str(v["criterion_id"]), _value(v))
+        ResultColumn(str(v["criterion_id"]), None if str(v["field"]) in hidden else _value(v))
         for v in values
         if is_display_column(v["mode"])
     )
@@ -262,11 +304,11 @@ def _result(
         config_id=run.config_id,
         instrument_id=str(row["instrument_id"]),
         instrument=instrument,
-        rank=int(row["rank"]),
+        rank=None if withheld else int(row["rank"]),
         decision=str(row["decision"]),
-        score=_float(row.get("score")),
-        tie_break=_float(row.get("tie_break")),
-        reasons=str(to_scalar(row.get("reasons")) or ""),
+        score=None if withheld else _float(row.get("score")),
+        tie_break=None if withheld else _float(row.get("tie_break")),
+        reasons="" if withheld else str(to_scalar(row.get("reasons")) or ""),
         flags=tuple(f for f in flags.split(",") if f),
         criteria=criteria,
         columns=columns,
@@ -290,19 +332,24 @@ def load_results(
     if not ids:
         return {}
     values = _values(ctx, runs, ids, wanted)
+    # The licence gate on stored values: a run recorded under a licence the viewer does not
+    # hold (the scheduled site run holds every one, or a user lost one since) never serves
+    # those fields' values, score, tie-break or reasons (the stored rows are shared in the
+    # cache, so it is applied here, per viewer).
     instruments = load_instruments(ctx, ids)
     out: dict[ResultKey, ScreenResult] = {}
     for run in runs:
         asked = set(wanted.get(run.run_id, ()))
         if not asked:
             continue
+        hidden = run_withheld(ctx, run)
         moved = changes[run.run_id].by_instrument if changes and run.run_id in changes else {}
         rows: pd.DataFrame = run_rows(ctx, run)
         for row in _records(rows[rows["instrument_id"].isin(asked)]):
             iid = str(row["instrument_id"])
             found = values.get((run.run_id, iid), [])
             change = moved.get(iid, (None, None))
-            out[(run.run_id, iid)] = _result(run, row, found, instruments.get(iid), change)
+            out[(run.run_id, iid)] = _result(run, row, found, instruments.get(iid), change, hidden)
     return out
 
 
@@ -368,7 +415,14 @@ def _check_sort(ctx: ReadContext, sort: str) -> str | None:
 def _stored_key(ctx: ReadContext, run: ScreenerRun, key: str) -> Mapping[str, Scalar]:
     """Each instrument's stored value of ``criterion:<id>`` or ``column:<name>`` in ``run``
     (one filtered read of the values partition, cached per run, key and published state)."""
-    cache_key = ("screen_sort_key", run.run_id, ctx.session.date, key, ctx.reader.visible_seq())
+    cache_key = (
+        "screen_sort_key",
+        run.run_id,
+        ctx.session.date,
+        key,
+        ctx.user.user_id,  # what a viewer may see differs by licence
+        ctx.reader.visible_seq(),
+    )
     found: Mapping[str, Scalar] | None = ctx.cache.get(cache_key)
     if found is not None:
         return found
@@ -384,7 +438,9 @@ def _stored_key(ctx: ReadContext, run: ScreenerRun, key: str) -> Mapping[str, Sc
             & (stored["criterion_id"] == name)
             & (column == (kind == "column"))
         ]
-        out = {str(r["instrument_id"]): _value(r) for r in _records(mine)}
+        seen = _records(mine)
+        hidden = run_withheld(ctx, run)
+        out = {str(r["instrument_id"]): _value(r) for r in seen if str(r["field"]) not in hidden}
     ctx.cache.put(cache_key, out)
     return out
 
@@ -409,6 +465,8 @@ def _ordered(ctx: ReadContext, run: ScreenerRun, query: ResultQuery, seq: int) -
     if found is not None:
         return found
     sort = query.sort or "rank"
+    if sort.removeprefix("-") in ("rank", "score") and run_withheld(ctx, run):
+        sort = ("-" if sort.startswith("-") else "") + "symbol"  # no order by hidden values
     catalogue_field = _check_sort(ctx, sort)
     rows = run_rows(ctx, run)  # rank order
     changes = load_run_changes(ctx, run).by_instrument

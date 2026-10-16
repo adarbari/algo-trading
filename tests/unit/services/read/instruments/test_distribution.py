@@ -90,3 +90,20 @@ def test_a_category_use_counts_without_bins(ctx: ReadContext) -> None:
         replace(ctx, configs=MemoryConfigStore(docs)), "instrument.security_type"
     )
     assert [(p.intent, p.count, p.bins) for p in found.passing] == [("an ETF", 1, ())]
+
+
+def test_the_distribution_of_a_withheld_field_is_unknown_with_the_licence_kind() -> None:
+    from algotrade.services.read.values import UnknownCode as Code  # noqa: PLC0415
+    from tests.unit.services.read.instruments.conftest import (  # noqa: PLC0415
+        IBKR_IV30,
+        context_as,
+        store_with,
+        with_ibkr,
+    )
+
+    reader = store_with(with_ibkr)
+    trader = load_distribution(context_as(reader, "trader"), IBKR_IV30)
+    assert trader.unknown is not None and trader.unknown.code is Code.LICENCE
+    assert (trader.count, trader.quantiles, trader.histogram) == (0, (), ())
+    owner = load_distribution(context_as(reader, "owner"), IBKR_IV30)
+    assert owner.unknown is None and owner.count == 1
