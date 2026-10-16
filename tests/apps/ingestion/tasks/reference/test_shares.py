@@ -11,7 +11,7 @@ from algotrade.data.shares import TABLE, share_facts, stored_shares
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.reference.shares import SharesSources, ingest_shares
+from algotrade_ingestion.tasks.reference.shares import SharesSources, _rows, ingest_shares
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from tests.helpers.ingest_fakes import http_for, task_ctx
@@ -184,3 +184,21 @@ def test_a_forced_refetch_adds_only_the_financials_to_an_older_store() -> None:
     assert partition is not None
     fresh = partition[partition["concept"] != "checked"]
     assert set(fresh["concept"]) == {"revenue"} and len(fresh) == 1  # AAPL's one revenue fact
+
+
+def test_the_writer_keeps_every_tag_of_a_period_and_collapses_a_same_tag_amendment() -> None:
+    base = {"concept": "revenue", "unit": "usd", "period_start": "2026-04-01",
+            "period_end": "2026-06-30", "filed": "2026-08-04"}  # fmt: skip
+    facts = pd.DataFrame(
+        [
+            {**base, "tag": "us-gaap:Revenues", "value": 100.0},
+            {**base, "tag": "us-gaap:SalesRevenueNet", "value": 101.0},
+            {**base, "tag": "us-gaap:SalesRevenueNet", "value": 102.0},  # a same-day amendment
+        ]
+    )
+    members = pd.DataFrame([{"instrument_id": "EQ:A", "symbol": "A", "cik": "0000000001"}])
+    rows = _rows(facts, members, DAY)
+    revenue = rows[rows["concept"] == "revenue"]
+    assert sorted(revenue["value"]) == [100.0, 102.0]
+    assert set(revenue["tag"]) == {"us-gaap:Revenues", "us-gaap:SalesRevenueNet"}
+    assert list(rows[rows["concept"] == "checked"]["tag"]) == [None]
