@@ -316,6 +316,10 @@ def test_types_mirror_read_model() -> None:
 RANGE_GRAIN_FIELDS = {
     "PriceBar.close": "a bar of a price series (range grain, docs/api/read-model.md); the "
     "session's close as a fact is rollup.price_stats@v2.close",
+    "BacktestDetail.equity": "a backtest's final portfolio value, not a company's book equity "
+    "(rollup.balance_sheet@v1.equity, ADR 0067)",
+    "EquityPoint.equity": "one point of a backtest's portfolio value curve (range grain), not a "
+    "company's book equity (rollup.balance_sheet@v1.equity, ADR 0067)",
 }
 
 

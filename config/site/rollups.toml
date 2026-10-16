@@ -73,6 +73,10 @@ history_days = 1100      # facts whose period ended earlier are not read
 stale_days = 480         # as income_statement@v1
 history_days = 1100
 
+["balance_sheet@v1"]
+stale_days = 480         # the newest balance sheet date is older than this: STALE (still shown); as income_statement@v1
+history_days = 1100      # facts whose period ended earlier are not read
+
 ["chain_flow@v1"]         # option flow and unusual activity (docs/data/positioning.md OP2)
 min_unusual_volume = 500 # a contract is unusual when its volume is above its open interest and at least this
 

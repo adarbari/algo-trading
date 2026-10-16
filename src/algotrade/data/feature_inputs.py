@@ -351,7 +351,7 @@ def _events_by_date(table: str) -> Loader:
     return load
 
 
-STATEMENT_COLUMNS = ["concept", "tag", "period_start", "period_end", "filed", "value"]
+STATEMENT_COLUMNS = ["concept", "tag", "period_start", "period_end", "filed", "value", "accn"]
 REFERENCE_FACTS = ("instrument_id", "security_type", "symbol", "name", "is_leveraged", "is_inverse")
 
 

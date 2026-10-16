@@ -358,6 +358,7 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `financials@v2` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `eps_diluted_ttm`, `eps_diluted_ttm_year_ago`, `revenue_fy`, `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `ttm_basis` (QUARTERS / ANNUAL), `revenue_qtr`, `revenue_qtr_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago`, `qtr_as_of`, `eps_stale`, `is_adr`, `financials_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` financial concepts (filed on or before the session), `price_stats@v2` (which instruments get a row), `events/split`, `instruments/reference` (security type); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
 | `income_statement@v1` | `gross_profit_ttm`, `cost_of_revenue_ttm`, `ebit_ttm`, `da_ttm`, `interest_expense_ttm`, `pretax_income_ttm`, `income_tax_ttm`, `is_ttm_as_of`, `is_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE / FINANCIAL) | `instruments/statements` duration concepts (filed on or before the session), `price_stats@v2`, `instruments/company` (SIC); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
 | `cash_flow@v1` | `ocf_ttm`, `capex_ttm` (the cash paid, positive), `cf_as_of`, `cf_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/statements` `ocf` and `capex` (filed on or before the session), `price_stats@v2`; `stale_days`, `history_days` | built |
+| `balance_sheet@v1` | `cash`, `sti`, `total_debt`, `debt_basis` (a / b / c / NOT_TAGGED), `total_assets`, `total_liabilities`, `liabilities_basis` (REPORTED / DERIVED / NONE), `equity`, `current_assets`, `current_liabilities`, `bs_as_of`, `bs_filed`, `is_financial`, `bs_status` (OK / PARTIAL / NO_FACTS / STALE) | `instruments/statements` instant concepts (filed on or before the session), `price_stats@v2`, `instruments/company` (SIC); `stale_days`, `history_days` | built |
 | `put_wing@v1` | `wing_status` (OK / OUTSIDE_BAND / NO_SPOT / NO_CHAIN / NO_EXPIRY / NO_STRIKE), `target_expiry` + `target_dte` (nearest 45 days in 30..60, standard monthlies first), `n_unpriced`; band totals of the puts with OUR \|delta\| in 0.08..0.15 (`n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`); the best put among 0.05..0.35 delta, nearest the band then by cash-secured ROC (`delta_band_distance`, `best_put_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_roc`) | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `chain_flow@v1` | `flow_status` (OK / NO_CHAIN); `call_volume`, `put_volume` (every expiry, 0-DTE included), `call_oi`, `put_oi` (`dte >= 1`), `next_exp_call_volume`, `next_exp_put_volume` (first listed expiry 1+ days out); the unusual-activity columns `unusual_contracts` (volume above OI and at least `min_unusual_volume`), `max_vol_oi_ratio`, `unusual_premium_usd` ([positioning.md](positioning.md)) | the session's `chains/option_quotes` (+ `chains/underlying_quotes`: a quoted name without a chain reads NO_CHAIN); `min_unusual_volume` in `config/site/rollups.toml` | built |
 | `flow_history@v1` | `option_volume_rel_20d` (today's option volume over the mean of the earlier sessions), `pc_volume_ratio_20d`, `flow_history_days`; null until 10 of the last 20 sessions have a chain (stored from 2026-10-02 only) | `chain_flow@v1` over 20 sessions; `window`, `min_sessions` in `config/site/rollups.toml` | built |
@@ -415,6 +416,20 @@ periods; NO_TTM = facts but no TTM; NO_FACTS = no fact; STALE (checked before FI
 TTM present ended more than `stale_days` (480) before the session; FINANCIAL = SIC 6000 to 6411 (`instruments/company`,
 unknown SIC is not financial): `ebit_ttm`, `da_ttm` and `interest_expense_ttm` are null. `cf_status` is
 the same with OK = both lines ending on the same period.
+
+**`balance_sheet@v1` rules (ADR 0067).** Balance sheet lines are instants (period type INSTANT, no start):
+no TTM, no subtraction. Per line the latest instant filed on or before the session (greatest period end),
+reported by the first tag of the line's list that has that end, never a mix of tags; a restatement filed after
+the session never moves it. `total_debt` is added up from the parts of ONE accession at the newest debt period
+end, first rule that applies: (a) `LongTermDebt` + (`ShortTermBorrowings`, else `CommercialPaper`); (b)
+`LongTermDebtNoncurrent` + `LongTermDebtCurrent` + the same short-term part; (c) `DebtCurrent` +
+`LongTermDebtNoncurrent`; `debt_basis` says which (`a`, `b`, `c`); in (a) and (b) the short-term part is added
+when the filing has one. No filing with a complete rule is null with `NOT_TAGGED`, never 0. `total_liabilities`
+is `Liabilities` (REPORTED), else `LiabilitiesAndStockholdersEquity` less equity of the same date (DERIVED),
+else NONE. `bs_as_of` is the newest period end of any line; `bs_status`: STALE (before the rest) = it is more
+than `stale_days` (480) before the session; OK = cash, total assets and equity all end on it; PARTIAL =
+otherwise; NO_FACTS = no instant filed. A bank keeps its balance sheet (`is_financial`, SIC 6000 to 6411);
+only the EBIT family of `income_statement@v1` is null for it.
 
 **`financials@v2` rules.** Among facts FILED on or before the session (a filing counts for
 the session of its filing date, even one made in the evening: the same few-hours look-ahead as

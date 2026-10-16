@@ -89,7 +89,7 @@ table: `out/feature-gap-survey.md` in the working tree). What it adds to the tra
 | `ps_ratio`, `net_margin`, `payout_ratio` | `fundamentals.toml` expressions over stored facts | built |
 | quarterly EPS and revenue growth yoy (CAN SLIM C / A) | `financials@v2` | built |
 | `shares_change_yoy` (buybacks / dilution) | `fundamentals@v3` | built |
-| balance-sheet and cash-flow facts (equity, assets, debt, OCF, capex, gross profit) and `roe`, `roa`, `pb_ratio`, `debt_to_equity`, `fcf_yield`, `gross_profitability` | `balance_sheet@v1` (corporate/; its data, `instruments/statements`, is stored: ADR 0067) | planned |
+| balance-sheet and cash-flow facts (equity, assets, debt, OCF, capex, gross profit) and `roe`, `roa`, `pb_ratio`, `debt_to_equity`, `fcf_yield`, `gross_profitability` | `balance_sheet@v1` (statements/; the group is built: cash, debt, assets, liabilities, equity; the ratios over it follow; ADR 0067) | partly built |
 | unusual options activity at chain level (`unusual_contracts`, `max_vol_oi_ratio`, `unusual_premium_usd`) | `chain_flow@v1` (positioning.md) | planned |
 | `iv30_chg_1d`, `iv30_chg_5d` | `iv_history@v3` | planned |
 | bar shape (body and wick shares, inside / outside bar) and the six named candles (hammer, shooting star, doji, bullish / bearish engulfing, inside-day breakout) | `candle@v1`, new folder `patterns/` | built |
