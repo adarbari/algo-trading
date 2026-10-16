@@ -75,11 +75,16 @@ def urllib_transport(
 def with_query_param(transport: Transport, name: str, value: str) -> Transport:
     """``transport`` that adds ``name=value`` to every URL it fetches, for the vendor whose key
     can only travel as a query parameter (FRED ``api_key``). The source and the retry loop see
-    the URL without it, so the key never reaches a log line, an error message or a raw path."""
+    the URL without it, so the key never reaches a log line, an error message or a raw path.
+    An ``HttpError`` is re-raised without its cause: urllib's ``HTTPError`` holds the full keyed
+    URL (``url``, ``filename``, ``geturl()``), and this is the one layer that knows the key."""
     pair = urllib.parse.urlencode({name: value})
 
     def get(url: str) -> bytes:
-        return transport(f"{url}{'&' if '?' in url else '?'}{pair}")
+        try:
+            return transport(f"{url}{'&' if '?' in url else '?'}{pair}")
+        except HttpError as exc:
+            raise HttpError(exc.status, exc.retry_after, exc.body) from None
 
     return get
 

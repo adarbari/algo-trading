@@ -184,8 +184,11 @@ error message or a raw path (`with_query_param`). About 250 calls a day on the f
 | `grades-consensus?symbol=` | ALLOWED | `strongBuy`, `buy`, `hold`, `sell`, `strongSell`, `consensus` |
 | `grades?symbol=&limit=` | ALLOWED | one record per rating action: `date`, `gradingCompany`, `previousGrade`, `newGrade`, `action` |
 
-An unknown symbol also answers 402 (the same sentence, naming `symbol`), so a
-402 is a plan limit, never "no data": it is raised at once and not retried.
+A symbol outside the plan's set also answers 402 (the same sentence, naming `symbol`): on
+2026-10-16 CHWY (a mid-cap of the scope list) got 402 on every endpoint while AAPL answered, and
+NVDA and JPM answered in a manual test, so the free plan is symbol-gated and its boundary is
+unknown. A 402 is therefore a plan limit, never "no data": it is raised at once and not retried.
+The probe asks AAPL and CHWY (`<endpoint>@broad` rows) so the table shows it.
 
 ### Finnhub
 
@@ -195,6 +198,7 @@ Host `https://finnhub.io/api/v1`; key `ALGOTRADE_FINNHUB_API_KEY` in an `X-Finnh
 | Endpoint | Free plan 2026-10-16 | Answer |
 |---|---|---|
 | `stock/recommendation?symbol=` | ALLOWED | one record a month, newest first: `period`, `strongBuy`, `buy`, `hold`, `sell`, `strongSell` |
+| `stock/recommendation` for CHWY | ALLOWED | the same shape (coverage is not symbol-gated like FMP's) |
 | `stock/price-target?symbol=` | DENIED: 403 `You don't have access to this resource` | premium |
 
 ### What is stored and when

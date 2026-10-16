@@ -42,6 +42,7 @@ def probe_analyst_access(ctx: TaskContext, session: date) -> RunRecord:
     with IngestRun(ctx, TASK, session) as run:
         skipped = {}
         asked = 0
+        answered: set[tuple[str, str]] = set()
         for name in SOURCES:
             source = ctx.sources.get(name)
             if not isinstance(source, ProbeSource):
@@ -51,11 +52,13 @@ def probe_analyst_access(ctx: TaskContext, session: date) -> RunRecord:
             rows = _probe(run, source)
             if not rows.empty:
                 run.stage(TABLE, source.name, rows, source.name)
+                answered |= {(source.name, str(e)) for e in rows["endpoint"]}
         if skipped:
             run.stats["skipped"] = skipped
         if not asked:
             run.failed("no analyst vendor is configured: " + "; ".join(skipped.values()))
             return run.record
+        run.stats["carried"] = _carry_forward(run, answered)
         run.publish(TABLE, sort_by="endpoint")
         run.stats.update(
             fmp_calls_today=fmp_calls_today(run),
@@ -64,6 +67,27 @@ def probe_analyst_access(ctx: TaskContext, session: date) -> RunRecord:
             counts=run.counts(),
         )
     return run.record
+
+
+def _carry_forward(run: IngestRun, answered: set[tuple[str, str]]) -> int:
+    """Re-stage the verdicts of the latest earlier session for every (vendor, endpoint) this run
+    got no verdict for (a vendor with no key, a 5xx, an endpoint over budget) and this session
+    does not hold yet, keeping their ``checked_ts``: runs merge only within one session's
+    partition, so without this a later session's partition would forget them. -> rows carried."""
+    earlier = [d for d in run.reader.dates(TABLE) if d < run.session]
+    if not earlier:
+        return 0
+    previous = run.reader.table(TABLE, max(earlier))
+    if previous is None:
+        return 0
+    held = run.reader.table(TABLE, run.session)
+    if held is not None:
+        answered = answered | set(zip(held["source"], held["endpoint"], strict=True))
+    keys = zip(previous["source"], previous["endpoint"], strict=True)
+    missing = previous[[k not in answered for k in keys]]
+    for vendor, rows in missing.groupby("source"):
+        run.stage(TABLE, f"{vendor}:carried", rows[COLUMNS].reset_index(drop=True), str(vendor))
+    return len(missing)
 
 
 def _probe(run: IngestRun, source: ProbeSource) -> pd.DataFrame:

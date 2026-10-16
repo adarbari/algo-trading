@@ -13,7 +13,12 @@ from algotrade_sources.framework.base import Access, FetchRequest
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.framework.registry import build_sources
 from algotrade_sources.vendors.finnhub.client import refused
-from algotrade_sources.vendors.finnhub.probe import ENDPOINTS, PROBE_SYMBOL, FinnhubProbe
+from algotrade_sources.vendors.finnhub.probe import (
+    BROAD_SYMBOL,
+    ENDPOINTS,
+    PROBE_SYMBOL,
+    FinnhubProbe,
+)
 from algotrade_sources.vendors.finnhub.recommendations import FinnhubRecommendations
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for
@@ -26,8 +31,15 @@ SITE = tomllib.loads((REPO_ROOT / "config" / "site" / "sources.toml").read_text(
 
 
 def test_the_probe_names_the_free_recommendation_and_the_premium_price_target() -> None:
-    assert set(ENDPOINTS) == {"recommendation", "price_target"}
-    assert all(f"symbol={PROBE_SYMBOL}" in u for u in ENDPOINTS.values())
+    assert set(ENDPOINTS) == {
+        "recommendation",
+        "price_target",
+        "recommendation@broad",
+        "price_target@broad",
+    }
+    for name, url in ENDPOINTS.items():
+        symbol = BROAD_SYMBOL if name.endswith("@broad") else PROBE_SYMBOL
+        assert f"symbol={symbol}" in url
 
 
 def test_the_key_travels_in_the_x_finnhub_token_header_never_the_url(

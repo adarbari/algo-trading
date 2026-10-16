@@ -34,14 +34,26 @@ frames and store nothing: the feature groups and the nightly fetch are later PRs
 
 ### The probe and `analyst/vendor_access`
 `algotrade-ingest run analyst-probe` (by hand, in no workflow) makes one un-retried request per
-endpoint for a large-cap every plan covers and classifies the answer (`framework/access.py`):
-`ALLOWED` (a 200 with rows), `DENIED` (401 / 402 / 403, or a 200 whose body says upgrade /
-restricted), `LIMITED` (429, a quota body, or an empty payload for the covered name). Any other
-answer (a 404, a 5xx) is no verdict: that item fails and the verdict stored before stays. The table
-has one row per `(source, endpoint)` with `status`, `http_code`, `rows`, a fixed-words `note`
-(never the vendor's body) and `checked_ts`; runs merge on the key, the latest verdict wins. Later
-analyst tasks read it before asking and treat a call the table says `DENIED` as a bug, not a
-retry.
+endpoint and classifies the answer (`framework/access.py`): `ALLOWED` (a 200 with rows), `DENIED`
+(401 / 402 / 403, or a 200 whose body says upgrade / restricted), `LIMITED` (429, a quota body, or
+an empty payload for the covered name). Any other answer (a 404, a 5xx) is no verdict: that item
+fails and no row is written for it. It asks for two names: AAPL, a mega-cap (rows named for the
+endpoint), and CHWY, a mid-cap of the event-sensitivity scope list (rows `<endpoint>@broad`). The
+free FMP plan serves only some symbols (402 for the others), so an AAPL-only probe could say
+`ALLOWED` for an endpoint the scoped pull cannot use for most names.
+
+First result, 2026-10-16, free keys: FMP answered AAPL on every endpoint but `period=quarter`
+(402), and CHWY with 402 on every endpoint; the owner's manual test had NVDA and JPM answering 200
+for grades and NVDA for annual estimates. So the plan is symbol-gated and **where its boundary
+lies is not known**: the probe reports it, the table records it, and nothing here assumes it.
+Finnhub answered `stock/recommendation` for AAPL and CHWY and refused `stock/price-target` (403).
+
+The table has one row per `(source, endpoint)` with `status`, `http_code`, `rows`, a fixed-words
+`note` (never the vendor's body) and `checked_ts`; the partition is the run's session. Runs merge
+on the key inside a session, but a later session's partition is a new one, so the task re-stages
+the latest earlier partition's row (keeping its `checked_ts`) for every `(source, endpoint)` that
+got no verdict this run (a vendor with no key, a 5xx, an endpoint over the budget): the verdict
+stored before stays across sessions, and `checked_ts` says how old it is.
 
 ### Designed, built in later PRs
 - **FMP: a scoped, rotating pull.** 200 calls a day cannot cover the universe: the scope list of
@@ -69,6 +81,14 @@ contains the key.
 - Two more keys in `.env` (optional: no key skips that vendor and the probe says so).
 - A plan change shows in the table the next time the owner runs the probe; nothing re-checks it
   nightly until the fetch tasks exist.
-- The probe spends 6 FMP calls a run; it counts against the daily budget like every FMP task.
+- The probe spends 12 FMP calls a run; it counts against the daily budget like every FMP task.
+- What the free plans mean for the features: forward P/E and the FMP estimates use fiscal-year
+  (annual) figures only; quarterly consensus stays with the existing calendar groups (the 402 on
+  `period=quarter`); price targets come only from FMP consensus (Finnhub's `price-target` is
+  premium). FMP's coverage is symbol-gated, so the scoped pull is limited to the names the table
+  says `ALLOWED` for.
+- Consumer rules for the table (later PRs): a `DENIED` row older than 7 days by `checked_ts`
+  counts as unknown and is re-probed before the fetch relies on it; `LIMITED` means "ask later",
+  never "denied".
 - The vendors can change or drop a free endpoint; the adapters are tested on recorded answers
   (2026-10-16) and the probe is how a drift is noticed.

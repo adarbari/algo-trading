@@ -26,7 +26,7 @@ from algotrade_sources.framework.http import (
     with_query_param,
 )
 from algotrade_sources.framework.registry import build_sources
-from algotrade_sources.vendors.fmp.probe import ENDPOINTS, PROBE_SYMBOL
+from algotrade_sources.vendors.fmp.probe import BROAD_SYMBOL, ENDPOINTS, PROBE_SYMBOL
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import task_ctx
 
@@ -42,17 +42,19 @@ def built(tmp_path: Path, name: str = "fmp_targets") -> Source:
     return build_sources(settings, env, [name], tmp_path).sources[name]
 
 
-def test_the_probe_names_one_endpoint_each_for_the_analyst_calls_for_a_large_cap() -> None:
-    assert set(ENDPOINTS) == {
-        "quote",
-        "estimates_annual",
-        "estimates_quarter",
-        "price_targets",
-        "ratings_summary",
-        "grades",
-    }
-    assert PROBE_SYMBOL == "AAPL" and all(f"symbol={PROBE_SYMBOL}" in u for u in ENDPOINTS.values())
-    assert not any("apikey" in u for u in ENDPOINTS.values())  # the transport adds the key
+def test_the_probe_names_one_endpoint_each_for_a_mega_cap_and_a_scope_mid_cap() -> None:
+    names = {"quote", "estimates_annual", "estimates_quarter", "price_targets"}
+    names |= {"ratings_summary", "grades"}
+    assert set(ENDPOINTS) == names | {f"{n}@broad" for n in names}
+    for name, url in ENDPOINTS.items():
+        symbol = BROAD_SYMBOL if name.endswith("@broad") else PROBE_SYMBOL
+        assert f"symbol={symbol}" in url and "apikey" not in url  # the transport adds the key
+    assert (PROBE_SYMBOL, BROAD_SYMBOL) == ("AAPL", "CHWY")
+
+
+def test_the_broad_name_is_in_the_event_scope_list() -> None:
+    scope = tomllib.loads((REPO_ROOT / "config/site/events/scope.toml").read_text())
+    assert BROAD_SYMBOL in {entry["symbol"] for entry in scope["name"]}
 
 
 def test_the_registry_adds_the_key_to_the_query_and_the_source_never_sees_it(
@@ -145,3 +147,4 @@ def test_the_real_transport_stack_never_prints_the_key_of_a_refused_request() ->
     printed = "".join(traceback.format_exception(raised.value))
     assert raised.value.status == 402 and raised.value.body == b"Premium Query Parameter"
     assert KEY not in printed and "apikey" not in printed
+    assert raised.value.__cause__ is None  # urllib's HTTPError holds the keyed URL: not chained

@@ -531,7 +531,8 @@ MACRO_SERIES = fixed(
 # ``http_code`` the answer's (200 for an empty payload); ``rows`` the records it held; ``note``
 # fixed words, never the vendor's body; ``checked_ts`` when the call was made. A probe run is a
 # window (it may skip a vendor with no key, or an endpoint over budget), so runs merge on the
-# key and the latest run's verdict wins; the partition is the run's session.
+# key and the latest run's verdict wins; the partition is the run's session, and the task carries
+# the latest earlier partition's rows (their ``checked_ts`` kept) for what a run got no verdict for.
 ANALYST_VENDOR_ACCESS = fixed(
     "analyst/vendor_access",
     "reference",
