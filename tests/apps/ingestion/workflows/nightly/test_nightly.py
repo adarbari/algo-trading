@@ -51,6 +51,7 @@ from tests.helpers.stored_frames import (
 
 D = date(2026, 10, 2)
 D1 = date(2026, 10, 1)
+CHAINS = "rollups/instrument/option_liquidity@v1"  # a table computed from the chains
 AFTER_CLOSE = datetime(2026, 10, 2, 23, tzinfo=UTC)  # 19:00 New York: D has closed
 TASK_STEPS = [
     s.name for s in (*NIGHTLY, *FINALLY) if s.name not in (SCREENS, EDGE_SIGNALS, EDGE_EVAL)
@@ -371,7 +372,7 @@ def test_catch_up_runs_missed_sessions_and_chains_only_for_the_latest(
 
     def screens(session: date) -> Outcome:
         screened.append(session)  # short of coverage without the session's chains: a WARN
-        short = {"screens": [{"config": "x", "status": "partial"}]}
+        short = {"screens": [{"config": "x", "status": "partial", "missing_tables": [CHAINS]}]}
         return Outcome(StepStatus.FAILED if session < D else StepStatus.SUCCEEDED, short, "x")
 
     writer = store(date(2026, 9, 25))

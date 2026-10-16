@@ -59,30 +59,46 @@ def test_only_snapshot_fetches_are_critical_and_latest_only() -> None:
     assert critical == {"universe-build": SNAPSHOT, "chains": SNAPSHOT}
 
 
-def _screens(*job_statuses: str) -> StepResult:
-    jobs = [{"config": f"s{i}", "status": j} for i, j in enumerate(job_statuses)]
-    return StepResult("screens", StepStatus.FAILED, result={"screens": jobs}, reason="short")
+CHAINED = "rollups/instrument/option_liquidity@v1"
+
+
+def _screens(*jobs: tuple[str, list[str]]) -> StepResult:
+    summaries = [
+        {"config": f"s{i}", "status": status, "missing_tables": missing}
+        for i, (status, missing) in enumerate(jobs)
+    ]
+    return StepResult("screens", StepStatus.FAILED, result={"screens": summaries}, reason="x")
+
+
+def test_chain_tables_are_the_rollups_computed_from_the_chains() -> None:
+    chained = screens_module.chain_tables()
+    assert {CHAINED, "rollups/instrument/iv30@v1"} <= chained  # iv_history via iv30 too
+    assert "rollups/instrument/iv_history@v2" in chained
+    assert "rollups/instrument/price_stats@v2" not in chained
 
 
 def test_screens_short_only_for_want_of_never_fetched_chains_warn_and_hold_nothing() -> None:
     # Architect review 2026-10-16: a night the Mac slept through has no chains; failing its
     # screens would hold every later session back and lose their snapshot fetches.
-    skipped = StepResult("chains", StepStatus.SKIPPED, reason="latest closed session only")
-    result = screens_module.without_chains(_screens("complete", "partial"), skipped)
+    result = screens_module.without_chains(_screens(("complete", []), ("partial", [CHAINED])), True)
     assert result.status is StepStatus.SUCCEEDED and result.reason is None
     assert [(c["name"], c["status"]) for c in result.checks] == [("no_chains", "WARN")]
     assert result.checks[0]["detail"].startswith("s1 short of coverage")
 
 
-def test_a_failed_screen_job_or_fetched_chains_still_fail_the_screens() -> None:
-    skipped = StepResult("chains", StepStatus.SKIPPED)
-    fetched = StepResult("chains", StepStatus.SUCCEEDED)
-    assert (
-        screens_module.without_chains(_screens("partial", "failed"), skipped).status.value
-        == "FAILED"
-    )
-    assert screens_module.without_chains(_screens("partial"), fetched).status.value == "FAILED"
-    assert screens_module.without_chains(_screens("partial"), None).status.value == "FAILED"
+@pytest.mark.parametrize(
+    ("jobs", "unfetched"),
+    [
+        ((("partial", [CHAINED]), ("failed", [])), True),  # a failed job
+        ((("partial", [CHAINED, "rollups/instrument/price_stats@v2"]),), True),  # not chains
+        ((("partial", []),), True),  # short with every table present
+        ((("partial", [CHAINED]),), False),  # the session's chains were fetched
+    ],
+)
+def test_any_other_shortfall_still_fails_the_screens(
+    jobs: tuple[tuple[str, list[str]], ...], unfetched: bool
+) -> None:
+    assert screens_module.without_chains(_screens(*jobs), unfetched).status is StepStatus.FAILED
 
 
 def test_an_optional_table_missed_by_a_complete_screen_is_a_warning(

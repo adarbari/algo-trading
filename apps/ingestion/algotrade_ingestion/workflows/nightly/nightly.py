@@ -531,7 +531,8 @@ def run_session(
                     eval_step,
                 )
                 if step.name == SCREENS:
-                    result = without_chains(result, done.get("chains"))
+                    unfetched = not latest and done["chains"].status is StepStatus.SKIPPED
+                    result = without_chains(result, unfetched)
                 # a done step that ran although none of its inputs did is a refetch
                 refetch = (
                     step.name in before.done

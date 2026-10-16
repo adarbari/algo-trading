@@ -34,7 +34,7 @@ edge, never a hold on the session or a later one.
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import nullcontext
 from dataclasses import replace
 from datetime import UTC, date, datetime
@@ -46,6 +46,7 @@ from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import AlgoTradeError
 from algotrade.data import StoreReader
+from algotrade.features.registry import GROUPS
 from algotrade.services.configs import nightly_screeners
 from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.evaluation.forward.results import paper_owners
@@ -107,33 +108,46 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
     return run
 
 
-def without_chains(result: StepResult, chains: StepResult | None) -> StepResult:
-    """The screens of a session whose chains were never fetched (SKIPPED: a catch-up session
-    the source no longer serves, ADR 0039 amendment 2026-10-16): screeners short of coverage
-    only (PARTIAL jobs, their runs stored) are one WARN each, never a hold on the session or the
-    later ones, whose snapshots would be lost; a FAILED job still fails the step."""
-    if result.status is not StepStatus.FAILED or chains is None:
+def chain_tables() -> frozenset[str]:
+    """The rollup tables computed from the option chains, directly or through another such
+    table (the groups in dependency order, so a group's inputs come first)."""
+    found: set[str] = set()
+    for group in GROUPS.values():
+        if any(i.table.startswith("chains/") or i.table in found for i in group.inputs):
+            found.add(group.table)
+    return frozenset(found)
+
+
+def without_chains(result: StepResult, unfetched: bool) -> StepResult:
+    """The screens of a catch-up session whose chains were never fetched (``unfetched``: SKIPPED,
+    the source no longer serves the session; ADR 0039 amendment 2026-10-16). A screener short of
+    coverage only for want of chain-derived tables (a PARTIAL job, its run stored, every missing
+    table one of ``chain_tables``) is one WARN, never a hold on the session or the later ones,
+    whose snapshots would be lost. Anything else short (a FAILED job, another missing table, a
+    shortfall with no missing table) still fails the step."""
+    if result.status is not StepStatus.FAILED or not unfetched:
         return result
-    if chains.status is not StepStatus.SKIPPED:
-        return result
-    short = [
-        s
-        for s in (result.result or {}).get("screens", [])
-        if s["status"] != JobStatus.COMPLETE.value
-    ]
-    if not short or any(s["status"] != JobStatus.PARTIAL.value for s in short):
+    complete, partial = JobStatus.COMPLETE.value, JobStatus.PARTIAL.value
+    short = [s for s in (result.result or {}).get("screens", []) if s["status"] != complete]
+    chained = chain_tables()
+
+    def for_want_of_chains(summary: Mapping[str, Any]) -> bool:
+        missing = summary.get("missing_tables") or []
+        return summary["status"] == partial and bool(missing) and set(missing) <= chained
+
+    if not short or not all(map(for_want_of_chains, short)):
         return result
     warnings = [
         {
             "name": "no_chains",
             "status": "WARN",
-            "detail": f"{s['config']} short of coverage: no chains stored for this session",
+            "detail": f"{s['config']} short of coverage: no chains stored for this session "
+            f"({', '.join(s['missing_tables'])})",
         }
         for s in short
     ]
-    return replace(
-        result, status=StepStatus.SUCCEEDED, reason=None, checks=[*result.checks, *warnings]
-    )
+    checks = [*result.checks, *warnings]
+    return replace(result, status=StepStatus.SUCCEEDED, reason=None, checks=checks)
 
 
 def _below_range(

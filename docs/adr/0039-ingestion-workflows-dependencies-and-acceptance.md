@@ -170,11 +170,13 @@ night after the Mac slept). The completion rule is unchanged: a session with a c
 SKIPPED as not applicable is complete, and the only critical latest-only steps are the
 snapshot fetches (universe build, chains; fitness test in `test_screens.py`). Consequences:
 - A catch-up session whose chains were never fetched (a night the Mac slept through: `chains`
-  SKIPPED as latest-only) runs the screens without them. Screeners short of coverage only (a
-  PARTIAL job, its run stored, the missing names UNKNOWN) are one `no_chains` WARN each, not
-  a failure (`screens.without_chains`): failing would hold every later session back and lose
-  their snapshot fetches, one owner waive per missed night (architect review). A FAILED screen
-  job still fails the step, and with the session's chains fetched coverage still decides. A
+  SKIPPED as latest-only) runs the screens without them. A screener short of coverage only
+  for want of chain-derived tables (a PARTIAL job, its run stored, every missing table computed
+  from the chains: `screens.chain_tables`) is one `no_chains` WARN, not a failure
+  (`screens.without_chains`): failing would hold every later session back and lose their
+  snapshot fetches, one owner waive per missed night (architect review). Any other shortfall (a
+  FAILED job, another missing table) still fails the step, and with the session's chains
+  fetched coverage still decides. A
   screens step that failed for a session no longer the latest is retried, never expired: its
   inputs are stored.
 - Every latest-only step states why (`Step.latest_only` is the reason, shown as "latest closed
