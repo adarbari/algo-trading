@@ -330,3 +330,264 @@ Sources: Frazzini and Lamont, The Earnings Announcement Premium and Trading Volu
 - A report window can carry other news (an offering, a deal), which inflates the ratio without the report being the cause.
 
 Sources: Frazzini and Lamont, The Earnings Announcement Premium and Trading Volume (2007)
+
+### `rollup.earnings_surprise@v1.surprise_status`
+
+**How to read it.** Whether the name's last known report can be compared with its forecast. OK: it has a reported result and a forecast. NO_REPORT: no reported result is known by the session (a name that has not reported, or an ETF). NO_FORECAST: the report has a result, but the calendar held no forecast. SIGN_CONFLICT: the sign of the forecast is in doubt, so the report has no surprise.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| only names whose last report has a surprise | `eq "OK"` | hard | - | - |
+
+**When the reading lies**
+
+- OK says the figure exists, not that the report is recent. rollup.earnings_surprise@v1.last_report_date gives its date, and a name stays OK for months until its next report.
+- NO_FORECAST is common for small names that few analysts cover. A hard criterion on a surprise field leaves them out, and this field says why.
+- SIGN_CONFLICT is rare (fewer than 1 report in 1,000). The calendar sometimes drops the minus sign of a loss-maker's forecast, so 1.00 beside a result of -0.67 may be a forecast of -1.00. We flag a report when the vendor's own surprise matches the negated forecast, and we never flip the forecast ourselves.
+- The check needs the vendor's figure. Where the calendar gave none, a lost sign goes unseen, so treat a positive forecast beside a negative result with care.
+
+Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
+
+### `rollup.earnings_surprise@v1.last_report_date`
+
+**How to read it.** The date of the latest report whose result the calendar had stored by the session. It tells how fresh every other surprise figure is: a report from last week is news, one from last year is history.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names with a stored report to date the surprise figures by | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- It is the date the calendar lists. For a report after the close the market reacts the next day: rollup.earnings_reaction@v1.reaction_end_date gives the last session of the reaction window.
+- Reports the calendar never stored are missing, so the date can be older than the real last report. Compare it with rollup.earnings@v1.last_earnings_date.
+
+Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
+
+### `rollup.earnings_surprise@v1.last_eps_reported`
+
+**How to read it.** The earnings per share the latest report gave, in dollars per share, as the earnings calendar stores it. Microsoft's report of 2026-07-29 reads 4.74. It is the actual half of the surprise; rollup.earnings_surprise@v1.last_eps_forecast is the other half.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names with a reported result to read the surprise from | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- The figure is the calendar's own, usually adjusted earnings, and can differ from the filing. Real estate trusts report cash flow per share, on a basis that can differ from the forecast.
+- A few rows hold a placeholder such as 999. Check the value against rollup.earnings_surprise@v1.last_eps_forecast before using it.
+
+Sources: Nasdaq earnings calendar (the stored events/earnings rows)
+
+### `rollup.earnings_surprise@v1.last_eps_forecast`
+
+**How to read it.** The consensus forecast of earnings per share, in dollars per share, that the latest report was measured against. It is the figure the calendar showed with the result. Microsoft's forecast for the report of 2026-07-29 was 4.21.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names whose last report had a consensus forecast | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- Null when the calendar held no forecast, which is common for small names. The forecast shown with a result can be the day's own figure, not the one a week before.
+- For a company expected to lose money the calendar can drop the minus sign. The value is shown as stored: rollup.earnings_surprise@v1.surprise_status reads SIGN_CONFLICT when the vendor's figure shows it happened.
+
+Sources: Nasdaq earnings calendar (the stored events/earnings rows)
+
+### `rollup.earnings_surprise@v1.last_surprise_eps`
+
+**How to read it.** How many dollars per share the latest report landed above (positive) or below (negative) the consensus forecast: reported minus forecast. Microsoft's report of 2026-07-29 reads +0.53 (4.74 against 4.21). It has no base, so a tiny forecast does not blow it up, and it is the figure to read for a name with a forecast near zero.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names that beat the forecast by at least 5 cents a share | `gte 0.05` | hard | - | - |
+
+**When the reading lies**
+
+- A cent means more to a stock earning 0.10 a share than to one earning 10. Read it beside rollup.earnings_surprise@v1.last_surprise_pct and rollup.earnings_surprise@v1.last_eps_forecast.
+- Null when there is no forecast or the report is a SIGN_CONFLICT. Check rollup.earnings_surprise@v1.surprise_status.
+
+Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
+
+### `rollup.earnings_surprise@v1.last_surprise_pct`
+
+**How to read it.** How far the latest report landed from the consensus forecast, in percent of the forecast: (reported - forecast) / |forecast|. A value of +12.6 is a report 12.6% above the forecast (Microsoft, 2026-07-29: 4.74 against 4.21). A value of -87.5 is a report far below it (Tesla, 2026-07-22: 0.04 against 0.32). We compute it from the two stored numbers, not from the vendor's figure.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a clear earnings beat on the last report | `gte 5` | hard | - | pair with rollup.earnings_surprise@v1.surprise_status eq OK and an upper bound, because a small forecast inflates the figure |
+
+**When the reading lies**
+
+- A small forecast makes the percentage huge: a result of 0.30 against a forecast of 0.06 is +400. It is null below a forecast of five cents; there rollup.earnings_surprise@v1.last_surprise_eps gives the size. Bound a threshold, for example below 100.
+- Most reports beat: the middle name beats by about 6. Compare a surprise with rollup.earnings_surprise@v1.surprise_median_4q, not with zero.
+- The price reaction can disagree with the surprise: a beat on weak guidance falls. Check rollup.earnings_reaction@v1.reaction_excess_return.
+- Null when there is no forecast, the forecast is below five cents in size, or the report is a SIGN_CONFLICT. A hard criterion rejects those names, so pair it with rollup.earnings_surprise@v1.surprise_status eq OK.
+
+Sources: Bernard and Thomas, Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium? (1989); Livnat and Mendenhall, Comparing the Post-Earnings Announcement Drift for Surprises Calculated from Analyst and Time Series Forecasts (2006)
+
+### `rollup.earnings_surprise@v1.surprise_median_4q`
+
+**How to read it.** The middle percent surprise of the last four known reports that can be compared. A median of +5 means the name cleared its forecast by about 5% in a typical report. A negative median means it fell short more often than not. Apple's reads +5.1, Tesla's -30.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a name that habitually clears its forecast | `gte 3` | hard | - | with rollup.earnings_surprise@v1.reports_4q eq 4, so the median rests on a full year |
+
+**When the reading lies**
+
+- It is a median, so one report with a placeholder result or a small forecast cannot move it. Reports with a forecast below five cents are left out, so it can be null while rollup.earnings_surprise@v1.beats_4q is not.
+- It covers the last four reports however far back they are. With rollup.earnings_surprise@v1.reports_4q below 4, or a rollup.earnings_surprise@v1.last_report_date a year old, the history is thin.
+
+Sources: Livnat and Mendenhall, Comparing the Post-Earnings Announcement Drift for Surprises Calculated from Analyst and Time Series Forecasts (2006)
+
+### `rollup.earnings_surprise@v1.beats_4q`
+
+**How to read it.** How many of the last four known reports came in above their forecast, from 0 to 4. It counts in dollars, so a small forecast still counts. 4 means every report beat (Apple, Microsoft). 0 means none did, which holds for about 6 names in 100 with four reports. A report equal to its forecast is not a beat.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a name that beat its forecast in every one of its last four reports | `gte 4` | hard | - | with rollup.earnings_surprise@v1.reports_4q eq 4 |
+
+**When the reading lies**
+
+- The count is out of rollup.earnings_surprise@v1.reports_4q, which can be below 4: 3 of 3 is a better record than 3 of 4.
+- Beating is the norm: about 3 names in 10 with four reports beat every time, so 4 of 4 is a mild signal, not a rare one.
+
+Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
+
+### `rollup.earnings_surprise@v1.reports_4q`
+
+**How to read it.** How many of the last four known reports can be compared, meaning a result and a forecast whose sign is not in doubt. It is the base of rollup.earnings_surprise@v1.beats_4q. 4 is a full record; 1 or 2 is a newer listing or a thinly covered name.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| four reports with a forecast behind the beat count and the median | `eq 4` | hard | - | - |
+
+**When the reading lies**
+
+- A low count is not a bad sign. It says the beat count and the median rest on few reports, so below 3 treat them as noise.
+
+Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
+
+### `rollup.earnings_revisions@v1.revision_status`
+
+**How to read it.** Whether the next report's forecast can be compared with an earlier one. OK: a snapshot of the calendar from a week ago holds the same fiscal quarter. BUILDING: no stored snapshot reaches back that far yet (they start on 2026-10-02). NO_PRIOR: one does, but it holds no row of this quarter for the name. NO_FORECAST: the next report has no forecast. NO_NEXT: no next report is known.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| only names whose forecast revision over a week can be measured | `eq "OK"` | hard | - | - |
+
+**When the reading lies**
+
+- OK says a 7-day comparison exists, not that the forecast moved: most names read OK with a revision of 0. rollup.earnings_revisions@v1.forecast_revision_7d gives the size.
+- NO_NEXT includes names that have reported lately. The calendar lists reports about 60 days ahead, so a company that reported last week can have none listed yet.
+- rollup.earnings_revisions@v1.forecast_revision_30d is null until about 2026-11-01, whatever the status says.
+
+Sources: Site convention (docs/data/features.md, earnings_revisions@v1)
+
+### `rollup.earnings_revisions@v1.next_eps_forecast`
+
+**How to read it.** The consensus forecast of earnings per share, in dollars per share, for the next report, as the calendar showed it on the session. Apple's was 1.99 on 2026-10-15. The revisions are measured on this figure.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names whose next report has a consensus forecast | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- A forecast built from one or two analysts moves with each of them. Read rollup.earnings_revisions@v1.estimate_count beside it.
+- Null when the calendar lists the report with no forecast, which is common for small names.
+
+Sources: Nasdaq earnings calendar (the stored events/earnings rows)
+
+### `rollup.earnings_revisions@v1.estimate_count`
+
+**How to read it.** How many analysts' estimates the next report's forecast averages. Apple's forecast averages 7, Microsoft's 13. A count of 1 or 2 is a thinly covered name. More estimates make a forecast steadier and a revision more meaningful.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a forecast with several analysts behind it | `gte 5` | hard | - | - |
+
+**When the reading lies**
+
+- It counts the estimates the calendar's vendor holds, not every analyst on the Street.
+- Null when the calendar gave no count for the next report.
+
+Sources: Nasdaq earnings calendar (the stored events/earnings rows)
+
+### `rollup.earnings_revisions@v1.forecast_revision_7d`
+
+**How to read it.** How much the consensus forecast for the next report moved in a week, in percent of the old forecast, for the same fiscal quarter. A value of +5 means analysts raised it by 5%. A value of -12.5 means they cut it: Tesla's went from 0.24 to 0.21 in the week to 2026-10-15. Zero is common, since most forecasts do not move in a week.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| analysts raising the forecast for the coming report | `gte 2` | hard | - | with rollup.earnings_revisions@v1.estimate_count gte 5 and rollup.earnings_revisions@v1.revision_status eq OK |
+
+**When the reading lies**
+
+- A small forecast makes a big percentage: a move from 0.06 to 0.15 is +150. The figure is null when the old forecast is below five cents. Read it beside rollup.earnings_revisions@v1.next_eps_forecast.
+- A forecast whose sign the calendar lost on one night shows as a revision of about -200 or +200. Treat a move that large between a positive and a negative forecast as a data error.
+- One analyst moving a forecast built from two estimates shifts it a lot. Read rollup.earnings_revisions@v1.estimate_count, and prefer 5 or more.
+- Null while rollup.earnings_revisions@v1.revision_status is not OK, and when the fiscal quarter changed between the two snapshots: a quarter roll is not a revision. A hard criterion rejects those names.
+
+Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003); Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect
+
+### `rollup.earnings_revisions@v1.forecast_revision_30d`
+
+**How to read it.** How much the consensus forecast for the next report moved in 30 days, in percent of the old forecast, for the same fiscal quarter. It reads like rollup.earnings_revisions@v1.forecast_revision_7d over a longer window, so a steady drift shows where a week looks flat. It is null for every name until about 2026-11-01, because the snapshots start on 2026-10-02.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names whose next forecast rose 3% or more in 30 days | `gte 3` | hard | - | history starts 2026-10-02, so the field is null before about 2026-11-01 |
+
+**When the reading lies**
+
+- The same quarter has to be in the snapshot 30 days back. A name whose quarter appeared on the calendar later reads null.
+- A long window mixes old and new moves. For a report under a week away, a flat 7-day figure inside a large 30-day one means the move is over.
+
+Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003)
+
+### `rollup.earnings_revisions@v1.estimate_count_change_30d`
+
+**How to read it.** How many more (positive) or fewer (negative) analysts' estimates the next report's forecast averages than 30 days ago, for the same fiscal quarter. A value of +3 means three more analysts now publish a forecast. It is null until about 2026-11-01, when the snapshots reach back 30 days.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names gaining analyst coverage for the next report | `gt 0` | hard | - | - |
+
+**When the reading lies**
+
+- Coverage grows toward a report as analysts publish, so a rise is the normal course. Compare names reporting in the same week.
+- Null when either snapshot gave no count, or the quarter is not in the snapshot 30 days back.
+
+Sources: Site convention (docs/data/features.md, earnings_revisions@v1)

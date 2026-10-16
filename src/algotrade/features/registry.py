@@ -25,6 +25,7 @@ from algotrade.features.framework.declaration import FeatureGroup, Superseded
 from algotrade.features.framework.feature import Feature
 from algotrade.features.framework.graph import dependency_order
 from algotrade.features.rollups.activity import vol_stats, volume_profile
+from algotrade.features.rollups.consensus import earnings_revisions, earnings_surprise
 from algotrade.features.rollups.corporate import (
     dividend_schedule,
     dividends,
@@ -88,6 +89,8 @@ GROUPS: dict[str, FeatureGroup] = {
             earnings_reaction.GROUP,
             earnings_schedule.GROUP,
             earnings_expected.GROUP,
+            earnings_surprise.GROUP,
+            earnings_revisions.GROUP,
             dividends.GROUP,
             dividend_schedule.GROUP,
             iv30.GROUP,
