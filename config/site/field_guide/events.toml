@@ -353,6 +353,10 @@ caveats = [
   "Reports the calendar never stored are missing, so the date can be older than the real last report. Compare it with rollup.earnings@v1.last_earnings_date.",
 ]
 sources = ["Site convention (docs/data/features.md, earnings_surprise@v1)"]
+[[field.use]]
+for = "names with a stored report to date the surprise figures by"
+op = "not_null"
+mode = "hard"
 
 [[field]]
 name = "rollup.earnings_surprise@v1.last_eps_reported"
@@ -363,6 +367,10 @@ caveats = [
   "A few rows hold a placeholder such as 999. Check the value against rollup.earnings_surprise@v1.last_eps_forecast before using it.",
 ]
 sources = ["Nasdaq earnings calendar (the stored events/earnings rows)"]
+[[field.use]]
+for = "names with a reported result to read the surprise from"
+op = "not_null"
+mode = "hard"
 
 [[field]]
 name = "rollup.earnings_surprise@v1.last_eps_forecast"
@@ -373,6 +381,10 @@ caveats = [
   "For a company expected to lose money the calendar can drop the minus sign. The value is shown as stored: rollup.earnings_surprise@v1.surprise_status reads SIGN_CONFLICT when the vendor's figure shows it happened.",
 ]
 sources = ["Nasdaq earnings calendar (the stored events/earnings rows)"]
+[[field.use]]
+for = "names whose last report had a consensus forecast"
+op = "not_null"
+mode = "hard"
 
 [[field]]
 name = "rollup.earnings_surprise@v1.last_surprise_eps"
@@ -383,6 +395,11 @@ caveats = [
   "Null when there is no forecast or the report is a SIGN_CONFLICT. Check rollup.earnings_surprise@v1.surprise_status.",
 ]
 sources = ["Site convention (docs/data/features.md, earnings_surprise@v1)"]
+[[field.use]]
+for = "names that beat the forecast by at least 5 cents a share"
+op = "gte"
+value = 0.05
+mode = "hard"
 
 [[field]]
 name = "rollup.earnings_surprise@v1.last_surprise_pct"
@@ -476,6 +493,10 @@ caveats = [
   "Null when the calendar lists the report with no forecast, which is common for small names.",
 ]
 sources = ["Nasdaq earnings calendar (the stored events/earnings rows)"]
+[[field.use]]
+for = "names whose next report has a consensus forecast"
+op = "not_null"
+mode = "hard"
 
 [[field]]
 name = "rollup.earnings_revisions@v1.estimate_count"
@@ -522,6 +543,12 @@ caveats = [
   "A long window mixes old and new moves. For a report under a week away, a flat 7-day figure inside a large 30-day one means the move is over.",
 ]
 sources = ["Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003)"]
+[[field.use]]
+for = "names whose next forecast rose 3% or more in 30 days"
+op = "gte"
+value = 3
+mode = "hard"
+note = "history starts 2026-10-02, so the field is null before about 2026-11-01"
 
 [[field]]
 name = "rollup.earnings_revisions@v1.estimate_count_change_30d"
@@ -532,3 +559,8 @@ caveats = [
   "Null when either snapshot gave no count, or the quarter is not in the snapshot 30 days back.",
 ]
 sources = ["Site convention (docs/data/features.md, earnings_revisions@v1)"]
+[[field.use]]
+for = "names gaining analyst coverage for the next report"
+op = "gt"
+value = 0
+mode = "hard"

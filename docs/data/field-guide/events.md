@@ -354,6 +354,12 @@ Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
 
 **How to read it.** The date of the latest report whose result the calendar had stored by the session. It tells how fresh every other surprise figure is: a report from last week is news, one from last year is history.
 
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names with a stored report to date the surprise figures by | `not_null` | hard | - | - |
+
 **When the reading lies**
 
 - It is the date the calendar lists. For a report after the close the market reacts the next day: rollup.earnings_reaction@v1.reaction_end_date gives the last session of the reaction window.
@@ -364,6 +370,12 @@ Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
 ### `rollup.earnings_surprise@v1.last_eps_reported`
 
 **How to read it.** The earnings per share the latest report gave, in dollars per share, as the earnings calendar stores it. Microsoft's report of 2026-07-29 reads 4.74. It is the actual half of the surprise; rollup.earnings_surprise@v1.last_eps_forecast is the other half.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names with a reported result to read the surprise from | `not_null` | hard | - | - |
 
 **When the reading lies**
 
@@ -376,6 +388,12 @@ Sources: Nasdaq earnings calendar (the stored events/earnings rows)
 
 **How to read it.** The consensus forecast of earnings per share, in dollars per share, that the latest report was measured against. It is the figure the calendar showed with the result. Microsoft's forecast for the report of 2026-07-29 was 4.21.
 
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names whose last report had a consensus forecast | `not_null` | hard | - | - |
+
 **When the reading lies**
 
 - Null when the calendar held no forecast, which is common for small names. The forecast shown with a result can be the day's own figure, not the one a week before.
@@ -386,6 +404,12 @@ Sources: Nasdaq earnings calendar (the stored events/earnings rows)
 ### `rollup.earnings_surprise@v1.last_surprise_eps`
 
 **How to read it.** How many dollars per share the latest report landed above (positive) or below (negative) the consensus forecast: reported minus forecast. Microsoft's report of 2026-07-29 reads +0.53 (4.74 against 4.21). It has no base, so a tiny forecast does not blow it up, and it is the figure to read for a name with a forecast near zero.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names that beat the forecast by at least 5 cents a share | `gte 0.05` | hard | - | - |
 
 **When the reading lies**
 
@@ -485,6 +509,12 @@ Sources: Site convention (docs/data/features.md, earnings_revisions@v1)
 
 **How to read it.** The consensus forecast of earnings per share, in dollars per share, for the next report, as the calendar showed it on the session. Apple's was 1.99 on 2026-10-15. The revisions are measured on this figure.
 
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names whose next report has a consensus forecast | `not_null` | hard | - | - |
+
 **When the reading lies**
 
 - A forecast built from one or two analysts moves with each of them. Read rollup.earnings_revisions@v1.estimate_count beside it.
@@ -532,6 +562,12 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 **How to read it.** How much the consensus forecast for the next report moved in 30 days, in percent of the old forecast, for the same fiscal quarter. It reads like rollup.earnings_revisions@v1.forecast_revision_7d over a longer window, so a steady drift shows where a week looks flat. It is null for every name until about 2026-11-01, because the snapshots start on 2026-10-02.
 
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names whose next forecast rose 3% or more in 30 days | `gte 3` | hard | - | history starts 2026-10-02, so the field is null before about 2026-11-01 |
+
 **When the reading lies**
 
 - The same quarter has to be in the snapshot 30 days back. A name whose quarter appeared on the calendar later reads null.
@@ -542,6 +578,12 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 ### `rollup.earnings_revisions@v1.estimate_count_change_30d`
 
 **How to read it.** How many more (positive) or fewer (negative) analysts' estimates the next report's forecast averages than 30 days ago, for the same fiscal quarter. A value of +3 means three more analysts now publish a forecast. It is null until about 2026-11-01, when the snapshots reach back 30 days.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names gaining analyst coverage for the next report | `gt 0` | hard | - | - |
 
 **When the reading lies**
 
