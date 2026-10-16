@@ -77,7 +77,7 @@ from algotrade.features.rollups.price import (
 )
 from algotrade.features.rollups.reference import fund_reference
 from algotrade.features.rollups.relative import relative_strength
-from algotrade.features.rollups.statements import cash_flow, income_statement
+from algotrade.features.rollups.statements import balance_sheet, cash_flow, income_statement
 
 GROUPS: dict[str, FeatureGroup] = {
     g.key: g
@@ -101,6 +101,7 @@ GROUPS: dict[str, FeatureGroup] = {
             financials.GROUP,
             income_statement.GROUP,
             cash_flow.GROUP,
+            balance_sheet.GROUP,
             put_wing.GROUP,
             call_wing.GROUP,
             price_moves.GROUP,

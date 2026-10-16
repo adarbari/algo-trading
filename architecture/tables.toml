@@ -214,6 +214,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "TTM operating cash flow and capex from instruments/statements (ADR 0067)"
 
 [[table]]
+name = "rollups/instrument/balance_sheet@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the latest balance sheet lines (instants) from instruments/statements (ADR 0067)"
+
+[[table]]
 name = "rollups/instrument/div_yield@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the materialised expression feature div_yield (config/site/features/company/fundamentals.toml)"
