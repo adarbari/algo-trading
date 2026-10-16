@@ -23,11 +23,13 @@ user, never a hold on the session or a later one.
 
 The ``edge-eval`` step (``edge_eval_jobs``) runs one ``edge-eval`` job per open edge (not
 rejected or blocked, with screeners or baselines) as the edge's owner over the stored outcome
-sessions (ADR 0063), under the owner's evaluation claim: ``mode="incremental"`` (reuse the stored
-legs), or ``mode="audit"`` (recompute every leg, compare, rewrite the ones that differ, FAIL
-naming them) on the first night of the ISO week that runs the step (the edge has no audit run
-that week yet). It needs ``outcomes`` and ``screens`` and is not critical: a job that is not
-COMPLETE fails the step, a warning naming the edge, never a hold on the session or a later one.
+sessions (ADR 0063), under the owner's evaluation claim (each summary carries ``mode``, the
+one requested, and ``effective_mode``, the one the harness ran, so a FULL fallback shows):
+``mode="incremental"`` (reuse the stored legs), or ``mode="audit"`` (recompute every leg,
+compare, rewrite the ones that differ, FAIL naming them) on the first night of the ISO week that
+runs the step (the edge has no audit run that week yet). It needs ``outcomes`` and ``screens``
+and is not critical: a job that is not COMPLETE fails the step, a warning naming the
+edge, never a hold on the session or a later one.
 """
 
 import logging
@@ -204,6 +206,7 @@ def edge_eval_jobs(
                 {**summary, "job_id": job.job_id, "status": job.status.value}
                 | ({"error": job.error} if job.error else {})
                 | {k: job.result[k] for k in ("run_id", "legs") if k in job.result}
+                | ({"effective_mode": job.result["mode"]} if "mode" in job.result else {})
             )
             if job.status is not JobStatus.COMPLETE:
                 short.append(f"{edge.owner}/{edge.id} {job.status.value}")
