@@ -119,6 +119,8 @@ Logs go to `var/logs/nightly.log` and `var/logs/nightly.err.log`. Optional: to h
 wake (or power on) before the run on weekdays, run `sudo pmset repeat wakeorpoweron MTWRF
 14:55:00` yourself (`pmset -g sched` shows it, `sudo pmset repeat cancel` removes it). Without
 it, a Mac asleep or off at 15:00 runs the nightly as soon as it wakes or you log in.
+Once started, the nightly runs under `caffeinate -i -s`, so the Mac stays awake until it
+exits (idle sleep on battery too, system sleep on AC); a closed lid on battery still sleeps it.
 
 ### Setting up the nightly summary email
 

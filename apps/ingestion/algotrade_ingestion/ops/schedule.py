@@ -18,6 +18,11 @@ Repeated starts are cheap: without ``--date`` the nightly ingests only sessions 
 plus settle has passed (``core/time/calendar.last_closed_session``), catches up the ones
 missed since its last COMPLETE / PARTIAL run (``workflows/nightly/sessions.py``) and, when
 there are none, exits 0 at once without a run record or a notification (``cli/main.py``).
+
+The command runs under ``caffeinate -i -s`` so the Mac stays awake until the nightly exits: on
+2026-10-15 it slept on battery mid-run, the chains step crawled through maintenance wakes and the
+run never finished. ``-i`` holds off idle sleep (battery too), ``-s`` system sleep on AC; neither
+stops a closed lid on battery.
 """
 
 import plistlib
@@ -29,6 +34,7 @@ DEFAULT_WATCHDOG_MINUTES = 60
 # The owner's optional wake (run by them, never by this code): powers the Mac on / wakes it
 # five minutes before the scheduled run on weekdays.
 WAKE_COMMAND = "sudo pmset repeat wakeorpoweron MTWRF 14:55:00"
+CAFFEINATE = ["/usr/bin/caffeinate", "-i", "-s"]  # keep the Mac awake while the nightly runs
 
 
 def nightly_plist(
@@ -42,7 +48,7 @@ def nightly_plist(
         raise ValueError(f"invalid time {hour:02d}:{minute:02d}")
     if watchdog_s < 0:
         raise ValueError(f"invalid watchdog interval {watchdog_s} s")
-    command = [str(repo / ".venv" / "bin" / "algotrade-ingest"), "nightly"]
+    command = [*CAFFEINATE, str(repo / ".venv" / "bin" / "algotrade-ingest"), "nightly"]
     if export_dir is not None:
         command += ["--export-dir", str(export_dir)]
     logs = repo / "var" / "logs"

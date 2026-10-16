@@ -378,6 +378,12 @@ AGENTS = {
 }
 
 
+def _program(args: list[str]) -> str:
+    """The agent's own program, past a system wrapper such as ``/usr/bin/caffeinate -i -s``
+    (the nightly runs under it to keep the Mac awake)."""
+    return next(str(a) for a in args if not str(a).startswith(("/usr/bin/", "-")))
+
+
 def check_agents(p: Probes) -> list[Result]:
     """Each installed launchd agent runs this (main) checkout's venv in this checkout: an agent
     written in a worktree or another clone serves or ingests with code nobody reviewed here."""
@@ -390,7 +396,7 @@ def check_agents(p: Probes) -> list[Result]:
             continue
         try:
             agent = plistlib.loads(installed.read_bytes())
-            paths = [str(agent["ProgramArguments"][0]), str(agent["WorkingDirectory"])]
+            paths = [_program(agent["ProgramArguments"]), str(agent["WorkingDirectory"])]
         except (OSError, ValueError, LookupError, TypeError, plistlib.InvalidFileException):
             paths = []
         bad = [x for x in paths if not _in_main(x, main)]
