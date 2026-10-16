@@ -14,8 +14,11 @@ SNAPSHOT = date(2026, 10, 2)
 type Row = tuple[str, date, float | None, float | None, date]
 
 
-def _events(rows: Sequence[Row], stored: date = SNAPSHOT) -> pd.DataFrame:
-    """(instrument, report date, eps_reported, eps_forecast, known_from) rows of one night."""
+def _events(
+    rows: Sequence[Row], stored: date = SNAPSHOT, vendor: float | None = None
+) -> pd.DataFrame:
+    """(instrument, report date, eps_reported, eps_forecast, known_from) rows of one night, each
+    with the vendor's own surprise figure ``vendor`` (none: the calendar gave none)."""
     frame: list[dict[str, object]] = [
         {
             "instrument_id": i,
@@ -24,7 +27,7 @@ def _events(rows: Sequence[Row], stored: date = SNAPSHOT) -> pd.DataFrame:
             "known_from": known,
             "eps_reported": reported,
             "eps_forecast": forecast,
-            "surprise_pct": 999.0,  # the vendor's figure: never read
+            "surprise_pct": vendor,
             "reported": reported is not None,
         }
         for i, d, reported, forecast, known in rows
@@ -61,17 +64,29 @@ def test_the_surprise_divides_by_the_absolute_forecast() -> None:
     assert got.loc["EQ:A", "beats_4q"] == 1
 
 
-def test_a_zero_or_missing_forecast_gives_no_surprise_and_the_status_says_so() -> None:
+def test_a_missing_forecast_gives_no_surprise_and_the_status_says_so() -> None:
+    got = _at(_events([("EQ:N", date(2026, 9, 20), 0.30, None, date(2026, 9, 20))]), SNAPSHOT)
+    assert got.loc["EQ:N", "surprise_status"] == "NO_FORECAST"
+    assert got.loc["EQ:N", ["last_surprise_pct", "last_surprise_eps", "beats_4q"]].isna().all()
+    assert got.loc["EQ:N", "reports_4q"] == 0
+    assert got.loc["EQ:N", "last_eps_reported"] == pytest.approx(0.30)
+
+
+def test_the_floor_drops_the_percent_but_keeps_the_beat_and_the_dollar_surprise() -> None:
     rows = [
-        ("EQ:Z", date(2026, 9, 20), 0.30, 0.0, date(2026, 9, 20)),
-        ("EQ:N", date(2026, 9, 20), 0.30, None, date(2026, 9, 20)),
+        ("EQ:Z", date(2026, 9, 20), 0.30, 0.0, date(2026, 9, 20)),  # a zero forecast
+        ("EQ:S", date(2026, 9, 20), 0.10, 0.04, date(2026, 9, 20)),  # below five cents
+        ("EQ:E", date(2026, 9, 20), 0.15, 0.05, date(2026, 9, 20)),  # at the floor: kept
     ]
     got = _at(_events(rows), SNAPSHOT)
-    for iid in ("EQ:Z", "EQ:N"):
+    for iid in ("EQ:Z", "EQ:S"):
         assert pd.isna(got.loc[iid, "last_surprise_pct"])
-        assert got.loc[iid, "surprise_status"] == "NO_FORECAST"
-        assert got.loc[iid, "reports_4q"] == 0 and pd.isna(got.loc[iid, "beats_4q"])
-        assert got.loc[iid, "last_eps_reported"] == pytest.approx(0.30)
+        assert got.loc[iid, "surprise_status"] == "OK"
+        assert (got.loc[iid, "reports_4q"], got.loc[iid, "beats_4q"]) == (1, 1)
+        assert pd.isna(got.loc[iid, "surprise_median_4q"])
+    assert got.loc["EQ:Z", "last_surprise_eps"] == pytest.approx(0.30)
+    assert got.loc["EQ:S", "last_surprise_eps"] == pytest.approx(0.06)
+    assert got.loc["EQ:E", "last_surprise_pct"] == pytest.approx(200.0)
 
 
 def test_a_report_not_known_by_the_session_is_ignored() -> None:
@@ -91,9 +106,9 @@ def test_the_four_report_columns_cover_the_last_four_reports() -> None:
     results = [(9.0, 1.0), (1.2, 1.0), (0.8, 1.0), (1.0, 1.0), (1.1, 1.0)]  # oldest first
     got = _at(_events(_quarters("EQ:A", results)), SNAPSHOT)
     row = got.loc["EQ:A"]
-    # The oldest (a +800% beat) is outside the last four: +20, -20, 0, +10 -> mean 2.5, 2 beats.
+    # The oldest (a +800% beat) is outside the last four: +20, -20, 0, +10 -> median 5, 2 beats.
     assert (row["reports_4q"], row["beats_4q"]) == (4, 2)
-    assert row["surprise_mean_4q"] == pytest.approx(2.5)
+    assert row["surprise_median_4q"] == pytest.approx(5.0)
     assert row["last_surprise_pct"] == pytest.approx(10.0)
 
 
@@ -103,9 +118,42 @@ def test_a_name_that_has_not_reported_has_a_row_with_no_report() -> None:
     assert got["last_surprise_pct"].isna().all() and got["reports_4q"].isna().all()
 
 
-def test_the_vendors_surprise_is_not_used() -> None:
-    got = _at(_events([("EQ:A", date(2026, 9, 20), 1.10, 1.00, date(2026, 9, 20))]), SNAPSHOT)
-    assert got.loc["EQ:A", "last_surprise_pct"] != 999.0
+def test_the_vendors_figure_is_a_check_never_the_value() -> None:
+    row = ("EQ:A", date(2026, 9, 20), 1.10, 1.00, date(2026, 9, 20))
+    for vendor in (None, 999.0, 10.0):  # absent, nonsense, agreeing: our value stands
+        got = _at(_events([row], vendor=vendor), SNAPSHOT)
+        assert got.loc["EQ:A", "last_surprise_pct"] == pytest.approx(10.0)
+        assert got.loc["EQ:A", "surprise_status"] == "OK"
+
+
+def test_one_placeholder_result_does_not_move_the_median() -> None:
+    results = [(1.10, 1.0), (1.20, 1.0), (1.05, 1.0), (999.0, 1.0)]  # +10, +20, +5, +99800
+    got = _at(_events(_quarters("EQ:A", results)), SNAPSHOT)
+    assert got.loc["EQ:A", "surprise_median_4q"] == pytest.approx(15.0)  # the mean is 24,959
+    assert got.loc["EQ:A", "beats_4q"] == 4
+
+
+def test_a_sign_conflict_is_null_and_left_out_of_the_four_reports() -> None:
+    # Reported -0.67 against a listed forecast of 1.00; the vendor's +33 is the surprise against
+    # -1.00: the calendar lost the forecast's minus sign. The forecast is not flipped.
+    day = date(2026, 9, 20)
+    earlier = _events(_quarters("EQ:C", [(1.10, 1.0), (1.20, 1.0)]))
+    conflict = _events([("EQ:C", day, -0.67, 1.00, day)], vendor=33.0)
+    stored = pd.concat([earlier, conflict], ignore_index=True)
+    row = _at(stored, SNAPSHOT).loc["EQ:C"]
+    assert row["surprise_status"] == "SIGN_CONFLICT"
+    assert row[["last_surprise_pct", "last_surprise_eps"]].isna().all()
+    assert row["last_eps_forecast"] == pytest.approx(1.00)  # as stored, never flipped
+    assert (row["reports_4q"], row["beats_4q"]) == (2, 2)  # the two earlier reports only
+    assert row["surprise_median_4q"] == pytest.approx(15.0)
+    # Without the vendor's witness the report keeps our value: -167%, a miss.
+    kept = _at(_events([("EQ:C", day, -0.67, 1.00, day)]), SNAPSHOT).loc["EQ:C"]
+    assert kept["surprise_status"] == "OK" and kept["last_surprise_pct"] == pytest.approx(-167.0)
+    # A vendor figure that differs from ours but not by the sign (another basis) is no conflict.
+    other = _at(_events([("EQ:C", day, 1.50, 1.48, day)], vendor=-29.0), SNAPSHOT).loc["EQ:C"]
+    assert other["surprise_status"] == "OK" and other["last_surprise_pct"] == pytest.approx(
+        1.35, abs=0.01
+    )
 
 
 def test_a_snapshot_stored_after_the_session_does_not_move_it() -> None:

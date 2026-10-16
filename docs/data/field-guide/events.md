@@ -333,7 +333,7 @@ Sources: Frazzini and Lamont, The Earnings Announcement Premium and Trading Volu
 
 ### `rollup.earnings_surprise@v1.surprise_status`
 
-**How to read it.** Whether the name's last known report has a surprise. OK: it has a reported result and a forecast to compare with. NO_REPORT: no reported result is known by the session (a name that has not reported, or an ETF). NO_FORECAST: the last report has a result, but the calendar held no forecast or a forecast of exactly zero.
+**How to read it.** Whether the name's last known report can be compared with its forecast. OK: it has a reported result and a forecast. NO_REPORT: no reported result is known by the session (a name that has not reported, or an ETF). NO_FORECAST: the report has a result, but the calendar held no forecast. SIGN_CONFLICT: the sign of the forecast is in doubt, so the report has no surprise.
 
 **The criterion per intent**
 
@@ -345,6 +345,8 @@ Sources: Frazzini and Lamont, The Earnings Announcement Premium and Trading Volu
 
 - OK says the figure exists, not that the report is recent. rollup.earnings_surprise@v1.last_report_date gives its date, and a name stays OK for months until its next report.
 - NO_FORECAST is common for small names that few analysts cover. A hard criterion on a surprise field leaves them out, and this field says why.
+- SIGN_CONFLICT is rare (fewer than 1 report in 1,000). The calendar sometimes drops the minus sign of a loss-maker's forecast, so 1.00 beside a result of -0.67 may be a forecast of -1.00. We flag a report when the vendor's own surprise matches the negated forecast, and we never flip the forecast ourselves.
+- The check needs the vendor's figure. Where the calendar gave none, a lost sign goes unseen, so treat a positive forecast beside a negative result with care.
 
 Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
 
@@ -377,9 +379,20 @@ Sources: Nasdaq earnings calendar (the stored events/earnings rows)
 **When the reading lies**
 
 - Null when the calendar held no forecast, which is common for small names. The forecast shown with a result can be the day's own figure, not the one a week before.
-- For a company expected to lose money the calendar can drop the minus sign. A forecast of 1.00 beside a result of -0.67 may be a forecast of -1.00, so treat a positive forecast beside a negative result as unreliable.
+- For a company expected to lose money the calendar can drop the minus sign. The value is shown as stored: rollup.earnings_surprise@v1.surprise_status reads SIGN_CONFLICT when the vendor's figure shows it happened.
 
 Sources: Nasdaq earnings calendar (the stored events/earnings rows)
+
+### `rollup.earnings_surprise@v1.last_surprise_eps`
+
+**How to read it.** How many dollars per share the latest report landed above (positive) or below (negative) the consensus forecast: reported minus forecast. Microsoft's report of 2026-07-29 reads +0.53 (4.74 against 4.21). It has no base, so a tiny forecast does not blow it up, and it is the figure to read for a name with a forecast near zero.
+
+**When the reading lies**
+
+- A cent means more to a stock earning 0.10 a share than to one earning 10. Read it beside rollup.earnings_surprise@v1.last_surprise_pct and rollup.earnings_surprise@v1.last_eps_forecast.
+- Null when there is no forecast or the report is a SIGN_CONFLICT. Check rollup.earnings_surprise@v1.surprise_status.
+
+Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
 
 ### `rollup.earnings_surprise@v1.last_surprise_pct`
 
@@ -389,37 +402,37 @@ Sources: Nasdaq earnings calendar (the stored events/earnings rows)
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a clear earnings beat on the last report | `gte 5` | hard | - | pair with rollup.earnings_surprise@v1.surprise_status eq OK, because a tiny forecast inflates the figure |
+| a clear earnings beat on the last report | `gte 5` | hard | - | pair with rollup.earnings_surprise@v1.surprise_status eq OK and an upper bound, because a small forecast inflates the figure |
 
 **When the reading lies**
 
-- A forecast near zero makes the percentage huge: a result of 0.05 against a forecast of 0.01 is +400. Read it beside rollup.earnings_surprise@v1.last_eps_forecast, and bound a threshold, for example below 100.
-- Most reports beat: the middle name beats by about 6. Compare a surprise with rollup.earnings_surprise@v1.surprise_mean_4q, not with zero.
+- A small forecast makes the percentage huge: a result of 0.30 against a forecast of 0.06 is +400. It is null below a forecast of five cents; there rollup.earnings_surprise@v1.last_surprise_eps gives the size. Bound a threshold, for example below 100.
+- Most reports beat: the middle name beats by about 6. Compare a surprise with rollup.earnings_surprise@v1.surprise_median_4q, not with zero.
 - The price reaction can disagree with the surprise: a beat on weak guidance falls. Check rollup.earnings_reaction@v1.reaction_excess_return.
-- Null when there is no forecast or it is exactly zero. A hard criterion rejects those names: pair it with rollup.earnings_surprise@v1.surprise_status eq OK.
+- Null when there is no forecast, the forecast is below five cents in size, or the report is a SIGN_CONFLICT. A hard criterion rejects those names, so pair it with rollup.earnings_surprise@v1.surprise_status eq OK.
 
 Sources: Bernard and Thomas, Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium? (1989); Livnat and Mendenhall, Comparing the Post-Earnings Announcement Drift for Surprises Calculated from Analyst and Time Series Forecasts (2006)
 
-### `rollup.earnings_surprise@v1.surprise_mean_4q`
+### `rollup.earnings_surprise@v1.surprise_median_4q`
 
-**How to read it.** The average surprise, in percent, of the last four known reports that have a forecast. A mean of +5 means the name cleared its forecast by about 5% on average. A negative mean means it fell short more often than not. Apple's reads +5.1, Tesla's -30.
+**How to read it.** The middle percent surprise of the last four known reports that can be compared. A median of +5 means the name cleared its forecast by about 5% in a typical report. A negative median means it fell short more often than not. Apple's reads +5.1, Tesla's -30.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a name that habitually clears its forecast | `gte 3` | hard | - | with rollup.earnings_surprise@v1.reports_4q eq 4, so the average rests on a full year |
+| a name that habitually clears its forecast | `gte 3` | hard | - | with rollup.earnings_surprise@v1.reports_4q eq 4, so the median rests on a full year |
 
 **When the reading lies**
 
-- It is an average, so one report with a tiny forecast can dominate it: a mean of 3000 is a data artefact. Read rollup.earnings_surprise@v1.beats_4q beside it, which counts and does not scale.
+- It is a median, so one report with a placeholder result or a small forecast cannot move it. Reports with a forecast below five cents are left out, so it can be null while rollup.earnings_surprise@v1.beats_4q is not.
 - It covers the last four reports however far back they are. With rollup.earnings_surprise@v1.reports_4q below 4, or a rollup.earnings_surprise@v1.last_report_date a year old, the history is thin.
 
 Sources: Livnat and Mendenhall, Comparing the Post-Earnings Announcement Drift for Surprises Calculated from Analyst and Time Series Forecasts (2006)
 
 ### `rollup.earnings_surprise@v1.beats_4q`
 
-**How to read it.** How many of the last four known reports came in above their forecast, from 0 to 4. 4 means every report beat (Apple, Microsoft). 0 means none did, which holds for about 6 names in 100 with four reports. A report equal to its forecast is not a beat.
+**How to read it.** How many of the last four known reports came in above their forecast, from 0 to 4. It counts in dollars, so a small forecast still counts. 4 means every report beat (Apple, Microsoft). 0 means none did, which holds for about 6 names in 100 with four reports. A report equal to its forecast is not a beat.
 
 **The criterion per intent**
 
@@ -436,17 +449,17 @@ Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
 
 ### `rollup.earnings_surprise@v1.reports_4q`
 
-**How to read it.** How many of the last four known reports have a surprise, meaning a result and a usable forecast. It is the base of rollup.earnings_surprise@v1.beats_4q and rollup.earnings_surprise@v1.surprise_mean_4q. 4 is a full record; 1 or 2 is a newer listing or a thinly covered name.
+**How to read it.** How many of the last four known reports can be compared, meaning a result and a forecast whose sign is not in doubt. It is the base of rollup.earnings_surprise@v1.beats_4q. 4 is a full record; 1 or 2 is a newer listing or a thinly covered name.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| four reports with a forecast behind the beat count and the mean | `eq 4` | hard | - | - |
+| four reports with a forecast behind the beat count and the median | `eq 4` | hard | - | - |
 
 **When the reading lies**
 
-- A low count is not a bad sign. It says the average and the beat count rest on few reports, so below 3 treat them as noise.
+- A low count is not a bad sign. It says the beat count and the median rest on few reports, so below 3 treat them as noise.
 
 Sources: Site convention (docs/data/features.md, earnings_surprise@v1)
 
@@ -508,7 +521,8 @@ Sources: Nasdaq earnings calendar (the stored events/earnings rows)
 
 **When the reading lies**
 
-- A small forecast makes a big percentage: a move from 0.02 to 0.05 is +150. The figure is null when the old forecast is below one cent. Read it beside rollup.earnings_revisions@v1.next_eps_forecast.
+- A small forecast makes a big percentage: a move from 0.06 to 0.15 is +150. The figure is null when the old forecast is below five cents. Read it beside rollup.earnings_revisions@v1.next_eps_forecast.
+- A forecast whose sign the calendar lost on one night shows as a revision of about -200 or +200. Treat a move that large between a positive and a negative forecast as a data error.
 - One analyst moving a forecast built from two estimates shifts it a lot. Read rollup.earnings_revisions@v1.estimate_count, and prefer 5 or more.
 - Null while rollup.earnings_revisions@v1.revision_status is not OK, and when the fiscal quarter changed between the two snapshots: a quarter roll is not a revision. A hard criterion rejects those names.
 

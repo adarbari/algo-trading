@@ -28,10 +28,11 @@ carried forward over a failed fetch (``carried_from``) is not an observation of 
                                 NO_FORECAST: the next report has no forecast; NO_NEXT: no
                                 next report is known
 
-A revision is null when the old forecast is missing or smaller than ``MIN_BASE`` (one cent:
-a percent of nothing), whatever the status. One row per instrument with an ``events/earnings``
-row known by the session. The windows (7 and 30 days), the slack, the base floor and matching
-by fiscal quarter are part of the definition: changing one is a new version.
+A revision is null when the old forecast is missing or smaller than ``MIN_BASE`` (five cents:
+a percent of nearly nothing), whatever the status. A forecast whose sign the calendar lost on
+one night reads as a revision of about +/-200%. One row per instrument with an
+``events/earnings`` row known by the session. The windows (7 and 30 days), the slack, the base
+floor and matching by fiscal quarter are part of the definition: changing one is a new version.
 """
 
 from datetime import date, timedelta
@@ -41,7 +42,7 @@ import pandas as pd
 
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.consensus.earnings_surprise import change_pct
+from algotrade.features.rollups.consensus.earnings_surprise import MIN_BASE, change_pct
 from algotrade.features.rollups.corporate import earnings
 
 NAME = "earnings_revisions"
@@ -50,7 +51,6 @@ OK, BUILDING, NO_PRIOR = "OK", "BUILDING", "NO_PRIOR"
 NO_FORECAST, NO_NEXT = "NO_FORECAST", "NO_NEXT"
 SHORT, LONG = 7, 30  # calendar days back for the two revisions
 SNAPSHOT_SLACK = 4  # a snapshot serves a date at most this many days after it (weekend, holiday)
-MIN_BASE = 0.01  # |old forecast| below this (US dollars per share) gives no percent change
 HISTORY_FROM = "2026-10-02"  # the first stored snapshot with forecasts
 FISCAL_QUARTER = "fiscal_quarter"
 _PCT = (-10000.0, 10000.0)  # percent: a small forecast makes huge revisions, kept and flagged
@@ -156,11 +156,6 @@ def _at(obs: pd.DataFrame, session: date, days: int) -> tuple[pd.DataFrame, bool
     return latest, len(window) > 0
 
 
-def _revision(now: pd.Series, old: pd.Series) -> pd.Series:
-    """``now`` against ``old`` in percent of ``|old|``; NaN when ``old`` is below the floor."""
-    return change_pct(now, old.where(old.abs() >= MIN_BASE))
-
-
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     stored = inputs[earnings.EVENTS]
     assert stored is not None  # required input
@@ -191,8 +186,8 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
         old = old.rename(columns={"forecast": f"old_{days}", "estimates": f"count_{days}"})
         old = old.assign(**{f"seen_{days}": True}).drop(columns=["night", "report"])
         out = out.merge(old, on=["instrument_id", FISCAL_QUARTER], how="left")
-    out["forecast_revision_7d"] = _revision(out["next_eps_forecast"], out[f"old_{SHORT}"])
-    out["forecast_revision_30d"] = _revision(out["next_eps_forecast"], out[f"old_{LONG}"])
+    out["forecast_revision_7d"] = change_pct(out["next_eps_forecast"], out[f"old_{SHORT}"])
+    out["forecast_revision_30d"] = change_pct(out["next_eps_forecast"], out[f"old_{LONG}"])
     out["estimate_count_change_30d"] = out["estimate_count"] - out[f"count_{LONG}"]
     has_next = out["instrument_id"].isin(upcoming["instrument_id"])
     seen = out[f"seen_{SHORT}"].eq(True)

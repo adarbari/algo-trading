@@ -130,7 +130,7 @@ def test_a_night_only_carried_is_no_snapshot() -> None:
 
 
 def test_a_zero_or_tiny_old_forecast_gives_no_percent_change() -> None:
-    for old in (0.0, 0.005, None):
+    for old in (0.0, 0.005, 0.04, None):
         nights = [
             _night(date(2026, 10, 9), [(A, old, 10)]),
             _night(date(2026, 10, 16), [(A, 0.40, 10)]),
@@ -138,6 +138,14 @@ def test_a_zero_or_tiny_old_forecast_gives_no_percent_change() -> None:
         row = _row(nights, date(2026, 10, 16))
         assert pd.isna(row["forecast_revision_7d"])
         assert row["next_eps_forecast"] == pytest.approx(0.40)
+
+
+def test_a_sign_flip_between_nights_reads_as_about_minus_200_percent() -> None:
+    nights = [
+        _night(date(2026, 10, 9), [(A, 1.00, 10)]),
+        _night(date(2026, 10, 16), [(A, -1.00, 10)]),
+    ]
+    assert _row(nights, date(2026, 10, 16))["forecast_revision_7d"] == pytest.approx(-200.0)
 
 
 def test_a_negative_forecast_rising_is_a_positive_revision() -> None:
