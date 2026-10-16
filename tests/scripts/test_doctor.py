@@ -287,9 +287,10 @@ def test_llm_error_reads_the_main_checkouts_file(tmp_path: Path) -> None:
     assert "llm.toml" in (doctor.llm_error(tmp_path) or "")
 
 
-def _agent(agents: Path, label: str, repo: Path, program: str) -> None:
+def _agent(agents: Path, label: str, repo: Path, program: str, wrapper: tuple = ()) -> None:
     agents.mkdir(exist_ok=True)
-    plist = {"Label": label, "ProgramArguments": [program], "WorkingDirectory": str(repo)}
+    args = [*wrapper, program]
+    plist = {"Label": label, "ProgramArguments": args, "WorkingDirectory": str(repo)}
     (agents / f"{label}.plist").write_bytes(doctor.plistlib.dumps(plist))
 
 
@@ -306,6 +307,13 @@ def test_installed_agents_must_run_the_main_checkout(tmp_path: Path) -> None:
     _agent(agents, "com.algotrade.api", worktree, str(worktree / ".venv" / "bin" / "algotrade-api"))
     bad = doctor.check_agents(p)[1]
     assert bad.level == doctor.FAIL and "algotrade-api schedule" in bad.fix
+    ingest = main / ".venv" / "bin" / "algotrade-ingest"
+    ingest.write_text("#!/bin/sh\n")
+    awake = ("/usr/bin/caffeinate", "-i", "-s")  # the nightly's wrapper is not its program
+    _agent(agents, "com.algotrade.nightly", main, str(ingest), awake)
+    assert doctor.check_agents(p)[0].level == "ok"
+    _agent(agents, "com.algotrade.nightly", worktree, str(worktree / ".venv/bin/x"), awake)
+    assert doctor.check_agents(p)[0].level == doctor.FAIL
     (agents / "com.algotrade.nightly.plist").write_bytes(b"not a plist")
     assert doctor.check_agents(p)[0].level == doctor.FAIL
 

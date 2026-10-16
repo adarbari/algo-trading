@@ -269,6 +269,9 @@ def test_nightly_plist() -> None:
     plist = plistlib.loads(nightly_plist(Path("/repo"), 15, 0, Path("/repo/out")))
     assert plist["Label"] == LABEL
     assert plist["ProgramArguments"] == [
+        "/usr/bin/caffeinate",  # the Mac stays awake until the nightly exits (2026-10-15)
+        "-i",
+        "-s",
         "/repo/.venv/bin/algotrade-ingest",
         "nightly",
         "--export-dir",
