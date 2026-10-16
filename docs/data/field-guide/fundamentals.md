@@ -665,7 +665,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 ### `rollup.balance_sheet@v1.cash`
 
-**How to read it.** Cash and cash equivalents at the latest balance sheet date, in dollars (us-gaap CashAndCashEquivalentsAtCarryingValue, else the figure that includes restricted cash). The first line of the balance sheet: what the business can spend without selling anything. Against rollup.balance_sheet@v1.total_debt it is the net debt.
+**How to read it.** Cash and cash equivalents at the balance sheet date (bs_as_of), in dollars (us-gaap CashAndCashEquivalentsAtCarryingValue, else the figure that includes restricted cash). The first line of the balance sheet: what the business can spend without selling anything. Against rollup.balance_sheet@v1.total_debt it is the net debt.
 
 **The criterion per intent**
 
@@ -675,7 +675,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
-- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date.
+- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.
 - Restricted cash is included only for filers that report just the combined figure; the two tags are never added. Short-term investments are a separate line (rollup.balance_sheet@v1.sti), so a company holding its money in treasury bills looks cash-poor here.
 - A quarter-end figure can be managed: some companies repay credit lines just before the date and draw them again after.
 - Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.
@@ -684,7 +684,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 ### `rollup.balance_sheet@v1.sti`
 
-**How to read it.** Short-term investments at the latest balance sheet date, in dollars (us-gaap ShortTermInvestments, else MarketableSecuritiesCurrent, never both added): money parked in securities that mature within a year. Cash plus this is the liquid reserve.
+**How to read it.** Short-term investments at the balance sheet date (bs_as_of), in dollars (us-gaap ShortTermInvestments, else MarketableSecuritiesCurrent, never both added): money parked in securities that mature within a year. Cash plus this is the liquid reserve.
 
 **The criterion per intent**
 
@@ -694,7 +694,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
-- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date.
+- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.
 - Filers draw the line between cash equivalents and short-term investments differently, so compare the sum, not the parts. Long-term investments are not included.
 - A filer that does not tag either has none and the value is null, which is not zero: a company with no such line still may hold securities under another label.
 - Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.
@@ -703,7 +703,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 ### `rollup.balance_sheet@v1.total_debt`
 
-**How to read it.** Debt at the latest balance sheet date, in dollars, added up from the parts of ONE filing by the first rule that applies (rollup.balance_sheet@v1.debt_basis says which): a) LongTermDebt plus short-term borrowings, else commercial paper; b) LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term borrowings, else commercial paper; c) DebtCurrent plus LongTermDebtNoncurrent. Against equity it is the leverage; less cash it is the net debt.
+**How to read it.** Debt at the balance sheet date (bs_as_of), in dollars, added up from the parts of ONE filing by the first rule that applies (rollup.balance_sheet@v1.debt_basis says which): a) LongTermDebt plus short-term borrowings, else commercial paper; b) LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term borrowings, else commercial paper; c) DebtCurrent plus LongTermDebtNoncurrent. Against equity it is the leverage; less cash it is the net debt.
 
 **The criterion per intent**
 
@@ -716,7 +716,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 - Null when no filing has a complete set of parts (rollup.balance_sheet@v1.debt_basis NOT_TAGGED). A filer without the tags and a debt-free filer look the same in the document, so the value is null, never zero: do not read null as no debt.
 - Parts are never taken from two filings: a quarterly report and an amendment are not mixed. Commercial paper is added only when the filer has no short-term borrowings line, as borrowings usually include it.
 - Lease liabilities, pension deficits and off-balance-sheet obligations are not included, so a retailer or an airline understates what it owes. Banks keep this line, but a bank's deposits and borrowings are its business, not leverage: rollup.balance_sheet@v1.is_financial says which names to leave out of a debt screen.
-- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date.
+- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
 
@@ -740,7 +740,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 ### `rollup.balance_sheet@v1.total_assets`
 
-**How to read it.** Total assets at the latest balance sheet date, in dollars (us-gaap Assets): everything the company owns, the denominator of return on assets and the size of the business. Against rollup.balance_sheet@v1.total_liabilities it gives the book value.
+**How to read it.** Total assets at the balance sheet date (bs_as_of), in dollars (us-gaap Assets): everything the company owns, the denominator of return on assets and the size of the business. Against rollup.balance_sheet@v1.total_liabilities it gives the book value.
 
 **The criterion per intent**
 
@@ -750,7 +750,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
-- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date.
+- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.
 - Book value, not market value: a company that carries a brand or a property at old cost shows less than it is worth, and goodwill from acquisitions can be a large share of the total.
 - For banks and insurers total assets includes loans and investments funded by deposits and policies: it is not comparable with an industrial's.
 - Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.
@@ -759,7 +759,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 ### `rollup.balance_sheet@v1.total_liabilities`
 
-**How to read it.** Total liabilities at the latest balance sheet date, in dollars: everything the company owes. The reported Liabilities when the filer tags it, else the total of liabilities and stockholders' equity less equity of the same date (rollup.balance_sheet@v1.liabilities_basis says which: REPORTED, DERIVED, NONE).
+**How to read it.** Total liabilities at the balance sheet date (bs_as_of), in dollars: everything the company owes. The reported Liabilities when the filer tags it, else the total of liabilities and stockholders' equity less equity of the same date (rollup.balance_sheet@v1.liabilities_basis says which: REPORTED, DERIVED, NONE).
 
 **The criterion per intent**
 
@@ -769,9 +769,9 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
-- DERIVED is the total less equity as tagged: when the equity figure excludes a noncontrolling interest or redeemable shares the derived liabilities include them. A reported figure is exact, a derived one is a reconstruction.
+- DERIVED is the total less the equity of the same date, the figure including the noncontrolling interest when the filer tags it: redeemable shares between liabilities and equity can still leave the derived figure a little high. A reported figure is exact, a derived one is a reconstruction.
 - Includes everything owed, not only borrowing: payables, deferred revenue, leases and pensions are in it. Debt is rollup.balance_sheet@v1.total_debt.
-- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date.
+- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.
 - Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
@@ -794,9 +794,9 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
 
-### `rollup.balance_sheet@v1.equity`
+### `rollup.balance_sheet@v1.stockholders_equity`
 
-**How to read it.** Stockholders' equity at the latest balance sheet date, in dollars (us-gaap StockholdersEquity, else the figure including the portion attributable to noncontrolling interests): what is left for the owners after the liabilities. Over total assets it is the equity ratio; under shares it is the book value per share; against profit it gives the return on equity. Negative after accumulated losses or heavy buybacks.
+**How to read it.** Stockholders' equity at the balance sheet date (bs_as_of), in dollars (us-gaap StockholdersEquity, else the figure including the portion attributable to noncontrolling interests): what is left for the owners after the liabilities. Over total assets it is the equity ratio; under shares it is the book value per share; against profit it gives the return on equity. Negative after accumulated losses or heavy buybacks.
 
 **The criterion per intent**
 
@@ -808,14 +808,14 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 - Book value, not market value. Years of buybacks can push equity below zero for a profitable business (negative equity is not distress by itself); a ratio over it then has no meaning.
 - The two tags differ by the noncontrolling interest: a company with large minority shareholders shows a larger figure under the including tag. The tag in use is not stored, so compare within a company over time, not across.
-- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date.
+- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.
 - Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
 
 ### `rollup.balance_sheet@v1.current_assets`
 
-**How to read it.** Current assets at the latest balance sheet date, in dollars (us-gaap AssetsCurrent): cash, securities, receivables and inventory, what turns to cash within a year. Over rollup.balance_sheet@v1.current_liabilities it is the current ratio (above 1 covers the year's bills, under 1 leans on new financing).
+**How to read it.** Current assets at the balance sheet date (bs_as_of), in dollars (us-gaap AssetsCurrent): cash, securities, receivables and inventory, what turns to cash within a year. Over rollup.balance_sheet@v1.current_liabilities it is the current ratio (above 1 covers the year's bills, under 1 leans on new financing).
 
 **The criterion per intent**
 
@@ -827,14 +827,14 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 - Banks, insurers and many financial filers do not report a classified balance sheet, so the line is null for them; null is not zero.
 - Inventory counts in full: a retailer with unsold stock can show a healthy ratio and still be short of cash. Read rollup.balance_sheet@v1.cash too.
-- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date.
+- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.
 - Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
 
 ### `rollup.balance_sheet@v1.current_liabilities`
 
-**How to read it.** Current liabilities at the latest balance sheet date, in dollars (us-gaap LiabilitiesCurrent): payables, accrued costs, deferred revenue and the debt due within a year. The bills of the next twelve months; rollup.balance_sheet@v1.current_assets over it is the current ratio.
+**How to read it.** Current liabilities at the balance sheet date (bs_as_of), in dollars (us-gaap LiabilitiesCurrent): payables, accrued costs, deferred revenue and the debt due within a year. The bills of the next twelve months; rollup.balance_sheet@v1.current_assets over it is the current ratio.
 
 **The criterion per intent**
 
@@ -846,14 +846,14 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 - Banks, insurers and many financial filers do not report a classified balance sheet, so the line is null for them; null is not zero.
 - Includes the current portion of debt: a company that must refinance soon shows it here before rollup.balance_sheet@v1.total_debt tells you.
-- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date.
+- A balance sheet is a snapshot at a quarter or year end and lags like every filing: it is up to four months old on the day it is filed, and a restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.
 - Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
 
 ### `rollup.balance_sheet@v1.bs_as_of`
 
-**How to read it.** The newest balance sheet date of any line: the quarter end or fiscal year end the lines of the row are read at. It tells how old rollup.balance_sheet@v1.cash and its siblings are, and the status is OK only when the core lines end on it.
+**How to read it.** The newest balance sheet date of the core lines (cash, total assets, stockholders equity): the quarter end or fiscal year end every other line of the row is read at. It tells how old rollup.balance_sheet@v1.cash and its siblings are, and the status is OK only when the core lines end on it.
 
 **The criterion per intent**
 
@@ -864,7 +864,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 **When the reading lies**
 
 - Not the date the figures became public: that is rollup.balance_sheet@v1.bs_filed, and the session reads only what was filed by it.
-- When rollup.balance_sheet@v1.bs_status is PARTIAL some line can end on an older date: each line shows its own latest instant, the newest date is this one.
+- When rollup.balance_sheet@v1.bs_status is PARTIAL some line can end on an older date: a core line that ends earlier keeps its own latest figure, the newest date is this one, and every other line is read at it.
 - Null when no balance sheet fact is filed.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
@@ -907,7 +907,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 ### `rollup.balance_sheet@v1.bs_status`
 
-**How to read it.** Whether the balance sheet lines of the name can be trusted as a set. OK: cash, total assets and equity all end on the newest balance sheet date. PARTIAL: at least one of them is missing or ends on an older date, so the lines may describe different dates. NO_FACTS: no balance sheet fact is filed (funds, foreign filers that do not report in USD). STALE: the newest balance sheet date is more than 480 days before the session; the values are shown but old. A bank keeps its balance sheet: it is flagged by rollup.balance_sheet@v1.is_financial, not by a status.
+**How to read it.** Whether the balance sheet lines of the name can be trusted as a set. OK: cash, total assets and stockholders equity all end on the newest balance sheet date; every other line is read at that date and is null when the filer did not report it then. PARTIAL: at least one of them is missing or ends on an older date, so the lines may describe different dates. NO_FACTS: no balance sheet fact is filed (funds, foreign filers that do not report in USD). STALE: the newest balance sheet date is more than 480 days before the session; the values are shown but old. A bank keeps its balance sheet: it is flagged by rollup.balance_sheet@v1.is_financial, not by a status.
 
 **The criterion per intent**
 

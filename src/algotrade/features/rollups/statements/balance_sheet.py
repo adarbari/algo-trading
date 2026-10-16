@@ -6,14 +6,16 @@ session: a restatement filed later never moves a session, ADR 0067), the session
 ``price_stats@v2`` (it sets which instruments get a row) and ``instruments/company`` (the SIC
 code).
 
-A balance sheet line is a balance at a date, not a flow: no TTM, no subtraction. Each line takes
-its latest instant (``instants.pick``): the greatest period end, then the first tag of the line's
-list that reports that end, never a mix of tags. ``bs_as_of`` is the newest period end of any
-line; the status is OK only when the core lines (cash, total assets, equity) all end on it.
+A balance sheet line is a balance at a date, not a flow: no TTM, no subtraction. ``bs_as_of`` is
+the newest period end of the core lines (cash, total assets, equity); every other line, total
+liabilities and debt are read ONLY at that date (``instants.pick``: the first tag of the line's
+list that reports it, never a mix of tags; not reported at that date is null), so a figure from
+an older balance sheet is never shown beside it. Each core line takes its own latest instant: the
+status is OK only when all three end on ``bs_as_of``, else PARTIAL shows one is behind.
 
     cash, sti                 cash and equivalents; short-term investments (one tag, never summed)
     total_debt, debt_basis    the parts of ONE filing by rule a / b / c; NOT_TAGGED is null, never 0
-    total_assets, equity      Assets; StockholdersEquity, else with the noncontrolling interest
+    total_assets, stockholders_equity   Assets; StockholdersEquity, else incl. noncontrolling
     total_liabilities         Liabilities (REPORTED), else total less equity (DERIVED), else NONE
     current_assets, current_liabilities   AssetsCurrent, LiabilitiesCurrent
     bs_as_of, is_financial    the newest balance sheet date; SIC 6000 to 6411
@@ -32,9 +34,8 @@ from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.statements.instants import (
     LINES,
     Book,
-    Pick,
     books,
-    debt_end,
+    newest_end,
     pick,
     total_debt,
     total_liabilities,
@@ -59,7 +60,7 @@ COLUMN_OF = {  # line -> its column
     "cash": "cash",
     "sti": "sti",
     "assets": "total_assets",
-    "equity": "equity",
+    "equity": "stockholders_equity",
     "current_assets": "current_assets",
     "current_liabilities": "current_liabilities",
 }
@@ -70,7 +71,10 @@ _WHY = (
     "no balance sheet line filed by the session (ETFs, funds, no CIK, issuers that report "
     "outside USD): NO_FACTS"
 )
-_UNTAGGED = "; or the filer does not report this line under any of its tags (never zero)"
+_UNTAGGED = (
+    "; or the filer does not report this line under any of its tags, or not at bs_as_of "
+    "(never zero)"
+)
 
 
 def _line(name: str, description: str, low: float | None = 0) -> Feature:
@@ -84,16 +88,16 @@ FEATURES = (
     _line(
         "cash",
         "Cash and cash equivalents (CashAndCashEquivalentsAtCarryingValue, else the figure "
-        "that includes restricted cash) at the latest balance sheet date",
+        "that includes restricted cash) at the balance sheet date (bs_as_of)",
     ),
     _line(
         "sti",
         "Short-term investments (ShortTermInvestments, else MarketableSecuritiesCurrent, never "
-        "both added) at the latest balance sheet date",
+        "both added) at the balance sheet date (bs_as_of)",
     ),
     Feature(
         "total_debt", "float", "usd",
-        "Debt at the latest balance sheet date, added up from the parts of ONE filing by the "
+        "Debt at the balance sheet date (bs_as_of), added up from the parts of ONE filing by the "
         "first rule that applies (debt_basis): a) LongTermDebt plus short-term borrowings, else "
         "commercial paper; b) LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term "
         "borrowings, else commercial paper; c) DebtCurrent plus LongTermDebtNoncurrent",
@@ -108,11 +112,12 @@ FEATURES = (
         "never when a balance sheet is filed; null with NO_FACTS", "label",
         categories=DEBT_BASES, inputs=INPUTS,
     ),
-    _line("total_assets", "Total assets (Assets) at the latest balance sheet date"),
+    _line("total_assets", "Total assets (Assets) at the balance sheet date (bs_as_of)"),
     _line(
         "total_liabilities",
         "Total liabilities: the reported Liabilities, else liabilities and stockholders' equity "
-        "less equity of the same date (liabilities_basis says which)",
+        "less the equity of the same date, including the noncontrolling interest "
+        "(liabilities_basis says which)",
         low=None,
     ),
     Feature(
@@ -123,21 +128,21 @@ FEATURES = (
         categories=LIABILITIES_BASES, inputs=INPUTS,
     ),
     _line(
-        "equity",
+        "stockholders_equity",
         "Stockholders' equity (StockholdersEquity, else the figure including the portion "
-        "attributable to noncontrolling interests) at the latest balance sheet date; negative "
+        "attributable to noncontrolling interests) at the balance sheet date (bs_as_of); negative "
         "after accumulated losses or buybacks",
         low=None,
     ),
-    _line("current_assets", "Current assets (AssetsCurrent) at the latest balance sheet date"),
+    _line("current_assets", "Current assets (AssetsCurrent) at the balance sheet date (bs_as_of)"),
     _line(
         "current_liabilities",
-        "Current liabilities (LiabilitiesCurrent) at the latest balance sheet date",
+        "Current liabilities (LiabilitiesCurrent) at the balance sheet date (bs_as_of)",
     ),
     Feature(
         "bs_as_of", "date", "date",
-        "The newest balance sheet date of any line: the period end of the quarter or fiscal "
-        "year the lines are read at",
+        "The newest balance sheet date of the core lines (cash, total assets, equity): the "
+        "quarter or fiscal year end every other line is read at",
         _WHY, inputs=("instruments/statements.period_end",),
     ),
     Feature(
@@ -172,13 +177,14 @@ def _filed(book: Book, end: int) -> int:
 def _row(book: Book, financial: bool, before: int) -> dict[str, object]:
     if not book:
         return {"bs_status": "NO_FACTS", "is_financial": financial}
-    got: dict[str, Pick] = {c: p for c in COLUMN_OF if (p := pick(book, LINES[c])) is not None}
-    liabilities, liab_basis, liab_end = total_liabilities(book)
-    debt, debt_basis = total_debt(book)
-    ends = [p[1] for p in got.values()] + [e for e in (liab_end, debt_end(book)) if e is not None]
-    as_of = max(ends)
-    core = all(c in got and got[c][1] == as_of for c in CORE)
-    status = "STALE" if as_of < before else ("OK" if core else "PARTIAL")
+    core = {c: p for c in CORE if (p := pick(book, LINES[c])) is not None}
+    as_of = max(p[1] for p in core.values()) if core else newest_end(book)
+    got = {c: p for c in COLUMN_OF if (p := pick(book, LINES[c], as_of)) is not None}
+    got |= core  # a core line keeps its own latest date: PARTIAL shows which one is behind
+    liabilities, liab_basis = total_liabilities(book, as_of)
+    debt, debt_basis = total_debt(book, as_of)
+    complete = all(c in core and core[c][1] == as_of for c in CORE)
+    status = "STALE" if as_of < before else ("OK" if complete else "PARTIAL")
     row: dict[str, object] = {COLUMN_OF[c]: p[0] for c, p in got.items()}
     return {
         **row,

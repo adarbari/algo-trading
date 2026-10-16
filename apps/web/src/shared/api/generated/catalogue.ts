@@ -351,7 +351,7 @@ export const SITE_FEATURES = [
   'rollup.balance_sheet@v1.total_assets',
   'rollup.balance_sheet@v1.total_liabilities',
   'rollup.balance_sheet@v1.liabilities_basis',
-  'rollup.balance_sheet@v1.equity',
+  'rollup.balance_sheet@v1.stockholders_equity',
   'rollup.balance_sheet@v1.current_assets',
   'rollup.balance_sheet@v1.current_liabilities',
   'rollup.balance_sheet@v1.bs_as_of',

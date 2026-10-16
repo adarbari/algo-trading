@@ -92,7 +92,9 @@ def test_a_tag_is_ranked_and_never_mixed() -> None:
     )
     assert sti["sti"] == 7.0  # never both summed
     eq = run([fact("equity", instants.LINES["equity"][1], 55.0)])
-    assert eq["equity"] == 55.0  # the including-noncontrolling tag when it is the only one
+    assert (
+        eq["stockholders_equity"] == 55.0
+    )  # the including-noncontrolling tag when it is the only one
 
 
 def test_debt_rule_a_adds_short_term_borrowings_not_commercial_paper_too() -> None:
@@ -131,7 +133,7 @@ def test_no_debt_tag_is_null_never_zero() -> None:
     row = run(core())
     assert pd.isna(row["total_debt"]) and row["debt_basis"] == "NOT_TAGGED"
     assert row["bs_status"] == "OK"  # debt is not a core line
-    zero = run(core() + debt(("LongTermDebt", 0.0)))
+    zero = run([*core(), *debt(("LongTermDebt", 0.0))])
     assert zero["total_debt"] == 0.0 and zero["debt_basis"] == "a"  # a reported zero is a zero
 
 
@@ -148,7 +150,11 @@ def test_liabilities_reported_derived_or_none() -> None:
 
 def test_partial_when_the_core_lines_end_on_different_dates() -> None:
     row = run([*core(Q1)[:2], fact("equity", "StockholdersEquity", 38.0, Q4)])
-    assert row["bs_status"] == "PARTIAL" and row["bs_as_of"] == Q1 and row["equity"] == 38.0
+    assert (
+        row["bs_status"] == "PARTIAL"
+        and row["bs_as_of"] == Q1
+        and row["stockholders_equity"] == 38.0
+    )
     assert run(core()[:2])["bs_status"] == "PARTIAL"  # equity missing
 
 
@@ -161,9 +167,13 @@ def test_stale_is_checked_before_anything_else() -> None:
 
 
 def test_a_bank_keeps_its_balance_sheet_and_is_flagged() -> None:
-    row = run(core() + debt(("LongTermDebt", 100.0)), sic="6021")
+    row = run([*core(), *debt(("LongTermDebt", 100.0))], sic="6021")
     assert bool(row["is_financial"]) is True and row["bs_status"] == "OK"
-    assert row["total_assets"] == 100.0 and row["equity"] == 40.0 and row["total_debt"] == 100.0
+    assert (
+        row["total_assets"] == 100.0
+        and row["stockholders_equity"] == 40.0
+        and row["total_debt"] == 100.0
+    )
     assert bool(run(core())["is_financial"]) is False
 
 
@@ -178,3 +188,32 @@ def test_the_tag_lists_match_the_parser_concepts() -> None:
         assert [t for t in concept_tags if t in tags] == list(tags), line
     instant = {t for c, (kind, tags) in STATEMENT_CONCEPTS.items() if kind == INSTANT for t in tags}
     assert instant == instants.ALL_TAGS  # every stored instant tag is read by the group
+
+
+def test_a_line_not_reported_at_the_balance_sheet_date_is_null_with_status_ok() -> None:
+    older = [
+        fact("sti", "ShortTermInvestments", 7.0, Q4),
+        fact("current_assets", "AssetsCurrent", 50.0, Q4),
+        fact("debt", "LongTermDebt", 100.0, Q4),
+        fact("liabilities", "Liabilities", 60.0, Q4),
+    ]
+    row = run([*core(), *older])
+    assert row["bs_status"] == "OK" and row["bs_as_of"] == Q1
+    assert pd.isna(row["sti"]) and pd.isna(row["current_assets"])  # not an older figure
+    assert pd.isna(row["total_debt"]) and row["debt_basis"] == "NOT_TAGGED"
+    assert pd.isna(row["total_liabilities"]) and row["liabilities_basis"] == "NONE"
+
+
+def test_derived_liabilities_subtract_the_equity_including_the_noncontrolling_interest() -> None:
+    total = fact("liabilities", "LiabilitiesAndStockholdersEquity", 100.0)
+    nci = fact("equity", instants.LINES["equity"][1], 45.0)  # parent 40 + minority 5
+    both = run([*core(), nci, total])
+    assert both["total_liabilities"] == 55.0 and both["liabilities_basis"] == "DERIVED"
+    assert both["stockholders_equity"] == 40.0  # the column keeps the parent-only figure first
+    assert run([*core(), total])["total_liabilities"] == 60.0  # parent-only when that is all
+
+
+def test_filings_of_one_day_are_ordered_by_accession_not_by_input_order() -> None:
+    one = fact("cash", "CashAndCashEquivalentsAtCarryingValue", 1.0, accn="A1")
+    two = fact("cash", "CashAndCashEquivalentsAtCarryingValue", 2.0, accn="A2")
+    assert run([one, two])["cash"] == run([two, one])["cash"] == 2.0

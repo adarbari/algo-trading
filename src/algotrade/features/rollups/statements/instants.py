@@ -80,7 +80,9 @@ def books(facts: pd.DataFrame | None, session: date, p: StatementParams) -> dict
         }
     )
     out = out[(out["filed"] <= today) & (out["end"] >= today - p.history_days)]
-    out = out.sort_values("filed", kind="stable")  # a later filing overwrites an earlier one
+    out = out.sort_values(
+        ["filed", "accn"], kind="stable"
+    )  # the later filing overwrites an earlier one
     found: dict[str, Book] = {}
     cols = (out[c].tolist() for c in ("instrument_id", "tag", "end", "filed", "accn", "value"))
     for iid, tag, end, filed, accn, value in zip(*cols, strict=True):
@@ -92,7 +94,7 @@ def pick(book: Book, tags: Sequence[str], end: int | None = None) -> Pick | None
     """The line's latest instant: the greatest period end over ``tags`` (or exactly ``end``),
     reported by the first tag of the list that has it; ``None`` when no tag has one."""
     ends = {e for t in tags for e in book.get(t, {})} if end is None else {end}
-    if end is None and not ends:
+    if not ends:
         return None
     at = max(ends)
     return next(((book[t][at][2], at, t) for t in tags if at in book.get(t, {})), None)
@@ -110,21 +112,19 @@ def _basis(parts: dict[str, float]) -> tuple[float, str] | None:
     return None
 
 
-def debt_end(book: Book) -> int | None:
-    """The newest period end any debt tag reports."""
-    ends = {e for t in DEBT_TAGS for e in book.get(t, {})}
-    return max(ends) if ends else None
+def newest_end(book: Book) -> int:
+    """The newest period end any fact of the book reports."""
+    return max(e for by_end in book.values() for e in by_end)
 
 
-def total_debt(book: Book) -> tuple[float | None, str]:
-    """``(debt, basis)`` at the newest debt period end: the parts of ONE filing (accession
-    number; the newest filing first) by the first rule that applies, ``a`` / ``b`` / ``c``
-    (ADR 0067). No filing at that date has a complete rule: ``(None, NOT_TAGGED)``, never
-    zero: a filer without the tags and a debt-free filer look the same in the document."""
-    end = debt_end(book)
+def total_debt(book: Book, end: int) -> tuple[float | None, str]:
+    """``(debt, basis)`` at the balance sheet date ``end`` only: the parts of ONE filing
+    (accession number; the newest filing first) by the first rule that applies, ``a`` / ``b`` /
+    ``c`` (ADR 0067). No filing reporting that date has a complete rule: ``(None, NOT_TAGGED)``,
+    never zero: a filer without the tags and a debt-free filer look the same in the document."""
     filings: dict[str, tuple[int, dict[str, float]]] = {}  # accn -> newest filed, tag -> value
     for tag in DEBT_TAGS:
-        hit = book.get(tag, {}).get(end) if end is not None else None
+        hit = book.get(tag, {}).get(end)
         if hit is not None:
             filed, accn, value = hit
             newest, parts = filings.setdefault(accn, (filed, {}))
@@ -136,17 +136,18 @@ def total_debt(book: Book) -> tuple[float | None, str]:
     return None, NOT_TAGGED
 
 
-def total_liabilities(book: Book) -> tuple[float | None, str, int | None]:
-    """``(value, basis, period end)``: the reported ``Liabilities`` of the newest period, else
-    that period's liabilities-and-equity total less its equity (``DERIVED``), else ``NONE``.
-    The total and the equity must end on the same day: never mixed across dates."""
-    got = pick(book, LINES["liabilities"])
+def total_liabilities(book: Book, end: int) -> tuple[float | None, str]:
+    """``(value, basis)`` at the balance sheet date ``end`` only: the reported ``Liabilities``,
+    else the liabilities-and-equity total less the equity of the same date (``DERIVED``), else
+    ``NONE``. The total includes the noncontrolling interest, so the equity subtracted is the
+    one including it when the filer tags it, else the parent-only figure."""
+    got = pick(book, LINES["liabilities"], end)
     if got is None:
-        return None, "NONE", None
-    value, end, tag = got
+        return None, "NONE"
+    value, _, tag = got
     if tag == LINES["liabilities"][0]:
-        return value, "REPORTED", end
-    equity = pick(book, LINES["equity"], end)
+        return value, "REPORTED"
+    equity = pick(book, LINES["equity"][::-1], end)  # including noncontrolling interest first
     if equity is None:
-        return None, "NONE", end  # the total still dates a balance sheet
-    return value - equity[0], "DERIVED", end
+        return None, "NONE"
+    return value - equity[0], "DERIVED"

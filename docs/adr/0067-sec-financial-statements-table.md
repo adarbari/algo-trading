@@ -61,11 +61,19 @@ carry no start. A figure in another currency is dropped: those issuers have no s
 ### Rollup rules this fixes (applied by the later `balance_sheet@v1`, not here)
 - **Null over zero.** A concept not tagged by a filer is null with a status (`NOT_TAGGED`), never 0.
 - **`total_debt` from the parts of ONE accession** (never a part from one filing and a part from
-  another), first rule that applies: (a) `LongTermDebt` + `ShortTermBorrowings`, else `CommercialPaper`
-  (short-term borrowings usually include commercial paper: never both); (b) `LongTermDebtNoncurrent` +
-  `LongTermDebtCurrent` + `ShortTermBorrowings`, else `CommercialPaper`;
-  (c) `DebtCurrent` + `LongTermDebtNoncurrent`. No debt tag at all is null with `NOT_TAGGED`, not
-  zero debt: a filer without the tags and a debt-free filer look the same in the document.
+  another), read at the balance sheet date (`bs_as_of`, the newest date of the core lines), first rule
+  that applies: (a) `LongTermDebt` + `ShortTermBorrowings`, else `CommercialPaper` (short-term borrowings
+  usually include commercial paper: never both); (b) `LongTermDebtNoncurrent` + `LongTermDebtCurrent` +
+  `ShortTermBorrowings`, else `CommercialPaper`; (c) `DebtCurrent` + `LongTermDebtNoncurrent`. Each rule
+  needs its main (anchor) parts (`LongTermDebt`; both noncurrent and current portions; `DebtCurrent` and
+  `LongTermDebtNoncurrent`); the short-term part is optional and a missing one counts as 0: the one place a
+  missing figure is added as 0, because a filer without short-term borrowings has none (owner accepted). An
+  incomplete set of main parts is null with `NOT_TAGGED`, not zero debt: a filer without the tags and a
+  debt-free filer look the same in the document.
+- **One balance sheet date.** Every line other than the core ones (cash, total assets, equity), total
+  liabilities and debt are read only at `bs_as_of`; a line not reported at that date is null, never an older
+  figure. Derived liabilities (`LiabilitiesAndStockholdersEquity` less equity) subtract the equity including
+  the noncontrolling interest first, as the total includes it.
 - **Financial-sector gating.** `is_financial` is SIC 6000 to 6411 (`instruments/company`). For these
   issuers the EBIT family (operating income, EBIT margin, interest cover, EV/EBIT, enterprise value
   from debt) is null: a bank's debt and operating income are not those of an operating company. ROE,
