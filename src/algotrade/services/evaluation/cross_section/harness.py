@@ -416,7 +416,7 @@ def evaluate_edge(
         stored,
         needs,
         as_of,
-        partial(_outcome_stamps, reader, as_of),
+        partial(_outcome_stamps, reader, as_of, _earnings_horizons(plans)),
         "requested" if full else None,
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
@@ -591,15 +591,21 @@ def _leg_rows(
 
 
 def _outcome_stamps(
-    reader: StoreReader, as_of: datetime, entries: Collection[date]
+    reader: StoreReader, as_of: datetime, names_for: Collection[int], entries: Collection[date]
 ) -> tuple[
     dict[tuple[date, int], datetime], dict[tuple[date, int], frozenset[str]], dict[date, int]
 ]:
     """What reuse asks of the outcome partitions of ``entries``: per (S, horizon) the latest
     ``knowledge_ts`` known by ``as_of`` with the names of those rows, and per S the commit
     sequence (the harness is the one reader of outcomes)."""
-    known, names = outcome_stamps(reader, entries, as_of)
+    known, names = outcome_stamps(reader, entries, as_of, names_for=names_for)
     return known, names, outcome_seqs(reader, entries)
+
+
+def _earnings_horizons(plans: Sequence[_Plan]) -> frozenset[int]:
+    """The horizons of the plans whose report diagnostic needs the names with an outcome row
+    (``earnings_expected``): the only ones whose names an incremental run reads."""
+    return frozenset(p.horizon for p in plans if p.scope.edge.event_class == "earnings_expected")
 
 
 def iv_field_of(edge: Edge, run_field: str = IMPLIED_VOL_FIELD) -> str:

@@ -5,7 +5,7 @@ excludes it, never counts it a miss; an ``UNMEASURED`` row (a flagged bar in the
 ``outcome_reason``) has no returns and is excluded the same way. ``as_of`` keeps only rows
 known by then (row by row, not only by run)."""
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from datetime import date, datetime
 
 import pandas as pd
@@ -37,13 +37,17 @@ def outcome_seqs(reader: StoreReader, sessions: Iterable[date]) -> dict[date, in
 
 
 def outcome_stamps(
-    reader: StoreReader, sessions: Iterable[date], as_of: datetime, benchmark: str = "SPY"
+    reader: StoreReader,
+    sessions: Iterable[date],
+    as_of: datetime,
+    benchmark: str = "SPY",
+    names_for: Collection[int] = (),
 ) -> tuple[dict[tuple[date, int], datetime], dict[tuple[date, int], frozenset[str]]]:
     """Per (start session, horizon) of ``sessions`` with a ``benchmark`` row known by ``as_of``:
     the latest ``knowledge_ts`` among those rows (which windows are closed, and when the newest
-    row of each became known) and the instrument ids of those rows (the names ``select_outcomes``
-    would return). One columns-only read of each wanted partition, not of the range between them
-    (ADR 0063)."""
+    row of each became known) and, only for the horizons in ``names_for`` (none: no name set is
+    built), the instrument ids of those rows (the names ``select_outcomes`` would return). One
+    columns-only read of each wanted partition, not of the range between them (ADR 0063)."""
     latest: dict[tuple[date, int], datetime] = {}
     names: dict[tuple[date, int], set[str]] = {}
     for day in sorted(set(sessions)):
@@ -65,7 +69,8 @@ def outcome_stamps(
             strict=True,
         ):
             key = (day, int(horizon))
-            names.setdefault(key, set()).add(str(name))
+            if key[1] in names_for:
+                names.setdefault(key, set()).add(str(name))
             if key not in latest or stamp > latest[key]:
                 latest[key] = stamp
     return latest, {k: frozenset(v) for k, v in names.items()}
