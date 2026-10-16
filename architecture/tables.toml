@@ -60,6 +60,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/reference/shares.py"
 also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"]
 
 [[table]]
+name = "instruments/statements"
+owner = "apps/ingestion/algotrade_ingestion/tasks/reference/shares.py"
+note = "ADR 0067: the financial statement lines of the same SEC company facts document the shares task fetches once; read through data/statements"
+
+[[table]]
 name = "instruments/description"
 owner = "apps/ingestion/algotrade_ingestion/tasks/profile/descriptions.py"
 

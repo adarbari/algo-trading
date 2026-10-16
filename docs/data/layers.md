@@ -211,6 +211,23 @@ counts from its `filed` date, whichever partition stored it, so a backfill serve
 financial facts only ever add rows to a store that already has share counts: the first
 `algotrade-ingest shares --force` after they shipped stores them and leaves the rest alone.
 
+**`instruments/statements`** (SEC company facts, ADR 0067; the same document and the same
+`algotrade-ingest shares` run as `instruments/shares`; increments merged across runs, one row per
+instrument, concept, tag, period start, period end and filing date)
+
+| Columns | Notes |
+|---|---|
+| `instrument_id`, `symbol`, `cik` | every instrument of a CIK gets the CIK's facts, as in `instruments/shares` |
+| `concept`, `tag` | `cost_of_revenue`, `gross_profit`, `operating_income`, `pretax_income`, `income_tax`, `interest_expense`, `da`, `ocf`, `capex` (durations); `cash`, `sti`, `debt`, `assets`, `liabilities`, `equity`, `current` (instants); `tag` is the us-gaap tag, every tag of a concept is its own row (docs/data/vendors.md lists them); or `checked`, the marker that the CIK was fetched on `fetched_on` (null `tag`) |
+| `period_type` | `DURATION` (an income statement or cash flow line over 3, 6, 9 or 12 months; cash flow lines are cumulative from the fiscal year start) or `INSTANT` (a balance sheet line) |
+| `period_start`, `period_end`, `filed`, `form`, `accn`, `fy`, `fp` | as filed; `filed` is the point-in-time date; `period_start` is null for an instant and a marker, and a null equals another null in the key |
+| `value`, `unit` | the amount in `usd` (USD facts only); a period appears once for the filing that first reported it plus once per later filing that changed the value |
+| `fetched_on` | when SEC was last asked; a CIK is fetched when the older of the two tables' latest `fetched_on` is past its slot |
+
+Reads (`data.statements.reading`): `stored_statements` (every row, the latest stored version per
+key) for the producer, `statement_facts(reader, session)` the facts FILED on or before the session.
+No feature reads it yet: `balance_sheet@v1` does (planned, `docs/data/technical.md`).
+
 **`macro/series`** (ADR 0048; increments merged across runs, one row per series, observation date
 and vintage) holds economic series (`MACRO:<KEY>`) and index levels (`IDX:<KEY>`: index levels
 are series, never bars) declared in `config/site/macro.toml` (`config/site/macro.py`):

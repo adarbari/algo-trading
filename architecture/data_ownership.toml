@@ -48,6 +48,7 @@ detect = [
     { call = "stored_events" },
     { call = "events_by_event_date" },
     { call = "share_facts" },
+    { call = "statement_facts" },
     { call = "curve_as_rows" },
     { call = "rollup_rows" },
     { call = "symbol_ids" },

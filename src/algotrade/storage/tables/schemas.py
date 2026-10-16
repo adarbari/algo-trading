@@ -233,6 +233,28 @@ INSTRUMENT_SHARES = fixed(
     runs="merge",
     key=("instrument_id", "concept", "tag", "period_start", "period_end", "filed"),
 )
+# L1: the financial statement lines (income statement, cash flow, balance sheet) from the same SEC
+# company facts document, per instrument (every class of a CIK gets the CIK's facts; ADR 0067).
+# Merging increments like ``instruments/shares``; a fact is identified by (instrument, concept,
+# tag, period start, period end, filed date): a null ``period_start`` (an instant, a ``checked``
+# marker) equals a null, and every us-gaap tag of a concept is its own row.
+INSTRUMENT_STATEMENTS = fixed(
+    "instruments/statements",
+    "reference",
+    ("instrument_id", "cik", "concept", "period_start", "fetched_on"),
+    "instrument_id string!",
+    *strings("symbol", "tag", "period_type", "form", "accn", "fp", "unit"),
+    "cik string!",
+    "concept string!",
+    "period_start date",
+    "period_end date",
+    "filed date",
+    "fy int64",
+    "value float64",
+    "fetched_on date!",
+    runs="merge",
+    key=("instrument_id", "concept", "tag", "period_start", "period_end", "filed"),
+)
 # L1: each instrument's IBKR stock contract (ADR 0028): conid and primary exchange from IB's
 # contract lookup, one full snapshot per run (rows not refreshed are carried forward).
 IBKR_CONTRACTS = fixed(
@@ -640,6 +662,7 @@ KNOWN: dict[str, TableSpec] = {
         INDEX_MEMBERSHIP,
         INSTRUMENT_COMPANY,
         INSTRUMENT_SHARES,
+        INSTRUMENT_STATEMENTS,
         INSTRUMENT_DESCRIPTION,
         TREASURY_RATES,
         VERIFICATION_IBKR,

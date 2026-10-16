@@ -114,6 +114,9 @@ raw_retention_days = 7           # submissions, company_tickers, companyfacts: ~
 refresh_days = 30                # refetch a company's details once per this many days
 facts_refresh_days = 30          # refetch a company's share counts (company facts) once per this
                                  # many days; both spread over the window by CIK
+statements_backfill_per_night = 400  # CIKs with share counts but no statement lines (ADR 0067)
+                                 # fetched per night, so the backfill spreads over ~15 nights; new
+                                 # CIKs and CIKs due for shares are never capped; 0: no cap
 fund_quarters = 6                # quarterly prospectus data sets read for ETF descriptions (ADR 0034):
                                  # ~80 MB each, the last N completed quarters, each fetched once
 

@@ -1,5 +1,5 @@
-"""SEC EDGAR company facts: share counts and basic financials per CIK from XBRL filings
-(free, no key).
+"""SEC EDGAR company facts: share counts, basic financials and statement lines per CIK from
+XBRL filings (free, no key).
 
 ``https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`` holds every
 non-dimensional XBRL fact a company has filed (MBs for a large filer). We keep two share
@@ -28,6 +28,13 @@ and three flows (``FLOWS``), the inputs of ``financials@v2``:
   point-in-time read sees exactly the values that were public at each date, without the
   repeats.
 
+A second parse of the same document gives the statement lines (``parse_statements``, the tags
+and period types in ``statement_concepts.py``, ADR 0067): income statement, cash flow and balance
+sheet figures, every us-gaap tag of a concept kept in ``tag`` and in USD only. Durations follow
+the rule above (periodic forms, quarter to year spans, the first filing of a period plus
+restatements, per tag); instants (balance sheet dates) follow it per (tag, date). One fetch
+feeds both tables.
+
 Every row keeps ``filed`` (the point-in-time date), ``period_end``, ``form`` and ``accn``.
 Amendments (10-K/A) are separate rows with a later ``filed``. Non-positive share counts are
 dropped (losses and negative EPS are kept). A 404 means the CIK has no XBRL facts (common
@@ -45,6 +52,12 @@ import pandas as pd
 from algotrade.core.model.instruments import pad_cik
 from algotrade_sources.framework.base import FetchRequest, Normalized
 from algotrade_sources.framework.http import Http
+from algotrade_sources.vendors.sec.statement_concepts import (
+    DURATION,
+    STATEMENT_CONCEPTS,
+    UNIT,
+    UNIT_KEY,
+)
 
 SOURCE = "sec_edgar"
 FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
@@ -81,6 +94,22 @@ FACT_COLUMNS = (
     "value",
     "unit",
 )
+STATEMENT_COLUMNS = (
+    "cik",
+    "concept",
+    "tag",
+    "period_type",
+    "period_start",
+    "period_end",
+    "filed",
+    "form",
+    "accn",
+    "fy",
+    "fp",
+    "value",
+    "unit",
+)
+FACT_FIELDS = ["start", "end", "val", "accn", "fy", "fp", "form", "filed", "tag"]
 
 
 def _facts(doc: dict[str, Any], concept: str) -> pd.DataFrame:
@@ -133,13 +162,15 @@ def _flow_facts(doc: dict[str, Any], concept: str) -> pd.DataFrame:
     return frame.assign(concept=concept, unit=unit, val=frame["val"].astype(float), class_values=1)
 
 
-def parse_company_facts(payload: bytes) -> pd.DataFrame:
-    """A companyfacts document -> fact rows (``FACT_COLUMNS``), sorted by
-    (concept, filed, period_end)."""
+def _document(payload: bytes) -> tuple[dict[str, Any], str]:
     doc = json.loads(payload)
     cik = pad_cik(doc.get("cik"))
     if cik is None:
         raise ValueError("companyfacts document has no CIK")
+    return doc, cik
+
+
+def _share_rows(doc: dict[str, Any], cik: str) -> pd.DataFrame:
     parts = []
     for concept, reduce in (("dei", _cover), ("weighted_basic", _current_period)):
         frame = _facts(doc, concept)
@@ -161,9 +192,62 @@ def parse_company_facts(payload: bytes) -> pd.DataFrame:
     return out.reindex(columns=list(FACT_COLUMNS)).reset_index(drop=True)
 
 
+def parse_company_facts(payload: bytes) -> pd.DataFrame:
+    """A companyfacts document -> fact rows (``FACT_COLUMNS``), sorted by
+    (concept, filed, period_end)."""
+    return _share_rows(*_document(payload))
+
+
+def _statement_facts(doc: dict[str, Any], concept: str) -> pd.DataFrame:
+    """One statement concept's periodic USD facts, every tag kept: per tag and period (or date,
+    for an instant) the first filing and the restatements only."""
+    period_type, tags = STATEMENT_CONCEPTS[concept]
+    taxonomy = (doc.get("facts") or {}).get("us-gaap", {})
+    parts = []
+    for tag in tags:
+        rows = ((taxonomy.get(tag) or {}).get("units") or {}).get(UNIT_KEY) or []
+        if rows:
+            parts.append(pd.DataFrame(rows).assign(tag=f"us-gaap:{tag}"))
+    frame = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=FACT_FIELDS)
+    frame = frame.reindex(columns=FACT_FIELDS).dropna(subset=["end", "val", "accn", "filed"])
+    frame = frame[frame["form"].astype(str).str.startswith(PERIODIC_FORMS)]
+    if period_type == DURATION:
+        frame = frame.dropna(subset=["start"])
+        span = (pd.to_datetime(frame["end"]) - pd.to_datetime(frame["start"])).dt.days
+        frame = frame[pd.concat([span.between(lo, hi) for lo, hi in SPAN_DAYS], axis=1).any(axis=1)]
+        period = ["tag", "start", "end"]
+    else:
+        frame = frame[frame["start"].isna()]
+        period = ["tag", "end"]
+    frame = frame.sort_values([*period, "filed", "accn"], kind="stable")
+    frame = frame[frame["val"].ne(frame.groupby(period)["val"].shift())]
+    return frame.assign(
+        concept=concept, period_type=period_type, unit=UNIT, val=frame["val"].astype(float)
+    )
+
+
+def _statement_rows(doc: dict[str, Any], cik: str) -> pd.DataFrame:
+    parts = [f for c in STATEMENT_CONCEPTS if not (f := _statement_facts(doc, c)).empty]
+    if not parts:
+        return pd.DataFrame(columns=list(STATEMENT_COLUMNS))
+    out = pd.concat(parts, ignore_index=True).rename(
+        columns={"start": "period_start", "end": "period_end", "val": "value"}
+    )
+    out = out.assign(cik=cik)
+    out = out.sort_values(["concept", "tag", "filed", "period_end", "accn"], kind="stable")
+    out = out.astype(object).where(out.notna(), None)
+    return out.reindex(columns=list(STATEMENT_COLUMNS)).reset_index(drop=True)
+
+
+def parse_statements(payload: bytes) -> pd.DataFrame:
+    """A companyfacts document -> statement rows (``STATEMENT_COLUMNS``), sorted by
+    (concept, tag, filed, period_end); an instant has no ``period_start``."""
+    return _statement_rows(*_document(payload))
+
+
 class SecCompanyFacts:
-    """One company's share counts and financials. Request key: a CIK (any form, padded to 10
-    digits)."""
+    """One company's share counts, financials and statement lines. Request key: a CIK (any
+    form, padded to 10 digits)."""
 
     name = SOURCE
     dataset = "companyfacts"
@@ -178,6 +262,11 @@ class SecCompanyFacts:
         return self._http.get(FACTS_URL.format(cik=cik))
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
-        return Normalized(
-            session_date=None, tables={}, parsed={"shares": parse_company_facts(payload)}
-        )
+        doc, cik = _document(payload)
+        parsed = {"shares": _share_rows(doc, cik)}
+        notes: dict[str, int] = {}
+        try:  # a statements parse error must not lose the share counts of the same document
+            parsed["statements"] = _statement_rows(doc, cik)
+        except Exception:
+            notes["statements_parse_error"] = 1
+        return Normalized(session_date=None, tables={}, parsed=parsed, notes=notes)

@@ -253,6 +253,7 @@ forbidden_modules = [
     "algotrade.data.chains",
     "algotrade.data.rates",
     "algotrade.data.shares",
+    "algotrade.data.statements",
     "algotrade.data.rollups",
     "algotrade.data.reference",
     "algotrade.data.resolver",

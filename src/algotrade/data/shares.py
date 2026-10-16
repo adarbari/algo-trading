@@ -37,7 +37,15 @@ def stored_shares(reader: StoreReader, as_of: datetime | None = None) -> pd.Data
     frame = reader.table_range(TABLE, *ALL_TIME, as_of)
     if frame is None or frame.empty:
         return pd.DataFrame(columns=[*KEY, "cik", "shares", "value", "fetched_on"])
-    if "tag" not in frame.columns:  # a partition written before the column: null, not a KeyError
+    return latest_versions(frame)
+
+
+def latest_versions(frame: pd.DataFrame) -> pd.DataFrame:
+    """The latest stored version of each ``KEY`` row of a union of partitions (shares and
+    statements alike), in key order. Date columns become ``date`` objects (``None`` when
+    missing) and a null ``tag`` (a marker, a partition written before the column) is ``None``,
+    so a null in a key column equals another null."""
+    if "tag" not in frame.columns:
         frame["tag"] = None
     frame["tag"] = frame["tag"].astype(object).where(frame["tag"].notna(), None)
     for column in DATES:

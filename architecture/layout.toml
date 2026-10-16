@@ -163,6 +163,10 @@ path = "src/algotrade/data/paper"
 purpose = "reads of the forward paper record (results/edge_paper, ADR 0053 amendment 2026-10-09): one user's trades with a signal session in a window, as of a session; read by services/evaluation/forward (to settle) and the read model (Ideas signals, an edge's live record)"
 
 [[dir]]
+path = "src/algotrade/data/statements"
+purpose = "reads of instruments/statements (SEC financial statement lines, ADR 0067): every stored row for the producer, and the facts filed on or before a session (point in time by filing date)"
+
+[[dir]]
 path = "src/algotrade/data/usage"
 purpose = "reads of the usage grain (usage/, ADR 0058): what the API's text model spent, over a date range; seeds the budget ledger and feeds the Admin usage page"
 
