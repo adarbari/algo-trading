@@ -18,7 +18,7 @@ from algotrade.storage.locks import held
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.workflows.nightly import screens as screens_module
 from algotrade_ingestion.workflows.nightly.nightly import EDGE_EVAL, EDGE_SIGNALS, NIGHTLY, SNAPSHOT
-from algotrade_ingestion.workflows.nightly.steps import StepStatus
+from algotrade_ingestion.workflows.nightly.steps import StepResult, StepStatus
 
 D = date(2026, 10, 2)
 IBKR = "rollups/instrument/ibkr_iv@v1"
@@ -57,6 +57,32 @@ def test_only_snapshot_fetches_are_critical_and_latest_only() -> None:
     # session without its chains fails the screens' coverage).
     critical = {s.name: s.latest_only for s in NIGHTLY if s.critical and s.latest_only}
     assert critical == {"universe-build": SNAPSHOT, "chains": SNAPSHOT}
+
+
+def _screens(*job_statuses: str) -> StepResult:
+    jobs = [{"config": f"s{i}", "status": j} for i, j in enumerate(job_statuses)]
+    return StepResult("screens", StepStatus.FAILED, result={"screens": jobs}, reason="short")
+
+
+def test_screens_short_only_for_want_of_never_fetched_chains_warn_and_hold_nothing() -> None:
+    # Architect review 2026-10-16: a night the Mac slept through has no chains; failing its
+    # screens would hold every later session back and lose their snapshot fetches.
+    skipped = StepResult("chains", StepStatus.SKIPPED, reason="latest closed session only")
+    result = screens_module.without_chains(_screens("complete", "partial"), skipped)
+    assert result.status is StepStatus.SUCCEEDED and result.reason is None
+    assert [(c["name"], c["status"]) for c in result.checks] == [("no_chains", "WARN")]
+    assert result.checks[0]["detail"].startswith("s1 short of coverage")
+
+
+def test_a_failed_screen_job_or_fetched_chains_still_fail_the_screens() -> None:
+    skipped = StepResult("chains", StepStatus.SKIPPED)
+    fetched = StepResult("chains", StepStatus.SUCCEEDED)
+    assert (
+        screens_module.without_chains(_screens("partial", "failed"), skipped).status.value
+        == "FAILED"
+    )
+    assert screens_module.without_chains(_screens("partial"), fetched).status.value == "FAILED"
+    assert screens_module.without_chains(_screens("partial"), None).status.value == "FAILED"
 
 
 def test_an_optional_table_missed_by_a_complete_screen_is_a_warning(

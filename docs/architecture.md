@@ -249,7 +249,9 @@ handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and
   their current snapshot (universe files, SEC, Cboe chains), the paper picks, the steps whose
   one run covers every session (edge-eval, history-copy, filings) and the live verification.
   The screens read only stored features and run for every session, catch-up too, so a
-  complete session always has its screener runs (ADR 0039 amendment 2026-10-16). `--date D`
+  complete session always has its screener runs; without the session's chains (never
+  fetched) a screener short of coverage is a WARN, not a hold (ADR 0039 amendment
+  2026-10-16). `--date D`
   runs exactly D (as the latest).
 - **Resume and expiry** (`attempts.py`): a FAILED session is retried (the hourly watchdog) from
   where it stopped: steps an earlier attempt SUCCEEDED or WAIVED are reused, not rerun

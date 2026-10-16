@@ -169,11 +169,14 @@ as the latest complete session with every screener NOT_RUN (2026-10-15, caught u
 night after the Mac slept). The completion rule is unchanged: a session with a critical step
 SKIPPED as not applicable is complete, and the only critical latest-only steps are the
 snapshot fetches (universe build, chains; fitness test in `test_screens.py`). Consequences:
-- A catch-up session whose chains were never fetched (its own attempts never reached them)
-  runs the screens without them: the options screeners fall short of coverage and the step
-  FAILS, holding later sessions back until the owner waives `screens` for that date (as for
-  expired chains, 0039 amendment 2026-10-05). A screens step that failed for a session no
-  longer the latest is retried, never expired: its inputs are stored.
+- A catch-up session whose chains were never fetched (a night the Mac slept through: `chains`
+  SKIPPED as latest-only) runs the screens without them. Screeners short of coverage only (a
+  PARTIAL job, its run stored, the missing names UNKNOWN) are one `no_chains` WARN each, not
+  a failure (`screens.without_chains`): failing would hold every later session back and lose
+  their snapshot fetches, one owner waive per missed night (architect review). A FAILED screen
+  job still fails the step, and with the session's chains fetched coverage still decides. A
+  screens step that failed for a session no longer the latest is retried, never expired: its
+  inputs are stored.
 - Every latest-only step states why (`Step.latest_only` is the reason, shown as "latest closed
   session only: <why>"): a current-snapshot source; `filings` (reads every filing since the
   latest stored one); `edge-signals` (a paper pick is made only on the night it is for);

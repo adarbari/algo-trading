@@ -78,6 +78,7 @@ from algotrade_ingestion.workflows.nightly.screens import (
     edge_eval_jobs,
     screen_jobs,
     signal_jobs,
+    without_chains,
 )
 from algotrade_ingestion.workflows.nightly.sessions import (
     NIGHTLY_RUN,
@@ -241,7 +242,7 @@ NIGHTLY: tuple[Step, ...] = (
     # Every session, catch-up too: the screeners read only stored features, and a complete
     # session without screener runs would be served as one (ADR 0062). In a catch-up session the
     # chains were fetched by its own earlier attempt or not at all; without them the options
-    # screeners fall short of coverage and the step FAILS until the owner waives it.
+    # screeners fall short of coverage: a WARN when they never were (``without_chains``).
     Step(SCREENS, needs=("chains", "rollups"), requires=universe_exists),
     # The followed edges' paper picks for tonight and the open paper trades the stored outcomes
     # close (ADR 0053 amendment 2026-10-09): one job per user, after the screens (the picks read
@@ -529,6 +530,8 @@ def run_session(
                     signal_step,
                     eval_step,
                 )
+                if step.name == SCREENS:
+                    result = without_chains(result, done.get("chains"))
                 # a done step that ran although none of its inputs did is a refetch
                 refetch = (
                     step.name in before.done

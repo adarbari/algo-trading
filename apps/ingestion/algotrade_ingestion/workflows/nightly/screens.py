@@ -10,7 +10,8 @@ screeners that did not. A screener that ran without a table none of its fields
 needed (``missing_optional_tables``: an optional source's, e.g. ``ibkr_iv@v1`` with IB Gateway
 down, or a required one whose coalesce fallback is present, e.g. ``iv30@v1`` before it was
 stored) is a WARN check on the step, never its failure (ADR 0055, coverage of coalescing
-expressions).
+expressions). In a catch-up session whose chains were never fetched, a screener short of coverage
+only is a WARN too (``without_chains``, ADR 0039 amendment 2026-10-16).
 
 The ``edge-signals`` step (``signal_jobs``) mirrors it: each job makes the owner's tonight picks of
 its evidenced or live edges (a follower's bookmark trades nothing) and settles the open paper
@@ -35,6 +36,7 @@ edge, never a hold on the session or a later one.
 import logging
 from collections.abc import Callable
 from contextlib import nullcontext
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -53,7 +55,7 @@ from algotrade.services.read.context import open_context
 from algotrade.services.read.edge_desk.states import below_range
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.interfaces import Backend
-from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus
+from algotrade_ingestion.workflows.nightly.steps import Outcome, StepResult, StepStatus
 
 LOG = logging.getLogger(__name__)
 
@@ -103,6 +105,35 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
         return Outcome(StepStatus.SUCCEEDED, result, None, warnings)
 
     return run
+
+
+def without_chains(result: StepResult, chains: StepResult | None) -> StepResult:
+    """The screens of a session whose chains were never fetched (SKIPPED: a catch-up session
+    the source no longer serves, ADR 0039 amendment 2026-10-16): screeners short of coverage
+    only (PARTIAL jobs, their runs stored) are one WARN each, never a hold on the session or the
+    later ones, whose snapshots would be lost; a FAILED job still fails the step."""
+    if result.status is not StepStatus.FAILED or chains is None:
+        return result
+    if chains.status is not StepStatus.SKIPPED:
+        return result
+    short = [
+        s
+        for s in (result.result or {}).get("screens", [])
+        if s["status"] != JobStatus.COMPLETE.value
+    ]
+    if not short or any(s["status"] != JobStatus.PARTIAL.value for s in short):
+        return result
+    warnings = [
+        {
+            "name": "no_chains",
+            "status": "WARN",
+            "detail": f"{s['config']} short of coverage: no chains stored for this session",
+        }
+        for s in short
+    ]
+    return replace(
+        result, status=StepStatus.SUCCEEDED, reason=None, checks=[*result.checks, *warnings]
+    )
 
 
 def _below_range(

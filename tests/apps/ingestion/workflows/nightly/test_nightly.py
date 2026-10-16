@@ -370,8 +370,9 @@ def test_catch_up_runs_missed_sessions_and_chains_only_for_the_latest(
     calls, screened = fake(), []
 
     def screens(session: date) -> Outcome:
-        screened.append(session)
-        return Outcome(StepStatus.SUCCEEDED, {"screens": []})
+        screened.append(session)  # short of coverage without the session's chains: a WARN
+        short = {"screens": [{"config": "x", "status": "partial"}]}
+        return Outcome(StepStatus.FAILED if session < D else StepStatus.SUCCEEDED, short, "x")
 
     writer = store(date(2026, 9, 25))
     run_session(task_ctx(writer), date(2026, 9, 28), latest=True)
@@ -390,6 +391,7 @@ def test_catch_up_runs_missed_sessions_and_chains_only_for_the_latest(
     )
     # The screens read stored features: every session has its screener runs (2026-10-16).
     assert screened == missed and statuses(summary, 0)["screens"] == "SUCCEEDED"
+    assert steps_of(summary, 0)["screens"]["checks"][0]["name"] == "no_chains"
     assert steps_of(summary, 0)[EDGE_EVAL]["reason"].endswith(ALL_OUTCOMES)
     assert calls.sessions("purge-raw") == [D]
     assert last_done(writer) == D
