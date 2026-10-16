@@ -26,11 +26,13 @@ from algotrade_ingestion.tasks.maintenance.quality import Check, check_macro
 from algotrade_ingestion.workflows.nightly import nightly as nightly_module
 from algotrade_ingestion.workflows.nightly import screens as screens_module
 from algotrade_ingestion.workflows.nightly.nightly import (
+    ALL_OUTCOMES,
     EDGE_EVAL,
     EDGE_SIGNALS,
     FINALLY,
     NIGHTLY,
     SCREENS,
+    SNAPSHOT,
     nightly_job,
     run_nightly,
     run_session,
@@ -49,6 +51,7 @@ from tests.helpers.stored_frames import (
 
 D = date(2026, 10, 2)
 D1 = date(2026, 10, 1)
+CHAINS = "rollups/instrument/option_liquidity@v1"  # a table computed from the chains
 AFTER_CLOSE = datetime(2026, 10, 2, 23, tzinfo=UTC)  # 19:00 New York: D has closed
 TASK_STEPS = [
     s.name for s in (*NIGHTLY, *FINALLY) if s.name not in (SCREENS, EDGE_SIGNALS, EDGE_EVAL)
@@ -295,7 +298,7 @@ def test_a_partial_task_names_its_failed_items() -> None:
 def test_the_macro_step_is_optional_latest_only_and_before_the_market_rollups() -> None:
     names = [s.name for s in NIGHTLY]
     step = NIGHTLY[names.index("macro")]
-    assert (step.critical, step.latest_only, step.needs) == (False, True, ())
+    assert (step.critical, step.latest_only, step.needs) == (False, SNAPSHOT, ())
     assert step.accept_with == (check_macro,) and step.accept == ()
     assert names.index("macro") < names.index("market-rollups")  # the regime reads it (RG3)
     # ... but never as a need: a failed macro step must not hold the regime back (ADR 0039)
@@ -365,19 +368,32 @@ def test_plan_sessions_takes_the_oldest_and_drops_none() -> None:
 def test_catch_up_runs_missed_sessions_and_chains_only_for_the_latest(
     fake: Callable[..., Calls],
 ) -> None:
-    calls = fake()
+    calls, screened = fake(), []
+
+    def screens(session: date) -> Outcome:
+        screened.append(session)  # short of coverage without the session's chains: a WARN
+        short = {"screens": [{"config": "x", "status": "partial", "missing_tables": [CHAINS]}]}
+        return Outcome(StepStatus.FAILED if session < D else StepStatus.SUCCEEDED, short, "x")
+
     writer = store(date(2026, 9, 25))
     run_session(task_ctx(writer), date(2026, 9, 28), latest=True)
     assert last_done(writer) == date(2026, 9, 28)
     plan = plan_sessions(last_done(writer), D, 5)
-    summary = run_nightly(task_ctx(writer), plan)
+    summary = run_nightly(task_ctx(writer), plan, screens=screens)
     missed = [date(2026, 9, 29), date(2026, 9, 30), D1, D]
     assert summary["sessions"] == [d.isoformat() for d in missed]
     assert calls.sessions("bars")[1:] == missed
     assert calls.sessions("rollups")[1:] == missed
     assert calls.sessions("chains") == [date(2026, 9, 28), D]
     assert statuses(summary, 0)["chains"] == "SKIPPED"
-    assert steps_of(summary, 0)["universe-build"]["reason"].startswith("latest closed session")
+    assert (
+        steps_of(summary, 0)["universe-build"]["reason"]
+        == f"latest closed session only: {SNAPSHOT}"
+    )
+    # The screens read stored features: every session has its screener runs (2026-10-16).
+    assert screened == missed and statuses(summary, 0)["screens"] == "SUCCEEDED"
+    assert steps_of(summary, 0)["screens"]["checks"][0]["name"] == "no_chains"
+    assert steps_of(summary, 0)[EDGE_EVAL]["reason"].endswith(ALL_OUTCOMES)
     assert calls.sessions("purge-raw") == [D]
     assert last_done(writer) == D
 
@@ -482,10 +498,10 @@ def test_stale_chains_are_not_refetched_without_staging_or_for_an_older_session(
     later = date(2026, 10, 5)
     plan = Plan([D, later], last_done=D1, until=later)
     third = run_nightly(task_ctx(writer), plan, screens=screens)
-    assert calls.sessions("chains") == [D]  # D is no longer served by Cboe: reused, not refetched
+    assert calls.sessions("chains") == [D, later]  # D is no longer served: reused, not refetched
     assert statuses(third, 0)["chains"] == "SUCCEEDED"
-    assert steps_of(third, 0)["screens"]["reason"].startswith("expired:")  # waive, as before
-    assert third["catch_up"]["held"] == [later.isoformat()]
+    # The screens read what is stored: an older session's are retried, never expired.
+    assert statuses(third, 0)["screens"] == "SUCCEEDED" and third["catch_up"]["held"] == []
 
 
 def test_refetch_falls_back_to_the_tasks_own_run_when_the_stored_result_has_no_task_run() -> None:

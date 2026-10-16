@@ -10,7 +10,8 @@ screeners that did not. A screener that ran without a table none of its fields
 needed (``missing_optional_tables``: an optional source's, e.g. ``ibkr_iv@v1`` with IB Gateway
 down, or a required one whose coalesce fallback is present, e.g. ``iv30@v1`` before it was
 stored) is a WARN check on the step, never its failure (ADR 0055, coverage of coalescing
-expressions).
+expressions). In a catch-up session whose chains were never fetched, a screener short of coverage
+only is a WARN too (``without_chains``, ADR 0039 amendment 2026-10-16).
 
 The ``edge-signals`` step (``signal_jobs``) mirrors it: each job makes the owner's tonight picks of
 its evidenced or live edges (a follower's bookmark trades nothing) and settles the open paper
@@ -33,8 +34,9 @@ edge, never a hold on the session or a later one.
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import nullcontext
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -44,6 +46,7 @@ from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import AlgoTradeError
 from algotrade.data import StoreReader
+from algotrade.features.registry import GROUPS
 from algotrade.services.configs import nightly_screeners
 from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.evaluation.forward.results import paper_owners
@@ -53,7 +56,7 @@ from algotrade.services.read.context import open_context
 from algotrade.services.read.edge_desk.states import below_range
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.interfaces import Backend
-from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus
+from algotrade_ingestion.workflows.nightly.steps import Outcome, StepResult, StepStatus
 
 LOG = logging.getLogger(__name__)
 
@@ -103,6 +106,48 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
         return Outcome(StepStatus.SUCCEEDED, result, None, warnings)
 
     return run
+
+
+def chain_tables() -> frozenset[str]:
+    """The rollup tables computed from the option chains, directly or through another such
+    table (the groups in dependency order, so a group's inputs come first)."""
+    found: set[str] = set()
+    for group in GROUPS.values():
+        if any(i.table.startswith("chains/") or i.table in found for i in group.inputs):
+            found.add(group.table)
+    return frozenset(found)
+
+
+def without_chains(result: StepResult, unfetched: bool) -> StepResult:
+    """The screens of a catch-up session whose chains were never fetched (``unfetched``: SKIPPED,
+    the source no longer serves the session; ADR 0039 amendment 2026-10-16). A screener short of
+    coverage only for want of chain-derived tables (a PARTIAL job, its run stored, every missing
+    table one of ``chain_tables``) is one WARN, never a hold on the session or the later ones,
+    whose snapshots would be lost. Anything else short (a FAILED job, another missing table, a
+    shortfall with no missing table) still fails the step."""
+    if result.status is not StepStatus.FAILED or not unfetched:
+        return result
+    complete, partial = JobStatus.COMPLETE.value, JobStatus.PARTIAL.value
+    short = [s for s in (result.result or {}).get("screens", []) if s["status"] != complete]
+    chained = chain_tables()
+
+    def for_want_of_chains(summary: Mapping[str, Any]) -> bool:
+        missing = summary.get("missing_tables") or []
+        return summary["status"] == partial and bool(missing) and set(missing) <= chained
+
+    if not short or not all(map(for_want_of_chains, short)):
+        return result
+    warnings = [
+        {
+            "name": "no_chains",
+            "status": "WARN",
+            "detail": f"{s['config']} short of coverage: no chains stored for this session "
+            f"({', '.join(s['missing_tables'])})",
+        }
+        for s in short
+    ]
+    checks = [*result.checks, *warnings]
+    return replace(result, status=StepStatus.SUCCEEDED, reason=None, checks=checks)
 
 
 def _below_range(
