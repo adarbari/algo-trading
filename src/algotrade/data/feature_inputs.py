@@ -46,6 +46,12 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        ``shares.share_facts``: every stored share-count and financial (revenue,
                        net income, diluted EPS) fact FILED on or before the session (point in
                        time by filing date), sorted by ``filed``; ``None`` when there is none
+- ``instruments/statements``
+                       ``statements.reading.statement_facts``: every stored statement line (cost
+                       of revenue, operating income, cash flow, balance sheet..., one row per
+                       tag, period and filing) FILED on or before the session (point in time by
+                       filing date, ADR 0067), sorted by ``filed``, without the stamp columns;
+                       ``None`` when there is none
 - ``instruments/reference``
                        ``reference.instruments``: the snapshot the session sees, only
                        ``instrument_id``, ``security_type`` and, when stored, the fund facts
@@ -67,10 +73,10 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        a population: it may come from a later snapshot (``pre_snapshot``), so
                        a group counts names over ``universe``, never over these rows
 - ``instruments/company``
-                       ``reference.company_sectors``: ``instrument_id``, ``sector`` and
-                       ``industry`` from the company snapshot on or before the session (read per
-                       session); ``None`` before the first snapshot (a later one would show
-                       company facts not known then)
+                       ``reference.company_sectors``: ``instrument_id``, ``sector``,
+                       ``industry`` and ``sic`` from the company snapshot on or before the session
+                       (read per session); ``None`` before the first snapshot (a later one
+                       would show company facts not known then)
 - ``rates/treasury``   ``rates.curve_as_rows``: the curve the session sees (latest on or before;
                        ``curve_date`` and ``pre_snapshot`` added); ``None`` when none is stored
 - ``volatility/ibkr_iv30``
@@ -120,6 +126,8 @@ from algotrade.data.reference import (
 from algotrade.data.rollups import rollup_rows
 from algotrade.data.shares import TABLE as SHARES
 from algotrade.data.shares import share_facts
+from algotrade.data.statements.reading import TABLE as STATEMENTS
+from algotrade.data.statements.reading import statement_facts
 from algotrade.data.volatility import IBKR_IV30, ibkr_iv30
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import KNOWN_FROM
@@ -273,6 +281,11 @@ def _share_facts(reader: StoreReader, sessions: Sequence[date], lookback: int) -
     return _Snapshots(frame, _days(frame["filed"]) if len(frame) else np.array([], "datetime64[D]"))
 
 
+def _statement_facts(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    frame = statement_facts(reader, sessions[-1], columns=STATEMENT_COLUMNS)
+    return _Snapshots(frame, _days(frame["filed"]) if len(frame) else np.array([], "datetime64[D]"))
+
+
 @dataclass(frozen=True)
 class _Vintages:
     """Every stored vintage, read once, sorted by ``vintage_date`` (``days``); ``at`` is what
@@ -338,6 +351,7 @@ def _events_by_date(table: str) -> Loader:
     return load
 
 
+STATEMENT_COLUMNS = ["concept", "tag", "period_start", "period_end", "filed", "value"]
 REFERENCE_FACTS = ("instrument_id", "security_type", "symbol", "name", "is_leveraged", "is_inverse")
 
 
@@ -406,6 +420,7 @@ INPUTS: Mapping[str, Loader] = {
     "events/split": _events_by_date("events/split"),
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,
+    STATEMENTS: _statement_facts,
     "instruments/reference": _partition(_reference_facts),
     HOLDINGS: _partition(_leveraged_holdings),
     "instruments/symbol_ids": _partition(symbol_ids),

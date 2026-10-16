@@ -172,3 +172,45 @@ def seed_chain_screen(
     )
     writer.write_table("chains/status", session, "c1", stamped(status, session, "c1"))
     return StoreReader(backend), writer
+
+
+type StatementFact = tuple[
+    str, str, str, date, date, date, float
+]  # id, concept, tag, start, end, filed, value
+STATEMENT_COLUMNS = [
+    "instrument_id",
+    "concept",
+    "tag",
+    "period_start",
+    "period_end",
+    "filed",
+    "value",
+]
+
+
+def statement_frame(facts: list[StatementFact]) -> pd.DataFrame:
+    """``instruments/statements`` facts as a statement group reads them (tag without prefix)."""
+    rows = [(i, c, f"us-gaap:{t}", s, e, f, v) for i, c, t, s, e, f, v in facts]
+    return pd.DataFrame(rows, columns=STATEMENT_COLUMNS)
+
+
+def quarter_facts(
+    instrument: str, concept: str, tag: str, values: list[float], first_end: date, lag: int = 40
+) -> list[StatementFact]:
+    """Consecutive discrete three-month facts ending ``first_end`` and every ~91 days after,
+    each filed ``lag`` days after its end."""
+    out = []
+    for n, value in enumerate(values):
+        end = first_end + timedelta(days=91 * n)
+        out.append(
+            (
+                instrument,
+                concept,
+                tag,
+                end - timedelta(days=89),
+                end,
+                end + timedelta(days=lag),
+                value,
+            )
+        )
+    return out
