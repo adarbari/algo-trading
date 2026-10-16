@@ -44,8 +44,11 @@ free FMP plan serves only some symbols (402 for the others), so an AAPL-only pro
 
 First result, 2026-10-16, free keys: FMP answered AAPL on every endpoint but `period=quarter`
 (402), and CHWY with 402 on every endpoint; the owner's manual test had NVDA and JPM answering 200
-for grades and NVDA for annual estimates. So the plan is symbol-gated and **where its boundary
-lies is not known**: the probe reports it, the table records it, and nothing here assumes it.
+for grades and NVDA for annual estimates. So the plan is symbol-gated. The owner measured the
+boundary with one `price-target-consensus` call per name on 2026-10-16: **15 of the 104 scope
+names are covered** (most refused ones are leveraged ETFs and small or mid caps), **21 of 25
+mega and large caps** and **2 of 25 S&P 500 mid-caps**. Free FMP is therefore a large-cap
+source; the probe keeps reporting it and the table records it.
 Finnhub answered `stock/recommendation` for AAPL and CHWY and refused `stock/price-target` (403).
 
 The table has one row per `(source, endpoint)` with `status`, `http_code`, `rows`, a fixed-words
@@ -56,9 +59,12 @@ got no verdict this run (a vendor with no key, a 5xx, an endpoint over the budge
 stored before stays across sessions, and `checked_ts` says how old it is.
 
 ### Designed, built in later PRs
-- **FMP: a scoped, rotating pull.** 200 calls a day cannot cover the universe: the scope list of
-  ADR 0050 plus tier A / B names, rotated, each name's estimates, targets and ratings refreshed on
-  a cadence set by the budget.
+- **FMP: a coverage-driven, rotating pull.** 200 calls a day cannot cover the universe, and the
+  free plan covers few names (see the measurement above). The pull learns the covered set (a name
+  answered with 402 is marked `NOT_COVERED`, not retried until the next probe) and spends the
+  200 calls a day only on covered names among the scope list of ADR 0050 plus tier A / B names
+  and the large caps, rotated, each name's estimates, targets and ratings refreshed on a cadence
+  set by the budget. Broad coverage needs a paid plan: an owner decision, not made here.
 - **Finnhub: a whole-universe rotation.** At one call a second the recommendation trend of every
   name is a few hours of calls; it is spread over nights.
 

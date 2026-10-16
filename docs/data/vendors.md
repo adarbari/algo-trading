@@ -186,8 +186,9 @@ error message or a raw path (`with_query_param`). About 250 calls a day on the f
 
 A symbol outside the plan's set also answers 402 (the same sentence, naming `symbol`): on
 2026-10-16 CHWY (a mid-cap of the scope list) got 402 on every endpoint while AAPL answered, and
-NVDA and JPM answered in a manual test, so the free plan is symbol-gated and its boundary is
-unknown. A 402 is therefore a plan limit, never "no data": it is raised at once and not retried.
+NVDA and JPM answered in a manual test, so the free plan is symbol-gated. Measured the same
+day with one `price-target-consensus` call per name: 15 of the 104 scope names, 21 of 25 mega
+and large caps and 2 of 25 S&P 500 mid-caps are covered. A 402 is therefore a plan limit, never "no data": it is raised at once and not retried.
 The probe asks AAPL and CHWY (`<endpoint>@broad` rows) so the table shows it.
 
 ### Finnhub
