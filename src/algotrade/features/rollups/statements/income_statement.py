@@ -23,7 +23,7 @@ kept as reported.
     da_ttm, interest_expense_ttm            depreciation and amortisation, interest expense
     pretax_income_ttm, income_tax_ttm       income before tax and the tax charge
     is_ttm_as_of                            the period end of the first TTM present
-    is_status                               OK / PARTIAL / NO_FACTS / STALE / FINANCIAL
+    is_status                               OK / PARTIAL / NO_TTM / NO_FACTS / STALE / FINANCIAL
 """
 
 from datetime import date
@@ -49,7 +49,7 @@ from algotrade.features.rollups.statements.ttm import Total
 
 NAME = "income_statement"
 VERSION = 1
-STATUSES = ("OK", "PARTIAL", "NO_FACTS", "STALE", "FINANCIAL")
+STATUSES = ("OK", "PARTIAL", "NO_TTM", "NO_FACTS", "STALE", "FINANCIAL")
 # Each concept's us-gaap tags, best first (the same lists as ``statement_concepts.py``, which a
 # test compares: a rollup imports no vendor package).
 CONCEPT_TAGS = {
@@ -84,8 +84,8 @@ NON_NEGATIVE = ("cost_of_revenue",)  # a derived quarter below zero is a restate
 
 _WHY = (
     "no income statement line filed by the session (ETFs, funds, no CIK, issuers that report "
-    "outside USD), or no TTM can be formed (neither four consecutive quarters nor a fiscal year "
-    "of this line): NO_FACTS"
+    "outside USD): NO_FACTS; or no TTM can be formed (neither four consecutive quarters nor a "
+    "fiscal year of this line): NO_TTM"
 )
 _UNTAGGED = "; or the filer does not report this line under any of its tags (never zero)"
 _FIN = "; or the issuer is a bank, broker or insurer (SIC 6000 to 6411): FINANCIAL"
@@ -148,28 +148,39 @@ FEATURES = (
     ),
     Feature(
         "is_status", "str", "category",
-        "OK (operating income, pretax income and tax all have a TTM); PARTIAL (some line has a "
-        "TTM, not all three); NO_FACTS (no line has one); STALE (the first TTM present ended more "
-        "than stale_days, 480, before the session; values still shown); FINANCIAL (SIC 6000 to "
-        "6411: the EBIT family is null)",
+        "OK (operating income, pretax income and tax all have a TTM, all ending on the same "
+        "period); PARTIAL (some line has a TTM, not all three or not the same period); NO_TTM "
+        "(facts filed, but no line has a TTM); NO_FACTS (no fact filed); STALE (the first TTM "
+        "present ended more than stale_days, 480, before the session; values still shown, and "
+        "checked before FINANCIAL); FINANCIAL (SIC 6000 to 6411, current: the EBIT family is "
+        "null)",
         "never", "label", categories=STATUSES, inputs=("instruments/statements.concept",),
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
 
 
-def _row(found: dict[str, Total], financial: bool, before: int) -> dict[str, object]:
-    if not found:
+def _status(found: dict[str, Total], first: Total | None, financial: bool, before: int) -> str:
+    if first is not None and first[1] < before:
+        return "STALE"  # before FINANCIAL: a bank's old pretax and tax must not read as current
+    if financial:
+        return "FINANCIAL"
+    # OK only when every core line ends on the same period: ratios of mixed periods are not OK
+    same = first is not None and all(c in found and found[c][1] == first[1] for c in CORE)
+    return "OK" if same else "PARTIAL"
+
+
+def _row(
+    found: dict[str, Total], financial: bool, before: int, has_facts: bool
+) -> dict[str, object]:
+    if not has_facts:
         return {"is_status": "NO_FACTS"}
+    if not found:
+        return {"is_status": "NO_TTM"}
     if financial:
         found = {c: t for c, t in found.items() if c not in EBIT_FAMILY}
     first = next((found[c] for c in COLUMN_OF if c in found), None)
-    if financial:
-        status = "FINANCIAL"
-    elif first is not None and first[1] < before:
-        status = "STALE"
-    else:
-        status = "OK" if all(c in found for c in CORE) else "PARTIAL"
+    status = _status(found, first, financial, before)
     row: dict[str, object] = {COLUMN_OF[c]: t[0] for c, t in found.items()}
     return {**row, "is_ttm_as_of": day_date(first[1]) if first else None, "is_status": status}
 
@@ -183,7 +194,13 @@ def compute(inputs: Inputs, session: date, p: StatementParams) -> pd.DataFrame:
     before = stale_before(session, p)
     ids = sorted(set(today) | set(by_instrument))
     rows = [
-        _row(totals(by_instrument.get(i, {}), NON_NEGATIVE), i in financial, before) for i in ids
+        _row(
+            totals(by_instrument.get(i, {}), NON_NEGATIVE),
+            i in financial,
+            before,
+            bool(by_instrument.get(i)),
+        )
+        for i in ids
     ]
     return pd.DataFrame(rows).assign(instrument_id=ids)
 

@@ -98,7 +98,7 @@ def test_a_missing_quarter_gives_partial_and_no_ttm_never_a_wrong_sum() -> None:
     gap = [f for i, f in enumerate(quarters("operating_income", [1.0] * 4)) if i != 1]
     assert pd.isna(run(gap).loc["EQ:A", "ebit_ttm"])  # a hole in the quarters
     nothing = run(quarters("operating_income", [10.0, 20.0, 30.0]))
-    assert nothing.loc["EQ:A", "is_status"] == "NO_FACTS"
+    assert nothing.loc["EQ:A", "is_status"] == "NO_TTM"  # facts filed, no TTM can be formed
 
 
 def test_an_instrument_without_facts_is_no_facts() -> None:
@@ -139,3 +139,27 @@ def test_an_old_ttm_is_stale_but_shown() -> None:
 def test_the_tag_lists_are_the_ones_the_parser_stores() -> None:
     for concept, tags in inc.CONCEPT_TAGS.items():
         assert tags == STATEMENT_CONCEPTS[concept][1], concept
+
+
+def test_lines_ending_on_different_periods_are_partial_not_ok() -> None:
+    tag = inc.CONCEPT_TAGS["pretax_income"][0]
+    year = (
+        "EQ:A",
+        "pretax_income",
+        tag,
+        date(2024, 1, 1),
+        date(2024, 12, 31),
+        date(2025, 2, 15),
+        7.0,
+    )
+    facts = quarters("operating_income", [1.0] * 4) + quarters("income_tax", [1.0] * 4) + [year]
+    row = run(facts).loc["EQ:A"]
+    assert row["pretax_income_ttm"] == 7.0 and row["ebit_ttm"] == 4.0  # the fiscal-year fallback
+    assert row["is_status"] == "PARTIAL"  # one line ends 2024-12-31, the others 2025-03-30
+
+
+def test_an_old_bank_is_stale_not_financial() -> None:
+    facts = [f for c in CORE for f in quarters(c, [1.0] * 4, iid="EQ:B")]
+    old = run(facts, ids=("EQ:B",), sic={"EQ:B": "6021"}, session=date(2026, 12, 1))
+    assert old.loc["EQ:B", "is_status"] == "STALE"
+    assert run(facts, ids=("EQ:B",), sic={"EQ:B": "6021"}).loc["EQ:B", "is_status"] == "FINANCIAL"

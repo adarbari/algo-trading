@@ -20,7 +20,7 @@ neither (some asset-light and financial issuers) has none: null, never zero.
     ocf_ttm      net cash provided by operating activities (USD; negative when used)
     capex_ttm    cash paid for property, plant and equipment (USD, positive)
     cf_as_of     the period end of the first TTM present (operating cash flow, else capex)
-    cf_status    OK / PARTIAL / NO_FACTS / STALE
+    cf_status    OK / PARTIAL / NO_TTM / NO_FACTS / STALE
 """
 
 from datetime import date
@@ -44,7 +44,7 @@ from algotrade.features.rollups.statements.ttm import Total
 
 NAME = "cash_flow"
 VERSION = 1
-STATUSES = ("OK", "PARTIAL", "NO_FACTS", "STALE")
+STATUSES = ("OK", "PARTIAL", "NO_TTM", "NO_FACTS", "STALE")
 # The same lists as ``statement_concepts.py``, best first (a test compares them).
 CONCEPT_TAGS = {
     "ocf": (
@@ -59,8 +59,8 @@ NON_NEGATIVE = ("capex",)  # a payment: a derived quarter below zero is a restat
 
 _WHY = (
     "no cash flow line filed by the session (ETFs, funds, no CIK, issuers that report outside "
-    "USD), or no TTM can be formed (neither four consecutive quarters nor a fiscal year of this "
-    "line): NO_FACTS"
+    "USD): NO_FACTS; or no TTM can be formed (neither four consecutive quarters nor a fiscal "
+    "year of this line): NO_TTM"
 )
 _UNTAGGED = "; or the filer does not report this line under any of its tags (never zero)"
 
@@ -88,7 +88,9 @@ FEATURES = (
     ),
     Feature(
         "cf_status", "str", "category",
-        "OK (both lines have a TTM); PARTIAL (one); NO_FACTS (neither); STALE (the first TTM "
+        "OK (both lines have a TTM ending on the same period); PARTIAL (one, or two ending on "
+        "different periods); NO_TTM (facts filed, but no TTM); NO_FACTS (no fact filed); STALE "
+        "(the first TTM "
         "present ended more than stale_days, 480, before the session; values still shown)",
         "never", "label", categories=STATUSES, inputs=("instruments/statements.concept",),
     ),
@@ -96,11 +98,14 @@ FEATURES = (
 COLUMNS = column_types(FEATURES)
 
 
-def _row(found: dict[str, Total], before: int) -> dict[str, object]:
-    if not found:
+def _row(found: dict[str, Total], before: int, has_facts: bool) -> dict[str, object]:
+    if not has_facts:
         return {"cf_status": "NO_FACTS"}
+    if not found:
+        return {"cf_status": "NO_TTM"}
     first = next(found[c] for c in COLUMN_OF if c in found)
-    complete = "OK" if len(found) == len(COLUMN_OF) else "PARTIAL"
+    same = len(found) == len(COLUMN_OF) and len({t[1] for t in found.values()}) == 1
+    complete = "OK" if same else "PARTIAL"  # OK only when both lines end on one period
     status = "STALE" if first[1] < before else complete
     row: dict[str, object] = {COLUMN_OF[c]: t[0] for c, t in found.items()}
     return {**row, "cf_as_of": day_date(first[1]), "cf_status": status}
@@ -113,7 +118,10 @@ def compute(inputs: Inputs, session: date, p: StatementParams) -> pd.DataFrame:
     by_instrument = lines(inputs.get(STATEMENTS), RANKS, session, p)
     before = stale_before(session, p)
     ids = sorted(set(today) | set(by_instrument))
-    rows = [_row(totals(by_instrument.get(i, {}), NON_NEGATIVE), before) for i in ids]
+    rows = [
+        _row(totals(by_instrument.get(i, {}), NON_NEGATIVE), before, bool(by_instrument.get(i)))
+        for i in ids
+    ]
     return pd.DataFrame(rows).assign(instrument_id=ids)
 
 

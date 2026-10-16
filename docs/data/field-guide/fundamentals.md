@@ -571,7 +571,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 ### `rollup.income_statement@v1.is_status`
 
-**How to read it.** Whether the income statement lines of the name can be trusted as a set. OK: operating income, pretax income and tax all have a TTM. PARTIAL: at least one line has a TTM but not all three. NO_FACTS: no line has one (funds, foreign filers that do not report in USD, a recent filer without four quarters). STALE: the first TTM ended more than 480 days before the session; the values are shown but old. FINANCIAL: a bank, broker or insurer (SIC 6000 to 6411); the EBIT, D&A and interest lines are null by design.
+**How to read it.** Whether the income statement lines of the name can be trusted as a set. OK: operating income, pretax income and tax all have a TTM, and all end on the same period. PARTIAL: at least one line has a TTM, but not all three or not on the same period. NO_TTM: facts are filed but no line has a TTM (a recent filer without four quarters or a year). NO_FACTS: no fact is filed (funds, foreign filers that do not report in USD). STALE: the first TTM ended more than 480 days before the session; the values are shown but old. FINANCIAL: a current bank, broker or insurer (SIC 6000 to 6411); the EBIT, D&A and interest lines are null by design.
 
 **The criterion per intent**
 
@@ -583,7 +583,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 **When the reading lies**
 
 - OK says the three core lines exist, not that gross profit, cost of revenue, D&A or interest do. Those are optional and many filers do not tag them, so read the line itself.
-- FINANCIAL is decided from the SIC code of the company snapshot. A company with no snapshot is treated as not financial. A holding company with a bank inside it may not be flagged.
+- STALE is checked first, so a bank with old filings reads STALE, not FINANCIAL. FINANCIAL is decided from the SIC code of the company snapshot. A company with no snapshot is treated as not financial. A holding company with a bank inside it may not be flagged.
 - STALE is a filer 16 months behind its filings (a late filer, a delisting in progress); a name between its quarterly and annual report is not stale.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
@@ -647,7 +647,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 ### `rollup.cash_flow@v1.cf_status`
 
-**How to read it.** Whether the cash flow lines of the name can be trusted as a set. OK: operating cash flow and capex both have a TTM. PARTIAL: only one does. NO_FACTS: neither does (funds, foreign filers that do not report in USD, a recent filer without four quarters). STALE: the first TTM ended more than 480 days before the session; the values are shown but old.
+**How to read it.** Whether the cash flow lines of the name can be trusted as a set. OK: operating cash flow and capex both have a TTM, ending on the same period. PARTIAL: only one does, or they end on different periods. NO_TTM: facts are filed but neither has a TTM (a recent filer without four quarters or a year). NO_FACTS: no fact is filed (funds, foreign filers that do not report in USD). STALE: the first TTM ended more than 480 days before the session; the values are shown but old.
 
 **The criterion per intent**
 
