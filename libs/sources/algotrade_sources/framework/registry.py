@@ -46,6 +46,13 @@ from algotrade_sources.framework.limiter import DEFAULT_DIR, Limiter, Pacing
 from algotrade_sources.llm.chat import ChatCompletions
 from algotrade_sources.llm.claude_cli import ClaudeCli
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
+from algotrade_sources.vendors.finnhub import client as finnhub_client
+from algotrade_sources.vendors.finnhub.probe import FinnhubProbe
+from algotrade_sources.vendors.finnhub.recommendations import FinnhubRecommendations
+from algotrade_sources.vendors.fmp import client as fmp_client
+from algotrade_sources.vendors.fmp.estimates import FmpAnalystEstimates
+from algotrade_sources.vendors.fmp.probe import FmpProbe
+from algotrade_sources.vendors.fmp.targets import FmpPriceTargets, FmpRatings
 from algotrade_sources.vendors.fred.observations import (
     FredObservations,
     missing_series,
@@ -200,6 +207,11 @@ def _token(key: str | None) -> dict[str, str]:
     return {"Authorization": f"Token {key}", "Content-Type": "application/json"}
 
 
+def _finnhub_token(key: str | None) -> dict[str, str]:
+    """Finnhub: ``X-Finnhub-Token: <key>`` (in a header, never in URLs or logs)."""
+    return {"X-Finnhub-Token": str(key)}
+
+
 def _sec_agent(contact: str | None) -> dict[str, str]:
     return {"User-Agent": user_agent(str(contact))}
 
@@ -315,6 +327,44 @@ SOURCES: dict[str, SourceSpec] = {
             "create a free Tiingo account (tiingo.com) and add the key to .env",
             _token,
             tries=4,
+        ),
+        *(
+            SourceSpec(
+                name,
+                "fmp",
+                "fmp",
+                build,
+                1.0,
+                env_names.FMP_API_KEY,
+                "create a free FMP account (financialmodelingprep.com) and add the key to .env",
+                tries=2,  # a 402 / 401 is raised at once (``refused``); a 5xx is tried once more
+                rejected=fmp_client.refused,
+                query_param="apikey",  # FMP takes the key only in the query string
+            )
+            for name, build in (
+                ("fmp_probe", FmpProbe),
+                ("fmp_estimates", FmpAnalystEstimates),
+                ("fmp_targets", FmpPriceTargets),
+                ("fmp_ratings", FmpRatings),
+            )
+        ),
+        *(
+            SourceSpec(
+                name,
+                "finnhub",
+                "finnhub",
+                build,
+                1.0,  # free tier: 60 calls a minute
+                env_names.FINNHUB_API_KEY,
+                "create a free Finnhub account (finnhub.io) and add the key to .env",
+                _finnhub_token,
+                tries=2,
+                rejected=finnhub_client.refused,
+            )
+            for name, build in (
+                ("finnhub_probe", FinnhubProbe),
+                ("finnhub_recommendations", FinnhubRecommendations),
+            )
         ),
         SourceSpec("sp500_history", "sp500_history", "sp500_history", Sp500Membership, 1.0),
         SourceSpec("published", "published", "published", PublishedSeries, 1.0),

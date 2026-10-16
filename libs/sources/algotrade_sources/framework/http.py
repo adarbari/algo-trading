@@ -75,11 +75,16 @@ def urllib_transport(
 def with_query_param(transport: Transport, name: str, value: str) -> Transport:
     """``transport`` that adds ``name=value`` to every URL it fetches, for the vendor whose key
     can only travel as a query parameter (FRED ``api_key``). The source and the retry loop see
-    the URL without it, so the key never reaches a log line, an error message or a raw path."""
+    the URL without it, so the key never reaches a log line, an error message or a raw path.
+    An ``HttpError`` is re-raised without its cause: urllib's ``HTTPError`` holds the full keyed
+    URL (``url``, ``filename``, ``geturl()``), and this is the one layer that knows the key."""
     pair = urllib.parse.urlencode({name: value})
 
     def get(url: str) -> bytes:
-        return transport(f"{url}{'&' if '?' in url else '?'}{pair}")
+        try:
+            return transport(f"{url}{'&' if '?' in url else '?'}{pair}")
+        except HttpError as exc:
+            raise HttpError(exc.status, exc.retry_after, exc.body) from None
 
     return get
 
@@ -129,6 +134,8 @@ def _error_body(exc: urllib.error.HTTPError) -> bytes:
         return body[:1024]
     except (OSError, EOFError):
         return b""
+    finally:
+        exc.close()  # the response is spent: never leave its socket to the garbage collector
 
 
 @dataclass(frozen=True)
@@ -309,6 +316,15 @@ def _linear(policy: RetryPolicy, attempt: int) -> float:
     return min(policy.max_delay, policy.base_delay * (attempt + 1) + random.uniform(0, 0.5))
 
 
+@dataclass(frozen=True)
+class Answer:
+    """One un-retried response: its HTTP ``status`` and ``body`` (an error's body is cut to
+    its first kilobyte)."""
+
+    status: int
+    body: bytes
+
+
 @dataclass
 class Http:
     """What a source fetches through. Built by the registry; sources never pace themselves."""
@@ -329,18 +345,23 @@ class Http:
             breaker=self.breaker,
         )
 
-    def status(self, url: str) -> int:
-        """One request, no retries and no circuit breaker: the HTTP status it got (200 when it
-        succeeded); a probe of "does the vendor answer this at all". Waits on the limiter."""
+    def answer(self, url: str) -> Answer:
+        """One request, no retries and no circuit breaker: the HTTP status and body it got
+        (200 and the payload when it succeeded), for a probe of what the vendor lets this key
+        do. Waits on the limiter. A failure that is not an HTTP answer (no network) raises."""
         if self.limiter is not None:
             self.limiter.wait()
         try:
-            self.transport(url)
+            body = self.transport(url)
         except HttpError as exc:
             _report(self.limiter, "error")
-            return exc.status
+            return Answer(exc.status, exc.body)
         _report(self.limiter, "ok")
-        return 200
+        return Answer(200, body)
+
+    def status(self, url: str) -> int:
+        """The HTTP status ``answer`` got (200 when it succeeded)."""
+        return self.answer(url).status
 
     def cool_down(self, seconds: float) -> None:
         """Ask the vendor's limiter (shared across processes) to pause new requests."""

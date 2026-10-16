@@ -45,6 +45,10 @@ SEC_CONTACT = "ALGOTRADE_SEC_CONTACT"
 # Tiingo daily prices (the event-study history from 2018, ADR 0050): optional, free key; no key:
 # the source is skipped and `bars-history` with it.
 TIINGO_API_KEY = "ALGOTRADE_TIINGO_API_KEY"
+# Analyst data (ADR 0068): optional free keys from FMP (a query parameter the transport adds) and
+# Finnhub (a header); no key: that vendor's sources are skipped and `analyst-probe` with them.
+FMP_API_KEY = "ALGOTRADE_FMP_API_KEY"
+FINNHUB_API_KEY = "ALGOTRADE_FINNHUB_API_KEY"
 # The text model behind natural-language screener drafts (ADR 0041): optional (a local server
 # needs none); the provider is `config/site/llm.toml`, never the environment.
 LLM_API_KEY = "ALGOTRADE_LLM_API_KEY"  # the single-provider (legacy) form of llm.toml only

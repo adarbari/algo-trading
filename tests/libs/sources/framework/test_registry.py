@@ -41,6 +41,8 @@ ENV = {
     "ALGOTRADE_SEC_CONTACT": "ops@example.org",
     "ALGOTRADE_FRED_API_KEY": "fred-key",
     "ALGOTRADE_TIINGO_API_KEY": "tiingo-key",
+    "ALGOTRADE_FMP_API_KEY": "fmp-key",
+    "ALGOTRADE_FINNHUB_API_KEY": "finnhub-key",
 }
 
 
