@@ -110,7 +110,8 @@ def _stamp(ctx: ReadContext) -> tuple[object, ...]:
     """What the resolved screeners depend on, cheaply: the screens and finalised versions each
     scope holds (a version file is immutable, a new one is a save), and the user's catalogue
     (their features join a screen's hash). Site files change only with a deploy, which restarts
-    the API."""
+    the API; a user's hand-edited selections and strategies (never written by the API) likewise
+    need a restart."""
     scopes = (SITE_USER,) if ctx.user.user_id == SITE_USER else (SITE_USER, ctx.user.user_id)
     held = tuple(
         (scope, name, tuple(ctx.configs.versions(scope, name)))

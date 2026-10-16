@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, cast
@@ -7,6 +8,7 @@ import pytest
 
 from algotrade_api.graphql import warm
 from algotrade_api.graphql.warm import CacheWarmer
+from algotrade_api.main import _start_warming
 
 
 @dataclass
@@ -164,3 +166,25 @@ def test_warm_home_reads_only_the_home_steps(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(warm, "warm_market_frames", lambda c: ran.append("frames"))
     warm.CacheWarmer(lambda: cast(Any, object())).warm_home()
     assert "frames" not in ran and "load_ideas" in ran and "load_regime" in ran
+
+
+def test_a_slow_home_warm_does_not_hold_the_start_past_its_cap(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    release = threading.Event()
+
+    class Slow:
+        def warm_home(self) -> None:
+            release.wait(5)
+
+        async def run(self) -> None:
+            await asyncio.sleep(0)
+
+    async def go() -> None:
+        task = await _start_warming(cast(Any, Slow()), home_timeout_s=0.05)
+        assert task is not None
+        release.set()
+        await task
+
+    asyncio.run(go())
+    assert "serving anyway" in caplog.text

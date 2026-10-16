@@ -77,6 +77,7 @@ from algotrade_api.web import web_router
 
 log = logging.getLogger(__name__)
 
+HOME_WARM_TIMEOUT_S = 60.0  # the longest a start waits for the home page's reads
 TITLE = "algotrade API"
 # Each of the 6 read threads (``READ_THREADS``) otherwise decodes Parquet with up to one Arrow
 # CPU thread per core plus an IO pool, every thread holding arena memory: 100 concurrent users
@@ -150,14 +151,19 @@ def _overloaded(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
-async def _start_warming(warmer: CacheWarmer | None) -> asyncio.Task[None] | None:
+async def _start_warming(
+    warmer: CacheWarmer | None, home_timeout_s: float = HOME_WARM_TIMEOUT_S
+) -> asyncio.Task[None] | None:
     """The home page's reads first (no request meets a cold cache), then the warmer's task."""
     if warmer is None:
         return None
-    try:
-        await asyncio.wait_for(off_loop(warmer.warm_home), HOME_WARM_TIMEOUT_S)
-    except Exception:  # an empty store, or slow: serve anyway, the warmer retries
-        log.exception("warming the home page before serving failed")
+    # not wait_for: off_loop shields its thread from cancellation, so a timeout would still wait
+    reading = asyncio.ensure_future(off_loop(warmer.warm_home))
+    done, _ = await asyncio.wait({reading}, timeout=home_timeout_s)
+    if not done:
+        log.warning("warming the home page took over %.0f s: serving anyway", home_timeout_s)
+    elif (error := reading.exception()) is not None:  # an empty store: serve, the warmer retries
+        log.error("warming the home page before serving failed", exc_info=error)
     return asyncio.create_task(warmer.run())
 
 
@@ -324,7 +330,6 @@ def create_app(
     return app
 
 
-HOME_WARM_TIMEOUT_S = 60.0  # the longest a start waits for the home page's reads
 READ_CACHE_SIZE = 64  # room for the warmed market tables (warm.py) beside the pages' entries
 
 
