@@ -79,7 +79,9 @@ class Step:
     reruns_after: tuple[str, ...] = ()
     critical: bool = True  # False: a failure is a warning, not the run's failure
     requires: Precondition | None = None  # data that must exist for the session
-    latest_only: bool = False  # current-snapshot sources: only the latest closed session
+    # Why the step runs only for the latest closed session (a catch-up session SKIPS it with
+    # this reason); empty: it runs for every session.
+    latest_only: str = ""
     accept: tuple[Acceptance, ...] = ()  # acceptance checks run after the task
     accept_with: tuple[ConfiguredAcceptance, ...] = ()  # the same, given the task context
     accept_stats: tuple[StatsAcceptance, ...] = ()  # the same, given the run record's stats
