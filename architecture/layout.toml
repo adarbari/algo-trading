@@ -270,6 +270,11 @@ purpose = "feature groups comparing an instrument with the market, its sector an
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/statements"
+purpose = "feature groups from the SEC financial statements (instruments/statements: income statement, cash flow lines as trailing twelve months), one module per group (its documented FEATURES, a pure compute and its GROUP declaration), plus ttm.py, the TTM arithmetic over one concept's periods that financials@v2 also uses"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/quant"
 purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model, the edge statistics in edges/"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]

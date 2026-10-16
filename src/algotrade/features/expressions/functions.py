@@ -11,11 +11,13 @@ own null:
 ``null`` (the literal) has type ``null`` until it meets another type. Null is UNKNOWN: it
 propagates through arithmetic, comparisons and functions; ``and`` / ``or`` are Kleene
 (``false and null`` is false, ``true or null`` is true); ``if(null, a, b)`` is null; a division
-by zero, ``log`` of a value <= 0, ``sqrt`` of a negative and any non-finite result are null.
+by zero, ``log`` of a value <= 0, ``sqrt`` of a negative and any non-finite result (``exp`` of
+a value too large to represent) are null.
 
 Built-ins (``FUNCTIONS``): ``if(cond, a, b)``, ``abs(x)``, ``min(a, b, ...)``,
 ``max(a, b, ...)`` (numbers or strings; null if any is null), ``log(x)`` (natural),
-``sqrt(x)``, ``ncdf(x)`` (the standard normal CDF, for a probit: ``ncdf(b0 + b1 * x)``),
+``sqrt(x)``, ``exp(x)`` (e to the x: a growth rate from a log ratio, ``exp(log(a / b) / n) - 1``),
+``ncdf(x)`` (the standard normal CDF, for a probit: ``ncdf(b0 + b1 * x)``),
 ``clip(x, lo, hi)``, ``coalesce(a, b, ...)`` (the first non-null),
 ``is_null(x)`` (never null), ``one_of(x, "A", "B", ...)`` (x equals one of the literals) and
 ``exists(group)`` (the instrument has a row in that group for the session: false when the
@@ -239,6 +241,7 @@ FUNCTIONS: dict[str, Function] = {
         Function("abs", 1, _numeric(np.abs, lambda x: ~np.isnan(x))),
         Function("sqrt", 1, _numeric(np.sqrt, lambda x: x >= 0)),
         Function("log", 1, _numeric(np.log, lambda x: x > 0)),
+        Function("exp", 1, _numeric(np.exp, lambda x: ~np.isnan(x))),
         Function("ncdf", 1, _numeric(norm_cdf, lambda x: ~np.isnan(x))),
         Function("min", 2, _extreme(np.minimum), variadic=True),
         Function("max", 2, _extreme(np.maximum), variadic=True),

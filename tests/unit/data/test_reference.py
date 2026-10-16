@@ -110,7 +110,7 @@ def test_companies_follow_the_snapshot_rule() -> None:
     assert every is not None and len(every) == 2
 
 
-def test_company_sectors_are_the_snapshot_on_or_before_with_three_columns() -> None:
+def test_company_sectors_are_the_snapshot_on_or_before_with_four_columns() -> None:
     writer, reader = store()
     company = "instruments/company"
     assert company_sectors(reader, D2) is None  # no company snapshot at all
@@ -122,7 +122,12 @@ def test_company_sectors_are_the_snapshot_on_or_before_with_three_columns() -> N
     writer.write_table(company, D2, "c2", stamped(rows, D2, "c2"))
     assert company_sectors(reader, D1) is None  # taken after the session: not known then
     found = company_sectors(reader, D2 + timedelta(days=3))
-    assert found is not None and list(found.columns) == ["instrument_id", "sector", "industry"]
+    assert found is not None and list(found.columns) == [
+        "instrument_id",
+        "sector",
+        "industry",
+        "sic",
+    ]
     assert found["sector"].iloc[0] == "Technology" and pd.isna(found["sector"].iloc[1])
 
 

@@ -15,6 +15,7 @@ from algotrade.data import feature_inputs as inputs
 from algotrade.data import prices
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.shares import TABLE as SHARES
+from algotrade.data.statements.reading import TABLE as STATEMENTS
 from tests.helpers.rollup_store import (
     END,
     series,
@@ -130,6 +131,7 @@ def test_company_input_is_the_sector_snapshot_the_session_sees() -> None:
         "instrument_id": ["EQ:A"],
         "sector": ["Technology"],
         "industry": ["Software"],
+        "sic": ["3571"],
     }
     assert inputs.has_input("instruments/company")
 
@@ -224,6 +226,25 @@ def test_share_facts_are_seen_from_their_filing_date() -> None:
     loaded = inputs.load_input(reader, SHARES, [END], 0)
     seen = loaded.at(END, 0)
     assert seen is not None and list(seen["shares"]) == [10.0]  # the later filing is not seen
+    assert loaded.at(early - timedelta(days=1), 0) is None
+
+
+def test_statement_facts_are_seen_from_their_filing_date_without_markers() -> None:
+    writer, reader = store()
+    assert inputs.load_input(reader, STATEMENTS, [END], 0).at(END, 0) is None
+    early, late = END - timedelta(days=30), END + timedelta(days=5)
+    rows = [
+        {"instrument_id": "EQ:A", "cik": "1", "concept": "ocf", "tag": "us-gaap:X",
+         "period_type": "DURATION", "period_start": f - timedelta(days=90), "period_end": f,
+         "filed": f, "value": n, "unit": "usd", "fetched_on": late}
+        for n, f in ((10.0, early), (12.0, late))
+    ]  # fmt: skip
+    rows.append({"instrument_id": "EQ:A", "cik": "1", "concept": "checked", "fetched_on": late})
+    writer.write_table(STATEMENTS, late, "r1", stamped(rows, late, "r1"))  # stored after both
+    loaded = inputs.load_input(reader, STATEMENTS, [END], 0)
+    seen = loaded.at(END, 0)
+    assert seen is not None and list(seen["value"]) == [10.0]  # the later filing is not seen
+    assert "run_id" not in seen.columns and list(seen["concept"]) == ["ocf"]
     assert loaded.at(early - timedelta(days=1), 0) is None
 
 
