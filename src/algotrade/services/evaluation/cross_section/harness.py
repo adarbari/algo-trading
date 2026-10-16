@@ -53,8 +53,8 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
-    outcome_known,
     outcome_seqs,
+    outcome_stamps,
     stored_sessions,
 )
 from algotrade.services.configs import resolve_config
@@ -410,7 +410,6 @@ def evaluate_edge(
         verdict.cost_levels_bps,  # every leg counts hits at the site's cost grid
     )
     stored = read_legs(reader, user.user_id, edge.id, start, end)
-    earnings = any(p.scope.edge.event_class == "earnings_expected" for p in plans)  # a diagnostic
     needs = _needs(plans, variants, schedules, spec)
     reuse = plan_reuse(
         reader,
@@ -418,7 +417,7 @@ def evaluate_edge(
         needs,
         as_of,
         partial(_outcome_stamps, reader, as_of),
-        "requested" if full or earnings else None,
+        "requested" if full else None,
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
     results, randoms, projected = [], [], projection_count(load_verdict(configs))  # (0064)
@@ -593,11 +592,14 @@ def _leg_rows(
 
 def _outcome_stamps(
     reader: StoreReader, as_of: datetime, entries: Collection[date]
-) -> tuple[dict[tuple[date, int], datetime], dict[date, int]]:
+) -> tuple[
+    dict[tuple[date, int], datetime], dict[tuple[date, int], frozenset[str]], dict[date, int]
+]:
     """What reuse asks of the outcome partitions of ``entries``: per (S, horizon) the latest
-    ``knowledge_ts`` known by ``as_of`` and per S the commit sequence (the harness is the one
-    reader of outcomes)."""
-    return outcome_known(reader, entries, as_of), outcome_seqs(reader, entries)
+    ``knowledge_ts`` known by ``as_of`` with the names of those rows, and per S the commit
+    sequence (the harness is the one reader of outcomes)."""
+    known, names = outcome_stamps(reader, entries, as_of)
+    return known, names, outcome_seqs(reader, entries)
 
 
 def iv_field_of(edge: Edge, run_field: str = IMPLIED_VOL_FIELD) -> str:

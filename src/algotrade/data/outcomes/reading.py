@@ -36,29 +36,47 @@ def outcome_seqs(reader: StoreReader, sessions: Iterable[date]) -> dict[date, in
     return {d: s for d, s in found.items() if d in set(wanted)}
 
 
-def outcome_known(
+def outcome_stamps(
     reader: StoreReader, sessions: Iterable[date], as_of: datetime, benchmark: str = "SPY"
-) -> dict[tuple[date, int], datetime]:
-    """Per (start session, horizon) of ``sessions`` with a ``benchmark`` row known by ``as_of``,
-    the latest ``knowledge_ts`` among those rows: which windows are closed, and when the newest
-    row of each became known (a columns-only read of each wanted partition, not of the range
-    between them; ADR 0063)."""
+) -> tuple[dict[tuple[date, int], datetime], dict[tuple[date, int], frozenset[str]]]:
+    """Per (start session, horizon) of ``sessions`` with a ``benchmark`` row known by ``as_of``:
+    the latest ``knowledge_ts`` among those rows (which windows are closed, and when the newest
+    row of each became known) and the instrument ids of those rows (the names ``select_outcomes``
+    would return). One columns-only read of each wanted partition, not of the range between them
+    (ADR 0063)."""
     latest: dict[tuple[date, int], datetime] = {}
+    names: dict[tuple[date, int], set[str]] = {}
     for day in sorted(set(sessions)):
         frame = reader.table_range(
-            FORWARD_RETURNS, day, day, as_of, columns=("horizon_sessions", "benchmark")
+            FORWARD_RETURNS,
+            day,
+            day,
+            as_of,
+            columns=("instrument_id", "horizon_sessions", "benchmark"),
         )
         if frame is None:
             continue
         known = pd.to_datetime(frame["knowledge_ts"], utc=True)
         keep = (frame["benchmark"] == benchmark) & (known <= pd.Timestamp(as_of))
-        for horizon, stamp in zip(
-            frame.loc[keep, "horizon_sessions"], known[keep].dt.to_pydatetime(), strict=True
+        for horizon, stamp, name in zip(
+            frame.loc[keep, "horizon_sessions"],
+            known[keep].dt.to_pydatetime(),
+            frame.loc[keep, "instrument_id"],
+            strict=True,
         ):
             key = (day, int(horizon))
+            names.setdefault(key, set()).add(str(name))
             if key not in latest or stamp > latest[key]:
                 latest[key] = stamp
-    return latest
+    return latest, {k: frozenset(v) for k, v in names.items()}
+
+
+def outcome_known(
+    reader: StoreReader, sessions: Iterable[date], as_of: datetime, benchmark: str = "SPY"
+) -> dict[tuple[date, int], datetime]:
+    """Per (start session, horizon) of ``sessions`` with a ``benchmark`` row known by ``as_of``,
+    the latest ``knowledge_ts`` among those rows (``outcome_stamps`` without the names)."""
+    return outcome_stamps(reader, sessions, as_of, benchmark)[0]
 
 
 def missing_outcomes(sessions: Sequence[date]) -> MissingDataError:

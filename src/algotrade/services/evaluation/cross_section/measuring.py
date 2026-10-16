@@ -437,6 +437,8 @@ def _measure(
                 _measure_plan(p, variant, session, events, chunk, closed, out, spec, as_of)
         session.release()
     reuse.adopt(out.legs, out.lost, out.randoms, {p.key for p in plans})
+    for (entry, horizon), names in reuse.names.items():  # the entries no chunk read
+        out.stored.setdefault((horizon, entry), names)
     for reads in reuse.reads.values():
         session.adopt(reads, reuse.snapshots())
     for horizon, missing in failed.items():
