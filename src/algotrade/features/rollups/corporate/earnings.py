@@ -104,7 +104,7 @@ COLUMNS = column_types(FEATURES)
 SEC_8K_SOURCE = "sec_8k"
 
 
-def _report_days(stored: pd.DataFrame) -> pd.Series:
+def report_days(stored: pd.DataFrame) -> pd.Series:
     """The report day of each row, naive: ``earnings_date`` where the writer gave one (an 8-K
     accepted after 20:00 New York time has a ``ts`` on the next UTC day; the Nasdaq calendar's
     ``ts`` is midnight UTC of the day), else the UTC date of ``ts``."""
@@ -131,7 +131,7 @@ def valid_events(stored: pd.DataFrame, session: date, since: date | None = None)
     over every stored row is a vectorised group-by of two day columns."""
     if "source" in stored.columns:  # the 8-K results rows wait for the v2 precedence (above)
         stored = stored[stored["source"] != SEC_8K_SOURCE]
-    report_day = _report_days(stored).to_numpy(dtype="datetime64[D]")
+    report_day = report_days(stored).to_numpy(dtype="datetime64[D]")
     snap_day = pd.to_datetime(stored["session_date"]).to_numpy(dtype="datetime64[D]")
     n = len(stored)
     history, carried, fetched_on = np.zeros(n, dtype=bool), np.zeros(n, dtype=bool), snap_day
@@ -173,7 +173,7 @@ def valid_events(stored: pd.DataFrame, session: date, since: date | None = None)
         _stored_by=stored_by[valid], _history=history[valid]
     )
     rows = rows.assign(
-        report=_report_days(rows).dt.date,
+        report=report_days(rows).dt.date,
         snapshot=pd.to_datetime(rows["session_date"]).dt.date,
     )
     if rows["_history"].any():

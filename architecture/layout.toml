@@ -216,6 +216,11 @@ purpose = "feature groups of volatility and trading activity from daily bars (AT
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/consensus"
+purpose = "feature groups from analysts' consensus as the earnings calendar stores it (the surprise of the last reports against their forecast, the revision of the next report's forecast across the nightly snapshots): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/corporate"
 purpose = "feature groups from corporate events and filings (earnings, dividends, share counts, financials): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
