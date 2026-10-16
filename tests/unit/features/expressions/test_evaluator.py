@@ -51,6 +51,12 @@ def run(text: str) -> list[object]:
         ("abs(g.x)", [1.0, 2.0, None, 4.0, 1.0]),
         ("sqrt(g.x)", [1.0, np.sqrt(2), None, 2.0, None]),
         ("log(g.y)", [None, 0.0, 0.0, np.log(2), np.log(3)]),
+        ("exp(g.x)", [np.e, np.e**2, None, np.e**4, np.exp(-1)]),
+        ("exp(g.x * 1000)", [None, None, None, None, 0.0]),  # overflow is null, underflow is 0
+        (
+            "exp(log(g.y))",
+            [None, 1.0, 1.0, 2.0, 3.0],
+        ),  # the inverse of log, a domain error stays null
         ("ncdf(g.y - 1)", [0.15865525393145707, 0.5, 0.5, 0.8413447460685429, 0.9772498680518208]),
         ("ncdf(g.x * 100)", [1.0, 1.0, None, 1.0, 0.0]),  # the tails are exact, never null
         ("min(g.x, g.y)", [0.0, 1.0, None, 2.0, -1.0]),
