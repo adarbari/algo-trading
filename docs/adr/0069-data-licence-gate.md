@@ -29,7 +29,7 @@ served stored values to any user.
    and records its licences in the run's audit; results are filtered per viewer at read. A user's
    own run holds what the registry gives that user. A viewer without the licence sees a screen
    that read a personal field **by names and decisions only**: its criteria values, `score`,
-   `tie_break` and `reasons` (which quote the value) are withheld, a sort by rank or score is
+   `tie_break`, `rank` and `reasons` (which quote the value) are withheld, a sort by rank or score is
    by symbol, and its Ideas ordering ignores score. (Owner default, as the ledger: names and
    decisions stay visible.)
 4. **Market fields.** The gate covers the market entity too: a trader without the licence loses
@@ -42,6 +42,7 @@ served stored values to any user.
 ## Consequences
 - A new feature with a personal source is protected by declaring `licence = "personal"`; no
   per-path work. A new reader of values fails the fitness test until it is listed as gated.
-- Not recomputed: the verdict of a stored run recorded under a licence later withdrawn (decision,
-  rank), and `rank` itself is still shown.
-- Granting `site` a licence would leak IBKR-derived picks through site results: not done.
+- Not recomputed: the verdict (decision) of a stored run recorded under a licence later withdrawn.
+  A run's `rank` is withheld with its score (null in GraphQL); the decision stays.
+- The site's own run keeps every licence on purpose (decision 3); the leak it would be to give
+  `site` no licence-filtering at read is what the per-viewer filter prevents.

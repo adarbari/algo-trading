@@ -94,7 +94,7 @@ class ScreenResult:
     config_id: str
     instrument_id: str
     instrument: Instrument | None
-    rank: int
+    rank: int | None  # None: withheld (the order follows values the viewer may not see)
     decision: str
     score: float | None
     tie_break: float | None
@@ -276,8 +276,8 @@ def run_withheld(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
     """The fields ``run`` read that the viewer's data licences do not cover (none for a viewer
     who holds them all: nothing is read). A run with any is a screen the viewer sees by names
     and decisions only: its ``score``, ``tie_break`` and ``reasons`` embed the hidden values
-    (``reasons`` says "0.83, needs >= 0.9") and its rank order follows them, so they are
-    withheld, and a sort by them is by symbol (ADR 0064 decision 10, ADR 0069)."""
+    (``reasons`` says "0.83, needs >= 0.9") and its rank order follows them, so they and
+    the ``rank`` are withheld, and a sort by them is by symbol (ADR 0064 decision 10, ADR 0069)."""
     if set(ctx.licences) >= ALL_LICENCES:
         return frozenset()
     return hidden_fields(ctx.features, _run_fields(ctx, run), ctx.licences)
@@ -304,7 +304,7 @@ def _result(
         config_id=run.config_id,
         instrument_id=str(row["instrument_id"]),
         instrument=instrument,
-        rank=int(row["rank"]),
+        rank=None if withheld else int(row["rank"]),
         decision=str(row["decision"]),
         score=None if withheld else _float(row.get("score")),
         tie_break=None if withheld else _float(row.get("tie_break")),

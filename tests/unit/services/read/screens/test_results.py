@@ -267,6 +267,7 @@ def test_a_run_the_viewer_may_see_only_by_names_and_decisions_serves_no_value_sc
     aaa, bbb = found[("r1", "EQ:AAA")], found[("r1", "EQ:BBB")]
     assert aaa.decision == "QUALIFIED" and bbb.instrument is not None  # names and decisions
     assert (aaa.score, aaa.tie_break, aaa.reasons) == (None, None, "")
+    assert aaa.rank is None and bbb.rank is None  # the order follows the hidden score
     assert (bbb.score, bbb.tie_break, bbb.reasons) == (None, None, "")
     assert aaa.criteria == (
         CriterionResult("iv30", "feature.vrp_iv30", "hard", "MISSING", None, None),
@@ -279,4 +280,4 @@ def test_a_run_the_viewer_may_see_only_by_names_and_decisions_serves_no_value_sc
     holder = context(reader)  # ``me`` holds the licence
     assert run_withheld(holder, run) == frozenset()
     seen = load_results(holder, {"r1": ["EQ:AAA"]}, [run])[("r1", "EQ:AAA")]
-    assert seen.criteria[0].value == "high" and seen.score == 50.0
+    assert seen.criteria[0].value == "high" and seen.score == 50.0 and seen.rank == 1

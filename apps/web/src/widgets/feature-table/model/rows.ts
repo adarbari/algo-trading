@@ -32,7 +32,7 @@ export function resultRows(page: ResultsPage): TableRow[] {
       instrumentId: result.instrumentId,
       name: result.instrument?.name ?? '',
       cells,
-      rank: result.rank,
+      rank: result.rank ?? undefined,
       decision: result.decision,
       score: result.score ?? null,
       flags: result.flags,

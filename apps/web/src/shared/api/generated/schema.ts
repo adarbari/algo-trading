@@ -1062,7 +1062,7 @@ export interface components {
             source: string;
             /**
              * Status
-             * @description LIVE, CACHED (a live answer under live_cache_s old), DISABLED, UNAVAILABLE (gateway down, busy or slow), ERROR: the last three serve the stored chain
+             * @description LIVE, CACHED (a live answer under live_cache_s old), DISABLED, UNAVAILABLE (gateway down, busy or slow), ERROR, LICENCE (IBKR quotes need the personal data licence): the last four serve the stored chain
              */
             status: string;
             /** Strikes */

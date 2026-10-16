@@ -2837,7 +2837,7 @@ type ScreenResult {
   configId: String!
   instrumentId: String!
   instrument: Instrument
-  rank: Int!
+  rank: Int
   decision: String!
   score: Float
   tieBreak: Float

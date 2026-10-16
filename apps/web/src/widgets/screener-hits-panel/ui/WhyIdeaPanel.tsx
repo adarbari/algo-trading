@@ -31,7 +31,9 @@ export function WhyIdeaPanel({ symbol, screenerId, onOpenScreener }: WhyIdeaPane
           label: 'Decision',
           value: <DecisionBadge decision={hit.result.decision} />,
         },
-        { id: 'rank', label: 'Rank', value: `#${String(hit.result.rank)}` },
+        ...(hit.result.rank === null
+          ? []
+          : [{ id: 'rank', label: 'Rank', value: `#${String(hit.result.rank)}` }]),
         ...(hit.result.score === null
           ? []
           : [{ id: 'score', label: 'Score', value: String(Math.round(hit.result.score)) }]),

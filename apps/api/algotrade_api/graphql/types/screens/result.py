@@ -65,7 +65,7 @@ class ScreenResult:
     config_id: str
     instrument_id: str
     instrument: Instrument | None
-    rank: int
+    rank: int | None
     decision: str
     score: float | None
     tie_break: float | None
