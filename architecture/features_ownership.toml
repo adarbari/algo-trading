@@ -59,3 +59,15 @@ owner = [
 ]
 section = "docs/data/layers.md#rollups-as-built"
 detect = [{ call = "compute_sessions" }, { call = "compute_one" }, { call = "FeatureGroup" }]
+
+[[responsibility]]
+id = "statement-ttm"
+description = "The trailing-twelve-month arithmetic over one concept's reported periods: the discrete quarter (a reported three-month fact, else the difference of two year-to-date facts of one fiscal year and one tag, never across tags), the TTM (four consecutive quarters, else the fiscal year), the latest quarter and its year-ago value. Written once in rollups/statements/ttm.py; financials@v2, income_statement@v1 and cash_flow@v1 import it, no group re-implements it"
+owner = [
+    "src/algotrade/features/rollups/statements/ttm.py",
+    "src/algotrade/features/rollups/corporate/financials.py",
+    "src/algotrade/features/rollups/statements/income_statement.py",
+    "src/algotrade/features/rollups/statements/cash_flow.py",
+]
+section = "docs/data/layers.md#rollups-as-built"
+detect = [{ call = "discrete_quarters" }, { call = "latest_quarter" }]
