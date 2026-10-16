@@ -46,7 +46,10 @@ already: they never decided anything, they only made the decision late.
    `nightly_duration` WARN measures the market-daily path alone. `make status` shows the last
    post-session line; the admin run reads and the availability `explain` also read post-session
    records (a verify gap cites the post-session run).
-8. **Unchanged:** ADR 0062's cutoff and completeness read the `nightly` record alone, so a
+8. **Alerts** (owner decision, 2026-10-16): a failed post-session step, or a run over `[post]
+   max_duration_minutes`, sends the same alert as a failed nightly step, through the nightly's
+   notifier (`default_notifier`, `[notify] enabled`); a quiet run sends nothing.
+9. **Unchanged:** ADR 0062's cutoff and completeness read the `nightly` record alone, so a
    post-session run finishing hours later never moves a session's cutoff.
 
 ## Consequences

@@ -301,3 +301,31 @@ def test_recovery_leaves_an_edge_evaluation_committing_outside_the_ingest_lock()
     writer.save_run(job)
     assert recover_unpublished(writer, START) == {"completed": [], "dropped": []}
     assert backend.tables.pending_runs() == ["edge-eval-run"]
+
+
+class Recorder:
+    def __init__(self) -> None:
+        self.notices: list[Any] = []
+
+    def notify(self, notice: Any) -> None:
+        self.notices.append(notice)
+
+
+def test_a_failed_post_session_step_or_a_blown_budget_alerts_like_a_failed_nightly_step() -> None:
+    steps = {"verify": {"status": "FAILED"}, "descriptions": {"status": "SUCCEEDED"}}
+    failed = post_module.post_notice({"session": "2026-10-02", "steps": steps, "warnings": []})
+    assert failed.alert and failed.message == "FAILED (2026-10-02): verify failed"
+    slow = post_module.post_notice(
+        {"session": "2026-10-02", "steps": {}, "warnings": [{"check": "post_duration"}]}
+    )
+    assert slow.alert and "duration budget" in slow.message
+    ok = post_module.post_notice({"session": "2026-10-02", "steps": {}, "warnings": []})
+    assert not ok.alert
+    sent, summary = Recorder(), {"session": "2026-10-02", "status": "SUCCEEDED", **{"steps": steps}}
+    summary["warnings"] = []
+    post_module._notify(summary, sent, NightlySettings())
+    assert [n.alert for n in sent.notices] == [True]
+    quiet = Recorder()
+    post_module._notify(summary, quiet, NightlySettings(notify_enabled=False))
+    post_module._notify({**summary, "status": BUSY}, quiet, NightlySettings())
+    assert quiet.notices == []

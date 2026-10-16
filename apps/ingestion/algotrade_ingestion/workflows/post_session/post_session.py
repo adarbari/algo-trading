@@ -37,6 +37,11 @@ from algotrade_ingestion.workflows.nightly.nightly import (
     skip_reason,
     step_item,
 )
+from algotrade_ingestion.workflows.nightly.notify import (
+    Notice,
+    Notifier,
+    default_notifier,
+)
 from algotrade_ingestion.workflows.nightly.records import latest_nightly
 from algotrade_ingestion.workflows.nightly.screens import ScreenStep, edge_eval_jobs
 from algotrade_ingestion.workflows.nightly.sessions import POST_SESSION_RUN, POST_STEPS, last_done
@@ -166,6 +171,30 @@ def run_post_session(
     }
 
 
+def post_notice(summary: Mapping[str, Any]) -> Notice:
+    """The notice for a run: FAILED (an alert, as a failed nightly step) when a step failed or
+    the ``[post] max_duration_minutes`` budget was exceeded, else SUCCEEDED (no alert)."""
+    failed = sorted(n for n, s in summary["steps"].items() if s["status"] == StepStatus.FAILED)
+    slow = any(w["check"] == "post_duration" for w in summary["warnings"])
+    problems = [f"{n} failed" for n in failed] + (["over its duration budget"] if slow else [])
+    status = "FAILED" if problems else Status.SUCCEEDED.value
+    message = f"{status} ({summary['session']})" + (f": {'; '.join(problems)}" if problems else "")
+    return Notice(status, "algotrade post-session", message)
+
+
+def _notify(summary: dict[str, Any], notifier: Notifier, settings: NightlySettings) -> None:
+    """Tell the nightly's notifier (``[notify] enabled``); a delivery problem is a WARN."""
+    if not settings.notify_enabled or summary["status"] == BUSY:
+        return
+    try:
+        problem = notifier.notify(post_notice(summary))
+    except Exception as exc:  # a notifier must not raise; if one does, it is a warning
+        problem = f"notifier failed: {type(exc).__name__}: {exc}"
+    if problem:
+        warn = {"check": "notify", "status": "WARN", "detail": problem}
+        summary["warnings"] = [*summary.get("warnings", []), warn]
+
+
 def post_session_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     """Job handler for the post-session workflow. params: ``session`` (the nightly-done session
     to run for), ``wait`` (queue behind a running ingest instead of ``BUSY``). Resources as the
@@ -174,11 +203,13 @@ def post_session_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str,
     task_ctx = job_task_context(ctx)
     backend = task_ctx.writer.backend  # the owner claim and the ingest lock are the store's
     evals = edge_eval_jobs(ctx.jobs, r["configs"], task_ctx.reader, backend) if ctx.jobs else None
+    settings = load_nightly(r["configs"])
     summary = run_post_session(
         task_ctx,
         date.fromisoformat(params["session"]),
-        load_nightly(r["configs"]),
+        settings,
         evals,
         lambda: exclusive_run(backend, wait=bool(params.get("wait"))),
     )
+    _notify(summary, r.get("notifier") or default_notifier(settings), settings)
     return {**summary, "_partial": summary["status"] != Status.SUCCEEDED}
