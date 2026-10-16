@@ -21,8 +21,10 @@ from algotrade.config.site.events.releases import load_macro_releases
 from algotrade.config.site.settings import load_macro, load_universe
 from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.storage.runs import RunRecord
+from algotrade_ingestion.tasks.analyst import probe as analyst_probe
 from algotrade_ingestion.tasks.derived import history_copy, market_rollups, outcomes, rollups
 from algotrade_ingestion.tasks.events import filings
+from algotrade_ingestion.tasks.framework import source_guards
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.listings import index_membership, listing_history, winners_sample
 from algotrade_ingestion.tasks.macro import calendar as macro_calendar
@@ -57,8 +59,6 @@ from algotrade_ingestion.tasks.verification import verify
 from algotrade_sources.framework.base import (
     DirectorySource,
     FixtureSource,
-    HoldingsSource,
-    SessionSource,
 )
 
 type Params = Mapping[str, Any]
@@ -185,32 +185,12 @@ def _shares(ctx: TaskContext, p: Params) -> RunRecord:
     return shares.ingest_shares(ctx, sources, session_of(p), bool(p.get("force")), p.get("limit"))
 
 
-HOLDINGS_ISSUERS = (
-    "ssga_holdings",
-    "ishares_holdings",
-    "proshares_holdings",
-    "sec_nport_holdings",
-)  # priority order
-
-
-def _holdings_issuers(ctx: TaskContext) -> list[HoldingsSource]:
-    found = [ctx.sources[n] for n in HOLDINGS_ISSUERS if n in ctx.sources]
-    return [s for s in found if isinstance(s, HoldingsSource)]
-
-
-def _no_holdings_source(ctx: TaskContext) -> str | None:
-    if not ctx.settings.vendor("etf_holdings").enabled:
-        return "skipped: [etf_holdings] is disabled in sources.toml"
-    if _holdings_issuers(ctx):
-        return None
-    reasons = sorted({ctx.unavailable.get(n, f"{n} is not configured") for n in HOLDINGS_ISSUERS})
-    return f"skipped: {'; '.join(reasons)}"
-
-
 def _etf_holdings(ctx: TaskContext, p: Params) -> RunRecord:
-    issuers = _holdings_issuers(ctx)
+    issuers = source_guards.holdings_issuers(ctx)
     if not issuers:
-        raise KeyError(f"task 'etf-holdings' needs one of the sources {list(HOLDINGS_ISSUERS)}")
+        raise KeyError(
+            f"task 'etf-holdings' needs one of the sources {list(source_guards.HOLDINGS_ISSUERS)}"
+        )
     sources = etf_holdings.HoldingsSources(
         issuers,
         ctx.settings.etf.refresh_days,
@@ -312,21 +292,19 @@ def _chains(ctx: TaskContext, p: Params) -> RunRecord:
 
 
 def _rollups(ctx: TaskContext, p: Params) -> RunRecord:
-    return rollups.compute_rollups(ctx, session_of(p), p.get("start"), p.get("end"), _only(p))
+    return rollups.compute_rollups(
+        ctx, session_of(p), p.get("start"), p.get("end"), _symbols(p, "only")
+    )
 
 
 def _market_rollups(ctx: TaskContext, p: Params) -> RunRecord:
     return market_rollups.compute_market_rollups(
-        ctx, session_of(p), p.get("start"), p.get("end"), _only(p)
+        ctx, session_of(p), p.get("start"), p.get("end"), _symbols(p, "only")
     )
 
 
 def _outcomes(ctx: TaskContext, p: Params) -> RunRecord:
     return outcomes.compute_outcomes(ctx, session_of(p), p.get("start"), p.get("end"))
-
-
-def _only(p: Params) -> list[str]:
-    return [k.strip() for k in str(p.get("only") or "").split(",") if k.strip()]
 
 
 def _macro(ctx: TaskContext, p: Params) -> RunRecord:
@@ -349,14 +327,6 @@ def _verify(ctx: TaskContext, p: Params) -> RunRecord:
 
 def _symbols(p: Params, name: str = "symbols") -> list[str]:
     return [s.strip() for s in str(p.get(name) or "").split(",") if s.strip()]
-
-
-DESCRIPTION_SOURCES = (
-    "massive_overview",
-    "sec_fund_tickers",
-    "sec_fund_objectives",
-    "sec_fund_series",
-)  # every source the task may read: the CLI builds only the ones a task declares
 
 
 def _descriptions(ctx: TaskContext, p: Params) -> RunRecord:
@@ -382,48 +352,29 @@ def _descriptions(ctx: TaskContext, p: Params) -> RunRecord:
     )
 
 
-def _no_description_source(ctx: TaskContext) -> str | None:
-    """Workflows skip ``descriptions`` when neither Massive nor the SEC sources are built."""
-    if any(name in ctx.sources for name in DESCRIPTION_SOURCES):
-        return None
-    reasons = sorted(
-        {ctx.unavailable.get(n, f"{n} is not configured") for n in DESCRIPTION_SOURCES}
-    )
-    return f"skipped: {'; '.join(reasons)}"
-
-
-def _ibkr(ctx: TaskContext) -> SessionSource:
-    source = ctx.sources["ibkr"]
-    if not isinstance(source, SessionSource):
-        raise TypeError("ibkr must be a SessionSource (IB Gateway)")
-    return source
-
-
 def _ibkr_contracts(ctx: TaskContext, p: Params) -> RunRecord:
     return ibkr_contracts.resolve_contracts(
-        ctx, _ibkr(ctx), session_of(p), _symbols(p), bool(p.get("force")), p.get("limit")
+        ctx,
+        source_guards.ibkr_source(ctx),
+        session_of(p),
+        _symbols(p),
+        bool(p.get("force")),
+        p.get("limit"),
     )
 
 
 def _ibkr_iv(ctx: TaskContext, p: Params) -> RunRecord:
     if p.get("start"):
         end = p.get("end") or session_of(p)
-        source = _ibkr(ctx)
+        source = source_guards.ibkr_source(ctx)
         return ibkr_iv.backfill_ivs(ctx, source, p["start"], end, _symbols(p), p.get("limit"))
-    return ibkr_iv.nightly_ivs(ctx, _ibkr(ctx), session_of(p), _symbols(p))
+    return ibkr_iv.nightly_ivs(ctx, source_guards.ibkr_source(ctx), session_of(p), _symbols(p))
 
 
 def _ibkr_iv_repair(ctx: TaskContext, p: Params) -> RunRecord:
     if not p.get("start"):
         raise ValueError("ibkr-iv-repair needs --from (the first session to check)")
     return ibkr_iv.repair_ivs(ctx, p["start"], p.get("end") or session_of(p))
-
-
-def _gateway_down(ctx: TaskContext) -> str | None:
-    """Workflows skip the IBKR tasks (with a WARN) when nothing listens on the gateway port."""
-    source = ctx.sources.get("ibkr")
-    reason = source.probe() if isinstance(source, SessionSource) else None
-    return f"skipped: WARN: {reason}" if reason else None
 
 
 def _quality(ctx: TaskContext, p: Params) -> RunRecord:
@@ -544,6 +495,17 @@ TASKS: dict[str, Task] = {
             params=(SESSION,),
         ),
         Task(
+            "analyst-probe",
+            "which analyst endpoints the FMP and Finnhub keys may call (analyst/vendor_access); "
+            "one request per endpoint, in no workflow",
+            analyst_probe,
+            ("analyst/vendor_access",),
+            analyst_probe.run,
+            optional_sources=analyst_probe.SOURCES,
+            settings="sources.toml [fmp]",
+            params=(SESSION,),
+        ),
+        Task(
             "index-membership",
             "S&P 500 membership intervals since 1996 from fja05680/sp500 "
             "(instruments/index_membership); in no workflow until the owner has read a real pull",
@@ -591,7 +553,7 @@ TASKS: dict[str, Task] = {
             etf_holdings,
             ("holdings/etf",),
             _etf_holdings,
-            optional_sources=HOLDINGS_ISSUERS,
+            optional_sources=source_guards.HOLDINGS_ISSUERS,
             settings="sources.toml [etf_holdings]",
             params=(
                 SESSION,
@@ -601,7 +563,7 @@ TASKS: dict[str, Task] = {
                 ),
                 Param("limit", ("--limit",), int, "read at most N funds this run"),
             ),
-            skip=_no_holdings_source,
+            skip=source_guards.no_holdings_source,
         ),
         Task(
             "descriptions",
@@ -609,7 +571,7 @@ TASKS: dict[str, Task] = {
             descriptions,
             (descriptions.TABLE,),
             _descriptions,
-            optional_sources=DESCRIPTION_SOURCES,
+            optional_sources=source_guards.DESCRIPTION_SOURCES,
             settings="sources.toml [massive] descriptions_per_night, [sec_edgar] fund_quarters",
             params=(
                 SESSION,
@@ -618,7 +580,7 @@ TASKS: dict[str, Task] = {
                 Param("only", ("--only",), str, "massive (stocks) or funds (ETFs)"),
                 Param("force", ("--force",), None, "ask again even if described"),
             ),
-            skip=_no_description_source,
+            skip=source_guards.no_description_source,
         ),
         Task(
             "earnings",
@@ -827,7 +789,7 @@ TASKS: dict[str, Task] = {
                 SESSION,
                 Param("symbols", ("--symbols",), str, "comma-separated tickers (default: sample)"),
             ),
-            skip=_gateway_down,
+            skip=source_guards.gateway_down,
         ),
         Task(
             "ibkr-contracts",
@@ -843,7 +805,7 @@ TASKS: dict[str, Task] = {
                 Param("force", ("--force",), None, "re-resolve every contract"),
                 Param("limit", ("--limit",), int, "resolve at most N contracts this run"),
             ),
-            skip=_gateway_down,
+            skip=source_guards.gateway_down,
         ),
         Task(
             "ibkr-iv",
@@ -861,7 +823,7 @@ TASKS: dict[str, Task] = {
                 Param("symbols", ("--symbols",), str, "comma-separated tickers"),
                 Param("limit", ("--limit",), int, "backfill at most N underlyings this run"),
             ),
-            skip=_gateway_down,
+            skip=source_guards.gateway_down,
         ),
         Task(
             "ibkr-iv-repair",

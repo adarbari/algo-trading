@@ -28,7 +28,7 @@ purpose = "the golden synthetic fixture source (generators, catalogue, CSV files
 
 [[dir]]
 path = "libs/sources/algotrade_sources/framework"
-purpose = "non-vendor source machinery: protocols, HTTP, pacing, the source registry, a session source served on its own thread (session_thread)"
+purpose = "non-vendor source machinery: protocols, HTTP, pacing, the source registry, a session source served on its own thread (session_thread), the verdict on what a vendor key may call (access)"
 contracts = ["Layout: only the source registry imports vendor folders"]
 
 [[dir]]
@@ -180,6 +180,11 @@ purpose = "operating the app on a host: scheduling the nightly run, the deploy h
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks"
 purpose = "ingestion tasks by domain (no modules of its own)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/analyst"
+purpose = "analyst-data tasks (ADR 0068): the probe of what each free vendor key may call (analyst/vendor_access) and the FMP daily call budget it counts against"
+kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/derived"

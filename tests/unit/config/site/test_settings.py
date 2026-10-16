@@ -116,6 +116,9 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"etf_holdings": {"per_night": -1}}, r"\[etf_holdings\] per_night: expected an integer"),
         ({"etf_holdings": {"min_interval_s": 1}}, r"\[etf_holdings\]: unknown keys"),
         ({"etf_holdings": {"raw_retention_days": 3}}, r"\[etf_holdings\]: unknown keys"),
+        ({"fmp": {"daily_budget": -1}}, r"\[fmp\] daily_budget: expected an integer >= 0"),
+        ({"fmp": {"licence": "free"}}, r"\[fmp\] licence"),
+        ({"finnhub": {"licence": "free"}}, r"\[finnhub\] licence"),
         ({"ssga": {"etf_files": "no"}}, r"\[ssga\] etf_files: expected true or false"),
         ({"etf_holdings": {"refresh": 7}}, r"\[etf_holdings\]: unknown keys \['refresh'\]"),
     ],
@@ -487,6 +490,13 @@ def test_description_settings_are_typed_and_zero_turns_the_nightly_requests_off(
         90,
         2,
     )
+
+
+def test_the_analyst_vendors_are_personal_licence_with_fmp_s_daily_budget() -> None:
+    s = SourcesSettings.from_document(tomllib.loads((SITE / "sources.toml").read_text()))
+    assert (s.fmp_licence, s.finnhub_licence, s.fmp_daily_budget) == ("personal", "personal", 200)
+    assert (s.vendor("fmp").min_interval_s, s.vendor("finnhub").min_interval_s) == (1.0, 1.0)
+    assert SourcesSettings().fmp_daily_budget == 200  # the default is the site value (ADR 0068)
 
 
 def test_every_vendor_section_sets_each_of_its_keys_explicitly() -> None:

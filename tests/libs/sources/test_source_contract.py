@@ -25,6 +25,9 @@ from algotrade_sources.framework.series import (
     SeriesRequest,
 )
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
+from algotrade_sources.vendors.finnhub.recommendations import FinnhubRecommendations
+from algotrade_sources.vendors.fmp.estimates import FmpAnalystEstimates
+from algotrade_sources.vendors.fmp.targets import FmpPriceTargets, FmpRatings
 from algotrade_sources.vendors.fred.observations import FredObservations
 from algotrade_sources.vendors.fred.releases import FredReleaseDates
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
@@ -257,7 +260,31 @@ def published() -> Adapter:
     return PublishedSeries(http_for(lambda url: published_payloads.STOOQ)), request
 
 
+def fmp_estimates() -> Adapter:
+    payload = (FIXTURES / "fmp" / "analyst_estimates_annual_aapl.json").read_bytes()
+    return FmpAnalystEstimates(http_for(lambda url: payload)), FetchRequest("AAPL:annual")
+
+
+def fmp_targets() -> Adapter:
+    payload = (FIXTURES / "fmp" / "price_target_consensus_aapl.json").read_bytes()
+    return FmpPriceTargets(http_for(lambda url: payload)), FetchRequest("AAPL")
+
+
+def fmp_ratings() -> Adapter:
+    payload = (FIXTURES / "fmp" / "grades_consensus_aapl.json").read_bytes()
+    return FmpRatings(http_for(lambda url: payload)), FetchRequest("AAPL")
+
+
+def finnhub_recommendations() -> Adapter:
+    payload = (FIXTURES / "finnhub" / "recommendation_aapl.json").read_bytes()
+    return FinnhubRecommendations(http_for(lambda url: payload)), FetchRequest("AAPL")
+
+
 ADAPTERS: dict[str, Callable[[], Adapter]] = {
+    "fmp_estimates": fmp_estimates,
+    "fmp_targets": fmp_targets,
+    "fmp_ratings": fmp_ratings,
+    "finnhub_recommendations": finnhub_recommendations,
     "fred": fred,
     "fred_release_dates": fred_release_dates,
     "sec_filings": sec_filings,

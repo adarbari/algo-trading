@@ -8,7 +8,7 @@ swapping a vendor never touches storage, features, strategies or the UI.
 
 **Pacing is shared.** Each source is declared once in `sources/framework/registry.py` with its
 `config/site/sources.toml` section and a limiter key (`cboe`, `nasdaqtrader`, `ssga`,
-`nasdaq`, `ishares`, `proshares`, `massive`, `sec`, `treasury`, `fred`, `published`, `ibkr`, `ibkr_historical`). One limiter per key (`sources/framework/limiter.py`)
+`nasdaq`, `ishares`, `proshares`, `massive`, `sec`, `treasury`, `fred`, `tiingo`, `fmp`, `finnhub`, `published`, `ibkr`, `ibkr_historical`). One limiter per key (`sources/framework/limiter.py`)
 spaces requests across every worker thread **and every process** on the machine (a lock file
 per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and the nightly
 run never exceed a vendor's limit together. The pace is **adaptive** between the section's
@@ -42,6 +42,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
 | Risk-free rates (option pricing) | **U.S. Treasury daily par yield curve** (official, free, no key; one CSV per year) | FRED (`DGS*`, needs a key), SOFR (overnight only) | Implemented, phase 2b.1 (ADR 0021) |
+| Analyst estimates, price targets, ratings (free tier) | **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters and the by-hand `analyst-probe` implemented (ADR 0068); the feature groups and nightly fetch follow |
 | Synthetic | `sources/fixtures/` (golden datasets) | — | Lets the whole pipeline run in CI with no account |
 
 ## Cboe delayed-quotes feed (primary for options)
@@ -159,6 +160,52 @@ listing's dates, bar count against the exchange sessions, missing sessions, rows
 listing; overall: the share of delisted names with bars to their end date, the gap share, whether
 a recycled ticker leaks another company's rows). It writes no table: the raw payloads are in
 `raw/source=tiingo`. At most 200 unique symbols of the free tier's 500 a month.
+
+## Analyst data: FMP and Finnhub (adapters and the probe implemented, ADR 0068)
+
+Both are free-tier, personal-licence vendors (`[fmp]`, `[finnhub]` in `config/site/sources.toml`,
+`licence = "personal"`), keyed in `.env`; nothing is stored from the adapters yet. Endpoints and
+answers verified 2026-10-16 on the owner's free keys (AAPL); the plans change, so the table
+`analyst/vendor_access` (the `analyst-probe` task, run by hand) is the record, not this page.
+
+### Financial Modeling Prep
+
+Host `https://financialmodelingprep.com/stable`; key `ALGOTRADE_FMP_API_KEY` as the `apikey`
+query parameter, added by the registry's transport and never held by a source, a log line, an
+error message or a raw path (`with_query_param`). About 250 calls a day on the free plan:
+`[fmp] daily_budget = 200`, `min_interval_s = 1.0`.
+
+| Endpoint | Free plan 2026-10-16 | Answer |
+|---|---|---|
+| `quote?symbol=` | ALLOWED | one record: price, day range, volume, market cap |
+| `analyst-estimates?symbol=&period=annual&page=0&limit=` | ALLOWED | per fiscal period (future ones too): `revenue` / `ebitda` / `ebit` / `netIncome` / `sgaExpense` / `eps` with `Low` / `High` / `Avg`, `numAnalystsRevenue`, `numAnalystsEps` |
+| `analyst-estimates?...&period=quarter` | DENIED: 402 `Premium Query Parameter` | text body |
+| `price-target-consensus?symbol=` | ALLOWED | `targetHigh`, `targetLow`, `targetConsensus`, `targetMedian` |
+| `grades-consensus?symbol=` | ALLOWED | `strongBuy`, `buy`, `hold`, `sell`, `strongSell`, `consensus` |
+| `grades?symbol=&limit=` | ALLOWED | one record per rating action: `date`, `gradingCompany`, `previousGrade`, `newGrade`, `action` |
+
+A symbol outside the plan's set also answers 402 (the same sentence, naming `symbol`): on
+2026-10-16 CHWY (a mid-cap of the scope list) got 402 on every endpoint while AAPL answered, and
+NVDA and JPM answered in a manual test, so the free plan is symbol-gated. Measured the same
+day with one `price-target-consensus` call per name: 15 of the 104 scope names, 21 of 25 mega
+and large caps and 2 of 25 S&P 500 mid-caps are covered. A 402 is therefore a plan limit, never "no data": it is raised at once and not retried.
+The probe asks AAPL and CHWY (`<endpoint>@broad` rows) so the table shows it.
+
+### Finnhub
+
+Host `https://finnhub.io/api/v1`; key `ALGOTRADE_FINNHUB_API_KEY` in an `X-Finnhub-Token` header.
+60 calls a minute (`[finnhub] min_interval_s = 1.0`).
+
+| Endpoint | Free plan 2026-10-16 | Answer |
+|---|---|---|
+| `stock/recommendation?symbol=` | ALLOWED | one record a month, newest first: `period`, `strongBuy`, `buy`, `hold`, `sell`, `strongSell` |
+| `stock/recommendation` for CHWY | ALLOWED | the same shape (coverage is not symbol-gated like FMP's) |
+| `stock/price-target?symbol=` | DENIED: 403 `You don't have access to this resource` | premium |
+
+### What is stored and when
+
+Nothing yet beyond `analyst/vendor_access`. History starts at the first fetch: neither vendor
+serves a point-in-time history, so none is backdated (ADR 0068).
 
 ## Company and fund descriptions (implemented, ADR 0034)
 
