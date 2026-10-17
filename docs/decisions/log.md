@@ -422,7 +422,7 @@ follow-up PR).
 ## 2026-10-17 | PR #589 (Describe it connector) | When the connector token shows
 - Question: which joins get a token between part cards?
 - Options: every join / only those that change the reading.
-- Decision: join "or" and "and_not" always; join "and" only when the words are not a plain conjunction: hidden for and, with, plus, also, then, "," or no words; shown for but, yet, while, although, though, whereas, as long as, so long as, only if, provided (that).
+- Decision: join "or" and "and_not" always; join "and" only when the words are not a plain conjunction: hidden when every word (commas ignored) is a plain conjunction: and, with, plus, also, then, or there are no words; shown for but, yet, while, although, though, whereas, as long as, so long as, only if, provided (that).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a token between every pair of cards is noise; "but" or "only if" changes how the second part reads and is where a misread hides.

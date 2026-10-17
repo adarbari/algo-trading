@@ -23,7 +23,19 @@ describe('joinToken', () => {
   });
 
   it('hides a plain and, whatever the case or spacing', () => {
-    for (const words of ['', 'and', ' AND ', 'with', 'plus', 'also', 'then', ',']) {
+    for (const words of [
+      '',
+      'and',
+      ' AND ',
+      'with',
+      'plus',
+      'also',
+      'then',
+      ',',
+      'and also',
+      'And then',
+      'and, with',
+    ]) {
       expect(joinToken(part('and', words))).toBeNull();
     }
   });

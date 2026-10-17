@@ -449,7 +449,9 @@ describe('DraftReview connectors', () => {
 
   it('a gap carrying and-not shows but not', () => {
     setup({ answer: { ...ANSWER, parts: joined } });
-    const items = screen.getAllByRole('listitem');
+    const items = within(screen.getByRole('list', { name: 'Parts of your sentence' })).getAllByRole(
+      'listitem',
+    );
     expect(items[3]?.textContent).toMatch(/^joined by.*except.*read as.*but not/);
   });
 });
