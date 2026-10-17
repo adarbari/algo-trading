@@ -38,12 +38,16 @@
         {
           "words": "stocks within 5% of their 52 week high",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": null,
+          "join_words": ""
         },
         {
           "words": "RSI under 70",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": "and",
+          "join_words": "but with"
         }
       ],
       "model_share": 1.0,

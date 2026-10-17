@@ -52,17 +52,23 @@
         {
           "words": "optionable stocks",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": null,
+          "join_words": ""
         },
         {
           "words": "above $8",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": null,
+          "join_words": ""
         },
         {
-          "words": "an IV rank above 80%",
+          "words": "not with an IV rank above 80%",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": "and",
+          "join_words": "but"
         }
       ],
       "model_share": 1.0,

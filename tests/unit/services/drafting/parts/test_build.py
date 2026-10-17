@@ -192,10 +192,10 @@ def test_connectors_the_model_leaves_out_are_joins_never_not_understood_chips() 
     cases = [
         (
             "liquid stocks near their 52-week high but not overbought",
-            ["liquid stocks near their 52-week high", "overbought"],
+            ["liquid stocks near their 52-week high", "not overbought"],
             [
                 ("liquid stocks near their 52-week high", None, ""),
-                ("overbought", "and_not", "but not"),
+                ("not overbought", "and", "but"),  # the negation stays in the condition's words
             ],
         ),
         (
@@ -278,3 +278,22 @@ def test_filler_around_a_part_vanishes() -> None:
         ("stocks that are liquid", None, ""),
         ("close to support", "and", "and also"),
     ]
+
+
+def test_a_negation_or_or_the_model_left_out_is_a_gap_never_silent() -> None:
+    """Review 2026-10-17: a trailing ``or not`` / ``, except`` and a leading ``not`` were lost."""
+    for sentence, words, gap in (
+        ("liquid stocks or not", ["liquid stocks"], "or not"),
+        ("liquid stocks, except", ["liquid stocks"], "except"),
+        ("not liquid stocks", ["liquid stocks"], "not"),
+        ("liquid but not overbought", ["liquid", "overbought"], "but not"),
+    ):
+        parts = _served(sentence, words)
+        gaps = [p for p in parts if p.origin == "gap"]
+        assert [(g.words, g.kind) for g in gaps] == [(gap, "not_understood")], sentence
+        assert gaps[0].join_words == gap and gaps[0].join in ("or", "and_not")
+
+
+def test_an_and_type_connector_before_the_first_part_is_no_join() -> None:
+    parts = _served("but liquid stocks", ["liquid stocks"])
+    assert [(p.join, p.join_words) for p in parts] == [(None, "")]

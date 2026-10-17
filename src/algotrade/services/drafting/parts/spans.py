@@ -10,7 +10,7 @@ are code points here; ``utf16`` converts them to what the browser counts."""
 import re
 from dataclasses import dataclass
 
-from algotrade.services.drafting.parts.connectors import merged, read
+from algotrade.services.drafting.parts.connectors import AND, merged, read
 
 MIN_FUZZY = 4  # a token shorter than this, or with a digit, must match exactly
 _TOKEN = re.compile("[\\w$%&'\u2019][\\w$%&'\u2019.\\-/]*")
@@ -122,19 +122,30 @@ def stretches(sentence: str, covered: list[Span]) -> list[Stretch]:
     for span in [*covered, Span(len(sentence), len(sentence))]:
         out.append(_stretch(sentence, cursor, span.start))
         cursor = max(cursor, span.end)
+    first = out[0]  # an and-type connector before everything has nothing to join: dropped
+    out[0] = Stretch(first.gap, _lead(first.gap_join), first.next_join if first.gap else None)
     return out
 
 
+def _lead(join: Join | None) -> Join | None:
+    return None if join is not None and join.logic == AND else join
+
+
 def _stretch(sentence: str, start: int, end: int) -> Stretch:
+    """A word of content, or a connector that is not and-type (a negation, an or), is kept: it
+    would change what the trader asked for, so it is never silent (it is a not-understood gap
+    unless the model kept it inside a part). Only and-type connectors and glue are read as a
+    join."""
     toks = [(s + start, e + start, w) for s, e, w in tokens(sentence[start:end])]
     kinds = read([t[2] for t in toks])
-    content = [i for i, k in enumerate(kinds) if k[0] == "content"]
-    if not content:
+    kept = [i for i, k in enumerate(kinds) if k[0] == "content" or (k[0] == "join" and k[1] != AND)]
+    if not kept:
         return Stretch(None, None, _join(sentence, toks, kinds, range(len(toks))))
-    first, last = content[0], content[-1]
+    first, last = kept[0], kept[-1]
+    pure = all(kinds[i][0] == "join" for i in kept)  # only a negation or an or, no content
     return Stretch(
         Span(toks[first][0], toks[last][1]),
-        _join(sentence, toks, kinds, range(first)),
+        _join(sentence, toks, kinds, range(last + 1 if pure else first)),
         _join(sentence, toks, kinds, range(last + 1, len(toks))),
     )
 

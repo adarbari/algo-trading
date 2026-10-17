@@ -101,9 +101,32 @@ def test_a_sentence_no_part_covers_is_one_gap() -> None:
     assert _gaps("zzz qqq xxx", []) == ["zzz qqq xxx"]
 
 
-def test_the_connector_is_the_longest_phrase_and_a_negation_wins() -> None:
+def test_a_negation_between_parts_is_a_gap_with_its_join_never_silent() -> None:
     sentence = "liquid but not overbought and also, except for ETFs"
     covered = [locate(sentence, w) for w in ("liquid", "overbought", "ETFs")]
     first, second = stretches(sentence, [c for c in covered if c])[1:3]
-    assert first.next_join == Join("and_not", "but not")
-    assert second.next_join == Join("and_not", "and also, except for")
+    assert (first.gap, first.gap_join) == (Span(7, 14), Join("and_not", "but not"))
+    assert sentence[second.gap.start : second.gap.end] == "except for"
+    assert second.gap_join == Join("and_not", "and also, except for")
+
+
+def test_a_trailing_negation_after_the_last_part_is_a_gap() -> None:
+    sentence = "liquid stocks or not"
+    last = stretches(sentence, [Span(0, 13)])[-1]
+    assert sentence[last.gap.start : last.gap.end] == "or not" and last.gap_join.logic == "and_not"
+    assert stretches("liquid stocks and", [Span(0, 13)])[-1].gap is None  # and-type: dropped
+
+
+def test_an_and_type_connector_before_the_first_part_is_dropped_but_a_negation_is_a_gap() -> None:
+    lead = stretches("but liquid", [Span(4, 10)])[0]
+    assert (lead.gap, lead.gap_join, lead.next_join) == (None, None, None)
+    lead = stretches("not liquid", [Span(4, 10)])[0]
+    assert lead.gap == Span(0, 3)
+
+
+def test_content_beside_a_connector_keeps_the_leading_and_trailing_joins() -> None:
+    sentence = "liquid, but cheap and high yield"
+    stretch = stretches(sentence, [Span(0, 6), locate(sentence, "high yield")])[1]
+    assert (stretch.gap, stretch.gap_join, stretch.next_join) == (
+        Span(12, 17), Join("and", "but"), Join("and", "and"),
+    )  # fmt: skip

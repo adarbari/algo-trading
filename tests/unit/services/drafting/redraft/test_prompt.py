@@ -117,7 +117,7 @@ def test_the_user_prompt_says_what_is_asked(site) -> None:  # noqa: F811
         assert rule.lower() in user.lower()
 
 
-PINNED = {"10": ("7ceb4313a6df9aaa", "cb03fbc5eba3b5b0")}  # PROMPT_VERSION -> (TASK, ASK) hashes
+PINNED = {"10": ("45ff18987b746134", "cb03fbc5eba3b5b0")}  # PROMPT_VERSION -> (TASK, ASK) hashes
 
 
 def _hash(text: str) -> str:

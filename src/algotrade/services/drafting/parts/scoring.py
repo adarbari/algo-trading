@@ -1,10 +1,11 @@
 """Scoring the explained parts of a draft against a golden case, and over many calls (ADR 0041,
 amended 2026-10-11). Structural, never the text of a reading (the model words it freely): each
-expected part is found by its ``words`` (and ``origin``) and must have the expected ``kind``
-(and, when the case says so, the ``reading_source``); a served part nobody expected that was not
-understood is extra. The measures, reported by the live golden run: the share of items the
-model placed itself, the share of its parts located in the sentence, the parts not understood
-(a deliberately vague case expects some) and the share of its readings that kept their numbers."""
+expected part is found by its ``words`` (and ``origin``) and must have the expected ``kind`` (and,
+when the case says so, the ``reading_source``, the ``join`` and its ``join_words``); a served part
+nobody expected that was not understood is extra. The measures, reported by the live golden run:
+the share of items the model placed itself, the share of its parts located in the sentence, the
+parts not understood (a deliberately vague case expects some) and the share of its readings that
+kept their numbers."""
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -47,8 +48,11 @@ def score_parts(expected: Mapping[str, Any], served: Sequence[Part] | None) -> P
             missing.append(str(want["words"]) or str(want["origin"]))
             continue
         used.add(n)
-        if parts[n].kind != want["kind"] or (
-            "reading" in want and parts[n].reading_source != want["reading"]
+        if (
+            parts[n].kind != want["kind"]
+            or ("reading" in want and parts[n].reading_source != want["reading"])
+            or ("join" in want and parts[n].join != want["join"])
+            or ("join_words" in want and parts[n].join_words != want["join_words"])
         ):
             wrong.append(str(want["words"]) or str(want["origin"]))
     extra = [p.words for i, p in enumerate(parts) if i not in used and p.kind == "not_understood"]

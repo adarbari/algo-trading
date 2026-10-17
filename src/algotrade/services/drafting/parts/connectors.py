@@ -1,5 +1,6 @@
 """The one vocabulary for the words between conditions (ADR 0041, amended 2026-10-17). ``JOINS``
-are the phrases that say how a condition relates to the one before it (and, or, and not);
+are the phrases that say how a condition relates to the one before it (and, or, and not; only the
+and-type ones are left out of a part's words, a negation or an or stays inside the condition);
 ``GLUE`` are closed-class words that mean nothing alone (auxiliaries, pronouns, fillers like
 "show me"). The prompt renders the join phrases from here, so the model's "leave the connector
 out of the words" and the server's reading of what it left out cannot drift; ``spans`` turns
@@ -34,15 +35,16 @@ GLUE = frozenset(
         "they", "them", "those", "these", "it", "its", "their", "there", "this",
         # fillers
         "show me", "find", "give me", "list", "get", "i", "i'm", "im", "looking for", "i want",
-        "want", "like", "basically", "just", "please", "some", "any", "ones",
+        "want", "basically", "just", "please", "some", "any", "ones",
     }
 )  # fmt: skip
 GLUE_WORDS = frozenset(w for w in GLUE if " " not in w)  # the one-word glue, for a word check
 
 
-def join_text() -> str:
-    """The join phrases as the prompt lists them, in the order declared here."""
-    return ", ".join(JOINS)
+def join_text(*logics: str) -> str:
+    """The join phrases of ``logics`` (default: the and-type ones, the only connectors the model
+    leaves out of a part's words) as the prompt lists them, in the order declared here."""
+    return ", ".join(p for p, logic in JOINS.items() if logic in (logics or (AND,)))
 
 
 def _phrase_words() -> dict[tuple[str, ...], str | None]:
@@ -58,6 +60,7 @@ _LONGEST = max(len(p) for p in _PHRASES)
 def read(words: list[str]) -> list[tuple[str, str | None]]:
     """What each lower-cased word of a stretch is: ``("join", logic)``, ``("glue", None)`` or
     ``("content", None)``; a phrase marks all its words, the longest phrase at a place wins."""
+    words = [w.replace("\u2019", "'") for w in words]  # a phone's curly apostrophe
     out: list[tuple[str, str | None]] = []
     i = 0
     while i < len(words):

@@ -41,12 +41,16 @@
         {
           "words": "stocks trading below $20",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": null,
+          "join_words": ""
         },
         {
           "words": "gained over 5% in the last 20 days",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": "and",
+          "join_words": "while"
         }
       ],
       "model_share": 1.0,

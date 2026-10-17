@@ -41,12 +41,16 @@
         {
           "words": "stocks with a dividend yield over 3%",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": null,
+          "join_words": ""
         },
         {
           "words": "still above their 200 day average",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": "and",
+          "join_words": "yet"
         }
       ],
       "model_share": 1.0,

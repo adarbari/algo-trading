@@ -52,12 +52,16 @@
         {
           "words": "optionable stocks over $10",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": null,
+          "join_words": ""
         },
         {
-          "words": "a market cap under $2B",
+          "words": "except those with a market cap under $2B",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": null,
+          "join_words": ""
         }
       ],
       "model_share": 1.0,

@@ -19,9 +19,14 @@ from algotrade.services.drafting.prompt import TASK
 
 
 def test_the_prompt_lists_exactly_the_joins() -> None:
-    assert join_text() in TASK
-    assert join_text().split(", ") == list(JOINS)  # no drift between prompt and server
-    assert "@@JOINS@@" not in TASK
+    """The left-out list is the and-type joins; the kept list the negations and ors."""
+    ands = [p for p, logic in JOINS.items() if logic == "and"]
+    keeps = [p for p, logic in JOINS.items() if logic != "and"]
+    assert join_text() in TASK and join_text("or", "and_not") in TASK
+    assert join_text().split(", ") == ands  # no drift between prompt and server
+    assert join_text("or", "and_not").split(", ") == keeps
+    assert set(ands) | set(keeps) == set(JOINS)
+    assert "@@" not in TASK
 
 
 def test_every_join_has_a_known_logic_and_glue_never_overlaps_a_join() -> None:
@@ -47,11 +52,34 @@ def test_the_longest_phrase_wins_and_only_whole_words_match() -> None:
     assert merged(["and", "or"]) == "or" and merged(["and", "and_not"]) == "and_not"
 
 
-@pytest.mark.parametrize("phrase", [*JOINS, *sorted(GLUE)])
-def test_no_connector_or_glue_word_yields_a_not_understood_part(phrase: str) -> None:
-    sentence = f"liquid stocks {phrase} high yield"
-    raw = [{"id": "p1", "words": "liquid stocks"}, {"id": "p2", "words": "high yield"}]
-    got = build_parts(sentence, raw, [], [])
+AND_PHRASES = [p for p, logic in JOINS.items() if logic == "and"]
+KEPT_PHRASES = [p for p, logic in JOINS.items() if logic != "and"]
+RAW = [{"id": "p1", "words": "liquid stocks"}, {"id": "p2", "words": "high yield"}]
+
+
+@pytest.mark.parametrize("phrase", [*AND_PHRASES, *sorted(GLUE)])
+def test_no_and_connector_or_glue_word_yields_a_not_understood_part(phrase: str) -> None:
+    got = build_parts(f"liquid stocks {phrase} high yield", RAW, [], [])
     assert got is not None
-    assert [p.id for p in got[0]] == ["p1", "p2"] and got[1].not_understood == 2  # no items
-    assert all(p.origin == "words" for p in got[0])
+    assert [p.id for p in got[0]] == ["p1", "p2"]  # no gap: it is a join or glue
+
+
+@pytest.mark.parametrize("phrase", KEPT_PHRASES)
+def test_a_negation_or_an_or_the_model_left_out_stays_visible_as_a_gap(phrase: str) -> None:
+    """Fail closed: a lost negation must never be silent."""
+    got = build_parts(f"liquid stocks {phrase} high yield", RAW, [], [])
+    assert got is not None
+    gaps = [p for p in got[0] if p.origin == "gap"]
+    assert [(g.words, g.kind, g.join) for g in gaps] == [(phrase, "not_understood", JOINS[phrase])]
+    assert gaps[0].join_words == phrase
+
+
+def test_a_curly_apostrophe_is_the_same_filler() -> None:
+    assert read(["i\u2019m", "looking", "for"]) == [("glue", None)] * 3
+    sentence = "I\u2019m looking for liquid stocks"
+    got = build_parts(sentence, [{"id": "p1", "words": "liquid stocks"}], [], [])
+    assert got is not None and [p.origin for p in got[0]] == ["words"]
+
+
+def test_like_is_never_glue() -> None:
+    assert "like" not in GLUE  # "stocks like NVDA" means similar to

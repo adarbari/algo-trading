@@ -49,12 +49,16 @@
         {
           "words": "optionable stocks over $10",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": null,
+          "join_words": ""
         },
         {
           "words": "trade at least $20M a day",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": "and",
+          "join_words": "only if"
         }
       ],
       "model_share": 1.0,

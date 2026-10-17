@@ -488,15 +488,22 @@ approved the fix the same day).
   from `JOINS`, so what the model is told to leave out and what the server reads cannot drift (a test).
   The phrasebook's `MEANING_WORDS` rule is unchanged: negation and `or` still send a sentence to the
   model, and the shortcut's filler-only check uses `GLUE`, never `JOINS`.
-- **Glue is never a chip.** A stretch no part covers that holds only glue and connectors is no part. A
-  connector in it becomes the **`join`** (`and` / `or` / `and_not`; a negation beats an or, an or beats
-  an and, for `and also`) and **`join_words`** (the sentence's own slice) of the part that follows it,
-  a located part or a gap. Glue at the start of the sentence vanishes. A gap that also holds a content
-  word stays `not_understood`, trimmed of glue and connectors at its edges, and carries the join of a
-  connector before it; one after it goes to the next part. `join` is served on the REST `Part`
-  (null when none lies between the parts, the first included); a re-draft keeps the join of the part it
-  replaces and of every untouched part. The web may ignore it until the review shows it.
-- **Prompt version 10**: the connector list is rendered from `JOINS`; a part is one condition and its
+- **Glue is never a chip; a negation is never silent.** A stretch no part covers that holds only
+  glue and and-type connectors is no part. An and-type connector in it becomes the **`join`** (`and`)
+  and **`join_words`** (the sentence's own slice) of the part that follows it, a located part or a gap;
+  glue, and an and-type connector before everything, vanish (the first part has no join). A negation or
+  an or (`or`, `not`, `no`, `except`, `without`, `unless`...: `or` / `and_not` joins) changes what is
+  asked, so the model keeps it **inside** the words of the condition it changes ("not overbought",
+  "except those reporting earnings this week"; "X or Y" is one part covering both sides, its formula)
+  and the server fails closed: such a connector the model left out stays a `not_understood` gap
+  (words: the connector, trimmed of the glue around it), carrying its `join` / `join_words`, anywhere
+  it lies (between parts, before the first, after the last). A gap that also holds a content word
+  stays `not_understood`, trimmed of glue and and-type connectors at its edges, carries the and-type
+  join before it, and the one after it goes to the next part. Why: the web does not render `join` yet,
+  so a negation the model dropped from the words and the server turned into a join would be lost to
+  the trader. `join` is served on the REST `Part` (null when none lies between the parts, the first
+  included); a re-draft keeps the join of the part it replaces and of every untouched part.
+- **Prompt version 10**: the left-out list is rendered from the and-type `JOINS` only (and the kept list from the others); a part is one condition and its
   words are contiguous ("cheap stocks on P/E" is one part); a vague word is never defined by a
   criterion the sentence does not ask for (offer unresolved readings).
 - **Still `not_understood`:** any content word no part covers (`cheap`, `ideally`, `still`), as before.

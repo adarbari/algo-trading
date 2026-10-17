@@ -41,12 +41,16 @@
         {
           "words": "stocks that are above their 200 day average",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": null,
+          "join_words": ""
         },
         {
           "words": "a daily range under 3% of price",
           "kind": "applied",
-          "origin": "words"
+          "origin": "words",
+          "join": "and",
+          "join_words": "and also"
         }
       ],
       "model_share": 1.0,
