@@ -162,5 +162,9 @@ purpose = "the decision log: product-direction and policy decisions, by the owne
 kind = "log"
 
 [[docs_dir]]
+path = "docs/edge-ideas"
+purpose = "the edge idea catalogue: researched hypotheses not yet filed as edge documents, one page per family with evidence, data needs and a verdict, and the index ranking them (docs/edges-plan.md quality bar; an idea becomes config/site/edges/<id>.toml when it is picked up)"
+
+[[docs_dir]]
 path = "docs/drafting"
 purpose = "the text-model drafting ('Describe it') plans and specs (ADR 0041)"
