@@ -663,7 +663,9 @@ def test_an_exhausted_quota_cools_the_member_off_until_it_passes(
         model.complete("s", "u")
     assert gemini.calls == 1 and claude.calls == 3
     skips = [a for a in ledger.attempts if a.error and "cooling off" in a.error]
-    assert len(skips) == 2 and {(a.provider, a.outcome) for a in skips} == {("gemini", "failed")}
+    assert len(skips) == 2 and {(a.provider, a.outcome) for a in skips} == {
+        ("gemini", "cooling_off")
+    }
     assert sum("quota exhausted" in r.message for r in caplog.records) == 1  # logged once
     clock.now = 601.0  # the cool-off is over: gemini is asked again
     gemini.outcome = None

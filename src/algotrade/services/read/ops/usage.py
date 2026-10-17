@@ -33,8 +33,9 @@ from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 DAYS = 30  # the span of the breakdowns, the daily series and the recent calls
 WEEK = 7
 RECENT = 50
-OUTCOMES = ("ok", "fell_back", "failed", "skipped_budget", "rejected")
+OUTCOMES = ("ok", "fell_back", "failed", "skipped_budget", "rejected", "cooling_off")
 SKIPPED = "skipped_budget"
+COOLING = "cooling_off"  # not an attempt: counted in no reliability figure
 REJECTED = "rejected"
 FAILURES = ("failed", "rejected")  # the outcomes the failures list holds
 COLUMNS = (
@@ -347,7 +348,8 @@ def _slices(frame: pd.DataFrame, columns: list[str], total: float) -> tuple[Slic
 
 def _reliability(frame: pd.DataFrame) -> Reliability:
     count = {o: int((frame["outcome"] == o).sum()) for o in OUTCOMES}
-    n = len(frame) - count[REJECTED]  # a rejected row is a second row of an ok attempt
+    # a rejected row is a second row of an ok attempt, a cooling-off row asked no one
+    n = len(frame) - count[REJECTED] - count[COOLING]
     return Reliability(
         n, count["ok"], count["fell_back"], count["failed"], count[SKIPPED], count["rejected"],
         count["fell_back"] / n if n else None, count["failed"] / n if n else None,
@@ -371,7 +373,7 @@ def _call(row: Mapping[Any, Any]) -> Call:
     missing = tuple(name for name, value in named if value is None)
     why = (
         "the attempt was skipped: nothing was asked, nothing spent"
-        if row["outcome"] == SKIPPED
+        if row["outcome"] in (SKIPPED, COOLING)
         else "the provider did not report it"
     )
     return Call(

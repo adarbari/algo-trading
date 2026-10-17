@@ -24,7 +24,7 @@ the next member is asked (``escalate``): at most two calls per member, none star
 ``deadline_s``. ``schema`` is passed to the members, which send it only when configured to.
 A member that raises ``QuotaExhaustedError`` (ADR 0041, amended 2026-10-17: its quota is used
 up for the day) cools off: until ``cool_off_s`` has passed on the chain's clock it is skipped
-without being asked, each skip recorded as a ``failed`` attempt saying "cooling off" (the first
+without being asked, each skip recorded as a ``cooling_off`` attempt (not a failure) (the first
 one logged once at WARNING). The state is process-local and thread-safe."""
 
 import logging
@@ -39,6 +39,7 @@ from typing import Any, Protocol
 
 from algotrade.core.model.completion import (
     ANSWER,
+    COOLING_OFF,
     FAILED,
     FELL_BACK,
     MAX_ANSWER,
@@ -266,7 +267,7 @@ class FallbackTextModel:
         if (left := self.cooling_for(provider)) is not None:
             message = f"cooling off, its quota is used up (back in {left:.0f} s)"
             self._note(
-                called, call.call_id, provider, model, FAILED, error=message,
+                called, call.call_id, provider, model, COOLING_OFF, error=message,
                 stage=PROVIDER, user_text=asked, chars=chars,
             )  # fmt: skip
             call.failures.append(f"{provider}: {message}")

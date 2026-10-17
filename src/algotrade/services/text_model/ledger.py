@@ -29,7 +29,7 @@ from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 
 from algotrade.config.site.llm import FREE, PRICED, REPORTED, LlmSettings, Rate
-from algotrade.core.model.completion import FAILED, REJECTED, SKIPPED_BUDGET, Attempt
+from algotrade.core.model.completion import COOLING_OFF, FAILED, REJECTED, SKIPPED_BUDGET, Attempt
 from algotrade.core.time.calendar import exchange_date
 from algotrade.services.text_model.usage import Seed, UsageSink
 
@@ -167,7 +167,7 @@ class UsageLedger:
         rate = self._rates.get(a.provider)
         if rate is not None and rate.basis == FREE:
             return 0.0, FREE
-        if a.outcome == SKIPPED_BUDGET:
+        if a.outcome in (SKIPPED_BUDGET, COOLING_OFF):
             return None, UNKNOWN
         known = None if a.outcome == FAILED else _known(rate, a)
         if known is not None and rate is not None:

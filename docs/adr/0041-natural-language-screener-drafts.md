@@ -534,8 +534,8 @@ to Claude, because `ChatCompletions` retried every 429 with a 20 s floor.
   midnight, not UTC, so a cool-off to UTC midnight would skip a refilled provider for hours); a
   retry each hour costs one instant 429.
 - **The chain skips a cooled-off member** without calling it until the cool-off passes
-  (process-local, thread-safe). Each skip is a `failed` ledger row whose error says "cooling
-  off"; the first is logged once at WARNING. A 503 keeps its retries; the chain's deadline
+  (process-local, thread-safe). Each skip is a `cooling_off` ledger row (not `failed`:
+  no one was asked; the usage reliability counts leave it out of attempts and failures); the first is logged once at WARNING. A 503 keeps its retries; the chain's deadline
   bounds it.
 
 ## Consequences
