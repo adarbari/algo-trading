@@ -26,6 +26,8 @@ export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 /** Writes are at least this far apart: a burst of loading pages is one write. */
 export const THROTTLE_MS = 2_000;
 const VERSION = 1;
+/** `whenRestored` gives the read of the record at most this long. */
+const MAX_WAIT_MS = 150;
 
 const VIEWER_HASH = hashKey(queryKeys.gql('Viewer', {}));
 
@@ -102,8 +104,12 @@ let running: { client: QueryClient; stop: () => void; restored: Promise<void> } 
  * none runs): a route loader waits for it, briefly, so a returning visit renders its page from
  * the record rather than from a loading state.
  */
-export function whenRestored(client: QueryClient): Promise<void> {
-  return running?.client === client ? running.restored : Promise.resolve();
+export function whenRestored(client: QueryClient, capMs = MAX_WAIT_MS): Promise<void> {
+  if (running?.client !== client) return Promise.resolve();
+  return Promise.race([
+    running.restored,
+    new Promise<void>((resolve) => setTimeout(resolve, capMs)),
+  ]);
 }
 
 /**

@@ -29,13 +29,8 @@ declare module '@tanstack/react-router' {
 type Prefetch<M> = (module: M, client: QueryClient) => void | Promise<void>;
 
 /** Waits for the saved page cache to be read into the client (never longer than the cap). */
-async function restored(client: QueryClient): Promise<void> {
-  const { whenRestored } = await import('@/entities/page-cache');
-  await Promise.race([
-    whenRestored(client),
-    new Promise<void>((resolve) => setTimeout(resolve, RESTORE_WAIT_MS)),
-  ]);
-}
+const restored = (client: QueryClient) =>
+  import('@/entities/page-cache').then((m) => m.whenRestored(client, RESTORE_WAIT_MS));
 
 /**
  * A page route's options: the `loader` (chunk, then the page's reads, then the saved page cache)
