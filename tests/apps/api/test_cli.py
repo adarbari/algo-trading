@@ -91,6 +91,26 @@ def test_golden_run_parses_its_flags_and_exits_with_the_command_code(
     )  # fmt: skip
 
 
+def test_golden_judge_parses_its_flags_and_exits_with_the_command_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[object] = []
+    monkeypatch.setattr(cli, "golden_judge", lambda args: seen.append(args) or 5)
+    with pytest.raises(SystemExit) as stop:
+        cli.main(
+            ["golden", "judge", "--cases", "a", "--provider", "x", "--judge", "j", "--repeat", "2",
+             "--json", "--max-calls", "9", "--budget-usd", "0.5", "--user", "me", "--yes"]
+        )  # fmt: skip
+    assert stop.value.code == 5
+    ns = seen[0]
+    assert (ns.cases, ns.provider, ns.judge, ns.repeat) == ("a", ["x"], "j", 2)  # type: ignore[attr-defined]
+    assert (ns.as_json, ns.max_calls, ns.budget_usd, ns.user, ns.yes) == (  # type: ignore[attr-defined]
+        True, 9, 0.5, "me", True,
+    )  # fmt: skip
+    defaults = cli._parser().parse_args(["golden", "judge"])
+    assert (defaults.judge, defaults.repeat, defaults.yes) == ("claude", 1, False)
+
+
 def test_feedback_commands_are_a_dry_run_until_yes_and_audit_only_what_they_applied(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

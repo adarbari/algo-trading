@@ -470,6 +470,19 @@ retyping just that part's words, which re-drafts only that part. This is the sec
   Notes and the dropped formulas / suggestions of the replaced words stay in the merged draft (they have no part to go
   with).
 
+## Amended 2026-10-17: the golden judge
+
+The structural score of `golden run` cannot see bad segmentation or wrong connector logic: on
+2026-10-17 a manual judge found 9 of 17 Claude drafts with connector chips (a "but" or "show me" as
+its own part) that the structural score passed. `algotrade-api golden judge` adds an LLM judge over
+the same real drafts: each (sentence, compact draft) is scored 0-2 on segmentation, coverage,
+logic and fidelity by one single-provider text model (use case `golden-judge`, its own prompt
+version), with the named issue patterns counted per drafting provider (`golden/judge.py`,
+rubric `golden/judge_prompt.py`). It is owner-run only: never CI (no network), never in the
+request path (a draft is never judged for a user), and under the same guards as `golden run`
+(`--yes`, `--max-calls`, `--budget-usd`, stop after three unavailable answers). It measures; it
+never gates a draft or a merge.
+
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
   dropped row with a reason, never a saved criterion.

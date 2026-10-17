@@ -11,7 +11,7 @@ open-files soft limit to ``OPEN_FILES`` and caps the connections served at once 
 ``MAX_CONNECTIONS`` (``ops/schedule.py``: launchd's 256 ran out on 2026-10-08).
 ``algotrade-api golden run`` is the owner-run live evaluation of the drafting prompt against
 the golden set (``services/drafting/golden/golden_run.py``: real models and money, only with
-``--yes``).
+``--yes``); ``golden judge`` has an LLM judge score each draft (``golden/judge.py``, same guards).
 ``algotrade-api feedback retain | erase`` are the owner-run retention (12 months) and per-user
 erasure of the personal text of the drafting feedback (``services/feedback/retention.py``, ADR
 0066): a dry run unless ``--yes``.
@@ -59,6 +59,12 @@ from algotrade.services.drafting.golden.golden_run import (
     drafter,
     run_golden,
 )
+from algotrade.services.drafting.golden.judge import (
+    DEFAULT_JUDGE,
+    JudgeArgs,
+    run_golden_judge,
+)
+from algotrade.services.drafting.golden.judge import DEFAULT_REPEAT as DEFAULT_JUDGE_REPEAT
 from algotrade.services.drafting.screens import ScreenDraft
 from algotrade.services.feedback import candidates, curate, retention
 from algotrade.services.feedback.chains import golden_candidates
@@ -123,6 +129,52 @@ def _feedback_parser(sub: Any) -> None:
         sp.add_argument("--yes", action="store_true", help="apply (without it nothing is written)")
 
 
+def add_golden_commands(sub: Any) -> None:
+    """The ``golden`` subcommands (run, judge, candidates, curate) on ``sub``."""
+    gd = sub.add_parser("golden", help="owner-run live evaluation of the drafting prompt")
+    gsub = gd.add_subparsers(dest="golden_command", required=True)
+    gr = gsub.add_parser("run", help="ask real models the golden cases and score the drafts")
+    gr.add_argument("--cases", default="", help="case ids, comma separated (default: all)")
+    gr.add_argument("--split", choices=SPLITS, default="all")
+    gr.add_argument("--provider", action="append", default=[], help="llm.toml provider id")
+    gr.add_argument("--repeat", type=int, default=DEFAULT_REPEAT)
+    gr.add_argument("--record", action="store_true", help="write passing raw answers for CI replay")
+    gr.add_argument("--force", action="store_true", help="--record may overwrite a file")
+    gr.add_argument("--json", action="store_true", dest="as_json")
+    gr.add_argument("--max-calls", type=int, default=DEFAULT_MAX_CALLS)
+    gr.add_argument("--budget-usd", type=float, default=DEFAULT_BUDGET_USD)
+    gr.add_argument("--pace", type=float, default=0.0, help="seconds to sleep between calls")
+    gr.add_argument("--batch", type=int, default=0, help="pause after every N calls")
+    gr.add_argument("--batch-pause", type=float, default=0.0, help="seconds paused per batch / 429")
+    gr.add_argument("--user", default=None, help="user id asked as (default $ALGOTRADE_USER)")
+    gr.add_argument("--yes", action="store_true", help="spend: without it only the plan is shown")
+    gj = gsub.add_parser("judge", help="an LLM judge scores each real draft (owner-run, spends)")
+    gj.add_argument("--cases", default="", help="case ids, comma separated (default: all)")
+    gj.add_argument("--split", choices=SPLITS, default="all")
+    gj.add_argument("--provider", action="append", default=[], help="drafting provider id")
+    gj.add_argument("--judge", default=DEFAULT_JUDGE, help="llm.toml provider id of the judge")
+    gj.add_argument("--repeat", type=int, default=DEFAULT_JUDGE_REPEAT)
+    gj.add_argument("--json", action="store_true", dest="as_json")
+    gj.add_argument("--max-calls", type=int, default=DEFAULT_MAX_CALLS)
+    gj.add_argument("--budget-usd", type=float, default=DEFAULT_BUDGET_USD)
+    gj.add_argument("--user", default=None, help="user id asked as (default $ALGOTRADE_USER)")
+    gj.add_argument("--yes", action="store_true", help="spend: without it only the plan is shown")
+    gc = gsub.add_parser("candidates", help="finalised sessions worth curating (real sentences)")
+    gc.add_argument("--since", default=None, help="YYYY-MM-DD (default: a year ago)")
+    gc.add_argument("--user", default=None, help="only this user's sessions")
+    gc.add_argument("--limit", type=int, default=candidates.DEFAULT_LIMIT)
+    gc.add_argument("--per-user-month", type=int, default=candidates.DEFAULT_PER_USER_MONTH)
+    gc.add_argument(
+        "--json", action="store_true", dest="as_json", help="to stdout only, never a file"
+    )
+    cu = gsub.add_parser("curate", help="write golden cases from your paraphrases")
+    cu.add_argument("--from", required=True, dest="source", type=Path, help="curation.json")
+    cu.add_argument("--since", default=None, help="YYYY-MM-DD (default: a year ago)")
+    cu.add_argument("--user", default=None, help="validate as this user (default $ALGOTRADE_USER)")
+    cu.add_argument("--dry-run", action="store_true", help="validate and show; write nothing")
+    cu.add_argument("--yes", action="store_true", help="write the case files")
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="algotrade-api", description=__doc__)
     parser.add_argument("--host", default=HOST)
@@ -148,37 +200,7 @@ def _parser() -> argparse.ArgumentParser:
     st = sub.add_parser("stamp-web", help="stamp a web build; say if the running API is behind it")
     st.add_argument("dist", type=Path)
     st.add_argument("--port", type=int, default=DEFAULT_PORT, dest="agent_port")
-    gd = sub.add_parser("golden", help="owner-run live evaluation of the drafting prompt")
-    gsub = gd.add_subparsers(dest="golden_command", required=True)
-    gr = gsub.add_parser("run", help="ask real models the golden cases and score the drafts")
-    gr.add_argument("--cases", default="", help="case ids, comma separated (default: all)")
-    gr.add_argument("--split", choices=SPLITS, default="all")
-    gr.add_argument("--provider", action="append", default=[], help="llm.toml provider id")
-    gr.add_argument("--repeat", type=int, default=DEFAULT_REPEAT)
-    gr.add_argument("--record", action="store_true", help="write passing raw answers for CI replay")
-    gr.add_argument("--force", action="store_true", help="--record may overwrite a file")
-    gr.add_argument("--json", action="store_true", dest="as_json")
-    gr.add_argument("--max-calls", type=int, default=DEFAULT_MAX_CALLS)
-    gr.add_argument("--budget-usd", type=float, default=DEFAULT_BUDGET_USD)
-    gr.add_argument("--pace", type=float, default=0.0, help="seconds to sleep between calls")
-    gr.add_argument("--batch", type=int, default=0, help="pause after every N calls")
-    gr.add_argument("--batch-pause", type=float, default=0.0, help="seconds paused per batch / 429")
-    gr.add_argument("--user", default=None, help="user id asked as (default $ALGOTRADE_USER)")
-    gr.add_argument("--yes", action="store_true", help="spend: without it only the plan is shown")
-    gc = gsub.add_parser("candidates", help="finalised sessions worth curating (real sentences)")
-    gc.add_argument("--since", default=None, help="YYYY-MM-DD (default: a year ago)")
-    gc.add_argument("--user", default=None, help="only this user's sessions")
-    gc.add_argument("--limit", type=int, default=candidates.DEFAULT_LIMIT)
-    gc.add_argument("--per-user-month", type=int, default=candidates.DEFAULT_PER_USER_MONTH)
-    gc.add_argument(
-        "--json", action="store_true", dest="as_json", help="to stdout only, never a file"
-    )
-    cu = gsub.add_parser("curate", help="write golden cases from your paraphrases")
-    cu.add_argument("--from", required=True, dest="source", type=Path, help="curation.json")
-    cu.add_argument("--since", default=None, help="YYYY-MM-DD (default: a year ago)")
-    cu.add_argument("--user", default=None, help="validate as this user (default $ALGOTRADE_USER)")
-    cu.add_argument("--dry-run", action="store_true", help="validate and show; write nothing")
-    cu.add_argument("--yes", action="store_true", help="write the case files")
+    add_golden_commands(sub)
     _feedback_parser(sub)
     return parser
 
@@ -290,34 +312,72 @@ def feedback_run(args: argparse.Namespace, now: datetime | None = None) -> int:
     return 0
 
 
-def golden_run(args: argparse.Namespace) -> int:
-    """``golden run``: wire the store, the user's context and one single-provider text model per
-    provider into ``ops/golden.run_golden``; the exit code."""
-    user = args.user or user_id(DEFAULT_USER)
-    store = open_store(data_url(), config_dir(), UserContext(user))
-    models: list[TextModel] = []
-    holder: list[ReadContext] = []
+class GoldenWiring:
+    """What ``golden run`` and ``golden judge`` share: the user's store and context, one
+    single-provider text model per provider id, and the real drafter over that context."""
 
-    def open_models(ids: Sequence[str], costs: CostTap) -> dict[str, TextModel]:
+    def __init__(self, user: str) -> None:
+        self.user = user
+        self.store = open_store(data_url(), config_dir(), UserContext(user))
+        self.models: list[TextModel] = []
+        self.holder: list[ReadContext] = []
+
+    def open_models(self, ids: Sequence[str], costs: CostTap) -> dict[str, TextModel]:
         try:
-            holder.append(open_context(store.reader, store.configs, UserContext(user)))
+            self.holder.append(
+                open_context(self.store.reader, self.store.configs, UserContext(self.user))
+            )
         except NotFoundError as exc:
             raise ConfigurationError(f"the store has no session to draft over: {exc}") from exc
         out: dict[str, TextModel] = {}
         for pid in ids:
-            model, why = open_text_model(store.configs, data_url(), only=[pid], tee=costs.submit)
+            model, why = open_text_model(
+                self.store.configs, data_url(), only=[pid], tee=costs.submit
+            )
             if model is None:
                 raise ConfigurationError(why)
             out[pid] = model
-            models.append(model)
+            self.models.append(model)
         return out
 
-    def draft(model: TextModel, sentence: str, current: Mapping[str, Any] | None) -> ScreenDraft:
-        return drafter(holder[0])(model, sentence, current)
+    def draft(
+        self, model: TextModel, sentence: str, current: Mapping[str, Any] | None
+    ) -> ScreenDraft:
+        return drafter(self.holder[0])(model, sentence, current)
 
-    def to_stderr(line: str) -> None:
-        print(line, file=sys.stderr)
+    def close(self) -> None:
+        for model in self.models:
+            getattr(model, "close", lambda: None)()
 
+
+def to_stderr(line: str) -> None:
+    print(line, file=sys.stderr)
+
+
+def golden_judge(args: argparse.Namespace) -> int:
+    """``golden judge``: the owner-run LLM judge over the drafts (``golden/judge.py``); the exit
+    code."""
+    user = args.user or user_id(DEFAULT_USER)
+    wiring = GoldenWiring(user)
+    judge_args = JudgeArgs(
+        tuple(c for c in args.cases.split(",") if c), args.split, tuple(args.provider), args.judge,
+        args.repeat, args.as_json, args.max_calls, args.budget_usd, args.yes, user,
+    )  # fmt: skip
+    try:
+        return run_golden_judge(
+            judge_args, load_llm(wiring.store.configs), llm_off(), Path.cwd() / GOLDEN_ROOT,
+            wiring.open_models, wiring.draft, print, to_stderr if args.as_json else print,
+        )  # fmt: skip
+    finally:
+        wiring.close()
+
+
+def golden_run(args: argparse.Namespace) -> int:
+    """``golden run``: wire the store, the user's context and one single-provider text model per
+    provider into ``ops/golden.run_golden``; the exit code."""
+    user = args.user or user_id(DEFAULT_USER)
+    wiring = GoldenWiring(user)
+    store, open_models, draft = wiring.store, wiring.open_models, wiring.draft
     run_args = RunArgs(
         tuple(c for c in args.cases.split(",") if c), args.split, tuple(args.provider),
         args.repeat, args.record, args.force, args.as_json, args.max_calls, args.budget_usd,
@@ -337,8 +397,7 @@ def golden_run(args: argparse.Namespace) -> int:
             draft, print, to_stderr if args.as_json else print, wait_for,
         )  # fmt: skip
     finally:
-        for model in models:
-            getattr(model, "close", lambda: None)()
+        wiring.close()
 
 
 def write_deploy_schedule(out: Path | None) -> dict[str, object]:
@@ -430,9 +489,11 @@ def main(argv: list[str] | None = None) -> None:
         print(json.dumps(plan, indent=2))
         return
     if args.command == "golden":
-        run = {"candidates": golden_candidates_cmd, "curate": golden_curate_cmd}.get(
-            args.golden_command, golden_run
-        )
+        run = {
+            "candidates": golden_candidates_cmd,
+            "curate": golden_curate_cmd,
+            "judge": golden_judge,
+        }.get(args.golden_command, golden_run)
         sys.exit(run(args))
     if args.command == "feedback":
         sys.exit(feedback_run(args))
