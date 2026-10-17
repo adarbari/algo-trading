@@ -39,14 +39,21 @@
     "explained": {
       "parts": [
         {
-          "words": "stocks that are above their 200 day average",
+          "words": "stocks",
           "kind": "applied",
           "origin": "words",
           "join": null,
           "join_words": ""
         },
         {
-          "words": "a daily range under 3% of price",
+          "words": "above their 200 day average",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "have a daily range under 3% of price",
           "kind": "applied",
           "origin": "words",
           "join": "and",

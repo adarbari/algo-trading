@@ -63,6 +63,8 @@ horizon apart. Every variant tried is a row in the run's trial log.
    the size and momentum baselines on the same sessions.
 
 Rejected and blocked candidates are kept with the reason so the same idea is not re-filed.
+Ideas not yet filed (about 300, researched 2026-10-17, graded with a pickup order) are in
+[edge-ideas/](edge-ideas/README.md); one becomes a document here when it is picked up.
 Checked 2026-10-07: S&P 500 index changes rejected (Greenwood and Sammon: under 1% since 2010);
 leveraged ETF rebalancing rejected (intraday, weak after costs); Russell reconstitution blocked
 (alive, about 1% over 20 sessions, one event a year, no membership data).
