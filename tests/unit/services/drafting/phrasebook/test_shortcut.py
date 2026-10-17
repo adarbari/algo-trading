@@ -315,3 +315,62 @@ def test_every_phrasebook_sentence_of_the_golden_set_is_a_valid_draft(ctx: ReadC
         assert draft.stage == "phrasebook" and draft.document["criteria"], case.id
         done += 1
     assert done >= 1
+
+
+BUT = "large caps near the 52-week high but with rising volume"
+
+
+def test_a_but_sentence_of_two_structured_clauses_is_drafted_with_no_model(
+    ctx: ReadContext,
+) -> None:
+    """Each clause resolves, so the model is never asked; the connector is the second part's join
+    (never a chip), and each part is one clause with the server's reading."""
+    draft = draft_screen(ctx, Forbidden(), "mine", BUT)
+    assert draft.stage == "phrasebook" and draft.call_id is None
+    assert criteria_of(draft) == expect(
+        {"field": CAP, "op": "gte", "value": 10_000_000_000},
+        {"field": "feature.pct_from_high_52w", "op": "gte", "value": -0.1,
+         "mode": "soft", "tolerance": 0.05},
+        {"field": "feature.volume_trend_20_60", "op": "gt", "value": 1.0,
+         "mode": "soft", "tolerance": 0.1},
+        ACTIVE,
+    )  # fmt: skip
+    assert draft.parts is not None
+    assert [
+        (p.words, p.join, p.join_words, p.reading_source)
+        for p in draft.parts
+        if p.origin == "words"
+    ] == [
+        ("large caps near the 52-week high", None, "", "server"),
+        ("rising volume", "and", "but with", "server"),
+    ]
+    assert not any(p.kind == "not_understood" for p in draft.parts)
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "oversold stocks but not in a downtrend",  # a negation
+        "oversold or overbought but uptrend",  # an or
+        "large caps but zzz",  # a clause nothing says
+        "large caps all but volatile",  # "all but" is an except
+        "oversold, all but downtrend",
+        "oversold stocks, all but a downtrend",
+        "oversold but overbought",  # one field twice
+    ],
+)
+def test_a_sentence_with_one_clause_in_doubt_still_goes_to_the_model(
+    ctx: ReadContext, sentence: str
+) -> None:
+    model = Canned()
+    draft = draft_screen(ctx, model, "mine", sentence)
+    assert model.asked == 1 and draft.stage == "model"
+
+
+def test_the_clause_shortcut_keeps_the_builders_current_criteria(ctx: ReadContext) -> None:
+    """The same rules as the whole-sentence shortcut: a field ``current`` holds, read otherwise,
+    is the model's."""
+    held = {"criteria": {"cap": {"field": CAP, "op": "lt", "value": 5, "mode": "hard"}}}
+    model = Canned()
+    draft_screen(ctx, model, "mine", BUT, held)
+    assert model.asked == 1

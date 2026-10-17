@@ -1,7 +1,9 @@
 import asyncio
+import json
 import threading
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -31,19 +33,82 @@ class _Ctx:
     reader: _Reader
 
 
+def _once(warmer: CacheWarmer) -> bool:
+    pending = warmer.begin()
+    if pending is None:
+        return False
+    warmer.finish(pending)
+    return True
+
+
 def test_it_warms_at_start_and_after_each_publish_or_new_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     warmed: list[tuple[date, int]] = []
-    monkeypatch.setattr(warm, "warm", lambda c, _f: warmed.append((c.session.date, c.reader.seq)))
+    monkeypatch.setattr(
+        warm, "warm", lambda c, _f, home: warmed.append((c.session.date, c.reader.seq))
+    )
     reader, session = _Reader(), _Session(date(2026, 10, 8))
     warmer = CacheWarmer(lambda: _Ctx(session, reader))  # type: ignore[arg-type, return-value]
-    assert warmer.warm_once() and not warmer.warm_once()  # nothing new: nothing read
+    assert _once(warmer) and not _once(warmer)  # nothing new: nothing read
     reader.seq = 2  # a publish
-    assert warmer.warm_once()
+    assert _once(warmer)
     session.date = date(2026, 10, 9)  # the next session
-    assert warmer.warm_once()
+    assert _once(warmer)
     assert warmed == [(date(2026, 10, 8), 1), (date(2026, 10, 8), 2), (date(2026, 10, 9), 2)]
+
+
+def test_the_served_operations_are_replayed_between_the_home_steps_and_the_rest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    order: list[str] = []
+    monkeypatch.setattr(warm, "home_steps", lambda c: [("home", lambda: order.append("home"))])
+    monkeypatch.setattr(warm, "warm", lambda c, _f, home: order.append("rest"))
+
+    async def replay() -> int:
+        order.append("replay")
+        return 3
+
+    warmer = CacheWarmer(
+        lambda: _Ctx(_Session(date(2026, 10, 8)), _Reader()),  # type: ignore[arg-type, return-value]
+        every_s=0.01,
+        replay=replay,
+    )
+
+    async def go() -> None:
+        task = asyncio.create_task(warmer.run())
+        await asyncio.sleep(0.2)
+        task.cancel()
+
+    asyncio.run(go())
+    assert order == ["home", "replay", "rest"]
+
+
+def test_a_failing_replay_does_not_stop_the_warm() -> None:
+    async def boom() -> int:
+        raise RuntimeError("no")
+
+    warmer = CacheWarmer(lambda: None, replay=boom)  # type: ignore[arg-type, return-value]
+    asyncio.run(warmer.replay_operations())  # logged, not raised
+
+
+def test_seed_operations_lists_each_page_load_operation_once(tmp_path: Path) -> None:
+    pages = {
+        "pages": {
+            "/a": [{"op": "Viewer", "query": "query Viewer { v }", "variables": {}}],
+            "/b": [
+                {"op": "Viewer", "query": "query Viewer { v }", "variables": {}},
+                {"op": "X", "query": "query X($n: Int) { x }", "variables": {"n": 1}},
+            ],
+        }
+    }
+    file = tmp_path / "pages.json"
+    file.write_text(json.dumps(pages))
+    assert warm.seed_operations(file) == [
+        ("query Viewer { v }", {}),
+        ("query X($n: Int) { x }", {"n": 1}),
+    ]
+    assert warm.seed_operations(tmp_path / "missing.json") == []
 
 
 def test_it_warms_when_a_session_becomes_complete_without_a_publish(
@@ -51,12 +116,12 @@ def test_it_warms_when_a_session_becomes_complete_without_a_publish(
 ) -> None:
     """ADR 0062: the nightly's record flipping the served session saves no table."""
     warmed: list[date] = []
-    monkeypatch.setattr(warm, "warm", lambda c, _f: warmed.append(c.session.date))
+    monkeypatch.setattr(warm, "warm", lambda c, _f, home: warmed.append(c.session.date))
     session = _Session(date(2026, 10, 8), newer="2026-10-09 failing")
     warmer = CacheWarmer(lambda: _Ctx(session, _Reader()))  # type: ignore[arg-type, return-value]
-    assert warmer.warm_once() and not warmer.warm_once()
+    assert _once(warmer) and not _once(warmer)
     session.date, session.newer = date(2026, 10, 9), None  # the retry completed 10-09
-    assert warmer.warm_once()
+    assert _once(warmer)
     assert warmed == [date(2026, 10, 8), date(2026, 10, 9)]
 
 
@@ -65,7 +130,7 @@ def test_a_failed_warm_is_logged_and_tried_again(
 ) -> None:
     calls: list[int] = []
 
-    def flaky(_ctx: Any, _frames: Any) -> None:
+    def flaky(_ctx: Any, _frames: Any, home: bool) -> None:
         calls.append(1)
         if len(calls) == 1:
             raise OSError("a store mid-publish")

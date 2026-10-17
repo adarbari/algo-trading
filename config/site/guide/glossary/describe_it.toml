@@ -298,3 +298,15 @@ body = """
 The request was refused before a draft came back. It can happen when the sentence is empty or too long, or when the screen has changed. Your screen is unchanged and nothing was saved.
 """
 next = "Shorten or reword the sentence, then try again."
+
+[[term]]
+id = "describe_part_join"
+term = "Describe it: Connector"
+short = "The word between two parts of your sentence and how Describe it read it: and, or, or but not."
+body = """
+A connector sits between two parts of your sentence and shows the word you used (but, except, or, unless) and how Describe it read it: and, or, or but not.
+"And" means both parts must hold. "Or" means either does, kept as one combined criterion. "But not" means the second part is an exclusion, already folded into that part's reading.
+A plain "and" shows no connector. A misread connector is the usual reason a result surprises you.
+"""
+see_also = ["describe_part_reading", "describe_applied"]
+next = "Check the connector when a result surprises you, and retype the part if it reads the wrong way."
