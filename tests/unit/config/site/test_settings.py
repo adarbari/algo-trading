@@ -45,6 +45,7 @@ def test_the_committed_site_files_load() -> None:
     assert sources.cboe_workers == 2 and sources.cboe_priority_symbols[:2] == ("SPY", "QQQ")
     assert (sources.descriptions_per_night, sources.descriptions_refresh_days) == (100, 365)
     assert sources.sec_fund_quarters == 6
+    assert sources.sec_statements_priority_min_adv_usd == 10_000_000.0
     assert (sources.http_backoff_factor, sources.http_speedup_factor) == (1.5, 1.05)
     assert (sources.http_speedup_after, sources.http_error_window) == (100, 50)
     assert sources.http_max_error_rate == 0.10
@@ -77,6 +78,10 @@ def test_missing_files_fall_back_to_defaults() -> None:
             r"descriptions_per_night: expected an integer",
         ),
         ({"massive": {"descriptions_refresh_days": 1.5}}, r"descriptions_refresh_days: expected"),
+        (
+            {"sec_edgar": {"statements_priority_min_adv_usd": -1}},
+            r"statements_priority_min_adv_usd",
+        ),
         ({"sec_edgar": {"fund_quarters": -2}}, r"fund_quarters: expected an integer >= 0"),
         ({"sec_edgar": {"raw_retention_days": 0}}, r"\[sec_edgar\] raw_retention_days: expected"),
         ({"sec_edgar": {"raw_retention_days": 1.5}}, r"raw_retention_days: expected an integer"),

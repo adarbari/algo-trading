@@ -19,13 +19,22 @@ company's document.
   a CIK with no marker in one of them is new there), so a table that failed to stage for a CIK
   that the other table stored is due again the next night, not in 30 days. A table's rows are
   staged separately, the shares first.
+- Priority: WHICH CIKs are fetched first (the statements backlog before the nightly cap, and
+  ``limit``) is ``priority_order``: tier 0 the event scope (list, tier A / B, fund references),
+  tier 1 the current S&P 500, tier 2 the rest; inside tiers 1 and 2 optionable and liquid names
+  (``optionable`` of the reference, ``adv_usd_20d`` at least ``[sec_edgar]
+  statements_priority_min_adv_usd``) first, then
+  optionable, then the others, each by dollar volume then market cap (shares x close) descending,
+  ties by CIK; a CIK takes its best instrument's key. It only reorders:
+  what is due, the cap's exemptions and ``force`` do not change, and a missing input (no list,
+  no membership snapshot, no roll-up) leaves that tier empty, the order falling back to CIK.
 - Per-CIK rows are staged and published as one partition per table; a crashed run resumes
   (CIKs it already fetched are skipped).
 """
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from functools import partial
 
 import pandas as pd
@@ -33,10 +42,12 @@ import pandas as pd
 from algotrade.core.model.instruments import pad_cik
 from algotrade.data import StoreReader
 from algotrade.data.reference import instruments, snapshot
+from algotrade.data.rollups import rollup_as_of
 from algotrade.data.shares import CHECKED, DATES, KEY, TABLE, stored_shares
 from algotrade.data.statements.reading import KEY as STATEMENT_KEY
 from algotrade.data.statements.reading import TABLE as STATEMENTS
 from algotrade.data.statements.reading import light_statements, stored_statements
+from algotrade.services.events.scope import scoped_instruments
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
@@ -45,6 +56,8 @@ from algotrade_sources.framework.base import FetchRequest, Source
 TASK = "shares"
 COMPANY = "instruments/company"
 CHECKPOINT_EVERY = 100
+FUNDAMENTALS = "rollups/instrument/fundamentals@v3"
+PRICE_STATS = "rollups/instrument/price_stats@v2"
 CARRY = "carry"  # staging key for facts copied to instruments new to a CIK
 
 
@@ -53,6 +66,9 @@ class SharesSources:
     facts: Source  # SecCompanyFacts
     refresh_days: int = 30
     backfill_per_night: int = 400  # CIKs with shares but no statements fetched a night (0: no cap)
+    liquid_adv_usd: float = (
+        10_000_000.0  # 20-day dollar volume from which an optionable name is liquid
+    )
 
 
 @dataclass(frozen=True)
@@ -212,19 +228,113 @@ def _fetched(light: pd.DataFrame) -> dict[str, date]:
     return {str(c): pd.Timestamp(v).date() for c, v in latest.items()}
 
 
+@dataclass(frozen=True)
+class Standing:
+    """What orders one instrument: ``optionable`` (reference flag; ``None`` unknown counts as
+    not), ``adv_usd`` (20-day dollar volume) and ``market_cap`` (0: not stored)."""
+
+    optionable: bool | None = None
+    adv_usd: float = 0.0
+    market_cap: float = 0.0
+
+
+def _key(
+    instrument_id: str, scope: set[str], sp500: set[str], standing: Standing, liquid: float
+) -> tuple[float, ...]:
+    """Sort key of one instrument: tier (scope 0, S&P 500 1, rest 2), then optionable and liquid
+    (0), optionable (1), not (2), then dollar volume and market cap descending."""
+    tier = 0 if instrument_id in scope else 1 if instrument_id in sp500 else 2
+    grade = 2 if not standing.optionable else 0 if standing.adv_usd >= liquid else 1
+    return (tier, grade if tier else 0, -standing.adv_usd, -standing.market_cap)
+
+
+def priority_order(
+    ciks: list[str],
+    scope: set[str],
+    sp500: set[str],
+    standing: Mapping[str, Standing],
+    cik_of: Mapping[str, str],
+    liquid_adv_usd: float = 10_000_000.0,
+) -> list[str]:
+    """``ciks`` by priority: tier 0 a CIK holding a ``scope`` instrument, tier 1 an ``sp500``
+    one, tier 2 the rest; inside a tier (scope excepted) optionable and liquid, optionable,
+    the others; then dollar volume and market cap descending, ties by CIK. A CIK takes its best
+    instrument's key. ``cik_of``: instrument id -> CIK. Deterministic; the same CIKs, reordered;
+    an instrument without standing sorts after those with it."""
+    best: dict[str, tuple[float, ...]] = {}
+    for instrument_id, cik in cik_of.items():
+        key = _key(
+            instrument_id, scope, sp500, standing.get(instrument_id, Standing()), liquid_adv_usd
+        )
+        if cik not in best or key < best[cik]:
+            best[cik] = key
+    return sorted(ciks, key=lambda c: (*best.get(c, (2, 2, 0.0, 0.0)), c))
+
+
+def _standing(reader: StoreReader, session: date, reference: pd.DataFrame) -> dict[str, Standing]:
+    """Optionable (the reference snapshot), 20-day dollar volume and market cap (shares x close)
+    from the newest stored roll-ups on or before ``session``; a missing input is 0 / unknown."""
+    out: dict[str, dict[str, float | bool | None]] = {}
+    if "optionable" in reference.columns:
+        for i, o in zip(reference["instrument_id"], reference["optionable"], strict=True):
+            out.setdefault(str(i), {})["optionable"] = None if pd.isna(o) else bool(o)
+    stats = rollup_as_of(reader, PRICE_STATS, session)
+    shares = rollup_as_of(reader, FUNDAMENTALS, session)
+    px = n = pd.Series(dtype=float)
+    if stats is not None:
+        frame = stats[1].set_index(stats[1]["instrument_id"].astype(str))
+        px = frame["close"] if "close" in frame.columns else px
+        if "adv_usd_20d" in frame.columns:
+            for i, v in frame["adv_usd_20d"].dropna().items():
+                out.setdefault(str(i), {})["adv_usd"] = float(v)
+    if shares is not None and "shares_outstanding" in shares[1].columns:
+        n = shares[1].set_index(shares[1]["instrument_id"].astype(str))["shares_outstanding"]
+    for i, v in (n * px).dropna().items():
+        out.setdefault(str(i), {})["market_cap"] = float(v)
+    return {i: Standing(**v) for i, v in out.items()}  # type: ignore[arg-type]
+
+
+def _prioritised(
+    ctx: TaskContext, ids: pd.DataFrame, session: date, ciks: list[str], liquid_adv_usd: float
+) -> list[str]:
+    """``ciks`` in the order the backlog is fetched: the owner's scope, the S&P 500 (the
+    reference's ``in_sp500``), the rest by liquidity and market cap. Every input is read as of
+    the day BEFORE ``session`` (the rule of ``tasks/market/tiers.py``): a rerun after tonight's
+    roll-ups exist must pick the same CIKs as the first attempt. Every input is optional: a
+    missing one leaves its tier empty."""
+    asof = session - timedelta(days=1)
+    cik_of = dict(zip(ids["instrument_id"], ids["cik"], strict=True))
+    scope = set(scoped_instruments(ctx.reader, ctx.configs, asof).instrument_ids)
+    reference = instruments(ctx.reader, session)
+    flag = reference["in_sp500"] if "in_sp500" in reference.columns else pd.Series([], dtype=bool)
+    flagged = flag.fillna(False).astype(bool).to_numpy()
+    sp500 = set(reference["instrument_id"].astype(str)[flagged]) if len(flag) else set()
+    standing = _standing(ctx.reader, asof, reference)
+    return priority_order(ciks, scope, sp500, standing, cik_of, liquid_adv_usd)
+
+
 def _due(
     ciks: list[str],
     fetched: list[dict[str, date]],
     session: date,
     sources: SharesSources,
     force: bool,
+    priority: list[str] | None = None,
 ) -> tuple[list[str], int]:
     """The CIKs to fetch and how many of the statements backlog the nightly cap defers. A CIK
     is due when either table is (the older latest fetch decides; one table's marker missing
     makes it new there). Only the backlog (shares stored, statements never) is capped, in its
-    order: a CIK new to both or due for shares is never deferred."""
+    ``priority`` order (default: CIK order): a CIK new to both or due for shares is never
+    deferred, and the cap defers the lowest priority."""
     both = {c: min(f[c] for f in fetched) for c in fetched[0] if all(c in f for f in fetched)}
     due = due_keys(ciks, both, session, sources.refresh_days, force)
+    rank = {c: i for i, c in enumerate(priority or [])}
+    new = sorted(
+        (c for c in due if force or c not in both), key=lambda c: (rank.get(c, len(rank)), c)
+    )
+    due = new + [
+        c for c in due if not force and c in both
+    ]  # new to a table by priority, then the stalest
     cap = sources.backfill_per_night
     if force or cap <= 0:
         return due, 0
@@ -246,7 +356,8 @@ def ingest_shares(
     with IngestRun(ctx, TASK, session, resume=True) as run:
         ciks = sorted(set(ids["cik"]))
         fetched = [_fetched(light[t.table]) for t in TARGETS]
-        due, backlog_deferred = _due(ciks, fetched, session, sources, force)
+        priority = _prioritised(ctx, ids, session, ciks, sources.liquid_adv_usd)
+        due, backlog_deferred = _due(ciks, fetched, session, sources, force, priority)
         todo = due if limit is None else due[: max(limit, 0)]
         members = dict(tuple(ids.groupby("cik")))
         todo_ids = list(ids["instrument_id"][ids["cik"].isin(todo)])

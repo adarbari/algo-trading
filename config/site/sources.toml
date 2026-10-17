@@ -115,8 +115,11 @@ refresh_days = 30                # refetch a company's details once per this man
 facts_refresh_days = 30          # refetch a company's share counts (company facts) once per this
                                  # many days; both spread over the window by CIK
 statements_backfill_per_night = 400  # CIKs with share counts but no statement lines (ADR 0067)
-                                 # fetched per night, so the backfill spreads over ~15 nights; new
+                                 # fetched per night, so the backfill spreads over ~14 nights; new
                                  # CIKs and CIKs due for shares are never capped; 0: no cap
+statements_priority_min_adv_usd = 10_000_000  # the backlog is fetched scope names, S&P 500, then the rest;
+                                 # inside a tier an optionable name with at least this 20-day
+                                 # dollar volume goes first (ADR 0067)
 fund_quarters = 6                # quarterly prospectus data sets read for ETF descriptions (ADR 0034):
                                  # ~80 MB each, the last N completed quarters, each fetched once
 

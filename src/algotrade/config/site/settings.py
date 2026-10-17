@@ -147,6 +147,7 @@ VENDOR_EXTRAS = {
         "refresh_days",
         "facts_refresh_days",
         "statements_backfill_per_night",
+        "statements_priority_min_adv_usd",
         "fund_quarters",
     ),
     "treasury": ("lookback_days",),
@@ -220,6 +221,7 @@ class SourcesSettings:
     sec_refresh_days: int = 30
     sec_facts_refresh_days: int = 30
     sec_statements_backfill_per_night: int = 400  # ADR 0067 (0: no cap)
+    sec_statements_priority_min_adv_usd: float = 10_000_000.0  # liquid: 20-day $ volume (ADR 0067)
     sec_fund_quarters: int = 6  # SEC prospectus data sets read for ETF descriptions (ADR 0034)
     descriptions_per_night: int = 100  # Massive ticker overviews the nightly requests (0: none)
     descriptions_refresh_days: int = 365  # refetch a stock's description after this many days
@@ -351,6 +353,9 @@ class SourcesSettings:
             ),
             sec_statements_backfill_per_night=_extra(vendors, "sec_edgar").integer(
                 "statements_backfill_per_night", d.sec_statements_backfill_per_night, 0
+            ),
+            sec_statements_priority_min_adv_usd=_extra(vendors, "sec_edgar").number(
+                "statements_priority_min_adv_usd", d.sec_statements_priority_min_adv_usd, 0.0
             ),
             sec_fund_quarters=_extra(vendors, "sec_edgar").integer(
                 "fund_quarters", d.sec_fund_quarters, 0
