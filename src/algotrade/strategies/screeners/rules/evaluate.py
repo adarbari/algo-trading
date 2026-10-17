@@ -1,6 +1,7 @@
 """Evaluate a rule screen over a ``FeatureView``: one ``RuleRow`` per instrument, ranked, plus
 the run summary. Pure and deterministic: the same spec and view give the same rows in the
-same order (preview and nightly call this one function, ADR 0029).
+same order (preview and nightly call this one function, ADR 0029). With boolean groups
+(ADR 0071) the decision and score read the gates: ungrouped criteria and top-level groups.
 
 ``memo`` (the preview's warm path): results by criterion (and by the spec's display part:
 flags, columns, tie-break) and instrument, valid for one view. Each depends
@@ -12,10 +13,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from algotrade.core.model.predicates import FieldValue, evaluate_group, is_missing
-from algotrade.core.model.screen_spec import ScreenSpec
+from algotrade.core.model.screen_spec import Criterion, ScreenSpec
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.strategies.screeners.rules.criteria import CriterionResult, evaluate_criterion
 from algotrade.strategies.screeners.rules.decision import decide, score
+from algotrade.strategies.screeners.rules.groups import Gate, Plan, evaluate_gates, plan
 from algotrade.strategies.screeners.rules.row import RuleRow
 from algotrade.strategies.screeners.rules.summary import RunSummary, summarise
 
@@ -93,26 +95,53 @@ def _shown(
     return found
 
 
+def _gates(
+    spec: ScreenSpec,
+    shape: Plan,
+    instrument: str,
+    row: Mapping[str, FieldValue],
+    results: tuple[CriterionResult, ...],
+    memo: ScreenMemo | None,
+) -> tuple[Gate, ...]:
+    """The gates of a grouped spec; a negated criterion is evaluated (and memoised) as one."""
+    done = dict(zip(spec.criteria, results, strict=True))
+
+    def lookup(criterion: Criterion) -> CriterionResult:
+        found = done.get(criterion)
+        if found is None:
+            table = memo.setdefault(criterion, {}) if memo is not None else {}
+            found = table.get(instrument)
+            if found is None:
+                found = table[instrument] = evaluate_criterion(criterion, row.get(criterion.field))
+        return found
+
+    return evaluate_gates(shape, lookup)
+
+
 def _row(
     spec: ScreenSpec,
+    shape: Plan,
     instrument: str,
     row: Mapping[str, FieldValue],
     known: list[dict[str, Any]] | None,
+    memo: ScreenMemo | None,
 ) -> RuleRow:
     """``known``: memo tables, one per criterion then one for the display (or ``None``)."""
     results = _results(spec, instrument, row, known)
-    decision, reasons = decide(results)
+    gates = _gates(spec, shape, instrument, row, results, memo) if shape.grouped else None
+    decision, reasons = decide(results if gates is None else gates)
     tie_break, flags, columns = _shown(spec, instrument, row, known)
     return RuleRow(
         instrument_id=instrument,
         decision=decision,
-        score=score(results),
+        score=score(results if gates is None else gates),
         rank=0,
         reasons=reasons,
         results=results,
         tie_break=tie_break,
         flags=flags,
         columns=columns,
+        gates=gates,
     )
 
 
@@ -131,7 +160,7 @@ def _ranked(r: RuleRow, rank: int) -> RuleRow:
     """``r`` with its rank (built directly: ``dataclasses.replace`` costs 3x per row)."""
     return RuleRow(
         r.instrument_id, r.decision, r.score, rank, r.reasons, r.results,
-        r.tie_break, r.flags, r.columns,
+        r.tie_break, r.flags, r.columns, r.gates,
     )  # fmt: skip
 
 
@@ -141,6 +170,10 @@ def evaluate_screen(
     """Every instrument of ``view`` once (``view`` rows are keyed by catalogue field)."""
     keys: list[Hashable] = [*spec.criteria, _display_key(spec)]
     known = None if memo is None else [memo.setdefault(k, {}) for k in keys]
-    rows = sorted((_row(spec, i, view.row(i), known) for i in view), key=lambda r: _order(spec, r))
+    shape = plan(spec)
+    rows = sorted(
+        (_row(spec, shape, i, view.row(i), known, memo) for i in view),
+        key=lambda r: _order(spec, r),
+    )
     ranked = tuple(_ranked(r, n) for n, r in enumerate(rows, start=1))
     return RuleScreenResult(spec, ranked, summarise(ranked))

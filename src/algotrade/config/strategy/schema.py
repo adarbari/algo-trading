@@ -47,7 +47,18 @@ RULE_IMPLS = (RULES_IMPL, MODEL_IMPL)
 # legacy (ADR 0030): accepted so v1 / v2 presets parse, then ignored. ``notes`` is what the
 # screen does not cover (a missing feature the trader asked for, Describe it).
 RULE_SCREEN_KEYS = frozenset(
-    {"version", "criteria", "tiers", "flags", "classify", "columns", "rank", "score", "notes"}
+    {
+        "version",
+        "criteria",
+        "groups",
+        "tiers",
+        "flags",
+        "classify",
+        "columns",
+        "rank",
+        "score",
+        "notes",
+    }
 )
 
 

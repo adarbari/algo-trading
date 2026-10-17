@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 from algotrade.core.model.predicates import FieldValue
 from algotrade.strategies.screeners.base import Decision, ScreenRow
-from algotrade.strategies.screeners.rules.criteria import CriterionResult, Outcome
+from algotrade.strategies.screeners.rules.criteria import CriterionResult
+from algotrade.strategies.screeners.rules.groups import Gate
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,13 @@ class RuleRow:
     tie_break: float | None = None
     flags: tuple[str, ...] = ()
     columns: tuple[tuple[str, FieldValue], ...] = ()  # (display name, value)
+    gates: tuple[Gate, ...] | None = None  # ADR 0071: with groups, what decided; else ``results``
+
+    @property
+    def gate_results(self) -> tuple[Gate, ...]:
+        """The gates in funnel order: ungrouped criteria and top-level groups (``results``
+        themselves when the screen has no groups)."""
+        return self.results if self.gates is None else self.gates
 
     def screen_row(self) -> ScreenRow:
         """This row under the shared screener contract (values keyed by field)."""
@@ -27,5 +35,9 @@ class RuleRow:
 
     def only_near_misses(self) -> bool:
         """Missed only within tolerance: every gating miss is NEAR (a narrow miss)."""
-        misses = [r for r in self.results if r.gating and r.outcome is not Outcome.PASS]
-        return bool(misses) and all(r.outcome is Outcome.NEAR for r in misses)
+        misses = [
+            g.verdict
+            for g in self.gate_results
+            if g.verdict.rejects or g.verdict.near or g.verdict.missing
+        ]
+        return bool(misses) and all(v.near for v in misses)
