@@ -14,7 +14,7 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from tests.unit.services.evaluation.cross_section.conftest import edge
 
-WHERE = "config/site/edges/drift.toml"
+WHERE = "config/site/edges/drift/edge.toml"
 
 
 def document(**changes: Any) -> dict[str, Any]:
@@ -467,3 +467,10 @@ def test_the_published_table_is_optional_typed_and_checked_against_the_document(
 def test_a_published_table_fails_closed(published: dict[str, Any], match: str) -> None:
     with pytest.raises(ConfigurationError, match=match):
         parse(published=published)
+
+
+def test_family_is_an_optional_catalogue_letter() -> None:
+    assert parse_edge(document(), "drift", WHERE).family == ""
+    assert parse_edge(document(family="C"), "drift", WHERE).family == "C"
+    with pytest.raises(ConfigurationError, match="family"):
+        parse_edge(document(family="Z"), "drift", WHERE)
