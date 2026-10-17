@@ -1,10 +1,11 @@
 /** Page: Trader > Regime (the market as weather, its warning signs, the reading list). */
-import { active } from '@/shared/api';
+import { prefetchRegimeEpisodes, prefetchRegimeSignals } from '@/entities/regime';
 
 export { RegimePage } from './ui/RegimePage';
 
-// This chunk loads when the page's link is hovered: start the read, and the saved page cache.
-const { client } = active;
-if (client) {
-  void import('@/entities/page-cache').then((m) => m.startQueryPersistence(client));
+/** Start the page's reads before it mounts (the route's loader); the widgets' hooks join them.
+ * The regime itself is read with every layout (the route guard). */
+export function prefetchRegimeReads(client: Parameters<typeof prefetchRegimeEpisodes>[0]): void {
+  prefetchRegimeEpisodes(client);
+  prefetchRegimeSignals(client);
 }

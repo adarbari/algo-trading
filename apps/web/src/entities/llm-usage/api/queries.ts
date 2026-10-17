@@ -3,7 +3,7 @@
  * ADR 0058, ADR 0037): windows with their caps, 30-day breakdowns, the daily series, reliability
  * the latest calls and the latest failures. One operation serves the whole page, so every widget shares one request.
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -191,11 +191,22 @@ const LlmUsageQuery = graphql(`
   }
 `);
 
+function llmUsageQuery(recent = RECENT_CALLS) {
+  return queryOptions({
+    queryKey: queryKeys.gql('LlmUsage', { recent }),
+    queryFn: () => gql(LlmUsageQuery, { recent }),
+  });
+}
+
+/** Start the read before the page mounts (a route loader); the hook then joins it. */
+export function prefetchLlmUsage(client: QueryClient, recent = RECENT_CALLS): void {
+  void client.query(llmUsageQuery(recent)).catch(() => undefined);
+}
+
 /** Null: the Admin read returned nothing (no stores). */
 export function useLlmUsage(recent = RECENT_CALLS) {
   return useQuery({
-    queryKey: queryKeys.gql('LlmUsage', { recent }),
-    queryFn: () => gql(LlmUsageQuery, { recent }),
+    ...llmUsageQuery(recent),
     select: (data) => data.llmUsage,
   });
 }

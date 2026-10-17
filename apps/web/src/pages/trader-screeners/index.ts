@@ -1,12 +1,12 @@
 /** Page: Trader > Screeners (the list of screeners with their results and track records). */
-import { prefetchScreeners } from '@/entities/screen';
-import { active } from '@/shared/api';
-
+import { prefetchTrackRecords } from '@/entities/edge';
+import { prefetchMyScreens, prefetchScreenerRuns, prefetchScreeners } from '@/entities/screen';
 export { ScreenersPage, type ScreenersPageProps } from './ui/ScreenersPage';
 
-// This chunk loads when the page's link is hovered: start the read, and the saved page cache.
-const { client } = active;
-if (client) {
+/** Start the page's reads before it mounts (the route's loader); the widgets' hooks join them. */
+export function prefetchScreenersReads(client: Parameters<typeof prefetchScreeners>[0]): void {
   prefetchScreeners(client);
-  void import('@/entities/page-cache').then((m) => m.startQueryPersistence(client));
+  prefetchMyScreens(client);
+  prefetchScreenerRuns(client);
+  prefetchTrackRecords(client);
 }

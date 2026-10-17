@@ -4,7 +4,7 @@ cache what every caller shares: the market tables' whole history (``warm_market_
 the regime page's charts slice a cached frame instead of reading 14 000 partitions on a
 request (20 s a table cold), and the status strip's one-session completeness grid and the
 session's regime that every page shows (3 to 5 s on the first page after a publish), the Ideas
-table and the edge desk (the home page), the
+table and the edge desk (the home page), the Admin Ingestion page's 10-session grid, the
 session's stored screen rows that every screener page and the Builder's preview read (1.6 s on
 the first one after a publish), the Builder's first preview of every screen on the Screeners
 list (its field frame and the picks of its saved run), and the signal timing of every
@@ -32,6 +32,7 @@ from algotrade_api.graphql.offload import off_loop
 
 WARM_EVERY_S = 60.0
 IDEAS_LIMIT = 200  # the Ideas page's request (entities/idea IDEAS_LIMIT)
+INGESTION_SESSIONS = 10  # the Admin Ingestion grid's window (entities/ingestion SESSIONS)
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +73,9 @@ def warm(ctx: ReadContext, extra: ExtraSteps | None = None) -> None:
     then the steps ``extra`` names for it (the Builder's first preview of each screen: the API
     wires them in, this layer reads only the read model), the market frames and the episodes."""
     steps = home_steps(ctx)
+    # the Admin Ingestion page's 10-session grid (3 s cold: 4300 partitions): not a home step, the
+    # start does not wait for it
+    steps.append(("ingestion grid", lambda: load_completeness(ctx, INGESTION_SESSIONS)))
     if extra is not None:
         try:
             steps.extend(extra(ctx))  # a second or two each

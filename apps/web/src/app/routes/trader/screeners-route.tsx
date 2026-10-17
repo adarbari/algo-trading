@@ -9,6 +9,7 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import { compareSearch } from '@/features/idea-compare';
 import { traderRoute } from './layout-route';
+import { pageRoute } from '../page-loader';
 import { lazyPage } from '@/shared/lib/lazy';
 
 // One import call for both: the entry then carries one preload file list, not two.
@@ -59,21 +60,27 @@ function ScreenerResultsRoute() {
 const indexRoute = createRoute({
   getParentRoute: () => screenersRoute,
   path: '/',
+  ...pageRoute(ScreenersPage, (page, client) => {
+    page.prefetchScreenersReads(client);
+  }),
   component: ScreenersIndex,
 });
 const newRoute = createRoute({
   getParentRoute: () => screenersRoute,
   path: 'new',
+  ...pageRoute(NewScreener),
   component: NewScreener,
 });
 const resultsRoute = createRoute({
   getParentRoute: () => screenersRoute,
   path: '$id',
+  ...pageRoute(ScreenerResultsPage),
   component: ScreenerResultsRoute,
 });
 const editRoute = createRoute({
   getParentRoute: () => screenersRoute,
   path: '$id/edit',
+  ...pageRoute(EditScreener),
   component: EditScreener,
 });
 

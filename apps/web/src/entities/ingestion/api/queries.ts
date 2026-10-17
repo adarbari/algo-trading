@@ -3,7 +3,7 @@
  * ADR 0037): the grid (the window of sessions ending at the latest), one cell's drill-down and
  * the option-chain coverage of the session (`Query.chainCoverage`, read with the grid: one request).
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -94,18 +94,28 @@ const IngestionCell = graphql(`
 export function useChainCoverage() {
   const sessions = SESSIONS;
   return useQuery({
-    queryKey: queryKeys.gql('IngestionCompleteness', { sessions }),
-    queryFn: () => gql(IngestionCompleteness, { sessions }),
+    ...completenessQuery(sessions),
     select: (data) => data.chainCoverage,
   });
+}
+
+function completenessQuery(sessions = SESSIONS) {
+  return queryOptions({
+    queryKey: queryKeys.gql('IngestionCompleteness', { sessions }),
+    queryFn: () => gql(IngestionCompleteness, { sessions }),
+  });
+}
+
+/** Start the grid's read before the page mounts (a route loader); the hooks then join it. */
+export function prefetchCompleteness(client: QueryClient, sessions = SESSIONS): void {
+  void client.query(completenessQuery(sessions)).catch(() => undefined);
 }
 
 /** The grid; null: nothing stored. */
 export function useCompleteness(sessions = SESSIONS, enabled = true) {
   return useQuery({
+    ...completenessQuery(sessions),
     enabled,
-    queryKey: queryKeys.gql('IngestionCompleteness', { sessions }),
-    queryFn: () => gql(IngestionCompleteness, { sessions }),
     select: (data) => data.completeness,
   });
 }

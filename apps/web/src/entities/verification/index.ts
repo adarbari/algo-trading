@@ -1,5 +1,5 @@
 /** Entity: the live verification of our data vs IBKR (verification/ibkr). */
-export { useVerification } from './api/queries';
+export { prefetchVerification, useVerification } from './api/queries';
 export {
   failedShare,
   failingChecks,

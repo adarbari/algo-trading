@@ -10,6 +10,11 @@ export const router = createRouter({
   context: undefined as unknown as RouterContext,
 });
 
+// The page chunk of the URL's route downloads now, beside the viewer's round trip (the route
+// guard waits for the viewer before any loader runs).
+const [matched] = router.getMatchedRoutes(router.latestLocation.pathname);
+for (const route of matched) void route.options.staticData?.preload?.().catch(() => undefined);
+
 declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router;

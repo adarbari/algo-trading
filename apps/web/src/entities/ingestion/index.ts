@@ -1,5 +1,11 @@
 /** Entity: ingestion completeness (dataset x session grid, a cell's drill-down, option-chain coverage). */
-export { useCellDetail, useChainCoverage, useCompleteness, useFocusCell } from './api/queries';
+export {
+  prefetchCompleteness,
+  useCellDetail,
+  useChainCoverage,
+  useCompleteness,
+  useFocusCell,
+} from './api/queries';
 export { datasetLabel, isChains } from './model/dataset';
 export {
   cellShare,

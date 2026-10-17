@@ -1,6 +1,8 @@
 /** Entity: runs (nightly runs, run records and their items, the data-quality checks). */
 export {
   NIGHTLY_LIMIT,
+  prefetchNightlyRuns,
+  prefetchQualityChecks,
   useNightlyRuns,
   useQualityChecks,
   useRun,

@@ -5,6 +5,7 @@
 export {
   PREVIEW_ROWS,
   forgetScreen,
+  prefetchMyScreens,
   prefetchScreeners,
   refreshScreens,
   useMyScreeners,
@@ -19,7 +20,7 @@ export {
   useScreenerPicks,
   type ScreenerPicksResponse,
 } from './api/picks';
-export { useScreenerRuns, type ScreenerRunSummary } from './api/runs';
+export { prefetchScreenerRuns, useScreenerRuns, type ScreenerRunSummary } from './api/runs';
 export { useScreenerHits, type ScreenerHitsResponse } from './api/hits';
 export {
   SCREENER_RESULTS_OPERATION,

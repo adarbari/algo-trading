@@ -7,6 +7,8 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { redirect } from '@tanstack/react-router';
 
+import { prefetchRegime } from '@/entities/regime';
+import { prefetchStatusStrip } from '@/entities/system-status';
 import { ensureViewer, type Viewer } from '@/entities/viewer';
 import { ApiError } from '@/shared/api';
 
@@ -24,6 +26,15 @@ export function canEnter(viewer: Viewer | null, workspace: WorkspaceId): boolean
 export function homeFor(viewer: Viewer | null): string | null {
   const open = [DEFAULT_WORKSPACE, ...WORKSPACES].find((w) => canEnter(viewer, w.id));
   return open?.sections[0]?.path ?? null;
+}
+
+/**
+ * Start the reads every page's layout makes (the regime chip, the status strip) as soon as the
+ * viewer is known, beside the page chunk and the page's own reads, not when the layout mounts.
+ */
+function prefetchLayoutReads(queryClient: QueryClient, viewer: Viewer): void {
+  prefetchRegime(queryClient);
+  prefetchStatusStrip(queryClient, canEnter(viewer, 'admin'));
 }
 
 /** Redirect to `/login` (with the reason when there is one) or to a workspace home. */
@@ -44,7 +55,9 @@ async function requireViewer(queryClient: QueryClient): Promise<Viewer> {
     }
     throw error;
   }
-  return viewer ?? go('/login');
+  if (!viewer) return go('/login');
+  prefetchLayoutReads(queryClient, viewer);
+  return viewer;
 }
 
 /** `beforeLoad` for a workspace's layout route. */

@@ -2,6 +2,7 @@
 import { createRoute } from '@tanstack/react-router';
 
 import { traderRoute } from './layout-route';
+import { pageRoute } from '../page-loader';
 import { lazyPage } from '@/shared/lib/lazy';
 
 const RegimePage = lazyPage(() => import('@/pages/trader-regime'), 'RegimePage');
@@ -9,5 +10,8 @@ const RegimePage = lazyPage(() => import('@/pages/trader-regime'), 'RegimePage')
 export const regimeRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'regime',
+  ...pageRoute(RegimePage, (page, client) => {
+    page.prefetchRegimeReads(client);
+  }),
   component: RegimePage,
 });

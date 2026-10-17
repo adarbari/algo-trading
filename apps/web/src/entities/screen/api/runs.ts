@@ -4,7 +4,7 @@
  * the Screeners list's rows. The rows themselves (`useScreenerResults`) load only when a screener
  * is opened.
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys, type gqlTypes } from '@/shared/api';
 
@@ -50,11 +50,21 @@ const ScreenerRuns = graphql(`
 
 export type ScreenerRunSummary = gqlTypes.ScreenerRunsQuery['screeners'][number];
 
+const runsQuery = () =>
+  queryOptions({
+    queryKey: queryKeys.gql('ScreenerRuns', {}),
+    queryFn: () => gql(ScreenerRuns, {}),
+  });
+
+/** Start reading the run summaries before the page mounts (a route loader). */
+export function prefetchScreenerRuns(client: QueryClient): void {
+  void client.query(runsQuery()).catch(() => undefined);
+}
+
 /** The summaries by screener id, and the session they are for (null: nothing stored). */
 export function useScreenerRuns() {
   return useQuery({
-    queryKey: queryKeys.gql('ScreenerRuns', {}),
-    queryFn: () => gql(ScreenerRuns, {}),
+    ...runsQuery(),
     select: (data) => ({
       session: data.session?.date ?? null,
       byId: new Map(data.screeners.map((s) => [s.id, s])),

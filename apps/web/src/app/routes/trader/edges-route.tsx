@@ -7,6 +7,7 @@
 import { createRoute, useNavigate, useSearch } from '@tanstack/react-router';
 
 import { traderRoute } from './layout-route';
+import { pageRoute } from '../page-loader';
 import type { EdgeView } from '@/entities/edge';
 import { lazyPage } from '@/shared/lib/lazy';
 
@@ -54,15 +55,24 @@ export const edgesRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'edges',
   validateSearch: validateEdgesSearch,
+  ...pageRoute(EdgesPage, (page, client) => {
+    page.prefetchEdgesReads(client);
+  }),
   component: EdgesIndex,
 });
 
 // The builder: siblings of the list, so `/edges` itself stays one route.
 export const edgesBuilderRoutes = [
-  createRoute({ getParentRoute: () => traderRoute, path: 'edges/new', component: BuilderRoute }),
+  createRoute({
+    getParentRoute: () => traderRoute,
+    path: 'edges/new',
+    ...pageRoute(BuilderRoute),
+    component: BuilderRoute,
+  }),
   createRoute({
     getParentRoute: () => traderRoute,
     path: 'edges/$id/edit',
+    ...pageRoute(BuilderRoute),
     component: BuilderRoute,
   }),
 ];
