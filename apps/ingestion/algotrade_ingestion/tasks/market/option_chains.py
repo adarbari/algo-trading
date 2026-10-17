@@ -16,6 +16,13 @@ Behaviour carried over from the original liquidity_screen.py and made stricter:
 - raw responses are saved before parsing (``IngestRun.fetch``), so normalisation can be
   replayed.
 
+- a nightly attempt that may still WAIT (``probe``, ADR 0043) first fetches a small evenly
+  spaced sample of the names left. If the sample says the feed has clearly not rolled over
+  (its projected stale share is over ``probe_max_stale_share``), the run finishes WAITING
+  after about a minute instead of after the ~75 min full pass: nothing is published, the
+  staging of the sampled names is kept and the next attempt resumes from it. (Cboe's data
+  arrives 5-8 h after the close, so a later start cannot replace the probe.)
+
 Per-ticker results are staged, then published as one partition per table and session. The
 staging is kept while FETCH_ERROR or STALE_DATA items remain (a re-run resumes from it and
 republishes the merged results), else dropped.
@@ -33,7 +40,13 @@ from algotrade.data.reference import load_universe, resolver
 from algotrade.services.jobs import as_completed
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
+from algotrade_ingestion.tasks.framework.run import (
+    PUBLISHED,
+    IngestRun,
+    NoResponseError,
+    TaskContext,
+    resumable_run,
+)
 from algotrade_ingestion.tasks.market.tiers import CLASS_RANK, Tiers, load_tiers
 from algotrade_sources.framework.base import FetchRequest, Source, Throttled
 
@@ -56,6 +69,9 @@ class ChainJobConfig:
     workers: int = 4
     retry_pause_s: float = 30.0
     priority_symbols: tuple[str, ...] = field(default=())  # fetched first, in this order
+    probe: bool = False  # sample first and WAIT when the feed has clearly not rolled over
+    probe_size: int = 40  # names sampled (evenly spaced over the fetch order)
+    probe_max_stale_share: float = 0.40  # WAIT above this projected share of the universe
 
 
 def universe_underlyings(reader: StoreReader, session_date: date) -> list[Underlying]:
@@ -143,6 +159,20 @@ def _run_pass(run: IngestRun, source: Source, todo: Sequence[Underlying], worker
             run.checkpoint()
 
 
+def _sample(todo: Sequence[Underlying], size: int) -> list[Underlying]:
+    """``size`` names evenly spaced over ``todo`` (fetch order), so every tier is sampled."""
+    return [todo[i * len(todo) // size] for i in range(size)]
+
+
+def _stale_projection(
+    run: IngestRun, sample: Sequence[Underlying], todo: int, universe: int
+) -> float:
+    """The share of the universe that would be STALE_DATA if the names left (``todo``) were as
+    stale as the sample (the names already fetched are OK or settled, so only ``todo`` counts)."""
+    stale = sum(1 for u in sample if run.items.get(u.instrument_id, "").startswith("STALE"))
+    return stale / len(sample) * todo / universe
+
+
 def _publish(
     run: IngestRun, universe: Sequence[Underlying], tiers: Tiers, source_name: str
 ) -> None:
@@ -170,14 +200,30 @@ def ingest_option_chains(
     config: ChainJobConfig | None = None,
 ) -> RunRecord:
     config = config or ChainJobConfig()
+    earlier = resumable_run(ctx.writer, TASK, session_date)
+    # a run that already published (PARTIAL) is refetched, never turned back into WAITING
+    probe = config.probe and not (earlier is not None and earlier.status in PUBLISHED)
     with IngestRun(ctx, TASK, session_date, resume=True) as run:
         run.checkpoint()
         tier_rule = load_tiers(run.reader, session_date, config.priority_symbols, ctx.configs)
         ordered, tiers = prioritise(
             run.reader, session_date, universe, config.priority_symbols, ctx.configs, tier_rule
         )
-        _run_pass(run, source, [u for u in ordered if u.instrument_id not in run.items],
-                  config.workers)  # fmt: skip
+        todo = [u for u in ordered if u.instrument_id not in run.items]
+        if probe and len(todo) >= 2 * config.probe_size:
+            sample = _sample(todo, config.probe_size)
+            _run_pass(run, source, sample, config.workers)
+            projected = _stale_projection(run, sample, len(todo), len(universe))
+            run.stats["probe"] = {"sampled": len(sample), "projected_stale_share": projected}
+            if projected > config.probe_max_stale_share:
+                run.waiting(
+                    f"probe: {projected:.0%} of the universe projected stale from "
+                    f"{len(sample)} sampled names (max {config.probe_max_stale_share:.0%})"
+                )
+                return run.record  # nothing published; the staging is kept for the resume
+            sampled = {u.instrument_id for u in sample}
+            todo = [u for u in todo if u.instrument_id not in sampled]
+        _run_pass(run, source, todo, config.workers)
         failed = [u for u in ordered if run.items.get(u.instrument_id, "").startswith("FETCH")]
         if failed:
             if isinstance(source, Throttled):

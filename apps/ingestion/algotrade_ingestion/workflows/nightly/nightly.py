@@ -472,7 +472,11 @@ def run_step(
                     StepStatus.SKIPPED, reason=f"no job runner to submit {JOB_STEPS[step.name]} to"
                 )
             return job(session)
-        record = run_task(step.name, ctx, {**params, **step.params, "session": session})
+        # ``probe``: a task that can sample its source first (chains) may WAIT as soon as the
+        # data is clearly not published; once the deadline has passed it fetches in full
+        record = run_task(
+            step.name, ctx, {**params, **step.params, "session": session, "probe": wait}
+        )
         return from_record(record, step, ctx, session, wait)
 
     result = run_isolated(step.name, body, ctx.clock, step.critical)
