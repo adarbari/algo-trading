@@ -1,0 +1,3 @@
+# L3 site setting: expression features (ADR 0023), the "statements" theme: formulas over the
+# SEC statement groups (rollup.income_statement@v1, rollup.cash_flow@v1, rollup.balance_sheet@v1;
+# instruments/statements, ADR 0067) go here, not in fundamentals.toml (at its line cap).

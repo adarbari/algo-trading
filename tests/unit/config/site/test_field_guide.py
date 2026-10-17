@@ -162,7 +162,7 @@ def test_the_shipped_guide_is_complete() -> None:
         "momentum",
         "options-chain",
         "options-wing",
-        "situations",
+        "statements",
         "trend",
         "volatility",
         "volume",
