@@ -111,7 +111,9 @@ def _explained(
     status = stored if own else reader.table(feat.status_table, day)
     if status is None or column not in status.columns:
         return {}
-    explains = status[column].isin({*feat.illiquid_statuses, *feat.explained_statuses})
+    explains = status[column].isin(
+        {*feat.illiquid_statuses, *feat.explained_statuses, *feat.uncovered_statuses}
+    )
     rows = status[explains]
     return dict(zip(rows["instrument_id"].astype(str), rows[column].astype(str), strict=True))
 
