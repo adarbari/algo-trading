@@ -2,6 +2,7 @@
 CIKs without facts, only new facts stored, carry to a new class, limit, force, resume."""
 
 import json
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
@@ -60,7 +61,9 @@ class FakeFacts:
 
 
 def sources(feed: FakeFacts, refresh_days: int = 30) -> SharesSources:
-    return SharesSources(SecCompanyFacts(http_for(feed, RetryPolicy(tries=1))), refresh_days)
+    return SharesSources(
+        SecCompanyFacts(http_for(feed, RetryPolicy(tries=1))), refresh_days, tags_date=DAY
+    )  # tags_date DAY: the markers these tests store are current
 
 
 def store(extra: tuple[tuple[str, str | None], ...] = ()) -> tuple[StoreWriter, StoreReader]:
@@ -305,7 +308,9 @@ def test_the_statements_backlog_is_fetched_a_few_ciks_a_night() -> None:
     seen: list[str] = []
     for night, deferred in ((1, 2), (2, 1), (3, 0), (4, 0)):
         feed = FakeFacts(aapl=AAPL_STATEMENTS)
-        capped = SharesSources(sources(feed, 100000).facts, 100000, backfill_per_night=1)
+        capped = SharesSources(
+            sources(feed, 100000).facts, 100000, backfill_per_night=1, tags_date=DAY
+        )
         record = ingest_shares(task_ctx(writer, reader, CLOCK), capped, DAY + timedelta(days=night))
         seen += [u.rsplit("CIK", 1)[1][:10] for u in feed.urls]
         assert record.stats["deferred_by_limit"] == deferred
@@ -316,9 +321,58 @@ def test_the_statements_backlog_is_fetched_a_few_ciks_a_night() -> None:
     }  # fmt: skip
 
 
+def test_statements_fetched_before_the_tag_list_date_are_backlog_under_the_cap() -> None:
+    """A marker older than ``tags_date`` (parsed with an older tag list) is due before its
+    refresh slot, counted in the backlog and capped; a newer one is not due; force bypasses."""
+    writer, reader = store()
+    day = DAY - timedelta(days=1)
+    for table, run in ((TABLE, "s"), (STATEMENTS, "t")):
+        markers = [
+            {"instrument_id": f"EQ:{sym}", "symbol": sym, "cik": cik, "concept": "checked",
+             "tag": None, "period_start": None, "period_end": None, "filed": None,
+             "fetched_on": day}
+            for sym, cik in (("AAPL", "0000320193"), ("GOOGL", GOOGL_CIK), ("GOOG", GOOGL_CIK),
+                             ("SPY", "0000884394"))
+        ]  # fmt: skip
+        writer.write_table(table, day, run, stamped(markers, day, run))
+    kinds = lambda feed: sorted(u.rsplit("CIK", 1)[1][:10] for u in feed.urls)  # noqa: E731
+    session = DAY + timedelta(days=1)  # inside every 100000-day slot: nothing else is due
+    base = SharesSources(
+        sources(FakeFacts(), 100000).facts, 100000, backfill_per_night=2, tags_date=DAY
+    )
+
+    current = FakeFacts()  # the marker (day) is not before tags_date: nothing due
+    ingest_shares(
+        task_ctx(writer, reader, CLOCK),
+        replace(base, facts=sources(current, 100000).facts, tags_date=day),
+        session,
+    )
+    assert current.urls == []
+
+    feed = FakeFacts(aapl=AAPL_STATEMENTS)
+    old = replace(base, facts=sources(feed, 100000).facts, tags_date=DAY)
+    record = ingest_shares(task_ctx(writer, reader, CLOCK), old, session)
+    assert len(kinds(feed)) == 2 and record.stats["deferred_by_limit"] == 1  # capped at 2 of 3
+
+    first = set(kinds(feed))
+    for night, expected in ((2, 1), (3, 0)):  # a plain rerun: the deferred CIK only, then nothing
+        again = FakeFacts(aapl=AAPL_STATEMENTS)
+        ingest_shares(
+            task_ctx(writer, reader, CLOCK),
+            replace(old, facts=sources(again, 100000).facts),
+            DAY + timedelta(days=night),
+        )
+        assert len(kinds(again)) == expected and not set(kinds(again)) & first
+
+    forced = FakeFacts(aapl=AAPL_STATEMENTS)
+    uncapped = replace(old, facts=sources(forced, 100000).facts)
+    ingest_shares(task_ctx(writer, reader, CLOCK), uncapped, session, force=True)
+    assert len(kinds(forced)) == 3  # force still refetches every company, cap or not
+
+
 def test_a_new_cik_is_never_capped_by_the_backlog_limit() -> None:
     writer, reader = store()
-    capped = SharesSources(sources(FakeFacts()).facts, 30, backfill_per_night=1)
+    capped = SharesSources(sources(FakeFacts()).facts, 30, backfill_per_night=1, tags_date=DAY)
     record = ingest_shares(task_ctx(writer, reader, CLOCK), capped, DAY)
     assert record.stats["requested"] == 3 and record.stats["deferred_by_limit"] == 0
 
