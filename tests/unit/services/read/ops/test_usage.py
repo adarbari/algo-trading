@@ -176,6 +176,12 @@ def test_reliability_counts_how_attempts_ended() -> None:
     assert r.fallback_rate == 1 / 6 and r.failure_rate == 1 / 6
 
 
+def test_a_cooling_off_skip_is_no_attempt_and_no_failure() -> None:
+    ctx = stores({TODAY: [row(TODAY, 0), row(TODAY, 1, outcome="cooling_off", provider="g")]})
+    r = load_llm_usage(ctx, TODAY).reliability
+    assert (r.attempts, r.ok, r.failed, r.failure_rate) == (1, 1, 0, 0.0)
+
+
 def test_a_broken_llm_toml_reports_its_error_and_no_caps() -> None:
     usage = load_llm_usage(stores({TODAY: [row(TODAY, 0)]}, {"budget": {"bogus": 1}}), TODAY)
     assert usage.budget.error is not None and usage.budget.daily_usd is None

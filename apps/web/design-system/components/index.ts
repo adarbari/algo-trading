@@ -203,6 +203,7 @@ export {
   type PartKind,
   type PartRetype,
 } from './PartCard';
+export { PartJoin, type PartJoinLogic, type PartJoinProps } from './PartJoin';
 export { PartList, type PartListProps } from './PartList';
 export { StatusBadge, type StatusBadgeProps, type StatusTone } from './StatusBadge';
 export { TabStrip, type TabStripItem, type TabStripProps } from './TabStrip';
