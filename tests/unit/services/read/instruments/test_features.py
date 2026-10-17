@@ -241,7 +241,7 @@ def _why(row: dict[str, object], applies: frozenset[str] = frozenset(), *rules: 
     return _absence(info, (PRICE_STATS,), row, ctx, "EQ:AAA", (applies, tuple(rules)))  # type: ignore[arg-type]
 
 
-NO_TRADE = (BAR_STATUS, frozenset(), frozenset({"NO_TRADE"}), PRICE_STATS)
+NO_TRADE = (BAR_STATUS, frozenset(), frozenset({"NO_TRADE"}), PRICE_STATS, frozenset())
 
 
 def test_an_explained_status_names_its_reason() -> None:
@@ -260,7 +260,13 @@ def test_a_status_that_explains_nothing_leaves_the_gap() -> None:
 
 
 def test_an_explained_input_never_hides_a_gap_in_another_input() -> None:
-    elsewhere = (BAR_STATUS, frozenset(), frozenset({"NOT_ANNOUNCED"}), "rollups/x/earnings@v2")
+    elsewhere = (
+        BAR_STATUS,
+        frozenset(),
+        frozenset({"NOT_ANNOUNCED"}),
+        "rollups/x/earnings@v2",
+        frozenset(),
+    )
     gap = _why({BAR_STATUS: "NOT_ANNOUNCED"}, frozenset(), elsewhere)  # no price_stats row
     assert (gap.code, gap.reason) == (UnknownCode.NO_ROW, None)
     covered = _why({BAR_STATUS: "NOT_ANNOUNCED", STATS_ROW: "EQ:AAA"}, frozenset(), elsewhere)
@@ -268,12 +274,62 @@ def test_an_explained_input_never_hides_a_gap_in_another_input() -> None:
 
 
 def test_absence_precedence_not_applicable_then_illiquid_then_explained() -> None:
-    thin = ("rollup.iv30@v1.iv30_status", frozenset({"WIDE_SPREADS"}), frozenset(), IV_STATUS)
+    thin = (
+        "rollup.iv30@v1.iv30_status",
+        frozenset({"WIDE_SPREADS"}),
+        frozenset(),
+        IV_STATUS,
+        frozenset(),
+    )
     row = {BAR_STATUS: "NO_TRADE", thin[0]: "WIDE_SPREADS", "instrument.optionable": False}
     assert _why(row, frozenset(), NO_TRADE, thin).code is UnknownCode.ILLIQUID
     assert _why(row, frozenset({"optionable"}), NO_TRADE, thin).code is UnknownCode.NOT_APPLICABLE
-    first = (BAR_STATUS, frozenset(), frozenset({"NO_TRADE", "FEW_BARS"}), PRICE_STATS)
+    first = (BAR_STATUS, frozenset(), frozenset({"NO_TRADE", "FEW_BARS"}), PRICE_STATS, frozenset())
     assert _why(row, frozenset(), first).reason is NullReason.NO_TRADE
+
+
+COVERAGE = "rollup.analyst@v1.analyst_status"
+NOT_COVERED = (
+    COVERAGE,
+    frozenset(),
+    frozenset(),
+    PRICE_STATS,
+    frozenset({"NOT_COVERED", "NOT_FETCHED"}),
+)
+
+
+@pytest.mark.parametrize("status", ["NOT_COVERED", "NOT_FETCHED"])
+def test_an_uncovered_status_reads_not_covered_for_both_statuses(status: str) -> None:
+    why = _why({COVERAGE: status}, frozenset(), NOT_COVERED)
+    assert (why.code, why.kind) == (UnknownCode.NOT_COVERED, UnavailableKind.NOT_COVERED)
+    assert why.guide_term == "unavailable_not_covered"
+    # the public words name no table or status; the admin chain tells the statuses apart
+    assert why.public_reason == "not covered by our analyst data"
+    assert f"analyst_status is {status} for EQ:AAA" in why.cause.text
+
+
+def test_not_covered_follows_illiquid_and_precedes_explained() -> None:
+    thin = (
+        "rollup.iv30@v1.iv30_status",
+        frozenset({"WIDE_SPREADS"}),
+        frozenset(),
+        IV_STATUS,
+        frozenset(),
+    )
+    row = {COVERAGE: "NOT_COVERED", BAR_STATUS: "NO_TRADE", thin[0]: "WIDE_SPREADS"}
+    assert _why(row, frozenset(), NO_TRADE, NOT_COVERED).code is UnknownCode.NOT_COVERED
+    assert _why(row, frozenset(), NO_TRADE, NOT_COVERED, thin).code is UnknownCode.ILLIQUID
+    off = {**row, "instrument.optionable": False}
+    assert (
+        _why(off, frozenset({"optionable"}), NOT_COVERED, thin).code is UnknownCode.NOT_APPLICABLE
+    )
+
+
+def test_other_statuses_leave_a_covered_gap_alone() -> None:
+    assert (
+        _why({COVERAGE: "COVERED", STATS_ROW: "EQ:AAA"}, frozenset(), NOT_COVERED).code
+        is UnknownCode.NULL
+    )
 
 
 def test_cell_codes_carry_the_reason_of_explained_cells() -> None:

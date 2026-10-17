@@ -11,6 +11,7 @@ export const KIND_TITLE: Record<UnavailableKindName, string> = {
   NOT_APPLICABLE: 'Does not apply',
   ILLIQUID: 'Too thinly traded',
   LICENCE: 'Licence',
+  NOT_COVERED: 'Not covered',
   NOT_RUN: 'Not run',
 };
 
@@ -20,6 +21,7 @@ export const KIND_ORDER: readonly UnavailableKindName[] = [
   'NOT_STORED',
   'NOT_RUN',
   'LICENCE',
+  'NOT_COVERED',
   'ILLIQUID',
   'NOT_APPLICABLE',
 ];

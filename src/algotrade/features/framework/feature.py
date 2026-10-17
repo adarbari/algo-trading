@@ -46,6 +46,8 @@ type and, later, UI and email labels (ADR 0023).
                   feature derived from it); when its value is an illiquid status the read
                   says ILLIQUID (ADR 0042), when it is an explained one EXPLAINED (ADR 0046)
 - ``illiquid_statuses``  which ``null_status`` values mean the chain is too thin
+- ``uncovered_statuses``  which ``null_status`` values mean the data source does not cover the
+                  instrument (or was never asked): the read says NOT_COVERED (ADR 0072)
 - ``explained_statuses``  which ``null_status`` values explain the null in words a reader
                   acts on; each is a ``NullReason`` value and the status value is the reason
                   (``bar_status`` ``NO_TRADE``: "No trade"). Other values stay NULL. A
@@ -68,9 +70,10 @@ type Kind = Literal["window", "chain", "expression", "cross_section", "label"]
 type Range = tuple[float | None, float | None]
 type Licence = Literal["open", "personal"]
 type AppliesTo = Literal["any", "optionable", "operating_company", "leveraged_fund"]
-# A status field, the values of it that read ILLIQUID and those that read EXPLAINED, and the
-# stored table of the feature declaring it (an EXPLAINED status covers a missing row there only).
-type StatusRule = tuple[str, frozenset[str], frozenset[str], str]
+# A status field, the values of it that read ILLIQUID and those that read EXPLAINED, the stored
+# table of the feature declaring it (an EXPLAINED status covers a missing row there only) and
+# the values that read NOT_COVERED.
+type StatusRule = tuple[str, frozenset[str], frozenset[str], str, frozenset[str]]
 
 ENTITIES = frozenset({"instrument", "market"})
 KINDS = frozenset({"window", "chain", "expression", "cross_section", "label"})
@@ -133,6 +136,7 @@ class Feature:
     null_status: str = ""  # a sibling status column; "": null always means UNKNOWN
     illiquid_statuses: tuple[str, ...] = ()  # the null_status values that mean "too thin"
     explained_statuses: tuple[str, ...] = ()  # the null_status values that are a NullReason
+    uncovered_statuses: tuple[str, ...] = ()  # the null_status values that mean "not covered"
 
     @property
     def key(self) -> str:
@@ -229,13 +233,20 @@ def _absence_problems(f: Feature) -> list[str]:
         problems.append(f"{f.name}: applies_to {f.applies_to!r} must be one of {list(APPLIES_TO)}")
     if "@" in f.null_status and not is_feature_ref(f.null_status):
         problems.append(f"{f.name}: null_status {f.null_status!r} is not <group>.<column>@vN")
-    if bool(f.null_status) != bool(f.illiquid_statuses or f.explained_statuses):
-        problems.append(f"{f.name}: null_status goes with illiquid_statuses or explained_statuses")
+    listed = f.illiquid_statuses or f.explained_statuses or f.uncovered_statuses
+    if bool(f.null_status) != bool(listed):
+        problems.append(
+            f"{f.name}: null_status goes with illiquid_statuses, uncovered_statuses "
+            "or explained_statuses"
+        )
     bad = sorted(set(f.explained_statuses) - set(NullReason))
     if bad:
         problems.append(f"{f.name}: explained_statuses {bad} are not NullReason values")
-    if set(f.explained_statuses) & set(f.illiquid_statuses):
-        problems.append(f"{f.name}: a status is either illiquid or explained, not both")
+    lists = (f.illiquid_statuses, f.uncovered_statuses, f.explained_statuses)
+    if any(set(a) & set(b) for i, a in enumerate(lists) for b in lists[i + 1 :]):
+        problems.append(
+            f"{f.name}: a status is illiquid, uncovered or explained, never more than one"
+        )
     return problems
 
 
