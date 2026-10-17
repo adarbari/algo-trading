@@ -35,7 +35,7 @@ would therefore find every CIK due for the statements (~6k documents, about 15 G
 `[sec_edgar] statements_backfill_per_night` (default 400, 0 = no cap) bounds the CIKs that have a
 shares marker but no statements marker fetched a night. A CIK new to both tables, or due for its
 shares by its slot, is never capped. Deferred CIKs count in `deferred_by_limit`; the backfill
-finishes by itself in about 15 to 20 nights with no manual run (`algotrade-ingest run shares --limit N`
+finishes by itself in about 14 nights (5,260 CIKs at 400 a night, checked against the live store 2026-10-17) with no manual run, worked in PRIORITY order (amendment 2026-10-17): the event scope list and tier A / B names first, then the S&P 500, then the rest, optionable and liquid names (20-day dollar volume at least `[sec_edgar] statements_priority_min_adv_usd`, 10M) before optionable before the others inside the last two tiers, each by dollar volume then market cap, ties by CIK; the order only decides which CIKs are fetched first, never what is due (the cap, its exemptions, `--force` and `--limit` slice the same list). Every input is read as of the day before the session (a rerun after tonight's roll-ups picks the same CIKs); the S&P 500 is the reference's `in_sp500`. A missing input leaves its tier empty. The scope and S&P 500 backlog CIKs number 419 (190 + 291, with overlap): night 1 takes the 190 scope names and 210 S&P 500, night 2 the other 81 (`algotrade-ingest run shares --limit N`
 remains for a chunk by hand). What is due is worked out from `cik` and `fetched_on` alone (a
 maximum over the stored rows) and the key rows are read only for the instruments fetched that
 night. A document whose statements do not parse still stores its share counts and leaves the

@@ -566,8 +566,8 @@ download: about 30 to 40 minutes, ~1 GB of gzip raw kept 7 days, `[sec_edgar] ra
 `algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v3`.
 A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks. The
 `instruments/statements` backlog (CIKs with share counts and no statements marker yet) is fetched
-`[sec_edgar] statements_backfill_per_night` (400) a night, so it finishes in about 15 to 20 nights
-by itself; the roll-up that reads it waits for the last of them.
+`[sec_edgar] statements_backfill_per_night` (400) a night (5,260 CIKs), so it finishes in about 14 nights
+by itself, the event scope and the S&P 500 first, then optionable liquid names (ADR 0067); the roll-up that reads it waits for the last of them.
 
 **Adding the financials to a store that already has share counts:** a CIK is refetched only
 on its 30-day slot, so run `algotrade-ingest shares --force` once (same cost; only facts not
@@ -584,7 +584,7 @@ Incremental SEC tasks (`company-details`, `shares`) refetch a CIK once per refre
 (`crc32(CIK) % window`; `tasks/framework/refresh.py`). After a one-night backfill the CIKs
 come due spread evenly over the next 30 nights (~200 a night) instead of all on night 30; a
 slot day without a run is picked up by the next run. New CIKs always come first, then the
-stalest, so `--limit` works through a backlog oldest first; `--force` refetches all.
+stalest, so `--limit` works through a backlog oldest first; `--force` refetches all. The `shares` task's statements backlog (CIKs new to a table) is ordered by priority instead of CIK (ADR 0067).
 
 ## IBKR
 
