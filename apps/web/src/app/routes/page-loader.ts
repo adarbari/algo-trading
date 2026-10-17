@@ -26,7 +26,8 @@ declare module '@tanstack/react-router' {
   }
 }
 
-type Prefetch<M> = (module: M, client: QueryClient) => void | Promise<void>;
+/** `deps` is what the route's `loaderDeps` returned (its search params), undefined without one. */
+type Prefetch<M, D> = (module: M, client: QueryClient, deps: D) => void | Promise<void>;
 
 /** Waits for the saved page cache to be read into the client (never longer than the cap). */
 const restored = (client: QueryClient) =>
@@ -37,14 +38,14 @@ const restored = (client: QueryClient) =>
  * and the static `preload`, so the chunk starts downloading at start-up beside the viewer's
  * round trip instead of after it (the guard runs before any loader).
  */
-export function pageRoute<M>(page: PageModule<M>, prefetch?: Prefetch<M>) {
+export function pageRoute<M, D = undefined>(page: PageModule<M>, prefetch?: Prefetch<M, D>) {
   return {
     staticData: { preload: page.preload },
     // `context` is untyped here: the admin routes are built over any parent route.
-    loader: async ({ context }: { context: unknown }): Promise<void> => {
+    loader: async ({ context, deps }: { context: unknown; deps?: unknown }): Promise<void> => {
       const { queryClient } = context as RouterContext;
       const module = await page.load();
-      const started = prefetch?.(module, queryClient);
+      const started = prefetch?.(module, queryClient, deps as D);
       await Promise.all([started, restored(queryClient)]);
     },
   };
