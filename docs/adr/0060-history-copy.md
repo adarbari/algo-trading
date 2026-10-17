@@ -93,7 +93,7 @@ for every other table (0.35 to 1.5 s a request, 5.8 to 7.1 s a ticker on the rea
 with the response cache bypassed). The copy now covers **every instrument rollup group** (and
 `bars/1d`), the last `recent_years` years: measured 1.34 GB for the 43 added tables (a build of
 all of them takes about 3 minutes; the largest are `trend_stats@v2`, 328 MB, and `bands@v2`,
-223 MB), 1.8 GB with the earlier two, inside `budget_gb = 2.0`. A history request of 60 fields
+223 MB), 1.8 GB with the earlier two, inside the budget, which is raised to `budget_gb = 2.6` (2026 is 80% elapsed: the copies reach about 2.0 GB by year end, and a skipped table would silently slow Explore). A history request of 60 fields
 falls to 0.11 to 0.2 s (0.3 to 0.4 s for the expression features, which also read the sessions of
 the `exists()` groups; those are now kept per published state in `ctx.cache`). The tables are
 listed in `nightly.toml`; `tests/unit/config/site/test_nightly.py` fails when a registered group

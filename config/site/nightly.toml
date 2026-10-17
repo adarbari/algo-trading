@@ -79,6 +79,6 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/volume_profile@v1",   # 51 MB
 ]
 recent_years = 2                 # calendar years kept: the session's and the one before
-budget_gb = 2.0                  # the instrument tables' copies together (1.8 GB measured 2026-10-17); the step skips (WARN) a table
+budget_gb = 2.6                  # the instrument tables' copies together (1.8 GB measured 2026-10-17, ~2.0 by year end); the step skips (WARN) a table
                                  # whose copy would not fit. Add a table only after measuring its size
 free_disk_floor_gb = 10.0        # no build when the disk has less free (WARN): a rebuilt year exists twice
