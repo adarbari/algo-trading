@@ -168,7 +168,8 @@ see the new head. GitHub also holds the `pull_request` run of a bot-pushed commi
 run instead when the `pull_request` run is `action_required` or missing: the latest `workflow_dispatch`
 CI run of this repository for the same head sha, started by `github-actions[bot]`, must be `success`
 (a failed, running or foreign run never counts, and every check run on the sha must still pass; the
-held run's suite is ignored as superseded). Review the PNG diff in the PR once CI has run.
+held run's suite is ignored as superseded). That run tests the branch head, not its merge with
+main. Review the PNG diff in the PR once CI has run.
 
 ## Web performance
 

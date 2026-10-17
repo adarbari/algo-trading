@@ -64,11 +64,12 @@ esac
 
 def _ci(run_id: int, conclusion: str | None, *, suite: int, sha: str = SHA,
         actor: str = "github-actions[bot]", repo: str = "o/r", at: str = "2026-10-17T10:00:00Z",
-        status: str = "completed") -> dict:  # fmt: skip
+        status: str = "completed",
+        path: str = ".github/workflows/ci.yml") -> dict:  # fmt: skip
     return {
-        "id": run_id, "name": "CI", "conclusion": conclusion, "status": status, "head_sha": sha,
-        "check_suite_id": suite, "created_at": at, "head_repository": {"full_name": repo},
-        "triggering_actor": {"login": actor},
+        "id": run_id, "name": "CI", "path": path, "conclusion": conclusion,
+        "status": status, "head_sha": sha, "check_suite_id": suite, "created_at": at,
+        "head_repository": {"full_name": repo}, "triggering_actor": {"login": actor},
     }  # fmt: skip
 
 
@@ -150,3 +151,19 @@ def test_a_failed_check_run_still_blocks_a_green_dispatch(tmp_path: Path) -> Non
     ]
     out = _decide(tmp_path, [HELD], [_ci(2, "success", suite=20)], bad)
     assert "checks not passed: lint" in out
+
+
+def test_a_newer_held_run_does_not_hide_a_failed_check_of_the_dispatched_suite(
+    tmp_path: Path,
+) -> None:
+    held_later = _ci(3, "action_required", suite=30, at="2026-10-17T11:00:00Z")
+    bad = [
+        {"name": "lint", "status": "completed", "conclusion": "failure", "check_suite": {"id": 20}}
+    ]
+    out = _decide(tmp_path, [held_later], [_ci(2, "success", suite=20)], bad)
+    assert "checks not passed: lint" in out
+
+
+def test_a_run_of_another_workflow_named_ci_is_ignored(tmp_path: Path) -> None:
+    other = _ci(2, "success", suite=20, path=".github/workflows/evil.yml")
+    assert "is 'missing', waiting" in _decide(tmp_path, [HELD], [other])
