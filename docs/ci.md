@@ -163,7 +163,12 @@ pushes again, up to 3 attempts. It never runs for a fork. The Playwright image h
 second job on a plain runner (`finish`, `needs` the first, runs even when it failed) removes the
 label and, when baselines were pushed, dispatches `ci.yml` on the branch (`actions: write`): a
 push with `GITHUB_TOKEN` starts no CI run, so without the dispatch CI and auto-merge would never
-see the new head. Review the PNG diff in the PR once CI has run.
+see the new head. GitHub also holds the `pull_request` run of a bot-pushed commit as
+`action_required` until a maintainer approves it, so `scripts/auto_merge.sh` takes the dispatched
+run instead when the `pull_request` run is `action_required` or missing: the latest `workflow_dispatch`
+CI run of this repository for the same head sha, started by `github-actions[bot]`, must be `success`
+(a failed, running or foreign run never counts, and every check run on the sha must still pass; the
+held run's suite is ignored as superseded). Review the PNG diff in the PR once CI has run.
 
 ## Web performance
 
