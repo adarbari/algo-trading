@@ -490,3 +490,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: no new spend.
+
+## 2026-10-17 | PR #599 (Explore features tab) | History copy covers every instrument rollup
+- Question: may the history copy (ADR 0060) grow to every instrument rollup, about +1.34 GB on the Mac (90% full, 20 GiB free), to cut the Features tab's history reads?
+- Options: accept the disk / keep the copy to market tables and bars only.
+- Decision: accept; release #599.
+- decided by: owner
+- status: final
+- Reasoning: the Features tab's history reads drop from 6.7-8.0 s to 1.3-1.9 s per ticker; the copy stays within its 2.6 GB budget.

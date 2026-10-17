@@ -271,11 +271,32 @@ def join_fields(
     """``out`` left-joined on ``instrument_id`` with ``frame``'s ``(field, column)`` pairs,
     each as its field name (a column ``frame`` lacks is left out)."""
     # Build the joined columns by name so the join key itself is never renamed.
-    picked = pd.DataFrame({"instrument_id": frame["instrument_id"].astype(str)})
+    # one construction: a column inserted at a time copied the frame once per column
+    data = {"instrument_id": frame["instrument_id"].astype(str).to_numpy()}
     for name, column in columns:
         if column in frame.columns:
-            picked[name] = frame[column].to_numpy()
-    return out.merge(picked, on="instrument_id", how="left")
+            data[name] = frame[column].to_numpy()
+    return out.merge(pd.DataFrame(data), on="instrument_id", how="left")
+
+
+def _rollup_rows_of(
+    reader: StoreReader,
+    table: str,
+    session: date,
+    as_of: datetime | None,
+    ids: Sequence[str] | None,
+) -> pd.DataFrame | None:
+    """``table``'s partition for ``session``, only ``ids``' rows when given: the view joins on
+    the reference's ids (already ``ids``), so a row of another instrument never lands in it, and
+    joining the other 12,000 rows of the partition cost 7 ms a table. A partition with none of
+    ``ids`` is read whole, so an empty or absent partition stays ``missing`` and one that only
+    lacks them does not (the read answers ``None`` for both)."""
+    if ids is None:
+        return reader.table(table, session, as_of)
+    narrowed = reader.table(table, session, as_of, ids)
+    if narrowed is not None and not narrowed.empty:
+        return narrowed
+    return reader.table(table, session, as_of)
 
 
 def instrument_view(
@@ -314,7 +335,7 @@ def instrument_view(
             frame = reader.table(table, company.snapshot_date, as_of) if company else None
             company_pre = company is not None and company.pre_snapshot
         else:
-            frame = reader.table(table, session, as_of)
+            frame = _rollup_rows_of(reader, table, session, as_of, ids)
         if frame is None or frame.empty:  # an empty partition holds no value either
             missing.append(table)
             continue

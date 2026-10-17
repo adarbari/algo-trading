@@ -33,11 +33,55 @@ max_examples = 5                 # examples listed per failure group
 [history_copy]                   # the history-copy step (ADR 0060): a read-optimised copy of long reads
 enabled = true                   # false: the nightly skips the step (the copies already built still serve)
 market_prefix = "rollups/market/"   # every table under it is copied, all years (a few MB each)
-instrument_tables = [            # the tables Explore charts read, copied for the last `recent_years` years
-    "bars/1d",                   # measured 2025-2026: 176 MB
-    "rollups/instrument/price_stats@v2",   # measured 2025-2026: 280 MB
+instrument_tables = [            # the tables Explore reads, copied for the last `recent_years` years: bars and every
+    "bars/1d",                   # instrument rollup group (a Features tab history reads them all; test_nightly.py). 176 MB
+    "rollups/instrument/anchored_vwap@v2",   # 68 MB
+    "rollups/instrument/balance_sheet@v1",
+    "rollups/instrument/bands@v2",   # 223 MB
+    "rollups/instrument/call_wing@v1",
+    "rollups/instrument/candle@v1",   # 82 MB
+    "rollups/instrument/cash_flow@v1",
+    "rollups/instrument/chain_flow@v1",
+    "rollups/instrument/dividend_schedule@v1",
+    "rollups/instrument/dividends@v2",
+    "rollups/instrument/earnings@v1",
+    "rollups/instrument/earnings_expected@v1",
+    "rollups/instrument/earnings_reaction@v1",
+    "rollups/instrument/earnings_revisions@v1",
+    "rollups/instrument/earnings_schedule@v1",
+    "rollups/instrument/earnings_surprise@v1",
+    "rollups/instrument/episode_behaviour@v1",   # 42 MB
+    "rollups/instrument/financials@v2",
+    "rollups/instrument/flow_history@v1",
+    "rollups/instrument/fund_reference@v1",
+    "rollups/instrument/fundamentals@v3",
+    "rollups/instrument/gaps@v1",   # 43 MB
+    "rollups/instrument/ibkr_iv@v1",
+    "rollups/instrument/implied_move@v1",
+    "rollups/instrument/income_statement@v1",
+    "rollups/instrument/iv30@v1",
+    "rollups/instrument/iv_history@v2",
+    "rollups/instrument/iv_term@v1",
+    "rollups/instrument/momentum@v1",   # 142 MB
+    "rollups/instrument/nearest_expiry@v1",
+    "rollups/instrument/oi_walls@v1",
+    "rollups/instrument/option_liquidity@v1",
+    "rollups/instrument/pivot_strength@v1",
+    "rollups/instrument/price_history@v1",
+    "rollups/instrument/price_moves@v1",
+    "rollups/instrument/price_stats@v2",   # 280 MB
+    "rollups/instrument/put_wing@v1",
+    "rollups/instrument/relative_strength@v1",   # 74 MB
+    "rollups/instrument/retest@v1",
+    "rollups/instrument/skew@v1",
+    "rollups/instrument/skew_history@v1",
+    "rollups/instrument/swing_levels@v1",
+    "rollups/instrument/trend_stats@v2",   # 328 MB
+    "rollups/instrument/vol_stats@v1",   # 149 MB
+    "rollups/instrument/volume@v1",
+    "rollups/instrument/volume_profile@v1",   # 51 MB
 ]
 recent_years = 2                 # calendar years kept: the session's and the one before
-budget_gb = 2.0                  # the instrument tables' copies together; the step skips (WARN) a table
+budget_gb = 2.6                  # the instrument tables' copies together (1.8 GB measured 2026-10-17, ~2.0 by year end); the step skips (WARN) a table
                                  # whose copy would not fit. Add a table only after measuring its size
 free_disk_floor_gb = 10.0        # no build when the disk has less free (WARN): a rebuilt year exists twice

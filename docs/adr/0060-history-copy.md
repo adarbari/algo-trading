@@ -85,3 +85,23 @@ column pruning, `ParquetFile` + filter) cannot remove the per-file cost.
   partitions changed after the build, ranges, filters, columns) and a stale-fallback unit
   suite. A new way to change a partition without replacing its index would break the rule: the
   contract tests of `tests/contract/storage/` and the property test are where to see it.
+
+## Amendment (2026-10-17): every instrument rollup is copied; short reads probe days
+Explore's Features tab asks six `InstrumentHistory` requests of three months, one per 60 fields:
+with only `bars/1d` and `price_stats@v2` copied, each read one whole-market partition per session
+for every other table (0.35 to 1.5 s a request, 5.8 to 7.1 s a ticker on the real store, measured
+with the response cache bypassed). The copy now covers **every instrument rollup group** (and
+`bars/1d`), the last `recent_years` years: measured 1.34 GB for the 43 added tables (a build of
+all of them takes about 3 minutes; the largest are `trend_stats@v2`, 328 MB, and `bands@v2`,
+223 MB), 1.8 GB with the earlier two, inside the budget, which is raised to `budget_gb = 2.6` (2026 is 80% elapsed: the copies reach about 2.0 GB by year end, and a skipped table would silently slow Explore). A history request of 60 fields
+falls to 0.11 to 0.2 s (0.3 to 0.4 s for the expression features, which also read the sessions of
+the `exists()` groups; those are now kept per published state in `ctx.cache`). The tables are
+listed in `nightly.toml`; `tests/unit/config/site/test_nightly.py` fails when a registered group
+is missing, so a new group is copied from the start. A read still falls back to the partitions for
+a year whose copy is stale, so nothing changes for correctness.
+
+Two read-path changes ride along, neither a layout change: `LocalTables.read_range` probes the
+days of a range of 31 days or fewer (one `stat` of the day's index each) instead of listing every
+partition of the table (75 ms for `price_stats@v2`'s 4,200); and `instrument_view` reads only the
+asked instruments' rows of a rollup (a partition with none of them is read whole, so "no row" and
+"no partition" stay distinct) and joins all of a table's columns at once.

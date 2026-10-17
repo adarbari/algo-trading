@@ -34,7 +34,7 @@ import threading
 from collections import OrderedDict
 from collections.abc import Collection, Sequence
 from dataclasses import replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -267,8 +267,8 @@ class LocalTables:
                         by_year[year] = rows
             parts: dict[int, list[pa.Table]] = {y: [t] for y, t in by_year.items() if t.num_rows}
             if any(y not in by_year for y in range(start.year, end.year + 1)):
-                for d in self.dates(table, own_run):
-                    if start <= d <= end and d.year not in by_year:
+                for d in self._stored_days(table, start, end, own_run):
+                    if d.year not in by_year:
                         data = self._partition(table, d, as_of, instruments, own_run, upto, columns)
                         if data is not None:
                             parts.setdefault(d.year, []).append(data)
@@ -279,6 +279,17 @@ class LocalTables:
             return None
         frame = to_frame(concat(table, parts))
         return None if frame.empty else frame.reset_index(drop=True)
+
+    def _stored_days(self, table: str, start: date, end: date, own_run: str | None) -> list[date]:
+        """The days of ``start..end`` the table has a partition for: a short range probes each
+        day's index (a one-session read of a 4,000-partition table listed 4,000 directories,
+        75 ms, to find one), a long one lists the table once. Both find a day exactly when
+        ``dates`` lists it."""
+        span = (end - start).days + 1
+        if own_run is None and span <= PROBE_DAYS:
+            days = (start + timedelta(days=k) for k in range(span))
+            return [d for d in days if (self._dir(table, d) / INDEX).exists()]
+        return [d for d in self.dates(table, own_run) if start <= d <= end]
 
     def build_history(self, table: str, years: Sequence[int]) -> list[int]:
         """Make the table's history copy hold ``years`` and be current (``history.py``); -> the
@@ -484,6 +495,7 @@ class LocalStaging:
         return len(old)
 
 
+PROBE_DAYS = 31  # a range this short probes its days instead of listing the table
 MAX_PARSED_BYTES = 64 * 1024 * 1024  # the run files ``LocalRuns`` keeps parsed, by file size
 
 
