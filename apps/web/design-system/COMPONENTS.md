@@ -876,7 +876,7 @@ Source: `design-system/components/KeyHints`
 
 ### KeyValue
 
-KeyValue: a definition list for detail panels: a label column and a value column (`<dl>`), values tabular. Values are text or formatted with a ValueFormat (`$13.99B`, `+1.24%` with its up / down tone); an optional hint (a feature id, a unit, a rule) sits under the label. Loading shows placeholder values, an empty list shows the empty message.
+KeyValue: a definition list for detail panels: a label column and a value column (`<dl>`), values tabular. Values are text or formatted with a ValueFormat (`$13.99B`, `+1.24%` with its up / down tone); an optional action (a help button) beside the label; an optional hint (a feature id, a unit, a rule) sits under the label. Loading shows placeholder values, an empty list shows the empty message.
 
 Source: `design-system/components/KeyValue`
 

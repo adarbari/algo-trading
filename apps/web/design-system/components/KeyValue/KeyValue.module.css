@@ -37,6 +37,19 @@
   color: var(--color-text-2);
 }
 
+.labelRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-1);
+  min-width: 0;
+}
+
+.action {
+  display: inline-flex;
+  flex: none;
+}
+
 .hint {
   overflow: hidden;
   color: var(--color-muted);
