@@ -534,6 +534,28 @@ FILING_EVENTS = fixed(
     runs="merge",
     key=("instrument_id", "accession"),
 )
+# L1: the daily NAV per share of a closed-end fund (edge build D5), one row per fund x series x
+# NAV date, from Tiingo's Nasdaq MFQS ``X<ticker>X`` symbols. ``instrument_id`` is the FUND's id
+# (from the reference snapshot, never built from the NAV symbol); ``series`` is ``nav`` (room for
+# a second series); ``ts`` is the NAV date at midnight UTC (and the partition: ``session_date``).
+# ``known_from`` is the first session the NAV was knowable on: the next session after the NAV
+# date (struck after the close, on the vendor the next day), a modelled lag the same for a
+# nightly fetch and a 2004 backfill; ``knowledge_ts`` is the true fetch instant. Runs merge on
+# (instrument, series, date): a re-fetched NAV that differs (an issuer's restatement) is a later
+# version, never hidden behind the first.
+FUND_NAV_EVENTS = fixed(
+    "events/fund_nav",
+    "event",
+    ("instrument_id", "ts", KNOWN_FROM, "series", "nav"),
+    "instrument_id string!",
+    "ts timestamp_utc!",
+    f"{KNOWN_FROM} date!",
+    "series string!",
+    "nav float64!",
+    "nav_symbol string!",
+    runs="merge",
+    key=("instrument_id", "series", "ts"),
+)
 MACRO_SERIES = fixed(
     "macro/series",
     "reference",
@@ -686,6 +708,7 @@ KNOWN: dict[str, TableSpec] = {
         EARNINGS_EVENTS,
         MACRO_RELEASE_EVENTS,
         FILING_EVENTS,
+        FUND_NAV_EVENTS,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the

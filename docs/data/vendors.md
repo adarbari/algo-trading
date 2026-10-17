@@ -140,6 +140,23 @@ fields are gated on the free tier). `listing-history` asks it only for tickers w
 are `/tiingo/daily/<permaTicker>/prices`; `bars-history --from-listings` fetches by it and never
 fetches a reused ticker that has none.
 
+### Closed-end fund NAVs: Nasdaq MFQS `X<ticker>X` on Tiingo (edge build D5)
+
+A closed-end fund of $75 M or more reports its NAV every evening to Nasdaq's Mutual Fund
+Quotation Service under `X<ticker>X` (`PHK` -> `XPHKX`); Tiingo's supported-tickers file lists
+them as exchange `NMFQS`, asset type `Mutual Fund` (49,827 rows on 2026-10-08, almost all ordinary
+mutual funds, so a symbol built from a ticker counts only for a fund the `fund-nav` task has
+matched: `XCATX` is a real fund, not Caterpillar's NAV). The series is the same
+`/tiingo/daily/<symbol>/prices` request, same pace, same licence, history from 2004. The
+`fund-nav` task (`tasks/market/fund_nav.py`, adapters `tiingo/nav.py`) takes the funds from the
+reference (`security_type = CEF`, plus stocks named "Closed End Fund": 332 + the Calamos funds),
+keeps the id of the fund, not of the NAV symbol, maps a fund only when Tiingo's listing holds its
+NAV symbol (273 of 332 CEFs on the 2026-10-08 file), and writes `events/fund_nav` (`nav` the
+unadjusted `close`; `known_from` the next session after the NAV date). CEFConnect's JSON has
+the same numbers but its terms forbid automation: never used. BDCs have no daily NAV (quarterly,
+10-Q `NetAssetValuePerShare`). Budget: one symbol per fund counted with `bars-history`'s
+(`tiingo_budget`); about 300 symbols a month, 6 hours a run on the free tier: in no workflow.
+
 ### S&P 500 membership history (fja05680/sp500; edges ED6b-3)
 
 `sp500_ticker_start_end.csv` of https://github.com/fja05680/sp500 (MIT licence, free, no key):

@@ -43,6 +43,7 @@ from algotrade_ingestion.tasks.market import (
     corporate_actions,
     earnings,
     etf_holdings,
+    fund_nav,
     ibkr_iv,
     option_chains,
     rates,
@@ -245,6 +246,19 @@ def _bars_history(ctx: TaskContext, p: Params) -> RunRecord:
         bool(p.get("include_tiers")),
         p.get("fill"),
         bool(p.get("from_listings")),
+    )
+
+
+def _fund_nav(ctx: TaskContext, p: Params) -> RunRecord:
+    return fund_nav.ingest_fund_nav(
+        ctx,
+        ctx.sources["tiingo_nav"],
+        ctx.sources["tiingo_nav_tickers"],
+        p.get("end") or session_of(p),
+        p.get("start"),
+        _symbols(p),
+        bool(p.get("force")),
+        p.get("limit"),
     )
 
 
@@ -651,6 +665,25 @@ TASKS: dict[str, Task] = {
                     None,
                     "also the tier A / B short-put names (hundreds: needs Tiingo's Power tier)",
                 ),
+            ),
+        ),
+        Task(
+            "fund-nav",
+            "daily NAV of closed-end funds from Tiingo's Nasdaq MFQS X<ticker>X series "
+            "(events/fund_nav; --from 2004-01-01 backfills, the default is the last 10 days; "
+            "in no workflow: the free tier cannot hold it nightly)",
+            fund_nav,
+            ("events/fund_nav",),
+            _fund_nav,
+            sources=("tiingo_nav", "tiingo_nav_tickers"),
+            settings="sources.toml [tiingo]",
+            params=(
+                SESSION,
+                FROM,
+                TO,
+                Param("symbols", ("--symbols",), str, "only these fund tickers (comma list)"),
+                Param("limit", ("--limit",), int, "fetch at most N funds this run"),
+                Param("force", ("--force",), None, "also funds already fetched for the window"),
             ),
         ),
         Task(
