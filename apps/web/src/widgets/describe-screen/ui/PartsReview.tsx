@@ -9,14 +9,16 @@
  * reference; a card is marked edited when the trader changed its rows (ADR 0038). Zero applied
  * criteria is not an error: the Builder's document stays.
  */
-import { Mono, PartCard, PartList, Stack, Text, type PartCardProps } from '@algotrade/ui';
+import { Mono, PartCard, PartJoin, PartList, Stack, Text, type PartCardProps } from '@algotrade/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { GuideHelp, termHelp } from '@/features/guide-help';
 import {
+  JOIN_TEXT,
   PART_TEXT,
   appliedRows,
   baselineAfter,
+  joinToken,
   partEdited,
   partKindLabel,
   partsOf,
@@ -280,6 +282,23 @@ export function PartsReview({
     );
   };
 
+  // A connector sits directly before the card it joins (PartList reads it unwrapped).
+  const withJoin = (part: DraftPart) => {
+    const token = joinToken(part);
+    return token
+      ? [
+          <PartJoin
+            key={`join-${part.id}`}
+            {...token}
+            joinedByLabel={JOIN_TEXT.joinedBy}
+            readAsLabel={JOIN_TEXT.readAs}
+            info={<GuideHelp entry={JOIN_TEXT.help} />}
+          />,
+          cardOf(part),
+        ]
+      : [cardOf(part)];
+  };
+
   const leftover = [
     ...(answer.formulas_dropped ?? []).map((d) => `Left out ${d.name}: ${d.reason}`),
     ...answer.notes,
@@ -287,7 +306,7 @@ export function PartsReview({
 
   return (
     <Stack gap={3}>
-      <PartList aria-label={PART_TEXT.list}>{parts.map(cardOf)}</PartList>
+      <PartList aria-label={PART_TEXT.list}>{parts.flatMap(withJoin)}</PartList>
       {unowned.length > 0 && (
         <Suggested
           suggestions={unowned}

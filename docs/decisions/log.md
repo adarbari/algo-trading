@@ -411,6 +411,22 @@ follow-up PR).
 - status: final
 - Reasoning: these steps used to appear in the nightly's alert; moving them out must not silence failures.
 
+## 2026-10-17 | PR #589 (Describe it connector) | The connector token's labels and reading
+- Question: what does the connector between part cards say, and how is it read aloud?
+- Options: the logic's own names (AND, OR, AND NOT) / the trader's register.
+- Decision: and -> "and", or -> "or", and_not -> "but not" (one negation beside a card that already states the exclusion, never two); read as "joined by {words}, read as {label}" (just "joined by {words}" when the words equal the label); the Guide entry `describe_part_join` explains it.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the traders' own words (but, except, unless) stay visible and the reading beside them is what they would say; a second negation would read as a double negative.
+
+## 2026-10-17 | PR #589 (Describe it connector) | When the connector token shows
+- Question: which joins get a token between part cards?
+- Options: every join / only those that change the reading.
+- Decision: join "or" and "and_not" always; join "and" only when the words are not a plain conjunction: hidden when every word (commas ignored) is a plain conjunction: and, with, plus, also, then, or there are no words; shown for but, yet, while, although, though, whereas, as long as, so long as, only if, provided (that).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a token between every pair of cards is noise; "but" or "only if" changes how the second part reads and is where a misread hides.
+
 ## 2026-10-17 | PR #590 (ADR 0071) | Boolean groups: a tree in the engine, one level in the Builder
 - Question: one level of groups, or a full boolean tree?
 - Options: keep formulas / one level `any` / `none` / inline tree / tree by reference in the engine with a one-level Builder.

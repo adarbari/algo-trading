@@ -424,3 +424,34 @@ describe('DraftReview with parts', () => {
     }
   });
 });
+
+describe('DraftReview connectors', () => {
+  const joined: Part[] = [
+    { ...(PARTS[0] as Part) },
+    { ...(PARTS[1] as Part), join: 'and', join_words: 'but' },
+    { ...(PARTS[2] as Part), join: 'and', join_words: 'and' },
+    { ...(PARTS[4] as Part), join: 'and_not', join_words: 'except' },
+  ];
+
+  it('shows the token before the card it joins, reads in order, and hides a plain and', async () => {
+    const { container } = setup({ answer: { ...ANSWER, parts: joined } });
+    const items = within(screen.getByRole('list', { name: 'Parts of your sentence' })).getAllByRole(
+      'listitem',
+    );
+    expect(items).toHaveLength(4);
+    expect(items[0]?.textContent).not.toContain('joined by');
+    // "but" joins as and: the trader's word shows beside the label.
+    expect(items[1]?.textContent).toMatch(/^joined by.*but.*read as.*and/);
+    expect(items[1]?.textContent).toContain('guide describe_part_join');
+    expect(items[2]?.textContent).not.toContain('joined by');
+    await expectNoA11yViolations(container);
+  });
+
+  it('a gap carrying and-not shows but not', () => {
+    setup({ answer: { ...ANSWER, parts: joined } });
+    const items = within(screen.getByRole('list', { name: 'Parts of your sentence' })).getAllByRole(
+      'listitem',
+    );
+    expect(items[3]?.textContent).toMatch(/^joined by.*except.*read as.*but not/);
+  });
+});

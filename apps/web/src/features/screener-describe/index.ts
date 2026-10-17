@@ -17,6 +17,7 @@ export {
   type BadgeLabel,
   type TermRef,
 } from './model/labels';
+export { JOIN_TEXT, joinToken } from './model/joins';
 export {
   baselineAfter,
   partEdited,
