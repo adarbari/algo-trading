@@ -74,3 +74,14 @@ not published yet" is not a failure until the day's deadline has passed.
 - The probe costs one request in the rare 403 case only; the run record says why a step
   waits, so a real outage reads differently from a late publication.
 - `RunStatus` gains `waiting`: run records are read by name, so Admin shows it as is.
+
+## Update 2026-10-16: the chains readiness probe
+
+The first chains attempt of a night fetched all ~4,200 names (80-117 min) before the stale
+check said WAITING, because Cboe's feed arrives 5-8 h after the close (p50 315 min). A
+nightly attempt that may still WAIT now samples 40 evenly spaced names first
+(`ChainJobConfig.probe`); when the projected stale share of the universe is over twice
+`max_chain_stale_share` the task run finishes `WAITING` (nothing published, staging kept, the
+next attempt resumes) and the step is WAITING. After the step's deadline, or in a manual
+`run chains`, there is no probe. A later start was rejected: no settle time shorter than the
+arrival time helps, and a longer one would idle the step for hours.

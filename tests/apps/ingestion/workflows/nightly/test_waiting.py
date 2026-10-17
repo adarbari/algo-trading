@@ -4,7 +4,7 @@ a WAITING run alerts nobody."""
 
 import json
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -13,7 +13,7 @@ from algotrade.config.site.settings import ConfigurationError, NightlySettings, 
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.runs import RunStatus
+from algotrade.storage.runs import RunStatus, start_run
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.maintenance.quality import Check, check_chains
 from algotrade_ingestion.workflows.nightly import screens as screens_module
@@ -25,6 +25,7 @@ from algotrade_ingestion.workflows.nightly.steps import (
     Status,
     StepResult,
     StepStatus,
+    from_record,
     judge,
     overall,
 )
@@ -296,3 +297,16 @@ def test_no_settle_time_is_the_current_behaviour(fake: Callable[..., Calls]) -> 
     )
     with pytest.raises(ConfigurationError, match="settle_minutes"):
         NightlySettings.from_document({"steps": {"chains": {"settle_minutes": -1}}})
+
+
+def test_a_task_that_waited_on_its_probe_is_a_waiting_step_until_the_deadline() -> None:
+    record = start_run("option_chains", date(2026, 10, 2), BEFORE_DEADLINE)
+    record.status = RunStatus.WAITING
+    record.stats = {
+        "waiting_because": ["probe: 60% of the universe projected stale"],
+        "probe": {"sampled": 40, "projected_stale_share": 0.6038},
+    }
+    waiting = from_record(record, wait=True)
+    assert waiting.status is StepStatus.WAITING and "projected stale" in str(waiting.reason)
+    assert waiting.observed == {"published": False, "stale_share": 0.6038}  # the arrival record
+    assert from_record(record, wait=False).status is StepStatus.FAILED  # at the deadline

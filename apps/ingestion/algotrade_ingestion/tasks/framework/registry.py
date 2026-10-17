@@ -287,7 +287,12 @@ def _chains(ctx: TaskContext, p: Params) -> RunRecord:
         ctx.sources["cboe"],
         underlyings,
         session,
-        option_chains.ChainJobConfig(workers, priority_symbols=ctx.settings.cboe_priority_symbols),
+        option_chains.ChainJobConfig(
+            workers,
+            priority_symbols=ctx.settings.cboe_priority_symbols,
+            probe=bool(p.get("probe")),  # the nightly, while the step may still WAIT
+            probe_max_stale_share=2 * ctx.settings.max_chain_stale_share,
+        ),
     )
 
 

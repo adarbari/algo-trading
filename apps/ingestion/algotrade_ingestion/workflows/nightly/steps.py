@@ -207,6 +207,16 @@ def _judged(
     if record.status is RunStatus.FAILED:
         error = record.stats.get("error") or "the task failed"
         return Outcome(StepStatus.FAILED, record.stats, reason=str(error))
+    if record.status is RunStatus.WAITING:  # the task's own readiness probe (chains)
+        why = "; ".join(str(r) for r in record.stats.get("waiting_because", []))
+        status = StepStatus.WAITING if wait else StepStatus.FAILED
+        outcome = Outcome(status, record.stats, reason=f"not published yet: {why}")
+        share = record.stats.get("probe", {}).get("projected_stale_share")
+        outcome.observed = {
+            "published": False,
+            **({} if share is None else {"stale_share": round(share, 4)}),
+        }
+        return outcome
     if step is not None and step.task_complete and record.status is not RunStatus.COMPLETE:
         reason = f"task finished {record.status.value}: {partial_reason(record)}"
         return Outcome(StepStatus.FAILED, record.stats, reason=reason)

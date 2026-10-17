@@ -366,3 +366,70 @@ def test_status_records_the_tier_of_each_underlying_at_fetch_time(tmp_path: Path
     status = StoreReader(backend).table(STATUS, DAY)
     assert status is not None
     assert dict(zip(status["symbol"], status["tier"], strict=True)) == {"SPY": "core", "B": "rest"}
+
+
+def _names(n: int) -> list[str]:
+    return [f"N{i:02d}" for i in range(n)]
+
+
+def test_probe_waits_on_an_unrolled_feed_and_the_resume_keeps_the_sample(
+    backend: MemoryBackend | LocalBackend,
+) -> None:
+    """Chains took 80-117 min to learn the feed had not rolled over (2026-10-12..16). A probe
+    of a few names says so at once, publishes nothing and leaves its staging for the resume."""
+    writer = StoreWriter(backend)
+    names = _names(12)
+    old = DAY - timedelta(days=1)
+    stale = FakeFeed({n: fx.payload(n, session=old) for n in names})
+    first = run(writer, stale, universe(*names), probe=True, probe_size=3, retry_pause_s=0)
+    assert first.status is RunStatus.WAITING
+    assert len(stale.calls) == 3  # the sample only, not the 12 names
+    assert first.stats["probe"]["projected_stale_share"] == 1.0
+    assert StoreReader(backend).table(OPTIONS, DAY) is None  # nothing published
+    # the feed rolled over: the resume refetches the sampled (stale) names and the rest, once
+    fresh = FakeFeed({n: fx.payload(n) for n in names})
+    second = run(writer, fresh, universe(*names), probe=True, probe_size=3, retry_pause_s=0)
+    assert second.run_id == first.run_id
+    assert second.status is RunStatus.COMPLETE
+    assert sorted(fresh.calls) == names  # each name fetched exactly once
+    assert set(StoreReader(backend).table(OPTIONS, DAY)["underlying_id"]) == {  # type: ignore[index]
+        f"EQ:{n}" for n in names
+    }
+
+
+def test_probe_lets_a_rolled_feed_through_without_refetching_the_sample() -> None:
+    writer = StoreWriter(MemoryBackend())
+    names = _names(12)
+    feed = FakeFeed({n: fx.payload(n) for n in names})
+    record = run(writer, feed, universe(*names), probe=True, probe_size=3, retry_pause_s=0)
+    assert record.status is RunStatus.COMPLETE
+    assert sorted(feed.calls) == names  # the sampled names are not fetched twice
+
+
+def test_probe_is_off_unless_asked_and_skips_a_short_todo_list() -> None:
+    names = _names(12)
+    old = DAY - timedelta(days=1)
+    full = FakeFeed({n: fx.payload(n, session=old) for n in names})
+    off = run(StoreWriter(MemoryBackend()), full, universe(*names), probe_size=3, retry_pause_s=0)
+    assert off.status is RunStatus.PARTIAL and len(full.calls) == 12  # a manual run fetches all
+    short = FakeFeed({n: fx.payload(n, session=old) for n in names[:5]})
+    done = run(
+        StoreWriter(MemoryBackend()), short, universe(*names[:5]),
+        probe=True, probe_size=3, retry_pause_s=0,
+    )  # fmt: skip
+    assert done.status is RunStatus.PARTIAL and len(short.calls) == 5  # < 2 x sample: no probe
+
+
+def test_probe_never_turns_a_published_run_back_into_waiting() -> None:
+    """A refetch resumes the PARTIAL run whose rows are committed: it fetches, probe or not."""
+    writer = StoreWriter(MemoryBackend())
+    names = _names(12)
+    old = DAY - timedelta(days=1)
+    stale = FakeFeed(
+        {n: fx.payload(n, session=old) for n in names[1:]} | {names[0]: fx.payload(names[0])}
+    )
+    first = run(writer, stale, universe(*names), probe_size=3, retry_pause_s=0)
+    assert first.status is RunStatus.PARTIAL  # published; one OK name keeps the staging
+    again = run(writer, stale, universe(*names), probe=True, probe_size=3, retry_pause_s=0)
+    assert again.run_id == first.run_id and again.status is RunStatus.PARTIAL
+    assert "probe" not in again.stats
