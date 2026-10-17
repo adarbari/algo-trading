@@ -11,7 +11,6 @@ import { EventStudyPanel } from '@/widgets/event-study-panel';
 import { EventsPanel } from '@/widgets/events-panel';
 import { FeatureTable } from '@/widgets/feature-table';
 import { FeaturesPanel } from '@/widgets/features-panel';
-import { FinancialsPanel } from '@/widgets/financials-panel';
 import { OptionsPanel } from '@/widgets/options-panel';
 import { ScreenerHitsPanel, WhyIdeaPanel } from '@/widgets/screener-hits-panel';
 
@@ -88,8 +87,6 @@ export function OtherTabs({ symbol, search, onSearchChange, onOpenScreener }: De
           }}
         />
       );
-    case 'financials':
-      return <FinancialsPanel symbol={symbol} />;
     case 'events':
       return (
         <Stack gap={4}>

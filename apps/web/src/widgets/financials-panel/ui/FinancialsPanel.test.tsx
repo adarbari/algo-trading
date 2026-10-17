@@ -59,6 +59,7 @@ const stock = {
       'unavailable_licence',
       'needs the data licence',
     ),
+    gap('feature.fcf', 'LICENCE', 'unavailable_licence', 'needs the data licence'),
     gap('rollup.cash_flow@v1.ocf_ttm', 'SYSTEM', 'unavailable_system', 'a system error'),
   ],
 };
@@ -73,8 +74,9 @@ describe('FinancialsPanel', () => {
     expect(hooks.useInstrumentFacts).toHaveBeenCalledWith('KO', FINANCIALS_FEATURES);
     expect(hooks.useInstrumentFacts).toHaveBeenCalledTimes(1);
     const strip = screen.getByRole('region', { name: 'KO key financials' });
-    expect(strip).toHaveTextContent('Net margin');
-    expect(strip).toHaveTextContent('P/E ratio24.30');
+    expect(strip).toHaveTextContent('Operating margin');
+    expect(strip).toHaveTextContent('P/E ratio');
+    expect(strip).toHaveTextContent('term unavailable_licence');
     await expectNoA11yViolations(container);
   });
 

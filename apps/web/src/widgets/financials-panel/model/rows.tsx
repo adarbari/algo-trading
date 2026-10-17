@@ -44,11 +44,26 @@ export function rowItem(
   };
 }
 
-/** A headline cell for one spec, in the same words. */
-export function statItem(values: Values, spec: RowSpec): StatItem {
+/** A headline cell for one spec: a gap names its Guide term beside the label. */
+export function statItem(values: Values, spec: RowSpec, help: RowHelp): StatItem {
   const { id, label, value, format, hint } = rowItem(values, spec, {
     field: () => null,
-    term: () => null,
+    term: help.term,
   });
-  return { id, label, value, ...(format ? { format } : {}), ...(hint ? { sub: hint } : {}) };
+  const served = values.get(spec.name);
+  const gap = !served || isUnknown(served) ? served?.unknown : null;
+  return {
+    id,
+    label: gap ? (
+      <>
+        {label}
+        {help.term(gap.guideTerm)}
+      </>
+    ) : (
+      label
+    ),
+    value,
+    ...(format ? { format } : {}),
+    ...(hint ? { sub: hint } : {}),
+  };
 }

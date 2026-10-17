@@ -6,21 +6,13 @@
  * the word for its kind with its Guide term button. Status and basis fields are badges in the
  * section header. A fund has no financials and says so with the panel's empty state.
  */
-import {
-  Grid,
-  Heading,
-  KeyValue,
-  Panel,
-  StatStrip,
-  StatusBadge,
-  Stack,
-  type StatusTone,
-} from '@algotrade/ui';
+import { Grid, Heading, KeyValue, Panel, StatStrip, StatusBadge, Stack } from '@algotrade/ui';
 import { useMemo } from 'react';
 
 import { unknownWord } from '@/entities/availability';
 import { isUnknown, type Values } from '@/entities/feature';
 import { useInstrumentFacts } from '@/entities/instrument';
+import { statusTone } from '@/entities/run';
 import { GuideHelp, termHelp } from '@/features/guide-help';
 
 import { rowItem, statItem, type RowHelp } from '../model/rows';
@@ -35,20 +27,15 @@ const HELP: RowHelp = {
   term: termHelp,
 };
 
-const TONES: Readonly<Record<string, StatusTone>> = {
-  OK: 'positive',
-  PARTIAL: 'warning',
-  STALE: 'warning',
-};
-
 function Badge({ values, name }: { values: Values; name: string }) {
   const served = values.get(name);
   const known = served && !isUnknown(served);
   const word = known ? String(served.value) : unknownWord(served?.unknown);
   return (
     <Stack direction="row" gap={1} align="center">
-      <StatusBadge tone={known ? (TONES[word] ?? 'neutral') : 'neutral'}>{word}</StatusBadge>
+      <StatusBadge tone={known ? statusTone(word) : 'neutral'}>{word}</StatusBadge>
       {HELP.field(name)}
+      {!known && served?.unknown ? HELP.term(served.unknown.guideTerm) : null}
     </Stack>
   );
 }
@@ -88,7 +75,7 @@ export function FinancialsPanel({ symbol }: FinancialsPanelProps) {
       <Stack gap={4}>
         <StatStrip
           label={`${symbol} key financials`}
-          items={KEY_METRICS.map((spec) => statItem(values, spec))}
+          items={KEY_METRICS.map((spec) => statItem(values, spec, HELP))}
         />
         <Grid columns={2} gap={4} collapse="md">
           {SECTIONS.map((section) => (

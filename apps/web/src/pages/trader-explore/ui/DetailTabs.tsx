@@ -19,6 +19,8 @@ import { exploreState, openTicker, type SearchPatch } from '../model/state';
 import { ExploreTabs } from './ExploreTabs';
 
 // The other tabs' widgets are one chunk, fetched when one of those tabs opens.
+// Its own chunk: loads only when the Financials tab opens.
+const FinancialsTab = lazyPage(() => import('./FinancialsTab'), 'FinancialsTab');
 const OtherTabs = lazyPage(() => import('./OtherTabs'), 'OtherTabs');
 
 /** Fetch the other tabs' chunk ahead of the page (a route loader), so it renders unsuspended. */
@@ -60,6 +62,12 @@ function Content(props: DetailTabsProps) {
             />
           }
         />
+      );
+    case 'financials':
+      return (
+        <Suspense fallback={<Skeleton variant="rect" height="lg" label="Loading the tab" />}>
+          <FinancialsTab symbol={symbol} />
+        </Suspense>
       );
     default:
       return (
