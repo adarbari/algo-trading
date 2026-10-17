@@ -41,7 +41,8 @@ LAUNCH = (
     "import sys, uvicorn;"
     "nocache = sys.argv[2] == '1';"
     "import algotrade_api.graphql.response_cache as rc;"
-    "rc.ResponseCache.get = (lambda self, key: None) if nocache else rc.ResponseCache.get;"
+    "[nocache and setattr(rc.ResponseCache, n, lambda self, key: None)"
+    " for n in ('get', 'get_stale')];"
     "from algotrade_api.app import app;"
     "uvicorn.run(app, host='127.0.0.1', port=int(sys.argv[1]), log_level='warning')"
 )

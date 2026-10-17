@@ -16,6 +16,8 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import date
 from functools import partial
+from pathlib import Path
+from typing import Any
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,7 +25,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from algotrade.config.site.settings import load_llm, load_users
-from algotrade.config.site.users import Role, UserRecord
+from algotrade.config.site.users import Role, UserRecord, UsersSettings
 from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import (
     ConfigurationError,
@@ -65,9 +67,9 @@ from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
 from algotrade_api.feedback import DraftMemory, feedback_sink, request_sink
 from algotrade_api.graphql.offload import OverloadedError, off_loop
-from algotrade_api.graphql.response_cache import CountWrites, WriteEpoch, served_token
-from algotrade_api.graphql.schema import graphql_router, sdl
-from algotrade_api.graphql.warm import CacheWarmer
+from algotrade_api.graphql.response_cache import CountWrites, OperationLog, WriteEpoch, served_token
+from algotrade_api.graphql.schema import CachingRouter, graphql_router, sdl
+from algotrade_api.graphql.warm import CacheWarmer, seed_operations
 from algotrade_api.live import no_live, open_live
 from algotrade_api.ops.build import api_stamp
 from algotrade_api.routes import PUBLIC_ROUTERS, ROUTERS
@@ -77,6 +79,7 @@ from algotrade_api.web import web_router
 
 log = logging.getLogger(__name__)
 
+SEED_PAGES = Path(__file__).resolve().parents[3] / "benchmarks/api_latency_pages.json"
 HOME_WARM_TIMEOUT_S = 60.0  # the longest a start waits for the home page's reads
 TITLE = "algotrade API"
 # Each of the 6 read threads (``READ_THREADS``) otherwise decodes Parquet with up to one Arrow
@@ -158,13 +161,51 @@ async def _start_warming(
     if warmer is None:
         return None
     # not wait_for: off_loop shields its thread from cancellation, so a timeout would still wait
-    reading = asyncio.ensure_future(off_loop(warmer.warm_home))
+    reading = asyncio.ensure_future(_warm_home(warmer))
     done, _ = await asyncio.wait({reading}, timeout=home_timeout_s)
     if not done:
         log.warning("warming the home page took over %.0f s: serving anyway", home_timeout_s)
     elif (error := reading.exception()) is not None:  # an empty store: serve, the warmer retries
         log.error("warming the home page before serving failed", exc_info=error)
     return asyncio.create_task(warmer.run())
+
+
+def _mount_graphql(
+    app: FastAPI,
+    settings: ApiSettings,
+    users: UsersSettings,
+    epoch: WriteEpoch,
+    caller: list[Any],
+) -> tuple[Callable[[UserContext, date | None], ReadContext], CachingRouter]:
+    """``POST /graphql`` over the app's store with one read-result cache and an operation log
+    (seeded for the configured user when served: the pages that user opens first); the read
+    opener and the router, whose ``replay`` the warmer runs."""
+    store = app.state.store
+    cache = ResultCache(READ_CACHE_SIZE)
+    reads = _reads(store, cache)
+    operations = OperationLog()
+    gql = graphql_router(
+        reads,
+        settings.debug,
+        _stores(store, cache),
+        store.reader.visible_seq,
+        epoch,
+        runs=store.reader.runs_generation,
+        served=_served(store, cache),
+        log=operations,
+    )
+    app.include_router(gql, dependencies=caller)
+    owner = users.get(settings.user)
+    if settings.live and owner is not None:
+        for document, variables in seed_operations(SEED_PAGES):
+            operations.note(owner, document, variables)
+    return reads, gql
+
+
+async def _warm_home(warmer: CacheWarmer) -> None:
+    """The home reads, then the served and seeded operations replayed into the response cache."""
+    await off_loop(warmer.warm_home)
+    await warmer.replay_operations()
 
 
 async def _stop(task: asyncio.Task[None]) -> None:
@@ -216,6 +257,7 @@ def create_app(
         yield
         if warming is not None:
             await _stop(warming)
+        await app.state.graphql.aclose()
         app.state.live.close()
         _flush(  # the queued usage rows, feedback events, feature requests
             app.state.text_model, app.state.feedback, app.state.requests
@@ -303,24 +345,14 @@ def create_app(
     caller = [Depends(get_caller)]
     for router in ROUTERS:
         app.include_router(router, dependencies=caller)
-    cache = ResultCache(READ_CACHE_SIZE)
-    reads, stores = _reads(app.state.store, cache), _stores(app.state.store, cache)
-    app.include_router(
-        graphql_router(
-            reads,
-            settings.debug,
-            stores,
-            app.state.store.reader.visible_seq,
-            epoch,
-            runs=app.state.store.reader.runs_generation,
-            served=_served(app.state.store, cache),
-        ),
-        dependencies=caller,
-    )
+    reads, gql = _mount_graphql(app, settings, users, epoch, caller)
+    app.state.graphql = gql  # the lifespan cancels its background recomputes
     user = app.state.store.user
     app.state.warmer = (
         CacheWarmer(
-            lambda: reads(user, None), extra=partial(warm_steps, app.state.store.preview_cache)
+            lambda: reads(user, None),
+            extra=partial(warm_steps, app.state.store.preview_cache),
+            replay=gql.replay,
         )
         if settings.live
         else None

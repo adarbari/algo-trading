@@ -83,3 +83,15 @@ ran on each request and, under load, queued for the read threads until the API a
    saved while an answer is computed leaves that answer under a key nobody asks for again. A
    publish and a save are two moves, so a read between them is keyed on one and recomputed on
    the other. The 300 s age bound still covers a config edited outside the process.
+   *Amended 2026-10-17 (stale-while-revalidate, replay):* past `TTL_S` an entry is *stale*, not
+   gone: it is served once more and recomputed in the background (single flight per key), dropped
+   only at `HARD_TTL_S` (24 h), so the first page after an idle spell is a cache answer; a config
+   edited outside the process is seen one request later than before, never older than the next
+   one. The router remembers each cacheable operation it serves (`OperationLog`: document,
+   variables and the caller's `UserRecord`, bounded) and the warmer replays them in process, as
+   the caller who asked (role-scoped causes and per-user keys are unchanged: ADR 0056), after the
+   home steps at start and after each publish or session flip, before the market frames; at start
+   the log is seeded with the web's page-load operations for the configured user
+   (`benchmarks/api_latency_pages.json`, `make api-latency-capture`). `LlmUsage` joined the
+   cached operations, keyed on `visible_seq` (a logged call publishes a partition) and the
+   exchange date.
