@@ -521,6 +521,24 @@ request path (a draft is never judged for a user), and under the same guards as 
 (`--yes`, `--max-calls`, `--budget-usd`, stop after three unavailable answers). It measures; it
 never gates a draft or a merge.
 
+## Amended 2026-10-17: a deterministic verifier; doubt repairs, then escalates
+
+Owner-approved the same day: free model first, a deterministic verifier, the strong model only on
+doubt. Why: the 2026-10-17 judge scored segmentation 15/34 for Claude, and a valid draft can still
+misread the sentence (the "cheap ... on P/E" split: words around a condition left as not
+understood). `services/drafting/parts/verify.py` reads the parts of a valid model draft and raises
+a doubt for: words with a content word no part maps (`unmapped_words`); an or / negation the model
+left out of a part's words (`connector_left_out`); an item tied to no words (`unplaced`); "X or Y"
+in one part drafted as two or more plain criteria and no formula (`or_not_formula`). A doubt is
+refused like an invalid answer, so the chain repairs once on the same (free) member with the doubts
+named, then asks the next, stronger one: the cost is a repair on the free member first, and the
+strong tier is reached only on doubt, within the chain's two calls per member and its deadline.
+When every attempt is refused and at least one was a valid draft whose only problem was doubts, the
+one with the fewest doubts (the later on a tie) is served with `ScreenDraft.doubts` set; an invalid
+draft is never served. A phrasebook-shortcut draft (no model) and a draft the model's own check
+skipped are not refused (the latter records its doubts). `doubts` is for the golden report
+("doubts served") and the feedback log; the API does not serve it.
+
 ## Amended 2026-10-17: a provider whose quota is exhausted cools off
 `usage/llm_calls` on the owner's machine: the free Gemini (first in the chain) failed 19 of 43
 screener-draft calls, mostly 429 `RESOURCE_EXHAUSTED` "exceeded your current quota" (a DAILY
