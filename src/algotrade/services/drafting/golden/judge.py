@@ -34,7 +34,7 @@ from algotrade.core.model.errors import (
     InvalidAnswerError,
     ModelUnavailableError,
 )
-from algotrade.services.drafting.golden.golden import GoldenCase, load_cases
+from algotrade.services.drafting.golden.golden import GoldenCase
 from algotrade.services.drafting.golden.golden_run import (
     UNAVAILABLE_STREAK,
     CallResult,
@@ -44,7 +44,7 @@ from algotrade.services.drafting.golden.golden_run import (
     call_estimate_usd,
     evaluate,
     make_plan,
-    select_cases,
+    start,
 )
 from algotrade.services.drafting.golden.judge_prompt import (
     DIMENSIONS,
@@ -395,30 +395,16 @@ def run_golden_judge(
     """The command: refuse, plan, require ``--yes``, draft and judge, report. ``say`` gets the
     report, ``note`` everything else. -> the exit code (0 done, 1 refused or not confirmed, 2 a
     bad argument)."""
-    if switch_off or not settings.enabled:
-        note(
-            "refused: the text model is off. Enable it: unset ALGOTRADE_LLM (it is `off`) and "
-            "set `enabled = true` in config/site/llm.toml (or your llm.local.toml)."
-        )
-        return 1
-    try:
-        cases = select_cases(load_cases(root), args.cases or None, args.split)
-        providers = args.providers or tuple(p.id for p in settings.providers)
-        plan = make_judge_plan(settings, cases, providers, args.judge, args.repeat, args.max_calls)
-    except ConfigurationError as exc:
-        note(f"refused: {exc}")
-        return 2
-    for line in plan.lines(args.max_calls, args.budget_usd):
-        note(line)
-    if not args.yes:
-        note("nothing spent: add --yes to run it.")
-        return 1
-    costs = CostTap()
-    try:
-        models = open_models(tuple(dict.fromkeys((*providers, args.judge))), costs)
-    except ConfigurationError as exc:
-        note(f"refused: {exc}")
-        return 2
+    got = start(
+        args, settings, switch_off, root,
+        lambda cases, providers: make_judge_plan(
+            settings, cases, providers, args.judge, args.repeat, args.max_calls
+        ),
+        open_models, lambda providers: tuple(dict.fromkeys((*providers, args.judge))), note,
+    )  # fmt: skip
+    if isinstance(got, int):
+        return got
+    plan, costs, models = got
     if not models[args.judge].names_for(args.user):
         note(
             f"refused: judge {args.judge!r} may not answer user {args.user!r} "
