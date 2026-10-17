@@ -202,24 +202,26 @@ audits. The local runner uses 2 threads.
 > ADR 0039 steps WF1-WF3 are implemented (needs, acceptance, hold-back, resume, waivers). Still
 > to come: WF4 (split into `market-daily` / weekly `reference` / `enrichment`) and WF5 (reads
 > default to the latest SUCCEEDED session); until WF4 the reference steps run in this one
-> workflow as optional steps.
+> workflow as optional steps. WF4 has started: the `post-session` workflow (below, ADR 0070)
+> runs after the nightly.
 
 `apps/ingestion/algotrade_ingestion/workflows/`: `nightly.py` (the steps and the job
 handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and expiry),
 `sessions.py` (catch-up), `screens.py` (screen jobs), `notify.py` (summary file + notifiers),
-`records.py` / `report.py` / `timing.py` / `render.py` (the summary email).
+`records.py` / `report.py` / `timing.py` / `render.py` (the summary email); `post_session/` (the
+post-session workflow, below).
 
 - **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `shares`, `macro-calendar`, `filings`, `earnings`, `bars`, `rates`,
   `corporate-actions`, `chains`, `etf-holdings`, `ibkr-contracts`, `ibkr-iv`, `rollups`,
-  `screens`, `edge-signals` (the followed edges' paper picks and settlements, ADR 0053), `edge-eval` (one incremental evaluation per open edge as its owner, a full audit on the week's first session, ADR 0063), `descriptions`, `verify`, `history-copy` (ADR 0060); then `purge-raw` once (`FINALLY`). Each is a registry
-  task (or the `screens` / `edge-signals` / `edge-eval` job steps) run in isolation, declared with the steps it `needs`, whether
+  `screens`, `edge-signals` (the followed edges' paper picks and settlements, ADR 0053), `history-copy` (ADR 0060); then `purge-raw` once (`FINALLY`). `edge-eval`, `descriptions` and `verify` are not nightly steps (ADR 0070, below). Each is a registry
+  task (or the `screens` / `edge-signals` job steps) run in isolation, declared with the steps it `needs`, whether
   it is `critical`, its data precondition (`requires`) and its acceptance checks. A step runs
   only when every need is satisfied (SUCCEEDED, WAIVED, or SKIPPED as not applicable); else it
   is NOT_RUN with the reason. `rollups` needs bars, rates, corporate actions, earnings and
   chains; `screens` needs chains and rollups. `chains` needs a universe snapshot to exist, not
   today's build to succeed (chains can be fetched only for the current session; a failed
   build fails the session anyway). Optional steps: company details, shares, ETF holdings, the
-  IBKR steps, descriptions, verify (their failures are warnings).
+  IBKR steps (their failures are warnings).
 - **Succeed or fail** (`steps.from_record`, `steps.overall`): a step that runs SUCCEEDS or
   FAILS. Its task must not fail (nor finish PARTIAL for `task_complete` steps: universe,
   earnings, rates, corporate actions, rollups), and its acceptance checks
@@ -291,9 +293,30 @@ handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and
   never in tests) alerts when the status is not SUCCEEDED (every failed retry alerts again),
   naming the critical steps that did not succeed and the sessions held back; the email
   notifier sends the summary email after every run (below). A run longer than
-  `max_duration_minutes` is recorded as a `nightly_duration` WARN, an optional step's failure
-  as an `optional_step` WARN. All in `config/site/nightly.toml` (`[notify] enabled = false`
+  `max_duration_minutes` is recorded as a `nightly_duration` WARN (the market-daily path only:
+  never the post-session run), an optional step's failure as an `optional_step` WARN. All in `config/site/nightly.toml` (`[notify] enabled = false`
   turns every notification off).
+
+### The post-session workflow (ADR 0070)
+
+A session is served when its `nightly` record is COMPLETE (ADR 0062), so what does not decide a
+session does not run in front of it. `workflows/post_session/` runs `descriptions` (ADR 0034),
+`verify` (ADR 0026) and `edge-eval` (ADR 0063) as the `post-session` job with its own run
+record (COMPLETE once it ran: every step is optional, a failure is a warning).
+
+- **One session, once**: only for `max(done nightly sessions)` (a catch-up night's earlier
+  sessions get none); a quiet no-op (`nothing to do`, exit 0) once its post-session record is
+  published; `--force` runs again; `--date D` runs for a nightly-done D.
+- **Locks**: `descriptions` and `verify` under the ingest run lock (taken: `busy`, exit 3, no
+  record); `edge-eval` after, outside it, under the per-owner evaluation claim, and the whole run
+  holds the named lock `post-session`. `recover_unpublished` touches only ingest runs, so it never
+  rolls back an evaluation's commit in flight.
+- **edge-eval** is SKIPPED, with the reason, when the nightly's `outcomes` step did not succeed. The
+  weekly audit is due on the week's last session (exchange calendar) or when the last audit is over
+  9 days old (`screens.audit_due`); other runs are incremental.
+- **Agent**: `algotrade-ingest schedule` also writes `com.algotrade.post-session` (`RunAtLoad` and a
+  30-minute watchdog; written, never installed). `[post] max_duration_minutes` is the duration
+  alert; the report has a post-session section; `make status` shows the last post-session line.
 
 ### Nightly summary email
 

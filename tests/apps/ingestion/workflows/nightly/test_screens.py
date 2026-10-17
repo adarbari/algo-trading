@@ -8,17 +8,16 @@ from typing import Any
 
 import pytest
 
-from algotrade.config.edges.document import job_name
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.services.jobs import JobRecord, JobStatus
 from algotrade.services.read.context import NotFoundError
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.locks import held
-from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.workflows.nightly import screens as screens_module
-from algotrade_ingestion.workflows.nightly.nightly import EDGE_EVAL, EDGE_SIGNALS, NIGHTLY, SNAPSHOT
+from algotrade_ingestion.workflows.nightly.nightly import EDGE_SIGNALS, NIGHTLY, SNAPSHOT
 from algotrade_ingestion.workflows.nightly.steps import StepResult, StepStatus
+from algotrade_ingestion.workflows.post_session.post_session import EDGE_EVAL, POST_SESSION
 
 D = date(2026, 10, 2)
 IBKR = "rollups/instrument/ibkr_iv@v1"
@@ -256,11 +255,21 @@ def _edges(monkeypatch: pytest.MonkeyPatch, *edges: tuple[str, str, str, bool]) 
     monkeypatch.setattr(screens_module, "stored_outcome_sessions", lambda reader: STORED)
 
 
-def _audited(backend: MemoryBackend, edge: str, owner: str, day: date, mode: str = "audit") -> None:
-    """An evaluation run of the edge started on ``day`` in ``mode``."""
-    start = datetime(day.year, day.month, day.day, 22, tzinfo=UTC)
-    run = RunRecord("r-" + edge + day.isoformat(), job_name(edge, owner), STORED[-1], start)
-    backend.runs.save(run.finish(start, stats={"mode": mode}))
+def _audited(
+    backend: MemoryBackend,
+    edge: str,
+    owner: str,
+    day: date,
+    mode: str = "audit",
+    late: timedelta = timedelta(hours=2),
+) -> None:
+    """A completed ``edge-eval`` job of the edge for the post-session of ``day`` (submitted
+    ``late`` after that day's midnight UTC) whose harness ran ``mode``."""
+    submitted = datetime(day.year, day.month, day.day, tzinfo=UTC) + late
+    params = {"edge": edge, "session": day.isoformat(), "mode": mode}
+    job = JobRecord(f"j-{edge}-{day}", "edge-eval", params, owner, submitted, JobStatus.COMPLETE)
+    job.result = {"mode": mode}
+    backend.runs.save(job.to_run())
 
 
 def _eval_step(jobs: SignalJobs, session: date, backend: MemoryBackend | None = None) -> Any:
@@ -268,18 +277,24 @@ def _eval_step(jobs: SignalJobs, session: date, backend: MemoryBackend | None = 
     return step(session)
 
 
-def test_edge_eval_audits_until_the_week_has_an_audit_then_is_incremental(
+def test_edge_eval_audits_when_the_last_audit_is_old_else_is_incremental(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _edges(monkeypatch, ("drift", "site", "evidenced", True), ("mine", "alice", "live", True))
+    _edges(
+        monkeypatch,
+        ("drift", "site", "evidenced", True),
+        ("mine", "alice", "live", True),
+        ("fresh", "bob", "live", True),
+    )
     backend = MemoryBackend()
-    _audited(backend, "drift", "site", MONDAY)  # only the site edge was audited this week
-    _audited(backend, "mine", "alice", MONDAY - timedelta(days=3))  # last week's does not count
-    jobs = SignalJobs()
+    _audited(backend, "drift", "site", MONDAY)  # two days before Wednesday: incremental
+    _audited(backend, "mine", "alice", WEDNESDAY - timedelta(days=10))  # over 9 days: audit
+    jobs = SignalJobs()  # "fresh" has no audit on record: due
     assert _eval_step(jobs, WEDNESDAY, backend).status is StepStatus.SUCCEEDED
     assert [(k, u, p["edge"], p["mode"], f) for k, u, p, f in jobs.asked] == [
         ("edge-eval", "site", "drift", "incremental", True),
         ("edge-eval", "alice", "mine", "audit", True),
+        ("edge-eval", "bob", "fresh", "audit", True),
     ]
     params = jobs.asked[0][2]
     assert (params["start"], params["end"], params["trigger"]) == (
@@ -287,19 +302,31 @@ def test_edge_eval_audits_until_the_week_has_an_audit_then_is_incremental(
     )  # fmt: skip
 
 
-def test_a_catch_up_night_over_monday_and_tuesday_audits_on_tuesday(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The step is latest-only: Monday's night did not run it, so Tuesday's is the week's audit,
-    and once an audit is on record the next night is incremental."""
-    _edges(monkeypatch, ("drift", "site", "evidenced", True))
+EDGE = SimpleNamespace(id="drift", owner="site")
+
+
+def test_the_audit_is_due_on_the_weeks_last_session_whatever_the_last_audit() -> None:
     backend = MemoryBackend()
-    tuesday, wednesday = SignalJobs(), SignalJobs()
-    _eval_step(tuesday, TUESDAY, backend)
-    _audited(backend, "drift", "site", TUESDAY)  # what the audit job recorded
-    _eval_step(wednesday, WEDNESDAY, backend)
-    assert tuesday.asked[0][2]["mode"] == "audit"
-    assert wednesday.asked[0][2]["mode"] == "incremental"
+    _audited(backend, "drift", "site", date(2026, 10, 8))  # yesterday
+    assert screens_module.audit_due(backend, EDGE, date(2026, 10, 9)) is True  # a Friday
+    assert screens_module.audit_due(backend, EDGE, date(2026, 10, 8)) is False  # a Thursday
+
+
+def test_the_weeks_last_session_follows_the_exchange_calendar() -> None:
+    """Good Friday 2026-04-03 is a holiday: the Thursday closes that week."""
+    backend = MemoryBackend()
+    _audited(backend, "drift", "site", date(2026, 4, 1))
+    assert screens_module.audit_due(backend, EDGE, date(2026, 4, 2)) is True
+    assert screens_module.audit_due(backend, EDGE, date(2026, 4, 1)) is False
+
+
+def test_the_audit_is_due_only_over_nine_days_after_the_last_one() -> None:
+    backend = MemoryBackend()
+    _audited(backend, "drift", "site", WEDNESDAY - timedelta(days=9))
+    assert screens_module.audit_due(backend, EDGE, WEDNESDAY) is False
+    _audited(backend, "drift", "site", WEDNESDAY - timedelta(days=10), "incremental")
+    assert screens_module.audit_due(backend, EDGE, WEDNESDAY) is False  # only audits count
+    assert screens_module.audit_due(MemoryBackend(), EDGE, WEDNESDAY) is True  # none on record
 
 
 def test_edge_eval_skips_closed_edges_and_edges_without_screeners(
@@ -330,9 +357,8 @@ def test_a_failed_edge_eval_job_fails_the_step_without_holding_the_workflow(
     assert step.status is StepStatus.FAILED
     assert step.reason == "edge evaluations not complete: alice/mine failed"
     assert [e["status"] for e in step.result["evaluations"]] == ["complete", "failed"]  # all ran
-    declared = next(s for s in NIGHTLY if s.name == EDGE_EVAL)
-    assert not declared.critical and declared.latest_only
-    assert declared.needs == ("outcomes", "screens")
+    declared = next(s for s in POST_SESSION if s.name == EDGE_EVAL)
+    assert not declared.critical  # the post-session workflow's step (ADR 0070)
 
 
 def test_an_owner_with_an_evaluation_in_flight_is_a_busy_warning_not_a_crash(
@@ -358,3 +384,29 @@ def test_edge_eval_summary_carries_the_mode_the_harness_ran_beside_the_requested
     _audited(backend, "drift", "site", MONDAY)
     (summary,) = _eval_step(SignalJobs(), WEDNESDAY, backend).result["evaluations"]
     assert (summary["mode"], summary["effective_mode"]) == ("incremental", "full")
+
+
+def test_the_nine_days_count_sessions_not_the_hour_the_audit_ran() -> None:
+    """The audit of Monday 10-05 ran after midnight (on the 6th): measured from its session, the
+    15th is 10 days on and due; measured from the day it started it would be 9 and wait."""
+    backend = MemoryBackend()
+    _audited(backend, "drift", "site", date(2026, 10, 5), late=timedelta(hours=26))
+    assert screens_module.audit_due(backend, EDGE, date(2026, 10, 14)) is False
+    assert screens_module.audit_due(backend, EDGE, date(2026, 10, 15)) is True
+
+
+def test_a_missed_friday_audit_comes_on_the_next_run_over_nine_days_later() -> None:
+    """Audited Friday 10-02; no post-session ran on Friday 10-09: Thursday 10-08 is incremental,
+    Monday 10-12 (10 days on) is the audit, and Tuesday 10-13 is too while none is recorded."""
+    backend = MemoryBackend()
+    _audited(backend, "drift", "site", date(2026, 10, 2))
+    assert screens_module.audit_due(backend, EDGE, date(2026, 10, 8)) is False
+    assert screens_module.audit_due(backend, EDGE, date(2026, 10, 12)) is True
+    assert screens_module.audit_due(backend, EDGE, date(2026, 10, 13)) is True
+
+
+def test_an_audit_that_fell_back_to_full_or_is_another_edges_does_not_count() -> None:
+    backend = MemoryBackend()
+    _audited(backend, "drift", "site", WEDNESDAY - timedelta(days=1), mode="full")
+    _audited(backend, "other", "site", WEDNESDAY - timedelta(days=1))
+    assert screens_module.audit_due(backend, EDGE, WEDNESDAY) is True

@@ -152,3 +152,47 @@ def test_a_catch_up_skip_delivers_nothing_wrong_so_a_gap_behind_it_is_not_system
     assert failed_tables(_stores(catch_up).reader, DAY) == frozenset()
     waived = {"feed": {"status": "WAIVED", "tables": [source]}}
     assert source in failed_tables(_stores(waived).reader, DAY)
+
+
+def test_a_post_session_step_explains_its_table_citing_its_own_run() -> None:
+    """ADR 0070: verify runs after the nightly; its failure is read from the post-session record,
+    and the cause link cites that run, not the nightly's."""
+    verification = "verification/ibkr"
+    backend = MemoryBackend()
+    nightly = start_run("nightly", DAY, datetime(2026, 10, 2, 22, tzinfo=UTC))
+    nightly.stats = {"steps": {"bars": {"status": "SUCCEEDED", "tables": ["bars/1d"]}}}
+    post = start_run("post-session", DAY, datetime(2026, 10, 3, 1, tzinfo=UTC))
+    post.stats = {
+        "steps": {
+            "verify": {
+                "status": "FAILED",
+                "error": "RuntimeError: gateway",
+                "tables": [verification],
+            }
+        }
+    }
+    backend.runs.save(nightly)
+    backend.runs.save(post)
+    stores = open_stores(StoreReader(backend), MemoryConfigStore({}), UserContext("local"))
+    chain = explain(stores, table_cause(verification, "no partition", session=DAY))
+    step = chain.links[0]
+    assert (step.level, step.subject, step.run_id) == (CauseLevel.STEP, "verify", post.run_id)
+    assert failed_tables(stores.reader, DAY) >= {verification}
+
+
+def test_a_newer_running_post_session_record_does_not_hide_the_finished_ones_steps() -> None:
+    verification = "verification/ibkr"
+    backend = MemoryBackend()
+    nightly = start_run("nightly", DAY, datetime(2026, 10, 2, 22, tzinfo=UTC))
+    nightly.stats = {"steps": {}}
+    done = start_run("post-session", DAY, datetime(2026, 10, 3, 1, tzinfo=UTC))
+    done.finish(
+        datetime(2026, 10, 3, 2, tzinfo=UTC),
+        stats={"steps": {"verify": {"status": "FAILED", "error": "x", "tables": [verification]}}},
+    )
+    crashed = start_run("post-session", DAY, datetime(2026, 10, 3, 5, tzinfo=UTC))  # RUNNING
+    for record in (nightly, done, crashed):
+        backend.runs.save(record)
+    stores = open_stores(StoreReader(backend), MemoryConfigStore({}), UserContext("local"))
+    chain = explain(stores, table_cause(verification, "no partition", session=DAY))
+    assert chain.links[0].run_id == done.run_id

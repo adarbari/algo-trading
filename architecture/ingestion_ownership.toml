@@ -116,7 +116,7 @@ detect = [{ string = "instruments/ibkr_contracts" }, { string = "volatility/ibkr
 
 [[responsibility]]
 id = "ingestion-report"
-description = "The nightly summary report (statistics per step, failed items grouped by reason with examples, failed checks, the option-chain coverage section and its drift WARN in the summary, hints), run timing with the arrival record (each attempt stores when bars / chains data appeared; p50 / p90 over bracketed sessions, timing.py, ADR 0043) and notifications: the desktop alert and the daily summary email over SMTP"
+description = "The nightly summary report (statistics per step, failed items grouped by reason with examples, failed checks, the option-chain coverage section and its drift WARN in the summary, the post-session section read from the session's post-session run record (ADR 0070), hints), run timing with the arrival record (each attempt stores when bars / chains data appeared; p50 / p90 over bracketed sessions, timing.py, ADR 0043) and notifications: the desktop alert and the daily summary email over SMTP"
 owner = [
     "apps/ingestion/algotrade_ingestion/workflows/nightly/records.py",
     "apps/ingestion/algotrade_ingestion/workflows/nightly/report.py",
@@ -134,7 +134,7 @@ detect = [
 
 [[responsibility]]
 id = "ingestion-step-dispatch"
-description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly): tasks are declared once in the registry; nightly is an ordered list of isolated task steps"
+description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly, post-session): tasks are declared once in the registry; nightly is an ordered list of isolated task steps; the post-session workflow (ADR 0070) holds the steps that do not decide a session (descriptions, verify, edge-eval), runs for the last nightly-done session once, and decides when the weekly edge audit is due"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",
     "apps/ingestion/algotrade_ingestion/workflows/*",
@@ -157,7 +157,7 @@ detect = [{ call = "Tiers" }, { call = "load_tiers" }]
 
 [[responsibility]]
 id = "launchd-agents"
-description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly (ingestion ops/schedule.py), the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0044) and the auto-deploy poll (the same api module, ADR 0057)"
+description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly and the post-session watchdog (ingestion ops/schedule.py, ADR 0070), the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0044) and the auto-deploy poll (the same api module, ADR 0057)"
 owner = [
     "apps/ingestion/algotrade_ingestion/ops/schedule.py",
     "apps/api/algotrade_api/ops/schedule.py",

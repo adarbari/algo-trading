@@ -1,5 +1,5 @@
-"""Generate the macOS launchd agents: the nightly job (self-healing missed runs) and the monthly
-Tiingo history fill.
+"""Generate the macOS launchd agents: the nightly job (self-healing missed runs), the post-session
+watchdog (ADR 0070) and the monthly Tiingo history fill.
 
 The file is only written, never installed: loading it changes the machine's configuration,
 so the owner runs ``launchctl load`` themselves. launchd uses local time; the default 15:00
@@ -18,6 +18,11 @@ Repeated starts are cheap: without ``--date`` the nightly ingests only sessions 
 plus settle has passed (``core/time/calendar.last_closed_session``), catches up the ones
 missed since its last COMPLETE / PARTIAL run (``workflows/nightly/sessions.py``) and, when
 there are none, exits 0 at once without a run record or a notification (``cli/main.py``).
+
+The post-session agent (``post_session_plist``) has no calendar time: ``RunAtLoad`` and a 30-minute
+watchdog start ``algotrade-ingest post-session``, which does nothing until the last session has a
+done nightly and no post-session record yet (``workflows/post_session/``), then runs descriptions,
+verify and edge-eval for it. It is written, never installed, like the others.
 
 The command runs under ``caffeinate -i -s`` so the Mac stays awake until the nightly exits: on
 2026-10-15 it slept on battery mid-run, the chains step crawled through maintenance wakes and the
@@ -65,6 +70,34 @@ def nightly_plist(
     }
     if watchdog_s:
         agent["StartInterval"] = watchdog_s
+    return plistlib.dumps(agent)
+
+
+POST_LABEL = "com.algotrade.post-session"
+POST_WATCHDOG_MINUTES = 30
+
+
+def post_session_plist(repo: Path, watchdog_s: int = POST_WATCHDOG_MINUTES * 60) -> bytes:
+    """The agent that runs ``algotrade-ingest post-session`` at login and every ``watchdog_s``
+    seconds: a start is a quiet no-op until the nightly of the last session is done, and again
+    once its post-session record exists. launchd never starts a second copy while one runs
+    (a long edge-eval audit), and the ``post-session`` lock refuses one started by hand."""
+    if watchdog_s < 1:
+        raise ValueError(f"invalid watchdog interval {watchdog_s} s")
+    logs = repo / "var" / "logs"
+    agent: dict[str, object] = {
+        "Label": POST_LABEL,
+        "ProgramArguments": [
+            *CAFFEINATE,
+            str(repo / ".venv" / "bin" / "algotrade-ingest"),
+            "post-session",
+        ],
+        "WorkingDirectory": str(repo),
+        "RunAtLoad": True,
+        "StartInterval": watchdog_s,
+        "StandardOutPath": str(logs / "post-session.log"),
+        "StandardErrorPath": str(logs / "post-session.err.log"),
+    }
     return plistlib.dumps(agent)
 
 

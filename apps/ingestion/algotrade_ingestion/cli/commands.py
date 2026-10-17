@@ -33,6 +33,7 @@ from algotrade_ingestion.workflows.nightly import notify
 from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, nightly_job
 from algotrade_ingestion.workflows.nightly.records import arrivals, stored_summary
 from algotrade_ingestion.workflows.nightly.timing import arrival_line
+from algotrade_ingestion.workflows.post_session.post_session import POST_SESSION, post_session_job
 from algotrade_sources.framework.base import Source
 from algotrade_sources.framework.registry import (
     RAW_SECTIONS,
@@ -42,7 +43,7 @@ from algotrade_sources.framework.registry import (
 )
 
 # Job kinds this app runs under the ingest run lock: safe to recover at once (see cli.main).
-LOCKED_KINDS = ("nightly", "screen")
+LOCKED_KINDS = ("nightly", "screen", "post-session")  # post-session: under its named lock
 
 
 def config_store(args: argparse.Namespace) -> ConfigStore:
@@ -138,7 +139,7 @@ def run_job(
     The caller holds the ingest run lock, so a queued/running job of ``LOCKED_KINDS`` was
     left by a crashed process: it is marked failed first, or it would block this re-run."""
     settings = sources_settings(args)
-    steps = [s.name for s in (*NIGHTLY, *FINALLY) if s.name in TASKS]
+    steps = [s.name for s in (*NIGHTLY, *FINALLY, *POST_SESSION) if s.name in TASKS]
     names = [n for t in steps for n in (*task(t).sources, *task(t).optional_sources)]
     built = sources_for(names, settings)
     resources: dict[str, object] = {
@@ -151,7 +152,11 @@ def run_job(
         "raw_sections": RAW_SECTIONS,
         "pacing": built.limiters,
     }
-    handlers: dict[str, JobKind | JobHandler] = {**LIBRARY_HANDLERS, "nightly": nightly_job}
+    handlers: dict[str, JobKind | JobHandler] = {
+        **LIBRARY_HANDLERS,
+        "nightly": nightly_job,
+        "post-session": post_session_job,
+    }
     user_ctx = UserContext(user)
     return run_service_job(
         writer.runs_backend, handlers, resources, kind, params, user_ctx, recover=LOCKED_KINDS

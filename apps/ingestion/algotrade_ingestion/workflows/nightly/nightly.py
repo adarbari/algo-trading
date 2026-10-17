@@ -31,6 +31,13 @@ every attempt for the latest session records when its source's data arrived (``a
 file and sends the notifications. Each session gets a ``nightly`` run record (COMPLETE when
 the session SUCCEEDED, else FAILED) holding every step's result, which is how the next run
 knows where to resume.
+
+What does not decide the session's COMPLETE record runs after it, in the ``post-session``
+workflow (``workflows/post_session/``, ADR 0070): ``descriptions``, ``verify`` and ``edge-eval``
+are not steps here, so the session is served (ADR 0062) as soon as the screens and the
+``edge-signals`` and ``history-copy`` steps are done. ``edge-signals`` stays: ``edge_paper`` is
+read as of ``knowledge_ts <= cutoff``. The duration alert (``nightly_duration``) measures this
+run, the market-daily path, and never the post-session run.
 """
 
 from collections.abc import Container, Mapping
@@ -68,14 +75,12 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_reference_classification,
     check_rollup_inputs,
     check_universe,
-    check_verification,
 )
 from algotrade_ingestion.workflows.nightly.attempts import Attempts, earlier_attempts
 from algotrade_ingestion.workflows.nightly.notify import Notifier, default_notifier, report
 from algotrade_ingestion.workflows.nightly.records import job_name
 from algotrade_ingestion.workflows.nightly.screens import (
     ScreenStep,
-    edge_eval_jobs,
     screen_jobs,
     signal_jobs,
     without_chains,
@@ -102,11 +107,9 @@ from algotrade_ingestion.workflows.nightly.timing import minutes_after_close
 
 SCREENS = "screens"  # not an ingestion task: one `screen` job per screener
 EDGE_SIGNALS = "edge-signals"  # not an ingestion task: one `edge-signals` job per user
-EDGE_EVAL = "edge-eval"  # not an ingestion task: one `edge-eval` job per open edge
 JOB_STEPS = {  # the steps that submit jobs
     SCREENS: "screens",
     EDGE_SIGNALS: "signals",
-    EDGE_EVAL: "edge evaluations",
 }
 PURGE = "purge-raw"
 # Why a step runs only for the latest closed session (``Step.latest_only``): a catch-up
@@ -116,8 +119,6 @@ PURGE = "purge-raw"
 SNAPSHOT = "the source serves only its current snapshot"
 NEW_SINCE_STORED = "it reads every filing since the latest stored one, so one run covers all"
 FORWARD_RECORD = "paper picks are made only on the night they are for (a later one is no record)"
-ALL_OUTCOMES = "it evaluates every stored outcome session in one run, so the latest covers this"
-LIVE = "it compares with the live source, which shows only the present"
 WHOLE_YEAR = "it copies the whole year in one run, so the latest session's run covers this one"
 MARKET_DATA = ("bars", "rates", "corporate-actions", "earnings", "chains")
 
@@ -249,23 +250,15 @@ NIGHTLY: tuple[Step, ...] = (
     # the same features); a trade whose outcome is not stored yet stays open. Optional: a
     # failure warns, never holds the session.
     Step(EDGE_SIGNALS, needs=(SCREENS,), critical=False, latest_only=FORWARD_RECORD),
-    # The incremental evaluation of every open edge (ADR 0063; the week's first session an audit
-    # that recomputes every leg): one job per edge as its owner, after the screens and the
-    # outcomes it joins. Optional: a failed job warns, never holds the session.
-    Step(EDGE_EVAL, needs=("outcomes", SCREENS), critical=False, latest_only=ALL_OUTCOMES),
-    # Company and ETF descriptions (ADR 0034): after the screens, so the Massive requests
-    # (capped per night, ~21 min) do not delay them. Optional.
-    Step("descriptions", latest_only=SNAPSHOT, critical=False),
-    # Read-only live verification vs IBKR (ADR 0026): SKIPPED with a WARN when [ibkr] is
-    # disabled or IB Gateway is not reachable; optional.
-    Step("verify", latest_only=LIVE, critical=False, accept=(check_verification,)),
+    # `edge-eval`, `descriptions` and `verify` are the post-session workflow's (ADR 0070): they
+    # do not feed the session's reads, so they no longer delay its COMPLETE record.
     # The derived history copies (ADR 0060), last: every step that publishes the copied tables
     # (bars, the rollups, the market rollups) has committed and the screens' jobs are done, so
-    # ingestion commits no more. The API can still commit (screener runs, ADR 0033; edge
-    # evaluations, ADR 0059): the build refuses half-applied commits, and its fallback may hold
-    # the commit lock up to ~48 s. Latest session only (a catch-up
-    # night would rebuild the same year per session). Optional: a missed night leaves the old
-    # copy, which reads detect as stale and replace by the partitions.
+    # ingestion commits no more until the post-session run (descriptions, verify). The API can
+    # still commit (screener runs, ADR 0033; edge evaluations, ADR 0059): the build refuses
+    # half-applied commits, and its fallback may hold the commit lock up to ~48 s. Latest
+    # session only (a catch-up night would rebuild the same year per session). Optional: a
+    # missed night leaves the old copy, which reads detect as stale and replace by the partitions.
     Step(
         "history-copy",
         needs=("bars", "rollups", "market-rollups"),
@@ -460,7 +453,6 @@ def run_step(
     settle_until: datetime | None = None,
     observe: bool = False,
     signal_step: ScreenStep | None = None,
-    eval_step: ScreenStep | None = None,
 ) -> StepResult:
     """One step, isolated: its precondition, the registry task (or the screen jobs), then
     its acceptance checks (``wait``: a pending failure is WAITING, not FAILED;
@@ -474,7 +466,7 @@ def run_step(
         if step.requires is not None and (why := step.requires(ctx, session)):
             return Outcome(StepStatus.NOT_RUN, reason=why)
         if step.name in JOB_STEPS:
-            job = {SCREENS: screens, EDGE_SIGNALS: signal_step, EDGE_EVAL: eval_step}[step.name]
+            job = {SCREENS: screens, EDGE_SIGNALS: signal_step}[step.name]
             if job is None:
                 return Outcome(
                     StepStatus.SKIPPED, reason=f"no job runner to submit {JOB_STEPS[step.name]} to"
@@ -500,7 +492,6 @@ def run_session(
     waive: Mapping[str, str] | None = None,
     settings: NightlySettings | None = None,
     signal_step: ScreenStep | None = None,
-    eval_step: ScreenStep | None = None,
 ) -> dict[str, Any]:
     """Every ``NIGHTLY`` step for one session; saves the session's ``nightly`` run record.
     ``resume``: reuse the steps an earlier attempt of the session did; ``waive``: step ->
@@ -528,7 +519,6 @@ def run_session(
                     settle_until(step, session, settings) if wait else None,
                     latest,
                     signal_step,
-                    eval_step,
                 )
                 if step.name == SCREENS:
                     unfetched = not latest and done["chains"].status is StepStatus.SKIPPED
@@ -545,7 +535,7 @@ def run_session(
                     reran.add(step.name)
                 held = result
             done[step.name] = held
-            run.record_item(step.name, _item(held))
+            run.record_item(step.name, step_item(held))
         status = overall(done.values())
         failed = [
             f"{n}: {r.error or r.reason or r.status.value}"
@@ -561,7 +551,7 @@ def run_session(
     return {"session": session.isoformat(), "status": status.value, "steps": steps}
 
 
-def _item(result: StepResult) -> str:
+def step_item(result: StepResult) -> str:
     """A step's item in the session's run record: an optional step's failure is a WARN, so it
     never makes the record PARTIAL (the session's status is ``overall``'s alone)."""
     if not result.critical and result.status is StepStatus.FAILED:
@@ -582,7 +572,6 @@ def run_nightly(
     resume: bool = True,
     waive: Mapping[str, str] | None = None,
     signal_step: ScreenStep | None = None,
-    eval_step: ScreenStep | None = None,
 ) -> dict[str, Any]:
     """The planned sessions, oldest first, stopping at the first that FAILS (the later ones
     are ``held``); then ``FINALLY``. -> the run summary (status, per-session steps with
@@ -606,7 +595,6 @@ def run_nightly(
                 waive,
                 settings,
                 signal_step,
-                eval_step,
             )
         )
     ran = [date.fromisoformat(r["session"]) for r in runs]
@@ -657,17 +645,11 @@ def run_nightly(
     }
 
 
-def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
-    """Job handler for the nightly workflow. params: ``session`` (the last closed session, or
-    the ``--date``), ``catch_up`` (also run the sessions pending since the last nightly),
-    ``resume`` (default true: reuse what earlier attempts of a session did; false reruns
-    every step), ``waive`` (step -> reason), ``export_dir``, ``workers``. Resources:
-    ``reader``, ``writer``, ``configs``, ``sources`` (by name), ``sources_settings``,
-    ``unavailable`` (source -> why it was not built), ``raw_sections`` (raw source ->
-    sources.toml section, for retention), ``pacing`` (limiter key -> limiter, for pacing
-    stats in run records), optional ``notifier`` and ``clock`` (tests)."""
+def job_task_context(ctx: JobContext) -> TaskContext:
+    """The task context of a workflow job from its resources (the nightly's and the
+    post-session's handlers share it)."""
     r = ctx.resources
-    task_ctx = TaskContext(
+    return TaskContext(
         r["reader"],
         r["writer"],
         r.get("sources", {}),
@@ -679,6 +661,19 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
         pacing=r.get("pacing", {}),
         clock=r.get("clock") or utc_now,
     )
+
+
+def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
+    """Job handler for the nightly workflow. params: ``session`` (the last closed session, or
+    the ``--date``), ``catch_up`` (also run the sessions pending since the last nightly),
+    ``resume`` (default true: reuse what earlier attempts of a session did; false reruns
+    every step), ``waive`` (step -> reason), ``export_dir``, ``workers``. Resources:
+    ``reader``, ``writer``, ``configs``, ``sources`` (by name), ``sources_settings``,
+    ``unavailable`` (source -> why it was not built), ``raw_sections`` (raw source ->
+    sources.toml section, for retention), ``pacing`` (limiter key -> limiter, for pacing
+    stats in run records), optional ``notifier`` and ``clock`` (tests)."""
+    r = ctx.resources
+    task_ctx = job_task_context(ctx)
     settings = load_nightly(r["configs"])
     session = date.fromisoformat(params["session"])
     until = last_closed_session(task_ctx.clock(), timedelta(minutes=settings.settle_minutes))
@@ -692,9 +687,7 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
     workers = int(params["workers"]) if params.get("workers") else None
     resume = bool(params.get("resume", True))
     waive = dict(params.get("waive") or {})
-    backend = task_ctx.writer.backend  # the owner claim: never run without it
-    evals = edge_eval_jobs(ctx.jobs, r["configs"], task_ctx.reader, backend) if ctx.jobs else None
-    summary = run_nightly(task_ctx, plan, settings, screens, workers, resume, waive, signals, evals)
+    summary = run_nightly(task_ctx, plan, settings, screens, workers, resume, waive, signals)
     notifier: Notifier = r.get("notifier") or default_notifier(settings)
     summary = report(summary, settings, notifier, task_ctx.reader)
     return {**summary, "_partial": summary["status"] != Status.SUCCEEDED}

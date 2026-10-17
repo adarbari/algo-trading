@@ -17,6 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -50,20 +51,28 @@ def _port_open(port: int) -> bool:
         return False
 
 
-def _store_facts() -> tuple[str, str]:
-    """(latest session, last nightly) read through the library; never a path of our own."""
+def _store_facts() -> tuple[str, str, str]:
+    """(latest session, last nightly, last post-session) read through the library; never a path
+    of our own."""
     # Lazy: the library may be missing (no venv), and status must still report the rest.
     from algotrade.config.env import config_dir, data_url  # noqa: PLC0415
     from algotrade.config.user import UserContext  # noqa: PLC0415
     from algotrade.services.read.context import open_read_stores, open_stores  # noqa: PLC0415
-    from algotrade.services.read.ops.runs import load_nightly_runs  # noqa: PLC0415
+    from algotrade.services.read.ops.runs import (  # noqa: PLC0415
+        load_nightly_runs,
+        load_post_session_runs,
+    )
     from algotrade.services.read.session import latest_session  # noqa: PLC0415
 
     reader, configs = open_read_stores(data_url(), config_dir())
     latest = latest_session(reader)
-    runs = load_nightly_runs(open_stores(reader, configs, UserContext("local")), 1)
-    last = f"{runs[0].session} {runs[0].status}" if runs else "none recorded"
-    return str(latest) if latest else "empty", last
+    stores = open_stores(reader, configs, UserContext("local"))
+
+    def last(runs: tuple[Any, ...]) -> str:
+        return f"{runs[0].session} {runs[0].status}" if runs else "none recorded"
+
+    nightly, post = load_nightly_runs(stores, 1), load_post_session_runs(stores, 1)
+    return str(latest) if latest else "empty", last(nightly), last(post)
 
 
 def _api_build(url: str) -> tuple[str, ...] | None:
@@ -78,7 +87,7 @@ class Probes:
     which: Callable[[str], str | None] = shutil.which
     run: Callable[[list[str]], tuple[int, str]] = _run
     port_open: Callable[[int], bool] = _port_open
-    store_facts: Callable[[], tuple[str, str]] = _store_facts
+    store_facts: Callable[[], tuple[str, str, str]] = _store_facts
     api_build: Callable[[str], tuple[str, ...] | None] = _api_build
     logs: Path = field(default_factory=lambda: REPO / "var" / "logs")
     golden_cases: Path = field(
@@ -128,10 +137,10 @@ def jobs(p: Probes) -> list[str]:
 
 def store(p: Probes) -> list[str]:
     try:
-        latest, last = p.store_facts()
+        latest, last, post = p.store_facts()
     except Exception as exc:  # a missing store or venv must not crash a status report
         return [f"Store: unreadable ({type(exc).__name__}: {str(exc)[:60]})"]
-    return [f"Store: latest session {latest}; last nightly {last}"]
+    return [f"Store: latest session {latest}; last nightly {last}; last post-session {post}"]
 
 
 def servers(p: Probes) -> list[str]:

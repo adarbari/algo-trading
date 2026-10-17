@@ -402,3 +402,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the cap counts answered calls (`part_redraft_limit`, ADR 0041 amended 2026-10-12); the server cannot tell an unused answer from a used one, and a refund path would add state for a rare case.
+
+## 2026-10-16 | PR #577 (post-session workflow) | A failed post-session step alerts like a failed nightly step
+- Question: should a failed edge-eval, descriptions or verify (now outside the nightly) alert?
+- Options: report only / the same alert as a failed nightly step.
+- Decision: the same alert, through the nightly's notifier; also when `[post] max_duration_minutes` is exceeded.
+- decided by: owner
+- status: final
+- Reasoning: these steps used to appear in the nightly's alert; moving them out must not silence failures.

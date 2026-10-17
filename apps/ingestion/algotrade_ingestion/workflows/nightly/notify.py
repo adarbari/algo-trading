@@ -217,7 +217,8 @@ def notice(
         return base, None
     try:
         limit = settings.max_duration_minutes * 60
-        built = load_report(reader, summary, settings.email_max_examples, limit)
+        post_limit = settings.post_max_duration_minutes * 60
+        built = load_report(reader, summary, settings.email_max_examples, limit, post_limit)
     except Exception as exc:  # the report is a summary; never fail the nightly for it
         return base, f"summary report not built: {type(exc).__name__}: {exc}"
     return replace(

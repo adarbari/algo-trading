@@ -7,7 +7,9 @@ summary, the registry task's run record that step produced (the latest one of th
 the session that finished inside the nightly's window); its per-item statuses feed the
 failure deep dive. ``labels`` maps instrument ids in the examples to tickers. ``chains`` is
 each session's option-chain coverage from the chains task's run records; ``chain_drift`` the
-warnings for it.
+warnings for it. ``stored_post_session`` reads a session's latest ``post-session`` run record
+(ADR 0070: descriptions, verify, edge-eval), the report's post-session section; ``task_records``
+finds its steps' task run records too.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -23,10 +25,10 @@ from algotrade.services.run_items import (
     ChainCoverage,
     chain_coverage,
 )
-from algotrade.storage.runs import RunRecord, RunStatus
+from algotrade.storage.runs import RunRecord, RunStatus, published
 from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.workflows.nightly.report import Report, build_report
-from algotrade_ingestion.workflows.nightly.sessions import NIGHTLY_RUN
+from algotrade_ingestion.workflows.nightly.sessions import NIGHTLY_RUN, POST_SESSION_RUN, POST_STEPS
 from algotrade_ingestion.workflows.nightly.timing import (
     DEFAULT_SESSIONS,
     ArrivalStat,
@@ -55,6 +57,40 @@ def latest_nightly(reader: StoreReader, session: date) -> RunRecord | None:
     """The session's most recent ``nightly`` run record (by start time)."""
     found = reader.runs(NIGHTLY_RUN, session)
     return max(found, key=lambda r: r.started_at) if found else None
+
+
+def latest_post_session(reader: StoreReader, session: date) -> RunRecord | None:
+    """The session's most recent published (COMPLETE or PARTIAL) ``post-session`` run record, else
+    its most recent one: a RUNNING or crashed attempt, which holds no steps, never hides the
+    steps of a finished one."""
+    found = reader.runs(POST_SESSION_RUN, session)
+    pool = [r for r in found if published(r)] or found
+    return max(pool, key=lambda r: r.started_at) if pool else None
+
+
+def _post_rank(stored: Mapping[str, Any]) -> Any:
+    """Sort key: the post-session steps in their workflow order, others after them."""
+    rank = {name: i for i, name in enumerate(POST_STEPS)}
+    return lambda name: (rank.get(name, len(rank)), name)
+
+
+def stored_post_session(reader: StoreReader, session: date) -> dict[str, Any] | None:
+    """The session's post-session run as the report shows it (session, status, steps, times,
+    duration), from its latest run record; ``None``: none recorded (it has not run yet)."""
+    record = latest_post_session(reader, session)
+    if record is None:
+        return None
+    finished = record.finished_at or record.started_at
+    stored = record.stats.get("steps") or {}
+    return {
+        "session": session.isoformat(),
+        "run_id": record.run_id,
+        "status": SHOWN_STATUS.get(record.status, record.status.value.upper()),
+        "steps": {k: stored[k] for k in sorted(stored, key=_post_rank(stored))},
+        "started_at": record.started_at.isoformat(),
+        "finished_at": finished.isoformat(),
+        "duration_s": round((finished - record.started_at).total_seconds(), 3),
+    }
 
 
 def _within(record: RunRecord, start: datetime, end: datetime | None) -> bool:
@@ -123,6 +159,13 @@ def task_records(
             found = _latest(reader, step, session, nightly.started_at, nightly.finished_at)
             if found is not None:
                 out[(run["session"], step)] = found
+    sessions = summary.get("sessions") or []
+    post = latest_post_session(reader, date.fromisoformat(sessions[-1])) if sessions else None
+    if post is not None:
+        for step in post.stats.get("steps") or {}:
+            found = _latest(reader, step, post.session_date, post.started_at, post.finished_at)
+            if found is not None:
+                out[(post.session_date.isoformat(), step)] = found
     return out
 
 
@@ -189,15 +232,18 @@ def load_report(
     summary: Mapping[str, Any],
     max_examples: int,
     max_duration_s: float | None = None,
+    max_post_duration_s: float | None = None,
 ) -> Report:
     """The report for ``summary``: its steps' task run records, examples labelled by ticker,
     timing trend against the earlier nightlies."""
     records = task_records(reader, summary)
+    sessions = summary.get("sessions") or []
+    post = stored_post_session(reader, date.fromisoformat(sessions[-1])) if sessions else None
     started = summary.get("started_at")
     past = history(reader, datetime.fromisoformat(started) if started else None)
     arrived = arrivals(reader)
     coverage = chains(reader, summary.get("sessions", []))
-    args = (past, max_duration_s, arrived, coverage)
+    args = (past, max_duration_s, arrived, coverage, post, max_post_duration_s)
     report = build_report(summary, records, None, max_examples, *args)
     keys = [e.key for g in report.failures for e in g.examples]
     keys += [k for c in coverage for k in c.chronic_top]

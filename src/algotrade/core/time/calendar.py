@@ -217,6 +217,12 @@ def last_session_of_month(year: int, month: int) -> date:
     return session_on_or_before(date(year + month // 12, month % 12 + 1, 1) - timedelta(1))
 
 
+def last_session_of_week(day: date) -> date:
+    """The last session of the ISO week of ``day`` (Friday, or the Thursday before Good Friday)."""
+    monday = day - timedelta(days=day.weekday())
+    return sessions_between(monday, monday + timedelta(days=6))[-1]
+
+
 def russell_reconstitution(year: int) -> date:
     """The annual Russell US index reconstitution, effective after the close: the fourth
     Friday of June (2018-06-22, 2024-06-28), or the session before it when closed."""

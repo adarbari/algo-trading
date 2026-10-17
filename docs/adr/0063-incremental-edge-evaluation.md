@@ -133,7 +133,9 @@ one; the alternative is cheaper to build.
    submits through `JobRunner` (the `edge-signals` precedent), never by an ingestion task.
 6. **No weekly workflow exists yet** (ADR 0039 WF4): the audit is the nightly step's run on the
    week's first session (`mode = audit`: compute full, compare, fail naming the legs, publish
-   only the legs that differ).
+   only the legs that differ). *Amended by [0070](0070-post-session-workflow.md):* the step runs in
+   the `post-session` workflow, and the audit is due on the week's last session or when the last
+   audit is over 9 days old.
 7. **Pruning by tombstone.** A leg of a trial the edge no longer has gets a tombstone row; date
    partitions shared with other edges are never rewritten (a concurrent run's write could be lost).
 8. **Files per partition.** Each run adds a file to every date partition it touches; a later

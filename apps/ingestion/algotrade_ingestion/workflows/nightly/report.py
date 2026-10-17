@@ -156,6 +156,12 @@ class Report:
     verification: tuple[VerificationLine, ...] = ()  # the verify step per session
     coverage: tuple[CoverageLine, ...] = ()  # feature x tier coverage per session (ADR 0043)
     chains: tuple[ChainCoverage, ...] = ()  # option-chain coverage per session, chronic names
+    # The post-session run of the last session (ADR 0070): its status ("": none recorded yet),
+    # the steps it ran and its duration; its verification lines are in ``verification``.
+    post_status: str = ""
+    post_steps: tuple[StepLine, ...] = ()
+    post_duration_s: float = 0.0
+    max_post_duration_s: float | None = None  # [post] max_duration_minutes
 
     @property
     def bad_steps(self) -> tuple[StepLine, ...]:
@@ -455,12 +461,15 @@ def build_report(
     max_duration_s: float | None = None,
     arrivals: Sequence[ArrivalStat] = (),
     chains: Sequence[ChainCoverage] = (),
+    post: Mapping[str, Any] | None = None,
+    max_post_duration_s: float | None = None,
 ) -> Report:
     """The report for one nightly run. ``records``: (session, step) -> that step's task run
     record (``""`` session for the steps after every session); ``labels``: id -> ticker;
     ``history``: step -> seconds of earlier nightlies, newest first (the timing trend);
     ``chains``: the sessions' chain coverage (``load_report``; chronic names as instrument ids,
-    shown by ticker through ``labels``)."""
+    shown by ticker through ``labels``); ``post``: the post-session run of the last session
+    (``records.stored_post_session``: status, steps, duration; ``None``: not run yet)."""
     labels = labels or {}
     lines, failures, checks, screens, rollups = [], [], [], [], []
     verification: list[VerificationLine] = []
@@ -488,6 +497,26 @@ def build_report(
         rollups += _rollups(session, result) if name == "rollups" else []
         verification += _verification(session, step) if name == "verify" else []
         coverage += _coverage(session, step, max_examples)
+    post_lines: list[StepLine] = []
+    post_session = str((post or {}).get("session", ""))
+    for name, step in ((post or {}).get("steps") or {}).items():
+        record, result = records.get((post_session, name)), step.get("result")
+        note = str(step.get("error") or step.get("reason") or "")
+        post_lines.append(
+            StepLine(
+                post_session,
+                name,
+                str(step.get("status")),
+                float(step.get("duration_s", 0.0)),
+                _counts(name, result),
+                _items(record, result),
+                note,
+            )
+        )
+        if record is not None:
+            failures += _groups(post_session, name, record, labels, max_examples)
+        checks += _checks(post_session, step)
+        verification += _verification(post_session, step) if name == "verify" else []
     warnings = tuple(
         str(w.get("detail", w)) if isinstance(w, Mapping) else str(w)
         for w in summary.get("warnings", [])
@@ -512,6 +541,10 @@ def build_report(
         chains=tuple(
             replace(c, chronic_top=tuple(labels.get(k, k) for k in c.chronic_top)) for c in chains
         ),
+        post_status=str((post or {}).get("status", "")),
+        post_steps=tuple(post_lines),
+        post_duration_s=float((post or {}).get("duration_s", 0.0)),
+        max_post_duration_s=max_post_duration_s,
     )
     items = {key: len(r.items) for key, r in records.items() if r.items}
     timings = step_timings(list(_steps(summary)), report.started, report.duration_s, items, history)

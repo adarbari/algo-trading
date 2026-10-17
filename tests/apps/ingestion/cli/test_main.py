@@ -362,6 +362,10 @@ def test_quality_and_schedule_commands(
     assert written["optional_wake"]["command"] == "sudo pmset repeat wakeorpoweron MTWRF 14:55:00"
     agent = plistlib.loads((env / "agent.plist").read_bytes())
     assert agent["StartCalendarInterval"][0]["Minute"] == 15 and agent["StartInterval"] == 3600
+    post = plistlib.loads((env / "var" / "com.algotrade.post-session.plist").read_bytes())
+    assert post["ProgramArguments"][-1] == "post-session" and post["StartInterval"] == 1800
+    assert written["post_session_watchdog_minutes"] == 30 and post["RunAtLoad"] is True
+    assert written["post_session_install"][-1].endswith("com.algotrade.post-session.plist")
     monthly = plistlib.loads(
         (env / "var" / "com.algotrade.bars-history-monthly.plist").read_bytes()
     )
@@ -600,3 +604,45 @@ def test_nightly_refuses_code_from_a_worktree(
     assert cli.main(["nightly", "--force"]) == 2
     assert "refusing to run the nightly" in capsys.readouterr().err
     assert not (env / "data").exists()  # refused before touching the store
+
+
+def test_post_session_runs_after_the_nightly_then_is_a_quiet_no_op(
+    env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR 0070: no nightly done yet: nothing; after it, the three steps run once (verify is
+    SKIPPED without IBKR, edge-eval with nothing to evaluate), a repeat start is a quiet no-op,
+    ``--force`` runs again, and a taken ingest lock is busy (exit 3) with no record."""
+    from algotrade.config.env import data_url  # noqa: PLC0415
+    from algotrade.services.jobs import exclusive_run  # noqa: PLC0415
+    from algotrade.storage.factory import open_backend  # noqa: PLC0415
+
+    assert cli.main(["post-session"]) == 0
+    assert "no session has a done nightly" in capsys.readouterr().out
+    import_universe(env, capsys, DAY)
+    scheduled_at(monkeypatch, DAY)
+    assert call(capsys, "nightly", "--workers", "1")[0] == 0
+    code, post = call(capsys, "post-session")
+    assert code == 0 and post["status"] == "SUCCEEDED" and post["session"] == DAY
+    assert set(post["steps"]) == {"descriptions", "verify", "edge-eval"}
+    assert post["steps"]["verify"]["status"] == "SKIPPED"  # [ibkr] is off here
+    assert post["steps"]["edge-eval"]["status"] == "SKIPPED"
+    records = open_backend(data_url()).runs.find("post-session")
+    assert [r.session_date.isoformat() for r in records] == [DAY]
+    files = all_run_files(env)
+    assert cli.main(["post-session"]) == 0
+    assert capsys.readouterr().out == f"nothing to do: {DAY} already post-processed\n"
+    assert all_run_files(env) == files  # no run record, no job record
+    from datetime import UTC, datetime  # noqa: PLC0415
+
+    from algotrade_ingestion.workflows.nightly import nightly  # noqa: PLC0415
+
+    later = datetime(2026, 10, 3, 1, tzinfo=UTC)  # the fixture clock is frozen: a new run id
+    monkeypatch.setattr(nightly, "utc_now", lambda: later)
+    assert call(capsys, "post-session", "--force")[0] == 0
+    assert len(open_backend(data_url()).runs.find("post-session")) == 2
+    with exclusive_run(open_backend(data_url())):  # an ingest run (a nightly) is in flight
+        assert cli.main(["post-session", "--force"]) == cli.LOCKED_EXIT
+        assert capsys.readouterr().out.startswith("busy: ")
+    assert len(open_backend(data_url()).runs.find("post-session")) == 2
+    assert cli.main(["post-session", "--date", "2020-01-02"]) == 2  # no done nightly for it
+    assert "no done nightly for 2020-01-02" in capsys.readouterr().err

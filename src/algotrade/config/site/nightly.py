@@ -1,5 +1,6 @@
 """Site settings for the nightly workflow (``config/site/nightly.toml``): which sessions it
-ingests, its alerts and notifications, and until when a step whose source has not published
+ingests, its alerts and notifications, the duration alert of the post-session workflow (ADR 0070),
+and until when a step whose source has not published
 the session yet waits instead of failing (ADR 0043)."""
 
 import re
@@ -61,6 +62,7 @@ class NightlySettings:
     settle_minutes: int = 30
     max_catch_up: int = 5
     max_duration_minutes: float = 40.0
+    post_max_duration_minutes: float = 360.0  # [post]: the post-session workflow's duration alert
     notify_enabled: bool = True
     notify_desktop: bool = True
     summary_path: str = "var/logs/nightly-latest.json"
@@ -88,13 +90,14 @@ class NightlySettings:
     ) -> "NightlySettings":
         d = cls()
         root = Table(doc, where)
-        root.only(["sessions", "alerts", "notify", "schedule", "steps", "history_copy"])
+        root.only(["sessions", "alerts", "notify", "schedule", "steps", "history_copy", "post"])
         schedule = root.table("schedule", ["data_deadline"])
         declared = root.raw("steps") or {}
         steps_table = root.table("steps", list(declared))
         steps = {n: steps_table.table(n, ["deadline", "settle_minutes"]) for n in declared}
         sessions = root.table("sessions", ["settle_minutes", "max_catch_up"])
         alerts = root.table("alerts", ["max_duration_minutes"])
+        post = root.table("post", ["max_duration_minutes"])
         notify = root.table("notify", ["enabled", "desktop", "summary_path", "email"])
         email = notify.table("email", ["enabled", "smtp_host", "smtp_port", "max_examples"])
         history_copy = HistoryCopySettings.from_table(
@@ -111,6 +114,9 @@ class NightlySettings:
             settle_minutes=sessions.integer("settle_minutes", d.settle_minutes, 0),
             max_catch_up=sessions.integer("max_catch_up", d.max_catch_up, 1),
             max_duration_minutes=alerts.number("max_duration_minutes", d.max_duration_minutes, 0),
+            post_max_duration_minutes=post.number(
+                "max_duration_minutes", d.post_max_duration_minutes, 0
+            ),
             notify_enabled=notify.boolean("enabled", d.notify_enabled),
             notify_desktop=notify.boolean("desktop", d.notify_desktop),
             summary_path=notify.text("summary_path", d.summary_path),

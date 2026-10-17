@@ -48,7 +48,7 @@ def probes(tmp_path: Path, **kw: object) -> "status.Probes":
         "which": lambda n: "/bin/" + n,
         "run": run,
         "port_open": lambda port: port == 8000,
-        "store_facts": lambda: ("2026-10-02", "2026-10-02 SUCCESS"),
+        "store_facts": lambda: ("2026-10-02", "2026-10-02 SUCCESS", "2026-10-02 COMPLETE"),
         "logs": tmp_path,
         "api_build": lambda url: (),
     }
@@ -69,7 +69,8 @@ def test_report_is_short_and_covers_every_area(
         "Ingest jobs: 1 running",
         "42 up 05:10",
         "job.status: chunk 2 exit=0",
-        "latest session 2026-10-02; last nightly 2026-10-02 SUCCESS",
+        "latest session 2026-10-02; last nightly 2026-10-02 SUCCESS; "
+        "last post-session 2026-10-02 COMPLETE",
         "8000 api",
         "API build: in step",
     ):
@@ -78,7 +79,7 @@ def test_report_is_short_and_covers_every_area(
 
 
 def test_degrades_without_gh_or_store(tmp_path: Path) -> None:
-    def boom() -> tuple[str, str]:
+    def boom() -> tuple[str, str, str]:
         raise FileNotFoundError("no store")
 
     text = status.report(

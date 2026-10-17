@@ -11,6 +11,7 @@ from algotrade.core.time.calendar import (
     is_session,
     last_closed_session,
     last_session_of_month,
+    last_session_of_week,
     local_deadline,
     monthly_expiry,
     next_session,
@@ -280,3 +281,11 @@ def test_session_offset_is_signed() -> None:
     assert session_offset(date(2026, 11, 25), date(2026, 11, 30)) == 2
     assert session_offset(date(2026, 11, 30), date(2026, 11, 25)) == -2
     assert session_offset(date(2026, 11, 25), date(2026, 11, 25)) == 0
+
+
+def test_last_session_of_week_follows_holidays() -> None:
+    assert last_session_of_week(date(2026, 10, 5)) == date(2026, 10, 9)  # Monday: that Friday
+    assert last_session_of_week(date(2026, 10, 9)) == date(2026, 10, 9)
+    assert last_session_of_week(date(2026, 10, 10)) == date(2026, 10, 9)  # a Saturday: its week
+    assert last_session_of_week(date(2026, 4, 1)) == date(2026, 4, 2)  # Good Friday 04-03 is shut
+    assert last_session_of_week(date(2026, 11, 26)) == date(2026, 11, 27)  # Thanksgiving: Friday

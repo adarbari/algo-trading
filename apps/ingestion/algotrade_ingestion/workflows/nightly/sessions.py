@@ -19,6 +19,8 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.run import last_finished_session
 
 NIGHTLY_RUN = "nightly"  # the job name of the per-session nightly run records
+POST_SESSION_RUN = "post-session"  # the job name of the post-session run records (ADR 0070)
+POST_STEPS = ("descriptions", "verify", "edge-eval")  # its steps, in order (``post_session``)
 
 
 @dataclass(frozen=True)

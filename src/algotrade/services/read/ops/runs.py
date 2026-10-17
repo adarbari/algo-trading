@@ -1,9 +1,11 @@
-"""Run records for the Admin pages: recent nightly runs (``NightlyRun``, step by step), one run
-record (``RunDetail``: items summarised, failures grouped by reason) and its items (``RunItem``).
+"""Run records for the Admin pages: recent nightly and post-session runs (``NightlyRun``, step by
+step), one run record (``RunDetail``: items summarised, failures grouped by reason) and its items
+(``RunItem``).
 
 Run records, not session data (a run names its own session): the loaders take the session-free
 ``Stores`` context. The nightly workflow saves one ``nightly`` record per session whose
-``stats.steps`` hold each step's status, duration and result counts; every other job saves
+``stats.steps`` hold each step's status, duration and result counts, and the post-session
+workflow (ADR 0070) one ``post-session`` record the same way; every other job saves
 per-item statuses (``items``: key -> status, a status may carry a detail after a colon, e.g.
 ``STALE_DATA: chain is for 2026-10-01``); failures are grouped by ``services.run_items``, as
 the nightly report groups them."""
@@ -14,7 +16,7 @@ from datetime import date, datetime
 from typing import Any
 
 from algotrade.services.read.context import Stores
-from algotrade.services.read.session import NIGHTLY
+from algotrade.services.read.session import NIGHTLY, POST_SESSION
 from algotrade.services.run_items import failed_items, status_code
 from algotrade.storage.runs import RunRecord
 
@@ -112,7 +114,17 @@ def _steps(run: RunRecord) -> tuple[RunStep, ...]:
 
 def load_nightly_runs(ctx: Stores, limit: int = 10) -> tuple[NightlyRun, ...]:
     """The ``limit`` most recent nightly session runs, newest first."""
-    runs = ctx.reader.runs(NIGHTLY)[-max(limit, 1) :]
+    return _workflow_runs(ctx, NIGHTLY, limit)
+
+
+def load_post_session_runs(ctx: Stores, limit: int = 10) -> tuple[NightlyRun, ...]:
+    """The ``limit`` most recent post-session runs (ADR 0070: descriptions, verify, edge-eval),
+    newest first, in the shape of a nightly run."""
+    return _workflow_runs(ctx, POST_SESSION, limit)
+
+
+def _workflow_runs(ctx: Stores, job: str, limit: int) -> tuple[NightlyRun, ...]:
+    runs = ctx.reader.runs(job)[-max(limit, 1) :]
     return tuple(
         NightlyRun(
             run_id=r.run_id,
