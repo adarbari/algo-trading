@@ -520,7 +520,18 @@ function graphqlAnswer(operation: Operation): Json | null {
       return {
         data: {
           session: { date: VALUES.session },
-          instrument: { instrumentId, features: featureValues(asked(operation)) },
+          instrument: {
+            instrumentId,
+            // one aliased field per chunk of names (`n0`..`n9` -> `f0`..`f9`)
+            ...Object.fromEntries(
+              Array.from({ length: 10 }, (_, i) => [
+                `f${String(i)}`,
+                featureValues(
+                  (operation.variables?.[`n${String(i)}`] as string[] | undefined) ?? [],
+                ),
+              ]),
+            ),
+          },
         },
       };
     case 'InstrumentHistory':

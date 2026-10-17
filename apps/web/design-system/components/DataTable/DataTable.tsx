@@ -25,6 +25,8 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
+  useEffect,
+  useEffectEvent,
   useId,
   useLayoutEffect,
   useMemo,
@@ -123,6 +125,8 @@ export interface DataTableProps<TRow> {
   activeRowId?: string | null;
   /** The active row changed: arrows, `j` / `k`, Home / End, Page Up / Down, or a click. */
   onActiveRowChange?: (row: TRow) => void;
+  /** The rows the scroll window holds (rendered rows, overscan included), each time it changes: a page that loads data per row asks only for these. */
+  onVisibleRowsChange?: (rows: readonly TRow[]) => void;
   /** Extra single-character keys for the active row (`c`, `x`), while the grid has focus. */
   rowKeys?: Readonly<Record<string, (row: TRow) => void>>;
   /** `ready` (default), `loading` (placeholder rows) or `error` (shows `errorMessage`). */
@@ -183,6 +187,7 @@ export function DataTable<TRow extends RowData>({
   activateOnClick = true,
   activeRowId,
   onActiveRowChange,
+  onVisibleRowsChange,
   rowKeys,
   status = 'ready',
   errorMessage = 'The data failed to load.',
@@ -328,6 +333,22 @@ export function DataTable<TRow extends RowData>({
     scrollPaddingStart: baseHeight,
     initialRect: { width: 0, height: rowHeight * visibleRows },
   });
+
+  // Tell the page which rows are in the window (once per change of that set).
+  const windowRows = ready
+    ? virtualizer.getVirtualItems().flatMap((item) => {
+        const entry = items[item.index];
+        const row = entry?.kind === 'row' ? tableRows[entry.row] : undefined;
+        return row ? [row] : [];
+      })
+    : [];
+  const windowKey = windowRows.map((r) => r.id).join('\u0000');
+  const reportWindow = useEffectEvent(() => {
+    onVisibleRowsChange?.(windowRows.map((r) => r.original));
+  });
+  useEffect(() => {
+    reportWindow();
+  }, [windowKey]);
 
   // Density changed: every row's fixed height changed with it.
   useLayoutEffect(() => {
