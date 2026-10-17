@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
-import { FINANCIALS_FEATURES } from '../model/sections';
+import { NAMES_PER_REQUEST } from '@/entities/instrument';
+
+import { FINANCIALS_PARTS, SECTIONS } from '../model/sections';
 import { FinancialsPanel } from './FinancialsPanel';
 
 const hooks = vi.hoisted(() => ({ useInstrumentFacts: vi.fn() }));
@@ -71,8 +73,8 @@ beforeEach(() => {
 describe('FinancialsPanel', () => {
   it('asks for every figure in one request and leads with the key metrics', async () => {
     const { container } = render(<FinancialsPanel symbol="KO" />);
-    expect(hooks.useInstrumentFacts).toHaveBeenCalledWith('KO', FINANCIALS_FEATURES);
-    expect(hooks.useInstrumentFacts).toHaveBeenCalledTimes(1);
+    expect(hooks.useInstrumentFacts).toHaveBeenCalledWith('KO', FINANCIALS_PARTS[0]);
+    expect(hooks.useInstrumentFacts).toHaveBeenCalledWith('KO', FINANCIALS_PARTS[1]);
     const strip = screen.getByRole('region', { name: 'KO key financials' });
     expect(strip).toHaveTextContent('Operating margin');
     expect(strip).toHaveTextContent('P/E ratio');
@@ -127,5 +129,15 @@ describe('FinancialsPanel', () => {
     hooks.useInstrumentFacts.mockReturnValue(fakeQuery(undefined, { isError: true }));
     render(<FinancialsPanel symbol="KO" />);
     expect(screen.getByText('KO failed to load.')).toBeInTheDocument();
+  });
+});
+
+describe('the names the panel sends', () => {
+  it('stay within the API cap per request and cover every row', () => {
+    for (const part of FINANCIALS_PARTS) expect(part.length).toBeLessThanOrEqual(NAMES_PER_REQUEST);
+    const sent = new Set(FINANCIALS_PARTS.flat());
+    for (const section of SECTIONS) {
+      for (const row of section.rows) expect(sent.has(row.name)).toBe(true);
+    }
   });
 });
