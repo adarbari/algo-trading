@@ -104,3 +104,39 @@ def test_kept_parts_and_no_parts_are_no_doubt() -> None:
 def test_kinds_are_a_small_closed_set() -> None:
     assert set(KINDS) == {"unmapped_words", "connector_left_out", "unplaced", "or_not_formula"}
     assert kinds_of(()) == ()
+
+
+def test_generic_nouns_are_glue_and_a_typed_universe_noun_is_no_doubt_only_when_typed() -> None:
+    generic = parts_of(
+        "show me tickers with RSI under 30", [{"id": "p1", "words": "with RSI under 30"}],
+        crit("rsi", "p1"),
+    )  # fmt: skip
+    assert doubts(generic) == ()
+    stocks = parts_of(
+        "show me stocks with RSI under 30", [{"id": "p1", "words": "with RSI under 30"}],
+        crit("rsi", "p1"),
+    )  # fmt: skip
+    assert kinds(doubts(stocks)) == [("unmapped_words", "g1")]  # not typed: the loss is visible
+    assert doubts(stocks, typed=True) == ()
+    etf_plus = parts_of(
+        "cheap ETFs with RSI under 30", [{"id": "p1", "words": "with RSI under 30"}],
+        crit("rsi", "p1"),
+    )  # fmt: skip
+    assert kinds(doubts(etf_plus, typed=True)) == [("unmapped_words", "g1")]  # "cheap" stays
+
+
+def test_on_and_of_stay_content_so_the_pe_split_is_still_a_doubt() -> None:
+    parts = parts_of(
+        "stocks on P/E", [{"id": "p1", "words": "stocks"}], crit("pe", "p1"),
+    )  # fmt: skip
+    assert kinds(doubts(parts, typed=True)) == [("unmapped_words", "g1")]
+
+
+def test_or_more_is_a_comparative_not_an_or() -> None:
+    gap = parts_of(
+        "price 10 or more", [{"id": "p1", "words": "price 10"}], crit("price", "p1"),
+    )  # fmt: skip
+    assert len(gap) == 1 and doubts(gap) == ()  # no gap chip, no connector doubt
+    sentence = "price 10 or more and volume 5 or less"
+    held = parts_of(sentence, [{"id": "p1", "words": sentence}], crit("a", "p1"), crit("b", "p1"))
+    assert doubts(held) == ()

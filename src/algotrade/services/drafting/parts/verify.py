@@ -18,6 +18,10 @@ UNMAPPED_WORDS = "unmapped_words"
 CONNECTOR_LEFT_OUT = "connector_left_out"
 UNPLACED = "unplaced"
 OR_NOT_FORMULA = "or_not_formula"
+UNIVERSE_NOUNS = frozenset(
+    {"stock", "stocks", "equity", "equities", "share", "shares", "etf", "etfs", "fund", "funds",
+     "adr", "adrs"}
+)  # fmt: skip  # a gap of only these is no doubt when the draft types the universe
 KINDS = (UNMAPPED_WORDS, CONNECTOR_LEFT_OUT, UNPLACED, OR_NOT_FORMULA)
 
 _TOKEN = re.compile("[\\w'\\u2019/.%+-]+")  # a field-ish token ("p/e", "52-week") stays whole
@@ -33,9 +37,10 @@ class Doubt:
     message: str
 
 
-def doubts(parts: Sequence[Part] | None) -> tuple[Doubt, ...]:
+def doubts(parts: Sequence[Part] | None, typed: bool = False) -> tuple[Doubt, ...]:
     """The doubts about a draft whose explained ``parts`` are given (none: no parts, no
-    doubts)."""
+    doubts). ``typed``: the draft has an ``instrument.security_type`` criterion, so a gap that is
+    only a universe noun ("stocks") loses nothing; without one it stays a doubt."""
     found: list[Doubt] = []
     for part in parts or ():
         if part.origin == "unplaced":
@@ -43,7 +48,9 @@ def doubts(parts: Sequence[Part] | None) -> tuple[Doubt, ...]:
         elif part.kind == "not_understood" and part.origin in ("gap", "words"):
             if part.origin == "gap" and (logic := _left_out(part)):
                 found.append(_connector(part, logic))
-            elif content_words(part.words):
+            elif (words := content_words(part.words)) and not (
+                typed and part.origin == "gap" and set(words) <= UNIVERSE_NOUNS
+            ):
                 found.append(_unmapped(part))
         elif _or_without_formula(part):
             found.append(_or_not_formula(part))

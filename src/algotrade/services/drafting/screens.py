@@ -217,7 +217,13 @@ def ask_for_draft(
         drafted.append((text, make(text)))
 
     def doubted(draft: ScreenDraft) -> tuple[Doubt, ...]:
-        return doubts(draft.parts) if verify and draft.stage == "model" else ()
+        if not verify or draft.stage != "model":
+            return ()
+        typed = any(
+            c.get("field") == "instrument.security_type"
+            for c in draft.document["criteria"].values()
+        )
+        return doubts(draft.parts, typed)
 
     def accept(text: str) -> None:
         """The chain's check of an answer: a draft we can use, else ``InvalidAnswerError``."""
@@ -239,6 +245,8 @@ def ask_for_draft(
     try:
         completion = model.complete(system, user, tag=tag, schema=ANSWER_SCHEMA, accept=accept)
     except ModelUnavailableError as unavailable:
+        # (a last attempt that was a did-you-mean draft wins over earlier doubtful ones: it is the
+        # newest, and its bare names are shown with their candidates)
         # every attempt refused for a bare entry name only: keep the good criteria, show the
         # bare ones dropped with their candidates (the refused attempts' call id, for their cost)
         if (
