@@ -1,0 +1,56 @@
+{
+  "id": "connectors-filler",
+  "sentence": "I want stocks that are above their 200 day average and also have a daily range under 3% of price",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "above their 200 day average",
+        "bucket": "A",
+        "fields": [
+          "feature.pct_vs_sma_200"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0,
+        "tolerance": 0
+      },
+      {
+        "span": "daily range under 3% of price",
+        "bucket": "A",
+        "fields": [
+          "feature.atr_pct"
+        ],
+        "op": [
+          "lt",
+          "lte"
+        ],
+        "value": 0.03,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "stocks that are above their 200 day average",
+          "kind": "applied",
+          "origin": "words"
+        },
+        {
+          "words": "a daily range under 3% of price",
+          "kind": "applied",
+          "origin": "words"
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 0
+    }
+  }
+}

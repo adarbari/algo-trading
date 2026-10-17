@@ -1862,6 +1862,29 @@
             "title": "Id",
             "type": "string"
           },
+          "join": {
+            "anyOf": [
+              {
+                "enum": [
+                  "and",
+                  "or",
+                  "and_not"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "how this part relates to the one before it, read by the server from the connector between them (but, or, except...); null when none lies between them",
+            "title": "Join"
+          },
+          "join_words": {
+            "default": "",
+            "description": "the sentence's own words of that connector; empty when no join",
+            "title": "Join Words",
+            "type": "string"
+          },
           "kind": {
             "description": "decided by the server from what the part holds, never by the model",
             "enum": [

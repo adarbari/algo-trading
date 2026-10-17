@@ -2,7 +2,15 @@
 found in order; no match is ``None``; a short or numeric token is never fuzzy; offsets convert to
 UTF-16 code units (a non-ASCII sentence slices back to the same words in a browser); the gaps."""
 
-from algotrade.services.drafting.parts.spans import Span, gaps, locate, tokens, utf16
+from algotrade.services.drafting.parts.spans import (
+    Join,
+    Span,
+    Stretch,
+    locate,
+    stretches,
+    tokens,
+    utf16,
+)
 
 SENTENCE = "liquid stocks with IV rank above 50% and no earnings in the next 10 sessions"
 
@@ -66,19 +74,36 @@ def test_tokens_keep_decimals_and_drop_trailing_punctuation() -> None:
     ]  # fmt: skip
 
 
-def test_gaps_hold_a_word_other_than_a_connector_and_trim_the_connectors() -> None:
+def _gaps(sentence: str, covered: list[Span]) -> list[str]:
+    return [sentence[s.gap.start : s.gap.end] for s in stretches(sentence, covered) if s.gap]
+
+
+def test_gaps_hold_a_word_other_than_glue_or_a_connector_and_trim_them() -> None:
     sentence = "liquid stocks and gibberish zzz with high yield"
     covered = [locate(sentence, "liquid stocks"), locate(sentence, "high yield")]
     assert None not in covered
-    found = [sentence[g.start : g.end] for g in gaps(sentence, [c for c in covered if c])]
-    assert found == ["gibberish zzz"]  # "and" and "with" at the edges are connectors
+    stretch = stretches(sentence, [c for c in covered if c])
+    assert _gaps(sentence, [c for c in covered if c]) == ["gibberish zzz"]
+    assert (stretch[0].gap, stretch[1].gap_join, stretch[1].next_join) == (
+        None, Join("and", "and"), Join("and", "with"),
+    )  # fmt: skip
 
 
-def test_text_of_connectors_and_punctuation_only_is_no_gap() -> None:
+def test_text_of_connectors_and_punctuation_only_is_no_gap_but_a_join() -> None:
     sentence = "liquid, and stocks"
-    assert gaps(sentence, [Span(0, 6), Span(12, 18)]) == []
-    assert gaps("", []) == []
+    found = stretches(sentence, [Span(0, 6), Span(12, 18)])
+    assert [s.gap for s in found] == [None, None, None]
+    assert found[1].next_join == Join("and", "and")
+    assert stretches("", [])[0] == Stretch(None, None, None)
 
 
 def test_a_sentence_no_part_covers_is_one_gap() -> None:
-    assert [Span(0, 11)] == gaps("zzz qqq xxx", [])
+    assert _gaps("zzz qqq xxx", []) == ["zzz qqq xxx"]
+
+
+def test_the_connector_is_the_longest_phrase_and_a_negation_wins() -> None:
+    sentence = "liquid but not overbought and also, except for ETFs"
+    covered = [locate(sentence, w) for w in ("liquid", "overbought", "ETFs")]
+    first, second = stretches(sentence, [c for c in covered if c])[1:3]
+    assert first.next_join == Join("and_not", "but not")
+    assert second.next_join == Join("and_not", "and also, except for")

@@ -1,0 +1,66 @@
+{
+  "id": "connectors-although",
+  "sentence": "optionable stocks with a market cap over $10B although IV rank is under 30%",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "optionable",
+        "bucket": "A",
+        "fields": [
+          "instrument.optionable"
+        ],
+        "op": "eq",
+        "value": true,
+        "tolerance": 0
+      },
+      {
+        "span": "market cap over $10B",
+        "bucket": "A",
+        "fields": [
+          "feature.market_cap"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 10000000000,
+        "tolerance": 0
+      },
+      {
+        "span": "IV rank under 30%",
+        "bucket": "A",
+        "fields": [
+          "feature.iv_rank"
+        ],
+        "op": [
+          "lt",
+          "lte"
+        ],
+        "value": 0.3,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "optionable stocks with a market cap over $10B",
+          "kind": "applied",
+          "origin": "words"
+        },
+        {
+          "words": "IV rank is under 30%",
+          "kind": "applied",
+          "origin": "words"
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 0
+    }
+  }
+}

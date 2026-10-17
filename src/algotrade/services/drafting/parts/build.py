@@ -1,14 +1,16 @@
 """``build_parts``: the explained parts of one draft (ADR 0041, amended 2026-10-11). The model's
 ``parts`` are located in the sentence (``spans``, in order; one that is not found, overlaps or is
 malformed is dropped and its items go down the fallback), the words nobody covers become
-``not_understood`` parts, every item is attributed (``attribute``), the kind of a part comes
-from what it holds (never from the model): a term to choose ``needs_choice`` over a formula over
-a missing request or a dropped criterion (``not_available``) over a plain criterion (``applied``),
-nothing ``not_understood``; suggestions and the model's reading never change it. The reading is
-kept only when its numbers are the part's (``consistency``); the stats leave out the criteria
-kept from ``current`` (the model rightly tags them with nothing). Caps: ``MAX_PARTS`` parts with
-words, ``MAX_WORDS`` characters of words, ``MAX_READING`` of reading. ``None`` when the model
-gave no parts, or none could be located: the draft is then served as it was before parts."""
+``not_understood`` parts unless they hold only glue and connectors (``connectors``: a connector
+becomes the ``join`` of the part after it, glue vanishes), every item is attributed
+(``attribute``), the kind of a part comes from what it holds (never from the model): a term to
+choose ``needs_choice`` over a formula over a missing request or a dropped criterion
+(``not_available``) over a plain criterion (``applied``), nothing ``not_understood``; suggestions
+and the model's reading never change it. The reading is kept only when its numbers are the part's
+(``consistency``); the stats leave out the criteria kept from ``current`` (the model rightly tags
+them with nothing). Caps: ``MAX_PARTS`` parts with words, ``MAX_WORDS`` characters of words,
+``MAX_READING`` of reading. ``None`` when the model gave no parts, or none could be located: the
+draft is then served as it was before parts."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -31,7 +33,7 @@ from algotrade.services.drafting.parts.model import (
     PartsStats,
     is_part_id,
 )
-from algotrade.services.drafting.parts.spans import Span, gaps, locate, utf16
+from algotrade.services.drafting.parts.spans import Join, Span, locate, stretches, utf16
 
 CHECKED = (
     "criteria",
@@ -58,24 +60,27 @@ def build_parts(
     located, considered = _located(sentence, raw)
     if not located:
         return None
-    word_gaps = gaps(sentence, [p.span for p in located])
-    while len(located) + len(word_gaps) > MAX_PARTS:  # the last part's words become a gap
-        located = located[:-1]
-        word_gaps = gaps(sentence, [p.span for p in located])
+    between = stretches(sentence, [p.span for p in located])
+    while len(located) + sum(s.gap is not None for s in between) > MAX_PARTS:
+        located = located[:-1]  # the last part's words become a gap
+        between = stretches(sentence, [p.span for p in located])
     placed = [Placed(p.id, sentence[p.span.start : p.span.end]) for p in located]
     assigned, tagged = attribute(items, placed, phrasebook)
     parts: list[tuple[int, Part]] = []
     kept = 0
     given = 0
-    for p, where in zip(located, placed, strict=True):
+    for p, where, before in zip(located, placed, between, strict=False):
         mine = assigned.get(p.id, [])
-        part = _part(sentence, p.id, p.span, where.words, p.reading, mine, "words")
+        part = _part(
+            sentence, p.id, p.span, where.words, p.reading, mine, "words", before.next_join
+        )
         given += bool(p.reading)
         kept += part.reading_source == "model"
         parts.append((p.span.start, part))
-    for n, gap in enumerate(word_gaps, 1):
+    word_gaps = [(s.gap, s.gap_join) for s in between if s.gap is not None]
+    for n, (gap, join) in enumerate(word_gaps, 1):
         words = sentence[gap.start : gap.end]
-        parts.append((gap.start, _part(sentence, f"g{n}", gap, words, None, [], "gap")))
+        parts.append((gap.start, _part(sentence, f"g{n}", gap, words, None, [], "gap", join)))
     ordered = [part for _, part in sorted(parts, key=lambda t: t[0])]
     for catch, origin in ((KEPT_ID, "kept"), (UNPLACED_ID, "unplaced")):
         if assigned.get(catch):
@@ -118,6 +123,7 @@ def _part(
     reading: str | None,
     mine: Sequence[Item],
     origin: str,
+    join: Join | None = None,
 ) -> Part:
     refs: dict[str, list[str]] = {}
     for item in mine:
@@ -130,6 +136,7 @@ def _part(
         tuple(refs.get("criteria", ())), tuple(refs.get("dropped", ())),
         tuple(refs.get("formulas", ())), tuple(refs.get("unresolved", ())),
         tuple(refs.get("missing", ())), tuple(refs.get("suggestions", ())), "rank" in refs,
+        join.logic if join else None, join.words if join else "",
     )  # fmt: skip
 
 

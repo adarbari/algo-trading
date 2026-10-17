@@ -9,7 +9,7 @@ timestamps or ids, so the same catalogue, phrasebook and guide give the same byt
 prompt cache hits and a recorded test stays valid). The prompt carries no market data, results
 or credentials.
 
-The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 8: the A / B / C answer contract,
+The draft sends ``sliced_system_prompt`` (``PROMPT_VERSION`` 10: the A / B / C answer contract,
 the explained parts, the open backlog keys most relevant to the sentence, the index grouped by
 prefix): the task, the
 examples and an index of every field (grouped under one heading per prefix: type, unit) as a prefix
@@ -33,6 +33,7 @@ from algotrade.config.site.field_guide import (
     Situation,
 )
 from algotrade.config.site.llm import Phrase
+from algotrade.services.drafting.parts.connectors import join_text
 from algotrade.services.drafting.retrieval import FIELD_REF, Slice, select_slice
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
@@ -45,7 +46,8 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 # of a part's re-draft (``redraft/prompt.py``). One version serves both prompts (the usage log
 # records it for ``screener-draft`` and ``screener-draft-part``): bump it on any change to ``TASK``
 # or to the scoped ``ASK`` (``redraft/test_prompt.py`` in the tests pins their hashes).
-PROMPT_VERSION = "9"
+# 10: connectors are rendered from ``parts/connectors.py``; one condition one contiguous part.
+PROMPT_VERSION = "10"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 
@@ -105,14 +107,18 @@ Answer shape:
 
 "parts": the sentence split in order, 1 to 12 parts, one per thing the trader asks for:
 {"id": "p1", "words": their own words, copied exactly, "reading": one short line (160 characters at
-most), what we read this as, with only numbers its criteria hold (10% is 0.1)}. No overlaps; skip
-connectors. Words you cannot map are still a part, with no item. Every criterion, formula, missing,
-unresolved, suggestion and the tie_break carries "part"; scaffolding (status ACTIVE) goes with the
-part naming the kind of instrument.
+most), what we read this as, with only numbers its criteria hold (10% is 0.1)}. No overlaps. A part
+is one condition and its words are contiguous: when the instrument word sits inside a condition
+("cheap stocks on P/E"), the whole phrase is one part. Leave out of the words the connector that
+joins a part to the previous one (@@JOINS@@: the server reads it) and filler such as "show me" or
+"I'm looking for". Words you cannot map are still a part, with no item. Every criterion, formula,
+missing, unresolved, suggestion and the tie_break carries "part"; scaffolding (status ACTIVE) goes
+with the part naming the kind of instrument.
 
 Each part of the sentence goes in one place. A: a criterion on a catalogue field (preferred). B: a
 formula, only when maths over fields says it and no field does. C: missing, when neither can. Never
-guess a field to fill a gap.
+guess a field to fill a gap. Never add a criterion the sentence does not ask for to define a vague
+word; offer unresolved readings.
 
 "formulas": [{"name": "draft_<slug>", "expr", "dtype": "float|bool|str|date", "unit", "description",
 "null_meaning", "inputs": [the names expr reads], "criterion": {"op", "value", "mode",
@@ -136,6 +142,8 @@ complete criterion}, 2 or 3]}] for a term with several readings ("liquid"); the 
 default to the criteria, so do not list it there. Not for a term the phrasebook or field guide
 settles.
 """
+
+TASK = TASK.replace("@@JOINS@@", join_text())
 
 # Two worked examples (sentence -> answer), rendered into the task so a smaller model sees the
 # shape and the judgement expected. Their fields exist in the site catalogue (a test checks).

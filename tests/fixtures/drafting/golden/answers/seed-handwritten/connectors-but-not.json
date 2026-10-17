@@ -1,0 +1,85 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "listed",
+      "part": "p1"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks",
+      "part": "p1"
+    },
+    {
+      "id": "optionable",
+      "field": "instrument.optionable",
+      "op": "eq",
+      "value": true,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "optionable",
+      "part": "p1"
+    },
+    {
+      "id": "price",
+      "field": "rollup.price_stats@v2.close",
+      "op": "gt",
+      "value": 8,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "above $8",
+      "part": "p2"
+    },
+    {
+      "id": "iv_rank",
+      "field": "feature.iv_rank",
+      "op": "lte",
+      "value": 0.8,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "not an IV rank above 80%",
+      "part": "p3"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": null,
+  "parts": [
+    {
+      "id": "p1",
+      "words": "optionable stocks",
+      "reading": "Active optionable stocks and ADRs"
+    },
+    {
+      "id": "p2",
+      "words": "above $8",
+      "reading": "Price above $8"
+    },
+    {
+      "id": "p3",
+      "words": "an IV rank above 80%",
+      "reading": "IV rank of 80% or less"
+    }
+  ]
+}

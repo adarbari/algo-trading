@@ -320,6 +320,7 @@ def _retyped(req: PartRequest, sub: ScreenDraft, mine: _Mine, start: int) -> Par
         old.id, req.new_words, 0, 0, None, "server", "", old.origin,
         tuple(mine.criteria), tuple(d.id for d in mine.dropped), tuple(mine.formulas),
         tuple(mine.unresolved), tuple(mine.missing), tuple(mine.suggestions), mine.rank,
+        old.join, old.join_words,
     )  # fmt: skip
     kind = kind_of(_groups(refs))
     model = sub.parts[0] if sub.parts else None

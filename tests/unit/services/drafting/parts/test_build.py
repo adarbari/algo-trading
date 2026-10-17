@@ -172,3 +172,109 @@ def test_offsets_are_utf16_units() -> None:
     p = parts["p1"]
     assert (p.start, p.end) == (3, 16)  # the rocket is two units and a space
     assert sentence.encode("utf-16-le")[2 * p.start : 2 * p.end].decode("utf-16-le") == p.words
+
+
+def _served(sentence: str, words: list[str]):
+    """The parts of a model that quoted ``words`` (connectors left out), each with one criterion."""
+    raw = [{"id": f"p{n}", "words": w} for n, w in enumerate(words, 1)]
+    items = [Item("criteria", f"c{n}", f"p{n}", field="f") for n in range(1, len(words) + 1)]
+    got = build_parts(sentence, raw, items, [])
+    assert got is not None
+    return got[0]
+
+
+def _shape(parts) -> list[tuple[str, str | None, str]]:
+    return [(p.words, p.join, p.join_words) for p in parts]
+
+
+def test_connectors_the_model_leaves_out_are_joins_never_not_understood_chips() -> None:
+    """The 2026-10-17 bug: the prompt said skip connectors, the server only knew 14 of them."""
+    cases = [
+        (
+            "liquid stocks near their 52-week high but not overbought",
+            ["liquid stocks near their 52-week high", "overbought"],
+            [
+                ("liquid stocks near their 52-week high", None, ""),
+                ("overbought", "and_not", "but not"),
+            ],
+        ),
+        (
+            "stocks trading below $20 while volume is rising",
+            ["stocks trading below $20", "volume is rising"],
+            [("stocks trading below $20", None, ""), ("volume is rising", "and", "while")],
+        ),
+        (
+            "small caps that are oversold yet still above their 200-day average",
+            ["small caps", "oversold", "still above their 200-day average"],
+            [
+                ("small caps", None, ""),
+                ("oversold", None, ""),  # "that are" is glue: no join
+                ("still above their 200-day average", "and", "yet"),
+            ],
+        ),
+        (
+            "names with a strong 3-month return although IV rank is under 30",
+            ["names with a strong 3-month return", "IV rank is under 30"],
+            [
+                ("names with a strong 3-month return", None, ""),
+                ("IV rank is under 30", "and", "although"),
+            ],
+        ),
+        (
+            "show me optionable stocks over $10, only if they trade at least 1M shares a day",
+            ["optionable stocks over $10", "trade at least 1M shares a day"],
+            [
+                ("optionable stocks over $10", None, ""),
+                ("trade at least 1M shares a day", "and", "only if"),
+            ],
+        ),
+    ]
+    for sentence, words, expected in cases:
+        parts = _served(sentence, words)
+        assert not [p for p in parts if p.origin == "gap"], sentence
+        assert _shape(parts) == expected, sentence
+
+
+def test_a_gap_with_content_stays_not_understood_trimmed_with_its_own_join() -> None:
+    sentence = "show me cheap, but liquid stocks"
+    raw = [{"id": "p1", "words": "liquid stocks"}]
+    got = build_parts(sentence, raw, [Item("criteria", "c1", "p1", field="f")], [])
+    assert got is not None
+    cheap = [p for p in got[0] if p.origin == "gap"]
+    assert [(p.words, p.kind, p.join, p.join_words) for p in cheap] == [
+        ("cheap", "not_understood", None, "")
+    ]  # "show me" vanishes; "but" is the join of the part that follows the gap
+    assert (got[0][-1].id, got[0][-1].join, got[0][-1].join_words) == ("p1", "and", "but")
+
+
+def test_the_long_growth_sentence_has_no_glue_chips() -> None:
+    sentence = (
+        "growth stock which have grown twice as fast as S&P and have had a great start to this "
+        "year but have been bad in the past few months and are possibly going to see a upward "
+        "trend soon."
+    )
+    words = [
+        "growth stock",
+        "grown twice as fast as S&P",
+        "great start to this year",
+        "bad in the past few months",
+        "possibly going to see a upward trend soon",
+    ]
+    parts = _served(sentence, words)
+    assert not [p for p in parts if p.origin == "gap"]
+    assert [(p.join, p.join_words) for p in parts] == [
+        (None, ""),
+        (None, ""),
+        ("and", "and"),
+        ("and", "but"),
+        ("and", "and"),
+    ]
+
+
+def test_filler_around_a_part_vanishes() -> None:
+    sentence = "I'm looking for, basically, stocks that are liquid and also, close to support"
+    parts = _served(sentence, ["stocks that are liquid", "close to support"])
+    assert _shape(parts) == [
+        ("stocks that are liquid", None, ""),
+        ("close to support", "and", "and also"),
+    ]

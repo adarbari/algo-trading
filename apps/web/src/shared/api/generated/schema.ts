@@ -1199,6 +1199,17 @@ export interface components {
              */
             id: string;
             /**
+             * Join
+             * @description how this part relates to the one before it, read by the server from the connector between them (but, or, except...); null when none lies between them
+             */
+            join?: ("and" | "or" | "and_not") | null;
+            /**
+             * Join Words
+             * @description the sentence's own words of that connector; empty when no join
+             * @default
+             */
+            join_words: string;
+            /**
              * Kind
              * @description decided by the server from what the part holds, never by the model
              * @enum {string}
