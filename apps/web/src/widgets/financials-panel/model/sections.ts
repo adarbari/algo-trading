@@ -174,10 +174,24 @@ export const SECTIONS: readonly SectionSpec[] = [
   },
 ];
 
-/** Every catalogue feature the panel asks for (one request). */
-export const FINANCIALS_FEATURES: readonly SiteFeature[] = [
+const namesOf = (sections: readonly SectionSpec[], extra: readonly RowSpec[] = []) => [
   ...new Set([
-    ...KEY_METRICS.map((r) => r.name),
-    ...SECTIONS.flatMap((s) => [...s.statuses, ...s.rows.map((r) => r.name)]),
+    ...extra.map((r) => r.name),
+    ...sections.flatMap((s) => [...s.statuses, ...s.rows.map((r) => r.name)]),
   ]),
+];
+
+const BALANCE = SECTIONS.filter((s) => s.id === 'balance');
+
+/**
+ * The catalogue features the panel asks for, in two requests (the API caps `features(names)` at
+ * `NAMES_PER_REQUEST`): the strip and every section but the balance sheet, then the balance
+ * sheet and cash flow. A test keeps each part under the cap.
+ */
+export const FINANCIALS_PARTS: readonly (readonly SiteFeature[])[] = [
+  namesOf(
+    SECTIONS.filter((s) => s.id !== 'balance'),
+    KEY_METRICS,
+  ),
+  namesOf(BALANCE),
 ];
