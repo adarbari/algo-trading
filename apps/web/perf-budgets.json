@@ -1,6 +1,6 @@
 {
   "bundle": {
-    "entry_gzip_bytes": 24800,
+    "entry_gzip_bytes": 24900,
     "entry_closure_gzip_bytes": 195700,
     "lazy_only": ["design-system/components/Chart/engine.ts"],
     "routes": {
@@ -61,6 +61,7 @@
     }
   },
   "reasons": {
+    "bundle.entry_gzip_bytes": "2026-10-17 #597 the web minor and patch dependency bump moves the entry chunk to 24831 B gzip (+31 B over the 24800 B budget); budget 24900 B keeps a small margin",
     "bundle.routes.src/pages/admin-feature-requests/index.ts": "2026-10-17 #585 the features tab's request fan-out fix: DataTable gains the onVisibleRowsChange window callback (shared table chunk code moves into page chunks; measured by CI: 29897 B, +70 B margin); then, before it: previous budget 29850 B",
     "bundle.routes.src/pages/admin-llm-usage/index.ts": "2026-10-11 #519 the single-flight session read (Web Lock + AbortSignal fallback) moves a few bytes of shared auth code: measured by CI 49414 B; before it: 2026-10-09 #454 ED8 step 2: BarList `diverging` (signed bars around a zero axis) grows the shared BarList code in this chunk; then 2026-10-10 #461 ED8 E8 the six-step edge builder: its lazy page shares Checkbox, SectionNav, NumberInput and ScreenerRecord with the pages that used them, so they leave those page chunks as shared chunks (each gzipped on its own); then 2026-10-10 #493 Why it's here links each screener (TextLink + its results path): the shared chunk graph moves a few bytes into this page (+5 B measured by CI: 49275 B); then 2026-10-10 #495 the design system's DataTable gains the column emphasis option (two data attributes in the shared table chunk) (+31 B measured by CI: 49306 B); then 2026-10-10 the design system's Chart gains a dashed stroke and underwater series, Legend a dashed swatch and LazySection is added (shared chunk code and CSS, +74 B measured by CI: 49380 B); 2026-10-10 #486 chain coverage (measured by CI: 49310 B; +40 B for the CI/local build difference); then 2026-10-10 #486 chain coverage merged with main: shared chunks (Guide glossary) grow; measured 49337 B, +70 B margin for CI/local and main drift",
     "e2e./explore?focus=AAPL&tab=chart.dom_nodes": "2026-10-10 #461 ED8 E8 the six-step edge builder reuses Checkbox, SectionNav, NumberInput and ScreenerRecord, so they leave the page chunk that inlined them and load as shared chunks: one more small request and its modulepreload link (measured); then 2026-10-10 ED9 PR 9 the edge page's lazy sections: Tabs and IndicatorRow load as shared chunks, two more modulepreload links (measured: 220)",
