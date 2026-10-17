@@ -5,7 +5,7 @@
  * one `Query.regime`; one `Regime` response is shared by every embedding (top bar, Ideas strip,
  * Regime page), so the cache key is the operation alone.
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -316,10 +316,21 @@ const MarketHistoryQuery = graphql(`
 /** The session's regime (null: nothing stored for the session; UNKNOWN is a label, not null). */
 export function useRegime() {
   return useQuery({
-    queryKey: queryKeys.gql(REGIME_OPERATION, {}),
-    queryFn: () => gql(RegimeQuery, {}),
+    ...regimeQuery(),
     select: (data): Regime | null => data.regime ?? null,
   });
+}
+
+function regimeQuery() {
+  return queryOptions({
+    queryKey: queryKeys.gql(REGIME_OPERATION, {}),
+    queryFn: () => gql(RegimeQuery, {}),
+  });
+}
+
+/** Start the regime read before the page mounts (a route loader); the hook then joins it. */
+export function prefetchRegime(client: QueryClient): void {
+  void client.query(regimeQuery()).catch(() => undefined);
 }
 
 /**

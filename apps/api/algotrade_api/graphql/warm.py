@@ -3,7 +3,8 @@ start and after every publish (polled every ``WARM_EVERY_S``), reads into the sh
 cache what every caller shares: the market tables' whole history (``warm_market_frames``), so
 the regime page's charts slice a cached frame instead of reading 14 000 partitions on a
 request (20 s a table cold), and the status strip's one-session completeness grid and the
-session's regime that every page shows (3 to 5 s on the first page after a publish), the
+session's regime that every page shows (3 to 5 s on the first page after a publish), the Ideas
+table and the edge desk (the home page), the
 session's stored screen rows that every screener page and the Builder's preview read (1.6 s on
 the first one after a publish), the Builder's first preview of every screen on the Screeners
 list (its field frame and the picks of its saved run), and the signal timing of every
@@ -19,14 +20,18 @@ from functools import partial
 
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.edge_desk.desk import load_edge_desk
 from algotrade.services.read.market.history import warm_market_frames
 from algotrade.services.read.ops.ingestion import load_completeness
 from algotrade.services.read.regime.regime import load_regime
 from algotrade.services.read.regime.timeline import load_episode_signals
+from algotrade.services.read.screens.ideas import load_ideas
 from algotrade.services.read.screens.runs import screen_rows
+from algotrade.services.read.screens.screeners import load_screeners
 from algotrade_api.graphql.offload import off_loop
 
 WARM_EVERY_S = 60.0
+IDEAS_LIMIT = 200  # the Ideas page's request (entities/idea IDEAS_LIMIT)
 
 log = logging.getLogger(__name__)
 
@@ -35,31 +40,7 @@ type Step = tuple[str, Callable[[], object]]
 type ExtraSteps = Callable[[ReadContext], list[Step]]
 
 
-def warm(ctx: ReadContext, extra: ExtraSteps | None = None) -> None:
-    """Read what every page shares for ``ctx``'s session and published state, then the steps
-    ``extra`` names for it (the Builder's first preview of each screen: the API wires them in,
-    this layer reads only the read model)."""
-    steps: list[Step] = [
-        # first: a second, not the market frames' minutes, stands between a publish and it
-        ("screen rows", lambda: screen_rows(ctx)),  # the screener pages' and the preview's runs
-    ]
-    if extra is not None:
-        try:
-            steps.extend(extra(ctx))  # a second or two each
-        except Exception:
-            log.exception("warming the read cache: the extra steps failed")
-    steps += [
-        ("market frames", lambda: warm_market_frames(ctx)),
-        ("completeness", lambda: load_completeness(ctx, 1)),  # the status strip's grid
-        ("regime", lambda: load_regime(ctx)),
-    ]
-    try:
-        for episode in load_episodes(ctx.configs).episodes:  # the regime page's History
-            steps.append(
-                (f"episode {episode.key}", partial(load_episode_signals, ctx, episode.key))
-            )
-    except Exception:
-        log.exception("warming the read cache: the episodes failed")
+def _run(steps: list[Step]) -> None:
     for name, step in steps:  # one failing step does not stop (or repeat) the others
         started = time.monotonic()
         try:
@@ -68,6 +49,43 @@ def warm(ctx: ReadContext, extra: ExtraSteps | None = None) -> None:
             log.exception("warming the read cache: %s failed", name)
         else:
             log.info("warmed %s in %.1f s", name, time.monotonic() - started)
+
+
+def home_steps(ctx: ReadContext) -> list[Step]:
+    """What the home page (Ideas) and the shell around every page read, a few seconds in all on a
+    cold store: the API finishes them (``CacheWarmer.warm_home``) before it accepts a request, so
+    the first visit after a start is served from the cache."""
+    return [
+        # the resolved screeners (18 TOML configs): the regime strip, status strip and Ideas read it
+        ("screeners", lambda: load_screeners(ctx)),
+        ("screen rows", lambda: screen_rows(ctx)),  # the screener pages' and the preview's runs
+        ("completeness", lambda: load_completeness(ctx, 1)),  # the status strip's grid
+        ("regime", lambda: load_regime(ctx)),
+        ("ideas", lambda: load_ideas(ctx, IDEAS_LIMIT)),  # the Ideas page, home of every login
+        ("edge desk", lambda: load_edge_desk(ctx)),
+    ]
+
+
+def warm(ctx: ReadContext, extra: ExtraSteps | None = None) -> None:
+    """Read what every page shares for ``ctx``'s session and published state (``home_steps``
+    first: seconds, not the market frames' minutes, stand between a publish and the home page),
+    then the steps ``extra`` names for it (the Builder's first preview of each screen: the API
+    wires them in, this layer reads only the read model), the market frames and the episodes."""
+    steps = home_steps(ctx)
+    if extra is not None:
+        try:
+            steps.extend(extra(ctx))  # a second or two each
+        except Exception:
+            log.exception("warming the read cache: the extra steps failed")
+    steps.append(("market frames", lambda: warm_market_frames(ctx)))
+    try:
+        for episode in load_episodes(ctx.configs).episodes:  # the regime page's History
+            steps.append(
+                (f"episode {episode.key}", partial(load_episode_signals, ctx, episode.key))
+            )
+    except Exception:
+        log.exception("warming the read cache: the episodes failed")
+    _run(steps)
 
 
 class CacheWarmer:
@@ -85,6 +103,10 @@ class CacheWarmer:
         self._extra = extra
         self._every_s = every_s
         self._warmed: Hashable | None = None
+
+    def warm_home(self) -> None:
+        """Read the home page's steps now (blocking): the app's start waits for it."""
+        _run(home_steps(self._open_ctx()))
 
     def warm_once(self) -> bool:
         """Warm when the session or the published state moved since the last warm; whether it

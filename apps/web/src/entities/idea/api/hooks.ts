@@ -5,7 +5,7 @@
  * picked counts over the whole run, and each idea's facts by catalogue name (earnings, nearest
  * expiry, IV: ADR 0038). The cache holds the response; `select` shapes it.
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -131,10 +131,18 @@ const IdeasPage = graphql(`
 
 /** The latest session's ideas (null `ideas`: nothing stored yet). */
 export function useIdeas() {
+  return useQuery({ ...ideasQuery(), select: toIdeasData });
+}
+
+function ideasQuery() {
   const variables = { limit: IDEAS_LIMIT, names: [...IDEA_FEATURES] };
-  return useQuery({
+  return queryOptions({
     queryKey: queryKeys.gql(IDEAS_OPERATION, variables),
     queryFn: () => gql(IdeasPage, variables),
-    select: toIdeasData,
   });
+}
+
+/** Start the ideas read before the page mounts (a route loader); the hook then joins it. */
+export function prefetchIdeas(client: QueryClient): void {
+  void client.query(ideasQuery()).catch(() => undefined);
 }

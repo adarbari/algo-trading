@@ -1,12 +1,14 @@
 import asyncio
+import threading
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from algotrade_api.graphql import warm
 from algotrade_api.graphql.warm import CacheWarmer
+from algotrade_api.main import _start_warming
 
 
 @dataclass
@@ -102,7 +104,7 @@ def test_a_failing_step_does_not_stop_the_others(
     monkeypatch.setattr(warm, "load_episode_signals", lambda c, k: ran.append(f"episode {k}"))
     ctx = type("C", (), {"configs": None})()
     warm.warm(ctx)  # type: ignore[arg-type]
-    assert ran == ["frames", "completeness", "episode a"] and "regime failed" in caplog.text
+    assert ran == ["completeness", "frames", "episode a"] and "regime failed" in caplog.text
 
 
 def test_it_runs_the_extra_steps_after_the_screen_rows_and_before_the_market_frames(
@@ -125,6 +127,9 @@ def test_it_runs_the_extra_steps_after_the_screen_rows_and_before_the_market_fra
     monkeypatch.setattr(warm, "warm_market_frames", lambda c: ran.append("frames"))
     monkeypatch.setattr(warm, "load_completeness", lambda c, n: None)
     monkeypatch.setattr(warm, "load_regime", lambda c: None)
+    monkeypatch.setattr(warm, "load_screeners", lambda c: None)
+    monkeypatch.setattr(warm, "load_ideas", lambda c, n: None)
+    monkeypatch.setattr(warm, "load_edge_desk", lambda c: None)
     monkeypatch.setattr(warm, "load_episodes", lambda configs: type("E", (), {"episodes": []}))
     ctx = type("C", (), {"configs": None})()
     warm.warm(ctx, lambda c: [(f"preview {i}", step(i)) for i in "abc"])  # type: ignore[arg-type]
@@ -132,3 +137,54 @@ def test_it_runs_the_extra_steps_after_the_screen_rows_and_before_the_market_fra
     ran.clear()
     warm.warm(ctx)  # type: ignore[arg-type]
     assert ran == ["rows", "frames"]
+
+
+def test_it_warms_what_the_ideas_page_reads(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The home page (Ideas) asks for the resolved screeners, the ideas table and the edge desk:
+    read into the cache before the first visit after a start or a publish, screeners first
+    (the regime strip and the status strip need them too)."""
+    ran: list[str] = []
+    monkeypatch.setattr(warm, "load_screeners", lambda c: ran.append("screeners"))
+    monkeypatch.setattr(warm, "screen_rows", lambda c: None)
+    monkeypatch.setattr(warm, "warm_market_frames", lambda c: None)
+    monkeypatch.setattr(warm, "load_completeness", lambda c, n: None)
+    monkeypatch.setattr(warm, "load_regime", lambda c: None)
+    monkeypatch.setattr(warm, "load_ideas", lambda c, n: ran.append(f"ideas {n}"))
+    monkeypatch.setattr(warm, "load_edge_desk", lambda c: ran.append("edge desk"))
+    monkeypatch.setattr(warm, "load_episodes", lambda configs: type("E", (), {"episodes": []}))
+    warm.warm(type("C", (), {"configs": None})())  # type: ignore[arg-type]
+    assert ran == ["screeners", "ideas 200", "edge desk"]
+
+
+def test_warm_home_reads_only_the_home_steps(monkeypatch: pytest.MonkeyPatch) -> None:
+    """What the app's start waits for: the home page's reads, never the market frames."""
+    ran: list[str] = []
+    for name in ("load_screeners", "screen_rows", "load_regime", "load_edge_desk"):
+        monkeypatch.setattr(warm, name, lambda c, _n=name: ran.append(_n))
+    monkeypatch.setattr(warm, "load_completeness", lambda c, n: ran.append("load_completeness"))
+    monkeypatch.setattr(warm, "load_ideas", lambda c, n: ran.append("load_ideas"))
+    monkeypatch.setattr(warm, "warm_market_frames", lambda c: ran.append("frames"))
+    warm.CacheWarmer(lambda: cast(Any, object())).warm_home()
+    assert "frames" not in ran and "load_ideas" in ran and "load_regime" in ran
+
+
+def test_a_slow_home_warm_does_not_hold_the_start_past_its_cap(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    release = threading.Event()
+
+    class Slow:
+        def warm_home(self) -> None:
+            release.wait(5)
+
+        async def run(self) -> None:
+            await asyncio.sleep(0)
+
+    async def go() -> None:
+        task = await _start_warming(cast(Any, Slow()), home_timeout_s=0.05)
+        assert task is not None
+        release.set()
+        await task
+
+    asyncio.run(go())
+    assert "serving anyway" in caplog.text

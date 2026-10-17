@@ -9,7 +9,7 @@
  * session left out, ADR 0062) feeds the session notice. Every viewer may read it; the nightly
  * run and the grid carry the same fields as the run and ingestion entities' own reads.
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -59,10 +59,21 @@ export interface StatusStripState {
 }
 
 /** What the strip draws from; `admin` adds the nightly run and the grid to the same request. */
-export function useStatusStrip(admin: boolean) {
-  return useQuery({
+function statusStripQuery(admin: boolean) {
+  return queryOptions({
     queryKey: queryKeys.gql('StatusStrip', { admin }),
     queryFn: () => gql(StatusStrip, { admin }),
+  });
+}
+
+/** Start the strip's read before the layout mounts (a route loader); the hook then joins it. */
+export function prefetchStatusStrip(client: QueryClient, admin: boolean): void {
+  void client.query(statusStripQuery(admin)).catch(() => undefined);
+}
+
+export function useStatusStrip(admin: boolean) {
+  return useQuery({
+    ...statusStripQuery(admin),
     select: (data): StatusStripState => ({
       screens: data.session
         ? {

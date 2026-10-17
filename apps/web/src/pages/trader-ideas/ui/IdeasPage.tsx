@@ -5,8 +5,9 @@
  * The signals of the followed edges sit above the table and load on demand (their own chunk).
  */
 import { Stack } from '@algotrade/ui';
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 
+import { lazyPage } from '@/shared/lib/lazy';
 import type { IdeaCompareSearch } from '@/features/idea-compare';
 import type { IdeasSearch, IdeasSearchPatch } from '@/entities/idea';
 import { IdeasHeading } from '@/widgets/ideas-heading';
@@ -14,9 +15,10 @@ import { PausedIdeas } from '@/widgets/paused-ideas';
 import { RegimeStrip } from '@/widgets/regime-strip';
 import { TopIdeas } from '@/widgets/top-ideas';
 
-const EdgeSignals = lazy(() =>
-  import('@/widgets/edge-signals').then((m) => ({ default: m.EdgeSignals })),
-);
+const EdgeSignals = lazyPage(() => import('@/widgets/edge-signals'), 'EdgeSignals');
+
+/** Fetch the edge signals' chunk ahead of the page (a route loader), so it renders unsuspended. */
+export const preloadEdgeSignals = EdgeSignals.preload;
 
 export interface IdeasPageProps {
   /** The view in use and the filter chips (the URL's search params). */

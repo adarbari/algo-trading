@@ -344,6 +344,14 @@ hundreds of concurrent requests, no hacks, and no UX trade-off that costs the cu
 5. **Long-history reads go through the history copy** (ADR 0060, [storage.md](../data/storage.md#history-copy-adr-0060)),
    not 14,000 partitions. A new chart table is added to `nightly.toml [history_copy]` within the disk budget.
 6. **Every new operation is classified** in the response-cache groups (see `add-graphql-field`).
+7. **The home page is warm before the API serves** (2026-10-16): `warm.home_steps` (screeners, screen
+   rows, completeness, regime, ideas, edge desk) run in the lifespan before the first request
+   (`CacheWarmer.warm_home`, capped at `HOME_WARM_TIMEOUT_S`) and again after each publish. The
+   resolved screeners are cached per (user, screens and versions held, catalogue)
+   (`screens/screeners.py`), not re-resolved from TOML on every request. A route's chunk is awaited
+   in its `loader` and `lazyPage` then renders it without suspending (React 19 holds a suspended
+   reveal 300 ms); the loader starts the page's reads (`prefetch*` of the entities), so they run
+   with the chunk, not when widgets mount. Target: Ideas data rendered < 500 ms, warm and cold.
 
 ## GraphQL conventions
 

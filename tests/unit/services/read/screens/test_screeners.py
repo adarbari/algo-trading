@@ -1,5 +1,9 @@
+import pytest
+
+from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
-from algotrade.services.read.context import ReadContext
+from algotrade.services.read.context import ReadContext, open_context
+from algotrade.services.read.screens import screeners
 from algotrade.services.read.screens.screeners import (
     ScreenColumn,
     ScreenCriterion,
@@ -7,7 +11,8 @@ from algotrade.services.read.screens.screeners import (
     load_screener,
     load_screeners,
 )
-from tests.unit.services.read.screens.conftest import context
+from algotrade.storage.configs.files import MemoryConfigStore
+from tests.unit.services.read.screens.conftest import CONFIGS, context
 
 
 def test_one_screener_per_id_the_users_own_config_first(ctx: ReadContext) -> None:
@@ -78,3 +83,32 @@ def test_criteria_carry_the_configs_op_and_threshold(reader: StoreReader) -> Non
         ("kind", "in", ("ETF", "ADR")),
         ("has", "not_null", None),
     ]
+
+
+def test_screeners_resolve_once_across_requests_until_a_version_is_saved(
+    reader: StoreReader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One page load asks for the screeners three times (regime strip, status strip, ideas);
+    resolving re-reads every config's TOML, so a later request shares the first's answer, and a
+    saved version (a new key) is seen at once."""
+    calls: list[str] = []
+    real = screeners._resolved
+
+    def counting(ctx: ReadContext, config_id: str, owner: str) -> Screener | None:
+        calls.append(config_id)
+        return real(ctx, config_id, owner)
+
+    monkeypatch.setattr(screeners, "_resolved", counting)
+    first = context(reader)
+    assert load_screeners(first) == load_screeners(first)
+    assert len(calls) == 3
+
+    # a later request: its own context over the same shared cache
+    later = open_context(reader, first.configs, UserContext("me"), cache=first.cache)
+    load_screeners(later)
+    assert len(calls) == 3
+
+    beta2 = CONFIGS[("me", "screeners", "beta@2")]
+    saved = {**CONFIGS, ("me", "screeners", "beta@3"): {**beta2, "version": 3}}
+    after = open_context(reader, MemoryConfigStore(saved), UserContext("me"), cache=first.cache)
+    assert {s.id: s.version for s in load_screeners(after)}["beta"] == 3
