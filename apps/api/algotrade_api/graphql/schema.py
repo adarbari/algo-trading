@@ -9,6 +9,7 @@ import asyncio
 import gzip
 import json
 import logging
+import time
 from collections.abc import Callable, Hashable
 from datetime import UTC, date, datetime
 from typing import Any, cast
@@ -27,6 +28,7 @@ from algotrade_api.graphql.context import Opener, RequestContext, StoresOpener, 
 from algotrade_api.graphql.errors import response_of
 from algotrade_api.graphql.limits import EXTENSIONS
 from algotrade_api.graphql.offload import (
+    READ_THREADS,
     Admission,
     OffLoop,
     OverloadedError,
@@ -48,6 +50,7 @@ from algotrade_api.graphql.response_cache import (
 from algotrade_api.graphql.scalars import SCALARS
 from algotrade_api.graphql.types.query import Query
 
+REPLAY_BUDGET_S = 30.0  # the longest one replay pass takes (start, or after a publish)
 _logger = logging.getLogger(__name__)
 PATH = "/graphql"
 GZIP_LEVEL = 5  # a cached answer is compressed once and read many times
@@ -86,7 +89,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
     ) -> None:
         super().__init__(*args, **kwargs)
         self._opener, self._stores_opener, self._log = opener, stores, log
-        self._revalidating: dict[str, asyncio.Task[bool]] = {}
+        self._revalidating: dict[str, asyncio.Task[None]] = {}
         self._seq, self._epoch, self._cache, self._admission = seq, epoch, cache, admission
         self._runs, self._closed, self._served = runs, closed, served
 
@@ -152,14 +155,28 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         is served stale again)."""
         if key in self._revalidating:
             return
-        task = asyncio.create_task(self.refresh(op))
+        task = asyncio.create_task(self._revalidated(op))
         self._revalidating[key] = task
         task.add_done_callback(lambda _t: self._revalidating.pop(key, None))
 
-    async def refresh(self, op: Served, only_missing: bool = False) -> bool:
+    async def _revalidated(self, op: Served) -> None:
+        try:
+            await self.refresh(op)
+        except Exception:  # a store mid-publish: the next stale hit tries again
+            _logger.exception("recomputing %s failed", operation_name(op.document))
+
+    async def aclose(self) -> None:
+        """Cancel the recomputes still running (the app is stopping) and wait for them."""
+        tasks = list(self._revalidating.values())
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def refresh(self, op: Served, only_missing: bool = False) -> bool | None:
         """Run ``op`` in process as its caller and keep the answer under the key read before it
         ran (the replay of the warmer and of a stale hit); with ``only_missing`` a fresh entry is
-        left alone. False when it was skipped, refused (a busy pool) or failed (never kept)."""
+        left alone. False when it was skipped or refused (a busy pool), None when it failed (never
+        kept)."""
         key = await self._key(op.viewer, op.document, op.variables)
         if only_missing and self._cache.get(key) is not None:
             return False
@@ -175,21 +192,33 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         finally:
             self._admission.release()
         if result.errors:
-            return False
+            return None
         body = self.encode_json(response_of(result, op.viewer.role is Role.ADMIN))
         raw = body if isinstance(body, bytes) else body.encode()
         self._cache.put(key, await asyncio.to_thread(gzip.compress, raw, GZIP_LEVEL))
         return True
 
-    async def replay(self, ops: list[Served] | None = None) -> int:
+    async def replay(
+        self, ops: list[Served] | None = None, budget_s: float = REPLAY_BUDGET_S
+    ) -> int:
         """Recompute, one after the other (the pool is shared with the pages), every operation
-        ``ops`` names (default: the log) whose answer is not fresh; how many were recomputed."""
+        ``ops`` names (default: the log) whose answer is not fresh; how many were recomputed.
+        Stops after ``budget_s``, and while the read pool is busy with requests (the next
+        publish tries again); an operation that fails is dropped from the log."""
         done = 0
+        deadline = time.monotonic() + budget_s
         for op in ops if ops is not None else self._log.items():
+            if time.monotonic() > deadline or self._admission.taken >= READ_THREADS:
+                break
             try:
-                done += await self.refresh(op, only_missing=True)
+                outcome = await self.refresh(op, only_missing=True)
             except Exception:
                 _logger.exception("replaying %s failed", operation_name(op.document))
+                outcome = None
+            if outcome is None:
+                self._log.discard(op)
+            else:
+                done += outcome
         return done
 
 

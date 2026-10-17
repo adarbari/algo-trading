@@ -436,6 +436,36 @@ def test_a_replay_runs_as_the_caller_it_recorded(harness: Harness) -> None:
         assert harness.opened > opened  # the trader's entry is not the admin's
 
 
+def test_a_replay_stops_when_the_pool_is_busy_and_drops_a_failing_operation(
+    harness: Harness,
+) -> None:
+    with harness.client() as client:
+        _post(client, SESSION)
+        _post(client, "query Day { nosuchfield }")  # errors: never kept, never replayed again
+        harness.seq = 2
+        assert client.portal is not None
+        router = harness.router
+        harness.admission.taken = READ_THREADS  # requests are using the pool
+        assert client.portal.call(router.replay) == 0
+        harness.admission.taken = 0
+        assert client.portal.call(router.replay) >= 1
+        assert client.portal.call(router.replay, None, 0.0) == 0  # no budget: nothing recomputed
+        documents = [op.document for op in router._log.items()]
+        assert "query Day { nosuchfield }" not in documents and SESSION in documents
+
+
+def test_closing_the_router_cancels_the_background_recomputes(harness: Harness) -> None:
+    with harness.client() as client:
+        _post(client, SESSION)
+        harness.now[0] += TTL_S + 1
+        _post(client, SESSION)  # stale: a recompute is started
+        assert client.portal is not None
+        client.portal.call(harness.router.aclose)
+        assert not harness.router._revalidating or all(
+            t.done() for t in harness.router._revalidating.values()
+        )
+
+
 def test_past_the_queue_the_api_answers_503_with_retry_after(harness: Harness) -> None:
     client = harness.client()
     harness.admission.admit()

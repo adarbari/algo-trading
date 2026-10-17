@@ -359,6 +359,16 @@ class OperationLog:
         while len(self._items) > self._max:
             self._items.popitem(last=False)
 
+    def discard(self, op: Served) -> None:
+        """Forget ``op`` (it failed: replaying it again every publish would only fail again)."""
+        text = json.dumps(op.variables, sort_keys=True, separators=(",", ":"), default=str)
+        ident = (
+            f"{op.viewer.role.value}:{op.viewer.user_id}",
+            hashlib.sha256(op.document.encode()).hexdigest(),
+            text,
+        )
+        self._items.pop(ident, None)
+
     def items(self) -> list[Served]:
         """The remembered operations, oldest first (the order pages first asked for them)."""
         return list(self._items.values())

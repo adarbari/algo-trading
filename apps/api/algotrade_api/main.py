@@ -257,6 +257,7 @@ def create_app(
         yield
         if warming is not None:
             await _stop(warming)
+        await app.state.graphql.aclose()
         app.state.live.close()
         _flush(  # the queued usage rows, feedback events, feature requests
             app.state.text_model, app.state.feedback, app.state.requests
@@ -345,6 +346,7 @@ def create_app(
     for router in ROUTERS:
         app.include_router(router, dependencies=caller)
     reads, gql = _mount_graphql(app, settings, users, epoch, caller)
+    app.state.graphql = gql  # the lifespan cancels its background recomputes
     user = app.state.store.user
     app.state.warmer = (
         CacheWarmer(
