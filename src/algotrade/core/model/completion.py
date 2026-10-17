@@ -9,7 +9,8 @@ from datetime import datetime
 
 OK, FAILED, FELL_BACK, SKIPPED_BUDGET = "ok", "failed", "fell_back", "skipped_budget"
 REJECTED = "rejected"  # the provider answered but the caller could not use the answer (ADR 0058)
-OUTCOMES = (OK, FAILED, FELL_BACK, SKIPPED_BUDGET, REJECTED)
+COOLING_OFF = "cooling_off"  # a provider skipped, not asked, while its exhausted quota cools off
+OUTCOMES = (OK, FAILED, FELL_BACK, SKIPPED_BUDGET, REJECTED, COOLING_OFF)
 PROVIDER, ANSWER = "provider", "answer"  # ``Attempt.stage``: where a failure happened
 MAX_SENTENCE, MAX_ANSWER = 2000, 8000  # characters of a failure's prompt / answer kept
 

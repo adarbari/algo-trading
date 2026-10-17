@@ -84,3 +84,46 @@ def claude_cli_structured(structured: object, result: str = "") -> str:
 RECORDED_STRUCTURED = claude_cli_structured(
     {"n": 1, "a": None, "b": False}, '{"n":1,"a":null,"b":false}'
 )
+
+QUOTA_MESSAGE = "You exceeded your current quota, please check your plan and billing details."
+
+
+def _google_quota(quota_id: str, retry: str | None = None) -> bytes:
+    details: list[dict[str, object]] = [
+        {
+            "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+            "violations": [
+                {"quotaMetric": "generativelanguage.googleapis.com/x", "quotaId": quota_id}
+            ],
+        }
+    ]
+    if retry:
+        details.append({"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": retry})
+    return json.dumps(
+        [
+            {
+                "error": {
+                    "code": 429,
+                    "message": QUOTA_MESSAGE,
+                    "status": "RESOURCE_EXHAUSTED",
+                    "details": details,
+                }
+            }
+        ]
+    ).encode()
+
+
+# Shaped after Gemini's 429 bodies as seen in usage/llm_calls 2026-10-17 (not byte-recorded).
+GEMINI_QUOTA_PER_DAY = _google_quota("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+GEMINI_QUOTA_PER_MINUTE = _google_quota(
+    "GenerateRequestsPerMinutePerProjectPerModel-FreeTier", "34s"
+)
+OPENAI_INSUFFICIENT_QUOTA = json.dumps(
+    {
+        "error": {
+            "message": QUOTA_MESSAGE,
+            "type": "insufficient_quota",
+            "code": "insufficient_quota",
+        }
+    }
+).encode()

@@ -7,7 +7,9 @@ allows). A
 provider that is busy (429, 500, 502, 503, 504) or unreachable is retried ``retries`` times
 with a doubling pause (``Retry-After`` wins); anything else, or the last failure, is a
 ``ModelUnavailableError`` (``core``) naming what went wrong, never the credential: the API
-answers 503 with it."""
+answers 503 with it. A 429 whose body says the quota is used up (``QUOTA_MARKERS``: Google's
+per-day ``RESOURCE_EXHAUSTED``, OpenAI's ``insufficient_quota``) is never retried (ADR 0041,
+amended 2026-10-17): it raises ``QuotaExhaustedError`` at once with a cool-off for the chain."""
 
 import json
 import re
@@ -17,17 +19,48 @@ from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
 from algotrade.core.model.completion import CallTag, Completion
-from algotrade.core.model.errors import ModelUnavailableError
+from algotrade.core.model.errors import ModelUnavailableError, QuotaExhaustedError
 from algotrade_sources.framework.http import HttpError, JsonTransport
 
 COMPLETIONS = "/chat/completions"
 JSON_SCHEMA = "json_schema"  # ``structured``: the provider takes a response schema
 SCHEMA_NAME = "answer"
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+# A 429 body that means "used up", not "slow down": (marker, per-day). Matched case-insensitively
+# against the raw body; a per-day marker cools off ``QUOTA_DAY_COOL_OFF_S`` (no assumption of the
+# provider's reset zone: Gemini resets at Pacific midnight), the others ``QUOTA_COOL_OFF_S``.
+# Google: a quota violation naming a ``...PerDay...`` quota id / metric, or the plain message;
+# OpenAI-compatible: ``error.code`` ``insufficient_quota``.
+QUOTA_MARKERS: tuple[tuple[str, bool], ...] = (
+    ("perday", True),
+    ("exceeded your current quota", False),
+    ("insufficient_quota", False),
+)
+RATE_MARKER = "perminute"  # a quota id of a per-minute limit: slow down, not used up
+QUOTA_COOL_OFF_S = 900.0
+QUOTA_DAY_COOL_OFF_S = 3600.0  # a retry an hour costs one instant 429
 DETAIL_CHARS = 120  # of an error body kept in the message (it is stored in the usage log)
 _KEYLIKE = re.compile(
     r"(?i)\b(?:bearer\s+\S+|(?:sk|pk|gsk|ghp|xox[a-z]?)[-_]\S+|AIza\S+)|[A-Za-z0-9_.\-]{16,}"
 )
+
+
+def quota_cool_off(body: bytes, retry_after: float | None) -> float | None:
+    """Seconds to leave the provider alone when the 429 ``body`` says its quota is used up, else
+    ``None`` (a rate limit: retry). ``Retry-After`` wins, else ``QUOTA_DAY_COOL_OFF_S`` for a
+    per-day quota, else ``QUOTA_COOL_OFF_S``. A per-minute Google quota (``PerMinute``)
+    keeps retrying although its message reads the same."""
+    text = body.decode("utf-8", "replace").lower()
+    if RATE_MARKER in text and QUOTA_MARKERS[0][0] not in text:
+        return None  # Google words a per-minute limit with the same message: it clears, retry
+    hits = [daily for marker, daily in QUOTA_MARKERS if marker in text]
+    if not hits:
+        return None
+    if retry_after:
+        return retry_after
+    if any(hits):
+        return QUOTA_DAY_COOL_OFF_S
+    return QUOTA_COOL_OFF_S
 
 
 def error_detail(body: bytes) -> str:
@@ -133,6 +166,10 @@ class ChatCompletions:
                 raw = self.transport(self.url, body)
             except HttpError as exc:
                 detail = error_detail(exc.body)
+                if exc.status == 429 and (cool := quota_cool_off(exc.body, exc.retry_after)):
+                    raise QuotaExhaustedError(
+                        f"{where}: HTTP 429 quota exhausted {detail}", cool
+                    ) from exc
                 if exc.status not in RETRY_STATUSES or last:
                     tried = tried if exc.status in RETRY_STATUSES else ""
                     raise ModelUnavailableError(

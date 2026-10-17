@@ -521,6 +521,23 @@ request path (a draft is never judged for a user), and under the same guards as 
 (`--yes`, `--max-calls`, `--budget-usd`, stop after three unavailable answers). It measures; it
 never gates a draft or a merge.
 
+## Amended 2026-10-17: a provider whose quota is exhausted cools off
+`usage/llm_calls` on the owner's machine: the free Gemini (first in the chain) failed 19 of 43
+screener-draft calls, mostly 429 `RESOURCE_EXHAUSTED` "exceeded your current quota" (a DAILY
+quota) and some 503 "high demand", and the call took about 40 s (p50) before the chain fell back
+to Claude, because `ChatCompletions` retried every 429 with a 20 s floor.
+- **A 429 that says the quota is used up is never retried.** The adapter reads the body
+  (`QUOTA_MARKERS` in `llm/chat.py`: a `...PerDay...` quota id, "exceeded your current quota",
+  `insufficient_quota`; a per-minute Google quota still retries) and raises `QuotaExhaustedError`
+  (a `ModelUnavailableError`) at once with a cool-off: `Retry-After` if given, else one hour for a
+  per-day quota, else 15 minutes. The hour assumes no reset zone (Gemini resets at Pacific
+  midnight, not UTC, so a cool-off to UTC midnight would skip a refilled provider for hours); a
+  retry each hour costs one instant 429.
+- **The chain skips a cooled-off member** without calling it until the cool-off passes
+  (process-local, thread-safe). Each skip is a `cooling_off` ledger row (not `failed`:
+  no one was asked; the usage reliability counts leave it out of attempts and failures); the first is logged once at WARNING. A 503 keeps its retries; the chain's deadline
+  bounds it.
+
 ## Amended 2026-10-17: the phrasebook per clause
 
 The shortcut drafted a sentence with no model only when structured entries claimed every content
