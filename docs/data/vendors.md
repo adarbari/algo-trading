@@ -207,8 +207,11 @@ Host `https://finnhub.io/api/v1`; key `ALGOTRADE_FINNHUB_API_KEY` in an `X-Finnh
 `analyst/vendor_access` (the by-hand probe) and `analyst/estimate_snapshots` (the nightly optional
 `analyst-snapshot` step). The snapshot asks FMP for three calls a name (price-target consensus, grades
 consensus, annual estimates) as far as `[fmp] daily_budget` allows, due names first (never fetched, then
-the stalest past `[fmp] refresh_days`), and Finnhub for one call a name (`[finnhub] per_night`); a name
-FMP refuses (402) is `NOT_COVERED` and waits four windows. Names: S&P 500 members plus the event-study
+the stalest past `[fmp] refresh_days`), and Finnhub for one call a name (`[finnhub] per_night`, due on its
+own `[finnhub] refresh_days`); a name FMP refuses (402) is `NOT_COVERED` and waits four windows. Each
+attempt of a vendor for a name also stores a `kind = "coverage"` row (`period = "current"`, `status`
+OK / EMPTY / NOT_COVERED / FAILED), so a refused name is told from one not yet fetched or one whose call
+failed from the store alone. With neither key set the nightly step is skipped with a WARN, not failed. Names: S&P 500 members plus the event-study
 scope list. Rows are appended per session (`ts` = fetch instant, `knowledge_ts` = publish instant),
 licence `personal`. History starts at the first fetch: neither vendor serves a point-in-time history, so
 none is backdated (ADR 0068).

@@ -21,7 +21,11 @@ never replaces (the partition is the session the fetch is for; ``ts`` the fetch 
 - which names a night asked is the run record's items (``fmp:SYM:price_target``,
   ``finnhub:SYM``...), read back by the next night: the rotation keeps no state of its own. An
   empty answer is ``EMPTY``, a refusal ``NOT_COVERED`` (neither fails the run); an error is a
-  ``FETCH_ERROR`` item and the name is asked again next night.
+  ``FETCH_ERROR`` item and the name is asked again next night;
+- every attempt of a vendor for a name also stores one ``kind = "coverage"`` row (``period``
+  ``current``, ``status`` OK / EMPTY / NOT_COVERED / FAILED, ``ts`` the attempt), so a feature can
+  tell a name the vendor refuses from one not yet fetched or one whose call failed, from the
+  store alone. A refused name has that marker and no estimate rows.
 
 Rows are staged per item and published as one partition (atomic, ADR 0022); the step is optional,
 so a vendor outage only warns. Features over the history come later (track E): nothing reads the
@@ -40,8 +44,10 @@ from algotrade.data.reference import instruments
 from algotrade.services.events.scope import LIST, REFERENCE, scoped_instruments
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.analyst.budget import NOT_MADE, PREFIX, fmp_calls_today
+from algotrade_ingestion.tasks.framework import source_guards
 from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import (
+    FAILURES,
     PUBLISHED,
     IngestRun,
     TaskContext,
@@ -52,8 +58,9 @@ from algotrade_sources.framework.base import FetchRequest, Source
 TASK = "analyst-snapshot"
 TABLE = "analyst/estimate_snapshots"
 ACCESS = "analyst/vendor_access"
-SOURCES = ("fmp_targets", "fmp_ratings", "fmp_estimates", "finnhub_recommendations")
-NOT_COVERED, EMPTY, OK = "NOT_COVERED", "EMPTY", "OK"
+SOURCES = source_guards.ANALYST_SOURCES
+NOT_COVERED, EMPTY, OK, FAILED = "NOT_COVERED", "EMPTY", "OK", "FAILED"
+COVERAGE = "coverage"  # the snapshot ``kind`` of an attempt's marker row
 PLAN_REFUSAL = 402  # FMP: "Premium Query Parameter", a symbol the free plan does not serve
 RETRY_WINDOWS = 4  # a refused name waits this many refresh windows before it is asked again
 CHECKPOINT_EVERY = 25
@@ -168,6 +175,31 @@ def build_rows(kind: str, parsed: pd.DataFrame, instrument_id: str) -> pd.DataFr
     return counts_rows(parsed, instrument_id, kind, "current")
 
 
+def coverage_status(labels: Sequence[str]) -> str:
+    """One vendor attempt for a name -> its marker ``status``, from its calls' item labels: a
+    refusal wins (the plan does not serve the name), then an error (the name is unknown, not
+    uncovered), then data (any call answered with rows), else every call was empty."""
+    if NOT_COVERED in labels:
+        return NOT_COVERED
+    if any(label in FAILURES for label in labels):
+        return FAILED
+    return OK if OK in labels else EMPTY
+
+
+def mark_coverage(run: IngestRun, name: Name, vendor: str, labels: Sequence[str]) -> None:
+    """Stage the coverage marker of one (name, vendor) attempt; none when no call was made."""
+    if not labels:
+        return
+    row = {
+        "instrument_id": name.instrument_id,
+        "ts": pd.Timestamp(run.clock()),
+        "kind": COVERAGE,
+        "period": "current",
+        "status": coverage_status(labels),
+    }
+    run.stage(TABLE, f"{COVERAGE}:{vendor}:{name.symbol}", pd.DataFrame([row]), vendor)
+
+
 def snapshot_analyst(ctx: TaskContext, session: date, limit: Any = None) -> RunRecord:
     with IngestRun(ctx, TASK, session) as run:
         sources = {n: s for n in SOURCES if isinstance((s := ctx.sources.get(n)), Source)}
@@ -230,6 +262,7 @@ def _fmp(
     fetched = refused_n = 0
     for symbol in take:
         name = by_symbol[symbol]
+        labels: list[str] = []
         for item, source_name, _, kind in calls:
             key = f"{PREFIX}{symbol}:{item}"
             if left <= 0:
@@ -237,11 +270,13 @@ def _fmp(
                 break
             left -= 1
             status = _ask(run, sources[source_name], key, name, kind, "fmp")
+            labels.append(status)
             if status == NOT_COVERED:
                 refused_n += 1
                 break  # the plan does not serve this name: the other kinds would be refused too
         else:
             fetched += 1
+        mark_coverage(run, name, "fmp", labels)
         if (fetched + refused_n) % CHECKPOINT_EVERY == 0:
             run.checkpoint()
     return {
@@ -268,17 +303,19 @@ def _finnhub(
     if ("finnhub", RECOMMENDATION[2]) in no:
         return {"skipped": "the probe says stock/recommendation is DENIED"}
     by_symbol = {n.symbol: n for n in names}
-    due = due_keys(by_symbol, answered, run.session, settings.fmp_refresh_days)
+    due = due_keys(by_symbol, answered, run.session, settings.finnhub_refresh_days)
     take = due[: settings.finnhub_per_night]
     for done, symbol in enumerate(take, 1):
-        _ask(run, source, f"{FINNHUB}{symbol}", by_symbol[symbol], "recommendation", "finnhub")
+        name = by_symbol[symbol]
+        label = _ask(run, source, f"{FINNHUB}{symbol}", name, "recommendation", "finnhub")
+        mark_coverage(run, name, "finnhub", [label])
         if done % CHECKPOINT_EVERY == 0:
             run.checkpoint()
     return {"due": len(due), "asked": len(take), "names": take}
 
 
 def _ask(run: IngestRun, source: Source, key: str, name: Name, kind: str, vendor: str) -> str:
-    """One vendor call -> its item status; the rows (stamped ``ts`` = now) are staged."""
+    """One vendor call -> its item label; the rows (stamped ``ts`` = now) are staged."""
 
     def ask() -> str:
         request = FetchRequest(name.symbol, name.instrument_id, run.session)

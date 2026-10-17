@@ -4,7 +4,15 @@
 from dataclasses import replace
 from datetime import timedelta
 
-from algotrade.features.rollups.consensus.analyst_status import NOT_FETCHED
+from algotrade.data.analyst.reading import KINDS as ANALYST_KINDS
+from algotrade.data.analyst.reading import snapshot_window
+from algotrade.features.rollups.consensus import analyst_estimates as ae
+from algotrade.features.rollups.consensus.analyst_status import (
+    LOOKBACK,
+    NOT_COVERED,
+    NOT_FETCHED,
+    OK,
+)
 from algotrade.services.features import site_features
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
@@ -13,6 +21,7 @@ from algotrade_ingestion.tasks.analyst.snapshot import run
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.workflows.nightly.nightly import NIGHTLY
 from tests.apps.ingestion.tasks.analyst.test_snapshot import D1, context, seed
+from tests.helpers.analyst_snapshots import FIRST, universe
 
 
 def limit(ctx: TaskContext, share: float) -> TaskContext:
@@ -35,10 +44,9 @@ def test_it_passes_when_the_backlog_is_within_the_limit() -> None:
     writer = StoreWriter(MemoryBackend())
     seed(writer)
     ctx = context(writer, D1, [])
-    run(ctx, {"session": D1})  # AAPL and NVDA asked; CHWY refused, no marker row yet
-    (check,) = check_analyst_backlog(limit(ctx, 0.5), D1)
-    assert check.status == "PASS" and check.data["not_asked"] == 1
-    assert check_analyst_backlog(limit(ctx, 0.2), D1)[0].status == "WARN"
+    run(ctx, {"session": D1})  # AAPL and NVDA asked; CHWY refused: its marker is an attempt
+    (check,) = check_analyst_backlog(ctx, D1)
+    assert check.status == "PASS" and check.data["not_asked"] == 0
 
 
 def test_a_name_asked_long_ago_is_back_in_the_backlog() -> None:
@@ -68,3 +76,21 @@ def test_not_fetched_is_never_declared_without_the_backlog_check_on_the_step() -
     assert declaring, "the analyst groups declare NOT_FETCHED"
     step = next(s for s in NIGHTLY if s.name == "analyst-snapshot")
     assert check_analyst_backlog in step.accept_with
+
+
+def test_the_groups_read_the_markers_the_task_writes() -> None:
+    """The task's own rows, not a hand-built frame: a refused name reads NOT_COVERED, an answered
+    one OK, a name the rotation has not reached NOT_FETCHED (the backlog this check counts)."""
+    writer = StoreWriter(MemoryBackend())
+    seed(writer)
+    ctx = context(writer, D1, [])
+    run(ctx, {"session": D1, "limit": 2})  # two of the three names reach FMP tonight
+    snaps = snapshot_window(ctx.reader, ANALYST_KINDS, FIRST).at(D1, LOOKBACK)
+    ids = [f"EQ:{s}" for s in ("AAPL", "NVDA", "CHWY")]
+    inputs = {ae.SNAPSHOTS: snaps, ae.UNIVERSE: universe(*ids), ae.FINANCIALS: None}
+    got = ae.compute(inputs, D1, ae.EstimatesParams()).set_index("instrument_id")
+    assert got["estimates_status"].to_dict() == {
+        "EQ:AAPL": OK,
+        "EQ:CHWY": NOT_COVERED,  # refused: its marker says so
+        "EQ:NVDA": NOT_FETCHED,  # not reached tonight: no row, no marker
+    }

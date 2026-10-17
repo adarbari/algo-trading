@@ -181,6 +181,7 @@ TASKS: dict[str, Task] = {
             ("analyst/estimate_snapshots",),
             analyst_snapshot.run,
             optional_sources=analyst_snapshot.SOURCES,
+            skip=source_guards.no_analyst_source,
             settings="sources.toml [fmp] [finnhub]; events/scope.toml",
             params=(SESSION, Param("limit", ("--limit",), int, "ask at most N names of FMP")),
         ),

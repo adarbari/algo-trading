@@ -10,8 +10,8 @@ that long before it is asked again, so its marker, or its rows, keep it out of t
 
 WARN only, above ``[quality] max_analyst_backlog``: the step is optional, and a backlog means
 the ``[fmp] daily_budget`` is smaller than the names due, not that data is wrong. Nothing without
-a finished run of the session. Until the task writes coverage markers a refused name has no row
-and counts here as never asked.
+a finished run of the session. Every attempt writes a coverage marker, so a refused or empty name
+is asked, not backlog; only a name no attempt reached in the window is.
 """
 
 from datetime import date, timedelta

@@ -149,6 +149,17 @@ def test_not_covered_and_not_fetched_are_told_apart() -> None:
     )
 
 
+def test_an_ok_attempt_whose_rows_are_over_21_days_old_is_stale_even_after_a_failed_one() -> None:
+    """The vendor returned data on 2026-09-20 (an OK marker and rows); a later attempt FAILED.
+    A transient failure is not a refusal: the name stays STALE, never NOT_COVERED."""
+    writer = store()
+    put(writer, date(2026, 9, 20), [*estimates(A, YEARS), marker(A, "OK")])
+    put(writer, S, [marker(A, "FAILED")])
+    row = run(writer, S).loc[A]
+    assert row[ae._STATUS] == STALE and row["estimates_age_days"] == 26
+    assert pd.isna(row["eps_fy1"])
+
+
 def test_a_store_without_markers_reads_every_name_as_never_asked_or_ok() -> None:
     writer = snapshot_of(S, estimates(A, YEARS))
     got = run(writer, S, ids=(A, B))
