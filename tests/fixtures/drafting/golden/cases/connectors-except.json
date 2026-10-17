@@ -50,7 +50,14 @@
     "explained": {
       "parts": [
         {
-          "words": "optionable stocks over $10",
+          "words": "optionable stocks",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "over $10",
           "kind": "applied",
           "origin": "words",
           "join": null,
