@@ -68,6 +68,16 @@ stored before stays across sessions, and `checked_ts` says how old it is.
 - **Finnhub: a whole-universe rotation.** At one call a second the recommendation trend of every
   name is a few hours of calls; it is spread over nights.
 
+### Built: the nightly snapshot (edge build D2, 2026-10-17)
+`analyst-snapshot` (`tasks/analyst/snapshot.py`, an optional step of the nightly workflow, latest
+session only) appends each night's slice to `analyst/estimate_snapshots`, keyed (`instrument_id`,
+`source`, `kind`, `period`) per session partition: `ts` the fetch instant, `knowledge_ts` the run's
+publish instant, never a vendor date, no earlier session's row replaced. Names: S&P 500 members and
+the scope list. FMP spends three calls a name within `[fmp] daily_budget` on names due on the
+`[fmp] refresh_days` cadence (never fetched first, then the stalest); a 402 name is `NOT_COVERED`
+and waits four windows. Finnhub reads up to `[finnhub] per_night` names. The rotation is read back
+from the run records' items, so the table holds no state of its own.
+
 ### History starts at the first fetch
 Neither vendor gives a point-in-time history: a value they serve today replaces yesterday's and the
 vendor's own "history" is a restated series. We do not backdate it: a row's `session_date` and

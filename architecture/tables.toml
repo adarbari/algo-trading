@@ -47,6 +47,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/analyst/probe.py"
 note = "ADR 0068: which analyst endpoints each free vendor key may call (FMP, Finnhub), one row per (vendor, endpoint), from the by-hand analyst-probe"
 
 [[table]]
+name = "analyst/estimate_snapshots"
+owner = "apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py"
+note = "ADR 0068: our own point-in-time history of FMP and Finnhub analyst data, appended nightly (ts = fetch, knowledge_ts = publish), never replaced by a later session"
+
+[[table]]
 name = "instruments/index_membership"
 owner = "apps/ingestion/algotrade_ingestion/tasks/listings/index_membership.py"
 

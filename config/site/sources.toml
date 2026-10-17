@@ -149,12 +149,15 @@ enabled = true                   # ALGOTRADE_FMP_API_KEY (free: site.financialmo
 min_interval_s = 1.0             # free tier: about 250 calls a day; the pace only keeps bursts polite
 licence = "personal"             # FMP's free terms: personal use; features derived from it inherit it
 daily_budget = 200               # FMP calls a UTC day the analyst tasks may spend (the plan allows ~250; the rest is
-                                 # headroom for a hand run); `analyst-probe` counts its own, later tasks add theirs
+                                 # headroom for a hand run); `analyst-probe` and `analyst-snapshot` count their own
+refresh_days = 7                 # analyst-snapshot: each name's FMP data (3 calls) is refetched this often, stalest first;
+                                 # a name FMP refused (402: not on the free plan) waits 4x this before it is asked again
 
 [finnhub]                        # Finnhub analyst recommendation trends (ADR 0068); key in .env
 enabled = true                   # ALGOTRADE_FINNHUB_API_KEY (free: finnhub.io); no key: the source is skipped
 min_interval_s = 1.0             # free tier: 60 calls a minute
 licence = "personal"             # Finnhub's free terms: personal use; features derived from it inherit it
+per_night = 300                  # analyst-snapshot: names whose recommendation trend a night reads (1 call each, stalest first)
 
 [sp500_history]                  # S&P 500 membership intervals since 1996 (fja05680/sp500, MIT licence, GitHub):
 enabled = true                   # the `index-membership` task (in no workflow until the owner runs it), one 28 KB file
@@ -227,6 +230,7 @@ max_macro_stale_share = 0.20     # macro (ADR 0048): FAIL if over 20% of the ena
                                  # than their cadence + release lag + 2 days (3 for a daily series), or any series lost stored vintages
 min_calendar_future_dates = 1    # macro release calendar (ADR 0050): FAIL if a FRED release lists fewer scheduled dates
                                  # after the session than this (FRED serves the next ones for every release it has)
+max_analyst_failed = 0.20        # analyst-snapshot (ADR 0068): WARN above 20% of the night's vendor calls failing (a refused name is no failure)
 max_filings_failed = 0.05  # 8-K filings (ADR 0050): FAIL if over 5% of the SEC requests (CIKs, index days) failed
 filings_backfill_per_night = 50  # 8-K filings: CIKs new to the universe (or never read) read in full a night, nightly mode
 
