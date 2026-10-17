@@ -446,14 +446,17 @@ def _priced_store() -> tuple[StoreWriter, StoreReader]:
     return writer, StoreReader(writer._backend)
 
 
-def _stats(writer: StoreWriter, day: date, adv: float, run: str) -> None:
-    frame = [{"instrument_id": "EQ:AAPL", "symbol": "AAPL", "close": 100.0, "adv_usd_20d": adv}]
+def _stats(writer: StoreWriter, day: date, adv: dict[str, float], run: str) -> None:
+    frame = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "close": 100.0, "adv_usd_20d": v}
+        for s, v in adv.items()
+    ]
     writer.write_table(PRICE_STATS, day, run, stamped(frame, day, run))
 
 
 def test_limit_takes_the_sp500_first_then_the_liquid_optionable() -> None:
     writer, reader = _priced_store()
-    _stats(writer, DAY - timedelta(days=1), 5e7, "p")
+    _stats(writer, DAY - timedelta(days=1), {"AAPL": 5e7}, "p")
     feed = FakeFacts()
     ingest_shares(task_ctx(writer, reader, CLOCK), sources(feed), DAY, limit=2)
     fetched = [u.rsplit("CIK", 1)[1][:10] for u in feed.urls]
@@ -461,12 +464,18 @@ def test_limit_takes_the_sp500_first_then_the_liquid_optionable() -> None:
 
 
 def test_a_rerun_after_tonights_rollups_keeps_the_same_order() -> None:
-    """Fails if an input was read on the session itself: the roll-ups written after the first
-    attempt would reorder (and the cap pick other CIKs)."""
+    """Two optionable names outside the S&P 500: the prior day's roll-up puts GOOGL (liquid)
+    ahead of AAPL; tonight's, written between the two runs, would lift AAPL above it. Fails if
+    an input is read on the session itself: the rerun would fetch AAPL first."""
     writer, reader = _priced_store()
+    reference = reader.table("instruments/reference", DAY)
+    fixed = reference.assign(in_sp500=False, optionable=reference["symbol"] != "SPY")
+    writer.write_table("instruments/reference", DAY, "v", fixed)
+    _stats(writer, DAY - timedelta(days=1), {"AAPL": 1e6, "GOOGL": 5e7}, "prior")
     first, second = FakeFacts(), FakeFacts()
-    ingest_shares(task_ctx(writer, reader, CLOCK), sources(first), DAY, limit=3)
-    _stats(writer, DAY, 5e7, "same-day")  # tonight's price_stats, written after
-    ingest_shares(task_ctx(writer, reader, CLOCK), sources(second), DAY, force=True, limit=3)
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(first), DAY, force=True, limit=1)
+    _stats(writer, DAY, {"AAPL": 9e8, "GOOGL": 5e7}, "same-day")  # tonight's, written after
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(second), DAY, force=True, limit=1)
     order = [u.rsplit("CIK", 1)[1][:10] for u in first.urls]
+    assert order == [GOOGL_CIK]
     assert order == [u.rsplit("CIK", 1)[1][:10] for u in second.urls]
