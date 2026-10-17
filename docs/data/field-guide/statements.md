@@ -508,3 +508,432 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 - PARTIAL is common for filers that switch the tag of a line (for example cash with or without restricted cash) between reports. Read rollup.balance_sheet@v1.bs_as_of and check the figures before a ratio.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
+
+### `rollup.growth_history@v1.revenue_ttm_3y_ago`
+
+**How to read it.** Revenue over the trailing twelve months that ended about three years before the newest one, in dollars. It is the four consecutive quarters, else the fiscal year, ending within 40 days of that date. The base of feature.revenue_cagr_3y.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| three years of revenue history exist | `not_null` | hard | - | mostly a building block for feature.revenue_cagr_3y; a hard criterion drops every company younger than three years |
+
+**When the reading lies**
+
+- Null for a company with less than three years of filed history, such as a recent listing, and for a gap in it. A missing quarter gives null, never a shorter sum.
+- Restatements and acquisitions are as filed: the figure is the one public at the session, not a like-for-like base. A merged company can show growth that no customer ever bought.
+- Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.
+- Null for funds, foreign filers that do not report in USD and companies without the filed history. A hard criterion drops them all.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
+
+### `rollup.growth_history@v1.revenue_ttm_5y_ago`
+
+**How to read it.** Revenue over the trailing twelve months that ended about five years before the newest one, in dollars. It is the four consecutive quarters, else the fiscal year, ending within 40 days of that date. The base of feature.revenue_cagr_5y.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| five years of revenue history exist | `not_null` | hard | - | mostly a building block for feature.revenue_cagr_5y; a hard criterion drops every company younger than five years |
+
+**When the reading lies**
+
+- Null for a company with less than five years of filed history and for a gap in it. A missing quarter gives null, never a shorter sum.
+- Restatements and acquisitions are as filed: the figure is the one public at the session, not a like-for-like base. A merged company can show growth that no customer ever bought.
+- Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.
+- Null for funds, foreign filers that do not report in USD and companies without the filed history. A hard criterion drops them all.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
+
+### `rollup.growth_history@v1.eps_diluted_ttm_3y_ago`
+
+**How to read it.** Diluted EPS over the trailing twelve months that ended about three years before the newest one, in dollars per share, split-adjusted to the session. The base of feature.eps_cagr_3y; negative when the company then lost money.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| earned money three years ago | `gt 0` | hard | - | mostly a building block for feature.eps_cagr_3y |
+
+**When the reading lies**
+
+- Split-adjusted by filing date like rollup.financials@v2.eps_diluted_ttm, so a split in between is not read as a fall. Quarterly EPS is not additive across share count changes, so the sum is the usual approximation.
+- A loss or a zero then gives no growth rate: feature.eps_cagr_3y is null, not negative. Check the revenue rate instead.
+- Null for a company with less than three years of filed history and for a gap in it. Companies of one CIK share the company figure.
+- Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.
+- Null for funds, foreign filers that do not report in USD and companies without the filed history. A hard criterion drops them all.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
+
+### `rollup.growth_history@v1.eps_diluted_ttm_5y_ago`
+
+**How to read it.** Diluted EPS over the trailing twelve months that ended about five years before the newest one, in dollars per share, split-adjusted to the session. The base of feature.eps_cagr_5y; negative when the company then lost money.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| earned money five years ago | `gt 0` | hard | - | mostly a building block for feature.eps_cagr_5y |
+
+**When the reading lies**
+
+- Split-adjusted by filing date like rollup.financials@v2.eps_diluted_ttm, so a split in between is not read as a fall. Quarterly EPS is not additive across share count changes, so the sum is the usual approximation.
+- A loss or a zero then gives no growth rate: feature.eps_cagr_5y is null, not negative. Check the revenue rate instead.
+- Null for a company with less than five years of filed history and for a gap in it. Companies of one CIK share the company figure.
+- Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.
+- Null for funds, foreign filers that do not report in USD and companies without the filed history. A hard criterion drops them all.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
+
+### `rollup.growth_history@v1.gh_status`
+
+**How to read it.** Whether the multi-year history of the name can be trusted as a set. OK: revenue and EPS TTMs end on the same period and all four values are known. PARTIAL: some are missing, or the two end on different periods. NO_FACTS: no revenue or EPS fact is filed. STALE: the newest TTM ended more than 480 days before the session; values are shown but old.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a complete history | `eq "OK"` | hard | - | - |
+| leave out stale filers | `ne "STALE"` | hard | - | - |
+
+**When the reading lies**
+
+- PARTIAL is normal for a company under five years old, and for a filer without an EPS line: read the single column you need instead of requiring OK.
+- STALE is checked first, so a late filer reads STALE whatever its history. A name between its quarterly and annual report is not stale.
+- OK does not say the growth rates exist: a loss then or now makes the EPS rates null, and a zero revenue base does the same for revenue.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
+
+### `feature.ebitda`
+
+**How to read it.** Operating income plus depreciation and amortisation over the trailing twelve months, in dollars: operating profit before the non-cash charge for old assets. Negative for an operating loss. The denominator of feature.ev_ebitda.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| positive EBITDA | `gt 0` | hard | - | - |
+| a large operating earner | `gte 1000000000` | soft | 0.3 x the threshold | - |
+
+**When the reading lies**
+
+- Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v1.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company.
+- A filer that does not tag a line has none, and null is not zero. A filer without a D&A line has no EBITDA: check the cash flow statement in the filing.
+- Both lines are the filer's own tags, so the sum can differ from the figure a company quotes as adjusted EBITDA. One-offs inside operating income stay in.
+- Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio. Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Damodaran, Investment Valuation (3rd ed.), ch. 'Measuring Earnings' and 'Equity Value to Firm Value': the definitions behind these ratios
+
+### `feature.gross_margin`
+
+**How to read it.** Gross profit over revenue for the trailing twelve months: 0.20 is a distributor or retailer, 0.40 a branded manufacturer, 0.70 and above software. The share of each sales dollar left after the direct cost of what was sold.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a strong gross margin | `gte 0.4` | soft | 0.05 | compare within instrument.sector: a retailer at 0.25 is strong |
+
+**When the reading lies**
+
+- Many filers do not tag GrossProfit, so a hard criterion drops them. Null is not a bad margin; check rollup.income_statement@v1.ebit_ttm for those names.
+- Filers draw the line between cost of revenue and operating costs differently. Compare within an industry only.
+- Gross profit and revenue are separate TTMs and can end on different quarters when the filer's tags differ in timing. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Penman, Financial Statement Analysis and Security Valuation: profitability ratios and their drivers
+
+### `feature.operating_margin`
+
+**How to read it.** Operating income (EBIT) over revenue for the trailing twelve months: 0.10 is healthy for most industries, 0.25 and above is software or a franchise, negative is an operating loss. The profit left on each sales dollar before interest and tax.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a profitable operation | `gt 0.1` | soft | 0.03 | - |
+| no operating loss | `gt 0` | hard | - | - |
+
+**When the reading lies**
+
+- Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v1.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company.
+- Operating income includes one-offs the filer leaves in it (impairments, restructuring, legal charges). One bad quarter can turn a sound business negative.
+- EBIT and revenue are separate TTMs and can end on different quarters when the tags differ in timing. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Penman, Financial Statement Analysis and Security Valuation: profitability ratios and their drivers
+
+### `feature.interest_cover`
+
+**How to read it.** Operating income over interest expense for the trailing twelve months: how many times the operating profit pays the interest. Under 2 is thin, 2 to 8 is normal, above 8 is comfortable. Negative when operating income is a loss.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| comfortable interest cover | `gte 5` | soft | 1 | with feature.debt_to_equity lte 1 so a low cover is not hidden by a large debt |
+
+**When the reading lies**
+
+- Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v1.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company.
+- Null when the interest expense is zero or untagged: a company without an interest line is not shown as infinitely covered. Check the debt in the filing.
+- Some filers net interest income against it or report it inside another line, which can flatter the cover. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Damodaran, Investment Valuation (3rd ed.), ch. 'Measuring Earnings' and 'Equity Value to Firm Value': the definitions behind these ratios
+
+### `feature.roe`
+
+**How to read it.** Net income over the trailing twelve months against stockholders' equity at the latest balance sheet: 0.10 is average, 0.15 and above is a strong business, negative is a loss. The yearly profit earned on each dollar of book equity.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a strong return on equity | `gte 0.15` | soft | 0.03 | with feature.debt_to_equity lte 1.5 |
+
+**When the reading lies**
+
+- Null for negative equity, which buybacks and accumulated losses both cause, so a hard criterion drops some of the best and some of the worst names. Check feature.roic.
+- Debt lifts it: a leveraged company shows a high ROE with the same business. Pair with feature.debt_to_equity.
+- Net income is a TTM and equity a quarter-end balance, not an average over the year. Banks keep it: ROE is their main measure. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Penman, Financial Statement Analysis and Security Valuation: profitability ratios and their drivers
+
+### `feature.roa`
+
+**How to read it.** Net income over the trailing twelve months against total assets at the latest balance sheet: 0.05 is a good industrial, 0.01 is normal for a bank. The yearly profit earned on each dollar of assets, whoever financed them.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a good return on assets | `gte 0.05` | soft | 0.02 | - |
+
+**When the reading lies**
+
+- Comparable only within an industry: a bank holds assets worth ten times its equity, a software company almost none.
+- Net income is a TTM and assets a quarter-end balance, not an average over the year. Banks keep it. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+- Null for a missing assets figure and for funds and foreign filers that do not report in USD.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Penman, Financial Statement Analysis and Security Valuation: profitability ratios and their drivers
+
+### `feature.roic`
+
+**How to read it.** Operating income after a flat 21% tax (EBIT times 0.79) over invested capital: equity plus total debt less cash. 0.08 is about the cost of capital, 0.15 and above is a strong business. The yearly return on money put into operations.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a strong return on capital | `gte 0.15` | soft | 0.03 | with rollup.income_statement@v1.is_status eq OK |
+
+**When the reading lies**
+
+- Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v1.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company.
+- The flat 21% tax is not the company's own rate, and invested capital leaves out leases, goodwill adjustments and short-term investments. Read it as a screen, not a valuation input.
+- Null when any of equity, debt or cash is untagged, and when cash exceeds equity plus debt. A hard criterion drops those names. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Greenblatt, The Little Book That Beats the Market: return on capital as a quality screen; Damodaran, Investment Valuation (3rd ed.), ch. 'Measuring Earnings' and 'Equity Value to Firm Value': the definitions behind these ratios
+
+### `feature.net_debt`
+
+**How to read it.** Total debt less cash and equivalents at the latest balance sheet, in dollars. Negative is a net cash position. Short-term investments are left out, so a company that keeps its cash as securities shows more net debt than it has.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a net cash balance sheet | `lt 0` | hard | - | mostly a building block; compare it with feature.market_cap |
+
+**When the reading lies**
+
+- Null when debt or cash is untagged: an untagged debt line is not zero, and rollup.balance_sheet@v1.debt_basis says NOT_TAGGED.
+- Leases and pension deficits are not debt here. Banks hold deposits as liabilities and a bank's debt is not comparable with an industrial's.
+- Dollars, not a ratio: compare with feature.ebitda or feature.market_cap. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Damodaran, Investment Valuation (3rd ed.), ch. 'Measuring Earnings' and 'Equity Value to Firm Value': the definitions behind these ratios
+
+### `feature.debt_to_equity`
+
+**How to read it.** Total debt over stockholders' equity at the latest balance sheet: 0.5 is 50 cents of borrowing for each dollar of book equity. Under 0.5 is conservative, above 2 is heavily borrowed for an industrial.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| conservative borrowing | `lte 0.5` | soft | 0.25 | - |
+| not heavily borrowed | `lte 2` | hard | - | - |
+
+**When the reading lies**
+
+- Null for negative equity, so a hard criterion drops the most indebted names. Check rollup.balance_sheet@v1.total_debt against feature.ebitda instead.
+- Total debt is the sum of the parts of one filing and leaves out leases. Banks and utilities run high ratios for good reason: compare within an industry.
+- A company that tags no debt line is null, not debt-free. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Damodaran, Investment Valuation (3rd ed.), ch. 'Measuring Earnings' and 'Equity Value to Firm Value': the definitions behind these ratios
+
+### `feature.pb_ratio`
+
+**How to read it.** Market cap over stockholders' equity at the latest balance sheet: 1 means the market values the company at its book. Under 1 is below book, 1 to 3 is typical, above 5 is priced for returns well above book value.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| cheap against book | `lt 1.5` | soft | 0.5 | with feature.roe gt 0.08 so a low price is not a poor business |
+
+**When the reading lies**
+
+- Null for negative equity. Buybacks and old losses push book equity down, so a high or missing P/B can mean an old, cash-rich company, not an expensive one.
+- Book value leaves out brands, software and people: it means little for asset-light companies. Banks keep it, where it is the standard ratio.
+- Market cap is the company total count times this class's close. The statements are the company's, so it is misstated when share classes trade at very different prices, and null for an ADR. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Fama and French (1992), The Cross-Section of Expected Stock Returns: book-to-market and returns
+
+### `feature.fcf`
+
+**How to read it.** Operating cash flow less capital expenditure over the trailing twelve months, in dollars: the cash left after the business pays to keep and grow its assets. Negative when spending exceeds cash from operations.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| positive free cash flow | `gt 0` | hard | - | - |
+
+**When the reading lies**
+
+- Null for a filer that does not tag capex: free cash flow is never taken as equal to operating cash flow. rollup.cash_flow@v1.cf_status shows PARTIAL for those names.
+- Capex covers property, plant and equipment only. Acquisitions, capitalised software and leases are other lines, so an acquisitive company can look richer than it is.
+- Working capital swings move one year's figure: read two years. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio. Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
+
+### `feature.fcf_yield`
+
+**How to read it.** Free cash flow over the trailing twelve months divided by market cap: 0.05 is 5 cents of free cash flow a year for each dollar of market value. Above 0.08 is cheap on cash, negative means the company burns cash.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| cheap on free cash flow | `gte 0.06` | soft | 0.02 | with feature.interest_cover gte 3 so the cash is not owed to lenders |
+
+**When the reading lies**
+
+- Null for a filer that does not tag capex, for a missing market cap and for an ADR. A hard criterion drops them all.
+- Market cap is the company total count times this class's close. The statements are the company's, so it is misstated when share classes trade at very different prices, and null for an ADR.
+- A high yield from a one-year working capital release reverses: check feature.fcf over two years. Banks' cash flow includes deposit movements, so the figure is not comparable with an industrial's.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Damodaran, free cash flow to equity and the cash yield as a valuation screen
+
+### `feature.enterprise_value`
+
+**How to read it.** Market cap plus total debt less cash at the latest balance sheet, in dollars: what it would cost to buy the whole business and clear its net debt. The numerator of feature.ev_ebitda.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a large enterprise | `gte 10000000000` | soft | 0.3 x the threshold | - |
+
+**When the reading lies**
+
+- Minority interest, preferred stock, leases, pensions and short-term investments are not adjusted for, so the figure is approximate for companies with large ones.
+- Null when debt or cash is untagged, for a missing market cap and for an ADR. Market cap is the company total count times this class's close. The statements are the company's, so it is misstated when share classes trade at very different prices, and null for an ADR.
+- Banks have no meaningful enterprise value: their debt is their operating liabilities. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Damodaran, Investment Valuation (3rd ed.), ch. 'Measuring Earnings' and 'Equity Value to Firm Value': the definitions behind these ratios
+
+### `feature.ev_ebitda`
+
+**How to read it.** Enterprise value over EBITDA for the trailing twelve months: 10 means the business is priced at ten years of its operating earnings before interest, tax and depreciation. Under 8 is cheap, above 20 is priced for growth.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| cheap on enterprise value | `lt 8` | soft | 2 | with feature.operating_margin gt 0.05 so a low multiple is not a thin margin |
+
+**When the reading lies**
+
+- Null when EBITDA is not positive, so loss makers are not shown cheap, and for banks, where the EBIT family is null by design. A hard 'lt 8' silently drops them.
+- Capital-intensive industries run low multiples for good reason: compare within instrument.sector. Debt, leases and one-offs are as the filer tagged them.
+- Null when any input is null, and for an ADR. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Damodaran, Investment Valuation (3rd ed.), ch. 'Measuring Earnings' and 'Equity Value to Firm Value': the definitions behind these ratios; Loughran and Wellman (2011), New Evidence on the Relation between the Enterprise Multiple and Average Stock Returns
+
+### `feature.revenue_cagr_3y`
+
+**How to read it.** Compound annual growth of revenue over three years: the TTM against the TTM about three years earlier, as a yearly rate. 0.10 is 10% a year, 0.20 and above is a fast grower, negative is a shrinking business.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| steady growth over three years | `gte 0.1` | soft | 0.03 | with feature.revenue_growth_yoy gt 0 so the old growth has not stopped |
+
+**When the reading lies**
+
+- Null when the base 3 years ago is zero or negative, or the current one is, and for a company with under three years of filed history.
+- Acquisitions inflate reported growth and divestitures deflate it; the figure is the reported one, not organic. A jump after a deal is not demand.
+- The two ends are TTMs, so a seasonal company is compared like with like, but a cycle peak or trough end point can mislead. Check feature.revenue_growth_yoy for the recent pace.
+- Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); CFA Institute curriculum, compound annual growth rate as the standard multi-year growth measure
+
+### `feature.revenue_cagr_5y`
+
+**How to read it.** Compound annual growth of revenue over five years: the TTM against the TTM about five years earlier, as a yearly rate. 0.10 is 10% a year, 0.20 and above is a fast grower, negative is a shrinking business.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| steady growth over five years | `gte 0.1` | soft | 0.03 | with feature.revenue_growth_yoy gt 0 so the old growth has not stopped |
+
+**When the reading lies**
+
+- Null when the base 5 years ago is zero or negative, or the current one is, and for a company with under five years of filed history.
+- Acquisitions inflate reported growth and divestitures deflate it; the figure is the reported one, not organic. A jump after a deal is not demand.
+- The two ends are TTMs, so a seasonal company is compared like with like, but a cycle peak or trough end point can mislead. Check feature.revenue_growth_yoy for the recent pace.
+- Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); CFA Institute curriculum, compound annual growth rate as the standard multi-year growth measure
+
+### `feature.eps_cagr_3y`
+
+**How to read it.** Compound annual growth of diluted EPS over three years: the TTM against the TTM about three years earlier, as a yearly rate. 0.10 is 10% a year, 0.20 and above is a fast grower, negative is a shrinking business.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| steady growth over three years | `gte 0.1` | soft | 0.03 | with feature.revenue_growth_yoy gt 0 so the old growth has not stopped |
+
+**When the reading lies**
+
+- Null when the base 3 years ago is zero or negative, or the current one is. A rate from or to a loss is meaningless, so a hard criterion drops loss makers.
+- Buybacks lift EPS growth above earnings growth, and splits are adjusted by filing date. A small base makes huge rates; check the EPS level too.
+- The two ends are TTMs, so a seasonal company is compared like with like, but a cycle peak or trough end point can mislead. Check feature.revenue_growth_yoy for the recent pace.
+- Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); CFA Institute curriculum, compound annual growth rate as the standard multi-year growth measure
+
+### `feature.eps_cagr_5y`
+
+**How to read it.** Compound annual growth of diluted EPS over five years: the TTM against the TTM about five years earlier, as a yearly rate. 0.10 is 10% a year, 0.20 and above is a fast grower, negative is a shrinking business.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| steady growth over five years | `gte 0.1` | soft | 0.03 | with feature.revenue_growth_yoy gt 0 so the old growth has not stopped |
+
+**When the reading lies**
+
+- Null when the base 5 years ago is zero or negative, or the current one is. A rate from or to a loss is meaningless, so a hard criterion drops loss makers.
+- Buybacks lift EPS growth above earnings growth, and splits are adjusted by filing date. A small base makes huge rates; check the EPS level too.
+- The two ends are TTMs, so a seasonal company is compared like with like, but a cycle peak or trough end point can mislead. Check feature.revenue_growth_yoy for the recent pace.
+- Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
+
+Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); CFA Institute curriculum, compound annual growth rate as the standard multi-year growth measure
