@@ -336,8 +336,8 @@ derives nothing (ADR 0038) and a model's copy of the trader's words is not the t
   found after the previous one (so also a reordered or overlapping one), are over 200 characters or are
   malformed is dropped and its items fall back. `start` / `end` are **UTF-16 code units** (what the
   browser's `slice` counts; Python counts code points, converted on the server, tested with accents and
-  an emoji). Text no part covers that holds a word other than glue (`and with plus also then that which
-  where whose who the a an &`) becomes a `not_understood` part, so nothing is silently dropped; at most 12
+  an emoji). Text no part covers that holds a word other than glue or a connector (the vocabulary of
+  "Amended 2026-10-17: connectors and glue between parts" below) becomes a `not_understood` part, so nothing is silently dropped; at most 12
   parts carry words (the last model parts give way).
 - **Attribution** is deterministic, in order: the part the model tagged the item with; else the part
   whose words contain the item's `span` (unresolved, missing); else the first part whose words say a
@@ -469,6 +469,44 @@ retyping just that part's words, which re-drafts only that part. This is the sec
 - **Not decided here**: the web states (limit reached, confirmation before replacing hand-edited rows) are the web PR's.
   Notes and the dropped formulas / suggestions of the replaced words stay in the merged draft (they have no part to go
   with).
+
+## Amended 2026-10-17: connectors and glue between parts
+
+The prompt told the model to "skip connectors" in a part's words, but the server treated only 14
+words as glue, so what the model rightly left out came back as `not_understood` chips: `have`, `have`,
+`but`, `are` for "growth stock which have grown twice as fast as S&P and have had a great start...";
+`but`, `while`, `are`, `yet`, `although`, `show me`, `I'm looking for, basically` for six other
+sentences of 2026-10-17. An LLM judge scored Claude's segmentation 15/34 for this alone (owner
+approved the fix the same day).
+
+- **One vocabulary**, `services/drafting/parts/connectors.py`. `JOINS` maps a phrase to a logic
+  (`and`: and, but, yet, while, although, though, whereas, plus, also, as long as, so long as, only if,
+  provided (that), with, then; `or`: or, either, otherwise; `and_not`: except (for), excluding, exclude,
+  unless, without, but not, not, avoid, other than, rather than, minus, no); the longest phrase wins and
+  only whole words match. `GLUE` is closed-class words that mean nothing alone (auxiliaries, pronouns,
+  determiners, and fillers such as `show me`, `I'm looking for`). The prompt renders its connector list
+  from `JOINS`, so what the model is told to leave out and what the server reads cannot drift (a test).
+  The phrasebook's `MEANING_WORDS` rule is unchanged: negation and `or` still send a sentence to the
+  model, and the shortcut's filler-only check uses `GLUE`, never `JOINS`.
+- **Glue is never a chip; a negation is never silent.** A stretch no part covers that holds only
+  glue and and-type connectors is no part. An and-type connector in it becomes the **`join`** (`and`)
+  and **`join_words`** (the sentence's own slice) of the part that follows it, a located part or a gap;
+  glue, and an and-type connector before everything, vanish (the first part has no join). A negation or
+  an or (`or`, `not`, `no`, `except`, `without`, `unless`...: `or` / `and_not` joins) changes what is
+  asked, so the model keeps it **inside** the words of the condition it changes ("not overbought",
+  "except those reporting earnings this week"; "X or Y" is one part covering both sides, its formula)
+  and the server fails closed: such a connector the model left out stays a `not_understood` gap
+  (words: the connector, trimmed of the glue around it), carrying its `join` / `join_words`, anywhere
+  it lies (between parts, before the first, after the last). A gap that also holds a content word
+  stays `not_understood`, trimmed of glue and and-type connectors at its edges, carries the and-type
+  join before it, and the one after it goes to the next part. Why: the web does not render `join` yet,
+  so a negation the model dropped from the words and the server turned into a join would be lost to
+  the trader. `join` is served on the REST `Part` (null when none lies between the parts, the first
+  included); a re-draft keeps the join of the part it replaces and of every untouched part.
+- **Prompt version 10**: the left-out list is rendered from the and-type `JOINS` only (and the kept list from the others); a part is one condition and its
+  words are contiguous ("cheap stocks on P/E" is one part); a vague word is never defined by a
+  criterion the sentence does not ask for (offer unresolved readings).
+- **Still `not_understood`:** any content word no part covers (`cheap`, `ideally`, `still`), as before.
 
 ## Amended 2026-10-17: the golden judge
 

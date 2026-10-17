@@ -1,0 +1,78 @@
+{
+  "id": "connectors-but-not",
+  "sentence": "optionable stocks above $8 but not with an IV rank above 80%",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "optionable",
+        "bucket": "A",
+        "fields": [
+          "instrument.optionable"
+        ],
+        "op": "eq",
+        "value": true,
+        "tolerance": 0
+      },
+      {
+        "span": "above $8",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.close",
+          "rollup.option_liquidity@v1.underlying_price"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 8,
+        "tolerance": 0
+      },
+      {
+        "span": "IV rank above 80% (not)",
+        "bucket": "A",
+        "fields": [
+          "feature.iv_rank"
+        ],
+        "op": [
+          "lt",
+          "lte"
+        ],
+        "value": 0.8,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "optionable stocks",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "above $8",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "not with an IV rank above 80%",
+          "kind": "applied",
+          "origin": "words",
+          "join": "and",
+          "join_words": "but"
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 0
+    }
+  }
+}

@@ -22,8 +22,8 @@ from typing import Any
 from algotrade.config.site.llm import Phrase
 from algotrade.core.model.predicates import NO_VALUE_OPS
 from algotrade.services.drafting.contract.answer_schema import check_criterion
+from algotrade.services.drafting.parts.connectors import GLUE_WORDS
 from algotrade.services.drafting.parts.model import MAX_PARTS, MAX_READING, Part
-from algotrade.services.drafting.parts.spans import CONNECTORS
 from algotrade.services.drafting.phrasebook.consistency import compatible
 from algotrade.services.drafting.phrasebook.resolve import FILLER, Resolution, is_structured
 from algotrade.services.drafting.retrieval import stem
@@ -193,7 +193,7 @@ def served(parts: Sequence[Part], shortcut_: Shortcut) -> tuple[Part, ...] | Non
     for part in parts:
         if part.origin == "gap":
             words = [stem(w) for w in _WORD.findall(part.words.lower())]
-            if all(w in FILLER or w in CONNECTORS for w in words):
+            if all(w in FILLER or w in GLUE_WORDS for w in words):
                 continue
             return None
         if part.kind == "not_understood":

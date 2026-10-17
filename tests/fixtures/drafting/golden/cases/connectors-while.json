@@ -1,0 +1,60 @@
+{
+  "id": "connectors-while",
+  "sentence": "stocks trading below $20 while they gained over 5% in the last 20 days",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "below $20",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.close"
+        ],
+        "op": [
+          "lt",
+          "lte"
+        ],
+        "value": 20,
+        "tolerance": 0
+      },
+      {
+        "span": "gained over 5% in the last 20 days",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.ret_20d"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.05,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "stocks trading below $20",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "gained over 5% in the last 20 days",
+          "kind": "applied",
+          "origin": "words",
+          "join": "and",
+          "join_words": "while"
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 0
+    }
+  }
+}
