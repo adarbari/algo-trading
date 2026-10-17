@@ -45,6 +45,24 @@ def no_description_source(ctx: TaskContext) -> str | None:
     return f"skipped: {'; '.join(reasons)}"
 
 
+ANALYST_SOURCES = (
+    "fmp_targets",
+    "fmp_ratings",
+    "fmp_estimates",
+    "finnhub_recommendations",
+)  # every source `analyst-snapshot` may read: FMP's three calls and Finnhub's one
+
+
+def no_analyst_source(ctx: TaskContext) -> str | None:
+    """Workflows skip ``analyst-snapshot`` when no vendor key is set (FMP's three sources are
+    one vendor, Finnhub's one another): the step runs when either vendor is built."""
+    fmp = all(n in ctx.sources for n in ANALYST_SOURCES[:3])
+    if fmp or ANALYST_SOURCES[3] in ctx.sources:
+        return None
+    reasons = sorted({ctx.unavailable.get(n, f"{n} is not configured") for n in ANALYST_SOURCES})
+    return f"skipped: {'; '.join(reasons)}"
+
+
 def ibkr_source(ctx: TaskContext) -> SessionSource:
     source = ctx.sources["ibkr"]
     if not isinstance(source, SessionSource):
