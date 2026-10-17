@@ -289,6 +289,16 @@ def _after_pinning(
         return real(table, own_run)
 
     monkeypatch.setattr(backend.tables, "dates", dates)
+    if hasattr(backend.tables, "_stored_days"):  # a short range probes its days, not ``dates``
+        probe = backend.tables._stored_days
+
+        def stored_days(table: str, start: date, end: date, own_run: str | None) -> list[date]:
+            if (end - start).days + 1 <= local.PROBE_DAYS and own_run is None:
+                calls.append(len(calls) + 1)
+                act(len(calls))
+            return probe(table, start, end, own_run)
+
+        monkeypatch.setattr(backend.tables, "_stored_days", stored_days)
     return calls
 
 

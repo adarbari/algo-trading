@@ -11,6 +11,7 @@ import pytest
 from algotrade.config.strategy.schema import Group, Rule, Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
+from algotrade.services import features as services_features
 from algotrade.services.configs import field_catalog
 from algotrade.services.features import read_expressions, site_features
 from algotrade.services.licences import HARNESS_ALL
@@ -90,6 +91,38 @@ def test_a_narrowed_read_with_exists_reads_only_its_instruments(
     assert reads and all(i == ids or c == ["instrument_id"] for i, c in reads)
     expected = whole[whole["instrument_id"].isin(ids)].reset_index(drop=True)
     pd.testing.assert_frame_equal(narrowed, expected)
+
+
+def test_the_sessions_an_exists_group_has_rows_for_are_kept_per_published_state(
+    reader: StoreReader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # every instrument's history of an exists() formula read the whole population's sessions
+    # again: 0.13 s a request on the real store
+    names = ["liquidity_class", "option_chain_known", "near_52w"]
+    kept: dict[object, object] = {}
+
+    def memo(key: object, compute: object) -> object:
+        if key not in kept:
+            kept[key] = compute()  # type: ignore[operator]
+        return kept[key]
+
+    population: list[object] = []
+    feature_rows = services_features.feature_rows
+
+    def spy(rd: StoreReader, table: str, columns: list[str], *a: object, **k: object) -> object:
+        population.append(columns == ["instrument_id"])
+        return feature_rows(rd, table, columns, *a, **k)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(services_features, "feature_rows", spy)
+    first = read_expressions(reader, names, D1, D2, instruments=["EQ:BULL"], memo=memo).frame
+    reads = population.count(True)
+    again = read_expressions(reader, names, D1, D2, instruments=["EQ:BEAR"], memo=memo).frame
+    assert reads and population.count(True) == reads  # the second instrument read none
+    assert first["instrument_id"].unique().tolist() == ["EQ:BULL"]
+    assert again["instrument_id"].unique().tolist() == ["EQ:BEAR"]
+    population.clear()
+    read_expressions(reader, names, D1, D2, instruments=["EQ:BULL"])  # no memo: read as before
+    assert population.count(True) == reads
 
 
 def test_selections_and_feature_views_name_expression_features(reader: StoreReader) -> None:
