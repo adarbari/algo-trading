@@ -48,7 +48,10 @@ export const SECTIONS: readonly SectionSpec[] = [
     id: 'growth',
     title: 'Growth',
     term: 'financials_growth',
-    statuses: [feature('rollup.financials@v2.financials_status')],
+    statuses: [
+      feature('rollup.financials@v2.financials_status'),
+      feature('rollup.growth_history@v1.gh_status'),
+    ],
     rows: [
       f('rev-ttm', 'Revenue (TTM)', feature('rollup.financials@v2.revenue_ttm')),
       f('rev-yoy', 'Revenue growth (YoY)', feature('feature.revenue_growth_yoy'), true),
@@ -60,6 +63,10 @@ export const SECTIONS: readonly SectionSpec[] = [
       ),
       f('eps-yoy', 'EPS growth (YoY)', feature('feature.eps_growth_yoy'), true),
       f('eps-qtr', 'EPS growth, quarter (YoY)', feature('feature.eps_growth_qtr_yoy'), true),
+      f('rev-cagr-3', 'Revenue CAGR (3y)', feature('feature.revenue_cagr_3y'), true),
+      f('rev-cagr-5', 'Revenue CAGR (5y)', feature('feature.revenue_cagr_5y'), true),
+      f('eps-cagr-3', 'EPS CAGR (3y)', feature('feature.eps_cagr_3y'), true),
+      f('eps-cagr-5', 'EPS CAGR (5y)', feature('feature.eps_cagr_5y'), true),
     ],
   },
   {
@@ -70,6 +77,12 @@ export const SECTIONS: readonly SectionSpec[] = [
     rows: [
       f('income', 'Net income (TTM)', feature('rollup.financials@v2.net_income_ttm')),
       f('margin', 'Net margin', feature('feature.net_margin')),
+      f('gross-margin', 'Gross margin', feature('feature.gross_margin')),
+      f('op-margin', 'Operating margin', feature('feature.operating_margin')),
+      f('ebitda', 'EBITDA', feature('feature.ebitda')),
+      f('roe', 'Return on equity', feature('feature.roe')),
+      f('roa', 'Return on assets', feature('feature.roa')),
+      f('roic', 'Return on invested capital', feature('feature.roic')),
       f('gross', 'Gross profit (TTM)', feature('rollup.income_statement@v1.gross_profit_ttm')),
       f('ebit', 'Operating income (TTM)', feature('rollup.income_statement@v1.ebit_ttm')),
       f('da', 'Depreciation and amortisation (TTM)', feature('rollup.income_statement@v1.da_ttm')),
@@ -95,6 +108,8 @@ export const SECTIONS: readonly SectionSpec[] = [
       f('cash', 'Cash', feature('rollup.balance_sheet@v1.cash')),
       f('sti', 'Short-term investments', feature('rollup.balance_sheet@v1.sti')),
       f('debt', 'Total debt', feature('rollup.balance_sheet@v1.total_debt')),
+      f('net-debt', 'Net debt', feature('feature.net_debt')),
+      f('d-e', 'Debt to equity', feature('feature.debt_to_equity')),
       f('assets', 'Total assets', feature('rollup.balance_sheet@v1.total_assets')),
       f('liabilities', 'Total liabilities', feature('rollup.balance_sheet@v1.total_liabilities')),
       f('equity', "Stockholders' equity", feature('rollup.balance_sheet@v1.stockholders_equity')),
@@ -103,6 +118,8 @@ export const SECTIONS: readonly SectionSpec[] = [
       f('as-of', 'Balance sheet as of', feature('rollup.balance_sheet@v1.bs_as_of')),
       f('ocf', 'Operating cash flow (TTM)', feature('rollup.cash_flow@v1.ocf_ttm')),
       f('capex', 'Capital spending (TTM)', feature('rollup.cash_flow@v1.capex_ttm')),
+      f('fcf', 'Free cash flow (TTM)', feature('feature.fcf')),
+      f('fcf-yield', 'Free cash flow yield', feature('feature.fcf_yield')),
     ],
   },
   {
@@ -114,6 +131,9 @@ export const SECTIONS: readonly SectionSpec[] = [
       f('pe', 'P/E ratio', feature('feature.pe_ratio')),
       f('ps', 'P/S ratio', feature('feature.ps_ratio')),
       f('eps', 'Diluted EPS (TTM)', feature('rollup.financials@v2.eps_diluted_ttm')),
+      f('pb', 'P/B ratio', feature('feature.pb_ratio')),
+      f('ev', 'Enterprise value', feature('feature.enterprise_value')),
+      f('ev-ebitda', 'EV / EBITDA', feature('feature.ev_ebitda')),
     ],
   },
   {
