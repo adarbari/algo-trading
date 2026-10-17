@@ -478,8 +478,10 @@ to Claude, because `ChatCompletions` retried every 429 with a 20 s floor.
 - **A 429 that says the quota is used up is never retried.** The adapter reads the body
   (`QUOTA_MARKERS` in `llm/chat.py`: a `...PerDay...` quota id, "exceeded your current quota",
   `insufficient_quota`; a per-minute Google quota still retries) and raises `QuotaExhaustedError`
-  (a `ModelUnavailableError`) at once with a cool-off: `Retry-After` if given, else the next UTC
-  midnight for a per-day quota, else 15 minutes.
+  (a `ModelUnavailableError`) at once with a cool-off: `Retry-After` if given, else one hour for a
+  per-day quota, else 15 minutes. The hour assumes no reset zone (Gemini resets at Pacific
+  midnight, not UTC, so a cool-off to UTC midnight would skip a refilled provider for hours); a
+  retry each hour costs one instant 429.
 - **The chain skips a cooled-off member** without calling it until the cool-off passes
   (process-local, thread-safe). Each skip is a `failed` ledger row whose error says "cooling
   off"; the first is logged once at WARNING. A 503 keeps its retries; the chain's deadline

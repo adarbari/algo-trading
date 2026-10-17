@@ -39,7 +39,7 @@ class ModelUnavailableError(AlgoTradeError):
 class QuotaExhaustedError(ModelUnavailableError):
     """The provider answered 429 because its quota is used up (a daily quota, a plan limit),
     which retrying now cannot fix (ADR 0041, amended 2026-10-17). ``cool_off_s``: how long the
-    chain leaves the provider alone (``Retry-After`` if given, else until the next UTC midnight
+    chain leaves the provider alone (``Retry-After`` if given, else an hour
     for a per-day quota, else a fixed pause)."""
 
     def __init__(self, message: str, cool_off_s: float) -> None:
