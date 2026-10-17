@@ -40,6 +40,7 @@ const PART: Omit<Part, 'id' | 'kind' | 'words'> = {
   start: 0,
   end: 0,
   rank: false,
+  join_words: '',
   reading: null,
   reading_source: 'model',
   origin: 'words',

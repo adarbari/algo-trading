@@ -23,6 +23,7 @@ const PART: components['schemas']['Part'] = {
   start: 0,
   end: 6,
   rank: false,
+  join_words: '',
   reading: null,
   reading_source: 'model',
   kind: 'applied',

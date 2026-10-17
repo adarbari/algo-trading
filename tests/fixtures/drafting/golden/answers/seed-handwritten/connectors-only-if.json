@@ -1,0 +1,80 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "listed",
+      "part": "p1"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks",
+      "part": "p1"
+    },
+    {
+      "id": "optionable",
+      "field": "instrument.optionable",
+      "op": "eq",
+      "value": true,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "optionable",
+      "part": "p1"
+    },
+    {
+      "id": "price",
+      "field": "rollup.price_stats@v2.close",
+      "op": "gt",
+      "value": 10,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "over $10",
+      "part": "p1"
+    },
+    {
+      "id": "liquid",
+      "field": "rollup.price_stats@v2.adv_usd_20d",
+      "op": "gte",
+      "value": 20000000,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "at least $20M a day",
+      "part": "p2"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": null,
+  "parts": [
+    {
+      "id": "p1",
+      "words": "optionable stocks over $10",
+      "reading": "Active optionable stocks priced over $10"
+    },
+    {
+      "id": "p2",
+      "words": "trade at least $20M a day",
+      "reading": "At least $20M traded a day"
+    }
+  ]
+}

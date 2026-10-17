@@ -175,6 +175,7 @@ describe('FeaturesPanel', () => {
       [IV30, 'feature.my_ratio'],
       '2026-07-04',
       '2026-10-02',
+      expect.any(Set), // the rows in the table's scroll window: history is read for those only
     );
   });
 

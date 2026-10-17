@@ -10,12 +10,14 @@ from typing import Any, TypeGuard
 KINDS = ("applied", "formula", "needs_choice", "not_available", "not_understood")
 ORIGINS = ("words", "gap", "kept", "unplaced")  # words: a part of the model, located; gap: words
 # no part covers; kept / unplaced: catch-alls with no words
+JOIN_KINDS = ("and", "or", "and_not")  # how a part relates to the one before it (``connectors``)
 READING_SOURCES = ("model", "server")
 GROUPS = ("criteria", "dropped", "formulas", "unresolved", "missing", "suggestions", "rank")
 
 MAX_PARTS = 12  # parts that carry words (the model's located ones and the not-understood gaps)
 MAX_WORDS = 200  # characters of a part's words
 MAX_READING = 160  # characters of a part's reading
+MAX_JOIN_WORDS = 60  # characters of the connector words of a part
 KEPT_ID = "kept"  # the catch-all parts: criteria carried over from ``current`` / tied to no words
 UNPLACED_ID = "unplaced"
 _ID = re.compile(r"^p[0-9]{1,3}$")  # what the model may call a part
@@ -32,7 +34,11 @@ class Part:
     (the model's disagreed with the criteria: the web shows the rows alone). The refs name items
     of the same draft: the ids of criteria in the document and of the dropped ones, formula
     names, unresolved terms, the key (or new slug) of missing requests and suggestion ids;
-    ``rank`` is true when the document's tie-break is this part's."""
+    ``rank`` is true when the document's tie-break is this part's. ``join`` (one of ``JOIN_KINDS``)
+    is how this part relates to the one before it, read by the server from the connector the model
+    left out of the words (``and``, ``or``, ``and_not``), ``join_words`` the sentence's own slice
+    of that connector; ``None`` and empty when no connector lies between them (the first part's
+    included)."""
 
     id: str
     words: str
@@ -49,6 +55,8 @@ class Part:
     missing: tuple[str, ...] = ()
     suggestions: tuple[str, ...] = ()
     rank: bool = False
+    join: str | None = None
+    join_words: str = ""
 
 
 @dataclass(frozen=True)

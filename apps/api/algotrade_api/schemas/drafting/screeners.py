@@ -146,6 +146,14 @@ class Part(Schema):
     missing: list[str] = Field(description="keys (or new slugs) of the missing-feature requests")
     suggestions: list[str] = Field(description="ids of suggestions")
     rank: bool = Field(description="true when the document's tie-break belongs to this part")
+    join: Literal["and", "or", "and_not"] | None = Field(
+        default=None,
+        description="how this part relates to the one before it, read by the server from the "
+        "connector between them (but, or, except...); null when none lies between them",
+    )
+    join_words: str = Field(
+        default="", description="the sentence's own words of that connector; empty when no join"
+    )
 
 
 class ScreenDraft(Schema):
