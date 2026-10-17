@@ -106,13 +106,11 @@ EVENT_CLASSES: Mapping[str, str] = {
     "anchor: the reaction's last session, E+1 (E: the report date)",
     "earnings_expected": "a next report expected, scheduled or from the year-ago report "
     "(earnings_expected@v1); anchor: the expected report date's session",
-    "ex_dividend": "an ex-dividend date (events/dividend); anchor: the ex-date",
-    "index_change": "an S&P 500 membership change (events/index_change); anchor: the session "
-    "it is first stored",
-    "macro_release": "a scheduled macro release (events/macro_release); anchor: the release "
-    "session",
+    "index_change": "an S&P 500 membership change (index_changes@v1); anchor: the session it is "
+    "first stored",
 }
-ANNOUNCED_AHEAD = ("earnings_expected", "macro_release")  # an entry may precede these
+# ex_dividend and macro_release were declared without a field to read; EB H4 re-adds them with it.
+ANNOUNCED_AHEAD = ("earnings_expected",)  # an entry may precede these
 # Quality bar answers 3 to 9 (1 and 2 are the document's mechanism and persistence).
 # What a hit_target compares with its target over the window (ED2 stores each as a field).
 MEASURES = ("excess_return", "realised_to_implied_vol")

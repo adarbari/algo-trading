@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-471 stored features in 51 groups, in dependency order; 120 expression features.
+474 stored features in 52 groups, in dependency order; 120 expression features.
 
 ## `option_liquidity@v1`
 
@@ -168,6 +168,16 @@ How the consensus forecast of the next earnings report has been revised (7 and 3
 | `forecast_revision_7d` | window | float32 | pct_points | open | -10000 .. 10000 | Change of the next report's forecast over 7 days, in percent of the old forecast: 5 is a forecast 5% higher than a week ago, same fiscal quarter | no report date on or after the session is known, the next report has no forecast in the calendar, no snapshot stored 7 days before the session (history starts 2026-10-02), or it holds no row of the next report's fiscal quarter, or the old forecast is missing or below 0.05 per share | `events/earnings.ts`, `events/earnings.eps_forecast`, `events/earnings.fiscal_quarter` |
 | `forecast_revision_30d` | window | float32 | pct_points | open | -10000 .. 10000 | Change of the next report's forecast over 30 days, in percent of the old forecast, same fiscal quarter | no report date on or after the session is known, the next report has no forecast in the calendar, no snapshot stored 30 days before the session (history starts 2026-10-02), or it holds no row of the next report's fiscal quarter, or the old forecast is missing or below 0.05 per share | `events/earnings.ts`, `events/earnings.eps_forecast`, `events/earnings.fiscal_quarter` |
 | `estimate_count_change_30d` | window | int | count | open | -1000 .. 1000 | Analysts' estimates now minus 30 days ago for the same fiscal quarter: positive is a quarter more analysts cover | no report date on or after the session is known, no snapshot stored 30 days before the session (history starts 2026-10-02), or it holds no row of the next report's fiscal quarter, or either snapshot gave no count | `events/earnings.ts`, `events/earnings.estimates`, `events/earnings.fiscal_quarter` |
+
+## `index_changes@v1`
+
+The latest S&P 500 membership change of an instrument and the sessions since it. Stored as `rollups/instrument/index_changes@v1`; reads `events/index_change` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `last_index_change_date` | window | date | date | open |  | The date of the latest S&P 500 membership change (the session it was first stored) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
+| `sessions_since_index_change` | window | int | sessions | open | >= 0 | Exchange sessions from the latest S&P 500 membership change up to the session (0: the session is that day) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
+| `last_index_change` | label | str | category | open | sp500_added, sp500_removed | The latest change: sp500_added (joined the index) or sp500_removed (left it) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
 
 ## `ibkr_iv@v1`
 

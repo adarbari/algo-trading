@@ -196,6 +196,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the next known ex-dividend date; reads events/dividend by knowledge date (events/dividend_declared)"
 
 [[table]]
+name = "rollups/instrument/index_changes@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the latest S&P 500 membership change and the sessions since it; reads events/index_change by event date"
+
+[[table]]
 name = "rollups/instrument/fundamentals@v3"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
