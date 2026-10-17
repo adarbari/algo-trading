@@ -285,7 +285,7 @@ describe('DataTable', () => {
     const last = seen.mock.calls.at(-1)?.[0] as TickerRow[];
     expect(last.length).toBeGreaterThan(0);
     expect(last.length).toBeLessThan(40);
-    expect(last[0]).toEqual(expect.objectContaining({ symbol: expect.any(String) }));
+    expect(typeof last[0]?.symbol).toBe('string');
   });
 
   it('pins the checkbox and first columns at the start, header and rows alike', () => {
