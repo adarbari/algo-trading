@@ -15,6 +15,7 @@ from pathlib import Path
 
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.analyst import probe as analyst_probe
+from algotrade_ingestion.tasks.analyst import snapshot as analyst_snapshot
 from algotrade_ingestion.tasks.derived import history_copy, market_rollups, outcomes, rollups
 from algotrade_ingestion.tasks.events import filings
 from algotrade_ingestion.tasks.framework import (
@@ -171,6 +172,18 @@ TASKS: dict[str, Task] = {
             optional_sources=analyst_probe.SOURCES,
             settings="sources.toml [fmp]",
             params=(SESSION,),
+        ),
+        Task(
+            "analyst-snapshot",
+            "tonight's FMP and Finnhub analyst data of a rotating slice of names, appended to our "
+            "own point-in-time history (analyst/estimate_snapshots); within [fmp] daily_budget",
+            analyst_snapshot,
+            ("analyst/estimate_snapshots",),
+            analyst_snapshot.run,
+            optional_sources=analyst_snapshot.SOURCES,
+            skip=source_guards.no_analyst_source,
+            settings="sources.toml [fmp] [finnhub]; events/scope.toml",
+            params=(SESSION, Param("limit", ("--limit",), int, "ask at most N names of FMP")),
         ),
         Task(
             "index-membership",

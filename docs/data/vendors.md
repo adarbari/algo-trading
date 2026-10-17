@@ -42,7 +42,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
 | Risk-free rates (option pricing) | **U.S. Treasury daily par yield curve** (official, free, no key; one CSV per year) | FRED (`DGS*`, needs a key), SOFR (overnight only) | Implemented, phase 2b.1 (ADR 0021) |
-| Analyst estimates, price targets, ratings (free tier) | **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters and the by-hand `analyst-probe` implemented (ADR 0068); the feature groups and nightly fetch follow |
+| Analyst estimates, price targets, ratings (free tier) | **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters, the by-hand `analyst-probe` and the nightly `analyst-snapshot` implemented (ADR 0068); the feature groups follow |
 | Synthetic | `sources/fixtures/` (golden datasets) | — | Lets the whole pipeline run in CI with no account |
 
 ## Cboe delayed-quotes feed (primary for options)
@@ -204,8 +204,19 @@ Host `https://finnhub.io/api/v1`; key `ALGOTRADE_FINNHUB_API_KEY` in an `X-Finnh
 
 ### What is stored and when
 
-Nothing yet beyond `analyst/vendor_access`. History starts at the first fetch: neither vendor
-serves a point-in-time history, so none is backdated (ADR 0068).
+`analyst/vendor_access` (the by-hand probe) and `analyst/estimate_snapshots` (the nightly optional
+`analyst-snapshot` step). The snapshot asks FMP for three calls a name (price-target consensus, grades
+consensus, annual estimates) as far as `[fmp] daily_budget` allows, due names first (never fetched, then
+the stalest past `[fmp] refresh_days`), and Finnhub for one call a name (`[finnhub] per_night`, due on its
+own `[finnhub] refresh_days`); a name FMP refuses (402) is `NOT_COVERED` and waits four windows. Each
+attempt of a vendor for a name also stores a `kind = "coverage"` row (`period = "current"`, `status`
+OK / EMPTY / NOT_COVERED / FAILED), so a refused name is told from one not yet fetched or one whose call
+failed from the store alone. With neither key set the nightly step is skipped with a WARN, not failed. The step runs after the
+screens and stops calling after `[fmp] run_budget_s` (1500 s; the names left are `OVER_BUDGET` and the
+next night continues). A name's cadence is dated by the run's session, from any of its FMP calls. Names: S&P 500 members plus the event-study
+scope list. Rows are appended per session (`ts` = fetch instant, `knowledge_ts` = publish instant),
+licence `personal`. History starts at the first fetch: neither vendor serves a point-in-time history, so
+none is backdated (ADR 0068).
 
 ## Company and fund descriptions (implemented, ADR 0034)
 
