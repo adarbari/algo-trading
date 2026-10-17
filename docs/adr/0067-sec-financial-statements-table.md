@@ -95,13 +95,24 @@ part that excludes it:
 - (g) `DebtLongtermAndShorttermCombinedAmount` alone (the carrying value of all short- and long-term
   debt: nothing is added).
 
-The us-gaap definitions relied on: `...CapitalLeaseObligations` is long-term debt and capital (finance)
-lease obligations classified as noncurrent; `...Current` the current portion of the same;
-`...IncludingCurrentMaturities` their total; `DebtCurrent` debt due within a year including short-term
-borrowings. Checked on the stored documents (identities within 0.1%): total = noncurrent + current for
-23 of 25 filings, `DebtLongtermAndShorttermCombinedAmount` = noncurrent + `DebtCurrent` for 2 of 2.
-Rules d to f therefore include finance lease obligations (the tag does, and the filer reports no split);
-operating lease liabilities are in none of the rules and the Guide says which rules include leases.
+The us-gaap definitions relied on, as the SEC's own descriptions in our stored documents read:
+`LongTermDebtAndCapitalLeaseObligations` "long-term debt and lease obligation, classified as
+noncurrent" (the description does not say finance leases only); `...Current` the same "classified as
+current"; `...IncludingCurrentMaturities` the same "including portion classified as current";
+`DebtCurrent` "short-term debt and current maturity of long-term debt and capital lease obligations";
+`DebtLongtermAndShorttermCombinedAmount` "the aggregate of total long-term debt, including current
+maturities and short-term debt" (it does not mention leases). Measured on the 987 stored documents
+(architect review): of 213 filers tagging the noncurrent lease-inclusive figure, 149 also tag
+`OperatingLeaseLiabilityNoncurrent` separately in the same filing; in none does the figure equal
+noncurrent debt plus the operating lease liability, and in 6 it equals noncurrent debt plus the
+finance lease liability. Also, on the 504 first fetched companies, total = noncurrent + current for
+23 of 25 filings and the all-debt figure = noncurrent + `DebtCurrent` for 2 of 2 (within 0.1%).
+So the figure is debt plus finance leases, not operating leases. **Owner-side decision
+(2026-10-17): finance leases stay in `total_debt` under the rules whose tags include them, labelled
+per rule; operating leases are never in debt.** Per rule: finance leases are in under d and f (both
+parts), in the noncurrent part of e and its current part (`DebtCurrent` includes the current
+maturity of capital leases), in the current part of the existing rule c, and not in a and b (long-term
+debt and its current maturities); the tag of g does not say, so g is not claimed either way.
 Unchanged: a filer with only a noncurrent figure (`LongTermDebtNoncurrent` or the lease-inclusive one)
 and no current part stays `NOT_TAGGED` (understated debt is worse than null), and so does a filer
 whose only tags are components or note items (`LineOfCredit`, `NotesPayable`, `SecuredDebt`,
@@ -109,8 +120,12 @@ whose only tags are components or note items (`LineOfCredit`, `NotesPayable`, `S
 scope is not clear). Of the 259: 72 become tagged (d 46, e 15, g 8, f 3), 187 stay `NOT_TAGGED` (132 tag
 no debt at all, 34 `LongTermDebtNoncurrent` without a current part, 9 the lease-inclusive noncurrent or
 total without one, 8 short-term only, 4 a current part only); the 245 already tagged keep their rule and
-value. Stored rows are only added to: companies fetched before this change need the `shares` task to
-refetch them (`--force`, or the 30-day refresh).
+value. Stored rows are only added to, and the parser keeps only listed tags, so companies fetched
+before this change need a refetch. No manual run: `STATEMENT_TAGS_VERSION_DATE`
+(`statement_concepts.py`) is the day the lists last grew, and the `shares` task counts a statements
+marker older than it as backlog, refetched under the existing nightly cap (`backfill_per_night`, 400:
+the ~800 already fetched take about two nights). `--force` is not needed and would refetch every CIK
+(~6k) outside the cap.
 
 ## Consequences
 - About 600 rows per company on average (median 386, largest of 114 sampled documents 1,815): ~5M
@@ -119,5 +134,6 @@ refetch them (`--force`, or the 30-day refresh).
 - `statement_facts` is read by feature inputs in a later PR; features may not import it directly
   (import-linter contract on `algotrade.data.*`, extended by this ADR with `data.statements`; the
   `feature-input-loading` ownership entry lists its call).
-- The tag lists grow by editing `statement_concepts.py` and re-running `shares --force`: stored rows
-  are only added to.
+- The tag lists grow by editing `statement_concepts.py` and bumping `STATEMENT_TAGS_VERSION_DATE`
+  there: the `shares` task refetches the older statements under the nightly cap, no `--force`; stored
+  rows are only added to.

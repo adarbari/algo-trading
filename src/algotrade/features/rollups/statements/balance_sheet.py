@@ -104,7 +104,8 @@ FEATURES = (
         "LongTermDebtAndCapitalLeaseObligations plus its current part plus short-term "
         "borrowings, else commercial paper; e) that noncurrent figure plus DebtCurrent; f) "
         "the same including current maturities plus short-term borrowings, else commercial "
-        "paper; g) DebtLongtermAndShorttermCombinedAmount (d to f include finance leases)",
+        "paper; g) DebtLongtermAndShorttermCombinedAmount (finance leases are in d, e and f "
+        "and in the DebtCurrent of c and e; operating leases never)",
         _WHY + "; or no filing has a complete set of debt parts (debt_basis NOT_TAGGED): a "
         "filer without the tags looks like a debt-free one, so the value is null, never zero",
         valid_range=(0, None), inputs=INPUTS,

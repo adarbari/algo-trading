@@ -53,6 +53,7 @@ class SharesSources:
     facts: Source  # SecCompanyFacts
     refresh_days: int = 30
     backfill_per_night: int = 400  # CIKs with shares but no statements fetched a night (0: no cap)
+    tags_date: date = date.min  # statements fetched before it are backlog (the source's date)
 
 
 @dataclass(frozen=True)
@@ -222,14 +223,23 @@ def _due(
     """The CIKs to fetch and how many of the statements backlog the nightly cap defers. A CIK
     is due when either table is (the older latest fetch decides; one table's marker missing
     makes it new there). Only the backlog (shares stored, statements never) is capped, in its
-    order: a CIK new to both or due for shares is never deferred."""
+    order: a CIK new to both or due for shares is never deferred. A statements marker older than
+    ``tags_date`` (parsed with an older tag list) is backlog too: due now, under the same cap."""
     both = {c: min(f[c] for f in fetched) for c in fetched[0] if all(c in f for f in fetched)}
     due = due_keys(ciks, both, session, sources.refresh_days, force)
+    if force:
+        return due, 0
+    wanted = set(ciks)
+    old_tags = {c: d for c, d in fetched[1].items() if d < sources.tags_date and c in wanted}
+    due += sorted(set(old_tags) - set(due), key=lambda c: (old_tags[c], c))
     cap = sources.backfill_per_night
-    if force or cap <= 0:
+    if cap <= 0:
         return due, 0
     shares_due = set(due_keys(ciks, fetched[0], session, sources.refresh_days, force))
-    backlog = [c for c in due if c in fetched[0] and c not in fetched[1] and c not in shares_due]
+    backlog = [
+        c for c in due
+        if c in fetched[0] and (c not in fetched[1] or c in old_tags) and c not in shares_due
+    ]  # fmt: skip
     deferred = set(backlog[cap:])
     return [c for c in due if c not in deferred], len(deferred)
 

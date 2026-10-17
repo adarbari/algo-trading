@@ -142,6 +142,18 @@ def test_debt_rule_e_f_and_g() -> None:
     assert run(debt((N, 700.0), (C, 50.0), (ALL, 99.0)))["debt_basis"] == "d"
 
 
+def test_rules_b_and_c_keep_winning_when_all_four_new_tags_are_in_the_same_filing() -> None:
+    new = ((N, 700.0), (C, 50.0), (T, 750.0), (ALL, 900.0))
+    b = run(debt(("LongTermDebtNoncurrent", 80.0), ("LongTermDebtCurrent", 20.0), *new))
+    assert b["total_debt"] == 100.0 and b["debt_basis"] == "b"
+    c = run(debt(("LongTermDebtNoncurrent", 80.0), ("DebtCurrent", 30.0), *new))
+    assert c["total_debt"] == 110.0 and c["debt_basis"] == "c"
+    a = run(debt(("LongTermDebt", 95.0), ("ShortTermBorrowings", 5.0), *new))
+    assert a["total_debt"] == 100.0 and a["debt_basis"] == "a"
+    d = run(debt((N, 700.0), (C, 50.0), ("DebtCurrent", 60.0), (T, 750.0), (ALL, 900.0)))
+    assert d["total_debt"] == 750.0 and d["debt_basis"] == "d"  # d before e, f and g
+
+
 def test_an_incomplete_lease_inclusive_set_stays_not_tagged() -> None:
     for parts in (
         (N,), (C,), (N, "ShortTermBorrowings"), (N, "LongTermDebtCurrent"),

@@ -22,6 +22,13 @@ flow figures cumulative from the start of the fiscal year); an INSTANT concept i
 a date. Only USD facts are kept: a figure in another currency is not summed with dollars.
 """
 
+from datetime import date
+
+# The day the tag lists below last grew. A company whose statements were fetched before it was
+# parsed with an older list: the ``shares`` task counts its marker as backlog (refetched under the
+# nightly cap, no ``--force``). Set it to the day a change to the lists merges.
+STATEMENT_TAGS_VERSION_DATE = date(2026, 10, 17)
+
 INSTANT = "INSTANT"
 DURATION = "DURATION"
 UNIT_KEY = "USD"  # the unit key in the document

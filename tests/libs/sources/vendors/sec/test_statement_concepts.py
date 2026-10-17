@@ -20,6 +20,7 @@ from algotrade_sources.vendors.sec.statement_concepts import (
     DURATION,
     INSTANT,
     STATEMENT_CONCEPTS,
+    STATEMENT_TAGS_VERSION_DATE,
 )
 from tests.conftest import REPO_ROOT
 
@@ -177,6 +178,10 @@ def test_the_lease_inclusive_and_all_debt_tags_are_stored_as_debt() -> None:
     )
     rows = parse_statements(_doc(**{t: [_row("2026-03-31", 5, "2026-05-01")] for t in tags}))
     assert set(rows["concept"]) == {"debt"} and set(rows["tag"]) == {f"us-gaap:{t}" for t in tags}
+
+
+def test_the_source_carries_the_tag_list_date_the_shares_task_reads() -> None:
+    assert SecCompanyFacts.statements_tags_date == STATEMENT_TAGS_VERSION_DATE
 
 
 def test_durations_follow_the_flow_rule_and_a_loss_and_zero_are_kept() -> None:

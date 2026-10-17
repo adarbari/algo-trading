@@ -55,6 +55,7 @@ from algotrade_sources.framework.http import Http
 from algotrade_sources.vendors.sec.statement_concepts import (
     DURATION,
     STATEMENT_CONCEPTS,
+    STATEMENT_TAGS_VERSION_DATE,
     UNIT,
     UNIT_KEY,
 )
@@ -251,6 +252,7 @@ class SecCompanyFacts:
 
     name = SOURCE
     dataset = "companyfacts"
+    statements_tags_date = STATEMENT_TAGS_VERSION_DATE  # read by the shares task (its backlog)
 
     def __init__(self, http: Http) -> None:
         self._http = http

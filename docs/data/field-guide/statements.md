@@ -289,7 +289,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 ### `rollup.balance_sheet@v1.total_debt`
 
-**How to read it.** Debt at the balance sheet date (bs_as_of), in dollars, added up from the parts of ONE filing by the first rule that applies (rollup.balance_sheet@v1.debt_basis says which). Rule a: LongTermDebt plus short-term borrowings, else commercial paper. Rule b: LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term borrowings, else commercial paper. Rule c: DebtCurrent plus LongTermDebtNoncurrent. Rules d to g serve filers that tag debt together with finance leases. Rule d: the noncurrent plus current parts of long-term debt and capital lease obligations, plus short-term borrowings. Rule e: that noncurrent figure plus DebtCurrent. Rule f: the figure including current maturities, plus short-term borrowings. Rule g: the all-debt total. Against equity it is the leverage; less cash it is the net debt.
+**How to read it.** Debt at the balance sheet date (bs_as_of), in dollars, added up from the parts of ONE filing by the first rule that applies (rollup.balance_sheet@v1.debt_basis says which). Rule a: LongTermDebt plus short-term borrowings, else commercial paper. Rule b: LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term borrowings, else commercial paper. Rule c: DebtCurrent plus LongTermDebtNoncurrent. Rules d to g serve filers whose tags group debt with leases. Rule d: the noncurrent plus current parts of long-term debt and capital lease obligations, plus short-term borrowings. Rule e: that noncurrent figure plus DebtCurrent. Rule f: the figure including current maturities, plus short-term borrowings. Rule g: the all-debt total. Against equity it is the leverage; less cash it is the net debt.
 
 **The criterion per intent**
 
@@ -301,7 +301,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 - Null when no filing has a complete set of parts (rollup.balance_sheet@v1.debt_basis NOT_TAGGED). A filer without the tags and a debt-free filer look the same in the document, so the value is null, never zero: do not read null as no debt.
 - Parts are never taken from two filings: a quarterly report and an amendment are not mixed. Commercial paper is added only when the filer has no short-term borrowings line, as borrowings usually include it.
-- Operating lease liabilities, pension deficits and off-balance-sheet obligations are not included, so a retailer or an airline understates what it owes. Finance leases are inside the figure only under rules d to f, whose tags include them. Banks keep this line, but a bank's deposits and borrowings are its business, not leverage: rollup.balance_sheet@v1.is_financial says which names to leave out of a debt screen.
+- Operating lease liabilities, pension deficits and off-balance-sheet obligations are not included, so a retailer or an airline understates what it owes. Finance leases are in the figure under rules d to f, and their current part under rules c and e through DebtCurrent. Rules a, b and g do not claim them. Banks keep this line, but a bank's deposits and borrowings are its business, not leverage: rollup.balance_sheet@v1.is_financial says which names to leave out of a debt screen.
 - A balance sheet is a snapshot at a quarter or year end and lags like every filing. It is up to four months old on the day it is filed. A restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)
@@ -319,7 +319,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 **When the reading lies**
 
 - NOT_TAGGED does not mean the company has no debt: it means the filer does not tag the parts a rule needs. Read the filing before treating it as debt-free.
-- The rules differ in what they include: a, f and g take a total, b to e add the noncurrent and current portions. Rules d to f include finance leases, the others do not. Across companies the totals are comparable, not identical.
+- The rules differ in what they include: a, f and g take a total, b to e add the noncurrent and current portions. Rules d to f include finance leases, and rules c and e their current part through DebtCurrent. Rules a, b and g do not claim them. Across companies the totals are comparable, not identical.
 - A filer that tags only a noncurrent debt figure, with no current portion, stays NOT_TAGGED: adding it up from one part would understate what it owes.
 - Null (not NOT_TAGGED) with no balance sheet filed: the status in rollup.balance_sheet@v1.bs_status is NO_FACTS.
 
@@ -736,7 +736,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 - Null unless rollup.balance_sheet@v1.bs_status is OK: PARTIAL means a core line sits at an older date than the debt, and mixing dates would mislead.
 - Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v1.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company.
-- The flat 21% tax is not the company's own rate, and invested capital leaves out leases, goodwill adjustments and short-term investments. Read it as a screen, not a valuation input.
+- The flat 21% tax is not the company's own rate. Invested capital leaves out operating leases, goodwill adjustments and short-term investments. Finance leases are in debt under rules d to f, and their current part under c and e. Read it as a screen, not a valuation input.
 - Null when any of equity, debt or cash is untagged, and when cash exceeds equity plus debt. A hard criterion drops those names. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Greenblatt, The Little Book That Beats the Market: return on capital as a quality screen; Damodaran, Investment Valuation (3rd ed.), ch. 'Measuring Earnings' and 'Equity Value to Firm Value': the definitions behind these ratios
@@ -755,7 +755,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 - Null unless rollup.balance_sheet@v1.bs_status is OK: PARTIAL means a core line sits at an older date than the debt, and mixing dates would mislead.
 - Null when debt or cash is untagged: an untagged debt line is not zero, and rollup.balance_sheet@v1.debt_basis says NOT_TAGGED.
-- Leases and pension deficits are not debt here. Banks hold deposits as liabilities and a bank's debt is not comparable with an industrial's.
+- Operating leases and pension deficits are not debt here. Finance leases are in under rules d to f, and their current part under rules c and e. Banks hold deposits as liabilities and a bank's debt is not comparable with an industrial's.
 - Dollars, not a ratio: compare with feature.ebitda or feature.market_cap. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Damodaran, Investment Valuation (3rd ed.), ch. 'Measuring Earnings' and 'Equity Value to Firm Value': the definitions behind these ratios
@@ -775,7 +775,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 - Null unless rollup.balance_sheet@v1.bs_status is OK: PARTIAL means a core line sits at an older date than the debt, and mixing dates would mislead.
 - Null for negative equity, so a hard criterion drops the most indebted names. Check rollup.balance_sheet@v1.total_debt against feature.ebitda instead.
-- Total debt is the sum of the parts of one filing and leaves out leases. Banks and utilities run high ratios for good reason: compare within an industry.
+- Total debt is the sum of the parts of one filing and leaves out operating leases. Finance leases are in under rules d to f, and their current part under rules c and e. Banks and utilities run high ratios for good reason: compare within an industry.
 - A company that tags no debt line is null, not debt-free. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); Damodaran, Investment Valuation (3rd ed.), ch. 'Measuring Earnings' and 'Equity Value to Firm Value': the definitions behind these ratios
@@ -849,7 +849,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 **When the reading lies**
 
 - Null unless rollup.balance_sheet@v1.bs_status is OK: PARTIAL means a core line sits at an older date than the debt, and mixing dates would mislead.
-- Minority interest, preferred stock, leases, pensions and short-term investments are not adjusted for, so the figure is approximate for companies with large ones.
+- Minority interest, preferred stock, operating leases, pensions and short-term investments are not adjusted for. Finance leases are in debt under rules d to f, and their current part under c and e. The figure is approximate for companies with large ones.
 - Null when debt or cash is untagged, for a missing market cap and for an ADR. Market cap is the company total count times this class's close. The statements are the company's, so it is misstated when share classes trade at very different prices, and null for an ADR.
 - Banks have no meaningful enterprise value: their debt is their operating liabilities. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
 

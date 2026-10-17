@@ -435,7 +435,7 @@ it). Every other line, `total_liabilities` and `total_debt` are read ONLY at `bs
 date is null (`NOT_TAGGED`, `NONE`), so no older figure sits beside the balance sheet. `total_debt` is added up
 from the parts of ONE accession, first rule that applies: (a) `LongTermDebt` + (`ShortTermBorrowings`, else
 `CommercialPaper`); (b) `LongTermDebtNoncurrent` + `LongTermDebtCurrent` + the same short-term part; (c)
-`DebtCurrent` + `LongTermDebtNoncurrent`; (d) `LongTermDebtAndCapitalLeaseObligations` + its `...Current` + the short-term part; (e) that noncurrent figure + `DebtCurrent`; (f) `...IncludingCurrentMaturities` + the short-term part; (g) `DebtLongtermAndShorttermCombinedAmount` alone (d to f include finance leases). The main parts are required; the short-term part is optional and a
+`DebtCurrent` + `LongTermDebtNoncurrent`; (d) `LongTermDebtAndCapitalLeaseObligations` + its `...Current` + the short-term part; (e) that noncurrent figure + `DebtCurrent`; (f) `...IncludingCurrentMaturities` + the short-term part; (g) `DebtLongtermAndShorttermCombinedAmount` alone (finance leases are in d, e and f, and in the `DebtCurrent` of c and e, not in a, b or g; operating leases never). The main parts are required; the short-term part is optional and a
 missing one counts as 0 (the one place a missing figure is added as 0). An incomplete set is null with
 `NOT_TAGGED`, never 0. `total_liabilities` is `Liabilities` (REPORTED), else `LiabilitiesAndStockholdersEquity`
 less the equity of the same date, the one including the noncontrolling interest first (DERIVED), else NONE.

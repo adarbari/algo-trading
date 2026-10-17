@@ -574,6 +574,8 @@ on its 30-day slot, so run `algotrade-ingest shares --force` once (same cost; on
 stored yet are written), then `algotrade-ingest rollups --from <first session> --to <last
 session> --only financials@v2` (compute alone measured at about 3 s for a synthetic frame of 6000 companies; not yet measured end to end). A CIK
 that has not been refetched yet shows `NO_FACTS` financials.
+A change to the tag lists bumps `STATEMENT_TAGS_VERSION_DATE` (`statement_concepts.py`): the `shares` task counts a
+statements marker older than it as backlog and refetches it under the nightly cap, no `--force`.
 
 ### Refreshes spread over the window
 
