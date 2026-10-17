@@ -30,6 +30,10 @@ ends with a "Rejected on sight" list.
 **Verification.** The agents shared one web-search quota, and it ran out partway through. Each page
 marks figures recalled from memory (*not verified*, *nv*, *recalled*, *from memory*). Before an
 edge document cites a number, check it against the source. That check is quality bar item 5.
+A second pass on 2026-10-17 checked every marked figure in the pickup-order and Strong ideas
+against its source and replaced the marker with *(verified)*, the corrected number
+*(corrected; was ...)*, or *(figure dropped: ...)* where the source states no number. Each of
+those ideas' Sources line gives author, year, venue and URL. Markers remain on the other ideas.
 
 ## Pickup order (Ready now, strongest first; duplicates across families merged)
 
