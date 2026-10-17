@@ -1,3 +1,172 @@
 # L3 site setting: expression features (ADR 0023), the "statements" theme: formulas over the
 # SEC statement groups (rollup.income_statement@v1, rollup.cash_flow@v1, rollup.balance_sheet@v1;
 # instruments/statements, ADR 0067) go here, not in fundamentals.toml (at its line cap).
+
+# Usable source statuses: a statement group's own STALE (its newest period ended more than
+# stale_days before the session) nulls every value built on it; the EBIT family is also null
+# for a FINANCIAL issuer (a bank or insurer). Missing lines are null, never zero, and a null
+# input makes the result null. A division by zero is null in the language; the guards below
+# only keep a nonsense sign (a negative equity or invested capital) out of a ratio.
+
+[ebitda]
+expr = 'if(one_of(income_statement.is_status, "OK", "PARTIAL"), income_statement.ebit_ttm + income_statement.da_ttm, null)'
+dtype = "float"
+unit = "usd"
+description = "EBITDA: operating income plus depreciation and amortisation over the trailing twelve months, in dollars; negative for an operating loss"
+null_meaning = "ebit_ttm or da_ttm is null (a filer that does not tag the line, no TTM, no facts), the income statement is STALE, or the issuer is a bank, broker or insurer (income_statement is_status FINANCIAL: the EBIT family is null by design). The two lines are not checked to end on the same quarter"
+valid_range = [-inf, inf]
+version = 1
+
+[gross_margin]
+expr = 'if(financials.revenue_ttm > 0 and income_statement.is_status != "STALE" and financials.financials_status != "STALE" and income_statement.is_ttm_as_of == financials.ttm_as_of, income_statement.gross_profit_ttm / financials.revenue_ttm, null)'
+dtype = "float"
+unit = "decimal"
+description = "Gross margin: gross profit over the trailing twelve months / revenue over the same window; 0.40 is 40 cents of gross profit on each dollar of sales"
+null_meaning = "gross_profit_ttm is null (the filer does not tag GrossProfit: many do not), revenue_ttm is null or not positive, either statement is STALE, or the income statement and the revenue end on different quarters (is_ttm_as_of differs from ttm_as_of). The end of the gross profit line itself is not checked"
+valid_range = [-inf, inf]
+version = 1
+
+[operating_margin]
+expr = 'if(financials.revenue_ttm > 0 and one_of(income_statement.is_status, "OK", "PARTIAL") and financials.financials_status != "STALE" and income_statement.is_ttm_as_of == financials.ttm_as_of, income_statement.ebit_ttm / financials.revenue_ttm, null)'
+dtype = "float"
+unit = "decimal"
+description = "Operating margin: operating income (EBIT) over the trailing twelve months / revenue over the same window; 0.15 is 15 cents of operating profit on each dollar of sales, negative for an operating loss"
+null_meaning = "ebit_ttm is null (no TTM, or a bank, broker or insurer: is_status FINANCIAL), revenue_ttm is null or not positive, either statement is STALE, or the income statement and the revenue end on different quarters (is_ttm_as_of differs from ttm_as_of)"
+valid_range = [-inf, inf]
+version = 1
+
+[interest_cover]
+expr = 'if(income_statement.interest_expense_ttm > 0 and one_of(income_statement.is_status, "OK", "PARTIAL"), income_statement.ebit_ttm / income_statement.interest_expense_ttm, null)'
+dtype = "float"
+unit = "ratio"
+description = "Interest cover: operating income (EBIT) / interest expense over the trailing twelve months; 5 means the operating profit pays the interest five times over, negative when operating income is a loss"
+null_meaning = "ebit_ttm or interest_expense_ttm is null (no TTM, an untagged line, or a bank, broker or insurer), the interest expense is not positive (a company without an interest line is not shown as infinitely covered), or the income statement is STALE. The two lines are not checked to end on the same quarter"
+valid_range = [-inf, inf]
+version = 1
+
+[roe]
+expr = 'if(balance_sheet.stockholders_equity > 0 and balance_sheet.bs_status != "STALE" and financials.financials_status != "STALE", financials.net_income_ttm / balance_sheet.stockholders_equity, null)'
+dtype = "float"
+unit = "decimal"
+description = "Return on equity: net income over the trailing twelve months / stockholders' equity at the latest balance sheet; 0.15 is 15 cents of profit a year on each dollar of book equity, negative for a loss. Banks keep it"
+null_meaning = "net_income_ttm or stockholders_equity is null, the equity is not positive (a negative equity gives no meaningful return), or the net income or the balance sheet is STALE"
+valid_range = [-inf, inf]
+version = 1
+
+[roa]
+expr = 'if(balance_sheet.total_assets > 0 and balance_sheet.bs_status != "STALE" and financials.financials_status != "STALE", financials.net_income_ttm / balance_sheet.total_assets, null)'
+dtype = "float"
+unit = "decimal"
+description = "Return on assets: net income over the trailing twelve months / total assets at the latest balance sheet; 0.05 is 5 cents of profit a year on each dollar of assets, negative for a loss. Banks keep it"
+null_meaning = "net_income_ttm or total_assets is null, the assets are not positive, or the net income or the balance sheet is STALE"
+valid_range = [-inf, inf]
+version = 1
+
+[roic]
+expr = 'if(balance_sheet.stockholders_equity + balance_sheet.total_debt - balance_sheet.cash > 0 and one_of(income_statement.is_status, "OK", "PARTIAL") and balance_sheet.bs_status == "OK", income_statement.ebit_ttm * (1 - tax_rate) / (balance_sheet.stockholders_equity + balance_sheet.total_debt - balance_sheet.cash), null)'
+dtype = "float"
+unit = "decimal"
+description = "Return on invested capital: operating income over the trailing twelve months after a flat 21% tax (EBIT x (1 - tax_rate), tax_rate 0.21) / invested capital (stockholders' equity plus total debt less cash); 0.12 is 12 cents a year on each dollar put into the business"
+null_meaning = "ebit_ttm, equity, total_debt or cash is null (an untagged debt or cash line, no TTM, or a bank, broker or insurer: is_status FINANCIAL), the invested capital is not positive (cash above equity plus debt), or the income statement is STALE or bs_status is not OK"
+params = { tax_rate = 0.21 }  # methodology choice: the US federal statutory rate, not the company's own
+valid_range = [-inf, inf]
+version = 1
+
+[net_debt]
+expr = 'if(balance_sheet.bs_status == "OK", balance_sheet.total_debt - balance_sheet.cash, null)'
+dtype = "float"
+unit = "usd"
+description = "Net debt: total debt less cash and equivalents at the latest balance sheet, in dollars; negative for a net cash position. Short-term investments are left out, so a company holding its cash as securities shows more net debt than it has"
+null_meaning = "total_debt or cash is null (an untagged line: debt_basis NOT_TAGGED is null, not zero), or bs_status is not OK (STALE, or a core line sits at an older date)"
+valid_range = [-inf, inf]
+version = 1
+
+[debt_to_equity]
+expr = 'if(balance_sheet.stockholders_equity > 0 and balance_sheet.bs_status == "OK", balance_sheet.total_debt / balance_sheet.stockholders_equity, null)'
+dtype = "float"
+unit = "ratio"
+description = "Debt to equity: total debt / stockholders' equity at the latest balance sheet; 0.5 is 50 cents of borrowing for each dollar of book equity"
+null_meaning = "total_debt or stockholders_equity is null (an untagged debt line is null, not zero), the equity is not positive (a negative equity gives no meaningful ratio), or bs_status is not OK (STALE, or a core line sits at an older date)"
+valid_range = [0, inf]
+version = 1
+
+[pb_ratio]
+expr = 'if(balance_sheet.stockholders_equity > 0 and balance_sheet.bs_status != "STALE" and not financials.is_adr, market_cap / balance_sheet.stockholders_equity, null)'
+dtype = "float"
+unit = "ratio"
+description = "Price to book: market_cap / stockholders' equity at the latest balance sheet (the company total on both sides; 3 means the market pays $3 for each dollar of book equity). Banks keep it"
+null_meaning = "market_cap is null (no count, a stale count, or no close), stockholders_equity is null or not positive (negative book equity gives no meaningful ratio), the balance sheet is STALE, or the instrument is an ADR (its market cap uses the ordinary-share count)"
+valid_range = [0, inf]
+version = 1
+
+[fcf]
+expr = 'if(cash_flow.cf_status == "OK", cash_flow.ocf_ttm - cash_flow.capex_ttm, null)'
+dtype = "float"
+unit = "usd"
+description = "Free cash flow: operating cash flow less capital expenditure (the cash paid for property, plant and equipment, stored positive) over the trailing twelve months, in dollars; negative when spending exceeds cash from operations"
+null_meaning = "ocf_ttm or capex_ttm is null (a filer that does not tag capex has no free cash flow: null, not equal to operating cash flow), or cf_status is not OK (STALE, or the two lines end on different periods)"
+valid_range = [-inf, inf]
+version = 1
+
+[fcf_yield]
+expr = 'if(market_cap > 0 and not financials.is_adr, fcf / market_cap, null)'
+dtype = "float"
+unit = "decimal"
+description = "Free cash flow yield: free cash flow over the trailing twelve months / market_cap; 0.05 is 5 cents of free cash flow a year for each dollar of market value, negative when the company burns cash"
+null_meaning = "fcf is null (no capex line, no TTM, a stale cash flow, or the two lines end on different periods), market_cap is null or not positive, or the instrument is an ADR (its market cap uses the ordinary-share count)"
+valid_range = [-inf, inf]
+version = 1
+
+[enterprise_value]
+expr = 'if(balance_sheet.bs_status == "OK" and not financials.is_adr, market_cap + balance_sheet.total_debt - balance_sheet.cash, null)'
+dtype = "float"
+unit = "usd"
+description = "Enterprise value: market_cap plus total debt less cash at the latest balance sheet, in dollars (minority interest, preferred stock and short-term investments are not adjusted for)"
+null_meaning = "market_cap, total_debt or cash is null (an untagged line is null, not zero), bs_status is not OK (STALE, or a core line sits at an older date), or the instrument is an ADR (its market cap uses the ordinary-share count)"
+valid_range = [-inf, inf]
+version = 1
+
+[ev_ebitda]
+expr = "if(ebitda > 0 and enterprise_value > 0, enterprise_value / ebitda, null)"
+dtype = "float"
+unit = "ratio"
+description = "Enterprise value to EBITDA: enterprise_value / EBITDA over the trailing twelve months; 10 means the whole business is priced at ten years of its operating cash earnings before interest and tax"
+null_meaning = "enterprise_value or ebitda is null (see each), or the EBITDA or the enterprise value is not positive (a negative multiple is not shown)"
+valid_range = [0, inf]
+version = 1
+
+[revenue_cagr_3y]
+expr = 'if(growth_history.revenue_ttm_3y_ago > 0 and financials.revenue_ttm > 0 and growth_history.gh_status != "STALE" and financials.financials_status != "STALE", exp(log(financials.revenue_ttm / growth_history.revenue_ttm_3y_ago) / 3) - 1, null)'
+dtype = "float"
+unit = "decimal"
+description = "Revenue compound annual growth over three years: (revenue_ttm / the revenue TTM about three years earlier) ^ (1/3) - 1; 0.10 is 10% a year"
+null_meaning = "revenue_ttm or its three-year-ago value is null (fewer than three years of reported history, or a gap in it), either is not positive, or the revenue is STALE"
+valid_range = [-1, inf]
+version = 1
+
+[revenue_cagr_5y]
+expr = 'if(growth_history.revenue_ttm_5y_ago > 0 and financials.revenue_ttm > 0 and growth_history.gh_status != "STALE" and financials.financials_status != "STALE", exp(log(financials.revenue_ttm / growth_history.revenue_ttm_5y_ago) / 5) - 1, null)'
+dtype = "float"
+unit = "decimal"
+description = "Revenue compound annual growth over five years: (revenue_ttm / the revenue TTM about five years earlier) ^ (1/5) - 1; 0.10 is 10% a year"
+null_meaning = "revenue_ttm or its five-year-ago value is null (fewer than five years of reported history, or a gap in it), either is not positive, or the revenue is STALE"
+valid_range = [-1, inf]
+version = 1
+
+[eps_cagr_3y]
+expr = 'if(growth_history.eps_diluted_ttm_3y_ago > 0 and financials.eps_diluted_ttm > 0 and growth_history.gh_status != "STALE" and not financials.eps_stale, exp(log(financials.eps_diluted_ttm / growth_history.eps_diluted_ttm_3y_ago) / 3) - 1, null)'
+dtype = "float"
+unit = "decimal"
+description = "Diluted EPS compound annual growth over three years: (eps_diluted_ttm / the EPS TTM about three years earlier, split-adjusted) ^ (1/3) - 1; 0.10 is 10% a year"
+null_meaning = "eps_diluted_ttm or its three-year-ago value is null (fewer than three years of history, or a gap), either is zero or negative (a rate from or to a loss is meaningless: null, not negative), or the EPS is STALE"
+valid_range = [-1, inf]
+version = 1
+
+[eps_cagr_5y]
+expr = 'if(growth_history.eps_diluted_ttm_5y_ago > 0 and financials.eps_diluted_ttm > 0 and growth_history.gh_status != "STALE" and not financials.eps_stale, exp(log(financials.eps_diluted_ttm / growth_history.eps_diluted_ttm_5y_ago) / 5) - 1, null)'
+dtype = "float"
+unit = "decimal"
+description = "Diluted EPS compound annual growth over five years: (eps_diluted_ttm / the EPS TTM about five years earlier, split-adjusted) ^ (1/5) - 1; 0.10 is 10% a year"
+null_meaning = "eps_diluted_ttm or its five-year-ago value is null (fewer than five years of history, or a gap), either is zero or negative (a rate from or to a loss is meaningless: null, not negative), or the EPS is STALE"
+valid_range = [-1, inf]
+version = 1
