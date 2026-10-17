@@ -138,6 +138,10 @@ path = "src/algotrade/data"
 purpose = "the domain read API: the only way consumers read market data (R1); feature inputs by table name (feature_inputs.py)"
 
 [[dir]]
+path = "src/algotrade/data/analyst"
+purpose = "reads of analyst/estimate_snapshots (our own FMP and Finnhub history, ADR 0068): the latest version of each snapshot row, and the rows a session may see (session_date on or before it, published before the next session's open); data/ is at its module cap, so the reads of this table are a folder"
+
+[[dir]]
 path = "src/algotrade/data/feedback"
 purpose = "reads of the feedback grain (feedback/, ADR 0066): the Describe-it events and the missing-feature requests the API recorded, over a date range, unfiltered; importable only by the read model's viewer-scoped loaders"
 contracts = ["Feedback reads are quarantined: only the read model's feedback loader imports them (ADR 0066)"]
@@ -162,10 +166,6 @@ contracts = ["Outcomes are quarantined: only services.evaluation reads them (ADR
 [[dir]]
 path = "src/algotrade/data/paper"
 purpose = "reads of the forward paper record (results/edge_paper, ADR 0053 amendment 2026-10-09): one user's trades with a signal session in a window, as of a session; read by services/evaluation/forward (to settle) and the read model (Ideas signals, an edge's live record)"
-
-[[dir]]
-path = "src/algotrade/data/analyst"
-purpose = "reads of analyst/estimate_snapshots (our own FMP and Finnhub history, ADR 0068): the latest version of each snapshot row, and the rows a session may see (session_date on or before it, published before the next session's open); data/ is at its module cap, so the reads of this table are a folder"
 
 [[dir]]
 path = "src/algotrade/data/statements"

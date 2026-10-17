@@ -16,7 +16,7 @@ from algotrade.features.rollups.consensus.analyst_status import (
     UNCOVERED,
     AnalystParams,
 )
-from tests.helpers.analyst_snapshots import estimates, marker, put, store, target, universe, visible
+from tests.helpers.analyst.snapshots import estimates, marker, put, store, target, universe, visible
 
 A, B, C = "EQ:A", "EQ:B", "EQ:C"
 S = date(2026, 10, 16)

@@ -21,7 +21,7 @@ from algotrade_ingestion.tasks.analyst.snapshot import run
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.workflows.nightly.nightly import NIGHTLY
 from tests.apps.ingestion.tasks.analyst.test_snapshot import D1, context, seed
-from tests.helpers.analyst_snapshots import FIRST, universe
+from tests.helpers.analyst.snapshots import FIRST, universe
 
 
 def limit(ctx: TaskContext, share: float) -> TaskContext:
