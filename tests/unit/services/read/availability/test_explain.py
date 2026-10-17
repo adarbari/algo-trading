@@ -178,3 +178,21 @@ def test_a_post_session_step_explains_its_table_citing_its_own_run() -> None:
     step = chain.links[0]
     assert (step.level, step.subject, step.run_id) == (CauseLevel.STEP, "verify", post.run_id)
     assert failed_tables(stores.reader, DAY) >= {verification}
+
+
+def test_a_newer_running_post_session_record_does_not_hide_the_finished_ones_steps() -> None:
+    verification = "verification/ibkr"
+    backend = MemoryBackend()
+    nightly = start_run("nightly", DAY, datetime(2026, 10, 2, 22, tzinfo=UTC))
+    nightly.stats = {"steps": {}}
+    done = start_run("post-session", DAY, datetime(2026, 10, 3, 1, tzinfo=UTC))
+    done.finish(
+        datetime(2026, 10, 3, 2, tzinfo=UTC),
+        stats={"steps": {"verify": {"status": "FAILED", "error": "x", "tables": [verification]}}},
+    )
+    crashed = start_run("post-session", DAY, datetime(2026, 10, 3, 5, tzinfo=UTC))  # RUNNING
+    for record in (nightly, done, crashed):
+        backend.runs.save(record)
+    stores = open_stores(StoreReader(backend), MemoryConfigStore({}), UserContext("local"))
+    chain = explain(stores, table_cause(verification, "no partition", session=DAY))
+    assert chain.links[0].run_id == done.run_id

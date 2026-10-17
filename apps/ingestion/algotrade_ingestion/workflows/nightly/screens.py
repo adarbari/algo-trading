@@ -40,7 +40,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from algotrade.config.edges.document import CLOSED, Edge, job_name
+from algotrade.config.edges.document import CLOSED, Edge
 from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import AlgoTradeError
@@ -51,7 +51,7 @@ from algotrade.services.configs import nightly_screeners
 from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
 from algotrade.services.evaluation.forward.results import paper_owners
 from algotrade.services.jobs import JobRecord, JobRunner, JobStatus
-from algotrade.services.jobs.exclusive import EdgeEvalBusyError, claim_edge_eval
+from algotrade.services.jobs.exclusive import EDGE_EVAL, EdgeEvalBusyError, claim_edge_eval
 from algotrade.services.read.context import open_context
 from algotrade.services.read.edge_desk.states import below_range
 from algotrade.storage.configs.store import ConfigStore
@@ -202,18 +202,24 @@ AUDIT_MAX_AGE = timedelta(days=9)  # an edge never goes longer than this without
 
 def audit_due(backend: Backend | None, edge: Edge, session: date) -> bool:
     """The edge's weekly audit is due (ADR 0063 amendment 6, moved by ADR 0070): on the last
-    session of the ISO week of ``session``, or when its last audit run is more than 9 days
-    older than ``session`` (none on record: due). Every other night is incremental."""
+    session of the ISO week of ``session``, or when its last audit is more than 9 days older than
+    ``session`` (none on record: due), session to session: the audit's own session is the
+    ``session`` param of its completed ``edge-eval`` job whose effective mode was audit (a job
+    from before the param counts as none). Every other run is incremental."""
     if session == last_session_of_week(session):
         return True
     if backend is None:
         return True
     audits = [
-        r.started_at
-        for r in backend.runs.find(job_name(edge.id, edge.owner))
-        if r.stats.get("mode") == "audit"
+        date.fromisoformat(job.params["session"])
+        for job in map(JobRecord.from_run, backend.runs.find(f"job:{EDGE_EVAL}"))
+        if job.params.get("edge") == edge.id
+        and job.user == edge.owner
+        and job.status is JobStatus.COMPLETE
+        and job.result.get("mode") == "audit"
+        and job.params.get("session")
     ]
-    return not audits or session - max(audits).date() > AUDIT_MAX_AGE
+    return not audits or session - max(audits) > AUDIT_MAX_AGE
 
 
 def edge_eval_jobs(
@@ -241,6 +247,7 @@ def edge_eval_jobs(
                 "start": stored[0].isoformat(),
                 "end": stored[-1].isoformat(),
                 "mode": mode,
+                "session": session.isoformat(),  # the audit rule counts sessions
                 "trigger": "nightly",
             }
             summary: dict[str, Any] = {"edge": edge.id, "owner": edge.owner, "mode": mode}

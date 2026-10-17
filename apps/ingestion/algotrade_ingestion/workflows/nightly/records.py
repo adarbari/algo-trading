@@ -25,7 +25,7 @@ from algotrade.services.run_items import (
     ChainCoverage,
     chain_coverage,
 )
-from algotrade.storage.runs import RunRecord, RunStatus
+from algotrade.storage.runs import RunRecord, RunStatus, published
 from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.workflows.nightly.report import Report, build_report
 from algotrade_ingestion.workflows.nightly.sessions import NIGHTLY_RUN, POST_SESSION_RUN, POST_STEPS
@@ -60,9 +60,12 @@ def latest_nightly(reader: StoreReader, session: date) -> RunRecord | None:
 
 
 def latest_post_session(reader: StoreReader, session: date) -> RunRecord | None:
-    """The session's most recent ``post-session`` run record (by start time)."""
+    """The session's most recent published (COMPLETE or PARTIAL) ``post-session`` run record, else
+    its most recent one: a RUNNING or crashed attempt, which holds no steps, never hides the
+    steps of a finished one."""
     found = reader.runs(POST_SESSION_RUN, session)
-    return max(found, key=lambda r: r.started_at) if found else None
+    pool = [r for r in found if published(r)] or found
+    return max(pool, key=lambda r: r.started_at) if pool else None
 
 
 def _post_rank(stored: Mapping[str, Any]) -> Any:

@@ -23,7 +23,7 @@ from algotrade.services.read.availability.cause import (
 )
 from algotrade.services.read.context import ResultCache, Stores
 from algotrade.services.read.session import NIGHTLY, POST_SESSION
-from algotrade.storage.runs import RunRecord
+from algotrade.storage.runs import RunRecord, published
 
 __all__ = ["explain", "failed_tables"]
 
@@ -74,9 +74,10 @@ def _post_steps(reader: StoreReader, session: date) -> Steps:
     """The steps of the session's latest post-session record, each tagged with that run's id (its
     own record, not the nightly's, is what a cause link cites); none when it has not run."""
     runs = reader.runs(POST_SESSION, session)
-    if not runs:
+    pool = [r for r in runs if published(r)] or runs  # a crashed attempt has no steps to show
+    if not pool:
         return {}
-    record = max(runs, key=lambda r: r.started_at)
+    record = max(pool, key=lambda r: r.started_at)
     return {n: {**s, "run_id": record.run_id} for n, s in _recorded(record).items()}
 
 

@@ -17,6 +17,10 @@ from algotrade_ingestion.workflows.post_session.post_session import POST_SESSION
 
 POST_ONLY = {"edge-eval", "descriptions", "verify"}
 SESSION_BOUND = {Grain.SESSION, Grain.SNAPSHOT, Grain.EVENT, Grain.ISSUER_DATED}
+# Job steps (no registry task, so no declared tables here): they write ``results/*`` (session
+# grain: the screener runs, ADR 0033) and the paper record read as of ``knowledge_ts <= cutoff``.
+# A new job step fails the test until it is listed here with that reasoning.
+JOB_STEPS_ALLOWED = {"screens", "edge-signals"}
 NOT_NIGHTLY = ("verification/", "live/")  # never produced nightly, never expected for a session
 
 
@@ -41,8 +45,14 @@ def _steps_after_the_first_critical() -> list[str]:
 def test_every_nightly_step_after_the_first_critical_one_writes_tables_read_session_bound(
     step: str,
 ) -> None:
-    spec = TASKS.get(step)  # the screens and edge-signals jobs write results/*, session grain
-    for table in spec.tables if spec else ():
+    spec = TASKS.get(step)
+    if spec is None:
+        assert step in JOB_STEPS_ALLOWED, (
+            f"{step} is a job step the split test does not know: list it in JOB_STEPS_ALLOWED "
+            "only if what it writes is read bound to the session (ADR 0070)"
+        )
+        return
+    for table in spec.tables:
         assert not table.startswith(NOT_NIGHTLY), f"{step} writes {table}: not a nightly table"
         try:
             grain = grain_of(table)

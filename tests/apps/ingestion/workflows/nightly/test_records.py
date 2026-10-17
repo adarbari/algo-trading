@@ -141,3 +141,16 @@ def test_chain_drift_is_a_warn_only_when_coverage_or_the_chronic_count_moves() -
     warns = records.chain_drift(reader, {"sessions": [fx.D.isoformat()]})
     assert {w["status"] for w in warns} == {"WARN"}
     assert any("points below its median" in w["detail"] for w in warns)
+
+
+def test_a_newer_running_post_session_record_does_not_hide_the_finished_one() -> None:
+    reader, writer = _store()
+    done = RunRecord("post-a", "post-session", fx.D, fx.START)
+    writer.save_run(done.finish(fx.END, stats={"steps": {"verify": {"status": "SKIPPED"}}}))
+    writer.save_run(RunRecord("post-b", "post-session", fx.D, fx.END + timedelta(hours=1)))
+    found = records.stored_post_session(reader, fx.D)
+    assert found is not None and found["run_id"] == "post-a" and "verify" in found["steps"]
+    only_running = RunRecord("post-c", "post-session", date(2020, 1, 2), fx.START)
+    writer.save_run(only_running)
+    fallback = records.stored_post_session(reader, date(2020, 1, 2))
+    assert fallback is not None and fallback["run_id"] == "post-c"  # nothing finished: the latest
