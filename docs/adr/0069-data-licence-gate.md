@@ -28,10 +28,14 @@ served stored values to any user.
    by its own record, decision 3).
 3. **Nightly runs.** The scheduled `site` run evaluates under every licence, stores every value
    and records its licences in the run's audit; results are filtered per viewer at read. A user's
-   own run holds what the registry gives that user. Each run records every field's licence
-   (its audit, `field_licences`, from the owner's catalogue at run time) and a stored value is
-   gated by that record, never by its name in the viewer's catalogue (a user's own expression
-   of the same name is another field); a field with no record (a run before it) is withheld.
+   own run holds what the registry gives that user. Each run records every field its spec reads with its licence (its audit,
+   `field_licences`, from the owner's catalogue at run time). A stored value is gated by the
+   stricter of that record and the site catalogue's current licence for the name (so a field
+   reclassified since stays hidden); a name the site does not resolve (a user's own expression)
+   by the record alone, never by the name in the viewer's catalogue, and with none it is
+   withheld. A run evaluated under licences the viewer also holds is fully visible; a run
+   with rows and neither values nor a record is withheld whole. A narrow miss of a withheld
+   field is dropped from the run's audit, for every role.
    A viewer without the licence sees a screen
    that read a personal field **by names and decisions only**: its criteria values, `score`,
    `tie_break`, `rank` and `reasons` (which quote the value) are withheld, a sort by rank or score is

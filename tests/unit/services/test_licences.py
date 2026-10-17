@@ -8,7 +8,7 @@ from algotrade.services.licences import (
     ALL_LICENCES,
     held_by,
     hidden_fields,
-    hidden_recorded,
+    hidden_stored,
     licence_of,
     recorded_licences,
 )
@@ -50,11 +50,15 @@ def test_hidden_fields_are_those_outside_the_held_licences() -> None:
     assert hidden_fields(features, asked, ALL_LICENCES) == frozenset()
 
 
-def test_a_stored_run_is_gated_by_the_licences_it_recorded_never_by_a_name() -> None:
+def test_a_stored_run_is_gated_by_its_record_and_the_site_catalogue_never_a_viewers_name() -> None:
     features = site_features()
     recorded = recorded_licences(features, [OPEN, STORED, OVER_IT, OPEN])
     assert recorded == {OPEN: "open", STORED: "personal", OVER_IT: "personal"}
-    asked = [OPEN, STORED, "feature.unrecorded"]
-    assert hidden_recorded(recorded, asked, {"open"}) == {STORED, "feature.unrecorded"}
-    assert hidden_recorded(recorded, asked, ALL_LICENCES) == {"feature.unrecorded"}  # no record
-    assert hidden_recorded(None, [OPEN], {"open"}) == {OPEN}  # a run with no record: hidden
+    own = "feature.owners_own"  # not in the site catalogue
+    asked = [OPEN, STORED, own]
+    assert hidden_stored(features, recorded, asked, {"open"}) == {STORED, own}  # no record: hidden
+    assert hidden_stored(features, {own: "open"}, asked, {"open"}) == {STORED}
+    assert hidden_stored(features, {own: "personal"}, asked, ALL_LICENCES) == frozenset()
+    # the stricter of the record and today's licence wins; a run with no record reads by today's
+    assert hidden_stored(features, {STORED: "open"}, [STORED], {"open"}) == {STORED}
+    assert hidden_stored(features, None, [OPEN, STORED], {"open"}) == {STORED}
