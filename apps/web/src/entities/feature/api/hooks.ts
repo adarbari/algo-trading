@@ -8,6 +8,8 @@ import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
+import type { CatalogueFeature } from '../model/catalogue';
+
 /** The catalogue changes only with a release or a user's feature file: cache it longer. */
 const CATALOGUE_STALE_MS = 10 * 60_000;
 
@@ -137,6 +139,14 @@ function featureCatalogueQuery() {
 /** Start the read before the page mounts (a route loader); the hook then joins it. */
 export function prefetchFeatureCatalogue(client: QueryClient): void {
   void client.query(featureCatalogueQuery()).catch(() => undefined);
+}
+
+/** The catalogue (the read joins one in flight); empty if it fails. */
+export function fetchCatalogue(client: QueryClient): Promise<CatalogueFeature[]> {
+  return client
+    .query(featureCatalogueQuery())
+    .then((data) => data.catalogue)
+    .catch(() => []);
 }
 
 export function useFeatureCatalogue() {
