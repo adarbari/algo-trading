@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
+import { narrow } from '../../testing';
+import { InfoButton } from '../InfoButton';
 import { KeyValue, type KeyValueItem } from './KeyValue';
 
 const ticker: KeyValueItem[] = [
@@ -66,4 +68,30 @@ export const Dense: Story = {
   args: {
     items: ticker.slice(0, 4).map(({ hint: _hint, ...item }) => item),
   },
+};
+
+const withActions: KeyValueItem[] = [
+  {
+    label: 'Revenue',
+    hint: 'financials.revenue',
+    value: 391_000_000_000,
+    format: { kind: 'currency-compact' },
+    action: <InfoButton label="About Revenue" onClick={() => undefined} />,
+  },
+  {
+    label: 'Net margin',
+    value: 0.24,
+    format: { kind: 'percent' },
+    action: <InfoButton label="About Net margin" onClick={() => undefined} />,
+  },
+  { label: 'Free cash flow', value: 99_000_000_000, format: { kind: 'currency-compact' } },
+];
+
+/** A help button beside a label; rows without one are unchanged. */
+export const WithAction: Story = { args: { items: withActions } };
+
+/** In a narrow container the action wraps under a long label instead of overflowing. */
+export const Narrow: Story = {
+  args: { items: withActions },
+  decorators: [narrow],
 };

@@ -110,3 +110,4 @@ export {
   distributionMarkers,
   type FeatureDistribution,
 } from './model/distribution';
+export { factItem, type Fact, type FactSpec, type Values } from './model/fact';
