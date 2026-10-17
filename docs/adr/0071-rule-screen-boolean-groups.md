@@ -1,6 +1,6 @@
 # ADR 0071: Boolean groups in rule screens
 
-**Status:** proposed (2026-10-17; design: the architect's plan from the Describe-it connector
+**Status:** accepted (2026-10-17, owner; design: the architect's plan from the Describe-it connector
 work, PRs #586-#589; owner 2026-10-17: a tree in the engine, one level in the Builder; Describe-it
 precedence is decided case by case and the owner verifies the cases; every criterion keeps its
 `hard` / `soft` / `score` mode inside a group; existing formulas stay as they are).
