@@ -93,7 +93,7 @@ def test_a_run_without_the_stamp_has_no_regime_and_nothing_paused(ctx: ReadConte
 
 def test_a_run_carries_its_record_stats(ctx: ReadContext) -> None:
     run = latest_run(ctx, "site", "alpha").run
-    assert run is not None and run.audit == {}  # the record holds no stats
+    assert run is not None and set(run.audit) == {"field_licences"}  # no other stats
     beta = latest_run(ctx, "me", "beta").run
     assert beta is not None and beta.audit == {}  # no record at all
     assert (beta.coverage, beta.missing_tables) == (None, ())
