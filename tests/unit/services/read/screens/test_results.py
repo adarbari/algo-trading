@@ -460,3 +460,15 @@ def test_the_audits_narrow_misses_of_a_withheld_field_are_dropped(
     holder, run = _later_run(backend, reader, "me", {PERSONAL_FIELD: "personal"}, OPEN_FIELD,
                              audit=audit)  # fmt: skip
     assert run_audit(holder, run)["summary"]["narrow_misses"] == misses
+
+
+def test_an_open_only_run_withholds_a_field_the_site_made_personal_since(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    """The run held only ``open``, so what it read counts as open to a viewer who holds it, but
+    the stricter of that and the site's current licence still wins (ADR 0069)."""
+    only_open = {"licences": ["open"]}
+    trader, run = _later_run(backend, reader, "trader", None, PERSONAL_FIELD, audit=only_open)
+    assert run_withheld(trader, run) == {PERSONAL_FIELD}
+    seen = load_results(trader, {"r3": ["EQ:AAA"]}, [run])[("r3", "EQ:AAA")]
+    assert seen.criteria[0].value is None and seen.score is None and seen.rank is None

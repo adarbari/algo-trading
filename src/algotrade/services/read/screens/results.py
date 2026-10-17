@@ -284,20 +284,27 @@ def run_withheld(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
     (``reasons`` says "0.83, needs >= 0.9") and its rank order follows them, so they and
     the ``rank`` are withheld, and a sort by them is by symbol (ADR 0064 decision 10, ADR 0069).
     A run evaluated under licences the viewer also holds read nothing else (``fields_view`` hid
-    the rest at run time): fully visible. Otherwise each field (the stored ones and every one
-    the run recorded, ``audit["field_licences"]``: the tie-break and flag fields too) is gated
-    by ``hidden_stored``: the run's record and the site catalogue, never the viewer's own
-    names. A run with rows but no readable values and no record is withheld whole."""
+    the rest at run time): its fields count as open unless recorded otherwise. Each field (the
+    stored ones and every one the run recorded, ``audit["field_licences"]``: the tie-break and
+    flag fields too) is gated by ``hidden_stored``: the run's record and the site catalogue's
+    current licence, never the viewer's own names. A run with rows but no readable values and no
+    record is withheld whole."""
     if set(ctx.licences) >= ALL_LICENCES:
         return frozenset()
     at_run = run.audit.get("licences")
-    if isinstance(at_run, list | tuple) and set(at_run) <= set(ctx.licences):
-        return frozenset()
+    within = isinstance(at_run, list | tuple) and set(at_run) <= set(ctx.licences)
     recorded = run.audit.get("field_licences")
     known: Mapping[str, str] = recorded if isinstance(recorded, Mapping) else {}
     stored = _run_fields(ctx, run)
+    fields = stored | frozenset(known)
+    if within:
+        # evaluated under licences the viewer holds: what it read is open to them as recorded
+        # (``fields_view`` hid the rest), but a field the site has since made personal is not
+        known = {**dict.fromkeys(fields, "open"), **known}
     site = ctx.cache.get_or_compute(("site_catalogue",), lambda: catalogue(ctx.configs))
-    hidden = hidden_stored(site, known, stored | frozenset(known), ctx.licences)
+    hidden = hidden_stored(site, known, fields, ctx.licences)
+    if within:
+        return hidden
     if not stored and not known and run.decisions:
         return hidden | {UNREADABLE}
     return hidden

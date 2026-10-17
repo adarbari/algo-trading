@@ -33,7 +33,7 @@ served stored values to any user.
    stricter of that record and the site catalogue's current licence for the name (so a field
    reclassified since stays hidden); a name the site does not resolve (a user's own expression)
    by the record alone, never by the name in the viewer's catalogue, and with none it is
-   withheld. A run evaluated under licences the viewer also holds is fully visible; a run
+   withheld. A run evaluated under licences the viewer also holds counts as open, the site's current licence still applying; a run
    with rows and neither values nor a record is withheld whole. A narrow miss of a withheld
    field is dropped from the run's audit, for every role.
    A viewer without the licence sees a screen
