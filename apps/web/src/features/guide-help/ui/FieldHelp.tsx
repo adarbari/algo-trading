@@ -4,8 +4,15 @@
  * how many caveats the full page lists. The text is the server's; nothing is written here.
  */
 import { Button, HelpLead, HelpSection, Mono, Stack, Surface, Text } from '@algotrade/ui';
+import { useState } from 'react';
 
-import { featureTitle, ruleText, unitLabel, type GuideUse } from '@/entities/feature';
+import {
+  featureTitle,
+  ruleText,
+  unitLabel,
+  useFeatureCatalogue,
+  type GuideUse,
+} from '@/entities/feature';
 
 import { useGuideHelp } from '../api/hooks';
 import { HelpShell } from './HelpShell';
@@ -23,7 +30,11 @@ export interface FieldHelpProps {
 const caveatCount = (n: number) => `${String(n)} ${n === 1 ? 'caveat' : 'caveats'}`;
 
 export function FieldHelp({ name, onUse, useDisabled = false }: FieldHelpProps) {
-  const help = useGuideHelp(name);
+  // The drawer's read starts on the first press; the hover sentence is the catalogue's own.
+  const [opened, setOpened] = useState(false);
+  const help = useGuideHelp(name, opened);
+  const catalogue = useFeatureCatalogue();
+  const hover = catalogue.data?.find((f) => f.name === name)?.guide?.summary;
   const title = featureTitle(name);
   const guide = help.data?.guide ?? null;
   const unit = unitLabel(help.data?.unit ?? null);
@@ -35,8 +46,19 @@ export function FieldHelp({ name, onUse, useDisabled = false }: FieldHelpProps) 
       title={title}
       eyebrow={<Mono>{name}</Mono>}
       {...(meta ? { meta } : {})}
-      summary={guide?.summary}
-      state={help.isPending ? 'pending' : help.isError ? 'error' : !guide ? 'missing' : 'ready'}
+      summary={guide?.summary ?? hover}
+      onOpen={() => {
+        setOpened(true);
+      }}
+      state={
+        help.isPending || !opened
+          ? 'pending'
+          : help.isError
+            ? 'error'
+            : !guide
+              ? 'missing'
+              : 'ready'
+      }
       missingText="The Guide has no entry for this field yet."
       onRetry={() => {
         void help.refetch();

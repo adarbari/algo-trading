@@ -414,12 +414,21 @@ export type InstrumentPricesQuery = { instrument: { instrumentId: string, prices
 
 export type InstrumentFeatureValuesQueryVariables = Exact<{
   key: string;
-  names: Array<string> | string;
   date?: string | null | undefined;
+  n0: Array<string> | string;
+  n1: Array<string> | string;
+  n2: Array<string> | string;
+  n3: Array<string> | string;
+  n4: Array<string> | string;
+  n5: Array<string> | string;
+  n6: Array<string> | string;
+  n7: Array<string> | string;
+  n8: Array<string> | string;
+  n9: Array<string> | string;
 }>;
 
 
-export type InstrumentFeatureValuesQuery = { session: { date: string } | null, instrument: { instrumentId: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null };
+export type InstrumentFeatureValuesQuery = { session: { date: string } | null, instrument: { instrumentId: string, f0: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }>, f1: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }>, f2: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }>, f3: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }>, f4: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }>, f5: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }>, f6: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }>, f7: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }>, f8: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }>, f9: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, reason: NullReason | null, kind: UnavailableKind, guideTerm: string, kindText: string, cause: { links: Array<{ level: CauseLevel, subject: string, status: string, message: string, runId: string | null }> } | null } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null };
 
 export type InstrumentHistoryQueryVariables = Exact<{
   key: string;
@@ -2503,13 +2512,247 @@ export const InstrumentPricesDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<InstrumentPricesQuery, InstrumentPricesQueryVariables>;
 export const InstrumentFeatureValuesDocument = new TypedDocumentString(`
-    query InstrumentFeatureValues($key: String!, $names: [FeatureName!]!, $date: Date) {
+    query InstrumentFeatureValues($key: String!, $date: Date, $n0: [FeatureName!]!, $n1: [FeatureName!]!, $n2: [FeatureName!]!, $n3: [FeatureName!]!, $n4: [FeatureName!]!, $n5: [FeatureName!]!, $n6: [FeatureName!]!, $n7: [FeatureName!]!, $n8: [FeatureName!]!, $n9: [FeatureName!]!) {
   session(date: $date) {
     date
   }
   instrument(key: $key, date: $date) {
     instrumentId
-    features(names: $names) {
+    f0: features(names: $n0) {
+      name
+      value
+      unknown {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      info {
+        format
+        unit
+        dtype
+        nullMeaning
+      }
+    }
+    f1: features(names: $n1) {
+      name
+      value
+      unknown {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      info {
+        format
+        unit
+        dtype
+        nullMeaning
+      }
+    }
+    f2: features(names: $n2) {
+      name
+      value
+      unknown {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      info {
+        format
+        unit
+        dtype
+        nullMeaning
+      }
+    }
+    f3: features(names: $n3) {
+      name
+      value
+      unknown {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      info {
+        format
+        unit
+        dtype
+        nullMeaning
+      }
+    }
+    f4: features(names: $n4) {
+      name
+      value
+      unknown {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      info {
+        format
+        unit
+        dtype
+        nullMeaning
+      }
+    }
+    f5: features(names: $n5) {
+      name
+      value
+      unknown {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      info {
+        format
+        unit
+        dtype
+        nullMeaning
+      }
+    }
+    f6: features(names: $n6) {
+      name
+      value
+      unknown {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      info {
+        format
+        unit
+        dtype
+        nullMeaning
+      }
+    }
+    f7: features(names: $n7) {
+      name
+      value
+      unknown {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      info {
+        format
+        unit
+        dtype
+        nullMeaning
+      }
+    }
+    f8: features(names: $n8) {
+      name
+      value
+      unknown {
+        code
+        reason
+        kind
+        guideTerm
+        kindText
+        cause {
+          links {
+            level
+            subject
+            status
+            message
+            runId
+          }
+        }
+      }
+      info {
+        format
+        unit
+        dtype
+        nullMeaning
+      }
+    }
+    f9: features(names: $n9) {
       name
       value
       unknown {

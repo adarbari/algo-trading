@@ -1,7 +1,8 @@
 /**
  * Read hook for one field's help (`Query.guideField`, ADR 0037 / 0051): the field's info with
  * the site field guide's entry (reads, its first sentence, the criterion per intent, caveats).
- * The button reads it on mount for its hover summary; the drawer shows the same cached read.
+ * The read starts when the drawer is first opened (`enabled`), never on mount: a page of
+ * fields would otherwise make one request per button. The hover summary is the catalogue's.
  */
 import { useQuery } from '@tanstack/react-query';
 
@@ -37,9 +38,10 @@ const GuideHelpField = graphql(`
 `);
 
 /** A field's help by catalogue name. */
-export function useGuideHelp(name: string) {
+export function useGuideHelp(name: string, enabled = true) {
   const variables = { name };
   return useQuery({
+    enabled,
     queryKey: queryKeys.gql('GuideHelpField', variables),
     queryFn: () => gql(GuideHelpField, variables),
     select: (data) => data.guideField?.info ?? null,

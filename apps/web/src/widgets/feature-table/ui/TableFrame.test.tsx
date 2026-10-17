@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -73,12 +73,7 @@ describe('TableFrame', () => {
   it('opens the field drawer from the header without sorting the column', async () => {
     setup();
     const field = await screen.findByRole('columnheader', { name: /Rel volume/i });
-    // The read arrives and the button gains its hover summary (a new element): click that one.
-    await waitFor(() => {
-      expect(within(field).getByRole('button', { name: /What is/ })).toHaveAttribute(
-        'aria-describedby',
-      );
-    });
+    // The field's entry is read when the drawer opens (the hover sentence is the catalogue's).
     await userEvent.click(within(field).getByRole('button', { name: /What is .*\?/ }));
     expect(await screen.findByRole('dialog')).toBeVisible();
     expect(screen.getByText('Volume over average. More.')).toBeVisible();

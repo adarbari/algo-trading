@@ -62,9 +62,23 @@ function setup(navigate = vi.fn(), onUse?: (use: unknown) => void) {
   return { ...view, navigate };
 }
 
+/** The catalogue carries every field's first sentence: the button's hover, with no read per button. */
+const CATALOGUE = {
+  catalogue: [{ name: NAME, guide: { summary: SERVED.guideField.info.guide.summary } }],
+};
+
+/** Answer by operation: the catalogue, and the field's help (`served`). */
+function serve(served: unknown) {
+  GQL.mockImplementation((document) =>
+    Promise.resolve(String(document).includes('query FeatureCatalogue') ? CATALOGUE : served),
+  );
+}
+
+const helpReads = () => GQL.mock.calls.filter(([d]) => String(d).includes('GuideHelpField'));
+
 beforeEach(() => {
   GQL.mockReset();
-  GQL.mockResolvedValue(SERVED);
+  serve(SERVED);
 });
 
 describe('GuideHelp', () => {
@@ -72,6 +86,8 @@ describe('GuideHelp', () => {
     const { container } = setup();
     const button = await summarised();
     expect(button).toHaveAttribute('aria-expanded', 'false');
+    // the field's own entry is read when the drawer opens, never on page load
+    expect(helpReads()).toHaveLength(0);
     await userEvent.click(button);
     const drawer = await screen.findByRole('dialog');
     expect(drawer).toHaveTextContent(NAME);
@@ -83,7 +99,7 @@ describe('GuideHelp', () => {
     expect(within(drawer).getByText(/2 caveats on the full page/)).toBeVisible();
     expect(button).toHaveAttribute('aria-expanded', 'true');
     await expectNoA11yViolations(container);
-    expect(GQL.mock.calls[0]?.[1]).toEqual({ name: NAME });
+    expect(helpReads().map(([, v]) => v)).toEqual([{ name: NAME }]);
   });
 
   it('offers "Use this" per intent only when given onUse, and closes the drawer after it', async () => {
@@ -121,14 +137,18 @@ describe('GuideHelp', () => {
   });
 
   it('says so when the Guide has no entry, and offers a retry when the read fails', async () => {
-    GQL.mockResolvedValue({ guideField: { info: { name: NAME, unit: null, guide: null } } });
+    serve({ guideField: { info: { name: NAME, unit: null, guide: null } } });
     const first = setup();
-    await userEvent.click(await screen.findByRole('button', { name: /^What is .*\?$/ }));
+    await userEvent.click(await summarised());
     expect(await screen.findByText(/no entry for this field yet/)).toBeVisible();
     first.unmount();
-    GQL.mockRejectedValue(new Error('down'));
+    GQL.mockImplementation((document) =>
+      String(document).includes('query FeatureCatalogue')
+        ? Promise.resolve(CATALOGUE)
+        : Promise.reject(new Error('down')),
+    );
     setup();
-    await userEvent.click(await screen.findByRole('button', { name: /^What is .*\?$/ }));
+    await userEvent.click(await summarised());
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not be loaded/);
     expect(screen.getByRole('button', { name: /Retry/ })).toBeVisible();
   });
