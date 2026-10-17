@@ -13,7 +13,14 @@ from algotrade.data.statements.reading import statement_facts, stored_statements
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.reference.shares import SharesSources, _rows, ingest_shares
+from algotrade_ingestion.tasks.reference.shares import (
+    SharesSources,
+    Standing,
+    _due,
+    _rows,
+    ingest_shares,
+    priority_order,
+)
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.sec import company_facts
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts, parse_statements
@@ -355,3 +362,46 @@ def test_a_restatement_filed_after_a_session_does_not_change_what_that_session_r
     after = statement_facts(reader, date(2026, 12, 1))
     assert len(after) == len(before) + 1
     assert after.iloc[-1]["value"] == latest["val"] * 2
+
+
+def _order(scope=(), sp500=(), standing=None):  # type: ignore[no-untyped-def]
+    ids = {"A": "1", "B": "2", "C": "3", "D": "4", "E": "5"}
+    return priority_order(sorted(ids.values()), set(scope), set(sp500), standing or {}, ids)
+
+
+def test_priority_scope_then_sp500_then_the_rest_by_market_cap() -> None:
+    standing = {"C": Standing(market_cap=5.0), "D": Standing(market_cap=9.0)}
+    assert _order(scope={"E"}, sp500={"B"}, standing=standing) == ["5", "2", "4", "3", "1"]
+
+
+def test_priority_inside_the_sp500_optionable_liquid_names_come_first() -> None:
+    standing = {
+        "A": Standing(optionable=False, adv_usd=9e9),
+        "B": Standing(optionable=True, adv_usd=1e6),
+        "C": Standing(optionable=True, adv_usd=5e7),
+    }
+    assert _order(sp500={"A", "B", "C"}, standing=standing)[:3] == ["3", "2", "1"]
+
+
+def test_priority_scope_names_stay_first_whatever_their_liquidity() -> None:
+    standing = {"A": Standing(optionable=False), "B": Standing(optionable=True, adv_usd=9e9)}
+    assert _order(scope={"A"}, sp500={"B"}, standing=standing)[:2] == ["1", "2"]
+
+
+def test_priority_missing_inputs_degrade_to_cik_order_and_a_cik_takes_its_best_instrument() -> None:
+    assert _order() == ["1", "2", "3", "4", "5"] == _order()  # deterministic
+    ids = {"A1": "9", "A2": "9", "B": "1"}
+    got = priority_order(["1", "9"], set(), {"A2"}, {}, ids)
+    assert got == ["9", "1"]  # CIK 9 holds an S&P 500 class
+
+
+def test_the_cap_defers_the_lowest_priority_backlog_ciks() -> None:
+    day = date(2026, 1, 5)
+    fetched = [dict.fromkeys("123", day), {}]
+    src = SharesSources(None, 30, backfill_per_night=1)  # type: ignore[arg-type]
+    due, deferred = _due(list("123"), fetched, day, src, False, ["3", "1", "2"])
+    assert due == ["3"] and deferred == 2
+    assert _due(list("123"), fetched, day, src, False)[0] == ["1"]  # default: CIK order
+    # a CIK new to both is never deferred, and --limit style slicing takes the highest first
+    fresh = _due(list("123"), [{"1": day}, {}], day, src, False, ["3", "2", "1"])
+    assert fresh == (["3", "2", "1"], 0)  # new to both are never deferred; priority order
