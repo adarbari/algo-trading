@@ -429,6 +429,18 @@ def test_the_explained_parts_measures_are_reported_apart_and_never_score_a_case(
     assert any("parts: 1 drafts, model placed 75%" in line for line in report_lines(rep))
 
 
+def test_doubts_served_are_counted_and_reported() -> None:
+    def drafting(model: TextModel, sentence: str, current: Mapping[str, Any] | None = None) -> Any:
+        return replace(draft(model, sentence), doubts=("unmapped_words", "unplaced"))
+
+    costs = CostTap()
+    result = evaluate(plan_of([case()], repeat=1), {"paid": Scripted([GOOD], costs)}, drafting,
+                      costs, budget_usd=1.0, max_calls=5)  # fmt: skip
+    assert measure(result.results)["doubts_served"] == 2
+    rep = report(result, plan_of([case()], repeat=1))
+    assert "  doubts served: 2" in report_lines(rep)
+
+
 # ------------------------------------------------------------------------ drops, pacing, 429
 
 LIMITED = ModelUnavailableError("HTTP 429: slow down")
