@@ -8,8 +8,13 @@
 import { DataTable, EmptyState, Panel, SearchInput, Stack } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
-import { useFeatureCatalogue } from '@/entities/feature';
-import { useFeatureHistory, useFeatureValues } from '@/entities/instrument';
+import { fetchCatalogue, useFeatureCatalogue } from '@/entities/feature';
+import {
+  prefetchFeatureHistory,
+  prefetchFeatureValues,
+  useFeatureHistory,
+  useFeatureValues,
+} from '@/entities/instrument';
 import { addDays } from '@/shared/lib';
 
 import {
@@ -23,6 +28,32 @@ import {
 import { FeatureDistribution } from './FeatureDistribution';
 
 const HISTORY_DAYS = 90;
+
+/**
+ * Start the panel's reads before it mounts (a route loader): the catalogue, then the values of
+ * its names and the history of the first chunk of them for the 90 days to the session the
+ * values answered for. The hooks join them, so the keys stay theirs.
+ */
+export async function prefetchFeaturesReads(
+  client: Parameters<typeof fetchCatalogue>[0],
+  symbol: string,
+): Promise<void> {
+  const catalogue = await fetchCatalogue(client);
+  const session = await prefetchFeatureValues(
+    client,
+    symbol,
+    catalogue.map((f) => f.name),
+  );
+  if (session) {
+    prefetchFeatureHistory(
+      client,
+      symbol,
+      historyNames(catalogue),
+      addDays(session, -HISTORY_DAYS),
+      session,
+    );
+  }
+}
 
 export interface FeaturesPanelProps {
   symbol: string;

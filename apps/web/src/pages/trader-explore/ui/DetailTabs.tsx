@@ -21,6 +21,9 @@ import { ExploreTabs } from './ExploreTabs';
 // The other tabs' widgets are one chunk, fetched when one of those tabs opens.
 const OtherTabs = lazyPage(() => import('./OtherTabs'), 'OtherTabs');
 
+/** Fetch the other tabs' chunk ahead of the page (a route loader), so it renders unsuspended. */
+export const preloadOtherTabs = OtherTabs.preload;
+
 export interface DetailTabsProps {
   /** The ticker in focus: the tabs are its own. */
   symbol: string;
