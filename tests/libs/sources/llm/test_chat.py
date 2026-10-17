@@ -3,14 +3,25 @@ temperature 0, the key only in a header), the content it returns, and every way 
 ``ModelUnavailableError`` that names the endpoint but never the key."""
 
 import json
+from datetime import UTC, datetime
 
 import pytest
 
-from algotrade.core.model.errors import InvalidAnswerError, ModelUnavailableError
+from algotrade.core.model.errors import (
+    InvalidAnswerError,
+    ModelUnavailableError,
+    QuotaExhaustedError,
+)
 from algotrade_sources.framework.http import HttpError, pause
 from algotrade_sources.framework.registry import build_text_model
 from algotrade_sources.llm.chat import DETAIL_CHARS, ChatCompletions, content_of, error_detail
-from tests.helpers.payloads.llm import anthropic_answer, gemini_answer
+from tests.helpers.payloads.llm import (
+    GEMINI_QUOTA_PER_DAY,
+    GEMINI_QUOTA_PER_MINUTE,
+    OPENAI_INSUFFICIENT_QUOTA,
+    anthropic_answer,
+    gemini_answer,
+)
 
 BASE = "https://api.groq.com/openai/v1"
 
@@ -291,3 +302,46 @@ def test_the_registry_builds_it_with_the_structured_mode() -> None:
         built.structured == "json_schema"
         and build_text_model(BASE, "m", 1.0, 1, None).structured == "none"
     )
+
+
+def exhausted(body: bytes, retry_after: float | None = None, retries: int = 2):  # type: ignore[no-untyped-def]
+    calls: list[int] = []
+    slept: list[float] = []
+
+    def transport(url: str, payload: bytes) -> bytes:
+        calls.append(1)
+        raise HttpError(429, retry_after, body)
+
+    client = ChatCompletions(
+        BASE, "gemini", transport, slept.append, retries=retries,
+        now=lambda: datetime(2026, 10, 17, 18, 0, tzinfo=UTC),
+    )  # fmt: skip
+    return client, calls, slept
+
+
+def test_a_daily_quota_429_fails_at_once_and_cools_off_until_utc_midnight() -> None:
+    client, calls, slept = exhausted(GEMINI_QUOTA_PER_DAY)
+    with pytest.raises(QuotaExhaustedError, match="quota exhausted") as caught:
+        client.complete("s", "u")
+    assert len(calls) == 1 and slept == []  # the test that would have caught 19 slow 429s
+    assert caught.value.cool_off_s == 6 * 3600.0
+    assert isinstance(caught.value, ModelUnavailableError)
+
+
+def test_retry_after_wins_and_insufficient_quota_cools_off_a_fixed_pause() -> None:
+    client, calls, _ = exhausted(OPENAI_INSUFFICIENT_QUOTA)
+    with pytest.raises(QuotaExhaustedError) as caught:
+        client.complete("s", "u")
+    assert len(calls) == 1 and caught.value.cool_off_s == 900.0
+    client, _, _ = exhausted(GEMINI_QUOTA_PER_DAY, retry_after=120.0)
+    with pytest.raises(QuotaExhaustedError) as caught:
+        client.complete("s", "u")
+    assert caught.value.cool_off_s == 120.0
+
+
+def test_a_per_minute_quota_429_is_still_retried() -> None:
+    client, calls, slept = exhausted(GEMINI_QUOTA_PER_MINUTE)
+    with pytest.raises(ModelUnavailableError) as caught:
+        client.complete("s", "u")
+    assert not isinstance(caught.value, QuotaExhaustedError)
+    assert len(calls) == 3 and len(slept) == 2

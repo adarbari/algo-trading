@@ -21,10 +21,15 @@ The order of the members is the tier order: cheap first, strong last. With the c
 usually ``InvalidAnswerError``) is recorded as ``rejected``, the same member is asked once more
 (``repair``: the question, the refused answer and the exact error), and if that is refused too
 the next member is asked (``escalate``): at most two calls per member, none started after
-``deadline_s``. ``schema`` is passed to the members, which send it only when configured to."""
+``deadline_s``. ``schema`` is passed to the members, which send it only when configured to.
+A member that raises ``QuotaExhaustedError`` (ADR 0041, amended 2026-10-17: its quota is used
+up for the day) cools off: until ``cool_off_s`` has passed on the chain's clock it is skipped
+without being asked, each skip recorded as a ``failed`` attempt saying "cooling off" (the first
+one logged once at WARNING). The state is process-local and thread-safe."""
 
 import logging
 import re
+import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
@@ -47,7 +52,7 @@ from algotrade.core.model.completion import (
     Completion,
     clip,
 )
-from algotrade.core.model.errors import ModelUnavailableError
+from algotrade.core.model.errors import ModelUnavailableError, QuotaExhaustedError
 from algotrade.services.text_model.model import TextModel
 
 log = logging.getLogger(__name__)
@@ -131,6 +136,27 @@ class FallbackTextModel:
     ledger: CallLedger | None = None
     worst_s: Mapping[str, float] = field(default_factory=dict)  # provider id -> worst_case_s
     now: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
+    cooling: dict[str, float] = field(default_factory=dict)  # provider id -> clock() it is back
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def cooling_for(self, provider: str) -> float | None:
+        """Seconds ``provider`` stays cooled off, else ``None`` (an expired entry is dropped)."""
+        with self._lock:
+            until = self.cooling.get(provider)
+            if until is None:
+                return None
+            left = until - self.clock()
+            if left <= 0:
+                del self.cooling[provider]
+                return None
+            return left
+
+    def _cool(self, provider: str, seconds: float) -> bool:
+        """Start (or extend) the cool-off; ``True`` when it was not cooling already."""
+        with self._lock:
+            fresh = provider not in self.cooling
+            self.cooling[provider] = self.clock() + seconds
+            return fresh
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -237,6 +263,15 @@ class FallbackTextModel:
         was skipped (budget) or failed (``ModelUnavailableError``; the cause is noted in
         ``call``). Any other error propagates after what it may have cost is settled."""
         chars = len(call.system) + len(asked)
+        if (left := self.cooling_for(provider)) is not None:
+            message = f"cooling off, its quota is used up (back in {left:.0f} s)"
+            self._note(
+                called, call.call_id, provider, model, FAILED, error=message,
+                stage=PROVIDER, user_text=asked, chars=chars,
+            )  # fmt: skip
+            call.failures.append(f"{provider}: {message}")
+            call.first_failed = call.first_failed or provider
+            return None
         reserved = self._admit(provider, chars)
         if reserved is None:
             self._note(called, call.call_id, provider, model, SKIPPED_BUDGET)
@@ -253,6 +288,13 @@ class FallbackTextModel:
             )  # fmt: skip
             call.failures.append(f"{provider}: {exc}")
             call.first_failed = call.first_failed or provider
+            if isinstance(exc, QuotaExhaustedError):
+                if self._cool(provider, exc.cool_off_s):  # the warning once, not per skip
+                    log.warning(
+                        "text model %s quota exhausted, skipped for %.0f s: %s",
+                        provider, exc.cool_off_s, exc,
+                    )  # fmt: skip
+                return None
             # a refusal that retrying cannot fix (bad key, unknown model) needs the owner
             refused = _REFUSED.search(str(exc)) is not None
             log.log(

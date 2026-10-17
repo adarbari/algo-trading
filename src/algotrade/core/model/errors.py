@@ -36,6 +36,17 @@ class ModelUnavailableError(AlgoTradeError):
     call_id: str | None = None
 
 
+class QuotaExhaustedError(ModelUnavailableError):
+    """The provider answered 429 because its quota is used up (a daily quota, a plan limit),
+    which retrying now cannot fix (ADR 0041, amended 2026-10-17). ``cool_off_s``: how long the
+    chain leaves the provider alone (``Retry-After`` if given, else until the next UTC midnight
+    for a per-day quota, else a fixed pause)."""
+
+    def __init__(self, message: str, cool_off_s: float) -> None:
+        self.cool_off_s = cool_off_s
+        super().__init__(message)
+
+
 class InvalidAnswerError(ModelUnavailableError):
     """The text model answered, but the answer is not one the caller can use (not JSON, not the
     asked-for shape, a draft the validator refuses; ADR 0041, amended 2026-10-11). A caller's

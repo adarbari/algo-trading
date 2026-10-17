@@ -7,27 +7,60 @@ allows). A
 provider that is busy (429, 500, 502, 503, 504) or unreachable is retried ``retries`` times
 with a doubling pause (``Retry-After`` wins); anything else, or the last failure, is a
 ``ModelUnavailableError`` (``core``) naming what went wrong, never the credential: the API
-answers 503 with it."""
+answers 503 with it. A 429 whose body says the quota is used up (``QUOTA_MARKERS``: Google's
+per-day ``RESOURCE_EXHAUSTED``, OpenAI's ``insufficient_quota``) is never retried (ADR 0041,
+amended 2026-10-17): it raises ``QuotaExhaustedError`` at once with a cool-off for the chain."""
 
 import json
 import re
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import Any, NamedTuple
 
 from algotrade.core.model.completion import CallTag, Completion
-from algotrade.core.model.errors import ModelUnavailableError
+from algotrade.core.model.errors import ModelUnavailableError, QuotaExhaustedError
 from algotrade_sources.framework.http import HttpError, JsonTransport
 
 COMPLETIONS = "/chat/completions"
 JSON_SCHEMA = "json_schema"  # ``structured``: the provider takes a response schema
 SCHEMA_NAME = "answer"
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+# A 429 body that means "used up", not "slow down": (marker, per-day). Matched case-insensitively
+# against the raw body; a per-day marker cools off until the next UTC midnight, the others for
+# ``QUOTA_COOL_OFF_S``. Google: a quota violation naming a ``...PerDay...`` quota id / metric, or
+# the plain message; OpenAI-compatible: ``error.code`` ``insufficient_quota``.
+QUOTA_MARKERS: tuple[tuple[str, bool], ...] = (
+    ("perday", True),
+    ("exceeded your current quota", False),
+    ("insufficient_quota", False),
+)
+RATE_MARKER = "perminute"  # a quota id of a per-minute limit: slow down, not used up
+QUOTA_COOL_OFF_S = 900.0
 DETAIL_CHARS = 120  # of an error body kept in the message (it is stored in the usage log)
 _KEYLIKE = re.compile(
     r"(?i)\b(?:bearer\s+\S+|(?:sk|pk|gsk|ghp|xox[a-z]?)[-_]\S+|AIza\S+)|[A-Za-z0-9_.\-]{16,}"
 )
+
+
+def quota_cool_off(body: bytes, retry_after: float | None, now: datetime) -> float | None:
+    """Seconds to leave the provider alone when the 429 ``body`` says its quota is used up, else
+    ``None`` (a rate limit: retry). ``Retry-After`` wins, else the next UTC midnight for a
+    per-day quota, else ``QUOTA_COOL_OFF_S``. A per-minute Google quota (``PerMinute``)
+    keeps retrying although its message reads the same."""
+    text = body.decode("utf-8", "replace").lower()
+    if RATE_MARKER in text and QUOTA_MARKERS[0][0] not in text:
+        return None  # Google words a per-minute limit with the same message: it clears, retry
+    hits = [daily for marker, daily in QUOTA_MARKERS if marker in text]
+    if not hits:
+        return None
+    if retry_after:
+        return retry_after
+    if any(hits):
+        midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        return (midnight - now).total_seconds()
+    return QUOTA_COOL_OFF_S
 
 
 def error_detail(body: bytes) -> str:
@@ -66,6 +99,7 @@ class ChatCompletions:
     provider: str = "default"  # the ``llm.toml`` id this client answers as
     structured: str = "none"  # ``json_schema``: send the caller's schema as ``response_format``
     clock: Callable[[], float] = time.monotonic
+    now: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -133,6 +167,12 @@ class ChatCompletions:
                 raw = self.transport(self.url, body)
             except HttpError as exc:
                 detail = error_detail(exc.body)
+                if exc.status == 429 and (
+                    cool := quota_cool_off(exc.body, exc.retry_after, self.now())
+                ):
+                    raise QuotaExhaustedError(
+                        f"{where}: HTTP 429 quota exhausted {detail}", cool
+                    ) from exc
                 if exc.status not in RETRY_STATUSES or last:
                     tried = tried if exc.status in RETRY_STATUSES else ""
                     raise ModelUnavailableError(

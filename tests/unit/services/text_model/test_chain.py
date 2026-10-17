@@ -9,7 +9,11 @@ import pytest
 
 from algotrade.config.site.llm import ProviderSettings
 from algotrade.core.model.completion import Attempt, CallTag, Completion
-from algotrade.core.model.errors import InvalidAnswerError, ModelUnavailableError
+from algotrade.core.model.errors import (
+    InvalidAnswerError,
+    ModelUnavailableError,
+    QuotaExhaustedError,
+)
 from algotrade.services.text_model.chain import FallbackTextModel
 from algotrade.services.text_model.model import TextModel
 
@@ -643,3 +647,35 @@ def test_the_not_repaired_failure_says_why_the_answer_was_refused() -> None:
     slow = Timed(clock, 100, "slow", "bad")
     with pytest.raises(ModelUnavailableError, match=r"'bad' is not good \(not repaired, the 60 s"):
         chain(slow, deadline_s=60.0, clock=clock).complete("s", "u", tag=TAG, accept=only_good)
+
+
+def test_an_exhausted_quota_cools_the_member_off_until_it_passes(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    ledger, clock = Ledger(), Clock()
+    gemini = Member("gemini", QuotaExhaustedError("HTTP 429 quota exhausted", 600.0))
+    claude = Member("claude")
+    model = FallbackTextModel([("gemini", gemini), ("claude", claude)], clock=clock, ledger=ledger)
+    with caplog.at_level(logging.WARNING):
+        model.complete("s", "u")  # asked once, fails, claude answers
+        clock.now = 599.0
+        model.complete("s", "u")  # skipped without being asked
+        model.complete("s", "u")
+    assert gemini.calls == 1 and claude.calls == 3
+    skips = [a for a in ledger.attempts if a.error and "cooling off" in a.error]
+    assert len(skips) == 2 and {(a.provider, a.outcome) for a in skips} == {("gemini", "failed")}
+    assert sum("quota exhausted" in r.message for r in caplog.records) == 1  # logged once
+    clock.now = 601.0  # the cool-off is over: gemini is asked again
+    gemini.outcome = None
+    model.complete("s", "u")
+    assert gemini.calls == 2 and model.cooling_for("gemini") is None
+
+
+def test_a_cooled_off_only_member_makes_the_call_unavailable_naming_why() -> None:
+    gemini = Member("gemini", QuotaExhaustedError("HTTP 429 quota exhausted", 60.0))
+    model = FallbackTextModel([("gemini", gemini)], clock=Clock())
+    with pytest.raises(ModelUnavailableError):
+        model.complete("s", "u")
+    with pytest.raises(ModelUnavailableError, match="cooling off"):
+        model.complete("s", "u")
+    assert gemini.calls == 1
