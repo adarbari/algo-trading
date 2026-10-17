@@ -15,7 +15,7 @@ import { useInstrumentFacts } from '@/entities/instrument';
 import { GuideHelp, termHelp } from '@/features/guide-help';
 
 import { rowItem, statItem, type RowHelp } from '../model/rows';
-import { FINANCIALS_FEATURES, KEY_METRICS, SECTIONS } from '../model/sections';
+import { FINANCIALS_PARTS, KEY_METRICS, SECTIONS } from '../model/sections';
 
 export interface FinancialsPanelProps {
   symbol: string;
@@ -40,19 +40,23 @@ function Badge({ values, name }: { values: Values; name: string }) {
 }
 
 export function FinancialsPanel({ symbol }: FinancialsPanelProps) {
-  const facts = useInstrumentFacts(symbol, FINANCIALS_FEATURES);
-  const instrument = facts.data?.instrument;
+  const first = useInstrumentFacts(symbol, FINANCIALS_PARTS[0] ?? []);
+  const second = useInstrumentFacts(symbol, FINANCIALS_PARTS[1] ?? []);
+  const instrument = first.data?.instrument;
+  const rest = second.data?.instrument;
   const values = useMemo<Values>(
-    () => new Map((instrument?.features ?? []).map((v) => [v.name, v])),
-    [instrument],
+    () =>
+      new Map([...(instrument?.features ?? []), ...(rest?.features ?? [])].map((v) => [v.name, v])),
+    [instrument, rest],
   );
-  const state = facts.isError
-    ? 'error'
-    : facts.isPending
-      ? 'loading'
-      : !instrument || instrument.isEtf
-        ? 'empty'
-        : 'ready';
+  const state =
+    first.isError || second.isError
+      ? 'error'
+      : first.isPending || second.isPending
+        ? 'loading'
+        : !instrument || instrument.isEtf
+          ? 'empty'
+          : 'ready';
   return (
     <Panel
       title={`${symbol} · financials`}
@@ -69,7 +73,10 @@ export function FinancialsPanel({ symbol }: FinancialsPanelProps) {
           {termHelp('financials_panel')}
         </Stack>
       }
-      onRetry={() => void facts.refetch()}
+      onRetry={() => {
+        void first.refetch();
+        void second.refetch();
+      }}
     >
       <Stack gap={4}>
         <StatStrip

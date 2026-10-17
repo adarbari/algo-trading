@@ -1,5 +1,7 @@
 """How much one request may ask for: depth, aliases, tokens, and the list caps."""
 
+import re
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -58,3 +60,11 @@ def test_max_items_refuses_before_the_resolver_runs(value: Any) -> None:
     with pytest.raises(GraphQLError, match="first: at most 1000, got 1001"):
         cap.resolve(lambda *a, **kw: called.append(True), None, None, first=value)  # type: ignore[arg-type]
     assert called == []
+
+
+def test_web_names_per_request_matches_the_server_cap():
+    """The web's `NAMES_PER_REQUEST` (the cap its name lists are tested against) is the server's
+    `MAX_NAMES`: a panel asking for 63 names failed with BAD_REQUEST on 2026-10-17."""
+    hooks = Path(__file__).parents[4] / "apps/web/src/entities/instrument/api/hooks.ts"
+    match = re.search(r"NAMES_PER_REQUEST = (\d+);", hooks.read_text())
+    assert match and int(match.group(1)) == MAX_NAMES
