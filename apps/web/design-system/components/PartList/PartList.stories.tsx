@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { narrow } from '../../testing';
 import { PartCard } from '../PartCard';
+import { PartJoin } from '../PartJoin';
 import { PartList } from './PartList';
 
 const meta = {
@@ -58,3 +59,45 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const Narrow: Story = { decorators: [narrow] };
+
+const joinedCards = (join: 'and' | 'or' | 'and_not', label: string, words: string) => [
+  <PartCard
+    key="a"
+    kind="applied"
+    kindLabel="applied"
+    words="optionable stocks"
+    reading="Stocks with listed options."
+    readingLabel="We read this as"
+    redraftingLabel="Redrafting this part"
+  />,
+  <PartJoin
+    key="j"
+    join={join}
+    label={label}
+    words={words}
+    joinedByLabel="joined by"
+    readAsLabel="read as"
+  />,
+  <PartCard
+    key="b"
+    kind="applied"
+    kindLabel="applied"
+    words="over $5"
+    reading="Price above 5."
+    readingLabel="We read this as"
+    redraftingLabel="Redrafting this part"
+  />,
+];
+
+/** A connector between parts: and, or and but not, then no connector at all. */
+export const Joined: Story = {
+  render: (args) => (
+    <>
+      <PartList {...args}>{joinedCards('and', 'and', 'but')}</PartList>
+      <PartList {...args}>{joinedCards('or', 'or', 'or')}</PartList>
+      <PartList {...args}>{joinedCards('and_not', 'but not', 'except')}</PartList>
+    </>
+  ),
+};
+
+export const JoinedNarrow: Story = { ...Joined, decorators: [narrow] };

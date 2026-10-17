@@ -1,0 +1,30 @@
+/* PartJoin: a quiet text-level connector between two cards; OR and AND NOT take a tone. */
+.join {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+  min-width: 0;
+  padding-inline: var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+
+.words {
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.label {
+  color: var(--color-muted);
+  font-weight: var(--font-weight-semibold);
+}
+
+.join[data-join='or'] .label {
+  color: var(--color-accent-strong);
+}
+
+.join[data-join='and_not'] .label {
+  color: var(--color-negative);
+}
