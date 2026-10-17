@@ -282,11 +282,11 @@ mode = "hard"
 [[field]]
 name = "rollup.balance_sheet@v1.total_debt"
 theme = "statements"
-reads = "Debt at the balance sheet date (bs_as_of), in dollars, added up from the parts of ONE filing by the first rule that applies (rollup.balance_sheet@v1.debt_basis says which). Rule a: LongTermDebt plus short-term borrowings, else commercial paper. Rule b: LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term borrowings, else commercial paper. Rule c: DebtCurrent plus LongTermDebtNoncurrent. Against equity it is the leverage; less cash it is the net debt."
+reads = "Debt at the balance sheet date (bs_as_of), in dollars, added up from the parts of ONE filing by the first rule that applies (rollup.balance_sheet@v1.debt_basis says which). Rule a: LongTermDebt plus short-term borrowings, else commercial paper. Rule b: LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term borrowings, else commercial paper. Rule c: DebtCurrent plus LongTermDebtNoncurrent. Rules d to g serve filers that tag debt together with finance leases. Rule d: the noncurrent plus current parts of long-term debt and capital lease obligations, plus short-term borrowings. Rule e: that noncurrent figure plus DebtCurrent. Rule f: the figure including current maturities, plus short-term borrowings. Rule g: the all-debt total. Against equity it is the leverage; less cash it is the net debt."
 caveats = [
   "Null when no filing has a complete set of parts (rollup.balance_sheet@v1.debt_basis NOT_TAGGED). A filer without the tags and a debt-free filer look the same in the document, so the value is null, never zero: do not read null as no debt.",
   "Parts are never taken from two filings: a quarterly report and an amendment are not mixed. Commercial paper is added only when the filer has no short-term borrowings line, as borrowings usually include it.",
-  "Lease liabilities, pension deficits and off-balance-sheet obligations are not included, so a retailer or an airline understates what it owes. Banks keep this line, but a bank's deposits and borrowings are its business, not leverage: rollup.balance_sheet@v1.is_financial says which names to leave out of a debt screen.",
+  "Operating lease liabilities, pension deficits and off-balance-sheet obligations are not included, so a retailer or an airline understates what it owes. Finance leases are inside the figure only under rules d to f, whose tags include them. Banks keep this line, but a bank's deposits and borrowings are its business, not leverage: rollup.balance_sheet@v1.is_financial says which names to leave out of a debt screen.",
   "A balance sheet is a snapshot at a quarter or year end and lags like every filing. It is up to four months old on the day it is filed. A restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v1.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.",
 ]
 sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
@@ -298,10 +298,11 @@ mode = "hard"
 [[field]]
 name = "rollup.balance_sheet@v1.debt_basis"
 theme = "statements"
-reads = "Which rule built rollup.balance_sheet@v1.total_debt. a: LongTermDebt plus short-term borrowings (else commercial paper) from one filing. b: LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term borrowings (else commercial paper). c: DebtCurrent plus LongTermDebtNoncurrent. NOT_TAGGED: no filing has a complete set of parts, so the total is null. Null when no balance sheet fact is filed."
+reads = "Which rule built rollup.balance_sheet@v1.total_debt. Rule a: LongTermDebt plus short-term borrowings (else commercial paper), from one filing. Rule b: LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term borrowings (else commercial paper). Rule c: DebtCurrent plus LongTermDebtNoncurrent. Rule d: noncurrent plus current long-term debt and capital lease obligations, plus short-term borrowings. Rule e: that noncurrent figure plus DebtCurrent. Rule f: the same including current maturities, plus short-term borrowings. Rule g: the all-debt total. NOT_TAGGED: no filing has a complete set of parts, so the total is null. Null when no balance sheet fact is filed."
 caveats = [
   "NOT_TAGGED does not mean the company has no debt: it means the filer does not tag the parts a rule needs. Read the filing before treating it as debt-free.",
-  "The rules differ in what they include: a counts all long-term debt in one tag, b and c rebuild it from the noncurrent and current portions. Across companies the totals are comparable, not identical.",
+  "The rules differ in what they include: a, f and g take a total, b to e add the noncurrent and current portions. Rules d to f include finance leases, the others do not. Across companies the totals are comparable, not identical.",
+  "A filer that tags only a noncurrent debt figure, with no current portion, stays NOT_TAGGED: adding it up from one part would understate what it owes.",
   "Null (not NOT_TAGGED) with no balance sheet filed: the status in rollup.balance_sheet@v1.bs_status is NO_FACTS.",
 ]
 sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]

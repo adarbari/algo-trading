@@ -45,7 +45,7 @@ Reads are `data/statements/reading.py` (a new folder: `data/` is at its module c
 for the producer, `statement_facts(reader, session)` the facts filed on or before a session.
 
 ### The parser stores every tag; rollups choose
-`statement_concepts.py` lists the us-gaap tags of each concept, best first (35 tags, 16 concepts,
+`statement_concepts.py` lists the us-gaap tags of each concept, best first (39 tags after the 2026-10-17 amendment, 16 concepts,
 checked against the 1,975 company documents in the store: every tag exists). `company_facts.py`
 stores **every tag found**, in `tag`, and never picks one over another, adds or subtracts across
 tags: the choice depends on what is public on each date and belongs to the rollup. The order is a
@@ -69,7 +69,7 @@ carry no start. A figure in another currency is dropped: those issuers have no s
   `LongTermDebtNoncurrent`); the short-term part is optional and a missing one counts as 0: the one place a
   missing figure is added as 0, because a filer without short-term borrowings has none (owner accepted). An
   incomplete set of main parts is null with `NOT_TAGGED`, not zero debt: a filer without the tags and a
-  debt-free filer look the same in the document.
+  debt-free filer look the same in the document. Rules d to g (amendment 2026-10-17, below) follow a, b, c.
 - **One balance sheet date.** Every line other than the core ones (cash, total assets, equity), total
   liabilities and debt are read only at `bs_as_of`; a line not reported at that date is null, never an older
   figure. Derived liabilities (`LiabilitiesAndStockholdersEquity` less equity) subtract the equity including
@@ -78,6 +78,39 @@ carry no start. A figure in another currency is dropped: those issuers have no s
   issuers the EBIT family (operating income, EBIT margin, interest cover, EV/EBIT, enterprise value
   from debt) is null: a bank's debt and operating income are not those of an operating company. ROE,
   ROA and price to book are kept.
+
+### Amendment 2026-10-17: rules d to g for the lease-inclusive debt tags
+Measured on the first fetched companies (non-financial, `bs_status` OK, 504): `debt_basis` was
+`NOT_TAGGED` for 259 (51%). 70 of them tag `LongTermDebtAndCapitalLeaseObligations` at `bs_as_of`, the
+most common balance sheet debt tag the lists lacked. Four tags are added to `debt` (35 to 39) and four
+rules follow a, b, c, each from the parts of ONE accession at `bs_as_of`, never summing a total with
+its own components, the short-term part (`ShortTermBorrowings`, else `CommercialPaper`) added only to a
+part that excludes it:
+- (d) `LongTermDebtAndCapitalLeaseObligations` (noncurrent) + `LongTermDebtAndCapitalLeaseObligationsCurrent`
+  + the short-term part;
+- (e) `LongTermDebtAndCapitalLeaseObligations` + `DebtCurrent` (which already includes short-term
+  borrowings: none added);
+- (f) `LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities` + the short-term part (a total
+  like `LongTermDebt`);
+- (g) `DebtLongtermAndShorttermCombinedAmount` alone (the carrying value of all short- and long-term
+  debt: nothing is added).
+
+The us-gaap definitions relied on: `...CapitalLeaseObligations` is long-term debt and capital (finance)
+lease obligations classified as noncurrent; `...Current` the current portion of the same;
+`...IncludingCurrentMaturities` their total; `DebtCurrent` debt due within a year including short-term
+borrowings. Checked on the stored documents (identities within 0.1%): total = noncurrent + current for
+23 of 25 filings, `DebtLongtermAndShorttermCombinedAmount` = noncurrent + `DebtCurrent` for 2 of 2.
+Rules d to f therefore include finance lease obligations (the tag does, and the filer reports no split);
+operating lease liabilities are in none of the rules and the Guide says which rules include leases.
+Unchanged: a filer with only a noncurrent figure (`LongTermDebtNoncurrent` or the lease-inclusive one)
+and no current part stays `NOT_TAGGED` (understated debt is worse than null), and so does a filer
+whose only tags are components or note items (`LineOfCredit`, `NotesPayable`, `SecuredDebt`,
+`ShortTermBankLoansAndNotesPayable`, `FinanceLeaseLiability*`, `DebtAndCapitalLeaseObligations` whose
+scope is not clear). Of the 259: 72 become tagged (d 46, e 15, g 8, f 3), 187 stay `NOT_TAGGED` (132 tag
+no debt at all, 34 `LongTermDebtNoncurrent` without a current part, 9 the lease-inclusive noncurrent or
+total without one, 8 short-term only, 4 a current part only); the 245 already tagged keep their rule and
+value. Stored rows are only added to: companies fetched before this change need the `shares` task to
+refetch them (`--force`, or the 30-day refresh).
 
 ## Consequences
 - About 600 rows per company on average (median 386, largest of 114 sampled documents 1,815): ~5M

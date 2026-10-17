@@ -9,9 +9,10 @@ The order is a preference for concepts whose tags are alternatives of one figure
 figures it only fixes the output order:
 
 - ``debt``: the parts a rollup adds up from ONE filing (long-term debt, its noncurrent and
-  current portions, short-term borrowings, commercial paper); which parts, in which order, is
-  the rollup's rule (ADR 0067), and a filer with none of them has no debt tag, which is not
-  zero debt.
+  current portions, short-term borrowings, commercial paper, and the lease-inclusive
+  ``LongTermDebtAndCapitalLeaseObligations*`` forms and the all-debt total
+  ``DebtLongtermAndShorttermCombinedAmount``); which parts, in which order, is the rollup's
+  rule (ADR 0067), and a filer with none of them has no debt tag, which is not zero debt.
 - ``liabilities``: ``Liabilities``, plus ``LiabilitiesAndStockholdersEquity`` stored so a
   rollup can derive liabilities as that total less equity for filers that do not tag them.
 - ``current``: ``AssetsCurrent`` and ``LiabilitiesCurrent``.
@@ -82,6 +83,10 @@ STATEMENT_CONCEPTS: dict[str, tuple[str, tuple[str, ...]]] = {
             "DebtCurrent",
             "ShortTermBorrowings",
             "CommercialPaper",
+            "LongTermDebtAndCapitalLeaseObligations",
+            "LongTermDebtAndCapitalLeaseObligationsCurrent",
+            "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+            "DebtLongtermAndShorttermCombinedAmount",
         ),
     ),
     "assets": (INSTANT, ("Assets",)),

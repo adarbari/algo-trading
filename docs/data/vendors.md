@@ -500,7 +500,7 @@ at about 400 to 500 rows per company instead of several thousand (a full re-pars
 are ignored, so those issuers have no financials (null, not an error).
 
 **Statement lines (`instruments/statements`, ADR 0067).** The same document, parsed a second time
-by `statement_concepts.py` + `company_facts.parse_statements`: 16 concepts, 35 us-gaap tags, USD only,
+by `statement_concepts.py` + `company_facts.parse_statements`: 16 concepts, 39 us-gaap tags, USD only,
 periodic forms only. Every tag found is stored in `tag` (the first filing of a period plus later
 filings that changed the value, per tag), and no tag is chosen over another here: the roll-up that
 reads a concept ranks them. The list is best tag first; for alternatives of one figure it is the
@@ -520,7 +520,7 @@ output.
 | `capex` | duration | `PaymentsToAcquirePropertyPlantAndEquipment`, `PaymentsToAcquireProductiveAssets` |
 | `cash` | instant | `CashAndCashEquivalentsAtCarryingValue`, `CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents` |
 | `sti` | instant | `ShortTermInvestments`, `MarketableSecuritiesCurrent` |
-| `debt` | instant | the parts: `LongTermDebt`, `LongTermDebtNoncurrent`, `LongTermDebtCurrent`, `DebtCurrent`, `ShortTermBorrowings`, `CommercialPaper` |
+| `debt` | instant | the parts: `LongTermDebt`, `LongTermDebtNoncurrent`, `LongTermDebtCurrent`, `DebtCurrent`, `ShortTermBorrowings`, `CommercialPaper`, `LongTermDebtAndCapitalLeaseObligations`, `LongTermDebtAndCapitalLeaseObligationsCurrent`, `LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities`, `DebtLongtermAndShorttermCombinedAmount` |
 | `assets` | instant | `Assets` |
 | `liabilities` | instant | `Liabilities`, `LiabilitiesAndStockholdersEquity` (stored so a roll-up can derive liabilities) |
 | `equity` | instant | `StockholdersEquity`, `StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest` |
