@@ -411,7 +411,7 @@ follow-up PR).
 - status: final
 - Reasoning: these steps used to appear in the nightly's alert; moving them out must not silence failures.
 
-## 2026-10-17 | PR #TBD (Describe it connector) | The connector token's labels and reading
+## 2026-10-17 | PR #589 (Describe it connector) | The connector token's labels and reading
 - Question: what does the connector between part cards say, and how is it read aloud?
 - Options: the logic's own names (AND, OR, AND NOT) / the trader's register.
 - Decision: and -> "and", or -> "or", and_not -> "but not" (one negation beside a card that already states the exclusion, never two); read as "joined by {words}, read as {label}" (just "joined by {words}" when the words equal the label); the Guide entry `describe_part_join` explains it.
@@ -419,7 +419,7 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the traders' own words (but, except, unless) stay visible and the reading beside them is what they would say; a second negation would read as a double negative.
 
-## 2026-10-17 | PR #TBD (Describe it connector) | When the connector token shows
+## 2026-10-17 | PR #589 (Describe it connector) | When the connector token shows
 - Question: which joins get a token between part cards?
 - Options: every join / only those that change the reading.
 - Decision: join "or" and "and_not" always; join "and" only when the words are not a plain conjunction: hidden for and, with, plus, also, then, "," or no words; shown for but, yet, while, although, though, whereas, as long as, so long as, only if, provided (that).
