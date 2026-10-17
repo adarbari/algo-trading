@@ -155,7 +155,7 @@ How the Python tests are cut (`make test` locally is unchanged):
 Baselines are Linux PNGs, so a change to a story or component used to need Docker locally.
 Add the label `update-screenshots` to the PR (or run the "Screenshot baselines" workflow on a
 branch): `.github/workflows/screenshots.yml` runs in the same Playwright image as CI
-(`mcr.microsoft.com/playwright:v1.63.0-noble`, a fitness test keeps the two in step), builds
+(`mcr.microsoft.com/playwright:v1.64.1-noble`, a fitness test keeps the two in step), builds
 Storybook, runs `npm run visual -- --update-snapshots --fully-parallel`, commits the changed
 PNGs to the PR branch as `github-actions[bot]`. If the push is rejected because the branch moved,
 it fetches, rebases the PNG commit onto the new head (a PNG clash keeps the fresh render) and
