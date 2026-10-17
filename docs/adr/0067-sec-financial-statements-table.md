@@ -107,8 +107,8 @@ maturities and short-term debt" (it does not mention leases). Measured on the 98
 noncurrent debt plus the operating lease liability, and in 6 it equals noncurrent debt plus the
 finance lease liability. Also, on the 504 first fetched companies, total = noncurrent + current for
 23 of 25 filings and the all-debt figure = noncurrent + `DebtCurrent` for 2 of 2 (within 0.1%).
-So the figure is debt plus finance leases, not operating leases. **Owner-side decision
-(2026-10-17): finance leases stay in `total_debt` under the rules whose tags include them, labelled
+So the figure is debt plus finance leases, not operating leases. **Owner decision
+(2026-10-17, in session): finance leases stay in `total_debt` under the rules whose tags include them, labelled
 per rule; operating leases are never in debt.** Per rule: finance leases are in under d and f (both
 parts), in the noncurrent part of e and its current part (`DebtCurrent` includes the current
 maturity of capital leases), in the current part of the existing rule c, and not in a and b (long-term
@@ -122,7 +122,7 @@ no debt at all, 34 `LongTermDebtNoncurrent` without a current part, 9 the lease-
 total without one, 8 short-term only, 4 a current part only); the 245 already tagged keep their rule and
 value. Stored rows are only added to, and the parser keeps only listed tags, so companies fetched
 before this change need a refetch. No manual run: `STATEMENT_TAGS_VERSION_DATE`
-(`statement_concepts.py`) is the day the lists last grew, and the `shares` task counts a statements
+(`statement_concepts.py`, 2026-10-19, the first nightly with this code) is the day the lists last grew, and the `shares` task counts a statements
 marker older than it as backlog, refetched under the existing nightly cap (`backfill_per_night`, 400:
 the ~800 already fetched take about two nights). `--force` is not needed and would refetch every CIK
 (~6k) outside the cap.

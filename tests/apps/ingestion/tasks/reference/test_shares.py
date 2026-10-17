@@ -354,6 +354,16 @@ def test_statements_fetched_before_the_tag_list_date_are_backlog_under_the_cap()
     record = ingest_shares(task_ctx(writer, reader, CLOCK), old, session)
     assert len(kinds(feed)) == 2 and record.stats["deferred_by_limit"] == 1  # capped at 2 of 3
 
+    first = set(kinds(feed))
+    for night, expected in ((2, 1), (3, 0)):  # a plain rerun: the deferred CIK only, then nothing
+        again = FakeFacts(aapl=AAPL_STATEMENTS)
+        ingest_shares(
+            task_ctx(writer, reader, CLOCK),
+            replace(old, facts=sources(again, 100000).facts),
+            DAY + timedelta(days=night),
+        )
+        assert len(kinds(again)) == expected and not set(kinds(again)) & first
+
     forced = FakeFacts(aapl=AAPL_STATEMENTS)
     uncapped = replace(old, facts=sources(forced, 100000).facts)
     ingest_shares(task_ctx(writer, reader, CLOCK), uncapped, session, force=True)
