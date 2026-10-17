@@ -52,28 +52,59 @@ describe('instrument hooks', () => {
     expect(prices.result.current.data).toEqual([{ session: 'd' }]);
   });
 
-  it('ask for feature values in chunks the API accepts, and merge them', async () => {
-    GQL.mockClear();
-    const names = Array.from({ length: NAMES_PER_REQUEST + 1 }, (_, i) => `feature.f${i}`);
-    GQL.mockImplementation((_document, variables) => {
-      const asked = (variables as { names: string[] }).names;
-      return Promise.resolve({
-        session: { date: '2026-10-02' },
-        instrument: { instrumentId: 'EQ:A', features: asked.map(value) },
-      });
+  /** An answer for the aliased slots `n0..` of a values request, as `f0..`. */
+  const answerValues = (variables: unknown) => {
+    const v = variables as Record<string, unknown>;
+    return Promise.resolve({
+      session: { date: '2026-10-02' },
+      instrument: {
+        instrumentId: 'EQ:A',
+        ...Object.fromEntries(
+          Array.from({ length: 10 }, (_, i) => [
+            `f${String(i)}`,
+            ((v[`n${String(i)}`] as string[] | undefined) ?? []).map(value),
+          ]),
+        ),
+      },
     });
+  };
+
+  it('ask for all feature values in ONE request (aliased fields, chunks of the cap)', async () => {
+    GQL.mockClear();
+    const names = Array.from({ length: 5 * NAMES_PER_REQUEST + 1 }, (_, i) => `feature.f${i}`);
+    GQL.mockImplementation((_document, variables) => answerValues(variables));
     const { result } = renderHook(() => useFeatureValues('AAPL', names), { wrapper });
     await waitFor(() => {
       expect(result.current.isPending).toBe(false);
     });
-    // The first chunk resolves the session; the rest ask for exactly that date.
-    expect(calls().map(([, v]) => v)).toEqual([
-      expect.objectContaining({ names: names.slice(0, NAMES_PER_REQUEST), date: null }),
-      expect.objectContaining({ names: names.slice(NAMES_PER_REQUEST), date: '2026-10-02' }),
-    ]);
+    expect(GQL).toHaveBeenCalledOnce();
+    expect(calls()[0]?.[1]).toEqual(
+      expect.objectContaining({
+        key: 'AAPL',
+        date: null,
+        n0: names.slice(0, NAMES_PER_REQUEST),
+        n5: names.slice(5 * NAMES_PER_REQUEST),
+        n6: [],
+      }),
+    );
     expect(result.current.session).toBe('2026-10-02');
     expect(result.current.values.size).toBe(names.length);
     expect(result.current.isError).toBe(false);
+  });
+
+  it('ask for the names past the slots in a second request for the same date', async () => {
+    GQL.mockClear();
+    const names = Array.from({ length: 10 * NAMES_PER_REQUEST + 1 }, (_, i) => `feature.f${i}`);
+    GQL.mockImplementation((_document, variables) => answerValues(variables));
+    const { result } = renderHook(() => useFeatureValues('AAPL', names), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(false);
+    });
+    expect(calls().map(([, v]) => (v as { date: string | null }).date)).toEqual([
+      null,
+      '2026-10-02',
+    ]);
+    expect(result.current.values.size).toBe(names.length);
   });
 
   it('read the history only once its start is known', async () => {
@@ -129,6 +160,42 @@ describe('instrument hooks', () => {
       expect(result.current.isPending).toBe(false);
     });
     expect(GQL).toHaveBeenCalledTimes(3);
+    expect(result.current.series).toHaveLength(2);
+  });
+
+  it('read only the history chunks that hold a shown name, each when first shown', async () => {
+    GQL.mockClear();
+    const names = Array.from({ length: 2 * NAMES_PER_REQUEST + 1 }, (_, i) => `feature.f${i}`);
+    GQL.mockImplementation((_document, variables) =>
+      Promise.resolve({
+        instrument: {
+          instrumentId: 'EQ:A',
+          series: { names: (variables as { names: string[] }).names, points: [] },
+        },
+      }),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, rerender } = renderHook(
+      ({ shown }: { shown: ReadonlySet<string> }) =>
+        useFeatureHistory('AAPL', names, '2026-07-04', '2026-10-02', shown),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+        initialProps: { shown: new Set(['feature.f1']) },
+      },
+    );
+    await waitFor(() => {
+      expect(result.current.isPending).toBe(false);
+    });
+    expect(GQL).toHaveBeenCalledOnce();
+    rerender({ shown: new Set([names[2 * NAMES_PER_REQUEST] ?? '']) });
+    await waitFor(() => {
+      expect(GQL).toHaveBeenCalledTimes(2);
+    });
+    // the first chunk stays read when it scrolls away
+    rerender({ shown: new Set() });
+    expect(GQL).toHaveBeenCalledTimes(2);
     expect(result.current.series).toHaveLength(2);
   });
 

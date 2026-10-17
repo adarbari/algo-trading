@@ -154,6 +154,35 @@ test('the tabs and the open tickers live in the URL; a closed tab leaves the lis
   expect(errors).toEqual([]);
 });
 
+test('the features tab loads with one values read, one history read and no per-field help reads', async ({
+  page,
+}) => {
+  // Measured 2026-10-17: ~40 requests (9 value chunks, 6 history chunks, one help read per
+  // row) queued on the single-process API and took 13.5 s to settle.
+  const ops: string[] = [];
+  page.on('request', (request) => {
+    if (!request.url().endsWith('/api/graphql')) return;
+    const body = request.postDataJSON() as { query?: string } | null;
+    ops.push(/query (\w+)/.exec(body?.query ?? '')?.[1] ?? 'anonymous');
+  });
+  await page.goto('/explore?sel=AAPL&focus=AAPL&tab=features');
+  const grid = page.getByRole('grid', { name: 'AAPL features' });
+  await expect(grid).toBeVisible();
+  await expect(page.getByText(/\d+ catalogue features/)).toBeVisible(); // history settled
+  await page.waitForLoadState('networkidle');
+  const count = (name: string) => ops.filter((op) => op === name).length;
+  expect(count('InstrumentFeatureValues')).toBe(1);
+  expect(count('InstrumentHistory')).toBe(1);
+  expect(count('GuideHelpField')).toBe(0);
+  // the help is read when a field's button is opened
+  await grid
+    .getByRole('button', { name: /^What is / })
+    .first()
+    .click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(count('GuideHelpField')).toBe(1);
+});
+
 test('a ticker Ideas opened shows why it is an idea, from the screener that surfaced it', async ({
   page,
 }) => {

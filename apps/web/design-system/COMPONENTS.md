@@ -409,6 +409,7 @@ Source: `design-system/components/DataTable`
 | `activateOnClick` | `boolean` | no | A click activates the row (default), or only makes it the active row (`false`). |
 | `activeRowId` | `string \| null` | no | The active (keyboard) row id, when the caller controls it (else the table keeps it). |
 | `onActiveRowChange` | `(row: TRow) => void` | no | The active row changed: arrows, `j` / `k`, Home / End, Page Up / Down, or a click. |
+| `onVisibleRowsChange` | `(rows: readonly TRow[]) => void` | no | The rows the scroll window holds (rendered rows, overscan included), each time it changes: a page that loads data per row asks only for these. |
 | `rowKeys` | `Readonly<Record<string, (row: TRow) => void>>` | no | Extra single-character keys for the active row (`c`, `x`), while the grid has focus. |
 | `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` (placeholder rows) or `error` (shows `errorMessage`). |
 | `errorMessage` | `ReactNode` | no |  |

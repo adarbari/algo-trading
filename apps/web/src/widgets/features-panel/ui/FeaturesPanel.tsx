@@ -38,7 +38,9 @@ export function FeaturesPanel({ symbol, feature, onFeatureChange }: FeaturesPane
   const values = useFeatureValues(symbol, names);
   const start = values.session ? addDays(values.session, -HISTORY_DAYS) : null;
   const tracked = useMemo(() => historyNames(catalogue.data ?? []), [catalogue.data]);
-  const history = useFeatureHistory(symbol, tracked, start, values.session);
+  // History is read for the rows the table has in its scroll window, not for every row.
+  const [windowNames, setWindowNames] = useState<ReadonlySet<string>>(new Set());
+  const history = useFeatureHistory(symbol, tracked, start, values.session, windowNames);
   const rows = useMemo(
     () => featureRows(catalogue.data ?? [], values.values, history),
     [catalogue.data, values.values, history],
@@ -67,6 +69,9 @@ export function FeaturesPanel({ symbol, feature, onFeatureChange }: FeaturesPane
           getRowId={(r) => r.feature.name}
           rowLines={2}
           visibleRows={12}
+          onVisibleRowsChange={(window) => {
+            setWindowNames(new Set(window.map((r) => r.feature.name)));
+          }}
           onRowActivate={(r) => {
             onFeatureChange(r.feature.name);
           }}

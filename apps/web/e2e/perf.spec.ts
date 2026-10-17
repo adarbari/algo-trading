@@ -33,6 +33,11 @@ const ROUTES: { name: string; url: string; ready?: (page: Page) => Locator }[] =
     url: '/explore?focus=AAPL&tab=chart',
     ready: (page) => page.getByRole('button', { name: 'Zoom in' }),
   },
+  {
+    name: 'Explore with a ticker (features tab)',
+    url: '/explore?focus=AAPL&tab=features',
+    ready: (page) => page.getByRole('grid', { name: 'AAPL features' }),
+  },
   { name: 'Regime', url: '/regime' },
   { name: 'Screener results', url: '/screeners/vrp_scanner' },
   { name: 'Admin ingestion', url: '/admin/ingestion' },
