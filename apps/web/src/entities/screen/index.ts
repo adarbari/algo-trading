@@ -21,7 +21,7 @@ export {
   type ScreenerPicksResponse,
 } from './api/picks';
 export { prefetchScreenerRuns, useScreenerRuns, type ScreenerRunSummary } from './api/runs';
-export { useScreenerHits, type ScreenerHitsResponse } from './api/hits';
+export { prefetchScreenerHits, useScreenerHits, type ScreenerHitsResponse } from './api/hits';
 export {
   SCREENER_RESULTS_OPERATION,
   useScreenerResults,

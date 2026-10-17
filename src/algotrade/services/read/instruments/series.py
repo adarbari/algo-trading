@@ -97,7 +97,13 @@ def _frame(
 ) -> pd.DataFrame | None:
     if table == EXPRESSIONS:  # computed from the caller's formulas: never shared
         return read_expressions(
-            ctx.reader, columns, start, end, instruments=ids, features=ctx.features
+            ctx.reader,
+            columns,
+            start,
+            end,
+            instruments=ids,
+            features=ctx.features,
+            memo=ctx.cache.get_or_compute,
         ).frame
     if entity != "market" or ctx.reader.own_run is not None:
         # Instrument reads come in batches (dataloaders) and would evict the session's and
