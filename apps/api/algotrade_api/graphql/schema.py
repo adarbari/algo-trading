@@ -8,6 +8,8 @@ the GraphiQL IDE only when ``ApiSettings.debug``). Every error in a response car
 import asyncio
 import gzip
 import json
+import logging
+import time
 from collections.abc import Callable, Hashable
 from datetime import UTC, date, datetime
 from typing import Any, cast
@@ -20,16 +22,26 @@ from strawberry.http import GraphQLHTTPResponse
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionResult
 
-from algotrade.config.site.users import Role
-from algotrade.core.time.calendar import last_closed_session
+from algotrade.config.site.users import Role, UserRecord
+from algotrade.core.time.calendar import exchange_date, last_closed_session
 from algotrade_api.graphql.context import Opener, RequestContext, StoresOpener, context_getter
 from algotrade_api.graphql.errors import response_of
 from algotrade_api.graphql.limits import EXTENSIONS
-from algotrade_api.graphql.offload import Admission, OffLoop, off_loop, only_inline
+from algotrade_api.graphql.offload import (
+    READ_THREADS,
+    Admission,
+    OffLoop,
+    OverloadedError,
+    off_loop,
+    only_inline,
+)
 from algotrade_api.graphql.response_cache import (
     CLOSED_SESSION_OPERATIONS,
     RUN_OPERATIONS,
+    TODAY_OPERATIONS,
+    OperationLog,
     ResponseCache,
+    Served,
     WriteEpoch,
     cacheable,
     operation_name,
@@ -38,6 +50,8 @@ from algotrade_api.graphql.response_cache import (
 from algotrade_api.graphql.scalars import SCALARS
 from algotrade_api.graphql.types.query import Query
 
+REPLAY_BUDGET_S = 30.0  # the longest one replay pass takes (start, or after a publish)
+_logger = logging.getLogger(__name__)
 PATH = "/graphql"
 GZIP_LEVEL = 5  # a cached answer is compressed once and read many times
 
@@ -53,7 +67,7 @@ def sdl() -> str:
     return schema.as_str() + "\n"
 
 
-class _Router(GraphQLRouter[RequestContext, None]):
+class CachingRouter(GraphQLRouter[RequestContext, None]):
     """Strawberry's FastAPI router with an ``extensions.code`` on every error, a response cache
     (``response_cache.py``) and the admission control in front of the read
     pool (``offload.Admission``: a request past the queue raises ``OverloadedError``)."""
@@ -68,9 +82,14 @@ class _Router(GraphQLRouter[RequestContext, None]):
         runs: Callable[[], tuple[int, int]],
         closed: Callable[[], date],
         served: Callable[[], str],
+        opener: Opener,
+        stores: StoresOpener | None,
+        log: OperationLog,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
+        self._opener, self._stores_opener, self._log = opener, stores, log
+        self._revalidating: dict[str, asyncio.Task[None]] = {}
         self._seq, self._epoch, self._cache, self._admission = seq, epoch, cache, admission
         self._runs, self._closed, self._served = runs, closed, served
 
@@ -89,23 +108,15 @@ class _Router(GraphQLRouter[RequestContext, None]):
         key = None
         if parsed is not None and viewer is not None and cacheable(parsed[0]):
             document, variables = parsed
-            name = operation_name(document)
-            # every state the answer depends on is read before it is computed (ADR 0022)
-            served = await off_loop(self._served)  # resolved once per publish / saved record
-            key = response_key(
-                self._seq(),
-                self._epoch.value,
-                viewer,
-                document,
-                variables,
-                name,
-                self._runs() if name in RUN_OPERATIONS else (0, 0),
-                self._closed() if name in CLOSED_SESSION_OPERATIONS else None,
-                served,
-            )
+            self._log.note(viewer, document, variables)
+            key = await self._key(viewer, document, variables)
             body = self._cache.get(key)
             if body is not None:
                 return await _served(body, request)
+            stale = self._cache.get_stale(key)
+            if stale is not None:  # stale-while-revalidate: answer now, recompute behind it
+                self._revalidate(key, Served(viewer, document, variables))
+                return await _served(stale, request)
         inline = parsed is not None and only_inline(cast(Hashable, self.schema), parsed[0])
         if not inline:
             self._admission.admit()
@@ -120,6 +131,95 @@ class _Router(GraphQLRouter[RequestContext, None]):
             self._cache.put(key, packed)
             return await _served(packed, request)
         return response
+
+    async def _key(self, viewer: UserRecord, document: str, variables: Any) -> str:
+        """The cache key of this operation for ``viewer`` now; every state the answer depends on
+        is read before it is computed (ADR 0022)."""
+        name = operation_name(document)
+        served = await off_loop(self._served)  # resolved once per publish / saved record
+        return response_key(
+            self._seq(),
+            self._epoch.value,
+            viewer,
+            document,
+            variables,
+            name,
+            self._runs() if name in RUN_OPERATIONS else (0, 0),
+            self._closed() if name in CLOSED_SESSION_OPERATIONS else None,
+            served,
+            exchange_date(datetime.now(UTC)) if name in TODAY_OPERATIONS else None,
+        )
+
+    def _revalidate(self, key: str, op: Served) -> None:
+        """Recompute ``op`` in the background (one at a time per key; a stale hit while it runs
+        is served stale again)."""
+        if key in self._revalidating:
+            return
+        task = asyncio.create_task(self._revalidated(op))
+        self._revalidating[key] = task
+        task.add_done_callback(lambda _t: self._revalidating.pop(key, None))
+
+    async def _revalidated(self, op: Served) -> None:
+        try:
+            await self.refresh(op)
+        except Exception:  # a store mid-publish: the next stale hit tries again
+            _logger.exception("recomputing %s failed", operation_name(op.document))
+
+    async def aclose(self) -> None:
+        """Cancel the recomputes still running (the app is stopping) and wait for them."""
+        tasks = list(self._revalidating.values())
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def refresh(self, op: Served, only_missing: bool = False) -> bool | None:
+        """Run ``op`` in process as its caller and keep the answer under the key read before it
+        ran (the replay of the warmer and of a stale hit); with ``only_missing`` a fresh entry is
+        left alone. False when it was skipped or refused (a busy pool), None when it failed (never
+        kept)."""
+        key = await self._key(op.viewer, op.document, op.variables)
+        if only_missing and self._cache.get(key) is not None:
+            return False
+        context = RequestContext(self._opener, op.viewer, self._stores_opener)
+        try:
+            self._admission.admit()
+        except OverloadedError:
+            return False
+        try:
+            result = await self.schema.execute(
+                op.document, variable_values=op.variables, context_value=context
+            )
+        finally:
+            self._admission.release()
+        if result.errors:
+            return None
+        body = self.encode_json(response_of(result, op.viewer.role is Role.ADMIN))
+        raw = body if isinstance(body, bytes) else body.encode()
+        self._cache.put(key, await asyncio.to_thread(gzip.compress, raw, GZIP_LEVEL))
+        return True
+
+    async def replay(
+        self, ops: list[Served] | None = None, budget_s: float = REPLAY_BUDGET_S
+    ) -> int:
+        """Recompute, one after the other (the pool is shared with the pages), every operation
+        ``ops`` names (default: the log) whose answer is not fresh; how many were recomputed.
+        Stops after ``budget_s``, and while the read pool is busy with requests (the next
+        publish tries again); an operation that fails is dropped from the log."""
+        done = 0
+        deadline = time.monotonic() + budget_s
+        for op in ops if ops is not None else self._log.items():
+            if time.monotonic() > deadline or self._admission.taken >= READ_THREADS:
+                break
+            try:
+                outcome = await self.refresh(op, only_missing=True)
+            except Exception:
+                _logger.exception("replaying %s failed", operation_name(op.document))
+                outcome = None
+            if outcome is None:
+                self._log.discard(op)
+            else:
+                done += outcome
+        return done
 
 
 async def _served(packed: bytes, request: Request) -> Response:
@@ -169,7 +269,8 @@ def graphql_router(
     runs: Callable[[], tuple[int, int]] = lambda: (0, 0),
     closed: Callable[[], date] = lambda: last_closed_session(datetime.now(UTC)),
     served: Callable[[], str] = lambda: "",
-) -> GraphQLRouter[RequestContext, None]:
+    log: OperationLog | None = None,
+) -> CachingRouter:
     """``POST /graphql`` over the read contexts ``opener`` opens (one per requested session,
     per request) and the session-free one ``stores`` opens (configs, run records); the
     GraphiQL IDE at ``GET /graphql`` only when ``debug``. ``seq`` is the published state
@@ -177,7 +278,7 @@ def graphql_router(
     ``runs`` the runs generation (``StoreReader.runs_generation``) and ``closed`` the last
     closed session, which the keys of the run-dependent operations hold; ``served`` the token of
     the default session (``served_token``) every key holds (ADR 0062)."""
-    router = _Router(
+    router = CachingRouter(
         schema,
         path=PATH,
         graphql_ide="graphiql" if debug else None,
@@ -191,6 +292,9 @@ def graphql_router(
         runs=runs,
         closed=closed,
         served=served,
+        opener=opener,
+        stores=stores,
+        log=log if log is not None else OperationLog(),
     )
     # No subscriptions: drop Strawberry's WebSocket route, which the caller guard (an HTTP
     # dependency, ADR 0040) cannot see; /graphql is served over HTTP POST only.

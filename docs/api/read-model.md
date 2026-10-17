@@ -364,8 +364,10 @@ hundreds of concurrent requests, no hacks, and no UX trade-off that costs the cu
    rendered at once, before the session date and the viewer answer; when either says the record is
    another session's or another user's, `reconcile` resets what it restored (a returning visit on a
    new session may show the previous session for one round trip). Warm-up: `warm` also reads
-   the Admin Ingestion grid (after the home steps; the start does not wait for it). A response-cache entry lives `TTL_S` (5 min): a page opened after
-   that pays its resolvers again whatever the warm-up did (see the PR for numbers).
+   the Admin Ingestion grid (after the home steps; the start does not wait for it). A response-cache entry is fresh for `TTL_S` (5 min), then served stale
+   once while it is recomputed behind the answer (ADR 0037 amendment 2026-10-17); the warmer
+   replays the served operations after the home steps (start, publish, session flip), so a page's
+   resolvers have run before its first visit.
 
 ## GraphQL conventions
 

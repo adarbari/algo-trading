@@ -1,0 +1,43 @@
+{
+  "id": "clauses-but-two-entries",
+  "sentence": "large caps near the 52-week high but with rising volume",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "large caps",
+        "bucket": "A",
+        "fields": [
+          "feature.market_cap"
+        ],
+        "op": "gte",
+        "value": 10000000000,
+        "tolerance": 0
+      },
+      {
+        "span": "near the 52-week high",
+        "bucket": "A",
+        "fields": [
+          "feature.pct_from_high_52w"
+        ],
+        "op": "gte",
+        "value": -0.1,
+        "tolerance": 0
+      },
+      {
+        "span": "rising volume",
+        "bucket": "A",
+        "fields": [
+          "feature.volume_trend_20_60"
+        ],
+        "op": "gt",
+        "value": 1.0,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}

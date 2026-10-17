@@ -9,7 +9,10 @@ meaning (negation, a comparative, "or") is never filler: it is a gap unless a st
 covers that very word, so "uptrend stocks without earnings this week" goes to the model.
 Longest wording first, so "breaking out to highs" is not also "breaking out".
 ``resolve`` also says where each entry's wording is in the sentence (``Claimed``), for the
-shortcut ``draft_screen`` takes when the phrasebook resolves a sentence (``shortcut.py``)."""
+shortcut ``draft_screen`` takes when the phrasebook resolves a sentence (``shortcut.py``).
+``resolve_clauses`` is the same for a sentence with a "but" or "while" between conditions
+(ADR 0041, amended 2026-10-17): split at the and-type connectors (``clauses.py``), each clause
+resolved fully on its own, one claim (one part) per clause."""
 
 import re
 from collections.abc import Sequence
@@ -17,6 +20,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from algotrade.config.site.llm import Phrase
+from algotrade.services.drafting.phrasebook.clauses import split
 from algotrade.services.drafting.phrasebook.consistency import compatible
 from algotrade.services.drafting.retrieval import STOP_WORDS, phrase_matches, stem
 
@@ -72,6 +76,13 @@ class Claimed:
     phrase: Phrase
     start: int
     end: int
+    criteria: tuple[dict[str, Any], ...] | None = None  # a clause's, when it holds several entries
+
+    def answers(self) -> list[dict[str, Any]]:
+        """What this claim says, in answer shape: its clause's criteria, else its entry's."""
+        if self.criteria is not None:
+            return [dict(c) for c in self.criteria]
+        return [c.as_answer() for c in self.phrase.criteria]
 
 
 @dataclass(frozen=True)
@@ -153,3 +164,38 @@ def resolve(sentence: str, phrasebook: Sequence[Phrase]) -> Resolution | None:
     if len(sentence.lower()) != len(sentence):
         return None
     return _resolution(sentence, phrasebook)
+
+
+def resolve_clauses(sentence: str, phrasebook: Sequence[Phrase]) -> Resolution | None:
+    """The sentence resolved clause by clause (ADR 0041, amended 2026-10-17): split at the
+    and-type connectors (``clauses.split``), every clause resolved fully on its own, the
+    criteria of the clauses never on one field twice and all able to hold together; one claim
+    per clause (its words run from its first entry's wording to its last), the connectors
+    between them left to the parts as joins. ``None`` for a sentence that is one clause (``resolve``
+    has it), a clause the entries do not resolve, or clauses that share a field."""
+    if len(sentence.lower()) != len(sentence):
+        return None
+    found = list(_WORD.finditer(sentence.lower()))
+    taken, _ = _cover([stem(m.group()) for m in found], phrasebook)
+    ranges = split(found, taken)
+    if len(ranges) < 2:
+        return None
+    claims: list[Claimed] = []
+    criteria: list[dict[str, Any]] = []
+    for first, last in ranges:
+        begin, finish = found[first].start(), found[last - 1].end()
+        clause = _resolution(sentence[begin:finish], phrasebook)
+        if clause is None:
+            return None
+        if {c["field"] for c in clause.criteria} & {c["field"] for c in criteria}:
+            return None  # the same field in two clauses: two readings of one thing
+        criteria += clause.criteria
+        claims.append(
+            Claimed(
+                clause.claims[0].phrase,
+                begin + clause.claims[0].start,
+                begin + clause.claims[-1].end,
+                clause.criteria,
+            )
+        )
+    return Resolution(tuple(criteria), tuple(claims)) if compatible(criteria) else None

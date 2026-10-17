@@ -1,0 +1,41 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "why": "listed"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "why": "stocks"
+    },
+    {
+      "id": "oversold",
+      "field": "rollup.momentum@v1.rsi_14",
+      "op": "lt",
+      "value": 30,
+      "mode": "hard",
+      "why": "oversold"
+    },
+    {
+      "id": "not_down",
+      "field": "feature.trend_state",
+      "op": "ne",
+      "value": "DOWNTREND",
+      "mode": "hard",
+      "why": "not in a downtrend"
+    }
+  ],
+  "tie_break": null,
+  "notes": []
+}

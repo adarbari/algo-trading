@@ -75,7 +75,7 @@ from algotrade.services.drafting.parts.build import build_parts
 from algotrade.services.drafting.parts.items import items_of
 from algotrade.services.drafting.parts.model import Part, PartsStats, part_tag
 from algotrade.services.drafting.parts.verify import Doubt, doubts, kinds_of
-from algotrade.services.drafting.phrasebook.resolve import resolve
+from algotrade.services.drafting.phrasebook.resolve import resolve, resolve_clauses
 from algotrade.services.drafting.phrasebook.shortcut import (
     phrasebook_version,
     served,
@@ -309,12 +309,13 @@ def _from_phrasebook(
     phrasebook: Sequence[Phrase],
     current: Mapping[str, Any] | None,
 ) -> ScreenDraft | None:
-    """The draft of a sentence the structured phrasebook entries resolve in full, made without
+    """The draft of a sentence the structured phrasebook entries resolve in full (the whole
+    sentence, else clause by clause: ``resolve_clauses``), made without
     the model (stage ``phrasebook``: no call id, so no ledger row to point at); ``None`` when the
     model should answer. The entries' answer takes the model's own path (``_draft``): a field
     outside this caller's catalogue or a criterion the validator refuses is not served from the
     phrasebook, the model is asked."""
-    resolution = resolve(sentence, phrasebook)
+    resolution = resolve(sentence, phrasebook) or resolve_clauses(sentence, phrasebook)
     quick = None if resolution is None else shortcut(resolution, sentence, current, phrasebook)
     if quick is None:
         return None

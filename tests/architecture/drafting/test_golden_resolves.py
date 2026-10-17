@@ -6,7 +6,7 @@ phrasebook has grown to cover moves to ``train`` and is replaced by an unseen on
 
 from algotrade.config.site.settings import load_phrasebook
 from algotrade.services.drafting.golden.golden import load_cases
-from algotrade.services.drafting.phrasebook.resolve import resolves_fully
+from algotrade.services.drafting.phrasebook.resolve import resolve_clauses, resolves_fully
 from algotrade.storage.factory import open_config_store
 from tests.conftest import REPO_ROOT
 
@@ -20,6 +20,10 @@ def test_no_held_out_sentence_resolves_without_the_model() -> None:
     for case in held:
         for sentence in case.sentences or (case.sentence,):
             assert resolves_fully(sentence, book) is None, (
+                f"{case.id}: {sentence!r} resolves from the phrasebook; make it a train case "
+                "and hold out a different sentence"
+            )
+            assert resolve_clauses(sentence, book) is None, (
                 f"{case.id}: {sentence!r} resolves from the phrasebook; make it a train case "
                 "and hold out a different sentence"
             )
