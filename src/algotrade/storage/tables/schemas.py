@@ -541,8 +541,9 @@ FILING_EVENTS = fixed(
 # ``known_from`` is the first session the NAV was knowable on: the next session after the NAV
 # date (struck after the close, on the vendor the next day), a modelled lag the same for a
 # nightly fetch and a 2004 backfill; ``knowledge_ts`` is the true fetch instant. Runs merge on
-# (instrument, series, date): a re-fetched NAV that differs (an issuer's restatement) is a later
-# version, never hidden behind the first.
+# (instrument, series, date): a re-fetched NAV that differs (an issuer's restatement) replaces
+# the row (the key has no knowledge_ts) and takes known_from = max(next session, the fetching
+# run's session). Readers go through ``data.events`` with ``through`` = S, never a raw partition.
 FUND_NAV_EVENTS = fixed(
     "events/fund_nav",
     "event",

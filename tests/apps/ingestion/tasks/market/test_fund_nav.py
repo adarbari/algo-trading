@@ -19,9 +19,11 @@ from algotrade_ingestion.tasks.framework.tiingo_budget import TASKS
 from algotrade_ingestion.tasks.market.fund_nav import (
     LOOKBACK_DAYS,
     TASK,
+    Fund,
     ingest_fund_nav,
     is_closed_end,
     map_funds,
+    nav_rows,
     nav_symbol,
 )
 from algotrade_sources.framework.http import HttpError, RetryPolicy
@@ -228,3 +230,15 @@ def test_the_task_name_is_the_one_the_budget_counts() -> None:
 def test_nav_symbol_is_x_ticker_x_with_the_vendor_share_class_spelling() -> None:
     assert nav_symbol("phk") == "XPHKX"
     assert nav_symbol("BRK.B") == "XBRK-BX"
+
+
+def test_a_restated_nav_is_known_from_the_restating_session_not_the_day_after() -> None:
+    ts = pd.Timestamp("2026-10-06", tz="UTC")
+    other = pd.Timestamp("2026-10-07", tz="UTC")
+    nav = pd.DataFrame({"ts": [ts, other], "nav": [99.0, 5.0]})
+    fund = Fund("PHK", "EQ:PHK", "XPHKX", date(2004, 3, 22), None)
+    rows, _, same = nav_rows(nav, fund, date(2026, 10, 1), UNTIL, {ts: 20.0, other: 5.0}, UNTIL)
+    assert same == 1 and list(rows["nav"]) == [99.0]
+    assert list(rows["known_from"]) == [UNTIL]  # not 2026-10-07, the next session after the NAV
+    fresh, _, _ = nav_rows(nav, fund, date(2026, 10, 1), UNTIL, {}, UNTIL)
+    assert list(fresh["known_from"]) == [date(2026, 10, 7), date(2026, 10, 8)]

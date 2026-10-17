@@ -24,8 +24,10 @@ and pace as ``bars-history``. Rows are staged per fund and published together wh
   (``already_stored_rows``); a different NAV for a stored date is written as a later version.
 - **known_from** is the next session after the NAV date (the NAV is struck after the close and
   the vendor shows it the next day), the same for the nightly fetch and the 2004 backfill;
-  ``knowledge_ts`` is the real fetch (publish) instant. An issuer's later restatement of an old
-  NAV is therefore visible only from its own ``knowledge_ts``.
+  ``knowledge_ts`` is the real fetch (publish) instant. A later restatement of a stored NAV
+  replaces the row (merge mode), so it takes ``known_from = max(next session, the run's
+  session)``: an as-of read before that session never sees it, and reads before it see no
+  NAV for that date (the replaced original is not served: the cost of the one-row key).
 - **Budget**: each fund is one Tiingo symbol (item ``nav:<id>``) counted with ``bars-history``'s
   against ``[tiingo] monthly_symbol_budget`` (``tiingo_budget``); a run fetches no more than the
   month's remainder (``stats`` carry ``month_budget``, ``month_used``, ``month_remaining``).
@@ -131,10 +133,18 @@ def _known_from(day: date) -> date:
 
 
 def nav_rows(
-    nav: pd.DataFrame, fund: Fund, first: date, last: date, stored: dict[pd.Timestamp, float]
+    nav: pd.DataFrame,
+    fund: Fund,
+    first: date,
+    last: date,
+    stored: dict[pd.Timestamp, float],
+    session: date,
 ) -> tuple[pd.DataFrame, int, int]:
     """Fetched NAV rows -> (rows to store, rows clipped outside ``first..last``, rows already
-    stored with the same NAV). ``stored``: this fund's stored NAV by ``ts``."""
+    stored with the same NAV). ``stored``: this fund's stored NAV by ``ts``. A NAV that differs
+    from a stored one is a restatement: merge mode replaces the original row (the key has no
+    ``knowledge_ts``), so its ``known_from`` is ``max(next session, session)``, the run's
+    session, never a date before the run learned it."""
     days = nav["ts"].dt.date
     inside = (days >= first) & (days <= last)
     kept = nav[inside]
@@ -143,11 +153,12 @@ def nav_rows(
         for t, v in zip(kept["ts"], kept["nav"], strict=True)
     ]
     fresh = kept[[not s for s in same]]
-    session = fresh["ts"].dt.date
+    days = fresh["ts"].dt.date
+    known = days.map(_known_from)
+    restated = fresh["ts"].isin(list(stored))
+    known = known.where(~restated, known.map(lambda d: max(d, session)))
     rows = fresh.drop(columns="instrument_id", errors="ignore").assign(
-        instrument_id=fund.instrument_id,
-        known_from=session.map(_known_from),
-        session_date=session,
+        instrument_id=fund.instrument_id, known_from=known, session_date=days
     )
     return rows.reset_index(drop=True), int((~inside).sum()), int(sum(same))
 
@@ -198,7 +209,12 @@ def _fetch_fund(
     stats = run.stats
     stats["invalid_rows"] = stats.get("invalid_rows", 0) + int(normalized.notes["invalid_rows"])
     rows, clipped, same = nav_rows(
-        normalized.tables[TABLE], fund, first, last, stored.get(fund.instrument_id, {})
+        normalized.tables[TABLE],
+        fund,
+        first,
+        last,
+        stored.get(fund.instrument_id, {}),
+        run.session,
     )
     stats["clipped_rows"] = stats.get("clipped_rows", 0) + clipped
     stats["already_stored_rows"] = stats.get("already_stored_rows", 0) + same

@@ -156,6 +156,8 @@ unadjusted `close`; `known_from` the next session after the NAV date). CEFConnec
 the same numbers but its terms forbid automation: never used. BDCs have no daily NAV (quarterly,
 10-Q `NetAssetValuePerShare`). Budget: one symbol per fund counted with `bars-history`'s
 (`tiingo_budget`); about 300 symbols a month, 6 hours a run on the free tier: in no workflow.
+The Tiingo licence is personal (`[tiingo] licence`): features derived from `events/fund_nav` must
+carry it (ADR 0028), and readers go through `data.events` with `through` = the session.
 
 ### S&P 500 membership history (fja05680/sp500; edges ED6b-3)
 
