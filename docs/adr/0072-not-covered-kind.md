@@ -30,6 +30,15 @@ term, without the vendor, the endpoint or the fetch state being named.
    the read serves one session (0036) and a value past its freshness is not stored for it.
    It is not an `uncovered_statuses` member.
 
+6. **The nightly coverage check exempts uncovered statuses** like illiquid and explained ones
+   (`tasks/maintenance/coverage.py`, not in `GAP_IN_CORE`), else most names would grade as gaps
+   and fail the step (0055). That hides the never-asked backlog (NOT_FETCHED) from coverage, so it
+   needs its own measure: an analyst fetch-backlog check (names never fetched / universe), added
+   with the analyst reader.
+7. `uncovered_statuses` is for analyst-sourced features until the public words are generalised.
+   The table cell word "Not covered" shares its words with the Describe-it "Not covered" note
+   (`describe_not_covered`); the two are unrelated and the glossary keeps separate terms.
+
 ## Consequences
 No stored feature declares `uncovered_statuses` yet: this ADR adds the mechanism, its word and its
 Guide term; the analyst reader and feature groups use it later. A screen treats NOT_COVERED as

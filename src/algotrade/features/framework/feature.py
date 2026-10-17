@@ -47,7 +47,8 @@ type and, later, UI and email labels (ADR 0023).
                   says ILLIQUID (ADR 0042), when it is an explained one EXPLAINED (ADR 0046)
 - ``illiquid_statuses``  which ``null_status`` values mean the chain is too thin
 - ``uncovered_statuses``  which ``null_status`` values mean the data source does not cover the
-                  instrument (or was never asked): the read says NOT_COVERED (ADR 0072)
+                  instrument (or was never asked): the read says NOT_COVERED (ADR 0072); for
+                  analyst-sourced features until the public words are generalised
 - ``explained_statuses``  which ``null_status`` values explain the null in words a reader
                   acts on; each is a ``NullReason`` value and the status value is the reason
                   (``bar_status`` ``NO_TRADE``: "No trade"). Other values stay NULL. A
