@@ -70,7 +70,14 @@ const joinedCards = (join: 'and' | 'or' | 'and_not', label: string, words: strin
     readingLabel="We read this as"
     redraftingLabel="Redrafting this part"
   />,
-  <PartJoin key="j" join={join} label={label} words={words} joinedByLabel="joined by" />,
+  <PartJoin
+    key="j"
+    join={join}
+    label={label}
+    words={words}
+    joinedByLabel="joined by"
+    readAsLabel="read as"
+  />,
   <PartCard
     key="b"
     kind="applied"
@@ -82,13 +89,13 @@ const joinedCards = (join: 'and' | 'or' | 'and_not', label: string, words: strin
   />,
 ];
 
-/** A connector between parts: AND, OR and AND NOT, then no connector at all. */
+/** A connector between parts: and, or and but not, then no connector at all. */
 export const Joined: Story = {
   render: (args) => (
     <>
-      <PartList {...args}>{joinedCards('and', 'AND', 'but')}</PartList>
-      <PartList {...args}>{joinedCards('or', 'OR', 'or')}</PartList>
-      <PartList {...args}>{joinedCards('and_not', 'AND NOT', 'except')}</PartList>
+      <PartList {...args}>{joinedCards('and', 'and', 'but')}</PartList>
+      <PartList {...args}>{joinedCards('or', 'or', 'or')}</PartList>
+      <PartList {...args}>{joinedCards('and_not', 'but not', 'except')}</PartList>
     </>
   ),
 };

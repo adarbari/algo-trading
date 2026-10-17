@@ -14,22 +14,30 @@ import styles from './PartList.module.css';
 export interface PartListProps {
   /** Accessible name of the list ("Parts of your sentence"). */
   'aria-label': string;
-  /** The PartCards, in order; a PartJoin before a card joins it to the previous one. */
+  /**
+   * The PartCards, in order; a PartJoin before a card joins it to the previous one. Pass the
+   * PartJoin directly, unwrapped: a wrapper component hides it from the list and it becomes an item.
+   * A trailing PartJoin has no card to join and is dropped (with a warning in development).
+   */
   children: ReactNode;
 }
 
 export function PartList({ 'aria-label': ariaLabel, children }: PartListProps) {
   const items: { key: string | number; join?: ReactNode; card: ReactNode }[] = [];
   let pending: ReactNode = null;
-  Children.toArray(children).forEach((child, index) => {
+  for (const [index, child] of Children.toArray(children).entries()) {
     if (isValidElement(child) && child.type === PartJoin) {
       pending = child;
-      return;
+      continue;
     }
     const key = isValidElement(child) && child.key !== null ? child.key : index;
     items.push({ key, join: pending, card: child });
     pending = null;
-  });
+  }
+  if (pending !== null && import.meta.env.DEV) {
+    // eslint-disable-next-line no-console -- a development-only misuse warning
+    console.warn('PartList: a trailing PartJoin has no card after it and was dropped.');
+  }
   return (
     <ol className={styles.list} aria-label={ariaLabel}>
       {items.map(({ key, join, card }) => (

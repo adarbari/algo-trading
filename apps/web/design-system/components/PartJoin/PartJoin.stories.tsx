@@ -6,7 +6,13 @@ import { PartJoin } from './PartJoin';
 const meta = {
   title: 'Components/PartJoin',
   component: PartJoin,
-  args: { join: 'and', label: 'AND', words: 'and', joinedByLabel: 'joined by' },
+  args: {
+    join: 'and',
+    label: 'and',
+    words: 'and',
+    joinedByLabel: 'joined by',
+    readAsLabel: 'read as',
+  },
   parameters: {
     states: {
       notApplicable: {
@@ -22,12 +28,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** AND with the trader's own word: the quiet case. */
+/** and with the trader's own word: the quiet case. */
 export const Default: Story = { args: { words: 'but' } };
 
-export const Or: Story = { args: { join: 'or', label: 'OR', words: 'or' } };
+export const Or: Story = { args: { join: 'or', label: 'or', words: 'or' } };
 
-export const AndNot: Story = { args: { join: 'and_not', label: 'AND NOT', words: 'except' } };
+export const AndNot: Story = { args: { join: 'and_not', label: 'but not', words: 'except' } };
 
 /** No word of the trader's own: the label alone. */
 export const NoWords: Story = { args: { words: undefined } };
@@ -35,7 +41,7 @@ export const NoWords: Story = { args: { words: undefined } };
 export const LongWords: Story = {
   args: {
     join: 'and_not',
-    label: 'AND NOT',
+    label: 'but not',
     words: 'but not including anything that happens to be',
   },
 };
@@ -44,7 +50,7 @@ export const Narrow: Story = {
   decorators: [narrow],
   args: {
     join: 'and_not',
-    label: 'AND NOT',
+    label: 'but not',
     words: 'but not including anything that happens to be',
   },
 };

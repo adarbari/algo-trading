@@ -1,35 +1,36 @@
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { expectNoA11yViolations } from '../../testing';
 import { PartJoin } from './PartJoin';
 
+const labels = { joinedByLabel: 'joined by', readAsLabel: 'read as' };
+
 describe('PartJoin', () => {
-  it('shows the traders word and the logic, named in reading order', async () => {
+  it('reads the traders word, then the logic, in order', async () => {
     const { container } = render(
-      <PartJoin join="and_not" label="AND NOT" words="except" joinedByLabel="joined by" />,
+      <PartJoin join="and_not" label="but not" words="except" {...labels} />,
     );
-    expect(screen.getByRole('group', { name: 'joined by except: AND NOT' })).toBeInTheDocument();
-    expect(screen.getByText('except')).toBeInTheDocument();
-    expect(screen.getByText('AND NOT')).toBeInTheDocument();
+    expect(container.textContent).toBe('joined byexcept, read asbut not');
     await expectNoA11yViolations(container);
   });
 
   it('drops a word that only repeats the label, or no word at all', () => {
-    const { rerender } = render(
-      <PartJoin join="or" label="OR" words="or" joinedByLabel="joined by" />,
+    const { container, rerender } = render(
+      <PartJoin join="or" label="or" words="Or" {...labels} />,
     );
-    expect(screen.getAllByText(/^or$/i)).toHaveLength(1);
-    rerender(<PartJoin join="and" label="AND" joinedByLabel="joined by" />);
-    expect(screen.getByRole('group', { name: 'joined by AND' })).toBeInTheDocument();
+    expect(container.textContent).toBe('joined byor');
+    rerender(<PartJoin join="and" label="and" {...labels} />);
+    expect(container.textContent).toBe('joined byand');
   });
 
-  it('tones OR and AND NOT apart from AND', () => {
-    const { container, rerender } = render(
-      <PartJoin join="and" label="AND" joinedByLabel="joined by" />,
-    );
-    expect(container.firstElementChild).toHaveAttribute('data-join', 'and');
-    rerender(<PartJoin join="or" label="OR" joinedByLabel="joined by" />);
-    expect(container.firstElementChild).toHaveAttribute('data-join', 'or');
+  it('tones or and but-not apart from and', () => {
+    const { container, rerender } = render(<PartJoin join="and" label="and" {...labels} />);
+    const tone = () => container.firstElementChild?.getAttribute('data-join');
+    expect(tone()).toBe('and');
+    rerender(<PartJoin join="or" label="or" {...labels} />);
+    expect(tone()).toBe('or');
+    rerender(<PartJoin join="and_not" label="but not" {...labels} />);
+    expect(tone()).toBe('and_not');
   });
 });
