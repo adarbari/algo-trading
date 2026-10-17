@@ -10,7 +10,7 @@
  * (`batch.ts`) under their own query keys. The field's own facts and guide
  * entry come from the catalogue (entities/feature).
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -226,12 +226,23 @@ export function useGuideStartPage(id: string) {
   });
 }
 
-export function useGuideIndex() {
-  return useQuery({
+function guideIndexQuery() {
+  return queryOptions({
     queryKey: queryKeys.gql('GuideIndex', {}),
     queryFn: () => gql(GuideIndexQuery, {}),
-    select: (data) => data.guideIndex,
     staleTime: GUIDE_STALE_MS,
+  });
+}
+
+/** Start the read before the page mounts (a route loader); the hook then joins it. */
+export function prefetchGuideIndex(client: QueryClient): void {
+  void client.query(guideIndexQuery()).catch(() => undefined);
+}
+
+export function useGuideIndex() {
+  return useQuery({
+    ...guideIndexQuery(),
+    select: (data) => data.guideIndex,
   });
 }
 

@@ -6,6 +6,8 @@ import { createRoute, useNavigate, useSearch, type AnyRoute } from '@tanstack/re
 
 import { lazyPage } from '@/shared/lib/lazy';
 
+import { pageRoute } from '../page-loader';
+
 const AdminLlmUsagePage = lazyPage(() => import('@/pages/admin-llm-usage'), 'AdminLlmUsagePage');
 
 interface LlmUsageSearch {
@@ -38,6 +40,9 @@ export function llmUsageRoute<P extends AnyRoute>(parent: P) {
     getParentRoute: () => parent,
     path: 'llm-usage',
     validateSearch: validateLlmUsageSearch,
+    ...pageRoute(AdminLlmUsagePage, (page, client) => {
+      page.prefetchLlmUsageReads(client);
+    }),
     component: LlmUsageRoute,
   });
 }

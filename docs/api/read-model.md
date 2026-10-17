@@ -352,6 +352,20 @@ hundreds of concurrent requests, no hacks, and no UX trade-off that costs the cu
    in its `loader` and `lazyPage` then renders it without suspending (React 19 holds a suspended
    reveal 300 ms); the loader starts the page's reads (`prefetch*` of the entities), so they run
    with the chunk, not when widgets mount. Target: Ideas data rendered < 500 ms, warm and cold.
+8. **Every page route has a loader** (2026-10-17, owner goal: data rendered < 100 ms on a reload with
+   the saved page cache, < 500 ms on a first visit and on a cold API): `pageRoute(Page, prefetch)`
+   (`app/routes/page-loader.ts`) is the `loader` (the page chunk, then the page's exported
+   `prefetch<Page>Reads`, then the saved page cache for at most 150 ms, never the data) and a static
+   `preload`, called at start-up for the URL's routes so the chunk downloads beside the viewer's round
+   trip (the guard runs before any loader). The shell's reads (Regime, StatusStrip) start in the
+   guard as soon as the viewer is known (`workspaces/guard.ts`), so no page repeats them. The hooks
+   stay the one source of query keys: an entity exports `prefetch<Read>` beside its hook, built from
+   the same query options. The saved page cache is read from the entry (`createQueryClient`) and
+   rendered at once, before the session date and the viewer answer; when either says the record is
+   another session's or another user's, `reconcile` resets what it restored (a returning visit on a
+   new session may show the previous session for one round trip). Warm-up: `warm` also reads
+   the Admin Ingestion grid (after the home steps; the start does not wait for it). A response-cache entry lives `TTL_S` (5 min): a page opened after
+   that pays its resolvers again whatever the warm-up did (see the PR for numbers).
 
 ## GraphQL conventions
 

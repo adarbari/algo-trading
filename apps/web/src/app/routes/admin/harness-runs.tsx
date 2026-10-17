@@ -3,6 +3,8 @@ import { createRoute, useNavigate, useSearch, type AnyRoute } from '@tanstack/re
 
 import { lazyPage } from '@/shared/lib/lazy';
 
+import { pageRoute } from '../page-loader';
+
 const AdminHarnessRunsPage = lazyPage(
   () => import('@/pages/admin-harness-runs'),
   'AdminHarnessRunsPage',
@@ -38,6 +40,9 @@ export function harnessRunsRoute<P extends AnyRoute>(parent: P) {
     getParentRoute: () => parent,
     path: 'harness-runs',
     validateSearch: validateHarnessRunsSearch,
+    ...pageRoute(AdminHarnessRunsPage, (page, client) => {
+      page.prefetchHarnessRunsReads(client);
+    }),
     component: HarnessRunsRoute,
   });
 }

@@ -103,3 +103,36 @@ describe('viewerGuard (the Guide: every role, no workspace)', () => {
     await expect(outcome('any')).resolves.toEqual({ to: '/login', search: {} });
   });
 });
+
+describe('the layout reads', () => {
+  const started = () =>
+    queryClient
+      .getQueryCache()
+      .getAll()
+      .map((q) => `${String(q.queryKey[1])}:${JSON.stringify(q.queryKey[2])}`)
+      .sort();
+
+  it('start the regime and the status strip once the viewer is known, before any loader', async () => {
+    GQL.mockImplementation((doc: unknown) =>
+      JSON.stringify(doc).includes('Viewer')
+        ? Promise.resolve({ viewer: TRADER })
+        : new Promise(() => undefined),
+    );
+    await outcome('trader');
+    expect(started()).toEqual(['Regime:{}', 'StatusStrip:{"admin":false}', 'Viewer:{}']);
+  });
+
+  it('ask the admin strip of an admin, and nothing of a signed-out visitor', async () => {
+    GQL.mockImplementation((doc: unknown) =>
+      JSON.stringify(doc).includes('Viewer')
+        ? Promise.resolve({ viewer: ADMIN })
+        : new Promise(() => undefined),
+    );
+    await outcome('admin');
+    expect(started()).toContain('StatusStrip:{"admin":true}');
+    queryClient.clear();
+    GQL.mockResolvedValue({ viewer: null });
+    await outcome('trader');
+    expect(started()).toEqual(['Viewer:{}']);
+  });
+});

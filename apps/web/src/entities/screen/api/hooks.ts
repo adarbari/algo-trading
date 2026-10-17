@@ -117,13 +117,20 @@ export function prefetchScreeners(client: QueryClient): void {
   void client.query(screenerConfigsQuery()).catch(() => undefined);
 }
 
-/** The user's own screens: finalized ones and draft-only ones (status DRAFT). */
-export function useMyScreeners() {
-  return useQuery({
+const myScreensQuery = () =>
+  queryOptions({
     queryKey: queryKeys.gql('MyScreens', {}),
     queryFn: () => gql(MyScreens, {}),
-    select: (data) => data.myScreens,
   });
+
+/** The user's own screens: finalized ones and draft-only ones (status DRAFT). */
+export function useMyScreeners() {
+  return useQuery({ ...myScreensQuery(), select: (data) => data.myScreens });
+}
+
+/** Start reading the user's screens before the page mounts (a route loader). */
+export function prefetchMyScreens(client: QueryClient): void {
+  void client.query(myScreensQuery()).catch(() => undefined);
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   MAX_AGE_MS,
   startQueryPersistence,
   THROTTLE_MS,
+  whenRestored,
   type PersistStore,
 } from './query-persistence';
 
@@ -142,7 +143,7 @@ describe('startQueryPersistence', () => {
     stop();
   });
 
-  it('renders nothing of a record until the session date answers, and drops another session', async () => {
+  it('renders a record before the session date answers, and resets it when it is another session', async () => {
     const store = fakeStore(record('s1'));
     let answer: (date: string) => void = () => undefined;
     const client = new QueryClient();
@@ -152,13 +153,35 @@ describe('startQueryPersistence', () => {
       fetchSession: () => new Promise((resolve) => (answer = resolve)),
       now: () => Date.now(),
     });
-    await vi.advanceTimersByTimeAsync(0);
-    expect(client.getQueryData(queryKeys.gql('IdeasPage', {}))).toBeUndefined(); // not yet
+    await whenRestored(client);
+    // shown at once: the reload does not wait for a round trip
+    expect(client.getQueryData(queryKeys.gql('IdeasPage', {}))).toEqual({ rows: ['old'] });
     answer('s2');
     await vi.advanceTimersByTimeAsync(0);
-    expect(client.getQueryData(queryKeys.gql('IdeasPage', {}))).toBeUndefined(); // never shown
+    expect(client.getQueryData(queryKeys.gql('IdeasPage', {}))).toBeUndefined(); // reset
     expect(store.data.has(CACHE_KEY)).toBe(false);
     stop();
+  });
+
+  it('keeps a record rendered before the session date answered when it is the same session', async () => {
+    const store = fakeStore(record('s1'));
+    let answer: (date: string) => void = () => undefined;
+    const client = new QueryClient();
+    client.setQueryData(queryKeys.gql('Viewer', {}), { id: 'u1' });
+    const stop = startQueryPersistence(client, {
+      store,
+      fetchSession: () => new Promise((resolve) => (answer = resolve)),
+      now: () => Date.now(),
+    });
+    await whenRestored(client);
+    answer('s1');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.getQueryData(queryKeys.gql('IdeasPage', {}))).toEqual({ rows: ['old'] });
+    stop();
+  });
+
+  it('whenRestored resolves at once when no persistence runs for the client', async () => {
+    await expect(whenRestored(new QueryClient())).resolves.toBeUndefined();
   });
 
   it('is busted by a new session: the old record is dropped, the new one is saved', async () => {
@@ -185,6 +208,17 @@ describe('startQueryPersistence', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(client.getQueryData(queryKeys.gql('IdeasPage', {}))).toBeUndefined();
     expect(store.data.has(CACHE_KEY)).toBe(false);
+    stop();
+  });
+
+  it('resets what it restored when the viewer turns null without a sign-out clean-up', async () => {
+    const store = fakeStore(record('s1'));
+    const { client, stop } = start(store, 's1');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.getQueryData(queryKeys.gql('IdeasPage', {}))).toEqual({ rows: ['old'] });
+    client.setQueryData(queryKeys.gql('Viewer', {}), null);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.getQueryData(queryKeys.gql('IdeasPage', {}))).toBeUndefined();
     stop();
   });
 

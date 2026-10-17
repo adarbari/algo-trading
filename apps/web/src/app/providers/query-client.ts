@@ -29,6 +29,9 @@ export function createQueryClient(): QueryClient {
     },
   });
   active.client = client;
+  // The saved page cache is read from the first moment, in parallel with the viewer and the page's
+  // chunk (its own chunk, off the entry); a route loader waits for it, briefly (routes/page-loader.ts).
+  void import('@/entities/page-cache').then((m) => m.startQueryPersistence(client));
   onUnauthorized(() => {
     forgetUser(client);
   });

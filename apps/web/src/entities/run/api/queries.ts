@@ -3,7 +3,7 @@
  * (`Query.{nightlyRuns,run,runItems}`, run records: no session) and the session's data-quality
  * checks (`Query.quality`, for exactly the latest session: NOT_RUN when it has none).
  */
-import { queryOptions, useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -96,12 +96,23 @@ const QualityChecks = graphql(`
   }
 `);
 
+function nightlyRunsQuery(limit = NIGHTLY_LIMIT) {
+  return queryOptions({
+    queryKey: queryKeys.gql('NightlyRuns', { limit }),
+    queryFn: () => gql(NightlyRuns, { limit }),
+  });
+}
+
+/** Start the read before the page mounts (a route loader); the hook then joins it. */
+export function prefetchNightlyRuns(client: QueryClient, limit = NIGHTLY_LIMIT): void {
+  void client.query(nightlyRunsQuery(limit)).catch(() => undefined);
+}
+
 /** The newest nightly runs; `enabled: false` skips the read (the viewer may not see runs). */
 export function useNightlyRuns(limit = NIGHTLY_LIMIT, enabled = true) {
   return useQuery({
+    ...nightlyRunsQuery(limit),
     enabled,
-    queryKey: queryKeys.gql('NightlyRuns', { limit }),
-    queryFn: () => gql(NightlyRuns, { limit }),
     select: (data) => data.nightlyRuns,
   });
 }
@@ -132,11 +143,22 @@ export function useRunItems(runId: string | null | undefined, enabled = true) {
   return useQuery({ ...runItemsQuery(runId ?? ''), enabled: Boolean(runId) && enabled });
 }
 
+function qualityChecksQuery() {
+  return queryOptions({
+    queryKey: queryKeys.gql('QualityChecks', {}),
+    queryFn: () => gql(QualityChecks, {}),
+  });
+}
+
+/** Start the read before the page mounts (a route loader); the hook then joins it. */
+export function prefetchQualityChecks(client: QueryClient): void {
+  void client.query(qualityChecksQuery()).catch(() => undefined);
+}
+
 /** The latest session's data-quality checks; null: nothing stored. */
 export function useQualityChecks() {
   return useQuery({
-    queryKey: queryKeys.gql('QualityChecks', {}),
-    queryFn: () => gql(QualityChecks, {}),
+    ...qualityChecksQuery(),
     select: (data) => data.quality,
   });
 }

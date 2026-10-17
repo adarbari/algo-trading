@@ -3,7 +3,7 @@
  * (`Query.verification`; ADR 0037): for exactly that session, `unknown` NO_PARTITION when the
  * verify step did not run for it.
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -40,11 +40,22 @@ const Verification = graphql(`
   }
 `);
 
+function verificationQuery() {
+  return queryOptions({
+    queryKey: queryKeys.gql('Verification', {}),
+    queryFn: () => gql(Verification, {}),
+  });
+}
+
+/** Start the read before the page mounts (a route loader); the hook then joins it. */
+export function prefetchVerification(client: QueryClient): void {
+  void client.query(verificationQuery()).catch(() => undefined);
+}
+
 /** Null: nothing stored. */
 export function useVerification() {
   return useQuery({
-    queryKey: queryKeys.gql('Verification', {}),
-    queryFn: () => gql(Verification, {}),
+    ...verificationQuery(),
     select: (data) => (data.verification ? toVerification(data.verification) : null),
   });
 }

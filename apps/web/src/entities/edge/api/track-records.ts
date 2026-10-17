@@ -3,7 +3,7 @@
  * the status of each edge, in one read (ADR 0053): the Screeners list's chip and the Ideas
  * screener rows' odds line both select from this one cached response.
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -52,11 +52,21 @@ const ScreenerTrackRecords = graphql(`
   }
 `);
 
+const trackRecordsQuery = () =>
+  queryOptions({
+    queryKey: queryKeys.gql('ScreenerTrackRecords', {}),
+    queryFn: () => gql(ScreenerTrackRecords, {}),
+  });
+
+/** Start reading every screener's track records before the page mounts (a route loader). */
+export function prefetchTrackRecords(client: QueryClient): void {
+  void client.query(trackRecordsQuery()).catch(() => undefined);
+}
+
 /** The track records of `screenerId` (empty: no edge lists it), one per edge, as served. */
 export function useTrackRecords(screenerId: string) {
   return useQuery({
-    queryKey: queryKeys.gql('ScreenerTrackRecords', {}),
-    queryFn: () => gql(ScreenerTrackRecords, {}),
+    ...trackRecordsQuery(),
     select: (data) => toTrackRecords(data).get(screenerId) ?? [],
   });
 }

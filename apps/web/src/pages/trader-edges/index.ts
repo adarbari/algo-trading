@@ -1,12 +1,10 @@
 /** Page: Trader > Edges (the Edges Lab: the edges by verdict, and the chosen edge's page). */
-import { prefetchEdges } from '@/entities/edge';
-import { active } from '@/shared/api';
+import { prefetchEdgeDesk, prefetchEdges } from '@/entities/edge';
 
 export { EdgesPage, type EdgesPageProps } from './ui/EdgesPage';
 
-// This chunk loads when the page's link is hovered: start the read, and the saved page cache.
-const { client } = active;
-if (client) {
+/** Start the page's reads before it mounts (the route's loader); the widgets' hooks join them. */
+export function prefetchEdgesReads(client: Parameters<typeof prefetchEdges>[0]): void {
   prefetchEdges(client);
-  void import('@/entities/page-cache').then((m) => m.startQueryPersistence(client));
+  prefetchEdgeDesk(client);
 }

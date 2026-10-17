@@ -1,5 +1,10 @@
 /** Entity: edge evaluation runs for the Admin Harness runs tab (ADR 0053; Admin only). */
-export { RUN_LIMIT, useHarnessRunRows, useHarnessRuns } from './api/harness-runs';
+export {
+  RUN_LIMIT,
+  prefetchHarnessRuns,
+  useHarnessRunRows,
+  useHarnessRuns,
+} from './api/harness-runs';
 export {
   lostInput as lostInputFixture,
   row as rowFixture,

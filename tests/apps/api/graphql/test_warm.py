@@ -104,7 +104,10 @@ def test_a_failing_step_does_not_stop_the_others(
     monkeypatch.setattr(warm, "load_episode_signals", lambda c, k: ran.append(f"episode {k}"))
     ctx = type("C", (), {"configs": None})()
     warm.warm(ctx)  # type: ignore[arg-type]
-    assert ran == ["completeness", "frames", "episode a"] and "regime failed" in caplog.text
+    assert (
+        ran == ["completeness", "completeness", "frames", "episode a"]
+        and "regime failed" in caplog.text
+    )
 
 
 def test_it_runs_the_extra_steps_after_the_screen_rows_and_before_the_market_frames(
@@ -188,3 +191,22 @@ def test_a_slow_home_warm_does_not_hold_the_start_past_its_cap(
 
     asyncio.run(go())
     assert "serving anyway" in caplog.text
+
+
+def test_it_warms_the_admin_ingestion_grid_after_the_home_steps_not_before_serving(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The Admin Ingestion page's 10-session grid (3 s of partition reads cold) is warmed by the
+    task after the start, never by the home warm-up the start waits for."""
+    ran: list[str] = []
+    for name in ("load_screeners", "screen_rows", "load_regime", "load_edge_desk"):
+        monkeypatch.setattr(warm, name, lambda c, _n=name: ran.append(_n))
+    monkeypatch.setattr(warm, "load_ideas", lambda c, n: ran.append("load_ideas"))
+    monkeypatch.setattr(warm, "load_completeness", lambda c, n: ran.append(f"grid {n}"))
+    monkeypatch.setattr(warm, "warm_market_frames", lambda c: None)
+    monkeypatch.setattr(warm, "load_episodes", lambda configs: type("E", (), {"episodes": []}))
+    warm.CacheWarmer(lambda: cast(Any, object())).warm_home()
+    assert "grid 10" not in ran
+    ran.clear()
+    warm.warm(cast(Any, type("C", (), {"configs": None})()))
+    assert ran.index("grid 1") < ran.index("load_ideas") < ran.index("grid 10")

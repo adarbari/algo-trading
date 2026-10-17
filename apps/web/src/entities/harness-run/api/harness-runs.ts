@@ -3,7 +3,7 @@
  * `Query.harnessRun`, Admin only; ADR 0053, ADR 0037): the list of runs of any status with what
  * each measured and left out, and one run's rows, read by run id.
  */
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -67,11 +67,22 @@ const HarnessRunQuery = graphql(`
   }
 `);
 
+function harnessRunsQuery(limit = RUN_LIMIT) {
+  return queryOptions({
+    queryKey: queryKeys.gql('HarnessRuns', { limit }),
+    queryFn: () => gql(HarnessRunsQuery, { limit }),
+  });
+}
+
+/** Start the read before the page mounts (a route loader); the hook then joins it. */
+export function prefetchHarnessRuns(client: QueryClient, limit = RUN_LIMIT): void {
+  void client.query(harnessRunsQuery(limit)).catch(() => undefined);
+}
+
 /** The evaluation runs, newest first. */
 export function useHarnessRuns(limit = RUN_LIMIT) {
   return useQuery({
-    queryKey: queryKeys.gql('HarnessRuns', { limit }),
-    queryFn: () => gql(HarnessRunsQuery, { limit }),
+    ...harnessRunsQuery(limit),
     select: (data) => data.harnessRuns,
   });
 }

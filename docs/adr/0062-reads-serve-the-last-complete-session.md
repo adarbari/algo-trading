@@ -56,3 +56,12 @@ nightly already retries hourly), never waived to unblock.
   a nightly completing a session changes every key at once.
 - A waived session counts as complete: waiving is the owner's explicit acceptance, as in 0039.
 - Old PARTIAL sessions count as done, as they do for the planner (no retry of them).
+
+## Amendment 2026-10-17: the browser's saved page cache
+
+The server still serves one session per read. The web's saved page cache (IndexedDB) is now rendered
+at once on a reload, before the session date and the viewer answer (owner goal: data on screen in
+under 100 ms); when the session date or the viewer says the record is another session's or another
+user's, what it restored is reset. A returning visit on a new session may therefore show the
+previous session for one round trip (each page's status strip names its own session date); a
+failed session-date read leaves the record until its queries refetch.

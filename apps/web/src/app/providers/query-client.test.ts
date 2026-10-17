@@ -7,6 +7,9 @@ import { createQueryClient, shouldRetry } from './query-client';
 /** The listeners `onUnauthorized` registered: the test plays a sign-out arriving. */
 const signOuts = vi.hoisted(() => new Set<() => void>());
 
+const startPersistence = vi.hoisted(() => vi.fn());
+vi.mock('@/entities/page-cache', () => ({ startQueryPersistence: startPersistence }));
+
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
@@ -47,5 +50,12 @@ describe('createQueryClient', () => {
     });
     expect(client.getQueryData(['gql', 'Positions'])).toBeUndefined();
     expect(client.getQueryData(queryKeys.gql('Viewer', {}))).toBeNull();
+  });
+
+  it('starts the saved page cache with the client, not with a page chunk', async () => {
+    const client = createQueryClient();
+    await vi.waitFor(() => {
+      expect(startPersistence).toHaveBeenCalledWith(client);
+    });
   });
 });

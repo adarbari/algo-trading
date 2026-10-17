@@ -23,7 +23,7 @@ export {
   useEdgeVariants,
 } from './api/edge-result';
 export { prefetchEdgeDesk, useEdgeDesk, useEdgeLiveStates, useEdgePaper } from './api/paper';
-export { useTrackRecords } from './api/track-records';
+export { prefetchTrackRecords, useTrackRecords } from './api/track-records';
 export {
   EDGE_VIEWS,
   inView,

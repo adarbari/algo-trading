@@ -4,6 +4,7 @@
  * situations), the linked prose the server sends, the glossary terms and Start here pages, and the paths of its pages and of the places it links to.
  */
 export {
+  prefetchGuideIndex,
   useGuideEpisode,
   useGuideField,
   useGuideIndex,

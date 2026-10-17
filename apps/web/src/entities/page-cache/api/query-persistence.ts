@@ -1,9 +1,13 @@
 /**
  * The page cache kept between visits (owner decision 2026-10-09): the query cache's GraphQL
- * page reads are saved to IndexedDB, restored after the first paint so a returning visit renders
- * at once, and read again in the background (stale-while-revalidate: the client's short
- * `staleTime`). The record is valid for one user and one published session; a record older than
- * 24 h, of another session or of another user is dropped, a sign-out deletes it, it never
+ * page reads are saved to IndexedDB, restored as soon as the browser hands the record over (not
+ * after the session date and viewer answer: owner decision 2026-10-17, a reload renders in
+ * under 100 ms) and read again in the background (stale-while-revalidate: the client's short
+ * `staleTime`). The record is valid for one user and one published session; when the session
+ * date or the viewer answers and the record is of another session or another user, what it
+ * restored is reset at once (a returning visit on a new session may show the previous one for
+ * the round trip of the session date). A record older than
+ * 24 h is never shown, a sign-out deletes it, it never
  * exceeds the byte cap (least recently used queries go first) and storage failures only switch
  * saving off: the page cache is an optimisation and must never hurt the browser.
  */
@@ -22,6 +26,8 @@ export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 /** Writes are at least this far apart: a burst of loading pages is one write. */
 export const THROTTLE_MS = 2_000;
 const VERSION = 1;
+/** `whenRestored` gives the read of the record at most this long. */
+const MAX_WAIT_MS = 150;
 
 const VIEWER_HASH = hashKey(queryKeys.gql('Viewer', {}));
 
@@ -91,7 +97,20 @@ function parseRecord(text: string | undefined): PersistedRecord | null {
 }
 
 /** The persistence now running, so a second start for the same client does nothing. */
-let running: { client: QueryClient; stop: () => void } | undefined;
+let running: { client: QueryClient; stop: () => void; restored: Promise<void> } | undefined;
+
+/**
+ * Resolves once the running persistence has read the saved record into the cache (at once when
+ * none runs): a route loader waits for it, briefly, so a returning visit renders its page from
+ * the record rather than from a loading state.
+ */
+export function whenRestored(client: QueryClient, capMs = MAX_WAIT_MS): Promise<void> {
+  if (running?.client !== client) return Promise.resolve();
+  return Promise.race([
+    running.restored,
+    new Promise<void>((resolve) => setTimeout(resolve, capMs)),
+  ]);
+}
 
 /**
  * Starts saving and restoring `client`'s page cache; the returned function stops it. Never
@@ -134,6 +153,7 @@ export function startQueryPersistence(
     if (!stale) return;
     const { stamps } = restored;
     restored = null;
+    void safe(() => store.del(CACHE_KEY));
     // Reset only the queries still holding the restored data (not refetched since): mounted
     // ones read again at once, so no page keeps showing another session's rows.
     void client.resetQueries({
@@ -166,7 +186,13 @@ export function startQueryPersistence(
     if (timer !== undefined) clearTimeout(timer);
     timer = undefined;
     user = null;
-    restored = null;
+    if (restored) {
+      const { stamps } = restored;
+      restored = null;
+      void client.resetQueries({
+        predicate: (query) => stamps.get(query.queryHash) === query.state.dataUpdatedAt,
+      });
+    }
     void safe(() => store.del(CACHE_KEY));
   };
 
@@ -204,16 +230,16 @@ export function startQueryPersistence(
 
   const restore = async () => {
     try {
-      // Nothing is shown before the API says which session it reads: the record is rendered only
-      // when its session is that one, so a page never shows the previous night's data.
-      const [text] = await Promise.all([store.get(CACHE_KEY), sessionKnown]);
+      // The record is read into the cache at once; when the API's session date (or the viewer)
+      // then says it is another session's or another user's, `reconcile` resets it.
+      const text = await store.get(CACHE_KEY);
       if (stopped) return;
       const record = parseRecord(text);
       if (!record || now() - record.savedAt > MAX_AGE_MS) {
         if (text !== undefined) void safe(() => store.del(CACHE_KEY));
         return;
       }
-      if (session === null || record.session !== session) {
+      if (session !== null && record.session !== session) {
         void safe(() => store.del(CACHE_KEY));
         return;
       }
@@ -238,13 +264,14 @@ export function startQueryPersistence(
   };
 
   // Without the session date nothing is restored or saved, nothing is trusted.
-  const sessionKnown = fetchSession()
+  void fetchSession()
     .then((date) => {
       session = date;
+      reconcile();
       schedule();
     })
     .catch(() => undefined);
-  void restore();
+  const restoring = restore();
   learnUser(client.getQueryData(queryKeys.gql('Viewer', {})) ?? undefined);
 
   const stop = () => {
@@ -254,6 +281,6 @@ export function startQueryPersistence(
     if (timer !== undefined) clearTimeout(timer);
     document.removeEventListener('visibilitychange', onHidden);
   };
-  running = { client, stop };
+  running = { client, stop, restored: restoring };
   return stop;
 }

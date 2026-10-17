@@ -8,6 +8,8 @@ import { createRoute, useNavigate, useSearch, type AnyRoute } from '@tanstack/re
 import type { CellRef } from '@/entities/ingestion';
 import { lazyPage } from '@/shared/lib/lazy';
 
+import { pageRoute } from '../page-loader';
+
 const AdminIngestionPage = lazyPage(() => import('@/pages/admin-ingestion'), 'AdminIngestionPage');
 
 interface IngestionSearch {
@@ -55,6 +57,9 @@ export function ingestionRoute<P extends AnyRoute>(parent: P) {
     getParentRoute: () => parent,
     path: 'ingestion',
     validateSearch: validateIngestionSearch,
+    ...pageRoute(AdminIngestionPage, (page, client) => {
+      page.prefetchIngestionReads(client);
+    }),
     component: IngestionRoute,
   });
 }

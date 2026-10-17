@@ -12,11 +12,14 @@
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
+import type * as GuidePages from '@/pages/guide';
+
 import { parseFieldsSearch } from '@/entities/guide';
 import { GuideLayout } from '../../layouts';
 import { viewerGuard } from '../../workspaces';
 import { rootRoute } from '../root';
 import { lazyPage } from '@/shared/lib/lazy';
+import { pageRoute, type PageModule } from '../page-loader';
 
 // One chunk for the Guide's pages (they share widgets), loaded when the first Guide page opens.
 // One import call for every Guide page: the entry carries one preload file list, not fourteen.
@@ -36,6 +39,13 @@ const GuideStartIndexPage = lazyPage(guidePages, 'GuideStartIndexPage');
 const GuideStartPage = lazyPage(guidePages, 'GuideStartPage');
 const GuideTermPage = lazyPage(guidePages, 'GuideTermPage');
 
+// Every Guide page shares one chunk and the index reads; each page preloads itself (a lazyPage
+// renders unsuspended only once its own `load` ran).
+const guideLoading = (page: PageModule<typeof GuidePages>) =>
+  pageRoute(page, (module, client) => {
+    module.prefetchGuideReads(client);
+  });
+
 export const guideRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'guide',
@@ -45,6 +55,7 @@ export const guideRoute = createRoute({
 
 const homeRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideHomePage),
   path: '/',
   component: GuideHomePage,
 });
@@ -64,6 +75,7 @@ function FieldsRoute() {
 
 const fieldsRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideFieldsPage),
   path: 'fields',
   validateSearch: parseFieldsSearch,
   component: FieldsRoute,
@@ -79,12 +91,14 @@ function FieldRoute() {
 
 const fieldRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideFieldPage),
   path: 'fields/$name',
   component: FieldRoute,
 });
 
 const playbooksRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuidePlaybooksPage),
   path: 'playbooks',
   component: GuidePlaybooksPage,
 });
@@ -103,12 +117,14 @@ function PlaybookRoute() {
 
 const playbookRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuidePlaybookPage),
   path: 'playbooks/$id',
   component: PlaybookRoute,
 });
 
 const situationsRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideSituationsPage),
   path: 'situations',
   component: GuideSituationsPage,
 });
@@ -120,12 +136,14 @@ function SituationRoute() {
 
 const situationRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideSituationPage),
   path: 'situations/$slug',
   component: SituationRoute,
 });
 
 const regimeIndexRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideRegimePage),
   path: 'regime',
   component: GuideRegimePage,
 });
@@ -137,6 +155,7 @@ function IndicatorRoute() {
 
 const indicatorRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideIndicatorPage),
   path: 'regime/indicators/$key',
   component: IndicatorRoute,
 });
@@ -148,12 +167,14 @@ function EpisodeRoute() {
 
 const episodeRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideEpisodePage),
   path: 'regime/episodes/$key',
   component: EpisodeRoute,
 });
 
 const startIndexRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideStartIndexPage),
   path: 'start',
   component: GuideStartIndexPage,
 });
@@ -165,12 +186,14 @@ function StartRoute() {
 
 const startRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideStartPage),
   path: 'start/$id',
   component: StartRoute,
 });
 
 const glossaryRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideGlossaryPage),
   path: 'glossary',
   component: GuideGlossaryPage,
 });
@@ -182,6 +205,7 @@ function TermRoute() {
 
 const termRoute = createRoute({
   getParentRoute: () => guideRoute,
+  ...guideLoading(GuideTermPage),
   path: 'glossary/$id',
   component: TermRoute,
 });

@@ -347,6 +347,18 @@ export function useRegimeBands(start: string, end: string | undefined) {
   });
 }
 
+function regimeEpisodesQuery() {
+  return queryOptions({
+    queryKey: queryKeys.gql(REGIME_EPISODES_OPERATION, {}),
+    queryFn: () => gql(RegimeEpisodesQuery, {}),
+  });
+}
+
+/** Start the read before the page mounts (a route loader); the hook then joins it. */
+export function prefetchRegimeEpisodes(client: QueryClient): void {
+  void client.query(regimeEpisodesQuery()).catch(() => undefined);
+}
+
 /**
  * The reference drawdowns and NBER recessions the session knows (`config/site/regime/
  * episodes.toml`, oldest first; a recovery or a recession's end only once it has come). Empty
@@ -354,13 +366,24 @@ export function useRegimeBands(start: string, end: string | undefined) {
  */
 export function useRegimeEpisodes() {
   return useQuery({
-    queryKey: queryKeys.gql(REGIME_EPISODES_OPERATION, {}),
-    queryFn: () => gql(RegimeEpisodesQuery, {}),
+    ...regimeEpisodesQuery(),
     select: (data): { episodes: readonly RegimeEpisode[]; recessions: readonly Recession[] } => ({
       episodes: data.regime?.episodes ?? [],
       recessions: data.regime?.recessions ?? [],
     }),
   });
+}
+
+function regimeSignalsQuery() {
+  return queryOptions({
+    queryKey: queryKeys.gql(REGIME_SIGNALS_OPERATION, {}),
+    queryFn: () => gql(RegimeSignalsQuery, {}),
+  });
+}
+
+/** Start the read before the page mounts (a route loader); the hook then joins it. */
+export function prefetchRegimeSignals(client: QueryClient): void {
+  void client.query(regimeSignalsQuery()).catch(() => undefined);
 }
 
 /**
@@ -371,8 +394,7 @@ export function useRegimeEpisodes() {
  */
 export function useRegimeSignals(enabled = true) {
   return useQuery({
-    queryKey: queryKeys.gql(REGIME_SIGNALS_OPERATION, {}),
-    queryFn: () => gql(RegimeSignalsQuery, {}),
+    ...regimeSignalsQuery(),
     enabled,
     select: (data): ReadonlyMap<string, EpisodeSignals | null> =>
       new Map(

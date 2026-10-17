@@ -1,5 +1,5 @@
 /** Entity: the text model's usage and cost (tokens, spend against the budget; Admin only, ADR 0058). */
-export { RECENT_CALLS, useLlmUsage } from './api/queries';
+export { RECENT_CALLS, prefetchLlmUsage, useLlmUsage } from './api/queries';
 export {
   call,
   callAt,

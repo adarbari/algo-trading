@@ -4,7 +4,7 @@
  * `Query.distribution`; ADR 0037). The distribution is for exactly
  * the latest session: a feature not stored for it comes back with `unknown` and no counts.
  */
-import { useQuery, type QueryClient } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
@@ -126,12 +126,23 @@ const FeatureDistribution = graphql(`
   }
 `);
 
-export function useFeatureCatalogue() {
-  return useQuery({
+function featureCatalogueQuery() {
+  return queryOptions({
     queryKey: queryKeys.gql('FeatureCatalogue', {}),
     queryFn: () => gql(FeatureCatalogue, {}),
-    select: (data) => data.catalogue,
     staleTime: CATALOGUE_STALE_MS,
+  });
+}
+
+/** Start the read before the page mounts (a route loader); the hook then joins it. */
+export function prefetchFeatureCatalogue(client: QueryClient): void {
+  void client.query(featureCatalogueQuery()).catch(() => undefined);
+}
+
+export function useFeatureCatalogue() {
+  return useQuery({
+    ...featureCatalogueQuery(),
+    select: (data) => data.catalogue,
   });
 }
 

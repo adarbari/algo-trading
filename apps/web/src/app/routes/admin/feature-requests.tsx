@@ -3,6 +3,8 @@ import { createRoute, useNavigate, useSearch, type AnyRoute } from '@tanstack/re
 
 import { lazyPage } from '@/shared/lib/lazy';
 
+import { pageRoute } from '../page-loader';
+
 const AdminFeatureRequestsPage = lazyPage(
   () => import('@/pages/admin-feature-requests'),
   'AdminFeatureRequestsPage',
@@ -41,6 +43,7 @@ export function featureRequestsRoute<P extends AnyRoute>(parent: P) {
     getParentRoute: () => parent,
     path: 'feature-requests',
     validateSearch: validateFeatureRequestsSearch,
+    ...pageRoute(AdminFeatureRequestsPage),
     component: FeatureRequestsRoute,
   });
 }
