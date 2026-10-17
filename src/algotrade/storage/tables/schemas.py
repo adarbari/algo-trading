@@ -569,6 +569,46 @@ ANALYST_VENDOR_ACCESS = fixed(
     key=("source", "endpoint"),
 )
 ACCESS_STATUSES = frozenset({"ALLOWED", "DENIED", "LIMITED"})
+# L1: our own point-in-time history of analyst data (ADR 0068; track D2 of the edge build). Both
+# vendors serve only today's value and restate their history, so each night's fetch is stored as
+# rows that are never replaced by a later session's: one row per (``instrument_id``, ``source``
+# (``fmp`` / ``finnhub``), ``kind``, ``period``) in the partition of the session the fetch is for.
+# ``kind``: ``estimates_annual`` (FMP, ``period`` the fiscal year end, ISO date), ``price_target``
+# and ``grades`` (FMP consensus, ``period`` ``current``) and ``recommendation`` (Finnhub, ``period``
+# the month's first day). ``ts`` is the fetch instant of the row; ``knowledge_ts`` is the publish
+# instant of its run (>= ``ts``, never a vendor date), so a read as of T sees only what we held at
+# T. The measure columns are those of the kind, the others null: estimates the ``<measure>_<side>``
+# floats and the two analyst counts; targets the four prices; grades and recommendation the five
+# counts (grades also the label ``consensus``). A run is a window (a rotation slice of the names),
+# so runs merge on the key; one session holds each name at most once, a later session adds new rows.
+SNAPSHOT_KINDS = frozenset({"estimates_annual", "price_target", "grades", "recommendation"})
+ANALYST_ESTIMATE_SNAPSHOTS = fixed(
+    "analyst/estimate_snapshots",
+    "reference",
+    ("instrument_id", "ts", "source", "kind", "period"),
+    "instrument_id string!",
+    "ts timestamp_utc!",
+    "kind string!",
+    "period string!",
+    *floats(
+        *(
+            f"{m}_{side}"
+            for m in ("revenue", "ebitda", "ebit", "net_income", "sga_expense", "eps")
+            for side in ("low", "high", "avg")
+        )
+    ),
+    "num_analysts_revenue int64",
+    "num_analysts_eps int64",
+    *floats("target_high", "target_low", "target_consensus", "target_median"),
+    "strong_buy int64",
+    "buy int64",
+    "hold int64",
+    "sell int64",
+    "strong_sell int64",
+    "consensus string",
+    runs="merge",
+    key=("instrument_id", "source", "kind", "period"),
+)
 # ``macro/series`` ``vintage_kind``: ALFRED's realtime_start, or obs_date + the release lag.
 ALFRED, LAGGED = "alfred", "lagged"
 VINTAGE_KINDS = frozenset({ALFRED, LAGGED})
@@ -683,6 +723,7 @@ KNOWN: dict[str, TableSpec] = {
         ETF_HOLDINGS,
         MACRO_SERIES,
         ANALYST_VENDOR_ACCESS,
+        ANALYST_ESTIMATE_SNAPSHOTS,
         EARNINGS_EVENTS,
         MACRO_RELEASE_EVENTS,
         FILING_EVENTS,
@@ -857,11 +898,18 @@ def access_status_problems(frame: pd.DataFrame) -> list[str]:
     return [f"status must be one of {sorted(ACCESS_STATUSES)}, got {bad}"] if bad else []
 
 
+def snapshot_kind_problems(frame: pd.DataFrame) -> list[str]:
+    """``analyst/estimate_snapshots`` rows whose ``kind`` is not one of ``SNAPSHOT_KINDS``."""
+    bad = sorted({str(v) for v in frame["kind"]} - SNAPSHOT_KINDS)
+    return [f"kind must be one of {sorted(SNAPSHOT_KINDS)}, got {bad}"] if bad else []
+
+
 # The value rules of the tables that restrict a column to a vocabulary, by table name.
 VALUE_CHECKS = {
     MACRO_SERIES.name: vintage_problems,
     MACRO_RELEASE_EVENTS.name: release_status_problems,
     ANALYST_VENDOR_ACCESS.name: access_status_problems,
+    ANALYST_ESTIMATE_SNAPSHOTS.name: snapshot_kind_problems,
 }
 
 

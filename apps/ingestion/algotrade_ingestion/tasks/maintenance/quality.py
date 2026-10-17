@@ -32,7 +32,13 @@ from algotrade.data.reference import snapshot
 from algotrade.data.volatility import ibkr_iv30
 from algotrade.services.features import site_features
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.framework.run import PUBLISHED, IngestRun, TaskContext
+from algotrade_ingestion.tasks.framework.run import (
+    FAILURES,
+    PUBLISHED,
+    IngestRun,
+    TaskContext,
+    status_label,
+)
 from algotrade_ingestion.tasks.reference.classify import security_type
 
 TASK = "data_quality"
@@ -556,3 +562,37 @@ def run_quality(ctx: TaskContext, session: date) -> RunRecord:
             run.partial(f"check {name} failed")
         run.stats.update(checks=[asdict(c) for c in checks], failed=failed)
     return run.record
+
+
+ANALYST_TASK = (
+    "analyst-snapshot"  # the analyst snapshot task's job name (tasks/analyst/snapshot.py)
+)
+
+
+def check_analyst_snapshot(ctx: TaskContext, session: date) -> list[Check]:
+    """The ``analyst-snapshot`` step's acceptance (optional step, so these only warn): WARN when
+    over ``[quality] max_analyst_failed`` of the night's vendor calls failed (a name FMP refuses
+    is ``NOT_COVERED``, not a failure) or when the run stored no row although names were asked.
+    Nothing without a finished run of the session."""
+    done = [
+        r
+        for r in ctx.reader.runs(ANALYST_TASK)
+        if r.status in PUBLISHED and r.session_date == session
+    ]
+    if not done:
+        return []
+    record = max(done, key=lambda r: (r.started_at, r.run_id))
+    calls = [s for s in record.items.values() if status_label(s) not in ("OVER_BUDGET",)]
+    failed = [s for s in calls if status_label(s) in FAILURES]
+    asked, rows = len(calls), int(record.stats.get("rows") or 0)
+    if not asked:
+        return [Check("analyst_snapshot", "PASS", "no vendor call was due")]
+    share, limit = len(failed) / asked, ctx.settings.max_analyst_failed
+    detail = (
+        f"{len(failed)} of {asked} vendor calls failed ({share:.0%}; max {limit:.0%}); {rows} rows"
+    )
+    if share > limit:
+        return [Check("analyst_snapshot", "WARN", detail)]
+    if not rows and len(failed) < asked:
+        return [Check("analyst_snapshot", "WARN", detail + ": every name was refused or empty")]
+    return [Check("analyst_snapshot", "PASS", detail)]

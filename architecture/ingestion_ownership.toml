@@ -16,11 +16,23 @@ owner = [
     "apps/ingestion/algotrade_ingestion/tasks/analyst/probe.py",
 ]
 allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py",  # counts its FMP calls the same way, and reads the verdicts
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task
     "src/algotrade/storage/tables/schemas.py",  # declares the table's schema
 ]
 section = "docs/adr/0068-analyst-data-vendors.md#decision"
 detect = [{ string = "analyst/vendor_access" }, { call = "fmp_calls_today" }]
+
+[[responsibility]]
+id = "analyst-estimate-snapshots"
+description = "Append tonight's FMP (annual estimates, price-target consensus, grades consensus) and Finnhub (recommendation trend) analyst data of a rotating slice of names to our own point-in-time history (analyst/estimate_snapshots): ts = fetch instant, knowledge_ts = publish instant, never a vendor date, never replacing an earlier session's rows; the rotation reads back the run records' items; FMP within [fmp] daily_budget; a nightly optional step (ADR 0068)"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task
+    "src/algotrade/storage/tables/schemas.py",  # declares the table's schema
+]
+section = "docs/adr/0068-analyst-data-vendors.md#decision"
+detect = [{ string = "analyst/estimate_snapshots" }]
 
 [[responsibility]]
 id = "bad-bar-detection"

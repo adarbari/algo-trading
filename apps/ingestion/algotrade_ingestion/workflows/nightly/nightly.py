@@ -63,6 +63,7 @@ from algotrade_ingestion.tasks.framework.run import (
 )
 from algotrade_ingestion.tasks.maintenance.coverage import check_coverage
 from algotrade_ingestion.tasks.maintenance.quality import (
+    check_analyst_snapshot,
     check_bars,
     check_bars_resolved,
     check_chains,
@@ -177,6 +178,17 @@ NIGHTLY: tuple[Step, ...] = (
         latest_only=SNAPSHOT,
         critical=False,
         params={"nightly": True},
+    ),
+    # Our own point-in-time history of FMP / Finnhub analyst data (ADR 0068): a rotating slice of
+    # names a night within [fmp] daily_budget, appended, never replaced. Optional: a vendor outage
+    # or no key only warns. The vendors serve only today's value, so a catch-up session is SKIPPED.
+    Step(
+        "analyst-snapshot",
+        needs=("universe-build",),
+        requires=universe_exists,
+        latest_only=SNAPSHOT,
+        critical=False,
+        accept_with=(check_analyst_snapshot,),
     ),
     # IBKR enrichment (ADR 0028), read-only, SKIPPED with a WARN when [ibkr] is disabled or IB
     # Gateway is not reachable: conids for new optionable names (and the monthly refresh),
