@@ -353,6 +353,9 @@ def test_a_but_sentence_of_two_structured_clauses_is_drafted_with_no_model(
         "oversold stocks but not in a downtrend",  # a negation
         "oversold or overbought but uptrend",  # an or
         "large caps but zzz",  # a clause nothing says
+        "large caps all but volatile",  # "all but" is an except
+        "oversold, all but downtrend",
+        "oversold stocks, all but a downtrend",
         "oversold but overbought",  # one field twice
     ],
 )

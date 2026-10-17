@@ -83,3 +83,9 @@ def test_a_curly_apostrophe_is_the_same_filler() -> None:
 
 def test_like_is_never_glue() -> None:
     assert "like" not in GLUE  # "stocks like NVDA" means similar to
+
+
+@pytest.mark.parametrize("phrase", ["all but", "anything but", "everything but", "nothing but"])
+def test_all_but_is_an_except_not_a_but(phrase: str) -> None:
+    assert JOINS[phrase] == "and_not"
+    assert {logic for _, logic in read(phrase.split())} == {"and_not"}

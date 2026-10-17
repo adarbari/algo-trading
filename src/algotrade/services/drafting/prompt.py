@@ -48,7 +48,7 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 # or to the scoped ``ASK`` (``redraft/test_prompt.py`` in the tests pins their hashes).
 # 10: connectors are rendered from ``parts/connectors.py`` (only the and-type ones are left out of
 # words; a negation or an or stays in the condition); one condition one contiguous part.
-PROMPT_VERSION = "10"
+PROMPT_VERSION = "11"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 

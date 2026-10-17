@@ -19,7 +19,8 @@ _JOIN_PHRASES: dict[str, tuple[str, ...]] = {
     OR: ("or", "either", "otherwise"),
     AND_NOT: (
         "except", "except for", "excluding", "exclude", "unless", "without", "but not", "not",
-        "avoid", "other than", "rather than", "minus", "no",
+        "avoid", "other than", "rather than", "minus", "no", "all but", "anything but",
+        "everything but", "nothing but",
     ),
 }  # fmt: skip
 JOINS: dict[str, str] = {p: logic for logic, ps in _JOIN_PHRASES.items() for p in ps}

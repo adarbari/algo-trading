@@ -560,7 +560,11 @@ rest).
   one part per clause (its words run from its first entry's wording to its last), the connector
   between two clauses becomes the next part's `join` / `join_words` (`parts/build.py`), glue
   vanishes, and everything else is the existing shortcut: `_draft` / `_finished`, `current` kept,
-  duplicate ids, the parts cap. Any doubt asks the model. A held-out golden sentence must not resolve
+  duplicate ids, the parts cap. A connector is a boundary only when the words just before and
+  just after it are both claimed by a structured wording, and `all but` / `anything but` /
+  `everything but` / `nothing but` are `and_not` joins (an except, never a split). Measured benefit:
+  0 of the 42 existing golden cases newly skip the model (their sentences carry numbers or words no
+  entry covers); the 2 new train cases do. Any doubt asks the model. A held-out golden sentence must not resolve
   this way either (fitness test).
 - **Not built: the partial settlement.** When some clauses resolve and others do not the model is
   still asked for the whole sentence, with nothing settled in its prompt: sending the resolved

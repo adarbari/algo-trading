@@ -25,9 +25,17 @@ def clauses(sentence: str, taken: Sequence[int] = ()) -> list[str]:
 
 
 def test_and_type_connectors_split_and_leave_no_words_of_their_own() -> None:
-    assert clauses("oversold but with rising volume") == ["oversold", "rising volume"]
-    assert clauses("oversold and also uptrend") == ["oversold", "uptrend"]
-    assert clauses("as long as oversold, yet uptrend") == ["oversold", "uptrend"]
+    assert clauses("oversold but with rising volume", taken=(0, 3, 4)) == [
+        "oversold",
+        "rising volume",
+    ]
+    assert clauses("oversold and also uptrend", taken=(0, 3)) == ["oversold", "uptrend"]
+    assert clauses("oversold, yet uptrend", taken=(0, 2)) == ["oversold", "uptrend"]
+
+
+def test_a_boundary_needs_a_claimed_word_on_both_sides() -> None:
+    assert clauses("oversold but zzz", taken=(0,)) == ["oversold but zzz"]
+    assert clauses("zzz but oversold", taken=(2,)) == ["zzz but oversold"]
 
 
 def test_a_negation_or_an_or_is_never_a_boundary() -> None:
@@ -43,25 +51,29 @@ def test_a_sequence_is_never_a_boundary() -> None:
 
 
 def test_a_range_or_two_numbers_stay_whole() -> None:
-    assert clauses("rsi between 40 and 60 and uptrend") == ["rsi between 40 and 60", "uptrend"]
+    assert clauses("rsi between 40 and 60 and uptrend", taken=(4, 6)) == [
+        "rsi between 40 and 60",
+        "uptrend",
+    ]
     assert clauses("rsi 40 and 60") == ["rsi 40 and 60"]
 
 
 def test_a_wording_that_holds_the_connector_is_claimed_whole() -> None:
     # tokens: cheap(0) and(1) liquid(2) but(3) uptrend(4); a wording claims cheap and liquid
-    assert clauses("cheap and liquid but uptrend", taken=(0, 1, 2)) == [
+    assert clauses("cheap and liquid but uptrend", taken=(0, 1, 2, 4)) == [
         "cheap and liquid",
         "uptrend",
     ]
 
 
-def test_a_leading_or_trailing_connector_has_no_empty_clause() -> None:
-    assert clauses("and oversold") == ["oversold"]
-    assert clauses("oversold but") == ["oversold"]
+def test_a_leading_or_trailing_connector_is_no_boundary() -> None:
+    assert clauses("and oversold", taken=(1,)) == ["and oversold"]  # nothing before it
+    assert clauses("oversold but", taken=(0,)) == ["oversold but"]
 
 
-def test_a_curly_apostrophe_reads_like_a_straight_one() -> None:
-    assert clauses("i’m looking for oversold but uptrend")[-1] == "uptrend"  # noqa: RUF001
+def test_a_curly_apostrophe_leaves_an_uncovered_word_so_the_model_answers() -> None:
+    # "I\u2019m" tokenises to "i" and "m": the stray "m" is no glue and no entry's word
+    assert resolve_clauses("I\u2019m looking for oversold but uptrend", BOOK) is None
 
 
 def test_every_clause_resolves_and_each_is_one_part() -> None:
@@ -87,6 +99,8 @@ def test_every_clause_resolves_and_each_is_one_part() -> None:
         "oversold stocks but not in a downtrend",  # a negation stays with its condition
         "oversold or overbought but uptrend",  # an or needs a formula
         "oversold but zzz",  # a clause no entry says
+        "large caps all but volatile",  # "all but" is an except
+        "oversold, all but downtrend",
         "oversold stocks",  # one clause: the whole-sentence path has it
         "oversold but overbought",  # one field twice, never both
         "oversold and then uptrend and downtrend",  # trend_state in two clauses
