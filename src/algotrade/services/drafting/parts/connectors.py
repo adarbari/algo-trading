@@ -36,6 +36,12 @@ GLUE = frozenset(
         # fillers
         "show me", "find", "give me", "list", "get", "i", "i'm", "im", "looking for", "i want",
         "want", "basically", "just", "please", "some", "any", "ones",
+        # nouns with no meaning of their own (a typed one, "ETFs" or "stocks", is content)
+        "name", "names", "ticker", "tickers", "symbol", "symbols", "security", "securities",
+        "instrument", "instruments", "company", "companies",
+        # comparatives, not an or: "price 10 or more" has no connector
+        "or more", "or higher", "or above", "or greater", "or less", "or lower", "or below",
+        "or fewer", "or better",
     }
 )  # fmt: skip
 GLUE_WORDS = frozenset(w for w in GLUE if " " not in w)  # the one-word glue, for a word check

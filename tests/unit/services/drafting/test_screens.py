@@ -735,3 +735,74 @@ def test_a_suggestion_equal_to_a_non_default_alternative_is_not_offered_twice(
     draft = draft_screen(ctx, Canned(answer), "my_screen", "deep")
     assert [(s.criterion["field"], s.criterion["op"]) for s in draft.suggestions] == [(OI, "lt")]
     assert draft.suggestions_dropped == ()
+
+
+# --------------------------- the verifier: doubts repair, then escalate (ADR 0041, 2026-10-17)
+
+VERIFIED = "cheap over $50 liquid"
+
+
+def parted(words: str) -> str:
+    """An answer with the one criterion in one part holding ``words`` of ``VERIFIED``."""
+    return json.dumps(proposal({**PRICE_GT, "part": "p1"}, parts=[{"id": "p1", "words": words}]))
+
+
+FIXED = parted(VERIFIED)
+TWO_GAPS = parted("over $50")  # "cheap" and "liquid" map to nothing
+GAP_AFTER = parted("cheap over $50")  # "liquid" maps to nothing
+GAP_BEFORE = parted("over $50 liquid")  # "cheap" maps to nothing
+
+
+def verified(ctx: ReadContext, model: Any) -> Any:
+    return draft_screen(ctx, model, "s", VERIFIED)
+
+
+def test_a_doubt_is_repaired_on_the_same_member_with_the_doubts_named(ctx: ReadContext) -> None:
+    """The test that would have caught the 2026-10-17 'cheap' / 'on P/E' split: words in no part
+    are a doubt, not a draft."""
+    cheap, strong = Scripted("cheap", TWO_GAPS, FIXED), Scripted("strong")
+    ledger = Ledger()
+    draft = verified(ctx, chained(ledger, cheap, strong))
+    assert draft.doubts == () and not strong.calls
+    assert [s for _, s, _ in cheap.calls] == ["first", "repair"]
+    assert "unmapped_words (g1)" in cheap.calls[1][0] and "cheap" in cheap.calls[1][0]
+    assert [(a.outcome, a.call_stage) for a in ledger.attempts][:2] == [
+        ("ok", "first"), ("rejected", "first")]  # fmt: skip
+
+
+def test_a_doubt_that_persists_escalates_to_the_stronger_member(ctx: ReadContext) -> None:
+    cheap, strong = Scripted("cheap", TWO_GAPS, TWO_GAPS), Scripted("strong", FIXED)
+    draft = verified(ctx, chained(Ledger(), cheap, strong))
+    assert draft.doubts == () and draft.parts and draft.parts[0].kind != "not_understood"
+    assert [s for _, s, _ in cheap.calls] == ["first", "repair"]
+    assert [s for _, s, _ in strong.calls] == ["escalate"]
+
+
+def test_every_member_doubting_serves_the_fewest_doubts_the_later_on_a_tie(
+    ctx: ReadContext,
+) -> None:
+    cheap = Scripted("cheap", TWO_GAPS, TWO_GAPS)
+    strong = Scripted("strong", GAP_AFTER, GAP_BEFORE)
+    draft = verified(ctx, chained(Ledger(), cheap, strong))
+    assert draft.doubts == ("unmapped_words",)
+    assert [p.words for p in draft.parts or () if p.origin == "gap"] == ["cheap"]  # the later
+    assert len(cheap.calls) == len(strong.calls) == 2  # the chain's own bound, nothing more
+
+
+def test_an_invalid_answer_is_never_served_over_a_doubtful_valid_one(ctx: ReadContext) -> None:
+    cheap, strong = Scripted("cheap", GAP_AFTER, NOT_JSON), Scripted("strong", NOT_JSON, NOT_JSON)
+    draft = verified(ctx, chained(Ledger(), cheap, strong))
+    assert draft.doubts == ("unmapped_words",) and list(draft.document["criteria"]) == ["price"]
+
+
+def test_only_invalid_answers_still_fail(ctx: ReadContext) -> None:
+    a, b = Scripted("a", NOT_JSON, NOT_JSON), Scripted("b", WRONG_SHAPE, WRONG_SHAPE)
+    with pytest.raises(ModelUnavailableError):
+        verified(ctx, chained(Ledger(), a, b))
+
+
+def test_a_model_that_does_not_check_gets_its_doubts_recorded_not_refused(
+    ctx: ReadContext,
+) -> None:
+    draft = verified(ctx, Canned(TWO_GAPS))
+    assert draft.doubts == ("unmapped_words", "unmapped_words")
