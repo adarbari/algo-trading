@@ -22,16 +22,6 @@
       "tolerance": null,
       "on_miss": null,
       "why": "stocks"
-    },
-    {
-      "id": "fcf_yield",
-      "field": "feature.fcf_yield",
-      "op": "gt",
-      "value": 0,
-      "mode": "hard",
-      "tolerance": null,
-      "on_miss": null,
-      "why": "free cash flow yield, the comparison with the treasury yield is not stored"
     }
   ],
   "tie_break": null,

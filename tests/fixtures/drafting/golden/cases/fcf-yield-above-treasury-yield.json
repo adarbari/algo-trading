@@ -6,13 +6,10 @@
     "parts": [
       {
         "span": "free cash flow yield",
-        "bucket": "A",
+        "bucket": "C",
         "fields": [
           "feature.fcf_yield"
-        ],
-        "op": "gt",
-        "value": 0,
-        "tolerance": 0
+        ]
       },
       {
         "span": "the 10 year treasury yield",
