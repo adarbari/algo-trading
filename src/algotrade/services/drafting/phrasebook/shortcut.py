@@ -10,6 +10,8 @@ has, an id the Builder would not keep, a shape that is not a criteria table); a 
 entries or two places of the sentence say; criteria two entries share; more parts than the
 cap; words nothing explains. The ``instrument.status`` = ``ACTIVE`` scaffolding the prompt
 always asks of the model is added when no entry says it (an ``unplaced`` row, as for the model).
+A clause-by-clause resolution (``resolve.resolve_clauses``) is one claim per clause; the
+connector between clauses is left to ``build_parts`` (the next part's join), never a gap.
 Pure; no model, no storage."""
 
 import hashlib
@@ -69,7 +71,7 @@ def shortcut(
     parts: list[dict[str, Any]] = []
     readings: dict[str, str] = {}
     for n, claim in enumerate(resolution.claims, 1):
-        mine = [c.as_answer() for c in claim.phrase.criteria]
+        mine = claim.answers()
         if not mine or any(c["field"] in held_fields and _norm(c) not in held for c in mine):
             return None  # a field current has, read otherwise: the model decides
         for c in mine:
