@@ -498,7 +498,7 @@ type EdgeCurve {
 }
 
 """
-The decay of one statistic: the paper's figure (`published`) against the harness's in-sample and out-of-sample ones (`bars`, in that order after the paper's) at the verdict's `basisHorizon`; `measure` is read in `unit` (return: a fraction; points). `published` is null when the edge's document gives no figure (the paper's bar is then not_given and `measure` is lift_pts)
+The decay of one statistic: the paper's figure (`published`) against the harness's in-sample and out-of-sample ones (`bars`, in that order after the paper's) at the verdict's `basisHorizon`; `measure` is read in `unit` (return: a fraction; points). `published` is null when the edge's document gives no figure (the paper's bar is then not_given and `measure` is lift_pts); `expected` is the figure after the haircut of its leg beside the out-of-sample bar (null without a published figure)
 """
 type EdgeDecay {
   measure: String!
@@ -506,6 +506,7 @@ type EdgeDecay {
   published: EdgePublished
   basisHorizon: Int!
   bars: [DecayBar!]!
+  expected: ExpectedFigure
 }
 
 """
@@ -554,7 +555,7 @@ type EdgeEvidence {
 }
 
 """
-The Sharpe ratio after the multiple-testing haircut (Harvey and Liu): the stored `sharpe` (per trade, not annualised) over `sessions` trades is `haircutSharpe` once `trials` variants tried are counted, `cut` (0 to 1) the share lost; `method` names the adjustment (bonferroni: Holm's value for the best of the trials) and `summary` is the sentence. Null: not stored, or the Sharpe ratio is not above zero
+The Sharpe ratio after the multiple-testing haircut (Harvey and Liu): the stored `sharpe` (per trade, not annualised) over `sessions` trades is `haircutSharpe` once `trials` variants tried are counted, `cut` (0 to 1) the share lost; `method` names the adjustment (bonferroni: Holm's value for the best of the trials) and `summary` is the sentence. `siteTrials`, `siteHaircutSharpe` and `siteCut` are the same adjustment for every variant tried across the site's open edges (null: not counted). Null: not stored, or the Sharpe ratio is not above zero
 """
 type EdgeHaircut {
   sharpe: Float!
@@ -564,6 +565,9 @@ type EdgeHaircut {
   sessions: Int!
   method: String!
   summary: String!
+  siteTrials: Int
+  siteHaircutSharpe: Float
+  siteCut: Float
 }
 
 """
@@ -662,7 +666,7 @@ type EdgeProblem {
 }
 
 """
-The figure the literature reports for the edge: `measure` (mean_excess, decile_spread or lift_pts) equal to `value` over `horizonSessions`, from `source` over `sample` years (null: not stated)
+The figure the literature reports for the edge: `measure` (mean_excess, decile_spread or lift_pts) equal to `value` over `horizonSessions`, from `source` over `sample` years (null: not stated); `leg`: what the figure is of (long_short or long_only)
 """
 type EdgePublished {
   measure: String!
@@ -670,6 +674,7 @@ type EdgePublished {
   horizonSessions: Int!
   source: EdgeSource!
   sample: Int
+  leg: String!
 }
 
 """
@@ -1012,6 +1017,18 @@ type EvidenceProgress {
   reached: Boolean!
   checks: [VerdictCriterion!]!
   outlook: EdgeOutlook
+}
+
+"""
+What to expect of the paper's figure once traded: `value` is the published figure less the `haircut` (0 to 1) of its `leg` (long_short or long_only), in the decay's unit; `realised` the out-of-sample bar's figure and `share` its share of `value` (null where the bar has none); `summary` is the sentence. Display only, no verdict reads it
+"""
+type ExpectedFigure {
+  leg: String!
+  haircut: Float!
+  value: Float!
+  realised: Float
+  share: Float
+  summary: String!
 }
 
 """
@@ -3374,6 +3391,7 @@ type VerdictColumn {
   thin: Boolean!
   referenceRate: Float
   touchRate: Float
+  picksT: Float
 }
 
 """

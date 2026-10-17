@@ -467,3 +467,12 @@ def test_the_published_table_is_optional_typed_and_checked_against_the_document(
 def test_a_published_table_fails_closed(published: dict[str, Any], match: str) -> None:
     with pytest.raises(ConfigurationError, match=match):
         parse(published=published)
+
+
+def test_a_published_leg_defaults_to_long_short_and_fails_closed() -> None:
+    base = {"measure": "lift_pts", "value": 4, "horizon_sessions": 20, "source": 0}
+    assert parse(published=base).published.leg == "long_short"  # type: ignore[union-attr]
+    only = parse(published={**base, "leg": "long_only"}).published
+    assert only == Published("lift_pts", 4.0, 20, 0, None, "long_only")
+    with pytest.raises(ConfigurationError, match="leg"):
+        parse(published={**base, "leg": "short"})

@@ -163,6 +163,7 @@ class VerdictColumn:
     thin: bool
     reference_rate: float | None
     touch_rate: float | None
+    picks_t: float | None
 
     @classmethod
     def of(cls, d: read.VerdictColumn) -> Self:
@@ -180,6 +181,7 @@ class VerdictColumn:
             thin=d.thin,
             reference_rate=d.reference_rate,
             touch_rate=d.touch_rate,
+            picks_t=d.picks_t,
         )
 
 
@@ -345,7 +347,9 @@ class Robustness:
     "stored `sharpe` (per trade, not annualised) over `sessions` trades is `haircutSharpe` once "
     "`trials` variants tried are counted, `cut` (0 to 1) the share lost; `method` names the "
     "adjustment (bonferroni: Holm's value for the best of the trials) and `summary` is the "
-    "sentence. Null: not stored, or the Sharpe ratio is not above zero"
+    "sentence. `siteTrials`, `siteHaircutSharpe` and `siteCut` are the same adjustment for every "
+    "variant tried across the site's open edges (null: not counted). "
+    "Null: not stored, or the Sharpe ratio is not above zero"
 )
 class EdgeHaircut:
     sharpe: float
@@ -355,6 +359,9 @@ class EdgeHaircut:
     sessions: int
     method: str
     summary: str
+    site_trials: int | None
+    site_haircut_sharpe: float | None
+    site_cut: float | None
 
     @classmethod
     def of(cls, d: robustness.EdgeHaircut) -> Self:
@@ -366,13 +373,16 @@ class EdgeHaircut:
             sessions=d.sessions,
             method=d.method,
             summary=d.summary,
+            site_trials=d.site_trials,
+            site_haircut_sharpe=d.site_haircut_sharpe,
+            site_cut=d.site_cut,
         )
 
 
 @strawberry.type(
     description="The figure the literature reports for the edge: `measure` (mean_excess, "
     "decile_spread or lift_pts) equal to `value` over `horizonSessions`, from `source` over "
-    "`sample` years (null: not stated)"
+    "`sample` years (null: not stated); `leg`: what the figure is of (long_short or long_only)"
 )
 class EdgePublished:
     measure: str
@@ -380,6 +390,7 @@ class EdgePublished:
     horizon_sessions: int
     source: EdgeSource
     sample: int | None
+    leg: str
 
     @classmethod
     def of(cls, d: edges.EdgePublished) -> Self:
@@ -389,6 +400,33 @@ class EdgePublished:
             horizon_sessions=d.horizon_sessions,
             source=EdgeSource.of(d.source),
             sample=d.sample,
+            leg=d.leg,
+        )
+
+
+@strawberry.type(
+    description="What to expect of the paper's figure once traded: `value` is the published "
+    "figure less the `haircut` (0 to 1) of its `leg` (long_short or long_only), in the decay's "
+    "unit; `realised` the out-of-sample bar's figure and `share` its share of `value` (null "
+    "where the bar has none); `summary` is the sentence. Display only, no verdict reads it"
+)
+class ExpectedFigure:
+    leg: str
+    haircut: float
+    value: float
+    realised: float | None
+    share: float | None
+    summary: str
+
+    @classmethod
+    def of(cls, d: decay.ExpectedFigure) -> Self:
+        return cls(
+            leg=d.leg,
+            haircut=d.haircut,
+            value=d.value,
+            realised=d.realised,
+            share=d.share,
+            summary=d.summary,
         )
 
 
@@ -417,7 +455,8 @@ class DecayBar:
     "harness's in-sample and out-of-sample ones (`bars`, in that order after the paper's) at the "
     "verdict's `basisHorizon`; `measure` is read in `unit` (return: a fraction; points). "
     "`published` is null when the edge's document gives no figure (the paper's bar is then "
-    "not_given and `measure` is lift_pts)"
+    "not_given and `measure` is lift_pts); `expected` is the figure after the haircut of its "
+    "leg beside the out-of-sample bar (null without a published figure)"
 )
 class EdgeDecay:
     measure: str
@@ -425,6 +464,7 @@ class EdgeDecay:
     published: EdgePublished | None
     basis_horizon: int
     bars: list[DecayBar]
+    expected: ExpectedFigure | None
 
     @classmethod
     def of(cls, d: decay.EdgeDecay) -> Self:
@@ -434,6 +474,7 @@ class EdgeDecay:
             published=EdgePublished.of(d.published) if d.published else None,
             basis_horizon=d.basis_horizon,
             bars=[DecayBar.of(b) for b in d.bars],
+            expected=ExpectedFigure.of(d.expected) if d.expected else None,
         )
 
 

@@ -46,7 +46,10 @@ class EdgeHaircut:
     the stored ``sharpe`` (per decision session, not annualised; of the excess wins for an outcome
     that is not a return, ADR 0064 amendment 2026-10-11) over ``sessions`` sessions becomes
     ``haircut_sharpe`` once ``trials`` variants tried are counted, ``cut`` (0 to 1) the share
-    lost; ``method`` names the adjustment and ``summary`` is the server's sentence."""
+    lost; ``method`` names the adjustment and ``summary`` is the server's sentence. The same
+    adjustment is also made for ``site_trials``, every variant tried across the site's open edges
+    (the programme's own multiple-testing count, ADR 0065 amendment 2026-10-17):
+    ``site_haircut_sharpe`` and ``site_cut`` (None where the count is not known)."""
 
     sharpe: float
     haircut_sharpe: float
@@ -55,21 +58,36 @@ class EdgeHaircut:
     sessions: int
     method: str
     summary: str
+    site_trials: int | None = None
+    site_haircut_sharpe: float | None = None
+    site_cut: float | None = None
 
 
 BONFERRONI = "bonferroni"  # Holm's value for the best of the trials; the peers' t are not stored
 
 
 def load_haircut(
-    sharpe: float | None, sessions: int | None, trials: int | None, wins: bool = False
+    sharpe: float | None,
+    sessions: int | None,
+    trials: int | None,
+    wins: bool = False,
+    site_trials: int | None = None,
 ) -> EdgeHaircut | None:
     """The haircut of the basis's ``sharpe`` over ``sessions`` decision sessions after ``trials``
     variants; None when any is not stored or the Sharpe ratio is not above zero. ``wins``: the
     outcome is not a return, so the Sharpe ratio is of the win rate above the base rate, and the
-    sentence says so."""
+    sentence says so. ``site_trials``: the variants tried across the site's open edges, which
+    the edge's own count is part of; the larger of the two is adjusted for, beside the edge's."""
     h = haircut_sharpe(sharpe, sessions, trials)
     if h is None or sharpe is None or sessions is None or trials is None:
         return None
+    wide = None if not site_trials else haircut_sharpe(sharpe, sessions, max(site_trials, trials))
+    across = (
+        ""
+        if wide is None or site_trials is None
+        else f" Counting the {max(site_trials, trials):,} variants tried across the site's open "
+        f"edges it falls to {wide.sharpe:.2f}, a haircut of {wide.cut * 100:.0f}%."
+    )
     return EdgeHaircut(
         sharpe=sharpe,
         haircut_sharpe=h.sharpe,
@@ -82,8 +100,11 @@ def load_haircut(
             f"{', of the win rate above the base rate,' if wins else ''} "
             f"falls to {h.sharpe:.2f} after "
             f"{trials:,} variant{'' if trials == 1 else 's'} tried, a haircut of "
-            f"{h.cut * 100:.0f}%."
+            f"{h.cut * 100:.0f}%.{across}"
         ),
+        site_trials=None if wide is None else max(site_trials or 0, trials),
+        site_haircut_sharpe=None if wide is None else wide.sharpe,
+        site_cut=None if wide is None else wide.cut,
     )
 
 

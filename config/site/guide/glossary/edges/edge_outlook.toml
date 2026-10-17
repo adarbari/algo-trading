@@ -68,6 +68,22 @@ next = "Trust a bar by its count: an out-of-sample bar on a few trades is noise.
 see_also = ["published_number", "decay_bar_state", "live_record", "in_sample", "out_of_sample", "trades", "top_vs_bottom_decile"]
 
 [[term]]
+id = "published_haircut"
+term = "Published, expect"
+short = "The paper's figure after the share papers usually lose by the time they are traded, set beside the out-of-sample figure."
+body = """
+Published figures are the best version of an effect, often a long-short spread, before costs.
+McLean and Pontiff found about a third of the return gone after publication. The page takes a share
+off the paper's number by what the figure is of. A long-short spread loses a half and a long-only
+figure a third. The edge's document says which, as the leg, and site settings hold the shares.
+Example: a paper reports 1.00% for a long-short spread, so the page says "Published 1.00%, expect
+0.50%" and then how much of that the out-of-sample bar reached. It is a guide to what is realistic,
+not a rule: the verdict never reads it, and the harness's own figure is the evidence.
+"""
+next = "Set the out-of-sample bar against the expected figure, not the published one."
+see_also = ["published_number", "decay", "out_of_sample"]
+
+[[term]]
 id = "decay_bar_state"
 term = "Decay bar state"
 short = "Why a decay bar has no value: not stored, not comparable, hidden or not measured live; a measured bar has one."
@@ -90,6 +106,7 @@ Try many versions and the best one looks good by luck. Harvey and Liu turn the S
 t-ratio and a p-value. They multiply the p-value by the number of variants tried and turn the result back into a Sharpe ratio. The share lost is the haircut. Their illustration: a t-ratio of 3.0
 whose p-value is adjusted to 0.05 becomes about 2.0, a haircut of about a third. Here the Sharpe ratio is the stored one, per decision session and not annualised, over the whole history. For a cushion or vol-ratio outcome it is the Sharpe ratio of the win rate minus the base rate, never of the cushion. Example: 0.5 over 40 sessions after 126 variants falls to about 0.20, a haircut of about 60%. The number of trades behind it counts independent sessions: windows that overlap are weighted by the sessions since the previous decision over the holding period. The adjustment is the Bonferroni bound, which is Holm's value for the best of the variants. The others' t statistics are not stored. When the picks of an edge overlap in time, as on an every-session schedule, the t-ratio is overstated and so is the Sharpe ratio behind it. The verdict uses the deflated Sharpe ratio, not this one;
 the haircut is shown beside it as a second view of the same luck.
+The page also shows the haircut after the variants tried across the whole site. Every open edge's trials count together, because the best of a hundred edges looks good by luck too.
 """
 next = "Read the cut against the trial count: a large cut with many variants means the best may be luck."
 see_also = ["sharpe_ratio", "deflated_sharpe", "variants_tried", "robustness", "win_rate", "base_rate"]

@@ -14,6 +14,7 @@ from algotrade.services.read.evaluation.runs import (
     load_run_draws,
     load_run_rows,
     load_run_series,
+    load_site_trials,
     measured_sessions,
     window_weights,
 )
@@ -315,3 +316,14 @@ def test_the_touch_and_reference_rates_are_read_and_none_when_not_stored_never_z
     by = {r.slice_kind: r for r in load_run_rows(ctx, run) if r.variant == "momo"}
     assert (by["in_sample"].reference_rate, by["in_sample"].touch_rate) == (0.63, 0.54)
     assert by["frozen"].reference_rate is None and by["frozen"].touch_rate is None
+
+
+def test_the_site_trial_count_sums_the_canonical_runs_of_the_open_site_edges(
+    backend: MemoryBackend,
+) -> None:
+    ctx = stores(backend)
+    assert load_site_trials(ctx) == 0  # no run yet: nothing was tried
+    write_run(backend, "explore", date(2026, 3, 1), 0.9, minutes=5)  # exploratory: not counted
+    assert load_site_trials(stores(backend)) == 0
+    write_run(backend, "official", FROZEN, 0.6, minutes=10)  # records ``trials_counted`` = 1
+    assert load_site_trials(stores(backend)) == 1

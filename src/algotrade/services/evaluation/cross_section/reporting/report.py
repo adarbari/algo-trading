@@ -15,6 +15,7 @@ COLUMNS = (
     ("decile_t", "t", "{:.2f}"), ("decile_sessions", "dec. sessions", "{}"),
     ("unscored", "unscored", "{}"), ("excluded_score_coverage", "no deciles", "{}"),
     ("excluded_coverage", "unmeasured", "{}"),
+    ("picks_t", "picks t", "{:.2f}"),
     ("deflated_sharpe", "DSR", "{:.2f}"), ("pbo", "PBO", "{:.2f}"),
 )  # fmt: skip
 

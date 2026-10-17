@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from algotrade.config.edges.verdict import VerdictSettings
+from algotrade.config.edges.verdict import KEYS, LEGS, VerdictSettings
 from algotrade.core.model.errors import ConfigurationError
 
 
@@ -65,3 +65,26 @@ def test_a_document_overrides_and_an_unknown_key_fails() -> None:
 def test_the_committed_file_parses_to_the_defaults() -> None:
     doc = tomllib.loads(Path("config/site/verdict.toml").read_text())
     assert VerdictSettings.from_document(doc) == VerdictSettings()
+
+
+def test_works_needs_the_picks_t_too_and_the_published_haircut_has_its_two_legs() -> None:
+    d = VerdictSettings.from_document(None)
+    assert (d.works_t, d.works_picks_t) == (3.0, 3.0)  # owner 2026-10-17
+    assert (d.haircut_long_short, d.haircut_long_only) == (0.5, 0.333)
+    assert d.published_haircut("long_short") == 0.5 and d.published_haircut("long_only") == 0.333
+    read = VerdictSettings.from_document({"published_haircut": {"long_only": 0.25}})
+    assert (read.haircut_long_only, read.haircut_long_short) == (0.25, 0.5)
+    for bad in ({"long_only": 1.5}, {"long_short": -0.1}, {"long_short": "half"}):
+        with pytest.raises(ConfigurationError, match="long_"):
+            VerdictSettings.from_document({"published_haircut": bad})
+    with pytest.raises(ConfigurationError, match="unknown keys"):
+        VerdictSettings.from_document({"published_haircut": {"short_only": 0.5}})
+
+
+def test_every_key_of_the_verdict_file_is_read_and_every_read_key_is_in_the_file() -> None:
+    """Fitness: a threshold added to ``KEYS`` is written in ``verdict.toml`` (with its comment),
+    and a key in the file is one the loader reads (an unknown one already fails to load)."""
+    doc = tomllib.loads(Path("config/site/verdict.toml").read_text())
+    assert set(doc) == set(KEYS)
+    assert set(doc["published_haircut"]) == set(LEGS)
+    assert set(doc["edge_costs"]) == {"levels_bps"}

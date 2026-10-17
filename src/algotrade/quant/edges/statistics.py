@@ -14,6 +14,7 @@ result (too few observations, a zero denominator) is ``None``, never NaN.
                          uniformly without replacement (the random-pick backtests)
     percentile_of        the share of a sample a value beats (ties half)
     sharpe               per-period mean over sample sd
+    sharpe_t             its t-ratio, ``sharpe sqrt(n)`` (the picks-series t)
     deflated_sharpe      Bailey and Lopez de Prado (2014): the probability the true Sharpe
                          beats what the best of ``n_trials`` noise strategies would show
     haircut_sharpe       Harvey and Liu (2015): the Sharpe ratio left after the multiple-testing
@@ -188,6 +189,13 @@ def sharpe(x: ArrayLike) -> float | None:
     if mean is None or sd is None or sd <= 0.0 or n < 2:
         return None
     return mean / sd
+
+
+def sharpe_t(x: ArrayLike) -> float | None:
+    """The t-ratio of the per-period Sharpe ratio of ``x`` (``sharpe(x) sqrt(n)``, the ``t`` of
+    ``haircut_sharpe``), signed; None where ``sharpe`` is. The picks-series t of an edge's
+    trial values, the figure the "t > 3" bar of the literature is about."""
+    return spread_summary(x)[2]
 
 
 def deflated_sharpe(x: ArrayLike, n_trials: int, sr_variance: float) -> float | None:

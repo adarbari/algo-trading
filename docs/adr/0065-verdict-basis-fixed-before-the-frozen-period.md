@@ -74,3 +74,27 @@ changed or dropped (`test_the_basis_is_invariant_to_any_change_of_the_out_of_sam
 - `promoted` was chosen by ED7c on frozen-slice numbers; it is a reviewed declaration, used as
   written. No site edge is promoted today.
 - The Guide term `verdict_basis` states the rule and why.
+
+### Amendment (2026-10-17): two t series, a site-wide trial count, the published haircut
+
+Owner decisions of 2026-10-17 (`docs/decisions/log.md`; build plan H1). Promising stays at a
+decile t of 2; Works needs a t of 3 on **both** t series: the top-vs-bottom decile spread
+(`works_t`) and the picks series (`works_picks_t`, new). The picks-series t is the t-ratio of the
+Sharpe ratio of the slice's trial values (`quant/edges/statistics.sharpe_t`, the `t` of
+`haircut_sharpe`), stored per slice as `results/edge_eval.picks_t` (not stored, as in an older
+run: the criterion is "not measured" and the verdict stays Promising until the next run).
+`deflate` is untouched: each edge's own trial count still deflates its Sharpe ratio.
+
+The haircut Sharpe is also made for a **site-wide trial count**, the variants tried across the
+whole programme (140 edges x variants x horizons is the count the literature's t > 3 bar is
+about): `runs.load_site_trials` sums `trials_counted` of the canonical run of every open site
+edge (not rejected or blocked, not a user's own), kept per published state. `EdgeHaircut` carries
+both, the edge's own and the site's (`site_trials`, `site_haircut_sharpe`, `site_cut`), and its
+sentence says both. Display only: the verdict reads the deflated Sharpe, as before.
+
+`[published] leg` (`long_short`, the default, or `long_only`) says what the paper's figure is of;
+`verdict.toml [published_haircut]` (`long_short = 0.5`, `long_only = 0.333`) is the share of it
+to expect lost once traded (McLean and Pontiff: about a third after publication). The decay read
+carries `expected` (the figure after the haircut, the out-of-sample bar and its share of it) and
+the edge page says "Published x, expect y" under the decay bars. **Display only**: no verdict
+criterion reads it, and changing a share needs no run.

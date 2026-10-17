@@ -30,6 +30,7 @@ from algotrade.quant.edges.statistics import (
     merge_moments,
     pbo_cscv,
     sharpe,
+    sharpe_t,
     spread_summary,
 )
 
@@ -221,6 +222,7 @@ class SliceMeasure:
     deflated_sharpe: float | None = field(default=None)
     trials: int | None = field(default=None)
     pbo: float | None = field(default=None)
+    picks_t: float | None = field(default=None)  # the t-ratio of ``sharpe`` (``sharpe_t``)
     reference_rate: float | None = field(default=None)  # expires_otm: mean risk-neutral N(d2)
     touch_rate: float | None = field(default=None)  # expires_otm: picks whose strike was touched
     in_sample: bool = field(default=False)  # a model screener's fit saw sessions of this slice
@@ -310,6 +312,7 @@ def _measure(
         decile_sessions=spread_n,
         effect_size=effect_vs_moments(pick_values, rest),
         sharpe=sharpe(means),
+        picks_t=sharpe_t(means),
         unscored=sum(r.unscored for r in rows),
         excluded_score_coverage=sum(r.excluded_score_coverage for r in rows),
         excluded_unclosed=sum(r.excluded_unclosed for r in rows),
@@ -380,6 +383,7 @@ def _cost_rows(m: SliceMeasure, rows: Sequence[SessionStat], costs: CostGrid) ->
                 decile_sessions=0,
                 effect_size=None,
                 sharpe=None,
+                picks_t=None,
                 deflated_sharpe=None,
                 trials=None,
                 pbo=None,

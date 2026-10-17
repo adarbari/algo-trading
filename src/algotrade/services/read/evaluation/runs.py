@@ -23,8 +23,14 @@ from typing import Any, Final
 
 import pandas as pd
 
-from algotrade.config.edges.document import LEGACY_SITE_CUTOFF, LEGACY_SITE_OWNERS, job_name
+from algotrade.config.edges.document import (
+    CLOSED,
+    LEGACY_SITE_CUTOFF,
+    LEGACY_SITE_OWNERS,
+    job_name,
+)
 from algotrade.config.edges.loading import load_all_edges
+from algotrade.config.edges.loading import load_edges as load_site_edges
 from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
 from algotrade.core.time.calendar import sessions_to
@@ -113,6 +119,9 @@ class EdgeRow:
     sharpe: float | None
     deflated_sharpe: float | None
     pbo: float | None
+    picks_t: float | None = (
+        None  # the t-ratio of ``sharpe`` over the picks series (not stored: None)
+    )
     exploratory: bool = False
     decile_sessions: int | None = None
     in_sample: bool = False  # a model screener's score was fitted on sessions of this slice
@@ -277,6 +286,22 @@ def load_canonical_run(ctx: Stores, edge: Edge) -> CanonicalRun:
     return CanonicalRun(None, Unknown(UnknownCode.NOT_RUN, run_cause(job, why)))
 
 
+def load_site_trials(ctx: Stores) -> int:
+    """The variants tried across the site (the multiple-testing count of the whole programme,
+    ADR 0065 amendment 2026-10-17): the sum of ``trials_counted`` of the canonical run of every
+    open site edge (not rejected or blocked, not a user's own); an edge with no canonical run, or
+    one from before the count, adds none. Kept until the next publish or run."""
+    key = ("site-trials", ctx.reader.visible_seq(), ctx.reader.runs_generation())
+
+    def count() -> int:
+        site = {e.id for e in load_site_edges(ctx.configs) if e.status not in CLOSED}
+        edges = [e for e in load_edges(ctx) if not e.mine and e.id in site]
+        found = (load_canonical_run(ctx, e).run for e in edges)
+        return sum(r.trials_counted or 0 for r in found if r is not None)
+
+    return int(ctx.cache.get_or_compute(key, count))
+
+
 def _int(value: Any) -> int | None:
     stored = to_scalar(value)
     return int(stored) if stored is not None else None
@@ -321,6 +346,7 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         effect_size=_float(row.get("effect_size")),
         sharpe=_float(row.get("sharpe")),
         deflated_sharpe=_float(row.get("deflated_sharpe")),
+        picks_t=_float(row.get("picks_t")),
         pbo=_float(row.get("pbo")),
         exploratory=to_scalar(row.get("exploratory")) is True,
         decile_sessions=_int(row.get("decile_sessions")),

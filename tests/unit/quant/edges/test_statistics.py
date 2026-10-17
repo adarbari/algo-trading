@@ -278,3 +278,14 @@ def test_haircut_sharpe_is_undefined_without_a_positive_sharpe_periods_or_trials
     sr: float | None, n: int | None, trials: int | None
 ) -> None:
     assert es.haircut_sharpe(sr, n, trials) is None
+
+
+def test_sharpe_t_is_the_sharpe_ratios_t_ratio_the_one_haircut_sharpe_reads() -> None:
+    x = [1.0, 2.0, 3.0, 2.0, 1.5]
+    n, sr = len(x), es.sharpe(x)
+    assert sr is not None
+    assert es.sharpe_t(x) == pytest.approx(sr * math.sqrt(n))
+    h = es.haircut_sharpe(sr, n, 1)
+    assert h is not None and es.sharpe_t(x) == pytest.approx(h.t)
+    assert es.sharpe_t([-1.0, -2.0, -3.0]) < 0  # signed: a losing series has a negative t
+    assert es.sharpe_t([1.0]) is None and es.sharpe_t([1.0, 1.0]) is None

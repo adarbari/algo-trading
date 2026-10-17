@@ -7,7 +7,13 @@ from datetime import date, timedelta
 import numpy as np
 import pytest
 
-from algotrade.quant.edges.statistics import break_even_cost, deflated_sharpe, moments, sharpe
+from algotrade.quant.edges.statistics import (
+    break_even_cost,
+    deflated_sharpe,
+    moments,
+    sharpe,
+    sharpe_t,
+)
 from algotrade.services.evaluation.cross_section.measures import (
     CostGrid,
     Pick,
@@ -462,3 +468,15 @@ def test_a_lone_trial_is_deflated_by_the_trial_count_against_the_nulls_sharpe_va
 
 def replace_horizon(t: Trial, horizon: int) -> Trial:
     return Trial(t.name, t.role, t.unit, t.stats, t.measures, horizon)
+
+
+def test_a_slice_carries_the_picks_series_t_of_its_trial_values() -> None:
+    stats = _cushions()
+    (m,) = slice_measures(stats, [ALL])
+    values = [s.pick_mean for s in stats]
+    assert m.picks_t == pytest.approx(sharpe_t(values))
+    assert m.picks_t == pytest.approx(m.sharpe * len(values) ** 0.5)
+    (wins,) = slice_measures(stats, [ALL], wins=True)  # the excess wins, as the Sharpe ratio is
+    assert wins.picks_t == pytest.approx(wins.sharpe * len(stats) ** 0.5)
+    year = Slice("year", "2026", lambda s: s.session.year == 2026)
+    assert slice_measures([stats[0]], [year])[0].picks_t is None  # one session has no sd

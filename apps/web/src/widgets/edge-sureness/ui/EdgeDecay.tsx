@@ -3,7 +3,9 @@
  * and the live record (its own read, `edgeResult.decay`), as signed bars of one statistic. A
  * stage with no value says its state in words instead of a bar of zero (not given, not stored,
  * not comparable, hidden, not measured live); the number of trades behind a measured bar is
- * written beside it. Every value, count and state is the server's.
+ * written beside it. Under the bars the server's "published x, expect y" sentence sets the paper's
+ * figure after its leg's haircut beside the out-of-sample one. Every value, count, state and
+ * sentence is the server's.
  */
 import { BarList, ExternalLink, Panel, Stack, Text, type BarListItem } from '@algotrade/ui';
 
@@ -79,6 +81,12 @@ export function EdgeDecay({ edgeId }: EdgeDecayProps) {
             diverging
             format={formatOf(decay)}
           />
+          {decay.expected && (
+            <Stack direction="row" gap={1} align="center">
+              <Text size="xs">{decay.expected.summary}</Text>
+              {termHelp('published_haircut')}
+            </Stack>
+          )}
           {decay.published && (
             <Text size="xs" tone="muted">
               <ExternalLink href={decay.published.source.url} size="inherit">
