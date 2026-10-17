@@ -415,3 +415,22 @@ Sources: SEC EDGAR company facts (docs/data/vendors.md)
 - A weighted average lags: it is the average over its period, not the count at its end.
 
 Sources: SEC EDGAR company facts (docs/data/vendors.md)
+
+### `rollup.financials@v2.financials_status`
+
+**How to read it.** Whether the company's revenue, net income and earnings per share each have a trailing twelve month figure. OK: all three do. PARTIAL: some do, so a ratio built on a missing one is blank. NO_TTM: facts are filed but no figure can be formed, a recent filer without four quarters or a year. NO_FACTS: nothing is filed, as for funds and foreign filers that do not report in dollars. STALE: the first figure ended more than 480 days before the session; the values are shown but old.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| complete, current financials | `eq "OK"` | hard | - | - |
+| leave out stale or missing financials | `in ["OK", "PARTIAL"]` | hard | - | - |
+
+**When the reading lies**
+
+- OK says the figures exist, not that they are recent. A name stays OK for months after its period ended, and a company between two reports is not stale.
+- STALE is checked before PARTIAL and OK, so a late filer with all three figures reads STALE. The price to sales ratio, feature.ps_ratio, is blank for it. The price to earnings ratio, feature.pe_ratio, is blank when only the earnings figure is old.
+- OK does not make feature.pe_ratio defined. It is also blank for a loss and for an ADR, which rollup.financials@v2.is_adr marks.
+
+Sources: SEC EDGAR company facts (docs/data/vendors.md)
