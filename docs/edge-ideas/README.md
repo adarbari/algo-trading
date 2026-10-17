@@ -35,6 +35,8 @@ against its source and replaced the marker with *(verified)*, the corrected numb
 *(corrected; was ...)*, or *(figure dropped: ...)* where the source states no number. Each of
 those ideas' Sources line gives author, year, venue and URL. Markers remain on the other ideas.
 
+**Build status**: the owner asked on 2026-10-17 to build every Strong and Promising idea; the plan, work items and owner decisions are in [build-plan.md](build-plan.md).
+
 ## Pickup order (Ready now, strongest first; duplicates across families merged)
 
 Each idea below is Strong or Promising and needs only data we already store. A variant
