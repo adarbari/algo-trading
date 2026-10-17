@@ -214,7 +214,7 @@ verdicts decide the row and its score:
 | Group | Rejects | Penalty | `on_miss` |
 |---|---|---|---|
 | `all` | any member rejects | sum of the members' | the most severe |
-| `any` | the best member rejects: one that does not reject comes first, then the lowest penalty, then criteria order | the best member's | the best member's |
+| `any` | the best member rejects: one that does not reject comes first, then the lowest penalty, a pass before a near miss, then criteria order | the best member's | the best member's |
 | `none` | `all` over the members negated | | |
 
 `none` pushes the negation down to the criteria (De Morgan: not `all` is `any` of the negations,

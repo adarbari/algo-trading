@@ -248,3 +248,27 @@ def test_negate_pairs_every_operator() -> None:
         ("is_null", None)
     ]
     assert neg("between", (1, 2)) == [("lt", 1), ("gt", 2)]
+
+
+def test_a_pass_beats_a_strict_threshold_near_miss_at_zero_penalty() -> None:
+    """lt 30 at exactly 30 is a NEAR with penalty 0; it must not win an any by criteria order."""
+    row = run({"a": soft("a"), "b": hard("b")}, {"g": {"any": ["a", "b"]}}, a=30, b=1)
+    assert row.decision is Decision.QUALIFIED
+    assert row.gate_results[0].decided_by == "b"
+
+
+def test_a_negated_between_at_a_bound_picks_the_pass_not_the_zero_penalty_near_miss() -> None:
+    """none over a soft between at 10: the lt 10 side is a 0-penalty near miss, gt 20 fails;
+    at 20 the other way round. A pass on the other side wins when there is one."""
+    criteria = {"px": soft("px", "between", [10, 20], 3), "ok": hard("ok", "gt", 0)}
+    row = run(criteria, {"outside": {"none": ["px"]}}, px=10, ok=1)
+    assert row.decision is Decision.WATCH  # at the bound there is no passing side
+    wide = {"px": soft("px", "between", [10, 10], 3), "ok": hard("ok", "gt", 0)}
+    assert run(wide, {"outside": {"none": ["px"]}}, px=11, ok=1).decision is Decision.QUALIFIED
+
+
+def test_a_none_rejection_says_the_excluded_condition_matched() -> None:
+    criteria = {"earnings_soon": hard("earnings_soon", "lt", 5), "ok": hard("ok", "gt", 0)}
+    row = run(criteria, {"no_earnings": {"none": ["earnings_soon"]}}, earnings_soon=3, ok=1)
+    assert row.decision is Decision.REJECT
+    assert row.reasons == ("no_earnings fail: earnings_soon matched (3)",)

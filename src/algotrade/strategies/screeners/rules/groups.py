@@ -105,8 +105,15 @@ class GroupResult:
         if self.verdict.near:
             leaf = self.leaf
             return f"{self.id} near miss via {leaf.id} ({leaf.value!r}{_tolerance(leaf)})"
-        by_id = {m.id: m for m in self.members}
-        return f"{self.id}: {by_id.get(self.decided_by or '', self.members[0]).describe()}"
+        decider = {m.id: m for m in self.members}.get(self.decided_by or "", self.members[0])
+        if (
+            self.group.kind == "none"
+            and self.verdict.rejects
+            and isinstance(decider, CriterionResult)
+            and decider.outcome is Outcome.FAIL  # the excluded condition held
+        ):
+            return f"{self.id} fail: {decider.id} matched ({decider.value!r})"
+        return f"{self.id}: {decider.describe()}"
 
 
 def _all(members: Sequence[Gate]) -> tuple[Verdict, str | None]:
@@ -131,8 +138,12 @@ def _all(members: Sequence[Gate]) -> tuple[Verdict, str | None]:
 
 
 def _best(members: Sequence[Gate]) -> Gate:
-    """Not rejecting before rejecting, then the lowest penalty, then criteria order."""
-    return min(members, key=lambda m: (m.verdict.rejects, m.verdict.penalty))  # min is stable
+    """Not rejecting before rejecting, then the lowest penalty, a pass before a near miss (a
+    strict threshold gives a near miss at 0 penalty), a value before none, then criteria order."""
+    return min(
+        members,
+        key=lambda m: (m.verdict.rejects, m.verdict.penalty, m.verdict.near, m.verdict.missing),
+    )  # min is stable
 
 
 def _any(members: Sequence[Gate]) -> tuple[Verdict, str | None]:
