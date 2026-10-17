@@ -426,3 +426,36 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a token between every pair of cards is noise; "but" or "only if" changes how the second part reads and is where a misread hides.
+
+
+## 2026-10-17 | Edge build plan (EB) | Verdict bar (t-statistic)
+- Question: Verdict bar (t-statistic)?
+- Options: t >= 2 for Promising (keep) / t >= 3 for Promising.
+- Decision: Promising stays at t >= 2; Works needs t >= 3 on both series.
+- decided by: owner (in session)
+- status: decided
+- Reasoning: Harvey-Liu-Zhu's t > 3 applies to claiming a new factor (Works); Promising remains a research state.
+
+## 2026-10-17 | Edge build plan (EB) | Short and long-short results as a verdict basis
+- Question: Short and long-short results as a verdict basis?
+- Options: long only / short ok and long-short diagnostic / both.
+- Decision: a short result on liquid names may be the basis; long-short is diagnostic only.
+- decided by: owner (in session)
+- status: decided
+- Reasoning: an avoid list is actionable with a read-only broker; a long-short spread needs shorting the owner does not do.
+
+## 2026-10-17 | Edge build plan (EB) | Historical option chains
+- Question: Historical option chains?
+- Options: buy now / not now.
+- Decision: not now: H8 model P&L ships, H13 chain P&L accrues from 2026-10-02.
+- decided by: owner (in session)
+- status: decided
+- Reasoning: no new spend.
+
+## 2026-10-17 | Edge build plan (EB) | Tiingo Power
+- Question: Tiingo Power?
+- Options: extend a month / pull within the bought month.
+- Decision: pull the 2010+ history and the outcomes backfill by 2026-11-09.
+- decided by: owner (in session)
+- status: decided
+- Reasoning: no new spend.
