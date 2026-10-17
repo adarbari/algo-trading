@@ -30,7 +30,11 @@
       {
         "span": "bad in the past few months",
         "bucket": "ask",
-        "fields": [],
+        "fields": [
+          "rollup.price_stats@v2.ret_60d",
+          "rollup.trend_stats@v2.ret_120d",
+          "rollup.price_stats@v2.ret_20d"
+        ],
         "term": "bad in the past few months"
       },
       {
@@ -43,7 +47,9 @@
         "span": "bad in the past few months",
         "bucket": "A",
         "fields": [
-          "rollup.price_stats@v2.ret_60d"
+          "rollup.price_stats@v2.ret_60d",
+          "rollup.trend_stats@v2.ret_120d",
+          "rollup.price_stats@v2.ret_20d"
         ],
         "op": "lt",
         "value": 0,
