@@ -9,6 +9,8 @@ import { useMemo } from 'react';
 
 import { gql, graphql, queryKeys, type gqlTypes } from '@/shared/api';
 
+import type { ServedValue } from '@/entities/feature';
+
 import { chunks, type FeatureHistory, type FeatureValues } from '../model/values';
 
 /** The API's cap on `features(names)` / `series(names)` (graphql/limits.MAX_NAMES). */
@@ -71,14 +73,265 @@ export function useInstrumentPrices(key: string | null, start: string) {
   });
 }
 
+/** `features(names)` is capped per field, so one request carries up to `SLOTS` aliased fields
+ * (`f0`..`f9`, one chunk each): a catalogue-wide read is one operation, not one per chunk. */
+const SLOTS = 10;
+
 const InstrumentFeatureValues = graphql(`
-  query InstrumentFeatureValues($key: String!, $names: [FeatureName!]!, $date: Date) {
+  query InstrumentFeatureValues(
+    $key: String!
+    $date: Date
+    $n0: [FeatureName!]!
+    $n1: [FeatureName!]!
+    $n2: [FeatureName!]!
+    $n3: [FeatureName!]!
+    $n4: [FeatureName!]!
+    $n5: [FeatureName!]!
+    $n6: [FeatureName!]!
+    $n7: [FeatureName!]!
+    $n8: [FeatureName!]!
+    $n9: [FeatureName!]!
+  ) {
     session(date: $date) {
       date
     }
     instrument(key: $key, date: $date) {
       instrumentId
-      features(names: $names) {
+      f0: features(names: $n0) {
+        name
+        value
+        unknown {
+          code
+          reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+        info {
+          format
+          unit
+          dtype
+          nullMeaning
+        }
+      }
+      f1: features(names: $n1) {
+        name
+        value
+        unknown {
+          code
+          reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+        info {
+          format
+          unit
+          dtype
+          nullMeaning
+        }
+      }
+      f2: features(names: $n2) {
+        name
+        value
+        unknown {
+          code
+          reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+        info {
+          format
+          unit
+          dtype
+          nullMeaning
+        }
+      }
+      f3: features(names: $n3) {
+        name
+        value
+        unknown {
+          code
+          reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+        info {
+          format
+          unit
+          dtype
+          nullMeaning
+        }
+      }
+      f4: features(names: $n4) {
+        name
+        value
+        unknown {
+          code
+          reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+        info {
+          format
+          unit
+          dtype
+          nullMeaning
+        }
+      }
+      f5: features(names: $n5) {
+        name
+        value
+        unknown {
+          code
+          reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+        info {
+          format
+          unit
+          dtype
+          nullMeaning
+        }
+      }
+      f6: features(names: $n6) {
+        name
+        value
+        unknown {
+          code
+          reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+        info {
+          format
+          unit
+          dtype
+          nullMeaning
+        }
+      }
+      f7: features(names: $n7) {
+        name
+        value
+        unknown {
+          code
+          reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+        info {
+          format
+          unit
+          dtype
+          nullMeaning
+        }
+      }
+      f8: features(names: $n8) {
+        name
+        value
+        unknown {
+          code
+          reason
+          kind
+          guideTerm
+          kindText
+          cause {
+            links {
+              level
+              subject
+              status
+              message
+              runId
+            }
+          }
+        }
+        info {
+          format
+          unit
+          dtype
+          nullMeaning
+        }
+      }
+      f9: features(names: $n9) {
         name
         value
         unknown {
@@ -108,14 +361,45 @@ const InstrumentFeatureValues = graphql(`
   }
 `);
 
+type ValuesQuery = gqlTypes.InstrumentFeatureValuesQuery;
+
+/** The aliased `f0..` fields of an answer, in order. */
+function servedOf(data: ValuesQuery | undefined): ServedValue[] {
+  const instrument = data?.instrument as Record<string, unknown> | null | undefined;
+  return Array.from(
+    { length: SLOTS },
+    (_, i) => instrument?.[`f${String(i)}`] ?? [],
+  ).flat() as ServedValue[];
+}
+
+/** The variables of one request: `names` spread over the slots (the rest empty). */
+function valuesVariables(key: string, date: string | null, names: readonly string[]) {
+  const slots = chunks(names, NAMES_PER_REQUEST);
+  const at = (i: number) => slots[i] ?? [];
+  return {
+    key,
+    date,
+    n0: at(0),
+    n1: at(1),
+    n2: at(2),
+    n3: at(3),
+    n4: at(4),
+    n5: at(5),
+    n6: at(6),
+    n7: at(7),
+    n8: at(8),
+    n9: at(9),
+  };
+}
+
 /**
- * The values of `names` (any catalogue features) for one session, one request per chunk: the
- * first chunk resolves the latest session, the others ask for exactly that date (a publish
- * between two requests never mixes sessions).
+ * The values of `names` (any catalogue features) for one session: one request for up to
+ * `SLOTS` x `NAMES_PER_REQUEST` names. The first request resolves the latest session; a rarer
+ * overflow asks for exactly that date (a publish between two requests never mixes sessions).
  */
 export function useFeatureValues(key: string | null, names: readonly string[]): FeatureValues {
-  const [first = [], ...rest] = chunks(names, NAMES_PER_REQUEST);
-  const head = { key: key ?? '', names: first, date: null };
+  const [first = [], ...rest] = chunks(names, SLOTS * NAMES_PER_REQUEST);
+  const head = valuesVariables(key ?? '', null, first);
   const lead = useQuery({
     queryKey: queryKeys.gql('InstrumentFeatureValues', head),
     queryFn: () => gql(InstrumentFeatureValues, head),
@@ -129,8 +413,8 @@ export function useFeatureValues(key: string | null, names: readonly string[]): 
         queryFn: () => gql(InstrumentFeatureValues, head),
         enabled: Boolean(key) && first.length > 0,
       },
-      ...rest.map((chunk) => {
-        const variables = { key: key ?? '', names: chunk, date: session };
+      ...rest.map((group) => {
+        const variables = valuesVariables(key ?? '', session, group);
         return {
           queryKey: queryKeys.gql('InstrumentFeatureValues', variables),
           queryFn: () => gql(InstrumentFeatureValues, variables),
@@ -142,14 +426,10 @@ export function useFeatureValues(key: string | null, names: readonly string[]): 
   });
 }
 
-function combineValues(
-  results: readonly UseQueryResult<gqlTypes.InstrumentFeatureValuesQuery>[],
-): FeatureValues {
+function combineValues(results: readonly UseQueryResult<ValuesQuery>[]): FeatureValues {
   return {
     session: results.find((r) => r.data)?.data?.session?.date ?? null,
-    values: new Map(
-      results.flatMap((r) => r.data?.instrument?.features ?? []).map((v) => [v.name, v]),
-    ),
+    values: new Map(results.flatMap((r) => servedOf(r.data)).map((v) => [v.name, v] as const)),
     isPending: results.some((r) => r.isPending),
     isError: results.some((r) => r.isError),
     refetch: () => Promise.all(results.map((r) => r.refetch())),
@@ -174,34 +454,41 @@ const InstrumentHistory = graphql(`
 /**
  * Each of `names` (features with a history: not `instrument.*` facts) per session from
  * `start` to the session `date` (either null: not known yet, nothing is read), one request
- * per chunk: the first (the rows a table shows first) alone, the rest once it has settled. A
- * history is a read per stored day of every table: all chunks at once kept the API busy for
- * seconds before the first came back (Explore's Features).
+ * per chunk. A history is a read per stored day of every table, so by default the first chunk
+ * is read alone and the rest once it has settled. With `shown` (the names a table has on
+ * screen) only the chunks holding a shown name are read, each when first shown (a long table
+ * reads the history of the rows the reader reaches, not of every row).
  */
 export function useFeatureHistory(
   key: string | null,
   names: readonly string[],
   start: string | null,
   date: string | null,
+  shown?: ReadonlySet<string>,
 ): FeatureHistory {
   const client = useQueryClient();
   const ready = Boolean(key) && start !== null && date !== null;
   const keys = chunks(names, NAMES_PER_REQUEST).map((chunk) => {
     const variables = { key: key ?? '', names: chunk, start: start ?? '', date: date ?? '' };
-    return { variables, queryKey: queryKeys.gql('InstrumentHistory', variables) };
+    return { chunk, variables, queryKey: queryKeys.gql('InstrumentHistory', variables) };
   });
   const { series, isPending } = useQueries({
-    queries: keys.map(({ variables, queryKey }, n) => {
+    queries: keys.map(({ chunk, variables, queryKey }, n) => {
       const first = n === 0 ? null : client.getQueryState(keys[0]?.queryKey ?? []);
+      const wanted = shown
+        ? chunk.some((name) => shown.has(name)) ||
+          ['success', 'error'].includes(client.getQueryState(queryKey)?.status ?? '')
+        : n === 0 || first?.status === 'success' || first?.status === 'error';
       return {
         queryKey,
         queryFn: () => gql(InstrumentHistory, variables),
-        enabled: ready && (n === 0 || first?.status === 'success' || first?.status === 'error'),
+        enabled: ready && wanted,
       };
     }),
     combine: combineHistory,
   });
-  return useMemo(() => ({ series, isPending }), [series, isPending]);
+  const pending = !ready || isPending;
+  return useMemo(() => ({ series, isPending: pending }), [series, pending]);
 }
 
 function combineHistory(
@@ -209,7 +496,8 @@ function combineHistory(
 ): FeatureHistory & { settled: number } {
   return {
     series: results.flatMap((r) => (r.data?.instrument ? [r.data.instrument.series] : [])),
-    isPending: results.some((r) => r.isPending),
+    // a chunk not asked for (idle) is not pending: it waits for its turn or for its rows
+    isPending: results.some((r) => r.isPending && r.fetchStatus !== 'idle'),
     // a chunk that fails changes no series: counted, so the hook re-renders to start the rest
     settled: results.filter((r) => r.isSuccess || r.isError).length,
   };

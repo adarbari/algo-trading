@@ -20,7 +20,9 @@ from algotrade.services.drafting.contract.gaps import Alternative, MissingFeatur
 from algotrade.services.drafting.contract.suggestions import DroppedSuggestion, Suggestion
 from algotrade.services.drafting.parts.build import kind_of
 from algotrade.services.drafting.parts.model import (
+    JOIN_KINDS,
     KEPT_ID,
+    MAX_JOIN_WORDS,
     MAX_PARTS,
     MAX_READING,
     MAX_WORDS,
@@ -122,11 +124,13 @@ def _part(raw: Mapping[str, Any]) -> Part:
     source = "model" if text and raw.get("reading_source") == "model" else "server"
     rank = bool(raw.get("rank"))
     origin = str(raw.get("origin"))
+    join = raw.get("join") if raw.get("join") in JOIN_KINDS else None
+    join_words = " ".join(str(raw.get("join_words") or "").split())[:MAX_JOIN_WORDS] if join else ""
     return Part(
         str(raw.get("id")), str(raw.get("words") or ""), int(raw.get("start") or 0),
         int(raw.get("end") or 0), text or None, source, kind_of(_groups(refs, rank)), origin,
         refs["criteria"], refs["dropped"], refs["formulas"], refs["unresolved"],
-        refs["missing"], refs["suggestions"], rank,
+        refs["missing"], refs["suggestions"], rank, join, join_words,
     )  # fmt: skip
 
 

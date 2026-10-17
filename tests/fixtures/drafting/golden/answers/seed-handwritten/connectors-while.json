@@ -1,0 +1,69 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "listed",
+      "part": "p1"
+    },
+    {
+      "id": "stocks",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks",
+      "part": "p1"
+    },
+    {
+      "id": "price",
+      "field": "rollup.price_stats@v2.close",
+      "op": "lt",
+      "value": 20,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "below $20",
+      "part": "p1"
+    },
+    {
+      "id": "ret_20d",
+      "field": "rollup.price_stats@v2.ret_20d",
+      "op": "gt",
+      "value": 0.05,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "gained over 5% in 20 days",
+      "part": "p2"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": null,
+  "parts": [
+    {
+      "id": "p1",
+      "words": "stocks trading below $20",
+      "reading": "Active stocks priced under $20"
+    },
+    {
+      "id": "p2",
+      "words": "gained over 5% in the last 20 days",
+      "reading": "20-day return above 5%"
+    }
+  ]
+}

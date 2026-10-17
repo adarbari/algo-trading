@@ -55,7 +55,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from algotrade.config.site.llm import LlmSettings, ProviderSettings, Rate
 from algotrade.core.model.completion import CallTag, Completion
@@ -621,6 +621,69 @@ class RunArgs:
     batch_pause_s: float = 0.0
 
 
+class PlanArgs(Protocol):
+    """What ``start`` reads of a golden command's arguments (``RunArgs``, the judge's)."""
+
+    @property
+    def cases(self) -> tuple[str, ...]: ...
+    @property
+    def split(self) -> str: ...
+    @property
+    def providers(self) -> tuple[str, ...]: ...
+    @property
+    def max_calls(self) -> int: ...
+    @property
+    def budget_usd(self) -> float: ...
+    @property
+    def yes(self) -> bool: ...
+
+
+class Planned(Protocol):
+    def lines(self, max_calls: int, budget_usd: float) -> list[str]: ...
+
+
+def start[P: Planned](
+    args: PlanArgs,
+    settings: LlmSettings,
+    switch_off: bool,
+    root: Path,
+    plan_for: Callable[[Sequence[GoldenCase], tuple[str, ...]], P],
+    open_models: Callable[[Sequence[str], CostTap], Mapping[str, TextModel]],
+    model_ids: Callable[[tuple[str, ...]], Sequence[str]],
+    note: Callable[[str], None],
+) -> tuple[P, CostTap, Mapping[str, TextModel]] | int:
+    """What every golden command does before it spends: refuse while the text model is off,
+    plan the selected cases over the providers (``plan_for``), show the plan, require ``--yes``,
+    open the models ``model_ids`` names. -> (plan, cost tap, models), or the exit code (1 off or
+    not confirmed, 2 a bad argument)."""
+    if switch_off or not settings.enabled:
+        note(
+            "refused: the text model is off. Enable it: unset ALGOTRADE_LLM (it is `off`) and "
+            "set `enabled = true` in config/site/llm.toml (or your llm.local.toml), with each "
+            "remote provider's key in ALGOTRADE_LLM_API_KEY_<ID>."
+        )
+        return 1
+    try:
+        cases = select_cases(load_cases(root), args.cases or None, args.split)
+        providers = args.providers or tuple(p.id for p in settings.providers)
+        plan = plan_for(cases, providers)
+    except ConfigurationError as exc:
+        note(f"refused: {exc}")
+        return 2
+    for line in plan.lines(args.max_calls, args.budget_usd):
+        note(line)
+    if not args.yes:
+        note("nothing spent: add --yes to run it.")
+        return 1
+    costs = CostTap()
+    try:
+        models = open_models(model_ids(providers), costs)
+    except ConfigurationError as exc:
+        note(f"refused: {exc}")
+        return 2
+    return plan, costs, models
+
+
 def run_golden(
     args: RunArgs,
     settings: LlmSettings,
@@ -636,31 +699,14 @@ def run_golden(
     report (what ``--json`` makes machine-readable), ``note`` everything else (the CLI sends it
     to stderr with ``--json``). -> the exit code (0 done, 1 refused or not confirmed, 2 a bad
     argument)."""
-    if switch_off or not settings.enabled:
-        note(
-            "refused: the text model is off. Enable it: unset ALGOTRADE_LLM (it is `off`) and "
-            "set `enabled = true` in config/site/llm.toml (or your llm.local.toml), with each "
-            "remote provider's key in ALGOTRADE_LLM_API_KEY_<ID>."
-        )
-        return 1
-    try:
-        cases = select_cases(load_cases(root), args.cases or None, args.split)
-        providers = args.providers or tuple(p.id for p in settings.providers)
-        plan = make_plan(settings, cases, providers, args.repeat, args.max_calls)
-    except ConfigurationError as exc:
-        note(f"refused: {exc}")
-        return 2
-    for line in plan.lines(args.max_calls, args.budget_usd):
-        note(line)
-    if not args.yes:
-        note("nothing spent: add --yes to run it.")
-        return 1
-    costs = CostTap()
-    try:
-        models = open_models(providers, costs)
-    except ConfigurationError as exc:
-        note(f"refused: {exc}")
-        return 2
+    got = start(
+        args, settings, switch_off, root,
+        lambda cases, providers: make_plan(settings, cases, providers, args.repeat, args.max_calls),
+        open_models, lambda providers: providers, note,
+    )  # fmt: skip
+    if isinstance(got, int):
+        return got
+    plan, costs, models = got
     run = evaluate(
         plan, models, draft, costs, budget_usd=args.budget_usd, max_calls=args.max_calls,
         pace_s=args.pace_s, batch=args.batch, batch_pause_s=args.batch_pause_s, sleep=sleep,

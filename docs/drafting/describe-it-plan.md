@@ -62,6 +62,11 @@ Measured live, by the owner only (CI never calls a model): `algotrade-api golden
 `draft_screen` over the golden cases per provider and reports pass rate, consistency, invalid rate, tokens,
 cache, latency and cost, under `--max-calls` / `--budget-usd` caps (`src/algotrade/services/drafting/golden/golden_run.py`).
 It also reports the criteria the server dropped (`drops_total`, `invented_field_drops` with the invented names, `would_repair`; `--json` lists each repeat's drops) and paces a rate-limited free tier (`--pace`, `--batch N --batch-pause S`; a 429 waits and retries twice).
+`algotrade-api golden judge [--cases ...] [--split ...] [--provider ID ...] [--judge ID=claude] [--repeat 1] [--json] --yes`
+(owner-run, ADR 0041 amended 2026-10-17) drafts as `golden run` does, then has one judge model score each draft 0-2 on
+segmentation, coverage, logic and fidelity and reports per provider the means, the share of perfect drafts and the top
+issue patterns with their case ids (`golden/judge.py`, rubric `golden/judge_prompt.py`); it catches what the structural
+score cannot (connector chips, split conditions, or-as-and).
 
 ## Token and latency budget
 

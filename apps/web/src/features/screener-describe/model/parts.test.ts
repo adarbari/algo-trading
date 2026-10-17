@@ -20,6 +20,7 @@ const PART: DraftPart = {
   start: 0,
   end: 6,
   rank: false,
+  join_words: '',
   reading: 'over $50M traded a day',
   reading_source: 'model',
   kind: 'needs_choice',

@@ -37,6 +37,8 @@ export interface HelpShellProps {
   missingText: string;
   onRetry: () => void;
   retrying: boolean;
+  /** The button was pressed (a kind that reads its entry only now starts the read here). */
+  onOpen?: (() => void) | undefined;
   children: ReactNode | ((close: () => void) => ReactNode);
 }
 
@@ -51,6 +53,7 @@ export function HelpShell({
   missingText,
   onRetry,
   retrying,
+  onOpen,
   children,
 }: HelpShellProps) {
   const [open, setOpen] = useState(false);
@@ -66,6 +69,7 @@ export function HelpShell({
         expanded={open}
         onClick={() => {
           setOpen(true);
+          onOpen?.();
         }}
       />
       <HelpDrawer

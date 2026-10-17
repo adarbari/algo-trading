@@ -3,31 +3,16 @@ words of each part; the server finds them in the sentence, in order, each part s
 previous one: exact (whole words), then ignoring case, then token by token allowing one edit per
 token (a typo: ``liquidd``; never in a short token or one with a digit). The served ``words`` is
 the sentence's own slice, so a copy the model got wrong is never shown. What no part covers and
-holds more than a connector is a ``not_understood`` gap. Offsets are code points here; ``utf16``
-converts them to what the browser counts."""
+holds more than glue and connectors is a ``not_understood`` gap; the connector that joins a part
+to the one before it is read from what lies between them (``connectors``, never a chip). Offsets
+are code points here; ``utf16`` converts them to what the browser counts."""
 
 import re
 from dataclasses import dataclass
 
+from algotrade.services.drafting.parts.connectors import AND, merged, read
+
 MIN_FUZZY = 4  # a token shorter than this, or with a digit, must match exactly
-CONNECTORS = frozenset(  # glue: words that mean nothing alone ("or" and "not" are never glue)
-    {
-        "and",
-        "with",
-        "plus",
-        "also",
-        "then",
-        "that",
-        "which",
-        "where",
-        "whose",
-        "who",
-        "the",
-        "a",
-        "an",
-        "&",
-    }
-)
 _TOKEN = re.compile("[\\w$%&'\u2019][\\w$%&'\u2019.\\-/]*")
 
 
@@ -109,14 +94,70 @@ def _one_edit(a: str, b: str) -> bool:
     return short[i:] == long_[i + 1 :]
 
 
-def gaps(sentence: str, covered: list[Span]) -> list[Span]:
-    """The stretches of ``sentence`` no span of ``covered`` (in order) touches that hold a word
-    other than a connector, trimmed of the connectors and punctuation at their edges."""
-    out: list[Span] = []
+@dataclass(frozen=True)
+class Join:
+    """A connector read from the sentence: its logic and the sentence's own words for it."""
+
+    logic: str
+    words: str
+
+
+@dataclass(frozen=True)
+class Stretch:
+    """What lies before one covered span (or the sentence's end): ``gap``, the words that hold
+    more than glue and connectors, trimmed at both edges, with ``gap_join``, the connector before
+    them; and ``next_join``, the connector after them (or all there is, when there is no gap),
+    which joins the span that follows."""
+
+    gap: Span | None
+    gap_join: Join | None
+    next_join: Join | None
+
+
+def stretches(sentence: str, covered: list[Span]) -> list[Stretch]:
+    """One ``Stretch`` for each span of ``covered`` (in order) and one for the end of the
+    sentence: glue and connectors are never a gap, only the words between them are."""
+    out: list[Stretch] = []
     cursor = 0
     for span in [*covered, Span(len(sentence), len(sentence))]:
-        found = [t for t in tokens(sentence[cursor : span.start]) if t[2] not in CONNECTORS]
-        if found:
-            out.append(Span(cursor + found[0][0], cursor + found[-1][1]))
+        out.append(_stretch(sentence, cursor, span.start))
         cursor = max(cursor, span.end)
+    first = out[0]  # an and-type connector before everything has nothing to join: dropped
+    out[0] = Stretch(first.gap, _lead(first.gap_join), first.next_join if first.gap else None)
     return out
+
+
+def _lead(join: Join | None) -> Join | None:
+    return None if join is not None and join.logic == AND else join
+
+
+def _stretch(sentence: str, start: int, end: int) -> Stretch:
+    """A word of content, or a connector that is not and-type (a negation, an or), is kept: it
+    would change what the trader asked for, so it is never silent (it is a not-understood gap
+    unless the model kept it inside a part). Only and-type connectors and glue are read as a
+    join."""
+    toks = [(s + start, e + start, w) for s, e, w in tokens(sentence[start:end])]
+    kinds = read([t[2] for t in toks])
+    kept = [i for i, k in enumerate(kinds) if k[0] == "content" or (k[0] == "join" and k[1] != AND)]
+    if not kept:
+        return Stretch(None, None, _join(sentence, toks, kinds, range(len(toks))))
+    first, last = kept[0], kept[-1]
+    pure = all(kinds[i][0] == "join" for i in kept)  # only a negation or an or, no content
+    return Stretch(
+        Span(toks[first][0], toks[last][1]),
+        _join(sentence, toks, kinds, range(last + 1 if pure else first)),
+        _join(sentence, toks, kinds, range(last + 1, len(toks))),
+    )
+
+
+def _join(
+    sentence: str,
+    toks: list[tuple[int, int, str]],
+    kinds: list[tuple[str, str | None]],
+    where: range,
+) -> Join | None:
+    held = [i for i in where if kinds[i][0] == "join"]
+    if not held:
+        return None
+    logics = [logic for i in held if (logic := kinds[i][1])]
+    return Join(merged(logics), sentence[toks[held[0]][0] : toks[held[-1]][1]])

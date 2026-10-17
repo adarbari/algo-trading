@@ -1,0 +1,71 @@
+{
+  "id": "connectors-except",
+  "sentence": "optionable stocks over $10 except those with a market cap under $2B",
+  "split": "held_out",
+  "expect": {
+    "parts": [
+      {
+        "span": "optionable",
+        "bucket": "A",
+        "fields": [
+          "instrument.optionable"
+        ],
+        "op": "eq",
+        "value": true,
+        "tolerance": 0
+      },
+      {
+        "span": "over $10",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.close",
+          "rollup.option_liquidity@v1.underlying_price"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 10,
+        "tolerance": 0
+      },
+      {
+        "span": "market cap not under $2B",
+        "bucket": "A",
+        "fields": [
+          "feature.market_cap"
+        ],
+        "op": [
+          "gte",
+          "gt"
+        ],
+        "value": 2000000000,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "optionable stocks over $10",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "except those with a market cap under $2B",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 0
+    }
+  }
+}

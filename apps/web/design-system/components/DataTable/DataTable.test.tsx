@@ -279,6 +279,15 @@ describe('DataTable', () => {
     expect(bodyRows().length).toBeLessThan(40);
   });
 
+  it('reports the rows in its scroll window, so a page can load data for those only', () => {
+    const seen = vi.fn();
+    render(<Table rows={makeUniverse(11_427)} visibleRows={12} onVisibleRowsChange={seen} />);
+    const last = seen.mock.calls.at(-1)?.[0] as TickerRow[];
+    expect(last.length).toBeGreaterThan(0);
+    expect(last.length).toBeLessThan(40);
+    expect(typeof last[0]?.symbol).toBe('string');
+  });
+
   it('pins the checkbox and first columns at the start, header and rows alike', () => {
     render(<Selectable />);
     const grid = screen.getByRole('grid');
