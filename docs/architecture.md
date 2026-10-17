@@ -246,9 +246,15 @@ post-session workflow, below).
   the last done one (SUCCEEDED; COMPLETE / PARTIAL before ADR 0039) up to the last closed
   session, oldest first, at most `max_catch_up` (5) per run; the rest wait for the next run
   (`catch_up.waiting`), none is dropped. The run stops at a session that FAILS: later ones are
-  `catch_up.held`, so lookback windows never span a gap. Sources that only serve the current
-  snapshot (universe files, SEC, Cboe chains) and screens run only for the last closed
-  session. `--date D` runs exactly D (as the latest).
+  `catch_up.held`, so lookback windows never span a gap. A step that runs only for the last
+  closed session says why (`Step.latest_only`, the SKIPPED reason): sources that serve only
+  their current snapshot (universe files, SEC, Cboe chains), the paper picks, the steps whose
+  one run covers every session (edge-eval, history-copy, filings) and the live verification.
+  The screens read only stored features and run for every session, catch-up too, so a
+  complete session always has its screener runs; without the session's chains (never
+  fetched) a screener short of coverage is a WARN, not a hold (ADR 0039 amendment
+  2026-10-16). `--date D`
+  runs exactly D (as the latest).
 - **Resume and expiry** (`attempts.py`): a FAILED session is retried (the hourly watchdog) from
   where it stopped: steps an earlier attempt SUCCEEDED or WAIVED are reused, not rerun
   (records from before ADR 0039 are never reused); the reused result cites the attempt that

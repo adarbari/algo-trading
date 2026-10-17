@@ -83,6 +83,7 @@ from algotrade_ingestion.workflows.nightly.screens import (
     ScreenStep,
     screen_jobs,
     signal_jobs,
+    without_chains,
 )
 from algotrade_ingestion.workflows.nightly.sessions import (
     NIGHTLY_RUN,
@@ -111,7 +112,14 @@ JOB_STEPS = {  # the steps that submit jobs
     EDGE_SIGNALS: "signals",
 }
 PURGE = "purge-raw"
-LATEST_ONLY = "latest closed session only (the source serves the current snapshot)"
+# Why a step runs only for the latest closed session (``Step.latest_only``): a catch-up
+# session SKIPS it as "latest closed session only: <why>". A step that reads only stored
+# data for the session (the rollups, the screens) runs for every session (2026-10-16: a
+# catch-up skipped its screens and served a complete session without screener runs).
+SNAPSHOT = "the source serves only its current snapshot"
+NEW_SINCE_STORED = "it reads every filing since the latest stored one, so one run covers all"
+FORWARD_RECORD = "paper picks are made only on the night they are for (a later one is no record)"
+WHOLE_YEAR = "it copies the whole year in one run, so the latest session's run covers this one"
 MARKET_DATA = ("bars", "rates", "corporate-actions", "earnings", "chains")
 
 
@@ -125,21 +133,23 @@ def universe_exists(ctx: TaskContext, session: date) -> str | None:
 NIGHTLY: tuple[Step, ...] = (
     Step(
         "universe-build",
-        latest_only=True,
+        latest_only=SNAPSHOT,
         accept=(check_universe, check_reference_classification),
         task_complete=True,
     ),
     # Reference data (ADR 0039: moves to the weekly `reference` workflow in WF4): optional.
-    Step("company-details", latest_only=True, critical=False),
-    Step("shares", latest_only=True, critical=False),
+    Step("company-details", latest_only=SNAPSHOT, critical=False),
+    Step("shares", latest_only=SNAPSHOT, critical=False),
     # The macro release calendar (ADR 0050): seven FRED requests, dates 400 days either side, so
     # it is a weekly-cadence fact kept current nightly until the `reference` workflow exists
     # (WF4: it moves there with the two steps above). Optional; FRED off or no key: SKIPPED.
-    Step("macro-calendar", latest_only=True, critical=False, accept_with=(check_macro_calendar,)),
+    Step(
+        "macro-calendar", latest_only=SNAPSHOT, critical=False, accept_with=(check_macro_calendar,)
+    ),
     # SEC 8-Ks of the event-study names (ADR 0050): one request per CIK from its latest stored
     # filing, so a night reads the new ones; their Item 2.02 releases are earnings rows. Optional:
     # a failed night is read again the next (the default start is the latest stored filing).
-    Step("filings", latest_only=True, critical=False, accept_with=(check_filings,)),
+    Step("filings", latest_only=NEW_SINCE_STORED, critical=False, accept_with=(check_filings,)),
     Step("earnings", accept=(check_earnings,), task_complete=True),
     Step("bars", accept=(check_bars, check_bars_resolved)),
     Step("rates", task_complete=True),
@@ -154,7 +164,7 @@ NIGHTLY: tuple[Step, ...] = (
     Step(
         "chains",
         requires=universe_exists,
-        latest_only=True,
+        latest_only=SNAPSHOT,
         accept=(check_chains,),
         resumable=True,
     ),
@@ -164,7 +174,7 @@ NIGHTLY: tuple[Step, ...] = (
         "etf-holdings",
         needs=("universe-build",),
         requires=universe_exists,
-        latest_only=True,
+        latest_only=SNAPSHOT,
         critical=False,
         params={"nightly": True},
     ),
@@ -176,14 +186,14 @@ NIGHTLY: tuple[Step, ...] = (
         "ibkr-contracts",
         needs=("universe-build",),
         requires=universe_exists,
-        latest_only=True,
+        latest_only=SNAPSHOT,
         critical=False,
     ),
     Step(
         "ibkr-iv",
         needs=("ibkr-contracts",),
         requires=universe_exists,
-        latest_only=True,
+        latest_only=SNAPSHOT,
         critical=False,
         accept=(check_ibkr_vols,),
     ),
@@ -207,7 +217,7 @@ NIGHTLY: tuple[Step, ...] = (
     # rollups whose macro and regime groups read them. Latest session only (the sources serve
     # their current state); optional, and its run budget ([macro] run_budget_s) bounds a FRED
     # outage, so it never holds up the screens.
-    Step("macro", critical=False, latest_only=True, accept_with=(check_macro,)),
+    Step("macro", critical=False, latest_only=SNAPSHOT, accept_with=(check_macro,)),
     # The market-entity rollups (ADR 0047: breadth, macro, the regime, one MKT:US row per group),
     # after the instrument rollups they read. Optional: a failure here never holds back the
     # screens. Not `needs=("macro",)`: a FAILED (or skipped, no FRED key) macro step would hold
@@ -230,12 +240,16 @@ NIGHTLY: tuple[Step, ...] = (
         critical=False,
         accept=(check_outcomes,),
     ),
-    Step(SCREENS, needs=("chains", "rollups"), requires=universe_exists, latest_only=True),
+    # Every session, catch-up too: the screeners read only stored features, and a complete
+    # session without screener runs would be served as one (ADR 0062). In a catch-up session the
+    # chains were fetched by its own earlier attempt or not at all; without them the options
+    # screeners fall short of coverage: a WARN when they never were (``without_chains``).
+    Step(SCREENS, needs=("chains", "rollups"), requires=universe_exists),
     # The followed edges' paper picks for tonight and the open paper trades the stored outcomes
     # close (ADR 0053 amendment 2026-10-09): one job per user, after the screens (the picks read
     # the same features); a trade whose outcome is not stored yet stays open. Optional: a
     # failure warns, never holds the session.
-    Step(EDGE_SIGNALS, needs=(SCREENS,), critical=False, latest_only=True),
+    Step(EDGE_SIGNALS, needs=(SCREENS,), critical=False, latest_only=FORWARD_RECORD),
     # `edge-eval`, `descriptions` and `verify` are the post-session workflow's (ADR 0070): they
     # do not feed the session's reads, so they no longer delay its COMPLETE record.
     # The derived history copies (ADR 0060), last: every step that publishes the copied tables
@@ -248,7 +262,7 @@ NIGHTLY: tuple[Step, ...] = (
     Step(
         "history-copy",
         needs=("bars", "rollups", "market-rollups"),
-        latest_only=True,
+        latest_only=WHOLE_YEAR,
         critical=False,
         accept_stats=(check_history_copy,),
     ),
@@ -379,7 +393,7 @@ def _not_latest(step: Step, before: Attempts, session: date) -> StepResult:
             f"{session.isoformat()} --waive {step.name} --reason ...`"
         )
         return _held(step, StepStatus.FAILED, why)
-    return _held(step, StepStatus.SKIPPED, LATEST_ONLY)
+    return _held(step, StepStatus.SKIPPED, f"latest closed session only: {step.latest_only}")
 
 
 def _not_run(
@@ -506,6 +520,9 @@ def run_session(
                     latest,
                     signal_step,
                 )
+                if step.name == SCREENS:
+                    unfetched = not latest and done["chains"].status is StepStatus.SKIPPED
+                    result = without_chains(result, unfetched)
                 # a done step that ran although none of its inputs did is a refetch
                 refetch = (
                     step.name in before.done

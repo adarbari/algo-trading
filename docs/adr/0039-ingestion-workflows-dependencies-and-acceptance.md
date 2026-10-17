@@ -1,6 +1,6 @@
 # ADR 0039: Ingestion workflows by cadence; steps succeed or fail by an acceptance rule; a failed critical step holds the workflow back
 
-**Status:** accepted (2026-10-05; owner decisions; implementation: roadmap WF1-WF5), amended 2026-10-05 (below), by [0070](0070-post-session-workflow.md) (a `post-session` workflow after the nightly: `edge-eval`, `descriptions`, `verify`; WF4 builds on it), by [0043](0043-waiting-on-publication-tiered-and-coverage-acceptance.md) and by [0055](0055-optional-source-tables-warn.md) (a screen without an optional source's table is a warning on `screens`). Amends the nightly workflow of R5
+**Status:** accepted (2026-10-05; owner decisions; implementation: roadmap WF1-WF5), amended 2026-10-05 and 2026-10-16 (below), by [0070](0070-post-session-workflow.md) (a `post-session` workflow after the nightly: `edge-eval`, `descriptions`, `verify`; WF4 builds on it), by [0043](0043-waiting-on-publication-tiered-and-coverage-acceptance.md) and by [0055](0055-optional-source-tables-warn.md) (a screen without an optional source's table is a warning on `screens`). Amends the nightly workflow of R5
 (`docs/architecture.md`, "The nightly workflow"), [0033](0033-screeners-run-nightly-and-on-request.md)
 (when the screens step runs), [0034](0034-instrument-descriptions.md) and
 [0035](0035-etf-holdings.md) (descriptions and ETF holdings leave the nightly), and
@@ -160,3 +160,27 @@ as for any rerun (2026-10-09: a killed forced attempt re-ran rollups, the next a
 rollups and history-copy and left the history copy stale). A FAILED or RUNNING run published
 nothing and does not count; only the step's own job is checked. SUCCEED / FAIL by acceptance and
 the owner-only waive are unchanged.
+
+## Amendment (2026-10-16, screens in catch-up sessions)
+The screens run for every session, catch-up included, gated on their `needs` (chains,
+rollups), no longer only for the latest closed session. They read only stored features, and a
+session whose screens were SKIPPED as latest-only still ended SUCCEEDED, so ADR 0062 served it
+as the latest complete session with every screener NOT_RUN (2026-10-15, caught up the next
+night after the Mac slept). The completion rule is unchanged: a session with a critical step
+SKIPPED as not applicable is complete, and the only critical latest-only steps are the
+snapshot fetches (universe build, chains; fitness test in `test_screens.py`). Consequences:
+- A catch-up session whose chains were never fetched (a night the Mac slept through: `chains`
+  SKIPPED as latest-only) runs the screens without them. A screener short of coverage only
+  for want of chain-derived tables (a PARTIAL job, its run stored, every missing table computed
+  from the chains: `screens.chain_tables`) is one `no_chains` WARN, not a failure
+  (`screens.without_chains`): failing would hold every later session back and lose their
+  snapshot fetches, one owner waive per missed night (architect review). Any other shortfall (a
+  FAILED job, another missing table) still fails the step, and with the session's chains
+  fetched coverage still decides. A
+  screens step that failed for a session no longer the latest is retried, never expired: its
+  inputs are stored.
+- Every latest-only step states why (`Step.latest_only` is the reason, shown as "latest closed
+  session only: <why>"): a current-snapshot source; `filings` (reads every filing since the
+  latest stored one); `edge-signals` (a paper pick is made only on the night it is for);
+  `edge-eval` (one run evaluates every stored outcome session); `verify` (the live source shows
+  only the present); `history-copy` (one run copies the whole year).

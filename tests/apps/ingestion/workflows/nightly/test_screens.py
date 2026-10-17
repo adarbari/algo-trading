@@ -17,8 +17,8 @@ from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.locks import held
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.workflows.nightly import screens as screens_module
-from algotrade_ingestion.workflows.nightly.nightly import EDGE_SIGNALS, NIGHTLY
-from algotrade_ingestion.workflows.nightly.steps import StepStatus
+from algotrade_ingestion.workflows.nightly.nightly import EDGE_SIGNALS, NIGHTLY, SNAPSHOT
+from algotrade_ingestion.workflows.nightly.steps import StepResult, StepStatus
 from algotrade_ingestion.workflows.post_session.post_session import EDGE_EVAL, POST_SESSION
 
 D = date(2026, 10, 2)
@@ -48,6 +48,58 @@ def _nightly(*ids: str) -> Any:
         SimpleNamespace(config=SimpleNamespace(id=i), user=UserContext(SITE_USER)) for i in ids
     ]
     return lambda store: configs
+
+
+def test_only_snapshot_fetches_are_critical_and_latest_only() -> None:
+    # 2026-10-16: the screens were latest-only, skipped in a catch-up session as "the source
+    # serves the current snapshot", and the session was served complete without screener runs.
+    # A critical step skipped as latest-only leaves its session complete: only a fetch of a
+    # source that serves its current snapshot may be one (reads take the latest snapshot; a
+    # session without its chains fails the screens' coverage).
+    critical = {s.name: s.latest_only for s in NIGHTLY if s.critical and s.latest_only}
+    assert critical == {"universe-build": SNAPSHOT, "chains": SNAPSHOT}
+
+
+CHAINED = "rollups/instrument/option_liquidity@v1"
+
+
+def _screens(*jobs: tuple[str, list[str]]) -> StepResult:
+    summaries = [
+        {"config": f"s{i}", "status": status, "missing_tables": missing}
+        for i, (status, missing) in enumerate(jobs)
+    ]
+    return StepResult("screens", StepStatus.FAILED, result={"screens": summaries}, reason="x")
+
+
+def test_chain_tables_are_the_rollups_computed_from_the_chains() -> None:
+    chained = screens_module.chain_tables()
+    assert {CHAINED, "rollups/instrument/iv30@v1"} <= chained  # iv_history via iv30 too
+    assert "rollups/instrument/iv_history@v2" in chained
+    assert "rollups/instrument/price_stats@v2" not in chained
+
+
+def test_screens_short_only_for_want_of_never_fetched_chains_warn_and_hold_nothing() -> None:
+    # Architect review 2026-10-16: a night the Mac slept through has no chains; failing its
+    # screens would hold every later session back and lose their snapshot fetches.
+    result = screens_module.without_chains(_screens(("complete", []), ("partial", [CHAINED])), True)
+    assert result.status is StepStatus.SUCCEEDED and result.reason is None
+    assert [(c["name"], c["status"]) for c in result.checks] == [("no_chains", "WARN")]
+    assert result.checks[0]["detail"].startswith("s1 short of coverage")
+
+
+@pytest.mark.parametrize(
+    ("jobs", "unfetched"),
+    [
+        ((("partial", [CHAINED]), ("failed", [])), True),  # a failed job
+        ((("partial", [CHAINED, "rollups/instrument/price_stats@v2"]),), True),  # not chains
+        ((("partial", []),), True),  # short with every table present
+        ((("partial", [CHAINED]),), False),  # the session's chains were fetched
+    ],
+)
+def test_any_other_shortfall_still_fails_the_screens(
+    jobs: tuple[tuple[str, list[str]], ...], unfetched: bool
+) -> None:
+    assert screens_module.without_chains(_screens(*jobs), unfetched).status is StepStatus.FAILED
 
 
 def test_an_optional_table_missed_by_a_complete_screen_is_a_warning(
