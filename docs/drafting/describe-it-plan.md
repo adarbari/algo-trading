@@ -68,6 +68,34 @@ segmentation, coverage, logic and fidelity and reports per provider the means, t
 issue patterns with their case ids (`golden/judge.py`, rubric `golden/judge_prompt.py`); it catches what the structural
 score cannot (connector chips, split conditions, or-as-and).
 
+### Judge baseline, 2026-10-17 (prompt v11, judge prompt v1, judge claude)
+
+Live recordings replaced the handwritten `connectors-*` seeds (answers under
+`answers/claude-cli-claude-sonnet-5-5/`) and two cases were added and recorded: `either-or-rsi-or-low`
+and `long-growth-sentence`. First `golden judge` over all 44 cases (cost about $0.40 reported):
+
+| Provider | Drafts judged | Segmentation | Coverage | Logic | Fidelity | Perfect |
+|---|---|---|---|---|---|---|
+| claude | 43 of 44 (1 failed) | 1.77 | 1.86 | 1.91 | 1.16 | 14% |
+| gemini | 1 of 4 asked | n/a | n/a | n/a | n/a | n/a |
+
+Gemini gave no baseline: its free quota was exhausted (HTTP 429, then given up after 3 unavailable answers), so
+rerun it after the quota resets. The 2026-10-17 manual judge counted segments, not means (Gemini seg 21/22,
+Claude seg 15/34 before the fixes), so the numbers are not directly comparable; Claude's segmentation is now
+1.77 of 2 and `connector-chip` appears in 2 of 43 drafts (`connectors-yet`, `parts-kept-from-current`).
+
+Recurring patterns on Claude (cases): soft mode on an explicit threshold (9: `etf-gainers-liquid`,
+`hard-suggestion-refused`, `iv-over-realised`, `liquid-optionable-near-high-support`, `ibkr-iv-rank-60`,
+`optionable-iv-rank-liquid`, `yield-trap-suggestions`, `connectors-only-if`, `parts-multi-clause`), a vague word
+made a hard threshold (2), the FCF-yield vs Treasury comparison not encoded (3 patterns on 2 cases).
+
+Next prompt change (not made here): (1) a number the sentence states is `hard`; `soft` only for a vague word;
+fidelity (1.16) is the weakest dimension; (2) keep connector words ("but with", "although", "yet", "except")
+out of a part's `words` (the recorded answers leave them in, so the server derives no join for them);
+(3) a boolean formula states `"unit": ""` or the formula validator accepts `null` (the recorded either-or answer
+sent `unit: null` and the server dropped the formula: `formula.unit: expected string, got None`; the case
+expects only the scope part and one not-understood part until this is fixed, then add its formula part back).
+
 ## Token and latency budget
 
 Targets for a first call on a cheap model (Haiku or Gemini Flash): input <= 12k tokens (>= 50% cache read),
