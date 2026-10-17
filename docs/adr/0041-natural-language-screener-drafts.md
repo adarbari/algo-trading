@@ -521,7 +521,6 @@ request path (a draft is never judged for a user), and under the same guards as 
 (`--yes`, `--max-calls`, `--budget-usd`, stop after three unavailable answers). It measures; it
 never gates a draft or a merge.
 
-<<<<<<< HEAD
 ## Amended 2026-10-17: a deterministic verifier; doubt repairs, then escalates
 
 Owner-approved the same day: free model first, a deterministic verifier, the strong model only on
@@ -539,7 +538,7 @@ one with the fewest doubts (the later on a tie) is served with `ScreenDraft.doub
 draft is never served. A phrasebook-shortcut draft (no model) and a draft the model's own check
 skipped are not refused (the latter records its doubts). `doubts` is for the golden report
 ("doubts served") and the feedback log; the API does not serve it.
-=======
+
 ## Amended 2026-10-17: a provider whose quota is exhausted cools off
 `usage/llm_calls` on the owner's machine: the free Gemini (first in the chain) failed 19 of 43
 screener-draft calls, mostly 429 `RESOURCE_EXHAUSTED` "exceeded your current quota" (a DAILY
@@ -556,7 +555,6 @@ to Claude, because `ChatCompletions` retried every 429 with a 20 s floor.
   (process-local, thread-safe). Each skip is a `cooling_off` ledger row (not `failed`:
   no one was asked; the usage reliability counts leave it out of attempts and failures); the first is logged once at WARNING. A 503 keeps its retries; the chain's deadline
   bounds it.
->>>>>>> origin/main
 
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
