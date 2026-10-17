@@ -16,6 +16,13 @@ pick_hi = 0.40
 zone_lo = 0.15        # zone open interest / volume: zone_lo <= |delta| <= zone_hi
 zone_hi = 0.40
 
+["analyst_estimates@v1"]
+stale_days = 21          # a snapshot older than this is STALE: its values are not served (nightly rotation refreshes in [fmp] refresh_days)
+fy_slack_days = 60       # a year end within this of the last annual report's is that report (52/53-week years); FY1 is the first after it
+
+["analyst_targets@v1"]
+stale_days = 21          # as analyst_estimates@v1
+
 ["pivot_strength@v1"]    # swing-level tests and structure (docs/data/swing.md); the 0.5 ATR is part of v1
 touch_atr = 0.5          # a bar touches a level when its high / low is within touch_atr x atr_14
 

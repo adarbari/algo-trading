@@ -579,9 +579,14 @@ ACCESS_STATUSES = frozenset({"ALLOWED", "DENIED", "LIMITED"})
 # instant of its run (>= ``ts``, never a vendor date), so a read as of T sees only what we held at
 # T. The measure columns are those of the kind, the others null: estimates the ``<measure>_<side>``
 # floats and the two analyst counts; targets the four prices; grades and recommendation the five
-# counts (grades also the label ``consensus``). A run is a window (a rotation slice of the names),
+# counts (grades also the label ``consensus``). ``coverage`` is a marker row, one per vendor and
+# attempt (``period`` ``current``): ``status`` OK / EMPTY / NOT_COVERED / FAILED is the vendor's
+# answer, so a name the vendor refuses is told from one never asked (the analyst feature groups
+# read it; a table stored before it has none). A run is a window (a rotation slice of the names),
 # so runs merge on the key; one session holds each name at most once, a later session adds new rows.
-SNAPSHOT_KINDS = frozenset({"estimates_annual", "price_target", "grades", "recommendation"})
+SNAPSHOT_KINDS = frozenset(
+    {"estimates_annual", "price_target", "grades", "recommendation", "coverage"}
+)
 ANALYST_ESTIMATE_SNAPSHOTS = fixed(
     "analyst/estimate_snapshots",
     "reference",
@@ -606,6 +611,7 @@ ANALYST_ESTIMATE_SNAPSHOTS = fixed(
     "sell int64",
     "strong_sell int64",
     "consensus string",
+    "status string",
     runs="merge",
     key=("instrument_id", "source", "kind", "period"),
 )

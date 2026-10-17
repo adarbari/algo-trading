@@ -175,6 +175,16 @@ name = "rollups/instrument/earnings_reaction@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/analyst_estimates@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0068: FY1 / FY2 consensus EPS and revenue from our own analyst snapshots (analyst/estimate_snapshots); personal licence, optional"
+
+[[table]]
+name = "rollups/instrument/analyst_targets@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0068: price-target consensus, median, high and low from our own analyst snapshots; personal licence, optional"
+
+[[table]]
 name = "rollups/instrument/earnings_revisions@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 

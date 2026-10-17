@@ -35,6 +35,7 @@ from typing import Any
 
 import pandas as pd
 
+from algotrade.data import StoreReader
 from algotrade.data.reference import instruments
 from algotrade.services.events.scope import LIST, REFERENCE, scoped_instruments
 from algotrade.storage.runs import RunRecord
@@ -83,14 +84,19 @@ def run(ctx: TaskContext, params: Mapping[str, Any]) -> RunRecord:
 
 def names_for(run: IngestRun, ctx: TaskContext) -> list[Name]:
     """The S&P 500 members of the session's reference plus the scope list's names, by symbol."""
-    reference = instruments(run.reader, run.session)
+    return scope_names(run.reader, ctx, run.session)
+
+
+def scope_names(reader: StoreReader, ctx: TaskContext, session: date) -> list[Name]:
+    """``names_for`` without a run: what the backlog check measures the rotation against."""
+    reference = instruments(reader, session)
     members = reference["in_sp500"] if "in_sp500" in reference.columns else pd.Series(False)
     found = {
         str(i): str(s)
         for i, s, m in zip(reference["instrument_id"], reference["symbol"], members, strict=False)
         if pd.notna(m) and bool(m) and isinstance(s, str) and s
     }
-    scope = scoped_instruments(run.reader, ctx.configs, run.session, reasons=(LIST, REFERENCE))
+    scope = scoped_instruments(reader, ctx.configs, session, reasons=(LIST, REFERENCE))
     found.update({n.instrument_id: n.symbol for n in scope.names if n.symbol})
     return sorted((Name(i, s) for i, s in found.items()), key=lambda n: (n.symbol, n.instrument_id))
 

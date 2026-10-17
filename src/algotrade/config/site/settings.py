@@ -266,6 +266,7 @@ class SourcesSettings:
     max_filings_failed: float = 0.05  # filings: share of CIKs whose SEC fetch failed
     filings_backfill_per_night: int = 50  # filings: CIKs new to the universe read in full a night
     max_analyst_failed: float = 0.20  # analyst-snapshot: share of the night's calls that failed
+    max_analyst_backlog: float = 0.25  # analyst-snapshot: share of in-scope names FMP was not asked
     coverage: tuple[CoverageRule, ...] = DEFAULT_COVERAGE  # [quality.coverage.<group>.<column>]
     ibkr: IbkrSettings = field(default_factory=IbkrSettings)
     etf: EtfHoldingsSettings = field(default_factory=EtfHoldingsSettings)  # [etf_holdings]
@@ -315,6 +316,7 @@ class SourcesSettings:
                 *("max_macro_stale_share", "min_calendar_future_dates", "max_filings_failed"),
                 "filings_backfill_per_night",
                 "max_analyst_failed",
+                "max_analyst_backlog",
                 "coverage",
             ],
         )
@@ -428,6 +430,7 @@ class SourcesSettings:
             ),
             max_filings_failed=quality.fraction("max_filings_failed", d.max_filings_failed),
             max_analyst_failed=quality.fraction("max_analyst_failed", d.max_analyst_failed),
+            max_analyst_backlog=quality.fraction("max_analyst_backlog", d.max_analyst_backlog),
             filings_backfill_per_night=quality.integer(
                 "filings_backfill_per_night", d.filings_backfill_per_night, 0
             ),
