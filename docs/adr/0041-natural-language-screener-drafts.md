@@ -556,6 +556,40 @@ to Claude, because `ChatCompletions` retried every 429 with a 20 s floor.
   no one was asked; the usage reliability counts leave it out of attempts and failures); the first is logged once at WARNING. A 503 keeps its retries; the chain's deadline
   bounds it.
 
+## Amended 2026-10-17: the phrasebook per clause
+
+The shortcut drafted a sentence with no model only when structured entries claimed every content
+word of the whole sentence, and a meaning word (`but`, `while`, `not`, `or`...) is never filler, so
+"large caps near the 52-week high but with rising volume" went to the model although each clause is
+in the book. Owner approved 2026-10-17 (cost: resolve what the book already says, ask only about the
+rest).
+
+- **Clauses** (`services/drafting/phrasebook/clauses.py`): the sentence splits at runs of and-type
+  `JOINS` (`parts/connectors.py`: and, but, yet, while, although, plus, also, with...), keeping each
+  clause's offsets. Never a split point: a run that holds an `or` or a negation (`but not`, `and
+  not`, `except`...: the negation stays with its condition, an or needs a formula), `then` (a
+  sequence, which still goes to the model), a word a structured wording claims (the longest wording
+  wins, so an entry whose words contain "and" stays whole), a numeric range ("between 40 and 60")
+  and an `and` between two numbers. A clause holding an or or a negation resolves only when a
+  structured wording covers that very word, as before.
+- **Full shortcut per clause** (`resolve.resolve_clauses`): tried only when the whole sentence does
+  not resolve. Every clause must resolve fully on its own (`resolves_fully`), no field may be in two
+  clauses and all criteria must be able to hold together (`consistency.compatible`); the answer has
+  one part per clause (its words run from its first entry's wording to its last), the connector
+  between two clauses becomes the next part's `join` / `join_words` (`parts/build.py`), glue
+  vanishes, and everything else is the existing shortcut: `_draft` / `_finished`, `current` kept,
+  duplicate ids, the parts cap. A connector is a boundary only when the words just before and
+  just after it are both claimed by a structured wording, and `all but` / `anything but` /
+  `everything but` / `nothing but` are `and_not` joins (an except, never a split). Measured benefit:
+  0 of the 42 existing golden cases newly skip the model (their sentences carry numbers or words no
+  entry covers); the 2 new train cases do. Any doubt asks the model. A held-out golden sentence must not resolve
+  this way either (fitness test).
+- **Not built: the partial settlement.** When some clauses resolve and others do not the model is
+  still asked for the whole sentence, with nothing settled in its prompt: sending the resolved
+  clauses as fixed rows and verifying they come back unchanged adds a second source of truth to the
+  asking path for a saving of a few hundred prompt tokens; decide it on the measured share of
+  partially resolvable sentences in the live feedback events.
+
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a
   dropped row with a reason, never a saved criterion.

@@ -1,0 +1,33 @@
+{
+  "id": "clauses-but-not-stays-with-model",
+  "sentence": "oversold stocks but not in a downtrend",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "oversold",
+        "bucket": "A",
+        "fields": [
+          "rollup.momentum@v1.rsi_14"
+        ],
+        "op": "lt",
+        "value": 30,
+        "tolerance": 0
+      },
+      {
+        "span": "not in a downtrend",
+        "bucket": "A",
+        "fields": [
+          "feature.trend_state"
+        ],
+        "op": "ne",
+        "value": "DOWNTREND",
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ]
+  }
+}
