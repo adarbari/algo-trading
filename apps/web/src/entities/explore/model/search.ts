@@ -13,6 +13,7 @@ export const EXPLORE_TABS = [
   'chart',
   'options',
   'features',
+  'financials',
   'events',
   'hits',
   'why',
