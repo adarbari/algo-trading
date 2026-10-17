@@ -24,10 +24,15 @@ served stored values to any user.
 2. **Fail closed.** `held` has no default (`HARNESS_ALL` where a caller reads for no user: the
    edge harness, backtests, training, which record the licence of what they read, ADR 0064). A
    catalogue name that does not resolve (a run owner's own expression feature, a retired field)
-   counts as `personal` for a viewer without the licence.
+   counts as `personal` for a viewer without the licence (a live read; a stored run is gated
+   by its own record, decision 3).
 3. **Nightly runs.** The scheduled `site` run evaluates under every licence, stores every value
    and records its licences in the run's audit; results are filtered per viewer at read. A user's
-   own run holds what the registry gives that user. A viewer without the licence sees a screen
+   own run holds what the registry gives that user. Each run records every field's licence
+   (its audit, `field_licences`, from the owner's catalogue at run time) and a stored value is
+   gated by that record, never by its name in the viewer's catalogue (a user's own expression
+   of the same name is another field); a field with no record (a run before it) is withheld.
+   A viewer without the licence sees a screen
    that read a personal field **by names and decisions only**: its criteria values, `score`,
    `tie_break`, `rank` and `reasons` (which quote the value) are withheld, a sort by rank or score is
    by symbol, and its Ideas ordering ignores score. (Owner default, as the ledger: names and

@@ -34,6 +34,7 @@ from algotrade.engines.screening.runner import RunCoverage, ScreenRun, audit_row
 from algotrade.engines.selection.evaluate import SelectionResult
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import config_features
+from algotrade.services.licences import recorded_licences
 from algotrade.services.screening.regime import market_names, regime_gate, session_market
 from algotrade.services.screening.rule_results import Stamp, rule_frames
 from algotrade.services.selection import fields_view, select
@@ -275,6 +276,10 @@ def run_screener(
         **run.audit(),
         "user": user,
         "licences": sorted(held),  # the licences the run was evaluated under (ADR 0069)
+        # each field's licence in the owner's catalogue now: what the read gates a viewer by
+        "field_licences": recorded_licences(config_features(config), rules.spec.fields())
+        if rules
+        else {},
         "config_id": config.config.id,
         "config_hash": config.hash,
         "config_version": rules.spec.version if rules else None,

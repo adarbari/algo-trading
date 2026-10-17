@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import replace
+from datetime import timedelta
 from typing import Any
 
 import pandas as pd
@@ -22,9 +23,12 @@ from algotrade.services.read.screens.results import (
     load_run_changes,
     run_withheld,
 )
-from algotrade.services.read.screens.runs import latest_run
+from algotrade.services.read.screens.runs import ScreenerRun, latest_run
 from algotrade.storage.backends.memory import MemoryBackend
-from tests.unit.services.read.screens.conftest import D0, context, write_gated
+from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.writers import StoreWriter
+from tests.helpers.stored_frames import stamped
+from tests.unit.services.read.screens.conftest import D0, D1, T, context, write_gated, write_run
 
 
 def test_results_carry_criteria_columns_flags_and_identity(ctx: ReadContext) -> None:
@@ -258,8 +262,8 @@ def test_a_run_the_viewer_may_see_only_by_names_and_decisions_serves_no_value_sc
     """Fix for: a run recorded under a licence the viewer lacks (the scheduled site run holds
     every licence) served its stored values, score, tie-break and ``reasons`` (which embed the
     value: "0.83, needs >= 0.9") to any viewer. The viewer sees names and decisions, as the
-    ledger does (ADR 0064 decision 10, ADR 0069); the stored fields here do not resolve in the
-    catalogue, so they count as personal (fail closed); a sort by rank or score is by symbol."""
+    ledger does (ADR 0064 decision 10, ADR 0069); the run recorded ``vrp_iv30`` and ``iv_rank``
+    as personal and ``spread`` as open; a sort by rank or score is by symbol."""
     trader = context(reader, user="trader")
     run = latest_run(trader, "site", "alpha").run
     assert run is not None
@@ -272,7 +276,7 @@ def test_a_run_the_viewer_may_see_only_by_names_and_decisions_serves_no_value_sc
     assert aaa.criteria == (
         CriterionResult("iv30", "feature.vrp_iv30", "hard", "MISSING", None, None),
     )
-    assert aaa.columns == (ResultColumn("spread", None),)
+    assert aaa.columns == (ResultColumn("spread", 0.05),)  # recorded open: visible
     assert bbb.criteria[0].value is None and bbb.criteria[0].outcome == "MISSING"
     assert _sorted(trader, "-score") == ["CCC", "BBB", "AAA"]  # by symbol, not by score
     assert run_withheld(trader, run) != frozenset()
@@ -281,3 +285,84 @@ def test_a_run_the_viewer_may_see_only_by_names_and_decisions_serves_no_value_sc
     assert run_withheld(holder, run) == frozenset()
     seen = load_results(holder, {"r1": ["EQ:AAA"]}, [run])[("r1", "EQ:AAA")]
     assert seen.criteria[0].value == "high" and seen.score == 50.0 and seen.rank == 1
+
+
+OPEN_FIELD = "rollup.price_stats@v2.close"  # open in every catalogue
+
+
+def _later_run(
+    backend: MemoryBackend,
+    reader: StoreReader,
+    user: str,
+    recorded: dict[str, str] | None,
+    field_name: str,
+    docs: Any = None,
+) -> tuple[ReadContext, ScreenerRun]:
+    """``user``'s context and the latest ``alpha`` run, ``r3``: one stored criterion on
+    ``field_name`` (value 7.0, PASS) and ``recorded`` as the licences its record holds (None: a
+    record without them)."""
+    writer = StoreWriter(backend)
+    later = T + timedelta(hours=3)
+    write_run(writer, D1, "r3", "site", "alpha", [("AAA", "QUALIFIED", 50.0, None)], later)
+    row = {"instrument_id": "EQ:AAA", "user_id": "site", "config_id": "alpha",
+           "criterion_id": "shared", "field": field_name, "mode": "hard", "value_num": 7.0,
+           "value_str": None, "outcome": "PASS", "distance": None}  # fmt: skip
+    writer.write_result("rule_screen_values", D1, "r3", stamped([row], D1, "r3", later))
+    stats = {} if recorded is None else {"field_licences": recorded}
+    writer.save_run(RunRecord("r3", "screen-alpha-site", D1, later).finish(later, stats=stats))
+    ctx = context(reader, docs, user=user)
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None and run.run_id == "r3"
+    return ctx, run
+
+
+def test_a_viewers_same_named_open_expression_does_not_open_a_stored_personal_value(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    """Fix for: ``run_withheld`` resolved each stored field NAME in the VIEWER's catalogue, so a
+    viewer's own open expression named like a field the run's owner computed from a personal
+    source passed as ``open`` and exposed the stored value, score and reasons (ADR 0069: the
+    recorded licence, never the name)."""
+    mine = {"shared": {"expr": "price_stats.close", "dtype": "float", "unit": "usd",
+                       "description": "d", "null_meaning": "n"}}  # fmt: skip
+    trader, run = _later_run(
+        backend, reader, "trader", {"feature.shared": "personal"}, "feature.shared",
+        {("trader", "features", "mine"): mine},
+    )  # fmt: skip
+    found = trader.features.feature("feature.shared")
+    assert found is not None and found.licence == "open"  # the viewer's own: open by name
+    assert run_withheld(trader, run) == {"feature.shared"}
+    seen = load_results(trader, {"r3": ["EQ:AAA"]}, [run])[("r3", "EQ:AAA")]
+    assert seen.criteria[0].value is None and seen.criteria[0].outcome == "MISSING"
+    assert (seen.score, seen.rank, seen.reasons) == (None, None, "")
+
+
+@pytest.mark.parametrize("recorded", [None, {}, {"feature.other": "open"}])
+def test_a_stored_field_with_no_recorded_licence_is_hidden(
+    backend: MemoryBackend, reader: StoreReader, recorded: dict[str, str] | None
+) -> None:
+    """A run whose record has no licences (before the record), or lacks the field, withholds
+    it even when the viewer's catalogue resolves the name as open (fail closed)."""
+    trader, run = _later_run(backend, reader, "trader", recorded, OPEN_FIELD)
+    assert run_withheld(trader, run) == {OPEN_FIELD}
+    seen = load_results(trader, {"r3": ["EQ:AAA"]}, [run])[("r3", "EQ:AAA")]
+    assert seen.criteria[0].value is None and seen.score is None
+
+
+def test_a_recorded_open_field_is_visible_to_every_viewer(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    trader, run = _later_run(backend, reader, "trader", {OPEN_FIELD: "open"}, OPEN_FIELD)
+    assert run_withheld(trader, run) == frozenset()
+    seen = load_results(trader, {"r3": ["EQ:AAA"]}, [run])[("r3", "EQ:AAA")]
+    assert (seen.criteria[0].value, seen.score, seen.rank) == (7.0, 50.0, 1)
+
+
+@pytest.mark.parametrize("recorded", [None, {OPEN_FIELD: "personal"}])
+def test_the_holder_of_every_licence_sees_a_run_whatever_it_recorded(
+    backend: MemoryBackend, reader: StoreReader, recorded: dict[str, str] | None
+) -> None:
+    holder, run = _later_run(backend, reader, "me", recorded, OPEN_FIELD)
+    assert run_withheld(holder, run) == frozenset()
+    seen = load_results(holder, {"r3": ["EQ:AAA"]}, [run])[("r3", "EQ:AAA")]
+    assert (seen.criteria[0].value, seen.score, seen.rank) == (7.0, 50.0, 1)

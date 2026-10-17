@@ -4,7 +4,14 @@ may not see."""
 
 from algotrade.config.site.users import UsersSettings
 from algotrade.services.features import site_features
-from algotrade.services.licences import ALL_LICENCES, held_by, hidden_fields, licence_of
+from algotrade.services.licences import (
+    ALL_LICENCES,
+    held_by,
+    hidden_fields,
+    hidden_recorded,
+    licence_of,
+    recorded_licences,
+)
 
 USERS = UsersSettings.from_document(
     {
@@ -41,3 +48,13 @@ def test_hidden_fields_are_those_outside_the_held_licences() -> None:
     features, asked = site_features(), [STORED, OVER_IT, OPEN]
     assert hidden_fields(features, asked, {"open"}) == {STORED, OVER_IT}
     assert hidden_fields(features, asked, ALL_LICENCES) == frozenset()
+
+
+def test_a_stored_run_is_gated_by_the_licences_it_recorded_never_by_a_name() -> None:
+    features = site_features()
+    recorded = recorded_licences(features, [OPEN, STORED, OVER_IT, OPEN])
+    assert recorded == {OPEN: "open", STORED: "personal", OVER_IT: "personal"}
+    asked = [OPEN, STORED, "feature.unrecorded"]
+    assert hidden_recorded(recorded, asked, {"open"}) == {STORED, "feature.unrecorded"}
+    assert hidden_recorded(recorded, asked, ALL_LICENCES) == {"feature.unrecorded"}  # no record
+    assert hidden_recorded(None, [OPEN], {"open"}) == {OPEN}  # a run with no record: hidden

@@ -9,7 +9,7 @@ Builder's preview and a screener run (``services.selection.fields_view``). A hid
 never read, so it is UNKNOWN (``UnknownCode.LICENCE`` in the read model; missing to a screen,
 which never passes a hard criterion on a missing value, ADR 0015)."""
 
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Mapping
 
 from algotrade.config.site.users import UsersSettings
 from algotrade.features.expressions.feature_set import FeatureSet
@@ -45,3 +45,20 @@ def hidden_fields(
 ) -> frozenset[str]:
     """The ``fields`` whose licence is not in ``held``."""
     return frozenset(f for f in fields if licence_of(features, f) not in held)
+
+
+def recorded_licences(features: FeatureSet, fields: Iterable[str]) -> dict[str, str]:
+    """``{field: licence}`` as the catalogue of the run's owner resolves them now: what a stored
+    run records (its audit, ``field_licences``) so that its values are gated by what they were
+    when it ran, never by a viewer's own catalogue (ADR 0069 decision 3)."""
+    return {f: licence_of(features, f) for f in sorted(set(fields))}
+
+
+def hidden_recorded(
+    recorded: Mapping[str, str] | None, fields: Iterable[str], held: Collection[str]
+) -> frozenset[str]:
+    """The ``fields`` of a stored run whose recorded licence is not in ``held``. A field with no
+    recorded licence (a run before the record, a field the record lacks) is hidden: fail
+    closed, a name is never looked up in the viewer's catalogue."""
+    known = recorded or {}
+    return frozenset(f for f in fields if known.get(f) not in held)

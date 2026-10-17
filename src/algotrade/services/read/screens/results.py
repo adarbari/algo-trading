@@ -26,7 +26,7 @@ import pandas as pd
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.features.framework.feature import NullReason
-from algotrade.services.licences import ALL_LICENCES, hidden_fields
+from algotrade.services.licences import ALL_LICENCES, hidden_recorded
 from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import ReadContext, at_session, catalogue_key, partition
@@ -277,10 +277,16 @@ def run_withheld(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
     who holds them all: nothing is read). A run with any is a screen the viewer sees by names
     and decisions only: its ``score``, ``tie_break`` and ``reasons`` embed the hidden values
     (``reasons`` says "0.83, needs >= 0.9") and its rank order follows them, so they and
-    the ``rank`` are withheld, and a sort by them is by symbol (ADR 0064 decision 10, ADR 0069)."""
+    the ``rank`` are withheld, and a sort by them is by symbol (ADR 0064 decision 10, ADR 0069).
+    Each field's licence is the one the run recorded when it ran (``audit["field_licences"]``),
+    never a lookup of its name in the viewer's catalogue (a user's own expression of the same
+    name is another field); a field with none recorded is withheld."""
     if set(ctx.licences) >= ALL_LICENCES:
         return frozenset()
-    return hidden_fields(ctx.features, _run_fields(ctx, run), ctx.licences)
+    recorded = run.audit.get("field_licences")
+    return hidden_recorded(
+        recorded if isinstance(recorded, Mapping) else None, _run_fields(ctx, run), ctx.licences
+    )
 
 
 def _result(
