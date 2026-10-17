@@ -288,6 +288,34 @@ def test_an_explained_absence_covers_except_no_trade_in_the_core_tier() -> None:
     assert (rest.covered, rest.missing) == (2, ("E1", "N1"))
 
 
+def test_an_uncovered_status_is_covered_in_every_tier() -> None:
+    uncovered = replace(
+        _explaining().groups["prices@v1"].feature("close"),
+        explained_statuses=(),
+        uncovered_statuses=("NOT_COVERED",),
+    )
+    group = FeatureGroup(
+        "prices",
+        1,
+        "",
+        (Input("bars/1d"),),
+        (uncovered, *features({"x": "float"})),
+        lambda *_: None,
+    )
+    base = _explaining()
+    fs = FeatureSet({"prices@v1": group, "history@v1": base.groups["history@v1"]}, {}, {})
+    writer, reader = store()
+    put(writer, "rollups/instrument/prices@v1", D, {"C1": {"close": 10.0}, "R2": {"close": None}})
+    put(
+        writer,
+        "rollups/instrument/history@v1",
+        D,
+        {s: {"bar_status": "NOT_COVERED"} for s in ("C2", "R1")},
+    )
+    core, _ = cells(reader, D, (CoverageRule("prices.close", 0.9, 0.9),), (), fs) or []
+    assert (core.covered, core.missing) == (2, ())  # unlike an explained NO_TRADE, no core gap
+
+
 def test_close_with_the_site_catalogue_no_trade_covers_only_outside_the_core() -> None:
     writer, reader = store()
     put(writer, PRICES, D, {s: {"close": 10.0} for s in ("C1", "R2", "N1", "E1")})

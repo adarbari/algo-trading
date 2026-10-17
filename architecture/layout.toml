@@ -42,6 +42,7 @@ warn_modules = 8   # make layout: "approaching the limit, plan the split by kind
 max_files = 12     # per config/ and docs/ folder
 source_registry = "libs/sources/algotrade_sources/framework/registry.py"
 task_registry = "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py"
+task_entries = "apps/ingestion/algotrade_ingestion/tasks/framework/entries_*.py"  # the registry's run wrappers: may import task domains
 
 [banned_module_names]
 reason = "a grab-bag name hides unrelated code and invites more: name the module for what it does (pricing.py, not utils.py); a bucket of test builders is the tests/helpers/ folder, its modules named for what they build"
@@ -271,7 +272,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/statements"
-purpose = "feature groups from the SEC financial statements (instruments/statements: income statement and cash flow lines as trailing twelve months, balance sheet lines at the latest date), one module per group (its documented FEATURES, a pure compute and its GROUP declaration), plus ttm.py, the TTM arithmetic over one concept's periods that financials@v2 also uses, and instants.py, the latest-instant and debt rules of the balance sheet"
+purpose = "feature groups from the SEC financial statements (instruments/statements: income statement and cash flow lines as trailing twelve months, balance sheet lines at the latest date), one module per group (its documented FEATURES, a pure compute and its GROUP declaration), plus growth_history@v1 (the revenue and EPS TTMs 3 and 5 years back, from instruments/shares), ttm.py, the TTM arithmetic over one concept's periods that financials@v2 also uses, and instants.py, the latest-instant and debt rules of the balance sheet"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]

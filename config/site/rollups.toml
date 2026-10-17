@@ -69,6 +69,10 @@ history_days = 1100      # facts whose period ended earlier are not read (two TT
 stale_days = 480         # the first TTM present ended longer ago than this: STALE (still shown); as financials@v2
 history_days = 1100      # facts whose period ended earlier are not read
 
+["growth_history@v1"]
+stale_days = 480         # the newest TTM ended longer ago than this: STALE (still shown); as income_statement@v1
+history_days = 2700      # facts whose period ended earlier are not read: 480 stale days + 5 years (1826) + 40 tolerance + 3 quarter gaps (273) = 2619
+
 ["cash_flow@v1"]
 stale_days = 480         # as income_statement@v1
 history_days = 1100

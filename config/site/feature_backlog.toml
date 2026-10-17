@@ -14,8 +14,9 @@
 [[item]]
 key = "free_cash_flow_yield"
 description = "Free cash flow per share over the price; the cash-flow statement fields are not ingested"
-feasibility = "NEEDS_SOURCE"
-status = "OPEN"
+feasibility = "ROLLUP_FROM_STORED"
+status = "PROMOTED"
+promoted_to = "fcf_yield"
 aliases = ["fcf_yield"]
 
 [[item]]

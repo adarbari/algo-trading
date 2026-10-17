@@ -68,6 +68,21 @@ of the data, not a fault.
 see_also = ["unknown"]
 
 [[term]]
+id = "unavailable_not_covered"
+term = "Not covered by our analyst data"
+short = "The analyst source we use has no estimates for this instrument, so the field has no value."
+body = """
+Analyst estimates, targets and revisions come from a free data source that covers only a
+minority of names, mostly the large and widely followed ones. When the source has nothing for
+an instrument, or the app has not asked it yet, the field shows this word. Most names show
+it for analyst fields, so it is the common case, not a fault. It does not mean analysts
+expect nothing. A screen treats it as missing data, like any other UNKNOWN value: a hard
+criterion rejects the row. An old analyst value is never shown in its place; a stale one reads
+as not stored. Check the company's own filings for its reported figures instead.
+"""
+see_also = ["unknown", "unavailable_not_stored"]
+
+[[term]]
 id = "chain_coverage"
 term = "Option chain coverage"
 short = "The share of optionable stocks and funds whose option chain was fetched fresh for the session."

@@ -149,6 +149,7 @@ id = "ingestion-step-dispatch"
 description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly, post-session): tasks are declared once in the registry; nightly is an ordered list of isolated task steps; the post-session workflow (ADR 0070) holds the steps that do not decide a session (descriptions, verify, edge-eval), runs for the last nightly-done session once, and decides when the weekly edge audit is due"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_*.py",  # the registry's run wrappers, split by domain
     "apps/ingestion/algotrade_ingestion/workflows/*",
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"

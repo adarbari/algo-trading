@@ -599,3 +599,38 @@ hint = "inside_day_breakout eq true (yesterday was an inside day and today close
 say = ["strong close", "closed strong", "closed at the high of the day", "closing near the high"]
 fields = ["feature.strong_close", "rollup.trend_stats@v2.close_range_pos"]
 hint = "strong_close eq true (close in the top 30% of the range and a body of at least half the range); for the close alone close_range_pos gte 0.7 (soft, tolerance 0.1); 'on volume' adds rollup.momentum@v1.rel_volume gte 1.25"
+
+[[phrase]]
+say = ["FCF yield", "cash yield", "cheap on free cash flow", "generates cash"]
+fields = ["feature.fcf_yield", "feature.fcf"]
+hint = "fcf_yield gte 0.05 (soft, tolerance 0.02); fcf gt 0 as the gate; null for a filer without a capex line and for an ADR, so a hard criterion drops them"
+
+[[phrase]]
+say = ["high return on equity", "ROE", "profitable on equity"]
+fields = ["feature.roe", "feature.debt_to_equity"]
+hint = "roe gte 0.15 (soft, tolerance 0.03); pair with debt_to_equity lte 1.5 because debt lifts ROE; null for negative equity"
+
+[[phrase]]
+say = ["ROIC", "return on capital", "high return on invested capital"]
+fields = ["feature.roic"]
+hint = "roic gte 0.15 (soft, tolerance 0.03); null for banks and insurers and when debt or cash is not tagged"
+
+[[phrase]]
+say = ["EV/EBITDA", "cheap on enterprise value", "low EV to EBITDA"]
+fields = ["feature.ev_ebitda", "feature.operating_margin"]
+hint = "ev_ebitda lt 8 (soft, tolerance 2); pair with operating_margin gt 0.05 so a low multiple is not a thin margin; null for loss makers and banks"
+
+[[phrase]]
+say = ["low debt", "debt to equity", "conservative balance sheet", "not heavily indebted"]
+fields = ["feature.debt_to_equity", "feature.interest_cover"]
+hint = "debt_to_equity lte 0.5 (soft, tolerance 0.25), lte 2 as a hard cut; interest_cover gte 5 as a confirmation; null for negative equity"
+
+[[phrase]]
+say = ["price to book", "P/B", "cheap against book value", "below book"]
+fields = ["feature.pb_ratio", "feature.roe"]
+hint = "pb_ratio lt 1.5 (soft, tolerance 0.5); pair with roe gt 0.08 so a low price is not a poor business; null for negative equity"
+
+[[phrase]]
+say = ["gross margin", "operating margin", "margins on sales"]
+fields = ["feature.gross_margin", "feature.operating_margin", "feature.net_margin"]
+hint = "operating_margin gt 0.10 (soft, tolerance 0.03) is the general gate; gross_margin gte 0.4 for a product company (null where the filer reports no gross profit); compare margins within one sector"
