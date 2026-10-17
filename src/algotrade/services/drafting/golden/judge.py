@@ -82,18 +82,22 @@ class JudgeRun:
     judged: list[Judged] = field(default_factory=list)
     drafts: dict[str, int] = field(default_factory=dict)  # provider -> drafts asked
     drafts_failed: dict[str, int] = field(default_factory=dict)  # provider -> no usable draft
-    stopped: str | None = None
+    stopped: str | None = None  # a cap that ended the whole run
+    given_up: dict[str, str] = field(default_factory=dict)  # provider -> why it was left
 
 
 def judge_once(
     model: TextModel, sentence: str, draft: ScreenDraft, user: str | None, costs: CostTap
-) -> tuple[str, Verdict | None, float | None]:
-    """Ask the judge once for ``draft``: (status, verdict, cost). The answer is checked by
-    ``parse_verdict`` as the chain's ``accept`` (one repair); a refusal that no repair cured is
-    ``judge_invalid``, any other failure ``unavailable``."""
+) -> tuple[str, Verdict | None, float | None, int]:
+    """Ask the judge once for ``draft``: (status, verdict, cost, requests). ``requests`` counts
+    the model requests made (each answer ``accept`` checked; a repair makes it 2, at least 1).
+    The answer is checked by ``parse_verdict`` as the chain's ``accept`` (one repair); a refusal
+    that no repair cured is ``judge_invalid``, any other failure ``unavailable``."""
     refused: list[bool] = []
+    asked: list[bool] = []
 
     def accept(text: str) -> None:
+        asked.append(True)
         try:
             parse_verdict(text)
         except InvalidAnswerError:
@@ -106,12 +110,13 @@ def judge_once(
             JUDGE_SYSTEM, judge_user_prompt(sentence, draft), tag=tag, schema=JUDGE_SCHEMA,
             accept=accept,
         )  # fmt: skip
-        return "judged", parse_verdict(got.text), costs.cost_of(got.call_id)
+        return "judged", parse_verdict(got.text), costs.cost_of(got.call_id), max(1, len(asked))
     except InvalidAnswerError:  # a single adapter lets the refusal propagate
-        return "judge_invalid", None, None
+        return "judge_invalid", None, None, max(1, len(asked))
     except ModelUnavailableError as exc:
         cost = costs.cost_of(getattr(exc, "call_id", None))
-        return ("judge_invalid" if refused else "unavailable"), None, cost
+        status = "judge_invalid" if refused else "unavailable"
+        return status, None, cost, max(1, len(asked))
 
 
 def capturing(draft: Draft, made: list[ScreenDraft]) -> Draft:
@@ -194,12 +199,12 @@ def run_judge(
     """Draft each provider's cases through ``golden_run.evaluate`` (capturing the drafts), then
     judge each draft. Stops (reason in ``stopped``) at ``max_calls`` (drafts and judge calls) or
     ``budget_usd`` and after ``UNAVAILABLE_STREAK`` unavailable judge answers in a row."""
-    run, calls, streak = JudgeRun(), 0, 0
+    run, calls = JudgeRun(), 0
     by_case = {c.id: c for c in plan.plan.cases}
     judge = models[plan.judge]
     for provider in plan.plan.providers:
         made: list[ScreenDraft] = []
-
+        streak = 0
         one = Plan(plan.plan.cases, (provider,), plan.plan.repeat, 0.0)
         drafted = evaluate(
             one, {provider: models[provider]}, capturing(draft, made), costs, budget_usd=budget_usd,
@@ -213,16 +218,24 @@ def run_judge(
         run.drafts[provider] = len(results)
         run.drafts_failed[provider] = len(results) - len(usable)
         if drafted.stopped:
-            run.stopped = drafted.stopped
+            if _ends_run(drafted.stopped):
+                run.stopped = drafted.stopped
+            else:
+                run.given_up[provider] = drafted.stopped
         for result, made_draft in usable:
-            stop = _stop_reason(calls, max_calls, costs, budget_usd, streak)
+            stop = _stop_reason(calls, max_calls, costs, budget_usd)
             if stop:
                 run.stopped = stop
                 return run
-            status, verdict, cost = judge_once(
+            if streak >= UNAVAILABLE_STREAK:
+                run.given_up[provider] = (
+                    f"the judge was unavailable {UNAVAILABLE_STREAK} times in a row"
+                )
+                break
+            status, verdict, cost, requests = judge_once(
                 judge, by_case[result.case].sentence, made_draft, user, costs
             )
-            calls += 1
+            calls += requests
             streak = streak + 1 if status == "unavailable" else 0
             run.judged.append(Judged(provider, result.case, status, verdict, cost))
         if run.stopped:
@@ -230,15 +243,17 @@ def run_judge(
     return run
 
 
-def _stop_reason(
-    calls: int, max_calls: int, costs: CostTap, budget: float, streak: int
-) -> str | None:
+def _ends_run(reason: str) -> bool:
+    """A cap (``--max-calls`` / ``--budget-usd``) ends the whole run; a provider that stopped
+    answering only ends its own drafts."""
+    return reason.startswith("--")
+
+
+def _stop_reason(calls: int, max_calls: int, costs: CostTap, budget: float) -> str | None:
     if calls >= max_calls:
         return f"--max-calls {max_calls} reached"
     if costs.spent >= budget:
         return f"--budget-usd {budget:.2f} reached (${costs.spent:.3f})"
-    if streak >= UNAVAILABLE_STREAK:
-        return f"the judge was unavailable {UNAVAILABLE_STREAK} times in a row"
     return None
 
 
@@ -291,7 +306,8 @@ def top_patterns(rows: Sequence[Judged], limit: int = TOP_PATTERNS) -> list[dict
 def report(run: JudgeRun, plan: JudgePlan) -> dict[str, Any]:
     """Everything the run measured, by drafting provider, then case (``--json`` prints this)."""
     out: dict[str, Any] = {
-        "stopped": run.stopped, "judge": plan.judge, "judge_prompt_version": JUDGE_PROMPT_VERSION,
+        "stopped": run.stopped, "given_up": run.given_up, "judge": plan.judge,
+        "judge_prompt_version": JUDGE_PROMPT_VERSION,
         "planned_calls": plan.calls, "providers": {},
     }  # fmt: skip
     for provider in plan.plan.providers:
@@ -343,6 +359,7 @@ def report_lines(rep: Mapping[str, Any]) -> list[str]:
                 f"  pattern {pat['pattern']} ({pat['dimension']}) x{pat['count']}: "
                 + ", ".join(pat["cases"])
             )
+    lines += [f"GAVE UP ON {p}: {why}" for p, why in rep["given_up"].items()]
     if rep["stopped"]:
         lines.append(f"STOPPED EARLY: {rep['stopped']}")
     return lines
@@ -401,6 +418,12 @@ def run_golden_judge(
         models = open_models(tuple(dict.fromkeys((*providers, args.judge))), costs)
     except ConfigurationError as exc:
         note(f"refused: {exc}")
+        return 2
+    if not models[args.judge].names_for(args.user):
+        note(
+            f"refused: judge {args.judge!r} may not answer user {args.user!r} "
+            "(llm.toml only_users, or no user: pass --user)"
+        )
         return 2
     run = run_judge(
         plan, models, draft, costs, args.user, budget_usd=args.budget_usd,

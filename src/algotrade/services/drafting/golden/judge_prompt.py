@@ -126,6 +126,20 @@ def judge_user_prompt(sentence: str, draft: ScreenDraft) -> str:
     return f"SENTENCE: {sentence}\n\nDRAFT:\n{render_draft(draft)}"
 
 
+def _issue(item: Any) -> Issue:
+    """One issue of a verdict, checked; ``InvalidAnswerError`` for a malformed one."""
+    if not isinstance(item, dict):
+        raise InvalidAnswerError("each issue must be an object")
+    kind, pattern, detail = item.get("dimension"), item.get("pattern"), item.get("detail")
+    if kind not in DIMENSIONS:
+        raise InvalidAnswerError(f"an issue's dimension must be one of {list(DIMENSIONS)}")
+    if not isinstance(pattern, str) or not SLUG.match(pattern):
+        raise InvalidAnswerError("an issue's pattern must be a short kebab-case slug")
+    if not isinstance(detail, str) or len(detail) > MAX_DETAIL:
+        raise InvalidAnswerError(f"an issue's detail must be text of at most {MAX_DETAIL} chars")
+    return Issue(kind, pattern, detail)
+
+
 def parse_verdict(text: str) -> Verdict:
     """The verdict in ``text``, strictly: a JSON object with the four integer scores 0-2 and
     well-formed issues. ``InvalidAnswerError`` (the message is fed back to the model for the one
@@ -145,21 +159,13 @@ def parse_verdict(text: str) -> Verdict:
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 2:
             raise InvalidAnswerError(f'"{dim}" must be an integer 0, 1 or 2')
         scores[dim] = value
-    issues_raw = raw.get("issues", [])
+    issues_raw = raw.get("issues")
     if not isinstance(issues_raw, list) or len(issues_raw) > MAX_ISSUES:
         raise InvalidAnswerError(f'"issues" must be a list of at most {MAX_ISSUES}')
-    issues: list[Issue] = []
-    for item in issues_raw:
-        if not isinstance(item, dict):
-            raise InvalidAnswerError("each issue must be an object")
-        kind, pattern, detail = item.get("dimension"), item.get("pattern"), item.get("detail")
-        if kind not in DIMENSIONS:
-            raise InvalidAnswerError(f"an issue's dimension must be one of {list(DIMENSIONS)}")
-        if not isinstance(pattern, str) or not SLUG.match(pattern):
-            raise InvalidAnswerError("an issue's pattern must be a short kebab-case slug")
-        if not isinstance(detail, str) or len(detail) > MAX_DETAIL:
-            raise InvalidAnswerError(
-                f"an issue's detail must be text of at most {MAX_DETAIL} chars"
-            )
-        issues.append(Issue(kind, pattern, detail))
+    issues = [_issue(item) for item in issues_raw]
+    for dim in DIMENSIONS:
+        if scores[dim] < 2 and not any(i.dimension == dim for i in issues):
+            raise InvalidAnswerError(f'"{dim}" scored below 2: add an issue for it')
+    if issues and all(v == 2 for v in scores.values()):
+        raise InvalidAnswerError("a perfect verdict has no issues")
     return Verdict(scores, tuple(issues))

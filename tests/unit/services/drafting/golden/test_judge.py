@@ -4,6 +4,7 @@ never calls the network)."""
 
 import json
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -93,7 +94,14 @@ def test_the_rubric_parse_is_strict_about_scores_and_issues() -> None:
     assert verdict.issues[0] == Issue("segmentation", "connector-chip", "'but' is a chip")
     assert parse_verdict("```json\n" + PERFECT + "\n```").perfect
     bad = [
-        "no json", "[]", json.dumps({"segmentation": 3, "coverage": 2, "logic": 2, "fidelity": 2}),
+        "no json", "[]",
+        json.dumps({"segmentation": 2, "coverage": 2, "logic": 2, "fidelity": 2}),
+        json.dumps({"segmentation": 1, "coverage": 2, "logic": 2, "fidelity": 2, "issues": []}),
+        json.dumps({"segmentation": 1, "coverage": 2, "logic": 2, "fidelity": 2, "issues": [
+            {"dimension": "logic", "pattern": "x-y", "detail": "d"}]}),
+        json.dumps({"segmentation": 2, "coverage": 2, "logic": 2, "fidelity": 2, "issues": [
+            {"dimension": "logic", "pattern": "x-y", "detail": "d"}]}),
+        json.dumps({"segmentation": 3, "coverage": 2, "logic": 2, "fidelity": 2}),
         json.dumps({"segmentation": True, "coverage": 2, "logic": 2, "fidelity": 2}),
         json.dumps({"segmentation": 2, "coverage": 2, "logic": 2, "fidelity": 2, "issues": 5}),
         json.dumps({"segmentation": 2, "coverage": 2, "logic": 2, "fidelity": 2, "issues": [1]}),
@@ -152,8 +160,8 @@ class Checking(Scripted):
 def test_an_invalid_verdict_is_repaired_once_else_counted_judge_invalid() -> None:
     costs = CostTap()
     fixed = Checking(["nonsense", PERFECT], costs)
-    status, verdict, cost = judge_once(fixed, "s", screen(), "me", costs)
-    assert (status, verdict.perfect, cost) == ("judged", True, 0.01)  # type: ignore[union-attr]
+    status, verdict, cost, asked = judge_once(fixed, "s", screen(), "me", costs)
+    assert (status, verdict.perfect, cost, asked) == ("judged", True, 0.01, 2)  # type: ignore[union-attr]
     tag = fixed.tags[0]
     assert (tag.use_case, tag.user, tag.prompt_version) == ("golden-judge", "me", "1")
     assert judge_once(Checking(["nope"], costs), "s", screen(), None, costs)[0] == "judge_invalid"
@@ -162,7 +170,7 @@ def test_an_invalid_verdict_is_repaired_once_else_counted_judge_invalid() -> Non
         judge_once(judge_model(["nope"], costs), "s", screen(), None, costs)[0] == "judge_invalid"
     )
     down = judge_model([ModelUnavailableError("down")], costs)
-    assert judge_once(down, "s", screen(), None, costs) == ("unavailable", None, None)
+    assert judge_once(down, "s", screen(), None, costs) == ("unavailable", None, None, 1)
 
 
 # ------------------------------------------------------------------------------ aggregation
@@ -240,13 +248,35 @@ def test_a_run_drafts_then_judges_each_draft_and_stops_at_its_caps() -> None:
     assert not broke.judged and "--budget-usd" in (broke.stopped or "")
 
 
-def test_three_unavailable_judge_answers_in_a_row_stop_the_run() -> None:
+def test_a_provider_whose_judge_goes_down_is_left_and_the_next_still_runs() -> None:
     costs = CostTap()
     cases = [case(f"c{i}") for i in range(5)]
-    plan = make_judge_plan(LLM, cases, ["paid"], "free", 1, 20)
-    down = [ModelUnavailableError("down")]
-    run = run_judge(plan, models(costs, down), draft, costs, None, budget_usd=1.0, max_calls=20)
-    assert len(run.judged) == 3 and "unavailable 3 times in a row" in (run.stopped or "")
+    plan = make_judge_plan(LLM, cases, ["paid", "free"], "free", 1, 40)
+    plan = replace(plan, judge="j")
+    down = [*[ModelUnavailableError("down")] * 3, PERFECT]
+    both = {
+        "paid": Scripted(['{"criteria": []}'], costs),
+        "free": Scripted(['{"criteria": []}'], costs),
+        "j": judge_model(down, costs),
+    }
+    run = run_judge(plan, both, draft, costs, None, budget_usd=1.0, max_calls=40)
+    assert [j.status for j in run.judged].count("unavailable") == 3
+    assert list(run.given_up) == ["paid"] and "3 times in a row" in run.given_up["paid"]
+    assert run.stopped is None
+    assert {j.provider for j in run.judged if j.status == "judged"} == {"free"}
+    assert len([j for j in run.judged if j.provider == "free"]) == 5
+    assert "GAVE UP ON paid" in "\n".join(report_lines(report(run, plan)))
+
+
+def test_max_calls_counts_each_judge_request_a_repair_is_two() -> None:
+    costs = CostTap()
+    plan = make_judge_plan(LLM, [case("c1"), case("c2")], ["paid"], "free", 1, 10)
+    both = {
+        "paid": Scripted(['{"criteria": []}'], costs),
+        "free": Checking(["nonsense", PERFECT], costs),
+    }
+    run = run_judge(plan, both, draft, costs, None, budget_usd=1.0, max_calls=4)
+    assert len(run.judged) == 1 and run.stopped == "--max-calls 4 reached"  # 2 drafts + 2 requests
 
 
 def test_a_draft_that_fails_is_counted_and_not_judged() -> None:
@@ -295,3 +325,21 @@ def test_a_confirmed_run_opens_the_providers_and_the_judge_once_and_reports(tmp_
     h2 = JudgeHarness(tmp_path)
     assert h2.judge(JudgeArgs(yes=True, providers=("free",), judge="free")) == 0
     assert h2.opened == [("free",)] and "judge: free" in h2.out[0]
+
+
+def test_it_refuses_before_any_draft_when_the_judge_may_not_answer_the_user(
+    tmp_path: Path,
+) -> None:
+    class Barred(Scripted):
+        def names_for(self, user: str | None) -> tuple[str, ...]:
+            return ()
+
+    class BarredHarness(JudgeHarness):
+        def open_models(self, ids: Sequence[str], costs: CostTap) -> Mapping[str, TextModel]:
+            self.opened.append(tuple(ids))
+            return {pid: Barred(['{"criteria": []}'], costs) for pid in ids}
+
+    h = BarredHarness(tmp_path)
+    args = JudgeArgs(yes=True, providers=("paid",), judge="free", user="u")
+    assert h.judge(args) == 2
+    assert "may not answer user 'u'" in h.notes[-1] and h.out == []
