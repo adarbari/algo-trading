@@ -1,0 +1,19 @@
+"""The nightly's site config (``algotrade.config.site.nightly``): its history copy covers what the
+Explore history reads."""
+
+from algotrade.config.site.settings import load_nightly
+from algotrade.features.registry import GROUPS
+from algotrade.storage.configs.files import FileConfigStore
+from tests.conftest import REPO_ROOT
+
+
+def test_the_history_copy_holds_every_instrument_table_a_feature_history_reads() -> None:
+    # Explore's Features tab asks 6 histories of 3 months: without a copy each reads one
+    # whole-market partition per session per table (1 to 2.8 s a request, 11.6 s a ticker)
+    copied = set(
+        load_nightly(
+            FileConfigStore(REPO_ROOT / "config", local=False)
+        ).history_copy.instrument_tables
+    )
+    stored = {g.table for g in GROUPS.values() if g.entity == "instrument"}
+    assert stored - copied == set(), "add these tables to [history_copy] instrument_tables"
