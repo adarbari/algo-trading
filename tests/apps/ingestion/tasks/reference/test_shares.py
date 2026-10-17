@@ -30,6 +30,7 @@ from tests.libs.sources.vendors.sec.test_company_facts import PAYLOAD
 from tests.libs.sources.vendors.sec.test_statement_concepts import AAPL as AAPL_STATEMENTS
 
 DAY = date(2026, 10, 2)
+PRICE_STATS = "rollups/instrument/price_stats@v2"
 CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731
 GOOGL_CIK = "0001652044"
 GOOGL_FACTS = (
@@ -405,3 +406,67 @@ def test_the_cap_defers_the_lowest_priority_backlog_ciks() -> None:
     # a CIK new to both is never deferred, and --limit style slicing takes the highest first
     fresh = _due(list("123"), [{"1": day}, {}], day, src, False, ["3", "2", "1"])
     assert fresh == (["3", "2", "1"], 0)  # new to both are never deferred; priority order
+
+
+def test_priority_never_changes_what_is_due_or_exempt() -> None:
+    """Fails if the order changed the due set or which CIKs the cap exempts (new to both,
+    shares-due, stale): only the order of the new part may differ."""
+    day = date(2026, 3, 1)
+    old, recent = date(2026, 1, 1), date(2026, 2, 28)
+    fetched = [
+        {"1": old, "2": recent, "3": recent, "4": old, "5": recent},  # shares
+        {"1": old, "4": old, "5": recent},  # statements: 2, 3 are backlog; 6 new to both
+    ]
+    ciks = ["1", "2", "3", "4", "5", "6"]
+    for cap, force in ((0, False), (1, False), (3, False), (1, True)):
+        src = SharesSources(None, 30, backfill_per_night=cap)  # type: ignore[arg-type]
+        plain = _due(ciks, fetched, day, src, force)
+        ranked = _due(ciks, fetched, day, src, force, ["6", "3", "2", "5", "4", "1"])
+        backlog = {"2", "3"}
+        assert set(plain[0]) - backlog == set(ranked[0]) - backlog  # exempt CIKs: the same
+        assert len(plain[0]) == len(ranked[0]) and plain[1] == ranked[1]
+        if cap == 0 or force or cap >= 2:
+            assert sorted(plain[0]) == sorted(ranked[0])  # nothing deferred: the same due set
+        else:
+            assert "3" in ranked[0] and "2" not in ranked[0]  # the cap defers the lowest
+
+
+def _priced_store() -> tuple[StoreWriter, StoreReader]:
+    """The shares store with a flagged S&P 500 name: GOOGL in the S&P 500, AAPL optionable."""
+    writer = StoreWriter(MemoryBackend())
+    rows = [("AAPL", "0000320193", False, True), ("GOOGL", GOOGL_CIK, True, False),
+            ("SPY", "0000884394", False, False)]  # fmt: skip
+    reference = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "asset_class": "equity", "multiplier": 1.0,
+         "security_type": "COMMON_STOCK", "status": "ACTIVE", "cik": cik, "in_sp500": sp,
+         "optionable": opt}
+        for s, cik, sp, opt in rows
+    ]  # fmt: skip
+    writer.write_table("instruments/reference", DAY, "u", stamped(reference, DAY, "u"))
+    return writer, StoreReader(writer._backend)
+
+
+def _stats(writer: StoreWriter, day: date, adv: float, run: str) -> None:
+    frame = [{"instrument_id": "EQ:AAPL", "symbol": "AAPL", "close": 100.0, "adv_usd_20d": adv}]
+    writer.write_table(PRICE_STATS, day, run, stamped(frame, day, run))
+
+
+def test_limit_takes_the_sp500_first_then_the_liquid_optionable() -> None:
+    writer, reader = _priced_store()
+    _stats(writer, DAY - timedelta(days=1), 5e7, "p")
+    feed = FakeFacts()
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(feed), DAY, limit=2)
+    fetched = [u.rsplit("CIK", 1)[1][:10] for u in feed.urls]
+    assert fetched == [GOOGL_CIK, "0000320193"]  # S&P 500 first; then optionable and liquid
+
+
+def test_a_rerun_after_tonights_rollups_keeps_the_same_order() -> None:
+    """Fails if an input was read on the session itself: the roll-ups written after the first
+    attempt would reorder (and the cap pick other CIKs)."""
+    writer, reader = _priced_store()
+    first, second = FakeFacts(), FakeFacts()
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(first), DAY, limit=3)
+    _stats(writer, DAY, 5e7, "same-day")  # tonight's price_stats, written after
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(second), DAY, force=True, limit=3)
+    order = [u.rsplit("CIK", 1)[1][:10] for u in first.urls]
+    assert order == [u.rsplit("CIK", 1)[1][:10] for u in second.urls]

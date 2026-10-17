@@ -566,7 +566,7 @@ download: about 30 to 40 minutes, ~1 GB of gzip raw kept 7 days, `[sec_edgar] ra
 `algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v3`.
 A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks. The
 `instruments/statements` backlog (CIKs with share counts and no statements marker yet) is fetched
-`[sec_edgar] statements_backfill_per_night` (400) a night, so it finishes in about 15 to 20 nights
+`[sec_edgar] statements_backfill_per_night` (400) a night (5,260 CIKs), so it finishes in about 14 nights
 by itself, the event scope and the S&P 500 first, then optionable liquid names (ADR 0067); the roll-up that reads it waits for the last of them.
 
 **Adding the financials to a store that already has share counts:** a CIK is refetched only

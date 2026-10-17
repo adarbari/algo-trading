@@ -206,6 +206,13 @@ section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-
 detect = [{ call = "stamp" }]
 
 [[responsibility]]
+id = "statements-backlog-priority"
+description = "In which order the shares task fetches the statements backlog and a --limit chunk (ADR 0067 amendment 2026-10-17): the event scope, the S&P 500, then the rest, optionable and liquid names first, by dollar volume and market cap, ties by CIK, every input as of the day before the session; it reorders only, never changes what is due"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/reference/shares.py"]
+section = "docs/adr/0067-sec-financial-statements-table.md#decision"
+detect = [{ call = "priority_order" }]
+
+[[responsibility]]
 id = "vendor-listing-perma-ticker"
 description = "Which vendor listing a Tiingo permaTicker belongs to (edges ED6): TiingoListingMeta fetches the fundamentals meta rows (one per listing that ever used a ticker) and match_perma assigns a permaTicker to a listing only by a unique ticker + active / inactive match (one listing and one row; the one open listing and the one active row; the one delisted listing and the one inactive row), otherwise it gets none (ambiguous / no_meta); the id then follows from equity_id, never from a guess"
 owner = [
