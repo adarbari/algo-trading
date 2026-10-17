@@ -4,7 +4,6 @@
  */
 import { createRoute } from '@tanstack/react-router';
 
-import { prefetchStatusStrip } from '@/entities/system-status';
 import { ensureViewer } from '@/entities/viewer';
 
 import { WorkspaceLayout } from '../../layouts';
@@ -18,7 +17,11 @@ export const traderRoute = createRoute({
   // The strip's read starts with the route, not when the layout mounts.
   loader: async ({ context }) => {
     const viewer = await ensureViewer(context.queryClient);
-    if (viewer) prefetchStatusStrip(context.queryClient, canEnter(viewer, 'admin'));
+    if (!viewer) return;
+    const admin = canEnter(viewer, 'admin');
+    void import('@/entities/system-status').then((m) => {
+      m.prefetchStatusStrip(context.queryClient, admin);
+    });
   },
   component: () => <WorkspaceLayout workspace={TRADER} />,
 });
