@@ -15,7 +15,7 @@ requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.5.3",
     "pandas>=2.2",
-    "pyarrow>=16",
+    "pyarrow>=26.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -39,8 +39,8 @@ dev = [
     "httpx2>=2.13",  # the FastAPI / Starlette TestClient transport (tests only)
     "pytest>=8.0",
     "pytest-cov>=7.1.0",
-    "hypothesis>=6.168.5",
-    "ruff>=0.6",
+    "hypothesis>=6.169.1",
+    "ruff>=0.17.0",
     "mypy>=2.3.1",
     "pandas-stubs>=2.2",
     "import-linter>=2.15",

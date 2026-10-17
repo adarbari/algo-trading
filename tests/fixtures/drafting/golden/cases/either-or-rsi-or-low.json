@@ -1,0 +1,47 @@
+{
+  "id": "either-or-rsi-or-low",
+  "sentence": "stocks with RSI under 30 or within 5% of their 52-week low",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "stocks",
+        "bucket": "A",
+        "fields": [
+          "instrument.security_type"
+        ],
+        "op": "in",
+        "value": [
+          "COMMON_STOCK",
+          "ADR"
+        ],
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "stocks",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "RSI under 30 or within 5% of their 52-week low",
+          "kind": "not_understood",
+          "origin": "words",
+          "join": "and",
+          "join_words": "with"
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 1
+    }
+  }
+}

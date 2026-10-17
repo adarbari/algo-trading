@@ -150,6 +150,32 @@ def test_instrument_view_joins_reference_and_session_rollups() -> None:
     )  # a rollup is read for the session only, never stale
 
 
+def test_instrument_view_reads_only_the_asked_instruments_rows_of_a_rollup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # joining a 12,000-row partition to one instrument's row cost 7 ms a table
+    writer, reader = store()
+    writer.write_table(REF, D1, "r1", stamped(reference({"A": "EQ:A", "B": "EQ:B"}), D1, "r1"))
+    liq = [{"instrument_id": "EQ:A", "put_tier": "A"}, {"instrument_id": "EQ:B", "put_tier": "B"}]
+    writer.write_table("rollups/instrument/liq@v1", D1, "r2", stamped(liq, D1, "r2"))
+    asked: list[object] = []
+    table = StoreReader.table
+
+    def spy(self: StoreReader, name: str, day: date, as_of: object = None, ids: object = None):
+        asked.append((name, ids))
+        return table(self, name, day, as_of, ids)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(StoreReader, "table", spy)
+    fields = ["rollup.liq@v1.put_tier", "rollup.other@v1.x"]
+    view = instrument_view(reader, D1, fields, ["EQ:A"])
+    assert ("rollups/instrument/liq@v1", ["EQ:A"]) in asked
+    assert view.frame["rollup.liq@v1.put_tier"].tolist() == ["A"]
+    assert view.missing == ("rollups/instrument/other@v1",)  # no partition: still missing
+    # the partition exists but holds no row of the instrument: a missing value, not a missing table
+    ghost = instrument_view(reader, D1, ["rollup.liq@v1.put_tier"], ["EQ:A", "EQ:C"])
+    assert ghost.missing == ()
+
+
 def test_instrument_view_flags_a_company_snapshot_taken_after_the_session() -> None:
     writer, reader = store()
     writer.write_table(REF, D1, "r1", stamped(reference({"A": "EQ:A"}), D1, "r1"))

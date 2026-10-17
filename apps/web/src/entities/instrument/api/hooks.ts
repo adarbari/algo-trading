@@ -4,7 +4,14 @@
  * features (values for the session and their recent history), asked in chunks the API's
  * `features(names)` cap allows.
  */
-import { useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import {
+  queryOptions,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { gql, graphql, queryKeys, type gqlTypes } from '@/shared/api';
@@ -392,6 +399,30 @@ function valuesVariables(key: string, date: string | null, names: readonly strin
   };
 }
 
+function valuesQuery(variables: ReturnType<typeof valuesVariables>) {
+  return queryOptions({
+    queryKey: queryKeys.gql('InstrumentFeatureValues', variables),
+    queryFn: () => gql(InstrumentFeatureValues, variables),
+  });
+}
+
+/**
+ * Start the first request of `useFeatureValues` (a route loader) and resolve to the session
+ * it answered for (null: it failed); the hook joins it.
+ */
+export function prefetchFeatureValues(
+  client: QueryClient,
+  key: string,
+  names: readonly string[],
+): Promise<string | null> {
+  const [first = []] = chunks(names, SLOTS * NAMES_PER_REQUEST);
+  if (first.length === 0) return Promise.resolve(null);
+  return client
+    .query(valuesQuery(valuesVariables(key, null, first)))
+    .then((data) => data.session?.date ?? null)
+    .catch(() => null);
+}
+
 /**
  * The values of `names` (any catalogue features) for one session: one request for up to
  * `SLOTS` x `NAMES_PER_REQUEST` names. The first request resolves the latest session; a rarer
@@ -401,16 +432,14 @@ export function useFeatureValues(key: string | null, names: readonly string[]): 
   const [first = [], ...rest] = chunks(names, SLOTS * NAMES_PER_REQUEST);
   const head = valuesVariables(key ?? '', null, first);
   const lead = useQuery({
-    queryKey: queryKeys.gql('InstrumentFeatureValues', head),
-    queryFn: () => gql(InstrumentFeatureValues, head),
+    ...valuesQuery(head),
     enabled: Boolean(key) && first.length > 0,
   });
   const session = lead.data?.session?.date ?? null;
   return useQueries({
     queries: [
       {
-        queryKey: queryKeys.gql('InstrumentFeatureValues', head),
-        queryFn: () => gql(InstrumentFeatureValues, head),
+        ...valuesQuery(head),
         enabled: Boolean(key) && first.length > 0,
       },
       ...rest.map((group) => {
@@ -451,6 +480,26 @@ const InstrumentHistory = graphql(`
   }
 `);
 
+function historyQuery(variables: { key: string; names: string[]; start: string; date: string }) {
+  return queryOptions({
+    queryKey: queryKeys.gql('InstrumentHistory', variables),
+    queryFn: () => gql(InstrumentHistory, variables),
+  });
+}
+
+/** Start the first chunk of `useFeatureHistory` (a route loader); the hook joins it. */
+export function prefetchFeatureHistory(
+  client: QueryClient,
+  key: string,
+  names: readonly string[],
+  start: string,
+  date: string,
+): void {
+  const [chunk] = chunks(names, NAMES_PER_REQUEST);
+  if (!chunk) return;
+  void client.query(historyQuery({ key, names: chunk, start, date })).catch(() => undefined);
+}
+
 /**
  * Each of `names` (features with a history: not `instrument.*` facts) per session from
  * `start` to the session `date` (either null: not known yet, nothing is read), one request
@@ -480,8 +529,7 @@ export function useFeatureHistory(
           ['success', 'error'].includes(client.getQueryState(queryKey)?.status ?? '')
         : n === 0 || first?.status === 'success' || first?.status === 'error';
       return {
-        queryKey,
-        queryFn: () => gql(InstrumentHistory, variables),
+        ...historyQuery(variables),
         enabled: ready && wanted,
       };
     }),

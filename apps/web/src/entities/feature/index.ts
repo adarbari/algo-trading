@@ -6,6 +6,7 @@
  * table is built from (ADR 0038).
  */
 export {
+  fetchCatalogue,
   prefetchFeatureCatalogue,
   refreshCatalogue,
   useFeatureCatalogue,

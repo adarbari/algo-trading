@@ -39,7 +39,14 @@
     "explained": {
       "parts": [
         {
-          "words": "stocks trading below $20",
+          "words": "stocks",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "trading below $20",
           "kind": "applied",
           "origin": "words",
           "join": null,
