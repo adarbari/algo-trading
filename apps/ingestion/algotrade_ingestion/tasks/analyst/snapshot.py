@@ -27,6 +27,11 @@ never replaces (the partition is the session the fetch is for; ``ts`` the fetch 
   tell a name the vendor refuses from one not yet fetched or one whose call failed, from the
   store alone. A refused name has that marker and no estimate rows.
 
+The run has a time budget (``[fmp] run_budget_s``, both vendors' calls): once spent no further call
+is made and the names not yet asked are ``OVER_BUDGET`` items (the next night continues, stalest
+first), so a stalling vendor cannot hold the ingest lock. A hand run for a session before the last
+closed one is refused: the vendors serve only today's values, which would land in an old partition.
+
 Rows are staged per item and published as one partition (atomic, ADR 0022); the step is optional,
 so a vendor outage only warns. Features over the history come later (track E): nothing reads the
 table yet, and its rows carry the vendors' ``licence = "personal"`` (``stats["licence"]``).
@@ -34,11 +39,12 @@ table yet, and its rows carry the vendors' ``licence = "personal"`` (``stats["li
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import pandas as pd
 
+from algotrade.core.time.calendar import last_closed_session
 from algotrade.data.reference import instruments
 from algotrade.services.events.scope import LIST, REFERENCE, scoped_instruments
 from algotrade.storage.runs import RunRecord
@@ -114,18 +120,20 @@ def denied(run: IngestRun) -> set[tuple[str, str]]:
 
 
 def history(run: IngestRun) -> tuple[dict[str, date], dict[str, date], dict[str, date]]:
-    """From the earlier published runs' items: the day each symbol's FMP price-target call was
-    answered (``fmp``), refused (``refused``) and its Finnhub call answered (``finnhub``)."""
+    """From the earlier published runs' items: the session each symbol's FMP data was last
+    answered (``fmp``, any of its calls: the probe may deny some kinds), refused (``refused``)
+    and its Finnhub call answered (``finnhub``). Dated by the run's session, the day the
+    rotation counts in (a nightly starts after midnight UTC, so its start date is a day late)."""
     answered: dict[str, date] = {}
     refused_on: dict[str, date] = {}
     finnhub: dict[str, date] = {}
     for record in sorted(run.writer.runs_for(TASK), key=lambda r: r.started_at):
         if record.run_id == run.run_id or record.status not in PUBLISHED:
             continue
-        day = record.started_at.date()
+        day = record.session_date
         for key, status in record.items.items():
             label = status_label(status)
-            if key.startswith(PREFIX) and key.endswith(":price_target"):
+            if key.startswith(PREFIX):
                 symbol = key.split(":")[1]
                 if label in (OK, EMPTY):
                     answered[symbol] = day
@@ -161,12 +169,15 @@ def target_rows(frame: pd.DataFrame, instrument_id: str) -> pd.DataFrame:
 
 
 def build_rows(kind: str, parsed: pd.DataFrame, instrument_id: str) -> pd.DataFrame:
-    """One parsed vendor frame -> snapshot rows of ``kind`` (``ts`` is set by the caller)."""
+    """One parsed vendor frame -> snapshot rows of ``kind`` (``ts`` is set by the caller); a
+    ``period`` the vendor repeats keeps its last row (the table key is unique per item)."""
     if kind == "price_target":
-        return target_rows(parsed, instrument_id)
-    if kind == "estimates_annual":
-        return estimate_rows(parsed, instrument_id)
-    return counts_rows(parsed, instrument_id, kind, "current")
+        rows = target_rows(parsed, instrument_id)
+    elif kind == "estimates_annual":
+        rows = estimate_rows(parsed, instrument_id)
+    else:
+        rows = counts_rows(parsed, instrument_id, kind, "current")
+    return rows.drop_duplicates("period", keep="last").reset_index(drop=True)
 
 
 def coverage_status(labels: Sequence[str]) -> str:
@@ -195,7 +206,14 @@ def mark_coverage(run: IngestRun, name: Name, vendor: str, labels: Sequence[str]
 
 
 def snapshot_analyst(ctx: TaskContext, session: date, limit: Any = None) -> RunRecord:
+    latest = last_closed_session(ctx.clock(), timedelta(0))
+    if session < latest:
+        raise ValueError(
+            f"session {session} is before the last closed session {latest}: the vendors serve "
+            "only today's values, so a run for it would store them in an old partition"
+        )
     with IngestRun(ctx, TASK, session) as run:
+        started = run.clock()
         sources = {n: s for n in SOURCES if isinstance((s := ctx.sources.get(n)), Source)}
         fmp_ready = all(n in sources for _, n, _, _ in FMP_CALLS)
         finnhub_ready = RECOMMENDATION[1] in sources
@@ -210,11 +228,13 @@ def snapshot_analyst(ctx: TaskContext, session: date, limit: Any = None) -> RunR
             "denied": sorted("/".join(d) for d in no),
         }
         if fmp_ready:
-            stats["fmp"] = _fmp(run, sources, names, no, (answered, refused_on), limit)
+            stats["fmp"] = _fmp(run, sources, names, no, (answered, refused_on), limit, started)
         else:
             stats["fmp"] = {"skipped": _why_not(ctx, "fmp")}
         if finnhub_ready:
-            stats["finnhub"] = _finnhub(run, sources[RECOMMENDATION[1]], names, no, finnhub_on)
+            stats["finnhub"] = _finnhub(
+                run, sources[RECOMMENDATION[1]], names, no, finnhub_on, started
+            )
         else:
             stats["finnhub"] = {"skipped": _why_not(ctx, "finnhub")}
         run.stats.update(
@@ -237,6 +257,7 @@ def _fmp(
     no: set[tuple[str, str]],
     state: tuple[dict[str, date], dict[str, date]],
     limit: Any,
+    started: datetime,
 ) -> dict[str, Any]:
     answered, refused_on = state
     settings = run.ctx.settings
@@ -259,6 +280,9 @@ def _fmp(
         labels: list[str] = []
         for item, source_name, _, kind in calls:
             key = f"{PREFIX}{symbol}:{item}"
+            if out_of_time(run, started):
+                run.record_item(key, f"{NOT_MADE}: [fmp] run_budget_s is spent")
+                break
             if left <= 0:
                 run.record_item(key, f"{NOT_MADE}: [fmp] daily_budget is spent")
                 break
@@ -286,12 +310,18 @@ def _fmp(
     }
 
 
+def out_of_time(run: IngestRun, started: datetime) -> bool:
+    """Whether the run has spent ``[fmp] run_budget_s`` (the clock, between two calls)."""
+    return (run.clock() - started).total_seconds() > run.ctx.settings.fmp_run_budget_s
+
+
 def _finnhub(
     run: IngestRun,
     source: Source,
     names: Sequence[Name],
     no: set[tuple[str, str]],
     answered: dict[str, date],
+    started: datetime,
 ) -> dict[str, Any]:
     settings = run.ctx.settings
     if ("finnhub", RECOMMENDATION[2]) in no:
@@ -301,6 +331,9 @@ def _finnhub(
     take = due[: settings.finnhub_per_night]
     for done, symbol in enumerate(take, 1):
         name = by_symbol[symbol]
+        if out_of_time(run, started):
+            run.record_item(f"{FINNHUB}{symbol}", f"{NOT_MADE}: [fmp] run_budget_s is spent")
+            continue
         label = _ask(run, source, f"{FINNHUB}{symbol}", name, "recommendation", "finnhub")
         mark_coverage(run, name, "finnhub", [label])
         if done % CHECKPOINT_EVERY == 0:

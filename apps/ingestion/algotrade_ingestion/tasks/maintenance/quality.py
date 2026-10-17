@@ -572,7 +572,8 @@ ANALYST_TASK = (
 def check_analyst_snapshot(ctx: TaskContext, session: date) -> list[Check]:
     """The ``analyst-snapshot`` step's acceptance (optional step, so these only warn): WARN when
     over ``[quality] max_analyst_failed`` of the night's vendor calls failed (a name FMP refuses
-    is ``NOT_COVERED``, not a failure) or when the run stored no row although names were asked.
+    is ``NOT_COVERED``, not a failure) or when no vendor call returned data although names were
+    asked (the rows count includes the coverage markers, so it cannot tell).
     Nothing without a finished run of the session."""
     done = [
         r
@@ -585,6 +586,7 @@ def check_analyst_snapshot(ctx: TaskContext, session: date) -> list[Check]:
     calls = [s for s in record.items.values() if status_label(s) not in ("OVER_BUDGET",)]
     failed = [s for s in calls if status_label(s) in FAILURES]
     asked, rows = len(calls), int(record.stats.get("rows") or 0)
+    answered = [s for s in calls if status_label(s) == "OK"]  # coverage markers count in rows
     if not asked:
         return [Check("analyst_snapshot", "PASS", "no vendor call was due")]
     share, limit = len(failed) / asked, ctx.settings.max_analyst_failed
@@ -593,6 +595,6 @@ def check_analyst_snapshot(ctx: TaskContext, session: date) -> list[Check]:
     )
     if share > limit:
         return [Check("analyst_snapshot", "WARN", detail)]
-    if not rows and len(failed) < asked:
+    if not answered and len(failed) < asked:
         return [Check("analyst_snapshot", "WARN", detail + ": every name was refused or empty")]
     return [Check("analyst_snapshot", "PASS", detail)]

@@ -211,7 +211,9 @@ the stalest past `[fmp] refresh_days`), and Finnhub for one call a name (`[finnh
 own `[finnhub] refresh_days`); a name FMP refuses (402) is `NOT_COVERED` and waits four windows. Each
 attempt of a vendor for a name also stores a `kind = "coverage"` row (`period = "current"`, `status`
 OK / EMPTY / NOT_COVERED / FAILED), so a refused name is told from one not yet fetched or one whose call
-failed from the store alone. With neither key set the nightly step is skipped with a WARN, not failed. Names: S&P 500 members plus the event-study
+failed from the store alone. With neither key set the nightly step is skipped with a WARN, not failed. The step runs after the
+screens and stops calling after `[fmp] run_budget_s` (1500 s; the names left are `OVER_BUDGET` and the
+next night continues). A name's cadence is dated by the run's session, from any of its FMP calls. Names: S&P 500 members plus the event-study
 scope list. Rows are appended per session (`ts` = fetch instant, `knowledge_ts` = publish instant),
 licence `personal`. History starts at the first fetch: neither vendor serves a point-in-time history, so
 none is backdated (ADR 0068).

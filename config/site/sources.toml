@@ -152,6 +152,9 @@ daily_budget = 200               # FMP calls a UTC day the analyst tasks may spe
                                  # headroom for a hand run); `analyst-probe` and `analyst-snapshot` count their own
 refresh_days = 7                 # analyst-snapshot: each name's FMP data (3 calls) is refetched this often, stalest first;
                                  # a name FMP refused (402: not on the free plan) waits 4x this before it is asked again
+run_budget_s = 1500              # analyst-snapshot (FMP and Finnhub calls): after this many seconds no further call is made and
+                                 # the names not yet asked are recorded OVER_BUDGET (a normal night takes ~9 min); the next
+                                 # night continues, stalest first. A vendor that stalls can then not hold the ingest lock
 
 [finnhub]                        # Finnhub analyst recommendation trends (ADR 0068); key in .env
 enabled = true                   # ALGOTRADE_FINNHUB_API_KEY (free: finnhub.io); no key: the source is skipped

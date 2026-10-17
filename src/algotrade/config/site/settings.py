@@ -152,7 +152,7 @@ VENDOR_EXTRAS = {
     "treasury": ("lookback_days",),
     "fred": ("base_url",),
     "tiingo": ("licence", "monthly_symbol_budget"),
-    "fmp": ("licence", "daily_budget", "refresh_days"),
+    "fmp": ("licence", "daily_budget", "refresh_days", "run_budget_s"),
     "finnhub": ("licence", "per_night", "refresh_days"),
     "etf_holdings": ETF_KEYS,
     **VENDOR_FLAGS,
@@ -234,6 +234,7 @@ class SourcesSettings:
         200  # [fmp] daily_budget: FMP calls a UTC day the analyst tasks may spend
     )
     fmp_refresh_days: int = 7  # [fmp] refresh_days: refetch cadence of a name
+    fmp_run_budget_s: int = 1500  # [fmp] run_budget_s: analyst-snapshot stops calling after this
     finnhub_licence: str = "personal"  # [finnhub] licence (ADR 0068)
     finnhub_per_night: int = 300  # [finnhub] per_night: names read a night
     finnhub_refresh_days: int = 7  # [finnhub] refresh_days: refetch cadence of a name
@@ -377,6 +378,7 @@ class SourcesSettings:
             fmp_licence=_extra(vendors, "fmp").choice("licence", d.fmp_licence, LICENCES),
             fmp_daily_budget=_extra(vendors, "fmp").integer("daily_budget", d.fmp_daily_budget, 0),
             fmp_refresh_days=_extra(vendors, "fmp").integer("refresh_days", d.fmp_refresh_days, 1),
+            fmp_run_budget_s=_extra(vendors, "fmp").integer("run_budget_s", d.fmp_run_budget_s, 1),
             finnhub_per_night=_extra(vendors, "finnhub").integer(
                 "per_night", d.finnhub_per_night, 0
             ),
