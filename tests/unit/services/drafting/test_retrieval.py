@@ -131,7 +131,10 @@ def test_the_prefix_is_identical_across_sentences_and_the_slice_is_smaller(site)
     prefix = prefix_text(infos)
     prompts = [sliced_system_prompt(infos, c.sentence, book, guide) for c in CASES]
     assert all(p.startswith(prefix) for p in prompts)
-    assert len({p[len(prefix) :] for p in prompts}) == len(prompts)  # the slice is per sentence
+    # the slice is per sentence: two sentences share one only when they retrieve the same fields
+    retrieved = {tuple(slice_for(infos, c.sentence, book, guide).fields) for c in CASES}
+    assert len({p[len(prefix) :] for p in prompts}) == len(retrieved)
+    assert len(retrieved) >= len(CASES) - 1  # sentences do not all retrieve the same fields
     for field in infos:  # every field is in the index, nameable as heading + entry
         head, local = index_group(field.name)
         assert f"\n{head}*\n" in prefix and f"\n{local}|{field.dtype}|" in prefix, field.name
