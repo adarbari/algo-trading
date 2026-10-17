@@ -1129,16 +1129,30 @@ Source: `design-system/components/PartCard`
 | `editedLabel` | `string \| undefined` | no | The mark's text ("edited"). |
 | `retype` | `PartRetype \| undefined` | no | Retype mode: the words become an input with Apply / Cancel. |
 
+### PartJoin
+
+PartJoin: the connector between two parts of the trader's sentence in the Describe it review, shown as text, not a card: the trader's own word ("but", "except", "or") beside the logic that joins this part to the one before (AND, OR, AND NOT). OR and AND NOT carry their own tone so a trader notices them; AND stays quiet. Read in order as "joined by but: AND". PartList places it above the card it joins; labels arrive as props and an optional `info` slot holds a Guide InfoButton.
+
+Source: `design-system/components/PartJoin`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `join` | `PartJoinLogic` | yes | The logic joining this part to the previous one. |
+| `label` | `string` | yes | The logic's label ("AND", "OR", "AND NOT"). |
+| `words` | `string \| undefined` | no | The trader's own connector ("but", "except"); omit when they wrote none. |
+| `joinedByLabel` | `string` | yes | The lead-in of the spoken name ("joined by"). |
+| `info` | `ReactNode` | no | A Guide InfoButton for the logic, shown after the label. |
+
 ### PartList
 
-PartList: the ordered PartCards of one sentence, in the order the trader wrote the parts, a token gap apart. A card for words that were not understood, or the "kept from your screen" card, sits in the list like any other. A list element, so assistive technology announces "list, N items"; its name arrives as a prop.
+PartList: the ordered PartCards of one sentence, in the order the trader wrote the parts, a token gap apart. A card for words that were not understood, or the "kept from your screen" card, sits in the list like any other. A list element, so assistive technology announces "list, N items"; its name arrives as a prop. A PartJoin child is not an item of its own: it is placed above the card that follows it, inside that card's item, so the count stays the number of parts and the connector is read just before the part it joins.
 
 Source: `design-system/components/PartList`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `'aria-label'` | `string` | yes | Accessible name of the list ("Parts of your sentence"). |
-| `children` | `ReactNode` | yes | The PartCards, in order. |
+| `children` | `ReactNode` | yes | The PartCards, in order; a PartJoin before a card joins it to the previous one. |
 
 ### PendingRow
 

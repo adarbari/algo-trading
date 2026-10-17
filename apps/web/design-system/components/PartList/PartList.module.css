@@ -11,3 +11,8 @@
 .item {
   min-width: 0;
 }
+
+/* A connector sits above its card, closer to it than the list gap. */
+.item > :first-child:not(:last-child) {
+  margin-block-end: var(--space-2);
+}
