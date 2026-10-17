@@ -106,6 +106,7 @@ export type UnavailableKind =
   | 'ILLIQUID'
   | 'LICENCE'
   | 'NOT_APPLICABLE'
+  | 'NOT_COVERED'
   | 'NOT_RUN'
   | 'NOT_STORED'
   | 'SYSTEM';
@@ -116,6 +117,7 @@ export type UnknownCode =
   | 'ILLIQUID'
   | 'LICENCE'
   | 'NOT_APPLICABLE'
+  | 'NOT_COVERED'
   | 'NOT_IN_CATALOGUE'
   | 'NOT_RECORDING'
   | 'NOT_RUN'

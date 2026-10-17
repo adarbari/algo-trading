@@ -10,22 +10,29 @@ earnings days, chain workers) are applied here, so the CLI and nightly cannot dr
 nightly workflow is an ordered list of these names (``workflows/nightly/nightly.py``).
 """
 
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
-from types import ModuleType
-from typing import Any
 
-from algotrade.config.site.events.releases import load_macro_releases
-from algotrade.config.site.settings import load_macro, load_universe
-from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.analyst import probe as analyst_probe
 from algotrade_ingestion.tasks.analyst import snapshot as analyst_snapshot
 from algotrade_ingestion.tasks.derived import history_copy, market_rollups, outcomes, rollups
 from algotrade_ingestion.tasks.events import filings
-from algotrade_ingestion.tasks.framework import source_guards
+from algotrade_ingestion.tasks.framework import (
+    entries_market,
+    entries_ops,
+    entries_reference,
+    source_guards,
+)
+from algotrade_ingestion.tasks.framework.params import (
+    FROM,
+    SESSION,
+    TO,
+    Param,
+    Params,
+    Task,
+    session_of,
+)
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.listings import index_membership, listing_history, winners_sample
 from algotrade_ingestion.tasks.macro import calendar as macro_calendar
@@ -57,367 +64,22 @@ from algotrade_ingestion.tasks.reference import (
     universe_import,
 )
 from algotrade_ingestion.tasks.verification import verify
-from algotrade_sources.framework.base import (
-    DirectorySource,
-    FixtureSource,
+
+__all__ = (
+    "FROM",
+    "SESSION",
+    "TASKS",
+    "TO",
+    "Param",
+    "Params",
+    "Task",
+    "run_task",
+    "session_of",
+    "task",
 )
 
-type Params = Mapping[str, Any]
 GOLDEN_DIR = Path("datasets/golden")
 FIGI_REVIEW_OUT = Path("var/figi_review.csv")
-
-
-@dataclass(frozen=True)
-class Param:
-    """One task parameter; ``flags`` are its CLI spelling. ``kind=None`` is an on/off flag."""
-
-    name: str
-    flags: tuple[str, ...]
-    kind: Callable[[str], Any] | None = str
-    help: str = ""
-    required: bool = False
-    default: Any = None
-
-
-@dataclass(frozen=True)
-class Task:
-    name: str
-    description: str
-    module: ModuleType  # the module that produces ``tables``
-    tables: tuple[str, ...]
-    run: Callable[[TaskContext, Params], RunRecord]
-    sources: tuple[str, ...] = ()  # required, by name in ``TaskContext.sources``
-    optional_sources: tuple[str, ...] = ()
-    settings: str | None = None  # the config/site section it reads
-    params: tuple[Param, ...] = ()
-    # Workflows (nightly) skip the task when this returns a reason; explicit runs ignore it.
-    skip: Callable[[TaskContext], str | None] | None = None
-
-
-SESSION = Param("session", ("--date",), date.fromisoformat, "session (default: last session)")
-FROM = Param("start", ("--from",), date.fromisoformat, "window start")
-TO = Param("end", ("--to",), date.fromisoformat, "window end")
-
-
-def session_of(params: Params) -> date:
-    session = params.get("session")
-    if not isinstance(session, date):
-        raise ValueError("task parameter 'session' (a date) is required")
-    return session
-
-
-# ----------------------------------------------------------------------------- entries
-
-
-def _universe_build(ctx: TaskContext, p: Params) -> RunRecord:
-    assert ctx.configs is not None
-    settings = load_universe(ctx.configs)
-    trader = ctx.sources["nasdaq_trader"]
-    if not isinstance(trader, DirectorySource):
-        raise TypeError("nasdaq_trader must be a DirectorySource (listing + options files)")
-    sources = universe_build.UniverseSources(
-        trader,
-        ctx.sources["spy_holdings"],
-        ctx.sources.get("massive_tickers"),
-    )
-    record = universe_build.build_universe(
-        ctx, sources, settings, session_of(p), bool(p.get("accept_sp500"))
-    )
-    if p.get("review_out"):
-        universe_build.write_review(ctx.reader, session_of(p), p["review_out"])
-        record.stats["review_out"] = str(p["review_out"])
-    if p.get("figi_review_out"):
-        path = Path(p["figi_review_out"])
-        rows = universe_build.write_figi_review(ctx.reader, session_of(p), path)
-        record.stats["figi_review_out"] = {"path": str(path), "rows": rows}
-    return record
-
-
-def _universe_mode(ctx: TaskContext) -> str | None:
-    mode = load_universe(ctx.configs).source if ctx.configs is not None else "csv_import"
-    return None if mode == "nasdaq_trader" else f"skipped: {mode} mode"
-
-
-def _universe_csv(ctx: TaskContext, p: Params) -> RunRecord:
-    files = [universe_import.UniverseFile(Path(p["stocks"]), "STOCK")]
-    if p.get("etfs"):
-        files.append(universe_import.UniverseFile(Path(p["etfs"]), "ETF"))
-    return universe_import.import_universe(ctx, files, str(p["version"]), session_of(p))
-
-
-def _company_details(ctx: TaskContext, p: Params) -> RunRecord:
-    sources = company_details.CompanySources(
-        ctx.sources["sec_tickers"], ctx.sources["sec_submissions"], ctx.settings.sec_refresh_days
-    )
-    return company_details.ingest_company_details(
-        ctx, sources, session_of(p), bool(p.get("force")), p.get("limit")
-    )
-
-
-def _listing_history(ctx: TaskContext, p: Params) -> RunRecord:
-    return listing_history.ingest_listing_history(
-        ctx, ctx.sources["tiingo_listings"], session_of(p), ctx.sources.get("tiingo_meta")
-    )
-
-
-def _index_membership(ctx: TaskContext, p: Params) -> RunRecord:
-    return index_membership.ingest_index_membership(
-        ctx, ctx.sources["sp500_history"], session_of(p)
-    )
-
-
-def _winners_sample(ctx: TaskContext, p: Params) -> RunRecord:
-    return winners_sample.ingest_winners_sample(
-        ctx,
-        ctx.sources["tiingo_prices"],
-        session_of(p),
-        Path(p["report"]) if p.get("report") else None,
-        p.get("seed") or winners_sample.DEFAULT_SEED,
-        p.get("limit"),
-    )
-
-
-def _shares(ctx: TaskContext, p: Params) -> RunRecord:
-    sources = shares.SharesSources(
-        ctx.sources["sec_company_facts"],
-        ctx.settings.sec_facts_refresh_days,
-        ctx.settings.sec_statements_backfill_per_night,
-    )
-    return shares.ingest_shares(ctx, sources, session_of(p), bool(p.get("force")), p.get("limit"))
-
-
-def _etf_holdings(ctx: TaskContext, p: Params) -> RunRecord:
-    issuers = source_guards.holdings_issuers(ctx)
-    if not issuers:
-        raise KeyError(
-            f"task 'etf-holdings' needs one of the sources {list(source_guards.HOLDINGS_ISSUERS)}"
-        )
-    sources = etf_holdings.HoldingsSources(
-        issuers,
-        ctx.settings.etf.refresh_days,
-        ctx.settings.etf.keep_top,
-        ctx.settings.etf.fallback_scope,
-        fallback_min_adv_usd=ctx.settings.etf.fallback_min_adv_usd,
-    )
-    limit = p.get("limit")
-    if limit is None and p.get("nightly") and ctx.settings.etf.per_night > 0:
-        limit = ctx.settings.etf.per_night  # the nightly reads a slice a night (per_night)
-    return etf_holdings.ingest_etf_holdings(
-        ctx, sources, session_of(p), bool(p.get("force")), limit, _symbols(p)
-    )
-
-
-def _earnings(ctx: TaskContext, p: Params) -> RunRecord:
-    session = session_of(p)
-    source = ctx.sources["nasdaq_earnings"]
-    if p.get("history_from"):
-        end = p.get("history_to") or session
-        return earnings.backfill_earnings(ctx, source, session, p["history_from"], end)
-    days = p.get("days") or ctx.settings.earnings_days
-    start = p.get("start")
-    if start is None:
-        # Also the last week: those reports now carry the reported EPS and surprise, and
-        # `last_earnings_date` stays current. An explicit --start is taken as given.
-        back = ctx.settings.earnings_lookback_days
-        start, days = session - timedelta(days=back), days + back
-    return earnings.ingest_earnings(ctx, source, session, start, days=days)
-
-
-def _bars(ctx: TaskContext, p: Params) -> RunRecord:
-    session = session_of(p)
-    # Exchange sessions in the window; an explicit non-session date is fetched as asked.
-    sessions = sessions_between(p.get("start") or session, p.get("end") or session) or [session]
-    return bars.ingest_daily_bars(ctx, ctx.sources["massive_bars"], sessions, bool(p.get("force")))
-
-
-def _bars_history(ctx: TaskContext, p: Params) -> RunRecord:
-    assert ctx.configs is not None  # the scope list is read from the site configs
-    # The scope (the list, fund references, with --include-tiers the tier names) is resolved by
-    # the task through ``services.events``; --symbols only adds to it.
-    since = p.get("since") or bars_history.DEFAULT_SINCE
-    return bars_history.ingest_bars_history(
-        ctx,
-        ctx.sources["tiingo_prices"],
-        _symbols(p),
-        since,
-        p.get("until") or session_of(p),
-        bool(p.get("force")),
-        p.get("limit"),
-        bool(p.get("include_tiers")),
-        p.get("fill"),
-        bool(p.get("from_listings")),
-    )
-
-
-def _filings(ctx: TaskContext, p: Params) -> RunRecord:
-    # The names are the session's universe without funds, resolved by the task; --symbols
-    # narrows them.
-    return filings.ingest_filings(
-        ctx,
-        ctx.sources["sec_filings"],
-        session_of(p),
-        _symbols(p),
-        p.get("since"),
-        p.get("limit"),
-        ctx.sources["sec_daily_index"],
-    )
-
-
-def _rates(ctx: TaskContext, p: Params) -> RunRecord:
-    end = p.get("end") or session_of(p)
-    start = p.get("start") or end - timedelta(ctx.settings.treasury_lookback_days - 1)
-    return rates.ingest_rates(ctx, ctx.sources["treasury"], start, end, bool(p.get("force")))
-
-
-def _corporate_actions(ctx: TaskContext, p: Params) -> RunRecord:
-    session = session_of(p)
-    before, after = ctx.settings.actions_window
-    start = p.get("start") or session + timedelta(before)
-    end = p.get("end") or session + timedelta(after)
-    source = ctx.sources["massive_corporate_actions"]
-    return corporate_actions.ingest_corporate_actions(ctx, source, session, start, end)
-
-
-def _chains(ctx: TaskContext, p: Params) -> RunRecord:
-    session = session_of(p)
-    symbols = [s for s in str(p.get("symbols") or "").split(",") if s.strip()]
-    underlyings = option_chains.select_underlyings(ctx.reader, session, symbols)
-    workers = int(p.get("workers") or ctx.settings.cboe_workers)
-    return option_chains.ingest_option_chains(
-        ctx,
-        ctx.sources["cboe"],
-        underlyings,
-        session,
-        option_chains.ChainJobConfig(
-            workers,
-            priority_symbols=ctx.settings.cboe_priority_symbols,
-            probe=bool(p.get("probe")),  # the nightly, while the step may still WAIT
-            probe_max_stale_share=2 * ctx.settings.max_chain_stale_share,
-        ),
-    )
-
-
-def _rollups(ctx: TaskContext, p: Params) -> RunRecord:
-    return rollups.compute_rollups(
-        ctx, session_of(p), p.get("start"), p.get("end"), _symbols(p, "only")
-    )
-
-
-def _market_rollups(ctx: TaskContext, p: Params) -> RunRecord:
-    return market_rollups.compute_market_rollups(
-        ctx, session_of(p), p.get("start"), p.get("end"), _symbols(p, "only")
-    )
-
-
-def _outcomes(ctx: TaskContext, p: Params) -> RunRecord:
-    return outcomes.compute_outcomes(ctx, session_of(p), p.get("start"), p.get("end"))
-
-
-def _macro(ctx: TaskContext, p: Params) -> RunRecord:
-    assert ctx.configs is not None
-    return macro_series.ingest_macro(
-        ctx, load_macro(ctx.configs), session_of(p), _symbols(p, "only"), p.get("since")
-    )
-
-
-def _macro_calendar(ctx: TaskContext, p: Params) -> RunRecord:
-    assert ctx.configs is not None
-    return macro_calendar.ingest_macro_calendar(
-        ctx, load_macro_releases(ctx.configs), session_of(p), _symbols(p, "only")
-    )
-
-
-def _verify(ctx: TaskContext, p: Params) -> RunRecord:
-    return verify.verify(ctx, session_of(p), _symbols(p))
-
-
-def _symbols(p: Params, name: str = "symbols") -> list[str]:
-    return [s.strip() for s in str(p.get(name) or "").split(",") if s.strip()]
-
-
-def _descriptions(ctx: TaskContext, p: Params) -> RunRecord:
-    s = ctx.settings
-    sources = descriptions.DescriptionSources(
-        ctx.sources.get("massive_overview"),
-        ctx.sources.get("sec_fund_tickers"),
-        ctx.sources.get("sec_fund_objectives"),
-        s.descriptions_per_night,
-        s.descriptions_refresh_days,
-        s.sec_fund_quarters,
-        s.cboe_priority_symbols,
-        ctx.sources.get("sec_fund_series"),
-    )
-    return descriptions.ingest_descriptions(
-        ctx,
-        sources,
-        session_of(p),
-        only=p.get("only"),
-        limit=p.get("limit"),
-        symbols=_symbols(p),
-        force=bool(p.get("force")),
-    )
-
-
-def _ibkr_contracts(ctx: TaskContext, p: Params) -> RunRecord:
-    return ibkr_contracts.resolve_contracts(
-        ctx,
-        source_guards.ibkr_source(ctx),
-        session_of(p),
-        _symbols(p),
-        bool(p.get("force")),
-        p.get("limit"),
-    )
-
-
-def _ibkr_iv(ctx: TaskContext, p: Params) -> RunRecord:
-    if p.get("start"):
-        end = p.get("end") or session_of(p)
-        source = source_guards.ibkr_source(ctx)
-        return ibkr_iv.backfill_ivs(ctx, source, p["start"], end, _symbols(p), p.get("limit"))
-    return ibkr_iv.nightly_ivs(ctx, source_guards.ibkr_source(ctx), session_of(p), _symbols(p))
-
-
-def _ibkr_iv_repair(ctx: TaskContext, p: Params) -> RunRecord:
-    if not p.get("start"):
-        raise ValueError("ibkr-iv-repair needs --from (the first session to check)")
-    return ibkr_iv.repair_ivs(ctx, p["start"], p.get("end") or session_of(p))
-
-
-def _quality(ctx: TaskContext, p: Params) -> RunRecord:
-    return quality.run_quality(ctx, session_of(p))
-
-
-def _bar_quality(ctx: TaskContext, p: Params) -> RunRecord:
-    session = session_of(p)
-    start = p.get("start") or sessions_ending(session, bar_quality.TRAILING_SESSIONS)[0]
-    ids = _symbols(p, "only")
-    return bar_quality.run_bar_quality(
-        ctx, session, start, p.get("end"), list(ids) if ids else None
-    )
-
-
-def _history_copy(ctx: TaskContext, p: Params) -> RunRecord:
-    return history_copy.build_copies(ctx, session_of(p))
-
-
-def _purge(ctx: TaskContext, p: Params) -> RunRecord:
-    return purge.purge(ctx, session_of(p), p.get("keep_days"), p.get("staging_keep_days"))
-
-
-def _migrate_ids(ctx: TaskContext, p: Params) -> RunRecord:
-    return migrate_ids.migrate_ids(ctx, dry_run=bool(p.get("dry_run")))
-
-
-def _retire_features(ctx: TaskContext, p: Params) -> RunRecord:
-    return retire_features.retire(ctx, session_of(p), str(p["group"]), bool(p.get("dry_run")))
-
-
-def _golden_load(ctx: TaskContext, p: Params) -> RunRecord:
-    # ``golden_dir`` chose the directory when the registry built the fixture source.
-    source = ctx.sources["synthetic"]
-    if not isinstance(source, FixtureSource):
-        raise TypeError("synthetic must be a FixtureSource (the golden CSVs)")
-    return golden.load_golden(ctx, source)
 
 
 # ----------------------------------------------------------------------------- the registry
@@ -439,7 +101,7 @@ TASKS: dict[str, Task] = {
             "build the universe from Nasdaq Trader + SPY holdings",
             universe_build,
             UNIVERSE_TABLES,
-            _universe_build,
+            entries_reference.run_universe_build,
             sources=("nasdaq_trader", "spy_holdings"),
             optional_sources=("massive_tickers",),
             settings="universe.toml",
@@ -460,14 +122,14 @@ TASKS: dict[str, Task] = {
                     default=FIGI_REVIEW_OUT,
                 ),
             ),
-            skip=_universe_mode,
+            skip=entries_reference.run_universe_mode,
         ),
         Task(
             "universe",
             "import the monthly master universe CSVs",
             universe_import,
             ("universe", "instruments/reference"),
-            _universe_csv,
+            entries_reference.run_universe_csv,
             params=(
                 SESSION,
                 Param("stocks", ("--stocks",), Path, "stock universe CSV", required=True),
@@ -480,7 +142,7 @@ TASKS: dict[str, Task] = {
             "company details from SEC EDGAR (incremental)",
             company_details,
             ("instruments/company",),
-            _company_details,
+            entries_reference.run_company_details,
             sources=("sec_tickers", "sec_submissions"),
             settings="sources.toml [sec_edgar]",
             params=(
@@ -495,7 +157,7 @@ TASKS: dict[str, Task] = {
             "(instruments/listing_history); in no workflow until the owner has read a real pull",
             listing_history,
             ("instruments/listing_history",),
-            _listing_history,
+            entries_reference.run_listing_history,
             sources=("tiingo_listings", "tiingo_meta"),
             settings="sources.toml [tiingo]",
             params=(SESSION,),
@@ -528,7 +190,7 @@ TASKS: dict[str, Task] = {
             "(instruments/index_membership); in no workflow until the owner has read a real pull",
             index_membership,
             ("instruments/index_membership",),
-            _index_membership,
+            entries_reference.run_index_membership,
             sources=("sp500_history",),
             settings="sources.toml [sp500_history]",
             params=(SESSION,),
@@ -540,7 +202,7 @@ TASKS: dict[str, Task] = {
             "(resumable; 72 s a name on the free tier)",
             winners_sample,
             (),
-            _winners_sample,
+            entries_reference.run_winners_sample,
             sources=("tiingo_prices",),
             settings="sources.toml [tiingo]",
             params=(
@@ -555,7 +217,7 @@ TASKS: dict[str, Task] = {
             "shares, financials and statement lines from SEC company facts (incremental)",
             shares,
             ("instruments/shares", "instruments/statements"),
-            _shares,
+            entries_reference.run_shares,
             sources=("sec_company_facts",),
             settings="sources.toml [sec_edgar] facts_refresh_days, statements_backfill_per_night",
             params=(
@@ -569,7 +231,7 @@ TASKS: dict[str, Task] = {
             "what each ETF holds, from the issuers' daily files and SEC N-PORT (incremental)",
             etf_holdings,
             ("holdings/etf",),
-            _etf_holdings,
+            entries_reference.run_etf_holdings,
             optional_sources=source_guards.HOLDINGS_ISSUERS,
             settings="sources.toml [etf_holdings]",
             params=(
@@ -587,7 +249,7 @@ TASKS: dict[str, Task] = {
             "descriptions: stocks from Massive (capped per night), ETFs from SEC prospectuses",
             descriptions,
             (descriptions.TABLE,),
-            _descriptions,
+            entries_ops.run_descriptions,
             optional_sources=source_guards.DESCRIPTION_SOURCES,
             settings="sources.toml [massive] descriptions_per_night, [sec_edgar] fund_quarters",
             params=(
@@ -605,7 +267,7 @@ TASKS: dict[str, Task] = {
             "(--from/--to)",
             earnings,
             ("events/earnings",),
-            _earnings,
+            entries_market.run_earnings,
             sources=("nasdaq_earnings",),
             settings="sources.toml [nasdaq_earnings]",
             params=(
@@ -621,7 +283,7 @@ TASKS: dict[str, Task] = {
             "unadjusted daily bars from Massive (resumable backfill)",
             bars,
             ("bars/1d",),
-            _bars,
+            entries_market.run_bars,
             sources=("massive_bars",),
             settings="sources.toml [massive]",
             params=(SESSION, FROM, TO, Param("force", ("--force",), None, "re-fetch stored")),
@@ -632,7 +294,7 @@ TASKS: dict[str, Task] = {
             "references (resumable backfill: 50 requests an hour on the free tier)",
             bars_history,
             ("bars/1d", "events/split", "events/bar_flag"),
-            _bars_history,
+            entries_market.run_bars_history,
             sources=("tiingo_prices",),
             settings="sources.toml [tiingo]; events/scope.toml",
             params=(
@@ -673,7 +335,7 @@ TASKS: dict[str, Task] = {
             "filing from EDGAR's daily form index",
             filings,
             (filings.TABLE, filings.EARNINGS),
-            _filings,
+            entries_market.run_filings,
             sources=("sec_filings", "sec_daily_index"),
             settings="sources.toml [sec_edgar] [quality]",
             params=(
@@ -694,7 +356,7 @@ TASKS: dict[str, Task] = {
             "Treasury par yield curve: risk-free rates by tenor (one request per year)",
             rates,
             ("rates/treasury",),
-            _rates,
+            entries_market.run_rates,
             sources=("treasury",),
             settings="sources.toml [treasury] lookback_days",
             params=(SESSION, FROM, TO, Param("force", ("--force",), None, "rewrite stored")),
@@ -704,7 +366,7 @@ TASKS: dict[str, Task] = {
             "splits and dividends from Massive",
             corporate_actions,
             ("events/split", "events/dividend"),
-            _corporate_actions,
+            entries_market.run_corporate_actions,
             sources=("massive_corporate_actions",),
             settings="sources.toml [massive] corporate_actions_window",
             params=(SESSION, FROM, TO),
@@ -714,7 +376,7 @@ TASKS: dict[str, Task] = {
             "option chains from the Cboe delayed feed",
             option_chains,
             ("chains/underlying_quotes", "chains/option_quotes", "chains/status"),
-            _chains,
+            entries_market.run_chains,
             sources=("cboe",),
             settings="sources.toml [cboe]",
             params=(
@@ -728,7 +390,7 @@ TASKS: dict[str, Task] = {
             "economic series and index levels (FRED / ALFRED, published files) with vintages",
             macro_series,
             (macro_series.TABLE,),
-            _macro,
+            entries_market.run_macro,
             optional_sources=("fred", "published"),
             settings="macro.toml + sources.toml [fred] [published] [quality]",
             params=(
@@ -747,7 +409,7 @@ TASKS: dict[str, Task] = {
             "the macro release calendar (FRED release dates, ISM by rule): past and scheduled",
             macro_calendar,
             (macro_calendar.TABLE,),
-            _macro_calendar,
+            entries_market.run_macro_calendar,
             optional_sources=("fred_release_dates",),
             settings="events/releases.toml + sources.toml [fred] [quality]",
             params=(
@@ -760,7 +422,7 @@ TASKS: dict[str, Task] = {
             "compute rollups for a session or backfill a range (--from/--to)",
             rollups,
             rollups.TABLES,
-            _rollups,
+            entries_market.run_rollups,
             settings="rollups.toml",
             params=(
                 SESSION,
@@ -774,7 +436,7 @@ TASKS: dict[str, Task] = {
             "compute the market-entity rollups (ADR 0047) for a session or backfill a range",
             market_rollups,
             market_rollups.TABLES,
-            _market_rollups,
+            entries_market.run_market_rollups,
             settings="rollups.toml",
             params=(
                 SESSION,
@@ -790,7 +452,7 @@ TASKS: dict[str, Task] = {
             "forward outcomes of the windows a session closes (ADR 0053); --from/--to: window ends",
             outcomes,
             outcomes.TABLES,
-            _outcomes,
+            entries_market.run_outcomes,
             settings="edges/*.toml (horizons, benchmarks)",
             params=(SESSION, FROM, TO),
         ),
@@ -799,7 +461,7 @@ TASKS: dict[str, Task] = {
             "compare the session's stored values with IBKR (IB Gateway, read-only market data)",
             verify,
             (verify.TABLE,),
-            _verify,
+            entries_ops.run_verify,
             sources=("ibkr",),
             settings="verification.toml + sources.toml [ibkr]",
             params=(
@@ -813,7 +475,7 @@ TASKS: dict[str, Task] = {
             "IBKR contract ids (conid) of the optionable universe: new names, then monthly",
             ibkr_contracts,
             (ibkr_contracts.TABLE,),
-            _ibkr_contracts,
+            entries_ops.run_ibkr_contracts,
             sources=("ibkr",),
             settings="sources.toml [ibkr] contracts_refresh_days, contracts_batch",
             params=(
@@ -830,7 +492,7 @@ TASKS: dict[str, Task] = {
             "(--from/--to)",
             ibkr_iv,
             (ibkr_iv.TABLE,),
-            _ibkr_iv,
+            entries_ops.run_ibkr_iv,
             sources=("ibkr",),
             settings="sources.toml [ibkr] iv_batch, iv_history_days, iv_backfill_per_night",
             params=(
@@ -848,7 +510,7 @@ TASKS: dict[str, Task] = {
             "(no request to IB); then rollups --only ibkr_iv@v1 over the range",
             ibkr_iv,
             (ibkr_iv.TABLE,),
-            _ibkr_iv_repair,
+            entries_ops.run_ibkr_iv_repair,
             params=(
                 SESSION,
                 Param("start", ("--from",), date.fromisoformat, "first session (needed)"),
@@ -860,7 +522,7 @@ TASKS: dict[str, Task] = {
             "run the data-quality checks for a session",
             quality,
             (),
-            _quality,
+            entries_ops.run_quality,
             settings="sources.toml [quality]",
             params=(SESSION,),
         ),
@@ -870,7 +532,7 @@ TASKS: dict[str, Task] = {
             "unexplained jump) in events/bar_flag; reads are the stored bars of --from..--to",
             bar_quality,
             ("events/bar_flag",),
-            _bar_quality,
+            entries_ops.run_bar_quality,
             settings="sources.toml [quality] min_bar_close, max_bar_jump, split_window_sessions, "
             "max_bad_bar_share",
             params=(
@@ -885,7 +547,7 @@ TASKS: dict[str, Task] = {
             "bring the derived history copies (read-optimised, one file per year) up to date",
             history_copy,
             (),  # derived files beside the tables, not a table (ADR 0060)
-            _history_copy,
+            entries_ops.run_history_copy,
             settings="nightly.toml [history_copy]",
             params=(SESSION,),
             skip=history_copy.skip_reason,
@@ -895,7 +557,7 @@ TASKS: dict[str, Task] = {
             "delete raw vendor responses, unfinished-run scratch and old live quotes after N days",
             purge,
             (),  # deletes raw files and scratch; produces no table
-            _purge,
+            entries_ops.run_purge,
             settings=(
                 "sources.toml raw_retention_days (+ per section), staging_retention_days,"
                 " live_retention_days"
@@ -921,7 +583,7 @@ TASKS: dict[str, Task] = {
             "rewrite stored ids per instruments/id_map (new runs)",
             migrate_ids,
             (),  # rewrites any table as a new run; produces none
-            _migrate_ids,
+            entries_ops.run_migrate_ids,
             params=(Param("dry_run", ("--dry-run",), None, "count only; write nothing"),),
         ),
         Task(
@@ -929,7 +591,7 @@ TASKS: dict[str, Task] = {
             "delete a superseded feature group's tables once its replacement covers them",
             retire_features,
             (),  # deletes a superseded table; produces none
-            _retire_features,
+            entries_ops.run_retire_features,
             params=(
                 Param("session", ("--date",), date.fromisoformat, "run date (default: last)"),
                 Param(
@@ -947,7 +609,7 @@ TASKS: dict[str, Task] = {
             "load the golden CSVs into the store (a fixture store, never production)",
             golden,
             ("bars/1d", "instruments/reference", "instruments/shares", "universe", golden.CATALOG),
-            _golden_load,
+            entries_ops.run_golden_load,
             sources=("synthetic",),
             params=(Param("golden_dir", ("--golden-dir",), Path, default=GOLDEN_DIR),),
         ),

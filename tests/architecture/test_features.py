@@ -169,7 +169,7 @@ def test_labels_and_units() -> None:
             assert f.valid_range is not None, f"{f.key}: give a numeric feature a range"
 
 
-def test_explained_and_illiquid_statuses_are_values_of_their_status_column() -> None:
+def test_explained_illiquid_and_uncovered_statuses_are_values_of_their_status_column() -> None:
     reasons = {r.value for r in NullReason}
     for f in FEATURES.values():
         if not f.null_status:
@@ -179,7 +179,7 @@ def test_explained_and_illiquid_statuses_are_values_of_their_status_column() -> 
             f"{f.key}: {f.status_field} has no categories"
         )
         assert set(f.explained_statuses) <= reasons, f"{f.key}: explained statuses not NullReason"
-        named = {*f.explained_statuses, *f.illiquid_statuses}
+        named = {*f.explained_statuses, *f.illiquid_statuses, *f.uncovered_statuses}
         assert named <= set(status.categories), f"{f.key}: {named - set(status.categories)}"
 
 

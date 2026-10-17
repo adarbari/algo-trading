@@ -244,6 +244,7 @@ describe('ExplorePage', () => {
       'Chart',
       'Options',
       'Features',
+      'Financials',
       'Events',
       'Screener hits',
       'Why it is an idea',

@@ -89,7 +89,7 @@ for depth. The original recommendation (a TRADER section after Explore) was supe
 4. **Fields**, the themes grouped in the order a screen uses them: who is tradeable
    (instrument gates, liquidity), the chart (momentum and trend, price levels, volume,
    volatility), options (implied volatility, option chain and short strikes, put wing, walls
-   and expiries), the company and its calendar (events, fundamentals, episode behaviour);
+   and expiries), the company and its calendar (events, fundamentals, statements);
    plus by intent and A-Z.
 5. **Situations**: the `[[situation]]` entries, each with the fields it fools.
 6. **Glossary**: the app's own words (session, knowledge time, UNKNOWN vs NOT_RUN, run,

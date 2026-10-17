@@ -1785,7 +1785,7 @@ export interface components {
             guide_term: string;
             /**
              * Kind
-             * @description SYSTEM, NOT_STORED, NOT_APPLICABLE, ILLIQUID, LICENCE, NOT_RUN
+             * @description SYSTEM, NOT_STORED, NOT_APPLICABLE, ILLIQUID, LICENCE, NOT_COVERED, NOT_RUN
              */
             kind: string;
             /**

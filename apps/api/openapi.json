@@ -3014,7 +3014,7 @@
             "type": "string"
           },
           "kind": {
-            "description": "SYSTEM, NOT_STORED, NOT_APPLICABLE, ILLIQUID, LICENCE, NOT_RUN",
+            "description": "SYSTEM, NOT_STORED, NOT_APPLICABLE, ILLIQUID, LICENCE, NOT_COVERED, NOT_RUN",
             "title": "Kind",
             "type": "string"
           },

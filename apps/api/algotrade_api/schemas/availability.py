@@ -22,7 +22,9 @@ class CauseLink(Schema):
 
 
 class Unavailable(Schema):
-    kind: str = Field(description="SYSTEM, NOT_STORED, NOT_APPLICABLE, ILLIQUID, LICENCE, NOT_RUN")
+    kind: str = Field(
+        description="SYSTEM, NOT_STORED, NOT_APPLICABLE, ILLIQUID, LICENCE, NOT_COVERED, NOT_RUN"
+    )
     features: list[str]
     guide_term: str = Field(description="the Guide glossary term that explains the kind")
     kind_text: str = Field(description="the kind in generic words")

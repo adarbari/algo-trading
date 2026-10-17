@@ -53,7 +53,7 @@ themes = ["implied volatility", "option chain and short strikes", "put wing, wal
 [[theme_group]]
 id = "company"
 title = "The company and its calendar"
-themes = ["events", "fundamentals", "episode behaviour"]
+themes = ["events", "fundamentals", "statements"]
 
 [[family]]
 id = "trend"
