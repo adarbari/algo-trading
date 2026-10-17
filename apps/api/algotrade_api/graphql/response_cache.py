@@ -9,8 +9,8 @@ configs, the same for every caller of a role: market and regime history, prices,
 ``USER_OPERATIONS`` (published tables and configs that depend on the caller's catalogue or
 configs: user features, the Guide's field entries), ``RUN_OPERATIONS`` (they also read run
 records or jobs: nightly runs, ingestion, screener runs and results, ideas, edges, status) and
-``NEVER_CACHED`` (the text model's usage and the Describe-it request ranking, which read the
-clock, and the caller's identity). The
+``NEVER_CACHED`` (the Describe-it request ranking, which reads the clock, and the caller's
+identity). The
 key (``response_key``) is the published state (``StoreReader.visible_seq()``), the writes the
 API itself served since it started (``WriteEpoch``, moved by ``CountWrites`` after
 the routes that write: a config save changes the caller's next read without a publish), a hash
@@ -25,8 +25,14 @@ workflow completing flips the pages without a publish, while a job's checkpoint 
 changes no session, evicts nothing. A ``SHARED_OPERATIONS`` entry does not hold the user id; every
 other cached one does. The role is always in the key (ADR 0056: an admin's answer carries causes a
 trader must never read). ``ResponseCache`` is an LRU bounded by bytes (``MAX_BYTES``, a
-constant) and by age (``TTL_S``: a write made outside this process, such as a CLI config edit,
-is seen within it). Only queries (the schema has no mutation), only answers without
+constant) and by age: after ``TTL_S`` an entry is *stale*, not gone (stale-while-revalidate:
+``get_stale`` still serves it while the router recomputes it in the background, so the first
+page after an idle spell costs nothing), and after ``HARD_TTL_S`` it is dropped. The age only
+matters for a write made outside this process, such as a CLI config edit, which the next read
+after ``TTL_S`` serves stale once and the one after it sees; every in-process change is in the
+key. ``OperationLog`` remembers the operations (document, variables, caller) the API served,
+so the warmer replays them in process after a start seed and after every publish
+(``warm.py``). Only queries (the schema has no mutation), only answers without
 ``errors``; the cache lives in one process, which is the only process the API runs as. The
 body kept is the gzip-compressed one (``schema._served`` sends it as is to a client that
 accepts gzip), so the byte bound counts compressed bytes."""
@@ -37,6 +43,7 @@ import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date
 from functools import lru_cache
 from typing import Any
@@ -47,7 +54,9 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from algotrade.config.site.users import UserRecord
 
 MAX_BYTES = 100 * 1024 * 1024
-TTL_S = 300.0
+TTL_S = 300.0  # an entry older than this is stale: served once more, recomputed behind it
+HARD_TTL_S = 24 * 3600.0  # beyond this an entry is dropped, not served
+LOG_MAX = 512  # operations the log remembers (a page sends a dozen, per user)
 # Operations (by name) whose answer is the same for every caller of a role.
 SHARED_OPERATIONS: frozenset[str] = frozenset(
     {
@@ -93,8 +102,12 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "GuideEntries",
         "OptionChain",  # stored chains and features: no live source
         "Verification",  # the stored verification/ibkr partition: no call to IBKR
+        "LlmUsage",  # the usage log: a logged call publishes a partition; TODAY_OPERATIONS
     }
 )
+# The operations whose loader reads the exchange date now (``load_llm_usage``'s "today"): that
+# date is in their key too, so the first read after midnight is not the day before's.
+TODAY_OPERATIONS: frozenset[str] = frozenset({"LlmUsage"})
 # Operations that also read run records or jobs: cached per user, keyed on the runs generation.
 RUN_OPERATIONS: frozenset[str] = frozenset(
     {
@@ -141,13 +154,13 @@ RUN_OPERATIONS: frozenset[str] = frozenset(
 # The run operations whose loader reads the clock (``load_completeness``: the last session the
 # exchange closed): the closed session is in their key too.
 CLOSED_SESSION_OPERATIONS: frozenset[str] = frozenset({"IngestionCompleteness", "StatusStrip"})
-# Never kept: the text model's usage (it reads the clock, unkeyed), the caller's identity
+# Never kept: the caller's identity
 # (answered inline, no context opened) and the caller's own missing-feature requests (a draft
 # POST records them, and a draft writes nothing the cache keys on; the window reads the clock).
 # A new operation is never in this group by default: the classification test fails until it is
 # placed.
 NEVER_CACHED: frozenset[str] = frozenset(
-    {"AcceptedFormulas", "FeatureRequests", "LlmUsage", "Viewer", "MyFeatureRequests"}
+    {"AcceptedFormulas", "FeatureRequests", "Viewer", "MyFeatureRequests"}
 )
 # The route packages whose endpoints write (configs, screen results, evaluations); a preview,
 # a draft or an explain POST writes nothing the cache keys on.
@@ -217,6 +230,7 @@ def response_key(
     runs: tuple[int, int] = (0, 0),
     closed: date | None = None,
     served: str = "",
+    today: date | None = None,
 ) -> str:
     """The hex digest identifying one cacheable answer. ``runs`` (the runs generation) is part
     of a ``RUN_OPERATIONS`` key, ``closed`` of a ``CLOSED_SESSION_OPERATIONS`` one, ``served``
@@ -233,6 +247,8 @@ def response_key(
         parts.append(f"runs:{runs[0]}:{runs[1]}")
     if name in CLOSED_SESSION_OPERATIONS:
         parts.append(f"closed:{closed}")
+    if name in TODAY_OPERATIONS:
+        parts.append(f"today:{today}")
     return hashlib.sha256("\x00".join(parts).encode()).hexdigest()
 
 
@@ -254,10 +270,12 @@ class ResponseCache:
         self,
         max_bytes: int = MAX_BYTES,
         ttl_s: float = TTL_S,
+        hard_ttl_s: float = HARD_TTL_S,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._max = max_bytes
         self._ttl = ttl_s
+        self._hard_ttl = hard_ttl_s
         self._clock = clock
         self._items: OrderedDict[str, tuple[float, bytes]] = OrderedDict()
         self._held = 0
@@ -269,14 +287,29 @@ class ResponseCache:
         return self._held
 
     def get(self, key: str) -> bytes | None:
+        """The body of a fresh entry (younger than ``ttl_s``)."""
+        return self._read(key, self._ttl)
+
+    def get_stale(self, key: str) -> bytes | None:
+        """The body of an entry past ``ttl_s`` but within ``hard_ttl_s`` (``None`` for a fresh
+        one: ``get`` serves that; the caller recomputes behind the stale answer)."""
+        found = self._read(key, self._hard_ttl)
+        if found is None or self._read(key, self._ttl) is not None:
+            return None
+        return found
+
+    def _read(self, key: str, limit: float) -> bytes | None:
         with self._lock:
             found = self._items.get(key)
             if found is None:
                 return None
             at, body = found
-            if self._clock() - at > self._ttl:
+            age = self._clock() - at
+            if age > self._hard_ttl:
                 del self._items[key]
                 self._held -= len(body)
+                return None
+            if age > limit:
                 return None
             self._items.move_to_end(key)
             return body
@@ -295,3 +328,37 @@ class ResponseCache:
             while self._held > self._max:
                 _, (_, dropped) = self._items.popitem(last=False)
                 self._held -= len(dropped)
+
+
+@dataclass(frozen=True)
+class Served:
+    """One operation the API served (or was seeded with): what the warmer replays."""
+
+    viewer: UserRecord
+    document: str
+    variables: Any
+
+
+class OperationLog:
+    """The operations served, newest last, bounded by ``LOG_MAX``: one entry per caller,
+    document and variables. Touched on the event loop only."""
+
+    def __init__(self, max_items: int = LOG_MAX) -> None:
+        self._max = max_items
+        self._items: OrderedDict[tuple[str, str, str], Served] = OrderedDict()
+
+    def note(self, viewer: UserRecord, document: str, variables: Any) -> None:
+        text = json.dumps(variables, sort_keys=True, separators=(",", ":"), default=str)
+        ident = (
+            f"{viewer.role.value}:{viewer.user_id}",
+            hashlib.sha256(document.encode()).hexdigest(),
+            text,
+        )
+        self._items.pop(ident, None)
+        self._items[ident] = Served(viewer, document, variables)
+        while len(self._items) > self._max:
+            self._items.popitem(last=False)
+
+    def items(self) -> list[Served]:
+        """The remembered operations, oldest first (the order pages first asked for them)."""
+        return list(self._items.values())

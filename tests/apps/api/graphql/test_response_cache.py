@@ -11,6 +11,7 @@ and the inline ``viewer`` are never refused."""
 import gzip
 import json
 import re
+import time
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -29,6 +30,7 @@ from algotrade_api.graphql.response_cache import (
     NEVER_CACHED,
     RUN_OPERATIONS,
     SHARED_OPERATIONS,
+    TTL_S,
     USER_OPERATIONS,
     ResponseCache,
     WriteEpoch,
@@ -42,7 +44,8 @@ from tests.helpers.api_store import END, as_user
 SESSION = "query Day { session { date } }"  # a cached operation (USER_OPERATIONS)
 VIEWER = "query Day { viewer { id role } }"
 SHARED = "query RegimeBands { viewer { id role } }"  # a SHARED_OPERATIONS name
-RUNS = "query LlmUsage { session { date } }"  # in NEVER_CACHED
+RUNS = "query AcceptedFormulas { session { date } }"  # in NEVER_CACHED
+USAGE = "query LlmUsage { session { date } }"  # USER_OPERATIONS + TODAY_OPERATIONS
 RUN_OP = "query NightlyRuns { session { date } viewer { id role } }"  # a RUN_OPERATIONS name
 CLOSED_OP = "query IngestionCompleteness { session { date } }"  # also CLOSED_SESSION_OPERATIONS
 GQL_TS = Path(__file__).parents[4] / "apps/web/src/shared/api/generated/graphql/gql.ts"
@@ -59,7 +62,9 @@ class Harness:
         self.served = "2026-10-08"  # the default session's token (ADR 0062)
         self.wired: Any = None  # the runs generation main.py passes
         self.opened = 0
-        self.cache = ResponseCache()
+        self.now = [0.0]
+        self.cache = ResponseCache(clock=lambda: self.now[0])
+        self.router: Any = None
         self.admission = Admission(2)
         real_reads = main._reads
 
@@ -80,9 +85,10 @@ class Harness:
             epoch: WriteEpoch,
             runs: Any,
             served: Any,
+            log: Any = None,
         ) -> Any:
             self.wired, self.wired_served = runs, served
-            return graphql_router(
+            self.router = graphql_router(
                 opener,
                 debug,
                 stores,
@@ -93,7 +99,9 @@ class Harness:
                 lambda: self.runs,
                 lambda: self.closed,
                 lambda: self.served,
+                log,
             )
+            return self.router
 
         monkeypatch.setattr(main, "_reads", reads)
         monkeypatch.setattr("algotrade_api.main.graphql_router", router)
@@ -326,6 +334,25 @@ def test_the_key_holds_the_variables_and_the_document() -> None:
     assert closed != response_key(1, 0, who, "{ a }", None, "StatusStrip", (1, 2), date(2026, 1, 2))
 
 
+def test_the_usage_page_is_kept_per_day_and_moves_with_a_publish(harness: Harness) -> None:
+    """A logged call publishes a partition (seq), a new exchange date changes the key: the
+    page that took 0.4-1 s every call is a hit until one of them moves."""
+    client = harness.client()
+    _post(client, USAGE)
+    opened = harness.opened
+    _post(client, USAGE)
+    assert harness.opened == opened  # a hit
+    harness.seq = 2  # a call was logged
+    _post(client, USAGE)
+    assert harness.opened > opened
+    viewer = UserRecord("ana", Role.ADMIN)
+
+    def key(day: date) -> str:
+        return response_key(1, 0, viewer, USAGE, None, "LlmUsage", today=day)
+
+    assert key(date(2026, 10, 8)) != key(date(2026, 10, 9))
+
+
 def test_the_cache_is_bounded_by_bytes_and_evicts_the_least_recently_used() -> None:
     cache = ResponseCache(max_bytes=10)
     cache.put("a", b"1234")
@@ -338,12 +365,75 @@ def test_the_cache_is_bounded_by_bytes_and_evicts_the_least_recently_used() -> N
     assert cache.get("big") is None and cache.held == 8
 
 
-def test_an_entry_expires_after_its_age() -> None:
+def test_an_entry_is_stale_after_ttl_and_dropped_after_the_hard_ttl() -> None:
     now = [0.0]
-    cache = ResponseCache(ttl_s=10, clock=lambda: now[0])
+    cache = ResponseCache(ttl_s=10, hard_ttl_s=100, clock=lambda: now[0])
     cache.put("a", b"1")
+    assert cache.get("a") == b"1" and cache.get_stale("a") is None  # fresh: get serves it
     now[0] = 11
-    assert cache.get("a") is None and cache.held == 0
+    assert cache.get("a") is None and cache.get_stale("a") == b"1"  # stale: kept for the router
+    now[0] = 101
+    assert cache.get_stale("a") is None and cache.held == 0  # hard TTL: gone
+
+
+def _wait_until(done: Callable[[], bool]) -> None:
+    for _ in range(500):
+        if done():
+            return
+        time.sleep(0.01)
+    raise AssertionError("the background recompute did not finish")
+
+
+def test_a_stale_entry_is_served_at_once_and_recomputed_behind_the_answer(
+    harness: Harness,
+) -> None:
+    """After an idle spell past the TTL the first request is a cache answer, not a recompute."""
+    with harness.client() as client:
+        first = _post(client, SESSION)
+        harness.now[0] += TTL_S + 1
+        opened = harness.opened
+        stale = _post(client, SESSION)
+        assert stale.content == first.content
+        _wait_until(lambda: harness.opened > opened)  # the recompute ran after the answer
+        opened = harness.opened
+        _wait_until(lambda: harness.cache.get(_key(harness)) is not None)  # fresh again
+        _post(client, SESSION)
+        assert harness.opened == opened  # fresh again: a hit
+
+
+def _key(harness: Harness) -> str:
+    return response_key(
+        harness.seq, 0, UserRecord("ana", Role.ADMIN), SESSION, None, "Day",
+        served=harness.served,
+    )  # fmt: skip
+
+
+def test_a_replay_after_a_publish_fills_the_cache_before_any_request(harness: Harness) -> None:
+    """The warmer replays the served operations for the new published state."""
+    with harness.client() as client:
+        _post(client, SESSION)
+        harness.seq = 2  # a publish: the cached entry is unreachable
+        assert client.portal is not None
+        assert client.portal.call(harness.router.replay) >= 1
+        opened = harness.opened
+        again = _post(client, SESSION)
+        assert again.status_code == 200 and harness.opened == opened  # served by the replay's entry
+        assert client.portal.call(harness.router.replay) == 0  # nothing stale: nothing recomputed
+
+
+def test_a_replay_runs_as_the_caller_it_recorded(harness: Harness) -> None:
+    """ADR 0056: a trader's operation is replayed as that trader: the entry it fills is the
+    trader's, and an admin asking next still computes its own."""
+    with harness.client("tia", Role.TRADER) as client:
+        trader = _post(client, RUN_OP)
+        harness.seq = 2
+        assert client.portal is not None
+        client.portal.call(harness.router.replay)
+        opened = harness.opened
+        assert _post(client, RUN_OP).content == trader.content and harness.opened == opened
+    with harness.client("ana", Role.ADMIN) as admin:
+        assert _post(admin, RUN_OP).status_code == 200
+        assert harness.opened > opened  # the trader's entry is not the admin's
 
 
 def test_past_the_queue_the_api_answers_503_with_retry_after(harness: Harness) -> None:
