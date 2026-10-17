@@ -2,7 +2,7 @@
 back, the bases of the multi-year growth rates (``revenue_cagr_3y`` and its siblings).
 
 Inputs: ``instruments/shares`` rows of the concepts ``revenue`` and ``eps_diluted`` (the same
-facts ``financials@v2`` reads, with a longer window: ``history_days``, about six years), the
+facts ``financials@v2`` reads, with a longer window: ``history_days``, about seven years), the
 session's ``price_stats@v2`` (it sets which instruments get a row), ``events/split`` and nothing
 else. Only facts FILED on or before the session are read (checked here, whatever the loader
 passed): a restatement filed later never moves a session.
@@ -17,7 +17,7 @@ the session is divided by its ratio, so the EPS then and now are per the same sh
 
     revenue_ttm_3y_ago, revenue_ttm_5y_ago              the revenue TTM about 3 / 5 years back
     eps_diluted_ttm_3y_ago, eps_diluted_ttm_5y_ago      the diluted EPS TTM about 3 / 5 years back
-    gh_status                                           OK / PARTIAL / NO_FACTS / STALE
+    gh_status                                           OK / PARTIAL / NO_TTM / NO_FACTS / STALE
 """
 
 from dataclasses import dataclass
@@ -41,7 +41,7 @@ from algotrade.features.rollups.statements.ttm import Fact, TtmParams, trailing,
 
 NAME = "growth_history"
 VERSION = 1
-STATUSES = ("OK", "PARTIAL", "NO_FACTS", "STALE")
+STATUSES = ("OK", "PARTIAL", "NO_TTM", "NO_FACTS", "STALE")
 YEARS = (3, 5)
 CONCEPTS = (REVENUE, EPS)
 COLUMN_OF = {REVENUE: "revenue_ttm_{}y_ago", EPS: "eps_diluted_ttm_{}y_ago"}
@@ -50,9 +50,10 @@ COLUMN_OF = {REVENUE: "revenue_ttm_{}y_ago", EPS: "eps_diluted_ttm_{}y_ago"}
 @dataclass(frozen=True)
 class GrowthParams(TtmParams):
     """``TtmParams`` with the longer window a five-year base needs (a TTM ending up to
-    ``stale_days`` ago, five years back, four quarters of 9 months, and the 40-day tolerance)."""
+    ``stale_days`` ago, five years back, the 40-day tolerance and the three gaps between four
+    quarters: 480 + 1826 + 40 + 273 = 2619 days)."""
 
-    history_days: int = 2500
+    history_days: int = 2700
 
 
 _COLS = tuple(f"{FACTS}.{c}" for c in ("concept", "value", "period_start", "period_end", "filed"))
@@ -86,7 +87,8 @@ FEATURES = (
     Feature(
         "gh_status", "str", "category",
         "OK (the revenue and EPS TTMs end on the same period and all four values are known); "
-        "PARTIAL (some are missing, or the two TTMs end on different periods); NO_FACTS (no "
+        "PARTIAL (some are missing, or the two TTMs end on different periods); NO_TTM (facts, "
+        "but no TTM can be formed); NO_FACTS (no "
         "revenue or EPS fact filed); STALE (the newest TTM ended more than stale_days, 480, "
         "before the session; values still shown, checked first)",
         "never", "label", categories=STATUSES, inputs=(f"{FACTS}.concept",),
@@ -103,6 +105,8 @@ def _row(facts: dict[str, list[Fact]], before: int) -> dict[str, object]:
         for c in now
         for n in YEARS
     }
+    if not now:
+        return {"gh_status": "NO_TTM"}  # facts are filed, but neither concept has a TTM
     first = now.get(REVENUE) or now.get(EPS)
     if first is not None and first[1] < before:
         return {**row, "gh_status": "STALE"}  # first: an old filer's history is old too

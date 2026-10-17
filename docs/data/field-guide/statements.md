@@ -589,7 +589,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 ### `rollup.growth_history@v1.gh_status`
 
-**How to read it.** Whether the multi-year history of the name can be trusted as a set. OK: revenue and EPS TTMs end on the same period and all four values are known. PARTIAL: some are missing, or the two end on different periods. NO_FACTS: no revenue or EPS fact is filed. STALE: the newest TTM ended more than 480 days before the session; values are shown but old.
+**How to read it.** Whether the multi-year history of the name can be trusted as a set. OK: revenue and EPS TTMs end on the same period and all four values are known. PARTIAL: some are missing, or the two end on different periods. NO_TTM: facts are filed but neither has a TTM. NO_FACTS: no revenue or EPS fact is filed. STALE: the newest TTM ended more than 480 days before the session; values are shown but old.
 
 **The criterion per intent**
 
@@ -619,6 +619,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
+- The operating income and D&A lines are not checked to end on the same quarter, as only operating income is a core line of is_status.
 - Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v1.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company.
 - A filer that does not tag a line has none, and null is not zero. A filer without a D&A line has no EBITDA: check the cash flow statement in the filing.
 - Both lines are the filer's own tags, so the sum can differ from the figure a company quotes as adjusted EBITDA. One-offs inside operating income stay in.
@@ -638,6 +639,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
+- Null when the income statement and the revenue end on different quarters: is_ttm_as_of must equal rollup.financials@v2.ttm_as_of. The end of the gross profit line itself is not checked.
 - Many filers do not tag GrossProfit, so a hard criterion drops them. Null is not a bad margin; check rollup.income_statement@v1.ebit_ttm for those names.
 - Filers draw the line between cost of revenue and operating costs differently. Compare within an industry only.
 - Gross profit and revenue are separate TTMs and can end on different quarters when the filer's tags differ in timing. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
@@ -657,6 +659,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
+- Null when the income statement and the revenue end on different quarters: rollup.income_statement@v1.is_ttm_as_of must equal rollup.financials@v2.ttm_as_of.
 - Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v1.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company.
 - Operating income includes one-offs the filer leaves in it (impairments, restructuring, legal charges). One bad quarter can turn a sound business negative.
 - EBIT and revenue are separate TTMs and can end on different quarters when the tags differ in timing. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
@@ -675,6 +678,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
+- The operating income and interest lines are not checked to end on the same quarter, as only operating income is a core line of is_status.
 - Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v1.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company.
 - Null when the interest expense is zero or untagged: a company without an interest line is not shown as infinitely covered. Check the debt in the filing.
 - Some filers net interest income against it or report it inside another line, which can flatter the cover. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
@@ -729,6 +733,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
+- Null unless rollup.balance_sheet@v1.bs_status is OK: PARTIAL means a core line sits at an older date than the debt, and mixing dates would mislead.
 - Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v1.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company.
 - The flat 21% tax is not the company's own rate, and invested capital leaves out leases, goodwill adjustments and short-term investments. Read it as a screen, not a valuation input.
 - Null when any of equity, debt or cash is untagged, and when cash exceeds equity plus debt. A hard criterion drops those names. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
@@ -747,6 +752,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
+- Null unless rollup.balance_sheet@v1.bs_status is OK: PARTIAL means a core line sits at an older date than the debt, and mixing dates would mislead.
 - Null when debt or cash is untagged: an untagged debt line is not zero, and rollup.balance_sheet@v1.debt_basis says NOT_TAGGED.
 - Leases and pension deficits are not debt here. Banks hold deposits as liabilities and a bank's debt is not comparable with an industrial's.
 - Dollars, not a ratio: compare with feature.ebitda or feature.market_cap. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
@@ -766,6 +772,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
+- Null unless rollup.balance_sheet@v1.bs_status is OK: PARTIAL means a core line sits at an older date than the debt, and mixing dates would mislead.
 - Null for negative equity, so a hard criterion drops the most indebted names. Check rollup.balance_sheet@v1.total_debt against feature.ebitda instead.
 - Total debt is the sum of the parts of one filing and leaves out leases. Banks and utilities run high ratios for good reason: compare within an industry.
 - A company that tags no debt line is null, not debt-free. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
@@ -802,6 +809,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
+- Null unless rollup.cash_flow@v1.cf_status is OK: PARTIAL can mean the two lines end on different periods, and subtracting one year of capex from another year of cash flow is wrong.
 - Null for a filer that does not tag capex: free cash flow is never taken as equal to operating cash flow. rollup.cash_flow@v1.cf_status shows PARTIAL for those names.
 - Capex covers property, plant and equipment only. Acquisitions, capitalised software and leases are other lines, so an acquisitive company can look richer than it is.
 - Working capital swings move one year's figure: read two years. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio. Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.
@@ -820,6 +828,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
+- Null unless the cash flow is OK: both lines must end on the same period.
 - Null for a filer that does not tag capex, for a missing market cap and for an ADR. A hard criterion drops them all.
 - Market cap is the company total count times this class's close. The statements are the company's, so it is misstated when share classes trade at very different prices, and null for an ADR.
 - A high yield from a one-year working capital release reverses: check feature.fcf over two years. Banks' cash flow includes deposit movements, so the figure is not comparable with an industrial's.
@@ -838,6 +847,7 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 
 **When the reading lies**
 
+- Null unless rollup.balance_sheet@v1.bs_status is OK: PARTIAL means a core line sits at an older date than the debt, and mixing dates would mislead.
 - Minority interest, preferred stock, leases, pensions and short-term investments are not adjusted for, so the figure is approximate for companies with large ones.
 - Null when debt or cash is untagged, for a missing market cap and for an ADR. Market cap is the company total count times this class's close. The statements are the company's, so it is misstated when share classes trade at very different prices, and null for an ADR.
 - Banks have no meaningful enterprise value: their debt is their operating liabilities. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.

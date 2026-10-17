@@ -20,10 +20,11 @@ TABLES = {
     "rollups/instrument/fundamentals@v3": ("shares_outstanding", "market_cap_status"),
     "rollups/instrument/financials@v2": (
         "revenue_ttm", "net_income_ttm", "eps_diluted_ttm", "financials_status", "eps_stale",
-        "is_adr",
+        "is_adr", "ttm_as_of",
     ),
     "rollups/instrument/income_statement@v1": (
         "gross_profit_ttm", "ebit_ttm", "da_ttm", "interest_expense_ttm", "is_status",
+        "is_ttm_as_of",
     ),
     "rollups/instrument/cash_flow@v1": ("ocf_ttm", "capex_ttm", "cf_status"),
     "rollups/instrument/balance_sheet@v1": (
@@ -38,6 +39,7 @@ BASE = {  # a healthy industrial: market cap 10 x 100 = 1000
     "close": 100.0, "shares_outstanding": 10.0, "market_cap_status": "OK",
     "revenue_ttm": 1000.0, "net_income_ttm": 100.0, "eps_diluted_ttm": 10.0,
     "financials_status": "OK", "eps_stale": False, "is_adr": False,
+    "ttm_as_of": pd.Timestamp("2025-03-31"), "is_ttm_as_of": pd.Timestamp("2025-03-31"),
     "gross_profit_ttm": 400.0, "ebit_ttm": 150.0, "da_ttm": 50.0, "interest_expense_ttm": 30.0,
     "is_status": "OK", "ocf_ttm": 200.0, "capex_ttm": 80.0, "cf_status": "OK",
     "cash": 100.0, "total_debt": 300.0, "total_assets": 1000.0, "stockholders_equity": 500.0,
@@ -70,7 +72,9 @@ def evaluate(fs: FeatureSet, rows: dict[str, dict]) -> pd.DataFrame:
     }
     for frame in frames.values():  # numbers as floats (None is NaN), the rest as given
         for c in frame.columns[2:]:
-            if c not in ("market_cap_status", "financials_status", "is_status", "cf_status",
+            if c in ("ttm_as_of", "is_ttm_as_of"):
+                frame[c] = pd.to_datetime(frame[c])
+            elif c not in ("market_cap_status", "financials_status", "is_status", "cf_status",
                          "bs_status", "gh_status", "eps_stale", "is_adr"):  # fmt: skip
                 frame[c] = frame[c].astype(float)
             elif c in ("eps_stale", "is_adr"):
@@ -237,3 +241,24 @@ def test_no_feature_is_ever_infinite(fs: FeatureSet) -> None:
     }
     values = evaluate(fs, rows)[NAMES].to_numpy(dtype=float)
     assert not np.isinf(values).any()
+
+
+def test_a_ratio_of_two_ttms_needs_them_to_end_on_the_same_quarter(fs: FeatureSet) -> None:
+    other = pd.Timestamp("2024-12-31")
+    rows = {"EQ:SKEW": {"is_ttm_as_of": other}, "EQ:NOEND": {"is_ttm_as_of": pd.NaT}}
+    out = evaluate(fs, rows)
+    assert out[["operating_margin", "gross_margin"]].isna().all().all()
+    assert out["ebitda"].notna().all() and out["roe"].notna().all()  # no revenue in them
+
+
+def test_formulas_over_several_lines_need_complete_statuses(fs: FeatureSet) -> None:
+    out = evaluate(fs, {"EQ:BSP": {"bs_status": "PARTIAL"}, "EQ:CFP": {"cf_status": "PARTIAL"}})
+    several = ["net_debt", "enterprise_value", "roic", "debt_to_equity", "ev_ebitda"]
+    assert out.loc["EQ:BSP", several].isna().all()
+    assert out.loc["EQ:BSP", ["roe", "roa", "pb_ratio"]].notna().all()  # one line each
+    assert out.loc["EQ:CFP", ["fcf", "fcf_yield"]].isna().all() and out.loc["EQ:CFP", "roe"] > 0
+
+
+def test_a_negative_enterprise_value_gives_no_multiple(fs: FeatureSet) -> None:
+    out = evaluate(fs, {"EQ:CASH": {"cash": 5000.0, "total_debt": 0.0}}).loc["EQ:CASH"]
+    assert out["enterprise_value"] == -4000.0 and pd.isna(out["ev_ebitda"])

@@ -144,6 +144,11 @@ def test_statuses_and_missing_facts() -> None:
     assert stale.loc["EQ:A", "revenue_ttm_3y_ago"] == 42.0  # shown, not hidden
 
 
+def test_facts_without_a_ttm_are_no_ttm() -> None:
+    three = [quarter(n, 1.0) for n in range(3)]  # three quarters: no TTM can be formed
+    assert run(three).loc["EQ:A", "gh_status"] == "NO_TTM"
+
+
 def test_revenue_and_eps_ending_on_different_periods_are_partial() -> None:
     eps = [quarter(n, 1.0, "eps_diluted") for n in range(QUARTERS - 1)]  # one quarter behind
     row = run(history() + eps).loc["EQ:A"]
@@ -152,7 +157,8 @@ def test_revenue_and_eps_ending_on_different_periods_are_partial() -> None:
 
 
 def test_params_keep_a_window_that_reaches_five_years_back() -> None:
-    assert P.history_days == 2500 and P.history_days > 5 * 365 + gh.TtmParams().stale_days
+    needed = gh.TtmParams().stale_days + 1826 + 40 + 3 * 91  # a stale filer, 5y back, 4 quarters
+    assert P.history_days == 2700 and P.history_days >= needed
     with pytest.raises(ValueError, match="history_days"):
         gh.GrowthParams(history_days=500)
     assert [f.name for f in gh.FEATURES][-1] == "gh_status"
