@@ -35,6 +35,7 @@ from algotrade.services.read.market.history import warm_market_frames
 from algotrade.services.read.ops.ingestion import load_completeness
 from algotrade.services.read.regime.regime import load_regime
 from algotrade.services.read.regime.timeline import load_episode_signals
+from algotrade.services.read.screens.hits import load_screener_hits
 from algotrade.services.read.screens.ideas import load_ideas
 from algotrade.services.read.screens.runs import screen_rows
 from algotrade.services.read.screens.screeners import load_screeners
@@ -74,6 +75,8 @@ def home_steps(ctx: ReadContext) -> list[Step]:
         ("regime", lambda: load_regime(ctx)),
         ("ideas", lambda: load_ideas(ctx, IDEAS_LIMIT)),  # the Ideas page, home of every login
         ("edge desk", lambda: load_edge_desk(ctx)),
+        # the Explore detail pane's hits of any ticker are a lookup in this index (hits.py)
+        ("screener hits", lambda: load_screener_hits(ctx, [])),
     ]
 
 
