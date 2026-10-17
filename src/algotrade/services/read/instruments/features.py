@@ -319,7 +319,9 @@ def _rows(
             raise ValueError(f"a {entity} read names its ids")
         frame, missing = entity_field_view(ctx.reader, day, fields, ids, features=ctx.features)
         return _by_id(frame), missing
-    view = field_view(ctx.reader, day, fields, ids, features=ctx.features)
+    view = field_view(
+        ctx.reader, day, fields, ids, features=ctx.features, memo=ctx.cache.get_or_compute
+    )
     rows, missing = _by_id(view.frame), view.missing
     # A company snapshot taken after the session is not known on it (no lookahead).
     if view.company_pre_snapshot:

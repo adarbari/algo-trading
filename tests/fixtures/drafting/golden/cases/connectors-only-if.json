@@ -47,14 +47,21 @@
     "explained": {
       "parts": [
         {
-          "words": "optionable stocks over $10",
+          "words": "optionable stocks",
           "kind": "applied",
           "origin": "words",
           "join": null,
           "join_words": ""
         },
         {
-          "words": "trade at least $20M a day",
+          "words": "over $10",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "they trade at least $20M a day",
           "kind": "applied",
           "origin": "words",
           "join": "and",

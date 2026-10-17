@@ -258,3 +258,17 @@ def test_find_lists_the_runs_directory_once_per_generation(
     time.sleep(0.01)
     runs.save(start_run("job", D1, T0 + timedelta(1)))
     assert len(runs.find("job")) == 2 and len(listed) == 3  # a save invalidates it
+
+
+def test_a_short_range_probes_its_days_and_reads_what_the_listing_reads(
+    store: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # a one-session read of a 4,000-partition table listed every directory (75 ms) to find one
+    tables = LocalBackend(store).tables
+    day = _days(30)[9]
+    listed = tables.read_range(TABLE, day, day + timedelta(days=11))
+    monkeypatch.setattr(local.LocalTables, "dates", lambda *_a, **_k: pytest.fail("listed"))
+    probed = tables.read_range(TABLE, day, day + timedelta(days=11))
+    assert listed is not None and probed is not None and len(probed) > 12
+    pd.testing.assert_frame_equal(probed, listed, check_exact=True)
+    assert tables.read_range(TABLE, date(1990, 1, 1), date(1990, 1, 5)) is None  # no partition
