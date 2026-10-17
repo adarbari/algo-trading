@@ -275,6 +275,7 @@ class CallResult:
     rate_limit_retries: int = 0
     suggestions: int = 0  # checks the draft offered (never scored: counted and reported)
     parts: PartsStats | None = None  # how its explained parts were made (None: it had none)
+    doubts: int = 0  # verifier doubts left in the draft served (ADR 0041, 2026-10-17)
 
 
 @dataclass
@@ -385,6 +386,7 @@ def _call(
         dropped=drops,
         suggestions=len(made.suggestions),
         parts=made.parts_stats,
+        doubts=len(made.doubts),
     )
 
 
@@ -401,6 +403,7 @@ def _result(
     dropped: tuple[Drop, ...] = (),
     suggestions: int = 0,
     parts: PartsStats | None = None,
+    doubts: int = 0,
 ) -> CallResult:
     if got is None:
         return CallResult(provider, case_id, status, error=error)
@@ -408,6 +411,7 @@ def _result(
         provider, case_id, status, passed, fields, got.model, got.input_tokens,
         got.output_tokens, got.cache_read_tokens, got.cache_write_tokens, got.latency_s,
         costs.cost_of(got.call_id), got.text, error, dropped, len(got.text), 0, suggestions, parts,
+        doubts,
     )  # fmt: skip
 
 
@@ -462,6 +466,7 @@ def measure(results: Sequence[CallResult]) -> dict[str, Any]:
         "cost_usd": sum(costs) if costs else None,
         "suggestions": sum(r.suggestions for r in results),
         "parts": aggregate(r.parts for r in answered),
+        "doubts_served": sum(r.doubts for r in answered),
         **drop_metrics(results),
     }
 
@@ -559,6 +564,7 @@ def report_lines(rep: Mapping[str, Any]) -> list[str]:
         lines += [_row(f"  {cid}", m) for cid, m in data["cases"].items()]
         lines.append(_row("  TOTAL", data["summary"]))
         lines.append(_parts_line(data["summary"]["parts"]))
+        lines.append(f"  doubts served: {data['summary']['doubts_served']}")
     lines += ["", "summary", HEADER]
     lines += [_row(p, d["summary"]) for p, d in rep["providers"].items()]
     if rep["stopped"]:

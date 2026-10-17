@@ -20,6 +20,10 @@ nor are the ``suggestions`` (protective soft / score checks the sentence did not
 amended 2026-10-12): its answer, in the model's own shape, goes through the same ``_draft`` and
 ``_finished``, so the validators, the ``current`` criteria and the parts are the same; any
 doubt (a criterion dropped or refused, a field ``current`` has) falls through to the model.
+A deterministic verifier (``parts/verify.py``, amended 2026-10-17) then reads the parts of a valid
+model draft: words nothing maps, an "or" left out of the words, an item tied to no words, "X or Y"
+drafted as ANDed criteria are doubts, refused like an invalid answer (repair on the same member,
+then the stronger ones); a draft every member leaves doubtful is served with its ``doubts``.
 Reads the catalogue, the configs and, for the dry run of a formula, the request's session;
 writes nothing."""
 
@@ -70,6 +74,7 @@ from algotrade.services.drafting.contract.suggestions import (
 from algotrade.services.drafting.parts.build import build_parts
 from algotrade.services.drafting.parts.items import items_of
 from algotrade.services.drafting.parts.model import Part, PartsStats, part_tag
+from algotrade.services.drafting.parts.verify import Doubt, doubts, kinds_of
 from algotrade.services.drafting.phrasebook.resolve import resolve
 from algotrade.services.drafting.phrasebook.shortcut import (
     phrasebook_version,
@@ -89,6 +94,8 @@ from algotrade.services.text_model.model import TextModel, reject_answer
 MODES = ("hard", "soft", "score")
 MISSES = ("WATCH", "LIQUIDITY_RISK", "EVENT_RISK")
 WHOLE = "p1"  # the one part of a part's re-draft: its words are the whole of the sentence
+MAX_DOUBTS = 4  # doubts a repair message lists
+MAX_DOUBT_CHARS = 300  # characters of one doubt in it
 MAX_TEXT = 1000  # characters of sentence (one request, synchronous: never a job)
 DID_YOU_MEAN = 5  # candidates named in a drop reason
 _ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -142,6 +149,7 @@ class ScreenDraft:
     sentence: str = ""  # the whitespace-normalised sentence the parts' offsets count in
     parts: tuple[Part, ...] | None = None  # explained parts; None: the model gave none
     parts_stats: PartsStats | None = None  # how they were made (golden scoring; never served)
+    doubts: tuple[str, ...] = ()  # the verifier's kinds still open in this draft (never served)
 
 
 def draft_screen(
@@ -176,6 +184,7 @@ def draft_screen(
     return ask_for_draft(
         ctx, model, tag, system, user,
         lambda text: _draft(ctx, screener_id, text, infos, sentence, phrasebook, current),
+        verify=True,
     )  # fmt: skip
 
 
@@ -187,6 +196,7 @@ def ask_for_draft(
     user: str,
     make: Callable[[str], ScreenDraft],
     finish: Callable[[ScreenDraft], ScreenDraft] | None = None,
+    verify: bool = False,
 ) -> ScreenDraft:
     """Ask ``model`` (``system``, ``user``, tagged ``tag``) and return the draft ``make`` builds
     from its answer: the model is asked with the answer schema and ``make`` as its ``accept``
@@ -195,11 +205,25 @@ def ask_for_draft(
     it, and a ``ConfigurationError`` from it rejects the answer in the usage log like any answer
     that cannot be used, so the call does not count as one that returned a draft. The one asking
     path of a whole sentence (``draft_screen``) and of one part of it
-    (``services/drafting/redraft``)."""
+    (``services/drafting/redraft``). ``verify`` (the whole sentence only) adds the deterministic
+    verifier (``parts/verify``, ADR 0041 amended 2026-10-17): a valid draft with doubts is
+    refused like an invalid one, so the chain repairs it once on the same member and then asks
+    the stronger ones; when every attempt is refused, the valid draft with the fewest doubts
+    (the later on a tie) is served with its ``doubts`` set, never an invalid one."""
     drafted: list[tuple[str, ScreenDraft]] = []  # the answers accepted: text and its draft
+    doubtful: list[ScreenDraft] = []  # valid drafts the verifier refused, with their doubts
 
     def check(text: str) -> None:
         drafted.append((text, make(text)))
+
+    def doubted(draft: ScreenDraft) -> tuple[Doubt, ...]:
+        if not verify or draft.stage != "model":
+            return ()
+        typed = any(
+            c.get("field") == "instrument.security_type"
+            for c in draft.document["criteria"].values()
+        )
+        return doubts(draft.parts, typed)
 
     def accept(text: str) -> None:
         """The chain's check of an answer: a draft we can use, else ``InvalidAnswerError``."""
@@ -210,10 +234,19 @@ def ask_for_draft(
         named = [d for d in drafted[-1][1].dropped if "; did you mean " in d.reason]
         if named:  # a bare entry name: the repair asks again with the full names
             raise InvalidAnswerError("; ".join(f"{d.field}: {d.reason}" for d in named))
+        if found := doubted(drafted[-1][1]):  # a draft that may have misread the sentence
+            doubtful.append(replace(drafted[-1][1], doubts=kinds_of(found)))
+            raise InvalidAnswerError(doubt_message(found))
+
+    def served(draft: ScreenDraft, call_id: str | None) -> ScreenDraft:
+        done = _finished(ctx, draft, call_id)
+        return finish(done) if finish is not None else done
 
     try:
         completion = model.complete(system, user, tag=tag, schema=ANSWER_SCHEMA, accept=accept)
     except ModelUnavailableError as unavailable:
+        # (a last attempt that was a did-you-mean draft wins over earlier doubtful ones: it is the
+        # newest, and its bare names are shown with their candidates)
         # every attempt refused for a bare entry name only: keep the good criteria, show the
         # bare ones dropped with their candidates (the refused attempts' call id, for their cost)
         if (
@@ -222,15 +255,27 @@ def ask_for_draft(
             and all("; did you mean " in d.reason for d in drafted[-1][1].dropped)
         ):
             return _finished(ctx, drafted[-1][1], unavailable.call_id)
+        if doubtful:  # valid drafts nobody could fix: the one with fewest doubts, later on a tie
+            best = min(reversed(doubtful), key=lambda d: len(d.doubts))
+            return served(best, unavailable.call_id)
         raise
     try:
         if not drafted or drafted[-1][0] != completion.text:  # a model that did not check
             check(completion.text)
-        done = _finished(ctx, drafted[-1][1], completion.call_id)
-        return finish(done) if finish is not None else done
+            if found := doubted(drafted[-1][1]):
+                drafted[-1] = (completion.text, replace(drafted[-1][1], doubts=kinds_of(found)))
+        return served(drafted[-1][1], completion.call_id)
     except (ModelUnavailableError, ConfigurationError) as exc:  # an answer we cannot use
         reject_answer(model, tag, completion, str(exc), user, len(system) + len(user))
         raise
+
+
+def doubt_message(found: Sequence[Doubt]) -> str:
+    """What the repair tells the model about ``found``: each doubt's message, bounded."""
+    text = "; ".join(
+        f"{d.kind} ({d.ref}): {d.message}"[:MAX_DOUBT_CHARS] for d in found[:MAX_DOUBTS]
+    )
+    return f"the draft may have misread the sentence: {text}"
 
 
 def draft_words(
