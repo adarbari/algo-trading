@@ -14,7 +14,9 @@ never replaces (the partition is the session the fetch is for; ``ts`` the fetch 
   earlier run of the day count). A name is due when never fetched or past its slot in ``[fmp]
   refresh_days`` (``due_keys``: new names first, then the stalest), so every name is refreshed on
   that cadence as far as the budget goes. A name FMP refuses (402, not on the free plan) is
-  ``NOT_COVERED`` after one call and is asked again only after four refresh windows; the free
+  ``NOT_COVERED`` after one call and is asked again only after four refresh windows. FMP gates by
+  endpoint, so a name any of whose calls answered is never held (a refused later kind just has no
+  rows); the free
   plan covers few names, so most nights spend their budget on the covered large caps;
 - Finnhub: one call a name (recommendation trend), at most ``[finnhub] per_night`` names, due on
   the same cadence, stalest first;
@@ -52,7 +54,6 @@ from algotrade_ingestion.tasks.analyst.budget import NOT_MADE, PREFIX, fmp_calls
 from algotrade_ingestion.tasks.framework import source_guards
 from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import (
-    FAILURES,
     PUBLISHED,
     IngestRun,
     TaskContext,
@@ -131,17 +132,19 @@ def history(run: IngestRun) -> tuple[dict[str, date], dict[str, date], dict[str,
         if record.run_id == run.run_id or record.status not in PUBLISHED:
             continue
         day = record.session_date
+        labels: dict[str, list[str]] = {}  # symbol -> its FMP calls' labels in this run
         for key, status in record.items.items():
             label = status_label(status)
             if key.startswith(PREFIX):
-                symbol = key.split(":")[1]
-                if label in (OK, EMPTY):
-                    answered[symbol] = day
-                    refused_on.pop(symbol, None)
-                elif label == NOT_COVERED:
-                    refused_on[symbol] = day
+                labels.setdefault(key.split(":")[1], []).append(label)
             elif key.startswith(FINNHUB) and label in (OK, EMPTY):
                 finnhub[key[len(FINNHUB) :]] = day
+        for symbol, calls in labels.items():  # FMP gates by endpoint: held only if none answered
+            if OK in calls or EMPTY in calls:
+                answered[symbol] = day
+                refused_on.pop(symbol, None)
+            elif NOT_COVERED in calls:
+                refused_on[symbol] = day
     return answered, refused_on, finnhub
 
 
@@ -181,14 +184,15 @@ def build_rows(kind: str, parsed: pd.DataFrame, instrument_id: str) -> pd.DataFr
 
 
 def coverage_status(labels: Sequence[str]) -> str:
-    """One vendor attempt for a name -> its marker ``status``, from its calls' item labels: a
-    refusal wins (the plan does not serve the name), then an error (the name is unknown, not
-    uncovered), then data (any call answered with rows), else every call was empty."""
-    if NOT_COVERED in labels:
-        return NOT_COVERED
-    if any(label in FAILURES for label in labels):
-        return FAILED
-    return OK if OK in labels else EMPTY
+    """One vendor attempt for a name -> its marker ``status``, from its calls' item labels. FMP
+    gates by endpoint, so a name any call answered is ``OK`` (rows) or ``EMPTY``, whatever else
+    was refused; only a name nothing answered is ``NOT_COVERED`` (the plan refuses it) or, when
+    an error is all there is, ``FAILED`` (the name is unknown, not uncovered)."""
+    if OK in labels:
+        return OK
+    if EMPTY in labels:
+        return EMPTY
+    return NOT_COVERED if NOT_COVERED in labels else FAILED
 
 
 def mark_coverage(run: IngestRun, name: Name, vendor: str, labels: Sequence[str]) -> None:
@@ -278,21 +282,25 @@ def _fmp(
     for symbol in take:
         name = by_symbol[symbol]
         labels: list[str] = []
+        unmade = False
         for item, source_name, _, kind in calls:
             key = f"{PREFIX}{symbol}:{item}"
             if out_of_time(run, started):
                 run.record_item(key, f"{NOT_MADE}: [fmp] run_budget_s is spent")
+                unmade = True
                 break
             if left <= 0:
                 run.record_item(key, f"{NOT_MADE}: [fmp] daily_budget is spent")
+                unmade = True
                 break
             left -= 1
             status = _ask(run, sources[source_name], key, name, kind, "fmp")
             labels.append(status)
-            if status == NOT_COVERED:
-                refused_n += 1
-                break  # the plan does not serve this name: the other kinds would be refused too
-        else:
+            if status == NOT_COVERED and OK not in labels and EMPTY not in labels:
+                break  # nothing answered yet: the plan does not serve this name, spare the rest
+        if coverage_status(labels) == NOT_COVERED:
+            refused_n += 1
+        elif not unmade:
             fetched += 1
         mark_coverage(run, name, "fmp", labels)
         if (fetched + refused_n) % CHECKPOINT_EVERY == 0:

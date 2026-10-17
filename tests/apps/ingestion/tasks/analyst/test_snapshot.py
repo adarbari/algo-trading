@@ -92,6 +92,7 @@ def context(
     finnhub_days: int = 7,
     run_budget_s: int = 1500,
     dup: frozenset[str] = frozenset(),
+    gated: frozenset[str] = frozenset(),
 ) -> TaskContext:
     def get(url: str) -> bytes:
         calls.append(url)
@@ -102,8 +103,8 @@ def context(
             return b"[]"
         if "finnhub" in url:
             return RECOMMENDATION.replace(b"AAPL", symbol.encode())
-        if symbol == "CHWY":
-            raise HttpError(402, body=PREMIUM)
+        if symbol == "CHWY" or (symbol in gated and "analyst-estimates" in url):
+            raise HttpError(402, body=PREMIUM)  # gated: the plan serves the name but not estimates
         for fragment, payload in FMP_PAYLOADS.items():
             if fragment in url:
                 body = payload
@@ -394,3 +395,18 @@ def test_the_acceptance_warns_when_too_many_calls_failed() -> None:
 def test_the_nightly_step_runs_after_the_screens_and_edge_signals() -> None:
     names = [step.name for step in NIGHTLY]
     assert names.index("analyst-snapshot") > names.index(EDGE_SIGNALS) > names.index("screens")
+
+
+def test_a_name_that_answers_one_kind_is_not_held_when_a_later_kind_is_refused() -> None:
+    writer, calls = StoreWriter(MemoryBackend()), []
+    seed(writer, ("AAPL",))
+    first = context(writer, D1, calls, gated=frozenset({"AAPL"}))
+    record = run(first, {"session": D1})
+    assert markers(first, D1)["EQ:AAPL", "fmp"] == "OK"  # grades answered; estimates refused
+    got = stored(first, D1)
+    kinds = set(got[(got["source"] == "fmp") & (got["kind"] != "coverage")]["kind"])
+    assert kinds == {"price_target", "grades"}  # rows only for the kinds that answered
+    assert record.stats["fmp"]["not_covered"] == 0 and record.stats["fmp"]["fetched"] == 1
+    d2 = D1 + timedelta(days=14)  # past the 7-day refresh, well inside a 28-day hold
+    again = run(context(writer, d2, [], gated=frozenset({"AAPL"})), {"session": d2})
+    assert again.stats["fmp"]["held_not_covered"] == 0 and again.stats["fmp"]["names"] == ["AAPL"]
