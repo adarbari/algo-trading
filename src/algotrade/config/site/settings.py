@@ -153,7 +153,7 @@ VENDOR_EXTRAS = {
     "fred": ("base_url",),
     "tiingo": ("licence", "monthly_symbol_budget"),
     "fmp": ("licence", "daily_budget", "refresh_days"),
-    "finnhub": ("licence", "per_night"),
+    "finnhub": ("licence", "per_night", "refresh_days"),
     "etf_holdings": ETF_KEYS,
     **VENDOR_FLAGS,
     "ibkr": (
@@ -236,6 +236,7 @@ class SourcesSettings:
     fmp_refresh_days: int = 7  # [fmp] refresh_days: refetch cadence of a name
     finnhub_licence: str = "personal"  # [finnhub] licence (ADR 0068)
     finnhub_per_night: int = 300  # [finnhub] per_night: names read a night
+    finnhub_refresh_days: int = 7  # [finnhub] refresh_days: refetch cadence of a name
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
     limits_dir: str = "var/run/limits"
@@ -378,6 +379,9 @@ class SourcesSettings:
             fmp_refresh_days=_extra(vendors, "fmp").integer("refresh_days", d.fmp_refresh_days, 1),
             finnhub_per_night=_extra(vendors, "finnhub").integer(
                 "per_night", d.finnhub_per_night, 0
+            ),
+            finnhub_refresh_days=_extra(vendors, "finnhub").integer(
+                "refresh_days", d.finnhub_refresh_days, 1
             ),
             finnhub_licence=_extra(vendors, "finnhub").choice(
                 "licence", d.finnhub_licence, LICENCES

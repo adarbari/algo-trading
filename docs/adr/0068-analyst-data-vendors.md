@@ -75,8 +75,13 @@ session only) appends each night's slice to `analyst/estimate_snapshots`, keyed 
 publish instant, never a vendor date, no earlier session's row replaced. Names: S&P 500 members and
 the scope list. FMP spends three calls a name within `[fmp] daily_budget` on names due on the
 `[fmp] refresh_days` cadence (never fetched first, then the stalest); a 402 name is `NOT_COVERED`
-and waits four windows. Finnhub reads up to `[finnhub] per_night` names. The rotation is read back
-from the run records' items, so the table holds no state of its own.
+and waits four windows. Finnhub reads up to `[finnhub] per_night` names on its own
+`[finnhub] refresh_days`. With neither key set the step is skipped with a WARN (a pass). The rotation
+is read back from the run records' items. Every attempt of a vendor for a name also stores one
+`kind = "coverage"` row (`period = "current"`, `status` OK / EMPTY / NOT_COVERED / FAILED, `ts` the
+attempt), in the same table and on the same key, so a feature reads "the vendor refuses this name"
+(NOT_COVERED) apart from "not fetched yet" (no row) and "the call failed" (FAILED) from storage, not
+from run items; a refused name has that marker and no estimate rows.
 
 ### History starts at the first fetch
 Neither vendor gives a point-in-time history: a value they serve today replaces yesterday's and the

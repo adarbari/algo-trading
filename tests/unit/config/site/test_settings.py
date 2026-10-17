@@ -517,7 +517,12 @@ def test_every_vendor_section_sets_each_of_its_keys_explicitly() -> None:
 def test_analyst_snapshot_settings_default_and_validate() -> None:
     settings = SourcesSettings.from_document(site("sources"))
     assert (settings.fmp_refresh_days, settings.finnhub_per_night) == (7, 300)
-    assert settings.max_analyst_failed == 0.20
-    document = {"fmp": {"refresh_days": 3}, "quality": {"max_analyst_failed": 0.5}}
+    assert settings.max_analyst_failed == 0.20 and settings.finnhub_refresh_days == 7
+    document = {
+        "fmp": {"refresh_days": 3},
+        "finnhub": {"refresh_days": 5},
+        "quality": {"max_analyst_failed": 0.5},
+    }
     changed = SourcesSettings.from_document(document)
     assert changed.fmp_refresh_days == 3 and changed.max_analyst_failed == 0.5
+    assert changed.finnhub_refresh_days == 5

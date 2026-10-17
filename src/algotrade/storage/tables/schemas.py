@@ -581,7 +581,15 @@ ACCESS_STATUSES = frozenset({"ALLOWED", "DENIED", "LIMITED"})
 # floats and the two analyst counts; targets the four prices; grades and recommendation the five
 # counts (grades also the label ``consensus``). A run is a window (a rotation slice of the names),
 # so runs merge on the key; one session holds each name at most once, a later session adds new rows.
-SNAPSHOT_KINDS = frozenset({"estimates_annual", "price_target", "grades", "recommendation"})
+# ``coverage`` rows (``period`` ``current``, measure columns null) record each ATTEMPT of a vendor
+# for a name in ``status``: ``OK`` (it returned data), ``EMPTY`` (answered, no data),
+# ``NOT_COVERED`` (it refused the name: not on the free plan) or ``FAILED`` (a transport, 5xx or
+# other error: a transient failure is not "not covered"), so a feature reads NOT_COVERED or
+# NOT_FETCHED from the store, not from run items. ``status`` is null on every other kind.
+SNAPSHOT_KINDS = frozenset(
+    {"estimates_annual", "price_target", "grades", "recommendation", "coverage"}
+)
+COVERAGE_STATUSES = frozenset({"OK", "EMPTY", "NOT_COVERED", "FAILED"})
 ANALYST_ESTIMATE_SNAPSHOTS = fixed(
     "analyst/estimate_snapshots",
     "reference",
@@ -606,6 +614,7 @@ ANALYST_ESTIMATE_SNAPSHOTS = fixed(
     "sell int64",
     "strong_sell int64",
     "consensus string",
+    "status string",
     runs="merge",
     key=("instrument_id", "source", "kind", "period"),
 )
@@ -899,9 +908,17 @@ def access_status_problems(frame: pd.DataFrame) -> list[str]:
 
 
 def snapshot_kind_problems(frame: pd.DataFrame) -> list[str]:
-    """``analyst/estimate_snapshots`` rows whose ``kind`` is not one of ``SNAPSHOT_KINDS``."""
+    """``analyst/estimate_snapshots``: a known ``kind``; ``status`` only on ``coverage`` rows."""
     bad = sorted({str(v) for v in frame["kind"]} - SNAPSHOT_KINDS)
-    return [f"kind must be one of {sorted(SNAPSHOT_KINDS)}, got {bad}"] if bad else []
+    problems = [f"kind must be one of {sorted(SNAPSHOT_KINDS)}, got {bad}"] if bad else []
+    status = frame["status"] if "status" in frame.columns else pd.Series(None, index=frame.index)
+    coverage = frame["kind"] == "coverage"
+    wrong = sorted({str(v) for v in status[coverage]} - COVERAGE_STATUSES)
+    if wrong:
+        problems.append(f"coverage status must be one of {sorted(COVERAGE_STATUSES)}, got {wrong}")
+    if status[~coverage].notna().any():
+        problems.append("status is set only on coverage rows")
+    return problems
 
 
 # The value rules of the tables that restrict a column to a vocabulary, by table name.

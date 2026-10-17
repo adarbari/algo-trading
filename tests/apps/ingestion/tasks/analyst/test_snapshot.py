@@ -83,10 +83,17 @@ def context(
     budget: int = 200,
     per_night: int = 300,
     hour: int = 9,
+    broken: frozenset[str] = frozenset(),
+    empty: frozenset[str] = frozenset(),
+    finnhub_days: int = 7,
 ) -> TaskContext:
     def get(url: str) -> bytes:
         calls.append(url)
         symbol = url.split("symbol=")[1].split("&", maxsplit=1)[0]
+        if symbol in broken:
+            raise HttpError(500, body=b"boom")
+        if symbol in empty:
+            return b"[]"
         if "finnhub" in url:
             return RECOMMENDATION.replace(b"AAPL", symbol.encode())
         if symbol == "CHWY":
@@ -103,7 +110,9 @@ def context(
         "fmp_estimates": FmpAnalystEstimates(fmp),
         "finnhub_recommendations": FinnhubRecommendations(finnhub),
     }
-    settings = SourcesSettings(fmp_daily_budget=budget, finnhub_per_night=per_night)
+    settings = SourcesSettings(
+        fmp_daily_budget=budget, finnhub_per_night=per_night, finnhub_refresh_days=finnhub_days
+    )
     return task_ctx(writer, clock=clock(day, hour), sources=sources, settings=settings)
 
 
@@ -121,13 +130,14 @@ def test_a_night_stores_every_kind_and_asks_a_refused_name_once() -> None:
     assert record.status is RunStatus.COMPLETE
     got = stored(ctx, D1)
     validate_frame(TABLE, got)
-    kinds = got.groupby(["instrument_id", "source"])["kind"].agg(lambda k: sorted(set(k)))
+    data = got[got["kind"] != "coverage"]
+    kinds = data.groupby(["instrument_id", "source"])["kind"].agg(lambda k: sorted(set(k)))
     assert kinds["EQ:AAPL", "fmp"] == ["estimates_annual", "grades", "price_target"]
     assert kinds["EQ:NVDA", "finnhub"] == ["recommendation"]
-    assert (
-        "EQ:CHWY" in set(got["instrument_id"])
-        and not ((got["instrument_id"] == "EQ:CHWY") & (got["source"] == "fmp")).any()
-    )  # only Finnhub served CHWY
+    assert "EQ:CHWY" in set(data["instrument_id"])
+    assert not (
+        (data["instrument_id"] == "EQ:CHWY") & (data["source"] == "fmp")
+    ).any()  # Finnhub only
     assert sum("symbol=CHWY" in c and "financialmodelingprep" in c for c in calls) == 1
     target = got[(got["instrument_id"] == "EQ:AAPL") & (got["kind"] == "price_target")].iloc[0]
     assert target["period"] == "current" and target["target_consensus"] > 0
@@ -194,7 +204,8 @@ def test_a_kind_the_probe_denied_is_not_asked() -> None:
     record = run(context(writer, D1, calls), {"session": D1})
     assert not any("grades-consensus" in c or "finnhub" in c for c in calls)
     assert record.stats["denied"] == ["finnhub/recommendation", "fmp/ratings_summary"]
-    assert set(stored(context(writer, D1, []), D1)["kind"]) == {"estimates_annual", "price_target"}
+    kinds = set(stored(context(writer, D1, []), D1)["kind"])
+    assert kinds == {"estimates_annual", "price_target", "coverage"}
 
 
 def test_no_configured_vendor_fails_the_run() -> None:
@@ -211,3 +222,79 @@ def test_the_task_is_registered_and_its_check_warns_only_on_failures() -> None:
     run(ctx, {"session": D1})
     assert [c.status for c in check_analyst_snapshot(ctx, D1)] == ["PASS"]
     assert check_analyst_snapshot(ctx, D1 + timedelta(days=3)) == []
+
+
+def markers(ctx: TaskContext, day: date) -> dict[tuple[str, str], str]:
+    """(instrument_id, source) -> the coverage status stored for the session."""
+    got = stored(ctx, day)
+    rows = got[got["kind"] == "coverage"]
+    assert (rows["period"] == "current").all()
+    ids, sources, statuses = rows["instrument_id"], rows["source"], rows["status"]
+    return {(i, s): st for i, s, st in zip(ids, sources, statuses, strict=True)}
+
+
+def test_a_refused_name_stores_a_not_covered_marker_and_an_answered_one_ok() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer)
+    ctx = context(writer, D1, [])
+    run(ctx, {"session": D1})
+    assert markers(ctx, D1) == {
+        ("EQ:AAPL", "fmp"): "OK",
+        ("EQ:AAPL", "finnhub"): "OK",
+        ("EQ:NVDA", "fmp"): "OK",
+        ("EQ:NVDA", "finnhub"): "OK",
+        ("EQ:CHWY", "fmp"): "NOT_COVERED",
+        ("EQ:CHWY", "finnhub"): "OK",
+    }
+    got = stored(ctx, D1)
+    validate_frame(TABLE, got)
+    fmp_chwy = got[(got["instrument_id"] == "EQ:CHWY") & (got["source"] == "fmp")]
+    assert list(fmp_chwy["kind"]) == ["coverage"]  # a marker and no estimate rows
+
+
+def test_a_failed_or_empty_attempt_is_not_read_as_not_covered() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer, ("AAPL", "NVDA", "MSFT"))
+    ctx = context(writer, D1, [], broken=frozenset({"NVDA"}), empty=frozenset({"MSFT"}))
+    run(ctx, {"session": D1})
+    got = markers(ctx, D1)
+    assert got["EQ:NVDA", "fmp"] == got["EQ:NVDA", "finnhub"] == "FAILED"
+    assert got["EQ:MSFT", "fmp"] == got["EQ:MSFT", "finnhub"] == "EMPTY"
+    assert got["EQ:AAPL", "fmp"] == "OK"
+    validate_frame(TABLE, stored(ctx, D1))
+
+
+def test_markers_are_point_in_time_and_merge_within_a_session() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer, ("AAPL", "NVDA"))
+    run(context(writer, D1, [], broken=frozenset({"NVDA"})), {"session": D1})
+    again = context(writer, D1, [], hour=15)  # the same session, a later run: NVDA works now
+    run(again, {"session": D1})
+    got = stored(again, D1)
+    mine = got[got["kind"] == "coverage"]
+    assert not mine.duplicated(["instrument_id", "source", "period"]).any()
+    assert markers(again, D1)["EQ:NVDA", "fmp"] == "OK"  # the retry replaced the FAILED marker
+    assert (mine["knowledge_ts"] >= mine["ts"]).all() and (mine["ts"].dt.date == D1).all()
+
+
+def test_a_refused_name_is_asked_again_after_four_refresh_windows() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer, ("CHWY",))
+    run(context(writer, D1, []), {"session": D1})
+    held, calls = D1 + timedelta(days=27), []
+    run(context(writer, held, calls), {"session": held})
+    assert not any("financialmodelingprep" in c for c in calls)
+    due, calls = D1 + timedelta(days=28), []
+    ctx = context(writer, due, calls)
+    run(ctx, {"session": due})
+    assert sum("symbol=CHWY" in c and "financialmodelingprep" in c for c in calls) == 1
+    assert markers(ctx, due)["EQ:CHWY", "fmp"] == "NOT_COVERED"
+
+
+def test_finnhub_rotates_on_its_own_refresh_days() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer, ("AAPL",))
+    run(context(writer, D1, [], finnhub_days=3), {"session": D1})
+    d2 = D1 + timedelta(days=3)  # past Finnhub's 3 days, inside FMP's 7
+    record = run(context(writer, d2, [], finnhub_days=3), {"session": d2})
+    assert record.stats["finnhub"]["names"] == ["AAPL"] and record.stats["fmp"]["asked"] == 0

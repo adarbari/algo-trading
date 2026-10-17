@@ -158,6 +158,7 @@ enabled = true                   # ALGOTRADE_FINNHUB_API_KEY (free: finnhub.io);
 min_interval_s = 1.0             # free tier: 60 calls a minute
 licence = "personal"             # Finnhub's free terms: personal use; features derived from it inherit it
 per_night = 300                  # analyst-snapshot: names whose recommendation trend a night reads (1 call each, stalest first)
+refresh_days = 7                 # analyst-snapshot: each name's recommendation trend is re-read this often (its own cadence, not [fmp]'s)
 
 [sp500_history]                  # S&P 500 membership intervals since 1996 (fja05680/sp500, MIT licence, GitHub):
 enabled = true                   # the `index-membership` task (in no workflow until the owner runs it), one 28 KB file
