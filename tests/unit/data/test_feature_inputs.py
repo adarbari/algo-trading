@@ -16,6 +16,7 @@ from algotrade.data import prices
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.shares import TABLE as SHARES
 from algotrade.data.statements.reading import TABLE as STATEMENTS
+from algotrade.features.rollups.reference.share_classes import pairs
 from tests.helpers.rollup_store import (
     END,
     series,
@@ -296,7 +297,8 @@ def test_reference_input_carries_the_fund_facts_when_stored() -> None:
     ]  # fmt: skip
     writer.write_table("instruments/reference", END, "r", stamped(rows, END, "r"))
     seen = inputs.load_input(reader, "instruments/reference", [END], 0).at(END, 0)
-    assert seen is not None and list(seen.columns) == list(inputs.REFERENCE_FACTS)
+    stored = [c for c in inputs.REFERENCE_FACTS if c not in ("cik", "share_class_figi")]
+    assert seen is not None and list(seen.columns) == stored  # the ids are not stored here
     assert seen.iloc[0]["name"].endswith("Bull 2X Shares") and bool(seen.iloc[0]["is_leveraged"])
 
 
@@ -554,3 +556,19 @@ def test_statements_accepted_follow_the_same_rule_and_an_empty_store_is_none() -
     assert seen is not None and len(seen) == 1
     _, empty = store()
     assert inputs.load_input(empty, inputs.STATEMENTS_ACCEPTED, [d], 0).at(d, 0) is None
+
+
+def test_reference_input_carries_the_issuer_and_class_ids_the_share_class_pairs_read() -> None:
+    """End to end through the loader: a pair stored in the reference is a pair of the group."""
+    writer, reader = store()
+    rows = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "asset_class": "equity", "multiplier": 1.0,
+         "security_type": "COMMON_STOCK", "status": "ACTIVE", "cik": cik, "share_class_figi": f}
+        for s, cik, f in (("GOOGL", "1652044", "F1"), ("GOOG", "0001652044", "F2"),
+                          ("AAPL", "320193", "F3"))
+    ]  # fmt: skip
+    writer.write_table("instruments/reference", END, "r", stamped(rows, END, "r"))
+    seen = inputs.load_input(reader, "instruments/reference", [END], 0).at(END, 0)
+    assert seen is not None
+    found = pairs(seen).set_index("instrument_id")
+    assert found.at["EQ:GOOGL", "sibling_id"] == "EQ:GOOG" and "EQ:AAPL" not in found.index

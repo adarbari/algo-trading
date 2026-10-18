@@ -618,3 +618,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the spec builds the pair on `long_short` and the owner decision of 2026-10-17 makes a spread diagnostic only, so a pair spread is never a verdict basis unless the owner says so; two legs cost two trades; per-name orientation is the one base that a random side of the pair produces; a one-sided or mismatched pair would pair a name with the wrong class.
+
+## 2026-10-18 | PR #661 review (EB H9) | Pair tests, verdict, and two follow-ups
+- Question: where do the pair harness tests live, is a pair spread ever a verdict basis, and are per-reason exclusion counts and a sibling ADV floor in this PR?
+- Options: split the test folder now / in the next PR touching it; diagnostic only / verdict-eligible; counts and floor now / follow-up.
+- Decision: tests stay in `test_harness_trials.py` (split the folder by kind in the next PR touching it); a pair spread stays Diagnostic only through `result_side`; per-reason exclusion counts (today folded into `excluded_missing`, the reason is on each pick) and an ADV floor on the sibling (short) leg are follow-ups. A reference snapshot without `cik` / `share_class_figi` is MissingDataError, never an empty pair set.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the architect review found `REFERENCE_FACTS` dropped the ids so every pick read `no_sibling`; the loader now carries them. The folder split and the two counts touch other modules and need their own review.
