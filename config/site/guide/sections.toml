@@ -58,7 +58,10 @@ themes = ["events", "fundamentals", "statements", "analyst"]
 [[family]]
 id = "trend"
 title = "Trend"
-presets = ["trend_continuation", "pullback", "momentum_12_1", "size_small"]
+presets = [
+  "trend_continuation", "pullback", "momentum_12_1", "size_small", "ivol_high", "max_ret_high",
+  "amihud_illiquid", "beta_low",
+]
 
 [[family]]
 id = "breakouts"

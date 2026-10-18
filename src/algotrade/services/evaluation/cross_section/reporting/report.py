@@ -31,6 +31,10 @@ def _cell(row: Mapping[str, Any], key: str, fmt: str) -> str:
     return "-" if value is None else fmt.format(value)
 
 
+def _gap(value: float | None) -> str:
+    return "-" if value is None else f"{value:+.4f}"
+
+
 def render_edge_report(result: Mapping[str, Any]) -> str:
     """The report of one ``edge-eval`` job result."""
     lines = [f"# Edge {result['edge']} (run {result['run_id']}, {result['trials']} trials)", ""]
@@ -72,6 +76,14 @@ def render_edge_report(result: Mapping[str, Any]) -> str:
             f"CONTAINED: {c['variant']} h={c['horizon']} contained the report: "
             f"{'-' if share is None else f'{share:.0%}'} of {c['windows']} windows "
             f"({c['no_report']} with no later report stored; a diagnostic, never a filter)"
+        )
+    for d in result.get("decoys", []):
+        shown = "-" if d["overlap"] is None else f"{d['overlap']:.2f}"
+        flag = "" if d.get("measured", True) else " NOT MEASURED (no sessions or spread to compare)"
+        lines.append(
+            f"DECOY: {d['edge_variant']}/{d['screener']} vs {d['decoy']} h={d['horizon']}: pick "
+            f"overlap {shown} (Jaccard at D, {d['sessions']} sessions); spread less the decoy's "
+            f"{_gap(d['spread_gap'])} all, {_gap(d['spread_gap_oos'])} out of sample{flag}"
         )
     rows: Sequence[Mapping[str, Any]] = result["rows"]
     header = "| " + " | ".join(label for _, label, _ in COLUMNS) + " |"
