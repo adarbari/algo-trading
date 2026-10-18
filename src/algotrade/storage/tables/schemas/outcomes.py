@@ -20,6 +20,9 @@ from algotrade.storage.tables.spec import (
 OUTCOMES_PREFIX = "outcomes/instrument/"
 
 FORWARD_RETURNS = f"{OUTCOMES_PREFIX}forward_returns@v2"  # the outcomes task's table
+# The residual-returns grain (ADR 0053 amendment, EB H11): the return left after the ETF factor
+# betas known before S, beside (never inside) forward_returns, so no stored leg is invalidated.
+RESIDUAL_RETURNS = f"{OUTCOMES_PREFIX}residual_returns@v1"  # the residual-returns task's table
 
 OUTCOME_STATUSES = frozenset({"COMPLETE", "DELISTED", "UNMEASURED"})
 
@@ -41,8 +44,31 @@ _OUTCOME_TYPES = (
 )
 
 
+_RESIDUAL_TYPES = (
+    "instrument_id string!",
+    "ts timestamp_utc!",  # the close of S
+    "horizon_sessions int64!",
+    "window_end date!",  # T: the h-th exchange session after S
+    "beta_session date",  # the session the betas were read at (before S); null: none was found
+    "fwd_residual_return float64",  # fwd_return - fwd_factor_return; null: UNMEASURED
+    "fwd_factor_return float64",  # sum of beta_k x factor_k return over S..end; null: UNMEASURED
+    "outcome_status string!",  # OUTCOME_STATUSES; DELISTED: measured to the last bar
+    "outcome_reason string",  # UNMEASURED only: BAD_BAR, NO_FACTOR_HISTORY, NO_BETAS, ...
+)
+_MEASURED = (
+    "fwd_return", "fwd_max_return", "fwd_max_drawdown", "fwd_residual_return",
+    "fwd_factor_return",
+)  # fmt: skip
+
+
 def outcomes_spec(table: str) -> TableSpec:
-    """The spec of one ``outcomes/instrument/`` table (they share one schema)."""
+    """The spec of one ``outcomes/instrument/`` table (the forward tables share one schema; the
+    residual-returns table has its own, with no benchmark)."""
+    if table == RESIDUAL_RETURNS:
+        return fixed(
+            table, "outcome", ("instrument_id", "ts", "horizon_sessions", "window_end"),
+            *_RESIDUAL_TYPES, runs="merge", key=("instrument_id", "horizon_sessions"),
+        )  # fmt: skip
     return fixed(
         table, "outcome", ("instrument_id", "ts", "horizon_sessions", "window_end", "benchmark"),
         *_OUTCOME_TYPES, runs="merge", key=("instrument_id", "horizon_sessions", "benchmark"),
@@ -57,7 +83,7 @@ def outcome_problems(frame: pd.DataFrame) -> list[str]:
     if unmeasured.any() and (reason is None or reason[unmeasured].isna().any()):
         problems.append("an UNMEASURED outcome needs an outcome_reason")
     measured = ~unmeasured
-    for column in ("fwd_return", "fwd_max_return", "fwd_max_drawdown"):
+    for column in (c for c in _MEASURED if c in frame.columns):
         values = frame[column]
         if values[unmeasured].notna().any():
             problems.append(f"{column} must be null when UNMEASURED")

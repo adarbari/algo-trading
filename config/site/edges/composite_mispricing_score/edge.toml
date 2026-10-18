@@ -1,0 +1,91 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea family F (docs/edge-ideas/altdata-text-ml.md).
+# Screener: mispricing_composite (mispricing@v1.composite_rank). Also the natural benchmark for
+# other edges' decoy test: a baseline they can name.
+id = "composite_mispricing_score"
+name = "Composite mispricing score"
+family = "F"
+thesis = "Averaging a firm's ranks across several published anomalies finds stocks that are overpriced or underpriced far better than any one signal, with most of the spread in the overpriced end."
+mechanism = """Each anomaly is a noisy measure of mispricing; averaging reduces the noise. The
+overpriced end persists because short-sale frictions and sentiment-driven overpricing keep
+arbitrageurs from correcting it (Stambaugh, Yu and Yuan 2015)."""
+persistence = """Composites decay less than their parts out of sample (Jensen, Kelly and Pedersen
+2023) and the short leg is expensive to trade; the monthly version is limited by turnover costs
+(Novy-Marx and Velikov 2016)."""
+schedule = "month_end"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["mispricing_composite"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """mispricing@v1.composite_rank is a simplified composite: the mean percentile rank of seven
+anomalies (net issuance, accruals, net operating assets, asset growth, the O-score, and, inverted,
+gross profitability and ROA) with five or more present; the paper's eleven also hold composite
+equity issues, investment to assets, momentum and a returns-based distress measure, so the
+numbers are not comparable. Fundamentals use the SEC acceptance time as knowledge_ts (H2), so a
+filing counts only from the session after its acceptance; history is from the stored statements
+(about 2024-10, earlier once the 2010 statements backfill lands), so the sessions are few until
+then. The main outcome holds the 50 lowest-rank (underpriced) names; the short variant holds the 50
+highest, the paper's strong end, net of the site's borrow assumption and held only among names above
+the capacity floor. Month-end start sessions spaced at least 20 sessions apart."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[[variants]]
+id = "short_overpriced"
+
+[variants.outcome]
+side = "short"
+
+[quality_bar]
+outcome = """Excess return over SPY for the 20 sessions after the entry close (the session after a
+month-end decision), net of 10 bps a round trip; the short_overpriced variant is the short's
+value: minus the excess return, less cost and borrow."""
+trigger_timing = """The rank is computed from the financials public at the decision session D (a
+month end) by SEC acceptance time (a 10-Q accepted after the close counts from the next session)
+and D's closes; the entry session is S = D + 1."""
+replication = """Stambaugh, Yu and Yuan: monthly percentile rank average of the anomalies, long
+the lowest decile (underpriced), short the highest. Here the 50 lowest and, as the variant, the 50
+highest of the liquid common stocks, seven of their eleven anomalies, equal weight."""
+expected_size = """The value-weighted decile long-short earns 1.48% a month, risk-adjusted, 1965-2011,
+62 bp more than the average of the single-anomaly spreads, and 58 of those 62 bp come from the short
+leg (Stambaugh, Yu and Yuan 2015). With four anomalies missing and the top 50 of liquid names,
+expect less; the harness reports t and the sessions."""
+capacity_costs = """Monthly turnover is the cost: a long-only underpriced book is the realistic
+form, with a smaller alpha; the short leg needs borrow. 10 bps a round trip is the assumption and
+the site's borrow cost applies to the variant."""
+failure_modes = """Decay of the components after publication, a sentiment-dependent premium, and
+the simplified composite missing the paper's strongest inputs. Retire if the frozen-period
+top-50 excess return is not above the buy-and-hold mean of the eligible names, or the decile
+spread is not above zero."""
+decoys = """It contains momentum-like and profitability tilts and the size effect: the 12-1
+momentum and size baselines on the same sessions. The real question is whether the composite beats
+the best single edge after costs."""
+
+[[sources]]
+title = "Stambaugh, R., Yu, J. and Yuan, Y., Arbitrage Asymmetry and the Idiosyncratic Volatility Puzzle, Journal of Finance, 2015"
+url = "https://www.nber.org/papers/w18560"
+
+[[sources]]
+title = "Jensen, T. I., Kelly, B. and Pedersen, L. H., Is There a Replication Crisis in Finance?, Journal of Finance, 2023"
+url = "https://www.nber.org/papers/w28432"
+
+[[sources]]
+title = "Novy-Marx, R. and Velikov, M., A Taxonomy of Anomalies and Their Trading Costs, Review of Financial Studies, 2016"
+url = "https://www.nber.org/papers/w20721"
+
+# The literature's figure (ADR 0064): Stambaugh, Yu and Yuan's value-weighted decile long-short on
+# the composite of eleven anomalies, 1.48% a month, FF3-adjusted, August 1965 to January 2011,
+# before costs. A spread of the extreme deciles of all stocks.
+[published]
+measure = "decile_spread"
+value = 0.0148
+horizon_sessions = 20
+sample = 46
+source = 0

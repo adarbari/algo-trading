@@ -13,6 +13,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 | Industry momentum (`industry_momentum`) | A | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `industry_momentum` |
 | 12-1 momentum (`momentum_12_1`) | A | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1`, `residual_momentum`, `volatility_scaled_momentum`, `frog_in_the_pan`, `momentum_x_quality_interaction`, `fifty_two_week_high` |
 | Short-term residual reversal (`short_term_residual_reversal`) | A | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `residual_reversal`, `sector_reversal` |
+| Dividend-month premium (`dividend_month_premium`) | B | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `dividend_month` |
 | Earnings-date advances (`earnings_date_shift`) | B | candidate | on each `earnings_date_shift:earlier` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `earnings_date_early` |
 | Earnings gap on heavy volume (`earnings_gap_volume_drift`) | B | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `earnings_gap_volume`, `earnings_gap_only` |
 | Adverse 8-K item drift (`eight_k_item_drift`) | B | candidate | on each `filing_8k:4.02` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `eight_k_adverse_items` |
@@ -20,9 +21,17 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 | Pre-earnings run-up in past winners (`pre_earnings_runup_winners`) | B | candidate | on each `earnings_expected` | excess return, over 5 sessions, vs SPY, starting -6 sessions from the event, costs 10 bps | `pre_earnings_runup` |
 | S&P 500 deletions rebound (`sp500_deletions_long`) | B | candidate | on each `index_change:deletion` | excess return, over 20, 60, 250 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `sp500_deletion` |
 | Spin-off drift (`spinoff_drift`) | B | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
+| Option-to-stock volume ratio (`c04_option_stock_volume_ratio`) | C | candidate | every session | excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `option_stock_volume` |
+| Lottery stocks, avoid list (`c31_lottery_options_short`) | C | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `lottery_max` |
+| Option-implied signals (`option_cp_iv_signals`) | C | candidate | every session | excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cp_iv_spread`, `iv_smirk`, `iv_change_call`, `iv_change_ibkr` |
+| High-volume return premium (`high_volume_return_premium`) | D | candidate | every session | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `volume_shock`, `volume_shock_no_news` |
+| Composite mispricing score (`composite_mispricing_score`) | F | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `mispricing_composite` |
+| Reversal into earnings (`earnings_neutral_reversal`) | G | candidate | on each `earnings_expected` | excess return, over 3 sessions, vs SPY, starting -2 sessions from the event, costs 10 bps | `pre_earnings_reversal`, `earnings_neutral_reversal` |
+| Retail lottery-option attention (`retail_options_lottery_attention`) | H | candidate | every session | excess return, over 6, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `retail_option_attention` |
 | Tender-offer drift after expiry (`tender_offer_drift`) | H | candidate | on each `tender_offer` | excess return, over 60, 250 sessions, vs SPY, starting +21 sessions from the event, costs 20 bps | `tender_offer_filed` |
 | Reverse-split distress filter (`reverse_split_distress_filter`) | H | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 | Thematic ETF launch fade (`thematic_etf_launch_fade`) | H | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
+| Call-put IV spread into earnings (`pre_earnings_cp_iv_spread`) | I | candidate | on each `earnings_expected` | excess return, over 3 sessions, vs SPY, starting -1 sessions from the event, costs 10 bps | `cp_iv_spread`, `cp_iv_spread_rise` |
 | Earnings announcement premium (`earnings_announcement_premium`) | - | candidate | on each `earnings_expected` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event, costs 10 bps | `eap_all`, `eap_volume` |
 | 12-1 momentum among names that just reported (`momentum_at_earnings`) | - | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 15 bps | `momentum_12_1` |
 | Small-cap post-earnings drift (`small_cap_earnings_drift`) | - | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 40 bps | `pead_small_cap` |
@@ -61,7 +70,6 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - Frazzini, A. and Pedersen, L., Betting Against Beta, Journal of Financial Economics, 2014
 - Novy-Marx, R. and Velikov, M., Betting Against Betting Against Beta, Journal of Financial Economics, 2022 <https://alphaarchitect.com/betting-against-beta-bab-construction/>
 - Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk without Lower Return, Journal of Portfolio Management, 2007
-- S&P Dow Jones Indices, Expectations and Anomalies, Indexology Blog, 2025 <https://www.indexologyblog.com/2025/04/09/expectations-and-anomalies/>
 
 ## Industry momentum (`industry_momentum`)
 
@@ -93,7 +101,6 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - Moskowitz, T. and Grinblatt, M., Do Industries Explain Momentum?, Journal of Finance, 1999 <https://ideas.repec.org/a/bla/jfinan/v54y1999i4p1249-1290.html>
 - Arnott, R., Clements, M., Kalesnik, V. and Linnainmaa, J., Factor Momentum, Review of Financial Studies, 2023
 - Grobys, K., Ruotsalainen, J. and Aijo, J., Risk-managed industry momentum and momentum crashes, Quantitative Finance, 2018 <https://ideas.repec.org/a/taf/quantf/v18y2018i10p1715-1733.html>
-- Quantpedia, Sector Momentum Rotational System (strategy page) <https://quantpedia.com/strategies/sector-momentum-rotational-system>
 
 ## 12-1 momentum (`momentum_12_1`)
 
@@ -107,7 +114,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Baselines:** `size_small`
 - **Frozen period:** from 2026-04-01
 - **Published:** decile spread 1.31% over 20 sessions (Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993, 25 years)
-- **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). Variants (EB E1a): five more screeners score the same sessions as one trial each in the trial log: residual_momentum (the 12-1 return net of beta x SPY; the paper's size and value residuals are not stored), volatility_scaled_momentum (12-1 return per unit of 60-session volatility; a ranking stand-in for Barroso and Santa-Clara's time-series scaling of the portfolio), frog_in_the_pan (winners with information discreteness below 0), momentum_x_quality_interaction (quality score of at least 0.5, ranked by 12-1) and fifty_two_week_high (George and Hwang's nearness to the high). Each is the source's rule from stored features, each overlaps raw momentum (a correlation of 0.5 to 0.7 in the literature), so the harness's number beside momentum_12_1's, not alone, is the read. No [published] figure is filed for a variant: the catalogue's figures for them are not marked verified.
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). Variants (EB E1a): five more screeners, one trial each: residual_momentum (net of beta x SPY), volatility_scaled_momentum (12-1 per unit of 60-session volatility; a stand-in for Barroso and Santa-Clara's time-series scaling), frog_in_the_pan, momentum_x_quality_interaction and fifty_two_week_high. They overlap raw momentum: read each beside momentum_12_1's number. No [published] figure: the catalogue's are not marked verified.
 
 **Quality bar**
 
@@ -157,9 +164,40 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 **Sources**
 
 - Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets, 2013 <https://repub.eur.nl/pub/40707>
-- Nagel, S., Evaporating Liquidity, Review of Financial Studies, 2012
 - Chen, A. and Velikov, M., Zeroing In on the Expected Returns of Anomalies, Journal of Financial and Quantitative Analysis, 2023
 - Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022 <https://alphaarchitect.com/short-term-momentum/>
+
+## Dividend-month premium (`dividend_month_premium`)
+
+**Status:** candidate. **Family:** B. **Thesis:** Stocks earn abnormal returns in the months they are expected to pay a dividend, and give some back later.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `dividend_month`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Published:** mean excess 0.53% over 20 sessions (Hartzmark, S. and Solomon, D., The Dividend Month Premium, Journal of Financial Economics, 2013, 83 years)
+- **Notes:** The expected month is the calendar month after the decision session's own (a month-end D reads the coming month): expected_div_month_flag is true when the name had an ex-dividend date in that calendar month in at least one of the last 3 years (specials excluded), and the 50 names with the most hits rank first. It is the paper's prediction simplified: Hartzmark and Solomon derive the month from the last payment and its frequency (3, 6 or 12 months later); the 3-year history reads the same months for regular payers. The premium is strongest between declaration and ex-date; this edge holds the month, not the window. The history is bars and dividends back to 2010 or later once the rollup is backfilled (three years of dividends are needed first). Month-end start sessions spaced at least 20 sessions apart. Long side only.
+
+**Quality bar**
+
+1. **Mechanism:** Dividend-seeking investors buy ahead of a predictable payout (price pressure), and the free-dividend fallacy makes them treat the payout as income: a small, predictable demand shock with no information (Hartzmark and Solomon 2013, 2019).
+2. **Persistence:** The demand is structural (income clienteles, dividend-capture funds) and the returns are small per name, so it takes breadth to harvest; there is no risk to be paid for, only uninformed demand, which the premium's age (1927 on) suggests has not been arbitraged away.
+3. **Outcome:** Excess return over SPY for the 20 sessions after the entry close (the session after a month-end decision, so about the expected month), net of 10 bps a round trip.
+4. **Trigger timing:** The flag is computed from the dividends known by the decision session D (a month end) and the 3 years before it, never from the coming month's declared dividend; the entry session is S = D + 1.
+5. **Faithful replication:** Hartzmark and Solomon: predicted payers in the month, long, against all other stocks (their abnormal return is against the rest of the market); here the 50 names with the most expected months among the liquid common stocks that expect a dividend, compared with all eligible names.
+6. **Expected size and sample:** +53 bp a month against all other stocks and +37 bp against payers outside their predicted month, 1927-2009 (Hartzmark and Solomon 2013, verified); Chen and Zimmermann carry it as DivSeason, long-short 0.36% a month, t = 16. Post-publication decay is not stated in their data.
+7. **Capacity and costs:** Many names and a monthly turn: cost per name is small but trades are many; best as a tilt on a long book. 10 bps a round trip is the assumption.
+8. **Failure modes and retirement:** The month's gain being a payer or value tilt, and a premium that decays after publication. Retire if the frozen-period excess return is not above the buy-and-hold mean of the eligible names, or the expected-month names do no better than payers outside their month.
+9. **Decoys:** The low-volatility and quality tilt of dividend payers, size and value: the 12-1 momentum and size baselines on the same sessions; the calendar structure (a payer outside its month) is the real test.
+
+**Sources**
+
+- Hartzmark, S. and Solomon, D., The Dividend Month Premium, Journal of Financial Economics, 2013 <https://doi.org/10.1016/j.jfineco.2013.02.015>
+- Hartzmark, S. and Solomon, D., The Dividend Disconnect, Journal of Finance, 2019
+- Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (signal DivSeason) <https://github.com/OpenSourceAP/CrossSection>
 
 ## Earnings-date advances (`earnings_date_shift`)
 
@@ -384,6 +422,227 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - S&P Global Market Intelligence, Capital Market Implications of Spinoffs, 2017 <https://www.spglobal.com/marketintelligence/en/documents/capital-market-implications-of-spinoffs.pdf>
 - McConnell, J., Sibley, S. and Xu, W., Journal of Portfolio Management, 2015 (spin-offs, 2001 to 2013)
 
+## Option-to-stock volume ratio (`c04_option_stock_volume_ratio`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Stocks with unusually heavy option volume against their share volume underperform over the next weeks, so the quiet-option names beat them.
+
+- **Outcome:** excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** every session
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `option_stock_volume`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Published:** decile spread 0.34% over 5 sessions (Johnson, T. and So, E., The Option to Stock Volume Ratio and Future Returns, Journal of Financial Economics, 2012, 15 years)
+- **Notes:** The plan lists it as a filter overlay, tested as a variant of the edge it filters; it is filed here as its own document so its avoid list can be judged alone: the main outcome holds the 50 lowest-ratio names (the source's low leg), the avoid_high variant is the short outcome on the 50 highest ratio names, a result an avoid list can act on (owner decision O2). The ratio is chain flow over share volume (option_stock_volume_ratio), computed from chains stored nightly from 2026-10-02 only: about 11 sessions by 2026-10-16, none before the frozen start 2026-04-01, so the verdict stays inconclusive for a long time; the harness reports the count beside every number. Opening against closing trades and signed volume are not in public data (Ge, Lin and Pearson's strongest sub-signal). The short outcome is net of the site's assumed borrow cost and is held only among names with at least the capacity floor of dollar volume (ADR 0053, outcome sides).
+
+**Quality bar**
+
+1. **Mechanism:** Bad news is traded in options because shorting is costly: the ratio spikes when informed traders lever bad news, and stock holders do not watch the option tape (Johnson and So 2012; Ge, Lin and Pearson 2016 trace the power to the options' leverage).
+2. **Persistence:** The signal predicts negative returns mostly, and harvesting it means shorting hard-to-borrow names, which keeps arbitrageurs out; as a long-only filter (drop the top decile) it is a quality control, not a return source. It shrank after 2012 in public replications (practitioner replications; not verified).
+3. **Outcome:** Excess return over SPY for the 5 and 20 sessions after the entry close (the session after the decision session), net of 10 bps a round trip; the avoid_high variant is the short's value: minus the excess return, less cost and borrow.
+4. **Trigger timing:** The ratio is computed from the option volume and the share volume of the decision session D; the entry session is S = D + 1. A name with no chain, no option volume (a chain whose quotes carry none reads null, not zero) or no stock volume has no value.
+5. **Faithful replication:** Johnson and So: weekly decile sort on total option volume (contracts x 100) over the week's share volume, long low and short high; here the 50 lowest of the liquid common stocks (option_stock_volume ranks lowest first), and the avoid_high variant the 50 highest. The paper's week is the 5-session horizon (it needs the outcomes backfill once the document merges); 20 is the month.
+6. **Expected size and sample:** About 0.34% a week for the low-minus-high spread (19.3% a year), 1996-2010 (Johnson and So 2012); practitioner replications put it in the high-ratio (short) leg and in small caps and report it shrinking after 2012 (not verified). The long leg of liquid names should be much smaller.
+7. **Capacity and costs:** Stock-side costs only for the long leg; the short leg is hard to borrow in the names where the ratio is high, so it is an avoid list. 10 bps a round trip and the site's borrow assumption are the costs modelled.
+8. **Failure modes and retirement:** Pre-earnings and expiration volume ramps carry no signal, and the effect has faded. Retire if the frozen-period avoid_high excess return is not below the buy-and-hold mean of the eligible names, or the decile spread is not above zero.
+9. **Decoys:** Small size and illiquidity, short interest (not stored), pre-earnings volume ramps and the put-call ratio (the same channel): the 12-1 momentum and size baselines on the same sessions.
+
+**Sources**
+
+- Johnson, T. and So, E., The Option to Stock Volume Ratio and Future Returns, Journal of Financial Economics, 2012 <https://academicnewsletter.sufe.edu.cn/info/356813>
+- Ge, L., Lin, T.-C. and Pearson, N., Why Does the Option to Stock Volume Ratio Predict Stock Returns?, Journal of Financial Economics, 2016 <https://research.monash.edu/en/publications/why-does-the-option-to-stock-volume-ratio-predict-stock-returns/>
+
+## Lottery stocks, avoid list (`c31_lottery_options_short`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Stocks with an extreme best day last month are lottery-like and overpriced, so they underperform, and their calls are the ones to sell, never to buy.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 30
+- **Screeners:** `lottery_max`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Published:** decile spread 1.00% over 20 sessions (Bali, T., Cakici, N. and Whitelaw, R., Maxing Out: Stocks as Lotteries and the Cross-Section of Expected Returns, Journal of Financial Economics, 2011, 44 years)
+- **Notes:** The source is Boyer and Vorkink's sort on ex-ante option skewness, and its short-call P&L needs the option model outcome (H8) and chains from 2026-10-02 only. What is filed here is the lottery measure of Bali, Cakici and Whitelaw, MAX (max_ret_21d, the best one-day return of the last 21 sessions, from bars: history back to 2010 once the rollup is backfilled), as the lottery score the brief names: the outcome is the short on the 30 highest-MAX names (rank last) among those with enough dollar volume to short, net of the site's borrow assumption: the stock-side avoid list that a covered-call selection would use. The plan marks the idea covered-call only: naked short calls on meme stocks are the most dangerous trade in the catalogue, and nothing here models them. The published figure below is the MAX paper's, 1962-2005 (the paper's low-minus-high decile spread exceeds 1% a month): it is the proxy's own number, not Boyer and Vorkink's, whose magnitude is not verified. Month-end start sessions spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Retail demand for skewness overprices lottery-like stocks and their out-of-the-money calls, and limits to arbitrage keep dealers from correcting it (Bali, Cakici and Whitelaw 2011; Boyer and Vorkink 2014).
+2. **Persistence:** Short-sale constraints and retail's lottery preference are structural, and retail call buying has grown since 2020; but the premium sits where shorting is costly, and the squeeze tail (GME, AMC) is the risk that keeps arbitrageurs out.
+3. **Outcome:** The short's value: minus the excess return over SPY for the 20 sessions after the entry close (the session after a month-end decision), less 10 bps a round trip and the assumed borrow cost.
+4. **Trigger timing:** max_ret_21d is computed from the closes through the decision session D (a month end); the entry session is S = D + 1 (start_offset_sessions = 1).
+5. **Faithful replication:** Bali, Cakici and Whitelaw: the largest daily return of the prior month, decile sorts, one-month hold, long low and short high; here the 30 highest of the liquid common stocks (lottery_max ranks the highest last) as the short, a stock-side proxy for Boyer and Vorkink's high-skewness sort, which is by option skewness.
+6. **Expected size and sample:** More than 1% a month for the low-minus-high MAX decile spread, 1962-2005 (Bali, Cakici and Whitelaw 2011); the effect concentrates in small names and is weak in large liquid stocks (Hou, Xue and Zhang), so expect much less in this universe.
+7. **Capacity and costs:** An individual cannot short the microcaps where the effect is: the short is held only above the capacity floor and net of the assumed borrow. The covered-call use sells calls on names one already holds; the naked version is not modelled.
+8. **Failure modes and retirement:** Squeezes, and the premium living only in microcaps. Retire if the frozen-period short value is not above zero after borrow, or the high-MAX names do not do worse than the buy-and-hold mean of the eligible names.
+9. **Decoys:** Size, price level, distress, low volatility and idiosyncratic volatility (one cluster), short-term reversal: the size and 12-1 momentum baselines on the same sessions; the retail_options_lottery_attention edge reads the same names by option volume.
+
+**Sources**
+
+- Bali, T., Cakici, N. and Whitelaw, R., Maxing Out: Stocks as Lotteries and the Cross-Section of Expected Returns, Journal of Financial Economics, 2011 <https://www.nber.org/papers/w14804>
+- Boyer, B. and Vorkink, K., Stock Options as Lotteries, Journal of Finance, 2014
+
+## Option-implied signals (`option_cp_iv_signals`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Stocks whose options show informed buying (calls richer than puts, a flat put wing, rising call IV) outperform the market over the next weeks.
+
+- **Outcome:** excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** every session
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `cp_iv_spread`, `iv_smirk`, `iv_change_call`, `iv_change_ibkr`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Published:** decile spread 0.50% over 5 sessions (Cremers, M. and Weinbaum, D., Deviations from Put-Call Parity and Stock Return Predictability, Journal of Financial and Quantitative Analysis, 2010, 10 years)
+- **Notes:** Four screeners, one per source rule, read on every session. History differs by screener. cp_iv_spread, iv_smirk and iv_change_call read cp_iv@v1 and cp_iv_history@v1, which are derived from our own chains: chains are stored nightly from 2026-10-02 only, so these have a few sessions (about 11 by 2026-10-16, a 21-session change from 2026-11-02) and none before the frozen period starts, 2026-04-01; the harness reports the count beside every number and the verdict stays inconclusive until it is near 40 independent sessions. iv_change_ibkr reads ibkr_iv_history@v1, IBKR's blended IV30 change, with about 502 sessions of history (licence personal, ADR 0028, so fine for this private evaluation): it stands in for the call-only change of An et al. and is not the paper's rule, since a blended IV rises on bad news as well. Horizon 5 is the Cremers and Weinbaum week and needs the outcomes backfill once the document merges (horizons are stored from the documents); 20 is the month of the smirk and IV-change papers. Long side only: the short legs need borrow we do not have. Earnings windows are not excluded (a known decoy of IV changes).
+
+**Quality bar**
+
+1. **Mechanism:** Informed traders use options for leverage and to avoid short-sale constraints, and market makers widen the side being hit, so the implied-volatility surface leaks the direction of informed flow before the stock moves; stock investors do not read option surfaces (Cremers and Weinbaum 2010; Xing, Zhang and Zhao 2010; An, Ang, Bali and Cakici 2014).
+2. **Persistence:** The effect needs option data for hundreds of names and a weekly to monthly rebalance, and the parity deviation itself is blocked from arbitrage by borrow costs and early exercise. It declined over the original samples, which the authors read as arbitrage at work, so find returns 26% lower out of sample and 58% lower after publication on average (McLean and Pontiff 2016).
+3. **Outcome:** Excess return over SPY for the 5 and 20 sessions after the entry close (the session after the decision session), net of 10 bps a round trip (an assumption for liquid names).
+4. **Trigger timing:** Every spread, smirk and IV change is computed from the chain stored at the decision session D's close; the entry session is S = D + 1 (start_offset_sessions = 1), so the first fill is a close after the quotes the signal read. A name with no chain or no expiry 10 to 60 days out has no value and never passes.
+5. **Faithful replication:** Cremers and Weinbaum: the open-interest-weighted mean of call minus put IV over same-strike pairs, quintile sorts, long the top (cp_iv_spread); Xing, Zhang and Zhao: the OTM put (moneyness 0.80 to 0.95) IV minus the ATM call IV, long the lowest (iv_smirk); An, Ang, Bali and Cakici: the one-month change of ATM call IV, long the largest rise (iv_change_call). Here the top 50 of the liquid common stocks (liquid_common_stocks), not their decile of all names.
+6. **Expected size and sample:** About 50 bp a week for the top-minus-bottom spread (Cremers and Weinbaum 2010, 1996-2005, risk-adjusted), about 1% a month for call-IV changes (An et al. 2014), and about 10.9% a year for the smirk (Xing et al. 2010); each declined within its sample. Few sessions of chain data cannot tell that from zero: the harness reports t and the sessions beside it.
+7. **Capacity and costs:** Liquid optionable names only, stock-side costs only (10 bps a round trip is the assumption); the effect is concentrated in illiquid stocks with liquid options, so the long-only top 50 of large names is the harder, cheaper version. Option spreads are not paid: nothing is traded in options.
+8. **Failure modes and retirement:** Decay after publication, and the spread being borrow cost or jump risk rather than information (Bali and Hovakimian 2009 read it as jump risk). Retire if the frozen-period top-50 excess return is not above the buy-and-hold mean of the eligible names, or the decile spread is not above zero.
+9. **Decoys:** Short interest and borrow cost (not stored), the past month's return (IV rises after a rally), earnings-month IV ramps, the IV level (low idiosyncratic volatility) and size: the 12-1 momentum and size baselines on the same sessions.
+
+**Sources**
+
+- Cremers, M. and Weinbaum, D., Deviations from Put-Call Parity and Stock Return Predictability, Journal of Financial and Quantitative Analysis, 2010 <https://ideas.repec.org/a/cup/jfinqa/v45y2010i02p335-367_00.html>
+- Xing, Y., Zhang, X. and Zhao, R., What Does the Individual Option Volatility Smirk Tell Us About Future Equity Returns?, Journal of Financial and Quantitative Analysis, 2010 <https://ideas.repec.org/a/cup/jfinqa/v45y2010i03p641-662_00.html>
+- An, B.-J., Ang, A., Bali, T. and Cakici, N., The Joint Cross Section of Stocks and Options, Journal of Finance, 2014 (NBER working paper 19590) <https://www.nber.org/papers/w19590>
+- Bali, T. and Hovakimian, A., Volatility Spreads and Expected Stock Returns, Management Science, 2009 <https://pubsonline.informs.org/doi/fpi/10.1287/mnsc.1090.1063>
+- McLean, R. D. and Pontiff, J., Does Academic Research Destroy Stock Return Predictability?, Journal of Finance, 2016 <https://ivey.uwo.ca/media/3775549/pontiff.pdf>
+
+## High-volume return premium (`high_volume_return_premium`)
+
+**Status:** candidate. **Family:** D. **Thesis:** A stock whose volume today is far above its own recent volume outperforms over the following weeks, most when nothing public explains the volume.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** every session
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `volume_shock`, `volume_shock_no_news`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Published:** decile spread 0.50% over 20 sessions (Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001, 34 years)
+- **Notes:** volume_shock is today's volume at or above 2 standard deviations over the previous 20 sessions (Gervais et al. use the top 10% of a 50-day reference: a looser, own-history version). volume_shock_no_news adds news_free_5d: no 8-K or 8-K/A through the previous session in the last 5 and no earnings reaction window in them; it is a practitioner hypothesis with no published number. The catalogue's variant also drops days with an absolute return of 1 standard deviation or more; the screener omits that condition. news_free_5d is null until the filings walk covers the session (filing_activity@v1 fails closed): the live store has no filing history until the filings backfill runs (EDGAR submissions from 2018-01-01 is the planned span), so volume_shock_no_news has no sessions today. Once the backfill is done, about 100 independent 20-session windows from 2018-01 are expected (about 2,000 sessions); volume_shock needs only bars and the volume rollup, so it has the bar history (2010 on, once the rollup is backfilled). The sign depends on the horizon and on an extreme return (the retail-herding literature finds the opposite at 5 days): the harness's 20 sessions is the paper's horizon. Earnings-day shocks are in volume_shock; the no-news variant removes them. Long side only.
+
+**Quality bar**
+
+1. **Mechanism:** A volume shock puts the stock on more screens, and with short-sale constraints the extra attention brings net buying (Merton 1987 visibility; Gervais, Kaniel and Mingelgrin 2001). The sellers who supplied the volume are not wrong, they just do not price the attention effect.
+2. **Persistence:** The per-event gain is small and works best in smaller names where capacity is low; attention is a behavioural constant. It was found in 41 countries (Kaniel, Ozoguz and Starks 2012), but no recent US out-of-sample figure was found.
+3. **Outcome:** Excess return over SPY for the 20 sessions after the entry close (the session after the shock), net of 10 bps a round trip (an assumption for liquid names).
+4. **Trigger timing:** The shock is read from the volume of the decision session D against the 20 sessions before it; the entry session is S = D + 1. The news flag at D counts filings accepted before the previous session's close and earnings reactions known by D, never later ones.
+5. **Faithful replication:** Gervais, Kaniel and Mingelgrin: a day's volume in the top 10% of a 50-day reference period, long, held 20 (or 50) days, against the bottom 10%; here volume_shock (2 standard deviations over 20 sessions) and the top 50 by the size of the shock among the liquid common stocks; the no-news variant is not in the paper.
+6. **Expected size and sample:** The high-minus-low portfolio earned 0.94% (small), 1.07% (medium) and 0.50% (large firms) per dollar long over 20 trading days, 1963-1996, t about 3 or higher (Gervais et al. 2001, Table 2): read the 0.50% for the liquid names. It is a published spread of the extremes; the top 50 long-only will show less.
+7. **Capacity and costs:** Many signals a day, so position limits and the liquidity floor matter; a 20-day hold keeps costs low (10 bps a round trip is the assumption). Capacity is limited in small names, which the $50M floor leaves out.
+8. **Failure modes and retirement:** Attention spikes that reverse (a shock with an extreme return), and a premium that has faded. Retire if the frozen-period top-50 excess return is not above the buy-and-hold mean of the eligible names, or the no-news variant does no better than all shocks.
+9. **Decoys:** Earnings-day volume (the earnings announcement premium and PEAD edges), index additions, short-term reversal after an extreme return, and size: the 12-1 momentum and size baselines on the same sessions.
+
+**Sources**
+
+- Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001 <https://rodneywhitecenter.wharton.upenn.edu/wp-content/uploads/2014/04/9901.pdf>
+- Kaniel, R., Ozoguz, A. and Starks, L., The High Volume Return Premium: Cross-Country Evidence, Journal of Financial Economics, 2012
+- Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (the signal catalogue; no volume-shock predictor of this paper) <https://github.com/OpenSourceAP/CrossSection>
+
+## Composite mispricing score (`composite_mispricing_score`)
+
+**Status:** candidate. **Family:** F. **Thesis:** Averaging a firm's ranks across several published anomalies finds stocks that are overpriced or underpriced far better than any one signal, with most of the spread in the overpriced end.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `mispricing_composite`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Published:** decile spread 1.48% over 20 sessions (Stambaugh, R., Yu, J. and Yuan, Y., Arbitrage Asymmetry and the Idiosyncratic Volatility Puzzle, Journal of Finance, 2015, 46 years)
+- **Notes:** mispricing@v1.composite_rank is a simplified composite: the mean percentile rank of seven anomalies (net issuance, accruals, net operating assets, asset growth, the O-score, and, inverted, gross profitability and ROA) with five or more present; the paper's eleven also hold composite equity issues, investment to assets, momentum and a returns-based distress measure, so the numbers are not comparable. Fundamentals use the SEC acceptance time as knowledge_ts (H2), so a filing counts only from the session after its acceptance; history is from the stored statements (about 2024-10, earlier once the 2010 statements backfill lands), so the sessions are few until then. The main outcome holds the 50 lowest-rank (underpriced) names; the short variant holds the 50 highest, the paper's strong end, net of the site's borrow assumption and held only among names above the capacity floor. Month-end start sessions spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Each anomaly is a noisy measure of mispricing; averaging reduces the noise. The overpriced end persists because short-sale frictions and sentiment-driven overpricing keep arbitrageurs from correcting it (Stambaugh, Yu and Yuan 2015).
+2. **Persistence:** Composites decay less than their parts out of sample (Jensen, Kelly and Pedersen 2023) and the short leg is expensive to trade; the monthly version is limited by turnover costs (Novy-Marx and Velikov 2016).
+3. **Outcome:** Excess return over SPY for the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip; the short_overpriced variant is the short's value: minus the excess return, less cost and borrow.
+4. **Trigger timing:** The rank is computed from the financials public at the decision session D (a month end) by SEC acceptance time (a 10-Q accepted after the close counts from the next session) and D's closes; the entry session is S = D + 1.
+5. **Faithful replication:** Stambaugh, Yu and Yuan: monthly percentile rank average of the anomalies, long the lowest decile (underpriced), short the highest. Here the 50 lowest and, as the variant, the 50 highest of the liquid common stocks, seven of their eleven anomalies, equal weight.
+6. **Expected size and sample:** The value-weighted decile long-short earns 1.48% a month, risk-adjusted, 1965-2011, 62 bp more than the average of the single-anomaly spreads, and 58 of those 62 bp come from the short leg (Stambaugh, Yu and Yuan 2015). With four anomalies missing and the top 50 of liquid names, expect less; the harness reports t and the sessions.
+7. **Capacity and costs:** Monthly turnover is the cost: a long-only underpriced book is the realistic form, with a smaller alpha; the short leg needs borrow. 10 bps a round trip is the assumption and the site's borrow cost applies to the variant.
+8. **Failure modes and retirement:** Decay of the components after publication, a sentiment-dependent premium, and the simplified composite missing the paper's strongest inputs. Retire if the frozen-period top-50 excess return is not above the buy-and-hold mean of the eligible names, or the decile spread is not above zero.
+9. **Decoys:** It contains momentum-like and profitability tilts and the size effect: the 12-1 momentum and size baselines on the same sessions. The real question is whether the composite beats the best single edge after costs.
+
+**Sources**
+
+- Stambaugh, R., Yu, J. and Yuan, Y., Arbitrage Asymmetry and the Idiosyncratic Volatility Puzzle, Journal of Finance, 2015 <https://www.nber.org/papers/w18560>
+- Jensen, T. I., Kelly, B. and Pedersen, L. H., Is There a Replication Crisis in Finance?, Journal of Finance, 2023 <https://www.nber.org/papers/w28432>
+- Novy-Marx, R. and Velikov, M., A Taxonomy of Anomalies and Their Trading Costs, Review of Financial Studies, 2016 <https://www.nber.org/papers/w20721>
+
+## Reversal into earnings (`earnings_neutral_reversal`)
+
+**Status:** candidate. **Family:** G. **Thesis:** Among stocks about to report, last days' losers beat last days' winners over the report window.
+
+- **Outcome:** excess return, over 3 sessions, vs SPY, starting -2 sessions from the event, costs 10 bps
+- **Schedule:** on each `earnings_expected` (a next report expected, scheduled or from the year-ago report (earnings_expected@v1); anchor: the expected report date's session)
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 20
+- **Screeners:** `pre_earnings_reversal`, `earnings_neutral_reversal`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Published:** decile spread 1.45% over 3 sessions (So, E. and Wang, S., News-Driven Return Reversals: Liquidity Provision Ahead of Earnings Announcements, Journal of Financial Markets, 2014, 16 years)
+- **Notes:** The window is the 3 sessions of days -1, 0 and +1 around the expected report A, entered at the close of A - 2 (start_offset_sessions -2, the same window as the Savor-Wilson variant of the earnings announcement premium; horizon 3 is stored). The decision session is D = A - 3, so the return the screener reads is one session older than the paper's (the paper uses days -4 to -2 and enters at the close of -2): the harness cannot read a signal at the entry close itself. The date comes from earnings_expected@v1 (SCHEDULED, or last year's plus 364 days), known by D, so a name whose date moved is a miss, not a lookahead. The paper's size filter is the top quintile: the liquid_common_stocks floors ($50M a day) are the nearest rule, wider than the paper's quintile. pre_earnings_reversal ranks the 3-session return, losers first (long the losers: the paper also shorts the winners, which is diagnostic only); earnings_neutral_reversal ranks the 20-session return without earnings reaction days (earnings_neutral_reversal@v1), the plan's "earnings week reversal". Both rollups need the backfill once the document merges, and the earnings history of the store (EDGAR 8-K Item 2.02 and the vendors') sets the sessions; reports cluster in four seasons a year, so the independent sessions are fewer than the events.
+
+**Quality bar**
+
+1. **Mechanism:** Liquidity providers demand higher compensation for holding inventory into a known information event; the price pressure before the event is reversed as the event resolves the risk (So and Wang 2014). The compensation is for a real risk, the announcement, so nobody fixes it.
+2. **Persistence:** It is a risk premium for inventory risk around scheduled news. It needs daily rebalancing across about a thousand announcers and short positions, so it is unattractive to large funds; but out-of-sample replications report the alpha deteriorating.
+3. **Outcome:** Excess return over SPY for the 3 sessions from the close two sessions before the expected report (days -1, 0 and +1), net of 10 bps a round trip.
+4. **Trigger timing:** The expected report date A is read at D = A - 3 (earnings_expected@v1, SCHEDULED or PRIOR_YEAR; UNKNOWN is excluded with a reason; a date confirmed after D is not used). The 3-session and the 20-session returns are read at D's close; the entry session is S = A - 2.
+5. **Faithful replication:** So and Wang: the largest size quintile, rank by the average return over days -4 to -2, long the bottom quintile and short the top, hold days -1, 0 and +1, equal-weighted. Here the 20 lowest-return names (long only) of the liquid common stocks with a report expected, from the 3-session return (pre_earnings_reversal) and from the earnings-neutral month (earnings_neutral_reversal).
+6. **Expected size and sample:** 1.45% for the low-minus-high 3-day return against 0.22% in pseudo-announcement windows, 1996-2011, before costs, Sharpe 1.73 as annualised by Quantpedia; the long-only half and the 2012-on sample are smaller, and Quantpedia's out-of-sample test is slightly negative (So and Wang 2014; Jansen and Nikiforov report profit in 40 of 42 years).
+7. **Capacity and costs:** Three-day holds, 5 to 30 names a night in a season, small for a retail account; a report is a gap risk the 10 bps a round trip do not cover; the short leg is not tested.
+8. **Failure modes and retirement:** The alpha having decayed, and bid-ask bounce in the pre-earnings return. Retire if the frozen-period excess return of the picks is not above that of the other names reporting in the window.
+9. **Decoys:** Pre-announcement drift from leaks (it predicts continuation: the opposite sign), momentum at earnings (a longer-horizon edge, opposite sign) and the small-cap PEAD (another size bucket): the 12-1 momentum and size baselines, and the other names reporting in the window.
+
+**Sources**
+
+- So, E. and Wang, S., News-Driven Return Reversals: Liquidity Provision Ahead of Earnings Announcements, Journal of Financial Markets, 2014 <https://papers.ssrn.com/abstract=2275982>
+- Quantpedia, Reversal During Earnings Announcements (strategy page) <https://quantpedia.com/strategies/reversal-during-earnings-announcements/>
+
+## Retail lottery-option attention (`retail_options_lottery_attention`)
+
+**Status:** candidate. **Family:** H. **Thesis:** Lottery-like stocks with heavy option volume against their share volume, the names retail traders buy short-dated calls in, underperform over the next weeks.
+
+- **Outcome:** excess return, over 6, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** every session
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 30
+- **Screeners:** `retail_option_attention`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The papers' feature, the share of option volume in short-dated out-of-the-money calls (lottery_call_share), and a meme score are not stored: the screener is a proxy, names with a best day of 10% or more in the last 21 sessions (max_ret_21d, a pre-declared threshold, not tuned) ranked by the option-to-stock volume ratio, the highest first. Filed with that proxy rather than waiting; a trade-level or strike-level feature would replace it. The outcome is the short on the 30 worst names (the highest ratio) among those with enough dollar volume to short (the site's capacity floor), net of the site's borrow assumption; a long_short spread would be diagnostic only. Chain flow is stored from 2026-10-02 only: about 11 sessions by 2026-10-16, none before the frozen start 2026-04-01, so no verdict is possible for a long time; the harness reports the count. The horizon 6 is the nearest stored one to the 5 to 10 sessions of the literature. The put-based fade of the catalogue (buying puts on the same names) needs the option P&L outcome (H8) and is not here.
+
+**Quality bar**
+
+1. **Mechanism:** Retail traders buy short-dated out-of-the-money calls through wholesalers; market makers hedge by buying the stock, which lifts it transiently, and the pressure reverses; the calls are overpriced (Byun and Kim 2016; Bryzgalova, Pavlova and Sikorskaya 2023).
+2. **Persistence:** Retail's preference for skewness is stable and zero-commission apps gamify it; the wholesalers internalise the flow, so institutions see it only indirectly, and shorting these names is costly and squeeze-prone, which keeps the overpricing from being traded away. Capacity per name is small.
+3. **Outcome:** The short's value: minus the excess return over SPY for 6 and 20 sessions after the entry close, less 10 bps a round trip and the assumed borrow cost.
+4. **Trigger timing:** The best day of the last 21 sessions and the option-to-stock volume ratio are computed from the close and the chain of the decision session D; the entry session is S = D + 1. A name with no chain, no option volume or no 21-session history has no value and is not ranked.
+5. **Faithful replication:** Byun and Kim: calls with lottery features (high IV, out of the money, short maturity) earn significantly lower returns; Bryzgalova et al.: retail identified by wholesaler price improvement. Neither is stored: the proxy ranks lottery-like names (best day of 10% or more) by option volume over stock volume, the 30 highest.
+6. **Expected size and sample:** No stock-return figure is verified for the proxy. The papers report retail losing money in options in aggregate (the exact figure is not verified) and negative subsequent returns after lottery demand; the harness reports t and the sessions, and with a short chain history it will say so.
+7. **Capacity and costs:** An individual cannot short the microcaps where this effect lives: the short is held only among names above the capacity floor, with the assumed borrow cost, and shorting squeeze-prone names (GME, AMC) is the dangerous trade. Treat the list as an avoid list or a call-selling selector, not a short book.
+8. **Failure modes and retirement:** Squeezes, and a best day that was news (a bid or a report) rather than lottery demand. Retire if the frozen-period short value is not above zero after borrow, or the picks do not do worse than the buy-and-hold mean of the eligible names.
+9. **Decoys:** Short-term reversal, MAX and idiosyncratic volatility (the same lottery cluster: lottery_max is its screen), momentum and size: the 12-1 momentum and size baselines on the same sessions.
+
+**Sources**
+
+- Bryzgalova, S., Pavlova, A. and Sikorskaya, T., Retail Trading in Options and the Rise of the Big Three Wholesalers, Journal of Finance, 2023
+- Byun, S.-J. and Kim, D.-H., Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics, 2016
+
 ## Tender-offer drift after expiry (`tender_offer_drift`)
 
 **Status:** candidate. **Family:** H. **Thesis:** Stocks whose own tender offer for their shares has run its course outperform the market for a year or more afterwards.
@@ -476,6 +735,36 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 - Ben-David, I., Franzoni, F., Kim, B. and Moussawi, R., Competition for Attention in the ETF Space, Review of Financial Studies, 2023 <https://www.nber.org/papers/w28369>
 - Alpha Architect, Competition for Attention in the ETF Space (summary) <https://alphaarchitect.com/competition-for-attention-in-the-etf-space/>
+
+## Call-put IV spread into earnings (`pre_earnings_cp_iv_spread`)
+
+**Status:** candidate. **Family:** I. **Thesis:** Stocks whose call-put implied-volatility spread is high, or climbing, just before a report earn more over the report window.
+
+- **Outcome:** excess return, over 3 sessions, vs SPY, starting -1 sessions from the event, costs 10 bps
+- **Schedule:** on each `earnings_expected` (a next report expected, scheduled or from the year-ago report (earnings_expected@v1); anchor: the expected report date's session)
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 20
+- **Screeners:** `cp_iv_spread`, `cp_iv_spread_rise`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The window is the report session and the two after it (3 sessions from S = A - 1 for the expected report A, start_offset_sessions -1: the decision session D = A - 2 reads the chain). The date comes from earnings_expected@v1 (SCHEDULED, or last year's plus 364 days), known by D. The base is the names with a report in the window (base = "event"), so the picks are compared with their reporting peers, not the whole market. Chains are stored nightly from 2026-10-02 only, so the screeners have about 11 sessions of data by 2026-10-16, all after the frozen start, and the harness will report few independent sessions for a long time; the October to November season gives many events on those sessions, and the 5-session change (cp_iv_spread_rise) exists from 2026-10-09. Not in the paper: the abnormal spread is read as the level here, the change as the second screener. Long side only. The published paper reports no return spread (its result is a regression coefficient), so there is no [published] figure.
+
+**Quality bar**
+
+1. **Mechanism:** Informed traders take leverage in options ahead of the event and market makers move implied volatilities, while the stock lags because the information sits in the options market (Lei, Wang and Yan 2020; Jin, Livnat and Zhang 2012).
+2. **Persistence:** It needs option data and event alignment, and the signal is the change of the spread over a few days into the event, which is noisy and narrow; few retail platforms compute it. Capacity per event is small.
+3. **Outcome:** Excess return over SPY for the 3 sessions from the close before the expected report (the report session and the two after), net of 10 bps a round trip.
+4. **Trigger timing:** The expected report date A is read at the decision session D = A - 2 (earnings_expected@v1, SCHEDULED or PRIOR_YEAR; UNKNOWN is excluded with a reason, a date confirmed after D is not used). The spread is read from D's chain; the entry session is S = A - 1.
+5. **Faithful replication:** Lei, Wang and Yan: a rise of the call-put IV spread into the announcement predicts the announcement return, most when option volume is high. cp_iv_spread ranks the level; cp_iv_spread_rise the 5-session change; the top 20 of the names reporting in the window.
+6. **Expected size and sample:** The paper reports a regression, not a portfolio: the spread enters the announcement return at 0.02 and its interaction with the surprise at 0.42 (p < 0.01), so the spread amplifies the response to the surprise rather than adding a drift of its own. No size can be stated; the harness reports t and the sessions.
+7. **Capacity and costs:** Liquid names, a 3-session hold, no options traded: the cost is the stock's spread, small for names over $50M a day; a report is a gap risk the 10 bps do not cover.
+8. **Failure modes and retirement:** The spread being the report's own implied move, and a gap against a long into the print. Retire if the frozen-period excess return of the picks is not above that of the other names reporting in the window.
+9. **Decoys:** Pre-announcement drift and momentum (the 12-1 and size baselines), and the implied-move overpricing into earnings; the same names with a low spread.
+
+**Sources**
+
+- Lei, Q., Wang, X. W. and Yan, Z., Volatility Spread and Stock Market Response to Earnings Announcements, Journal of Banking and Finance, 2020 <https://doi.org/10.1016/j.jbankfin.2017.04.002>
+- Jin, W., Livnat, J. and Zhang, Y., Option Prices Leading Equity Prices: Do Options Traders Have an Information Advantage?, Journal of Accounting Research, 2012
 
 ## Earnings announcement premium (`earnings_announcement_premium`)
 

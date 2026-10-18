@@ -32,7 +32,7 @@ from algotrade.services.evaluation.cross_section.measures import SessionStat
 from algotrade.services.evaluation.cross_section.reads import session as session_reads
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame, write_edge_eval
 from algotrade.storage.configs.files import MemoryConfigStore
-from algotrade.storage.tables.schemas import FORWARD_RETURNS
+from algotrade.storage.tables.schemas import FORWARD_RETURNS, RESIDUAL_RETURNS
 from tests.helpers.stored_frames import stamped, universe_rows
 from tests.unit.services.evaluation.cross_section.conftest import (
     DAYS,
@@ -414,3 +414,48 @@ def test_reused_sessions_still_count_in_the_historical_caveat_and_the_snapshot()
     assert first.historical is not None and first.historical.sessions == 2
     assert again.historical == first.historical and again.snapshot == first.snapshot
     same(first, again)
+
+
+RESIDUAL = {
+    "kind": "excess_return", "measure": "residual_return", "horizon_sessions": [2],
+    "benchmark": "SPY", "start_offset_sessions": 1,
+}  # fmt: skip
+
+
+def residual_rows(day: date) -> list[dict[str, Any]]:
+    return [
+        {
+            "instrument_id": iid, "ts": pd.Timestamp(f"{day}T20:00Z"), "horizon_sessions": 2,
+            "window_end": day, "beta_session": day, "outcome_status": "COMPLETE",
+            "fwd_residual_return": 2 * (i - 9.5) / 100, "fwd_factor_return": 0.0,
+        }
+        for i, iid in enumerate(IDS)
+    ]  # fmt: skip
+
+
+def test_a_residual_backfill_after_the_legs_were_stored_recomputes_exactly_that_leg(
+    world: World,
+) -> None:
+    """A leg stored while its residual rows were missing (NO_RESIDUAL_ROW) is not reused for
+    ever: the stamps cover the residual partitions, so the backfill re-measures it."""
+    entries = [next_session(d) for d in (D1, D2, D3, D4)]
+    for day in entries:
+        if day != entries[2]:
+            world.writer.write_table(
+                RESIDUAL_RETURNS, day, f"res-{day}", stamped(residual_rows(day), day, f"res-{day}")
+            )
+    first = run(world, T1, outcome=RESIDUAL)
+    measured = rows(first).query("slice_kind == 'all'")["sessions"].iloc[0]
+    recommit(world, RESIDUAL_RETURNS, entries[2], "res-late", residual_rows(entries[2]))
+    night = run(world, T2, write=False, outcome=RESIDUAL)
+    assert (night.legs_computed, night.legs_reused) == (1, 3)
+    assert dict(night.legs_invalidated) == {"outcomes": 1}
+    same(night, run(world, T2, full=True, write=False, outcome=RESIDUAL))
+    assert rows(night).query("slice_kind == 'all'")["sessions"].iloc[0] == measured + 1
+
+
+def test_an_excess_return_edge_ignores_residual_partitions_in_its_stamps(world: World) -> None:
+    run(world, T1)
+    day = next_session(D2)
+    recommit(world, RESIDUAL_RETURNS, day, "res-x", residual_rows(day))
+    assert dict(run(world, T2, write=False).legs_invalidated) == {}

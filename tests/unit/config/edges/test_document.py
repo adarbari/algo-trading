@@ -18,10 +18,10 @@ from algotrade.config.edges.document import (
     Edge,
     Published,
     expand_baselines,
-    identity_dict,
     parse_edge,
 )
 from algotrade.config.edges.follow import AUDIT_LABELS, BOOKMARK_LABELS, Follow
+from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.model_tenor import tenor_sessions
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
@@ -739,6 +739,32 @@ def test_a_published_figure_of_a_short_edge_defaults_to_the_short_leg() -> None:
     assert leg("mean_excess", "short") == "short"
     assert leg("decile_spread", "short") == "long_short"  # a spread stays a spread
     assert leg("mean_excess", "long") == "long"
+
+
+def test_an_excess_return_may_name_the_residual_return_measure() -> None:
+    outcome = {"kind": "excess_return", "horizon_sessions": [20], "benchmark": "SPY",
+               "start_offset_sessions": 1, "measure": "residual_return"}  # fmt: skip
+    edge = parse(outcome=outcome, schedule="every_session")
+    assert edge.outcome.measure == "residual_return" and edge.outcome.is_return
+    plain = {k: v for k, v in outcome.items() if k != "measure"}
+    assert parse(outcome=plain, schedule="every_session").outcome.measure is None
+
+
+@pytest.mark.parametrize("measure", ["excess_return", "realised_to_implied_vol", "nope"])
+def test_an_excess_return_refuses_any_other_measure(measure: str) -> None:
+    outcome = {"kind": "excess_return", "horizon_sessions": [20], "benchmark": "SPY",
+               "start_offset_sessions": 1, "measure": measure}  # fmt: skip
+    with pytest.raises(ConfigurationError, match="measure"):
+        parse(outcome=outcome, schedule="every_session")
+
+
+def test_a_hit_target_still_refuses_the_residual_measure() -> None:
+    outcome = {
+        "kind": "hit_target", "horizon_sessions": [20], "benchmark": "SPY", "target": 0.0,
+        "measure": "residual_return", "direction": "above", "start_offset_sessions": 1,
+    }  # fmt: skip
+    with pytest.raises(ConfigurationError, match="measure"):
+        parse(outcome=outcome, schedule="every_session")
 
 
 def _band(**changes: Any) -> dict[str, Any]:

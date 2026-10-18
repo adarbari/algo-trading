@@ -38,7 +38,7 @@ detector would flag but no flag covers (the row would not be UNMEASURED); a rise
 bound with no suspect bar (a real squeeze) is a WARN naming the names.
 """
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from datetime import date
 
 import pandas as pd
@@ -106,23 +106,63 @@ def compute_outcomes(
         raise ValueError(f"the window ending {ends[-1]} has not closed yet")
     horizons, benchmarks = horizons_and_benchmarks(ctx.configs)
     nightly = start is None
-    gone = _delisted(ctx.reader, ends[-1])  # the latest snapshot: delistings noticed since
-    listed = _listing_delisted(ctx.reader, ends[-1])  # filtered to each window end in ``_one``
-    stored = ctx.reader.dates("bars/1d")
-    first = stored[0] if stored else ends[-1]
+    gone, listed, first = scope_of(ctx.reader, ends[-1])
     record: RunRecord | None = None
     for i in range(0, len(ends), CHUNK):
         chunk = ends[i : i + CHUNK]
-        lo = sessions_ending(
-            chunk[0], max(h for h in horizons if not nightly or h <= NIGHTLY_MAX_HORIZON) + 1
-        )[0]
-        panel = session_bars(
-            ctx.reader, max(lo, first), chunk[-1], columns=("high", "low", "close")
-        )
+        panel = read_panel(ctx, chunk, horizons, nightly, first)
         for t in chunk:
             record = _one(ctx, t, horizons, benchmarks, first, panel, gone, listed, nightly)
     assert record is not None
     return record
+
+
+def scope_of(reader: StoreReader, last: date) -> tuple[dict[str, date], dict[str, date], date]:
+    """What a run of window ends up to ``last`` needs: the delistings the latest reference
+    snapshot notes, the listing history's, and the first stored bars session."""
+    stored = reader.dates("bars/1d")
+    return (
+        delisted_stamps(reader, last),
+        listing_delisted(reader, last),
+        stored[0] if stored else last,
+    )
+
+
+def read_panel(
+    ctx: TaskContext, chunk: Sequence[date], horizons: Sequence[int], nightly: bool, first: date
+) -> SessionBars:
+    """The bars of a chunk of window ends and every window's start (high, low, close)."""
+    deepest = max(h for h in horizons if not nightly or h <= NIGHTLY_MAX_HORIZON)
+    lo = sessions_ending(chunk[0], deepest + 1)[0]
+    return session_bars(ctx.reader, max(lo, first), chunk[-1], columns=("high", "low", "close"))
+
+
+def left_by(end: date, gone: dict[str, date], listed: dict[str, date]) -> dict[str, date]:
+    """Instrument -> delisting date counted for the window ending ``end``: a last trading day on
+    or before it, or a reference stamp within the ``RECHECK`` sessions after it (the nights that
+    recheck this window)."""
+    noticed = end
+    for _ in range(RECHECK):
+        noticed = next_session(noticed)
+    return {i: d for i, d in listed.items() if d <= end} | {
+        i: d for i, d in gone.items() if d <= noticed
+    }
+
+
+def windows(
+    run: IngestRun, end: date, horizons: Sequence[int], first: date, nightly: bool
+) -> Iterator[tuple[int, Window]]:
+    """The (horizon, window) pairs a run computes for window end ``end``; the others are
+    recorded as items (BACKFILL_ONLY above the nightly depth, BEFORE_HISTORY before the bars)."""
+    for h in horizons:
+        if nightly and h > NIGHTLY_MAX_HORIZON:
+            run.record_item(f"h{h}", "BACKFILL_ONLY")
+            continue
+        window = Window(tuple(sessions_ending(end, h + 1)))
+        if window.start < first:
+            run.record_item(f"h{h}", "BEFORE_HISTORY")
+            continue
+        yield h, window
 
 
 def _one(
@@ -136,24 +176,10 @@ def _one(
     listed: dict[str, date],
     nightly: bool,
 ) -> RunRecord:
-    noticed = end
-    for _ in range(RECHECK):
-        noticed = next_session(noticed)
-    # a last trading day counts when on or before ``end``; a reference stamp (the notice date)
-    # when within the ``RECHECK`` sessions after it, the nights that recheck this window
-    left = {i: d for i, d in listed.items() if d <= end} | {
-        i: d for i, d in gone.items() if d <= noticed
-    }
+    left = left_by(end, gone, listed)
     with IngestRun(ctx, TASK, end) as run:
-        for h in horizons:
-            if nightly and h > NIGHTLY_MAX_HORIZON:
-                run.record_item(f"h{h}", "BACKFILL_ONLY")
-                continue
-            window = Window(tuple(sessions_ending(end, h + 1)))
-            if window.start < first:
-                run.record_item(f"h{h}", "BEFORE_HISTORY")
-                continue
-            names, pre_snapshot = _universe_ids(run.reader, window.start, not nightly)
+        for h, window in windows(run, end, horizons, first, nightly):
+            names, pre_snapshot = universe_ids(run.reader, window.start, not nightly)
             resolver = run.resolver(window.start)
             frames, reasons, eligible = [], {}, 0
             prices = panel.window(window.start, end)
@@ -180,9 +206,7 @@ def _one(
     return run.record
 
 
-def _universe_ids(
-    reader: StoreReader, start: date, backfill: bool = False
-) -> tuple[set[str], bool]:
+def universe_ids(reader: StoreReader, start: date, backfill: bool = False) -> tuple[set[str], bool]:
     """The names to measure from ``start`` and whether they are today's (survivorship): the
     universe snapshot's, or before the first snapshot the listing history's alive on ``start``
     (with no listing history stored: the snapshot's names, flagged, in the nightly; a backfill
@@ -198,7 +222,7 @@ def _universe_ids(
         return set(universe.instruments), True
 
 
-def _listing_delisted(reader: StoreReader, on: date) -> dict[str, date]:
+def listing_delisted(reader: StoreReader, on: date) -> dict[str, date]:
     """Listing-history delistings known on ``on`` (none when no history is stored)."""
     try:
         return delisted_by(reader, on)
@@ -206,7 +230,7 @@ def _listing_delisted(reader: StoreReader, on: date) -> dict[str, date]:
         return {}
 
 
-def _delisted(reader: StoreReader, on: date) -> dict[str, date]:
+def delisted_stamps(reader: StoreReader, on: date) -> dict[str, date]:
     """Instrument id -> delisting date, as the reference snapshot at ``on`` records it."""
     frame = instruments(reader, on)
     if "delisted_on" not in frame.columns:
@@ -279,7 +303,7 @@ def check_outcomes(reader: StoreReader, session: date, s: SourcesSettings) -> li
 def _eligible(reader: StoreReader, start: date) -> set[str]:
     """The names in the universe at ``start`` with a bar at ``start`` (a flagged bar included:
     that name has an UNMEASURED row)."""
-    universe = _universe_ids(reader, start)[0]
+    universe = universe_ids(reader, start)[0]
     day, dropped = bars_with_flags(reader, "1d", start, start, columns=("close",))
     have = set(day.loc[day["close"].notna(), "instrument_id"].astype(str))
     return universe & (have | set(dropped["instrument_id"].astype(str)))
