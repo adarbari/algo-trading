@@ -117,11 +117,14 @@ from algotrade.config.edges.identity import (
 from algotrade.config.edges.portfolio import (
     BENCHMARK_BASE,
     PORTFOLIO_KIND,
+    Canary,
     benchmark_of,
+    canary_of,
     check_base,
     check_portfolio,
     ensemble_of,
     oos_class_of,
+    vol_target_of,
     weighting_of,
 )
 from algotrade.config.edges.schedules.events import (
@@ -191,6 +194,7 @@ OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
     "side", "borrow_bps_annual", "tenor_days", "hold_rank", "weighting", "vol_field", "pair_field",
+    "vol_target", "vol_window", "vol_return_field", "canary",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -231,6 +235,13 @@ class Outcome:
     # declared feature whose value at D is each name's volatility.
     weighting: str = "equal"
     vol_field: str | None = None
+    # Volatility targeting of the book (ADR 0074 amendment): None, or the annualised volatility
+    # the book is scaled down to (never up), measured over ``vol_window`` sessions of
+    # ``vol_return_field``; the rest is cash.
+    vol_target: float | None = None
+    vol_window: int = 60
+    vol_return_field: str = "rollup.trend_stats@v2.ret_1d"
+    canary: Canary | None = None  # a risk-off gate on the book (ADR 0074 amendment)
 
     @property
     def result_side(self) -> str:
@@ -691,6 +702,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
     check_side(o, side, borrow, kind, drawdown)
     hold_rank = hold_rank_of(o, side, kind, schedule, SCHEDULES, horizons)
     weighting, vol_field = weighting_of(o, kind)
+    vol_target, vol_window, vol_return_field = vol_target_of(o, kind)
     check_portfolio(o, kind, side, drawdown, hold_rank is not None, schedule, SCHEDULES, horizons)
     return Outcome(
         kind=kind,
@@ -713,6 +725,10 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         hold_rank=hold_rank,
         weighting=weighting,
         vol_field=vol_field,
+        vol_target=vol_target,
+        vol_window=vol_window,
+        vol_return_field=vol_return_field,
+        canary=canary_of(o, kind),
     )
 
 

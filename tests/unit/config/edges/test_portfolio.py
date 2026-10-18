@@ -2,6 +2,7 @@
 parses closed, the weighting and its volatility feature agree, a book is long, banded by nothing and
 rebalanced on a schedule whose windows never overlap, and ``base = "benchmark"`` is its alone."""
 
+from dataclasses import asdict
 from typing import Any
 
 import pytest
@@ -216,6 +217,51 @@ def test_an_ensemble_is_part_of_the_run_and_an_empty_one_is_not() -> None:
     assert identity_dict({"ensemble": ("a", "b")})["ensemble"] == ["a", "b"]
 
 
+def test_a_vol_target_parses_with_its_defaults_and_is_part_of_the_identity() -> None:
+    """ADR 0074 amendment: ``vol_target`` is a fraction a year, ``vol_window`` defaults to 60
+    sessions and ``vol_return_field`` to the stored daily return; no target, none of the three is
+    part of an outcome's identity (no existing hash moves), a target is."""
+    plain = book(outcome=outcome(weighting=None, vol_field=None)).outcome
+    assert (plain.vol_target, plain.vol_window) == (None, 60)
+    assert plain.vol_return_field == "rollup.trend_stats@v2.ret_1d"
+    bare = identity_dict(plain.__dict__)
+    assert not {"vol_target", "vol_window", "vol_return_field"} & set(bare)
+    sized = book(outcome=outcome(vol_target=0.1, vol_window=40, vol_return_field="a.b@v1.c"))
+    o = sized.outcome
+    assert (o.vol_target, o.vol_window, o.vol_return_field) == (0.1, 40, "a.b@v1.c")
+    kept = identity_dict(o.__dict__)
+    assert (kept["vol_target"], kept["vol_window"]) == (0.1, 40)
+    assert identity_dict(book(outcome=outcome(vol_target=0.1)).outcome.__dict__) != kept
+    assert identity_dict(book(outcome=outcome(vol_target=0.12)).outcome.__dict__) != identity_dict(
+        book(outcome=outcome(vol_target=0.1)).outcome.__dict__
+    )
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"vol_target": 0}, "vol_target"),
+        ({"vol_target": -0.1}, "vol_target"),
+        ({"vol_target": 1.5}, "vol_target: expected a fraction in \\(0, 1\\]"),
+        ({"vol_target": 0.1, "vol_window": 5}, "vol_window"),
+        ({"vol_target": 0.1, "vol_window": 20.5}, "vol_window"),
+        ({"vol_window": 60}, "vol_window: needs a vol_target"),
+        ({"vol_return_field": "a.b@v1.c"}, "vol_return_field: needs a vol_target"),
+    ],
+)
+def test_a_bad_vol_target_is_refused(changes: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        book(outcome=outcome(**changes))
+
+
+@pytest.mark.parametrize("key", ["vol_target", "vol_window", "vol_return_field"])
+def test_only_a_portfolio_outcome_names_a_vol_target(key: str) -> None:
+    doc = edge_document(schedule="month_end", top_k=3)
+    doc["outcome"] = {**doc["outcome"], key: 0.1 if key == "vol_target" else 60}
+    with pytest.raises(ConfigurationError, match=f"{key}: only a portfolio_return outcome"):
+        parse_edge(doc, "drift", "drift.toml")
+
+
 BOOKS = [
     e
     for e in load_edges(FileConfigStore(REPO_ROOT / "config", local=False))
@@ -244,3 +290,51 @@ def test_a_trend_book_declares_its_ensemble_of_lookbacks() -> None:
     assert len(trend) >= 7
     for e in trend:
         assert len(e.ensemble) >= 2 and set(e.ensemble) <= set(e.screeners), e.id
+
+
+CANARY = {"tickers": ["VWO", "BND"], "field": "rollup.trend_stats@v2.ret_1d", "breadth": 2}
+
+
+def test_a_canary_parses_and_is_part_of_the_identity() -> None:
+    """ADR 0074 amendment item 17: the canaries, the field read at D, the breadth and the defensive
+    choice; no canary, no key in the identity (no existing hash moves)."""
+    o = book(outcome=outcome(canary={**CANARY, "defensive": ["CASH"]})).outcome
+    c = o.canary
+    assert c is not None and (c.tickers, c.breadth, c.defensive) == (("BND", "VWO"), 2, ("CASH",))
+    assert c.field == "rollup.trend_stats@v2.ret_1d"
+    assert identity_dict(asdict(o))["canary"]["tickers"] == ["BND", "VWO"]
+    assert "canary" not in identity_dict(asdict(book().outcome))
+    other = book(outcome=outcome(canary={**CANARY, "defensive": ["SHY", "IEF"]})).outcome
+    assert other.canary is not None and other.canary.defensive == ("IEF", "SHY")  # sorted
+    assert identity_dict(asdict(other)) != identity_dict(asdict(o))
+    reordered = book(
+        outcome=outcome(canary={**CANARY, "tickers": ["BND", "VWO"], "defensive": ["IEF", "SHY"]})
+    ).outcome
+    assert identity_dict(asdict(reordered)) == identity_dict(asdict(other))  # order is no trial
+
+
+@pytest.mark.parametrize(
+    ("canary", "message"),
+    [
+        ({**CANARY, "tickers": []}, "tickers: expected one or more distinct"),
+        ({**CANARY, "tickers": ["VWO", "VWO"]}, "tickers: expected one or more distinct"),
+        ({**CANARY, "tickers": ["VWO", "eq:bnd"]}, "are not plain symbols"),
+        ({**CANARY, "tickers": ["VWO", "CASH"]}, "CASH is only the whole defensive choice"),
+        ({**CANARY, "defensive": []}, "defensive: expected one or more distinct"),
+        ({**CANARY, "defensive": ["CASH", "SHY"]}, "CASH is only the whole defensive choice"),
+        ({**CANARY, "breadth": 0}, "breadth"),
+        ({**CANARY, "breadth": 3}, "more than the 2 canaries"),
+        ({k: v for k, v in CANARY.items() if k != "field"}, "field: expected a non-empty string"),
+        ({**CANARY, "defensive": ["CASH"], "weights": [1]}, "weights"),
+    ],
+)
+def test_a_bad_canary_is_refused(canary: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        book(outcome=outcome(canary={"defensive": ["CASH"], **canary}))
+
+
+def test_only_a_portfolio_outcome_has_a_canary() -> None:
+    doc = edge_document(schedule="month_end", top_k=3)
+    doc["outcome"] = {**doc["outcome"], "canary": {**CANARY, "defensive": ["CASH"]}}
+    with pytest.raises(ConfigurationError, match="canary: only a portfolio_return outcome"):
+        parse_edge(doc, "drift", "drift.toml")

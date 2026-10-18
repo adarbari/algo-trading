@@ -350,3 +350,19 @@ def test_a_portfolio_book_round_trips_and_every_other_leg_stores_nothing_new() -
     assert {"weight_ids", "weight_values", "portfolio_reason"} <= {
         c.name for c in EDGE_LEGS.columns
     }
+
+
+def test_the_overlay_figures_of_a_book_round_trip_and_default_to_null() -> None:
+    """ADR 0074 amendment: ``book_vol`` and ``risk_off`` are nullable columns of the leg (no
+    version bump): stored when an overlay ran, null otherwise and in a leg written before them."""
+    held = leg(stat=stat(pick_values=(0.01,), pick_hits=1, picks=(), book_vol=0.2, risk_off=0.5))
+    row = encode_leg(held, "site", "drift")
+    assert (row["book_vol"], row["risk_off"]) == (0.2, 0.5)
+    assert decode_leg(row).stat == held.stat
+    plain = encode_leg(leg(), "site", "drift")
+    assert (plain["book_vol"], plain["risk_off"]) == (None, None)
+    again = decode_leg(plain).stat
+    assert (again.book_vol, again.risk_off) == (None, None)
+    legacy = {k: v for k, v in plain.items() if k not in ("book_vol", "risk_off")}
+    assert decode_leg(legacy).stat.book_vol is None
+    assert {"book_vol", "risk_off"} <= {c.name for c in EDGE_LEGS.columns}

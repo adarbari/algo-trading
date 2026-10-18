@@ -850,6 +850,37 @@ follow-up PR).
 - status: final
 - Reasoning: `closed_end_fund_discounts` (Strong), `cef_distribution_trap` and `muni_cef_december` are blocked because CEFs are not in universe coverage (ADR 0013). Bars already exist for 330 CEFs (the nightly Massive grouped-daily and Tiingo bars-history from 2010), so the Tiingo cost is 0 symbols; the change is the universe coverage amendment, with no deadline pressure. Continuing the Tiingo Power account is to be reconsidered if the CEF (or other) edges prove strong.
 
+## 2026-10-18 | EB E5 (vol_target) | A volatility-targeted book is scaled down from today's weights over past returns
+- Question: how is a book sized to a volatility target without look-ahead, leverage or a hidden re-weighting?
+- Options: scale by the stored realised vol of each name / by the book's own daily returns; scale up as well as down / down only; use the returns as stored today / as each day read them; a missing return counts as zero / leaves the session out.
+- Decision: sigma is the annualised sample std of `sum(w_i r_i,t)` over `vol_window` (60) sessions ending at D, today's weights on the returns each day `t <= D` read at `t` (through the recording reader, so a restated partition invalidates the legs); `k = min(1, target / sigma)`, names times `k`, the rest cash at the bill yield; a missing return is `no_book_vol`; an all-cash book is not scaled; the target and its window and field join an outcome's hash only when set. The scaled weights go through the turnover pass, so rescaling pays the cost.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the book's own series captures correlation, which per-name vols do not; down-only keeps the outcome a long, unlevered book; reading each day as it was known keeps a later restatement from moving an earlier session. Architect design of 2026-10-18 (ADR 0074 items 14 to 16 and 18).
+
+## 2026-10-18 | EB E5 (vol_target) | A de-risked book is still judged against the fully invested blend
+- Question: when a book holds cash by a volatility target or a canary, is its benchmark scaled the same way or left as the fully invested blend?
+- Options: leave the benchmark as written / scale it by the same cash share / add `CASH` as a benchmark constituent on request.
+- Decision: leave it: the book is judged against the fully invested blend, so the cost of de-risking shows up as a lower excess return in rising markets; a `CASH` constituent of the benchmark is added only if the owner asks.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: scaling the benchmark by the book's own choices would hide what de-risking cost; the proposed default is the stricter bar. Owner to confirm or overrule.
+
+## 2026-10-18 | EB E5 (macro bridge) | Revised CAPE history is accepted with a caveat
+- Question: country CAPE values are revised, so a backfill is not as it was known on each date; is the history used?
+- Options: use the history with a caveat in the edge's notes / start the series at the first stored vintage / drop the signal.
+- Decision: use it, flagged `revised` with the caveat in the notes of every edge that reads it; a signal built from it is never presented as an as-known test.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the series is monthly and slow-moving, a vintage-only start would leave years of history empty, and the caveat keeps the limit visible. Owner to confirm or overrule.
+## 2026-10-18 | EB E5 (allocation extensions, macro series) | FX 3-month rates and the broad dollar added; two owner calls logged
+- Question: which series feed the etf_macro bridge's dollar and FX carry columns, and what does the allocation overlay measure against?
+- Options: DTWEXBGS + OECD 3-month interbank rates via FRED (free) / a paid FX source; de-risked book judged against the fully invested blend / against a book with CASH as a constituent; revised CAPE history accepted with a caveat / dropped.
+- Decision: add DTWEXBGS (daily, lag 10 days) and the OECD rates for USD, JPY, AUD, CAD and CHF (monthly, lag 60 days), all `pit = "lag"` and open. EUR (IR3TIB01EZM156N) and GBP (IR3TIB01GBM156N) are left out: their last observation is January 2026, so those currencies' `fx_carry` is null until a fresher series is found. Owner decision 1: a de-risked book is still judged against the fully invested blend (CASH becomes a benchmark constituent only if the owner asks). Owner decision 2: the revised CAPE history is accepted for the bridge with a caveat (the backfill is not as-known).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: no paid source is needed; a stale series would make carry look known when it is not; the benchmark stays comparable across edges.
+
 ## 2026-10-18 | EB E5 (PR 680 review) | Allocation edges the harness measures only in part
 - Question: how are the IBS edge (the source day is close(D) to close(D+1), but S = D + 1 at the earliest), the natgas avoid list and the 9-month lookback filed?
 - Options: IBS dropped / filed as a documented-limit variant; natgas against SPY / against the mix of its own funds; a 189-session return column (changes stored group trend_stats@v2) / the 3, 6 and 12 month grid.
@@ -857,3 +888,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a document that states what it cannot measure is better than none, and a stored-group change for a highly correlated member is cost without information.
+
+## 2026-10-18 | EB E5 (canary) | The canary gate reads its signal at D and fails closed
+- Question: how does a risk-off gate on a book read its scouts and choose its defensive asset without look-ahead or a silent default?
+- Options: read the signal at D / at S; a missing scout counts as positive / leaves the session out; the defensive asset fixed / the highest signal among a declared few; chosen always / only when the gate is on.
+- Decision: scouts resolved to ids and the field read at D, never S; the risk-off share is `min(1, bad / breadth)` and the book is `(1 - f) * book + f * defensive`; a missing scout or defensive value is `no_canary:<T>` / `no_defensive:<T>` and leaves the session out; the defensive asset (`CASH`, or the highest signal, ties by ticker) is resolved only when the share is above zero; the canary table is in the outcome hash only when present.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a signal read at S would trade on the window it is measured over; a missing scout read as positive would be a silent decision to stay invested. Architect design of 2026-10-18 (ADR 0074 item 17).
