@@ -135,6 +135,7 @@ def run_filing_text(ctx: TaskContext, p: Params) -> RunRecord:
         ctx,
         ctx.sources["sec_filings"],
         ctx.sources["sec_filing_text"],
+        ctx.sources["sec_daily_index"],
         session_of(p),
         symbols(p),
         p.get("start"),
@@ -142,6 +143,7 @@ def run_filing_text(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("limit"),
         symbols(p, "items"),
         bool(p.get("force")),
+        symbols(p, "allow_gap"),
     )
 
 

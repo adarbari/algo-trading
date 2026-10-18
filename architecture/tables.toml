@@ -139,7 +139,7 @@ note = "ADR 0050: SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q
 [[table]]
 name = "events/filing_text"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/filing_text.py"
-note = "Edge build D10: the plain text of the Item sections of every 10-K / 10-K/A / 10-Q / 10-Q/A of the universe's operating companies (never the HTML), one row per instrument, accession, item, parser_version and known_from (every version stays), partitioned by the filing's acceptance session; known_from = acceptance_sessions(ts) for a filing's first extraction, max(that, the session after the fetch) for a later row that changes or adds a text (a parser bump never rewrites history as known earlier), the stored stamp kept for an identical one; readers go through data/filing_text (known_from <= S, the latest version per item), never a raw partition read"
+note = "Edge build D10 / D10b: the plain text of the Item sections (by default risk factors and MD&A) of every 10-K / 10-K/A / 10-Q / 10-Q/A of EVERY filer, delisted companies included (the filers of the EDGAR daily form index; never the HTML), one row per cik, accession, item, parser_version and known_from (every version stays), partitioned by the filing's acceptance session; no instrument_id is stored (NULL): readers map a cik to instruments through instruments/company as of their session; known_from = acceptance_sessions(ts) for a filing's first extraction, max(that, the session after the fetch) for a later row that changes or adds a text (a parser bump never rewrites history as known earlier), the stored stamp kept for an identical one; readers go through data/filing_text (known_from <= S, the latest version per item), never a raw partition read"
 
 [[table]]
 name = "events/short_interest"

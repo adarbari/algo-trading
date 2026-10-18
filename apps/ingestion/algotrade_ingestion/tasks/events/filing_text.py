@@ -1,19 +1,27 @@
-"""The ``filing-text`` task: the item sections of every 10-K / 10-Q (and 10-K/A, 10-Q/A) of the
-universe's operating companies -> ``events/filing_text`` (edge build D10; Lazy Prices, risk-factor
-change, MD&A tone; the similarity features are track E, this is the text).
+"""The ``filing-text`` task: the item sections of every 10-K / 10-Q (and 10-K/A, 10-Q/A) of EVERY
+filer, delisted companies included -> ``events/filing_text`` (edge build D10 / D10b; Lazy Prices,
+risk-factor change, MD&A tone; the similarity features are track E, this is the text).
+
+**Filer-first**: the backfill's CIKs are the filers of the window from the SEC daily form index
+(``filing_text_filers.py``: one request a business day through ``sec_daily_index``, the list of a
+past window recorded in the run's stats so a later run of it does not walk the days again), not
+today's universe, so a company delisted before the first snapshot is covered (no stored table maps a
+delisted listing to a CIK; the index is the cheapest honest source). ``--symbols`` is the narrow
+read of those tickers' CIKs (no index walk). Rows are keyed by ``cik`` + ``accession`` + ``item``
++ ``parser_version`` + ``known_from``; ``instrument_id`` stays NULL (see **No ids stored**).
 
 **Per CIK**: the filing list is the ``sec_filings`` source read with the periodic forms
 (``PERIODIC_FORMS``; one submissions request per CIK, the older pages when ``--from`` precedes the
 recent block), then one document request per filing to ``sec_filing_text`` (the primary document,
 parsed and dropped: only the items are stored, ``vendors/sec_text/filing_items.py``; kept items
-per form by default ``DEFAULT_10K`` / ``DEFAULT_10Q``, ``--items`` narrows or widens). Names are the
-session's universe snapshot minus the funds, each CIK from ``instruments/company`` as of the
-session (``events/filings.py``'s ``universe_names`` / ``ciks_of``: the same names as the 8-K
-history, share classes of one CIK get a row set each from one fetch). Rows carry the stable FIGI
-instrument id; no ticker is resolved, so a recycled ticker never names another company.
-**Not covered yet: names delisted before the first universe snapshot** (the snapshots start
-2026-10-02): no stored table maps a delisted listing to a CIK (``instruments/listing_history`` has
-none), so the history has survivorship bias until a clean CIK source exists (roadmap, EB D10).
+per form by default ``DEFAULT_ITEMS`` (risk factors ``1A`` / ``II-1A`` and MD&A ``7`` / ``I-2``:
+the two highest-value sections, ~6 GB for all filers; ``--items`` widens to the full set
+``1,1A,3,7,7A,9A,I-2,I-3,II-1,II-1A`` or narrows; ``--limit`` bounds the CIKs a run reads).
+
+**No ids stored**: ``instrument_id`` is NULL in every row (the run's universe is today's: a stored
+id would exist only for the survivors, and a second copy of each text to fill it would cost ~4.5
+GB). Readers map a CIK to its instruments through ``instruments/company`` as of their own
+session on every read (``data.filing_text``).
 
 **Two modes**, one row shape:
 
@@ -24,7 +32,8 @@ none), so the history has survivorship bias until a clean CIK source exists (roa
   from 2010: run the windows newest first (``README.md`` "Long runs": 2021-, 2016-2020, 2010-2015),
   so recent years are usable early.
 - **Nightly increment** (no ``--from``): the CIKs that are DUE (a filing stored, the latest filed
-  at least ``DUE_DAYS`` ago: a report is due every ~91 days) and not asked within ``RECHECK_DAYS``,
+  at least ``DUE_DAYS`` and at most ``ACTIVE_DAYS`` ago: a report is due every ~91 days, a CIK
+  silent for over 400 days no longer rotates) and not asked within ``RECHECK_DAYS``,
   the longest unchecked first (``last_checked``: a CIK that never files again takes its turn like
   the rest), at most ``NIGHTLY_CIKS``. Each is read from its latest STORED filing day, never a fixed
   window, so a CIK reached late loses no filing. With nothing stored it does nothing and the run is
@@ -52,14 +61,20 @@ ones. A document that is short or has no item header at all (an exhibit-only 10-
 filing SEC lists no primary document for, are stored as one row with a null item (``NO_ITEMS``) or a
 ``SHORT`` section, never guessed text. Only a listing or a blocked / failing document counts toward
 ``STOP_AFTER_FAILED`` CIKs in a row (SEC blocking us: the run ends PARTIAL); a CIK that failed
-before goes last in a backfill, so one bad filing never starves the others.
+before goes last in a backfill, so one bad filing never starves the others. A day of the form index
+that fails, or a weekday without an index that is no SEC closure (``filing_text_filers.py``:
+federal holidays, executive-order, mourning, inauguration and weather closures), fails the run
+before any CIK is read (a filer list is never cached with an unexplained gap); an operator who
+verified a closure by hand passes ``--allow-gap YYYY-MM-DD[,...]``.
 
 Items: per CIK ``OK: <from>..<to> (<n> filings)``, ``NO_DATA`` (SEC has no filings for the CIK) or
-``FETCH_ERROR``. ``stats``: the window, ``tag``, filings listed / fetched / already stored, rows
-written, ``revised`` rows (a stamp later than the acceptance session), rows by ``quality``, and
-``pending`` CIKs left.
+``FETCH_ERROR``. ``stats``: the window, ``tag``, filers found (and whether from an earlier run),
+index days walked / SEC holidays, filings listed / fetched / already stored, rows written,
+``revised`` rows (a text stamped later than the acceptance session), rows by ``quality``,
+and ``pending`` CIKs left.
 """
 
+import hashlib
 import shutil
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
@@ -75,11 +90,18 @@ from algotrade.data.events import acceptance_sessions
 from algotrade.data.filing_text.reading import (
     COLUMNS,
     KEY_COLUMNS,
+    effective_known_from,
     latest_filing_versions,
     stored_filing_text,
 )
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.events.filings import Listed, ciks_of, universe_names
+from algotrade_ingestion.tasks.events.filing_text_filers import (
+    CIKS_KEY,
+    WINDOW_KEY,
+    discover,
+    window_label,
+)
+from algotrade_ingestion.tasks.events.filings import Names, ciks_of, universe_names
 from algotrade_ingestion.tasks.framework.run import (
     FAILURES,
     FETCH_ERROR,
@@ -114,7 +136,14 @@ BACKFILL_CIKS = 100  # CIKs per backfill run when --limit is not given
 STOP_AFTER_FAILED = 3  # CIKs failing in a row for a listing or a blocked document end the run
 CHECKPOINT_EVERY = 10
 DONE = ("OK", "NO_DATA")
-ROW_COLUMNS = [*COLUMNS, "method", "session_date"]  # the reader's columns + what the writer stamps
+ACTIVE_DAYS = 400  # the nightly asks only CIKs that filed this recently (a dead CIK stops rotating)
+DEFAULT_ITEMS = ("1A", "7", "I-2", "II-1A")  # risk factors and MD&A of a 10-K / 10-Q (size)
+ROW_COLUMNS = [
+    *COLUMNS,
+    "text_sha",
+    "method",
+    "session_date",
+]  # the reader's columns + what the writer stamps
 
 
 def run_tag(requested: Collection[str]) -> str:
@@ -125,7 +154,7 @@ def run_tag(requested: Collection[str]) -> str:
 
 
 def _window(since: date, until: date) -> str:
-    return f"{since.isoformat()}..{until.isoformat()}"
+    return window_label(since, until)
 
 
 def _learned_on(run: IngestRun) -> date:
@@ -182,102 +211,105 @@ def listed_filings(frame: pd.DataFrame, since: date, until: date) -> list[Filing
     ]
 
 
-def complete_filings(
-    stored: pd.DataFrame, wanted: dict[str, tuple[str, ...]], ids: Sequence[str]
-) -> set[str]:
-    """The accessions every one of ``ids`` already holds at ``PARSER_VERSION``: a null-item row
-    (nothing to find) or a row for each item ``wanted`` for its form (``wanted``: form -> items).
-    ``stored``: ``KEY_COLUMNS`` + ``form``."""
+def complete_filings(stored: pd.DataFrame, wanted: dict[str, tuple[str, ...]]) -> set[str]:
+    """The accessions already held at ``PARSER_VERSION``: a null-item row (nothing to find) or a
+    row for each item ``wanted`` for its form (``wanted``: form -> items). ``stored``:
+    ``KEY_COLUMNS`` + ``form``."""
     if stored.empty:
         return set()
     now = stored[stored["parser_version"] == PARSER_VERSION]
-    have: dict[tuple[str, str], tuple[set[str], bool, str]] = {}
-    for (iid, accession), rows in now.groupby(["instrument_id", "accession"], sort=False):
-        have[(str(iid), str(accession))] = (
-            set(rows["item"].dropna()),
-            bool(rows["item"].isna().any()),
-            str(rows["form"].iloc[0]),
-        )
+    done = set()
+    for accession, rows in now.groupby("accession", sort=False):
+        have = set(rows["item"].dropna())
+        form = str(rows["form"].iloc[0])
+        if rows["item"].isna().any() or set(wanted.get(form, ())) <= have:
+            done.add(str(accession))
+    return done
 
-    def holds(iid: str, accession: str) -> bool:
-        found = have.get((iid, accession))
-        return found is not None and (found[1] or set(wanted.get(found[2], ())) <= found[0])
 
-    return {a for _, a in have if all(holds(i, a) for i in ids)}
+def _key(item: object) -> str | None:
+    return None if pd.isna(item) else str(item)  # type: ignore[call-overload]
+
+
+def text_hash(text: object) -> str | None:
+    """sha256 of a section's text (``text_sha``), None for a row with no text."""
+    return None if text is None or pd.isna(text) else hashlib.sha256(str(text).encode()).hexdigest()  # type: ignore[call-overload]
+
+
+def _held(prior: pd.DataFrame) -> dict[str | None, tuple[Any, Any, date]]:
+    """Per item of a filing's stored versions (``prior``: every one, ``KEY_COLUMNS`` +
+    ``text_sha``): the latest version's ``(text_sha, quality, stamp)``, the stamp being the session
+    the EARLIEST version of that same text and quality was known from."""
+    if prior.empty:
+        return {}
+    versions = prior.assign(
+        _known=effective_known_from(prior).dt.date,
+        _slot=pd.Series([_key(i) for i in prior["item"]], index=prior.index, dtype=object),
+    )
+    held: dict[str | None, tuple[Any, Any, date]] = {}
+    for _, row in latest_filing_versions(versions).iterrows():
+        mine = versions[[k == row["_slot"] for k in versions["_slot"]]]
+        same = [
+            _same(t, row["text_sha"]) and _same(q, row["quality"])
+            for t, q in zip(mine["text_sha"], mine["quality"], strict=True)
+        ]
+        held[row["_slot"]] = (row["text_sha"], row["quality"], mine["_known"][same].min())
+    return held
 
 
 def text_rows(
-    extracted: pd.DataFrame,
-    filing: Filing,
-    instrument_ids: Sequence[str],
-    stored: pd.DataFrame,
-    learned_on: date,
+    extracted: pd.DataFrame, filing: Filing, stored: pd.DataFrame, learned_on: date
 ) -> pd.DataFrame:
-    """``ROW_COLUMNS`` rows of one filing's extracted items for each instrument (module doc:
-    ``known_from``). ``stored``: the LATEST stored version of each (instrument, accession, item)
-    with ``text`` (``latest_filing_versions``); an instrument with none for this accession is on its
-    first extraction."""
+    """``ROW_COLUMNS`` rows of one filing's extracted items (module doc: ``known_from``).
+    ``stored``: every stored version of the filing's items (``KEY_COLUMNS`` + ``text_sha``; none:
+    the first extraction). A row is known from the acceptance session on a first extraction,
+    ``max(acceptance session, learned_on)`` when its text changed or is new, the stored stamp
+    when identical. ``instrument_id`` is NULL (readers map the CIK)."""
     own = acceptance_sessions(pd.Series([filing.ts]))[0]
-    parts = []
-    for iid in instrument_ids:
-        prior = stored[(stored["instrument_id"] == iid) & (stored["accession"] == filing.accession)]
-        before = {
-            (None if pd.isna(i) else str(i)): (t, q)
-            for i, t, q in zip(prior["item"], prior["text"], prior["quality"], strict=True)
-        }
-        stamp = dict(
-            zip(
-                ((None if pd.isna(i) else str(i)) for i in prior["item"]),
-                prior["known_from"],
-                strict=True,
-            )
-        )
-        known = []
-        for item, text, quality in zip(
-            extracted["item"], extracted["text"], extracted["quality"], strict=True
-        ):
-            key = None if pd.isna(item) else str(item)
-            if prior.empty:
-                known.append(own)
-            elif key in before and _same(before[key][0], text) and _same(before[key][1], quality):
-                known.append(max(own, stamp[key]))  # unchanged: knowable as it was
-            else:
-                known.append(max(own, learned_on))  # changed or new: from the fetch's session
-        parts.append(
-            extracted.assign(
-                instrument_id=iid,
-                ts=filing.ts,
-                known_from=known,
-                cik=filing.cik,
-                form=filing.form,
-                accession=filing.accession,
-                filing_date=filing.filing_date,
-                report_date=filing.report_date,
-                session_date=own,
-            )
-        )
-    out = pd.concat(parts, ignore_index=True)
-    out["text"] = out["text"].astype(object).where(out["text"].notna(), None)
-    out["item"] = out["item"].astype(object).where(out["item"].notna(), None)
-    out["reason"] = out["reason"].astype(object).where(out["reason"].notna(), None)
-    return out[ROW_COLUMNS]
+    prior = stored[(stored["cik"] == filing.cik) & (stored["accession"] == filing.accession)]
+    held = _held(prior)
+    shas = [text_hash(t) for t in extracted["text"]]
+    known = []
+    for item, sha, quality in zip(extracted["item"], shas, extracted["quality"], strict=True):
+        key = _key(item)
+        if prior.empty:
+            known.append(own)
+        elif key in held and _same(held[key][0], sha) and _same(held[key][1], quality):
+            known.append(max(own, held[key][2]))  # unchanged: knowable as it was
+        else:
+            known.append(max(own, learned_on))  # changed or new: from the fetch's session
+    out = extracted.assign(
+        instrument_id=None,
+        text_sha=pd.Series(shas, index=extracted.index, dtype=object),
+        known_from=known,
+        ts=filing.ts,
+        cik=filing.cik,
+        form=filing.form,
+        accession=filing.accession,
+        filing_date=filing.filing_date,
+        report_date=filing.report_date,
+        session_date=own,
+    )
+    for column in ("text", "item", "reason", "text_sha", "instrument_id"):
+        out[column] = out[column].astype(object).where(out[column].notna(), None)
+    return out[ROW_COLUMNS].reset_index(drop=True)
 
 
-def stored_latest(
-    run: IngestRun, ids: Sequence[str], start: date | None = None, end: date | None = None
-) -> pd.DataFrame:
-    """The latest stored version of each item of ``ids`` (with ``text``), every ``known_from``,
-    from the acceptance-session partitions of ``start..end`` (widened by ``MARGIN``)."""
-    stored = stored_filing_text(run.reader, ids, (*KEY_COLUMNS, "text"), start=start, end=end)
-    return latest_filing_versions(stored) if len(stored) else stored
+def stored_versions(run: IngestRun, cik: str, session: date) -> pd.DataFrame:
+    """Every stored version (no text: its ``text_sha``) of one CIK's filings accepted in
+    ``session``: one acceptance-session partition, read when a filing that already has rows is
+    read again."""
+    return stored_filing_text(
+        run.reader, None, (*KEY_COLUMNS, "text_sha"), start=session, end=session, ciks=[cik]
+    )
 
 
 def latest_filing_day(stored: pd.DataFrame) -> dict[str, date]:
-    """Instrument id -> the New York date of its latest stored acceptance."""
+    """CIK -> the New York date of its latest stored acceptance."""
     if stored.empty:
         return {}
     local = pd.to_datetime(stored["ts"], utc=True).dt.tz_convert(EXCHANGE_TZ).dt.date
-    return {str(i): d for i, d in local.groupby(stored["instrument_id"]).max().items()}
+    return {str(i): d for i, d in local.groupby(stored["cik"]).max().items()}
 
 
 def last_checked(runs: Sequence[RunRecord]) -> dict[str, date]:
@@ -301,30 +333,21 @@ def failed_before(runs: Sequence[RunRecord]) -> set[str]:
     return {k for k, bad in state.items() if bad}
 
 
-def due_ciks(
-    ciks: dict[str, list[Listed]],
-    stored: pd.DataFrame,
-    checked: dict[str, date],
-    session: date,
-) -> dict[str, tuple[list[Listed], date]]:
-    """The CIKs the nightly asks -> (names, the date to read from): a report stored, the latest
-    filed at least ``DUE_DAYS`` before ``session``, not asked within ``RECHECK_DAYS``; the longest
-    unchecked first, at most ``NIGHTLY_CIKS``. Each is read from its latest STORED filing day,
-    never a fixed window, so a CIK reached late loses no filing."""
-    last = latest_filing_day(stored)
+def due_ciks(stored: pd.DataFrame, checked: dict[str, date], session: date) -> dict[str, date]:
+    """The CIKs the nightly asks -> the date to read from: a report stored, the latest filed at
+    least ``DUE_DAYS`` and at most ``ACTIVE_DAYS`` before ``session`` (a CIK that stopped filing
+    stops rotating), not asked within ``RECHECK_DAYS``; the longest unchecked first, at most
+    ``NIGHTLY_CIKS``. Each is read from its latest STORED filing day, never a fixed window, so a
+    CIK reached late loses no filing."""
     rows = []
-    for cik, names in ciks.items():
-        days = [last[n.instrument_id] for n in names if n.instrument_id in last]
-        if not days:
-            continue
-        newest = max(days)
+    for cik, newest in latest_filing_day(stored).items():
         looked = checked.get(cik)
-        if newest <= session - timedelta(days=DUE_DAYS) and (
-            looked is None or looked <= session - timedelta(days=RECHECK_DAYS)
-        ):
+        if session - timedelta(days=ACTIVE_DAYS) <= newest <= session - timedelta(
+            days=DUE_DAYS
+        ) and (looked is None or looked <= session - timedelta(days=RECHECK_DAYS)):
             rows.append((looked or date.min, newest, cik))
     rows.sort()
-    return {cik: (ciks[cik], newest) for _, newest, cik in rows[:NIGHTLY_CIKS]}
+    return {cik: newest for _, newest, cik in rows[:NIGHTLY_CIKS]}
 
 
 def free_gb(path: Path) -> float:
@@ -407,7 +430,6 @@ def _one_cik(
     listing: Source,
     text: Source,
     cik: str,
-    names: list[Listed],
     window: tuple[date, date],
     requested: Sequence[str],
     force: bool,
@@ -430,10 +452,9 @@ def _one_cik(
         raise
     assert normalized is not None
     filings = listed_filings(normalized.parsed[FILINGS_FRAME], since, until)
-    ids = [n.instrument_id for n in names]
     counts.listed += len(filings)
     wanted = {f.form: items_for(f.form, requested) for f in filings}
-    complete = set() if force else complete_filings(held["keys"], wanted, ids)
+    complete = set() if force else complete_filings(held["keys"].get(cik, held["empty"]), wanted)
     failures: list[str] = []
     for filing in filings:
         if filing.accession in complete:
@@ -453,7 +474,9 @@ def _one_cik(
                 )
                 extracted = _document(text, request)
                 counts.fetched += 1
-            rows = text_rows(extracted, filing, ids, held["latest"](), _learned_on(run))
+            seen = filing.accession in set(held["keys"].get(cik, held["empty"])["accession"])
+            prior = stored_versions(run, cik, _acceptance(filing)) if seen else held["empty_text"]
+            rows = text_rows(extracted, filing, prior, _learned_on(run))
         except Exception as exc:  # one filing failing must not drop the others
             counts.blocked |= _blocking(exc)
             failures.append(f"{filing.accession}: {exc}")
@@ -472,11 +495,16 @@ def _one_cik(
     return f"OK: {_window(since, until)} ({len(filings)} filings)"
 
 
+def _acceptance(filing: Filing) -> date:
+    """The acceptance session of a filing: the partition its rows are in."""
+    return date.fromisoformat(str(acceptance_sessions(pd.Series([filing.ts]))[0]))
+
+
 @dataclass(frozen=True)
 class Plan:
     """The CIKs a run asks (``todo``), the window of each, and the counts for ``stats``."""
 
-    todo: dict[str, list[Listed]]
+    todo: list[str]
     windows: dict[str, tuple[date, date]]
     skipped: int
     pending: int
@@ -484,7 +512,8 @@ class Plan:
 
 def _select(
     run: IngestRun,
-    ciks: dict[str, list[Listed]],
+    candidates: Sequence[str] | None,
+    runs: Sequence[RunRecord],
     session: date,
     since: date | None,
     until: date,
@@ -493,35 +522,40 @@ def _select(
     tag: str,
 ) -> Plan:
     """The nightly's due CIKs (each from its latest stored filing), or the backfill's CIKs not yet
-    read for the window (failed ones last, ``limit`` of them)."""
-    runs = finished_runs(run.writer, TASK)
+    read for the window (failed ones last, ``limit`` of them). ``candidates``: the backfill's
+    filers; for the nightly the CIKs it may ask (``None``: every stored one)."""
     if since is None:
-        every = [n.instrument_id for group in ciks.values() for n in group]
-        known = stored_filing_text(run.reader, every, ("instrument_id", "ts"))
+        known = stored_filing_text(run.reader, None, ("cik", "ts"), ciks=candidates)
         if known.empty:
             run.partial("nothing stored yet: run the backfill (--from)")
-        due = due_ciks(ciks, known, last_checked(runs), session)
-        return Plan(
-            {cik: names for cik, (names, _) in due.items()},
-            {cik: (start, until) for cik, (_, start) in due.items()},
-            0,
-            0,
-        )
+        due = due_ciks(known, last_checked(runs), session)
+        return Plan(list(due), {cik: (start, until) for cik, start in due.items()}, 0, 0)
     done = set() if force else read_done(runs, tag, since, until)
     bad = failed_before(runs)
-    left = {c: n for c, n in ciks.items() if c not in done}
-    left = dict(sorted(left.items(), key=lambda item: item[0] in bad))  # failed ones last
+    left = [c for c in (candidates or ()) if c not in done]
+    left.sort(key=lambda c: c in bad)  # failed ones last (stable: the index order otherwise)
     cap = limit or BACKFILL_CIKS
-    todo = dict(list(left.items())[:cap])
+    todo = left[:cap]
     return Plan(
-        todo, dict.fromkeys(todo, (since, until)), len(ciks) - len(left), max(0, len(left) - cap)
+        todo,
+        dict.fromkeys(todo, (since, until)),
+        len(candidates or ()) - len(left),
+        max(0, len(left) - cap),
     )
+
+
+def _symbol_ciks(run: IngestRun, requested: Sequence[str]) -> tuple[Names, list[str]]:
+    """The tickers asked (``--symbols``): the universe's operating companies among them and their
+    CIKs (funds and unknown tickers are left out, as in ``events/filing``)."""
+    covered = universe_names(run, requested)
+    return covered, list(ciks_of(run, covered.listed))
 
 
 def ingest_filing_text(
     ctx: TaskContext,
     listing: Source,
     text: Source,
+    index: Source,
     session: date,
     requested_symbols: Sequence[str] = (),
     since: date | None = None,
@@ -529,51 +563,61 @@ def ingest_filing_text(
     limit: int | None = None,
     items: Sequence[str] = (),
     force: bool = False,
+    allow_gap: Sequence[str] = (),
 ) -> RunRecord:
-    """Store the item sections of the periodic filings of the universe's operating companies
-    (module doc): the backfill window ``since..until`` (``--limit`` CIKs a run), or, without
-    ``since``, the nightly increment of the due CIKs."""
+    """Store the item sections of the periodic filings of every filer (module doc): the backfill
+    window ``since..until`` (the filers of the daily index, ``--limit`` CIKs a run), or, without
+    ``since``, the nightly increment of the due CIKs. ``items``: the ids kept (default
+    ``DEFAULT_ITEMS``); ``allow_gap``: ISO weekdays with no daily index an operator verified
+    (SEC closed), which the walk then accepts."""
     until = until or session
     if since is not None and until < since:
         raise ValueError(f"--to {until} is before --from {since}")
+    items = tuple(items) or DEFAULT_ITEMS
     tag = run_tag(items)
     with IngestRun(ctx, TASK, session) as run:
-        covered = universe_names(run, requested_symbols)
-        for symbol in covered.unknown:
-            run.record_item(f"sym:{symbol}", "UNKNOWN: not in the universe")
-        ciks = ciks_of(run, covered.listed)
+        covered = Names([], 0, [])
+        runs = finished_runs(run.writer, TASK)
         nightly = since is None
+        found = None
+        if requested_symbols:  # a targeted read: those tickers' CIKs, no index walk
+            covered, candidates = _symbol_ciks(run, requested_symbols)
+            for symbol in covered.unknown:
+                run.record_item(f"sym:{symbol}", "UNKNOWN: not in the universe")
+        elif nightly:
+            candidates = None
+        else:
+            assert since is not None
+            found = discover(
+                run, index, runs, since, until, [date.fromisoformat(d) for d in allow_gap]
+            )
+            candidates = found.ciks
+            if not found.cached:
+                run.stats.update({WINDOW_KEY: _window(since, until), CIKS_KEY: found.ciks})
         counts = Counts()
-        plan = _select(run, ciks, session, since, until, limit, force, tag)
+        plan = _select(run, candidates, runs, session, since, until, limit, force, tag)
         todo, windows = plan.todo, plan.windows
         starts = [w[0] for w in windows.values()]
         low, high = (min(starts), until) if starts else (until, until)
         window = (low, high)
-        ids = [n.instrument_id for group in todo.values() for n in group]
         start, end = low - MARGIN, high + MARGIN
-        keys = stored_filing_text(run.reader, ids, (*KEY_COLUMNS, "form"), start=start, end=end)
-        cache: dict[str, pd.DataFrame] = {}
-
-        def latest() -> pd.DataFrame:  # the text of what is stored: read once, only when needed
-            if "frame" not in cache:
-                cache["frame"] = (
-                    stored_latest(run, ids, start, end)
-                    if len(keys)
-                    else pd.DataFrame({c: [] for c in (*KEY_COLUMNS, "text")})
-                )
-            return cache["frame"]
-
-        held = {"keys": keys, "latest": latest}
+        empty = pd.DataFrame({c: [] for c in (*KEY_COLUMNS, "form")})
+        keys = stored_filing_text(
+            run.reader, None, (*KEY_COLUMNS, "form"), start=start, end=end, ciks=todo
+        )
+        by_cik = {str(c): g for c, g in keys.groupby("cik")} if len(keys) else {}
+        empty_text = pd.DataFrame({c: [] for c in (*KEY_COLUMNS, "text_sha")})
+        held = {"keys": by_cik, "empty": empty, "empty_text": empty_text}
         floor, path = ctx.settings.sec_filing_text_min_free_gb, store_path(ctx)
         blocked_in_a_row = 0
-        for i, (cik, group) in enumerate(todo.items(), 1):
+        for i, cik in enumerate(todo, 1):
             if path is not None and (free := free_gb(path)) < floor:
                 run.partial(
                     f"stopped: {free:.1f} GB free is under {floor:g} GB "
                     "(sources.toml [sec_edgar] filing_text_min_free_gb)"
                 )
                 break
-            args = (run, listing, text, cik, group, windows[cik], items, force, held, counts)
+            args = (run, listing, text, cik, windows[cik], items, force, held, counts)
             status = run.attempt(cik, partial(_one_cik, *args))
             failed = status_label(status) == FETCH_ERROR and counts.blocked
             blocked_in_a_row = blocked_in_a_row + 1 if failed else 0
@@ -587,7 +631,11 @@ def ingest_filing_text(
             mode="nightly" if nightly else "backfill",
             window=_window(*window),
             tag=tag,
-            names=len(covered.listed),
+            filers=len(candidates) if candidates is not None else None,
+            filers_cached=found.cached if found else None,
+            index_days=found.days if found else None,
+            index_holidays=len(found.holidays) if found else None,
+            index_gaps_allowed=list(allow_gap),
             ciks=len(todo),
             skipped_covered=plan.skipped,
             pending=plan.pending,
