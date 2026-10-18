@@ -17,7 +17,7 @@ tenths pay it. Small samples are noise: below about 40 trades, read the lines as
 Real costs rise with size and fall with liquidity, and the cost a trader pays can differ from every
 level shown. Don't pick the cost that makes the result look best; check capacity too.
 """
-see_also = ["break_even_cost", "capacity", "cost_state", "win_rate", "base_rate", "lift", "top_vs_bottom_decile", "trades"]
+see_also = ["break_even_cost", "hold_band", "capacity", "cost_state", "win_rate", "base_rate", "lift", "top_vs_bottom_decile", "trades"]
 
 [[term]]
 id = "break_even_cost"
@@ -32,7 +32,26 @@ cost, even when the win rate looks good. It is a mean over every trade in the pe
 large winners can lift it; the median trade can still lose. Take the in-sample and out-of-sample
 figures side by side: if the out-of-sample one is much lower, the edge was thinner than it looked.
 """
-see_also = ["cost_sensitivity", "capacity", "win_rate", "in_sample", "out_of_sample", "trades"]
+see_also = ["cost_sensitivity", "hold_band", "capacity", "win_rate", "in_sample", "out_of_sample", "trades"]
+
+[[term]]
+id = "hold_band"
+term = "Hold band"
+short = "A rule that keeps a name until its rank falls below a lower line, so cost is paid on entries and exits only."
+body = """
+A plain edge buys the top K names at every decision session and pays a whole round trip on each. A
+hold band buys at rank K or better and keeps a name while its rank stays within the edge's hold
+rank, a deeper line. A name that stays is not sold and bought again, so it pays nothing for that
+session. An entry pays half a round trip and an exit half. The net return and the break-even cost
+follow this rule. The win rate, lift and decile spread do not: they stay the picks' own. The last
+session counts as an exit, and a session the screen could not measure closes every position. A band
+is allowed for a long or short edge on a monthly schedule, or a daily one held one session, where
+windows do not overlap. Example: K is 5 and the hold rank 8. A name ranked 7 stays if held
+yesterday and is not bought if not. Held names can be weaker than the top K, so a band lowers the
+average gross return as it lowers cost. Don't judge a band by cost alone: compare the net mean at
+the same cost with and without it.
+"""
+see_also = ["cost_sensitivity", "break_even_cost", "win_rate", "lift", "capacity"]
 
 [[term]]
 id = "capacity"
