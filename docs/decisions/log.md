@@ -603,6 +603,14 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the nightly starts about 18:00 New York time and SEC lists 17:30-22:00 acceptances in the next day's index, so S's own 8-Ks are usually unstored when the nightly runs; counting through S read 0 live and 1 on a recompute. The span through S-1 gives the same value live and in a backtest. A history before the first nightly walk reads null. Known limits: the session after a market day EDGAR was closed reads null, and on a SEC-only holiday Friday an after-17:30 acceptance can be missing from the walked index until the next walk.
 
+## 2026-10-18 | filing_activity follow-up to PR #645 | History before the first nightly walk
+- Question: how does `filing_count_5d` get values for sessions before the first nightly walk, so `volume_shock_no_news` can be backtested?
+- Options: leave null until walks accumulate / let a full per-CIK read (`covers_since` on or before the span, run of S-1 or later) cover past sessions for that CIK only / treat the backfill as covering every CIK.
+- Decision: `data/events.filing_coverage(reader)` is the one reader of the filings task's coverage (`walks`, `reads`, `asked_since`, `walked_to`; the ingestion's own copies are gone); `filing_activity@v1` reads its per-CIK reads through the `filings/read` input, whatever the session, and counts a CIK's 8-Ks when a clean walk covers S-1 (as before) or a read of that CIK covers the span. No version change: values only appear where they were null. Rebuild: `algotrade-ingest rollups --from <first session> --to <last session> --only filing_activity@v1` (owner's go-ahead for the live store). No SEC-closed-day list: the session after Columbus Day or Veterans Day stays null until a walk reads past it (fail closed, as accepted).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the 8-Ks known on a past session do not change once read, so a later full read of a CIK says its history is complete; coverage stays per CIK because a read says nothing about another company, and an instrument with no 8-K in the lookback stays null (no CIK to match). Past sessions use the knowledge of a later run for coverage only, never for a value (rows are still bounded by `known_from <= S-1`).
+
 ## 2026-10-18 | EB H7 (buy/hold bands) | Where a band applies, long_short, and what the net series is
 - Question: which edges may carry `hold_rank`, what happens for `long_short`, how is a name's cost split between entry and exit, and which figures follow the banded series?
 - Options: allow a band on every schedule / only where decision sessions do not overlap; a band on both legs of a spread / refuse it; the whole round trip at entry / half in, half out; replace `pick_values` (and so every statistic) / keep gross figures and bind only the net series.
