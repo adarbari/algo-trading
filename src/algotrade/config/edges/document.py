@@ -748,10 +748,10 @@ def _check_side(
 def _hold_rank(
     o: Table, side: str, kind: str, schedule: str, horizons: tuple[int, ...]
 ) -> int | None:
-    """The outcome's buy/hold band rank (None: no band). A band needs positions that carry from
-    one decision session to the next, so it is refused where they cannot: a spread (``long_short``
-    has no cost rows), a return that is not an excess return, an event or calendar schedule, and
-    an ``every_session`` outcome whose horizon overlaps the next decision session."""
+    """The outcome's buy/hold band rank (None: no band). Refused for a spread (``long_short`` has
+    no cost rows), a return that is not an excess return and an event or calendar schedule. The
+    schedule limit (``month_end``, or ``every_session`` at one session) is stricter than needed:
+    windows never overlap on a plain schedule (``sessions.py``), so loosening it is a later PR."""
     if "hold_rank" not in o.names():
         return None
     rank = o.integer("hold_rank", 1, 1)
@@ -762,9 +762,9 @@ def _hold_rank(
         )
     if schedule not in SCHEDULES or (schedule == "every_session" and horizons != (1,)):
         raise ConfigurationError(
-            f"{o.where} hold_rank: a band carries a name to the next decision session, so the "
-            f"schedule is month_end, or every_session at horizon_sessions = [1] (windows that "
-            f"do not overlap), got {schedule!r} with {list(horizons)}"
+            f"{o.where} hold_rank: for now the schedule is month_end, or every_session at "
+            f"horizon_sessions = [1] (kept stricter than needed), got {schedule!r} with "
+            f"{list(horizons)}"
         )
     return rank
 

@@ -753,7 +753,8 @@ name enters at rank <= `top_k` and is held while its rank is <= `hold_rank`.
 1. **Document rule.** `hold_rank >= top_k` and `top_k` is an integer (config error otherwise, for
    the edge and for each variant's outcome). Allowed only for a `long` or `short`
    `excess_return`, on `month_end`, or `every_session` at `horizon_sessions = [1]`: a band carries
-   a name from one decision session to the next, so the windows must not overlap. Refused for
+   a name from one decision session to the next. The schedule limit is stricter than needed (windows
+   never overlap on a plain schedule); loosening it is a later PR. Refused for
    `long_short` (a spread: no cost rows, and two legs with no single book to turn over), a
    `hit_target`, an event or a calendar schedule. Unset, nothing changes: `identity_dict` drops
    the key, so the run and trial hashes of every existing edge are as they were. Set, it is part
@@ -782,3 +783,7 @@ name enters at rank <= `top_k` and is held while its rank is <= `hold_rank`.
 5. **One full re-run.** `LEG_VERSION` 3 (H6) and 4 (this) both invalidate every stored leg once:
    the owner pays one full re-run after both merge: `algotrade-backtest evaluate-edges --full` (every
    open edge; `--edge ID` for one), from the main checkout's environment against the real store.
+6. **Accepted limits (architect review, non-blocking).** A month end the schedule skips counts a
+   name as held through it at no cost. A period with a single cost row has no slope, so the
+   break-even falls back to a full round trip per name: conservative. No exit reason is recorded
+   per name. `LEG_VERSION` 4 recomputes every leg (item 5).

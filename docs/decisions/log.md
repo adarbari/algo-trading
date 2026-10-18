@@ -609,7 +609,7 @@ follow-up PR).
 - Decision: `long` and `short` `excess_return` with an integer `top_k`, on `month_end` or `every_session` at horizon 1; `long_short`, event and calendar schedules refused in the document; an entry and an exit each pay half a round trip, the last session exits (charged) and a coverage gap closes every position; hit rate, lift, decile spread, effect size and the floor stay the legs' own, the net series (Sharpe, deflated Sharpe, PBO, `mean_excess_picks`), the cost rows and the break-even follow the band; the break-even's turnover is read from the slope of the stored cost rows, no new column; hit counts at cost levels and the trade ledger stay per round-trip trade (follow-up).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
-- Reasoning: a name can only carry from one session to the next when windows do not overlap; a spread has no cost rows and no single book; half and half makes a name held through pay exactly one trip over its stay; gross figures must not move so the verdict's evidence is the same picks, and only what a trader pays changes.
+- Reasoning: the schedule limit is stricter than needed (plain-schedule windows never overlap; loosening is a later PR); a spread has no cost rows and no single book; half and half makes a name held through pay exactly one trip over its stay; gross figures must not move so the verdict's evidence is the same picks, and only what a trader pays changes.
 
 ## 2026-10-18 | EB H7 (buy/hold bands) | One full re-run after LEG_VERSION 4
 - Question: who pays the re-run that LEG_VERSION 3 (H6) and 4 (H7) each force?
