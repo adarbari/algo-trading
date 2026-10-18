@@ -562,3 +562,18 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: settled by the architect reviewer of #644 (the format accepts no `architect` decider); the edge can be scored now instead of from November; the read-only broker boundary is untouched (it reads a stored rollup).
+
+## 2026-10-17 | EB H8 (option model P&L) | Short delta-hedged side, stored basis, short put
+- Question: how is the short side of the delta-hedged straddle expressed, where does `basis = "model"` live, and when does the short-put P&L land?
+- Options: a `side` key / a separate structure value; a stored `edge_eval` basis column now / with the chain P&L grain (H13); short put in H8 / a follow-up PR.
+- Decision: a separate structure value `delta_hedged_atm_short` (Guide entry, coverage, fitness test; no `side` key); the stored basis column waits for H13 (today `Outcome.basis`, page text and Guide); the short-put P&L is a follow-up PR.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a value per structure keeps every position one enum value with its own Guide entry; a column on a stored table is a schema change that belongs with the chain grain; a put needs a strike key and a put price that H8's three straddle structures do not.
+## 2026-10-18 | PR #645 (E1b filing_activity) | The 8-K span ends at the previous session
+- Question: may `filing_activity@v1.filing_count_5d` count 8-Ks through the session itself?
+- Options: through S, with coverage read from row presence / through S-1 (filings known before S-1's close), coverage from the filings walk's `walked_to`.
+- Decision: the span ends at S-1 (filings that became known on or before S-1, so accepted before S-1's close, over the 5 sessions ending there; only 8-K and 8-K/A rows), and the value is null unless a clean walk of a session on or before S reached S-1. `feature.news_free_5d` means no 8-K through S-1 and no earnings window in the last 5 sessions.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the nightly starts about 18:00 New York time and SEC lists 17:30-22:00 acceptances in the next day's index, so S's own 8-Ks are usually unstored when the nightly runs; counting through S read 0 live and 1 on a recompute. The span through S-1 gives the same value live and in a backtest. A history before the first nightly walk reads null. Known limits: the session after a market day EDGAR was closed reads null, and on a SEC-only holiday Friday an after-17:30 acceptance can be missing from the walked index until the next walk.
