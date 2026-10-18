@@ -26,8 +26,10 @@ from algotrade.quant.edges.statistics import (
     decile_spread,
     deflated_sharpe,
     effect_vs_moments,
+    independent_sessions,
     lift,
     merge_moments,
+    overlap_t,
     pbo_cscv,
     sharpe,
     sharpe_t,
@@ -276,6 +278,7 @@ def _measure(
     in_sample: bool = False,
     adv_floor: float | None = None,
     wins: bool = False,
+    horizon: int = 1,
 ) -> SliceMeasure:
     rows = [r for r in kept if not r.excluded_coverage]
     adv_median, adv_known, adv_low = _capacity(rows, adv_floor)
@@ -290,7 +293,13 @@ def _measure(
     spreads = [r.spread for r in rows if r.spread is not None]
     tops = [r.top_decile for r in rows if r.top_decile is not None]
     spread_mean, _, spread_t, spread_n = spread_summary(spreads)
-    means = [m for m in (trial_value(r, wins) for r in rows) if m is not None]
+    # Windows of ``horizon`` sessions started every session overlap: a t-ratio over n of them
+    # stands for fewer independent sessions, the count the haircut Sharpe ratio rests on too.
+    spread_days = [r.session for r in rows if r.spread is not None]
+    spread_t = overlap_t(spread_t, spread_n, independent_sessions(spread_days, horizon))
+    values = [(r.session, trial_value(r, wins)) for r in rows]
+    means = [m for _, m in values if m is not None]
+    value_days = [d for d, m in values if m is not None]
     return SliceMeasure(
         slice_kind=sl.kind,
         slice_value=sl.value,
@@ -312,7 +321,7 @@ def _measure(
         decile_sessions=spread_n,
         effect_size=effect_vs_moments(pick_values, rest),
         sharpe=sharpe(means),
-        picks_t=sharpe_t(means),
+        picks_t=sharpe_t(means, independent_sessions(value_days, horizon)),
         unscored=sum(r.unscored for r in rows),
         excluded_score_coverage=sum(r.excluded_score_coverage for r in rows),
         excluded_unclosed=sum(r.excluded_unclosed for r in rows),
@@ -419,17 +428,20 @@ def slice_measures(
     frozen_from: date | None = None,
     adv_floor: float | None = None,
     wins: bool = False,
+    horizon: int = 1,
 ) -> list[SliceMeasure]:
     """One ``SliceMeasure`` per slice, in the slices' order, over the stats it keeps. A ``model``
     screener's score was fitted on sessions before ``frozen_from`` (a fitness test): a slice that
     keeps one of them is IN_SAMPLE, whatever its kind (no ``frozen_from``: every slice is).
     ``adv_floor``: the site's capacity floor for the capacity columns (none: not measured);
-    ``wins``: the outcome is not a return, so the Sharpe ratio is of the excess wins."""
+    ``wins``: the outcome is not a return, so the Sharpe ratio is of the excess wins;
+    ``horizon``: the holding period in sessions, which sets how far the windows overlap (the
+    t-ratios count independent sessions, ``statistics.window_weights``)."""
     out = []
     for sl in slices:
         kept = [r for r in rows if sl.keep(r)]
         seen = model and (frozen_from is None or any(r.session < frozen_from for r in kept))
-        out.append(_measure(sl, kept, seen, adv_floor, wins))
+        out.append(_measure(sl, kept, seen, adv_floor, wins, horizon))
     return out
 
 

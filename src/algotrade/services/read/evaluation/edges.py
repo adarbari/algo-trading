@@ -37,14 +37,14 @@ class EdgePublished:
     """The figure the literature reports for the edge (``[published]``): ``measure``
     (``mean_excess``, ``decile_spread`` or ``lift_pts``) equal to ``value`` over
     ``horizon_sessions``, from ``source`` (title and link), over ``sample`` years (None: not
-    stated); ``leg``: what the figure is of (``long_short`` spread or ``long_only``)."""
+    stated); ``leg``: what the figure is of (``long_short`` spread or ``long``)."""
 
     measure: str
     value: float
     horizon_sessions: int
     source: EdgeSource
     sample: int | None = None
-    leg: str = "long_short"
+    leg: str = "long"
 
 
 @dataclass(frozen=True)

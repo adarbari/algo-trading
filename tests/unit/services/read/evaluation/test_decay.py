@@ -103,7 +103,7 @@ def test_an_edge_that_publishes_nothing_keeps_its_decay_with_the_paper_not_given
 def test_the_published_figure_is_shown_after_the_haircut_of_its_leg_beside_the_oos_bar() -> None:
     """ADR 0065 amendment 2026-10-17: display only, the verdict never reads it."""
     rows = result(oos={"decile_sessions": 11, "decile_spread": 0.0050})
-    paper = published("decile_spread", value=0.0200)  # long-short by default: a half off
+    paper = replace(published("decile_spread", value=0.0200), leg="long_short")  # a half off
     v = judge("e", rows, SPLIT, T, facts=EdgeFacts(paper))
     assert v.decay is not None and v.decay.expected is not None
     e = v.decay.expected
@@ -113,11 +113,11 @@ def test_the_published_figure_is_shown_after_the_haircut_of_its_leg_beside_the_o
         "Published 2.00%, expect 1.00% (50% off for a long-short figure). "
         "Out of sample it is 0.50%, 50% of that."
     )
-    only = replace(paper, leg="long_only")
-    long_only = judge("e", rows, SPLIT, T, facts=EdgeFacts(only)).decay
-    assert long_only is not None and long_only.expected is not None
-    assert long_only.expected.value == pytest.approx(0.0200 * (1 - 0.333))
-    assert "33% off for a long-only figure" in long_only.expected.summary
+    only = replace(paper, leg="long")
+    long_side = judge("e", rows, SPLIT, T, facts=EdgeFacts(only)).decay
+    assert long_side is not None and long_side.expected is not None
+    assert long_side.expected.value == pytest.approx(0.0200 * (1 - 0.333))
+    assert "33% off for a long figure" in long_side.expected.summary
     same = judge("e", rows, SPLIT, T, facts=EdgeFacts(only)).verdict
     assert same == v.verdict  # the leg moves no verdict
 
@@ -129,4 +129,4 @@ def test_there_is_no_expected_figure_without_a_published_one_or_an_out_of_sample
     d = judge("e", rows, SPLIT, T, facts=EdgeFacts(other)).decay
     assert d is not None and d.expected is not None
     assert (d.expected.realised, d.expected.share) == (None, None)
-    assert d.expected.summary == "Published 1.31%, expect 0.66% (50% off for a long-short figure)."
+    assert d.expected.summary == "Published 1.31%, expect 0.87% (33% off for a long figure)."

@@ -70,12 +70,12 @@ def test_the_committed_file_parses_to_the_defaults() -> None:
 def test_works_needs_the_picks_t_too_and_the_published_haircut_has_its_two_legs() -> None:
     d = VerdictSettings.from_document(None)
     assert (d.works_t, d.works_picks_t) == (3.0, 3.0)  # owner 2026-10-17
-    assert (d.haircut_long_short, d.haircut_long_only) == (0.5, 0.333)
-    assert d.published_haircut("long_short") == 0.5 and d.published_haircut("long_only") == 0.333
-    read = VerdictSettings.from_document({"published_haircut": {"long_only": 0.25}})
-    assert (read.haircut_long_only, read.haircut_long_short) == (0.25, 0.5)
-    for bad in ({"long_only": 1.5}, {"long_short": -0.1}, {"long_short": "half"}):
-        with pytest.raises(ConfigurationError, match="long_"):
+    assert (d.haircut_long_short, d.haircut_long) == (0.5, 0.333)
+    assert d.published_haircut("long_short") == 0.5 and d.published_haircut("long") == 0.333
+    read = VerdictSettings.from_document({"published_haircut": {"long": 0.25}})
+    assert (read.haircut_long, read.haircut_long_short) == (0.25, 0.5)
+    for bad in ({"long": 1.5}, {"long_short": -0.1}, {"long_short": "half"}):
+        with pytest.raises(ConfigurationError, match="long"):
             VerdictSettings.from_document({"published_haircut": bad})
     with pytest.raises(ConfigurationError, match="unknown keys"):
         VerdictSettings.from_document({"published_haircut": {"short_only": 0.5}})

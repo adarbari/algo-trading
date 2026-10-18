@@ -83,7 +83,13 @@ decile t of 2; Works needs a t of 3 on **both** t series: the top-vs-bottom deci
 Sharpe ratio of the slice's trial values (`quant/edges/statistics.sharpe_t`, the `t` of
 `haircut_sharpe`), stored per slice as `results/edge_eval.picks_t` (not stored, as in an older
 run: the criterion is "not measured" and the verdict stays Promising until the next run).
-`deflate` is untouched: each edge's own trial count still deflates its Sharpe ratio.
+Both t-ratios count **independent sessions**: windows of `h` sessions started every session
+overlap, so the picks t is `sharpe x sqrt(independent)` and the decile t is scaled by
+`sqrt(independent / n)`, with `independent` the sum of `statistics.window_weights` (the count the
+haircut already used: `runs.measured_sessions`) over the slice's measured sessions. The decile t
+of an every-session edge with `h` > 1 therefore falls by about `sqrt(h)` from the next run, which
+can lower a verdict that rested on it (it was overstated, never understated); a schedule spaced
+at least `h` apart is unchanged. `deflate` is untouched: each edge's own trial count still deflates its Sharpe ratio.
 
 The haircut Sharpe is also made for a **site-wide trial count**, the variants tried across the
 whole programme (140 edges x variants x horizons is the count the literature's t > 3 bar is
@@ -92,8 +98,9 @@ edge (not rejected or blocked, not a user's own), kept per published state. `Edg
 both, the edge's own and the site's (`site_trials`, `site_haircut_sharpe`, `site_cut`), and its
 sentence says both. Display only: the verdict reads the deflated Sharpe, as before.
 
-`[published] leg` (`long_short`, the default, or `long_only`) says what the paper's figure is of;
-`verdict.toml [published_haircut]` (`long_short = 0.5`, `long_only = 0.333`) is the share of it
+`[published] leg` (`long_short` or `long`; by default `long_short` for a `decile_spread` and `long`
+for any other measure; H3 adds `short`) says what the paper's figure is of;
+`verdict.toml [published_haircut]` (`long_short = 0.5`, `long = 0.333`) is the share of it
 to expect lost once traded (McLean and Pontiff: about a third after publication). The decay read
 carries `expected` (the figure after the haircut, the out-of-sample bar and its share of it) and
 the edge page says "Published x, expect y" under the decay bars. **Display only**: no verdict

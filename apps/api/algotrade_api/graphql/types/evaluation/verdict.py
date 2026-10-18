@@ -382,7 +382,7 @@ class EdgeHaircut:
 @strawberry.type(
     description="The figure the literature reports for the edge: `measure` (mean_excess, "
     "decile_spread or lift_pts) equal to `value` over `horizonSessions`, from `source` over "
-    "`sample` years (null: not stated); `leg`: what the figure is of (long_short or long_only)"
+    "`sample` years (null: not stated); `leg`: what the figure is of (long_short or long)"
 )
 class EdgePublished:
     measure: str
@@ -406,7 +406,7 @@ class EdgePublished:
 
 @strawberry.type(
     description="What to expect of the paper's figure once traded: `value` is the published "
-    "figure less the `haircut` (0 to 1) of its `leg` (long_short or long_only), in the decay's "
+    "figure less the `haircut` (0 to 1) of its `leg` (long_short or long), in the decay's "
     "unit; `realised` the out-of-sample bar's figure and `share` its share of `value` (null "
     "where the bar has none); `summary` is the sentence. Display only, no verdict reads it"
 )

@@ -34,7 +34,7 @@ KEYS = (
     "capacity_adv_floor_usd",
     "capacity_position_usd",
 )
-LEGS = ("long_short", "long_only")  # ``[published] leg`` of an edge document (ADR 0065)
+LEGS = ("long", "long_short")  # ``[published] leg`` (ADR 0065; H3 adds ``short``)
 HAIRCUT_KEYS = LEGS  # ``[published_haircut]``: the share of a published figure lost, by leg
 COST_LEVELS = (0.0, 15.0, 30.0, 50.0)  # bp, the site grid (ADR 0064 decision 5; owner 2026-10-10)
 
@@ -87,11 +87,11 @@ class VerdictSettings:
     # a long-short spread that also has costs and short limits). Display only: never a verdict
     # input (ADR 0065 amendment 2026-10-17).
     haircut_long_short: float = 0.5
-    haircut_long_only: float = 0.333
+    haircut_long: float = 0.333
 
     def published_haircut(self, leg: str) -> float:
         """The share of a published figure on ``leg`` (``LEGS``) expected to be lost."""
-        return self.haircut_long_only if leg == "long_only" else self.haircut_long_short
+        return self.haircut_long_short if leg == "long_short" else self.haircut_long
 
     @classmethod
     def from_document(
@@ -124,7 +124,7 @@ class VerdictSettings:
             capacity_adv_floor_usd=t.number("capacity_adv_floor_usd", d.capacity_adv_floor_usd, 1),
             capacity_position_usd=t.number("capacity_position_usd", d.capacity_position_usd, 1),
             haircut_long_short=cut.fraction("long_short", d.haircut_long_short),
-            haircut_long_only=cut.fraction("long_only", d.haircut_long_only),
+            haircut_long=cut.fraction("long", d.haircut_long),
         )
 
 

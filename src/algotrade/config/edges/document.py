@@ -44,8 +44,9 @@ and the key.
                       return as a fraction, ``lift_pts`` in points), ``value``,
                       ``horizon_sessions`` (one of the outcome's), ``source`` (the index of its
                       ``[[sources]]`` entry) and optional ``sample`` (years it covers; ADR 0064
-                      decision 6), and optional ``leg`` (LEGS: ``long_short`` by default, or
-                      ``long_only``: what the figure is of; picks the ``verdict.toml``
+                      decision 6), and optional ``leg`` (LEGS: ``long_short``, or ``long``:
+                      what the figure is of; by default ``long_short`` for a ``decile_spread``
+                      and ``long`` for any other measure; picks the ``verdict.toml``
                       ``[published_haircut]`` shown beside it, display only). A copy inherits it
     [[sources]]       title, optional https url (a paper without one: author, title, year)
     [quality_bar]     the other seven answers (QUALITY_BAR); required unless rejected / blocked
@@ -225,7 +226,7 @@ class Published:
     horizon_sessions: int
     source: int
     sample: int | None = None
-    leg: str = "long_short"  # what the paper's figure is of: a long-short spread | the long side
+    leg: str = "long"  # what the paper's figure is of: the long side | a long-short spread
 
 
 @dataclass(frozen=True)
@@ -430,13 +431,14 @@ def _published(t: Table, outcome: Outcome, sources: int) -> Published | None:
         raise ConfigurationError(
             f"{sub.where} source: {source} is not an index of the {sources} [[sources]]"
         )
+    measure = sub.choice("measure", "", PUBLISHED_MEASURES)
     return Published(
-        measure=sub.choice("measure", "", PUBLISHED_MEASURES),
+        measure=measure,
         value=sub.number("value", 0.0),
         horizon_sessions=horizon,
         source=source,
         sample=sub.integer("sample", 0, 1) if "sample" in sub.names() else None,
-        leg=sub.choice("leg", "long_short", LEGS),
+        leg=sub.choice("leg", "long_short" if measure == "decile_spread" else "long", LEGS),
     )
 
 

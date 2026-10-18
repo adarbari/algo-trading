@@ -15,16 +15,14 @@ viewer does not hold as ``Unknown(LICENCE)``, and a ledger the retention purge r
 its admin cause (ADR 0056). ``ledger_keep`` says which partitions the
 purge spares: those of each edge's canonical run, latest run per user and cited run."""
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
-from itertools import pairwise
 from typing import Any, Final
 
 import pandas as pd
 
 from algotrade.config.edges.document import (
-    CLOSED,
     LEGACY_SITE_CUTOFF,
     LEGACY_SITE_OWNERS,
     job_name,
@@ -33,8 +31,8 @@ from algotrade.config.edges.loading import load_all_edges
 from algotrade.config.edges.loading import load_edges as load_site_edges
 from algotrade.config.site.settings import load_users
 from algotrade.config.user import SITE_USER
-from algotrade.core.time.calendar import sessions_to
 from algotrade.data import StoreReader
+from algotrade.quant.edges.statistics import window_weights
 from algotrade.services.read.availability.cause import run_cause, table_cause
 from algotrade.services.read.context import ReadContext, Stores, run_partition
 from algotrade.services.read.evaluation.edges import Edge, load_edges
@@ -289,12 +287,19 @@ def load_canonical_run(ctx: Stores, edge: Edge) -> CanonicalRun:
 def load_site_trials(ctx: Stores) -> int:
     """The variants tried across the site (the multiple-testing count of the whole programme,
     ADR 0065 amendment 2026-10-17): the sum of ``trials_counted`` of the canonical run of every
-    open site edge (not rejected or blocked, not a user's own); an edge with no canonical run, or
-    one from before the count, adds none. Kept until the next publish or run."""
-    key = ("site-trials", ctx.reader.visible_seq(), ctx.reader.runs_generation())
+    site edge, rejected and blocked ones too (a trial stays a trial once the idea is dropped; a
+    user's own edges are not the site's). An edge with no canonical run, or one from before the
+    count, adds none. Kept until the next publish or run, and keyed on the site edges' ids,
+    frozen periods and statuses, so an edited document recounts."""
+    site = {e.id: (e.status, e.frozen_from) for e in load_site_edges(ctx.configs)}
+    key = (
+        "site-trials",
+        ctx.reader.visible_seq(),
+        ctx.reader.runs_generation(),
+        tuple(sorted(site.items(), key=lambda kv: kv[0])),
+    )
 
     def count() -> int:
-        site = {e.id for e in load_site_edges(ctx.configs) if e.status not in CLOSED}
         edges = [e for e in load_edges(ctx) if not e.mine and e.id in site]
         found = (load_canonical_run(ctx, e).run for e in edges)
         return sum(r.trials_counted or 0 for r in found if r is not None)
@@ -480,20 +485,6 @@ def load_run_series(ctx: Stores, run: EdgeRun) -> tuple[SeriesRow, ...]:
     found = [_series_row({str(k): v for k, v in r.items()}) for r in frame.to_dict("records")]
     kept = [r for r in found if r.before_split] if run.oos_hidden else found
     return tuple(sorted(kept, key=lambda r: (r.variant, r.horizon_sessions, r.decision_session)))
-
-
-def window_weights(days: Iterable[date], horizon: int) -> dict[date, float]:
-    """The weight of each decision session's window in a sum over windows: ``min(1, spacing /
-    horizon)``, the spacing the sessions since the previous decision (the first takes the next
-    one's). Windows of ``horizon`` sessions started every session overlap: counted whole they
-    add each day ``horizon`` times. A portfolio of ``horizon`` staggered tranches, each 1 /
-    ``horizon`` of the capital, earns each day the average of the windows covering it, which is
-    this weighting; a schedule spaced at least ``horizon`` apart has weight 1."""
-    ordered = sorted(set(days))
-    if len(ordered) < 2 or horizon <= 1:
-        return dict.fromkeys(ordered, 1.0)
-    steps = [sessions_to(a, b) for a, b in pairwise(ordered)]
-    return {d: min(1.0, n / horizon) for d, n in zip(ordered, [steps[0], *steps], strict=True)}
 
 
 def measured_sessions(series: Sequence[SeriesRow]) -> dict[tuple[str, int], int]:
