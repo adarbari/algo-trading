@@ -690,7 +690,7 @@ Sources: Site convention (docs/data/features.md, earnings_revisions@v1)
 **When the reading lies**
 
 - The span stops at the previous session because the nightly runs before SEC lists the evening's filings. SEC lists the evening's filings in the next day's index. Counting through the session would read 0 tonight and 1 tomorrow. This count is the same on every recompute.
-- Null means the table cannot say none. Either neither a clean nightly walk of the SEC index has reached the previous session nor a full per-company read of its filings covers the span (a backfill read, from the span or earlier, by a run of the previous session or later: history before the first nightly walk has a count only for the companies a backfill read in full). Or nothing is stored for the company (never fetched, or never filed). Or the stored history starts after the span.
+- Null means the table cannot say none. Either no clean nightly walk of the SEC index has reached the previous session, and no full read of the company's filings covers the span. A backfill read covers it when it started at the span or earlier and ran on the previous session or later. So history before the first nightly walk has a count only for companies a backfill read in full. Or nothing is stored for the company (never fetched, or never filed). Or the stored history starts after the span.
 - Null is also the answer on a night the filings step failed or was skipped, and on the session after a market day EDGAR was closed (Columbus Day, Veterans Day). On a Friday that only SEC observed as a holiday, an acceptance after 17:30 can be missing until the next walk. A zero would wrongly read as no news. The count appears once a later walk covers the day.
 - News with no 8-K is not counted: an analyst note, a press story, a rumour, a competitor's results. A zero is 'no company filing', not 'no news'. rollup.filing_activity@v1.earnings_in_5d adds the report windows, and feature.news_free_5d combines both.
 - An Item 2.02 results release is an 8-K, so an earnings week shows at least one filing.
@@ -765,7 +765,7 @@ Sources: Hartzmark and Solomon (2013), The dividend month premium, Journal of Fi
 **When the reading lies**
 
 - It is the absence of company filings and report dates, not of news. A press story, an analyst call, a rumour, a peer's results or a macro release still moves a name in a news-free week.
-- Null is common before the filings backfill, when neither a clean nightly walk nor a full backfill read of the company's filings covers the span, and for names with no stored filing. A hard 'eq true' keeps only names where the absence is known.
+- Null is common when neither a clean nightly walk nor a full backfill read of the company's filings covers the span. It is also common for names with no stored filing. A hard 'eq true' keeps only names where the absence is known.
 - A past session is read as it was. A filing accepted after it, or a report date published later, never changes it.
 
 Sources: Gervais, Kaniel and Mingelgrin (2001), The high-volume return premium, Journal of Finance
