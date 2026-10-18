@@ -1,0 +1,3 @@
+# Append-only logs: parallel PRs each add rows at the end; keep both sides instead of a conflict.
+docs/decisions/log.md merge=union
+docs/history.md merge=union

@@ -1,0 +1,56 @@
+# Dual-class cheap leg (ADR 0053, EB E3b; edge dual_class_spread_reversion): a common stock or
+# ADR that is one of exactly two listed classes of its issuer (rollup.share_classes@v1) and trades
+# two or more standard deviations cheaper against its sibling than its own last 252 sessions
+# (spread_z_252d at or below -2: the threshold is declared, not tuned). Ranked cheapest first.
+# The harness values the pick as the cheap class's return less its sibling's (the pair_spread
+# outcome). A missing value never passes (ADR 0030). What it does not check: dividend or voting
+# parity, a control event or a recapitalisation that legitimately moves one class, borrow on the
+# sibling, the sibling's liquidity beyond the base gates.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "dual_class_cheap_leg"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Dual-class cheap leg"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 3
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 2_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.paired]
+field = "rollup.share_classes@v1.sibling_status"
+op = "eq"
+value = "PAIRED"
+
+[criteria.cheap]
+field = "rollup.share_classes@v1.spread_z_252d"
+op = "lte"
+value = -2
+
+[columns]
+close = "rollup.price_stats@v2.close"
+sibling_id = "rollup.share_classes@v1.sibling_id"
+spread_z_252d = "rollup.share_classes@v1.spread_z_252d"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.share_classes@v1.spread_z_252d"
+tie_break_order = "asc"
