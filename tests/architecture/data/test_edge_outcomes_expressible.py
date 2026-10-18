@@ -11,7 +11,7 @@ from datetime import date
 
 import pytest
 
-from algotrade.config.edges.document import ANNOUNCED_AHEAD, CLOSED, Edge
+from algotrade.config.edges.document import ANNOUNCED_AHEAD, CLOSED, MODEL_STRUCTURES, Edge
 from algotrade.config.edges.loading import load_edges
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
@@ -23,6 +23,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     EXPIRES_OTM_FIELDS,
     IMPLIED_VOL_FIELD,
     MEASURE_FIELDS,
+    MODEL_PNL_FIELDS,
 )
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions
 from algotrade.storage.configs.files import FileConfigStore
@@ -52,18 +53,32 @@ def _measure(edge: Edge) -> str:
 @pytest.mark.parametrize("edge", EDGES, ids=_ids())
 def test_the_measure_and_the_path_condition_are_stored_outcome_fields(edge: Edge) -> None:
     for o in (edge.outcome, *(v.outcome for v in edge.variants)):
-        fields = (
-            EXPIRES_OTM_FIELDS
-            if o.kind == "expires_otm"
-            else MEASURE_FIELDS[o.measure or "excess_return"]
-        )
+        if o.kind == "option_model_pnl":
+            assert o.structure is not None
+            fields: tuple[str, ...] = MODEL_PNL_FIELDS[o.structure]
+        elif o.kind == "expires_otm":
+            fields = EXPIRES_OTM_FIELDS
+        else:
+            fields = MEASURE_FIELDS[o.measure or "excess_return"]
         stored = [f for f in fields if f != IMPLIED_VOL_FIELD]
         assert set(stored) <= set(OUTCOME_FIELDS), f"{edge.id}: {fields} are not outcome fields"
-    fields = MEASURE_FIELDS[_measure(edge)] if edge.outcome.kind != "expires_otm" else ()
+    fields = (
+        MEASURE_FIELDS[_measure(edge)]
+        if edge.outcome.kind not in ("expires_otm", "option_model_pnl")
+        else ()
+    )
     stored = [f for f in fields if f != IMPLIED_VOL_FIELD]
     assert set(stored) <= set(OUTCOME_FIELDS), f"{edge.id}: {fields} are not outcome fields"
     if edge.outcome.max_drawdown is not None:
         assert "fwd_max_drawdown" in OUTCOME_FIELDS
+
+
+def test_every_model_structure_names_the_stored_fields_it_reads() -> None:
+    """An ``option_model_pnl`` structure reads only fields the outcomes task writes (it adds no
+    grain, ADR 0053), and every structure the document accepts has its entry."""
+    assert set(MODEL_PNL_FIELDS) == set(MODEL_STRUCTURES)
+    for structure, fields in MODEL_PNL_FIELDS.items():
+        assert set(fields) <= set(OUTCOME_FIELDS), f"{structure}: {fields} are not outcome fields"
 
 
 @pytest.mark.parametrize("edge", EDGES, ids=_ids())
@@ -79,12 +94,12 @@ def test_the_implied_vol_a_ratio_measure_divides_by_is_in_the_catalogue() -> Non
 
 
 @pytest.mark.parametrize("edge", EDGES, ids=_ids())
-def test_every_expires_otm_iv_field_is_a_catalogue_feature_with_a_licence(edge: Edge) -> None:
+def test_every_option_outcome_iv_field_is_a_catalogue_feature_with_a_licence(edge: Edge) -> None:
     """An expires_otm outcome names the one implied-vol field it reads (iv_source and licence
     are recorded from it): it is in the catalogue and never the mixed-source field."""
     catalogue = field_catalog(STORE)
     for o in (edge.outcome, *(v.outcome for v in edge.variants)):
-        if o.kind == "expires_otm":
+        if o.kind in ("expires_otm", "option_model_pnl"):
             assert o.iv_field is not None and o.iv_field not in MIXED_SOURCE_IV
             catalogue.check_field(o.iv_field, f"{edge.id} iv_field")
 
