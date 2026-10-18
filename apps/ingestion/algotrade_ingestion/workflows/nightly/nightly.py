@@ -50,6 +50,7 @@ from algotrade.core.time.calendar import close_time, last_closed_session, local_
 from algotrade.data.reference import snapshot
 from algotrade.services.jobs import JobContext
 from algotrade.storage.runs import published
+from algotrade_ingestion.tasks.analyst.backlog import check_analyst_backlog
 from algotrade_ingestion.tasks.derived.history_copy import check_history_copy
 from algotrade_ingestion.tasks.derived.outcomes import check_outcomes
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
@@ -263,7 +264,7 @@ NIGHTLY: tuple[Step, ...] = (
         requires=universe_exists,
         latest_only=SNAPSHOT,
         critical=False,
-        accept_with=(check_analyst_snapshot,),
+        accept_with=(check_analyst_snapshot, check_analyst_backlog),
     ),
     # `edge-eval`, `descriptions` and `verify` are the post-session workflow's (ADR 0070): they
     # do not feed the session's reads, so they no longer delay its COMPLETE record.
