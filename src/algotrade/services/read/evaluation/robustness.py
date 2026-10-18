@@ -47,7 +47,7 @@ class EdgeHaircut:
     that is not a return, ADR 0064 amendment 2026-10-11) over ``sessions`` sessions becomes
     ``haircut_sharpe`` once ``trials`` variants tried are counted, ``cut`` (0 to 1) the share
     lost; ``method`` names the adjustment and ``summary`` is the server's sentence. The same
-    adjustment is also made for ``site_trials``, every variant tried across the site's open edges
+    adjustment is also made for ``site_trials``, every variant tried across every site edge
     (the programme's own multiple-testing count, ADR 0065 amendment 2026-10-17):
     ``site_haircut_sharpe`` and ``site_cut`` (None where the count is not known)."""
 
@@ -76,7 +76,7 @@ def load_haircut(
     """The haircut of the basis's ``sharpe`` over ``sessions`` decision sessions after ``trials``
     variants; None when any is not stored or the Sharpe ratio is not above zero. ``wins``: the
     outcome is not a return, so the Sharpe ratio is of the win rate above the base rate, and the
-    sentence says so. ``site_trials``: the variants tried across the site's open edges, which
+    sentence says so. ``site_trials``: the variants tried across every site edge, which
     the edge's own count is part of; the larger of the two is adjusted for, beside the edge's."""
     h = haircut_sharpe(sharpe, sessions, trials)
     if h is None or sharpe is None or sessions is None or trials is None:
@@ -85,8 +85,8 @@ def load_haircut(
     across = (
         ""
         if wide is None or site_trials is None
-        else f" Counting the {max(site_trials, trials):,} variants tried across the site's open "
-        f"edges it falls to {wide.sharpe:.2f}, a haircut of {wide.cut * 100:.0f}%."
+        else f" Counting the {max(site_trials, trials):,} variants tried across every site "
+        f"edge it falls to {wide.sharpe:.2f}, a haircut of {wide.cut * 100:.0f}%."
     )
     return EdgeHaircut(
         sharpe=sharpe,

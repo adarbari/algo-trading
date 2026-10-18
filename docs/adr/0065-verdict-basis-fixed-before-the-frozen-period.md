@@ -93,8 +93,8 @@ at least `h` apart is unchanged. `deflate` is untouched: each edge's own trial c
 
 The haircut Sharpe is also made for a **site-wide trial count**, the variants tried across the
 whole programme (140 edges x variants x horizons is the count the literature's t > 3 bar is
-about): `runs.load_site_trials` sums `trials_counted` of the canonical run of every open site
-edge (not rejected or blocked, not a user's own), kept per published state. `EdgeHaircut` carries
+about): `runs.load_site_trials` sums `trials_counted` of the canonical run of every site
+edge (rejected and blocked ones too, not a user's own), kept per published state. `EdgeHaircut` carries
 both, the edge's own and the site's (`site_trials`, `site_haircut_sharpe`, `site_cut`), and its
 sentence says both. Display only: the verdict reads the deflated Sharpe, as before.
 

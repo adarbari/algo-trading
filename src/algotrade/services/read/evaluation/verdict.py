@@ -455,8 +455,8 @@ class EdgeFacts:
     after: date | None = None
     measured: Callable[[], Mapping[tuple[str, int], int] | None] | None = None
     wins: bool = False  # the outcome is not a return: the Sharpe ratio is of the excess wins
-    site_trials: Callable[[], int] | None = None  # the variants tried across the site's open
-    # edges, read when the haircut is (None: not counted)
+    site_trials: Callable[[], int] | None = None  # the variants tried across every site
+    # edge, read when the haircut is (None: not counted)
 
 
 def counts_wins(edge: Edge) -> bool:

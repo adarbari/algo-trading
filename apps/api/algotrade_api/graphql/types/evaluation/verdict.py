@@ -348,7 +348,7 @@ class Robustness:
     "`trials` variants tried are counted, `cut` (0 to 1) the share lost; `method` names the "
     "adjustment (bonferroni: Holm's value for the best of the trials) and `summary` is the "
     "sentence. `siteTrials`, `siteHaircutSharpe` and `siteCut` are the same adjustment for every "
-    "variant tried across the site's open edges (null: not counted). "
+    "variant tried across every site edge (null: not counted). "
     "Null: not stored, or the Sharpe ratio is not above zero"
 )
 class EdgeHaircut:

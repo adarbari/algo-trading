@@ -82,7 +82,7 @@ def test_the_haircut_is_also_made_for_the_variants_tried_across_the_site() -> No
     assert both.site_haircut_sharpe == pytest.approx(wide.sharpe)
     assert both.site_cut == pytest.approx(wide.cut) and both.site_cut > both.cut
     assert both.summary.endswith(
-        f"Counting the 900 variants tried across the site's open edges it falls to "
+        f"Counting the 900 variants tried across every site edge it falls to "
         f"{wide.sharpe:.2f}, a haircut of {wide.cut * 100:.0f}%."
     )
     # the site count includes the edge's own: a smaller figure is never read as fewer trials
