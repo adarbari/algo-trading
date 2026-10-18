@@ -11,6 +11,9 @@ describe('financialsTone', () => {
     ['NO_TTM', 'neutral'],
     ['NOT_COVERED', 'neutral'],
     ['FINANCIAL', 'neutral'],
+    ['NOT_FETCHED', 'neutral'],
+    ['BUILDING', 'neutral'],
+    ['NO_PRIOR', 'neutral'],
   ] as const)('%s reads %s', (word, tone) => {
     expect(financialsTone(word)).toBe(tone);
   });

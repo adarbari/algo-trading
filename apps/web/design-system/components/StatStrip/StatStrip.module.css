@@ -1,7 +1,9 @@
 /*
  * StatStrip: one bordered strip, stats divided by soft borders (not cards). Columns from the
  * item count (--stat-count, set by StatStrip.tsx); two, then one column in narrow containers.
- * The px values in the container queries are the breakpoint tokens md 720 / sm 480 (tokens/space.ts).
+ * The px values in the container queries are the breakpoint tokens md 720 / sm 480 (tokens/space.ts);
+ * 1200 is the width at which nine stats fit one row (a seven-character value at the 2xl size needs
+ * about 130px a column), a dense strip (data-many, more than six stats) is three to a row below it.
  */
 .strip {
   container-type: inline-size;
@@ -28,6 +30,20 @@
 
 .stat:first-child {
   border-inline-start: 0;
+}
+
+@container (720px <= width < 1200px) {
+  .list[data-many] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .list[data-many] .stat:nth-child(3n + 1) {
+    border-inline-start: 0;
+  }
+
+  .list[data-many] .stat:nth-child(n + 4) {
+    border-top: var(--border-width-thin) solid var(--color-border-soft);
+  }
 }
 
 @container (width < 720px) {

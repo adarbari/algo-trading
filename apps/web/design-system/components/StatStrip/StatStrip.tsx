@@ -2,7 +2,9 @@
  * StatStrip: a summary row of a few headline numbers (completeness, checks, run time, open
  * issues), separated by thin borders inside one bordered strip, never as separate cards. Each
  * stat has a label, a value (text or a formatted number, optionally toned) and a sub-line. The
- * strip wraps to two columns, then one, in narrow containers. Loading shows placeholders.
+ * strip wraps to two columns, then one, in narrow containers; a strip of more than `MANY`
+ * stats (the Financials key metrics: nine) steps to three columns below 1200 px first, so each
+ * value keeps room. Loading shows placeholders.
  */
 import type { CSSProperties, ReactNode } from 'react';
 
@@ -33,6 +35,9 @@ export interface StatStripProps {
   /** Shown when there are no items. */
   emptyMessage?: ReactNode;
 }
+
+/** More stats than this and the strip is dense (`data-many`: StatStrip.module.css). */
+const MANY = 6;
 
 function value(item: StatItem): { node: ReactNode; tone: string } {
   const raw = item.value;
@@ -65,6 +70,7 @@ export function StatStrip({
       ) : (
         <dl
           className={styles.list}
+          data-many={items.length > MANY || undefined}
           style={{ '--stat-count': Math.max(items.length, 1) } as CSSProperties}
         >
           {items.map((item, index) => {
