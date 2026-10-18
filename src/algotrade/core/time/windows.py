@@ -37,6 +37,7 @@ from datetime import date
 from algotrade.core.time.calendar import (
     SPECIAL_CLOSURES,
     holidays,
+    is_session,
     last_session_of_month,
     monthly_expiry,
     next_session,
@@ -111,16 +112,23 @@ def windows(name: str, first: date, last: date) -> list[list[date]]:
     return [list(w) for w in sorted(found)]
 
 
-def out_of_window_stretches(placed: list[list[date]], length: int, last: date) -> list[list[date]]:
+def out_of_window_stretches(
+    placed: list[list[date]], length: int, last: date, start: date | None = None
+) -> list[list[date]]:
     """The non-overlapping stretches of ``length`` sessions that end by ``last`` and
     touch no session of ``placed`` (the windows of the range), in order, tiled from the session
-    after each window. Deterministic: a function of the windows and the range only."""
+    after each window, and from ``start`` first when given (the first session of the range, so
+    sessions before the first window are in the base too; a calendar edge passes none).
+    Deterministic: a function of the windows and the range only."""
     if length < 1:
         raise ValueError(f"a stretch is at least 1 session, got {length}")
     taken = {d for w in placed for d in w}
     stretches: list[list[date]] = []
-    for window in sorted(placed, key=lambda w: w[0]):
-        cursor = next_session(window[-1])
+    cursors = [next_session(w[-1]) for w in sorted(placed, key=lambda w: w[0])]
+    if start is not None:
+        cursors.insert(0, start if is_session(start) else next_session(start))
+    for first in cursors:
+        cursor = first
         while True:
             stretch = _starting_at(cursor, length)
             if stretch[-1] > last or any(d in taken for d in stretch):
