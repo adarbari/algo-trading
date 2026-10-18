@@ -57,3 +57,22 @@ def test_sector_leader_is_a_top_three_sector_and_unknown_without_a_rank(fs: Feat
         "EQ:C": False,
         "EQ:NONE": None,
     }
+
+
+def test_mom_12_1_vol_scaled_divides_by_hv60_and_is_unknown_on_zero_or_null(
+    fs: FeatureSet,
+) -> None:
+    ids = ["EQ:A", "EQ:B", "EQ:C", "EQ:D"]
+    frames: dict[str, pd.DataFrame | None] = {
+        "rollups/instrument/trend_stats@v2": pd.DataFrame(
+            {"instrument_id": ids, "session_date": END, "mom_12_1": [0.30, -0.10, 0.20, np.nan]}
+        ).astype({"mom_12_1": "float32"}),
+        "rollups/instrument/vol_stats@v1": pd.DataFrame(
+            {"instrument_id": ids, "session_date": END, "hv60": [0.30, 0.20, 0.0, 0.25]}
+        ).astype({"hv60": "float32"}),
+    }
+    out = fs.evaluate(frames, ["mom_12_1_vol_scaled"]).set_index("instrument_id")
+    value = out["mom_12_1_vol_scaled"]
+    assert value["EQ:A"] == pytest.approx(1.0, rel=1e-5)
+    assert value["EQ:B"] == pytest.approx(-0.5, rel=1e-5)
+    assert pd.isna(value["EQ:C"]) and pd.isna(value["EQ:D"])  # hv60 of 0, mom_12_1 null
