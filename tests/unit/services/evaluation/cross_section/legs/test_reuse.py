@@ -32,7 +32,7 @@ from algotrade.services.evaluation.cross_section.measures import SessionStat
 from algotrade.services.evaluation.cross_section.reads import session as session_reads
 from algotrade.services.evaluation.cross_section.results import edge_eval_frame, write_edge_eval
 from algotrade.storage.configs.files import MemoryConfigStore
-from algotrade.storage.tables.schemas import FORWARD_RETURNS
+from algotrade.storage.tables.edge_schemas import FORWARD_RETURNS
 from tests.helpers.stored_frames import stamped, universe_rows
 from tests.unit.services.evaluation.cross_section.conftest import (
     DAYS,

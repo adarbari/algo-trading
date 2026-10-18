@@ -16,8 +16,8 @@ from algotrade.core.time.calendar import next_session, sessions_between
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.tables.edge_schemas import FORWARD_RETURNS
 from algotrade.storage.tables.result_writer import ResultWriter
-from algotrade.storage.tables.schemas import FORWARD_RETURNS
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import reference_rows, stamped, universe_rows
 
