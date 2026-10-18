@@ -244,7 +244,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/events"
-purpose = "feature groups of the event classes an edge schedule triggers on (on_event:<class>[:<subtype>], ADR 0050, ADR 0053 amendment 2026-10-18): one module per group, its documented FEATURES (a sessions-since count, the event's date, a subtype field), a pure compute and its GROUP declaration"
+purpose = "feature groups of the event classes an edge schedule triggers on (on_event:<class>[:<subtype>], ADR 0050, ADR 0053 amendment 2026-10-18) and of event windows around a session (the 8-K filings and earnings reaction windows of its last sessions, the no-news filter): one module per group, its documented FEATURES (a sessions-since count, the event's date, a subtype field), a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
