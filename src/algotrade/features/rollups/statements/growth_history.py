@@ -1,18 +1,18 @@
-"""``growth_history@v1``: the revenue and diluted EPS trailing twelve months three and five years
+"""``growth_history@v2``: the revenue and diluted EPS trailing twelve months three and five years
 back, the bases of the multi-year growth rates (``revenue_cagr_3y`` and its siblings).
 
 Inputs: ``instruments/shares`` rows of the concepts ``revenue`` and ``eps_diluted`` (the same
-facts ``financials@v2`` reads, with a longer window: ``history_days``, about seven years), the
+facts ``financials@v3`` reads, with a longer window: ``history_days``, about seven years), the
 session's ``price_stats@v2`` (it sets which instruments get a row), ``events/split`` and nothing
 else. Only facts FILED on or before the session are read (checked here, whatever the loader
 passed): a restatement filed later never moves a session.
 
-Each TTM is assembled as ``financials@v2``'s are (``ttm.trailing``). The newest TTM of the
+Each TTM is assembled as ``financials@v3``'s are (``ttm.trailing``). The newest TTM of the
 concept sets the end the history is counted back from; the ago value is the four consecutive
 quarters (else the fiscal year) whose last period ends within 40 days of that end minus three or
 five years (``ttm.trailing_ago``). A hole in that history (a missing quarter, no fiscal year
 there) is null, never a shorter sum. EPS is split-adjusted to the session exactly as in
-``financials@v2`` (``prepare_facts``): a fact filed before a split that took effect on or before
+``financials@v3`` (``prepare_facts``): a fact filed before a split that took effect on or before
 the session is divided by its ratio, so the EPS then and now are per the same share count.
 
     revenue_ttm_3y_ago, revenue_ttm_5y_ago              the revenue TTM about 3 / 5 years back
@@ -40,7 +40,7 @@ from algotrade.features.rollups.statements.lines import epoch_days, stale_before
 from algotrade.features.rollups.statements.ttm import Fact, TtmParams, trailing, trailing_ago
 
 NAME = "growth_history"
-VERSION = 1
+VERSION = 2
 STATUSES = ("OK", "PARTIAL", "NO_TTM", "NO_FACTS", "STALE")
 YEARS = (3, 5)
 CONCEPTS = (REVENUE, EPS)

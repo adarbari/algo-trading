@@ -1,4 +1,4 @@
-"""cash_flow@v1: quarters from cumulative 10-Q figures, capex as a positive payment, look-ahead."""
+"""cash_flow@v2: quarters from cumulative 10-Q figures, capex as a positive payment, look-ahead."""
 
 from datetime import date, timedelta
 

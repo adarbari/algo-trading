@@ -25,6 +25,7 @@ from algotrade_ingestion.tasks.reference.shares import (
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.sec import company_facts
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts, parse_statements
+from algotrade_sources.vendors.sec.submissions import SecFilings
 from tests.helpers.ingest_fakes import http_for, task_ctx
 from tests.helpers.stored_frames import stamped
 from tests.libs.sources.vendors.sec.test_company_facts import PAYLOAD
@@ -533,3 +534,120 @@ def test_a_rerun_after_tonights_rollups_keeps_the_same_order() -> None:
     order = [u.rsplit("CIK", 1)[1][:10] for u in first.urls]
     assert order == [GOOGL_CIK]
     assert order == [u.rsplit("CIK", 1)[1][:10] for u in second.urls]
+
+
+# --- acceptance time (ADR 0067 amendment) ---------------------------------------------------
+LATE_10Q = "0000320193-26-000020"  # filed 2026-07-31 in PAYLOAD
+EARLY_10Q = "0000320193-26-000013"  # filed 2026-05-01
+
+
+def submissions_for(listed: dict[str, str], broken: bool = False):  # type: ignore[no-untyped-def]
+    """A transport for ``submissions/CIK##########.json``: AAPL lists ``listed`` (accession ->
+    UTC acceptance time, all 10-Q), every other CIK has no submissions (404)."""
+    urls: list[str] = []
+
+    def transport(url: str) -> bytes:
+        urls.append(url)
+        if "0000320193" not in url:
+            raise HttpError(404)
+        if broken:
+            raise HttpError(500)
+        accns = list(listed)
+        doc = {
+            "cik": "320193",
+            "filings": {"recent": {
+                "accessionNumber": accns, "form": ["10-Q"] * len(accns),
+                "filingDate": [listed[a][:10] for a in accns],
+                "acceptanceDateTime": [listed[a].replace("Z", ".000Z") for a in accns],
+            }, "files": []},
+        }  # fmt: skip
+        return json.dumps(doc).encode()
+
+    transport.urls = urls  # type: ignore[attr-defined]
+    return transport
+
+
+def with_filings(feed: FakeFacts, transport) -> SharesSources:  # type: ignore[no-untyped-def]
+    return replace(sources(feed), filings=SecFilings(http_for(transport, RetryPolicy(tries=1))))
+
+
+def test_each_fact_is_stored_with_the_acceptance_time_of_its_accession() -> None:
+    """The join the lookahead fix rests on: a 10-Q accepted 16:30 New York time (20:30 UTC)
+    keeps that instant in ``accepted_ts``; an accession the submissions do not list stays null
+    (a reader then counts it from the session after ``filed``)."""
+    writer, reader = store()
+    listed = {LATE_10Q: "2026-07-31T20:30:00Z", EARLY_10Q: "2026-05-01T12:00:00Z"}
+    transport = submissions_for(listed)
+    record = ingest_shares(
+        task_ctx(writer, reader, CLOCK), with_filings(FakeFacts(), transport), DAY
+    )
+    assert record.status is RunStatus.COMPLETE
+    facts = share_facts(reader)
+    aapl = facts[facts["instrument_id"] == "EQ:AAPL"].set_index("accn")
+    assert aapl.loc[LATE_10Q, "accepted_ts"].iloc[0] == pd.Timestamp("2026-07-31T20:30:00Z")
+    assert aapl.loc[EARLY_10Q, "accepted_ts"].iloc[0] == pd.Timestamp("2026-05-01T12:00:00Z")
+    unlisted = aapl.drop([LATE_10Q, EARLY_10Q])
+    assert len(unlisted) > 0 and unlisted["accepted_ts"].isna().all()
+    assert transport.urls == [  # type: ignore[attr-defined]
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0001652044.json",
+    ]  # the fund has no facts: its submissions are not asked for
+    assert facts[facts["instrument_id"] == "EQ:GOOGL"]["accepted_ts"].isna().all()  # 404: null
+
+
+def test_the_statements_carry_the_acceptance_time_of_the_same_join() -> None:
+    writer, reader = store()
+    accn = str(parse_statements(AAPL_STATEMENTS)["accn"].iloc[0])
+    transport = submissions_for({accn: "2026-05-01T21:15:00Z"})
+    feed = FakeFacts(aapl=AAPL_STATEMENTS)
+    ingest_shares(task_ctx(writer, reader, CLOCK), with_filings(feed, transport), DAY)
+    facts = statement_facts(reader, DAY)
+    stamped_rows = facts[facts["accn"] == accn]
+    assert len(stamped_rows) > 0
+    assert (stamped_rows["accepted_ts"] == pd.Timestamp("2026-05-01T21:15:00Z")).all()
+    assert facts[facts["accn"] != accn]["accepted_ts"].isna().all()
+
+
+def test_facts_stored_without_acceptance_are_stored_again_once_it_is_known() -> None:
+    """The backfill: a store written before the column (or without the submissions source)
+    has null ``accepted_ts``; a forced refetch with the source stores exactly the rows whose
+    accession is now listed, under the same keys (the merge replaces them: no duplicates)."""
+    writer, reader = store()
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(FakeFacts()), DAY)
+    before = share_facts(reader)
+    assert before["accepted_ts"].isna().all() and len(before) == 10
+    later = DAY + timedelta(days=1)
+    transport = submissions_for({LATE_10Q: "2026-07-31T20:30:00Z"})
+    ingest_shares(
+        task_ctx(writer, reader, CLOCK), with_filings(FakeFacts(), transport), later, force=True
+    )
+    partition = reader.table(TABLE, later)
+    assert partition is not None
+    restaged = partition[partition["concept"] != "checked"]
+    assert set(restaged["accn"]) == {LATE_10Q} and restaged["accepted_ts"].notna().all()
+    after = share_facts(reader)
+    assert len(after) == 10  # same keys: replaced, not added
+    assert after["accepted_ts"].notna().sum() == len(restaged) == 2  # that accession's two rows
+    again = ingest_shares(
+        task_ctx(writer, reader, CLOCK),
+        with_filings(FakeFacts(), transport),
+        later + timedelta(days=1),
+        force=True,
+    )
+    final = reader.table(TABLE, later + timedelta(days=1))
+    assert final is not None and set(final["concept"]) == {"checked"}  # nothing left to restage
+    assert again.status is RunStatus.COMPLETE
+
+
+def test_a_submissions_error_leaves_the_cik_unstored_and_due() -> None:
+    """A transport error of the submissions must not store the facts with a null time for good:
+    the CIK fails (nothing staged) and is fetched again."""
+    writer, reader = store()
+    transport = submissions_for({LATE_10Q: "2026-07-31T20:30:00Z"}, broken=True)
+    record = ingest_shares(
+        task_ctx(writer, reader, CLOCK), with_filings(FakeFacts(), transport), DAY
+    )
+    assert record.status is RunStatus.PARTIAL
+    assert record.stats["failed"][0].startswith("0000320193")
+    assert "EQ:AAPL" not in set(share_facts(reader)["instrument_id"])
+    assert "EQ:AAPL" not in set(stored_shares(reader)["instrument_id"])  # no marker either

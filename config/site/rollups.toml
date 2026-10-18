@@ -66,37 +66,37 @@ source = "ours"          # "ours" (iv30@v1.iv30) or "cboe" (iv30@v1.iv30_cboe)
 window = 252             # sessions for a FULL rank (today included)
 min_provisional = 60     # sessions with an IBKR IV before the rank is shown (PROVISIONAL)
 
-["fundamentals@v3"]
+["fundamentals@v4"]
 stale_days = 400         # shares whose period ended longer ago than this are STALE (no market cap);
                          # 10-Q filers report every ~3 months, 20-F filers once a year
 
-["financials@v2"]
+["financials@v3"]
 stale_days = 480         # the oldest TTM period ended longer ago than this: STALE (still shown, no P/E);
                          # a 10-K-only or 20-F filer is up to ~15 months behind just before its next annual report
 history_days = 1100      # facts whose period ended earlier are not read (two TTMs need ~2.3 years)
 
-["income_statement@v1"]
-stale_days = 480         # the first TTM present ended longer ago than this: STALE (still shown); as financials@v2
+["income_statement@v2"]
+stale_days = 480         # the first TTM present ended longer ago than this: STALE (still shown); as financials@v3
 history_days = 1100      # facts whose period ended earlier are not read
 
-["growth_history@v1"]
-stale_days = 480         # the newest TTM ended longer ago than this: STALE (still shown); as income_statement@v1
+["growth_history@v2"]
+stale_days = 480         # the newest TTM ended longer ago than this: STALE (still shown); as income_statement@v2
 history_days = 2700      # facts whose period ended earlier are not read: 480 stale days + 5 years (1826) + 40 tolerance + 3 quarter gaps (273) = 2619
 
 ["mispricing@v1"]
-stale_days = 480         # a statement group whose newest period ended longer ago is STALE: its values are not used; as income_statement@v1
+stale_days = 480         # a statement group whose newest period ended longer ago is STALE: its values are not used; as income_statement@v2
 history_days = 1100      # facts whose period ended earlier are not read (the balance sheet a year back)
 ago_tolerance_days = 40  # the balance sheet a year back ends within this many days of the latest one's date minus 365
 min_members = 100        # instruments with a known value a percentile rank needs
 min_quality_inputs = 4   # of the six quality measures quality_score averages
 min_anomalies = 5        # of the seven anomalies composite_rank averages
 
-["cash_flow@v1"]
-stale_days = 480         # as income_statement@v1
+["cash_flow@v2"]
+stale_days = 480         # as income_statement@v2
 history_days = 1100
 
-["balance_sheet@v1"]
-stale_days = 480         # the newest balance sheet date is older than this: STALE (still shown); as income_statement@v1
+["balance_sheet@v2"]
+stale_days = 480         # the newest balance sheet date is older than this: STALE (still shown); as income_statement@v2
 history_days = 1100      # facts whose period ended earlier are not read
 
 ["chain_flow@v1"]         # option flow and unusual activity (docs/data/positioning.md OP2)

@@ -1,12 +1,12 @@
 """``mispricing@v1``: the Stambaugh-Yuan anomaly inputs, a QMJ-like quality score and the
 cross-sectional composite rank, from the stored SEC statement groups.
 
-Inputs: ``balance_sheet@v1``, ``income_statement@v1``, ``cash_flow@v1``, ``financials@v2`` and
-``fundamentals@v3`` rows of the session (each already point in time by FILING date, ADR 0067: a
-figure enters a session on the day its filing was public, never at its period end), the SEC
-INSTANT facts of ``instruments/statements`` (only for the total assets a year before the balance
-sheet date) and the session's ``price_stats@v2`` (it sets which instruments get a row). A value
-whose statement group is STALE is null, as in the expression features over the same groups;
+Inputs: ``balance_sheet@v2``, ``income_statement@v2``, ``cash_flow@v2``, ``financials@v3`` and
+``fundamentals@v4`` rows of the session (each already point in time by when its filing was public,
+ADR 0067: a figure enters a session at its filing's acceptance, never at its period end), the SEC
+INSTANT facts of ``instruments/statements_accepted`` (only for the total assets a year before the
+balance sheet date) and the session's ``price_stats@v2`` (it sets which instruments get a row). A
+value whose statement group is STALE is null, as in the expression features over the same groups;
 a balance-sheet measure also needs ``bs_status`` OK (PARTIAL keeps a line at an older date), and
 net income with operating cash flow need ``ttm_as_of`` equal to ``cf_as_of``.
 
@@ -48,11 +48,11 @@ from algotrade.features.rollups.statements.ttm import TtmParams
 
 NAME = "mispricing"
 VERSION = 1
-BALANCE = "rollups/instrument/balance_sheet@v1"
-INCOME = "rollups/instrument/income_statement@v1"
-CASH_FLOW = "rollups/instrument/cash_flow@v1"
-FINANCIALS = "rollups/instrument/financials@v2"
-FUNDAMENTALS = "rollups/instrument/fundamentals@v3"
+BALANCE = "rollups/instrument/balance_sheet@v2"
+INCOME = "rollups/instrument/income_statement@v2"
+CASH_FLOW = "rollups/instrument/cash_flow@v2"
+FINANCIALS = "rollups/instrument/financials@v3"
+FUNDAMENTALS = "rollups/instrument/fundamentals@v4"
 ASSETS_TAG = LINES["assets"][0]
 YEAR_DAYS = 365
 # Overpriced when HIGH: the first five; the last two are underpriced when high (inverted).
@@ -97,16 +97,16 @@ _RANKED = (
     "session (the cross-section is too thin to rank)"
 )
 _BS_INPUTS = (
-    "balance_sheet.total_assets@v1",
-    "balance_sheet.bs_status@v1",
+    "balance_sheet.total_assets@v2",
+    "balance_sheet.bs_status@v2",
 )
 
 FEATURES = (
     Feature(
         "total_assets_1y_ago", "float", "usd",
         "Total assets (Assets) at the balance sheet a year before the latest one (bs_as_of): "
-        "the newest balance sheet date in the facts filed by the session that lies within "
-        "ago_tolerance_days (40) of bs_as_of minus 365 days; a restatement filed by the session "
+        "the newest balance sheet date in the facts public by the session that lies within "
+        "ago_tolerance_days (40) of bs_as_of minus 365 days; a restatement public by the session "
         "replaces the original figure",
         "no balance sheet of the session, or it is STALE, or no Assets fact of a balance sheet "
         "a year back (a company reporting for less than a year, or a gap) or it is not positive",
@@ -130,8 +130,8 @@ FEATURES = (
         valid_range=(None, None),
         inputs=(
             *_BS_INPUTS,
-            "financials.net_income_ttm@v2",
-            "cash_flow.ocf_ttm@v1",
+            "financials.net_income_ttm@v3",
+            "cash_flow.ocf_ttm@v2",
         ),
     ),
     Feature(
@@ -142,7 +142,7 @@ FEATURES = (
         _STATEMENT + "; or the filer does not tag GrossProfit (many do not); or the issuer is a "
         "bank, broker or insurer",
         valid_range=(None, None),
-        inputs=(*_BS_INPUTS, "income_statement.gross_profit_ttm@v1"),
+        inputs=(*_BS_INPUTS, "income_statement.gross_profit_ttm@v2"),
     ),
     Feature(
         "net_operating_assets", "float", "decimal",
@@ -156,9 +156,9 @@ FEATURES = (
         valid_range=(None, None),
         inputs=(
             *_BS_INPUTS,
-            "balance_sheet.total_debt@v1",
-            "balance_sheet.stockholders_equity@v1",
-            "balance_sheet.cash@v1",
+            "balance_sheet.total_debt@v2",
+            "balance_sheet.stockholders_equity@v2",
+            "balance_sheet.cash@v2",
         ),
     ),
     Feature(
@@ -177,11 +177,11 @@ FEATURES = (
         "a bank, broker or insurer",
         inputs=(
             *_BS_INPUTS,
-            "balance_sheet.total_liabilities@v1",
-            "balance_sheet.current_assets@v1",
-            "balance_sheet.current_liabilities@v1",
-            "financials.net_income_ttm@v2",
-            "cash_flow.ocf_ttm@v1",
+            "balance_sheet.total_liabilities@v2",
+            "balance_sheet.current_assets@v2",
+            "balance_sheet.current_liabilities@v2",
+            "financials.net_income_ttm@v3",
+            "cash_flow.ocf_ttm@v2",
         ),
     ),
     Feature(
@@ -200,10 +200,10 @@ FEATURES = (
         valid_range=(0, 1), kind="cross_section",
         inputs=(
             *_BS_INPUTS,
-            "financials.net_income_ttm@v2",
-            "financials.revenue_ttm@v2",
-            "income_statement.gross_profit_ttm@v1",
-            "cash_flow.ocf_ttm@v1",
+            "financials.net_income_ttm@v3",
+            "financials.revenue_ttm@v3",
+            "income_statement.gross_profit_ttm@v2",
+            "cash_flow.ocf_ttm@v2",
         ),
     ),
     Feature(
@@ -223,8 +223,8 @@ FEATURES = (
         valid_range=(0, 1), kind="cross_section",
         inputs=(
             *_BS_INPUTS,
-            "fundamentals.shares_outstanding@v3",
-            "fundamentals.shares_outstanding_year_ago@v3",
+            "fundamentals.shares_outstanding@v4",
+            "fundamentals.shares_outstanding_year_ago@v4",
         ),
     ),
     Feature(
@@ -424,7 +424,7 @@ GROUP = FeatureGroup(
     "The Stambaugh-Yuan anomaly inputs (asset growth, accruals, gross profitability, net "
     "operating assets, a simplified Ohlson O-score), a QMJ-like quality score and the "
     "cross-sectional composite mispricing rank, from the stored SEC statement groups, point in "
-    "time by filing date; missing inputs are left out of a rank and too few make it null",
+    "time by filing acceptance; missing inputs are left out of a rank and too few make it null",
     (
         Input(PRICE_STATS),
         Input(BALANCE, required=False),
