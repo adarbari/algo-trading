@@ -18,7 +18,7 @@ purpose = "L3 site settings: one <name>.toml per settings group, each loaded by 
 
 [[config_dir]]
 path = "config/site/field_guide"
-purpose = "L3 field guide, one <theme>.toml per theme (the situations sit in instrument.toml; statements.toml holds the SEC statement groups, analyst.toml the analyst consensus fields and, while the other files sit at the 1000-line cap, the edge build's fundamentals entries under their own themes): how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
+purpose = "L3 field guide, one <theme>.toml per theme (the situations sit in instrument.toml; statements.toml holds the SEC statement groups, analyst.toml the analyst consensus fields and, while the other files sit at the 1000-line cap, the edge build's entries under their own themes; events.toml and levels.toml also hold edge build entries, filed under their own themes, while the other files sit at the cap): how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
 
 [[config_dir]]
 path = "config/site/features"
