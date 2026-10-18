@@ -48,6 +48,7 @@ def test_the_shipped_sections_follow_the_spec() -> None:
         "reversals",
         "income",
         "events",
+        "filings",
         "options_signals",
         "cross_section",
     ]

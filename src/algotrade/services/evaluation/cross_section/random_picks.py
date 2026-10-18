@@ -25,6 +25,7 @@ import hashlib
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -211,6 +212,48 @@ def pool_random(legs: Sequence[RandomStat]) -> RandomStat:
     )
 
 
+_NOT_MEASURED: dict[str, Any] = {
+    "bh_mean": None, "top_decile_mean": None, "decile_spread": None, "decile_t": None,
+    "decile_sessions": 0, "effect_size": None, "sharpe": None, "unscored": 0,
+    "excluded_score_coverage": 0, "excluded_unclosed": 0, "excluded_missing": 0,
+    "excluded_coverage": 0, "delisted": 0, "pre_snapshot_sessions": 0,
+}  # fmt: skip
+
+
+def draw_measure(
+    draw: int,
+    sessions: int,
+    picks: int,
+    hit_rate: float | None,
+    hits: int,
+    eligible: int,
+    base_hits: int,
+    base_rate: float | None,
+    mean: float | None,
+) -> SliceMeasure:
+    """One random draw's row: the pooled picks against the base, no other statistic."""
+    rates: dict[str, Any] = {
+        "hit_rate": hit_rate,
+        "base_rate": base_rate,
+        "lift": lift(hit_rate, base_rate),
+    }
+    counts: dict[str, Any] = {
+        "sessions": sessions,
+        "picks": picks,
+        "hits": hits,
+        "eligible": eligible,
+    }
+    return SliceMeasure(
+        slice_kind=DRAW,
+        slice_value=str(draw),
+        base_hits=base_hits,
+        mean_excess_picks=mean,
+        **counts,
+        **rates,
+        **_NOT_MEASURED,
+    )
+
+
 def random_measures(stats: Sequence[RandomStat]) -> tuple[SliceMeasure, ...]:
     """One measure per draw over the sessions ``stats`` (the out-of-sample slice), slice kind
     ``draw`` and the draw's number as value; empty without sessions."""
@@ -226,32 +269,16 @@ def random_measures(stats: Sequence[RandomStat]) -> tuple[SliceMeasure, ...]:
     for draw in range(len(hits)):
         hit_rate = float(hits[draw]) / picks if picks else None
         out.append(
-            SliceMeasure(
-                slice_kind=DRAW,
-                slice_value=str(draw),
-                sessions=len(stats),
-                picks=picks,
-                hits=int(hits[draw]),
-                hit_rate=hit_rate,
-                eligible=eligible,
-                base_hits=base_hits,
-                base_rate=base_rate,
-                lift=lift(hit_rate, base_rate),
-                mean_excess_picks=float(values[draw]) / picks if picks else None,
-                bh_mean=None,
-                top_decile_mean=None,
-                decile_spread=None,
-                decile_t=None,
-                decile_sessions=0,
-                effect_size=None,
-                sharpe=None,
-                unscored=0,
-                excluded_score_coverage=0,
-                excluded_unclosed=0,
-                excluded_missing=0,
-                excluded_coverage=0,
-                delisted=0,
-                pre_snapshot_sessions=0,
+            draw_measure(
+                draw,
+                len(stats),
+                picks,
+                hit_rate,
+                int(hits[draw]),
+                eligible,
+                base_hits,
+                base_rate,
+                float(values[draw]) / picks if picks else None,
             )
         )
     return tuple(out)

@@ -155,6 +155,10 @@ path = "src/algotrade/data/futures"
 purpose = "reads of rates/futures_curve (the nightly IBKR futures curve snapshots, personal licence): a range of stored sessions and one root's curve with its roll yield; data/ is at its module cap, so the reads of this table are a folder"
 
 [[dir]]
+path = "src/algotrade/data/insiders"
+purpose = "reads of events/insider_transaction (Form 4, EB D6): the lines a session may see (known_from on or before it), each line's latest version, the originals a known 4/A replaced; data/ is at its module cap, so the reads of this table are a folder"
+
+[[dir]]
 path = "src/algotrade/data/listings"
 purpose = "reads of instruments/listing_history and instruments/index_membership (ADR 0018 amendment): the universe as it was on a session (universe_asof), from the latest listing and S&P 500 membership snapshots, which it names"
 
@@ -347,7 +351,7 @@ contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation"
-purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/); the forward paper record of the edges a user follows (forward/); learned edge scorers (training/); the winners study's discovery (discovery/)"
+purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/) and its time-series base (time_series/); the forward paper record of the edges a user follows (forward/); learned edge scorers (training/); the winners study's discovery (discovery/)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
@@ -376,6 +380,11 @@ purpose = "the ED6 winners study's discovery (ADR 0053 amendment 2026-10-09): th
 [[dir]]
 path = "src/algotrade/services/evaluation/forward"
 purpose = "the forward paper record (ADR 0053 amendment 2026-10-09): a followed edge's tonight picks by the harness's own picker (signals.py), the open trades a stored outcome closes (settle.py, with the harness and the training frame an importer of outcomes) and one night's rows and run record published atomically into results/edge_paper (results.py)"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/time_series"
+purpose = "the time-series base of the edge evaluation (ADR 0073): an edge timed by a calendar window and judged against the same instrument's returns outside every window; the windows and their tiled out-of-window stretches from the calendar alone (periods.py), the one reader of outcomes, symbol ids and the bill rate (harness.py), the in-window against out-of-window measures as the rows the verdict reads (measures.py), the seeded random window sets (random_windows.py) and one edge's evaluation (evaluate.py)"
+contracts = ["Time-series evaluation reads outcomes only through its harness seam (ADR 0073)"]
 
 [[dir]]
 path = "src/algotrade/services/evaluation/training"

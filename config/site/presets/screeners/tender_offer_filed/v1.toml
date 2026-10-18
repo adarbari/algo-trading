@@ -1,0 +1,50 @@
+# Tender offers (ADR 0053, EB E3; edge tender_offer_drift): a common stock trading at least $5M a day
+# with an SC TO-I (the issuer's own) or SC TO-T (a third party's) tender offer that became known 20 or
+# more sessions ago, the earliest a tender offer can have expired (a tender offer stays open at least
+# 20 business days; the group looks back 60 sessions). Ranked by dollar volume, the most liquid
+# first. A missing value never passes (ADR 0030). What it does not check: the expiry (extensions
+# keep an offer open, and the date is not stored), whether the offer was the issuer's or a third
+# party's (one column), or that it completed.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "tender_offer_filed"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Tender offers past their minimum period"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 5_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.tender_offer]
+field = "rollup.filing_events@v1.sessions_since_tender_offer"
+op = "gte"
+value = 20
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+sessions_since_tender_offer = "rollup.filing_events@v1.sessions_since_tender_offer"
+last_tender_offer_date = "rollup.filing_events@v1.last_tender_offer_date"
+
+[rank]
+tie_break = "rollup.price_stats@v2.adv_usd_20d"
+tie_break_order = "desc"

@@ -113,6 +113,7 @@ def _period(
     rows: Sequence[EdgeRow],
     hidden: bool,
     sign: float,
+    banded: bool = False,
 ) -> CostPeriod:
     if hidden and period != IN_SAMPLE:
         return CostPeriod(period, OOS_HIDDEN, None, None)
@@ -122,16 +123,36 @@ def _period(
     spread = next(
         (r.decile_spread for r in rows if STORED_PERIOD.get(r.slice_kind) == period), None
     )
-    return CostPeriod(period, MEASURED, break_even_cost(row.mean_excess_picks, bp, sign), spread)
+    trips = _trips(found, sign) if banded else 1.0
+    return CostPeriod(
+        period, MEASURED, break_even_cost(row.mean_excess_picks, bp, sign, trips), spread
+    )
+
+
+def _trips(found: Sequence[tuple[float, EdgeRow]], sign: float) -> float:
+    """The round trips of cost each name pays under a buy/hold band, from the slope of the
+    period's cost rows (the mean is linear in the cost: ``-sign * trips / 1e4`` per bp), so no
+    column is stored for it; 1.0 (a full round trip) when the rows give no slope."""
+    (bp_a, a), (bp_b, b) = found[0], found[-1]
+    if bp_a == bp_b or a.mean_excess_picks is None or b.mean_excess_picks is None:
+        return 1.0
+    trips = -sign * (b.mean_excess_picks - a.mean_excess_picks) * 1e4 / (bp_b - bp_a)
+    return round(trips, 9) if trips > 0 else 1.0
 
 
 def costs_of(
-    basis: BasisRows, assumed_bp: float | None, cost_applies: bool = True, sign: float = 1.0
+    basis: BasisRows,
+    assumed_bp: float | None,
+    cost_applies: bool = True,
+    sign: float = 1.0,
+    banded: bool = False,
 ) -> EdgeCosts:
     """The cost sensitivity of ``basis`` (None ``assumed_bp``: the document sets no cost, 0).
     ``cost_applies``: the edge document's outcome is a return (``Outcome.is_return``); when it is
     not, the state is ``not_a_cost_outcome`` whatever rows exist. ``sign``: the outcome's
-    orientation (``Outcome.sign``), which the break-even undoes."""
+    orientation (``Outcome.sign``), which the break-even undoes. ``banded``: the outcome has a
+    buy/hold band, whose cost is charged on entries and exits only, so the break-even is scaled by
+    the turnover (``_trips``)."""
     assumed = assumed_bp or 0.0
     if not cost_applies:
         return EdgeCosts(NOT_A_COST_OUTCOME, basis.variant, basis.horizon, assumed, (), ())
@@ -146,7 +167,7 @@ def costs_of(
         for p in PERIODS
     }
     levels = tuple(_level(p, bp, r, assumed) for p in PERIODS for bp, r in by_period[p])
-    periods = tuple(_period(p, by_period[p], plain, basis.hidden, sign) for p in PERIODS)
+    periods = tuple(_period(p, by_period[p], plain, basis.hidden, sign, banded) for p in PERIODS)
     state = MEASURED if cost_rows else NOT_STORED  # a run from before the cost rows, or no rows
     return EdgeCosts(state, basis.variant, basis.horizon, assumed, levels, periods)
 
@@ -161,4 +182,5 @@ def load_edge_costs(ctx: Stores, edge: Edge, basis: OfficialBasis | None = None)
         cost,
         st.cost_applies if st is not None else True,
         st.outcome_sign if st is not None else 1.0,
+        st is not None and st.hold_rank is not None,
     )

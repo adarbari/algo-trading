@@ -17,7 +17,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data.outcomes import OUTCOME_FIELDS
 from algotrade.services.configs import field_catalog
-from algotrade.services.evaluation.cross_section.events import EVENT_FIELDS
+from algotrade.services.evaluation.cross_section.events import event_field
 from algotrade.services.evaluation.cross_section.harness import MIXED_SOURCE_IV
 from algotrade.services.evaluation.cross_section.hit import (
     EXPIRES_OTM_FIELDS,
@@ -39,6 +39,7 @@ DISCOVERY = "src/algotrade/services/evaluation/discovery/labels.py"  # the winne
 FORWARD = (
     "src/algotrade/services/evaluation/forward/settle.py"  # closes a followed edge's paper trades
 )
+TIME_SERIES = "src/algotrade/services/evaluation/time_series/harness.py"  # ADR 0073's seam
 PROTECTED = "algotrade.data.outcomes"
 
 
@@ -129,7 +130,10 @@ def test_the_schedule_is_one_the_harness_runs(edge: Edge) -> None:
         assert edge.outcome.start_offset_sessions >= 1, (
             f"{edge.id}: {event} is known when it happens"
         )
-    spec = EVENT_FIELDS.get(event)
+    try:  # resolved for the schedule's subtype (an 8-K item has its own count and date fields)
+        spec = event_field(event, edge.event_subtype)
+    except ConfigurationError:
+        spec = None
     if spec is None or not all(_stored(f) for f in (spec.count, spec.date)):
         assert not edge.screeners and not edge.baselines, (
             f"{edge.id}: the field of {event} is not in the catalogue yet: no screeners until "
@@ -157,12 +161,13 @@ def test_only_the_named_modules_read_outcomes() -> None:
                 [node.module or ""] if isinstance(node, ast.ImportFrom) else []
             )
         }  # fmt: skip
-        if rel not in (HARNESS, MEASURING, TRAINING, DISCOVERY, FORWARD) and any(
+        if rel not in (HARNESS, MEASURING, TRAINING, DISCOVERY, FORWARD, TIME_SERIES) and any(
             n == PROTECTED or n.startswith(f"{PROTECTED}.") for n in names
         ):
             offenders.append(rel)
     assert not offenders, (
-        f"only {HARNESS}, {MEASURING}, {TRAINING}, {DISCOVERY}, {FORWARD} may read outcomes: "
+        f"only {HARNESS}, {MEASURING}, {TRAINING}, {DISCOVERY}, {FORWARD}, {TIME_SERIES} may read "
+        f"outcomes: "
         f"{offenders}"
     )
 
