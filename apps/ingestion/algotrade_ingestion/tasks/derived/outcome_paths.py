@@ -32,7 +32,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from algotrade.storage.tables.edge_schemas import UNMEASURED
+from algotrade.storage.tables.schemas import UNMEASURED
 
 TRADING_DAYS = 252  # annualises the realised volatility
 BAD_BAR = "BAD_BAR"  # the outcome_reason of an UNMEASURED row (ADR 0061)

@@ -160,6 +160,24 @@ test('editing a threshold previews after 300 ms, then saves the draft and finali
   await expect(page.getByText('v2 · finalized')).toBeVisible();
 });
 
+test('either-or groups two criteria in place, saves the group and ungroups it (ADR 0071)', async ({
+  page,
+}) => {
+  const mock = await mockBuilderApi(page);
+  await page.goto('/screeners/my-vrp/edit');
+  await page.getByRole('button', { name: 'Either this or the previous' }).first().click();
+  const group = page.getByRole('region', { name: /or/ }).filter({ hasText: 'Any of' });
+  await expect(group).toBeVisible();
+  // Each member keeps its own mode control.
+  await expect(group.getByRole('radiogroup', { name: /Mode of/ })).toHaveCount(2);
+  await expectAccessible(page);
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect.poll(() => mock.drafts.length).toBe(1);
+  expect(mock.drafts[0]?.document['groups']).toEqual({ any: { any: ['iv30', 'spread'] } });
+  await group.getByRole('button', { name: 'Ungroup' }).click();
+  await expect(page.getByText('Any of')).toHaveCount(0);
+});
+
 test('changing a mode saves a tolerance with it', async ({ page }) => {
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners/my-vrp/edit');

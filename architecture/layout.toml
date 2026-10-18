@@ -239,6 +239,11 @@ purpose = "feature groups from corporate events and filings (earnings, dividends
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/events"
+purpose = "feature groups of the event classes an edge schedule triggers on (on_event:<class>[:<subtype>], ADR 0050, ADR 0053 amendment 2026-10-18): one module per group, its documented FEATURES (a sessions-since count, the event's date, a subtype field), a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/levels"
 purpose = "feature groups of price-level structure from daily bars (swing pivots and their strength, breakouts and their retests, unfilled gaps): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
@@ -541,10 +546,17 @@ contracts = [
 
 [[dir]]
 path = "src/algotrade/storage/tables"
-purpose = "market and result tables: the schema vocabulary (spec.py), the schemas (schemas.py; the edge harness result tables in edge_schemas.py), store protocols, reader / writer facades"
+purpose = "market and result tables: the schema vocabulary (spec.py), the schemas (the schemas/ package; the edge harness result tables in edge_schemas.py), store protocols, reader / writer facades"
 contracts = [
     "Only the ingestion app writes market and feature data (ADR 0005)",
     "R1: only algotrade.data reads market data (consumers never import storage readers)",
+    "Layout: market tables never import config documents",
+]
+
+[[dir]]
+path = "src/algotrade/storage/tables/schemas"
+purpose = "table schemas by family (market, reference, events, results, outcomes), the registry that resolves a table name to its spec, and frame validation; the package re-exports every public name"
+contracts = [
     "Layout: market tables never import config documents",
 ]
 

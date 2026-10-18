@@ -7,13 +7,15 @@ from typing import Any
 
 import pytest
 
-from algotrade.config.edges.document import EVENT_CLASSES
+from algotrade.config.edges.document import EVENT_CLASSES, EVENT_SUBTYPES, SUBTYPE_REQUIRED
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.features.registry import GROUPS
 from algotrade.services.evaluation.cross_section import events
 from algotrade.services.evaluation.cross_section.events import (
     EVENT_FIELDS,
     NO_EVENT_ROW,
     NOT_KNOWN_AT_D,
+    EventField,
     event_field,
     read_events,
     read_events_for,
@@ -129,3 +131,92 @@ def test_every_declared_event_class_has_a_field_to_read() -> None:
     validated, then failed at run time (ex_dividend, index_change, macro_release had no
     field). ex_dividend and macro_release are removed until EB H4 builds their fields."""
     assert set(EVENT_CLASSES) == set(EVENT_FIELDS)
+
+
+def test_every_declared_subtype_has_a_field_and_the_other_way_round() -> None:
+    """EB H4: the class list and its subtypes are a contract (ADR 0050 / 0053 amendment): the
+    schedule a document may name (``EVENT_SUBTYPES``) is exactly what the harness reads."""
+    assert {c: set(v) for c, v in EVENT_SUBTYPES.items()} == {
+        c: set(f.subtypes) for c, f in EVENT_FIELDS.items() if f.subtypes
+    }
+    assert set(SUBTYPE_REQUIRED) == {c for c, f in EVENT_FIELDS.items() if not f.count}
+    for cls in EVENT_FIELDS:
+        for sub in [None] if cls not in EVENT_SUBTYPES else list(EVENT_SUBTYPES[cls]):
+            if cls in SUBTYPE_REQUIRED and sub is None:
+                continue
+            assert event_field(cls, sub).count  # resolves to a field
+
+
+def test_every_event_field_is_a_catalogue_feature() -> None:
+    """A field the harness reads that no group stores would fail at run time, not at load."""
+    stored = {f"rollup.{g.key}.{f.name}" for g in GROUPS.values() for f in g.features}
+    for cls, declared in EVENT_FIELDS.items():
+        subs = [None, *declared.subtypes] if declared.count else list(declared.subtypes)
+        for sub in subs:
+            fields = event_field(cls, sub).fields()
+            assert set(fields) <= stored, (cls, sub, set(fields) - stored)
+
+
+def test_subtypes_fail_closed() -> None:
+    with pytest.raises(ConfigurationError, match="no subtype 'sideways'"):
+        event_field("index_change", "sideways")
+    with pytest.raises(ConfigurationError, match="no subtype 'x'"):
+        event_field("nt_late_filing", "x")  # a class with none
+    with pytest.raises(ConfigurationError, match="needs a subtype"):
+        event_field("filing_8k")
+    assert event_field("index_change").where is None  # no subtype: every change
+    assert event_field("index_change", "deletion").where == (
+        "rollup.index_changes@v1.last_index_change",
+        "sp500_removed",
+    )
+    assert isinstance(event_field("filing_8k", "4.02"), EventField)
+
+
+INDEX = "rollups/instrument/index_changes@v1"
+
+
+def test_a_subtype_with_a_label_keeps_only_names_whose_label_matches() -> None:
+    """``index_change:deletion`` is the names whose latest change reads ``sp500_removed``: a
+    name added the same day is no event of it (and not UNKNOWN), a null label is UNKNOWN."""
+    w = build_world()
+    d = DAYS[1]
+    rows = [
+        {"instrument_id": IDS[0], "sessions_since_index_change": 0, "last_index_change_date": d,
+         "last_index_change": "sp500_removed"},
+        {"instrument_id": IDS[1], "sessions_since_index_change": 0, "last_index_change_date": d,
+         "last_index_change": "sp500_added"},
+        {"instrument_id": IDS[2], "sessions_since_index_change": 0, "last_index_change_date": d,
+         "last_index_change": None},
+        {"instrument_id": IDS[3], "sessions_since_index_change": 4, "last_index_change_date": d,
+         "last_index_change": "sp500_removed"},
+    ]  # fmt: skip
+    w.write_rollup(INDEX, d, rows)
+    every = read_events(w.reader, "index_change", 1, [d], lambda _: ALL)
+    deleted = read_events(w.reader, "index_change", 1, [d], lambda _: ALL, "deletion")
+    added = read_events(w.reader, "index_change", 1, [d], lambda _: ALL, "addition")
+    assert every.names == {d: frozenset(IDS[:3])}
+    assert deleted.names == {d: frozenset({IDS[0]})}
+    assert added.names == {d: frozenset({IDS[1]})}
+    assert deleted.unknown[d] == {NO_EVENT_ROW: 17}  # 16 names with no row, N02 with a null label
+
+
+FILINGS = "rollups/instrument/filing_events@v1"
+
+
+def test_an_8k_item_subtype_reads_its_own_count_and_date_fields() -> None:
+    w = build_world()
+    d = DAYS[1]
+    w.write_rollup(
+        FILINGS,
+        d,
+        [
+            {"instrument_id": IDS[0], "sessions_since_8k_4_02": 0, "last_8k_4_02_date": d,
+             "sessions_since_8k_5_02": 3, "last_8k_5_02_date": d},
+            {"instrument_id": IDS[1], "sessions_since_8k_4_02": 1, "last_8k_4_02_date": d,
+             "sessions_since_8k_5_02": 0, "last_8k_5_02_date": d},
+        ],
+    )  # fmt: skip
+    got = read_events(w.reader, "filing_8k", 1, [d], lambda _: ALL, "4.02")
+    other = read_events(w.reader, "filing_8k", 1, [d], lambda _: ALL, "5.02")
+    assert got.names == {d: frozenset({IDS[0]})}
+    assert other.names == {d: frozenset({IDS[1]})}

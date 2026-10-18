@@ -26,7 +26,7 @@ def test_the_window_known_by_the_session_newest_first() -> None:
         (datetime(2026, 7, 30, 20, 10, tzinfo=UTC), "Results", ("2.02", "9.01")),
     ]  # 2024-02-01 is before the window; 2026-10-02 was accepted after the session
     assert (aaa[1].form, aaa[1].filing_date, aaa[1].known_from) == (
-        "8-K", date(2026, 7, 30), date(2026, 7, 30),
+        "8-K", date(2026, 7, 30), date(2026, 7, 31),
     )  # fmt: skip
     assert gaps == {}
     longer, _ = load_filings(context(store_with()), ["EQ:AAA"], 36)
@@ -77,3 +77,20 @@ def test_only_8ks_are_shown_the_other_event_forms_of_the_table_are_not() -> None
     found, gaps = load_filings(context(store_with(other_forms)), ["EQ:AAA", "EQ:BBB"], 24)
     assert {f.form for f in found["EQ:AAA"]} == {"8-K"} and len(found["EQ:AAA"]) == 2
     assert "EQ:BBB" in gaps  # asked about nowhere: still UNKNOWN
+
+
+def test_a_filing_accepted_after_the_close_is_not_visible_at_that_session_whatever_its_stamp() -> (
+    None
+):
+    """EB H4: an old-rule row (``known_from`` the 16:30 day D itself, in an old partition) was
+    shown at D; the read takes the session from ``ts``: not at D, shown from D+1."""
+
+    def late(writer):  # type: ignore[no-untyped-def]
+        row = filing_row("2026-09-30 20:30", "4.02", date(2026, 9, 30))  # 16:30 ET Wednesday
+        writer.write_table(FILING, D1, "late", stamped([row], D1, "late", source="sec"))
+
+    on_d, _ = load_filings(context(store_with(late), date(2026, 9, 30)), ["EQ:AAA"], 24)
+    assert "4.02" not in {i for f in on_d["EQ:AAA"] for i in f.items}
+    after, _ = load_filings(context(store_with(late), D1), ["EQ:AAA"], 24)
+    shown = [f for f in after["EQ:AAA"] if f.items == ("4.02",)]
+    assert [f.known_from for f in shown] == [D1]
