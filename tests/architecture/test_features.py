@@ -435,7 +435,8 @@ def test_an_expression_over_an_optional_source_still_has_a_value_without_it(name
 
 
 def test_sole_source_groups_are_optional_and_name_their_adr() -> None:
-    assert {"analyst_estimates", "analyst_targets"} == SOLE_SOURCE  # a new one is a decision
+    analyst = {"analyst_estimates", "analyst_targets", "analyst_ratings", "analyst_revisions"}
+    assert analyst == SOLE_SOURCE  # a new one is a decision
     assert SOLE_SOURCE <= OPTIONAL
     assert all("ADR " in GROUPS[f"{n}@v1"].sole_source for n in SOLE_SOURCE)
     # the checks see through expressions: the forward features read the sole sources, the

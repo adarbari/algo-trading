@@ -27,6 +27,8 @@ from algotrade.features.framework.graph import dependency_order
 from algotrade.features.rollups.activity import vol_stats, volume_profile
 from algotrade.features.rollups.consensus import (
     analyst_estimates,
+    analyst_ratings,
+    analyst_revisions,
     analyst_targets,
     earnings_revisions,
     earnings_surprise,
@@ -104,6 +106,8 @@ GROUPS: dict[str, FeatureGroup] = {
             earnings_revisions.GROUP,
             analyst_estimates.GROUP,
             analyst_targets.GROUP,
+            analyst_ratings.GROUP,
+            analyst_revisions.GROUP,
             dividends.GROUP,
             dividend_schedule.GROUP,
             iv30.GROUP,
