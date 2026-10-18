@@ -1,0 +1,66 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "part": "p1",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "stocks",
+      "part": "p1",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": [
+    {
+      "name": "draft_double_low_or_oversold",
+      "expr": "price_stats.close > 2 * price_stats.low_52w or momentum.rsi_14 < 30",
+      "dtype": "bool",
+      "unit": "flag",
+      "description": "True when the close is over twice the 52-week low or RSI14 is under 30",
+      "null_meaning": "Unknown when the 52-week low or RSI14 is unavailable",
+      "inputs": [
+        "price_stats.close",
+        "price_stats.low_52w",
+        "momentum.rsi_14"
+      ],
+      "criterion": {
+        "op": "eq",
+        "value": true,
+        "mode": "hard",
+        "tolerance": null
+      },
+      "part": "p2"
+    }
+  ],
+  "missing": null,
+  "unresolved": null,
+  "suggestions": null,
+  "parts": [
+    {
+      "id": "p1",
+      "words": "stocks"
+    },
+    {
+      "id": "p2",
+      "words": "close is more than twice the 52-week low or RSI14 under 30"
+    }
+  ]
+}

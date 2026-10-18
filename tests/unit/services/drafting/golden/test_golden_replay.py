@@ -16,6 +16,7 @@ from algotrade.services.drafting.golden.golden import (
     score,
 )
 from algotrade.services.drafting.parts.scoring import score_parts, share_ok
+from algotrade.services.drafting.parts.verify import doubts
 from algotrade.services.drafting.screens import criteria_of, draft_screen, parse_answer
 from algotrade.services.read.context import ReadContext, open_context
 from algotrade.storage.factory import open_config_store
@@ -90,6 +91,7 @@ def test_a_contract_answer_through_the_whole_draft_meets_the_case(
         [(f.expr, f.criterion) for f in draft.formulas],
         [m.key or f"new:{m.new_key_slug}" for m in draft.missing],
         [u.term for u in draft.unresolved],
+        draft.document.get("groups") or {},  # compared when the case expects groups (ADR 0071)
     )
     assert result.passed, f"{slug}/{case.id}: {result}"
     assert not any(f.name in json.dumps(draft.document) for f in draft.formulas)
@@ -101,6 +103,47 @@ def test_a_contract_answer_through_the_whole_draft_meets_the_case(
         wanted = case.explained.get("not_understood")
         if wanted is not None:  # a deliberately vague case
             assert draft.parts_stats is not None and draft.parts_stats.not_understood == wanted
+
+
+GROUPED = [(c, slug, text) for c, slug, text in CONTRACT if c.groups is not None]
+
+
+def test_the_group_cases_cover_every_phrasing_the_owner_verifies() -> None:
+    """ADR 0071 (owner decision 2: precedence case by case): one case per phrasing, with its
+    expected tree; the PR lists them under "Owner to verify (precedence)"."""
+    trees = {c.id: c.groups for c, _, _ in GROUPED}
+    assert trees == {
+        "groups-a-or-b": ({"any": ["RSI14 under 30", "above SMA50"]},),
+        "groups-a-or-b-and-c": (
+            {
+                "any": [
+                    "RSI14 under 30",
+                    {"all": ["above SMA50", "within 5% of their 52 week high"]},
+                ]
+            },
+        ),
+        "groups-except-a": ({"none": ["IV rank above 80%"]},),
+        "groups-except-a-or-b": ({"none": ["IV rank above 80%", "market cap under $2B"]},),
+        "groups-a-and-b-or-c": (
+            {"any": [{"all": ["above SMA50", "RSI14 under 30"]}, "rising volume"]},
+        ),
+        "groups-a-ideally-b-or-c": ({"any": ["ideally with IV rank above 80%", "rising volume"]},),
+        "groups-maths-stays-formula": (),
+    }
+
+
+@pytest.mark.parametrize(
+    ("case", "slug", "text"), GROUPED, ids=[f"{c.id}-{slug}" for c, slug, _ in GROUPED]
+)
+def test_the_groups_of_a_recorded_answer_are_the_expected_tree_and_never_a_doubt(
+    ctx: ReadContext, case: GoldenCase, slug: str, text: str
+) -> None:
+    """The whole draft: the groups the parts' joins give (a scorer failure names both trees), a
+    grouped sentence has no doubt, and the document with its groups validates as finalise."""
+    draft = draft_screen(ctx, Recorded(text), "golden", case.sentence)
+    assert bool(draft.document.get("groups")) == bool(case.groups), case.id
+    assert doubts(draft.parts, True, draft.document["criteria"]) == (), case.id
+    assert '"part"' not in json.dumps(draft.document)
 
 
 def test_the_suggestions_of_a_contract_answer_are_offered_apart(ctx: ReadContext) -> None:

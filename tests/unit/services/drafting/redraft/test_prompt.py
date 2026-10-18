@@ -118,6 +118,7 @@ def test_the_user_prompt_says_what_is_asked(site) -> None:  # noqa: F811
 
 
 PINNED = {
+    "12": ("ac0ca060dd6963f7", "cb03fbc5eba3b5b0"),
     "11": ("c9d0abccce7c9bc1", "cb03fbc5eba3b5b0"),
     "10": ("45ff18987b746134", "cb03fbc5eba3b5b0"),
 }  # PROMPT_VERSION -> (TASK, ASK) hashes

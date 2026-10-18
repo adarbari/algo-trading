@@ -281,17 +281,36 @@ def test_filler_around_a_part_vanishes() -> None:
 
 
 def test_a_negation_or_or_the_model_left_out_is_a_gap_never_silent() -> None:
-    """Review 2026-10-17: a trailing ``or not`` / ``, except`` and a leading ``not`` were lost."""
+    """Review 2026-10-17: a trailing ``or not`` / ``, except`` and a leading ``not`` were lost.
+    (Between two parts it is the join of the next one: ADR 0071, below.)"""
     for sentence, words, gap in (
         ("liquid stocks or not", ["liquid stocks"], "or not"),
         ("liquid stocks, except", ["liquid stocks"], "except"),
         ("not liquid stocks", ["liquid stocks"], "not"),
-        ("liquid but not overbought", ["liquid", "overbought"], "but not"),
     ):
         parts = _served(sentence, words)
         gaps = [p for p in parts if p.origin == "gap"]
         assert [(g.words, g.kind) for g in gaps] == [(gap, "not_understood")], sentence
         assert gaps[0].join_words == gap and gaps[0].join in ("or", "and_not")
+
+
+def test_an_or_or_a_negation_between_two_parts_is_the_join_of_the_next_never_a_gap() -> None:
+    """ADR 0071: the connector the model left out is read, so the server can group the parts."""
+    cases = [
+        ("liquid but not overbought", ["liquid", "overbought"], "and_not", "but not"),
+        ("RSI under 30 or near the low", ["RSI under 30", "near the low"], "or", "or"),
+        ("cheap and also, except for ETFs", ["cheap", "ETFs"], "and_not", "and also, except for"),
+        ("cheap, or growing", ["cheap", "growing"], "or", "or"),
+    ]
+    for sentence, words, logic, join_words in cases:
+        parts = _served(sentence, words)
+        assert not [p for p in parts if p.origin == "gap"], sentence
+        assert (parts[1].join, parts[1].join_words) == (logic, join_words), sentence
+
+
+def test_a_leading_either_is_dropped_but_a_leading_negation_is_a_gap() -> None:
+    parts = _served("either cheap or growing", ["cheap", "growing"])
+    assert [(p.origin, p.join) for p in parts] == [("words", None), ("words", "or")]
 
 
 def test_an_and_type_connector_before_the_first_part_is_no_join() -> None:

@@ -1,0 +1,44 @@
+{
+  "id": "groups-maths-stays-formula",
+  "sentence": "stocks where the close is more than twice the 52-week low or RSI14 under 30",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "the close is more than twice the 52-week low or RSI14 under 30",
+        "bucket": "B",
+        "fields": [],
+        "expr": "price_stats.close > 2 * price_stats.low_52w or momentum.rsi_14 < 30",
+        "op": "eq",
+        "value": true,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "stocks",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "close is more than twice the 52-week low or RSI14 under 30",
+          "kind": "formula",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 0
+    },
+    "groups": []
+  }
+}

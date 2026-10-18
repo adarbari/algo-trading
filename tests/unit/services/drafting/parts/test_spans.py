@@ -101,13 +101,12 @@ def test_a_sentence_no_part_covers_is_one_gap() -> None:
     assert _gaps("zzz qqq xxx", []) == ["zzz qqq xxx"]
 
 
-def test_a_negation_between_parts_is_a_gap_with_its_join_never_silent() -> None:
+def test_a_negation_between_parts_is_the_join_of_the_next_part_never_a_gap() -> None:
     sentence = "liquid but not overbought and also, except for ETFs"
     covered = [locate(sentence, w) for w in ("liquid", "overbought", "ETFs")]
     first, second = stretches(sentence, [c for c in covered if c])[1:3]
-    assert (first.gap, first.gap_join) == (Span(7, 14), Join("and_not", "but not"))
-    assert sentence[second.gap.start : second.gap.end] == "except for"
-    assert second.gap_join == Join("and_not", "and also, except for")
+    assert (first.gap, first.next_join) == (None, Join("and_not", "but not"))
+    assert (second.gap, second.next_join) == (None, Join("and_not", "and also, except for"))
 
 
 def test_a_trailing_negation_after_the_last_part_is_a_gap() -> None:

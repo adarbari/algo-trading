@@ -1,7 +1,12 @@
 """The diff of a saved screen against the draft the model returned (ADR 0066): criteria added,
 removed and changed by id (field, op, value), the unchanged count and a changed tie-break."""
 
-from algotrade.services.feedback.diff import criteria_diff, document_diff
+from algotrade.services.feedback.diff import (
+    criteria_diff,
+    criteria_snapshot,
+    document_diff,
+    groups_diff,
+)
 
 P = {"field": "rollup.price@v1.close", "op": "gt", "value": 5}
 V = {"field": "rollup.vol@v1.hv20", "op": "lt", "value": 0.4}
@@ -40,3 +45,40 @@ def test_document_diff_lists_added_removed_and_changed_top_level_keys() -> None:
     d = document_diff({"a": 1, "b": 2, "c": 3}, {"a": 1, "b": 5, "d": 4})
     assert d == {"added": {"d": 4}, "removed": ["c"], "changed": {"b": {"from": 2, "to": 5}}}
     assert document_diff(None, {"a": 1})["added"] == {"a": 1}
+
+
+def test_groups_added_removed_and_changed_are_in_the_diff() -> None:
+    """ADR 0071: a save that changes the boolean groups of the draft says which."""
+    returned = {
+        **RETURNED,
+        "groups": {"either": {"any": ["price", "vol"]}, "gone": {"none": ["vol"]}},
+    }
+    saved = {
+        **RETURNED,
+        "groups": {"either": {"any": ["price", "vol", "iv"]}, "fresh": {"all": ["price", "vol"]}},
+    }
+    diff = criteria_diff(returned, saved)
+    assert diff["groups"] == {
+        "added": [{"id": "fresh", "kind": "all", "members": ["price", "vol"]}],
+        "removed": [{"id": "gone", "kind": "none", "members": ["vol"]}],
+        "changed": [
+            {
+                "id": "either",
+                "from": {"kind": "any", "members": ["price", "vol"]},
+                "to": {"kind": "any", "members": ["price", "vol", "iv"]},
+            }
+        ],
+    }
+
+
+def test_the_same_groups_or_none_leave_no_groups_key() -> None:
+    same = {**RETURNED, "groups": {"either": {"any": ["price", "vol"]}}}
+    assert "groups" not in criteria_diff(same, dict(same))
+    assert "groups" not in criteria_diff(RETURNED, dict(RETURNED))
+    assert groups_diff({"groups": "no"}, {}) == {}
+
+
+def test_the_snapshot_carries_groups_only_when_there_are_some() -> None:
+    assert "groups" not in criteria_snapshot(RETURNED)
+    held = {**RETURNED, "groups": {"either": {"any": ["price", "vol"]}}}
+    assert criteria_snapshot(held)["groups"] == {"either": {"any": ["price", "vol"]}}

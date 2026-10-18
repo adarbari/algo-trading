@@ -10,7 +10,7 @@ are code points here; ``utf16`` converts them to what the browser counts."""
 import re
 from dataclasses import dataclass
 
-from algotrade.services.drafting.parts.connectors import AND, merged, read
+from algotrade.services.drafting.parts.connectors import AND, OR, merged, read
 
 MIN_FUZZY = 4  # a token shorter than this, or with a digit, must match exactly
 _TOKEN = re.compile("[\\w$%&'\u2019][\\w$%&'\u2019.\\-/]*")
@@ -119,8 +119,9 @@ def stretches(sentence: str, covered: list[Span]) -> list[Stretch]:
     sentence: glue and connectors are never a gap, only the words between them are."""
     out: list[Stretch] = []
     cursor = 0
-    for span in [*covered, Span(len(sentence), len(sentence))]:
-        out.append(_stretch(sentence, cursor, span.start))
+    for n, span in enumerate([*covered, Span(len(sentence), len(sentence))]):
+        where = "lead" if n == 0 else "between" if n < len(covered) else "tail"
+        out.append(_stretch(sentence, cursor, span.start, where))
         cursor = max(cursor, span.end)
     first = out[0]  # an and-type connector before everything has nothing to join: dropped
     out[0] = Stretch(first.gap, _lead(first.gap_join), first.next_join if first.gap else None)
@@ -128,21 +129,29 @@ def stretches(sentence: str, covered: list[Span]) -> list[Stretch]:
 
 
 def _lead(join: Join | None) -> Join | None:
-    return None if join is not None and join.logic == AND else join
+    return None if join is not None and join.logic in (AND, OR) else join
 
 
-def _stretch(sentence: str, start: int, end: int) -> Stretch:
+def _stretch(sentence: str, start: int, end: int, where: str = "between") -> Stretch:
     """A word of content, or a connector that is not and-type (a negation, an or), is kept: it
     would change what the trader asked for, so it is never silent (it is a not-understood gap
     unless the model kept it inside a part). Only and-type connectors and glue are read as a
-    join."""
+    join, and so is an or or a negation that lies alone between two parts (``where`` is
+    ``between``): the next part's join, which ``contract/groups`` turns into a group (ADR 0071);
+    a negation before the first part or any after the last has nothing to join and stays a gap
+    (a leading "either" is dropped like a leading and-type connector)."""
     toks = [(s + start, e + start, w) for s, e, w in tokens(sentence[start:end])]
     kinds = read([t[2] for t in toks])
-    kept = [i for i, k in enumerate(kinds) if k[0] == "content" or (k[0] == "join" and k[1] != AND)]
-    if not kept:
+    quiet = {AND, OR} if where == "lead" else {AND}  # joins that never make a gap here
+    kept = [
+        i
+        for i, k in enumerate(kinds)
+        if k[0] == "content" or (k[0] == "join" and k[1] not in quiet)
+    ]
+    pure = all(kinds[i][0] == "join" for i in kept)  # only a negation or an or, no content
+    if not kept or (where == "between" and pure):
         return Stretch(None, None, _join(sentence, toks, kinds, range(len(toks))))
     first, last = kept[0], kept[-1]
-    pure = all(kinds[i][0] == "join" for i in kept)  # only a negation or an or, no content
     return Stretch(
         Span(toks[first][0], toks[last][1]),
         _join(sentence, toks, kinds, range(last + 1 if pure else first)),

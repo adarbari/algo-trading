@@ -26,6 +26,7 @@ from typing import Any
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.drafting.contract.formulas import DroppedFormula
 from algotrade.services.drafting.contract.gaps import Unresolved
+from algotrade.services.drafting.contract.groups import group_parts, prune_groups
 from algotrade.services.drafting.contract.suggestions import rewrites
 from algotrade.services.drafting.parts.build import kind_of
 from algotrade.services.drafting.parts.model import KEPT_ID, UNPLACED_ID, Part
@@ -37,6 +38,7 @@ from algotrade.services.drafting.screens import (
     ScreenDraft,
     reading_of,
     validated,
+    with_groups,
 )
 from algotrade.services.read.context import ReadContext
 
@@ -114,7 +116,8 @@ def merge_part(ctx: ReadContext, req: PartRequest, sub: ScreenDraft) -> ScreenDr
     parts = _parts(req, sub, document, mine, others)
     dropped, parts = _bounded(dropped, parts)
     return ScreenDraft(
-        req.screener_id, document, tuple(dropped), _newest(dict.fromkeys(_clip(n) for n in notes)),
+        req.screener_id, _regrouped(ctx, req, document, parts), tuple(dropped),
+        _newest(dict.fromkeys(_clip(n) for n in notes)),
         call_id=sub.call_id, formulas=tuple(formulas), formulas_dropped=_newest(formulas_dropped),
         missing=tuple(missing), unresolved=tuple(unresolved), suggestions=tuple(suggestions),
         suggestions_dropped=_newest([*prior.suggestions_dropped, *sub.suggestions_dropped]),
@@ -214,7 +217,9 @@ def _document(ctx: ReadContext, req: PartRequest, sub: ScreenDraft, mine: _Mine)
         did = _unique(dropped.id, taken_dropped)
         taken_dropped.add(did)
         mine.dropped.append(replace(dropped, id=did))
-    document = {k: v for k, v in req.prior.document.items() if k not in ("criteria", "rank")}
+    document = {
+        k: v for k, v in req.prior.document.items() if k not in ("criteria", "rank", "groups")
+    }  # the groups are put back by ``_regrouped``
     document["criteria"] = criteria
     own = req.prior.document.get("rank")  # the document's tie-break: the part's, or another's
     new = sub.document.get("rank")
@@ -243,6 +248,23 @@ def _document(ctx: ReadContext, req: PartRequest, sub: ScreenDraft, mine: _Mine)
         mine.rank = False
     mine.criteria = [cid for cid in added.values() if cid in document["criteria"]]
     return document
+
+
+def _regrouped(
+    ctx: ReadContext, req: PartRequest, document: dict[str, Any], parts: Sequence[Part]
+) -> dict[str, Any]:
+    """``document`` with its boolean groups (ADR 0071) back: the sentence's reading of the merged
+    parts' joins when the groups the draft held were that reading of its parts (the retyped part
+    keeps its join), else the Builder's own groups (the trader edited them) without the members
+    that are gone; what the validator refuses leaves the draft flat."""
+    held = req.prior.document.get("groups") or {}
+    unedited = held == group_parts(req.prior.parts, req.criteria).groups
+    table = (
+        group_parts(parts, document["criteria"]).groups
+        if unedited
+        else prune_groups(held, document["criteria"])
+    )
+    return with_groups(ctx, req.screener_id, document, [table])
 
 
 def _parts(

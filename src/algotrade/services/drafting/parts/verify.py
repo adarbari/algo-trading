@@ -1,16 +1,21 @@
 """``doubts``: what a deterministic read of a draft's parts doubts about the model's work (ADR
 0041, amended 2026-10-17). A draft the validator accepts can still have misread the sentence
 (the 2026-10-17 judge: words split off a condition as "not understood", an "or" left out of the
-words, a criterion tied to no words, "X or Y" drafted as two ANDed criteria). Each doubt is a
-``kind`` (one of ``KINDS``), the part it is about and a message written to the model, so the
+words, a criterion tied to no words, "X or Y" drafted as two ANDed criteria). An "or" between
+parts is grouped by the server (ADR 0071, ``contract/groups``), so the "or" doubt
+(``OR_NOT_FORMULA``) fires only when grouping was impossible: an "or" inside one part's words,
+or a formula part next to an "or" or an exclusion. Each doubt is a ``kind`` (one of ``KINDS``),
+the part it is about and a message written to the model, so the
 chain repairs once on the same member and then asks a stronger one; a draft the phrasebook made
 never reaches this (it never asks a model). Pure: reads the draft's parts and the connectors'
 vocabulary, calls nothing."""
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
+from algotrade.services.drafting.contract.groups import group_parts
 from algotrade.services.drafting.parts.connectors import AND_NOT, OR, read
 from algotrade.services.drafting.parts.model import Part
 
@@ -37,10 +42,15 @@ class Doubt:
     message: str
 
 
-def doubts(parts: Sequence[Part] | None, typed: bool = False) -> tuple[Doubt, ...]:
+def doubts(
+    parts: Sequence[Part] | None,
+    typed: bool = False,
+    criteria: Mapping[str, Any] | None = None,
+) -> tuple[Doubt, ...]:
     """The doubts about a draft whose explained ``parts`` are given (none: no parts, no
     doubts). ``typed``: the draft has an ``instrument.security_type`` criterion, so a gap that is
-    only a universe noun ("stocks") loses nothing; without one it stays a doubt."""
+    only a universe noun ("stocks") loses nothing; without one it stays a doubt. ``criteria``:
+    the draft's, to tell the parts that only name the kind of instrument."""
     found: list[Doubt] = []
     for part in parts or ():
         if part.origin == "unplaced":
@@ -54,6 +64,8 @@ def doubts(parts: Sequence[Part] | None, typed: bool = False) -> tuple[Doubt, ..
                 found.append(_unmapped(part))
         elif _or_without_formula(part):
             found.append(_or_not_formula(part))
+    blocked = set(group_parts(parts, criteria).blocked)
+    found += [_grouped_formula(p) for p in parts or () if p.id in blocked]
     return tuple(found)
 
 
@@ -95,9 +107,10 @@ def _left_out(part: Part) -> str | None:
 
 def _connector(part: Part, logic: str) -> Doubt:
     keep = (
-        "keep 'X or Y' as one part (one boolean formula)"
+        "make each side of an 'or' its own part, with the 'or' left out of the words"
         if logic == OR
-        else "keep the negation inside the words of the condition it negates"
+        else "make what is excluded its own part with the exclusion word left out of the words, "
+        "or keep a negation inside the words of the one condition it negates"
     )
     return Doubt(
         CONNECTOR_LEFT_OUT, part.id,
@@ -118,8 +131,19 @@ def _unplaced(part: Part) -> Doubt:
 def _or_not_formula(part: Part) -> Doubt:
     return Doubt(
         OR_NOT_FORMULA, part.id,
-        f"the words '{part.words}' say 'or' but are drafted as {len(part.criteria)} criteria, "
-        "which a rule screen ANDs: 'or' needs one boolean formula",
+        f"the words '{part.words}' say 'or' but are drafted as {len(part.criteria)} criteria in "
+        "one part, which a rule screen ANDs: make each side of the 'or' its own part (the server "
+        "groups them), or draft the whole as one boolean formula when maths needs one",
+    )  # fmt: skip
+
+
+def _grouped_formula(part: Part) -> Doubt:
+    return Doubt(
+        OR_NOT_FORMULA, part.id,
+        f"the words '{part.words}' hold a formula and sit next to an 'or' or an exclusion "
+        f"('{part.join_words or 'a neighbour'}'), which a group cannot hold: draft the whole 'or' "
+        "or exclusion (every side of it) as one boolean formula in one part, or make each side a "
+        "criterion if no maths is needed",
     )  # fmt: skip
 
 
