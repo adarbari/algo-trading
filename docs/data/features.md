@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-602 stored features in 79 groups, in dependency order; 157 expression features.
+605 stored features in 80 groups, in dependency order; 157 expression features.
 
 ## `option_liquidity@v1`
 
@@ -1129,6 +1129,16 @@ Slow macro readings of the regime model: the yield curve, credit spreads, labour
 | `vix` | window | float32 | pct_points | personal | 0 .. 150 | Cboe VIX close (20 = 20% implied vol) | no observation of VIX known by the session (no FRED key, or before it starts) | `series:VIX` |
 | `vix3m` | window | float32 | pct_points | personal | 0 .. 150 | Cboe 3-month VIX close | no observation of VIX3M known by the session (no FRED key, or before it starts) | `series:VIX3M` |
 | `vix_term_ratio` | window | float32 | ratio | personal | 0 .. 5 | VIX / VIX3M (above 1: backwardation, short-term stress) | no observation of VIX, VIX3M known by the session (no FRED key, or before it starts) | `series:VIX`, `series:VIX3M` |
+
+### `market_triggers@v1`
+
+Market-level triggers for the time-series edges: the latest VIX spike (VIX at least 30 in backwardation after 21 quiet sessions), known from the session after its close. Stored as `rollups/market/market_triggers@v1`; reads `macro/series` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `vix_spike_date` | window | date | date | personal |  | The session the latest VIX spike was first known: the first day with VIX at least 30 and VIX / VIX3M above 1 after 21 sessions without one (known from the session after its close) | VIX or VIX3M has no observation known by the session, or its newest is more than 3 sessions old (stale: nothing is read, never 'no spike'); or no spike in the last 300 sessions of observations | `series:VIX`, `series:VIX3M` |
+| `sessions_since_vix_spike` | window | int | sessions | personal | 0 .. 301 | Exchange sessions from the latest VIX spike's session up to the session (0: the session is that day); 301 when the readings are fresh and no spike is in the last 300 sessions | VIX or VIX3M has no observation known by the session, or its newest is more than 3 sessions old (stale: nothing is read, never 'no spike') | `series:VIX`, `series:VIX3M` |
+| `vix_spike_level` | window | float32 | pct_points | personal | 30 .. 150 | The VIX close of the latest spike (20 = 20% implied vol) | VIX or VIX3M has no observation known by the session, or its newest is more than 3 sessions old (stale: nothing is read, never 'no spike'); or no spike in the last 300 sessions of observations | `series:VIX`, `series:VIX3M` |
 
 ### `regime_indicators@v1`
 
