@@ -348,7 +348,7 @@ Sources: George and Hwang (2004) for the high; the VRP scanner's spec (docs/scre
 
 ### `rollup.momentum_variants@v1.resid_mom_12_1`
 
-**How to read it.** The 12-1 momentum with the market taken out: the log return from 252 to 21 sessions back minus the name's beta times SPY's log return over the same window. 0.15 means the name gained 15 points beyond what its market exposure explains; near 0 means the year was the market's move. Blitz, Huij and Martens (2011) rank on residual returns to take the market leg out; this is a simpler, market-only version (one SPY beta over the window, no intercept, unscaled), not their 36-month Fama-French residual scaled by its standard deviation.
+**How to read it.** The 12-1 momentum with the market taken out: the log return from 252 to 21 sessions back minus the name's beta times SPY's log return over the same window. 0.15 means the name gained 15 points beyond what its market exposure explains; near 0 means the year was the market's move. Blitz, Huij and Martens (2011) rank on residual returns to take the market leg out. This is a simpler, market-only version: one SPY beta over the window, no intercept, unscaled. It is not their 36-month Fama-French residual scaled by its standard deviation.
 
 **The criterion per intent**
 
@@ -359,7 +359,7 @@ Sources: George and Hwang (2004) for the high; the VRP scanner's spec (docs/scre
 **When the reading lies**
 
 - Only the market is removed, not the sector or style: a name that rode a hot sector still reads as a winner. Compare rollup.momentum_variants@v1.sector_ret_252d to see how much of the year was its sector.
-- The beta is estimated on the same window it is applied to, so it is noisy for a young listing or a name with thin bars; it needs 200 daily returns that overlap SPY's. Check rollup.price_history@v1.range_status.
+- The beta is estimated on the same window it is applied to. It is noisy for a young listing or a name with thin bars, and needs 200 daily returns that overlap SPY's. Check rollup.price_history@v1.range_status.
 - It is a log return, not the simple 12-1 of rollup.trend_stats@v2.mom_12_1: a big winner reads lower than its simple return.
 - Null after any gap in the window (252 to 21 sessions back), a shorter history, or without SPY in the symbol map; a hard criterion then rejects the name.
 
@@ -385,7 +385,7 @@ Sources: Barroso and Santa-Clara (2015), Momentum has its moments, Journal of Fi
 
 ### `rollup.momentum_variants@v1.fip_12_1`
 
-**How to read it.** Information discreteness of the 12-1 path: the sign of the 12-1 return times the share of down days minus the share of up days in that window. Below 0 the winner climbed on many small up days (continuous information, 'frog in the pan'); above 0 it got there on a few big jumps. -0.2 is 20 points more up days than down days in an up move. Da, Gurun and Warachka find continuous winners keep going, jumpy ones reverse, so the better winners have the lower value.
+**How to read it.** Information discreteness of the 12-1 path: the sign of the 12-1 return times the share of down days minus the share of up days in that window. Below 0 the winner climbed on many small up days (continuous information, 'frog in the pan'). Above 0 it got there on a few big jumps. -0.2 is 20 points more up days than down days in an up move. Da, Gurun and Warachka find continuous winners keep going, jumpy ones reverse, so the better winners have the lower value.
 
 **The criterion per intent**
 
@@ -404,7 +404,7 @@ Sources: Da, Gurun and Warachka (2014), Frog in the Pan: Continuous Information 
 
 ### `rollup.momentum_variants@v1.resid_ret_20d`
 
-**How to read it.** The last month's return with the market taken out: the log return over 20 sessions minus beta_252d times SPY's over the same sessions. 0.10 means the name beat its market exposure by 10 points this month. The one-month return reverses (Jegadeesh 1990), and Blitz, Huij, Lansdorp and Verbeek find the residual version reverses more cleanly because a market rally does not make every high-beta name a short; the high values are the reversal candidates, the low ones the buys.
+**How to read it.** The last month's return with the market taken out: the log return over 20 sessions minus beta_252d times SPY's over the same sessions. 0.10 means the name beat its market exposure by 10 points this month. The one-month return reverses (Jegadeesh 1990). Blitz, Huij, Lansdorp and Verbeek find the residual version reverses more cleanly, because a market rally does not make every high-beta name a short. The high values are the reversal candidates, the low ones the buys.
 
 **The criterion per intent**
 
@@ -423,7 +423,7 @@ Sources: Jegadeesh (1990), Evidence of Predictable Behavior of Security Returns;
 
 ### `rollup.momentum_variants@v1.sector_ret_252d`
 
-**How to read it.** The 252-session return of the instrument's sector ETF: how the whole sector did over a year (0.20 up 20%). Moskowitz and Grinblatt find industry momentum explains much of single-stock momentum: sectors that did well keep doing well for months, so a name in a strong sector has a tailwind of its own.
+**How to read it.** The 252-session return of the instrument's sector ETF: how the whole sector did over a year (0.20 up 20%). Moskowitz and Grinblatt find industry momentum explains much of single-stock momentum. Sectors that did well keep doing well for months, so a name in a strong sector has a tailwind of its own.
 
 **The criterion per intent**
 
@@ -441,7 +441,7 @@ Sources: Moskowitz and Grinblatt (1999), Do Industries Explain Momentum?, Journa
 
 ### `rollup.momentum_variants@v1.rs_sector_20d`
 
-**How to read it.** The last month's return against the sector ETF's: (1 + the name's 20-session return) / (1 + the ETF's) - 1. 0.05 beat its sector by 5 points; -0.05 lagged by 5. It is the one-month return with the industry move taken out (Hou and Moskowitz style), the sector standing in for the industry; the extremes reverse more than the raw return does.
+**How to read it.** The last month's return against the sector ETF's: (1 + the name's 20-session return) / (1 + the ETF's) - 1. 0.05 beat its sector by 5 points; -0.05 lagged by 5. It is the one-month return with the industry move taken out (Hou and Moskowitz style), the sector standing in for the industry. The extremes reverse more than the raw return does.
 
 **The criterion per intent**
 

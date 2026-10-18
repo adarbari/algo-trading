@@ -676,10 +676,10 @@ tolerance = 0
 [[field]]
 name = "rollup.momentum_variants@v1.resid_mom_12_1"
 theme = "momentum and trend"
-reads = "The 12-1 momentum with the market taken out: the log return from 252 to 21 sessions back minus the name's beta times SPY's log return over the same window. 0.15 means the name gained 15 points beyond what its market exposure explains; near 0 means the year was the market's move. Blitz, Huij and Martens (2011) rank on residual returns to take the market leg out; this is a simpler, market-only version (one SPY beta over the window, no intercept, unscaled), not their 36-month Fama-French residual scaled by its standard deviation."
+reads = "The 12-1 momentum with the market taken out: the log return from 252 to 21 sessions back minus the name's beta times SPY's log return over the same window. 0.15 means the name gained 15 points beyond what its market exposure explains; near 0 means the year was the market's move. Blitz, Huij and Martens (2011) rank on residual returns to take the market leg out. This is a simpler, market-only version: one SPY beta over the window, no intercept, unscaled. It is not their 36-month Fama-French residual scaled by its standard deviation."
 caveats = [
   "Only the market is removed, not the sector or style: a name that rode a hot sector still reads as a winner. Compare rollup.momentum_variants@v1.sector_ret_252d to see how much of the year was its sector.",
-  "The beta is estimated on the same window it is applied to, so it is noisy for a young listing or a name with thin bars; it needs 200 daily returns that overlap SPY's. Check rollup.price_history@v1.range_status.",
+  "The beta is estimated on the same window it is applied to. It is noisy for a young listing or a name with thin bars, and needs 200 daily returns that overlap SPY's. Check rollup.price_history@v1.range_status.",
   "It is a log return, not the simple 12-1 of rollup.trend_stats@v2.mom_12_1: a big winner reads lower than its simple return.",
   "Null after any gap in the window (252 to 21 sessions back), a shorter history, or without SPY in the symbol map; a hard criterion then rejects the name.",
 ]
@@ -719,7 +719,7 @@ note = "a score; gate rollup.trend_stats@v2.mom_12_1 gt 0 as well"
 [[field]]
 name = "rollup.momentum_variants@v1.fip_12_1"
 theme = "momentum and trend"
-reads = "Information discreteness of the 12-1 path: the sign of the 12-1 return times the share of down days minus the share of up days in that window. Below 0 the winner climbed on many small up days (continuous information, 'frog in the pan'); above 0 it got there on a few big jumps. -0.2 is 20 points more up days than down days in an up move. Da, Gurun and Warachka find continuous winners keep going, jumpy ones reverse, so the better winners have the lower value."
+reads = "Information discreteness of the 12-1 path: the sign of the 12-1 return times the share of down days minus the share of up days in that window. Below 0 the winner climbed on many small up days (continuous information, 'frog in the pan'). Above 0 it got there on a few big jumps. -0.2 is 20 points more up days than down days in an up move. Da, Gurun and Warachka find continuous winners keep going, jumpy ones reverse, so the better winners have the lower value."
 caveats = [
   "It counts days, not size: five big up days and a hundred tiny down days read as discrete however the size shakes out. Read it with rollup.trend_stats@v2.mom_12_1 for the amount.",
   "A flat day counts for neither side, so a name that barely trades shows a value near 0 whatever its path; gate on rollup.price_stats@v2.adv_usd_20d.",
@@ -740,7 +740,7 @@ note = "with rollup.trend_stats@v2.mom_12_1 gt 0.2 as the gate; alone it also pi
 [[field]]
 name = "rollup.momentum_variants@v1.resid_ret_20d"
 theme = "momentum and trend"
-reads = "The last month's return with the market taken out: the log return over 20 sessions minus beta_252d times SPY's over the same sessions. 0.10 means the name beat its market exposure by 10 points this month. The one-month return reverses (Jegadeesh 1990), and Blitz, Huij, Lansdorp and Verbeek find the residual version reverses more cleanly because a market rally does not make every high-beta name a short; the high values are the reversal candidates, the low ones the buys."
+reads = "The last month's return with the market taken out: the log return over 20 sessions minus beta_252d times SPY's over the same sessions. 0.10 means the name beat its market exposure by 10 points this month. The one-month return reverses (Jegadeesh 1990). Blitz, Huij, Lansdorp and Verbeek find the residual version reverses more cleanly, because a market rally does not make every high-beta name a short. The high values are the reversal candidates, the low ones the buys."
 caveats = [
   "News moves the name as well as noise: an earnings gap or a takeover in the month does not reverse. Check rollup.price_moves@v1.one_day_move and the earnings dates before shorting a high value.",
   "It reverses against low liquidity worst: small, thinly traded names have the largest values and the highest costs. Gate on rollup.price_stats@v2.adv_usd_20d.",
@@ -762,7 +762,7 @@ note = "with rollup.price_stats@v2.adv_usd_20d as a liquidity gate; the buys are
 [[field]]
 name = "rollup.momentum_variants@v1.sector_ret_252d"
 theme = "momentum and trend"
-reads = "The 252-session return of the instrument's sector ETF: how the whole sector did over a year (0.20 up 20%). Moskowitz and Grinblatt find industry momentum explains much of single-stock momentum: sectors that did well keep doing well for months, so a name in a strong sector has a tailwind of its own."
+reads = "The 252-session return of the instrument's sector ETF: how the whole sector did over a year (0.20 up 20%). Moskowitz and Grinblatt find industry momentum explains much of single-stock momentum. Sectors that did well keep doing well for months, so a name in a strong sector has a tailwind of its own."
 caveats = [
   "The sector is the SEC SIC code's eleven coarse groups, not an industry: a biotech and a hospital chain share Health Care. rollup.relative_strength@v1.sector_etf names the ETF used.",
   "An ETF's year is dominated by its largest holdings (XLK by a few mega-caps), so it can differ from the median name's sector; compare rollup.relative_strength@v1.rs_sector_63d.",
@@ -782,7 +782,7 @@ note = "a score beside the name's own momentum, never alone"
 [[field]]
 name = "rollup.momentum_variants@v1.rs_sector_20d"
 theme = "momentum and trend"
-reads = "The last month's return against the sector ETF's: (1 + the name's 20-session return) / (1 + the ETF's) - 1. 0.05 beat its sector by 5 points; -0.05 lagged by 5. It is the one-month return with the industry move taken out (Hou and Moskowitz style), the sector standing in for the industry; the extremes reverse more than the raw return does."
+reads = "The last month's return against the sector ETF's: (1 + the name's 20-session return) / (1 + the ETF's) - 1. 0.05 beat its sector by 5 points; -0.05 lagged by 5. It is the one-month return with the industry move taken out (Hou and Moskowitz style), the sector standing in for the industry. The extremes reverse more than the raw return does."
 caveats = [
   "The sector is coarse (eleven ETFs), so a name in a small industry that moved on its own news reads as large; check rollup.price_moves@v1.one_day_move for a single big day.",
   "A name that is a large part of its sector ETF (a mega-cap in XLK) is compared partly with itself, so its value is shrunk toward 0.",
