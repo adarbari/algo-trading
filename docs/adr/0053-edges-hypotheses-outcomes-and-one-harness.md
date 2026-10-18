@@ -770,13 +770,13 @@ factor-neutral.
    Sector would need a `factor_betas@v2` storing all five betas of the five-factor fit.
 3. **Point in time.** The betas are the `factor_betas@v1` rows of the session before S
    (`previous_session(S)`), estimated on the 252 sessions ending there, read through
-   `data.rollups` and the same session's `relative_strength@v1` `sector_etf`. Nothing of the
+   `data.rollups` . Nothing of the
    window enters them; for the usual offset of 1 they are exactly the betas known at the
    decision session D. A later partition is never read (the exact session, not "on or before").
 4. **Gaps are UNMEASURED with a reason, never market-only, never zero.** `NO_FACTOR_HISTORY` (a
    factor ETF has no bar at S: MTUM and VLUE start in 2013, so every earlier window; or the betas
    row says so), `NO_BETAS` (no partition or no row before S, or a non-finite beta),
-   `SHORT_HISTORY` (the betas say too few joint returns), `NO_FACTOR_BAR` (a factor or sector ETF
+   `SHORT_HISTORY` (the betas say too few joint returns), `NO_FACTOR_BAR` (a factor ETF
    has no bar at the end), `BAD_BAR` (carried from the forward row). The harness treats such a
    row like an `UNMEASURED` forward row: excluded as `unmeasured`, counted, and a session most of
    whose picks are unmeasured is not measured. A forward row with no residual row at all
