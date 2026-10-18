@@ -893,19 +893,19 @@ follow-up PR).
 - Question: ADR 0075 says read the lock-up table with `latest_versions(through=D)` and map the CIK through `instruments/company` as of D, but a rollup is pure (no storage, no data) and reads its inputs per session.
 - Options: a loader that returns the latest version known by each session (`feature_inputs._Versions`, sharing `events.latest_of` with `latest_versions`) / a version filter inside `compute`; the CIK from `instruments/reference` / from `instruments/company` with its `cik` column added to `company_sectors`.
 - Decision: the loader dedupes per session by the one shared rule, and `compute` joins the CIK to `instruments/company` of the session (`company_sectors` now returns `cik` too, one more column for its other readers); a CIK with several share classes gives each the event; the nearest lock-up is the earliest expiry from 20 sessions back on.
-- decided by: implementer (within the ADR's design)
-- status: pending architect review
+- decided by: proposed by orchestrator; awaiting owner
+- status: pending owner confirmation
 - Reasoning: keeps the one version rule in `data/`, keeps the rollup pure, and honours the ADR's company snapshot; the stored reverse-split ratio is new shares per old (a forward 4-for-1 is 4), pinned by a test, a ratio below 1 is a reverse split.
 
 ## 2026-10-18 | EB H4 follow-up (ipo_lockup, reverse_split) | Field-guide entries of the new groups sit under the instrument-gates theme
 - Question: `events.toml` (977 lines) and the events theme page `docs/data/field-guide/events.md` cannot take 11 more entries (cap 1000 each), the field_guide folder and the docs page folder are both at 12 files, and a new theme would be a 13th page.
 - Options: entries under the events theme (fails `make filelen`); a new theme or file (breaks the 12-file cap); the entries under `instrument gates`, whose page has room (the names are avoid-list gates), filed in the files that have room (trend, momentum, options-wing).
 - Decision: the third; a structural fix (raise the page cap, or split the events theme) is for the architect.
-- decided by: implementer (forced by the caps; user-visible grouping)
+- decided by: proposed by orchestrator; awaiting owner
 - status: pending owner confirmation
 - Reasoning: the entries must ship with the columns (coverage test); a mislabelled group is cheaper to move later than a failing gate.
 
 ## 2026-10-18 | EB H4 follow-up (PR 700 review) | Dual-class CIKs and the events field-guide split
 - Decision: a CIK with two share classes counts the same lock-up expiry twice, which overstates the independent events of an `ipo_lockup` edge: the edge's run record notes it. The events field-guide theme (`events.toml` and its docs page at the cap) needs a sub-folder split; Now / Next is full, so the follow-up is here only.
-- decided by: architect review
+- decided by: proposed by orchestrator; awaiting owner
 - status: pending owner confirmation
