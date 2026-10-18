@@ -30,7 +30,7 @@ allowed = [
     "src/algotrade/data/*",  # the generic table reads (R1)
     "src/algotrade/features/*",  # feature groups name their own tables
     "src/algotrade/core/model/fields.py",  # ROLLUP_TABLE_PREFIX: catalogue names -> tables, in one place
-    "src/algotrade/storage/tables/schemas.py",  # declares the rollups/instrument/* and rollups/market/* table families
+    "src/algotrade/storage/tables/schemas/registry.py",  # declares the rollups/instrument/* and rollups/market/* table families
     "src/algotrade/strategies/screeners/*",  # a screener declares the feature table it reads through core.views (engine input, not a display read)
     "apps/ingestion/*",  # producers and the verification checks name the tables they write or compare
 ]

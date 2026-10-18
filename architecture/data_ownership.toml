@@ -109,7 +109,7 @@ id = "macro-series-reads"
 description = "Read macro series and index levels (macro/series, ADR 0048) point in time by vintage: each observation's latest vintage on or before a session (data.macro.series) and the pit = lag vintage rule (data.macro.vintages); consumers and feature groups read the table only through data.macro and data.feature_inputs"
 owner = ["src/algotrade/data/macro/*"]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/features/rollups/market/macro.py",  # names its input; read through data.feature_inputs (ADR 0048)
 ]
 section = "docs/adr/0048-macro-series-with-vintages.md#decision"
@@ -152,7 +152,7 @@ id = "rates-reads"
 description = "Which Treasury curve a date sees (latest on or before, earliest flagged) and rates for a time to expiry: consumers call data.rates.curve, never read rates/treasury themselves"
 owner = ["src/algotrade/data/rates.py"]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/market.py",  # declares the table
     "apps/ingestion/algotrade_ingestion/tasks/market/rates.py",  # its one producer
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "libs/sources/algotrade_sources/vendors/treasury/*",  # the vendor's frame key

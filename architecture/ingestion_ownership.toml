@@ -18,7 +18,7 @@ owner = [
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py",  # counts its FMP calls the same way, and reads the verdicts
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task
-    "src/algotrade/storage/tables/schemas.py",  # declares the table's schema
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table's schema
 ]
 section = "docs/adr/0068-analyst-data-vendors.md#decision"
 detect = [{ string = "analyst/vendor_access" }, { call = "fmp_calls_today" }]
@@ -29,7 +29,7 @@ description = "Append tonight's FMP (annual estimates, price-target consensus, g
 owner = ["apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task
-    "src/algotrade/storage/tables/schemas.py",  # declares the table's schema
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table's schema
     "src/algotrade/data/analyst/reading.py",  # the one read of the table (analyst-snapshot-reading)
     "src/algotrade/features/rollups/consensus/analyst_status.py",  # names the feature input table its groups read
 ]
@@ -59,7 +59,7 @@ owner = [
     "src/algotrade/data/funds/holdings.py",
 ]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/reference.py",  # declares the table
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "src/algotrade/features/rollups/reference/fund_reference.py",  # names its input; read through data.feature_inputs (ADR 0050)
 ]
@@ -85,7 +85,7 @@ owner = ["apps/ingestion/algotrade_ingestion/tasks/events/*"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (filings_fetched)
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/features/rollups/corporate/earnings.py",  # the one reader that must tell the 8-K rows apart (v1 reads the calendar rows only; rollups import no storage, so the source name is spelled there)
     "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py",  # the carry-forward never copies the 8-K rows
     "src/algotrade/services/read/events/filings.py",  # the filings read of InstrumentEvents (known_from <= session), a display read
@@ -102,7 +102,7 @@ owner = [
     "src/algotrade/data/outcomes/*",
 ]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the outcomes tables' one schema
+    "src/algotrade/storage/tables/schemas/outcomes.py",  # declares the outcomes tables' one schema
     "src/algotrade/services/evaluation/cross_section/harness.py",  # the reader of outcomes (ADR 0053)
     "src/algotrade/services/evaluation/cross_section/measuring.py",  # the harness's measuring of legs reads the outcome rows (ADR 0053)
     "src/algotrade/services/evaluation/training/frame.py",  # the other: the labels of a fit (ED7)
@@ -123,7 +123,7 @@ owner = [
     "src/algotrade/data/futures/curves.py",
 ]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the tables
+    "src/algotrade/storage/tables/schemas/market.py",  # declares the tables
     "src/algotrade/data/reference.py",  # the conid snapshot read (one snapshot rule)
     "src/algotrade/features/rollups/options/ibkr_iv.py",  # names its input; read through data.feature_inputs
 ]
@@ -187,7 +187,7 @@ id = "live-verification"
 description = "Compare a session's stored values with an independent live source (IBKR): the sample, the checks and their tolerances (verification.toml), the verification/ibkr table; the quality check `verification` grades it and the nightly email reports it"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/verification/*"]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/market.py",  # declares the table
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the session's rows
     "src/algotrade/services/read/ops/quality.py",  # shows the session's rows read-only (Query.verification)
 ]
@@ -201,7 +201,7 @@ owner = ["apps/ingestion/algotrade_ingestion/tasks/macro/*"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the calendar (macro_calendar_future)
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/services/read/events/ahead.py",  # the events-ahead read of the stored calendar (known_from <= session), a display read
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
