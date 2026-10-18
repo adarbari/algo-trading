@@ -9,6 +9,7 @@ works_oos_trades = 40    # ... of which this many out-of-sample
 not_working_t = 1.0      # top-vs-bottom decile t below this: Not working
 promising_t = 2.0        # Promising needs at least this t
 works_t = 3.0            # Works needs at least this t
+works_picks_t = 3.0      # ... and this t on the picks series (the t of its Sharpe ratio); owner 2026-10-17
 
 not_working_dsr = 0.5    # deflated Sharpe below this: Not working
 promising_dsr = 0.80
@@ -36,3 +37,8 @@ levels_bps = [0, 15, 30, 50] # beside its own cost_bps; in the leg key (a change
 borrow_bps_annual = 100       # the short leg's assumed borrow cost a year (bp; no borrow data
                               # is stored): only for an edge with side short / long_short, in
                               # the leg key of such edges only; names must clear the ADV floor
+
+[published_haircut]        # ADR 0065: the share of a paper's figure to expect lost by the time it is
+short = 0.5                # a short leg: as the spread (ADR 0065 amendment)
+long_short = 0.5           # traded, by the paper's leg (`[published] leg`); shown beside the figure,
+long = 0.333          # never a verdict input

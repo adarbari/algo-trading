@@ -7,7 +7,16 @@ from datetime import date, timedelta
 import numpy as np
 import pytest
 
-from algotrade.quant.edges.statistics import break_even_cost, deflated_sharpe, moments, sharpe
+from algotrade.core.time.calendar import sessions_between
+from algotrade.quant.edges.statistics import (
+    break_even_cost,
+    deflated_sharpe,
+    haircut_sharpe,
+    independent_sessions,
+    moments,
+    sharpe,
+    sharpe_t,
+)
 from algotrade.services.evaluation.cross_section.measures import (
     CostGrid,
     Pick,
@@ -462,6 +471,51 @@ def test_a_lone_trial_is_deflated_by_the_trial_count_against_the_nulls_sharpe_va
 
 def replace_horizon(t: Trial, horizon: int) -> Trial:
     return Trial(t.name, t.role, t.unit, t.stats, t.measures, horizon)
+
+
+def test_a_slice_carries_the_picks_series_t_of_its_trial_values() -> None:
+    stats = _cushions()
+    (m,) = slice_measures(stats, [ALL])
+    values = [s.pick_mean for s in stats]
+    assert m.picks_t == pytest.approx(sharpe_t(values))
+    assert m.picks_t == pytest.approx(m.sharpe * len(values) ** 0.5)
+    (wins,) = slice_measures(stats, [ALL], wins=True)  # the excess wins, as the Sharpe ratio is
+    assert wins.picks_t == pytest.approx(wins.sharpe * len(stats) ** 0.5)
+    year = Slice("year", "2026", lambda s: s.session.year == 2026)
+    assert slice_measures([stats[0]], [year])[0].picks_t is None  # one session has no sd
+
+
+def _every_session(n: int = 60) -> list[SessionStat]:
+    """Trial values on consecutive sessions: with a 20-session window each is one of twenty that
+    overlap, so ``n`` of them stand for ``n / 20`` independent ones."""
+    days = sessions_between(date(2026, 1, 5), date(2026, 12, 31))[:n]
+    return [
+        stat(d, (0.02 + 0.01 * (i % 5), 0.0), (0.0, 0.01), 1, spread=0.03 + 0.01 * (i % 4))
+        for i, d in enumerate(days)
+    ]
+
+
+def test_the_t_ratios_of_windows_started_every_session_count_the_independent_sessions() -> None:
+    """The architect-review defect: ``picks_t`` read 60 overlapping 20-session windows as 60
+    independent sessions, while the haircut counts 3. Both t-ratios are over the same count."""
+    stats = _every_session(60)
+    (naive,) = slice_measures(stats, [ALL])  # horizon 1: the sessions do not overlap
+    (m,) = slice_measures(stats, [ALL], horizon=20)
+    assert naive.sharpe is not None and m.sharpe == pytest.approx(naive.sharpe)
+    assert m.picks_t == pytest.approx(m.sharpe * (60 / 20) ** 0.5)  # sharpe * sqrt(n / 20)
+    assert naive.picks_t == pytest.approx(naive.sharpe * 60**0.5)
+    assert m.decile_t == pytest.approx(naive.decile_t * (60 / 20) ** 0.5 / 60**0.5)
+    assert m.decile_sessions == 60  # the count of sessions is still the sessions measured
+    # the haircut reads the same t: independent sessions, never the 60 overlapping windows
+    h = haircut_sharpe(m.sharpe, independent_sessions([s.session for s in stats], 20), 1)
+    assert h is not None and h.t == pytest.approx(m.picks_t)
+
+
+def test_windows_spaced_at_least_a_horizon_apart_are_independent() -> None:
+    stats = [s for i, s in enumerate(_every_session(60)) if i % 20 == 0]
+    (m,) = slice_measures(stats, [ALL], horizon=20)
+    (naive,) = slice_measures(stats, [ALL])
+    assert m.picks_t == pytest.approx(naive.picks_t) and m.decile_t == pytest.approx(naive.decile_t)
 
 
 def _spread_day(day: date, longs: tuple[float, ...], shorts: tuple[float, ...]) -> SessionStat:

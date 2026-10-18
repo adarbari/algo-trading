@@ -60,7 +60,7 @@ EDGE_EVAL = fixed(
     )),
     *floats(
         "hit_rate", "base_rate", "lift", "mean_excess_picks", "bh_mean", "top_decile_mean",
-        "decile_spread", "decile_t", "effect_size", "sharpe", "deflated_sharpe", "pbo",
+        "decile_spread", "decile_t", "effect_size", "sharpe", "picks_t", "deflated_sharpe", "pbo",
         "reference_rate", "touch_rate", "pick_adv_median",
         *(f"decile_mean_{i:02d}" for i in range(1, 11)),
     ),

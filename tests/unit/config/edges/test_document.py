@@ -23,7 +23,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.tables.edge_schemas import EDGE_EVAL, EDGE_LEGS, EDGE_TRADES
 from tests.unit.services.evaluation.cross_section.conftest import edge
 
-WHERE = "config/site/edges/drift.toml"
+WHERE = "config/site/edges/drift/edge.toml"
 
 
 def document(**changes: Any) -> dict[str, Any]:
@@ -468,9 +468,9 @@ def test_the_published_table_is_optional_typed_and_checked_against_the_document(
             "sample": 25,
         },
     ).published
-    assert found == Published("decile_spread", 0.0131, 60, 1, 25)
+    assert found == Published("decile_spread", 0.0131, 60, 1, 25, "long_short")
     no_sample = {"measure": "lift_pts", "value": 4, "horizon_sessions": 20, "source": 0}
-    assert parse(published=no_sample).published == Published("lift_pts", 4.0, 20, 0, None)
+    assert parse(published=no_sample).published == Published("lift_pts", 4.0, 20, 0, None, "long")
 
 
 @pytest.mark.parametrize(
@@ -496,6 +496,29 @@ def test_the_published_table_is_optional_typed_and_checked_against_the_document(
 def test_a_published_table_fails_closed(published: dict[str, Any], match: str) -> None:
     with pytest.raises(ConfigurationError, match=match):
         parse(published=published)
+
+
+def test_family_is_an_optional_catalogue_letter() -> None:
+    assert parse_edge(document(), "drift", WHERE).family == ""
+    assert parse_edge(document(family="C"), "drift", WHERE).family == "C"
+    with pytest.raises(ConfigurationError, match="family"):
+        parse_edge(document(family="Z"), "drift", WHERE)
+
+
+def test_a_published_leg_defaults_from_the_measure_and_fails_closed() -> None:
+    base = {"measure": "lift_pts", "value": 4, "horizon_sessions": 20, "source": 0}
+    for measure, leg in (
+        ("lift_pts", "long"),
+        ("mean_excess", "long"),
+        ("decile_spread", "long_short"),
+    ):
+        assert parse(published={**base, "measure": measure}).published.leg == leg  # type: ignore[union-attr]
+    assert parse(published={**base, "leg": "long_short"}).published.leg == "long_short"  # type: ignore[union-attr]
+    assert parse(published={**base, "leg": "long"}).published == Published(
+        "lift_pts", 4.0, 20, 0, None, "long"
+    )
+    with pytest.raises(ConfigurationError, match="leg"):
+        parse(published={**base, "leg": "flat"})
 
 
 def test_an_outcome_side_defaults_to_long_and_a_short_or_long_short_names_its_borrow() -> None:
@@ -534,3 +557,19 @@ def test_every_outcome_side_is_a_column_of_the_results_the_ledger_and_the_legs()
     for table in (EDGE_EVAL, EDGE_TRADES):
         assert "side" in [c.name for c in table.columns]
     assert "short_values" in [c.name for c in EDGE_LEGS.columns]
+
+
+def test_a_published_figure_of_a_short_edge_defaults_to_the_short_leg() -> None:
+    def leg(measure: str, side: str) -> str:
+        got = parse(
+            top_k=5,
+            outcome=_outcome(side=side),
+            sources=[{"title": "A paper"}],
+            published={"measure": measure, "value": 0.01, "horizon_sessions": 20, "source": 0},
+        )
+        assert got.published is not None
+        return got.published.leg
+
+    assert leg("mean_excess", "short") == "short"
+    assert leg("decile_spread", "short") == "long_short"  # a spread stays a spread
+    assert leg("mean_excess", "long") == "long"

@@ -37,13 +37,14 @@ class EdgePublished:
     """The figure the literature reports for the edge (``[published]``): ``measure``
     (``mean_excess``, ``decile_spread`` or ``lift_pts``) equal to ``value`` over
     ``horizon_sessions``, from ``source`` (title and link), over ``sample`` years (None: not
-    stated)."""
+    stated); ``leg``: what the figure is of (``long_short`` spread or ``long``)."""
 
     measure: str
     value: float
     horizon_sessions: int
     source: EdgeSource
     sample: int | None = None
+    leg: str = "long"
 
 
 @dataclass(frozen=True)
@@ -265,7 +266,7 @@ def _published(e: document.Edge) -> EdgePublished | None:
         return None
     src = e.sources[p.source]
     return EdgePublished(
-        p.measure, p.value, p.horizon_sessions, EdgeSource(src.title, src.url), p.sample
+        p.measure, p.value, p.horizon_sessions, EdgeSource(src.title, src.url), p.sample, p.leg
     )
 
 

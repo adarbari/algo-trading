@@ -154,7 +154,7 @@ RUN_INPUTS = (
 BOOKKEEPING = (
     "name", "thesis", "mechanism", "persistence", "sources", "quality_bar", "notes", "status",
     "rejection_reason", "evidence", "promoted", "compared", "basis_horizon", "extends", "follow",
-    "audit", "owner", "published",
+    "audit", "owner", "published", "family",
 )  # fmt: skip
 # The one fixed implied-vol field of a run is never a field mixing sources by name or by rule.
 MIXED_SOURCE_IV = ("feature.vrp_iv30",)
@@ -217,12 +217,14 @@ def _slice_rows(
     costs: CostGrid | None,
     adv_floor: float,
     wins: bool = False,
+    horizon: int = 1,
 ) -> tuple[tuple[SliceMeasure, ...], tuple[SliceMeasure, ...]]:
     """One variant's slice rows and, for a return outcome (``costs``), its cost rows (ADR 0064
     decision 5: none for an outcome that is not a return). ``wins``: the Sharpe ratio is of the
-    excess wins (``measures.trial_value``)."""
+    excess wins (``measures.trial_value``); ``horizon``: the holding period, for the overlap of
+    the windows the t-ratios count."""
     slices = edge_slices(stats, split, exploratory)
-    measures = slice_measures(stats, slices, model, frozen_from, adv_floor, wins)
+    measures = slice_measures(stats, slices, model, frozen_from, adv_floor, wins, horizon)
     costed = cost_measures(stats, slices, measures, costs) if costs is not None else []
     return tuple(measures), tuple(costed)
 
@@ -492,6 +494,7 @@ def evaluate_edge(
                 else None,  # a spread has no hit rate to cost
                 verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key
                 counts_wins(unit_of(scope.edge)),
+                horizon,
             )
             results.append(
                 VariantResult(

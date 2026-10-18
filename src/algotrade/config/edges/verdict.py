@@ -17,6 +17,7 @@ KEYS = (
     "not_working_t",
     "promising_t",
     "works_t",
+    "works_picks_t",
     "not_working_dsr",
     "promising_dsr",
     "works_dsr",
@@ -29,10 +30,13 @@ KEYS = (
     "live_low",
     "live_high",
     "edge_costs",
+    "published_haircut",
     "capacity_adv_floor_usd",
     "capacity_position_usd",
 )
 EDGE_COSTS_KEYS = ("levels_bps", "borrow_bps_annual")
+LEGS = ("long", "short", "long_short")  # ``[published] leg`` (ADR 0065; outcome sides)
+HAIRCUT_KEYS = LEGS  # ``[published_haircut]``: the share of a published figure lost, by leg
 COST_LEVELS = (0.0, 15.0, 30.0, 50.0)  # bp, the site grid (ADR 0064 decision 5; owner 2026-10-10)
 
 
@@ -50,6 +54,7 @@ class VerdictSettings:
     not_working_t: float = 1.0
     promising_t: float = 2.0
     works_t: float = 3.0
+    works_picks_t: float = 3.0  # Works needs this t on the picks series too (owner 2026-10-17)
     not_working_dsr: float = 0.5
     promising_dsr: float = 0.80
     works_dsr: float = 0.95
@@ -84,6 +89,20 @@ class VerdictSettings:
     # pick's 20-day dollar volume ("a $100,000 position is 0.07% of the median pick's volume");
     # read when served, never stored, so changing it needs no run.
     capacity_position_usd: float = 100_000.0
+    # ``[published_haircut]``: the share of a published figure to expect lost by the time it is
+    # traded, by the paper's leg (McLean and Pontiff: about a third after publication, a half for
+    # a long-short spread that also has costs and short limits). Display only: never a verdict
+    # input (ADR 0065 amendment 2026-10-17).
+    haircut_long_short: float = 0.5
+    haircut_long: float = 0.333
+    haircut_short: float = 0.5  # as the spread: a short leg is harder to hold (ADR 0065)
+
+    def published_haircut(self, leg: str) -> float:
+        """The share of a published figure on ``leg`` (``LEGS``) expected to be lost."""
+        return {
+            "long_short": self.haircut_long_short,
+            "short": self.haircut_short,
+        }.get(leg, self.haircut_long)
 
     @classmethod
     def from_document(
@@ -92,6 +111,7 @@ class VerdictSettings:
         d = cls()
         t = Table(doc, where)
         t.only(KEYS)
+        cut = t.table("published_haircut", HAIRCUT_KEYS)
         return cls(
             min_oos_trades=t.integer("min_oos_trades", d.min_oos_trades, 1),
             works_trades=t.integer("works_trades", d.works_trades, 1),
@@ -99,6 +119,7 @@ class VerdictSettings:
             not_working_t=t.number("not_working_t", d.not_working_t),
             promising_t=t.number("promising_t", d.promising_t),
             works_t=t.number("works_t", d.works_t),
+            works_picks_t=t.number("works_picks_t", d.works_picks_t),
             not_working_dsr=t.fraction("not_working_dsr", d.not_working_dsr),
             promising_dsr=t.fraction("promising_dsr", d.promising_dsr),
             works_dsr=t.fraction("works_dsr", d.works_dsr),
@@ -116,6 +137,9 @@ class VerdictSettings:
             ),
             capacity_adv_floor_usd=t.number("capacity_adv_floor_usd", d.capacity_adv_floor_usd, 1),
             capacity_position_usd=t.number("capacity_position_usd", d.capacity_position_usd, 1),
+            haircut_long_short=cut.fraction("long_short", d.haircut_long_short),
+            haircut_short=cut.fraction("short", d.haircut_short),
+            haircut_long=cut.fraction("long", d.haircut_long),
         )
 
 

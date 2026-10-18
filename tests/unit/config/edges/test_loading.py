@@ -1,5 +1,5 @@
 """``load_edges`` (ADR 0053 decision 1, ADR 0015 layering), and the fitness test over the
-shipped ``config/site/edges/*.toml``: every document validates, its presets and inline fields
+shipped ``config/site/edges/*/edge.toml``: every document validates, its presets and inline fields
 exist, and every edge not rejected or blocked answers all nine quality-bar questions."""
 
 import re
@@ -56,7 +56,7 @@ def test_presets_that_do_not_exist_fail_with_the_file(
 ) -> None:
     with pytest.raises(ConfigurationError, match=message) as caught:
         load_edges(store(site__drift=document(**changes)))
-    assert "config/site/edges/drift.toml" in str(caught.value)
+    assert "config/site/edges/drift/edge.toml" in str(caught.value)
 
 
 def test_a_copy_extends_a_site_edge_under_its_own_id_and_adds_new_edges() -> None:
@@ -276,7 +276,7 @@ def test_with_a_catalog_inline_universe_fields_must_exist() -> None:
     rule = {"field": "feature.no_such_field", "op": "eq", "value": 1}
     configs = store(site__drift=document(universe={"where": {"all": [rule]}}))
     assert load_edges(configs)[0].id == "drift"  # shape only without a catalogue
-    with pytest.raises(ConfigurationError, match=r"drift\.toml universe"):
+    with pytest.raises(ConfigurationError, match=r"drift/edge\.toml universe"):
         load_edges(configs, catalog=field_catalog(SHIPPED))
 
 

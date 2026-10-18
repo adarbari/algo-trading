@@ -34,7 +34,7 @@ TRIGGERS = ("nightly", "ui", "cli")  # what can start a run; stored in its stats
 MEASURE_COLUMNS = (
     "sessions", "picks", "hits", "hit_rate", "eligible", "base_hits", "base_rate", "lift",
     "mean_excess_picks", "bh_mean", "top_decile_mean", "decile_spread", "decile_t",
-    "decile_sessions", "effect_size", "sharpe", "deflated_sharpe", "trials", "pbo",
+    "decile_sessions", "effect_size", "sharpe", "picks_t", "deflated_sharpe", "trials", "pbo",
     "unscored", "excluded_score_coverage", "excluded_unclosed", "excluded_missing",
     "excluded_coverage", "delisted", "excluded_unmeasured", "unmeasured_base",
     "pre_snapshot_sessions", "pick_adv_median", "pick_adv_known", "pick_adv_low",
@@ -157,6 +157,7 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
         "lift": m.lift,
         "decile_spread": m.decile_spread,
         "sharpe": m.sharpe,
+        "picks_t": m.picks_t,
         "deflated_sharpe": m.deflated_sharpe,
         "ranked_share": sum(s.ranked for s in r.stats) / eligible if eligible else None,
         "outside_universe": sum(s.outside_universe for s in r.stats),
