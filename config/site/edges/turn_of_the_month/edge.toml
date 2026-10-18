@@ -17,6 +17,7 @@ top_k = "all"
 screeners = []
 base = "out_of_window"
 status = "candidate"
+mechanism_kind = "forced_flows"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09): the stored
 outcome history of the three funds is too short to measure a window edge before it (about 24

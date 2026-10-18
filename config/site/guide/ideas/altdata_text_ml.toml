@@ -1,0 +1,239 @@
+# Researched, not built: family F (altdata text ml) of the edge-idea catalogue, one [[idea]] each (ADR 0051; keys in config/site/guide/ideas.py).
+
+family = "F"
+
+[[idea]]
+id = "lazy_prices_10k_change"
+title = "Year-on-year change in filing text"
+mechanism_kind = "slow_to_update"
+verdict = "strong"
+feasibility = "needs_data"
+why_not_built = "Planned as the first filing-text edge, but filing text is not ingested yet."
+
+[[idea]]
+id = "risk_factor_section_change"
+title = "Newly added risk factors in annual filings"
+mechanism_kind = "slow_to_update"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "A refinement of the filing-text edge; it waits for filing text ingestion and section parsing."
+
+[[idea]]
+id = "tnic_text_peer_momentum"
+title = "Peers found by business description text"
+mechanism_kind = "slow_to_update"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but it needs annual-filing business text and a peer table built from it."
+
+[[idea]]
+id = "conglomerate_pseudo_lead_lag"
+title = "Complicated firms follow their pure-play peers"
+mechanism_kind = "slow_to_update"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but it needs business segment data, which is messy to extract from filings."
+
+[[idea]]
+id = "sec_comment_letters"
+title = "SEC review comment letters as a screen"
+mechanism_kind = "informed_footprints"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak as a return signal; as a quality filter it needs the regulator's correspondence filings ingested first."
+
+[[idea]]
+id = "shared_analyst_coverage_momentum"
+title = "Connected firms via shared analysts"
+mechanism_kind = "slow_to_update"
+verdict = "strong"
+feasibility = "out_of_scope"
+why_not_built = "Strong in the research, but it needs analyst identities from a paid source, so the implementable linked-firm ideas are planned instead."
+
+[[idea]]
+id = "technology_links_momentum"
+title = "Peers linked by patent classes"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and it needs patent data mapped to tickers; lower priority than the text-based peer idea."
+
+[[idea]]
+id = "geographic_lead_lag"
+title = "Lead-lag between firms in the same city"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak, small and largely subsumed by other links, so it is low priority."
+
+[[idea]]
+id = "llm_headline_score_drift"
+title = "Drift after language-model scored headlines"
+mechanism_kind = "slow_to_update"
+verdict = "decayed"
+feasibility = "needs_data"
+why_not_built = "The effect has faded as a daily strategy, and it needs a full time-stamped headline feed we do not have."
+
+[[idea]]
+id = "llm_news_embeddings_expected_returns"
+title = "Return forecasts from news text embeddings"
+mechanism_kind = "slow_to_update"
+verdict = "strong"
+feasibility = "out_of_scope"
+why_not_built = "Strong in the research, but it needs a licensed news corpus we do not have."
+
+[[idea]]
+id = "earnings_call_qa_evasiveness"
+title = "Evasive answers on earnings calls"
+mechanism_kind = "informed_footprints"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Earnings call transcripts have no licence-clean free feed, so the build plan leaves it out until a source appears."
+
+[[idea]]
+id = "earnings_call_vocal_cues"
+title = "Voice stress on earnings calls"
+mechanism_kind = "informed_footprints"
+verdict = "weak"
+feasibility = "out_of_scope"
+why_not_built = "Rests on one paper and needs call audio, which is outside our data and tools."
+
+[[idea]]
+id = "mdna_tone_change"
+title = "Tone change in management discussion text"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak on its own; the catalogue folds it into the filing-text feature group instead."
+
+[[idea]]
+id = "innovative_efficiency_patents"
+title = "Patents produced per research dollar"
+mechanism_kind = "mispriced_fundamentals"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but it needs patent data mapped to tickers; only the financials-based version could start now."
+
+[[idea]]
+id = "ml_cross_sectional_scorer"
+title = "Machine-learned ranking of stocks"
+mechanism_kind = "mispriced_fundamentals"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "It is tooling that proposes ranks for the harness to judge, and it needs more price history to train."
+
+[[idea]]
+id = "short_seller_report_drift"
+title = "Activist short-seller reports"
+mechanism_kind = "informed_footprints"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but there is no feed of reports, only a list that would be curated by hand."
+
+[[idea]]
+id = "wikipedia_pageviews_attention"
+title = "Wikipedia page-view spikes"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak and low priority; page views are not stored."
+
+[[idea]]
+id = "google_svi_attention"
+title = "Google search volume"
+mechanism_kind = "lottery_demand"
+verdict = "decayed"
+feasibility = "needs_data"
+why_not_built = "The effect has faded and it is not worth building."
+
+[[idea]]
+id = "reddit_stocktwits_sentiment"
+title = "Social media sentiment"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "out_of_scope"
+why_not_built = "Weak, and social feeds are not available to us at a sensible cost."
+
+[[idea]]
+id = "congress_trades_copycat"
+title = "Copying politicians' stock trades"
+mechanism_kind = "informed_footprints"
+verdict = "dead"
+feasibility = "needs_data"
+why_not_built = "Dead as a copy strategy, and the disclosures are not stored."
+
+[[idea]]
+id = "lobbying_intensity"
+title = "Lobbying spend relative to size"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, old and small, and lobbying filings are not stored."
+
+[[idea]]
+id = "government_contract_dependency"
+title = "Revenue share from government contracts"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, resting on one early paper, and contract data is not stored."
+
+[[idea]]
+id = "political_connections_pac"
+title = "Breadth of political donations"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and donation data is not stored."
+
+[[idea]]
+id = "employee_reviews_glassdoor"
+title = "Crowdsourced employer ratings"
+mechanism_kind = "informed_footprints"
+verdict = "promising"
+feasibility = "out_of_scope"
+why_not_built = "Promising in the research, but review data is not licensable to individuals."
+
+[[idea]]
+id = "job_postings_growth"
+title = "Online job postings"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "out_of_scope"
+why_not_built = "Weak, and no postings panel is available to us."
+
+[[idea]]
+id = "web_traffic_app_downloads"
+title = "Web traffic and app downloads"
+mechanism_kind = "informed_footprints"
+verdict = "promising"
+feasibility = "out_of_scope"
+why_not_built = "Promising in the research, but the data is unaffordable for an individual."
+
+[[idea]]
+id = "satellite_cardpanel_nowcasting"
+title = "Satellite images and card spending panels"
+mechanism_kind = "informed_footprints"
+verdict = "not_graded"
+feasibility = "out_of_scope"
+why_not_built = "The data is out of reach for an individual; the page keeps only a lesson about where earnings drift may remain."
+
+[[idea]]
+id = "quantpedia_sweep_misc"
+title = "Other families from the practitioner sweep"
+mechanism_kind = "slow_to_update"
+verdict = "not_graded"
+feasibility = "out_of_scope"
+why_not_built = "A catch-all entry rather than an idea: the sweep found no family not already covered elsewhere."
+
+[[idea]]
+id = "eight_k_item_event_drift"
+title = "Drift after coded 8-K items"
+mechanism_kind = "slow_to_update"
+filed_as = "eight_k_item_drift"
+
+[[idea]]
+id = "canslim_episodic_pivot_vcp"
+title = "Growth breakout setups after earnings"
+mechanism_kind = "slow_to_update"
+filed_as = "earnings_gap_volume_drift"

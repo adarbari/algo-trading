@@ -19,6 +19,7 @@ base = "universe"
 screeners = ["insider_cluster_buys"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "informed_footprints"
 frozen_from = 2026-04-01
 notes = """Filed as a cross-section screen, not an on_event edge: no insider_filing event class is
 declared in config/edges/document.py (EVENT_CLASSES), so the event is read as a feature at each

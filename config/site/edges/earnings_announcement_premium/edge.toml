@@ -14,6 +14,7 @@ base = "universe"
 screeners = ["eap_all", "eap_volume"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 notes = """Window: from five sessions before the scheduled report to one after (six sessions,
 start_offset_sessions -5; the PRD's proposal, ADR 0053 open decisions). The date must be

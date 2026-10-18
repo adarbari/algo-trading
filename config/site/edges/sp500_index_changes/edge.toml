@@ -11,6 +11,7 @@ schedule = "on_event:index_change"
 top_k = "all"
 screeners = []
 status = "rejected"
+mechanism_kind = "forced_flows"
 rejection_reason = """Under 1% since 2010 (Greenwood and Sammon, The Disappearing Index Effect),
 inside costs and the announcement-to-inclusion window; checked 2026-10-07."""
 

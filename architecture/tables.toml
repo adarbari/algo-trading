@@ -472,6 +472,10 @@ name = "rollups/instrument/factor_betas@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/etf_macro@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
 name = "rollups/instrument/illiquidity@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
