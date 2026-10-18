@@ -13,6 +13,7 @@ import pytest
 
 from algotrade.config.edges.document import ANNOUNCED_AHEAD, CLOSED, MODEL_STRUCTURES, Edge
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.portfolio import MIX, PORTFOLIO_KIND
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data.outcomes import OUTCOME_FIELDS
@@ -25,6 +26,9 @@ from algotrade.services.evaluation.cross_section.hit import (
     MEASURE_FIELDS,
     MODEL_PNL_FIELDS,
     PAIR_FIELDS,
+)
+from algotrade.services.evaluation.cross_section.portfolio.session import (
+    FIELDS as PORTFOLIO_FIELDS,
 )
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions
 from algotrade.storage.configs.files import FileConfigStore
@@ -62,13 +66,16 @@ def test_the_measure_and_the_path_condition_are_stored_outcome_fields(edge: Edge
             fields = EXPIRES_OTM_FIELDS
         elif o.kind == "pair_spread":
             fields = PAIR_FIELDS
+        elif o.kind == PORTFOLIO_KIND:
+            fields = PORTFOLIO_FIELDS
         else:
             fields = MEASURE_FIELDS[o.measure or "excess_return"]
         stored = [f for f in fields if f != IMPLIED_VOL_FIELD]
         assert set(stored) <= set(OUTCOME_FIELDS), f"{edge.id}: {fields} are not outcome fields"
     fields = (
         MEASURE_FIELDS[_measure(edge)]
-        if edge.outcome.kind not in ("expires_otm", "option_model_pnl", "pair_spread")
+        if edge.outcome.kind
+        not in ("expires_otm", "option_model_pnl", PORTFOLIO_KIND, "pair_spread")
         else ()
     )
     stored = [f for f in fields if f != IMPLIED_VOL_FIELD]
@@ -89,8 +96,8 @@ def test_every_model_structure_names_the_stored_fields_it_reads() -> None:
 def test_horizons_and_benchmark_are_written_by_the_outcomes_task(edge: Edge) -> None:
     horizons, benchmarks = horizons_and_benchmarks(STORE)
     assert set(edge.outcome.horizon_sessions) <= set(horizons), f"{edge.id}: {horizons}"
-    if edge.outcome.benchmark != "none":
-        assert edge.outcome.benchmark in benchmarks
+    if edge.outcome.benchmark != "none" and not edge.outcome.benchmark.startswith(MIX):
+        assert edge.outcome.benchmark in benchmarks  # a mix is computed from its constituents
 
 
 def test_the_implied_vol_a_ratio_measure_divides_by_is_in_the_catalogue() -> None:
@@ -123,6 +130,18 @@ def test_every_pair_field_is_a_text_catalogue_feature(edge: Edge) -> None:
         if o.kind == "pair_spread":
             assert o.pair_field is not None
             assert catalogue.check_field(o.pair_field, f"{edge.id} pair_field") == "str"
+
+
+@pytest.mark.parametrize("edge", EDGES, ids=_ids())
+def test_every_portfolio_vol_field_is_a_catalogue_feature(edge: Edge) -> None:
+    """A portfolio_return book sized by inverse volatility reads one declared feature at D."""
+    for o in (edge.outcome, *(v.outcome for v in edge.variants)):
+        if o.vol_field is not None:
+            field_catalog(STORE).check_field(o.vol_field, f"{edge.id} vol_field")
+
+
+def test_a_book_reads_only_stored_outcome_fields() -> None:
+    assert set(PORTFOLIO_FIELDS) <= set(OUTCOME_FIELDS)
 
 
 def _stored(field: str) -> bool:

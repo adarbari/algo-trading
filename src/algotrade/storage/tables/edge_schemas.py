@@ -175,6 +175,8 @@ EDGE_PAPER = fixed(
 # Leg v3 (ADR 0053 amendment 2026-10-18): a screener's second set of draws, matched to the picks'
 # sector mix, as ``strat_picks`` / ``strat_value_sums`` / ``strat_hit_sums`` beside ``rand_*``.
 # Leg v4 (ADR 0053 amendment 2026-10-18): the names of a buy/hold band as ``band_*`` lists.
+# Leg v5 (ADR 0074): a portfolio_return leg's book as ``weight_ids`` / ``weight_values`` and, for a
+# session with no value, ``portfolio_reason``; null in every other leg, which no key change moves.
 EDGE_LEGS = fixed(
     "results/edge_legs",
     "results",
@@ -183,7 +185,7 @@ EDGE_LEGS = fixed(
         "horizon_sessions",
     ),
     *strings("user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant"),
-    *strings("trial_hash", "regime", "lost_table"),
+    *strings("trial_hash", "regime", "lost_table", "portfolio_reason"),
     "horizon_sessions int64!",
     "entry_session date",
     "screen_snapshot date",
@@ -192,6 +194,8 @@ EDGE_LEGS = fixed(
     "band_values float64[]",  # leg v4: a buy/hold band's net values (null: no band, or no value)
     "band_ranks int64[]",
     "band_ids string[]",
+    "weight_values float64[]",  # leg v5: a portfolio_return book's weights (null for every other)
+    "weight_ids string[]",  # ... by instrument id, CASH for the T-bill share
     "short_values float64[]",  # a long-short leg's short names' values; null for every other side
     "deciles float64[]",
     "pick_reference float64[]",

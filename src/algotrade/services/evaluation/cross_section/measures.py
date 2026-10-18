@@ -123,6 +123,13 @@ class SessionStat:
     band: tuple[Pick, ...] = ()
     banded_values: tuple[float, ...] | None = None
     round_trips: float | None = None
+    # ``portfolio_return`` only (ADR 0074): the book's weights at D by instrument id (``CASH`` is
+    # the T-bill share), summing to one, stored with the leg (leg v5); ``pick_values`` is then the
+    # one session value. ``portfolio_reason``: why a session has no value (the session is then
+    # ``excluded_coverage``): a held name or a benchmark constituent with no return at S, no
+    # volatility or score to weight by, no bill yield for the cash.
+    weights: tuple[tuple[str, float], ...] = ()
+    portfolio_reason: str = ""
 
     @property
     def net_values(self) -> tuple[float, ...]:
@@ -386,7 +393,18 @@ def _measure(
     )
     if any(r.short_values is not None for r in rows):
         return _long_short(measure, means)
+    if any(r.weights for r in rows):
+        return _portfolio(measure)
     return measure
+
+
+def _portfolio(measure: SliceMeasure) -> SliceMeasure:
+    """``measure`` of a ``portfolio_return`` outcome (ADR 0074): the base is the blended benchmark
+    itself (a value of zero by construction), so there is no base rate, lift, effect size or
+    equal-weight floor (None, never 0); the hit rate is the share of sessions that beat it. The
+    decile figures are the screen's ranking over the eligible names, present only when enough were
+    ranked."""
+    return replace(measure, base_hits=0, base_rate=None, lift=None, bh_mean=None, effect_size=None)
 
 
 def _long_short(measure: SliceMeasure, spreads: Sequence[float]) -> SliceMeasure:

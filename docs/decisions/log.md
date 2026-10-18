@@ -675,6 +675,30 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: a long edge reads an avoid list's confirmation as a negative lift (Not working), the short side states the same claim so that it passes; a dense-score short leg over a universe fills up with unflagged names when few are flagged, so a non-event schedule cannot test a small flagged set; entering at the filing would trade the offer's own period, not the post-expiry dip the thesis is about; a blocked document keeps the thesis, the bar and the missing pieces on file without a placeholder passing as a test.
 
+## 2026-10-18 | EB H10 (portfolio outcomes) | What a book is judged on and how it is built
+- Question: how is an allocation edge (a weighted book against a blended benchmark) measured, and what do Promising and Works rest on when there is no base rate over names?
+- Options: a new outcome kind in the harness / a path in the backtest engine; a mix read from the grain / computed from the constituents' rows; slots a `top_k` leaves unfilled go to cash / are left out; win rate and lift against the benchmark's hit rate / no base rate; Works on the decile t as for a ranking / on the picks-series t.
+- Decision: a `portfolio_return` kind in the harness (ADR 0074); the mix computed from the constituents' own `fwd_return` at the same S through the resolver (a missing constituent leaves the session out with its reason); unfilled slots are NOT put to cash (only a `CASH` pick or an empty pick set is); no base rate, lift or random draws for a book; Promising needs the picks-series t of 2 and Works of 3, with the decile t beside it only when about 20 names are ranked; decoys compared on the mean excess return of their own books.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the harness already owns the frozen split, the trial log and the verdict, and the engine none; a base rate over ten ETFs is a coin flip and a decile of ten names is one name; putting unfilled slots to cash is a policy (a defensive default that changes what the screen means), so it waits for the owner; failing closed on a missing input keeps a book from being quietly re-weighted.
+
+## 2026-10-18 | EB H10 (portfolio outcomes) | Leg v5 without a LEG_VERSION bump
+- Question: does adding the book's weights to a leg need another full re-run of every stored leg?
+- Options: bump `LEG_VERSION` to 5 / add nullable columns and leave the version.
+- Decision: nullable columns (`weight_ids`, `weight_values`, `portfolio_reason`), no bump; the default weighting stays out of an outcome's identity.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: no existing leg's content or key changes (a bump recomputes every leg for nothing); a portfolio edge's legs are new keys anyway. H6 and H7's bumps already force the one full re-run.
+
+## 2026-10-18 | EB H10 (portfolio outcomes) | Unfilled slots are cash; Works for a book without deciles
+- Question: when fewer names qualify than `top_k`, is the book re-normalised over them or is the rest cash? What does Works rest on for a book with no deciles?
+- Options: re-normalise / unfilled slots in cash; picks-series t alone / both t series always.
+- Decision: each unfilled slot is `1 / top_k` in cash (re-normalising puts the whole book in one name); a day before the first stored Treasury curve has no yield (no look-ahead); Works for a book rests on the picks-series t of 3 when there are no deciles, with deciles both t series.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: architect review of PR 666; the cash rule is set before any edge stores legs, so no leg is invalidated.
+
 ## 2026-10-18 | EB H9 (pair spread) | Result side, costs, base and eligibility of a pair
 - Question: how is a pair spread judged, what does it charge, what is its base and which pairs count?
 - Options: verdict-eligible as a long outcome / diagnostic only like `long_short`; one round trip / two; the base as one value per pair / per name against its sibling; a sibling outside the universe counts / is excluded.

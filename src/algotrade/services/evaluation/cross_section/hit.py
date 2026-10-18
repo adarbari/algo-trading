@@ -45,6 +45,8 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   UNMEASURED is excluded with that reason, never a zero. A hit is ``value > 0``. The base is
   the same value of every eligible name (each class against its sibling), so it is the spread
   of a random side of the pair.
+- ``portfolio_return`` (ADR 0074) is not valued here: a book is one value per session, from its
+  weights and a blended benchmark (``cross_section/portfolio``); ``apply_outcome`` refuses it.
 - ``max_drawdown`` set: a hit also needs ``fwd_max_drawdown <= max_drawdown``.
 
 A row whose value cannot be computed is *excluded with a reason*, never a miss and never a
@@ -335,6 +337,24 @@ def _unmeasured(edge: Edge, outcomes: pd.DataFrame) -> np.ndarray:
     return mask
 
 
+def _otm_outcome(
+    edge: Edge,
+    outcomes: pd.DataFrame,
+    implied: Mapping[str, float | None] | None,
+    excluded: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """``(cushion, hit, reference, touch)`` of an ``expires_otm`` outcome; ``excluded`` gets the
+    reason of each row with no value."""
+    if implied is None:
+        raise ConfigurationError(f"{edge.id}: expires_otm needs the implied vol")
+    value, hit, reference, touched, _ = _expires_otm(edge, outcomes, implied)
+    excluded[~np.isfinite(_numbers(outcomes, "fwd_return"))] = MISSING_VALUE
+    reasons = _implied_reasons(_implied_array(outcomes, implied))
+    excluded[(excluded == "") & (reasons != "")] = reasons[(excluded == "") & (reasons != "")]
+    excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE  # no horizon: no strike
+    return value, hit, reference, touched.astype(np.float64)
+
+
 def apply_outcome(
     edge: Edge,
     outcomes: pd.DataFrame,
@@ -346,20 +366,18 @@ def apply_outcome(
     and whether the name was delisted. ``implied``: the IV at S by instrument id (needed when
     ``needs_implied_vol``); ``pairs``: the siblings (needed when ``needs_pairs``)."""
     o = edge.outcome
+    if o.kind == "portfolio_return":
+        raise ConfigurationError(
+            f"{edge.id}: a portfolio_return is valued as a book (cross_section/portfolio), "
+            f"never name by name"
+        )
     n = len(outcomes)
     excluded = np.full(n, "", dtype=object)
     reference = np.full(n, np.nan)
     touch = np.full(n, np.nan)
     otm_hit: np.ndarray | None = None
     if o.kind == "expires_otm":
-        if implied is None:
-            raise ConfigurationError(f"{edge.id}: expires_otm needs the implied vol")
-        value, otm_hit, reference, touched, _ = _expires_otm(edge, outcomes, implied)
-        touch = touched.astype(np.float64)
-        excluded[~np.isfinite(_numbers(outcomes, "fwd_return"))] = MISSING_VALUE
-        reasons = _implied_reasons(_implied_array(outcomes, implied))
-        excluded[(excluded == "") & (reasons != "")] = reasons[(excluded == "") & (reasons != "")]
-        excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE  # no horizon: no strike
+        value, otm_hit, reference, touch = _otm_outcome(edge, outcomes, implied, excluded)
     elif o.kind == "option_model_pnl":
         value = _model_outcome(edge, outcomes, implied, excluded)
     elif o.kind == "pair_spread":
