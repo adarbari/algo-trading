@@ -105,7 +105,7 @@ describe('PickDetail', () => {
     const gate = screen.getByRole('button', { name: /Any of/ });
     expect(gate).toHaveTextContent('IV30 or IV/HV');
     expect(gate).toHaveTextContent('Near miss');
-    expect(gate).toHaveTextContent('via IV/HV');
+    expect(gate).toHaveTextContent('Decided by IV/HV');
     expect(screen.getByRole('button', { name: 'Help: group_any' })).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });

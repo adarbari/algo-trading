@@ -86,17 +86,11 @@ export function CriteriaRows({ nodes }: { nodes: readonly Node[] }) {
         <ConditionGroup
           kind={group.kind}
           kindLabel={KIND_LABEL[group.kind]}
-          title={group.id}
+          title={expression(group)}
           connectorLabel={CONNECTOR_LABEL[group.kind]}
           joinedByLabel="joined by"
-          // The read-only row is one button and shows no header actions: the Guide help is
-          // drawn beside it, below.
-          actions={termHelp(KIND_TERM[group.kind])}
-          expression={
-            <>
-              {expression(group)} {label}
-            </>
-          }
+          info={termHelp(KIND_TERM[group.kind])}
+          expression={label ?? undefined}
           readOnly
         >
           {node.members.map((member) =>
@@ -114,9 +108,8 @@ export function CriteriaRows({ nodes }: { nodes: readonly Node[] }) {
             ),
           )}
         </ConditionGroup>
-        <Stack direction="row" gap={2} align="center">
-          {termHelp(KIND_TERM[group.kind])}
-          {!nested && node.owned && (
+        {!nested && node.owned && (
+          <Stack direction="row" gap={2}>
             <Button
               variant="ghost"
               size="sm"
@@ -126,8 +119,8 @@ export function CriteriaRows({ nodes }: { nodes: readonly Node[] }) {
             >
               Ungroup
             </Button>
-          )}
-        </Stack>
+          </Stack>
+        )}
       </Stack>
     );
   };

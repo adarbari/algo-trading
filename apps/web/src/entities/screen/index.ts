@@ -40,6 +40,7 @@ export {
 } from './model/preview';
 export {
   CONNECTOR_LABEL,
+  DECIDED_BY_LABEL,
   eitherWithPrevious,
   excludeCriterion,
   excludeGroup,

@@ -28,6 +28,9 @@ export const KIND_TERM: Record<GroupKind, string> = {
   none: 'group_none',
 };
 
+/** The word before the member that decided a group's outcome in a pick's scorecard. */
+export const DECIDED_BY_LABEL = 'Decided by';
+
 /** The fewest members a group of that kind needs (the server's size rule). */
 const MIN_MEMBERS: Record<GroupKind, number> = { all: 2, any: 2, none: 1 };
 

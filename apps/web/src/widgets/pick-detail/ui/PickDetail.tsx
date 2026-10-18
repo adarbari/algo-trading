@@ -6,7 +6,6 @@
  */
 import {
   ActionGroup,
-  Box,
   ConditionGroup,
   KeyHints,
   type KeyHint,
@@ -20,6 +19,7 @@ import type { CriterionInfo, TableRow } from '@/entities/feature';
 import {
   CONNECTOR_LABEL,
   CriteriaScorecard,
+  DECIDED_BY_LABEL,
   DecisionBadge,
   decisionLabel,
   KIND_LABEL,
@@ -111,34 +111,28 @@ export function PickDetail({
           renderGroup={({ group, names, decidedBy, members }) => {
             const kind = group.kind as GroupKind;
             return (
-              <Stack direction="row" gap={2} align="start" key={group.id}>
-                <Box grow>
-                  <ConditionGroup
-                    kind={kind}
-                    kindLabel={KIND_LABEL[kind]}
-                    title={names.join(` ${CONNECTOR_LABEL[kind]} `)}
-                    connectorLabel={CONNECTOR_LABEL[kind]}
-                    joinedByLabel="joined by"
-                    // The read-only row is one button and shows no header actions: its Guide
-                    // help is drawn beside it.
-                    actions={termHelp(KIND_TERM[kind])}
-                    expression={
-                      <>
-                        {group.outcome ? (
-                          <StatusBadge tone={outcomeTone(group.outcome)}>
-                            {outcomeLabel(group.outcome)}
-                          </StatusBadge>
-                        ) : null}
-                        {decidedBy ? ` via ${decidedBy}` : ''}
-                      </>
-                    }
-                    readOnly
-                  >
-                    {members}
-                  </ConditionGroup>
-                </Box>
-                {termHelp(KIND_TERM[kind])}
-              </Stack>
+              <ConditionGroup
+                key={group.id}
+                kind={kind}
+                kindLabel={KIND_LABEL[kind]}
+                title={names.join(` ${CONNECTOR_LABEL[kind]} `)}
+                connectorLabel={CONNECTOR_LABEL[kind]}
+                joinedByLabel="joined by"
+                info={termHelp(KIND_TERM[kind])}
+                expression={
+                  <>
+                    {group.outcome ? (
+                      <StatusBadge tone={outcomeTone(group.outcome)}>
+                        {outcomeLabel(group.outcome)}
+                      </StatusBadge>
+                    ) : null}
+                    {decidedBy ? ` ${DECIDED_BY_LABEL} ${decidedBy}` : ''}
+                  </>
+                }
+                readOnly
+              >
+                {members}
+              </ConditionGroup>
             );
           }}
         />

@@ -91,7 +91,7 @@ describe('CriteriaScorecard', () => {
         entries={entries}
         groups={groups}
         renderGroup={({ group, names, decidedBy, members }) => (
-          <Stack aria-label={`${group.kind}: ${names.join(' / ')}`} role="region">
+          <Stack aria-label={`${group.kind}: ${names.join(' / ')}`} as="section">
             <Text>{`${group.outcome ?? ''} via ${decidedBy ?? ''}`}</Text>
             {members}
           </Stack>
