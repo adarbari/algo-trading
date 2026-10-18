@@ -82,17 +82,19 @@ for depth. The original recommendation (a TRADER section after Explore) was supe
    session value) and `Query.guideEpisode(slug)` (the episode's key; as the file holds it, with
    the cards whose `before` label means it) from `services/read/guide/regime.py`
    over the same config loaders as the Regime page (GD5a).
-3. **Playbooks**, one per site preset screen, grouped by family and ordered within it: Trend
+3. **Edges**: why an edge should work, from the nine mechanisms down to each site edge (the
+   section "Edges" below).
+4. **Playbooks**, one per site preset screen, grouped by family and ordered within it: Trend
    (Trend continuation, Pullback), Breakouts in lifecycle order (Range breakout, Breakout,
    Failed breakout), Reversals (Support reversal, Oversold reversal, Exhaustion), Option
    income (VRP).
-4. **Fields**, the themes grouped in the order a screen uses them: who is tradeable
+5. **Fields**, the themes grouped in the order a screen uses them: who is tradeable
    (instrument gates), the chart (momentum and trend, price levels, volume and liquidity,
    volatility), options (implied volatility, option chain and short strikes, put wing, walls
    and expiries), the company and its calendar (events, fundamentals, statements);
    plus by intent and A-Z.
-5. **Situations**: the `[[situation]]` entries, each with the fields it fools.
-6. **Glossary**: the app's own words (session, knowledge time, UNKNOWN vs NOT_RUN, run,
+6. **Situations**: the `[[situation]]` entries, each with the fields it fools.
+7. **Glossary**: the app's own words (session, knowledge time, UNKNOWN vs NOT_RUN, run,
    selection, draft) and the rule grammar (`op`, `mode` hard / soft / score, `tolerance`,
    `on_miss`; from docs/screeners/rules.md). Last: it is a lookup.
 
@@ -131,6 +133,47 @@ preset and none more, `asks` names exactly the latest version's criteria, every 
 exists, every catalogue name in the prose exists. The presets mark the base gates only with a
 TOML comment, so the read (`Query.guidePlaybook`, GD4a) lists the criteria in file order (base
 gates first in every site preset); prose comes split at catalogue names (`GuideProse`).
+
+### Edges
+
+The Edges section answers one question at three levels: why should anything like this work
+(the mechanism), what do we test (an edge), and how is it built (its playbooks and fields). It
+is session-free like every Guide page: it shows no win rate, lift, curve, verdict or run, only
+what the documents say (the Edges page and the evidence pages hold the live figures).
+
+- **Index** `/guide/edges` (`Query.guideEdgeIndex`): the nine mechanisms as cards in the fixed
+  order of `MECHANISM_KINDS` (question, one-line hero, an "e.g." line, how many edges rest on
+  it and their statuses), the filters with counts (asset class: stocks, ETFs and funds,
+  options; side; holding band; computed by the server from the documents, `asset_of` in
+  `services/read/guide/edges/universe.py`) and two groups after the mechanisms: **Set aside**
+  (the edges with status `rejected` or `blocked`, each with the reason on file) and **Researched,
+  not built** (the ideas of `docs/edge-ideas` that no edge document files).
+- **Mechanism** `/guide/edges/m/<mechanism>` (`Query.guideMechanism(id)`): the prose of
+  `config/site/guide/mechanisms/<id>.toml` (how it works, why it survives, the research, real
+  against decoy, the one thing not to read into it, stat tiles, sources) and the site edges that
+  rest on it as rows (name, thesis, asset, holding, side, status), then the ideas not built.
+- **Edge** `/guide/edges/<id>` (`Query.guideEdge(id)`): the thesis; who is on the other side
+  (the document's `mechanism`) and why it lasts (`persistence`); **what the research found**
+  (the `[published]` figure with the planning haircut of `verdict.toml [published_haircut]` for
+  its leg, labelled as a planning figure, only where the document has one); **how we test it**
+  (outcome, horizon, trigger, entry, universe, picks, cost, baselines, frozen period as
+  structured facts, each with the glossary term for its help button); **how it is built** (the
+  site playbooks among its screeners and the catalogue fields they read, each linked);
+  **what fools it** (the quality bar's failure modes and decoys; for a rejected or blocked edge,
+  why); **can you trade it** (capacity and costs); the sources; related edges.
+- **Sources**: the site edge documents only, through `config.edges.loading.load_edges` as the
+  `site` user, so a user's copy or draft never appears; the mechanism files; the glossary. The
+  server never reads the document's `notes`, `expected_size` answer, `[evidence]` or any run.
+- **Playbook backlinks**: a playbook page lists the edges whose screeners include it
+  (`GuidePlaybookDetail.edges`), one derivation for both directions (`site_edges.py`).
+- **Two drawer kinds**: `mechanism` and `edge` join the entry kinds (`ENTRY_KINDS`,
+  `GuideEntryKind.MECHANISM` and `EDGE`, the batched `Query.guideEntries`) so a help button
+  anywhere opens a mechanism or an edge in the drawer beside the terms; search indexes both
+  (id and title, then thesis or question and prose) like every other kind.
+- Coverage: an edge's status values map to the `edge_status` term in
+  `architecture/guide_coverage.toml` (`GuideEdgeRow.status`, `GuideStatusCount.status`); its
+  side to the `side_*` terms; the trigger and outcome facts to the event, calendar and outcome
+  terms that already exist.
 
 ### The help drawer
 

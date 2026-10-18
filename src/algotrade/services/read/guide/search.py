@@ -11,6 +11,10 @@ What is searched, per kind (``guide_entries``, the one list of the Guide's entri
 - a situation: its slug and name; its signs and what to do;
 - a regime indicator: its key and field, its plain and technical names; the card's prose;
 - an episode: its key and name; its cause and notes;
+- a mechanism: its id and title; its question, hero line, examples and prose (how it works, why
+  it survives, the research, real against decoy, the one thing not to read into it);
+- an edge (a site edge only, never a user's): its id and name; its thesis, who is on the other
+  side, why it lasts, what fools it and what it costs to trade;
 - a glossary term: its id and term; its short line and body;
 - a Start here page: its id and title; its summary and sections.
 
@@ -32,13 +36,14 @@ import re
 from dataclasses import dataclass
 
 from algotrade.config.site.guide.glossary import load_guide_glossary
+from algotrade.config.site.guide.mechanisms import load_guide_mechanisms
 from algotrade.config.site.guide.playbooks import load_guide_playbooks
 from algotrade.config.site.guide.start import ENTRY_KINDS, load_guide_start
 from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.config.site.settings import load_field_guide
 from algotrade.services.read.context import Stores
-from algotrade.services.read.guide.playbooks import site_playbooks
+from algotrade.services.read.guide.edges.site_edges import playbooks_of, site_edges
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 
 SNIPPET = 160  # characters of a snippet, at most (an ellipsis marks a cut)
@@ -196,8 +201,27 @@ def guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
                        e.cause)
         for e in load_episodes(ctx.configs).episodes
     )  # fmt: skip
+    mechanisms = tuple(
+        GuideEntryText(
+            "mechanism", m.id, m.title, (m.id,), (m.title,), (),
+            (m.question, m.short, m.examples, *m.how_it_works, *m.why_it_survives, *m.research,
+             *m.real_vs_decoy, m.dont),
+            m.short,
+        )
+        for m in load_guide_mechanisms(ctx.configs).mechanisms
+    )  # fmt: skip
+    edges = tuple(
+        GuideEntryText(
+            "edge", e.edge.id, e.edge.name, (e.edge.id,), (e.edge.name,), (),
+            (e.edge.thesis, e.edge.mechanism, e.edge.persistence,
+             e.edge.quality_bar.get("failure_modes", ""), e.edge.quality_bar.get("decoys", ""),
+             e.edge.quality_bar.get("capacity_costs", "")),
+            e.edge.thesis,
+        )
+        for e in site_edges(ctx)
+    )  # fmt: skip
     playbooks = []
-    for p in site_playbooks(ctx):
+    for p in playbooks_of(ctx):
         written = prose.get(p.id)
         texts = (
             (written.summary, written.hit, written.not_checked, *written.before_acting,
@@ -219,7 +243,10 @@ def guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
         GuideEntryText("term", t.id, t.term, (t.id,), (t.term,), (), (t.short, t.reading), t.short)
         for t in load_guide_glossary(ctx.configs).terms
     )
-    return (*pages, *indicators, *episodes, *playbooks, *fields, *situations, *terms)
+    return (
+        *pages, *indicators, *episodes, *mechanisms, *edges, *playbooks, *fields, *situations,
+        *terms,
+    )  # fmt: skip
 
 
 def _field(info: FeatureInfo) -> GuideEntryText:

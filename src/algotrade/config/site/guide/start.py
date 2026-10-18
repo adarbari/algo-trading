@@ -25,7 +25,10 @@ from algotrade.core.model.errors import ConfigurationError
 FOLDER = "guide"  # the config store's kind: site/guide/start.toml
 NAME = "start"
 ID = re.compile(r"^[a-z0-9_]+$")  # a written entry's id: snake_case, as every Guide id
-ENTRY_KINDS = ("start", "indicator", "episode", "playbook", "field", "situation", "term")
+ENTRY_KINDS = (
+    "start", "indicator", "episode", "mechanism", "edge", "playbook", "field", "situation",
+    "term",
+)  # fmt: skip
 PAGE_KEYS = ("id", "order", "title", "summary", "section", "links")
 SECTION_KEYS = ("title", "body")
 LINK_KEYS = ("kind", "id")

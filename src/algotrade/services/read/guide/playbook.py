@@ -16,7 +16,9 @@ site playbook's page, what the server derives for it (ADR 0038: never the browse
 - ``related``: the prose's related playbooks with their names (an id that is no site
   playbook is left out);
 - ``situations``: the field guide's situations that fool any field the screen decides on
-  (criteria, flags, the tie-break), each with those fields (``situation.fooled``)."""
+  (criteria, flags, the tie-break), each with those fields (``situation.fooled``);
+- ``edges``: the site edges whose screeners include this playbook (``edges/site_edges.py``:
+  the one derivation of the link both ways), as rows in Guide order."""
 
 from dataclasses import dataclass
 
@@ -26,6 +28,8 @@ from algotrade.config.site.settings import load_field_guide
 from algotrade.core.model.screen_spec import Criterion, Mode
 from algotrade.services.configs import catalog_of
 from algotrade.services.read.context import Stores
+from algotrade.services.read.guide.edges.edge import GuideEdgeRow, edge_row
+from algotrade.services.read.guide.edges.site_edges import edges_of_playbook
 from algotrade.services.read.guide.playbooks import rule_text, site_playbooks
 from algotrade.services.read.guide.prose import LinkedProse, link_prose
 from algotrade.services.read.guide.situation import fooled
@@ -82,6 +86,7 @@ class GuidePlaybookDetail:
     tie_break_descending: bool
     related: tuple[GuideRelatedPlaybook, ...]
     situations: tuple[GuidePlaybookSituation, ...]
+    edges: tuple[GuideEdgeRow, ...] = ()
 
 
 def load_guide_playbook(ctx: Stores, playbook_id: str) -> GuidePlaybookDetail | None:
@@ -115,6 +120,7 @@ def load_guide_playbook(ctx: Stores, playbook_id: str) -> GuidePlaybookDetail | 
             if r.id in names
         ),
         situations=tuple(s for s in situations if s.fields),
+        edges=tuple(edge_row(e) for e in edges_of_playbook(ctx, playbook_id)),
     )
 
 

@@ -1260,6 +1260,107 @@ type GuideCriterionRow {
 }
 
 """
+A site edge's Guide page (ADR 0051), from its document alone: `summary` (the row), the mechanism page, the thesis, who is on `otherSide`, why it `lasts`, the `research` figure with its planning haircut (null: the document has none), how it is tested (`tests`), how it is built (the site `playbooks` among its screeners and the catalogue `fields` their criteria read), what fools it (`failureModes`, `decoys`, `rejection`: why a rejected or blocked edge is), what it costs to trade (`capacity`), `sources`, `related` edges and the mechanism's glossary terms (`seeAlso`). Null text: not written
+"""
+type GuideEdgeEntry {
+  summary: GuideEdgeRow!
+  mechanism: GuideMechanismRef
+  thesis: GuideProse!
+  otherSide: GuideProse!
+  lasts: GuideProse!
+  research: GuideEdgeResearch
+  tests: [GuideEdgeFact!]!
+  playbooks: [GuideEdgePlaybook!]!
+  fields: [String!]!
+  failureModes: GuideProse
+  decoys: GuideProse
+  rejection: GuideProse
+  capacity: GuideProse
+  sources: [GuideEdgeSource!]!
+  related: [GuideEdgeRow!]!
+  seeAlso: [String!]!
+}
+
+"""
+One line of how an edge is tested: `key` (outcome, horizon, trigger, entry, universe, picks, cost, baselines or frozen), its `title`, the `text` and the glossary `term` that explains it (null: none)
+"""
+type GuideEdgeFact {
+  key: String!
+  title: String!
+  text: String!
+  term: String
+}
+
+"""
+The filters of the edge list with their counts: asset class, side and holding band, each over every site edge
+"""
+type GuideEdgeFilters {
+  assets: [GuideFilterOption!]!
+  sides: [GuideFilterOption!]!
+  holdings: [GuideFilterOption!]!
+}
+
+"""
+The Edges section's top page (ADR 0051): the mechanism cards in order, the filters with counts and the edges set aside with their reasons; no live number
+"""
+type GuideEdgeIndex {
+  mechanisms: [GuideMechanismCard!]!
+  filters: GuideEdgeFilters!
+  setAsideTitle: String!
+  setAsidePurpose: String!
+  setAside: [GuideSetAsideEdge!]!
+}
+
+"""A site playbook among an edge's screeners: id, name and family"""
+type GuideEdgePlaybook {
+  id: String!
+  name: String!
+  family: String
+}
+
+"""
+What the paper behind an edge reports: `measure` in words, the published `figure`, what to `expect` once the `haircut` is taken off (a planning haircut by the paper's `leg`), the horizon, the sample in years (null: not stated) and the `source`; display only, never a verdict. `terms`: glossary terms for its help buttons
+"""
+type GuideEdgeResearch {
+  measure: String!
+  figure: String!
+  expect: String!
+  haircut: String!
+  horizonText: String!
+  leg: String!
+  sample: String
+  source: String!
+  terms: [String!]!
+}
+
+"""
+An edge in a list: `asset` (stocks, etfs or options) with `assetText`, `side` (long, short or long_short) with its glossary term, `holdingSessions` with `holdingText` and `holdingBand` (short, medium or long), `status` and `mechanism` (the mechanism page's id; null: not set)
+"""
+type GuideEdgeRow {
+  id: String!
+  name: String!
+  thesis: String!
+  mechanism: String
+  asset: String!
+  assetText: String!
+  side: String!
+  sideTerm: String!
+  holdingSessions: [Int!]!
+  holdingText: String!
+  holdingBand: String!
+  status: String!
+}
+
+"""
+A source of the edge document: `title`, `url` (null: none) and its `form` (Paper, Working paper, Filing or Source)
+"""
+type GuideEdgeSource {
+  title: String!
+  url: String
+  form: String!
+}
+
+"""
 The entries found for the refs asked, each list in the order of the refs; a ref with no entry is left out (the caller matches by key)
 """
 type GuideEntries {
@@ -1267,6 +1368,8 @@ type GuideEntries {
   episodes: [GuideEpisodeDetail!]!
   terms: [GuideTerm!]!
   startPages: [GuideStartPage!]!
+  mechanisms: [GuideMechanism!]!
+  edges: [GuideEdgeEntry!]!
 }
 
 """The kinds of Guide entry `guideEntries` reads"""
@@ -1275,6 +1378,8 @@ enum GuideEntryKind {
   EPISODE
   TERM
   START
+  MECHANISM
+  EDGE
 }
 
 """
@@ -1324,8 +1429,15 @@ type GuideField {
   caveatsLinked: [GuideProse!]!
 }
 
+"""A filter value: the `id` an edge row carries, its `text`, its count"""
+type GuideFilterOption {
+  id: String!
+  text: String!
+  count: Int!
+}
+
 """
-What the Guide holds (ADR 0051): the sections in order with entry counts, the field theme groups, the intents (most fields first), the situations, the playbooks by family, the regime indicators, the reference episodes, the Start here pages in order and the glossary terms
+What the Guide holds (ADR 0051): the sections in order with entry counts, the field theme groups, the intents (most fields first), the situations, the playbooks by family, the regime indicators, the reference episodes, the mechanisms of the Edges section with their edge counts, the Start here pages in order and the glossary terms
 """
 type GuideIndex {
   sections: [GuideSection!]!
@@ -1337,6 +1449,7 @@ type GuideIndex {
   episodes: [GuideEpisode!]!
   startPages: [GuideStartEntry!]!
   terms: [GuideTermEntry!]!
+  mechanisms: [GuideMechanismEntry!]!
 }
 
 """
@@ -1393,6 +1506,74 @@ type GuideLink {
   title: String!
 }
 
+"""
+A mechanism's Guide page: the card's `question`, `short` and `examples`, the paragraphs of how it works, why it survives, the research and real against decoy (each linked), the one thing not to read into it (`dont`), glossary terms (`seeAlso`), the stat tiles, the sources and the `edges` that rest on it (every status, Guide order)
+"""
+type GuideMechanism {
+  id: String!
+  title: String!
+  question: String!
+  examples: String!
+  short: String!
+  howItWorks: [GuideProse!]!
+  whyItSurvives: [GuideProse!]!
+  research: [GuideProse!]!
+  realVsDecoy: [GuideProse!]!
+  dont: GuideProse!
+  seeAlso: [String!]!
+  stats: [GuideMechanismStat!]!
+  sources: [GuideMechanismSource!]!
+  edges: [GuideEdgeRow!]!
+}
+
+"""
+A mechanism's card: its question, one-line hero, examples, how many edges rest on it, the count by status and the edges as rows
+"""
+type GuideMechanismCard {
+  id: String!
+  title: String!
+  question: String!
+  short: String!
+  examples: String!
+  count: Int!
+  statuses: [GuideStatusCount!]!
+  edges: [GuideEdgeRow!]!
+}
+
+"""
+A mechanism in the Guide index: its id (`Query.guideMechanism(id)`), title and how many edges rest on it
+"""
+type GuideMechanismEntry {
+  id: String!
+  title: String!
+  count: Int!
+}
+
+"""A mechanism page by its id and title"""
+type GuideMechanismRef {
+  id: String!
+  title: String!
+}
+
+"""
+A source of a mechanism page: the citation `title`, its https `url` and `reading`, what it shows
+"""
+type GuideMechanismSource {
+  title: String!
+  url: String!
+  reading: String!
+}
+
+"""
+A tile of a mechanism page: `title`, `value` as shown, `reading` and `source`, a 1-based index into the page's sources (null: our own bar, from the verdict settings)
+"""
+type GuideMechanismStat {
+  title: String!
+  value: String!
+  reading: String!
+  source: Int
+}
+
 """A playbook: a site rule-screen preset's id and name"""
 type GuidePlaybook {
   id: String!
@@ -1400,7 +1581,7 @@ type GuidePlaybook {
 }
 
 """
-A site playbook's Guide page: the preset's latest `version`, its family, the prose (null: none written), the criteria in file order (the base gates are not marked apart), the tie-break, related playbooks and the situations that fool its fields
+A site playbook's Guide page: the preset's latest `version`, its family, the prose (null: none written), the criteria in file order (the base gates are not marked apart), the tie-break, related playbooks, the situations that fool its fields and the site edges it implements (`edges`, as rows)
 """
 type GuidePlaybookDetail {
   id: String!
@@ -1414,6 +1595,7 @@ type GuidePlaybookDetail {
   tieBreakDescending: Boolean!
   related: [GuideRelatedPlaybook!]!
   situations: [GuidePlaybookSituation!]!
+  edges: [GuideEdgeRow!]!
 }
 
 """
@@ -1466,7 +1648,7 @@ type GuideProseSegment {
 }
 
 """
-One entry a page asks for: its `kind` and its `id` (an indicator's key, an episode's slug, a term's or Start here page's id)
+One entry a page asks for: its `kind` and its `id` (an indicator's key, an episode's slug, a mechanism's or site edge's id, a term's or Start here page's id)
 """
 input GuideRef {
   kind: GuideEntryKind!
@@ -1512,6 +1694,12 @@ type GuideSection {
   title: String!
   purpose: String!
   entries: Int!
+}
+
+"""An edge set aside (rejected or blocked): its row and the reason"""
+type GuideSetAsideEdge {
+  edge: GuideEdgeRow!
+  why: GuideProse!
 }
 
 """
@@ -1578,6 +1766,12 @@ type GuideStartPage {
 type GuideStartSection {
   title: String!
   body: GuideProse!
+}
+
+"""How many of a mechanism's edges have `status` (none with zero)"""
+type GuideStatusCount {
+  status: String!
+  count: Int!
 }
 
 """
@@ -2376,6 +2570,21 @@ type Query {
   guideEpisode(slug: String!): GuideEpisodeDetail
 
   """
+  The Edges section's top page (ADR 0051): the mechanism cards in order with their edges as rows, the filters with counts and the edges set aside with their reasons; site edges only, no live number
+  """
+  guideEdgeIndex: GuideEdgeIndex
+
+  """
+  The Guide page of the mechanism `id` (ADR 0051): why an edge should work, the research, real against decoy, the sources and the site edges that rest on it; null: no such mechanism
+  """
+  guideMechanism(id: String!): GuideMechanism
+
+  """
+  The Guide page of the site edge `id` (ADR 0051), from its document alone: thesis, the other side of the trade, why it lasts, the published figure with a planning haircut, how it is tested and built, what fools it, sources and related edges; a user's own edge is never served; null: no such site edge
+  """
+  guideEdge(id: String!): GuideEdgeEntry
+
+  """
   The glossary term `id` (ADR 0051): its entry, the body linked and the terms it refers to; null: no such term
   """
   guideTerm(id: String!): GuideTerm
@@ -2386,7 +2595,7 @@ type Query {
   guideStartPage(id: String!): GuideStartPage
 
   """
-  Many Guide entries in one read (ADR 0051): the regime indicators, episodes, glossary terms and Start here pages named by `refs` (at most 100), so a page's help buttons cost one request; a ref with no entry is left out
+  Many Guide entries in one read (ADR 0051): the regime indicators, episodes, mechanisms, edges, glossary terms and Start here pages named by `refs` (at most 100), so a page's help buttons cost one request; a ref with no entry is left out
   """
   guideEntries(refs: [GuideRef!]!): GuideEntries
 

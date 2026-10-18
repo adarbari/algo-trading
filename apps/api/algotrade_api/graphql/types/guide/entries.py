@@ -6,6 +6,8 @@ from typing import Self
 import strawberry
 
 from algotrade.services.read.guide import entries
+from algotrade_api.graphql.types.guide.edges.edge import GuideEdgeEntry
+from algotrade_api.graphql.types.guide.edges.mechanism import GuideMechanism
 from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
 from algotrade_api.graphql.types.guide.indicator import GuideIndicatorDetail
 from algotrade_api.graphql.types.guide.written import GuideStartPage, GuideTerm
@@ -14,7 +16,7 @@ strawberry.enum(entries.GuideEntryKind, description="The kinds of Guide entry `g
 strawberry.input(
     entries.GuideRef,
     description="One entry a page asks for: its `kind` and its `id` (an indicator's key, an "
-    "episode's slug, a term's or Start here page's id)",
+    "episode's slug, a mechanism's or site edge's id, a term's or Start here page's id)",
 )
 
 
@@ -27,6 +29,8 @@ class GuideEntries:
     episodes: list[GuideEpisodeDetail]
     terms: list[GuideTerm]
     start_pages: list[GuideStartPage]
+    mechanisms: list[GuideMechanism]
+    edges: list[GuideEdgeEntry]
 
     @classmethod
     def of(cls, d: entries.GuideEntries) -> Self:
@@ -35,4 +39,6 @@ class GuideEntries:
             episodes=[GuideEpisodeDetail.of(e) for e in d.episodes],
             terms=[GuideTerm.of(t) for t in d.terms],
             start_pages=[GuideStartPage.of(p) for p in d.start_pages],
+            mechanisms=[GuideMechanism.of(m) for m in d.mechanisms],
+            edges=[GuideEdgeEntry.of(e) for e in d.edges],
         )
