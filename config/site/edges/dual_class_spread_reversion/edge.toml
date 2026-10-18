@@ -1,0 +1,93 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: dual_class_cheap_leg (new, EB E3b), read with
+# the pair_spread outcome (EB H9) over share_classes@v1. Idea page: docs/edge-ideas/structural-niches.md
+# (dual_class_spread_reversion). A pair edge: the result is always the two-leg spread, a diagnostic.
+id = "dual_class_spread_reversion"
+name = "Dual-class share spread reversion"
+family = "H"
+thesis = "When one share class of a company trades much cheaper than its sibling class against their own history, the spread narrows: the cheap class beats the rich one over the next one to three months."
+mechanism = """Two classes with the same cash flows should keep a stable price ratio, but index membership, option
+hedging and retail flow hit one ticker more than the other, and nobody is paid to arbitrage a one to three
+percent spread that closes slowly and costs borrow to hold (Schultz and Shive 2010; Froot and Dabora 1999)."""
+persistence = """Capacity is tens of pairs and the carry is negative for arbitrageurs, so capital stays away; but
+Froot and Dabora's twins deviated 10 to 30 percent for years, so a spread can keep widening, and collapses
+of a class structure deliver it in one jump. Persistence is a claim to test."""
+schedule = "month_end"
+top_k = 5
+base = "universe"
+screeners = ["dual_class_cheap_leg"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """The outcome is the pair_spread of EB H9: a pick is the cheap class of a pair, and its value is its return
+over the horizon less its sibling's, less two round trips and the borrow on the sibling (the rich leg);
+a hit is a positive value. It is a two-leg spread, so the result is the spread and nothing is filed
+under [published] (Schultz and Shive's figures are for trades opened at a fixed spread and held to closure, not this
+monthly rule). The pair is read from share_classes@v1 at D (the issuer's two classes of the reference snapshot the
+session sees, joined on CIK and share-class FIGI, never a hand list and never today's reference): only issuers
+with exactly two listed classes are PAIRED, three or more are AMBIGUOUS and no pair is guessed, and the
+universe requires PAIRED, so both classes must pass the liquidity floors (a pair with one class below $3 or
+2M dollars a day is out). Declared thresholds, not tuned: the cheap class is one at or below -2 standard
+deviations of its own log price ratio over the last 252 sessions (spread_z_252d), at least 200 sessions of
+both bars needed; the stored bars start 2024-10, so the first z-scores are about a year old. The base
+is every eligible class against its sibling (a random side of the pair), so the lift is over the pair's
+own noise. Few pairs (about 15 to 25 US issuers) and few below -2 at any month end: the harness reports the
+picks and the sessions beside each number, and most sessions will pick none. Proxies, each stated: a z-score
+of the ratio against its own year, not Schultz and Shive's deviation from a moving average; no dividend or
+voting parity check (a class with different dividend or voting rights holds a gap for years: the z-score then
+measures drift inside the gap); the entry and exit are month-end closes with no convergence exit; the
+borrow is the site's default, not a quote. Month-end start sessions at least 20 sessions apart."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 3 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 2_000_000 },
+  { field = "rollup.share_classes@v1.sibling_status", op = "eq", value = "PAIRED" },
+  { field = "rollup.share_classes@v1.spread_z_252d", op = "gte", value = -20 },
+]
+
+[outcome]
+kind = "pair_spread"
+pair_field = "rollup.share_classes@v1.sibling_id"
+horizon_sessions = [20, 60]
+benchmark = "none"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """The cheap class's return less its sibling's over 20 and 60 sessions after the entry close, net of two
+round trips at 10 bps and the borrow on the sibling: a hit is a positive spread."""
+trigger_timing = """The pair and the z-score are read at the decision session D (a month end) from the closes through D and
+the reference snapshot D sees, so a reclassification counts from its own date; the entry session is S = D + 1
+(start_offset_sessions = 1); both legs are valued from the same stored outcome rows at S."""
+replication = """Schultz and Shive: when the relative price deviation of two classes exceeds a threshold against its moving
+average, long the cheap and short the rich class, exit on reversion. Here: the cheap class of a paired issuer
+at 2 or more standard deviations under its own 252-session ratio, held 20 and 60 sessions, the
+sibling shorted, the pick limit 5 pairs a month."""
+expected_size = """Schultz and Shive report that 82 percent of 3,687 trades opened at a 1 percent spread and held to closure were
+profitable, and 9.75 percent on average over 213 days for spreads above 10 percent, 100 US pairs 1993-2006
+(verified through Alpha Architect's summary of the paper); those are trades held to closure, not this
+rule. Recent US spreads are one to two percent and narrowing (GOOG and GOOGL), so expect little, in very few
+pairs; the history holds a year of month-ends, under the 40 the bar asks."""
+capacity_costs = """Tiny: capacity of tens to hundreds of thousands of dollars a pair on the liquid pairs, which is why large
+funds do not trade it. Two legs pay two round trips (the 10 bps is the assumption) and the borrow on the
+rich class, cheap on mega-caps; the convergence date is unknown, so the carry can be negative."""
+failure_modes = """Control events legitimately widen a spread (a takeover rumour, a proxy fight, a recapitalisation), a class
+with different voting or dividend rights keeps a gap for years, and a spread can widen for longer than the
+horizon. Retire if the frozen-period mean spread of the picks is not above the mean of every eligible class
+against its sibling, or the sample stays under a handful of picks after the 40 months."""
+decoys = """The liquidity premium of the thinner class, voting premia around control events, and index membership of one
+class: the 12-1 momentum and size baselines on the same sessions (stock rankings, so a rough read for a pair); the
+base here is every class against its sibling."""
+
+[[sources]]
+title = "Schultz, P. and Shive, S., Mispricing of Dual-Class Shares: Profit Opportunities, Arbitrage, and Trading, Journal of Financial Economics, 2010"
+url = "https://papers.ssrn.com/abstract=1338885"
+
+[[sources]]
+title = "Froot, K. and Dabora, E., How Are Stock Prices Affected by the Location of Trade?, Journal of Financial Economics, 1999"
+
+[[sources]]
+title = "Lamont, O. and Thaler, R., Can the Market Add and Subtract? Mispricing in Tech Stock Carve-outs, Journal of Political Economy, 2003"
