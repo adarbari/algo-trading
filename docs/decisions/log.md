@@ -514,3 +514,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a partial fix would leave the same one-session look-ahead in four groups that share the input and its backfill.
+
+## 2026-10-18 | EB H4 (event-class framework) | Subtypes, the filing group, and what is left out
+- Question: how are subtypes read, which classes ship on stored data, and does the folder cap force a new feature-group folder?
+- Options: one subtype label field per class (the plan) / per-subtype count and date fields; keep every group in `rollups/corporate` / a folder `rollups/events` for the event-class groups; add `ex_dividend`, `macro_release` and `lockup_expiry` / leave them until their fields exist.
+- Decision: a subtype is its own count and date fields (an 8-K item: the latest filing only would miss an item filed before another 8-K) or a label field that must read a value (index changes, date-shift direction), one mechanism in `EventField.subtypes`; `filing_events@v1` holds the 8-K items 1.02, 2.05, 3.01, 4.01, 4.02, 5.02, NT and tender offers (SC TO-T joins the kept forms); `earnings_date_shift@v1` with a 7-day threshold; `rollups/corporate` is at its 10-module cap, so the event-class groups (and `index_changes`, moved) live in a new `rollups/events` folder; `ex_dividend`, `macro_release`, `lockup_expiry` are left out (ADR 0053 amendment, point 4); filings are read by the acceptance session recomputed from `ts`, never the stored `known_from`.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the item list and the 7-day threshold are judgement calls the owner may widen; a stale `known_from` left in the store must not leak, so the reader does not trust it; a new folder is the layout rule's answer to a full one.

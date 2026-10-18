@@ -130,3 +130,31 @@ UNKNOWN until 2027).
 - Reviewed 2026-10-06 by `architect`: the original two-rule design was replaced by this
   decision 3 (hindsight in measured peers and dossiers, statistics with inputs after S, the
   storage stamp as a key, rescheduled dates counted twice, Stooq split days, run modes).
+
+## Amendment 2026-10-18: a filing is known from the session whose close follows its acceptance (edge build H4)
+
+`events/filing` rows had `known_from` = the New York DAY of SEC's acceptance. That is wrong in
+both directions the architect found: a filing accepted at 16:30 on D was counted as known by
+D's close (it was public after it), and a filing accepted on a Saturday or a holiday got a
+`known_from` that is no session. The rule is now `core/time/calendar.py::acceptance_session`
+(vectorised in `data.events.acceptance_sessions`): **the first session whose close is strictly
+after the acceptance instant**. 15:59 counts that session; 16:00, a weekend or a holiday count
+from the next one; an early-close day uses its own close.
+
+1. **Writer.** `tasks/events/filings.py` stamps `known_from` with it for `events/filing` and for
+   the `sec_8k` rows of `events/earnings` (whose `earnings_date` stays the New York DAY of the
+   acceptance: it is the date of the report, not when we knew it).
+2. **Readers recompute.** A reader of filings (`data.events.events_by_acceptance`, the input of
+   `filing_events@v1`) takes the session from `ts`, never from the stored `known_from`: the
+   store reads the latest version of a row only among rows already known by S, so a stale row
+   stamped by the old rule and left in a partition would still be seen by an old S. Recomputing
+   makes the read right whatever the stamp.
+3. **Backfill.** The writer's run tag (`FORMS_TAG`) now includes the rule, so a run before this
+   change does not count as having covered a CIK: `algotrade-ingest run filings --since
+   2018-01-01` re-reads every CIK once and rewrites the rows (same `accession`, later
+   `knowledge_ts`); the nightly also re-reads up to `filings_backfill_per_night` CIKs a night
+   until done. No feature read these rows before this change (`earnings@v1` and
+   `earnings_expected@v1` leave the `sec_8k` rows out), so no feature version is bumped; the
+   display read of the filings list keeps its `known_from <= session` filter.
+4. **Forms.** SC TO-T (a third party's tender offer) joins the kept forms; with the form tag
+   change the backfill reads it with the rest.

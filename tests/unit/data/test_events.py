@@ -5,8 +5,9 @@ from datetime import date, timedelta
 
 import pandas as pd
 
+from algotrade.core.time.calendar import acceptance_session
 from algotrade.data import StoreReader
-from algotrade.data.events import read_events
+from algotrade.data.events import acceptance_sessions, events_by_acceptance, read_events
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import T0, stamped
@@ -187,3 +188,53 @@ def test_a_nightly_window_run_does_not_hide_the_backfilled_dividends() -> None:
     assert trailing.runs == ["ca1"]
     ahead = read_events(reader, "events/dividend", session, date(2026, 11, 1))
     assert list(ahead.frame["instrument_id"]) == ["EQ:XOM"]
+
+
+def test_acceptance_sessions_are_the_first_session_closing_after_the_instant() -> None:
+    """Vectorised ``calendar.acceptance_session``: before the close that session, at or after it,
+    on a weekend, on a holiday (2026-11-26 Thanksgiving) or after an early close (2026-11-27,
+    closes 13:00 ET) the next; a null stays null."""
+    instants = [
+        "2026-10-01T19:59:59Z",  # 15:59:59 ET Thursday
+        "2026-10-01T20:00:00Z",  # 16:00:00 ET: at the close
+        "2026-10-01T20:30:00Z",  # 16:30 ET
+        "2026-10-04T23:00:00Z",  # Sunday
+        "2026-11-26T15:00:00Z",  # Thanksgiving
+        "2026-11-27T18:30:00Z",  # 13:30 ET on the half day
+        "2026-11-27T17:30:00Z",  # 12:30 ET on the half day
+    ]
+    got = acceptance_sessions(pd.Series([*pd.to_datetime(instants, utc=True), pd.NaT]))
+    assert list(got[:-1]) == [
+        date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 2), date(2026, 10, 5),
+        date(2026, 11, 27), date(2026, 11, 30), date(2026, 11, 27),
+    ]  # fmt: skip
+    assert got.iloc[-1] is None
+    scalar = [acceptance_session(t.to_pydatetime()) for t in pd.to_datetime(instants, utc=True)]
+    assert list(got[:-1]) == scalar
+
+
+def test_filings_are_known_from_the_acceptance_session_whatever_their_stored_stamp() -> None:
+    """A row stored under the New York-DAY rule (``known_from`` the 16:30 day D itself) is still
+    read as known from D+1: ``events_by_acceptance`` recomputes the session from ``ts``, so the
+    stale stamp left in the store by an earlier run cannot leak a one-session lookahead."""
+    backend = MemoryBackend()
+    d = date(2026, 10, 1)  # a Thursday
+
+    def row(iid: str, ts: str, accession: str, items: str, filed: date, known: date) -> dict:
+        return {"instrument_id": iid, "ts": pd.Timestamp(ts), "form": "8-K", "items": items,
+                "accession": accession, "cik": accession, "filing_date": filed,
+                "known_from": known}  # fmt: skip
+
+    rows = [
+        row("EQ:A", "2026-10-01T20:30:00Z", "a1", "4.02", d, d),  # stale: the day, not D+1
+        row("EQ:B", "2026-10-01T15:00:00Z", "b1", "5.02", d, d),
+        row("EQ:C", "2026-10-03T15:00:00Z", "c1", "1.02", date(2026, 10, 5), date(2026, 10, 3)),
+    ]
+    StoreWriter(backend).write_table("events/filing", d, "f", stamped(rows, d, "f"))
+    reader = StoreReader(backend)
+    on_d = events_by_acceptance(reader, "events/filing", d, d)
+    assert list(on_d["instrument_id"]) == ["EQ:B"]  # A is public after D's close
+    later = events_by_acceptance(reader, "events/filing", d, date(2026, 10, 5))
+    got = dict(zip(later["instrument_id"], later["event_date"], strict=True))
+    assert got == {"EQ:B": d, "EQ:A": date(2026, 10, 2), "EQ:C": date(2026, 10, 5)}
+    assert events_by_acceptance(reader, "events/filing", date(2026, 11, 1), date(2026, 11, 2)).empty
