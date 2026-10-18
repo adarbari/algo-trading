@@ -14,7 +14,7 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from tests.unit.services.evaluation.cross_section.conftest import edge
 
-WHERE = "config/site/edges/drift.toml"
+WHERE = "config/site/edges/drift/edge.toml"
 
 
 def document(**changes: Any) -> dict[str, Any]:
@@ -439,9 +439,9 @@ def test_the_published_table_is_optional_typed_and_checked_against_the_document(
             "sample": 25,
         },
     ).published
-    assert found == Published("decile_spread", 0.0131, 60, 1, 25)
+    assert found == Published("decile_spread", 0.0131, 60, 1, 25, "long_short")
     no_sample = {"measure": "lift_pts", "value": 4, "horizon_sessions": 20, "source": 0}
-    assert parse(published=no_sample).published == Published("lift_pts", 4.0, 20, 0, None)
+    assert parse(published=no_sample).published == Published("lift_pts", 4.0, 20, 0, None, "long")
 
 
 @pytest.mark.parametrize(
@@ -467,3 +467,26 @@ def test_the_published_table_is_optional_typed_and_checked_against_the_document(
 def test_a_published_table_fails_closed(published: dict[str, Any], match: str) -> None:
     with pytest.raises(ConfigurationError, match=match):
         parse(published=published)
+
+
+def test_family_is_an_optional_catalogue_letter() -> None:
+    assert parse_edge(document(), "drift", WHERE).family == ""
+    assert parse_edge(document(family="C"), "drift", WHERE).family == "C"
+    with pytest.raises(ConfigurationError, match="family"):
+        parse_edge(document(family="Z"), "drift", WHERE)
+
+
+def test_a_published_leg_defaults_from_the_measure_and_fails_closed() -> None:
+    base = {"measure": "lift_pts", "value": 4, "horizon_sessions": 20, "source": 0}
+    for measure, leg in (
+        ("lift_pts", "long"),
+        ("mean_excess", "long"),
+        ("decile_spread", "long_short"),
+    ):
+        assert parse(published={**base, "measure": measure}).published.leg == leg  # type: ignore[union-attr]
+    assert parse(published={**base, "leg": "long_short"}).published.leg == "long_short"  # type: ignore[union-attr]
+    assert parse(published={**base, "leg": "long"}).published == Published(
+        "lift_pts", 4.0, 20, 0, None, "long"
+    )
+    with pytest.raises(ConfigurationError, match="leg"):
+        parse(published={**base, "leg": "short"})

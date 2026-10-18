@@ -1,5 +1,5 @@
 """Load the edge documents a user sees (ADR 0053 decision 1, ADR 0015 layering): the site's
-``config/site/edges/<id>.toml``, then the user's own ``config/users/<user>/edges/<id>.toml``.
+``config/site/edges/<id>/edge.toml``, then the user's own ``config/users/<user>/edges/<id>.toml``.
 A user document never shadows a site edge (ADR 0053 amendment 2026-10-09):
 
 - with ``extends = "<edge id>"`` it is a COPY: a new edge under its own id, the extended
@@ -146,7 +146,7 @@ def _layered(
     site = _documents(configs, SITE)
     own = {} if user == SITE_USER else _documents(configs, user)
     layered: dict[str, tuple[dict[str, Any], str, str | None]] = {
-        n: (dict(d), f"{_folder(SITE)}/{n}.toml", None) for n, d in site.items()
+        n: (dict(d), _site_file(n), None) for n, d in site.items()
     }
     problems: dict[str, str] = {}
     for name, doc in own.items():
@@ -184,7 +184,7 @@ def _own_document(
                 f"ignored {stray} (change its settings in a copy under a new id)"
             )
         parse_follow(doc, where)
-        return {**site[name], FOLLOW: doc.get(FOLLOW, {})}, f"{_folder(SITE)}/{name}.toml", None
+        return {**site[name], FOLLOW: doc.get(FOLLOW, {})}, _site_file(name), None
     doc = _modernised(doc, where)
     chain: list[tuple[str, Mapping[str, Any]]] = [(name, doc)]  # outermost first
     base: Mapping[str, Any] = {}
@@ -256,6 +256,10 @@ def _copy_over(base: Mapping[str, Any], layer: Mapping[str, Any], where: str) ->
         )
     skipped = ("extends", "status", FOLLOW, AUDIT)
     return deep_merge(base, {k: v for k, v in layer.items() if k not in skipped})
+
+
+def _site_file(name: str) -> str:
+    return f"{_folder(SITE)}/{name}/edge.toml"
 
 
 def _folder(scope: str) -> str:

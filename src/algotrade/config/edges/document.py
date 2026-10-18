@@ -1,5 +1,5 @@
 """The edge document (ADR 0053 decision 1; the quality bar is docs/edges-plan.md): one
-``config/site/edges/<id>.toml`` typed into a frozen ``Edge``, fail closed: an unknown key, a
+``config/site/edges/<id>/edge.toml`` typed into a frozen ``Edge``, fail closed: an unknown key, a
 wrong type, an unknown status, schedule or event class, or a missing answer fails with the file
 and the key.
 
@@ -34,6 +34,8 @@ and the key.
     screeners         the screener presets that implement it (empty while a candidate waits)
     baselines         screener presets run on the same sessions (quality bar 9)
     status            researching | candidate | evidenced | live | retired | rejected | blocked
+    family            optional "A".."I": the idea catalogue's family (docs/edge-ideas/); the
+                      edges page groups by it
     frozen_from       optional date: the harness reports sessions from it on their own as the
                       frozen period (fixed once chosen, never rolling; none: no frozen slice)
     [evidence]        run_id and split_from of the run an evidenced or live edge rests on; its
@@ -44,7 +46,10 @@ and the key.
                       return as a fraction, ``lift_pts`` in points), ``value``,
                       ``horizon_sessions`` (one of the outcome's), ``source`` (the index of its
                       ``[[sources]]`` entry) and optional ``sample`` (years it covers; ADR 0064
-                      decision 6). A copy inherits it
+                      decision 6), and optional ``leg`` (LEGS: ``long_short``, or ``long``:
+                      what the figure is of; by default ``long_short`` for a ``decile_spread``
+                      and ``long`` for any other measure; picks the ``verdict.toml``
+                      ``[published_haircut]`` shown beside it, display only). A copy inherits it
     [[sources]]       title, optional https url (a paper without one: author, title, year)
     [quality_bar]     the other seven answers (QUALITY_BAR); required unless rejected / blocked
     notes             optional: a proxy, an open decision
@@ -77,12 +82,14 @@ from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
 from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
+from algotrade.config.edges.verdict import LEGS
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Selection, parse_selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 
 MIN_INDEPENDENT_SESSIONS = 40  # the quality bar's count: a fit and a promotion need this many
+FAMILIES = tuple("ABCDEFGHI")  # the idea catalogue's families (docs/edge-ideas/)
 STATUSES = ("researching", "candidate", "evidenced", "live", "retired", "rejected", "blocked")
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
 OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm")
@@ -103,13 +110,11 @@ EVENT_CLASSES: Mapping[str, str] = {
     "anchor: the reaction's last session, E+1 (E: the report date)",
     "earnings_expected": "a next report expected, scheduled or from the year-ago report "
     "(earnings_expected@v1); anchor: the expected report date's session",
-    "ex_dividend": "an ex-dividend date (events/dividend); anchor: the ex-date",
-    "index_change": "an S&P 500 membership change (events/index_change); anchor: the session "
-    "it is first stored",
-    "macro_release": "a scheduled macro release (events/macro_release); anchor: the release "
-    "session",
+    "index_change": "an S&P 500 membership change (index_changes@v1); anchor: the session it is "
+    "first stored",
 }
-ANNOUNCED_AHEAD = ("earnings_expected", "macro_release")  # an entry may precede these
+# ex_dividend and macro_release were declared without a field to read; EB H4 re-adds them with it.
+ANNOUNCED_AHEAD = ("earnings_expected",)  # an entry may precede these
 # Quality bar answers 3 to 9 (1 and 2 are the document's mechanism and persistence).
 # What a hit_target compares with its target over the window (ED2 stores each as a field).
 MEASURES = ("excess_return", "realised_to_implied_vol")
@@ -124,12 +129,12 @@ QUALITY_BAR = (
     "decoys",
 )
 PUBLISHED_MEASURES = ("mean_excess", "decile_spread", "lift_pts")
-PUBLISHED_KEYS = ("measure", "value", "horizon_sessions", "sample", "source")
+PUBLISHED_KEYS = ("measure", "value", "horizon_sessions", "sample", "source", "leg")
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
-    "extends", "follow", "audit", "published",
+    "extends", "follow", "audit", "published", "family",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -222,6 +227,7 @@ class Published:
     horizon_sessions: int
     source: int
     sample: int | None = None
+    leg: str = "long"  # what the paper's figure is of: the long side | a long-short spread
 
 
 @dataclass(frozen=True)
@@ -248,6 +254,7 @@ class Edge:
     quality_bar: Mapping[str, str]  # QUALITY_BAR -> answer ("" only when CLOSED)
     rejection_reason: str = ""
     notes: str = ""
+    family: str = ""  # the catalogue family "A".."I" the idea came from ("" none)
     frozen_from: date | None = None
     base: str = "universe"  # what the picks are compared with: the event's names | the universe
     picks: str = "event"  # an event schedule's pick set: within the event names | the universe
@@ -341,6 +348,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         quality_bar=_quality_bar(t, closed),
         rejection_reason=_prose(t, "rejection_reason"),
         notes=_prose(t, "notes"),
+        family=t.choice("family", "", FAMILIES) if "family" in doc else "",
         frozen_from=_frozen_from(t),
         base=base,
         picks=picks,
@@ -426,12 +434,14 @@ def _published(t: Table, outcome: Outcome, sources: int) -> Published | None:
         raise ConfigurationError(
             f"{sub.where} source: {source} is not an index of the {sources} [[sources]]"
         )
+    measure = sub.choice("measure", "", PUBLISHED_MEASURES)
     return Published(
-        measure=sub.choice("measure", "", PUBLISHED_MEASURES),
+        measure=measure,
         value=sub.number("value", 0.0),
         horizon_sessions=horizon,
         source=source,
         sample=sub.integer("sample", 0, 1) if "sample" in sub.names() else None,
+        leg=sub.choice("leg", "long_short" if measure == "decile_spread" else "long", LEGS),
     )
 
 

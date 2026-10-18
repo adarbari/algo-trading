@@ -450,7 +450,7 @@ the same files.
 ## Edges
 
 An edge (ADR 0053, plan [edges-plan.md](edges-plan.md)) is a typed document
-`config/site/edges/<id>.toml`, loaded by `algotrade.config.edges.loading.load_edges` (the
+`config/site/edges/<id>/edge.toml`, loaded by `algotrade.config.edges.loading.load_edges` (the
 `edge-documents` owner): `id` (the file name), `name`, a one-sentence `thesis`, `mechanism`,
 `persistence`, `[outcome]` (`kind` `excess_return` | `hit_target`, `horizon_sessions`,
 `benchmark` `SPY` | `none`, `start_offset_sessions` (the entry session S: the decision session D
