@@ -42,3 +42,13 @@ This schedule opens a trade for the single session before each scheduled full-da
 """
 next = "Open the edge's cost estimate and compare it with the lift."
 see_also = ["base_rate", "out_of_sample", "calendar_turn_of_month"]
+
+[[term]]
+id = "base_out_of_window"
+term = "Compared with its own other days"
+short = "An edge on one fund or index is judged against that same fund's returns on days outside the window."
+body = """
+Some edges time one instrument, not a list of names: hold SPY over the turn of the month, say. There is no crowd to compare it with, so the comparison is the same instrument on ordinary days. Each window's return is set beside the returns of equal-length stretches outside every window. The result shows the difference in average return, a t-ratio for that difference, and the share of windows that gained against the share of other stretches that gained. The Sharpe ratio and its t on the result are read from each window minus the stretch right after it, so a fund that simply rises does not pass on its drift. Windows are few: about 12 a year for a monthly window. Treat a result from fewer than 100 windows as noise. A high t from many tries is weaker than it looks, so read the trial count beside it.
+"""
+next = "Read the difference and the t-ratio together with the number of windows behind them."
+see_also = ["base_rate", "out_of_sample", "calendar_turn_of_month"]

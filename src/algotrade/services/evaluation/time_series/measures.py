@@ -11,8 +11,11 @@ period's decision session) is measured as:
 - ``mean_excess_picks`` / ``bh_mean``: the mean in-window and out-of-window return;
   ``decile_spread``: their difference; ``decile_t``: its Welch t-ratio (the verdict's Promising
   t >= 2 and Works t >= 3), read over the independent periods
-- ``effect_size``: Hedges' g between the two; ``sharpe`` / ``picks_t``: the in-window returns'
-  Sharpe ratio and its t-ratio; ``sessions`` / ``decile_sessions``: the independent windows
+- ``effect_size``: Hedges' g between the two; ``sharpe`` / ``picks_t``: the Sharpe ratio and t of
+  the *paired* series (each window minus the stretch tiled right after it: a window's raw return
+  is mostly drift, a rising instrument would pass on it alone); ``excluded_missing``: windows
+  with no stretch beside them to pair, counted, never filled; ``sessions`` /
+  ``decile_sessions``: the independent windows
 
 Every count is of independent periods: one period is one session, and ``statistics.window_weights``
 corrects for periods closer together than the window (the tiling leaves none; an overlapping
@@ -27,6 +30,7 @@ from functools import partial
 
 import numpy as np
 
+from algotrade.core.time.calendar import next_session
 from algotrade.quant.edges.statistics import (
     deflated_sharpe,
     independent_sessions,
@@ -49,6 +53,26 @@ class Obs:
     period: Period
     value: float
     regime: str
+    paired: float | None = None  # a window: its return minus the next stretch's (``with_pairs``)
+
+
+def with_pairs(obs: Sequence[Obs], horizon: int) -> list[Obs]:
+    """``obs`` with each window's ``paired`` set to its return minus that of the stretch tiled
+    right after it (the one whose first session follows the window's last). The paired series is
+    what the Sharpe ratio, its t and the deflated Sharpe ratio read: a window's raw return is
+    mostly the instrument's drift, the difference to the stretch beside it is the timing. A window
+    with no such stretch measured stays unpaired: counted, never filled."""
+    after = {o.period.first: o.value for o in obs if not o.period.inside}
+    out = []
+    for o in obs:
+        if not o.period.inside:
+            out.append(o)
+            continue
+        nxt = o.period.first
+        for _ in range(horizon):
+            nxt = next_session(nxt)
+        out.append(replace(o, paired=o.value - after[nxt] if nxt in after else None))
+    return out
 
 
 def _mean(x: Sequence[float]) -> float | None:
@@ -68,6 +92,10 @@ def measure(kind: str, value: str, kept: Sequence[Obs], horizon: int) -> SliceMe
     ind_in = independent_sessions([o.period.entry for o in inside], horizon)
     ind_out = independent_sessions([o.period.entry for o in outside], horizon)
     diff, t = welch_t(a, b)
+    paired = [o.paired for o in inside if o.paired is not None]
+    ind_pairs = independent_sessions(
+        [o.period.entry for o in inside if o.paired is not None], horizon
+    )
     hits, hit_rate = _share(a)
     base_hits, base_rate = _share(b)
     return SliceMeasure(
@@ -88,15 +116,15 @@ def measure(kind: str, value: str, kept: Sequence[Obs], horizon: int) -> SliceMe
         decile_t=overlap_t(t, len(a) + len(b), ind_in + ind_out),
         decile_sessions=ind_in,
         effect_size=standardised_effect(a, b),
-        sharpe=sharpe(a),
+        sharpe=sharpe(paired),
         unscored=0,
         excluded_score_coverage=0,
         excluded_unclosed=0,
-        excluded_missing=0,
+        excluded_missing=len(a) - len(paired),  # windows with no stretch beside them to pair
         excluded_coverage=0,
         delisted=0,
         pre_snapshot_sessions=0,
-        picks_t=sharpe_t(a, ind_in),
+        picks_t=sharpe_t(paired, ind_pairs),
     )
 
 
@@ -108,14 +136,32 @@ def _in_regime(label: str, o: Obs) -> bool:
     return o.regime == label
 
 
+def _year_side(year: int, split: date, before: bool, o: Obs) -> bool:
+    return _in_year(year, o) and (o.period.decision < split) == before
+
+
+def _regime_side(label: str, split: date, before: bool, o: Obs) -> bool:
+    return _in_regime(label, o) and (o.period.decision < split) == before
+
+
 def _slices(
     obs: Sequence[Obs], split: date | None, exploratory: bool
 ) -> list[tuple[str, str, Callable[[Obs], bool]]]:
     out: list[tuple[str, str, Callable[[Obs], bool]]] = [("all", "all", lambda o: True)]
     for year in sorted({o.period.decision.year for o in obs}):
         out.append(("year", str(year), partial(_in_year, year)))
+        if split is not None and date(year, 1, 1) < split <= date(year, 12, 31):
+            for side, before in (("in_sample", True), ("out_of_sample", False)):
+                out.append(
+                    ("year_part", f"{year}:{side}", partial(_year_side, year, split, before))
+                )
     for label in sorted({o.regime for o in obs}):
         out.append(("regime", label, partial(_in_regime, label)))
+        if split is not None:
+            for side, before in (("in_sample", True), ("out_of_sample", False)):
+                out.append(
+                    ("regime_part", f"{label}:{side}", partial(_regime_side, label, split, before))
+                )
     if split is not None:  # cut by the period's decision session, as the cross-section slices
         out.append(("in_sample", "in_sample", lambda o: o.period.decision < split))
         kind = "split" if exploratory else "frozen"
@@ -151,13 +197,20 @@ def timing_sharpes(
 
 
 def deflate_trial(
-    measure_all: SliceMeasure, in_window: Sequence[float], trials: int, pbo: float | None
+    measure_all: SliceMeasure,
+    paired: Sequence[float],
+    trials: int,
+    pbo: float | None,
+    variance: float | None = None,
 ) -> SliceMeasure:
     """``measure_all`` (the ``all`` row) with the trial count, the deflated Sharpe ratio of the
-    in-window returns (the variance of a lone trial's estimate under the null, ``1 / (T - 1)``,
-    as for a cross-section edge) and the PBO among the edge's instruments."""
-    n = len(in_window)
-    dsr = deflated_sharpe(in_window, trials, 1.0 / (n - 1)) if n > 1 else None
+    ``paired`` series and the PBO among the edge's instruments. ``variance``: that of the
+    instruments' Sharpe ratios when there are several (as ``cross_section.measures.deflate``
+    reads its peers'), else the null's for one trial's estimate, ``1 / (T - 1)``."""
+    n = len(paired)
+    if variance is None and n > 1:
+        variance = 1.0 / (n - 1)
+    dsr = deflated_sharpe(paired, trials, variance) if n > 1 and variance is not None else None
     return replace(measure_all, deflated_sharpe=dsr, trials=trials, pbo=pbo)
 
 

@@ -626,3 +626,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the package-level contract already admits all of `services.evaluation`, so widening it would change nothing; the per-package contract is what makes "one reader" true for the new folder.
+
+## 2026-10-18 | EB H5b (PR 660 review) | The paired series carries the Sharpe, t and deflated Sharpe
+- Question: the in-window Sharpe, picks t and deflated Sharpe on raw window returns read drift, not timing.
+- Options: raw in-window series / each window minus the first stretch tiled right after it (unpaired windows counted, never filled).
+- Decision: the paired series; `decile_t` stays the Welch t, worded "In-window minus out-of-window t (Welch)" through `EdgeFacts.base`; several instruments deflate with the variance of their Sharpe ratios; `year_part` / `regime_part` slices added; Guide term `base_out_of_window`.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a rising instrument would otherwise pass Works on drift alone; the paired difference removes the instrument's drift without a model.

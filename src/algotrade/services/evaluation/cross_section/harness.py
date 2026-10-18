@@ -38,6 +38,8 @@ from datetime import date, datetime
 from functools import partial
 from typing import Any
 
+import numpy as np
+
 from algotrade.config.edges.document import (
     LEGACY_SITE_CUTOFF,
     LEGACY_SITE_OWNERS,
@@ -627,12 +629,14 @@ def _time_series(
     }
     tried = {(MAIN, r.symbol, keys[r.symbol], run.horizon) for r in run.results}
     trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
-    pbo = pbo_among({r.symbol: dict(r.in_window) for r in run.results if r.in_window})
+    pbo = pbo_among({r.symbol: dict(r.paired) for r in run.results if r.paired})
+    sharpes = [r.measures[0].sharpe for r in run.results if r.measures[0].sharpe is not None]
+    spread = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else None  # as ``deflate`` reads it
     results = [
         VariantResult(
             r.symbol, SCREENER, keys[r.symbol], run.horizon, (),
             (
-                deflate_trial(r.measures[0], [v for _, v in r.in_window], trials, pbo),
+                deflate_trial(r.measures[0], [v for _, v in r.paired], trials, pbo, spread),
                 *r.measures[1:],
             ),
             lost_sessions=r.lost, timing=r.timing,

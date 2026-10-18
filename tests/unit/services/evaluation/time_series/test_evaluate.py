@@ -163,4 +163,6 @@ def test_the_stored_rows_reach_the_verdict_and_the_t_ratio_is_the_edges_t() -> N
     frozen = next(m for m in ev.results[0].measures if m.slice_kind == "frozen")
     assert verdict.decile_t == pytest.approx(frozen.decile_t)
     assert verdict.basis.startswith("SPY") and verdict.oos_trades == frozen.sessions
+    labels = {c.id: c.label for c in verdict.criteria}
+    assert "Welch" in labels["decile_t"] and "Welch" in labels["works_t"]
     assert verdict.verdict == "not_enough_data", verdict.rationale

@@ -27,6 +27,7 @@ from algotrade.services.evaluation.time_series.measures import (
     Obs,
     measures,
     timing_sharpes,
+    with_pairs,
 )
 from algotrade.services.evaluation.time_series.periods import Period, periods
 from algotrade.services.evaluation.time_series.random_windows import random_windows
@@ -41,6 +42,7 @@ class InstrumentResult:
     measures: tuple[SliceMeasure, ...]  # ``all`` first
     randoms: tuple[SliceMeasure, ...]  # out-of-sample draws; empty without a split
     in_window: tuple[tuple[date, float], ...]  # (entry session, raw return) of the windows
+    paired: tuple[tuple[date, float], ...]  # (entry session, window minus the next stretch)
     timing: dict[str, float | int | None] = field(default_factory=dict)
     lost: dict[str, int] = field(default_factory=dict)  # reason -> periods without a value
 
@@ -111,6 +113,7 @@ def _instrument(
             obs.append(Obs(p, read.values[instrument, p.entry], label(p.decision)))
         else:
             lost[read.reasons.get((instrument, p.entry), harness.NO_OUTCOME)] += 1
+    obs = with_pairs(obs, horizon)
     window = window_name(edge.schedule)
     oos = [o for o in obs if split is not None and o.period.decision >= split]
     return InstrumentResult(
@@ -121,6 +124,7 @@ def _instrument(
         if split is not None
         else (),
         in_window=tuple((o.period.entry, o.value) for o in obs if o.period.inside),
+        paired=tuple((o.period.entry, o.paired) for o in obs if o.paired is not None),
         timing=timing_sharpes(obs, bills),
         lost=dict(lost),
     )

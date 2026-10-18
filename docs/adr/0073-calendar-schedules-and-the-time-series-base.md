@@ -1,7 +1,6 @@
 # ADR 0073: Calendar schedules and the time-series base
 
-**Status:** accepted (2026-10-18; design from the EB harness plan, pending architect review of
-the diff). Extends [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) (edges, outcomes,
+**Status:** accepted (2026-10-18; design from the EB harness plan, architect-reviewed). Extends [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) (edges, outcomes,
 one harness) and [0064](0064-edge-evidence-series-and-trade-ledger.md) (what a run publishes).
 
 ## Context
@@ -32,8 +31,15 @@ to the cross-section harness first; this ADR adds the comparison they need.
    minus out-of-window return (`decile_spread`); its Welch t-ratio (`decile_t`, the number the
    verdict's Promising t >= 2 and Works t >= 3 read); the share of positive windows against the
    base's share (`hit_rate` against `base_rate`, so `lift` and the verdict words are the existing
-   ones); Hedges' g; the in-window Sharpe ratio and its t (`picks_t`); the deflated Sharpe ratio
-   (trials counted as for any edge, one per instrument) and the PBO among the named instruments.
+   ones); Hedges' g; the Sharpe ratio and its t (`picks_t`) of the *paired* series, each window minus
+   the first stretch tiled right after it (a window's raw return is mostly the instrument's drift,
+   so a rising fund would pass on it; a window with no such stretch is counted in
+   `excluded_missing`, never filled); the deflated Sharpe ratio of that series (trials counted as
+   for any edge, one per instrument; with several instruments the variance of their Sharpe ratios,
+   else the null's `1 / (T - 1)`) and the PBO among them. `decile_t` stays the honest Welch t (the
+   verdict words it "In-window minus out-of-window t (Welch)" for such an edge). Year and regime
+   slices are also cut by the split (`year_part`, `regime_part`), so a hidden out-of-sample run
+   keeps its in-sample rows.
    The Sharpe ratio of "long in the window, Treasury bill otherwise" against buying and holding
    (the bill: the par rate of the curve tenor nearest 91 days that D itself saw, times h / 252) is
    recorded in the run record's trial entry (`timing`), not in `results/edge_eval`.
