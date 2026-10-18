@@ -9,7 +9,7 @@ Research note, 2026-10-07. Read-only survey (WebSearch + WebFetch; Investopedia,
 glossary index, IBKR's glossary and Robinhood article pages refused the fetcher, so those rows
 mix a fetched index with page templates recalled from use, marked "recalled"). The question:
 the field guide (about 450 catalogue fields, each with reads / criteria per intent / caveats /
-sources, `config/site/field_guide/*.toml`) is today a tab inside Explore, a per-ticker page.
+sources, `config/site/field_guide/<group>/*.toml`) is today a tab inside Explore, a per-ticker page.
 Where should education live, how should it be structured, and how should it hook back into
 the product?
 

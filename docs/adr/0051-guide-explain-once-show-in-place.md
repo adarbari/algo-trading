@@ -24,8 +24,8 @@ its first paragraph where the user is.
    Sections, in this order: Start here (how-to), Market regime, Playbooks, Fields,
    Situations, Glossary.
 2. **Every explanation is written once, as a Guide entry in site configuration** (reviewed by
-   PR), of one kind: a field (`config/site/field_guide/<theme>.toml`), a situation
-   (`field_guide/situations.toml`), a regime indicator or episode (`config/site/regime/`), a
+   PR), of one kind: a field (`config/site/field_guide/<group>/<file>.toml`), a situation
+   (`field_guide/tradeable/instrument-2.toml`), a regime indicator or episode (`config/site/regime/`), a
    playbook (one per site preset screen), a glossary term or a how-to page. Each kind has one
    owner in `architecture/ownership.toml`, and every entry has a URL under `/guide`.
 3. **A page shows an explanation only through the help drawer**: an `InfoButton` beside the

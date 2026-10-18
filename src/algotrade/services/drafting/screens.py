@@ -1,7 +1,7 @@
 """``draft_screen``: a sentence to a draft rule screen (ADR 0041). The prompt is the task, an
 index of the caller's catalogue and, for the sentence's slice of it (``retrieval``), the
 fields in detail, the site phrasebook (``config/site/phrasebook.toml``) entries and the site
-field guide (``config/site/field_guide/*.toml``: thresholds and caveats per field). The
+field guide (``config/site/field_guide/<group>/*.toml``: thresholds and caveats per field). The
 model's JSON is parsed strictly (ids, fields, ops, modes, values, tolerances); a criterion on
 a field outside the caller's catalogue, or one the validator rejects, is dropped with the
 reason (never saved, never silently kept); the rest is validated with ``resolve_rule_draft``
