@@ -23,7 +23,12 @@ series is always fetched whole: its first vintage, which dates what ALFRED's arc
 
 The run has a time budget (``[macro] run_budget_s``): once spent, the series not yet fetched
 are recorded as skipped (``over_budget``) and the run is PARTIAL, so a FRED outage cannot hold
-the nightly up; they are still graded by ``check_macro`` (they were fetchable).
+the nightly up; they are still graded by ``check_macro`` (they were fetchable). The budget can
+split a many-series file (the 26 country CAPE series share one request) across nights: the
+series not reached are retried next run, and each stored series carries its own vintages.
+
+``stats["newest_obs"]`` is the newest observation date each fetched series' file held and
+``stats["fetched_on"]`` the session of the fetch, so a late posting is visible per run.
 """
 
 from collections.abc import Mapping, Sequence
@@ -57,7 +62,9 @@ MAX_REFETCH_DAYS = 7
 
 
 def refetch_days(spec: MacroSeries) -> int:
-    return min(spec.cadence_days, MAX_REFETCH_DAYS)
+    """The registry's ``refetch_days`` (a file with a use-limited licence: one pull a month),
+    else the cadence capped at a week."""
+    return spec.refetch_days or min(spec.cadence_days, MAX_REFETCH_DAYS)
 
 
 def _last_fetched(ctx: TaskContext) -> dict[str, date]:
@@ -100,6 +107,7 @@ def _fetch_one(
     stored: pd.DataFrame,
     since: date | None,
     counts: dict[str, int],
+    newest: dict[str, str],
 ) -> str:
     """Fetch, apply the vintage rule, write what is new -> the item status; ``counts`` gets the
     series' stored vintages once this is written."""
@@ -111,6 +119,7 @@ def _fetch_one(
     fetched = normalized.parsed[SERIES_FRAME] if normalized else None
     if fetched is None or fetched.empty:
         return "NO_DATA"
+    newest[spec.key] = str(fetched["obs_date"].max().date())
     target = vintage_rows(spec, fetched)
     if since is not None:
         target = target[target["obs_date"] >= since]
@@ -134,6 +143,7 @@ def ingest_macro(
     forced = bool(only) or since is not None
     last = _last_fetched(ctx)
     counts: dict[str, int] = {}
+    newest: dict[str, str] = {}
     skipped: dict[str, str] = {}
     over_budget: list[str] = []
     started = ctx.clock()
@@ -152,7 +162,9 @@ def ingest_macro(
                 over_budget.append(spec.key)
                 run.record_item(spec.key, f"SKIPPED: run budget of {registry.run_budget_s}s spent")
             else:
-                run.attempt(spec.key, partial(_fetch_one, run, spec, source, stored, since, counts))
+                run.attempt(
+                    spec.key, partial(_fetch_one, run, spec, source, stored, since, counts, newest)
+                )
             run.checkpoint()
         if over_budget:
             run.partial(
@@ -167,6 +179,8 @@ def ingest_macro(
             over_budget=over_budget,
             vintages={**_stored_counts(by_id, chosen), **counts},
             items=run.counts(),
+            newest_obs=newest,
+            fetched_on=session.isoformat(),
         )
     return run.record
 

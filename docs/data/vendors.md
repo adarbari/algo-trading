@@ -421,7 +421,16 @@ Paced by `[published] min_interval_s` (1 s); one request per file, refetched by 
 | Fed Excess Bond Premium, `ebp_csv.csv` (Federal Reserve Board) | `csv`: `date,gz_spread,ebp,est_prob`, monthly, `value_column = "ebp"` | credit risk premium | public Fed Notes data: `open` |
 | OFR Financial Stress Index (financialresearch.gov) | `csv`: `Date,OFR FSI,Credit,Equity valuation,...`, daily | market stress | OFR public data: `open` |
 | Stooq daily history (`stooq.com/q/d/l/?s=<symbol>&i=d`) | `csv`: `Date,Open,High,Low,Close,Volume`, `value_column = "Close"` | not used: it now answers a JavaScript browser-verification page (HTML), so `SPX` comes from FRED `SP500` | free for personal use, no redistribution: **`personal`** |
+| Barclays Shiller CAPE, `cape.csv` (`indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv`) | `cape_csv`: `Date` (`dd/mm/yyyy` month-ends) + 26 country columns, 1981-12-, `0` and `#VALUE!` = no value | country CAPE, `MACRO:CAPE_<COUNTRY>` (EB D7) | terms not retrievable (decision log 2026-10-17): **`personal`**, one pull per 28 days, never redistributed |
 | Shiller `ie_data.xls` (Yale) | `shiller_xls`: a legacy `.xls` workbook | CAPE, long-run earnings | academic data, credit the author: `open` |
+
+**Country CAPE point in time:** the file has no vintages and is re-estimated. A month first
+seen is known from month end + 45 days (`release_lag_days`; Barclays posts within about two
+weeks, so this errs late); a month whose value changes on a later pull is a new `lagged`
+vintage dated that run's session, never before the fetch. The 26 series share one request per
+run (the adapter reads a URL once) and `refetch_days = 28` keeps it to one pull a month.
+`tests/fixtures/sources/published/cape.csv` is hand-built in the file's format, not vendor
+data.
 
 The fixtures in `tests/helpers/payloads/` are written from these documented formats, not
 recorded: CI never calls the network. **Follow-up:** `shiller_xls` raises

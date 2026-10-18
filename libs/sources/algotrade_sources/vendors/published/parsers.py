@@ -11,6 +11,10 @@ plain format needs no code, only a registry entry:
 - ``epu_daily``: the daily Economic Policy Uncertainty CSV (``All_Daily_Policy_Data.csv``:
   ``day,month,year,daily_policy_index``): the date is in three columns, so this parser adds a
   ``date`` column (ISO ``YYYY-MM-DD``; a row whose parts do not form a date gets none);
+- ``cape_csv``: Barclays' Shiller CAPE file (``cape.csv``: ``Date`` as ``dd/mm/yyyy`` month-ends,
+  then one column per country). The date is read day first (a plain ``csv`` read would take
+  ``05/10/1982`` as May) and written ISO; ``0`` (before a country's start) and ``#VALUE!``
+  are no value, as a blank cell;
 - ``shiller_xls``: Shiller's ``ie_data.xls`` (a legacy Excel workbook with a multi-row header).
   Reading ``.xls`` needs ``xlrd``, which is not a dependency (``openpyxl``, the one workbook
   reader we ship, reads only ``.xlsx``), so it raises ``NotImplementedError`` until that
@@ -56,6 +60,23 @@ def parse_epu_daily(payload: bytes) -> pd.DataFrame:
     return frame
 
 
+BARCLAYS_NO_VALUE = {"0", "0.0", "0.00", "#VALUE!", "#N/A", "N/A", "NA"}
+
+
+def parse_cape_csv(payload: bytes) -> pd.DataFrame:
+    """Barclays' ``cape.csv``: ISO ``Date`` (a row whose date does not read gets none) and every
+    country column as text, with the file's ``0`` / ``#VALUE!`` placeholders blanked."""
+    frame = parse_csv(payload)
+    if "Date" not in frame.columns:
+        return frame
+    dates = pd.to_datetime(frame["Date"].str.strip(), format="%d/%m/%Y", errors="coerce")
+    frame["Date"] = dates.dt.strftime("%Y-%m-%d").where(dates.notna(), None)
+    for column in frame.columns.drop("Date"):
+        cells = frame[column].str.strip()
+        frame[column] = cells.where(~cells.isin(BARCLAYS_NO_VALUE), None)
+    return frame
+
+
 def parse_shiller_xls(payload: bytes) -> pd.DataFrame:
     """Shiller's ``ie_data.xls``: not readable until ``xlrd`` is a dependency."""
     raise NotImplementedError(
@@ -67,5 +88,6 @@ def parse_shiller_xls(payload: bytes) -> pd.DataFrame:
 PARSERS: dict[str, Parser] = {
     "csv": parse_csv,
     "epu_daily": parse_epu_daily,
+    "cape_csv": parse_cape_csv,
     "shiller_xls": parse_shiller_xls,
 }
