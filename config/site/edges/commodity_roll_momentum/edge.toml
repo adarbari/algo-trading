@@ -1,0 +1,76 @@
+# Edge document (ADR 0053, ADR 0074; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/trend-macro.md (commodity_momentum_etf, commodity_term_structure_roll).
+# An allocation edge (EB E5): a weighted book of ETFs against a blended benchmark of its own list.
+id = "commodity_roll_momentum"
+name = "Commodity ETF momentum"
+family = "E"
+thesis = "Commodity ETFs on a rising 12-month trend keep rising, so holding the strongest three and cash otherwise beats an equal-weight basket of ten."
+mechanism = """Inventories (low stocks keep a market in backwardation and prices rising), hedger pressure and a
+slow supply response make commodity returns persist (Miffre and Rallis 2007; Fuertes, Miffre and
+Rallis 2010)."""
+persistence = """Commodities have few natural arbitrageurs and high volatility, and crashes (2008, 2014 to 2015,
+2020) deter capital; the effect was strong before 2008, weak from 2010 to 2020 and strong in 2021 to
+2022, so persistence is a claim to test."""
+schedule = "month_end"
+top_k = 3
+screeners = [
+  "trend_positive_6m", "trend_positive_12m",
+]
+base = "benchmark"
+oos_class = "trend"
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history and evaluated. LIMITS: ETF
+momentum only. The roll-yield leg (backwardation long, contango avoided) needs futures curves that
+are not stored (the D11 history): not built, and the document does not combine them. Ten funds (GLD,
+SLV, PPLT, PALL, USO, UNG, UGA, DBB, DBA, CORN; the page's 15 include funds with a short history
+such as CANE, SOYB, WEAT and CPER, left out so every constituent of the benchmark has rows from
+2010). The ETFs roll futures themselves: the roll loss of USO, UNG and UGA is inside their prices,
+so the momentum signal and the value are contaminated by the contango the dropped leg would have
+measured; a clean test needs futures. The ranking is by raw return above 0 and not the source's
+long-short formation of 31 futures; the book is long only, three funds at a third each, an unfilled
+slot cash at the bill yield, against an equal-weight ten. Price only; cost_bps 20 a round trip
+assumed. The energy funds put energy beta in the book. verdict.toml [oos_haircut] trend = 0.45
+prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one
+beside the result, as display only."""
+
+[ensemble]
+variants = ["trend_positive_6m", "trend_positive_12m"]
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["GLD", "SLV", "PPLT", "PALL", "USO", "UNG", "UGA", "DBB", "DBA", "CORN"] },
+]
+
+[outcome]
+kind = "portfolio_return"
+horizon_sessions = [21]
+benchmark = "mix:GLD=0.1,SLV=0.1,PPLT=0.1,PALL=0.1,USO=0.1,UNG=0.1,UGA=0.1,DBB=0.1,DBA=0.1,CORN=0.1"
+start_offset_sessions = 1
+cost_bps = 20
+weighting = "equal"
+
+[quality_bar]
+outcome = """The three-fund book's return over the 21 sessions from the close after each month end, less an
+equal-weight basket of the ten funds, net of cost on the weight change; unfilled slots are cash.
+Price only: the stored forward return is close to close and carries no dividend or distribution, so
+the book and the benchmark both miss their yield and cash earns the Treasury bill."""
+trigger_timing = """The ranking reads trailing returns at the month-end close D; the book is held from the next
+session's close S for 21 sessions. Nothing after D enters a pick."""
+replication = """Miffre and Rallis (2007): formation and holding of 1 to 12 months, long the top and short the bottom
+of about 31 futures, 1979 to 2004 (up to 9.4 percent a year, not verified). Here: long only, three
+of ten ETFs, 6 and 12 month lookbacks averaged."""
+expected_size = """Strong before 2008 and weak from 2010 to 2020 in the sources; long-only with a cash filter keeps
+only the part of the premium that is not on the short side. No recent-decade split is on file."""
+capacity_costs = """Single-commodity ETFs are thin in places (UGA, DBB, DBA); many issue a K-1 for tax; cost_bps 20 a
+round trip assumed; about 6 to 10 switches a year."""
+failure_modes = """Energy beta and roll drag dominate the funds' returns and a sideways decade gives no trend. Retire
+if the frozen-period picks-series t is under 2."""
+decoys = """Energy beta, the tsmom edges (this is their commodity subset) and the equal-weight benchmark's own
+trend: the benchmark is the null for owning the ten."""
+
+[[sources]]
+title = "Miffre, J. and Rallis, G., Momentum strategies in commodity futures markets, Journal of Banking and Finance, 2007"
+
+[[sources]]
+title = "Fuertes, A., Miffre, J. and Rallis, G., Tactical allocation in commodity futures markets: Combining momentum and term structure signals, Journal of Banking and Finance, 2010"

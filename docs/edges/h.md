@@ -7,6 +7,8 @@ Back to the [index of every edge](../edges.md).
 |---|---|---|---|---|
 | BDC price to NAV reversion (`bdc_price_to_nav_reversion`) | candidate | month end | excess return, over 60 sessions, vs SPY, entered 1 session after the decision session, costs 30 bps | `bdc_price_to_nav` |
 | Dual-class share spread reversion (`dual_class_spread_reversion`) | candidate | month end | pair spread, over 20, 60 sessions, entered 1 session after the decision session, the cheap share class against its sibling from rollup.share_classes@v1.sibling_id, short leg pays borrow, costs 10 bps | `dual_class_cheap_leg` |
+| Currency ETF momentum (`fx_etf_carry_momentum`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 20% FXE, 20% FXY, 20% FXB, 20% FXA and 20% FXC, entered 1 session after the decision session, costs 10 bps | `trend_positive_6m`, `trend_positive_12m` |
+| Natural gas and oil ETF avoid list (`natgas_etf_contango_drag`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 34% UNG, 33% USO and 33% DBO, entered 1 session after the decision session, costs 20 bps | `trend_positive_12m` |
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | every session | excess return, over 6, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `retail_option_attention` |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | on each `tender_offer` | excess return, over 60, 250 sessions, vs SPY, starting +21 sessions from the event, costs 20 bps | `tender_offer_filed` |
 | Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
@@ -75,6 +77,67 @@ Back to the [index of every edge](../edges.md).
 - Schultz, P. and Shive, S., Mispricing of Dual-Class Shares: Profit Opportunities, Arbitrage, and Trading, Journal of Financial Economics, 2010 <https://papers.ssrn.com/abstract=1338885>
 - Froot, K. and Dabora, E., How Are Stock Prices Affected by the Location of Trade?, Journal of Financial Economics, 1999
 - Lamont, O. and Thaler, R., Can the Market Add and Subtract? Mispricing in Tech Stock Carve-outs, Journal of Political Economy, 2003
+
+## Currency ETF momentum (`fx_etf_carry_momentum`)
+
+**Status:** candidate. **Family:** H. **Thesis:** Currency ETFs that rose most over the past year keep rising, so holding the three strongest beats an equal mix of the five major currencies.
+
+- **Outcome:** portfolio return, over 21 sessions, vs a blend of 20% FXE, 20% FXY, 20% FXB, 20% FXA and 20% FXC, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.symbol in ('FXE', 'FXY', 'FXB', 'FXA', 'FXC', 'UUP')`
+- **Top K:** 3
+- **Screeners:** `trend_positive_6m`, `trend_positive_12m`
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** VERDICTS ARE UNMEASURED until the screens are run and evaluated. LIMITS: this is the MOMENTUM leg only. The carry leg of the source (sort on the forward discount) needs foreign short-rate series that are not stored: not built, and the document does not claim carry. The universe is the five major-currency funds and UUP, the dollar, so a falling foreign mix can be held as the dollar; the benchmark is an equal mix of the five foreign funds. The top three by raw return where above 0 are held at a third each, an unfilled slot is cash at the bill yield. The funds hold deposits, whose interest is in the fund's price only as a drag for the dollar fund; no distributions in the stored return; cost_bps 10 a round trip assumed. The ensemble of 6 and 12 months is ONE trial. verdict.toml [oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one beside the result, as display only.
+
+**Quality bar**
+
+1. **Mechanism:** Currency momentum comes from slow-moving capital flows and central-bank reaction functions rather than profit maximisation (Menkhoff, Sarno, Schmeling and Schrimpf 2012).
+2. **Persistence:** The effect has been weak since 2010 in G10 (near-zero rate dispersion) and the funds cost 0.4 percent a year and track poorly; persistence is a claim to test.
+3. **Outcome:** The three-fund book's return over the 21 sessions from the close after each month end, less an equal mix of the five foreign-currency funds, net of cost on the weight change. Price only: the stored forward return is close to close and carries no dividend or distribution, so the book and the benchmark both miss their yield and cash earns the Treasury bill.
+4. **Trigger timing:** Trailing returns are read at the month-end close D; the book is held from the next session's close S for 21 sessions. Nothing after D enters a pick.
+5. **Faithful replication:** Menkhoff, Sarno, Schmeling and Schrimpf (2012): sort currencies on the 1 to 12 month return, long the top and short the bottom, monthly. Here: six ETFs, top three by 6 and 12 month raw return where above 0, long only.
+6. **Expected size and sample:** Carry has worked for forty years with crashes and weakly since 2010; the momentum figures are not verified here. An ETF wrapper's 0.4 percent cost is large against a 2 to 4 percent carry.
+7. **Capacity and costs:** Capacity is limited by FXF and FXC volume, not by the large funds; about 8 switches a year; cost_bps 10 assumed.
+8. **Failure modes and retirement:** A dollar regime dominates all six series, and six funds leave few independent choices. Retire if the frozen-period picks-series t is under 2.
+9. **Decoys:** Dollar beta and risk-on equity beta; the benchmark excludes the dollar fund on purpose (a held UUP is a bet against the foreign mix).
+
+**Sources**
+
+- Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A., Currency momentum strategies, Journal of Financial Economics, 2012
+- Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A., Carry trades and global foreign exchange volatility, Journal of Finance, 2012
+
+## Natural gas and oil ETF avoid list (`natgas_etf_contango_drag`)
+
+**Status:** candidate. **Family:** H. **Thesis:** Funds that roll futures in a market in contango lose value by structure, so holding them only while their own price trend is up, and cash otherwise, beats holding them always.
+
+- **Outcome:** portfolio return, over 21 sessions, vs a blend of 34% UNG, 33% USO and 33% DBO, entered 1 session after the decision session, costs 20 bps
+- **Schedule:** month end
+- **Universe:** `instrument.symbol in ('UNG', 'USO', 'DBO')`
+- **Top K:** 3
+- **Screeners:** `trend_positive_12m`
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** DOCUMENTED-LIMIT VARIANT. VERDICTS ARE UNMEASURED until the screen is run and evaluated. An allocation edge is long (ADR 0074), so the source's AVOID or SHORT rule cannot be filed as such: this document expresses the avoid list as a long book that holds each fund only while its own 12-month raw return is above 0 and holds cash at the Treasury bill yield for the rest, measured against an near-equal mix of the three funds held always (34, 33 and 33 percent: weights must add to one). A fund the structure drags down is mostly out of the book, so the book earns the bill where the fund's drift is negative. NOT BUILT: the source's trigger (short when the front and second futures are in contango beyond the cost of carry) needs the Henry Hub futures curve, which is not stored (the D11 history); the price-drift version (the fund against the spot price) needs the spot series. A positive excess means cash in the funds' falling years beat holding them; it is the effect of the trend rule, so a pass is still not evidence of a contango drag. The short side with a borrow cost (Quantpedia's UNG and BOIL) is not expressible here: an excess-return short over three names has no decile figures. Three funds, price only, cost_bps 20 a round trip assumed. Leveraged BOIL and KOLD are excluded by the screen.
+
+**Quality bar**
+
+1. **Mechanism:** A commodity ETF must roll its futures monthly; natural gas has steep seasonal contango, so each roll sells low and buys high, and its holders are retail speculators on weather (Erb and Harvey 2006; Guedj, Li and McCann 2011).
+2. **Persistence:** The structure has not changed (UNG has lost most of its value since 2007, not verified), but a cold snap can lift the fund by 50 percent, which is the risk that keeps shorts small.
+3. **Outcome:** The book's return over the 21 sessions from the close after each month end, less the near-equal mix of the three funds held always, net of the cost on the weight change; a fund with a falling trend is held as cash. Price only: the stored forward return is close to close and carries no dividend or distribution, so the book and the benchmark both miss their yield and cash earns the Treasury bill.
+4. **Trigger timing:** The 12-month raw return is read at the month-end close D; the book is held from the next session's close S for 21 sessions. No fact after D enters a pick.
+5. **Faithful replication:** The source's rule is a futures-curve trigger on the single ETP (Erb and Harvey 2006; Gorton, Hayashi and Rouwenhorst 2013). Here only the trend filter and a cash position exist, so the replication is partial: it tests whether staying out of a drag fund after a falling year helps.
+6. **Expected size and sample:** Guedj, Li and McCann (2011) document the roll losses in UNG and USO; no recent split is on file. The size of a trend-filtered avoidance is not published.
+7. **Capacity and costs:** Capacity is small to moderate in three funds; a few switches a year; cost_bps 20 assumed. The source's short side needs borrow (1 to 5 percent on UNG, not verified): not charged.
+8. **Failure modes and retirement:** A cold-snap rally while the book is in cash costs a month against the held mix; the result rests on three funds and a few years of falling prices. Retire if the frozen-period picks-series t is under 2.
+9. **Decoys:** The energy market's own direction: in the funds' falling years cash looks good by construction. Read it beside commodity_roll_momentum's energy funds.
+
+**Sources**
+
+- Erb, C. and Harvey, C., The Strategic and Tactical Value of Commodity Futures, Financial Analysts Journal, 2006
+- Gorton, G., Hayashi, F. and Rouwenhorst, K., The Fundamentals of Commodity Futures Returns, Review of Finance, 2013
+- Guedj, I., Li, G. and McCann, C., Futures-based commodity ETFs, Journal of Index Investing, 2011
 
 ## Retail lottery-option attention (`retail_options_lottery_attention`)
 
