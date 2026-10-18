@@ -73,9 +73,6 @@ title = "Boyer, B. and Vorkink, K., Stock Options as Lotteries, Journal of Finan
 # The literature's figure (ADR 0064): Bali, Cakici and Whitelaw's low-minus-high MAX decile spread,
 # more than 1% a month (a lower bound, from the paper's abstract), 1962-2005, before costs; it is
 # of the MAX proxy, not of Boyer and Vorkink's option-skewness sort.
-
-[[sources]]
-title = "Boyer, B. and Vorkink, K. (2014), Stock Options as Lotteries, Journal of Finance"
 url = "https://ideas.repec.org/a/bla/jfinan/v69y2014i4p1485-1527.html"
 
 [[sources]]

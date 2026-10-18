@@ -90,9 +90,6 @@ title = "So, E. and Wang, S., News-driven return reversals: Liquidity provision 
 # The literature's figure (ADR 0064): the market-adjusted return of top-decile prior-12-month
 # winners in the 5 days before the announcement, +1.58% (Aboody, Lehavy and Trueman 2010), before
 # costs.
-
-[[sources]]
-title = "So, E. and Wang, S. (2014), News-Driven Return Reversals: Liquidity Provision Ahead of Earnings Announcements, Journal of Financial Economics (MIT open access)"
 url = "https://dspace.mit.edu/handle/1721.1/119665"
 
 [[sources]]

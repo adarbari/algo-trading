@@ -299,6 +299,40 @@ def test_every_shipped_edge_document_validates() -> None:
     assert {"vrp_short_premium", "sp500_index_changes", "russell_reconstitution"} <= set(names)
 
 
+def _source_key(title: str) -> str:
+    """A title as the duplicate check compares it: lowercase, punctuation stripped."""
+    return " ".join(re.sub(r"[^a-z0-9 ]", " ", title.lower()).split())
+
+
+def test_no_shipped_edge_lists_the_same_source_twice() -> None:
+    """One paper is one ``[[sources]]`` entry (an unlinked original and a linked twin were merged
+    in PR #709): the same normalised title or the same url twice names the edge and the title."""
+    repeated = []
+    for e in load_edges(SHIPPED):
+        seen_titles: dict[str, str] = {}
+        seen_urls: dict[str, str] = {}
+        for s in e.sources:
+            key = _source_key(s.title)
+            if key in seen_titles:
+                repeated.append(f"{e.id}: title repeated: {s.title!r}")
+            seen_titles.setdefault(key, s.title)
+            if s.url:
+                if s.url in seen_urls:
+                    repeated.append(
+                        f"{e.id}: url repeated: {s.url} ({s.title!r} and {seen_urls[s.url]!r})"
+                    )
+                seen_urls.setdefault(s.url, s.title)
+    assert not repeated, f"merge the entries into one [[sources]] block: {repeated}"
+
+
+def test_every_published_figure_names_a_source_in_range() -> None:
+    """``[published] source`` is a 0-based index into ``[[sources]]``; a merge or deletion that
+    shifts the list must re-point it."""
+    for e in load_edges(SHIPPED):
+        if e.published is not None:
+            assert 0 <= e.published.source < len(e.sources), (e.id, e.published.source)
+
+
 def test_every_open_shipped_edge_answers_the_whole_quality_bar() -> None:
     unanswered = [
         f"{e.id}: {key}"

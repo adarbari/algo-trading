@@ -64,6 +64,7 @@ url = "https://doi.org/10.1016/j.jfineco.2013.02.015"
 
 [[sources]]
 title = "Hartzmark, S. and Solomon, D., The Dividend Disconnect, Journal of Finance, 2019"
+url = "https://ideas.repec.org/a/bla/jfinan/v74y2019i5p2153-2199.html"
 
 [[sources]]
 title = "Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (signal DivSeason)"
@@ -72,14 +73,6 @@ url = "https://github.com/OpenSourceAP/CrossSection"
 # The literature's figure (ADR 0064): Hartzmark and Solomon's abnormal return of stocks in their
 # predicted dividend month over all other stocks, 53 bp a month, CRSP 1927-2009, before costs
 # (the long leg).
-
-[[sources]]
-title = "Hartzmark, S. and Solomon, D. (2013), The dividend month premium, Journal of Financial Economics"
-url = "https://ideas.repec.org/a/eee/jfinec/v109y2013i3p640-660.html"
-
-[[sources]]
-title = "Hartzmark, S. and Solomon, D. (2019), The Dividend Disconnect, Journal of Finance"
-url = "https://ideas.repec.org/a/bla/jfinan/v74y2019i5p2153-2199.html"
 
 [published]
 measure = "mean_excess"

@@ -81,10 +81,6 @@ url = "https://quantpedia.com/strategies/reversal-during-earnings-announcements/
 # before costs. A long-short spread of the extreme quintiles.
 
 [[sources]]
-title = "So, E. and Wang, S. (2014), News-Driven Return Reversals: Liquidity Provision Ahead of Earnings Announcements, Journal of Financial Economics (MIT open access)"
-url = "https://dspace.mit.edu/handle/1721.1/119665"
-
-[[sources]]
 title = "Nagel, S. (2011), Evaporating Liquidity, NBER working paper 17653 (Review of Financial Studies 2012)"
 url = "https://www.nber.org/papers/w17653"
 

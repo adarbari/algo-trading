@@ -35,8 +35,6 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Lei, Q., Wang, X. W. and Yan, Z., Volatility Spread and Stock Market Response to Earnings Announcements, Journal of Banking and Finance, 2020 <https://doi.org/10.1016/j.jbankfin.2017.04.002>
-- Jin, W., Livnat, J. and Zhang, Y., Option Prices Leading Equity Prices: Do Options Traders Have an Information Advantage?, Journal of Accounting Research, 2012
-- Jin, W., Livnat, J. and Zhang, Y. (2012), Option Prices Leading Equity Prices: Do Option Traders Have an Information Advantage?, Journal of Accounting Research <https://ideas.repec.org/a/bla/joares/v50y2012i2p401-432.html>
-- Lei, Q., Wang, X. W. and Yan, Z. (2020), Volatility Spread and Stock Market Response to Earnings Announcements, Journal of Banking and Finance (NJIT Digital Commons) <https://digitalcommons.njit.edu/fac_pubs/4962>
+- Jin, W., Livnat, J. and Zhang, Y., Option Prices Leading Equity Prices: Do Options Traders Have an Information Advantage?, Journal of Accounting Research, 2012 <https://ideas.repec.org/a/bla/joares/v50y2012i2p401-432.html>
 - Cremers, M. and Weinbaum, D. (2010), Deviations from Put-Call Parity and Stock Return Predictability, Journal of Financial and Quantitative Analysis <https://ideas.repec.org/a/cup/jfinqa/v45y2010i02p335-367_00.html>
 - Bali, T. and Hovakimian, A. (2009), Volatility Spreads and Expected Stock Returns, Management Science <https://ideas.repec.org/a/inm/ormnsc/v55y2009i11p1797-1812.html>

@@ -40,25 +40,15 @@ decoys = """The profitability tilt alone (the cash_op_profitability baseline), s
 
 [[sources]]
 title = "Lakonishok, J., Shleifer, A. and Vishny, R., Contrarian Investment, Extrapolation, and Risk, Journal of Finance, 1994"
+url = "https://www.nber.org/papers/w4360"
 
 [[sources]]
 title = "Asness, C. and Frazzini, A., The Devil in HML's Details, Journal of Portfolio Management, 2013"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/The-Devil-in-HMLs-Details"
 
 [[sources]]
 title = "Novy-Marx, R., The Other Side of Value: The Gross Profitability Premium, Journal of Financial Economics, 2013"
 url = "https://www.nber.org/system/files/working_papers/w15940/w15940.pdf"
-
-[[sources]]
-title = "Lakonishok, J., Shleifer, A. and Vishny, R. (1993), Contrarian Investment, Extrapolation, and Risk, NBER working paper 4360 (Journal of Finance 1994)"
-url = "https://www.nber.org/papers/w4360"
-
-[[sources]]
-title = "Asness, C. and Frazzini, A. (2013), The Devil in HML's Details, Journal of Portfolio Management (AQR page)"
-url = "https://www.aqr.com/Insights/Research/Journal-Article/The-Devil-in-HMLs-Details"
-
-[[sources]]
-title = "Novy-Marx, R. (2010), The Other Side of Value: Good Growth and the Gross Profitability Premium, NBER working paper 15940 (Journal of Financial Economics 2013)"
-url = "https://www.nber.org/papers/w15940"
 
 [[sources]]
 title = "Ball, R., Gerakos, J., Linnainmaa, J. and Nikolaev, V. (2016), Accruals, Cash Flows, and Operating Profitability in the Cross Section of Stock Returns, Journal of Financial Economics"

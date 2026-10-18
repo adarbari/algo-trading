@@ -41,6 +41,7 @@ decoys = """Low-price, idiosyncratic-volatility and lottery names (the same clus
 
 [[sources]]
 title = "Campbell, J., Hilscher, J. and Szilagyi, J., In Search of Distress Risk, Journal of Finance, 2008"
+url = "https://ideas.repec.org/a/bla/jfinan/v63y2008i6p2899-2939.html"
 
 [[sources]]
 title = "Campbell, J., Hilscher, J. and Szilagyi, J., Predicting Financial Distress and the Performance of Distressed Stocks, Journal of Investment Management, 2011"
@@ -48,18 +49,11 @@ url = "https://joim.com/article/predicting-financial-distress-and-the-performanc
 
 [[sources]]
 title = "Dichev, I., Is the Risk of Bankruptcy a Systematic Risk?, Journal of Finance, 1998"
+url = "https://academicnewsletter.sufe.edu.cn/info/361843"
 
 [[sources]]
 title = "Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies, 2020"
 url = "https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html"
-
-[[sources]]
-title = "Campbell, J., Hilscher, J. and Szilagyi, J. (2008), In Search of Distress Risk, Journal of Finance"
-url = "https://ideas.repec.org/a/bla/jfinan/v63y2008i6p2899-2939.html"
-
-[[sources]]
-title = "Dichev, I. (1998), Is the Risk of Bankruptcy a Systematic Risk?, Journal of Finance"
-url = "https://academicnewsletter.sufe.edu.cn/info/361843"
 
 [[variants]]
 id = "safest_long"

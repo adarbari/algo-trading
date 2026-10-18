@@ -75,10 +75,8 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Miffre, J. and Rallis, G., Momentum strategies in commodity futures markets, Journal of Banking and Finance, 2007
-- Fuertes, A., Miffre, J. and Rallis, G., Tactical allocation in commodity futures markets: Combining momentum and term structure signals, Journal of Banking and Finance, 2010
-- Miffre, J. and Rallis, G. (2007), Momentum strategies in commodity futures markets, Journal of Banking and Finance <https://ideas.repec.org/a/eee/jbfina/v31y2007i6p1863-1886.html>
-- Fuertes, A.-M., Miffre, J. and Rallis, G. (2010), Tactical allocation in commodity futures markets: Combining momentum and term structure signals, Journal of Banking and Finance (City Research Online) <https://openaccess.city.ac.uk/id/eprint/6416/>
+- Miffre, J. and Rallis, G., Momentum strategies in commodity futures markets, Journal of Banking and Finance, 2007 <https://ideas.repec.org/a/eee/jbfina/v31y2007i6p1863-1886.html>
+- Fuertes, A., Miffre, J. and Rallis, G., Tactical allocation in commodity futures markets: Combining momentum and term structure signals, Journal of Banking and Finance, 2010 <https://openaccess.city.ac.uk/id/eprint/6416/>
 - Gorton, G., Hayashi, F. and Rouwenhorst, K. (2007), The Fundamentals of Commodity Futures Returns, NBER working paper 13249 (Review of Finance 2013) <https://www.nber.org/papers/w13249>
 - Erb, C. and Harvey, C. (2006), The Strategic and Tactical Value of Commodity Futures, Financial Analysts Journal <https://ideas.repec.org/a/taf/ufajxx/v62y2006i2p69-97.html>
 
@@ -110,9 +108,7 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Asness, C., Moskowitz, T. and Pedersen, L., Value and Momentum Everywhere, Journal of Finance, 2013 <https://w4.stern.nyu.edu/facdir/lpederse/papers/ValMomEverywhere.pdf>
-- Andreu, L., Swinkels, L. and Tjong-A-Tjoe, L., Can Exchange Traded Funds be used to exploit country and industry momentum?, 2013
-- Asness, C., Moskowitz, T. and Pedersen, L. (2013), Value and Momentum Everywhere, Journal of Finance (AQR page) <https://www.aqr.com/Insights/Research/Journal-Article/Value-and-Momentum-Everywhere>
-- Andreu, L., Swinkels, L. and Tjong-A-Tjoe, L. (2013), Can exchange traded funds be used to exploit industry and country momentum?, Financial Markets and Portfolio Management <https://ideas.repec.org/a/kap/fmktpm/v27y2013i2p127-148.html>
+- Andreu, L., Swinkels, L. and Tjong-A-Tjoe, L., Can Exchange Traded Funds be used to exploit country and industry momentum?, 2013 <https://ideas.repec.org/a/kap/fmktpm/v27y2013i2p127-148.html>
 - CXO Advisory, Exploiting Industry Momentum via ETFs? (summary of Swinkels and Tjong-A-Tjoe (2008), the industry-only predecessor) <https://www.cxoadvisory.com/momentum-investing/exploiting-industry-momentum-via-etfs/>
 - Moskowitz, T., Ooi, Y. and Pedersen, L. (2012), Time Series Momentum, Journal of Financial Economics (AQR page) <https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum>
 
@@ -143,9 +139,8 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Jostova, G., Nikolova, S., Philipov, A. and Stahel, C., Momentum in Corporate Bond Returns, Review of Financial Studies, 2013
+- Jostova, G., Nikolova, S., Philipov, A. and Stahel, C., Momentum in Corporate Bond Returns, Review of Financial Studies, 2013 <https://ideas.repec.org/a/oup/rfinst/v26y2013i7p1649-1693.html>
 - Faber, M., A Quantitative Approach to Tactical Asset Allocation, Journal of Wealth Management, 2007 <https://papers.ssrn.com/abstract=962461>
-- Jostova, G., Nikolova, S., Philipov, A. and Stahel, C. (2013), Momentum in Corporate Bond Returns, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v26y2013i7p1649-1693.html>
 - Hurst, B., Ooi, Y. and Pedersen, L. (2017), A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management (AQR page) <https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing>
 - Moskowitz, T., Ooi, Y. and Pedersen, L. (2012), Time Series Momentum, Journal of Financial Economics (AQR page) <https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum>
 
@@ -209,9 +204,6 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Moskowitz, T., Ooi, Y. and Pedersen, L., Time Series Momentum, Journal of Financial Economics, 2012
+- Moskowitz, T., Ooi, Y. and Pedersen, L., Time Series Momentum, Journal of Financial Economics, 2012 <https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum>
 - Hurst, B., Ooi, Y. and Pedersen, L., A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management, 2017 <https://www.TrendFollowing.com/whitepaper/Century_Evidence_Trend_Following.pdf>
 - Huang, D., Li, J., Wang, L. and Zhou, G., Time series momentum: Is it there?, Journal of Financial Economics, 2020 <https://doi.org/10.1016/j.jfineco.2019.08.004>
-- Moskowitz, T., Ooi, Y. and Pedersen, L. (2012), Time Series Momentum, Journal of Financial Economics (AQR page) <https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum>
-- Hurst, B., Ooi, Y. and Pedersen, L. (2017), A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management (AQR page) <https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing>
-- Huang, D., Li, J., Wang, L. and Zhou, G. (2020), Time Series Momentum: Is It There?, Journal of Financial Economics (WashU profile record) <https://profiles.wustl.edu/en/publications/time-series-momentum-is-it-there/>

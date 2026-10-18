@@ -75,11 +75,8 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Schultz, P. and Shive, S., Mispricing of Dual-Class Shares: Profit Opportunities, Arbitrage, and Trading, Journal of Financial Economics, 2010 <https://papers.ssrn.com/abstract=1338885>
-- Froot, K. and Dabora, E., How Are Stock Prices Affected by the Location of Trade?, Journal of Financial Economics, 1999
-- Lamont, O. and Thaler, R., Can the Market Add and Subtract? Mispricing in Tech Stock Carve-outs, Journal of Political Economy, 2003
-- Schultz, P. and Shive, S. (2010), Mispricing of Dual-Class Shares: Profit Opportunities, Arbitrage, and Trading, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v98y2010i3p524-549.html>
-- Froot, K. and Dabora, E. (1998), How Are Stock Prices Affected by the Location of Trade?, NBER working paper 6572 (Journal of Financial Economics 1999) <https://www.nber.org/papers/w6572>
-- Lamont, O. and Thaler, R. (2001), Can the Market Add and Subtract? Mispricing in Tech Stock Carve-Outs, NBER working paper 8302 (Journal of Political Economy 2003) <https://www.nber.org/papers/w8302>
+- Froot, K. and Dabora, E., How Are Stock Prices Affected by the Location of Trade?, Journal of Financial Economics, 1999 <https://www.nber.org/papers/w6572>
+- Lamont, O. and Thaler, R., Can the Market Add and Subtract? Mispricing in Tech Stock Carve-outs, Journal of Political Economy, 2003 <https://www.nber.org/papers/w8302>
 - Mitchell, M., Pulvino, T. and Stafford, E. (2002), Limited Arbitrage in Equity Markets, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v57y2002i2p551-584.html>
 
 ## Currency ETF momentum (`fx_etf_carry_momentum`)
@@ -109,11 +106,8 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A., Currency momentum strategies, Journal of Financial Economics, 2012
-- Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A., Carry trades and global foreign exchange volatility, Journal of Finance, 2012
-- Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A. (2011), Currency Momentum Strategies, BIS working paper 366 (Journal of Financial Economics 2012) <https://www.bis.org/publ/work366.pdf>
-- Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A. (2012), Carry Trades and Global Foreign Exchange Volatility, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v67y2012i2p681-718.html>
-- Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A. (2012), Carry Trades and Global Foreign Exchange Volatility, Journal of Finance (City Research Online author version) <https://openaccess.city.ac.uk/id/eprint/3391/>
+- Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A., Currency momentum strategies, Journal of Financial Economics, 2012 <https://www.bis.org/publ/work366.pdf>
+- Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A., Carry trades and global foreign exchange volatility, Journal of Finance, 2012 <https://ideas.repec.org/a/bla/jfinan/v67y2012i2p681-718.html>
 - Lustig, H., Roussanov, N. and Verdelhan, A. (2008), Common Risk Factors in Currency Markets, NBER working paper 14082 (Review of Financial Studies 2011) <https://www.nber.org/papers/w14082>
 
 ## Natural gas and oil ETF avoid list (`natgas_etf_contango_drag`)
@@ -143,11 +137,9 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Erb, C. and Harvey, C., The Strategic and Tactical Value of Commodity Futures, Financial Analysts Journal, 2006
-- Gorton, G., Hayashi, F. and Rouwenhorst, K., The Fundamentals of Commodity Futures Returns, Review of Finance, 2013
+- Erb, C. and Harvey, C., The Strategic and Tactical Value of Commodity Futures, Financial Analysts Journal, 2006 <https://ideas.repec.org/a/taf/ufajxx/v62y2006i2p69-97.html>
+- Gorton, G., Hayashi, F. and Rouwenhorst, K., The Fundamentals of Commodity Futures Returns, Review of Finance, 2013 <https://www.nber.org/papers/w13249>
 - Guedj, I., Li, G. and McCann, C., Futures-based commodity ETFs, Journal of Index Investing, 2011
-- Gorton, G., Hayashi, F. and Rouwenhorst, K. (2007), The Fundamentals of Commodity Futures Returns, NBER working paper 13249 (Review of Finance 2013) <https://www.nber.org/papers/w13249>
-- Erb, C. and Harvey, C. (2006), The Strategic and Tactical Value of Commodity Futures, Financial Analysts Journal <https://ideas.repec.org/a/taf/ufajxx/v62y2006i2p69-97.html>
 - Fuertes, A.-M., Miffre, J. and Rallis, G. (2010), Tactical allocation in commodity futures markets: Combining momentum and term structure signals, Journal of Banking and Finance (City Research Online) <https://openaccess.city.ac.uk/id/eprint/6416/>
 
 ## Retail lottery-option attention (`retail_options_lottery_attention`)
@@ -177,10 +169,8 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Bryzgalova, S., Pavlova, A. and Sikorskaya, T., Retail Trading in Options and the Rise of the Big Three Wholesalers, Journal of Finance, 2023
-- Byun, S.-J. and Kim, D.-H., Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics, 2016
-- Bryzgalova, S., Pavlova, A. and Sikorskaya, T. (2023), Retail Trading in Options and the Rise of the Big Three Wholesalers, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v78y2023i6p3465-3514.html>
-- Byun, S.-J. and Kim, D.-H. (2016), Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v122y2016i1p155-174.html>
+- Bryzgalova, S., Pavlova, A. and Sikorskaya, T., Retail Trading in Options and the Rise of the Big Three Wholesalers, Journal of Finance, 2023 <https://ideas.repec.org/a/bla/jfinan/v78y2023i6p3465-3514.html>
+- Byun, S.-J. and Kim, D.-H., Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics, 2016 <https://ideas.repec.org/a/eee/jfinec/v122y2016i1p155-174.html>
 - Boyer, B. and Vorkink, K. (2014), Stock Options as Lotteries, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v69y2014i4p1485-1527.html>
 - Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html>
 
@@ -211,12 +201,9 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Lakonishok, J. and Vermaelen, T., Anomalous price behavior around repurchase tender offers, Journal of Finance, 1990
-- Peyer, U. and Vermaelen, T., The nature and persistence of buyback anomalies, Review of Financial Studies, 2009
-- Fu, F. and Huang, S., The persistence of long-run abnormal returns following stock repurchases and offerings, Management Science, 2016
-- Lakonishok, J. and Vermaelen, T. (1990), Anomalous Price Behavior around Repurchase Tender Offers, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v45y1990i2p455-77.html>
-- Peyer, U. and Vermaelen, T. (2009), The Nature and Persistence of Buyback Anomalies, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v22y2009i4p1693-1745.html>
-- Fu, F. and Huang, S. (2016), The Persistence of Long-Run Abnormal Returns Following Stock Repurchases and Offerings, Management Science <https://ideas.repec.org/a/inm/ormnsc/v62y2016i4p964-984.html>
+- Lakonishok, J. and Vermaelen, T., Anomalous price behavior around repurchase tender offers, Journal of Finance, 1990 <https://ideas.repec.org/a/bla/jfinan/v45y1990i2p455-77.html>
+- Peyer, U. and Vermaelen, T., The nature and persistence of buyback anomalies, Review of Financial Studies, 2009 <https://ideas.repec.org/a/oup/rfinst/v22y2009i4p1693-1745.html>
+- Fu, F. and Huang, S., The persistence of long-run abnormal returns following stock repurchases and offerings, Management Science, 2016 <https://ideas.repec.org/a/inm/ormnsc/v62y2016i4p964-984.html>
 - Ikenberry, D., Lakonishok, J. and Vermaelen, T. (1995), Market underreaction to open market share repurchases, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v39y1995i2-3p181-208.html>
 
 ## Premium closed-end funds that over-distribute (`cef_distribution_trap`)
@@ -283,10 +270,8 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Kim, S., Klein, A. and Rosenfeld, J., Return performance surrounding reverse stock splits: can investors profit?, Financial Management, 2008
-- Han, K., The effects of reverse splits on the liquidity of the stock, Journal of Financial and Quantitative Analysis, 1995
-- Kim, S., Klein, A. and Rosenfeld, J. (2008), Return Performance Surrounding Reverse Stock Splits: Can Investors Profit?, Financial Management <https://ideas.repec.org/a/bla/finmgt/v37y2008i2p173-192.html>
-- Han, K. (1995), The Effects of Reverse Splits on the Liquidity of the Stock, Journal of Financial and Quantitative Analysis <https://ideas.repec.org/a/cup/jfinqa/v30y1995i01p159-169_00.html>
+- Kim, S., Klein, A. and Rosenfeld, J., Return performance surrounding reverse stock splits: can investors profit?, Financial Management, 2008 <https://ideas.repec.org/a/bla/finmgt/v37y2008i2p173-192.html>
+- Han, K., The effects of reverse splits on the liquidity of the stock, Journal of Financial and Quantitative Analysis, 1995 <https://ideas.repec.org/a/cup/jfinqa/v30y1995i01p159-169_00.html>
 - Campbell, J., Hilscher, J. and Szilagyi, J. (2008), In Search of Distress Risk, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v63y2008i6p2899-2939.html>
 
 ## Thematic ETF launch fade (`thematic_etf_launch_fade`)
@@ -319,6 +304,5 @@ Back to the [index of every edge](../edges.md).
 
 - Ben-David, I., Franzoni, F., Kim, B. and Moussawi, R., Competition for Attention in the ETF Space, Review of Financial Studies, 2023 <https://www.nber.org/papers/w28369>
 - Alpha Architect, Competition for Attention in the ETF Space (summary) <https://alphaarchitect.com/competition-for-attention-in-the-etf-space/>
-- Ben-David, I., Franzoni, F., Kim, B. and Moussawi, R. (2023), Competition for Attention in the ETF Space, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v36y2023i3p987-1042..html>
 - Brown, D., Davies, S. and Ringgenberg, M. (2021), ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance <https://ideas.repec.org/a/oup/revfin/v25y2021i4p937-972..html>
 - Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html>

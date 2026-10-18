@@ -80,14 +80,6 @@ url = "https://research.monash.edu/en/publications/why-does-the-option-to-stock-
 # (a long-short spread: the harness's decile spread over 5 sessions is the comparable number).
 
 [[sources]]
-title = "Johnson, T. and So, E. (2012), The Option to Stock Volume Ratio and Future Returns, Journal of Financial Economics"
-url = "https://ideas.repec.org/a/eee/jfinec/v106y2012i2p262-286.html"
-
-[[sources]]
-title = "Ge, L., Lin, T.-C. and Pearson, N. (2016), Why Does the Option to Stock Volume Ratio Predict Stock Returns?, Journal of Financial Economics"
-url = "https://ideas.repec.org/a/eee/jfinec/v120y2016i3p601-622.html"
-
-[[sources]]
 title = "Pan, J. and Poteshman, A. (2004), The Information of Option Volume for Future Stock Prices, NBER working paper 10925 (Review of Financial Studies 2006)"
 url = "https://www.nber.org/papers/w10925"
 

@@ -40,6 +40,7 @@ decoys = """Cash-based operating profitability alone (Novy-Marx finds most quali
 
 [[sources]]
 title = "Asness, C., Frazzini, A. and Pedersen, L., Quality Minus Junk, Review of Accounting Studies, 2019"
+url = "https://ideas.repec.org/a/spr/reaccs/v24y2019i1d10.1007_s11142-018-9470-2.html"
 
 [[sources]]
 title = "Novy-Marx, R., The Quality Dimension of Value Investing, working paper, 2014"
@@ -47,14 +48,6 @@ title = "Novy-Marx, R., The Quality Dimension of Value Investing, working paper,
 [[sources]]
 title = "Alpha Architect, Value and Quality Stocks (summary of the AQR data)"
 url = "https://alphaarchitect.com/value-and-quality-stocks/"
-
-[[sources]]
-title = "Asness, C., Frazzini, A. and Pedersen, L. (2019), Quality minus junk, Review of Accounting Studies"
-url = "https://ideas.repec.org/a/spr/reaccs/v24y2019i1d10.1007_s11142-018-9470-2.html"
-
-[[sources]]
-title = "Asness, C., Frazzini, A. and Pedersen, L. (2019), Quality Minus Junk, Review of Accounting Studies (publisher's version, Copenhagen Business School repository)"
-url = "https://research-api.cbs.dk/ws/portalfiles/portal/60211462/lasse_heje_pedersen_et_al_quality_minus_junk_publishersversion.pdf"
 
 [[sources]]
 title = "Novy-Marx, R. (2010), The Other Side of Value: Good Growth and the Gross Profitability Premium, NBER working paper 15940 (Journal of Financial Economics 2013)"

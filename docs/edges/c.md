@@ -45,8 +45,6 @@ Back to the [index of every edge](../edges.md).
 
 - Johnson, T. and So, E., The Option to Stock Volume Ratio and Future Returns, Journal of Financial Economics, 2012 <https://academicnewsletter.sufe.edu.cn/info/356813>
 - Ge, L., Lin, T.-C. and Pearson, N., Why Does the Option to Stock Volume Ratio Predict Stock Returns?, Journal of Financial Economics, 2016 <https://research.monash.edu/en/publications/why-does-the-option-to-stock-volume-ratio-predict-stock-returns/>
-- Johnson, T. and So, E. (2012), The Option to Stock Volume Ratio and Future Returns, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v106y2012i2p262-286.html>
-- Ge, L., Lin, T.-C. and Pearson, N. (2016), Why Does the Option to Stock Volume Ratio Predict Stock Returns?, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v120y2016i3p601-622.html>
 - Pan, J. and Poteshman, A. (2004), The Information of Option Volume for Future Stock Prices, NBER working paper 10925 (Review of Financial Studies 2006) <https://www.nber.org/papers/w10925>
 - Easley, D., O'Hara, M. and Srinivas, P. S. (1998), Option Volume and Stock Prices: Evidence on Where Informed Traders Trade, Journal of Finance <https://academicnewsletter.sufe.edu.cn/info/361875>
 
@@ -77,11 +75,9 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Goyal, A. and Saretto, A., Cross-section of option returns and volatility, Journal of Financial Economics, 2009
+- Goyal, A. and Saretto, A., Cross-section of option returns and volatility, Journal of Financial Economics, 2009 <https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html>
 - Bali, T., Beckmeyer, H., Moerke, M. and Weigert, F., Option Return Predictability with Machine Learning and Big Data, Review of Financial Studies, 2023 <https://www.wiwi.uni-muenster.de/fcm/en/publication/98329575>
 - EDHEC, Empirical properties of straddle returns <https://risk.edhec.edu/publications/empirical-properties-straddle-returns>
-- Goyal, A. and Saretto, A. (2009), Cross-section of option returns and volatility, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html>
-- Bali, T., Beckmeyer, H., Moerke, M. and Weigert, F. (2021), Option Return Predictability with Machine Learning and Big Data, CFR working paper 21-08 (Review of Financial Studies 2023) <https://www.cfr-cologne.de/download/workingpaper/cfr-21-08.pdf>
 - Carr, P. and Wu, L. (2009), Variance Risk Premiums, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v22y2009i3p1311-1341.html>
 - Bakshi, G. and Kapadia, N. (2003), Delta-Hedged Gains and the Negative Market Volatility Risk Premium, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v16y2003i2p527-566.html>
 
@@ -113,9 +109,8 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Zhan, X., Han, B., Cao, J. and Tong, Q., Option Return Predictability, Review of Financial Studies, 2022 <https://research.polyu.edu.hk/en/publications/option-return-predictability/>
-- Cao, J. and Han, B., Cross section of option returns and idiosyncratic stock volatility, Journal of Financial Economics, 2013
+- Cao, J. and Han, B., Cross section of option returns and idiosyncratic stock volatility, Journal of Financial Economics, 2013 <https://ideas.repec.org/a/eee/jfinec/v108y2013i1p231-249.html>
 - CXO Advisory, Option Strategies Based on Factor Sorts (summary) <https://www.cxoadvisory.com/equity-options/option-strategies-based-on-factor-sorts>
-- Cao, J. and Han, B. (2013), Cross section of option returns and idiosyncratic stock volatility, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v108y2013i1p231-249.html>
 - Bali, T., Beckmeyer, H., Moerke, M. and Weigert, F. (2021), Option Return Predictability with Machine Learning and Big Data, CFR working paper 21-08 (Review of Financial Studies 2023) <https://www.cfr-cologne.de/download/workingpaper/cfr-21-08.pdf>
 - Goyal, A. and Saretto, A. (2009), Cross-section of option returns and volatility, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html>
 
@@ -147,8 +142,7 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - tastylive research on IV rank for premium selling (practitioner, not peer reviewed)
-- Goyal, A. and Saretto, A., Cross-section of option returns and volatility, Journal of Financial Economics, 2009
-- Goyal, A. and Saretto, A. (2009), Cross-section of option returns and volatility, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html>
+- Goyal, A. and Saretto, A., Cross-section of option returns and volatility, Journal of Financial Economics, 2009 <https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html>
 - Santa-Clara, P. and Saretto, A. (2009), Option strategies: Good deals and margin calls, Journal of Financial Markets <https://ideas.repec.org/a/eee/finmar/v12y2009i3p391-417.html>
 - Carr, P. and Wu, L. (2009), Variance Risk Premiums, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v22y2009i3p1311-1341.html>
 - Coval, J. and Shumway, T. (2001), Expected Option Returns, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v56y2001i3p983-1009.html>
@@ -182,8 +176,7 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Bali, T., Cakici, N. and Whitelaw, R., Maxing Out: Stocks as Lotteries and the Cross-Section of Expected Returns, Journal of Financial Economics, 2011 <https://www.nber.org/papers/w14804>
-- Boyer, B. and Vorkink, K., Stock Options as Lotteries, Journal of Finance, 2014
-- Boyer, B. and Vorkink, K. (2014), Stock Options as Lotteries, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v69y2014i4p1485-1527.html>
+- Boyer, B. and Vorkink, K., Stock Options as Lotteries, Journal of Finance, 2014 <https://ideas.repec.org/a/bla/jfinan/v69y2014i4p1485-1527.html>
 - Byun, S.-J. and Kim, D.-H. (2016), Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v122y2016i1p155-174.html>
 - Barberis, N. and Huang, M. (2007), Stocks as Lotteries: The Implications of Probability Weighting for Security Prices, NBER working paper 12936 (American Economic Review 2008) <https://www.nber.org/papers/w12936>
 - Kumar, A. (2009), Who Gambles in the Stock Market?, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v64y2009i4p1889-1933.html>
