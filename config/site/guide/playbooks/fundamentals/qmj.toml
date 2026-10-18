@@ -1,0 +1,32 @@
+# L3 site setting: the Guide's playbook for the site preset qmj (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "qmj"
+version = 1  # the preset version this prose was written for
+summary = "Ranks every tradeable stock by a quality score, highest first: how profitable it is and how little debt and distress risk it carries, each measured against every other stock. It is quality minus junk from the finance literature, built from what the stored statements support, a candidate edge under test."
+hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and it has a quality minus junk score. Every such name qualifies; the order is the point, the highest quality first."
+not_checked = "It does not check price, momentum, size or industry (the score ranks across all names), and it has no growth part and no beta or earnings volatility in its safety. It is the screen of the quality minus junk edge, which the harness is still testing."
+before_acting = [
+  "The safety half is leverage and distress only: rollup.qmj@v1.safety_z does not know the stock's beta or how steady its earnings are, so a volatile but low-debt name can score well.",
+  "Quality is not cheapness; the highest scores are often the dearest names, so compare feature.pb_ratio and feature.ev_ebit before acting.",
+  "A score is relative to the day's cross-section: rollup.qmj@v1.qmj_score can fall with no change in the company when others improve.",
+]
+sources = [
+  "Asness, Frazzini and Pedersen, Quality Minus Junk (2019)",
+  "Novy-Marx, The Quality Dimension of Value Investing (2014)",
+]
+related = [
+  { id = "cash_op_profitability", reason = "the single profitability measure that dominates most quality definitions" },
+]
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+qmj = "Has a quality minus junk score"

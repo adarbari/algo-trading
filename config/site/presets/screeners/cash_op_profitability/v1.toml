@@ -1,0 +1,52 @@
+# Cash-based operating profitability, v1 (Ball, Gerakos, Linnainmaa and Nikolaev 2016): every
+# stock with the measure, ranked by it, highest first. The one criterion only asks that the value
+# exists (a missing value never passes, ADR 0030): the ranking is the screen, so the edge harness
+# (ADR 0053) takes its top K and compares the decile spread over all eligible names. The measure
+# is feature.cash_op_profitability: EBIT less the accruals in earnings, over total assets (the
+# paper's line by line accrual changes and the R&D add-back are not stored: see the field).
+# What it does not check: value, momentum, size, banks (their EBIT is null, so they have no value).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "cash_op_profitability"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Cash-based operating profitability"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.cash_op]
+field = "feature.cash_op_profitability"
+op = "not_null"
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+cash_op_profitability = "feature.cash_op_profitability"
+gross_profit_to_assets = "rollup.mispricing@v1.gross_profit_to_assets"
+
+[rank]
+tie_break = "feature.cash_op_profitability"
+tie_break_order = "desc"
