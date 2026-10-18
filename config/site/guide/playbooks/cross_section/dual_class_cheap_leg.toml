@@ -1,0 +1,30 @@
+# L3 site setting: the Guide's playbook for the site preset dual_class_cheap_leg (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Typed by src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "dual_class_cheap_leg"
+version = 1  # the preset version this prose was written for
+summary = "Finds the cheaper share class of a company with two listed classes, when it trades two or more standard deviations below its usual gap to its sibling. The spread tends to close. It is a candidate edge under test."
+hit = "The name is a common stock or ADR closing above $3 that trades at least $2M a day, one of exactly two listed classes of its issuer, with its price against its sibling at least 2 standard deviations under its own year."
+not_checked = "It does not check dividend or voting rights, a takeover or recapitalisation that moves one class, or the cost of borrowing the sibling. It uses its own year of the ratio, not a long history."
+before_acting = [
+  "Classes with different voting or dividend rights can hold a gap for years: read rollup.share_classes@v1.spread_z_252d only for a pair whose rights match.",
+  "A control event legitimately widens the spread; check the news before treating a wide gap as a mispricing.",
+  "Few issuers have two liquid classes, so the list is short and often empty; judge the result by its count of pairs.",
+]
+sources = [
+  "Schultz and Shive, Mispricing of Dual-Class Shares (2010)",
+  "Froot and Dabora, How Are Stock Prices Affected by the Location of Trade? (1999)",
+]
+related = [
+  { id = "size_small", reason = "the size baseline the edge is compared with" },
+]
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $3"
+adv = "Trades at least $2M a day"
+paired = "One of exactly two listed classes of its issuer"
+cheap = "Trades 2 or more standard deviations cheaper than its usual gap to the sibling"

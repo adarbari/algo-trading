@@ -67,12 +67,12 @@ presets = [
 [[family]]
 id = "breakouts"
 title = "Breakouts"
-presets = ["range_breakout", "breakout", "failed_breakout"]
+presets = ["range_breakout", "breakout", "failed_breakout", "momentum_squeeze_entry"]
 
 [[family]]
 id = "reversals"
 title = "Reversals"
-presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reversal", "sector_reversal"]
+presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reversal", "sector_reversal", "news_free_residual_reversal"]
 
 [[family]]
 id = "income"
@@ -97,7 +97,7 @@ presets = ["cp_iv_spread", "cp_iv_spread_rise", "iv_smirk", "iv_change_call", "i
 [[family]]
 id = "cross_section"
 title = "Cross-section ranks"
-presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite", "short_term_momentum_turnover", "short_squeeze_dtc"]
+presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite", "short_term_momentum_turnover", "short_squeeze_dtc", "dual_class_cheap_leg"]
 
 [[family]]
 id = "factors"
@@ -105,10 +105,10 @@ title = "Factors"
 presets = [
   "residual_momentum", "volatility_scaled_momentum", "frog_in_the_pan",
   "momentum_x_quality_interaction", "fifty_two_week_high", "industry_momentum", "low_beta",
-  "low_volatility",
+  "low_volatility", "ivol_avoid",
 ]
 
 [[family]]
 id = "fundamentals"
 title = "Quality and value"
-presets = ["cash_op_profitability", "composite_value", "qmj", "net_share_issuance", "asset_growth", "distress_ohlson", "bdc_price_to_nav"]
+presets = ["cash_op_profitability", "composite_value", "qmj", "net_share_issuance", "asset_growth", "distress_ohlson", "bdc_price_to_nav", "eps_revision_up", "target_upside_high"]

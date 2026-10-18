@@ -6,6 +6,7 @@ Back to the [index of every edge](../edges.md).
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
 | BDC price to NAV reversion (`bdc_price_to_nav_reversion`) | candidate | month end | excess return, over 60 sessions, vs SPY, entered 1 session after the decision session, costs 30 bps | `bdc_price_to_nav` |
+| Dual-class share spread reversion (`dual_class_spread_reversion`) | candidate | month end | pair spread, over 20, 60 sessions, entered 1 session after the decision session, the cheap share class against its sibling from rollup.share_classes@v1.sibling_id, short leg pays borrow, costs 10 bps | `dual_class_cheap_leg` |
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | every session | excess return, over 6, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `retail_option_attention` |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | on each `tender_offer` | excess return, over 60, 250 sessions, vs SPY, starting +21 sessions from the event, costs 20 bps | `tender_offer_filed` |
 | Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
@@ -43,6 +44,37 @@ Back to the [index of every edge](../edges.md).
 - Patro, D., Piccotti, L. and Wu, Y., Exploiting closed-end fund discounts: a systematic examination of alphas, Journal of Financial Research, 2017 <https://ideas.repec.org/a/bla/jfnres/v40y2017i2p223-248.html>
 - CXO Advisory, Enhanced Exploitation of Closed-End Fund Discounts (summary of Patro, Piccotti and Wu) <https://www.cxoadvisory.com/mutual-hedge-funds/enhanced-exploitation-of-closed-end-fund-discounts/>
 - CEFdata, BDC portfolio summary and the 3-year relative discount metric <https://legacy.cefdata.com/portfolios/194/summary/>
+
+## Dual-class share spread reversion (`dual_class_spread_reversion`)
+
+**Status:** candidate. **Family:** H. **Thesis:** When one share class of a company trades much cheaper than its sibling class against their own history, the spread narrows: the cheap class beats the rich one over the next one to three months.
+
+- **Outcome:** pair spread, over 20, 60 sessions, entered 1 session after the decision session, the cheap share class against its sibling from rollup.share_classes@v1.sibling_id, short leg pays borrow, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type in ('COMMON_STOCK', 'ADR')` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 3` and `rollup.price_stats@v2.adv_usd_20d gte 2000000` and `rollup.share_classes@v1.sibling_status eq 'PAIRED'` and `rollup.share_classes@v1.spread_z_252d gte -20`
+- **Top K:** 5
+- **Screeners:** `dual_class_cheap_leg`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The outcome is the pair_spread of EB H9: a pick is the cheap class of a pair, and its value is its return over the horizon less its sibling's, less two round trips and the borrow on the sibling (the rich leg); a hit is a positive value. It is a two-leg spread, so the result is the spread and nothing is filed under [published] (Schultz and Shive's figures are for trades opened at a fixed spread and held to closure, not this monthly rule). The pair is read from share_classes@v1 at D (the issuer's two classes of the reference snapshot the session sees, joined on CIK and share-class FIGI, never a hand list and never today's reference): only issuers with exactly two listed classes are PAIRED, three or more are AMBIGUOUS and no pair is guessed, and the universe requires PAIRED, so both classes must pass the liquidity floors (a pair with one class below $3 or 2M dollars a day is out). Declared thresholds, not tuned: the cheap class is one at or below -2 standard deviations of its own log price ratio over the last 252 sessions (spread_z_252d), at least 200 sessions of both bars needed; the stored bars start 2024-10, so the first z-scores are about a year old. The base is every eligible class against its sibling (a random side of the pair), so the lift is over the pair's own noise. Few pairs (about 15 to 25 US issuers) and few below -2 at any month end: the harness reports the picks and the sessions beside each number, and most sessions will pick none. Proxies, each stated: a z-score of the ratio against its own year, not Schultz and Shive's deviation from a moving average; no dividend or voting parity check (a class with different dividend or voting rights holds a gap for years: the z-score then measures drift inside the gap); the entry and exit are month-end closes with no convergence exit; the borrow is the site's default, not a quote. Month-end start sessions at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Two classes with the same cash flows should keep a stable price ratio, but index membership, option hedging and retail flow hit one ticker more than the other, and nobody is paid to arbitrage a one to three percent spread that closes slowly and costs borrow to hold (Schultz and Shive 2010; Froot and Dabora 1999).
+2. **Persistence:** Capacity is tens of pairs and the carry is negative for arbitrageurs, so capital stays away; but Froot and Dabora's twins deviated 10 to 30 percent for years, so a spread can keep widening, and collapses of a class structure deliver it in one jump. Persistence is a claim to test.
+3. **Outcome:** The cheap class's return less its sibling's over 20 and 60 sessions after the entry close, net of two round trips at 10 bps and the borrow on the sibling: a hit is a positive spread.
+4. **Trigger timing:** The pair and the z-score are read at the decision session D (a month end) from the closes through D and the reference snapshot D sees, so a reclassification counts from its own date; the entry session is S = D + 1 (start_offset_sessions = 1); both legs are valued from the same stored outcome rows at S.
+5. **Faithful replication:** Schultz and Shive: when the relative price deviation of two classes exceeds a threshold against its moving average, long the cheap and short the rich class, exit on reversion. Here: the cheap class of a paired issuer at 2 or more standard deviations under its own 252-session ratio, held 20 and 60 sessions, the sibling shorted, the pick limit 5 pairs a month.
+6. **Expected size and sample:** Schultz and Shive report that 82 percent of 3,687 trades opened at a 1 percent spread and held to closure were profitable, and 9.75 percent on average over 213 days for spreads above 10 percent, 100 US pairs 1993-2006 (verified through Alpha Architect's summary of the paper); those are trades held to closure, not this rule. Recent US spreads are one to two percent and narrowing (GOOG and GOOGL), so expect little, in very few pairs; the history holds a year of month-ends, under the 40 the bar asks.
+7. **Capacity and costs:** Tiny: capacity of tens to hundreds of thousands of dollars a pair on the liquid pairs, which is why large funds do not trade it. Two legs pay two round trips (the 10 bps is the assumption) and the borrow on the rich class, cheap on mega-caps; the convergence date is unknown, so the carry can be negative.
+8. **Failure modes and retirement:** Control events legitimately widen a spread (a takeover rumour, a proxy fight, a recapitalisation), a class with different voting or dividend rights keeps a gap for years, and a spread can widen for longer than the horizon. Retire if the frozen-period mean spread of the picks is not above the mean of every eligible class against its sibling, or the sample stays under a handful of picks after the 40 months.
+9. **Decoys:** The liquidity premium of the thinner class, voting premia around control events, and index membership of one class: the 12-1 momentum and size baselines on the same sessions (stock rankings, so a rough read for a pair); the base here is every class against its sibling.
+
+**Sources**
+
+- Schultz, P. and Shive, S., Mispricing of Dual-Class Shares: Profit Opportunities, Arbitrage, and Trading, Journal of Financial Economics, 2010 <https://papers.ssrn.com/abstract=1338885>
+- Froot, K. and Dabora, E., How Are Stock Prices Affected by the Location of Trade?, Journal of Financial Economics, 1999
+- Lamont, O. and Thaler, R., Can the Market Add and Subtract? Mispricing in Tech Stock Carve-outs, Journal of Political Economy, 2003
 
 ## Retail lottery-option attention (`retail_options_lottery_attention`)
 

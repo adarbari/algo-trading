@@ -7,6 +7,8 @@ Back to the [index of every edge](../edges.md).
 |---|---|---|---|---|
 | Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `earnings_vwap_overhang` |
 | Reversal into earnings (`earnings_neutral_reversal`) | candidate | on each `earnings_expected` | excess return, over 3 sessions, vs SPY, starting -2 sessions from the event, costs 10 bps | `pre_earnings_reversal`, `earnings_neutral_reversal` |
+| Residual reversal on names with no news (`news_conditioned_reversal`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `news_free_residual_reversal` |
+| Momentum winners in a volatility squeeze (`volatility_contraction_expansion`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_squeeze_entry` |
 
 ## Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`)
 
@@ -69,3 +71,66 @@ Back to the [index of every edge](../edges.md).
 
 - So, E. and Wang, S., News-Driven Return Reversals: Liquidity Provision Ahead of Earnings Announcements, Journal of Financial Markets, 2014 <https://papers.ssrn.com/abstract=2275982>
 - Quantpedia, Reversal During Earnings Announcements (strategy page) <https://quantpedia.com/strategies/reversal-during-earnings-announcements/>
+
+## Residual reversal on names with no news (`news_conditioned_reversal`)
+
+**Status:** candidate. **Family:** G. **Thesis:** Large stocks that fell most last month against what the market explains, with nothing filed to explain the fall, rise over the next month; a fall with news keeps going.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type in ('COMMON_STOCK', 'ADR')` and `instrument.status eq 'ACTIVE'` and `instrument.optionable eq True` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 50000000` and `feature.news_free_5d eq True` and `rollup.momentum_variants@v1.resid_ret_20d gt -5`
+- **Top K:** 50
+- **Screeners:** `news_free_residual_reversal`
+- **Baselines:** `momentum_12_1`, `size_small`, `residual_reversal`
+- **Frozen period:** from 2026-04-01
+- **Notes:** A variant of short_term_residual_reversal filed as its own edge (its own screener, one trial): the same market-residual 20-session return (rollup.momentum_variants@v1.resid_ret_20d, lowest first) among names with feature.news_free_5d true, that is, no 8-K or 8-K/A through the previous session and no earnings window in the last 5 sessions. The unconditioned residual_reversal is a baseline on the same sessions, so the question the harness answers is whether the news filter adds to the ranking; the universe holds the news-free liquid common stocks, so the base is every news-free name and the picks are the 50 most extreme of them. Proxies, each stated: the source's no-news test is a headline or news-wire search over the move's day, here only 8-K filings and earnings windows (a press story, an analyst note or a rumour is not seen, so some news moves read as no-news; the bias is toward weaker measured reversal); the window is 5 sessions while the residual return runs 20, so news older than 5 sessions inside the window is not excluded; the residual is market-only (the paper also strips size and value). news_free_5d is null until the filings coverage reaches a session (the 8-K history of EB D1 from its backfill), so sessions before it screen nothing, count as not measured, and the first measurable sessions are the backfill's. Short side, owner decision O2 (2026-10-17): the variant winners_short shorts the 50 highest residuals among the news-free names (liquid, net of cost and the assumed borrow); the long_short spread is diagnostic only. Month-end start sessions at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** A move with no disclosed cause is an order imbalance (a block, a forced seller, an index trade) that liquidity providers absorb and reverse; a move with news is under-reaction to hard information and drifts on (Chan 2003; Pritamani and Singal 2001; Tetlock 2010; Da, Liu and Schaumburg 2014).
+2. **Persistence:** The reversal is pay for liquidity provision and survives while that is scarce in a stress, but the plain reversal has shrunk since decimalisation and is near zero after costs (Chen and Velikov 2023; Cox and Peterson 1994: part was bid-ask bounce); the news filter is the claim that the part that is left is the no-news part. Persistence is a claim to test.
+3. **Outcome:** Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip: a long hold of the 50 lowest market-residual 20-session returns among the names with no 8-K and no earnings window in the last 5 sessions.
+4. **Trigger timing:** resid_ret_20d comes from the close of the decision session D (nightly rollup); news_free_5d counts filings known through D (an 8-K from the session after its SEC acceptance, never the filing's own date) and the earnings windows as known at D; the entry session is S = D + 1 (start_offset_sessions = 1); the screen is read at D, the outcome at S.
+5. **Faithful replication:** Chan (2003) and Pritamani and Singal (2001): sort the extreme movers by whether a headline accompanied the move, and the no-news ones reverse; Blitz, Huij, Lansdorp and Verbeek (2013): the residual version. Here the lowest 50 market-residual returns of the 20 sessions among liquid common stocks with no 8-K and no earnings window in the last 5 sessions; the headline test is replaced by the filing test.
+6. **Expected size and sample:** The papers report sizable reversals in 1980s to 1990s samples (a two-day bounce of 1.8 percent after a 10 percent drop in Bremer and Sweeney 1991, from memory) that shrank after decimalisation; the residual reversal's own figure on short_term_residual_reversal is the comparison. No post-2010 net figure for the news split is verified: expect a small number the harness reports with its t statistic and session count.
+7. **Capacity and costs:** Liquid names ($50M a day), monthly turnover is high, and the 10 bps round trip is the whole question (the cost curve shows the break-even); the capacity of the residual reversal is the lowest of the anomalies (Frazzini, Israel and Moskowitz 2015). The winners_short variant pays the site's assumed borrow.
+8. **Failure modes and retirement:** A loser whose news was not an 8-K (a press story, a downgrade) reads as no-news and keeps falling; a market that keeps falling keeps its losers falling; the filter thins the set so the picks are fewer than 50 on some sessions. Retire if the frozen-period spread of the picks is not above the unconditioned residual_reversal's on the same sessions, or the picks do not beat the buy-and-hold mean of the eligible names net of costs.
+9. **Decoys:** Plain one-month reversal and the residual without the news filter (the residual_reversal baseline), size and liquidity, the earnings reaction (the filter removes the earnings window), and low beta.
+
+**Sources**
+
+- Chan, W., Stock Price Reaction to News and No-News: Drift and Reversal after Headlines, Journal of Financial Economics, 2003
+- Pritamani, M. and Singal, V., Return Predictability Following Large Price Changes and Information Releases, Journal of Banking and Finance, 2001
+- Da, Z., Liu, Q. and Schaumburg, E., A Closer Look at the Short-Term Return Reversal, Management Science, 2014
+- Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets, 2013 <https://repub.eur.nl/pub/40707>
+
+## Momentum winners in a volatility squeeze (`volatility_contraction_expansion`)
+
+**Status:** candidate. **Family:** G. **Thesis:** Past-year winners in an uptrend whose price range has narrowed to the tightest fifth of their year break out more cleanly, so they beat the market over the next month by more than winners that are not compressed.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `momentum_squeeze_entry`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** A per-name entry filter on momentum_12_1, filed as its own edge (one trial): positive 12-1 momentum, trend_state UPTREND and rollup.bands@v2.bb_width_pctile_252d at or below 0.2 (the Bollinger bandwidth narrower than 80 percent of the last 252 sessions), ranked by 12-1 momentum. The 0.2 cut is declared, not tuned (the TTM squeeze, feature.bb_squeeze, is the tighter-in-volatility variant and a follow-up). The main baseline is momentum_12_1 on the same sessions: the question is whether the squeeze beats the same ranking without it. A narrower screener scores fewer names than the base, so the harness reports its picks and lift but no decile spread. Proxies, each stated: the source's tight base is a count of successive contractions of pullback depth and a pivot buy (Minervini), and Crabel's NR7 is intraday; this is a bandwidth percentile, which sees neither; the every-session schedule of the idea is not available to a month-end edge, so only names in a squeeze at the month end are seen and the list is short. The options version (buy cheap gamma when realised and implied are both compressed) belongs to the options family. Month-end start sessions at least 20 sessions apart; the bands rollup is stored from about 2025-10, so the first percentile is about a year old.
+
+**Quality bar**
+
+1. **Mechanism:** Volatility clusters, so a contraction is followed by an expansion (a GARCH fact); the direction is not predictable from the squeeze alone, so it is the momentum and the trend that supply it: a winner that consolidates in a tight base is one where the sellers have run out (the O'Neil and Minervini tight base). The squeeze times the entry; it is not a source of return of its own.
+2. **Persistence:** Volatility clustering is permanent, but direction never had an edge: Bollinger-band breakout rules are among those that fail data-snooping tests (Bajgrowicz and Scaillet 2012; Lento 2007), so what is tested is only whether the squeeze improves an entry into a premium that exists (12-1 momentum). A claim to test.
+3. **Outcome:** Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip, the same as 12-1 momentum, so the two compare on one footing.
+4. **Trigger timing:** The bandwidth percentile, the trend state and mom_12_1 come from the closes through the decision session D (nightly rollups); the entry session is S = D + 1 (start_offset_sessions = 1); the screen is read at D, the outcome at S.
+5. **Faithful replication:** The sources' rules are not replicated exactly: Bollinger's squeeze is the bandwidth at a six-month low with a trade on the first close outside the band, Crabel's NR7 an intraday opening-range trade, Minervini's VCP a count of contractions and a pivot buy. Here: the 12-1 momentum winners in an uptrend with the bandwidth in the lowest 20 percent of its year, the top 50 of the liquid common stocks by momentum.
+6. **Expected size and sample:** No academic direct test of the squeeze as a return source is on file (the idea page: practitioner evidence only), and the band-breakout rules fail data-snooping tests; the expectation is no gain over 12-1 momentum alone, and the filter shrinks the list, so a handful of names a month and under ten independent sessions so far.
+7. **Capacity and costs:** Liquid common stocks above $50M a day trade at a few basis points; monthly turnover is momentum's, and the filter reduces the names, so a concentrated list is the larger cost. The 10 bps round trip is the assumption.
+8. **Failure modes and retirement:** A squeeze resolves downward as often as up (the trend and momentum filters supply the direction and a trend can end), a short list makes the result noisy, and a tight month can be a quiet market, not a base. Retire if the frozen-period picks do not beat 12-1 momentum's top 50 on the same sessions.
+9. **Decoys:** Low volatility (a name with narrow bands may simply be a low-volatility stock; the bandwidth percentile is against its own year, which removes most of that), 12-1 momentum itself (the baseline), size, and the 52-week-high effect.
+
+**Sources**
+
+- Bollinger, J., Bollinger on Bollinger Bands, McGraw-Hill, 2001
+- Bajgrowicz, P. and Scaillet, O., Technical Trading Revisited: False Discoveries, Persistence Tests, and Transaction Costs, Journal of Financial Economics, 2012
+- Crabel, T., Day Trading with Short Term Price Patterns and Opening Range Breakout, Traders Press, 1990

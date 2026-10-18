@@ -16,12 +16,14 @@ Each edge's full section is on its family page (docs/edges/).
 | Cash-based operating profitability (`cash_based_operating_profitability`) | candidate | [family A](edges/a.md) |
 | Composite value among cash-profitable names (`composite_value`) | candidate | [family A](edges/a.md) |
 | Financial distress (an avoid list) (`distress_failure_probability`) | candidate | [family A](edges/a.md) |
+| High idiosyncratic volatility and lottery stocks, avoid list (`idiosyncratic_volatility_and_max`) | candidate | [family A](edges/a.md) |
 | Industry momentum (`industry_momentum`) | candidate | [family A](edges/a.md) |
 | 12-1 momentum (`momentum_12_1`) | candidate | [family A](edges/a.md) |
 | Net share issuance (`net_share_issuance`) | candidate | [family A](edges/a.md) |
 | Quality minus junk (`quality_minus_junk`) | candidate | [family A](edges/a.md) |
 | Short-term momentum in heavily traded stocks (`short_term_momentum_high_turnover`) | candidate | [family A](edges/a.md) |
 | Short-term residual reversal (`short_term_residual_reversal`) | candidate | [family A](edges/a.md) |
+| Analyst earnings-estimate revision momentum (`analyst_revision_momentum`) | candidate | [family B](edges/b.md) |
 | Dividend-month premium (`dividend_month_premium`) | candidate | [family B](edges/b.md) |
 | Earnings-date advances (`earnings_date_shift`) | candidate | [family B](edges/b.md) |
 | Earnings gap on heavy volume (`earnings_gap_volume_drift`) | candidate | [family B](edges/b.md) |
@@ -30,6 +32,7 @@ Each edge's full section is on its family page (docs/edges/).
 | Late filers (NT 10-K and NT 10-Q) (`late_filer_nt_drift`) | candidate | [family B](edges/b.md) |
 | Pre-earnings run-up in past winners (`pre_earnings_runup_winners`) | candidate | [family B](edges/b.md) |
 | S&P 500 deletions rebound (`sp500_deletions_long`) | candidate | [family B](edges/b.md) |
+| Analyst target-price implied return (`target_price_implied_return`) | candidate | [family B](edges/b.md) |
 | Spin-off drift (`spinoff_drift`) | blocked | [family B](edges/b.md) |
 | Option-to-stock volume ratio (`c04_option_stock_volume_ratio`) | candidate | [family C](edges/c.md) |
 | Per-name volatility premium, ranked (`c12_vrp_cross_section_iv_hv`) | candidate | [family C](edges/c.md) |
@@ -50,7 +53,10 @@ Each edge's full section is on its family page (docs/edges/).
 | Composite mispricing score (`composite_mispricing_score`) | candidate | [family F](edges/f.md) |
 | Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | candidate | [family G](edges/g.md) |
 | Reversal into earnings (`earnings_neutral_reversal`) | candidate | [family G](edges/g.md) |
+| Residual reversal on names with no news (`news_conditioned_reversal`) | candidate | [family G](edges/g.md) |
+| Momentum winners in a volatility squeeze (`volatility_contraction_expansion`) | candidate | [family G](edges/g.md) |
 | BDC price to NAV reversion (`bdc_price_to_nav_reversion`) | candidate | [family H](edges/h.md) |
+| Dual-class share spread reversion (`dual_class_spread_reversion`) | candidate | [family H](edges/h.md) |
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | [family H](edges/h.md) |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | [family H](edges/h.md) |
 | Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | [family H](edges/h.md) |
