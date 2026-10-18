@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { expectNoA11yViolations } from '../../testing';
+import { InfoButton } from '../InfoButton';
 import { ConditionGroup, type ConditionGroupProps } from './ConditionGroup';
 
 const base: Omit<ConditionGroupProps, 'children'> = {
@@ -53,6 +54,25 @@ describe('ConditionGroup', () => {
     expect(screen.queryByRole('heading')).toBeNull();
     await userEvent.setup().click(button);
     expect(screen.getByText('first')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('read only shows its info beside the row, outside the toggle button', async () => {
+    const { container } = render(
+      <ConditionGroup
+        {...base}
+        readOnly
+        expression="price above 5 or volume above 1M"
+        info={<InfoButton label="About any of" onClick={() => undefined} />}
+        actions={<span>never shown</span>}
+      >
+        <p>first</p>
+      </ConditionGroup>,
+    );
+    const info = screen.getByRole('button', { name: 'About any of' });
+    expect(info.closest('button:not([aria-label="About any of"])')).toBeNull();
+    expect(screen.getByRole('button', { name: /price above 5/ })).not.toContainElement(info);
+    expect(screen.queryByText('never shown')).toBeNull();
     await expectNoA11yViolations(container);
   });
 });

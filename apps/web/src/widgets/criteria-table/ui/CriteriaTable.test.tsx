@@ -52,13 +52,31 @@ const addCriterion = vi.fn();
 const setTieBreak = vi.fn();
 const reviewFormula = vi.fn();
 const skipFormula = vi.fn();
-const builder = (patch: Record<string, unknown> = {}) => ({
+const CRITERIA = [
+  { id: 'iv30', field: 'rollup.iv30@v1.iv30', op: 'gte', mode: 'hard', value: 0.5 },
+  { id: 'close', field: 'rollup.price_stats@v2.close', op: 'gt', mode: 'hard', value: 5 },
+];
+const joinWithPrevious = vi.fn();
+const excludeCriterion = vi.fn();
+const excludeGroup = vi.fn();
+const ungroup = vi.fn();
+const builder = (patch: Record<string, unknown> = {}) => {
+  const criteria = (patch['criteria'] as typeof CRITERIA | undefined) ?? CRITERIA;
+  return base({
+    layout: criteria.map((criterion) => ({ type: 'criterion', criterion })),
+    ...patch,
+  });
+};
+const base = (patch: Record<string, unknown>) => ({
   status: 'ready',
   preset: null,
-  criteria: [
-    { id: 'iv30', field: 'rollup.iv30@v1.iv30', op: 'gte', mode: 'hard', value: 0.5 },
-    { id: 'close', field: 'rollup.price_stats@v2.close', op: 'gt', mode: 'hard', value: 5 },
-  ],
+  criteria: CRITERIA,
+  groups: [],
+  canJoinPrevious: (id: string) => id === 'close',
+  joinWithPrevious,
+  excludeCriterion,
+  excludeGroup,
+  ungroup,
   tieBreak: { field: null, order: 'desc' },
   errorCriterion: null,
   preview: { error: null },
@@ -83,6 +101,10 @@ function setup() {
 
 beforeEach(() => {
   for (const mock of [
+    joinWithPrevious,
+    excludeCriterion,
+    excludeGroup,
+    ungroup,
     setCriterion,
     removeCriterion,
     addCriterion,
@@ -209,6 +231,103 @@ describe('CriteriaTable', () => {
       state.builder = builder({ criteria: [], pendingFormulas: [FORMULA] });
       setup();
       expect(screen.queryByText('No criteria yet')).toBeNull();
+    });
+  });
+
+  describe('groups (ADR 0071)', () => {
+    const [iv30, close] = CRITERIA as [(typeof CRITERIA)[number], (typeof CRITERIA)[number]];
+    const any = { id: 'any', kind: 'any', members: ['iv30', 'close'] };
+    const grouped = (mode: string, extra: Record<string, unknown> = {}) => {
+      const criteria = [iv30, { ...close, mode }];
+      return builder({
+        criteria,
+        groups: [any],
+        layout: [
+          {
+            type: 'group',
+            group: any,
+            editable: true,
+            owned: true,
+            members: criteria.map((criterion) => ({ type: 'criterion', criterion })),
+          },
+        ],
+        ...extra,
+      });
+    };
+
+    it('offers the grouping actions on a loose criterion', async () => {
+      setup();
+      expect(screen.getAllByRole('button', { name: 'Exclude (none of)' })).toHaveLength(2);
+      await userEvent.click(screen.getByRole('button', { name: 'Either this or the previous' }));
+      expect(joinWithPrevious).toHaveBeenCalledWith('close');
+      await userEvent.click(
+        screen.getAllByRole('button', { name: 'Exclude (none of)' })[0] as HTMLElement,
+      );
+      expect(excludeCriterion).toHaveBeenCalledWith('iv30');
+    });
+
+    it('shows one level in place, each member with its own mode control', async () => {
+      state.builder = grouped('hard');
+      const { container } = setup();
+      const group = screen.getByRole('region', { name: /IV30 ≥ 50% or Close > \$5/ });
+      expect(group).toHaveTextContent('Any of');
+      expect(screen.getAllByRole('radiogroup', { name: /Mode of/ })).toHaveLength(2);
+      expect(screen.queryByText('Never rejects')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Ungroup' }));
+      expect(ungroup).toHaveBeenCalledWith('any');
+      await userEvent.click(screen.getByRole('button', { name: 'Exclude (none of)' }));
+      expect(excludeGroup).toHaveBeenCalledWith(any);
+      await expectNoA11yViolations(container);
+    });
+
+    it('labels an any with a score member as never rejecting', () => {
+      state.builder = grouped('score');
+      setup();
+      expect(screen.getByText('Never rejects')).toBeInTheDocument();
+    });
+
+    it("shows a deeper group as one read-only row that ungroups when it is the draft's", async () => {
+      const inner = { id: 'dip', kind: 'all', members: ['iv30', 'close'] };
+      const outer = { id: 'either', kind: 'any', members: ['dip', 'extra'] };
+      const extra = {
+        id: 'extra',
+        field: 'rollup.iv30@v1.iv30',
+        op: 'lt',
+        mode: 'hard',
+        value: 0.1,
+      };
+      const criteria = [iv30, close, extra];
+      const leaf = (criterion: (typeof criteria)[number]) => ({ type: 'criterion', criterion });
+      state.builder = builder({
+        criteria,
+        groups: [inner, outer],
+        layout: [
+          {
+            type: 'group',
+            group: outer,
+            editable: false,
+            owned: true,
+            members: [
+              {
+                type: 'group',
+                group: inner,
+                editable: false,
+                owned: true,
+                members: [leaf(iv30), leaf(close)],
+              },
+              leaf(extra),
+            ],
+          },
+        ],
+      });
+      const { container } = setup();
+      expect(screen.queryAllByRole('radiogroup', { name: /Mode of/ })).toHaveLength(0);
+      expect(
+        screen.getAllByText(/\(IV30 ≥ 50% and Close > \$5\) or IV30 < 10%/).length,
+      ).toBeGreaterThan(0);
+      await userEvent.click(screen.getByRole('button', { name: 'Ungroup' }));
+      expect(ungroup).toHaveBeenCalledWith('either');
+      await expectNoA11yViolations(container);
     });
   });
 });

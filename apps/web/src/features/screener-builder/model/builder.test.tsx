@@ -73,6 +73,22 @@ function Probe() {
     <>
       <Text>{`status ${b.status} preset ${b.preset?.id ?? 'none'} dirty ${String(b.dirty)} next v${String(b.nextVersion)}`}</Text>
       <Text>{`criteria ${b.criteria.map((c) => `${c.id}=${String(c.value)}`).join(',')}`}</Text>
+      <Text>{`groups ${b.groups.map((g) => `${g.id}:${g.kind}:${g.members.join('+')}`).join(',')}`}</Text>
+      <Text>{`joinable ${String(b.canJoinPrevious('close'))}`}</Text>
+      <Button
+        onClick={() => {
+          b.joinWithPrevious('close');
+        }}
+      >
+        either
+      </Button>
+      <Button
+        onClick={() => {
+          b.ungroup('any');
+        }}
+      >
+        ungroup
+      </Button>
       <Text>{`idle ${String(b.preview.idle)} error ${b.errorCriterion ?? 'none'}`}</Text>
       <Button
         onClick={() => {
@@ -312,6 +328,33 @@ describe('ScreenerBuilderProvider', () => {
     await userEvent.click(screen.getByRole('button', { name: 'add hard' }));
     expect(screen.getByText('criteria iv30=0.5,close=5')).toBeInTheDocument();
     expect(screen.getByText(/dirty false/)).toBeInTheDocument();
+  });
+
+  it('groups two criteria as either-or, saves the group with the draft and ungroups it', async () => {
+    setup();
+    await screen.findByText('criteria iv30=0.5,close=5');
+    expect(screen.getByText('joinable true')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'either' }));
+    expect(screen.getByText('groups any:any:iv30+close')).toBeInTheDocument();
+    expect(screen.getByText('joinable false')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'save' }));
+    await waitFor(() => {
+      expect(PUT).toHaveBeenCalledTimes(1);
+    });
+    expect(PUT.mock.calls[0]?.[1]).toMatchObject({
+      body: { document: { groups: { any: { any: ['iv30', 'close'] } } } },
+    });
+  });
+
+  it('removing a member dissolves a group left too small; ungroup drops the group', async () => {
+    setup();
+    await screen.findByText('criteria iv30=0.5,close=5');
+    await userEvent.click(screen.getByRole('button', { name: 'either' }));
+    await userEvent.click(screen.getByRole('button', { name: 'ungroup' }));
+    expect(screen.getByText('groups')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'either' }));
+    await userEvent.click(screen.getByRole('button', { name: 'remove' }));
+    expect(screen.getByText('groups')).toBeInTheDocument();
   });
 
   it('saves the edited draft, then is clean', async () => {

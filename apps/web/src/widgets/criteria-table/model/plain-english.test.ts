@@ -65,4 +65,57 @@ describe('plainEnglish', () => {
       'Find instruments where IV30 ≥ 50%. Not covered: support lines; a trend.',
     );
   });
+
+  describe('groups (ADR 0071)', () => {
+    const iv = (id: string, extra: Partial<Criterion> = {}) => criterion({ id, ...extra });
+    const px = (id: string, extra: Partial<Criterion> = {}) =>
+      criterion({ id, field: 'rollup.price_stats@v2.close', op: 'gt', value: 5, ...extra });
+
+    it('writes an any beside other criteria in parentheses', () => {
+      const text = plainEnglish(
+        [px('p'), iv('a', { group: 'either' }), iv('b', { group: 'either', op: 'lt', value: 0.1 })],
+        catalogue,
+        [],
+        [{ id: 'either', kind: 'any', members: ['a', 'b'] }],
+      );
+      expect(text).toBe('Find instruments where Close > $5 and (IV30 ≥ 50% or IV30 < 10%).');
+    });
+
+    it('writes none of one member as "not C", whatever its mode', () => {
+      const text = plainEnglish(
+        [px('p', { group: 'no' })],
+        catalogue,
+        [],
+        [{ id: 'no', kind: 'none', members: ['p'] }],
+      );
+      expect(text).toBe('Find instruments where not Close > $5.');
+    });
+
+    it('writes (A and B) or C for an all inside an any', () => {
+      const text = plainEnglish(
+        [
+          iv('a', { group: 'dip' }),
+          px('b', { group: 'dip' }),
+          iv('c', { group: 'either', op: 'lt', value: 0.1 }),
+        ],
+        catalogue,
+        [],
+        [
+          { id: 'dip', kind: 'all', members: ['a', 'b'] },
+          { id: 'either', kind: 'any', members: ['dip', 'c'] },
+        ],
+      );
+      expect(text).toBe('Find instruments where (IV30 ≥ 50% and Close > $5) or IV30 < 10%.');
+    });
+
+    it('skips a group none of whose members is ready', () => {
+      const text = plainEnglish(
+        [px('p'), iv('a', { group: 'either', value: undefined })],
+        catalogue,
+        [],
+        [{ id: 'either', kind: 'any', members: ['a'] }],
+      );
+      expect(text).toBe('Find instruments where Close > $5.');
+    });
+  });
 });
