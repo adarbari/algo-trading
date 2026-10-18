@@ -511,7 +511,7 @@ follow-up PR).
 - Question: what does an edge whose outcome is a long-short spread show as its verdict, given a spread is never a basis?
 - Options: Waiting on data with a reason / its own state, Diagnostic only.
 - Decision: its own state, `diagnostic_only`, with a Guide entry; the figures stay on the page.
-- decided by: architect, for the owner (away)
+- decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: Waiting on data says a result is coming; a spread's never becomes a verdict, so the word would mislead.
 
@@ -519,6 +519,6 @@ follow-up PR).
 - Question: what borrow cost does a short leg pay, and are hard-to-borrow names excluded?
 - Options: flat 100 bp a year, no exclusion / flat rate plus a hard-to-borrow exclusion / no borrow cost.
 - Decision: 100 bp a year (`verdict.toml [edge_costs] borrow_bps_annual`, per outcome overridable), no hard-to-borrow exclusion; the $5M ADV floor stands in. The limitation is recorded in ADR 0053.
-- decided by: architect, for the owner (away)
+- decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: no borrow data is stored, so any exclusion would be a guess; a flat assumption is stated and visible.
