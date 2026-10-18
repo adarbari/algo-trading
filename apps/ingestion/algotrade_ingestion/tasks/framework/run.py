@@ -348,11 +348,20 @@ class IngestRun:
         return stamp(frame, session or self.session, self.clock(), source, self.run_id)
 
     def write(
-        self, table: str, frame: pd.DataFrame, source: str, session: date | None = None
+        self,
+        table: str,
+        frame: pd.DataFrame,
+        source: str,
+        session: date | None = None,
+        known: datetime | None = None,
     ) -> None:
-        """Stamp and write one partition (validated against the table schema)."""
+        """Stamp and write one partition (validated against the table schema). ``known``: the
+        ``knowledge_ts`` of the rows when it is not the write time (a row derived from stored
+        data is knowable when the latest of that data was: the chain P&L, ADR 0053 amendment)."""
         day = session or self.session
         frame = self.stamped(frame, source, day)
+        if known is not None:
+            frame["knowledge_ts"] = pd.Timestamp(known)
         self.writer.write_table(table, day, self.run_id, frame, pending=True)
 
     def rewrite(self, table: str, day: date, frame: pd.DataFrame) -> None:

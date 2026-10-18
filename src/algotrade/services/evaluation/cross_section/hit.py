@@ -25,6 +25,14 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   (``quant/black_scholes``), ``delta_hedged_atm_short`` its negative. ``cost_bps`` is charged
   once, in bps of ``P`` (the excess return's convention); no hedging cost, spread or fill is
   modelled and the cost grid does not apply (it scales a stored return). A hit is ``value > 0``.
+- ``option_pnl`` (basis ``chain``, quoted prices; ADR 0053 amendment, EB H13): the P&L of the
+  structure the stored chains priced (``outcomes/option/structure_pnl@v1``, rows of the edge's
+  structure and tenor only), as a fraction of the entry underlying price, net of the quoted
+  spread: ``sign * (pnl_per_underlying)`` less the half-spread paid at entry
+  (``entry_ask - entry_mid``) and at exit (``exit_mid - exit_bid``) over ``entry_spot``, ``sign``
+  -1 for a short structure, ``pnl_per_underlying`` the daily-hedged one
+  (``hedged_pnl_per_underlying``, our own delta) for ``delta_hedged_atm[_short]``; ``cost_bps``
+  once on top. No hedge cost and no financing. A hit is ``value > 0``.
 - ``side`` ``short`` or ``long_short`` (an ``excess_return`` outcome only): ``short_value`` is the
   value of being short the name, ``-fwd_excess_return - cost_bps / 1e4 - borrow``, with the
   borrow ``borrow_bps_annual / 1e4 * horizon / 252`` (an assumption: no borrow data is stored);
@@ -46,6 +54,12 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
+from algotrade.config.edges.chain import (
+    CHAIN_KIND,
+    HEDGED_STRUCTURES,
+    SHORT_STRUCTURES,
+    grain_structure,
+)
 from algotrade.config.edges.document import Edge
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.quant.black_scholes import (
@@ -71,6 +85,17 @@ MODEL_PNL_FIELDS: Mapping[str, tuple[str, ...]] = {
     "delta_hedged_atm": ("fwd_realised_vol",),
     "delta_hedged_atm_short": ("fwd_realised_vol",),
 }  # the stored fields each option_model_pnl structure reads, beside the implied vol
+CHAIN_PNL_FIELDS = (
+    "structure",
+    "tenor_days",
+    "entry_spot",
+    "entry_mid",
+    "entry_ask",
+    "exit_mid",
+    "exit_bid",
+    "pnl_per_underlying",
+    "hedged_pnl_per_underlying",
+)  # the stored chain-grain fields an option_pnl outcome reads
 MISSING_VALUE = "missing_value"  # a row, but the measure is null (no benchmark bar, no vol)
 NO_IMPLIED_VOL = "no_implied_vol"  # the implied vol at S is missing or not positive
 INVALID_IMPLIED_VOL = "invalid_implied_vol"  # ... or non-finite or above MAX_IMPLIED_VOL: garbage
@@ -153,6 +178,24 @@ def _expires_otm(
     return cushion, hit, np.asarray(reference), np.asarray(touch), usable
 
 
+def _otm_outcome(
+    edge: Edge,
+    outcomes: pd.DataFrame,
+    implied: Mapping[str, float | None] | None,
+    excluded: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """``(cushion, hit, reference, touch)`` of an expires_otm outcome; ``excluded`` gets the
+    reason of each row that has no value."""
+    if implied is None:
+        raise ConfigurationError(f"{edge.id}: expires_otm needs the implied vol")
+    value, hit, reference, touched, _ = _expires_otm(edge, outcomes, implied)
+    excluded[~np.isfinite(_numbers(outcomes, "fwd_return"))] = MISSING_VALUE
+    reasons = _implied_reasons(_implied_array(outcomes, implied))
+    excluded[(excluded == "") & (reasons != "")] = reasons[(excluded == "") & (reasons != "")]
+    excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE  # no horizon: no strike
+    return value, hit, reference, touched.astype(np.float64)
+
+
 def _model_pnl(edge: Edge, outcomes: pd.DataFrame, iv: np.ndarray) -> np.ndarray:
     """The ``option_model_pnl`` value per row (NaN where the stored window or the vol is not
     usable; ``iv`` is NaN where it is not), net of ``cost_bps``."""
@@ -185,6 +228,34 @@ def _model_outcome(
     excluded[:] = reasons
     excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE
     return value
+
+
+def chain_rows(edge: Edge, outcomes: pd.DataFrame) -> pd.DataFrame:
+    """The rows of ``outcomes`` (the chain grain's, every structure and tenor) the edge's
+    ``option_pnl`` outcome names: one per instrument."""
+    o = edge.outcome
+    held = grain_structure(o.structure or "", o.strike_delta)
+    keep = (outcomes["structure"] == held) & (outcomes["tenor_days"] == o.tenor_days)
+    return outcomes[keep]
+
+
+def _chain_pnl(edge: Edge, outcomes: pd.DataFrame) -> np.ndarray:
+    """The ``option_pnl`` value per row of ``chain_rows`` (NaN where a price is missing), net of
+    the quoted half-spreads and ``cost_bps``."""
+    o = edge.outcome
+    hedged = o.structure in HEDGED_STRUCTURES
+    gross = _numbers(outcomes, "hedged_pnl_per_underlying" if hedged else "pnl_per_underlying")
+    spot = _numbers(outcomes, "entry_spot")
+    spread = (
+        _numbers(outcomes, "entry_ask")
+        - _numbers(outcomes, "entry_mid")
+        + _numbers(outcomes, "exit_mid")
+        - _numbers(outcomes, "exit_bid")
+    )
+    sign = -1.0 if o.structure in SHORT_STRUCTURES else 1.0
+    with np.errstate(divide="ignore", invalid="ignore"):
+        value = sign * gross - spread / spot - (o.cost_bps or 0.0) / 1e4
+    return np.where(spot > 0, value, np.nan)
 
 
 def _numbers(frame: pd.DataFrame, column: str) -> np.ndarray:
@@ -246,22 +317,19 @@ def apply_outcome(
     and whether the name was delisted. ``implied``: the IV at S by instrument id (needed when
     ``needs_implied_vol``)."""
     o = edge.outcome
+    outcomes = chain_rows(edge, outcomes) if o.kind == CHAIN_KIND else outcomes
     n = len(outcomes)
     excluded = np.full(n, "", dtype=object)
     reference = np.full(n, np.nan)
     touch = np.full(n, np.nan)
     otm_hit: np.ndarray | None = None
     if o.kind == "expires_otm":
-        if implied is None:
-            raise ConfigurationError(f"{edge.id}: expires_otm needs the implied vol")
-        value, otm_hit, reference, touched, _ = _expires_otm(edge, outcomes, implied)
-        touch = touched.astype(np.float64)
-        excluded[~np.isfinite(_numbers(outcomes, "fwd_return"))] = MISSING_VALUE
-        reasons = _implied_reasons(_implied_array(outcomes, implied))
-        excluded[(excluded == "") & (reasons != "")] = reasons[(excluded == "") & (reasons != "")]
-        excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE  # no horizon: no strike
+        value, otm_hit, reference, touch = _otm_outcome(edge, outcomes, implied, excluded)
     elif o.kind == "option_model_pnl":
         value = _model_outcome(edge, outcomes, implied, excluded)
+    elif o.kind == CHAIN_KIND:
+        value = _chain_pnl(edge, outcomes)
+        excluded[~np.isfinite(value)] = MISSING_VALUE
     elif is_return(edge):
         value = _numbers(outcomes, "fwd_excess_return") - (o.cost_bps or 0.0) / 1e4
         excluded[~np.isfinite(value)] = MISSING_VALUE

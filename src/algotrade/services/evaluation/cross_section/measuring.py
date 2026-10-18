@@ -15,6 +15,7 @@ from typing import Any
 
 import pandas as pd
 
+from algotrade.config.edges.chain import CHAIN_KIND
 from algotrade.config.edges.document import (
     LONG,
     LONG_SHORT,
@@ -27,10 +28,15 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
+    CHAIN_COLUMNS,
     OUTCOME_FIELDS,
+    chain_seqs,
+    missing_chain,
     missing_outcomes,
     outcome_seqs,
+    read_chain_stored,
     read_stored,
+    select_chain,
     select_outcomes,
 )
 from algotrade.engines.screening.runner import RunCoverage
@@ -483,7 +489,8 @@ def _measure(
     todo = reuse.days
     legs = [lg for p in plans for b in p.blocks for lg in b if todo is None or lg.decision in todo]
     days = sorted({leg.decision for leg in legs})
-    out.seqs = outcome_seqs(reader, {leg.entry for leg in legs})  # before any outcome row is read
+    seqs = chain_seqs if _chain(plans) else outcome_seqs  # the grain the edge's outcome reads
+    out.seqs = seqs(reader, {leg.entry for leg in legs})  # before any outcome row is read
     failed: dict[int, MissingDataError] = {}
     out.closed.update({p.horizon: set(reuse.closed.get(p.horizon, ())) for p in plans})
     for at in range(0, len(days), CHUNK_SESSIONS):
@@ -513,6 +520,12 @@ def _measure(
     return out
 
 
+def _chain(plans: Sequence[_Plan]) -> bool:
+    """Whether the plans' outcomes are option P&Ls read from the chain grain (an edge's variants
+    are all of one kind, ``config/edges/chain.check_kinds``)."""
+    return any(p.scope.edge.outcome.kind == CHAIN_KIND for p in plans)
+
+
 def _read_closed(
     reader: StoreReader,
     plans: Sequence[_Plan],
@@ -531,7 +544,9 @@ def _read_closed(
         for h in sorted({p.horizon for p in plans})
     }  # fmt: skip
     entries = sorted({d for days in wanted.values() for d in days})
-    stored = read_stored(reader, entries, as_of) if entries else None  # once for the horizons
+    chain = _chain(plans)
+    read = read_chain_stored if chain else read_stored
+    stored = read(reader, entries, as_of) if entries else None  # once for the horizons
     have: set[date] = set()  # the entry sessions with a partition visible at ``as_of``
     if stored is not None:  # plain strings: the ``isin`` over arrow strings is the slow path
         stored = stored.assign(instrument_id=stored["instrument_id"].astype(object))
@@ -541,10 +556,14 @@ def _read_closed(
         if not days:
             continue
         if stored is None or not any(days[0] <= d <= days[-1] for d in have):
-            failed.setdefault(horizon, missing_outcomes(days))  # nothing stored in its span
-            continue
-        frame = select_outcomes(stored, horizon, days, BENCHMARK, as_of)
-        kept = frame[list(OUTCOME_COLUMNS)]  # what apply_outcome reads, no more
+            failed.setdefault(horizon, (missing_chain if chain else missing_outcomes)(days))
+            continue  # nothing stored in its span
+        frame = (
+            select_chain(stored, horizon, days, as_of)
+            if chain
+            else select_outcomes(stored, horizon, days, BENCHMARK, as_of)
+        )
+        kept = frame[list(CHAIN_COLUMNS if chain else OUTCOME_COLUMNS)]  # what apply_outcome reads
         closed[horizon] = dict(tuple(kept.groupby(frame["session_date"].map(_day))))
         out.closed[horizon] |= set(closed[horizon])
         for entry, rows in closed[horizon].items():

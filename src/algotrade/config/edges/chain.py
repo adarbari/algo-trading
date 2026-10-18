@@ -1,0 +1,84 @@
+"""The ``option_pnl`` outcome of an edge document (ADR 0053 amendment, EB H13): a P&L of an option
+structure from the stored chains (``outcomes/option/structure_pnl@v1``), basis ``chain``, beside
+``option_model_pnl`` (a modelled P&L, basis ``model``).
+
+    structure     one of ``CHAIN_STRUCTURES``: an at-the-money straddle held long or short,
+                  delta-hedged daily long or short (our own delta from each session's chain), or a
+                  short put chosen by its own delta (``strike_delta``, required for it only)
+    tenor_days    the tenor rule: the contracts expire on the first listed date at least this many
+                  calendar days after the entry session and not before the window's end
+    horizon_sessions, benchmark ``"none"``, ``start_offset_sessions``, ``cost_bps``, ``side`` as
+                  for any outcome; it reads no implied-vol field and sets no ``otm_pct``
+
+The grain is forward-only: chains are stored from 2026-10-02, after every frozen split, so no
+pre-frozen basis exists and every row is out of sample (ADR 0065 amendment).
+"""
+
+from algotrade.config.site.fields import Table
+from algotrade.core.model.errors import ConfigurationError
+
+CHAIN_KIND = "option_pnl"
+CHAIN_BASIS = "chain"  # what a P&L of quoted prices is labelled (results and UI)
+CHAIN_STRUCTURES = (
+    "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
+    "put_short",
+)  # fmt: skip
+SHORT_STRUCTURES = ("atm_straddle_short", "delta_hedged_atm_short", "put_short")
+HEDGED_STRUCTURES = ("delta_hedged_atm", "delta_hedged_atm_short")
+MAX_TENOR_DAYS = 400
+
+
+def grain_structure(structure: str, strike_delta: float | None) -> str:
+    """The structure the grain stores (held long) for a document ``structure``: ``atm_straddle``,
+    or ``put_delta_NN`` for the short put of delta ``NN / 100``."""
+    if structure == "put_short":
+        assert strike_delta is not None
+        return f"put_delta_{round(strike_delta * 100):02d}"
+    return "atm_straddle"
+
+
+def check_chain(
+    o: Table, structure: str | None, delta: float | None, pct: float | None, iv_field: str | None
+) -> tuple[str, float | None, float | None, str | None]:
+    """``(structure, strike_delta, otm_pct, iv_field)`` of an ``option_pnl`` outcome, or a
+    ``ConfigurationError`` naming the file and key."""
+    if structure is None:
+        raise ConfigurationError(f"{o.where} structure: required for an option_pnl outcome")
+    if pct is not None or iv_field is not None:
+        key = "otm_pct" if pct is not None else "iv_field"
+        raise ConfigurationError(f"{o.where} {key}: an option_pnl reads quoted prices, it has none")
+    if structure == "put_short":
+        if delta is None or not 0.05 <= round(delta, 2) <= 0.5:
+            raise ConfigurationError(
+                f"{o.where} strike_delta: a put_short names the put's delta, 0.05 to 0.5, "
+                f"got {delta}"
+            )
+        delta = round(delta, 2)
+    elif delta is not None:
+        raise ConfigurationError(f"{o.where} strike_delta: only a put_short has a strike")
+    return structure, delta, None, None
+
+
+def chain_tenor(o: Table, kind: str) -> int | None:
+    """The ``tenor_days`` of an ``option_pnl`` outcome (required, 1 to ``MAX_TENOR_DAYS``); None
+    for any other kind, which may not name one."""
+    if kind != CHAIN_KIND:
+        if "tenor_days" in o.names():
+            raise ConfigurationError(f"{o.where} tenor_days: only an option_pnl outcome has one")
+        return None
+    days = o.integer("tenor_days", 0)
+    if not 1 <= days <= MAX_TENOR_DAYS:
+        raise ConfigurationError(
+            f"{o.where} tenor_days: required, calendar days from 1 to {MAX_TENOR_DAYS}, got {days}"
+        )
+    return days
+
+
+def check_kinds(kinds: set[str]) -> str | None:
+    """Why an edge's outcome and its variants' kinds cannot be evaluated together (an
+    ``option_pnl`` edge reads another grain than every other kind), else None."""
+    return (
+        "an edge's outcome and its variants are all option_pnl or none is (another grain)"
+        if CHAIN_KIND in kinds and len(kinds) > 1
+        else None
+    )

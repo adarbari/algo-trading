@@ -67,7 +67,7 @@ contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
 path = "src/algotrade/config/edges"
-purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/edges/<id>/edge.toml, layered under a user's config/users/<id>/edges/ (ADR 0015), validated fail closed, checked against the screener and selection presets that exist, rendered to docs/edges.md, the user's bookmark of a site edge and the server-written audit of their own edge (follow.py) and the winners study's settings (winners.py, ADR 0053 amendment 2026-10-09)"
+purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/edges/<id>/edge.toml, layered under a user's config/users/<id>/edges/ (ADR 0015), validated fail closed, checked against the screener and selection presets that exist, rendered to docs/edges.md, the user's bookmark of a site edge and the server-written audit of their own edge (follow.py), the option_pnl outcome's structures, tenor rule and checks (chain.py, EB H13) and the winners study's settings (winners.py, ADR 0053 amendment 2026-10-09)"
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
@@ -164,7 +164,7 @@ purpose = "reads of macro series and index levels (macro/series, ADR 0048): each
 
 [[dir]]
 path = "src/algotrade/data/outcomes"
-purpose = "reads of the outcomes grain (outcomes/instrument/, ADR 0053): what happened after a start session, the one table read across sessions, only by the edge harness"
+purpose = "reads of the outcomes grains (outcomes/instrument/ price windows, reading.py; outcomes/option/ chain P&L of option structures, chain.py; ADR 0053 and its EB H13 amendment): what happened after a start session, the tables read across sessions, only by the edge harness"
 contracts = ["Outcomes are quarantined: only services.evaluation reads them (ADR 0053)"]
 
 [[dir]]
@@ -295,7 +295,7 @@ contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow
 
 [[dir]]
 path = "src/algotrade/quant/edges"
-purpose = "the statistics that judge an edge's screeners (ADR 0053; split from quant, at its module cap): lift, effect size, deciles, Sharpe, deflated Sharpe, PBO and the live win-rate band (statistics.py); sign stability, rank-correlation clusters and the permutation null of the discovery study (discovery.py)"
+purpose = "the statistics that judge an edge's screeners (ADR 0053; split from quant, at its module cap): lift, effect size, deciles, Sharpe, deflated Sharpe, PBO and the live win-rate band (statistics.py); sign stability, rank-correlation clusters and the permutation null of the discovery study (discovery.py); the maths of a chain P&L: two-sided mids, long P&L, our own delta of a leg, the daily delta-hedged P&L (chain_pnl.py, EB H13)"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]

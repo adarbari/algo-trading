@@ -21,10 +21,11 @@ from datetime import date, datetime
 
 import pandas as pd
 
+from algotrade.config.edges.chain import CHAIN_KIND
 from algotrade.config.edges.document import Edge, identity_dict
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
-from algotrade.data.outcomes import read_outcomes
+from algotrade.data.outcomes import read_chain, read_outcomes
 from algotrade.services.evaluation.cross_section.harness import iv_field_of
 from algotrade.services.evaluation.cross_section.hit import (
     INVALID_IMPLIED_VOL,
@@ -93,7 +94,10 @@ def settle_group(
     if not names:
         return out
     try:
-        stored = read_outcomes(reader, horizon, [buy], BENCHMARK, as_of=now)
+        if edge.outcome.kind == CHAIN_KIND:  # an option P&L reads the chain grain (EB H13)
+            stored = read_chain(reader, horizon, [buy], as_of=now)
+        else:
+            stored = read_outcomes(reader, horizon, [buy], BENCHMARK, as_of=now)
     except MissingDataError:
         stored = pd.DataFrame()
     if stored.empty:

@@ -119,6 +119,12 @@ def _outcome(o: Outcome, event: bool) -> str:
     if o.kind == "option_model_pnl":
         shape = (o.structure or "").replace("_", " ")
         parts.append(f"modelled P&L of an {shape} (basis {o.basis}, not a quote)")
+    elif o.kind == "option_pnl":
+        shape = (o.structure or "").replace("_", " ")
+        parts.append(
+            f"P&L of a {shape} from the stored chains (basis {o.basis}, quoted prices, "
+            f"{o.tenor_days}-day tenor, forward-only from 2026-10-02)"
+        )
     elif o.structure is not None:
         strike = (
             f"delta {o.strike_delta:g}" if o.strike_delta else f"{o.otm_pct:.0%} out of the money"

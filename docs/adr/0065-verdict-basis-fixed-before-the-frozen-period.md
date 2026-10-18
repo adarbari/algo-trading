@@ -116,3 +116,17 @@ A `long_short` candidate is never a basis (owner decision 2026-10-17: a spread c
 by buying alone and the broker access is read-only); an edge whose candidates are all
 `long_short` has no basis; its verdict is Diagnostic only, a state of its own, not Waiting on data. Promising still needs t >= 2 and Works
 t >= 3 on both t series. The verdict and the edge page carry the basis's side.
+
+## Amendment 2026-10-18: a grain with no pre-frozen history (chain P&L, ADR 0053 amendment)
+
+The rule above fixes the basis before the frozen period is read, and ranks several candidates on
+the in-sample slice. The chain P&L grain (`outcomes/option/structure_pnl@v1`) has no in-sample
+history: chains are stored from 2026-10-02, after the frozen split 2026-04-01. So for an
+`option_pnl` edge no candidate can be ranked on an in-sample period, and none was chosen by
+looking at one: **the basis is declared at filing** (the document's one screen and one horizon,
+the main variant first; `choose_basis` already takes one declared candidate without ranking), and
+**every row is out of sample**; the in-sample slice is empty, not zero. An edge that files several
+candidates cannot be ranked, and its verdict is Waiting on data until one is declared. Candidates
+added after the first row was stored are trials in the site-wide count and cannot become the
+basis. How the Promising and Works rules read an empty in-sample t is not changed here: it is a
+question for the architect review of the first `option_pnl` edge (the rule's two t series).

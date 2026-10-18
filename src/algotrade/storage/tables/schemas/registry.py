@@ -38,7 +38,11 @@ from algotrade.storage.tables.schemas.market import (
     UNIVERSE,
     VERIFICATION_IBKR,
 )
-from algotrade.storage.tables.schemas.outcomes import OUTCOMES_PREFIX, outcomes_spec
+from algotrade.storage.tables.schemas.outcomes import (
+    OPTION_PNL_SPEC,
+    OUTCOMES_PREFIX,
+    outcomes_spec,
+)
 from algotrade.storage.tables.schemas.reference import (
     ETF_HOLDINGS,
     ETF_SHARES,
@@ -107,6 +111,7 @@ KNOWN: dict[str, TableSpec] = {
         MACRO_RELEASE_EVENTS,
         FILING_EVENTS,
         FUND_NAV_EVENTS,
+        OPTION_PNL_SPEC,
     )
 }
 

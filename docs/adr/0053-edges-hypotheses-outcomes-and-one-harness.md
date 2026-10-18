@@ -690,3 +690,72 @@ column, and reads the stored `forward_returns@v2` window and the implied vol at 
 6. **Not here.** The chain P&L grain (H13) and a short-put P&L (needs a strike key and a put
    price) are a follow-up PR. The short delta-hedged side is its own structure value
    (`delta_hedged_atm_short`), not a `side` key. The stored basis column is left to H13.
+
+## Amendment 2026-10-18: `option_pnl`, the chain P&L grain (EB H13)
+
+`option_model_pnl` (amendment 2026-10-17) prices a straddle with a formula because no historical
+option prices exist. Chains are stored from 2026-10-02, so a P&L of real quotes can now accrue.
+It is a second outcomes grain and a second outcome kind; the first is unchanged.
+
+1. **Grain.** `outcomes/option/structure_pnl@v1` (`architecture/tables.toml`, one producer: the
+   ingestion task `option-outcomes`, `tasks/derived/option_outcomes.py`, the window arithmetic in
+   `option_paths.py`, the maths in `quant/edges/chain_pnl.py`). One row per (underlying,
+   start session S, structure, tenor rule, horizon); `session_date = S`, partition S, runs
+   merge on that key. `structure` is the position held *long*: `atm_straddle` or
+   `put_delta_NN`. The document's side and hedging are applied by the harness, so one stored row
+   serves the long, the short and the hedged edge. Columns: the contracts (`call_id`, `put_id`,
+   `expiry`, `strike`), entry spot, mid and ask, exit spot, mid and bid, `exit_kind` (`QUOTE`, or
+   `INTRINSIC` at expiry), the P&L per unit premium (mid, and executable), per underlying (mid),
+   the daily delta-hedged P&L per premium and per underlying, `outcome_status` and
+   `outcome_reason`. The grain is read only through `algotrade.data.outcomes` (`chain.py`), under
+   the same import contract as the price grain: importable only from `services/evaluation`.
+2. **Contracts, from S's chain alone.** The first listed expiry at least `tenor_days` calendar
+   days after S and not before the window's end T. Then the at-the-money strike (the listed
+   strike nearest the underlying's closing quote with a call and a put both two-sided; the lower
+   on a tie) or, for a put, the listed put whose own delta is nearest the target. The underlying
+   is the `close` of the stored quote (the quote's `price` can carry after-hours trades, option
+   quotes are closing quotes), as the positioning features read it.
+3. **Timing and point in time.** The chain for S arrives about 315 minutes after the close, so the
+   entry is knowable only that evening and the decision session is D = S - 1 (the existing
+   offset rule, unchanged). A row's `knowledge_ts` is the latest `knowledge_ts` among the chain
+   partitions it was computed from (the exit session's, S..T), not the write time: a window is
+   known only when its exit chain was. A window whose T has not closed is refused. Past
+   restatements of a chain partition would move the stamp, never the other way round.
+4. **Stale and missing chains.** A name is UNMEASURED, with a reason and no P&L, when any session
+   from S to T has no chain for it (`NO_CHAIN:<day>`) or a `STALE_DATA` chain
+   (`STALE_CHAIN:<day>`, ADR 0054's labelling, chronic staleness included), when a contract has
+   no two-sided quote at the exit (`NO_EXIT_QUOTE`), when a hedge delta cannot be computed on a
+   session (`NO_DELTA:<day>`), or when no expiry can be held (`NO_EXPIRY`) or no strike
+   entered (`NO_ENTRY_QUOTE`). A chain is never filled from an earlier session and a P&L is
+   never zero when it could not be computed. The whole row is UNMEASURED, also for the unhedged
+   P&L, so one status means one thing. A name whose chain at S is not `OK` has no row (no
+   position was knowable). The harness counts an UNMEASURED pick like any unmeasurable one.
+5. **Hedge.** Daily, at each close from S to T - 1, with *our own* delta: the implied vol that
+   each leg's mid gives (`quant/implied_vol`), then the Black-Scholes delta with r = q = 0 and
+   t in calendar days over 365 (ADR 0021's time convention; the curve's rate and the dividend
+   yield move a one-month delta by under 1% and are left out, so the figure does not depend on
+   the rates and dividend tables). Never a vendor Greek. No hedge cost and no financing.
+6. **Value.** The harness value of an `option_pnl` outcome is executable, net of the quoted
+   spread: `sign * pnl_per_underlying` (or the hedged one for `delta_hedged_atm[_short]`) less
+   the half-spread paid at entry (`entry_ask - entry_mid`) and at exit (`exit_mid - exit_bid`)
+   over `entry_spot`; `sign` is -1 for a short structure. For an unhedged short this is exactly
+   bid in, ask out (the stored quote is symmetric around the mid). `cost_bps` is charged once on
+   top. Unit `pnl`, so the trial statistics read the picks' mean P&L, never the win rate
+   (`counts_wins` is false), as for `option_model_pnl`.
+7. **Document.** `[outcome] kind = "option_pnl"` (`config/edges/chain.py`): `structure` in
+   `atm_straddle_long | atm_straddle_short | delta_hedged_atm | delta_hedged_atm_short |
+   put_short`, `tenor_days` (required, calendar days), `strike_delta` for `put_short` only,
+   `benchmark = "none"`, no implied-vol field. An edge and its `[[variants]]` are all
+   `option_pnl` or none is: the harness reads one grain per run. The short put that the H8
+   amendment left to a follow-up lands here, as a chain P&L. The writer takes its structures,
+   tenors and horizons from the open edge documents, like the price grain.
+8. **Basis.** `Outcome.basis` is `"chain"` for this kind (`"model"` for the formula's). No stored
+   `results/edge_eval` column carries it: the basis follows the document's kind, which is in
+   the outcome hash, so a run's outcome cannot be mistaken for the other basis. The Guide terms
+   `chain_basis`, `outcome_option_pnl`, `put_short` and the status terms explain it.
+9. **Forward-only.** Chains exist from 2026-10-02, after the frozen split 2026-04-01 and every
+   other frozen period. There is no backfill; results are UNMEASURED or insufficient (fewer
+   independent sessions than the quality bar's count) until history accrues. The Guide entry and
+   the verdict's own insufficiency text say so; nothing is imputed from the model P&L.
+10. **Not here.** Hedging cost, financing, margin, early exercise and the fill below the quote.
+    A structure other than the five above (a strangle, a spread) is a later `structure` value.

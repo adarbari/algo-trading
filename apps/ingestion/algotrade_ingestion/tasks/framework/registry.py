@@ -16,7 +16,13 @@ from pathlib import Path
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.analyst import probe as analyst_probe
 from algotrade_ingestion.tasks.analyst import snapshot as analyst_snapshot
-from algotrade_ingestion.tasks.derived import history_copy, market_rollups, outcomes, rollups
+from algotrade_ingestion.tasks.derived import (
+    history_copy,
+    market_rollups,
+    option_outcomes,
+    outcomes,
+    rollups,
+)
 from algotrade_ingestion.tasks.events import filings
 from algotrade_ingestion.tasks.framework import (
     entries_market,
@@ -477,6 +483,15 @@ TASKS: dict[str, Task] = {
             outcomes.TABLES,
             entries_market.run_outcomes,
             settings="edges/*.toml (horizons, benchmarks)",
+            params=(SESSION, FROM, TO),
+        ),
+        Task(
+            "option-outcomes",
+            "chain P&L of the option windows a session closes (ADR 0053 amendment); forward-only",
+            option_outcomes,
+            option_outcomes.TABLES,
+            entries_market.run_option_outcomes,
+            settings="edges/*.toml (option_pnl structures, tenors, horizons)",
             params=(SESSION, FROM, TO),
         ),
         Task(

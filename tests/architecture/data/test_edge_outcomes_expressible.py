@@ -15,11 +15,12 @@ from algotrade.config.edges.document import ANNOUNCED_AHEAD, CLOSED, MODEL_STRUC
 from algotrade.config.edges.loading import load_edges
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
-from algotrade.data.outcomes import OUTCOME_FIELDS
+from algotrade.data.outcomes import CHAIN_FIELDS, OUTCOME_FIELDS
 from algotrade.services.configs import field_catalog
 from algotrade.services.evaluation.cross_section.events import EVENT_FIELDS
 from algotrade.services.evaluation.cross_section.harness import MIXED_SOURCE_IV
 from algotrade.services.evaluation.cross_section.hit import (
+    CHAIN_PNL_FIELDS,
     EXPIRES_OTM_FIELDS,
     IMPLIED_VOL_FIELD,
     MEASURE_FIELDS,
@@ -58,13 +59,15 @@ def test_the_measure_and_the_path_condition_are_stored_outcome_fields(edge: Edge
             fields: tuple[str, ...] = MODEL_PNL_FIELDS[o.structure]
         elif o.kind == "expires_otm":
             fields = EXPIRES_OTM_FIELDS
+        elif o.kind == "option_pnl":  # the chain grain's own fields (checked below)
+            fields = ()
         else:
             fields = MEASURE_FIELDS[o.measure or "excess_return"]
         stored = [f for f in fields if f != IMPLIED_VOL_FIELD]
         assert set(stored) <= set(OUTCOME_FIELDS), f"{edge.id}: {fields} are not outcome fields"
     fields = (
         MEASURE_FIELDS[_measure(edge)]
-        if edge.outcome.kind not in ("expires_otm", "option_model_pnl")
+        if edge.outcome.kind not in ("expires_otm", "option_model_pnl", "option_pnl")
         else ()
     )
     stored = [f for f in fields if f != IMPLIED_VOL_FIELD]
@@ -79,6 +82,12 @@ def test_every_model_structure_names_the_stored_fields_it_reads() -> None:
     assert set(MODEL_PNL_FIELDS) == set(MODEL_STRUCTURES)
     for structure, fields in MODEL_PNL_FIELDS.items():
         assert set(fields) <= set(OUTCOME_FIELDS), f"{structure}: {fields} are not outcome fields"
+
+
+def test_an_option_pnl_outcome_reads_only_fields_the_chain_grain_writes() -> None:
+    """``option_pnl`` adds a grain (ADR 0053 amendment, EB H13): the fields its value reads are
+    the ones ``outcomes/option/structure_pnl@v1`` carries to the harness."""
+    assert set(CHAIN_PNL_FIELDS) <= set(CHAIN_FIELDS)
 
 
 @pytest.mark.parametrize("edge", EDGES, ids=_ids())
