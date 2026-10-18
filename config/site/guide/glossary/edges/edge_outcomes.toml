@@ -165,6 +165,91 @@ next = "Treat a model result as a size estimate; the edge's evidence needs the s
 see_also = ["outcome_option_model_pnl", "edge", "out_of_sample"]
 
 [[term]]
+id = "outcome_option_pnl"
+term = "Outcome: Option chain P&L"
+short = "A pick works when an option position bought from the stored chain quotes would have made money over the holding period."
+body = """
+The position is priced from the option chains we store. It is bought at the ask of the entry
+close and sold at the bid of the exit close, so the quoted spread is paid. The value is the profit and loss as
+a fraction of the entry price of the stock. The structure says which position is held (a straddle, a
+hedged straddle or a short put) and the tenor says how far out the options expire. The hedged
+structures also trade the stock every day using our own delta from each session's chain. A
+chain that is missing or stale on a session of the window makes the pick unmeasured, with the
+reason, never a zero. Chains are stored only from 2 October 2026, after every frozen period, so the
+results grow one session at a time and stay insufficient for weeks. Example: a straddle bought at
+6% of the price and sold at 7.5% with a 1% spread cost earns about 0.5% of the stock price. Don't
+read the first few windows as a result: the sample is small.
+"""
+next = "Check the chain basis and the number of measured windows before reading the verdict."
+see_also = ["chain_basis", "chain_outcome_unmeasured", "straddle_long", "put_short", "edge", "out_of_sample"]
+
+[[term]]
+id = "chain_basis"
+term = "Chain basis"
+short = "A value priced from stored option quotes at the entry and exit sessions, not from a formula."
+body = """
+A result with the basis chain used the bid, ask and mid of real quotes we stored on the entry
+session and on the exit session. It pays the quoted spread and uses our own delta, computed from
+each session's chain, for any hedge. It leaves out the fill below the quote, margin, early
+exercise, the cost of trading the stock and financing, so a real result can be lower.
+Chains exist only from 2 October 2026. Every row is out of sample: no earlier period is
+stored to choose a setting from. The verdict can reach Promising but not Works until the rule
+for such a basis is amended. Don't compare a chain result with a model result as if both
+were the same kind of number.
+"""
+next = "Treat the first results as a small sample and read how many windows were measured."
+see_also = ["outcome_option_pnl", "model_basis", "edge", "out_of_sample"]
+
+[[term]]
+id = "put_short"
+term = "Structure: Short put by delta"
+short = "A put sold at the strike whose delta matches the edge's setting and held to the horizon."
+body = """
+The strike is chosen on the entry session from the chain: the listed put whose own delta is nearest
+the edge's strike delta. The position collects the put's premium and pays back its later price.
+It earns when the stock stays above the strike and loses when it falls through it. The
+value is net of the quoted spread. Example: a put sold for 1.0% of the price and bought back
+at 0.4% earns 0.6% less the spread. Wins are frequent and the losses are large and rare, so
+judge the mean value, not the win rate. There is no margin, assignment or early exit in the
+number. Don't size a real position from it.
+"""
+next = "Read the mean value and the worst windows before the hit rate."
+see_also = ["outcome_option_pnl", "chain_basis", "straddle_short", "win_rate"]
+
+[[term]]
+id = "chain_outcome_unmeasured"
+term = "Chain outcome: Unmeasured"
+short = "A chain P&L window with no value because a quote it needs was missing or stale."
+body = """
+The row is kept with its reason and no profit and loss, and the harness counts the pick as
+unmeasured, never as a loss or a zero. NO_CHAIN means a session of the window has no chain for the
+name. STALE_CHAIN means the feed served an older session's chain, so it is not used. NO_EXIT_QUOTE
+means a contract has no two-sided quote at the exit. NO_DELTA means a hedge delta could not be
+computed on a session. NO_EXPIRY means no listed expiry could be held to the window's end.
+NO_ENTRY_QUOTE means no two-sided strike or no underlying quote at the entry. NO_PNL means a
+price was missing in the arithmetic. NO_CHAIN, STALE_CHAIN and NO_DELTA on a session between the
+entry and the exit cost only the hedged value. The row keeps its unhedged value, and a hedged
+edge reads it as unmeasured. Don't fill the gap from an older chain.
+"""
+next = "Read how many windows were measured; a high unmeasured share means the sample is thinner than it looks."
+see_also = ["outcome_option_pnl", "chain_outcome_complete", "chain_basis"]
+
+[[term]]
+id = "chain_outcome_complete"
+term = "Chain outcome: Complete"
+short = "A chain P&L window measured from stored quotes on every session it needs."
+body = """
+The entry and the exit session have a current chain for the name. The contracts were quoted at
+the entry and the exit. The hedged value also needs a current chain and a delta on each session in
+between; without them only the hedged value is missing.
+The values are stored with the contracts held, so the result can be audited. A complete window is
+a measurement of one name over one holding period, not a forecast. It is known only after the exit
+session's chain was stored, which is in the evening. Don't read one complete window as a result.
+"""
+next = "Read the mean value across windows and how many were measured."
+see_also = ["outcome_option_pnl", "chain_outcome_unmeasured", "chain_basis"]
+
+[[term]]
 id = "outcome_portfolio_return"
 term = "Outcome: Portfolio return"
 short = "A book of the screen's picks works when it beats a blended benchmark over the holding period, after the cost of changing the book."

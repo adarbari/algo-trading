@@ -613,6 +613,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"
 note = "ADR 0053: forward outcomes per (instrument, start session, horizon, benchmark); read only by the edge harness through algotrade.data.outcomes"
 
 [[table]]
+name = "outcomes/option/structure_pnl@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/option_outcomes.py"
+note = "ADR 0053 amendment (EB H13): chain P&L per (underlying, start session, structure, tenor rule, horizon) from the stored chains, forward-only from 2026-10-02; read only by the edge harness through algotrade.data.outcomes"
+
+[[table]]
 name = "outcomes/instrument/residual_returns@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/residual_returns.py"
 note = "ADR 0053 amendment (EB H11): the factor-neutral return per (instrument, start session, horizon), beside forward_returns@v2; read only by the edge harness through algotrade.data.outcomes"

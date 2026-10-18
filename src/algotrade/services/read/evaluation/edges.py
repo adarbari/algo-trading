@@ -180,6 +180,8 @@ def _win(o: document.Outcome) -> str:
         return "the option expires worthless"
     if o.kind == "option_model_pnl":
         return "the modelled straddle P&L is positive (a model, not a quote)"
+    if o.kind == "option_pnl":
+        return "the chain P&L is positive (quoted prices, net of the spread)"
     if o.kind == "hit_target":
         return f"{(o.measure or 'the measure').replace('_', ' ')} {o.direction} {o.target:g}"
     if o.benchmark != "none":
