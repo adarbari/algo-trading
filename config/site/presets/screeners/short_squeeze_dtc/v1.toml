@@ -1,0 +1,56 @@
+# Crowded shorts (ADR 0053, EB E6; edge short_squeeze_days_to_cover): a common stock trading at
+# least $5M a day with 5% or more of its shares outstanding sold short and three or more days of
+# volume to cover (FINRA's own days to cover), from the latest report public by the session (the
+# figure is two weeks old when it is public). Ranked by days to cover, the highest last, so the
+# harness's short leg takes the most crowded first. A missing value never passes (ADR 0030). What it
+# does not check: borrow cost or availability, the float, a catalyst, or a squeeze already under
+# way. The source (finra.org short interest) bars machine learning: rule screens only.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "short_squeeze_dtc"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Crowded shorts by days to cover"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 5_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.short_ratio]
+field = "feature.short_interest_ratio"
+op = "gte"
+value = 0.05
+
+[criteria.days_to_cover]
+field = "rollup.short_interest@v1.days_to_cover"
+op = "gte"
+value = 3
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+short_interest_ratio = "feature.short_interest_ratio"
+days_to_cover = "rollup.short_interest@v1.days_to_cover"
+short_interest_date = "rollup.short_interest@v1.short_interest_date"
+
+[rank]
+tie_break = "rollup.short_interest@v1.days_to_cover"
+tie_break_order = "asc"

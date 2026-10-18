@@ -6,7 +6,7 @@ from datetime import date
 
 import pandas as pd
 
-from algotrade.data.insiders.reading import read_insider_transactions
+from algotrade.data.insiders.reading import buyer_histories, read_insider_transactions
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
@@ -103,3 +103,29 @@ def test_lines_and_owners_of_one_filing_stay_separate_rows() -> None:
     assert len(read_insider_transactions(found)) == 4
     only = read_insider_transactions(found, instruments=["EQ:NOPE"])
     assert only.empty
+
+
+def test_buyer_histories_hold_the_open_market_lines_of_recent_buyers_as_each_session_saw_them() -> (
+    None
+):
+    buy = row("A1", date(2026, 9, 30))
+    old_sale = row("A0", date(2022, 3, 1), transaction_code="S", transaction_date=date(2022, 2, 28))
+    grant = row("A2", date(2026, 9, 30), transaction_code="A", owner_cik="0000888001", line=2)
+    derivative = row("A3", date(2026, 9, 30), derivative=True, line=3)
+    quiet = row("B1", date(2026, 7, 1), instrument_id="EQ:QUIET", owner_cik="0000888002")
+    found = reader((S1, [buy, old_sale, grant, derivative, quiet]))
+    seen = buyer_histories(found, [date(2026, 10, 9), date(2026, 11, 2)])
+    first = seen[seen["as_of"] == date(2026, 10, 9)]
+    # the buyer's sale and purchase; no grant, no derivative line, no one who bought in July
+    assert sorted(first["transaction_code"]) == ["P", "S"]
+    assert set(first["instrument_id"]) == {"EQ:EXMP"}
+    assert seen[seen["as_of"] == date(2026, 11, 2)].empty  # the purchase is over 30 days old
+
+
+def test_a_buyer_history_never_shows_a_restated_line_early() -> None:
+    old = row("A1", date(2026, 9, 30), price=12.5)
+    new = row("A1", date(2026, 10, 7), price=12.0)
+    found = reader((S1, [old]), (S2, [new]))
+    seen = buyer_histories(found, [date(2026, 10, 6), date(2026, 10, 7)])
+    assert len(seen) == 2  # one line per session: the old version, then the restated one
+    assert buyer_histories(reader(), [S1]).empty

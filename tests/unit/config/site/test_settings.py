@@ -467,6 +467,7 @@ def test_the_committed_feature_files_load() -> None:
         "positioning",
         "price",
         "regime",
+        "shorting",
         "statements",
         "swing",
         "volatility",

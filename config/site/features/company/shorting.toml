@@ -1,0 +1,11 @@
+# Expression features over FINRA short interest (EB E6; edge short_squeeze_days_to_cover). The source
+# table is no_ml: no learned scorer may read these (tests/architecture/data/test_no_ml_tables.py).
+
+[short_interest_ratio]
+expr = 'if(fundamentals.market_cap_status == "OK", short_interest.short_position / fundamentals.shares_outstanding, null)'
+dtype = "float"
+unit = "decimal"
+valid_range = [0, inf]
+description = "Shares sold short as a share of the company's shares outstanding: the latest FINRA short position public by the session over the latest share count; 0.10 means 10% of the shares are short (shares outstanding, not the float)"
+null_meaning = "no short-interest report became public in the last 30 sessions, or no current share count (market_cap_status is not OK: no count, or a stale one)"
+version = 1

@@ -1,0 +1,89 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/events.md
+# (insider_opportunistic_cluster_buys). Screener: insider_cluster_buys (EB E6; insider_buys@v1).
+id = "insider_opportunistic_cluster_buys"
+name = "Opportunistic insider cluster buys"
+family = "B"
+thesis = "Stocks that several insiders buy on the open market within a month, at times that are not routine for them, outperform the market over the next months."
+mechanism = """Insiders know their firm and buying with their own money is costly, so a purchase
+carries information; routine trades are liquidity and diversification noise that dilutes it, and
+the signal is concentrated in smaller firms (Cohen, Malloy and Pomorski 2012; Lakonishok and
+Lee 2001)."""
+persistence = """A Form 4 is public within two business days, yet the signal needs a filter (routine
+against opportunistic, a cluster of buyers, the 10b5-1 flag) that most retail screens skip, and
+small-cap capacity is limited. The studies' samples end in 2007 and 1995; a post-2010 test is not on
+file, so persistence is a claim to test."""
+schedule = "month_end"
+top_k = 20
+base = "universe"
+screeners = ["insider_cluster_buys"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Filed as a cross-section screen, not an on_event edge: no insider_filing event class is
+declared in config/edges/document.py (EVENT_CLASSES), so the event is read as a feature at each
+month end. A cluster is three or more distinct insiders with an open-market purchase (Form 4 code
+P) known in the last 30 calendar days, and an opportunistic buyer is one who did not trade in the
+same calendar month of each of the three previous years (Cohen, Malloy and Pomorski's rule over
+the owner's own Form 4 lines, from the 2006 bulk history); a buyer with a shorter record is
+unclassified, never opportunistic, so the screen drops a name whose buyers are all new. The
+filings count from known_from, the first session whose close follows SEC's acceptance (a filing
+accepted after the close counts from the next session), never the transaction or filing date;
+each session reads the table as that session saw it (a restated line shows its old version
+until its own known_from). The picks are the 20 names with the most buyers, compared with every
+eligible name (base = universe: the screen selects a small subset, so a base of the same names
+would give no lift). The universe is common stocks above 5 dollars trading 1M dollars a day: the studies find the
+effect in the smaller firms, and the floor keeps the end an individual can trade. A purchase under a 10b5-1 plan (a checkbox since April 2023) is not screened out: the column shows it. The
+published 82 bp a month is a two-group alpha of opportunistic against routine, which the harness
+does not measure, so no [published] figure. The Form 4 history is stored from 2006, but outcomes
+before 2018 need the D0 Tiingo backfill (due 2026-11-09): verdicts are UNMEASURED until then.
+Month-end start sessions spaced at least 20 sessions apart."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 1_000_000 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 20
+
+[quality_bar]
+outcome = """Excess return over SPY over 20 and 60 sessions after the entry close (the session after a
+month-end decision), net of 20 bps a round trip, a small-cap-sized cost assumption."""
+trigger_timing = """Every purchase is counted from known_from at D, the first session whose close follows
+SEC's acceptance of the Form 4, so a filing accepted after the close of D is read at D + 1 at the
+earliest; the entry session is S = D + 1 (start_offset_sessions = 1). The opportunistic class reads
+only filings known by D, and a restated line shows its old version until its own known_from."""
+replication = """The source's rule: long the opportunistic purchases of insiders, routine ones ignored
+(Cohen, Malloy and Pomorski 2012); the cluster of three or more buyers in 30 days is the practitioner
+rule. Here insider_cluster_buys v1 takes the common stocks above the floor meeting both and the harness holds
+the 20 with the most buyers; the studies' value-weighted portfolios of all opportunistic buyers are
+not replicated."""
+expected_size = """About 82 bp a month of value-weighted alpha for opportunistic buyers against about zero for
+routine ones, 1986-2007 (Cohen, Malloy and Pomorski 2012, verified); a post-2010 out-of-sample test is
+not on file, and most of the signal is in small firms this universe leaves out. About ten
+independent month-ends of cluster names a year, so the sample is small."""
+capacity_costs = """Small and mid caps, long only, capacity of tens of thousands of dollars a name; the
+1M dollar floor keeps names where the effect is weaker than in microcaps. The outcome deducts 20 bps a
+round trip; insiders buy after falls, so spreads are often wide."""
+failure_modes = """Insiders buy after declines, so the picks are a reversal and value bet; a buyer with
+no three-year record cannot be classified and is dropped; a 10b5-1 plan buy says little. Retire if
+the frozen-period excess return of the picks is not above the base rate of every eligible name."""
+decoys = """Long-term reversal and value (insiders buy cheap names), size, and 12-1 momentum: the size
+and momentum baselines on the same sessions; opportunistic against routine is the study's own
+control."""
+
+[[sources]]
+title = "Cohen, L., Malloy, C. and Pomorski, L., Decoding Inside Information, Journal of Finance, 2012"
+url = "https://www.nber.org/papers/w16454"
+
+[[sources]]
+title = "Lakonishok, J. and Lee, I., Are Insider Trades Informative?, Review of Financial Studies, 2001"
+url = "https://doi.org/10.1093/rfs/14.1.79"

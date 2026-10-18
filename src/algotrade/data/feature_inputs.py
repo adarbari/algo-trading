@@ -52,6 +52,18 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        sessions before the session up to it, with ``event_date`` that session
                        (``filing_events@v1``; ADR 0050 amendment, EB H4); an empty frame when
                        there are none
+- ``events/insider_transaction``
+                       ``insiders.buyer_histories``: per session, the open-market lines (codes P
+                       and S) known by it of each (issuer, owner) with a purchase known in the
+                       last 30 calendar days, each session read as the one rule says (a restated
+                       line shows its old version until its own ``known_from``), tagged
+                       ``as_of``; ``at(session)`` returns the session's own view only (lookback
+                       is not supported; ``insider_buys@v1``, EB E6)
+- ``events/short_interest``
+                       FINRA short interest by the session it became public (``known_from``, set
+                       from the publication schedule at ingestion), from ``lookback`` sessions
+                       before the session up to it; an empty frame when none
+                       (``short_interest@v1``, EB E6; the table is no_ml)
 - ``instruments/shares``
                        ``shares.share_facts``: every stored share-count and financial (revenue,
                        net income, diluted EPS) fact FILED on or before the session (point in
@@ -120,7 +132,7 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Protocol
 
 import numpy as np
@@ -137,10 +149,13 @@ from algotrade.data.events import (
     events_by_acceptance,
     events_by_event_date,
     filing_walks,
+    read_events,
     stored_events,
 )
 from algotrade.data.funds.holdings import TABLE as HOLDINGS
 from algotrade.data.funds.holdings import funds_holdings
+from algotrade.data.insiders.reading import TABLE as INSIDERS
+from algotrade.data.insiders.reading import buyer_histories
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.macro.series import known_window, stored_vintages
 from algotrade.data.prices import DateWindow, SessionBars, session_bars, window_closes
@@ -417,6 +432,27 @@ def _filings(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Lo
     return _Window(frame, _days(frame["event_date"]), need_session=False)
 
 
+def _insider_views(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    frame = buyer_histories(reader, sessions)
+    return _Window(frame, _days(frame["as_of"]), need_session=False)
+
+
+SHORT_INTEREST_MARGIN = timedelta(days=15)  # a settlement date precedes its publication
+
+
+def _short_interest(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    first = sessions_before(sessions[0], lookback)
+    stored = read_events(
+        reader, "events/short_interest", first - SHORT_INTEREST_MARGIN, sessions[-1],
+        through=sessions[-1],
+    ).frame  # fmt: skip
+    if stored.empty:
+        stored = pd.DataFrame({"instrument_id": [], KNOWN_FROM: []})
+    stored = stored[pd.to_datetime(stored[KNOWN_FROM]) >= pd.Timestamp(first)]
+    frame = stored.sort_values([KNOWN_FROM, "instrument_id"], kind="stable").reset_index(drop=True)
+    return _Window(frame, _days(frame[KNOWN_FROM]), need_session=False)
+
+
 SHARES_ACCEPTED = f"{SHARES}_accepted"  # instruments/shares counted from its acceptance session
 STATEMENTS_ACCEPTED = f"{STATEMENTS}_accepted"
 STATEMENT_COLUMNS = ["concept", "tag", "period_start", "period_end", "filed", "value", "accn"]
@@ -492,6 +528,8 @@ INPUTS: Mapping[str, Loader] = {
     "events/split": _events_by_date("events/split"),
     "events/index_change": _events_by_date("events/index_change"),
     "events/filing": _filings,
+    INSIDERS: _insider_views,
+    "events/short_interest": _short_interest,
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,
     SHARES_ACCEPTED: _share_facts_accepted,

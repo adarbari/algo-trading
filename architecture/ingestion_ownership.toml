@@ -106,6 +106,8 @@ allowed = [
     "src/algotrade/storage/tables/schemas/events.py",  # declares the tables
     "libs/sources/algotrade_sources/vendors/finra/short_interest.py",  # the source's frame key
     "libs/sources/algotrade_sources/vendors/finra/short_volume.py",  # the source's frame key
+    "src/algotrade/data/feature_inputs.py",  # the events/short_interest input of short_interest@v1: rows by known_from (publication), read_events
+    "src/algotrade/features/rollups/events/short_interest.py",  # the group that reads it: the latest report public by the session (EB E6); computes only, never writes
 ]
 section = "docs/edge-ideas/build-plan.md#3-finra-short-interest-bi-monthly-and-daily-short-sale-volume"
 detect = [{ string = "events/short_interest" }, { string = "events/short_volume" }]
@@ -204,6 +206,7 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's table
     "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/data/insiders/reading.py",  # the one reader: known_from <= session, latest version, amendments applied
+    "src/algotrade/features/rollups/events/insider_buys.py",  # names its input; read through data.feature_inputs (buyer_histories), computes only (EB E6)
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ string = "events/insider_transaction" }]

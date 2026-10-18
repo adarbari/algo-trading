@@ -1,0 +1,57 @@
+# Opportunistic insider cluster buys (ADR 0053, EB E6; edge insider_opportunistic_cluster_buys): a
+# common stock trading at least $1M a day where three or more insiders bought on the open market in
+# the last 30 days (counted from the session each Form 4 became public) and a buyer is
+# opportunistic, not a routine trader (Cohen, Malloy and Pomorski 2012). Ranked by the number of
+# buyers. A missing value never passes (ADR 0030). What it does not check: the size of the
+# purchases, whether the buyers are officers or directors, why they bought, or whether a purchase
+# was made under a Rule 10b5-1 plan (the column shows it; the box exists since April 2023, and an
+# older filing has no value, so a hard test would drop every name before it).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "insider_cluster_buys"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Opportunistic insider cluster buys"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 1_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.cluster]
+field = "rollup.insider_buys@v1.insider_cluster_buy_count"
+op = "gte"
+value = 3
+
+[criteria.opportunistic]
+field = "rollup.insider_buys@v1.insider_opportunistic_flag"
+op = "eq"
+value = true
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+insider_cluster_buy_count = "rollup.insider_buys@v1.insider_cluster_buy_count"
+insider_opportunistic_flag = "rollup.insider_buys@v1.insider_opportunistic_flag"
+plan_10b5_1_flag = "rollup.insider_buys@v1.plan_10b5_1_flag"
+
+[rank]
+tie_break = "rollup.insider_buys@v1.insider_cluster_buy_count"
+tie_break_order = "desc"

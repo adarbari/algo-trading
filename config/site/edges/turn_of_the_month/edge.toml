@@ -1,0 +1,83 @@
+# Edge document (ADR 0053, ADR 0073; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/calendar-flows.md
+# (turn_of_the_month). A time-series edge: no screener, the instruments are the universe.
+id = "turn_of_the_month"
+name = "Turn of the month"
+family = "D"
+thesis = "Broad US equity funds earn more over the last session of a month and the first three of the next than over the same number of sessions elsewhere."
+mechanism = """Month-end cash arrives in payroll, 401(k) and pension accounts and is invested on a
+schedule, and settlement conventions make the selling before month end and the buying after it
+predictable (McConnell and Xu 2008; Etula, Rinne, Suominen and Vaittinen 2020)."""
+persistence = """The flow is mandated by contribution schedules, not chosen, and is small per day, so
+arbitrage capital does not fully absorb it; it was found in about 30 markets. After 2010 only
+whole-sample figures are on file and no recent-decade split is published, so persistence is a
+claim to test."""
+schedule = "calendar:turn_of_month"
+top_k = "all"
+screeners = []
+base = "out_of_window"
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09): the stored
+outcome history of the three funds is too short to measure a window edge before it (about 24
+month ends from 2024-10). The window is the calendar's turn_of_month (core/time/windows.py): the
+month's last session and the three after it, 4 sessions; the entry session S is the session
+before the last (the close of T-1) and the decision session D is the one before S. The value is
+the fund's raw return over the window, compared with its own non-overlapping 4-session stretches
+outside every window (ADR 0073); the harness also pairs each window with the stretch right after
+it, so a rising fund does not pass on its drift. SPY, QQQ and IWM are three trials, not one
+(deflated Sharpe ratio). No cost is deducted from a timed position in this version (ADR 0073);
+the page's 1 to 2 bp a side is small against a 4-session window. The source's 7-day variant and
+its rule of holding cash outside the window are not filed; the Sharpe ratio of that timing is in
+the run record. No [published] figure: the whole-sample numbers on file are of the timing rule's
+total return, which the harness does not measure."""
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SPY", "QQQ", "IWM"] },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [4]
+benchmark = "none"
+start_offset_sessions = 1
+
+[quality_bar]
+outcome = """The fund's raw return (benchmark none) over the 4 sessions of the turn-of-month window
+from the entry close, against its own return over the same number of sessions outside every window;
+no cost is deducted from a timed position (ADR 0073)."""
+trigger_timing = """The window is fixed by the exchange calendar ahead of time (the month's last session
+and the three after it), so nothing is read at D: the entry session S is the session before the last
+session of the month (start_offset_sessions = 1 from D = S - 1) and the return runs from S's close
+over 4 sessions. No fact after D places a window or a stretch of the base."""
+replication = """The source's rule: hold the index from the close of the last trading day (or T-1)
+through the third session of the new month, cash otherwise (McConnell and Xu 2008). Here the
+three funds are held over the same four sessions, and the cash leg is only in the run record's
+timing Sharpe ratio."""
+expected_size = """McConnell and Xu (2008), 1926-2005: essentially all of the equity premium accrues in
+these four days; the practitioner pages give only whole-sample timing returns (about 7 percent a
+year, against 7.5 percent buy and hold, invested a third of the time). A recent-decade split is not
+on file. About 100 windows since 2018 give a t statistic that cannot separate a few basis points
+a day from zero."""
+capacity_costs = """Unlimited capacity in three index funds, about 12 round trips a year, cost 1 to
+2 bps a side; long only. No cost is deducted in this version; the premium per window is a few
+tens of basis points before the 4-session hold's market risk."""
+failure_modes = """The effect is small against the funds' own drift and volatility and sits on the same
+dates as quarter-end and month-end index flows. Retire if the frozen-period in-window minus
+out-of-window mean is not above zero for SPY, or the Welch t over the independent windows stays
+under 2."""
+decoys = """Quarter-end rebalancing and the December and January effects share these dates, and the
+windows are in the market's beta (compare the paired series with the stretch after each window):
+test against the 'any 4-session window' null, which the 1,000 random draws of the harness are."""
+
+[[sources]]
+title = "McConnell, J. and Xu, W., Equity Returns at the Turn of the Month, Financial Analysts Journal, 2008"
+
+[[sources]]
+title = "Etula, E., Rinne, K., Suominen, M. and Vaittinen, L., Dash for Cash: Monthly Market Impact of Institutional Liquidity Needs, Review of Financial Studies, 2020"
+url = "https://aaltodoc.aalto.fi/items/00fea0ae-963b-444c-8221-912121905b98"
+
+[[sources]]
+title = "Quantpedia, Turn of the Month in Equity Indexes"
+url = "https://quantpedia.com/strategies/turn-of-the-month-in-equity-indexes"
