@@ -22,6 +22,8 @@ from algotrade.storage.tables.schemas.events import (
     KNOWN_FROM,
     MACRO_RELEASE_EVENTS,
     MACRO_SERIES,
+    SHORT_INTEREST_EVENTS,
+    SHORT_VOLUME_EVENTS,
 )
 from algotrade.storage.tables.schemas.market import (
     _BAR_TYPES,
@@ -106,6 +108,8 @@ KNOWN: dict[str, TableSpec] = {
         EARNINGS_EVENTS,
         MACRO_RELEASE_EVENTS,
         FILING_EVENTS,
+        SHORT_INTEREST_EVENTS,
+        SHORT_VOLUME_EVENTS,
         FUND_NAV_EVENTS,
     )
 }

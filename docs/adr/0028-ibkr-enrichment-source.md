@@ -183,3 +183,14 @@ with an HV of 0.55), and 0.0 for a history bar without a value.
 
 The hiding recorded under "Licence tags" is made, in every path that serves per-name values:
 see [ADR 0069](0069-data-licence-gate.md).
+
+## Amendment 2026-10-17: no-ML tables
+
+A source whose terms bar machine learning over its data (FINRA's website terms, restriction (m);
+EB D9) has its tables flagged `no_ml = true` in `architecture/tables.toml`, the same set as
+`schemas.NO_ML_TABLES`. It is a second tag beside the licence: a feature computed from such a table
+(an expression feature over it inherits it, through `feature_reads`) is never fitted: not in the
+training frame of a learned scorer (`services/evaluation/training/no_ml.py`) and not among the
+winners study's usable fields, which the probit proposer fits (`discovery/frame.py`). Rule screens
+may read them and the edge harness may score those screens (decision log 2026-10-17, #643). The
+text model is never given their rows (`tests/architecture/data/test_no_ml_tables.py`).
