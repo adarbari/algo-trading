@@ -21,7 +21,7 @@ from algotrade.features.rollups.corporate.fundamentals import (
     choose,
     year_ago,
 )
-from algotrade.features.rollups.price import price_stats
+from algotrade.features.rollups.price import price_stats, volume
 from algotrade.features.site import site_features
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.writers import StoreWriter
@@ -322,3 +322,34 @@ def test_a_count_accepted_after_the_close_is_invisible_that_session_and_visible_
     write_facts(writer2, [row])
     assert _rows(reader2, [filed])[filed].loc["EQ:A", "shares_outstanding"] == 1000.0
     assert SHARES == "instruments/shares_accepted"
+
+
+def test_turnover_is_in_one_share_terms_across_forward_and_reverse_splits() -> None:
+    """Volume and the filed count are both split-adjusted to the session: a 1:10 split and a
+    10:1 reverse split after the count change neither the turnover's meaning nor its size, and
+    a split with an ex-date after the session adjusts neither input."""
+    writer, reader = store()
+    ids = ["EQ:FWD", "EQ:REV", "EQ:LATE", "EQ:NONE"]
+    days = write_bars(
+        writer, {i: series(60, n) for n, i in enumerate(ids)}, volume={i: [1e5] * 60 for i in ids}
+    )
+    count_date = END - timedelta(days=80)
+    write_facts(writer, [fact(i, "dei", 1e6, count_date, count_date) for i in ids])
+    ex_before = END - timedelta(days=40)  # after the count, before the 20-session window
+    write_split(writer, "EQ:FWD", ex_before, 10.0, END)  # 1:10
+    write_split(writer, "EQ:REV", ex_before, 0.1, END - timedelta(days=1))  # 10:1 reverse
+    write_split(
+        writer, "EQ:LATE", END + timedelta(days=5), 10.0, END - timedelta(days=2)
+    )  # after S
+    groups = [price_stats.GROUP, volume.GROUP, GROUP]
+    out = compute_in_memory(reader, groups, [days[-1]])  # type: ignore[arg-type]
+    frames = {
+        g.table: out[g.key][0].frame.assign(session_date=days[-1])  # type: ignore[union-attr]
+        for g in groups
+    }
+    fs = site_features(FileConfigStore(REPO_ROOT / "config"))
+    turnover = fs.evaluate(frames, ["turnover_20d"]).set_index("instrument_id")["turnover_20d"]
+    assert turnover["EQ:FWD"] == pytest.approx(1e5 / 1e7)  # 10x the shares, same volume
+    assert turnover["EQ:REV"] == pytest.approx(1e5 / 1e5)  # a tenth of the shares
+    assert turnover["EQ:LATE"] == pytest.approx(1e5 / 1e6)  # the later split changes nothing
+    assert turnover["EQ:NONE"] == pytest.approx(1e5 / 1e6)
