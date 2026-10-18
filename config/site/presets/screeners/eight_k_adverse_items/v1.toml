@@ -1,0 +1,51 @@
+# Adverse 8-K items (ADR 0053, EB E3; edge eight_k_item_drift): a common stock trading at least $5M a day
+# that disclosed an 8-K with Item 4.02 (non-reliance on prior financials), 4.01 (a change of
+# auditor) or 5.02 (an officer or director departure) in the last 20 sessions: an avoid list, and the
+# short side of the edge. The order puts the most liquid first (the lowest score is the harness's
+# short leg, so the highest dollar volume is shorted first). A missing value never passes (ADR
+# 0030). What it does not check: whether a 5.02 is a forced exit or a retirement, or a 4.01 a
+# dismissal or a planned rotation (the text is not read), or the reason behind a 4.02.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "eight_k_adverse_items"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Adverse 8-K items"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 5_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.adverse_item]
+field = "feature.eight_k_item_flag"
+op = "eq"
+value = true
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+sessions_since_8k_4_02 = "rollup.filing_events@v1.sessions_since_8k_4_02"
+sessions_since_8k_4_01 = "rollup.filing_events@v1.sessions_since_8k_4_01"
+sessions_since_8k_5_02 = "rollup.filing_events@v1.sessions_since_8k_5_02"
+
+[rank]
+tie_break = "rollup.price_stats@v2.adv_usd_20d"
+tie_break_order = "asc"

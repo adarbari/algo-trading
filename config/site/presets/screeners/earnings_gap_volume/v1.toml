@@ -1,0 +1,61 @@
+# Earnings gap on heavy volume (ADR 0053, EB E3; edge earnings_gap_volume_drift): a common stock
+# trading at least $5M a day whose last report moved it at least 10% more than SPY over the reaction
+# window (close before the report to close after it) on at least three times its volume before the
+# report: the episodic pivot of practitioner playbooks, with the volume confirmation. Ranked by the
+# reaction, largest first. A missing value never passes (ADR 0030). What it does not check: the cause
+# (an earnings beat, guidance, a bid or an offering look the same), the base before the gap (the
+# practitioner's "dormant" name), or the opening range (only closes are stored).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "earnings_gap_volume"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Earnings gap on heavy volume"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 5_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.reaction_status]
+field = "rollup.earnings_reaction@v1.reaction_status"
+op = "eq"
+value = "OK"
+
+[criteria.reaction]
+field = "rollup.earnings_reaction@v1.reaction_excess_return"
+op = "gte"
+value = 0.10
+
+[criteria.volume]
+field = "rollup.earnings_gap_volume@v1.reaction_volume_ratio"
+op = "gte"
+value = 3
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+reaction_excess_return = "rollup.earnings_reaction@v1.reaction_excess_return"
+sessions_since_reaction = "rollup.earnings_reaction@v1.sessions_since_reaction"
+reaction_volume_ratio = "rollup.earnings_gap_volume@v1.reaction_volume_ratio"
+
+[rank]
+tie_break = "rollup.earnings_reaction@v1.reaction_excess_return"
+tie_break_order = "desc"

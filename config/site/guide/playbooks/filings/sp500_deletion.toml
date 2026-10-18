@@ -1,0 +1,34 @@
+# L3 site setting: the Guide's playbook for the site preset sp500_deletion (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "sp500_deletion"
+version = 1  # the preset version this prose was written for
+summary = "Finds liquid stocks that left the S&P 500 in the last month, dated when the change was stored: the finding that names dropped from the index rebound over the next year as forced selling ends. It is a candidate edge under test, not a proven trade."
+hit = "The name is a common stock closing above $5 that trades at least $5M a day and whose latest S&P 500 membership change in the last 20 sessions is a removal. The most liquid ranks first."
+not_checked = "It does not know why the name left (a demotion to a smaller index, or a takeover that delists it), and the date is when we stored the change, after the announcement. It is the screen of the S&P 500 deletions edge, which the harness is still testing."
+before_acting = [
+  "The announcement effect has faded to under 1%: the claim is a slower rebound over months, not the days around the change (rollup.index_changes@v1.sessions_since_index_change counts from the stored date).",
+  "A name removed because it was bought has no rebound to trade: check that rollup.price_stats@v2.close is still being printed.",
+  "Deletions are often value and long-term reversal names: compare with the momentum and size baselines before trusting a pick.",
+]
+sources = [
+  "Arnott, Kalesnik and Wu, Buy High and Sell Low with Index Funds! (2018)",
+  "Greenwood and Sammon, The Disappearing Index Effect (2022)",
+]
+related = [
+  { id = "tender_offer_filed", reason = "another event-driven long idea" },
+  { id = "momentum_12_1", reason = "a baseline every edge is compared with" },
+]
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $5M a day"
+index_change = "Its latest S&P 500 change is a removal"
+recent_change = "The change was stored in the last 20 sessions"
