@@ -13,6 +13,9 @@ import {
   decisionLabel,
   type ScorecardEntry,
 } from '@/entities/screen';
+import { lazy, Suspense } from 'react';
+
+const GateRow = lazy(() => import('./GateRow'));
 
 export interface PickDetailProps {
   row: TableRow;
@@ -87,7 +90,16 @@ export function PickDetail({
         {row.flags && row.flags.length > 0 ? (
           <Text size="sm" tone="muted">{`Flags: ${row.flags.join(', ')}`}</Text>
         ) : null}
-        <CriteriaScorecard screenerId={screenerId} entries={entries} />
+        <CriteriaScorecard
+          screenerId={screenerId}
+          entries={entries}
+          groups={row.groups ?? []}
+          renderGroup={(gate) => (
+            <Suspense key={gate.group.id} fallback={null}>
+              <GateRow gate={gate} />
+            </Suspense>
+          )}
+        />
         {showActions ? (
           <ActionGroup
             label="Pick actions"

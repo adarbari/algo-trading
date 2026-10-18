@@ -6,16 +6,30 @@
 import { BarList, Panel, Text } from '@algotrade/ui';
 
 import { byName, useFeatureCatalogue } from '@/entities/feature';
-import { describeCriterion } from '@/entities/screen';
+import { describeCriterion, groupText } from '@/entities/screen';
 import { previewPanelState, useScreenerBuilder } from '@/features/screener-builder';
 
 export function ScreenFunnel() {
-  const { preview, criteria } = useScreenerBuilder();
+  const { preview, criteria, groups } = useScreenerBuilder();
   const features = byName(useFeatureCatalogue().data ?? []);
   // A step reads as the criterion as it is now, not as a label stored with an older threshold.
   const described = new Map(
     criteria.map((c) => [c.id, describeCriterion(c, features.get(c.field))]),
   );
+  // A gate that is a group is one step, named by its expression ("(A or B)", "not C").
+  const byGroup = new Map(groups.map((g) => [g.id, g]));
+  const byCriterion = new Map(criteria.map((c) => [c.id, c]));
+  for (const group of groups) {
+    const text = groupText(
+      group,
+      (id) => {
+        const c = byCriterion.get(id);
+        return c ? describeCriterion(c, features.get(c.field)) : null;
+      },
+      byGroup,
+    );
+    if (text) described.set(group.id, text);
+  }
   const funnel = preview.data?.funnel ?? [];
   const universe = funnel[0]?.entering ?? preview.data?.coverage.selected ?? 0;
   const items = [

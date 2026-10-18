@@ -7,7 +7,9 @@ import { featureLabel, type CatalogueFeature } from '@/entities/feature';
 import type { gqlTypes } from '@/shared/api';
 
 import { describeRule } from './rule';
-import { MODES, type Criterion } from './spec';
+import { MODES } from '../lib/modes';
+
+import type { Criterion } from './spec';
 
 /** A criterion as the typed `Screener` serves it (`id`, `field`, `mode`, `op`, `value`). */
 export type ServedCriterion = gqlTypes.ScreenerRunsQuery['screeners'][number]['criteria'][number];

@@ -4,7 +4,8 @@
  * members as a vertical list with the PartJoin connector between them (and for all, or for any,
  * and not for none). One level only, so phones need no variant. `readOnly` shows a group the
  * Builder cannot edit (a deeper tree from Describe it or TOML) as one ExpandableRow: its
- * plain-English expression, members shown on expanding. Every label arrives as a prop.
+ * plain-English expression, members shown on expanding; of the slots only `info` shows there,
+ * beside the row so no control nests in its button. Every label arrives as a prop.
  */
 import { Children, useId, useState, type ReactNode } from 'react';
 
@@ -34,9 +35,9 @@ export interface ConditionGroupProps {
   connectorLabel: string;
   /** The spoken lead-in to the connector ("joined by"), hidden visually. */
   joinedByLabel: string;
-  /** Controls on the header's end (buttons, a Guide InfoButton). Edit mode only. */
+  /** Controls on the header's end (buttons). Edit mode only; a read-only row shows none. */
   actions?: ReactNode;
-  /** A Guide InfoButton for the kind, shown beside the title. */
+  /** A Guide InfoButton for the kind: beside the title, or (read only) beside the row, outside its toggle button. */
   info?: ReactNode;
   /** The group as one plain-English sentence; shown on the read-only row. */
   expression?: ReactNode;
@@ -89,24 +90,27 @@ export function ConditionGroup({
   if (readOnly) {
     return (
       <div className={styles.readonly} data-kind={kind}>
-        <ExpandableRow
-          title={
-            <>
-              {title}
-              {expression !== undefined && (
-                <>
-                  {' '}
-                  <span className={styles.expression}>{expression}</span>
-                </>
-              )}
-            </>
-          }
-          badge={kindLabel}
-          open={open}
-          onOpenChange={setOpen}
-        >
-          {members}
-        </ExpandableRow>
+        <div className={styles.row}>
+          <ExpandableRow
+            title={
+              <>
+                {title}
+                {expression !== undefined && (
+                  <>
+                    {' '}
+                    <span className={styles.expression}>{expression}</span>
+                  </>
+                )}
+              </>
+            }
+            badge={kindLabel}
+            open={open}
+            onOpenChange={setOpen}
+          >
+            {members}
+          </ExpandableRow>
+        </div>
+        {info}
       </div>
     );
   }

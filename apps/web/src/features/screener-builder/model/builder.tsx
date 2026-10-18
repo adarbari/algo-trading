@@ -9,6 +9,14 @@ import {
   criteriaOf,
   criterionOfError,
   criterionIds,
+  eitherWithPrevious,
+  excludeCriterion,
+  excludeGroup,
+  groupsFor,
+  joinTarget,
+  layoutOf,
+  ownGroupIds,
+  ungroup,
   mergeNotes,
   newCriterionId,
   notesOf,
@@ -24,6 +32,8 @@ import {
   withoutCriterion,
   withTieBreak,
   type Criterion,
+  type CriterionGroup,
+  type LayoutNode,
   type ScreenDocument,
   type ScreenerDetail,
   type ScreenPreview,
@@ -65,6 +75,10 @@ export interface ScreenerBuilder {
   preset: { id: string; version: number | null } | null;
   document: ScreenDocument;
   criteria: Criterion[];
+  /** The enabled boolean groups (ADR 0071). */
+  groups: CriterionGroup[];
+  /** The criteria as the Builder lays them out: loose criteria and gates in funnel order. */
+  layout: LayoutNode<Criterion>[];
   dirty: boolean;
   /** The newest version: finalising saves version `nextVersion`. */
   nextVersion: number;
@@ -82,6 +96,16 @@ export interface ScreenerBuilder {
    * refused: no edit, returns ''.
    */
   addSuggested: (criterion: Readonly<Record<string, unknown>>) => string;
+  /** Can the loose criterion join the one before it as "either this or the previous"? */
+  canJoinPrevious: (id: string) => boolean;
+  /** "Either this or the previous": an `any` group of the two, or added to the `any` group before. */
+  joinWithPrevious: (id: string) => void;
+  /** "Exclude (none of)": the criterion alone in a `none` group. */
+  excludeCriterion: (id: string) => void;
+  /** "Exclude (none of)" on an `any` group: not any of its members. */
+  excludeGroup: (group: CriterionGroup) => void;
+  /** "Ungroup": the group goes, its members become gates (a deeper tree flattens one level). */
+  ungroup: (id: string) => void;
   setTieBreak: (field: string | null, order: 'asc' | 'desc') => void;
   /** Replace the working document with one drafted elsewhere (a sentence, ADR 0041): an unsaved edit. */
   loadDocument: (document: Readonly<Record<string, unknown>>) => void;
@@ -148,6 +172,11 @@ export function useScreenerBuilder(): ScreenerBuilder {
   if (!builder) throw new Error('useScreenerBuilder needs a ScreenerBuilderProvider');
   return builder;
 }
+
+const groupTable = (base: Readonly<Record<string, unknown>> | null): Record<string, unknown> => {
+  const table = base?.['groups'];
+  return table && typeof table === 'object' ? (table as Record<string, unknown>) : {};
+};
 
 /** The server's working document: the draft, else the latest version, else (a preset) a copy of it. */
 function useSource(id: string) {
@@ -229,6 +258,13 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
   const preset = asPreset ? { id: asPreset.presetId, version: asPreset.current } : null;
   const document = useMemo<ScreenDocument>(() => edited ?? source ?? { id }, [edited, source, id]);
   const criteria = useMemo(() => criteriaOf(base, document), [base, document]);
+  const groups = useMemo(() => groupsFor(base, document), [base, document]);
+  const layout = useMemo(() => {
+    // a group of the preset layer is not the draft's to edit from here
+    const inBase = new Set(Object.keys(groupTable(base)));
+    const own = new Set([...ownGroupIds(document)].filter((gid) => !inBase.has(gid)));
+    return layoutOf(criteria, groups, own);
+  }, [criteria, groups, base, document]);
 
   const spec = useMemo(() => previewDocument(document), [document]);
   const runnable = criteriaOf(base, spec).some((c) => c.field !== '');
@@ -276,6 +312,8 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     preset,
     document,
     criteria,
+    groups,
+    layout,
     dirty: edited !== null,
     nextVersion: (detail.data?.latest ?? 0) + 1,
     tieBreak: tieBreakOf(base, document),
@@ -304,6 +342,19 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
       const created = newCriterionId(criterionIds(base, document), field);
       edit(withCriterion(document, toCriterion(created, { ...table })));
       return created;
+    },
+    canJoinPrevious: (criterionId) => joinTarget(layout, criterionId) !== null,
+    joinWithPrevious: (criterionId) => {
+      edit(eitherWithPrevious(document, layout, criterionIds(base, document), criterionId));
+    },
+    excludeCriterion: (criterionId) => {
+      edit(excludeCriterion(document, criterionIds(base, document), criterionId));
+    },
+    excludeGroup: (group) => {
+      edit(excludeGroup(document, group));
+    },
+    ungroup: (groupId) => {
+      edit(ungroup(document, groups, groupId));
     },
     setTieBreak: (field, order) => {
       edit(withTieBreak(document, field, order));
