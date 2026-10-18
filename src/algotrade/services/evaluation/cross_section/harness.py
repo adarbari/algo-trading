@@ -51,7 +51,7 @@ from algotrade.config.edges.document import (
 )
 from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
 from algotrade.config.edges.named import OUT_OF_WINDOW
-from algotrade.config.edges.portfolio import PORTFOLIO_KIND
+from algotrade.config.edges.portfolio import ENSEMBLE, PORTFOLIO_KIND
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -108,6 +108,7 @@ from algotrade.services.evaluation.cross_section.legs.rows import (
 from algotrade.services.evaluation.cross_section.legs.store import read_legs
 from algotrade.services.evaluation.cross_section.measures import (
     BASELINE,
+    MEMBER,
     SCREENER,
     CostGrid,
     SessionStat,
@@ -165,12 +166,12 @@ from algotrade.storage.tables.result_writer import ResultWriter
 # A fitness test classifies every field: a new one fails until it is named here.
 RUN_INPUTS = (
     "id", "outcome", "schedule", "universe", "top_k", "screeners", "baselines", "frozen_from",
-    "site_frozen_from", "base", "picks", "variants", "scorer_features",
+    "site_frozen_from", "base", "picks", "variants", "scorer_features", "ensemble",
 )  # fmt: skip
 BOOKKEEPING = (
     "name", "thesis", "mechanism", "persistence", "sources", "quality_bar", "notes", "status",
     "rejection_reason", "evidence", "promoted", "compared", "basis_horizon", "extends", "follow",
-    "audit", "owner", "published", "family",
+    "audit", "owner", "published", "family", "oos_class",
 )  # fmt: skip
 # The one fixed implied-vol field of a run is never a field mixing sources by name or by rule.
 MIXED_SOURCE_IV = ("feature.vrp_iv30",)
@@ -203,6 +204,9 @@ class VariantResult:
     legs: tuple[LegDetail, ...] = ()  # the main edge variant's measured legs, for the ledger
     side: str = LONG  # the outcome's side (``edge_eval.side``; ADR 0053 amendment)
     timing: Mapping[str, Any] | None = None  # a time-series edge: timing vs buy-and-hold Sharpe
+    grid: int | None = (
+        None  # an ensemble: the size of its pre-registered grid (ADR 0074); else None
+    )
 
     @property
     def licence(self) -> str | None:
@@ -290,6 +294,9 @@ class EdgeEvaluation:
     legs_reused: int = 0
     legs_computed: int = 0
     legs_invalidated: Mapping[str, int] = field(default_factory=dict)
+    # The share of an in-sample Sharpe ratio to expect lost out of sample (``verdict.toml
+    # [oos_haircut]`` of the edge's ``oos_class``; None: the edge has none), for the report.
+    oos_haircut: float | None = None
 
 
 def _random_sets(
@@ -332,7 +339,7 @@ def run_hash(
     payload = {
         "edge": identity_dict({k: asdict(edge)[k] for k in RUN_INPUTS}),
         "iv_field": iv_field,
-        "variants": [(v.id, v.config.hash) for v in variants],
+        "variants": [(v.id, v.hash) for v in variants],
         "range": [start, end],
         "as_of": as_of,
         "split_from": split_from,
@@ -343,10 +350,19 @@ def run_hash(
 
 
 def _variants(configs: ConfigStore, user: UserContext, edge: Edge) -> list[Variant]:
+    """The screeners, the baselines and, for an ``[ensemble]``, the combined variant (ADR 0074):
+    its grid's screeners are ``member``s (reported, never a trial nor a basis) and the ensemble
+    itself the one trial, counted once whatever the grid's size."""
     found = [
-        *(Variant(s, SCREENER, resolve_config(configs, s, user)) for s in edge.screeners),
+        *(
+            Variant(s, MEMBER if s in edge.ensemble else SCREENER, resolve_config(configs, s, user))
+            for s in edge.screeners
+        ),
         *(Variant(s, BASELINE, resolve_config(configs, s, user)) for s in edge.baselines),
     ]
+    if edge.ensemble:
+        members = tuple(v for v in found if v.role == MEMBER)
+        found.append(Variant(ENSEMBLE, SCREENER, members[0].config, members))
     if not found:
         raise ConfigurationError(f"edge {edge.id}: no screeners or baselines to evaluate")
     return found
@@ -389,8 +405,8 @@ def _prior_trials(
             ]
     for record in records:
         for t in record.stats.get("trials", []):
-            if t.get("role") == BASELINE:  # a comparison, not a trial; no role: counted
-                continue
+            if t.get("role") in (BASELINE, MEMBER):  # a comparison or a grid member, not a trial
+                continue  # (no role: counted; an ensemble is one trial, whatever its grid)
             found.add(
                 (t.get("edge_variant") or MAIN, t["variant"], t["config_hash"], int(t["horizon"]))
             )
@@ -570,8 +586,13 @@ def evaluate_edge(
                     edge_variant=scope.key,
                     side=scope.edge.outcome.result_side,
                     iv_source=scope.iv_field if needs_iv else None,
+                    grid=len(variant.members) or None,
                     licences=trial_licences(
-                        features, scope.edge, scope.universe, variant.config, licences[scope.key]
+                        features,
+                        scope.edge,
+                        scope.universe,
+                        [m.config for m in variant.members] or [variant.config],
+                        licences[scope.key],
                     ),
                     legs=_details(kept, block_stats, found, closed) if scope.key == MAIN else (),
                     report_containment=diagnostic,
@@ -624,6 +645,7 @@ def evaluate_edge(
         legs_reused=len(reuse.reused),
         legs_computed=len(stats.rows),
         legs_invalidated=dict(reuse.invalidated),
+        oos_haircut=None if edge.oos_class is None else verdict.oos_haircut(edge.oos_class),
     )
 
 

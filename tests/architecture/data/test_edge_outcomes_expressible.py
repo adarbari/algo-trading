@@ -11,7 +11,8 @@ from datetime import date
 
 import pytest
 
-from algotrade.config.edges.document import ANNOUNCED_AHEAD, CLOSED, MODEL_STRUCTURES, Edge
+from algotrade.config.edges.chain import MODEL_STRUCTURES
+from algotrade.config.edges.document import ANNOUNCED_AHEAD, CLOSED, Edge
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.portfolio import MIX, PORTFOLIO_KIND
 from algotrade.core.model.errors import ConfigurationError
