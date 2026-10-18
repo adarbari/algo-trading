@@ -441,7 +441,7 @@ Sources: Site convention (docs/data/instruments.md; Nasdaq Trader symbol directo
 **When the reading lies**
 
 - A class with different voting rights or dividend can keep a gap for years; a year's z-score then only measures drift inside that gap. Check rollup.share_classes@v1.sibling_status is PAIRED first.
-- Sessions before the first stored reference snapshot have no pairs and read null; a reclassification before a snapshot is not seen. Read the count of sessions beside the result.
+- Sessions before the first stored reference snapshot use the earliest snapshot's pairs, so history carries today's pairs (survivorship bias). The result shows the count of such sessions.
 - Null with fewer than 200 sessions of both classes, a flat ratio, or a sibling that is not PAIRED. A hard criterion then rejects the name.
 - Few issuers qualify, about 15 to 25, so one rule shows a handful of names per session. Judge it over many independent windows.
 
@@ -460,7 +460,7 @@ Sources: Site convention (docs/edge-ideas/harness-design.md section 5, pair spre
 **When the reading lies**
 
 - Only operating companies count; a fund or a preferred share is not a class. Check rollup.share_classes@v1.sibling_id before reading a pair.
-- Sessions before the first stored reference snapshot read null, not AMBIGUOUS.
+- Sessions before the first stored reference snapshot use the earliest snapshot's status, so history carries today's classes. The result shows the count of such sessions.
 
 Sources: Site convention (ADR 0053 amendment, EB H9)
 
@@ -477,6 +477,6 @@ Sources: Site convention (ADR 0053 amendment, EB H9)
 **When the reading lies**
 
 - Null when the issuer has one class or the status is AMBIGUOUS; a pair pick is then excluded with the reason no_sibling, never counted as zero. Check rollup.share_classes@v1.sibling_status.
-- Sessions before the first stored reference snapshot read null.
+- Sessions before the first stored reference snapshot use the earliest snapshot's sibling, so history carries today's pairs. The result shows the count of such sessions.
 
 Sources: Site convention (ADR 0018, ADR 0053 amendment, EB H9)
