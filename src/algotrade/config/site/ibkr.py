@@ -11,6 +11,26 @@ IBKR_MARKET_DATA_TYPES = (1, 2, 3, 4)
 
 
 @dataclass(frozen=True)
+class FuturesRoot:
+    """One futures root of the nightly curve snapshot: IB symbol, exchange, trading class (the
+    contracts of that class only; the root itself unless one is named)."""
+
+    symbol: str
+    exchange: str
+    trading_class: str
+
+    @classmethod
+    def parse(cls, text: str, where: str) -> "FuturesRoot":
+        """``ROOT:EXCHANGE`` or ``ROOT:EXCHANGE:CLASS`` (``sources.toml [ibkr] futures_roots``)."""
+        parts = [p.strip().upper() for p in text.split(":")]
+        if len(parts) not in (2, 3) or not all(parts):
+            raise ConfigurationError(
+                f"{where} futures_roots: expected ROOT:EXCHANGE[:CLASS], got {text!r}"
+            )
+        return cls(parts[0], parts[1], parts[2] if len(parts) == 3 else parts[0])
+
+
+@dataclass(frozen=True)
 class IbkrSettings:
     """``[ibkr]`` beyond ``enabled`` / ``min_interval_s`` (the IB Gateway session; host, port
     and client id come from the environment, ``config/env.py``). Pacing follows IBKR's rules:
@@ -30,6 +50,9 @@ class IbkrSettings:
     iv_batch: int = 50  # IV streams open together (under the account's market-data lines)
     iv_history_days: int = 730  # calendar days of IV history a backfill fetches per underlying
     iv_backfill_per_night: int = 100  # underlyings without IV history the nightly backfills
+    # The nightly futures curve snapshot (``futures-curves``): which roots, how many contracts
+    futures_roots: tuple[FuturesRoot, ...] = ()
+    futures_front: int = 6  # nearest unexpired contracts of each root stored
     # The API's live option quotes (ADR 0028): cache, strikes per request, failing fast
     live_cache_s: float = (
         60.0  # an answer is reused for this long (per underlying, expiry, strikes)
@@ -63,6 +86,10 @@ def load_ibkr(section: Table) -> IbkrSettings:
         iv_batch=section.integer("iv_batch", d.iv_batch, 1),
         iv_history_days=section.integer("iv_history_days", d.iv_history_days, 1),
         iv_backfill_per_night=section.integer("iv_backfill_per_night", d.iv_backfill_per_night, 0),
+        futures_roots=tuple(
+            FuturesRoot.parse(t, section.where) for t in section.strings("futures_roots", ())
+        ),
+        futures_front=section.integer("futures_front", d.futures_front, 1),
         live_cache_s=section.number("live_cache_s", d.live_cache_s, 0),
         live_strikes=section.integer("live_strikes", d.live_strikes, 1),
         live_max_strikes=section.integer("live_max_strikes", d.live_max_strikes, 1),

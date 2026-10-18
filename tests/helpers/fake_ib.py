@@ -85,6 +85,14 @@ class FakeIB:
     quotes: Mapping[tuple[str, float, str], tuple[float, float]] = field(default_factory=dict)
     hv: Mapping[str, Sequence[Bar]] = field(default_factory=dict)  # HISTORICAL_VOLATILITY
     vols: Mapping[str, tuple[float, float]] = field(default_factory=dict)  # ticks 106, 104
+    # futures: root -> [(last trade date, trading class[, contract month])] listed;
+    # fut_quotes: (root, date) -> (last, close, volume, open interest), NaN: no tick arrives
+    futures: Mapping[str, Sequence[tuple[str, ...]]] = field(default_factory=dict)
+    # fut_hours: root -> (``tradingHours``, ``timeZoneId``) of its contracts (default: none)
+    fut_hours: Mapping[str, tuple[str, str]] = field(default_factory=dict)
+    fut_quotes: Mapping[tuple[str, str], tuple[float, float, float, float]] = field(
+        default_factory=dict
+    )
     connect_error: Exception | None = None
     faults: Mapping[str, list[str]] = field(default_factory=dict)  # symbol -> faults, in order
     calls: list[str] = field(default_factory=list)
@@ -118,6 +126,27 @@ class FakeIB:
                 c.primaryExchange = "NASDAQ"
             out.append(c if known else None)
         return out
+
+    def reqContractDetails(self, contract: Any) -> list[Any]:  # noqa: N802
+        self.calls.append("reqContractDetails")
+        self.requests.append({"symbol": contract.symbol, "exchange": contract.exchange})
+        return [
+            SimpleNamespace(
+                contractMonth=(rest[0] if rest else day[:6]),
+                tradingHours=self.fut_hours.get(contract.symbol, ("", ""))[0],
+                timeZoneId=self.fut_hours.get(contract.symbol, ("", ""))[1],
+                contract=SimpleNamespace(
+                    symbol=contract.symbol,
+                    conId=5000 + i,
+                    lastTradeDateOrContractMonth=day,
+                    localSymbol=f"{contract.symbol}{day[2:6]}",
+                    tradingClass=trading_class,
+                    multiplier="1000",
+                    secType="FUT",
+                ),
+            )
+            for i, (day, trading_class, *rest) in enumerate(self.futures.get(contract.symbol, ()))
+        ]
 
     def reqHistoricalData(self, contract: Any, **kwargs: Any) -> list[Any]:  # noqa: N802
         self.calls.append("reqHistoricalData")
@@ -157,7 +186,11 @@ class FakeIB:
         ticker = SimpleNamespace(
             dividends=None, close=close, _past=past, impliedVolatility=nan, histVolatility=nan,
             _vols=self.vols.get(contract.symbol), bid=nan, ask=nan, last=nan, _quote=quote,
+            volume=nan, futuresOpenInterest=nan, _fut=None,
         )  # fmt: skip
+        if getattr(contract, "secType", "") == "FUT":
+            fut_key = (contract.symbol, contract.lastTradeDateOrContractMonth)
+            ticker._fut = self.fut_quotes.get(fut_key)
         self._streams.append(ticker)
         return ticker
 
@@ -168,6 +201,8 @@ class FakeIB:
                 t.impliedVolatility, t.histVolatility = t._vols
             if t._quote is not None:
                 t.bid, t.ask = t._quote
+            if t._fut is not None:
+                t.last, t.close, t.volume, t.futuresOpenInterest = t._fut
             if t._past is not None:
                 t.dividends = SimpleNamespace(
                     past12Months=t._past, next12Months=t._past, nextDate=None, nextAmount=None

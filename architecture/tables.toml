@@ -468,6 +468,11 @@ name = "volatility/ibkr_iv30"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py"
 
 [[table]]
+name = "rates/futures_curve"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/futures/curves.py"
+note = "the nightly futures curve snapshot per root (IBKR, read-only, personal licence): the front contracts' last / prior settle / volume / open interest with expiry, so basis and roll yield are rebuilt from our own history; read through data/futures"
+
+[[table]]
 name = "holdings/etf"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py"
 

@@ -290,6 +290,20 @@ IBKR_IV30 = fixed(
     "vol_reject string",
     runs="merge",
 )
+# L2: the futures curve, one partition per session (``futures-curves``, IB Gateway, read-only;
+# personal licence): a row per front-month contract, ``instrument_id`` ``FUT:<root>:<YYYY-MM
+# delivery month>``, ``parent_id`` ``FUT:<root>`` (ADR 0009). ``price`` is ONE ``price_kind`` per
+# root and session by the read clock against ``next_open`` (IB ``tradingHours``): ``last`` before
+# it, ``settle`` (IB close) from it to 12:00 New York next weekday, else nothing: see
+# ``tasks/market/futures/curves.py``. ``ts``: when the stream was read; a run is the partition.
+FUTURES_CURVE = fixed(
+    "rates/futures_curve", "curve", ("instrument_id", "ts", "root", "contract_month"),
+    "instrument_id string!", "ts timestamp_utc!", "parent_id string!", "root string!",
+    "contract_month string!", "expiry date", "next_open timestamp_utc", "conid int64",
+    "local_symbol string", "price_kind string",
+    *floats("price", "last", "close", "bid", "ask", "volume", "open_interest", "multiplier"),
+    key=("instrument_id",),
+)  # fmt: skip
 # Live option quotes the API read from IB Gateway (ADR 0028, the API's one write exception):
 # every answer it served, one partition per session, a row per contract and time taken. Runs
 # merge (each is a few snapshots; all are kept, keyed by contract and ``ts``). Written only
@@ -767,6 +781,7 @@ KNOWN: dict[str, TableSpec] = {
         VERIFICATION_IBKR,
         IBKR_CONTRACTS,
         IBKR_IV30,
+        FUTURES_CURVE,
         RULE_SCREEN,
         RULE_SCREEN_VALUES,
         EDGE_EVAL,
