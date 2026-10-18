@@ -26,6 +26,8 @@ from datetime import date, timedelta
 from typing import Final
 
 from algotrade.config.edges.document import MODEL_KIND
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
+from algotrade.config.edges.portfolio import benchmark_words as benchword
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import load_verdict
 from algotrade.services.read.context import Stores
@@ -172,6 +174,11 @@ def _pct(x: float | None) -> str:
     return "n/a" if x is None else f"{x * 100:.0f}%"
 
 
+def _ret(x: float | None) -> str:
+    """A mean return as a percentage with two decimals (a whole percent hides a book's edge)."""
+    return "not stored" if x is None else f"{x * 100:.2f}%"
+
+
 def _num(x: float | None, digits: int = 2) -> str:
     return "not stored" if x is None else f"{x:.{digits}f}"
 
@@ -306,7 +313,63 @@ def _measured(found: int, declared: int) -> str:
     return f" ({found} of {declared} measured)" if declared and found < declared else ""
 
 
+PORTFOLIO_BASE = "a book is read against its benchmark, not a base rate"  # a criterion's value
+NO_NAMES = "needs about 20 ranked names"  # the value of a decile criterion with no deciles
+
+
+def _portfolio_criteria(
+    crit: Sequence[VerdictCriterion], c: _Candidate, t: VerdictSettings
+) -> tuple[VerdictCriterion, ...]:
+    """The criteria of a ``portfolio_return`` edge (ADR 0073): the value is the book's excess return
+    over a blended benchmark, so the win rate, the lift and the random picks (a base rate over
+    names, a name drawn at random) do not apply, the decoys are compared on the mean excess return
+    of their own books, and the picks-series t is Promising's test as well as Works's. The decile
+    criteria stand when the screen ranked enough names (about 20) to have deciles, else they do not
+    apply (served N/A): then the picks-series t is the one t Works needs."""
+    oos = c.oos
+    others = [b.mean_excess_picks for b in c.baselines if b.mean_excess_picks is not None]
+    beats = _beats(oos.mean_excess_picks, others, len(c.baselines))
+    none = oos.decile_t is None
+    out = []
+    for x in crit:
+        if x.id in ("win_rate", "oos_lift", "random") or (none and x.id.endswith("decile_t")):
+            value = NO_NAMES if x.id.endswith("decile_t") else PORTFOLIO_BASE
+            out.append(replace(x, value=value, status=NOT_APPLICABLE))
+        elif x.id in ("works_t", "works_spread") and none:
+            out.append(replace(x, value=NO_NAMES, status=NOT_APPLICABLE))
+        elif x.id == "baselines" and x.status != NOT_APPLICABLE:
+            best = (
+                f"{_pct(oos.mean_excess_picks)} vs best {_pct(max(others))}"
+                if others
+                else ("not stored")
+            )
+            out.append(
+                _crit("baselines", "Mean excess return against every baseline", best,
+                      "beats every baseline", beats, PROMISING)
+            )  # fmt: skip
+        else:
+            out.append(x)
+    at = out.index(next(x for x in out if x.id == "dsr"))
+    out.insert(
+        at,
+        _crit("promising_picks_t", "Picks-series t (Sharpe ratio's t-ratio)", _num(oos.picks_t),
+              f"at least {t.promising_t:g}", _at_least(oos.picks_t, t.promising_t), PROMISING),
+    )  # fmt: skip
+    return tuple(out)
+
+
 def _criteria(
+    c: _Candidate,
+    t: VerdictSettings,
+    draws: Sequence[EdgeRow],
+    decoys: bool,
+    portfolio: bool = False,
+) -> tuple[VerdictCriterion, ...]:
+    found = _all_criteria(c, t, draws, decoys)
+    return _portfolio_criteria(found, c, t) if portfolio else found
+
+
+def _all_criteria(
     c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool
 ) -> tuple[VerdictCriterion, ...]:
     oos, whole = c.oos, c.whole
@@ -413,6 +476,10 @@ def _level(c: _Candidate, crit: Sequence[VerdictCriterion], t: VerdictSettings) 
     hard = [
         (pts is not None and pts <= 0, "win_rate"),
         (oos.decile_t is not None and oos.decile_t < t.not_working_t, "decile_t"),
+        (  # a portfolio book's picks-series t, as the decile t is for a ranking
+            "promising_picks_t" in by and oos.picks_t is not None and oos.picks_t < t.not_working_t,
+            "promising_picks_t",
+        ),
         (pbo is not None and pbo > t.max_pbo, "pbo"),
         (dsr is not None and dsr < t.not_working_dsr, "dsr"),
         (below_median, "baselines"),
@@ -479,6 +546,8 @@ class EdgeFacts:
     after: date | None = None
     measured: Callable[[], Mapping[tuple[str, int], int] | None] | None = None
     wins: bool = False  # the outcome is not a return: the Sharpe ratio is of the excess wins
+    portfolio: bool = False  # a portfolio_return book (ADR 0073): read against its benchmark
+    benchmark: str = ""  # ... the words of that benchmark ("SPY", "60% SPY and 40% AGG")
     site_trials: Callable[[], int] | None = None  # the variants tried across every site
     # edge, read when the haircut is (None: not counted)
 
@@ -550,7 +619,7 @@ def _at_target(
 def _judge_one(
     c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool, facts: EdgeFacts
 ) -> EdgeVerdict:
-    crit = _criteria(c, t, draws, decoys)
+    crit = _criteria(c, t, draws, decoys, facts.portfolio)
     level, reason = _level(c, crit, t)
     gap = _next_gap(crit)
     outlook = outlook_of(
@@ -570,7 +639,10 @@ def _judge_one(
     basis = _basis_words((c.variant, c.horizon))
     held = " (short leg)" if oos.side == "short" else ""
     body = (
-        f"Out-of-sample, {basis}{held}: win rate {_pct(oos.hit_rate)} against a base rate of "
+        f"Out-of-sample, {basis}: the book beat {facts.benchmark} in {_pct(oos.hit_rate)} of "
+        f"sessions, a mean excess return of {_ret(oos.mean_excess_picks)}."
+        if facts.portfolio
+        else f"Out-of-sample, {basis}{held}: win rate {_pct(oos.hit_rate)} against a base rate of "
         f"{_pct(oos.base_rate)} ({_num(pts, 0)} pts)."
     )
     shown = level in (WORKS, PROMISING, NOT_WORKING)
@@ -581,7 +653,11 @@ def _judge_one(
         verdict=level,
         rationale=reason,
         headline=f"{body} {reason}." if reason else body,
-        result=f"Win rate {_pct(oos.hit_rate)} · base rate {_pct(oos.base_rate)}"
+        result=(
+            f"Beat the benchmark in {_pct(oos.hit_rate)} of sessions"
+            if facts.portfolio
+            else f"Win rate {_pct(oos.hit_rate)} · base rate {_pct(oos.base_rate)}"
+        )
         if shown
         else reason,
         criteria=crit,
@@ -667,6 +743,15 @@ def _diagnostic(edge_id: str) -> EdgeVerdict:
     return EdgeVerdict(edge_id, DIAGNOSTIC, reason, reason, reason, side="long_short")
 
 
+def _strength(row: EdgeRow) -> float | None:
+    """What ranks two candidates in-sample: the lift in points; for a book (no base rate) its mean
+    excess return in points."""
+    pts = runs.lift_points(row.hit_rate, row.base_rate)
+    if pts is None and row.base_rate is None and row.mean_excess_picks is not None:
+        return row.mean_excess_picks * 100.0
+    return pts
+
+
 def _rank(lift_pts: float | None) -> float:
     return float("-inf") if lift_pts is None else lift_pts
 
@@ -719,7 +804,7 @@ def _in_sample_rank(
     )
     c = _Candidate(key[0], key[1], ins, ins, ins, base, ())
     level, _ = _level(c, _criteria(c, t, (), decoys), t)
-    return ORDER.index(level), _rank(runs.lift_points(ins.hit_rate, ins.base_rate))
+    return ORDER.index(level), _rank(_strength(ins))
 
 
 def choose_basis(
@@ -854,6 +939,8 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
             after=run.range_to,
             measured=lambda: runs.load_measured_sessions(ctx, run),
             wins=counts_wins(edge),
+            portfolio=edge.settings is not None and edge.settings.kind == PORTFOLIO_KIND,
+            benchmark=benchword(edge.settings.benchmark) if edge.settings is not None else "",
             site_trials=None if edge.mine else lambda: runs.load_site_trials(ctx),
         ),
         range_to=run.range_to,

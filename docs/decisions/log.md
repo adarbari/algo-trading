@@ -626,3 +626,19 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the owner CIK is an SEC public identifier the data set is keyed on; a hash buys nothing (the hash of a public id is trivially reversible against EDGAR) and loses the join to later filings, amendments (4/A) and the deep-dive dossier. Officer title is attribute data a cluster-buy edge weighs (CEO / CFO buys vs. director buys), stored as filed with no name. The cluster-insider-buy edge needs a distinct-insider count, so a stable per-person key is functionally required. Data never enters the public repo (store is local, git-ignored); the read model serves aggregates. Precedent: ADR 0040 keeps emails (private personal data) out of the repo, not public filing data out of the store. Erasure and shorter retention are owner-only decisions (log 2026-10-11), so the default event retention stands until the owner says otherwise.
+
+## 2026-10-18 | EB H10 (portfolio outcomes) | What a book is judged on and how it is built
+- Question: how is an allocation edge (a weighted book against a blended benchmark) measured, and what do Promising and Works rest on when there is no base rate over names?
+- Options: a new outcome kind in the harness / a path in the backtest engine; a mix read from the grain / computed from the constituents' rows; slots a `top_k` leaves unfilled go to cash / are left out; win rate and lift against the benchmark's hit rate / no base rate; Works on the decile t as for a ranking / on the picks-series t.
+- Decision: a `portfolio_return` kind in the harness (ADR 0073); the mix computed from the constituents' own `fwd_return` at the same S through the resolver (a missing constituent leaves the session out with its reason); unfilled slots are NOT put to cash (only a `CASH` pick or an empty pick set is); no base rate, lift or random draws for a book; Promising needs the picks-series t of 2 and Works of 3, with the decile t beside it only when about 20 names are ranked; decoys compared on the mean excess return of their own books.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the harness already owns the frozen split, the trial log and the verdict, and the engine none; a base rate over ten ETFs is a coin flip and a decile of ten names is one name; putting unfilled slots to cash is a policy (a defensive default that changes what the screen means), so it waits for the owner; failing closed on a missing input keeps a book from being quietly re-weighted.
+
+## 2026-10-18 | EB H10 (portfolio outcomes) | Leg v5 without a LEG_VERSION bump
+- Question: does adding the book's weights to a leg need another full re-run of every stored leg?
+- Options: bump `LEG_VERSION` to 5 / add nullable columns and leave the version.
+- Decision: nullable columns (`weight_ids`, `weight_values`, `portfolio_reason`), no bump; the default weighting stays out of an outcome's identity.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: no existing leg's content or key changes (a bump recomputes every leg for nothing); a portfolio edge's legs are new keys anyway. H6 and H7's bumps already force the one full re-run.

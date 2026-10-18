@@ -13,6 +13,7 @@ from typing import Any
 from algotrade.config.edges import document, loading
 from algotrade.config.edges.follow import AUDIT
 from algotrade.config.edges.follow import KEY as FOLLOW
+from algotrade.config.edges.portfolio import benchmark_words
 from algotrade.core.time.windows import window_name
 from algotrade.services.read.context import Stores
 
@@ -179,7 +180,9 @@ def _win(o: document.Outcome) -> str:
         return "the modelled straddle P&L is positive (a model, not a quote)"
     if o.kind == "hit_target":
         return f"{(o.measure or 'the measure').replace('_', ' ')} {o.direction} {o.target:g}"
-    return f"beats {o.benchmark}" if o.benchmark != "none" else "rises"
+    if o.benchmark != "none":
+        return f"beats {benchmark_words(o.benchmark)}"
+    return "rises"
 
 
 def _trade(o: document.Outcome) -> str:

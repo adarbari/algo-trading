@@ -30,6 +30,8 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   borrow ``borrow_bps_annual / 1e4 * horizon / 252`` (an assumption: no borrow data is stored);
   ``short_hit`` is ``short_value > 0`` (the name underperformed by more than the costs). The
   long columns are unchanged: the deciles and the base are over them whatever the side.
+- ``portfolio_return`` (ADR 0073) is not valued here: a book is one value per session, from its
+  weights and a blended benchmark (``cross_section/portfolio``); ``apply_outcome`` refuses it.
 - ``max_drawdown`` set: a hit also needs ``fwd_max_drawdown <= max_drawdown``.
 
 A row whose value cannot be computed is *excluded with a reason*, never a miss and never a
@@ -246,6 +248,11 @@ def apply_outcome(
     and whether the name was delisted. ``implied``: the IV at S by instrument id (needed when
     ``needs_implied_vol``)."""
     o = edge.outcome
+    if o.kind == "portfolio_return":
+        raise ConfigurationError(
+            f"{edge.id}: a portfolio_return is valued as a book (cross_section/portfolio), "
+            f"never name by name"
+        )
     n = len(outcomes)
     excluded = np.full(n, "", dtype=object)
     reference = np.full(n, np.nan)

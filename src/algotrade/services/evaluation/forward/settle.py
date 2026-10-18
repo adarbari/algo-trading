@@ -22,6 +22,7 @@ from datetime import date, datetime
 import pandas as pd
 
 from algotrade.config.edges.document import Edge, identity_dict
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
@@ -92,6 +93,8 @@ def settle_group(
     names = [i for i in names if i not in {s.instrument_id for s in out}]
     if not names:
         return out
+    if edge.outcome.kind == PORTFOLIO_KIND:  # a book is valued whole, never name by name
+        return out + [_skipped(i, "a portfolio book is not settled name by name") for i in names]
     try:
         stored = read_outcomes(reader, horizon, [buy], BENCHMARK, as_of=now)
     except MissingDataError:

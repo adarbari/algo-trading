@@ -15,13 +15,9 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.config.edges.document import (
-    LONG,
-    LONG_SHORT,
-    SHORT,
-    Edge,
-    identity_dict,
-)
+from algotrade.config.edges.document import Edge, identity_dict
+from algotrade.config.edges.portfolio import CASH, PORTFOLIO_KIND, blend
+from algotrade.config.edges.sides import LONG, LONG_SHORT, SHORT
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
@@ -67,6 +63,15 @@ from algotrade.services.evaluation.cross_section.measures import (
     SessionStat,
     decile_means,
 )
+from algotrade.services.evaluation.cross_section.picks import RankedRun
+from algotrade.services.evaluation.cross_section.portfolio.session import (
+    cash_return,
+    portfolio_stat,
+    ranking_deciles,
+    session_value,
+    window_returns,
+)
+from algotrade.services.evaluation.cross_section.portfolio.weights import book_weights
 from algotrade.services.evaluation.cross_section.random_picks import (
     RandomStat,
     generator,
@@ -188,6 +193,8 @@ def _stat(
     ):  # read incomplete data: not measured, counted
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
     names = names_for(scope.edge, eligible, event_names)
+    if edge.outcome.kind == PORTFOLIO_KIND:
+        return _portfolio_stat(scope, session, run, names, leg, horizon, rows)
     pickable, ids = names.pickable, names.ids
     scored = {i: v for i, v in run.scores.items() if i in ids}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(ids)  # too few scores to rank: no deciles
@@ -272,6 +279,46 @@ def _stat(
             else None
         ),
     )
+
+
+def _portfolio_stat(
+    scope: _Scope,
+    session: SessionReads,
+    run: RankedRun,
+    names: Names,
+    leg: Leg,
+    horizon: int,
+    rows: pd.DataFrame,
+) -> SessionStat:
+    """One ``portfolio_return`` session (ADR 0073): the qualified names among the pickable ones,
+    best first, ``top_k`` of them, weighted at D (``portfolio/weights.py``) and valued at S against
+    the blended benchmark with the cash at the bill yield read at D (``portfolio/session.py``).
+    No picks is a cash session, not an excluded one."""
+    o, day = scope.edge.outcome, leg.decision
+    chosen = [i for i in run.qualified if i in names.pickable]
+    picks = chosen if scope.edge.top_k is None else chosen[: scope.edge.top_k]
+    vols = session.numbers(o.vol_field, frozenset(picks), day) if o.vol_field and picks else {}
+    weights, why = book_weights(picks, o.weighting, run.scores, vols)
+    regime = session.label(day)
+    if why:
+        return portfolio_stat(day, regime, None, why, (), o.cost_bps)
+    constituents = blend(o.benchmark)
+    held_cash = any(name == CASH for name, _ in weights)
+    value, why = session_value(
+        weights,
+        constituents,
+        session.instruments(tuple(t for t, _ in constituents), leg.entry),
+        window_returns(rows),
+        cash_return(session.bill_yield(day), horizon) if held_cash else None,
+    )
+    scored = {i: v for i, v in run.scores.items() if i in names.ids}
+    thin = len(scored) < MIN_SCORE_COVERAGE * len(names.ids)  # too few scores to rank
+    deciles = (
+        ()
+        if thin
+        else ranking_deciles(rows[rows["instrument_id"].isin(names.ids)], scored, o.cost_bps)
+    )
+    return portfolio_stat(day, regime, value, why, weights, o.cost_bps, deciles, len(scored))
 
 
 def _side_picks(
@@ -392,9 +439,15 @@ def _hits_at(
     return [frame[column] for frame in found]
 
 
-def _drawing(spec: "_RandomSpec", variant: Variant, block: Sequence[Leg]) -> bool:
-    """Whether the screener's legs in ``block`` carry random draws: out of sample only."""
-    return spec.split is not None and variant.role == "screener" and block[0].decision >= spec.split
+def _drawing(spec: "_RandomSpec", variant: Variant, block: Sequence[Leg], edge: Edge) -> bool:
+    """Whether the screener's legs in ``block`` carry random draws: out of sample only, and never
+    for a portfolio_return book (its value is the book's, not a name's: no random names to draw)."""
+    return (
+        spec.split is not None
+        and variant.role == "screener"
+        and block[0].decision >= spec.split
+        and edge.outcome.kind != PORTFOLIO_KIND
+    )
 
 
 def _needs(
@@ -410,7 +463,7 @@ def _needs(
         for variant in variants:
             key = spec.key_for(p.scope, variant)
             for block in p.blocks:
-                drawing = _drawing(spec, variant, block)
+                drawing = _drawing(spec, variant, block, p.scope.edge)
                 for leg in block:
                     names = None if events is None else tuple(sorted(events.names[leg.decision]))
                     id_: LegId = (key, p.scope.key, variant.id, p.horizon, leg.decision)
@@ -598,7 +651,7 @@ def _measure_plan(
                 continue
             names = None if events is None else events.names[leg.decision]
             rows = closed[p.horizon][leg.entry]
-            drawing = _drawing(spec, variant, block)
+            drawing = _drawing(spec, variant, block, p.scope.edge)
             with session.attribute(leg.decision):
                 stat = _stat(
                     p.scope, session, variant, leg, p.horizon, rows, names, spec.costs,

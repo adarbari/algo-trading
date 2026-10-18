@@ -18,9 +18,10 @@ stay the legs'; the pass sets ``banded_values`` (the net series) and ``round_tri
 turnover the break-even is scaled by). Decision sessions are taken to be a book's rebalances, one
 window each; the document refuses a band where windows overlap (``config/edges/document.py``)."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 
+from algotrade.config.edges.portfolio import CASH
 from algotrade.services.evaluation.cross_section.measures import SessionStat
 
 ENTRY, EXIT = 0.5, 0.5  # the share of a round trip an entry and an exit pay
@@ -87,6 +88,50 @@ def apply_hold_bands(
             banded.append(values[name] + sign * cost * (1.0 - paid))
             trips += paid
         done.append(replace(stat, banded_values=tuple(banded), round_trips=trips))
+    out = list(stats)
+    for slot, stat in zip(order, done, strict=True):
+        out[slot] = stat
+    return tuple(out)
+
+
+def _traded(weights: Mapping[str, float]) -> dict[str, float]:
+    """The weights a book pays to trade: cash is free to hold and to leave."""
+    return {i: w for i, w in weights.items() if i != CASH}
+
+
+def apply_rebalances(
+    stats: Sequence[SessionStat], cost_bp: float | None
+) -> tuple[SessionStat, ...]:
+    """``stats`` (one portfolio_return variant at one horizon, one per decision session) with the
+    net series of a book that trades only the weight change (ADR 0073): ``banded_values`` (the
+    session's one value) and ``round_trips`` per session.
+
+    The legs' value is net of one full round trip (the convention of every leg: the whole book
+    bought and sold); the book pays ``sum |w_t - w_(t-1)| / 2`` round trips instead, over the
+    names (cash excluded), so a book that holds still pays nothing and a full replacement pays
+    one. The first session buys its whole book (half a trip per unit of weight), the last
+    session's book is sold at the end of the data (charged, as in a band), a session the screen
+    could not value breaks the chain (everything held before it is sold, the next session buys
+    afresh). The net value is ``stored + cost * (1 - trips)``. Gross figures and the hit stay the
+    legs' own. Deterministic and in the order given."""
+    order = sorted(range(len(stats)), key=lambda i: stats[i].session)
+    ordered = [stats[i] for i in order]
+    cost = (cost_bp or 0.0) / 1e4
+    books = [_traded(dict(s.weights)) if s.weights else None for s in ordered]
+    done: list[SessionStat] = []
+    for at, stat in enumerate(ordered):
+        book = books[at]
+        if book is None:
+            done.append(stat)
+            continue
+        before = (books[at - 1] if at else None) or {}  # a gap or the first session: none held
+        into = sum(abs(w - before.get(i, 0.0)) for i, w in book.items())
+        into += sum(w for i, w in before.items() if i not in book)  # sold at this rebalance
+        trips = into * ENTRY
+        if at + 1 == len(books) or books[at + 1] is None:  # the last book, or one before a gap
+            trips += sum(book.values()) * EXIT  # is sold
+        net = stat.pick_values[0] + cost * (1.0 - trips)
+        done.append(replace(stat, banded_values=(net,), round_trips=trips))
     out = list(stats)
     for slot, stat in zip(order, done, strict=True):
         out[slot] = stat

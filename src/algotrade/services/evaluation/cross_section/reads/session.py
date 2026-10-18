@@ -18,7 +18,8 @@ from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.data import StoreReader
 from algotrade.data.listings.membership import TABLE as MEMBERSHIP_TABLE
 from algotrade.data.listings.universe import TABLE as LISTING_TABLE
-from algotrade.data.reference import UNIVERSE_TABLE
+from algotrade.data.rates import curve
+from algotrade.data.reference import UNIVERSE_TABLE, resolver
 from algotrade.services.evaluation.cross_section.historical import (
     HistoricalCaveat,
     IdentityTally,
@@ -69,6 +70,9 @@ class SessionReads:
         self._implied: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
         self._adv: dict[tuple[frozenset[str], date], dict[str, float | None]] = {}
         self._sectors: dict[tuple[frozenset[str], date], dict[str, str | None]] = {}
+        self._numbers: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
+        self._bills: dict[date, float | None] = {}
+        self._tickers: dict[tuple[tuple[str, ...], date], dict[str, str | None]] = {}
         self._outcomes: dict[tuple[str, int, date], pd.DataFrame] = {}
         self._snapshots: set[date] = set()
         self._identity = IdentityTally()
@@ -149,6 +153,9 @@ class SessionReads:
         self._implied.clear()
         self._adv.clear()
         self._sectors.clear()
+        self._numbers.clear()
+        self._bills.clear()
+        self._tickers.clear()
         self._outcomes.clear()
 
     def label(self, day: date) -> str:
@@ -172,6 +179,38 @@ class SessionReads:
         if key not in self._adv:
             self._adv[key] = numbers_at(self._reader, ADV_FIELD, ids, day)
         return self._adv[key]
+
+    def numbers(self, field_name: str, ids: frozenset[str], day: date) -> dict[str, float | None]:
+        """The declared numeric feature ``field_name`` of ``ids`` at D (None: not stored, never
+        0), read once per set and session through the recording reader (a portfolio book's
+        volatility, ADR 0073)."""
+        key = (field_name, ids, day)
+        if key not in self._numbers:
+            self._numbers[key] = numbers_at(self._reader, field_name, ids, day)
+        return self._numbers[key]
+
+    def bill_yield(self, day: date) -> float | None:
+        """The shortest-tenor Treasury bill yield (a decimal per year) of the curve ``day`` sees,
+        the latest stored on or before it (``data.rates``: known at D); None when no curve is
+        stored. What cash earns in a portfolio book (ADR 0073)."""
+        if day not in self._bills:
+            try:
+                frame = curve(self._reader, day).frame
+            except MissingDataError:
+                self._bills[day] = None
+            else:
+                self._bills[day] = float(frame["rate_par"].iloc[0]) if len(frame) else None
+        return self._bills[day]
+
+    def instruments(self, tickers: tuple[str, ...], on: date) -> dict[str, str | None]:
+        """The instrument id each ticker names in the reference snapshot ``on`` sees (None: the
+        snapshot does not know it): how the benchmark's constituents are found, only through the
+        resolver (ADR 0018), never built."""
+        key = (tickers, on)
+        if key not in self._tickers:
+            found = resolver(self._reader, on)
+            self._tickers[key] = {t: found.id_for(t) if found.knows(t) else None for t in tickers}
+        return self._tickers[key]
 
     def sectors(self, ids: frozenset[str], day: date) -> dict[str, str | None]:
         """``instrument.sector`` of ``ids`` at D (None: not stored), read once per set and session
