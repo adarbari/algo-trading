@@ -21,6 +21,9 @@ MIX = "mix:"  # a benchmark of this form is a blend of the listed instruments
 CASH = "CASH"  # a pick that earns the T-bill yield (``rates/treasury``) instead of an instrument
 ENSEMBLE = "ensemble"  # the id of the combined variant of an ``[ensemble]`` (a screener may not be)
 OOS_CLASSES = ("trend",)  # ``oos_class``: what ``verdict.toml [oos_haircut]`` has a share for
+VOL_RETURN_FIELD = "rollup.trend_stats@v2.ret_1d"  # the daily return a vol_target book is sized by
+VOL_WINDOW = 60  # sessions of the book's daily returns its volatility is measured over
+MIN_VOL_WINDOW = 20  # a sample standard deviation over fewer sessions says nothing
 WEIGHTINGS = ("equal", "inverse_vol", "score")
 EQUAL, INVERSE_VOL, SCORE = WEIGHTINGS
 # A blend's weights add to one within this tolerance (``0.6, 0.4`` is exact, thirds are not).
@@ -105,6 +108,34 @@ def weighting_of(o: Table, kind: str) -> tuple[str, str | None]:
     if weighting != INVERSE_VOL and vol_field is not None:
         raise ConfigurationError(f"{o.where} vol_field: only an inverse_vol book reads one")
     return weighting, vol_field
+
+
+def vol_target_of(o: Table, kind: str) -> tuple[float | None, int, str]:
+    """``(vol_target, vol_window, vol_return_field)`` of an outcome: the book's annualised
+    volatility target (a fraction in ``(0, 1]``, None: none), the sessions it is measured over
+    and the daily return feature it is measured from (ADR 0074 amendment). Only a
+    ``portfolio_return`` outcome has any; ``vol_window`` and ``vol_return_field`` need a target."""
+    names = o.names()
+    keys = ("vol_target", "vol_window", "vol_return_field")
+    if kind != PORTFOLIO_KIND:
+        for key in keys:
+            if key in names:
+                raise ConfigurationError(
+                    f"{o.where} {key}: only a portfolio_return outcome has one"
+                )
+        return None, VOL_WINDOW, VOL_RETURN_FIELD
+    target = o.number("vol_target", None, 0)
+    if target is None:
+        for key in keys[1:]:
+            if key in names:
+                raise ConfigurationError(f"{o.where} {key}: needs a vol_target")
+        return None, VOL_WINDOW, VOL_RETURN_FIELD
+    if not math.isfinite(target) or not 0 < target <= 1:
+        raise ConfigurationError(
+            f"{o.where} vol_target: expected a fraction in (0, 1], got {target}"
+        )
+    window = o.integer("vol_window", VOL_WINDOW, MIN_VOL_WINDOW)
+    return target, window, o.text("vol_return_field", VOL_RETURN_FIELD)
 
 
 def check_portfolio(
