@@ -2,11 +2,15 @@
 cannot be computed is excluded with a reason, never a miss; DELISTED rows count; ``oriented`` is
 higher-is-better."""
 
+from datetime import date
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.time.calendar import next_session
 from algotrade.quant.black_scholes import (
     atm_straddle_price,
     atm_straddle_vega,
@@ -19,7 +23,16 @@ from algotrade.services.evaluation.cross_section.hit import (
     needs_implied_vol,
     short_view,
 )
-from tests.unit.services.evaluation.cross_section.conftest import edge
+from algotrade.storage.tables.schemas import RESIDUAL_RETURNS
+from tests.helpers.stored_frames import stamped
+from tests.unit.services.evaluation.cross_section.conftest import (
+    IDS,
+    KNOWN,
+    World,
+    build_world,
+    edge,
+)
+from tests.unit.services.evaluation.cross_section.test_harness import DAYS, run
 
 NAN = float("nan")
 VRP = {
@@ -354,3 +367,99 @@ def test_a_long_outcome_has_no_short_value_and_borrow_scales_with_the_holding_pe
     assert np.isnan(out["short_value"]).all() and not out["short_hit"].any()
     assert np.allclose(borrow_cost(252.0, np.array([252.0, 63.0])), [0.0252, 0.0063])
     assert np.allclose(borrow_cost(None, np.array([20.0])), [0.0])
+
+
+def _residual(**outcome: object) -> object:
+    base = {
+        "kind": "excess_return", "measure": "residual_return", "horizon_sessions": [20],
+        "benchmark": "SPY", "start_offset_sessions": 1, "cost_bps": 100,
+    }  # fmt: skip
+    return edge(outcome={**base, **outcome}, top_k=5)
+
+
+def _with_residual(**columns: list[object]) -> pd.DataFrame:
+    n = len(next(iter(columns.values())))
+    base = {"residual_status": ["COMPLETE"] * n, "residual_reason": [None] * n}
+    return rows(fwd_excess_return=[0.5] * n, **{**base, **columns})  # excess is far from it
+
+
+def test_a_residual_outcome_reads_the_residual_never_the_excess_return() -> None:
+    out = apply_outcome(_residual(), _with_residual(fwd_residual_return=[0.02, 0.01, -0.01]))
+    assert np.allclose(out["value"], [0.01, 0.0, -0.02])  # net of 100 bp, not of 0.5
+    assert list(out["hit"]) == [True, False, False] and set(out["excluded"]) == {""}
+
+
+def test_an_unmeasured_residual_is_excluded_unmeasured_never_a_miss_or_the_excess() -> None:
+    frame = _with_residual(
+        fwd_residual_return=[0.05, NAN, 0.05],
+        residual_status=["COMPLETE", "UNMEASURED", "COMPLETE"],
+        residual_reason=[None, "NO_FACTOR_HISTORY", None],
+    )
+    frame.loc[2, "outcome_status"] = "UNMEASURED"  # a flagged bar in the forward window too
+    out = apply_outcome(_residual(), frame)
+    assert list(out["excluded"]) == ["", "unmeasured", "unmeasured"]
+    assert list(out["hit"]) == [True, False, False] and np.isnan(out["value"][1])
+
+
+def test_a_residual_outcome_without_the_attached_residuals_fails_loudly() -> None:
+    with pytest.raises(ConfigurationError, match="residual-returns rows"):
+        apply_outcome(_residual(), rows(fwd_excess_return=[0.05]))
+
+
+def test_a_short_residual_is_minus_the_residual_less_cost_and_borrow() -> None:
+    e = _residual(side="short", borrow_bps_annual=0)
+    out = apply_outcome(
+        e, _with_residual(fwd_residual_return=[-0.03, 0.01], horizon_sessions=[20] * 2)
+    )
+    assert np.allclose(out["short_value"], [0.03 - 0.01, -0.01 - 0.01])
+    assert list(out["short_hit"]) == [True, False]
+
+
+ENTRIES = [*DAYS, next_session(DAYS[-1])]  # the world stores outcomes for these start sessions
+HARNESS_RESIDUAL = {
+    "kind": "excess_return", "measure": "residual_return", "horizon_sessions": [2],
+    "benchmark": "SPY", "start_offset_sessions": 1,
+}  # fmt: skip
+
+
+def _write_residuals(w: World, day: date, scale: float = 2.0) -> None:
+    rows: list[dict[str, Any]] = [
+        {
+            "instrument_id": iid, "ts": pd.Timestamp(f"{day}T20:00Z"), "horizon_sessions": 2,
+            "window_end": day, "beta_session": day, "outcome_status": "COMPLETE",
+            "fwd_residual_return": scale * (i - 9.5) / 100, "fwd_factor_return": 0.0,
+        }
+        for i, iid in enumerate(IDS)
+    ]  # fmt: skip
+    frame = stamped(rows, day, f"r-{day}", KNOWN, "residual_returns")
+    w.writer.write_table(RESIDUAL_RETURNS, day, f"r-{day}", frame)
+
+
+def test_the_statistics_read_the_residual_not_the_excess_return() -> None:
+    w = build_world()
+    for day in ENTRIES:
+        _write_residuals(w, day)
+    (r,) = run(w, edge(outcome=HARNESS_RESIDUAL)).results
+    m = r.measures[0]
+    # the excess return of name i is (i - 9.5)%, its residual twice that: picks 15..19 earn 15%
+    assert m.mean_excess_picks == pytest.approx(0.15)
+    assert (m.sessions, m.picks, m.hits) == (4, 20, 20)
+    assert m.decile_spread == pytest.approx(0.36)  # twice the excess run's 0.18
+
+
+def test_a_start_session_without_residuals_is_unmeasured_never_a_miss_or_a_zero() -> None:
+    w = build_world()
+    for day in ENTRIES[:-1]:  # the residuals of the last start session were not written
+        _write_residuals(w, day)
+    plain = run(build_world(), edge()).results[0].measures[0]
+    m = run(w, edge(outcome=HARNESS_RESIDUAL)).results[0].measures[0]
+    assert m.sessions < plain.sessions  # the unstored session is not measured at all
+    assert m.hits == m.picks  # and what is measured is not diluted by zeros
+
+
+def test_an_excess_return_edge_never_reads_the_residual_rows() -> None:
+    w = build_world()
+    for day in ENTRIES:
+        _write_residuals(w, day, scale=-5.0)  # would flip every figure if they were read
+    m = run(w, edge()).results[0].measures[0]
+    assert m.mean_excess_picks == pytest.approx(0.075)

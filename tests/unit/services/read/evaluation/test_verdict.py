@@ -20,6 +20,7 @@ from algotrade.services.read.evaluation.verdict import (
     WORKS,
     BasisChoice,
     Declared,
+    EdgeFacts,
     EdgeVerdict,
     choose_basis,
     judge,
@@ -635,3 +636,13 @@ def test_a_decoy_with_no_figure_is_not_measured_never_left_out_of_beats_every_ba
     assert {c.id: c.status for c in verdict(lost).criteria}["baselines"] == "fail"
     whole = {c.id: c for c in verdict(result(oos={"lift": 1.5}, baselines=(1.05, 1.1))).criteria}
     assert whole["baselines"].status == "pass" and "measured" not in whole["baselines"].value
+
+
+def test_a_residual_return_verdict_says_the_figure_is_factor_neutral() -> None:
+    v = judge("e", result(), SPLIT, T, facts=EdgeFacts(neutral=True))
+    assert "factor-neutral" in v.headline
+    assert "factor-neutral" not in verdict(result()).headline
+    both = judge(
+        "e", [replace(r, side="short") for r in result()], SPLIT, T, facts=EdgeFacts(neutral=True)
+    )
+    assert "(short leg, factor-neutral" in both.headline
