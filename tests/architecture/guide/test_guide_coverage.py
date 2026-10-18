@@ -146,12 +146,14 @@ def web_sources(root: Path) -> list[Path]:
 
 
 def uncovered_titled(text: str, tags: tuple[str, ...]) -> int:
-    """Titled containers of ``tags`` in one source whose ``actions`` carry no help button."""
+    """Titled containers of ``tags`` in one source whose ``actions`` (or ``info``, the slot a
+    read-only ConditionGroup shows) carry no help button."""
     context = bool(re.search(r"import\s*\{[^}]*\buseHelp\b[^}]*\}\s*from", text))
     return sum(
         1
         for _, attrs in jsx_tags(text, tags)
-        if "title" in attrs and not has_help(attrs.get("actions", ""), context)
+        if "title" in attrs
+        and not has_help(attrs.get("actions", "") + " " + attrs.get("info", ""), context)
     )
 
 

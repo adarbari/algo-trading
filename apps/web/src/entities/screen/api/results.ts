@@ -48,6 +48,7 @@ const ScreenerResults = graphql(`
         id
         field
         mode
+        group
       }
       displayColumns {
         name
@@ -166,6 +167,15 @@ const ScreenerResults = graphql(`
               outcome
               value
               distance
+              group
+            }
+            groups {
+              id
+              kind
+              members
+              parent
+              outcome
+              decidedBy
             }
             columns {
               name

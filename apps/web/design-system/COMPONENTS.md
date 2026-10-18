@@ -380,7 +380,7 @@ Source: `design-system/components/Combobox`
 
 ### ConditionGroup
 
-ConditionGroup: a titled surface for a group of rule conditions (ADR 0071): the group's kind label (all / any / none of), a title, an actions slot and an optional Guide InfoButton, then the members as a vertical list with the PartJoin connector between them (and for all, or for any, and not for none). One level only, so phones need no variant. `readOnly` shows a group the Builder cannot edit (a deeper tree from Describe it or TOML) as one ExpandableRow: its plain-English expression, members shown on expanding. Every label arrives as a prop.
+ConditionGroup: a titled surface for a group of rule conditions (ADR 0071): the group's kind label (all / any / none of), a title, an actions slot and an optional Guide InfoButton, then the members as a vertical list with the PartJoin connector between them (and for all, or for any, and not for none). One level only, so phones need no variant. `readOnly` shows a group the Builder cannot edit (a deeper tree from Describe it or TOML) as one ExpandableRow: its plain-English expression, members shown on expanding; of the slots only `info` shows there, beside the row so no control nests in its button. Every label arrives as a prop.
 
 Source: `design-system/components/ConditionGroup`
 
@@ -391,8 +391,8 @@ Source: `design-system/components/ConditionGroup`
 | `title` | `ReactNode` | yes | The group's name; shown as a heading (a row title when read only). |
 | `connectorLabel` | `string` | yes | The connector between members ("and", "or", "and not"). |
 | `joinedByLabel` | `string` | yes | The spoken lead-in to the connector ("joined by"), hidden visually. |
-| `actions` | `ReactNode` | no | Controls on the header's end (buttons, a Guide InfoButton). Edit mode only. |
-| `info` | `ReactNode` | no | A Guide InfoButton for the kind, shown beside the title. |
+| `actions` | `ReactNode` | no | Controls on the header's end (buttons). Edit mode only; a read-only row shows none. |
+| `info` | `ReactNode` | no | A Guide InfoButton for the kind: beside the title, or (read only) beside the row, outside its toggle button. |
 | `expression` | `ReactNode` | no | The group as one plain-English sentence; shown on the read-only row. |
 | `readOnly` | `boolean` | no | Show one expandable row with no editing controls. |
 | `defaultOpen` | `boolean` | no | Read only: start expanded. |
