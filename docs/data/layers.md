@@ -226,7 +226,7 @@ instrument, concept, tag, period start, period end and filing date)
 
 Reads (`data.statements.reading`): `stored_statements` (every row, the latest stored version per
 key) for the producer, `statement_facts(reader, session)` the facts FILED on or before the session.
-No feature reads it yet: `balance_sheet@v1` does (planned, `docs/data/technical.md`).
+Read by `income_statement@v1`, `cash_flow@v1` and `balance_sheet@v1` (the `instruments/statements` feature input), and through them `growth_history@v1` and the formulas of `config/site/features/company/statements.toml`.
 
 **`macro/series`** (ADR 0048; increments merged across runs, one row per series, observation date
 and vintage) holds economic series (`MACRO:<KEY>`) and index levels (`IDX:<KEY>`: index levels
@@ -442,7 +442,7 @@ is as new), NOT_FETCHED (no row and no marker, or only FAILED markers: never ask
 covered" (`Feature.uncovered_statuses`, ADR 0072), the admin cause tells them apart. FY1 is the first estimate year ending more than
 `fy_slack_days` (60, under 85) after the later of the last annual report's year end (`financials@v2.revenue_fy_end`) and the last quarter's end
 (`qtr_as_of`), else the first ending after S for a name with neither; without `financials@v2` for the session no year is served. FY2 is the next
-listed; at the fiscal-year roll FY1 moves on the session the 10-K becomes known, so a forward P/E jumps once. Forward P/E is a later formula. The never-asked names are graded by `analyst_backlog` and
+listed; at the fiscal-year roll FY1 moves on the session the 10-K becomes known, so a forward P/E jumps once. Forward P/E, forward EPS and revenue growth and target upside are formulas over it (`config/site/features/company/forward.toml`). The never-asked names are graded by `analyst_backlog` and
 `finnhub_backlog` (`tasks/analyst/backlog.py`, WARN only; the latter also when the run skipped Finnhub).
 
 **`analyst_ratings@v1` and `analyst_revisions@v1` rules (ADR 0068, 0072).** Ratings read Finnhub's recommendation trend through the same
