@@ -3,10 +3,12 @@
 
 import pytest
 
+from algotrade.quant.edges.statistics import haircut_sharpe
 from algotrade.services.read.evaluation.robustness import (
     BINS,
     beat_share,
     draw_lifts,
+    load_haircut,
     load_robustness,
 )
 from algotrade.services.read.evaluation.runs import EdgeRow
@@ -66,3 +68,22 @@ def test_identical_draws_make_one_bin_and_nothing_drawn_is_none() -> None:
         load_robustness(None, draws([1.0]), 20, "scr", 3) is None
     )  # no lift: base rate not stored
     assert load_robustness(1.0, draws([1.0], horizon=5), 20, "scr", 3) is None
+
+
+def test_the_haircut_is_also_made_for_the_variants_tried_across_the_site() -> None:
+    own = load_haircut(0.4, 70, 5)
+    both = load_haircut(0.4, 70, 5, site_trials=900)
+    assert own is not None and both is not None
+    assert own.site_trials is None and own.site_cut is None  # not counted: not shown
+    assert (both.haircut_sharpe, both.cut) == (own.haircut_sharpe, own.cut)  # the edge's own stays
+    assert both.site_trials == 900
+    wide = haircut_sharpe(0.4, 70, 900)
+    assert wide is not None
+    assert both.site_haircut_sharpe == pytest.approx(wide.sharpe)
+    assert both.site_cut == pytest.approx(wide.cut) and both.site_cut > both.cut
+    assert both.summary.endswith(
+        f"Counting the 900 variants tried across every site edge it falls to "
+        f"{wide.sharpe:.2f}, a haircut of {wide.cut * 100:.0f}%."
+    )
+    # the site count includes the edge's own: a smaller figure is never read as fewer trials
+    assert load_haircut(0.4, 70, 5, site_trials=3).site_trials == 5  # type: ignore[union-attr]

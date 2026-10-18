@@ -7,6 +7,8 @@ from datetime import date, timedelta
 import pytest
 
 from algotrade.core.time.calendar import is_session
+from algotrade.quant.edges.statistics import window_weights
+from algotrade.services.read.context import ResultCache
 from algotrade.services.read.evaluation.edges import load_edge, load_edges
 from algotrade.services.read.evaluation.runs import (
     load_canonical_run,
@@ -14,13 +16,15 @@ from algotrade.services.read.evaluation.runs import (
     load_run_draws,
     load_run_rows,
     load_run_series,
+    load_site_trials,
     measured_sessions,
-    window_weights,
 )
 from algotrade.services.read.values import UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from tests.unit.services.read.evaluation.conftest import (
+    DOCS,
+    EDGE,
     FROZEN,
     row,
     series_row,
@@ -315,3 +319,45 @@ def test_the_touch_and_reference_rates_are_read_and_none_when_not_stored_never_z
     by = {r.slice_kind: r for r in load_run_rows(ctx, run) if r.variant == "momo"}
     assert (by["in_sample"].reference_rate, by["in_sample"].touch_rate) == (0.63, 0.54)
     assert by["frozen"].reference_rate is None and by["frozen"].touch_rate is None
+
+
+def _site_docs(**second: object) -> dict[tuple[str, str, str], dict]:
+    """The store's documents with a second site edge ``other`` beside ``drift``."""
+    return {**DOCS, ("site", "edges", "other"): {**EDGE, "id": "other", "name": "Other", **second}}
+
+
+def test_the_site_trial_count_sums_the_canonical_runs_of_every_site_edge(
+    backend: MemoryBackend,
+) -> None:
+    docs = _site_docs()
+    assert load_site_trials(stores(backend, docs=docs)) == 0  # no run yet: nothing was tried
+    write_run(backend, "explore", date(2026, 3, 1), 0.9, minutes=5, trials_counted=50)
+    assert load_site_trials(stores(backend, docs=docs)) == 0  # exploratory: not canonical
+    write_run(backend, "d1", FROZEN, 0.6, minutes=10, trials_counted=7)
+    assert load_site_trials(stores(backend, docs=docs)) == 7
+    write_run(backend, "o1", FROZEN, 0.6, minutes=11, edge="other", trials_counted=5)
+    assert load_site_trials(stores(backend, docs=docs)) == 12  # more than one edge
+    write_run(backend, "d2", FROZEN, 0.6, minutes=20, trials_counted=9)  # the latest is canonical
+    assert load_site_trials(stores(backend, docs=docs)) == 14
+
+
+def test_a_rejected_or_blocked_edges_trials_still_count(backend: MemoryBackend) -> None:
+    """A trial stays a trial once the idea is dropped (architect review of H1)."""
+    docs = _site_docs(status="rejected", rejection_reason="Costs eat it.")
+    write_run(backend, "d1", FROZEN, 0.6, minutes=10, trials_counted=7)
+    write_run(backend, "o1", FROZEN, 0.6, minutes=11, edge="other", trials_counted=5)
+    assert load_site_trials(stores(backend, docs=docs)) == 12
+
+
+def test_the_site_trial_count_recounts_when_a_site_edge_document_changes(
+    backend: MemoryBackend,
+) -> None:
+    """One cache serves every request: its key moves with the site edges' status and period."""
+    write_run(backend, "d1", FROZEN, 0.6, minutes=10, trials_counted=7)
+    write_run(backend, "o1", FROZEN, 0.6, minutes=11, edge="other", trials_counted=5)
+    cache = ResultCache()
+    assert load_site_trials(stores(backend, cache=cache)) == 7  # no ``other`` document yet
+    added = stores(backend, docs=_site_docs(), cache=cache)  # the same store and published state
+    assert load_site_trials(added) == 12
+    closed = _site_docs(status="blocked", rejection_reason="No data.")
+    assert load_site_trials(stores(backend, docs=closed, cache=cache)) == 12  # still counted
