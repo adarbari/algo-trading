@@ -1,0 +1,85 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E4) until a short-tenor implied
+# volatility is stored. Idea page: docs/edge-ideas/options-volatility.md (c17_earnings_iv_crush_sell).
+id = "c17_earnings_iv_crush_sell"
+name = "Earnings implied-volatility crush"
+thesis = "In large liquid names the implied move before a report exceeds the realised one on average, so selling the straddle before the announcement and covering after earns the difference."
+mechanism = """Retail demand for event protection and lottery calls, and the jump risk dealers cannot
+hedge, push the pre-report straddle above the move that follows; the premium is the insurer's
+(practitioner evidence only; no peer-reviewed rule publishes a return)."""
+persistence = """Well known and crowded: practitioner sites publish the trade. The average edge is small
+(an implied-to-realised move ratio near 1.1 to 1.3 in large caps, not verified) and the payoff is
+a short jump tail: one 30% gap erases the premium of many trades."""
+family = "C"
+schedule = "on_event:earnings_expected"
+top_k = "all"
+base = "universe"
+picks = "event"
+screeners = []
+baselines = ["vrp_iv_hv"]
+status = "blocked"
+frozen_from = 2026-04-01
+rejection_reason = """The position's horizon cannot be priced. The model P&L prices every horizon with one
+30-day implied volatility (IV30, the only history stored), and the document parser refuses a horizon
+outside 10 to 42 sessions for it (ADR 0053 amendment 2026-10-17, tenor_sessions); the trade is held 1
+to 2 sessions, from the close before the report to the close after. The 10-session horizon below is a
+placeholder that keeps the document valid and is not the thesis. Unblock with a short-tenor implied
+volatility field (an iv7-style name with history); iv_next of iv_term@v1 is stored from 2026-10-02
+only and carries no tenor in its name. A second gap: the page's own first step, the implied move
+(implied_move@v1, chain-based, from 2026-10-02) against the realised reaction by size bucket, has no
+history either; earnings_reaction@v1 has the realised half."""
+notes = """The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8): the short at-the-money
+straddle priced by Black-Scholes (r = q = 0) from an implied volatility at D; no skew, no spread
+beyond cost_bps, no margin; no historical chains are stored (owner decision O3) and the real-chain P&L
+(H13) accrues from 2026-10-02. The page expects 65 to 70% winning trades with a negative skew: the
+harness reads the mean P&L, which a short straddle's win rate overstates. Large caps only (the
+universe: $200M a day, price above $20); the source evidence favours buying into earnings in small
+names, so the selling edge is an inference about the large-cap half. A defined-risk iron-fly
+version would cut the tail and most of the edge and needs a different structure."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 20 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 200_000_000 },
+]
+
+[outcome]
+kind = "option_model_pnl"
+structure = "atm_straddle_short"
+iv_field = "rollup.ibkr_iv@v1.iv30_ibkr"
+horizon_sessions = [10]
+benchmark = "none"
+start_offset_sessions = -1
+cost_bps = 50
+
+[quality_bar]
+outcome = """The model P&L of one short at-the-money straddle from the close before the report to the
+close after, as a fraction of the entry price, net of 50 bps: the premium kept less the move. The
+placeholder horizon is 10 sessions until a short-tenor volatility exists. The distribution, not the win
+rate, is the result."""
+trigger_timing = """The expected report date is known weeks ahead (earnings_expected@v1, known_from <= D); the
+entry session is S = the report session - 1 (start_offset_sessions = -1), D = S - 1, and the
+straddle is priced with the implied volatility read at D. An after-close report is covered the next
+session; a date taken from last year is a guess and the screener should read only SCHEDULED dates."""
+replication = """The practitioner rule: at the close before the report sell the at-the-money straddle (or a
+16-delta strangle) expiring after it and cover at the open or close after. No peer-reviewed rule
+with a published return exists, so no figure is filed. No screener is written until the horizon can be
+priced."""
+expected_size = """No published return. The page's own test is the implied move against the realised
+reaction by size bucket, which can settle the sign quickly once chain history exists; today the
+reaction half is stored (earnings_reaction@v1) and the implied half is not."""
+capacity_costs = """Undefined-risk short straddles need margin; a defined-risk fly cuts the tail and most of the
+edge. Large caps with $200M a day have tight option spreads, which the 50 bps cost approximates, and
+an individual's size is far below the open interest."""
+failure_modes = """The tail: one large gap wipes ten to twenty winning trades. Crowding thins the
+premium. Retire if the frozen-period mean P&L is not above the mean of every large liquid name
+reporting on the same sessions, or the worst window breaches the drawdown the owner accepts."""
+decoys = """The filed VRP edge (this is the premium at an event) and the pre-earnings straddle purchase
+(c16, the mirror image by size); the post-event drift is a separate edge."""
+
+[[sources]]
+title = "Gao, C., Xing, Y. and Zhang, X., Anticipating Uncertainty: Straddles around Earnings Announcements, Journal of Financial and Quantitative Analysis, 2018"
+url = "https://resolve.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/anticipating-uncertainty-straddles-around-earnings-announcements/7B34877AD5E06304BA3C55FBA3219FDD"
