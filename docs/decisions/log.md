@@ -805,7 +805,7 @@ follow-up PR).
 - Question: may the owner-approved ops actions run: a forced refetch of every SEC company-facts CIK (`algotrade-ingest shares --force`), and clearing the stale `edge-eval` job record for edge `momentum_12_1` (status running since 2026-10-18T10:00:35Z, no process)?
 - Options: wait for the nightly backlog (400 CIKs a night) / run `shares --force` once locally; hand-edit or delete the stale record / clear it only through the jobs service.
 - Decision: owner, in the session chat: "run shares --force"; for the stale record: "Approved" (to "clear the stale momentum_12_1 job record through the jobs service"). Bounds: local ingestion through the normal writer, detached, one at a time under the claim lock; no deletes, no `--waive`, no `--force` on anything else, no new vendor calls beyond SEC EDGAR (free, the `shares` task's own pace); the stale record is cleared only through the jobs service (`LocalJobRunner.recover`), never by deleting files by hand.
-- decided by: owner (in the session chat)
+- decided by: owner
 - status: final
 - Note: the parent (orchestrating) session ran `shares --force`, not the implementer that recorded this entry; the stale record was cleared by this task through `LocalJobRunner.recover` (kind `edge-eval`, the only running record).
 - Reasoning: the statements groups v2/v3/v4 need every CIK refetched: 5,260 CIKs are in the backlog at 400 a night, about 14 nights; `--force` does it in about 40 minutes. The stale record would otherwise block its owner's edge evaluations until the 2 h staleness window, and it is marked failed ("abandoned: the process running it stopped") with a `finished_at`.
@@ -814,6 +814,6 @@ follow-up PR).
 - Question: may closed-end funds be pulled into coverage (and their history) while the Tiingo Power account is active?
 - Options: keep CEFs out of the universe (ADR 0013) / amend coverage to pull CEFs and their history before Tiingo Power ends.
 - Decision: owner, in the session chat: "pull cef also until tingo power is there. If the edges is strong we can reconsider our decision to continue tingo power account"
-- decided by: owner (in the session chat)
+- decided by: owner
 - status: final
 - Reasoning: `closed_end_fund_discounts` (Strong), `cef_distribution_trap` and `muni_cef_december` are blocked because CEFs are not in universe coverage (ADR 0013). Bars already exist for 330 CEFs (the nightly Massive grouped-daily and Tiingo bars-history from 2010), so the Tiingo cost is 0 symbols; the change is the universe coverage amendment, with no deadline pressure. Continuing the Tiingo Power account is to be reconsidered if the CEF (or other) edges prove strong.
