@@ -484,3 +484,56 @@ Sources: Patro, Piccotti and Wu, Closed-end fund discounts (Quantpedia summary o
 - A share change is not a price effect: a fund can create shares because its price rose. Read it beside the fund's own return.
 
 Sources: Brown, Davies and Ringgenberg (2021), ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance
+
+### `rollup.share_classes@v1.spread_z_252d`
+
+**How to read it.** How far today's price ratio to the issuer's other share class is from its own last year, in standard deviations. Negative means this class is cheap against its sibling; positive means rich. -2 is two standard deviations cheaper than usual. The sibling's value is the exact mirror.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the cheap class of a share class pair | `lt -2` | soft | 0.5 | rank on it ascending; the pair_spread outcome shorts the sibling |
+
+**When the reading lies**
+
+- A class with different voting rights or dividend can keep a gap for years; a year's z-score then only measures drift inside that gap. Check rollup.share_classes@v1.sibling_status is PAIRED first.
+- Sessions before the first stored reference snapshot use the earliest snapshot's pairs, so history carries today's pairs (survivorship bias). The result shows the count of such sessions.
+- Null with fewer than 200 sessions of both classes, a flat ratio, or a sibling that is not PAIRED. A hard criterion then rejects the name.
+- Few issuers qualify, about 15 to 25, so one rule shows a handful of names per session. Judge it over many independent windows.
+
+Sources: Site convention (docs/edge-ideas/harness-design.md section 5, pair spread)
+
+### `rollup.share_classes@v1.sibling_status`
+
+**How to read it.** PAIRED means the issuer has exactly two share classes with one listed id each, so the sibling is named. AMBIGUOUS means three or more classes, or a class listed under several ids, so no sibling is named.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| only names whose share class pair is unambiguous | `eq "PAIRED"` | hard | - | a pair_spread outcome excludes the other statuses anyway; this keeps the screen honest |
+
+**When the reading lies**
+
+- Only operating companies count; a fund or a preferred share is not a class. Check rollup.share_classes@v1.sibling_id before reading a pair.
+- Sessions before the first stored reference snapshot use the earliest snapshot's status, so history carries today's classes. The result shows the count of such sessions.
+
+Sources: Site convention (ADR 0053 amendment, EB H9)
+
+### `rollup.share_classes@v1.sibling_id`
+
+**How to read it.** The instrument id of the issuer's other listed share class, read from the reference snapshot the session sees. The pair_spread outcome reads it on the decision session, so a later reclassification never changes a past result.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names that have a named sibling class | `not_null` | hard | - | the pair_spread outcome needs it; a name without one is excluded with the reason |
+
+**When the reading lies**
+
+- Null when the issuer has one class or the status is AMBIGUOUS; a pair pick is then excluded with the reason no_sibling, never counted as zero. Check rollup.share_classes@v1.sibling_status.
+- Sessions before the first stored reference snapshot use the earliest snapshot's sibling, so history carries today's pairs. The result shows the count of such sessions.
+
+Sources: Site convention (ADR 0018, ADR 0053 amendment, EB H9)

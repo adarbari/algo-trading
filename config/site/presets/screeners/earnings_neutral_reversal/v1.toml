@@ -1,0 +1,51 @@
+# Earnings-neutral reversal, losers first: The month's return without the days earnings moved the price: the last 20 sessions less every earnings reaction
+# window, the biggest losers first. Reversal after a move that news did not make is the
+# liquidity-provision part of short-term reversal. The edge restricts it to names about to report;
+# the criterion only asks that the value exists (a missing value never passes, ADR 0030).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "earnings_neutral_reversal"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Earnings-neutral reversal, losers first"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1 for stocks, so the screens compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.ret_ex_earnings_20d]
+field = "rollup.earnings_neutral_reversal@v1.ret_ex_earnings_20d"
+op = "gt"
+value = -1
+
+[columns]
+close = "rollup.price_stats@v2.close"
+ret_ex_earnings_20d = "rollup.earnings_neutral_reversal@v1.ret_ex_earnings_20d"
+earnings_days_excluded = "rollup.earnings_neutral_reversal@v1.earnings_days_excluded"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.earnings_neutral_reversal@v1.ret_ex_earnings_20d"
+tie_break_order = "asc"

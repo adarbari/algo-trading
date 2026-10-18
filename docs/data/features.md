@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-585 stored features in 73 groups, in dependency order; 149 expression features.
+589 stored features in 74 groups, in dependency order; 149 expression features.
 
 ## `option_liquidity@v1`
 
@@ -503,6 +503,17 @@ How much an iShares fund's share count changed over about a month (creations les
 | `etf_shares_outstanding` | window | float | count | open | >= 0 | The issuer's latest shares outstanding for the fund known by the session (iShares files only) | the fund has no count dated within the last 30 days: not an iShares fund, or not listed in the issuer's file | `holdings/etf_shares.shares_outstanding` |
 | `etf_shares_asof` | window | date | date | open |  | The issuer's date of that count | the fund has no count dated within the last 30 days | `holdings/etf_shares.as_of` |
 | `etf_shares_chg_21d` | window | float32 | decimal | open | -1 .. 20 | The latest count over the count 21 sessions earlier, minus 1: positive is net creation, negative net redemption | the latest count is more than 7 days old, or no count dated within the 7 days up to the session 21 sessions back is stored (the history starts about 2026-10-17) | `holdings/etf_shares.shares_outstanding`, `holdings/etf_shares.as_of` |
+
+## `share_classes@v1`
+
+The other listed share class of an issuer and where the pair's price ratio stands. Stored as `rollups/instrument/share_classes@v1`; reads `instruments/reference`, `bars/1d` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `sibling_id` | label | str | text | open |  | The issuer's other listed share class (an instrument id of the reference snapshot the session sees): the one class sharing its issuer CIK with a different share-class FIGI | the issuer has one class listed, or the reference has no issuer or class id for it; or the classes are not a pair (see sibling_status) | `instruments/reference.cik`, `instruments/reference.share_class_figi` |
+| `class_count` | window | int | count | open | >= 2 | How many share classes of the issuer the reference lists (operating companies only) | the issuer has one class listed, or the reference has no issuer or class id for it | `instruments/reference.cik`, `instruments/reference.share_class_figi` |
+| `sibling_status` | label | str | category | open | PAIRED, AMBIGUOUS | PAIRED: exactly two classes, one instrument each; AMBIGUOUS: three or more classes, or a class under several ids, so no pair is named | the issuer has one class listed, or the reference has no issuer or class id for it | `instruments/reference.cik`, `instruments/reference.share_class_figi` |
+| `spread_z_252d` | window | float32 | ratio | open | -20 .. 20 | Where today's ln(close / sibling close) stands against its own last 252 sessions: (today - mean) / standard deviation. -2 is two standard deviations cheaper than its usual gap to the sibling, +2 as much richer | the status is not PAIRED, either class has fewer than 200 of the last 253 sessions with a bar, or the ratio has no spread over them | `bars/1d.close`, `instruments/reference.share_class_figi` |
 
 ## `relative_strength@v1`
 

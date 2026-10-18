@@ -71,7 +71,7 @@ presets = ["range_breakout", "breakout", "failed_breakout"]
 [[family]]
 id = "reversals"
 title = "Reversals"
-presets = ["support_reversal", "oversold_reversal", "exhaustion"]
+presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reversal", "sector_reversal"]
 
 [[family]]
 id = "income"
@@ -81,9 +81,28 @@ presets = ["vrp_scanner", "vrp_iv_hv", "vrp_cross_section", "iv_rank_high"]
 [[family]]
 id = "events"
 title = "Earnings events"
-presets = ["pead_small_cap", "eap_all", "eap_volume", "earnings_date_early", "pre_earnings_runup", "earnings_gap_volume", "earnings_gap_only"]
+presets = ["pead_small_cap", "eap_all", "eap_volume", "earnings_date_early", "pre_earnings_runup", "earnings_gap_volume", "earnings_gap_only", "pre_earnings_reversal", "earnings_neutral_reversal"]
 
 [[family]]
 id = "filings"
 title = "Filings and index changes"
 presets = ["eight_k_adverse_items", "nt_late_filer", "tender_offer_filed", "sp500_deletion"]
+
+[[family]]
+id = "options_signals"
+title = "Option-implied signals"
+presets = ["cp_iv_spread", "cp_iv_spread_rise", "iv_smirk", "iv_change_call", "iv_change_ibkr", "option_stock_volume", "retail_option_attention", "lottery_max"]
+
+[[family]]
+id = "cross_section"
+title = "Cross-section ranks"
+presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite"]
+
+[[family]]
+id = "factors"
+title = "Factors"
+presets = [
+  "residual_momentum", "volatility_scaled_momentum", "frog_in_the_pan",
+  "momentum_x_quality_interaction", "fifty_two_week_high", "industry_momentum", "low_beta",
+  "low_volatility",
+]

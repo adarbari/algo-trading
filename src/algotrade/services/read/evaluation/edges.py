@@ -13,6 +13,7 @@ from typing import Any
 from algotrade.config.edges import document, loading
 from algotrade.config.edges.follow import AUDIT
 from algotrade.config.edges.follow import KEY as FOLLOW
+from algotrade.config.edges.portfolio import benchmark_words
 from algotrade.core.time.windows import window_name
 from algotrade.services.read.context import Stores
 
@@ -174,14 +175,22 @@ def _picks(e: document.Edge) -> str:
     return f"{when.capitalize()} · {top}"
 
 
+_WINS = {
+    "expires_otm": "the option expires worthless",
+    "option_model_pnl": "the modelled straddle P&L is positive (a model, not a quote)",
+    "pair_spread": "the cheap class returns more than its sibling, after costs and borrow",
+    "option_pnl": "the chain P&L is positive (quoted prices, net of the spread)",
+}
+
+
 def _win(o: document.Outcome) -> str:
-    if o.kind == "expires_otm":
-        return "the option expires worthless"
-    if o.kind == "option_model_pnl":
-        return "the modelled straddle P&L is positive (a model, not a quote)"
+    if o.kind in _WINS:
+        return _WINS[o.kind]
     if o.kind == "hit_target":
         return f"{(o.measure or 'the measure').replace('_', ' ')} {o.direction} {o.target:g}"
-    return f"beats {o.benchmark}" if o.benchmark != "none" else "rises"
+    if o.benchmark != "none":
+        return f"beats {benchmark_words(o.benchmark)}"
+    return "rises"
 
 
 def _trade(o: document.Outcome) -> str:

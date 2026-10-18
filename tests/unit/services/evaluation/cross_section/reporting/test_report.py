@@ -72,6 +72,18 @@ def test_an_iv_field_with_no_value_in_range_is_a_line_beside_the_zeros() -> None
     ) in render_edge_report(result).splitlines()
 
 
+def test_a_pair_spread_with_no_sibling_data_is_a_line() -> None:
+    gap = {"variant": "main/momo", "horizon": 20, "sessions": 12, "no_sibling_data": 12}
+    result = {
+        "edge": "e", "run_id": "r", "trials": 1, "survivorship": {}, "unclosed_sessions": {},
+        "universe_snapshot": None, "rows": [], "sibling_coverage": [gap],
+    }  # fmt: skip
+    assert (
+        "NO SIBLING DATA: main/momo h=20 has no pair field stored at 12 of 12 measured sessions "
+        "(picks excluded as no_sibling, not misses)"
+    ) in render_edge_report(result).splitlines()
+
+
 def test_each_decoy_reads_as_a_line_with_its_overlap_and_spread_gap() -> None:
     result = {
         "edge": "drift", "run_id": "r1", "trials": 1, "universe_snapshot": None,

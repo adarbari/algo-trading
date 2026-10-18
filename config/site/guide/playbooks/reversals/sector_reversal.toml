@@ -1,0 +1,27 @@
+# L3 site setting: the Guide's playbook for the site preset sector_reversal (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Typed by src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "sector_reversal"
+version = 1  # the preset version this prose was written for
+summary = "Ranks every tradeable name by its last 20 sessions against its sector fund, the worst first. It is the industry-neutral version of the residual reversal: a name that fell with its whole sector is not a loser here. It is a candidate edge under test."
+hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, with a 20-session return against its sector fund. Every such name qualifies; the one furthest behind its sector comes first."
+not_checked = "It does not adjust for beta or exclude names that moved on news. The sector is the SEC SIC code's coarse market sector, 11 groups."
+before_acting = [
+  "A name far behind its sector may be one with company news: check rollup.momentum_variants@v1.rs_sector_20d beside the earnings calendar.",
+  "Eleven sectors are a coarse yardstick: a biotech against Health Care is mostly not a like-for-like comparison.",
+]
+sources = [
+  "Blitz, Huij, Lansdorp and Verbeek, Short-Term Residual Reversal (2013)",
+]
+related = [
+  { id = "residual_reversal", reason = "the same idea against the market" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+rs_sector_20d = "Has a 20-session return against its sector fund"

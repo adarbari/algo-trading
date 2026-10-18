@@ -1,0 +1,49 @@
+# Dividend month: The dividend-month premium (Hartzmark and Solomon 2013): stocks with an ex-dividend date in the calendar month
+# after today's, in at least one of the last 3 years, ranked by how many of the 3 years. The criterion
+# asks for the flag (a missing value never passes, ADR 0030). What it does not check: the declared
+# dividend of this year or a change of the payout.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "dividend_month"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Dividend month"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1 for stocks, so the screens compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.expected_div_month_flag]
+field = "rollup.dividend_months@v1.expected_div_month_flag"
+op = "eq"
+value = true
+
+[columns]
+close = "rollup.price_stats@v2.close"
+div_month_hits_3y = "rollup.dividend_months@v1.div_month_hits_3y"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.dividend_months@v1.div_month_hits_3y"
