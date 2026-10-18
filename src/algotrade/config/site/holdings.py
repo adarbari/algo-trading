@@ -10,7 +10,14 @@ from dataclasses import dataclass
 from algotrade.config.site.fields import Table
 
 FALLBACK_SCOPES = ("liquid", "optionable", "all", "off")
-KEYS = ("refresh_days", "keep_top", "fallback_scope", "fallback_min_adv_usd", "per_night")
+KEYS = (
+    "refresh_days",
+    "keep_top",
+    "fallback_scope",
+    "fallback_min_adv_usd",
+    "per_night",
+    "daily_funds",
+)
 OWN_KEYS_ONLY = {"etf_holdings": ("enabled",)}  # no pacing or retention of its own
 VENDOR_FLAGS = {"ssga": ("etf_files",)}  # [ssga] etf_files = false: SPY membership stays on
 # Sections that were renamed: a file with only the old one keeps its on/off switch under the new
@@ -30,6 +37,10 @@ class EtfHoldingsSettings:
     )
     fallback_min_adv_usd: float = 5_000_000.0  # "liquid": also funds trading at least this a day
 
+    # iShares funds whose shares outstanding are read every night, outside the weekly slots and
+    # the per_night cap (a few dozen requests; the flow-pressure inputs, docs/edge-ideas)
+    daily_funds: tuple[str, ...] = ()
+
     @classmethod
     def from_table(cls, section: Table) -> "EtfHoldingsSettings":
         d = cls()
@@ -41,4 +52,5 @@ class EtfHoldingsSettings:
             fallback_min_adv_usd=section.number(
                 "fallback_min_adv_usd", d.fallback_min_adv_usd, 0.0
             ),
+            daily_funds=tuple(s.upper() for s in section.strings("daily_funds", d.daily_funds)),
         )

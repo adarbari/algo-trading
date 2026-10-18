@@ -10,6 +10,11 @@ and carry ``CUSIP`` / ``ISIN``. Foreign lines use their local ticker (Roche prin
 which is Roper in the U.S.), so only lines located in the United States count as U.S. listings.
 Funds that hold a physical metal or have no file answer HTTP 400 (read as "no file").
 
+The header block also states ``Shares Outstanding`` (``"1,149,200,000.00"``, a count as of the
+file's date, rounded to creation units): ``parse_shares`` reads it, and ``normalize`` returns it
+as the one-row frame ``parsed["shares"]`` (absent when a file has none) so the holdings task
+stores it without a second download. The file has no NAV or AUM line.
+
 Funds that overlay futures (IJH, IJR) publish a second layout: no ``Weight (%)``, but ``Market
 Weight`` and ``Notional Weight`` (the futures line has a notional weight and no market weight).
 ``Market Weight`` is the share of the fund's market value and adds up to 100%, so it is the
@@ -20,6 +25,8 @@ import csv
 import io
 import json
 from datetime import date, datetime
+
+import pandas as pd
 
 from algotrade_sources.framework.base import FetchRequest, Normalized
 from algotrade_sources.framework.holdings import (
@@ -90,6 +97,18 @@ def parse_csv(payload: bytes) -> tuple[date | None, list[dict[str, str]]]:
     if not lines:
         raise ValueError("the file's table has no lines")
     return as_of, lines
+
+
+def parse_shares(payload: bytes) -> float | None:
+    """The ``Shares Outstanding`` of the file's header block (before the table), else ``None``;
+    an unreadable or non-positive value is ``None`` too, never a guess."""
+    for row in csv.reader(io.StringIO(_decode(payload))):
+        if len(row) >= 2 and row[0].strip() == "Shares Outstanding":
+            value = number(row[1])
+            return value if value is not None and value > 0 else None
+        if any(c in row for c in WEIGHT_COLUMNS):  # the table started: no header line has it
+            return None
+    return None
 
 
 def weight_column(lines: list[dict[str, str]]) -> str:
@@ -193,4 +212,8 @@ class IsharesHoldings:
         published = published_sum(lines, column)
         if published is not None:
             notes["published_weight_bp"] = round(published * 10_000)
-        return Normalized(as_of, {}, notes=notes, parsed={"holdings": holdings})
+        parsed = {"holdings": holdings}
+        shares = parse_shares(payload)
+        if shares is not None:
+            parsed["shares"] = pd.DataFrame({"shares_outstanding": [shares]})
+        return Normalized(as_of, {}, notes=notes, parsed=parsed)

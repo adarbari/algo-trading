@@ -12,6 +12,7 @@ from algotrade_sources.vendors.ishares.etf_holdings import (
     no_file,
     parse_csv,
     parse_screener,
+    parse_shares,
 )
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for
@@ -219,3 +220,36 @@ def test_a_file_with_neither_weight_column_is_a_layout_change() -> None:
     broken = IJH.replace(b"Market Weight", b"Mkt Wt").replace(b"Notional Weight", b"Not Wt")
     with pytest.raises(ValueError, match="Weight"):
         parse_csv(broken)
+
+
+@pytest.mark.parametrize(
+    ("fund", "shares", "as_of"),
+    [
+        ("IVV", 1_149_200_000.0, date(2026, 10, 1)),
+        ("AGG", 1_441_300_000.0, date(2026, 10, 2)),
+        ("EFA", 739_200_000.0, date(2026, 10, 1)),
+        ("IJH", 1_679_050_000.0, date(2026, 10, 2)),
+        ("IWM", 277_650_000.0, date(2026, 10, 1)),
+    ],
+)
+def test_the_header_block_gives_shares_outstanding_with_the_files_own_date(
+    fund: str, shares: float, as_of: date
+) -> None:
+    """Verified on the recorded files: the count sits in the header block with the as-of date.
+    Funds of one recording carry different dates (IVV / EFA / IWM Oct 1, AGG / IJH Oct 2): the
+    date is the file's, never the fetch day's."""
+    assert parse_shares(csv(fund)) == shares
+    normalized = source().normalize(FetchRequest(fund), csv(fund))
+    assert normalized is not None and normalized.session_date == as_of
+    assert list(normalized.parsed["shares"]["shares_outstanding"]) == [shares]
+
+
+def test_a_file_without_a_readable_count_has_no_shares_frame() -> None:
+    payload = csv("IVV")
+    for broken in (b'Shares Outstanding,"-"', b'Shares Outstanding,"0.00"'):
+        edited = payload.replace(b'Shares Outstanding,"1,149,200,000.00"', broken)
+        assert parse_shares(edited) is None
+        normalized = source().normalize(FetchRequest("IVV"), edited)
+        assert normalized is not None and "shares" not in normalized.parsed
+    table_only = payload.replace(b'Shares Outstanding,"1,149,200,000.00"\n', b"")
+    assert parse_shares(table_only) is None

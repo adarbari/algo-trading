@@ -101,3 +101,26 @@ def test_a_block_is_an_error_not_a_missing_day() -> None:
 def test_a_plain_request_is_refused() -> None:
     with pytest.raises(TypeError, match="DailyIndexRequest"):
         SecDailyIndex(http_for(lambda url: INDEX)).fetch(FetchRequest("2026-09-30"))
+
+
+EVENT_FORMS = (FIXTURE / "daily_index_event_forms_trimmed.idx").read_bytes()  # real lines, 4 days
+
+
+def test_event_forms_are_kept_with_spaces_in_the_form_and_the_longest_form_wins() -> None:
+    frame = parse_index(EVENT_FORMS)
+    by_form = frame.groupby("form")["cik"].apply(list).to_dict()
+    kept = {"10-12B", "424B4", "SC TO-I", "25-NSE", "NT 10-K", "NT 10-Q", "8-K", "25"}
+    assert set(by_form) == kept
+    assert len(frame) == 11 and frame["accession"].is_unique
+    assert "0002101664" in by_form["10-12B"]  # Form 10 of a spin-off candidate
+    assert "0001893219" in by_form["25-NSE"]  # the issuer
+    assert "0000876661" in by_form["25-NSE"]  # the exchange's own line
+    assert len(by_form["25"]) == 1  # the issuer's own Form 25 is not the 25-NSE line
+    assert len(by_form["SC TO-I"]) == 1  # its SC TO-I/A amendment is left out
+    assert "0001744494" in by_form["NT 10-K"] and len(by_form["NT 10-Q"]) == 2
+
+
+def test_forms_that_only_start_like_an_event_form_are_skipped() -> None:
+    line = "{:<17}{:<62}{:<12}20260930    edgar/data/5/0000000005-26-000001.txt\n"
+    for form in ("NT 10-K/A", "NT 11-K", "25-NSE/A", "424B40", "SC TO-I/A", "8-KT"):
+        assert parse_index(line.format(form, "SOME CO", "5").encode()).empty, form
