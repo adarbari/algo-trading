@@ -8,6 +8,7 @@ import pytest
 
 from algotrade.config.edges.document import Edge, parse_edge
 from algotrade.config.edges.identity import identity_dict
+from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.portfolio import (
     CASH,
     benchmark_words,
@@ -15,6 +16,8 @@ from algotrade.config.edges.portfolio import (
     parse_mix,
 )
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.storage.configs.files import FileConfigStore
+from tests.conftest import REPO_ROOT
 from tests.unit.services.evaluation.cross_section.conftest import edge_document
 
 
@@ -211,3 +214,78 @@ def test_an_ensemble_is_for_a_portfolio_outcome_only() -> None:
 def test_an_ensemble_is_part_of_the_run_and_an_empty_one_is_not() -> None:
     assert "ensemble" not in identity_dict({"ensemble": (), "top_k": 3})
     assert identity_dict({"ensemble": ("a", "b")})["ensemble"] == ["a", "b"]
+
+
+def test_a_vol_target_parses_with_its_defaults_and_is_part_of_the_identity() -> None:
+    """ADR 0074 amendment: ``vol_target`` is a fraction a year, ``vol_window`` defaults to 60
+    sessions and ``vol_return_field`` to the stored daily return; no target, none of the three is
+    part of an outcome's identity (no existing hash moves), a target is."""
+    plain = book(outcome=outcome(weighting=None, vol_field=None)).outcome
+    assert (plain.vol_target, plain.vol_window) == (None, 60)
+    assert plain.vol_return_field == "rollup.trend_stats@v2.ret_1d"
+    bare = identity_dict(plain.__dict__)
+    assert not {"vol_target", "vol_window", "vol_return_field"} & set(bare)
+    sized = book(outcome=outcome(vol_target=0.1, vol_window=40, vol_return_field="a.b@v1.c"))
+    o = sized.outcome
+    assert (o.vol_target, o.vol_window, o.vol_return_field) == (0.1, 40, "a.b@v1.c")
+    kept = identity_dict(o.__dict__)
+    assert (kept["vol_target"], kept["vol_window"]) == (0.1, 40)
+    assert identity_dict(book(outcome=outcome(vol_target=0.1)).outcome.__dict__) != kept
+    assert identity_dict(book(outcome=outcome(vol_target=0.12)).outcome.__dict__) != identity_dict(
+        book(outcome=outcome(vol_target=0.1)).outcome.__dict__
+    )
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"vol_target": 0}, "vol_target"),
+        ({"vol_target": -0.1}, "vol_target"),
+        ({"vol_target": 1.5}, "vol_target: expected a fraction in \\(0, 1\\]"),
+        ({"vol_target": 0.1, "vol_window": 5}, "vol_window"),
+        ({"vol_target": 0.1, "vol_window": 20.5}, "vol_window"),
+        ({"vol_window": 60}, "vol_window: needs a vol_target"),
+        ({"vol_return_field": "a.b@v1.c"}, "vol_return_field: needs a vol_target"),
+    ],
+)
+def test_a_bad_vol_target_is_refused(changes: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        book(outcome=outcome(**changes))
+
+
+@pytest.mark.parametrize("key", ["vol_target", "vol_window", "vol_return_field"])
+def test_only_a_portfolio_outcome_names_a_vol_target(key: str) -> None:
+    doc = edge_document(schedule="month_end", top_k=3)
+    doc["outcome"] = {**doc["outcome"], key: 0.1 if key == "vol_target" else 60}
+    with pytest.raises(ConfigurationError, match=f"{key}: only a portfolio_return outcome"):
+        parse_edge(doc, "drift", "drift.toml")
+
+
+BOOKS = [
+    e
+    for e in load_edges(FileConfigStore(REPO_ROOT / "config", local=False))
+    if e.outcome.kind == "portfolio_return"
+]
+
+
+def test_the_shipped_allocation_edges_are_allocation_edges() -> None:
+    """EB E5: ten documents ship a book of ETFs; every one has a preset for each screener it
+    lists, a book no larger than its universe, and a benchmark whose weights add to one."""
+    assert len(BOOKS) >= 10
+    for e in BOOKS:
+        symbols = {r.value for r in e.universe.where.rules()}  # type: ignore[union-attr]
+        names = [n for r in e.universe.where.rules() for n in r.value]  # type: ignore[union-attr]
+        assert symbols and e.top_k is not None and e.top_k <= len(names), e.id
+        for screener in e.screeners:
+            path = REPO_ROOT / f"config/site/presets/screeners/{screener}/v1.toml"
+            assert path.exists(), f"{e.id}: no preset {screener}"
+        assert abs(sum(w for _, w in blend(e.outcome.benchmark)) - 1.0) < 1e-6, e.id
+
+
+def test_a_trend_book_declares_its_ensemble_of_lookbacks() -> None:
+    """ADR 0074 amendment: an edge of class ``trend`` is read as a grid of lookbacks, one trial,
+    never a single lookback chosen after the fact."""
+    trend = [e for e in BOOKS if e.oos_class == "trend"]
+    assert len(trend) >= 7
+    for e in trend:
+        assert len(e.ensemble) >= 2 and set(e.ensemble) <= set(e.screeners), e.id

@@ -907,3 +907,71 @@ op = "gte"
 value = 3
 mode = "hard"
 note = "the episodic-pivot variant of the earnings drift screen asks 3"
+
+# Edge build entries (short-interest dates and the earnings date shift), filed under their own themes.
+
+[[field]]
+name = "rollup.short_interest@v1.short_position"
+theme = "instrument gates"
+reads = "Shares sold short at the latest settlement date whose report was public by the session (FINRA, all markets). 2,000,000 against a share count of 40 million is 5% of the company short. The figure is a stock, not a flow: it says how large the bet is, not whether it is growing."
+caveats = [
+  "It is old by design: FINRA publishes on the 8th business day after the settlement date, so the figure is about two weeks old when it first shows. A squeeze can have come and gone; rollup.short_interest@v1.short_interest_date says which day it describes.",
+  "Reports come twice a month, so the figure holds still for about 10 sessions and then jumps; don't read a day-to-day change into it.",
+  "Null when no report became public in the last 30 sessions: unknown, never 'no shorts'. FINRA data is not for ML use here: rule screens only, no learned scorer reads it.",
+  "It counts short positions, not borrow cost or the float; read feature.short_interest_ratio and rollup.short_interest@v1.days_to_cover for the crowding.",
+]
+sources = ["FINRA, Equity short interest data and publication schedule: https://www.finra.org/finra-data/browse-catalog/equity-short-interest"]
+[[field.use]]
+for = "names with a public short-interest report"
+op = "not_null"
+mode = "hard"
+note = "rule screens only: FINRA data is not for ML use"
+
+[[field]]
+name = "rollup.short_interest@v1.short_interest_date"
+theme = "instrument gates"
+reads = "The settlement date the latest public short-interest report describes. It is about two weeks before the report was public (T+8 business days). A session late in the month shows the figure of the 15th or the month end before it. The age of the short data is the session minus this date."
+caveats = [
+  "Check it before trusting the short fields: a date more than 20 sessions old means FINRA's next report is missing for the name, and the figures are stale.",
+  "It is the date of the figure, not of its publication; a screen at the session sees only what was public then, never a report that came out later.",
+  "Null when no report was public in the last 30 sessions (unknown, never 'no shorts'). FINRA data is not for ML use here.",
+]
+sources = ["FINRA, Equity short interest data and publication schedule: https://www.finra.org/finra-data/browse-catalog/equity-short-interest"]
+[[field.use]]
+for = "names with a public short-interest report"
+op = "not_null"
+mode = "hard"
+note = "compare the date with the session to see how old the figure is; rule screens only"
+
+[[field]]
+name = "rollup.earnings_date_shift@v1.earnings_shift_known_date"
+theme = "analyst"
+reads = "The session the next report date was first stored in a calendar known by the session: when the market could first have seen that the date had moved. A date that moved a week later and first appeared on the 3rd is known from the 3rd, even if the move was decided earlier. It is set only for a date at least 7 days from the same weekday a year ago."
+caveats = [
+  "The history starts with the first stored calendar snapshot. A date first stored then says nothing about when it became known (vendor backfills carry no time), so it is never an event.",
+  "Dates are the calendar's scheduled ones; the Nasdaq calendar does not confirm a date, so a move can be an estimate being revised, not a decision.",
+  "Null with no next date, no report a year ago to compare with, or a shift under 7 days.",
+]
+sources = ["Site convention over the stored earnings calendars (ADR 0050)"]
+[[field.use]]
+for = "names whose report date moved by a week or more"
+op = "not_null"
+mode = "hard"
+note = "null means the date did not move, or no year-ago report to compare with"
+
+[[field]]
+name = "rollup.earnings_date_shift@v1.sessions_since_earnings_shift"
+theme = "analyst"
+reads = "Exchange sessions from the session the shifted report date became known up to the session: 0 means it became known today; 5 is a week ago. It measures how fresh the news of the move is; the event reads best in the first sessions after it."
+caveats = [
+  "Null without a shift of at least 7 days (rollup.earnings_date_shift@v1.earnings_shift_direction null), so a hard criterion drops every name with a normal date.",
+  "A later date resets the count if the date moves again, so a name whose date keeps changing shows small values for the wrong reason; check rollup.earnings_date_shift@v1.earnings_shift_known_date.",
+  "The date is scheduled, not confirmed; the report can still move. With few shifted names in a window the evidence is thin.",
+]
+sources = ["Site convention over the stored earnings calendars (ADR 0050)"]
+[[field.use]]
+for = "a report date that moved in the last five sessions"
+op = "lte"
+value = 5
+mode = "hard"
+note = "illustrative screen: five sessions is one trading week, the window in which the move is still news; no published cut-off"

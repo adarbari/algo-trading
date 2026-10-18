@@ -4,7 +4,7 @@ label, the eligible names per universe, the implied vol, the ADV and the scored 
 chunk of sessions is released; ``implied_at`` reads the implied vol of names at one session, for
 the harness and the paper record alike."""
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import AbstractContextManager
 from datetime import date
 from typing import TYPE_CHECKING
@@ -73,6 +73,7 @@ class SessionReads:
         self._sectors: dict[tuple[frozenset[str], date], dict[str, str | None]] = {}
         self._numbers: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
         self._bills: dict[date, float | None] = {}
+        self._history: dict[tuple[date, str, frozenset[str], date], dict[str, float | None]] = {}
         self._tickers: dict[tuple[tuple[str, ...], date], dict[str, str | None]] = {}
         self._outcomes: dict[tuple[str, int, date], pd.DataFrame] = {}
         self._snapshots: set[date] = set()
@@ -156,6 +157,7 @@ class SessionReads:
         self._siblings.clear()
         self._sectors.clear()
         self._numbers.clear()
+        self._history.clear()
         self._bills.clear()
         self._tickers.clear()
         self._outcomes.clear()
@@ -199,6 +201,22 @@ class SessionReads:
         if key not in self._numbers:
             self._numbers[key] = numbers_at(self._reader, field_name, ids, day)
         return self._numbers[key]
+
+    def history(
+        self, field_name: str, ids: frozenset[str], days: Sequence[date], decision: date
+    ) -> dict[date, dict[str, float | None]]:
+        """``field_name`` of ``ids`` as each of ``days`` read it (the value known at that day, not
+        the latest), for the book of decision session ``decision``. Read through the recording
+        reader and cached per decision session, never across them: a cache hit logs no read, so
+        a later decision session sharing a day with this window would otherwise lose the partitions
+        it depends on and keep a stale leg after a restatement (ADR 0074 amendment, item 15)."""
+        out: dict[date, dict[str, float | None]] = {}
+        for day in days:
+            key = (decision, field_name, ids, day)
+            if key not in self._history:
+                self._history[key] = numbers_at(self._reader, field_name, ids, day)
+            out[day] = self._history[key]
+        return out
 
     def bill_yield(self, day: date) -> float | None:
         """The shortest-tenor Treasury bill yield (a decimal per year) of the curve ``day`` sees,

@@ -1,0 +1,60 @@
+# Residual reversal on news-free names (ADR 0053, EB E3b; edge news_conditioned_reversal): a
+# common stock or ADR trading at least $50M a day with nothing in the last 5 sessions to explain
+# its move (no 8-K, no earnings window: feature.news_free_5d) and a market-residual 20-session
+# return, ranked with the biggest loser first (the long side; the harness's short leg takes the
+# highest residual). Extreme returns without news reverse, with news they drift (Chan 2003;
+# Tetlock 2010). A missing value never passes (ADR 0030): news_free_5d is null until the filings
+# coverage reaches the session, so earlier sessions screen nothing. What it does not check: a
+# headline that is not an 8-K, and news older than 5 sessions inside the 20-session window.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "news_free_residual_reversal"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Residual reversal, news-free"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as residual_reversal, stocks only: an ETF has no 8-K)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.resid_ret_20d]
+field = "rollup.momentum_variants@v1.resid_ret_20d"
+op = "gt"
+value = -5
+
+[criteria.news_free]
+field = "feature.news_free_5d"
+op = "eq"
+value = true
+
+[columns]
+close = "rollup.price_stats@v2.close"
+resid_ret_20d = "rollup.momentum_variants@v1.resid_ret_20d"
+filing_count_5d = "rollup.filing_activity@v1.filing_count_5d"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.momentum_variants@v1.resid_ret_20d"
+tie_break_order = "asc"

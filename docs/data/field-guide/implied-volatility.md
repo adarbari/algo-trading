@@ -324,6 +324,95 @@ Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options
 
 Sources: Site convention (docs/edge-ideas/options-volatility.md c03)
 
+### `rollup.cp_iv_history@v1.cp_iv_spread_chg_21d`
+
+**How to read it.** The call-put IV spread now minus 21 sessions ago (about a month), as a fraction: 0.03 is three vol points. Positive means calls got richer against puts over the month. It is the slow version of rollup.cp_iv_history@v1.cp_iv_spread_chg_5d. Chains are stored from 2026-10-02 only, so it reads null until 2026-11-02.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| calls getting richer against puts over a month | `gte 0.02` | soft | 0.005 | illustrative screen, not a published cut-off: 0.02 is two vol points over a month; Cremers and Weinbaum rank names and set no level |
+
+**When the reading lies**
+
+- Judge it as a rank across names on the same session, never against zero. A market-wide scare moves every name's spread together, so the change says little about one name.
+- It inherits every caveat of rollup.cp_iv@v1.cp_iv_spread: a hard-to-borrow name has a large spread that is borrow cost, not a view. Check rollup.cp_iv@v1.cp_iv_dte, and the earnings fields, since a report inside the window moves both ends of the pair.
+- Null when the spread is missing today or 21 sessions ago; a gap is never filled. With under a few dozen names in the cross-section on a session, a rank is noise.
+
+Sources: Cremers and Weinbaum, Deviations from Put-Call Parity and Stock Return Predictability, JFQA 2010: https://ideas.repec.org/a/cup/jfinqa/v45y2010i02p335-367_00.html
+
+### `rollup.cp_iv_history@v1.atm_call_iv_chg_5d`
+
+**How to read it.** The ATM call IV now minus 5 sessions ago, as a fraction: 0.03 is three vol points. A week-long rise says call buyers have paid up; it is the short window of rollup.cp_iv_history@v1.atm_call_iv_chg_21d, which is the one the published sort uses. History starts 2026-10-02, so it reads null until 2026-10-09.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| call IV up three vol points in a week | `gte 0.03` | soft | 0.01 | illustrative screen, not a published cut-off: 0.03 is three vol points, a move larger than a week of ordinary noise on most names; the published rule ranks names |
+
+**When the reading lies**
+
+- A week of IV is mostly the market's week: when the index sells off every call IV rises. Compare names on one session, and read rollup.iv30@v1.iv30 for the name's own level.
+- An earnings report inside the five sessions lifts IV into the report and drops it after; read rollup.earnings@v1.days_to_earnings first.
+- Null if the ATM call IV is missing at either end of the five sessions.
+
+Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181
+
+### `rollup.cp_iv_history@v1.atm_put_iv_chg_5d`
+
+**How to read it.** The ATM put IV now minus 5 sessions ago, as a fraction: 0.03 is three vol points. A rise says put buyers have paid up. In the published sort a put-IV rise precedes lower returns, the opposite sign to the call's (rollup.cp_iv_history@v1.atm_call_iv_chg_5d). History starts 2026-10-02, so it reads null until 2026-10-09.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| put IV up three vol points in a week (a caution) | `gte 0.03` | soft | 0.01 | illustrative screen, not a published cut-off: 0.03 is three vol points, a move larger than a week of ordinary noise on most names; the published rule ranks names |
+
+**When the reading lies**
+
+- Put IV rises in any sell-off with no view on the name behind it; read it against the call-side change and across names on one session.
+- A report or a dividend inside the window moves it; check rollup.earnings@v1.days_to_earnings.
+- Null if the ATM put IV is missing at either end; the published edge uses the month (rollup.cp_iv_history@v1.atm_put_iv_chg_21d).
+
+Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181
+
+### `rollup.cp_iv@v1.cp_iv_status`
+
+**How to read it.** Whether the option-implied signals of the session could be formed, and the first step that failed if not. OK: a call-put spread exists. NO_SPOT: no positive close or price for the underlying. NO_CHAIN: no option quotes stored. NO_EXPIRY: no listed expiry 10 to 60 days out. NO_PAIRS: an expiry, but no same-strike call and put with quotes and open interest on both sides; the ATM vols and the smirk may still be set.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names with a usable option-implied spread | `eq "OK"` | hard | - | the gate before any cp_iv rule; NO_CHAIN before 2026-10-02 is a gap, not a calm market |
+
+**When the reading lies**
+
+- Read it before any other cp_iv field: every null there has one of these causes. NO_CHAIN is common for a small name and for any session before 2026-10-02, when chains were first stored; it is a gap, never a calm market.
+- It is a status of our data, not a view on the name. A name that flips between OK and NO_PAIRS from night to night has a thin chain; rollup.option_liquidity@v1.chain_oi says how thin.
+
+Sources: Site convention over the stored chains
+
+### `rollup.cp_iv@v1.cp_iv_dte`
+
+**How to read it.** Calendar days from the session to the expiry the cp_iv columns read: the listed expiry 10 to 60 days out nearest 30. A value of 30 is an ordinary monthly; 12 is a weekly close to the 10-day floor; 58 means no nearer monthly was listed. Every cp_iv column and change of a name describes that one expiry.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| an expiry near a month out | `between [20, 40]` | soft | 5 | illustrative screen: 20 to 40 days keeps the vol near the 30-day target so changes compare like with like; the rule uses 10 to 60 |
+
+**When the reading lies**
+
+- The expiry changes as expiries roll, so a change over weeks (rollup.cp_iv_history@v1.cp_iv_spread_chg_21d) can compare vols of different maturities. A dte that jumps by 20 or more in the window is a warning.
+- An expiry after a report carries the report's premium and one before it does not. Check rollup.earnings@v1.days_to_earnings against this value.
+- Null with no chain or spot, or no expiry in range (cp_iv_status says which).
+
+Sources: Site convention (the expiry rule of rollup.cp_iv@v1)
+
 ### `rollup.cp_iv@v1.cp_iv_spread`
 
 **How to read it.** The call-put IV spread, as a fraction (0.02 is two vol points): call IV minus put IV on the same strike, averaged over the pairs within 10% of the spot. Pairs are weighted by open interest, at the expiry nearest 30 days. Positive: calls richer than puts, the pattern Cremers and Weinbaum found ahead of stock gains over a week to a month; negative: puts richer. Near zero is the normal state, and the published edge is a rank across many names, not a level. History starts 2026-10-02, when the chains were first stored.

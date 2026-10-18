@@ -62,7 +62,7 @@ When the reviewer's last verdict is `Re-review: no`, CI on the head is green, th
 `needs-owner` label (added for every open policy decision), no policy decision is unanswered, and the PR body lists the decisions taken (owner, or Fable on the
 owner's behalf), the **orchestrating session** removes `no-automerge` from PRs created in its
 own flow (an implementer's label counts as its orchestrator's). The auto-merge workflow then
-merges on green; never `gh pr merge`. Post a short PR comment: reviewer rounds and decisions.
+merges on green; never `gh pr merge`. The sweep runs on CI completion and every 30 minutes, not on label events, so right after removing the label run `gh workflow run auto-merge.yml` (the sanctioned nudge; it only sweeps). Post a short PR comment: reviewer rounds and decisions.
 
 - A PR with an open owner decision stays `no-automerge`.
 - `needs-owner` is the explicit "owner must look" label (e.g. a requested visual review);
