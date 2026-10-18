@@ -11,6 +11,8 @@ from hypothesis import strategies as st
 
 from algotrade.services.evaluation.cross_section.portfolio.overlays import (
     book_volatility,
+    canary_blend,
+    risk_off_share,
     vol_scaled,
 )
 
@@ -80,3 +82,39 @@ def test_a_scaled_book_is_long_only_adds_to_one_and_never_exceeds_the_names_it_h
     assert {n for n, _ in scaled if n != "CASH"} == {n for n, _ in names}
     reversed_book = vol_scaled(tuple(reversed(book)), sigma, target)
     assert dict(reversed_book) == pytest.approx(held)  # the order of the names does not matter
+
+
+def test_the_canary_share_counts_negative_canaries_in_breadths() -> None:
+    values = {"A": -0.1, "B": 0.2, "C": 0.0}
+    assert risk_off_share(values, ["A", "B"], 2) == 0.5
+    assert risk_off_share(values, ["A", "B"], 1) == 1.0
+    assert risk_off_share(values, ["B", "C"], 1) == 0.0  # zero is not negative
+    assert risk_off_share({"A": -1, "B": -1, "C": -1}, ["A", "B", "C"], 2) == 1.0  # capped
+
+
+def test_the_canary_blend_mixes_the_book_with_the_defensive_asset() -> None:
+    book = (("A", 0.6), ("B", 0.4))
+    assert dict(canary_blend(book, 0.25, "CASH")) == pytest.approx(
+        {"A": 0.45, "B": 0.3, "CASH": 0.25}
+    )
+    assert dict(canary_blend(book, 0.5, "A")) == pytest.approx({"A": 0.8, "B": 0.2})
+    assert canary_blend(book, 1.0, "D") == (("D", 1.0),)
+    assert canary_blend(book, 0.0, "D") == (("A", 0.6), ("B", 0.4))  # no share: nothing added
+
+
+@given(
+    weights=st.lists(st.floats(0.01, 1.0), min_size=1, max_size=5),
+    cash=st.floats(0.0, 0.5),
+    share=st.floats(0.0, 1.0),
+    held=st.booleans(),
+)
+def test_a_blended_book_is_long_only_and_adds_to_one(
+    weights: list[float], cash: float, share: float, held: bool
+) -> None:
+    total = sum(weights)
+    book = (*((f"N{i}", (1 - cash) * w / total) for i, w in enumerate(weights)), ("CASH", cash))
+    out = canary_blend(book, share, "N0" if held else "CASH")
+    assert all(w > 0 for _, w in out) and sum(w for _, w in out) == pytest.approx(1.0, abs=1e-12)
+    assert dict(canary_blend(tuple(reversed(book)), share, "CASH" if not held else "N0")) == (
+        pytest.approx(dict(out))
+    )
