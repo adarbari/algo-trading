@@ -23,6 +23,11 @@ Layout (``root`` = ``tests/fixtures/drafting/golden``):
   unresolved (any other unresolved term is extra). A part without these keys expects nothing of
   the new buckets, and a score given no
   ``formulas`` / ``missing`` / ``unresolved`` leaves them unchecked (an answer of the old shape).
+  Boolean groups (ADR 0071): ``expect.groups`` is the list of the draft's gates as trees,
+  ``{"any" | "all" | "none": [member, ...]}`` whose leaves are the ``span`` of an ``A`` part (a
+  member list is unordered); ``[]`` expects none (a formula, or no connector). The score compares
+  them with the draft's ``groups`` table (``groups=``); absent: not checked. A part may also
+  carry ``mode`` (default: not checked), the mode its words ask for inside a group.
   ``scope_fields`` are tolerated scaffolding (status, security type). Only ``criteria`` are
   scored: the draft's ``suggestions`` (soft / score checks offered, never applied) never pass or
   fail a case, they are counted and reported (``golden_run``). ``EQUIVALENT_READINGS`` names the
@@ -86,6 +91,7 @@ class GoldenCase:
     explained: Mapping[str, Any] = field(
         default_factory=dict
     )  # replay: the parts expected (``parts/scoring.py``); empty: not checked
+    groups: tuple[Any, ...] | None = None  # the gates expected as trees (ADR 0071); None: unchecked
 
 
 @dataclass(frozen=True)
@@ -126,6 +132,7 @@ def load_cases(root: Path) -> tuple[GoldenCase, ...]:
                 bool(expect.get("contract", False)),
                 expect.get("suggestions", {}),
                 expect.get("explained", {}),
+                tuple(expect["groups"]) if "groups" in expect else None,
             )
         )
     return tuple(cases)
@@ -176,12 +183,15 @@ def score(
     formulas: Sequence[tuple[str, Mapping[str, Any] | None]] | None = None,
     missing_keys: Sequence[str] | None = None,
     terms: Sequence[str] | None = None,
+    groups: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> GoldenScore:
     """Score the kept criteria (``criteria_of``'s table) and the fields it dropped as invented.
     ``formulas``: the kept formulas' ``(expr, criterion)``; ``missing_keys``: each missing
     item's curated key (``new:<slug>`` for a new one); ``terms``: the unresolved terms (``None``:
-    that bucket is not scored)."""
+    that bucket is not scored); ``groups``: the draft's ``groups`` table (``None``: not scored,
+    ``{}``: it has none)."""
     missing: list[str] = []
+    matched: dict[str, str] = {}  # criterion id -> the span of the part it answers
     wrong: list[str] = []
     used: set[str] = set()
     for part in case.parts:
@@ -199,15 +209,51 @@ def score(
         if hit is None:
             wrong.append(part["span"])
             used.add(found[0])
+            matched[found[0]] = part["span"]
         else:
             used.add(hit)
+            matched[hit] = part["span"]
     extra = [
         crit["field"]
         for cid, crit in kept.items()
         if cid not in used and crit["field"] not in case.scope_fields
     ]
     extra += _bucket_scores(case, formulas, missing_keys, terms, missing, wrong)
+    if groups is not None and case.groups is not None:
+        got = group_trees(groups, kept, matched)
+        if got != sorted(map(_canon, case.groups), key=_order):
+            wrong.append(f"groups: expected {json.dumps(case.groups)}, got {json.dumps(got)}")
     return GoldenScore(tuple(missing), tuple(wrong), tuple(extra) + tuple(dropped_fields))
+
+
+def group_trees(
+    groups: Mapping[str, Mapping[str, Any]],
+    kept: Mapping[str, Mapping[str, Any]],
+    matched: Mapping[str, str],
+) -> list[Any]:
+    """The gates of a ``groups`` table (the groups no group holds) as canonical trees, a leaf
+    being the span of the part its criterion answers (else ``? <field>``)."""
+    inner = {m for body in groups.values() for members in body.values() for m in members}
+
+    def node(name: str) -> Any:
+        if name in groups:
+            ((kind, members),) = groups[name].items()
+            return {kind: sorted((_canon(node(m)) for m in members), key=_order)}
+        return matched.get(name) or f"? {kept[name]['field'] if name in kept else name}"
+
+    return sorted((node(g) for g in groups if g not in inner), key=_order)
+
+
+def _canon(tree: Any) -> Any:
+    """``tree`` with every member list sorted (a group's members are unordered)."""
+    if isinstance(tree, str):
+        return tree
+    ((kind, members),) = tree.items()
+    return {kind: sorted((_canon(m) for m in members), key=_order)}
+
+
+def _order(tree: Any) -> str:
+    return json.dumps(tree, sort_keys=True)
 
 
 def _bucket_scores(
@@ -284,6 +330,8 @@ def _fits(part: Mapping[str, Any], crit: Mapping[str, Any]) -> bool:
     if crit["op"] in part.get("equivalent_ops", ()):  # the boundary partner: the exact value
         return _close(crit.get("value"), part["value"], 0.0)
     if crit["op"] not in ops:
+        return False
+    if "mode" in part and (crit.get("mode") or "hard") != part["mode"]:
         return False
     return _close(crit.get("value"), part["value"], tolerance)
 

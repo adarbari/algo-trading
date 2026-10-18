@@ -1,0 +1,73 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "part": "p1",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "stocks",
+      "part": "p1",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "etfs",
+      "part": "p2",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "ETF"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "ETFs"
+    },
+    {
+      "id": "iv_rank",
+      "part": "p3",
+      "field": "feature.iv_rank",
+      "op": "gt",
+      "value": 0.8,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "IV rank above 80%"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": null,
+  "parts": [
+    {
+      "id": "p1",
+      "words": "stocks"
+    },
+    {
+      "id": "p2",
+      "words": "ETFs"
+    },
+    {
+      "id": "p3",
+      "words": "IV rank above 80%"
+    }
+  ]
+}
