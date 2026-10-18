@@ -1,7 +1,10 @@
-"""The ``events/filing_text`` read rule (edge build D10): rows known on a session (the stored
+"""The ``events/filing_text`` read rule (edge builds D10, D10b): rows known on a session (the stored
 ``known_from`` floored by the acceptance session recomputed from ``ts``), the latest known version
 per item (``known_from``, then ``parser_version``), null items equal, the null-item row of a filing
-dropped when it has an item row, ``as_of`` pins, and every column the callers name."""
+dropped when it has an item row, ``as_of`` pins, and every column the callers name; a filing read
+before and after its id version (NULL, then the id, one filing), the scan of every filer
+(``ids=None``, NULL ids included), the ``ciks`` filter, and ids mapped through the company
+snapshot as of the session."""
 
 from datetime import date, timedelta
 
@@ -122,3 +125,124 @@ def test_since_bounds_the_acceptance_session_partitions_read() -> None:
         "A2"
     ]
     assert filing_text(store, ["EQ:AAA"], later - timedelta(days=1))["accession"].tolist() == ["A1"]
+
+
+# ----------------------------------------------- filer-first (D10b): ids filled later
+
+FILLED = date(2026, 10, 5)
+OTHER = pd.Timestamp("2026-03-03T15:00:00Z")
+
+
+def bare(item: str | None, text: str | None, **kw: object) -> dict[str, object]:
+    return row(item, text, instrument_id=None, **kw)
+
+
+def filled_store() -> StoreReader:
+    """One filing (A1, items 1A and 7) of filer 1 stored with no id, the id versions known later,
+    and a delisted filer's filing (A2, filer 2, accepted later) that never gets one."""
+    gone = {"cik": "0000000002", "accession": "A2", "ts": OTHER, "known_from": date(2026, 3, 3)}
+    writer = StoreWriter(MemoryBackend())
+    parts = [
+        (FIRST, "r1", [bare("1A", "risk"), bare("7", "mda")], T0),
+        (date(2026, 3, 3), "r1b", [bare("1A", "gone", **gone)], T0),
+        (FIRST, "r2", [row("1A", "risk", known=FILLED), row("7", "mda", known=FILLED)], T0),
+    ]
+    for day, name, rows_, at in parts:
+        writer.write_table(TABLE, day, name, stamped(rows_, day, name, at, "sec_edgar"))
+    return StoreReader(writer._backend)
+
+
+def test_a_filing_reads_with_a_null_id_until_its_id_version_is_known_and_is_one_filing() -> None:
+    store = filled_store()
+    before = filing_text(store, None, FILLED - timedelta(days=1), ciks=["0000000001"])
+    assert before["instrument_id"].isna().all() and sorted(before["item"]) == ["1A", "7"]
+    after = filing_text(store, None, FILLED, ciks=["0000000001"])
+    assert after["instrument_id"].eq("EQ:AAA").all() and sorted(after["item"]) == ["1A", "7"]
+    assert after["accession"].eq("A1").all() and len(after) == 2  # one row an item, not two
+    assert after["text"].tolist() == before["text"].tolist()
+
+
+def test_ids_none_scans_every_filer_null_ids_included_and_ciks_filters() -> None:
+    store = filled_store()
+    scan = filing_text(store, None, FILLED)
+    assert sorted(scan["cik"].unique()) == ["0000000001", "0000000002"]
+    assert scan.loc[scan["cik"] == "0000000002", "instrument_id"].isna().all()  # delisted: no id
+    assert len(scan) == 3 and tuple(scan.columns) == COLUMNS
+    one = filing_text(store, None, FILLED, ciks=["0000000002"])
+    assert one["text"].tolist() == ["gone"]
+    padded = filing_text(store, None, FILLED, ciks=["2"])  # a CIK as the vendor writes it
+    assert padded["text"].tolist() == ["gone"]
+    assert filing_text(store, None, FILLED, ciks=["0000000003"]).empty
+    light = filing_text(store, None, FILLED, with_text=False)
+    assert "text" not in light.columns and len(light) == 3
+
+
+def test_the_scan_by_accession_window_bounds_what_is_found() -> None:
+    store = filled_store()
+    window = filing_text(store, None, FILLED, since=date(2026, 3, 1), forms=["10-K"])
+    assert window["accession"].tolist() == ["A2"]  # since floors the acceptance session
+    assert filing_text(store, None, FILLED, forms=["10-Q"]).empty
+    early = filing_text(store, None, date(2026, 3, 2))
+    assert early["accession"].tolist() == ["A1", "A1"]  # A2 is accepted on the 3rd
+
+
+def test_ids_are_mapped_to_ciks_through_the_company_snapshot_as_of_the_session() -> None:
+    writer = StoreWriter(MemoryBackend())
+    store = reader(("r1", [bare("1A", "risk")], T0))
+    snapshot = date(2026, 6, 1)
+    names = (("EQ:AAA", "AAA"), ("EQ:AAB", "AAB"))
+    company = [
+        {"instrument_id": i, "symbol": n, "cik": "1", "name": n, "sic": "1", "sector": "x",
+         "fetched_on": snapshot}
+        for i, n in names
+    ]  # fmt: skip
+    backend = store._backend
+    StoreWriter(backend).write_table(
+        "instruments/company", snapshot, "co", stamped(company, snapshot, "co")
+    )
+    del writer
+    on = date(2026, 10, 2)
+    found = filing_text(store, ["EQ:AAA", "EQ:AAB"], on)  # the id is not stored: mapped
+    assert sorted(found["instrument_id"]) == ["EQ:AAA", "EQ:AAB"]  # a row each, one filer
+    assert found["text"].tolist() == ["risk", "risk"]
+    assert filing_text(store, ["EQ:AAA"], on)["instrument_id"].tolist() == ["EQ:AAA"]
+    assert filing_text(store, ["EQ:ZZZ"], on).empty
+    assert filing_text(store, ["EQ:AAA"], date(2026, 5, 1)).empty  # before the snapshot, no id yet
+
+
+def test_ids_fall_back_to_the_id_a_known_version_carries_without_a_company_snapshot() -> None:
+    store = filled_store()
+    assert filing_text(store, ["EQ:AAA"], FILLED - timedelta(days=1)).empty  # not filled yet
+    found = filing_text(store, ["EQ:AAA"], FILLED)
+    assert sorted(found["item"]) == ["1A", "7"] and found["instrument_id"].eq("EQ:AAA").all()
+
+
+def test_the_text_of_a_chosen_version_is_read_from_its_own_partition() -> None:
+    writer = StoreWriter(MemoryBackend())
+    later = date(2026, 5, 1)
+    for day, rows_ in (
+        (FIRST, [bare("1A", "risk one")]),
+        (
+            later,
+            [
+                bare(
+                    "1A",
+                    "risk two",
+                    accession="A2",
+                    known=later,
+                    ts=pd.Timestamp("2026-05-01T14:00:00Z"),
+                )
+            ],
+        ),
+    ):
+        writer.write_table(TABLE, day, f"r{day}", stamped(rows_, day, f"r{day}", T0, "sec_edgar"))
+    found = filing_text(StoreReader(writer._backend), None, date(2026, 10, 2))
+    assert found.sort_values("accession")["text"].tolist() == ["risk one", "risk two"]
+
+
+def test_stored_filing_text_scans_every_filer_and_filters_by_cik() -> None:
+    store = filled_store()
+    everything = stored_filing_text(store, None, ("cik", "item"))
+    assert len(everything) == 5 and set(everything["cik"]) == {"0000000001", "0000000002"}
+    one = stored_filing_text(store, None, ("item",), ciks=["0000000002"])
+    assert one["cik"].tolist() == ["0000000002"]

@@ -151,25 +151,32 @@ IPO_LOCKUP_EVENTS = fixed(
     key=("cik", "accession", KNOWN_FROM),
 )
 
-# L1: the item sections of a 10-K / 10-Q (edge build D10), one row per instrument, filing, item and
-# parser version (a CIK's share classes each get the rows). ``item`` is the Item id (10-K ``1A``,
-# ``7``; 10-Q ``I-2``, ``II-1A``), null on the one row of a filing no header was found in
-# (``quality`` ``NO_ITEMS``); ``text`` is the section's plain text (null when ``quality`` is
-# ``NOT_FOUND``), ``char_count`` its length, ``reason`` why a row is not ``OK``. ``ts`` is SEC's
-# acceptance instant of the filing; the partition (``session_date``) is its acceptance session.
-# ``known_from``: the acceptance session for the first extraction of a filing; a LATER extraction
-# of the same filing (a new ``parser_version``, an item added to the kept list) that differs from
-# the stored one carries max(its acceptance session, the next session after the fetch), so a
-# parser change never rewrites history as known earlier; one that is identical keeps the stored
-# row's ``known_from``. ``parser_version`` and ``known_from`` are in the key: every version stays,
-# even a same-version rewrite that changes a text, so a read before its stamp still finds the
-# earlier text; the reader (``data.filing_text``) takes, per item, the latest known on or before
-# its session.
+# L1: the item sections of a 10-K / 10-Q (edge build D10, filer-first from D10b), one row per
+# filing (``cik`` + ``accession``), item and parser version: every 10-K / 10-Q filer is covered,
+# delisted companies included, so the key is the FILER's ``cik``, not an instrument. ``item`` is the
+# Item id (10-K ``1A``, ``7``; 10-Q ``I-2``, ``II-1A``), null on the one row of a filing no header
+# was found in (``quality`` ``NO_ITEMS``); ``text`` is the section's plain text (null when
+# ``quality`` is ``NOT_FOUND``), ``char_count`` its length, ``reason`` why a row is not ``OK``.
+# ``ts`` is SEC's acceptance instant of the filing; the partition (``session_date``) is its
+# acceptance session. ``instrument_id`` is NULLABLE: the first version of a filing carries none (the
+# run's universe is today's, the row is known from an old session: an id there would exist only for
+# the survivors); a run stages the id as a version of its own (same cik, accession, item and
+# parser version) known from max(acceptance session, the session after the fetch), the D8 pattern
+# (``ipo_lockup``). Readers map a cik to an instrument through ``instruments/company`` as of their
+# own session. ``known_from``: the acceptance session for the first extraction of a filing; a LATER
+# extraction of the same filing (a new ``parser_version``, an item added to the kept list) that
+# differs from the stored one carries max(its acceptance session, the next session after the
+# fetch), so a parser change never rewrites history as known earlier; one that is identical keeps
+# the stored row's ``known_from``. ``parser_version`` and ``known_from`` are in the key: every
+# version stays, even a same-version rewrite that changes a text, so a read before its stamp still
+# finds the earlier text; the reader (``data.filing_text``) takes, per item, the latest known on or
+# before its session. (No row was stored under the earlier instrument key: the D10 backfill never
+# ran, so the key change needs no migration.)
 FILING_TEXT_EVENTS = fixed(
     "events/filing_text",
     "event",
-    ("instrument_id", "ts", KNOWN_FROM, "cik", "form", "accession", "quality", "parser_version"),
-    "instrument_id string!",
+    ("ts", KNOWN_FROM, "cik", "form", "accession", "quality", "parser_version"),
+    "instrument_id string",
     "ts timestamp_utc!",
     f"{KNOWN_FROM} date!",
     "cik string!",
@@ -185,7 +192,7 @@ FILING_TEXT_EVENTS = fixed(
     "reason string",
     "method string!",
     runs="merge",
-    key=("instrument_id", "accession", "item", "parser_version", KNOWN_FROM),
+    key=("cik", "accession", "item", "parser_version", KNOWN_FROM),
 )
 
 # L1: a closed-end fund's daily NAV (edge build D5), keyed by the FUND's id; ``ts`` = the NAV date
