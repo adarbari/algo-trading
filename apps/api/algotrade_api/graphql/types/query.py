@@ -33,6 +33,9 @@ from algotrade.services.read.guide import regime as regime_page
 from algotrade.services.read.guide import search as guide_search
 from algotrade.services.read.guide import situation as situation_page
 from algotrade.services.read.guide import written as written_page
+from algotrade.services.read.guide.edges import edge as edge_page
+from algotrade.services.read.guide.edges import index as edge_index_page
+from algotrade.services.read.guide.edges import mechanism as mechanism_page
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
 from algotrade.services.read.market import market
@@ -63,6 +66,9 @@ from algotrade_api.graphql.types.evaluation.evidence import (
 from algotrade_api.graphql.types.evaluation.paper import EdgeDesk, EdgePaper
 from algotrade_api.graphql.types.evaluation.result import EdgeResult
 from algotrade_api.graphql.types.events.calendar import EventCalendar
+from algotrade_api.graphql.types.guide.edges.edge import GuideEdgeEntry
+from algotrade_api.graphql.types.guide.edges.index import GuideEdgeIndex
+from algotrade_api.graphql.types.guide.edges.mechanism import GuideMechanism
 from algotrade_api.graphql.types.guide.entries import GuideEntries
 from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
 from algotrade_api.graphql.types.guide.field import GuideField
@@ -342,6 +348,37 @@ class Query:
         return GuideEpisodeDetail.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Edges section's top page (ADR 0051): the mechanism cards in order with "
+        "their edges as rows, the filters with counts and the edges set aside with their "
+        "reasons; site edges only, no live number"
+    )
+    def guide_edge_index(self, info: Ctx) -> GuideEdgeIndex | None:
+        ctx = info.context.stores()
+        found = edge_index_page.load_guide_edge_index(ctx) if ctx is not None else None
+        return GuideEdgeIndex.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Guide page of the mechanism `id` (ADR 0051): why an edge should work, "
+        "the research, real against decoy, the sources and the site edges that rest on it; "
+        "null: no such mechanism"
+    )
+    def guide_mechanism(self, info: Ctx, id: str) -> GuideMechanism | None:
+        ctx = info.context.stores()
+        found = mechanism_page.load_guide_mechanism(ctx, id) if ctx is not None else None
+        return GuideMechanism.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Guide page of the site edge `id` (ADR 0051), from its document alone: "
+        "thesis, the other side of the trade, why it lasts, the published figure with a planning "
+        "haircut, how it is tested and built, what fools it, sources and related edges; a "
+        "user's own edge is never served; null: no such site edge"
+    )
+    def guide_edge(self, info: Ctx, id: str) -> GuideEdgeEntry | None:
+        ctx = info.context.stores()
+        found = edge_page.load_guide_edge(ctx, id) if ctx is not None else None
+        return GuideEdgeEntry.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
         description="The glossary term `id` (ADR 0051): its entry, the body linked and the "
         "terms it refers to; null: no such term"
     )
@@ -361,8 +398,8 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Many Guide entries in one read (ADR 0051): the regime indicators, "
-        "episodes, glossary terms and Start here pages named by `refs` (at most 100), so a "
-        "page's help buttons cost one request; a ref with no entry is left out",
+        "episodes, mechanisms, edges, glossary terms and Start here pages named by `refs` (at "
+        "most 100), so a page's help buttons cost one request; a ref with no entry is left out",
         extensions=[MaxItems("refs", MAX_REFS)],
     )
     def guide_entries(self, info: Ctx, refs: list[entries_page.GuideRef]) -> GuideEntries | None:

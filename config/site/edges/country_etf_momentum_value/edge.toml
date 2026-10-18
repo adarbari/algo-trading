@@ -19,6 +19,7 @@ base = "benchmark"
 oos_class = "trend"
 status = "candidate"
 mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history and evaluated. LIMITS:
 this is the MOMENTUM leg only. The value leg of the source (country CAPE, Asness, Moskowitz and

@@ -17,6 +17,7 @@ screeners = ["etf_low_ibs"]
 base = "benchmark"
 status = "candidate"
 mechanism_kind = "liquidity_provision"
+asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """DOCUMENTED-LIMIT VARIANT: the source day is not measurable (see trigger_timing). VERDICTS ARE UNMEASURED until the screen is run over the stored history and evaluated; the stored
 daily bars give internal bar strength as rollup.trend_stats@v2.close_range_pos, so no new feature is

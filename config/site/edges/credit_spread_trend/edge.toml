@@ -20,6 +20,7 @@ base = "benchmark"
 oos_class = "trend"
 status = "candidate"
 mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. PROXY: the idea is a spread trend;
 this version uses the funds' own price trend as the stand-in (HYG for high yield, LQD for investment
