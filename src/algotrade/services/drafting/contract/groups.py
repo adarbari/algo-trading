@@ -118,7 +118,7 @@ def _unapplied(busy: list[list[_Row]], dirty: list[_Row]) -> tuple[str, ...]:
             said = " ".join(f"{r.part.join_words} {r.part.words}".strip() for r in seg)
             notes.append(
                 f"'{said[:80]}': '{gone[0].part.words}' is not available, so the 'or' or "
-                "exclusion is not applied"
+                "exclusion is not applied: the other conditions apply on their own"
             )
     return tuple(notes)
 
