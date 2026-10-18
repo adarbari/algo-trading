@@ -103,6 +103,24 @@ FILING_EVENTS = fixed(
     runs="merge",
     key=("instrument_id", "accession"),
 )
+# L1: Form 4 insider transactions (EB D6), a row per transaction line and reporting owner. ``ts``:
+# SEC's acceptance instant; ``known_from``: the session it is known from (``acceptance_session``;
+# later for a line that restates a stored one, ``tasks/events/insider_rows.py``). It is in the key
+# so a restated line sits beside its predecessor (merge is per partition); readers take, among
+# the rows known by S, each line's latest (``data.insiders``). ``amends_date``: a 4/A's original.
+INSIDER_EVENTS = fixed(
+    "events/insider_transaction",
+    "event",
+    ("instrument_id", "ts", KNOWN_FROM, "accession", "line", "owner_cik"),
+    "instrument_id string!", "ts timestamp_utc!", f"{KNOWN_FROM} date!", "accession string!",
+    "line int64!", "owner_cik string!", "form string!", "issuer_cik string!", "filing_date date!",
+    "period_of_report date", "amends_date date", "transaction_date date!", "derivative bool!",
+    "transaction_code string", "acquired_disposed string", "shares float64", "price float64",
+    "shares_after float64", "direct_indirect string", "is_director bool!", "is_officer bool!",
+    "is_ten_pct_owner bool!", "is_other bool!", "officer_title string", "plan_10b5_1 bool",
+    "owner_count int64!", runs="merge",
+    key=("instrument_id", "accession", "line", "owner_cik", KNOWN_FROM),
+)  # fmt: skip
 
 # L1: a closed-end fund's daily NAV (edge build D5), keyed by the FUND's id; ``ts`` = the NAV date
 # (also the partition); known_from: next session after it, after the fetch if restated.
