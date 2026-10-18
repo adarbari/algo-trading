@@ -520,6 +520,7 @@ type = "independence"
 modules = [
     "algotrade_sources.vendors.cboe",
     "algotrade_sources.vendors.finnhub",
+    "algotrade_sources.vendors.finra",
     "algotrade_sources.vendors.fmp",
     "algotrade_sources.vendors.fred",
     "algotrade_sources.vendors.ibkr",

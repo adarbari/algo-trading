@@ -39,6 +39,24 @@ Sources: Gervais, Kaniel and Mingelgrin (2001), The high-volume return premium, 
 
 Sources: Gervais, Kaniel and Mingelgrin (2001), The high-volume return premium, Journal of Finance
 
+### `rollup.illiquidity@v1.amihud_63d`
+
+**How to read it.** Amihud illiquidity: the mean over 63 sessions of the day's absolute return per million dollars traded. 0.01 is a 1% move per $1M, a liquid name; 1 is 100% per $1M, so thin a small order moves it. High is illiquid. Illiquid stocks have earned a premium over liquid ones (Amihud 2002), which the decoy battery ranks by; it is also the cost you pay to trade them.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| liquid names only | `lte 0.05` | soft | 0.02 | a score over the universe; the decoy battery's amihud_illiquid ranks the other end |
+
+**When the reading lies**
+
+- A premium you may not collect: the stocks it ranks first are the ones with the widest spreads and the least volume. Compare rollup.price_stats@v2.adv_usd_20d with the size you would trade.
+- A quarter of daily ratios: one thin day with a large move raises it for months.
+- Null after any gap among the last 64 closes, a shorter history or a session with no volume.
+
+Sources: Amihud (2002), Illiquidity and Stock Returns: Cross-Section and Time-Series Effects, Journal of Financial Markets
+
 ### `rollup.volume@v1.session_volume`
 
 **How to read it.** The shares traded on the session, split-adjusted as of the session. 0 means no trades (known, not missing). Its size has no universal scale: a typical S&P 500 stock trades 1 to 10 million shares a day, a mega cap 20 to 100 million, a small Nasdaq name 100,000 to 1 million, and under about 100,000 shares a day a name is thin. Read it against the name's own normal: today over rollup.volume@v1.adv_shares_20d near 1 is an ordinary day, 1.5 a busy one, 3 or more an event (rollup.momentum@v1.rel_volume and rollup.volume@v1.volume_z_20d do that comparison for you). For dollars traded use rollup.volume@v1.dollar_volume.

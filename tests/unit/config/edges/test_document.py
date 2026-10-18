@@ -15,11 +15,12 @@ from algotrade.config.edges.document import (
     STATUSES,
     Edge,
     Published,
+    expand_baselines,
     identity_dict,
     parse_edge,
-    tenor_sessions,
 )
 from algotrade.config.edges.follow import AUDIT_LABELS, BOOKMARK_LABELS, Follow
+from algotrade.config.edges.tenor import tenor_sessions
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.tables.edge_schemas import EDGE_EVAL, EDGE_LEGS, EDGE_TRADES
@@ -634,6 +635,30 @@ def test_a_variant_may_not_change_a_calendar_horizon() -> None:
     variants = [{"id": "long", "outcome": {"horizon_sessions": [20]}}]
     with pytest.raises(ConfigurationError, match="4 sessions long"):
         parse(**_calendar("turn_of_month", [4]), variants=variants)
+
+
+def test_the_standard_token_is_a_baseline_entry_and_nothing_else() -> None:
+    assert parse(baselines=["@standard"]).baselines == ("@standard",)  # expanded on load
+    assert parse(baselines=["size_small", "@standard"]).baselines == ("size_small", "@standard")
+    with pytest.raises(ConfigurationError, match="invalid screener id"):
+        parse(screeners=["@standard"])  # only baselines take it
+    with pytest.raises(ConfigurationError, match="invalid screener id"):
+        parse(baselines=["@other"])
+    with pytest.raises(ConfigurationError, match="listed twice"):
+        parse(baselines=["@standard", "@standard"])
+
+
+def test_expand_baselines_keeps_the_token_place_and_drops_repeats_and_own_screeners() -> None:
+    standard = ("size_small", "momentum_12_1", "ivol_high")
+    assert expand_baselines(("@standard",), standard, ()) == standard
+    assert expand_baselines(("beta_low", "@standard"), standard, ()) == ("beta_low", *standard)
+    assert expand_baselines(("@standard", "beta_low"), standard, ()) == (*standard, "beta_low")
+    # a decoy already listed, or the edge's own screener, is not run twice
+    assert expand_baselines(("ivol_high", "@standard"), standard, ("momentum_12_1",)) == (
+        "ivol_high", "size_small",
+    )  # fmt: skip
+    assert expand_baselines(("size_small",), standard, ()) == ("size_small",)  # no token: as is
+    assert expand_baselines((), standard, ()) == ()
 
 
 def test_an_event_schedule_may_name_a_subtype_of_the_class() -> None:

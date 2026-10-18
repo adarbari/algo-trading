@@ -641,13 +641,20 @@ def _measure_random(
     names = names_for(p.scope.edge, eligible, event_names)
     res = _outcomes(p.scope, session, leg, p.horizon, rows, eligible, names.ids)
     counted = res[res["excluded"] == ""]
-    rng = generator(
-        spec.key_for(p.scope, variant), f"{p.scope.key}|{variant.id}", p.horizon, leg.decision
-    )
+    key, label = spec.key_for(p.scope, variant), f"{p.scope.key}|{variant.id}"
+    rng = generator(key, label, p.horizon, leg.decision)
     side = p.scope.edge.outcome.side
-    if side == LONG:
+    if side == LONG:  # the sector-matched draws are the long leg's (a short leg has none)
         return random_stat(
-            leg.decision, counted, names.pickable, len(stat.pick_values), spec.draws, rng
+            leg.decision,
+            counted,
+            names.pickable,
+            len(stat.pick_values),
+            spec.draws,
+            rng,
+            sectors=session.sectors(frozenset(counted.index), leg.decision),
+            pick_ids=[x.instrument_id for x in stat.picks if x.reason == ""],
+            sector_rng=generator(key, f"{label}|sector", p.horizon, leg.decision),
         )
     # The short leg is drawn from the names it could hold (the dollar volume floor), minus the
     # draw; a long-short spread is two draws, the long's then the short's, one generator.

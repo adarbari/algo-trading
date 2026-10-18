@@ -49,7 +49,9 @@ and the key.
     universe          a selection preset name, or an inline selection (``[universe] where``)
     top_k             an integer >= 1, or ``"all"`` (every qualified name)
     screeners         the screener presets that implement it (empty while a candidate waits)
-    baselines         screener presets run on the same sessions (quality bar 9)
+    baselines         screener presets run on the same sessions (quality bar 9); the one entry
+                      ``"@standard"`` stands for ``verdict.toml [decoys] standard`` (the decoy
+                      battery, ADR 0053 amendment 2026-10-18), expanded where the edge loads
     status            researching | candidate | evidenced | live | retired | rejected | blocked
     family            optional "A".."I": the idea catalogue's family (docs/edge-ideas/); the
                       edges page groups by it
@@ -101,7 +103,7 @@ from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
 from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
-from algotrade.config.edges.tenor import tenor_sessions
+from algotrade.config.edges.tenor import check_tenor
 from algotrade.config.edges.verdict import LEGS
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Selection, parse_selection
@@ -199,6 +201,7 @@ QUALITY_BAR = (
 )
 PUBLISHED_MEASURES = ("mean_excess", "decile_spread", "lift_pts")
 PUBLISHED_KEYS = ("measure", "value", "horizon_sessions", "sample", "source", "leg")
+STANDARD = "@standard"  # in ``baselines``: the site's standard decoys (``expand_baselines``)
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
@@ -469,7 +472,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         universe=universe,
         top_k=top_k,
         screeners=_ids(t, "screeners"),
-        baselines=_ids(t, "baselines"),
+        baselines=_ids(t, "baselines", (STANDARD,)),
         status=status,
         sources=sources,
         quality_bar=_quality_bar(t, closed),
@@ -705,7 +708,7 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
     structure, strike_delta, otm_pct, iv_field = _expires_otm(o, kind)
     if kind == MODEL_KIND:
-        _check_tenor(o, horizons, iv_field)
+        check_tenor(o, horizons, iv_field)
     side = o.choice("side", LONG, SIDES)
     borrow = o.number("borrow_bps_annual", None, 0)
     _check_side(o, side, borrow, kind, drawdown)
@@ -748,25 +751,6 @@ def _pair_field(
             f"cheap legs; the sibling is the short leg) and no max_drawdown"
         )
     return named
-
-
-def _check_tenor(o: Table, horizons: tuple[int, ...], iv_field: str | None) -> None:
-    """Refuse an ``option_model_pnl`` horizon the field's one tenor cannot price (module docs)."""
-    if iv_field is None:
-        return  # required, and reported, by ``_expires_otm``
-    tenor = tenor_sessions(iv_field)
-    if tenor is None:
-        raise ConfigurationError(
-            f"{o.where} iv_field: {iv_field!r} names no tenor (iv<days>), so an option_model_pnl "
-            f"cannot tell which horizons its vol prices"
-        )
-    low, high = tenor // 2, tenor * 2
-    bad = [h for h in horizons if not low <= h <= high]
-    if bad:
-        raise ConfigurationError(
-            f"{o.where} horizon_sessions: {bad} are outside {low}..{high} sessions, what the "
-            f"{tenor}-session tenor of {iv_field!r} prices; use a field of the horizon's tenor"
-        )
 
 
 def _check_side(
@@ -970,8 +954,22 @@ def _basis_horizon(t: Table, outcome: Outcome) -> int | None:
     return horizon
 
 
-def _ids(t: Table, key: str) -> tuple[str, ...]:
-    found = tuple(validate_id("screener", s) for s in t.strings(key, ()))
+def expand_baselines(
+    baselines: tuple[str, ...], standard: tuple[str, ...], screeners: tuple[str, ...]
+) -> tuple[str, ...]:
+    """``baselines`` with ``STANDARD`` replaced, in place, by the site's standard decoys: those
+    not already listed and not the edge's own screeners (a screener is never its own baseline)."""
+    if STANDARD not in baselines:
+        return baselines
+    listed = {*baselines, *screeners}
+    out: list[str] = []
+    for b in baselines:
+        out += [d for d in standard if d not in listed and d not in out] if b == STANDARD else [b]
+    return tuple(out)
+
+
+def _ids(t: Table, key: str, tokens: tuple[str, ...] = ()) -> tuple[str, ...]:
+    found = tuple(s if s in tokens else validate_id("screener", s) for s in t.strings(key, ()))
     if len(set(found)) != len(found):
         raise ConfigurationError(f"{t.where} {key}: a screener is listed twice: {list(found)}")
     return found
