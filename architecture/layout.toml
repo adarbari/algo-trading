@@ -121,7 +121,7 @@ contracts = ["Layout: core model and time are the base of core (they never impor
 
 [[dir]]
 path = "src/algotrade/core/time"
-purpose = "the exchange session calendar and UTC clock helpers; never compute weekdays elsewhere"
+purpose = "the exchange session calendar, the calendar windows an edge schedule uses, and UTC clock helpers; never compute weekdays elsewhere"
 contracts = ["Layout: core model and time are the base of core (they never import views or validation)"]
 
 [[dir]]

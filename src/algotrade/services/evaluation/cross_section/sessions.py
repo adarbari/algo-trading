@@ -8,6 +8,9 @@ horizon apart so the windows do not overlap and the sessions are independent:
 - ``every_session``: the first session, then every ``h``-th session after it
 - ``month_end``: the last session of each calendar month, thinned greedily so consecutive
   ones are at least ``h`` sessions apart (a month cut short by the range's end is not one)
+- ``calendar:<window>``: D of each window of ``core/time/windows.py`` (turn of month, expiry
+  week, quarter end, before a holiday) that lies wholly in the range; the window has a fixed
+  length, so ``horizon`` must equal it, and windows of one kind never overlap
 - ``on_event:<class>``: every session is a candidate; ``events.py`` says which have events and
   ``event_blocks`` pools them into blocks of ``h`` sessions
 
@@ -22,6 +25,13 @@ from datetime import date
 from algotrade.config.edges.document import Edge
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import next_session
+from algotrade.core.time.windows import (
+    WINDOW_NAMES,
+    decision_session,
+    window_length,
+    window_name,
+    windows,
+)
 from algotrade.engines.selection.schedule import rebalance_sessions
 from algotrade.services.evaluation.cross_section.events import EventSchedule
 
@@ -44,11 +54,32 @@ def decision_sessions(schedule: str, sessions: Sequence[date], horizon: int) -> 
         raise ConfigurationError(f"schedule {schedule!r} is read through events.py, not here")
     if not sessions:
         return []
+    calendar_window = window_name(schedule)
+    if calendar_window is not None:
+        return _window_decisions(calendar_window, sessions, horizon)
     if schedule == "every_session":
         return rebalance_sessions(sessions[0], sessions, f"{horizon}d")
     if schedule == "month_end":
         return _spaced(_month_ends(sessions), sessions, horizon)
     raise ConfigurationError(f"unknown schedule {schedule!r}")
+
+
+def _window_decisions(name: str, sessions: Sequence[date], horizon: int) -> list[date]:
+    """D of every window of kind ``name`` among ``sessions`` (a window cut by the range is not
+    one); the horizon must be the window's length."""
+    if name not in WINDOW_NAMES:
+        raise ConfigurationError(f"unknown calendar window {name!r}: one of {list(WINDOW_NAMES)}")
+    if horizon != window_length(name):
+        raise ConfigurationError(
+            f"calendar:{name} is {window_length(name)} sessions long, so its horizon is "
+            f"{window_length(name)}, got {horizon}"
+        )
+    held = set(sessions)
+    return [
+        d
+        for w in windows(name, sessions[0], sessions[-1])
+        if (d := decision_session(w)) in held and d >= sessions[0]
+    ]
 
 
 def entry_session(decision: date, offset: int) -> date:

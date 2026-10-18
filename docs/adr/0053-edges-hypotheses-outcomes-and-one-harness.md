@@ -523,6 +523,34 @@ for one thing is removed.
    status or follow fields. Excluding bookkeeping from `run_hash` is a follow-up if the draw
    stability matters.
 
+## Amendment 2026-10-17: calendar windows as schedules (edge build H5a)
+
+The schedule kinds are now `every_session`, `month_end`, `calendar:<window>` and
+`on_event:<class>`. A calendar window is a stretch of sessions the exchange calendar fixes ahead
+of time, a closed set in `core/time/windows.py` (owner `session-calendar`):
+
+| window | placement (from `core/time/calendar.py` alone) | length |
+|---|---|---|
+| `turn_of_month` | the month's last session and the three after it | 4 |
+| `opex_week` | the sessions ending on the monthly option expiry | 5 |
+| `quarter_end` | the last sessions of March, June, September, December | 5 |
+| `pre_holiday` | the session before a scheduled full-day holiday | 1 |
+
+1. **S and D.** A window's entry session S is the session before its first session; D = S - 1
+   as for every schedule, so `start_offset_sessions` must be 1 (a document that says otherwise is
+   refused).
+2. **One horizon.** A window has a fixed length, so the outcome's `horizon_sessions` is exactly
+   `[length]`, validated by the document parser (variants too). No outcome-grain change: the
+   existing `forward_returns` partition at S serves it.
+3. **No overlap, no peeking.** Windows of one kind never overlap by construction. A window rule
+   may use only the calendar, which is known ahead; an unscheduled closure (a day of mourning,
+   a storm) is not a holiday window, and a window tied to an event date is `on_event:<class>`,
+   never a calendar window. A window cut by the end of the evaluated range is not a window.
+4. **Guide.** Each window has its own glossary term `calendar_<window>`, kept complete by a
+   fitness test (`edge.schedule` is a plain String, so `guide_coverage.toml` cannot map it).
+5. The time-series base for one instrument timed by a window (`base = "out_of_window"`) is not
+   part of this amendment; it is a new comparison and gets its own ADR (H5b).
+
 ## Amendment 2026-10-17: outcome sides (owner decision 2026-10-17, `docs/decisions/log.md`)
 
 An outcome has a **side**, `[outcome] side = "long" | "short" | "long_short"` (default `long`; a
