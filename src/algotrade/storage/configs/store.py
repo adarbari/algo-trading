@@ -19,6 +19,7 @@ KINDS = (
     "guide_playbooks",
     "guide_glossary",
     "guide_glossary_edges",
+    "guide_mechanisms",
     "guide_ideas",
     "events",
     "studies",
@@ -44,6 +45,7 @@ class ConfigStore(Protocol):
         ``guide_playbooks`` its playbook prose (``site/guide/playbooks/<family>/<id>.toml``);
         ``guide_glossary`` its glossary terms (``site/guide/glossary/<theme>.toml``),
         ``guide_glossary_edges`` the edge ones (``site/guide/glossary/edges/<theme>.toml``),
+        ``guide_mechanisms`` its edge-mechanism pages (``site/guide/mechanisms/<id>.toml``),
         ``guide_ideas`` the researched-not-built ideas (``site/guide/ideas/<family>.toml``);
         ``edges`` the edge documents (``site/edges/<id>/edge.toml``, or a user's draft under
         ``users/<id>/edges/``, ADR 0053).

@@ -1,0 +1,106 @@
+id = "slow_to_update"
+title = "Slow to update"
+question = "Who is slow to update?"
+examples = "post-earnings drift, earnings-date advances, 12-1 momentum"
+short = "Prices absorb news in steps, not at once; the trade holds the direction of the last step while the rest arrives."
+how_it_works = [
+  "A company reports, an analyst revises, a filing lands. The price moves, but not all the way: holders anchor on their old view and act on the news a little at a time. You buy, or sell, after the first move and hold while the rest arrives.",
+  "The other side is anyone who updates late: funds that rebalance monthly, analysts who revise in small steps, holders who sell a winner too early and keep a loser. Their next trades push the price the same way yours did.",
+  "The family covers the drift after an earnings report, momentum over the past year, analyst revisions, 8-K and late-filing notices, and the timing of a report. Each is one kind of news and one speed of reaction.",
+]
+why_it_survives = [
+  "Arbitrage closes the gap slowly because the trade is expensive to run: high turnover, many small names, a hard borrow on the short side. Momentum also crashes: the losers it is short rally hardest when a market turns, so the capital that could arbitrage it limits itself.",
+  "The behaviour is old. Hong and Stein's model of gradual information flow and Barberis, Shleifer and Vishny's model of anchoring were published in the late 1990s and still describe the data.",
+]
+research = [
+  "Jegadeesh and Titman (1993) find past winners beat past losers over holding periods of three to twelve months, with part of the gain given back over the next two years. Asness and co-authors show the effect across 212 years of US data, 40 other countries and more than a dozen asset classes.",
+  "Hong, Lim and Stein (2000): momentum profits fall sharply with firm size and are strongest where few analysts cover the stock, most of all for losers. Medhat and Schmeling (2022): among the most traded stocks last month's winners keep going; among the least traded they reverse.",
+  "The drift after earnings has faded. Martineau (2022) finds it gone in large stocks since 2006 and only recently in microcaps. McLean and Pontiff track 97 published predictors and find their returns decay after publication; a 2015 draft of the paper put the post-publication decline at 56%.",
+  "Costs decide what is left. Novy-Marx and Velikov: most anomalies with one-sided turnover under 50% a month keep a significant net spread; few faster ones do. Our bar: a paper's long/short figure is expected to lose half by the time it trades, a long-only one a third. Works needs t > 3 on the deciles and on the picks.",
+]
+real_vs_decoy = [
+  "A real slow-to-update edge names the news and the reader who is late, and beats the plain momentum and size yardsticks on the same sessions. A decoy is a sort on past returns under a new name: it fades once 12-1 momentum is controlled for, or lives only in names you cannot trade.",
+  "The harness compares every edge with the standard decoys (size, momentum, idiosyncratic volatility, lottery, illiquidity, low beta) on the same sessions. It keeps a frozen period the rule never saw and asks for t > 3 before it says Works. Read the lift against those baselines before the hit rate.",
+]
+dont = "Don't read a momentum win rate as a steady income: the losses cluster in market turns, when the short losers rally and the long winners fall together."
+see_also = ["edge_how_sure", "edge_evidence_section"]
+
+[[stats]]
+label = "Our bar"
+value = "t > 3"
+note = "Works needs t above 3 on the deciles and on the picks, on sessions the rule never saw."
+
+[[stats]]
+label = "Haircut on a paper's figure"
+value = "50% / one third"
+note = "Expect a long/short or short-leg figure to lose half by the time it trades, a long-only one a third."
+
+[[sources]]
+title = "Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance (1993)"
+url = "https://ideas.repec.org/a/bla/jfinan/v48y1993i1p65-91.html"
+note = "The original momentum result: winners beat losers over three to twelve months, part reversed later."
+
+[[sources]]
+title = "Chan, L., Jegadeesh, N. and Lakonishok, J., Momentum Strategies, NBER working paper 5375 (1995; Journal of Finance 1996)"
+url = "https://www.nber.org/papers/w5375"
+note = "Price and earnings momentum each predict drift; analysts' forecasts adjust slowly, markets respond gradually."
+
+[[sources]]
+title = "Hong, H., Lim, T. and Stein, J., Bad News Travels Slowly: Size, Analyst Coverage and the Profitability of Momentum Strategies, NBER working paper 6553 (1998; Journal of Finance 2000)"
+url = "https://www.nber.org/papers/w6553"
+note = "Momentum profits fall with size and rise where analyst coverage is low, most for losers."
+
+[[sources]]
+title = "Hong, H. and Stein, J., A Unified Theory of Underreaction, Momentum Trading, and Overreaction in Asset Markets, Journal of Finance (1999)"
+url = "https://ideas.repec.org/a/bla/jfinan/v54y1999i6p2143-2184.html"
+note = "The model: information diffuses gradually, prices underreact, then trend chasers overshoot."
+
+[[sources]]
+title = "Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, NBER working paper 5926 (1997; Journal of Financial Economics 1998)"
+url = "https://www.nber.org/papers/w5926"
+note = "Belief formation from psychology that yields both underreaction to news and overreaction to a run."
+
+[[sources]]
+title = "Asness, C., Frazzini, A., Israel, R. and Moskowitz, T., Fact, Fiction and Momentum Investing, Journal of Portfolio Management (2014)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Momentum-Investing"
+note = "Momentum across 212 years of US data, 40 countries and over a dozen asset classes."
+
+[[sources]]
+title = "Daniel, K. and Moskowitz, T., Momentum Crashes, NBER working paper 20439 (2014; Journal of Financial Economics 2016)"
+url = "https://www.nber.org/papers/w20439"
+note = "Momentum's losses cluster in market rebounds; a dynamic version roughly doubles the Sharpe ratio."
+
+[[sources]]
+title = "Martineau, C., Rest in Peace Post-Earnings Announcement Drift, Critical Finance Review (2022)"
+url = "https://ideas.repec.org/a/now/jnlcfr/104.00000122.html"
+note = "The drift after earnings is gone in large stocks since 2006 and only recently in microcaps."
+
+[[sources]]
+title = "Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies (2022)"
+url = "https://openaccess.city.ac.uk/id/eprint/31278/"
+note = "High-turnover stocks show one-month momentum, low-turnover ones reversal; survives costs, strongest in large names."
+
+[[sources]]
+title = "Johnson, T. and So, E., Time Will Tell: Information in the Timing of Scheduled Earnings News, Journal of Financial and Quantitative Analysis (2018)"
+url = "https://www.cambridge.org/core/product/identifier/S0022109018000492/type/journal_article"
+note = "A later-than-expected report date predicts worse news; equities ignore it until the report, options do not."
+
+[[sources]]
+title = "Moskowitz, T. and Grinblatt, M., Do Industries Explain Momentum?, Journal of Finance (1999)"
+url = "https://ideas.repec.org/a/bla/jfinan/v54y1999i4p1249-1290.html"
+note = "Industry momentum is strong and explains much of stock momentum."
+
+[[sources]]
+title = "McLean, R. D. and Pontiff, J., Does Academic Research Destroy Stock Return Predictability?, Journal of Finance (2016; Boston College summary)"
+url = "https://www.bc.edu/content/bc-web/schools/carroll-school/news/2017/pontiff-paper.html"
+note = "97 published predictors from 79 papers; their returns decay after publication but do not vanish."
+
+[[sources]]
+title = "Novy-Marx, R. and Velikov, M., A Taxonomy of Anomalies and their Trading Costs, NBER working paper 20721 (2014; Review of Financial Studies 2016)"
+url = "https://www.nber.org/papers/w20721"
+note = "Anomalies turning over under 50% a month mostly keep a net spread; faster ones rarely do."
+
+[[sources]]
+title = "Frazzini, A., Israel, R. and Moskowitz, T., Trading Costs of Asset Pricing Anomalies, AQR working paper (2012)"
+url = "https://www.aqr.com/Insights/Research/Working-Paper/Trading-Costs-of-Asset-Pricing-Anomalies"
+note = "Live trading data 1998-2011, 19 markets: momentum survives costs at size; short-term reversal does not."

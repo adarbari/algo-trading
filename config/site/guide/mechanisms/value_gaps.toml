@@ -1,0 +1,106 @@
+id = "value_gaps"
+title = "Prices that drift from a known value"
+question = "Who cannot close the gap?"
+examples = "closed-end fund discounts, BDC price to NAV, dual-class spreads"
+short = "A fund or share class trades below the value of what it holds; the trade buys the gap and waits for it to narrow."
+how_it_works = [
+  "A closed-end fund, a BDC, a share class: each has a price and a value you can check, the net asset value or the sibling's price. When the price falls far below it against its own history, you buy the cheap one and hold until the gap narrows.",
+  "The other side is a holder who sells without looking at the value. A retail investor bought for the yield and leaves on a cut; a tax-loss seller exits in December; an index cannot own the wrapper. The seller sets the price; the value stays.",
+  "The family covers closed-end fund discounts, over-distributing funds at a premium, BDC price to NAV and the cheap class of a dual-class pair. Two avoid lists complete it: reverse splits and new theme ETFs. Each is one gap and one reason it opens.",
+]
+why_it_survives = [
+  "Nobody closes the gap because closing it costs more than it pays. There is no redemption, the short side of a pair pays borrow and the dividend, and the convergence date is unknown. The capital is small and specialised, and it leaves when prices move further away (Shleifer and Vishny 1997; Pontiff 1996).",
+  "Part of the discount is fair: fees, leverage and payout policy are a real drag (Cherkes, Sagi and Stanton 2009). So a discount narrows but does not close, and a premium can persist for years.",
+]
+research = [
+  "Discounts predict returns. Pontiff (1995): a fund at a 20% discount earns about 6% more over the next 12 months than one at no discount, from the discount reverting, not from the portfolio. Pontiff (1996): the gap is wider where the portfolio is hard to replicate, the dividend small and the fund small.",
+  "Gemmill and Thomas (2002), 158 funds: retail flows move the discount in the short run, but costly arbitrage sets its long-run level. Lee, Shleifer and Thaler (1991): discounts move together and narrow when small stocks do well. Bradley, Brav, Goldstein and Jiang (2010): an activist open-ending attempt cuts the discount to about half.",
+  "The traded versions are gross and thin. Patro, Piccotti and Wu (2017), 377 US funds 1984-2011: a long/short quintile sort on expected discount reversion earns 18.2% a year gross, Sharpe near 1.9, 582% turnover. CXO's cost estimate puts its net gain over plain discount sorting near zero. Schultz and Shive (2010): a simple rule on dual-class gaps earns abnormal profits after costs, and one-sided trades, not arbitrage, close most gaps.",
+  "The avoid lists are better evidenced than the long trades. Kim, Klein and Rosenfeld (2008): over 1,600 reverse-split firms earn significant negative abnormal returns for three years and are very hard to short. Ben-David, Franzoni, Kim and Moussawi (2023): specialised ETFs lose about 30% risk-adjusted over their first five years. Mitchell, Pulvino and Stafford (2002): of 82 parent-below-subsidiary cases, 30% ended before the gap closed. Our bar: a published long/short figure loses half, a long-only one a third, and Works needs t > 3 on the deciles and on the picks.",
+]
+real_vs_decoy = [
+  "A real value gap names the value, the seller and the reason the gap opened, and the cheap thing beats its own sibling or peer group, not SPY. A decoy is a fair discount: a fee drag, or a leveraged bond fund in a rate rise. So is a class with other votes or dividends, or a gap widening on a control event.",
+  "The harness compares a pair against its sibling and a fund against every eligible fund on the same sessions, with size as the baseline. It keeps a frozen period and asks for t > 3 before it says Works. Most sessions pick few names: read the count beside each figure.",
+]
+dont = "Don't buy a discount because it is wide: a fund can stay there for years, and a premium fund paying more than it earns falls hard on the cut."
+see_also = ["edge_how_sure", "edge_evidence_section", "outcome_pair_spread", "share_class_pair"]
+
+[[stats]]
+label = "Our bar"
+value = "t > 3"
+note = "Works needs t above 3 on the deciles and on the picks, on sessions the rule never saw."
+
+[[stats]]
+label = "Haircut on a paper's figure"
+value = "50% / one third"
+note = "Expect a long/short or short-leg figure to lose half by the time it trades, a long-only one a third."
+
+[[sources]]
+title = "Pontiff, J., Closed-End Fund Premia and Returns: Implications for Financial Market Equilibrium, Journal of Financial Economics (1995)"
+url = "https://academicnewsletter.sufe.edu.cn/info/358172"
+note = "A 20% discount means about 6% higher expected 12-month return; the discount reverts, the portfolio does not explain it."
+
+[[sources]]
+title = "Pontiff, J., Costly Arbitrage: Evidence from Closed-End Funds, Quarterly Journal of Economics (1996)"
+url = "https://ideas.repec.org/a/oup/qjecon/v111y1996i4p1135-1151..html"
+note = "Mispricing is larger where the portfolio is hard to replicate, dividends small, the fund small and rates high."
+
+[[sources]]
+title = "Lee, C., Shleifer, A. and Thaler, R., Investor Sentiment and the Closed-End Fund Puzzle, NBER working paper 3465 (1990; Journal of Finance 1991)"
+url = "https://www.nber.org/papers/w3465"
+note = "Discounts move together with retail sentiment and narrow when small stocks do well."
+
+[[sources]]
+title = "Gemmill, G. and Thomas, D., Noise Trading, Costly Arbitrage, and Asset Prices: Evidence from Closed-End Funds, Journal of Finance (2002)"
+url = "https://ideas.repec.org/a/bla/jfinan/v57y2002i6p2571-2594.html"
+note = "158 funds: retail flows move the discount short term; costly arbitrage sets its long-run level and bounds."
+
+[[sources]]
+title = "Cherkes, M., Sagi, J. and Stanton, R., A Liquidity-Based Theory of Closed-End Funds, Review of Financial Studies (2009)"
+url = "https://ideas.repec.org/a/oup/rfinst/v22y2009i1p257-297.html"
+note = "The discount trades liquidity benefits against fees; funds list at a premium and drift to a discount."
+
+[[sources]]
+title = "Bradley, M., Brav, A., Goldstein, I. and Jiang, W., Activist Arbitrage: A Study of Open-Ending Attempts of Closed-End Funds, Journal of Financial Economics (2010)"
+url = "https://ideas.repec.org/a/eee/jfinec/v95y2010i1p1-19.html"
+note = "Open-ending attempts cut the discount to about half; the discount's size decides who is targeted."
+
+[[sources]]
+title = "Patro, D., Piccotti, L. and Wu, Y., Exploiting Closed-End Fund Discounts: A Systematic Examination of Alphas, Journal of Financial Research (2017)"
+url = "https://ideas.repec.org/a/bla/jfnres/v40y2017i2p223-248.html"
+note = "The systematic discount-reversion strategy; the listing carries the citation, the numbers are in the CXO summary."
+
+[[sources]]
+title = "CXO Advisory, Enhanced Exploitation of Closed-End Fund Discounts (summary of Patro, Piccotti and Wu)"
+url = "https://www.cxoadvisory.com/mutual-hedge-funds/enhanced-exploitation-of-closed-end-fund-discounts/"
+note = "377 funds 1984-2011: 18.2% a year gross, Sharpe 1.9, 582% turnover; net of spreads about even with plain sorting."
+
+[[sources]]
+title = "Schultz, P. and Shive, S., Mispricing of Dual-Class Shares: Profit Opportunities, Arbitrage, and Trading, Journal of Financial Economics (2010)"
+url = "https://ideas.repec.org/a/eee/jfinec/v98y2010i3p524-549.html"
+note = "A simple rule on dual-class price gaps earns abnormal profits after costs; one-sided trades close most gaps."
+
+[[sources]]
+title = "Mitchell, M., Pulvino, T. and Stafford, E., Limited Arbitrage in Equity Markets, Journal of Finance (2002)"
+url = "https://ideas.repec.org/a/bla/jfinan/v57y2002i2p551-584.html"
+note = "82 parent-below-subsidiary cases: 30% severed before the gap closed; smooth convergence would pay 50% more."
+
+[[sources]]
+title = "Lamont, O. and Thaler, R., Can the Market Add and Subtract? Mispricing in Tech Stock Carve-Outs, NBER working paper 8302 (2001; Journal of Political Economy 2003)"
+url = "https://www.nber.org/papers/w8302"
+note = "Carve-outs priced below their stake in the subsidiary, 1998-2000; short-sale costs stop the arbitrage."
+
+[[sources]]
+title = "Shleifer, A. and Vishny, R., The Limits of Arbitrage, NBER working paper 5167 (1995; Journal of Finance 1997)"
+url = "https://www.nber.org/papers/w5167"
+note = "Arbitrage is done by few specialists with other people's money and fails when prices move further away."
+
+[[sources]]
+title = "Kim, S., Klein, A. and Rosenfeld, J., Return Performance Surrounding Reverse Stock Splits: Can Investors Profit?, Financial Management (2008)"
+url = "https://ideas.repec.org/a/bla/finmgt/v37y2008i2p173-192.html"
+note = "Over 1,600 reverse-split firms: significant negative abnormal returns for three years; very hard to short."
+
+[[sources]]
+title = "Ben-David, I., Franzoni, F., Kim, B. and Moussawi, R., Competition for Attention in the ETF Space, NBER working paper 28369 (2021; Review of Financial Studies 2023)"
+url = "https://www.nber.org/papers/w28369"
+note = "Specialised ETFs lose about 30% risk-adjusted over their first five years; launched on overvalued themes."

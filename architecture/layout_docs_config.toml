@@ -58,7 +58,7 @@ purpose = "event-sensitivity track settings: the scope list of names the event s
 
 [[config_dir]]
 path = "config/site/guide"
-purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups and playbook families in order), start.toml (the numbered Start here pages, [[page]]); the glossary in glossary/, the researched-not-built ideas in ideas/ and the playbook prose in playbooks/"
+purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups and playbook families in order), start.toml (the numbered Start here pages, [[page]]); the glossary in glossary/, the edge mechanism pages in mechanisms/, the researched-not-built ideas in ideas/ and the playbook prose in playbooks/"
 
 [[config_dir]]
 path = "config/site/guide/glossary"
@@ -67,6 +67,10 @@ purpose = "the Guide's glossary (ADR 0051), one <theme>.toml per theme (the 400-
 [[config_dir]]
 path = "config/site/guide/glossary/edges"
 purpose = "the Guide's glossary of the edges (ADR 0051, ADR 0064), one <theme>.toml per theme: the edge page, its evidence and curve, the live record, the outlook and haircut, the ledger and variants, cost and capacity, where the result worked (loaded after the glossary folder; kind guide_glossary_edges)"
+
+[[config_dir]]
+path = "config/site/guide/mechanisms"
+purpose = "the Guide's edge mechanism pages (ADR 0051, ADR 0064), one <id>.toml per MECHANISM_KINDS value of config/edges/document.py (nine files, the 12-file cap): title, question, an examples line, the short hero, how it works, why it survives, what the research found, real versus decoy, what not to read into it, see-also glossary terms, optional stat tiles and the verified sources (loaded by config/site/guide/mechanisms.py; kind guide_mechanisms; fitness tests: exactly one file per mechanism kind)"
 
 [[config_dir]]
 path = "config/site/guide/ideas"

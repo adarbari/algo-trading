@@ -15,6 +15,8 @@ site/guide/glossary/<theme>.toml           L3 Guide glossary, one file per theme
                                            ``guide_glossary``)
 site/guide/glossary/edges/<theme>.toml     L3 Guide glossary of the edges (kind
                                            ``guide_glossary_edges``)
+site/guide/mechanisms/<id>.toml            L3 Guide mechanism pages, one per edge mechanism kind
+                                           (kind ``guide_mechanisms``)
 site/guide/ideas/<family>.toml            L3 Guide's researched-not-built ideas, one file per
                                            family (kind ``guide_ideas``)
 site/guide/playbooks/<family>/<id>.toml    L3 Guide playbook prose, one folder per family (kind
@@ -62,6 +64,7 @@ SITE_FOLDERS = {
     "studies": "studies",
     "guide": "guide",
     "guide_playbooks": "guide/playbooks",
+    "guide_mechanisms": "guide/mechanisms",
     "guide_glossary": "guide/glossary",
     "guide_glossary_edges": "guide/glossary/edges",
     "guide_ideas": "guide/ideas",
@@ -70,7 +73,7 @@ SITE_FOLDERS = {
 NESTED = (PLAYBOOKS, "features")  # site kinds filed in one level of subfolders, by name
 SITE_ONLY = (  # never a user's
     "defaults", "settings", "field_guide", "regime", "events", "studies", "guide",
-    "guide_playbooks", "guide_glossary", "guide_glossary_edges", "guide_ideas",
+    "guide_playbooks", "guide_glossary", "guide_glossary_edges", "guide_mechanisms", "guide_ideas",
 )  # fmt: skip
 DRAFT = "draft.toml"
 EDGE_FILE = "edge.toml"  # site/edges/<id>/edge.toml
