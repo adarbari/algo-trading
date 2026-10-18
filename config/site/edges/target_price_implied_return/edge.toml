@@ -24,7 +24,7 @@ notes = """No exploration period exists: our own nightly snapshots of the analys
 the one after that day. Every measurable session is frozen-period data and the verdict accrues over months: the bar's 40 independent
 months is about three and a half years away and the harness reports the count beside every number. Licence: the targets are a
 personal-licence feed (ADRs 0068 and 0069), so this edge's rows are for the owner's own use. The universe holds only names with a
-target (feature.target_upside present; the free vendor key covers few names), so every base name is scored (the free vendor key covers about 15 of the 104 scope names: 21 of 25 mega-caps, 2 of 25 mid-caps; a covered base of about 20 would make 20 picks the whole base and the lift about 0, so top_k is 10 and a session is measured only with a base of at least 2 x top_k) and the variants are ranked;
+target (feature.target_upside present; the free vendor key covers few names), so every base name is scored (the roadmap's measurement of 2026-10-16: the free vendor key covers 15 of 104 scope names; a covered base of about 20 would make 20 picks the whole base and the lift about 0, so top_k is 10; nothing in the harness enforces it, but the lift is expected to be reliable only with a base of at least 2 x top_k, 20 names) and the variants are ranked;
 the base is the covered names. Proxies, each stated: the source demeans the implied return within the industry, here the RAW
 upside (no industry demeaning: the optimism bias of a sector enters the ranking, and an industry-relative version is a follow-up
 once a sector map is joined to the score); one snapshot's consensus target, not a revision (Brav and Lehavy's target
