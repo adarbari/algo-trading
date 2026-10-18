@@ -34,7 +34,7 @@ for = "a forward multiple exists"
 op = "gt"
 value = 0
 mode = "hard"
-note = "drops names with no estimates, a forecast loss or an ADR"
+note = "drops names with no estimates, a forecast loss or an ADR. On a night without the analyst table it rejects every row, though the run reads complete"
 
 [[field]]
 name = "feature.forward_pe_fy2"
