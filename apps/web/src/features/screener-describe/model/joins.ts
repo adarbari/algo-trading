@@ -41,7 +41,7 @@ export function joinToken(
 ): { join: PartJoinKind; label: string; words: string } | null {
   const join = part.join;
   if (join === null || join === undefined) return null;
-  const words = part.join_words.trim();
+  const words = part.join_words.replace(/^[,;\s]+/, '').trim();
   if (join === 'and' && isPlain(words)) return null;
   return { join, label: JOIN_LABELS[join], words };
 }

@@ -1,0 +1,91 @@
+{
+  "id": "groups-a-ideally-b-or-c",
+  "sentence": "stocks above $10, ideally with IV rank above 80% or rising volume",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "above $10",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.close"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 10,
+        "tolerance": 0,
+        "mode": "hard"
+      },
+      {
+        "span": "ideally with IV rank above 80%",
+        "bucket": "A",
+        "fields": [
+          "feature.iv_rank"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.8,
+        "tolerance": 0,
+        "mode": "score"
+      },
+      {
+        "span": "rising volume",
+        "bucket": "A",
+        "fields": [
+          "feature.volume_trend_20_60"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 1.0,
+        "tolerance": 0,
+        "mode": "score"
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "stocks above $10",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "ideally with IV rank above 80%",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "rising volume",
+          "kind": "applied",
+          "origin": "words",
+          "join": "or",
+          "join_words": "or"
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 0
+    },
+    "groups": [
+      {
+        "any": [
+          "ideally with IV rank above 80%",
+          "rising volume"
+        ]
+      }
+    ]
+  }
+}

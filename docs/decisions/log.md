@@ -523,3 +523,19 @@ follow-up PR).
 - status: pending owner confirmation
 - Architect review (PR 655): keep the six 8-K items (1.03 and 2.06 later), keep the 7-day threshold, approve the `features/rollups/events` folder.
 - Reasoning: the item list and the 7-day threshold are judgement calls the owner may widen; a stale `known_from` left in the store must not leak, so the reader does not trust it; a new folder is the layout rule's answer to a full one.
+
+## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Describe-it precedence of connectors
+- Question: how do "or", "and" and "except" combine in a drafted sentence?
+- Options: and binds tighter than or, a comma or "ideally" starts a new condition, an exclusion is its own gate / a flat left-to-right reading / the model decides per sentence.
+- Decision: and binds tighter than or (as the expression parser does); a comma or "ideally" starts a new condition, so an "or" never reaches across it; "except A or B" is neither; "except A and B" is neither only for a bare "and" (", and" ends the exclusion); "A or B except C" is (A or B) and not C. One golden case per phrasing pins it.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: one rule set gives the same reading every time and a wrong reading is one line and one golden case; the owner verifies the cases in the PR. Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it unchanged: "and" narrows a condition and "or" offers alternatives, the narrower screen costs a few missed names where a wider one buries the idea, and the Builder's plain-English line shows any wrong reading before a save. No golden case changes.
+
+## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Flat fallback when a part cannot sit in a group
+- Question: what does a draft do when an "or" or exclusion has a part that is a formula, a missing request, a dropped criterion or words nothing maps?
+- Options: keep the draft flat as before groups / group the available sides only.
+- Decision: keep it flat; only the formula case gets the verifier's doubt (draft one boolean formula), every other block leaves a visible note ("... is not available, so the 'or' or exclusion is not applied"); two kinds of instrument joined by "or" are doubted (one security_type criterion).
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: grouping the available sides would silently change the meaning (an "or" side dropped makes the other side mandatory). Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it and asked that the note say the other conditions apply on their own (done): blocking the draft would throw away the parts that worked.
