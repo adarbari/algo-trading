@@ -1,0 +1,493 @@
+# Continues volume.toml: the same keys, the same theme; see its header.
+
+[[field]]
+name = "feature.dist_to_poc"
+theme = "volume and liquidity"
+reads = "Close over the year's point of control minus one: 0.05 means the price sits 5% above the most-traded level of the year, -0.10 ten percent below it. Near 0 the name is at its volume magnet (expect rotation); far above after a strong year the point of control is the support a deep pullback would find; far below it is the overhead supply."
+caveats = [
+  "A daily-bar estimate of the level, a bin or two wide.",
+  "Null unless profile_status is OK.",
+]
+sources = ["Dalton (2007), Markets in Profile"]
+[[field.use]]
+for = "near the point of control"
+op = "between"
+value = [-0.03, 0.03]
+mode = "soft"
+tolerance = 0.02
+note = "with feature.in_value_area eq true; a mean-reversion zone"
+
+# ---------------------------------------------------------------------------------------------
+# Skew, skew rank and the implied-vol term structure (skew@v1, skew_history@v1, iv_term@v1;
+# docs/data/positioning.md OP3 and the term group; ADR 0031). Theme "implied volatility", filed
+# here because volatility.toml, where that theme's other fields live, is at its line cap.
+
+[[field]]
+name = "rollup.candle@v1.body_share"
+theme = "volume and liquidity"
+reads = "The candle body (open to close) over the day's whole range, 0 to 1. Near 0 (under 0.1) the session closed where it opened: a doji, indecision. Around 0.5 an ordinary day. Above 0.7 a long body with short wicks: one side controlled the session from open to close (a marubozu at 1)."
+caveats = [
+  "A big body is only meaningful against the name's usual body: rollup.candle@v1.body_vs_avg_20d says whether 0.8 is a large move or a normal one for it.",
+  "An earnings day or a gap open makes the open far from the prior close, so the body hides most of the move; check rollup.earnings@v1.last_earnings_date and rollup.gaps@v1.gap_open_pct.",
+  "Null when the bar has no range (high equals low: a halted or untraded session).",
+]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques: the real body", "Bulkowski (2008), Encyclopedia of Candlestick Charts"]
+[[field.use]]
+for = "a decisive session (a long body)"
+op = "gte"
+value = 0.6
+mode = "soft"
+tolerance = 0.1
+note = "with rollup.trend_stats@v2.close_range_pos gte 0.7 for a strong close; feature.strong_close is that pair"
+[[field.use]]
+for = "an indecisive session (a doji-like body)"
+op = "lte"
+value = 0.1
+mode = "soft"
+tolerance = 0.05
+note = "rollup.candle@v1.candle eq DOJI is the same cut with its range check"
+
+[[field]]
+name = "rollup.candle@v1.upper_wick_share"
+theme = "volume and liquidity"
+reads = "The share of the day's range above the body: how much of the session's high was given back by the close, 0 to 1. Under 0.1 the close was at or near the high; above 0.5 half the day's range was sold off from the high (the shape of a shooting star when the body is small and the lower wick short)."
+caveats = [
+  "One session: a long upper wick after a run (feature.stretch_sma20_atr above 2) is the warning Nison describes; the same wick in a base means little. Read it with where the name is.",
+  "A wick on a day with an earnings report or a gap open (rollup.earnings@v1.last_earnings_date) reflects the event, not supply at that price.",
+  "Null when the bar has no range (high equals low).",
+]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques: the upper shadow", "Bulkowski (2008), Encyclopedia of Candlestick Charts"]
+[[field.use]]
+for = "a long upper wick (sold off from the high)"
+op = "gte"
+value = 0.5
+mode = "soft"
+tolerance = 0.1
+note = "with feature.stretch_sma20_atr gte 2 for a reversal warning after a run"
+
+[[field]]
+name = "rollup.candle@v1.lower_wick_share"
+theme = "volume and liquidity"
+reads = "The share of the day's range below the body: how much of the session's low was bought back by the close, 0 to 1. Under 0.1 the close was at or near the low; above 0.5 half the range was recovered from the low (the shape of a hammer when the body is small and the upper wick short)."
+caveats = [
+  "A long lower wick means little in the middle of a range: it matters at a level where buyers are expected, so pair it with feature.dist_to_support.",
+  "An earnings day or a gap open (rollup.earnings@v1.last_earnings_date) makes long wicks by nature.",
+  "Null when the bar has no range (high equals low).",
+]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques: the lower shadow", "Bulkowski (2008), Encyclopedia of Candlestick Charts"]
+[[field.use]]
+for = "a long lower wick (bought back from the low)"
+op = "gte"
+value = 0.5
+mode = "soft"
+tolerance = 0.1
+note = "with feature.dist_to_support lte 0.02 for the support reversal shape"
+
+[[field]]
+name = "rollup.candle@v1.body_vs_avg_20d"
+theme = "volume and liquidity"
+reads = "Today's body (open to close) over the mean body of the 20 sessions before it: 1 is a body of the usual size, 2 twice the usual, 0.3 a much smaller one. Above 1.5 the day's move was unusual for this name; under 0.5 the day was quiet."
+caveats = [
+  "Bodies measure open to close, not the range: a large gap with a small body reads small here. rollup.trend_stats@v2.ret_z_20d is the close-to-close surprise.",
+  "After a volatile month the base is inflated and a normal day reads small; after a quiet one a normal day reads large.",
+  "Null when a session among the 20 before has no bar (a gap), the history is shorter, or those bodies were all zero.",
+]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques: the engulfing pattern's size", "Bulkowski (2008), Encyclopedia of Candlestick Charts"]
+[[field.use]]
+for = "a larger body than usual"
+op = "gte"
+value = 1.5
+mode = "soft"
+tolerance = 0.25
+note = "with rollup.candle@v1.body_share gte 0.5 so the body is also most of the range"
+
+[[field]]
+name = "rollup.candle@v1.bar_relation"
+theme = "volume and liquidity"
+reads = "How the day's high-low range sits against the previous day's. INSIDE: the range lies within the day before's (a pause, compression, the setup before a break). OUTSIDE: it covers the whole previous range (a wider swing, a shake-out or an expansion). UP_GAP: the whole day traded above yesterday's high; DOWN_GAP: the whole day below yesterday's low. OVERLAP: any other partial overlap, the ordinary case."
+caveats = [
+  "Inside days are common and inside days alone are not a signal: the direction comes from the day after (feature.inside_day_breakout) and from the trend (feature.trend_state).",
+  "An earnings day or a news gap is an UP_GAP or DOWN_GAP by nature: check rollup.earnings@v1.last_earnings_date before reading a gap as a trend change; rollup.gaps@v1.gap_above tracks the gaps that stay open.",
+  "Compares ranges with the previous session only: a name that traded no session yesterday has no relation (null).",
+]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques (the harami and the engulfing as inside and outside days)", "Crabel (1990), Day Trading with Short Term Price Patterns and Opening Range Breakout"]
+[[field.use]]
+for = "an inside day (a pause in the range)"
+op = "eq"
+value = "INSIDE"
+mode = "hard"
+note = "the day after is the breakout test; feature.inside_day_breakout is the confirmed form"
+[[field.use]]
+for = "not a gap day"
+op = "in"
+value = ["INSIDE", "OUTSIDE", "OVERLAP"]
+mode = "hard"
+note = "to keep the earnings and news gap days out of a pattern screen"
+
+[[field]]
+name = "rollup.candle@v1.prev_bar_relation"
+theme = "volume and liquidity"
+reads = "The bar_relation of the previous session: how yesterday's range sat against the day before's (INSIDE, OUTSIDE, UP_GAP, DOWN_GAP, OVERLAP). It lets a screen ask what yesterday was while reading today: an INSIDE here and a close above yesterday's close today is the inside day breakout."
+caveats = [
+  "A label of yesterday, not today: for the shape of today's bar use rollup.candle@v1.bar_relation.",
+  "Null when the previous session or the one before it has no bar.",
+]
+sources = ["Crabel (1990), Day Trading with Short Term Price Patterns and Opening Range Breakout", "Nison (1991), Japanese Candlestick Charting Techniques"]
+[[field.use]]
+for = "yesterday was an inside day"
+op = "eq"
+value = "INSIDE"
+mode = "hard"
+note = "with rollup.trend_stats@v2.ret_1d gt 0 for the break up; feature.inside_day_breakout is that pair"
+
+[[field]]
+name = "rollup.candle@v1.candle"
+theme = "volume and liquidity"
+reads = "The named candle of the session: HAMMER (a long lower wick, a small upper wick, a body above a doji: sellers pushed the price down and buyers took it back), SHOOTING_STAR (the mirror: buyers pushed it up and sellers took it back), DOJI (open and close nearly equal: indecision), BULLISH_ENGULFING (a rising body that covers the previous falling body and is at least half an average body), BEARISH_ENGULFING (the mirror), else NONE. The first match wins, in that order: engulfing, hammer, shooting star, doji."
+caveats = [
+  "A single candle means little without its location: a hammer at support (feature.dist_to_support small) or after a run down means something; in the middle of a range it is noise. Bulkowski's tests put the reliability of most candles near a coin flip, a hammer or an engulfing in the right place a little better; use it as a filter on a setup, never as the setup.",
+  "A shooting star or a bearish engulfing matters after a run up: check feature.stretch_sma20_atr (above 2) before reading it as a top.",
+  "An earnings day makes gaps and engulfing bars by nature: check rollup.earnings@v1.last_earnings_date and drop the report day from a pattern screen.",
+  "Null when the bar has no range (high equals low) or the previous session has no bar. An unknown 20-session average body never matches an engulfing candle: the bar then reads on as a hammer, a shooting star, a doji or NONE.",
+]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques", "Bulkowski (2008), Encyclopedia of Candlestick Charts: the reliability and the performance rank of each candle"]
+[[field.use]]
+for = "a hammer (at support or after a decline)"
+op = "eq"
+value = "HAMMER"
+mode = "hard"
+note = "with feature.dist_to_support lte 0.02, or feature.stretch_sma20_atr lte -2 after a run down"
+[[field.use]]
+for = "a shooting star (after a run up)"
+op = "eq"
+value = "SHOOTING_STAR"
+mode = "hard"
+note = "with feature.stretch_sma20_atr gte 2"
+[[field.use]]
+for = "a doji (indecision)"
+op = "eq"
+value = "DOJI"
+mode = "hard"
+[[field.use]]
+for = "a bullish engulfing day"
+op = "eq"
+value = "BULLISH_ENGULFING"
+mode = "hard"
+note = "with rollup.momentum@v1.rel_volume gte 1.25 for the volume to confirm it"
+[[field.use]]
+for = "a bearish engulfing day"
+op = "eq"
+value = "BEARISH_ENGULFING"
+mode = "hard"
+note = "with feature.stretch_sma20_atr gte 2 for a reversal after a run up"
+
+[[field]]
+name = "feature.inside_day_breakout"
+theme = "volume and liquidity"
+reads = "True when the session closed above the previous close and the previous session was an inside day (its range within the day before's): the squeeze of the quiet day resolved upward the day after. False for every other session; null when the return or the relation is unknown."
+caveats = [
+  "Closing above the previous close is a weak test of a breakout: it is not above the inside day's high or the mother bar's high. Gate on rollup.trend_stats@v2.close_range_pos gte 0.7 or feature.breakout_20d to ask for a real break.",
+  "Direction only: an inside day inside a downtrend is a rest, not a base; gate on feature.trend_state eq UPTREND.",
+  "An earnings day or a news gap the day after is the event, not the pattern: check rollup.earnings@v1.last_earnings_date.",
+  "Null when yesterday or the day before has no bar, or the return is unknown.",
+]
+sources = ["Crabel (1990), Day Trading with Short Term Price Patterns and Opening Range Breakout", "Bulkowski (2008), Encyclopedia of Candlestick Charts"]
+[[field.use]]
+for = "an inside day broke up"
+op = "eq"
+value = true
+mode = "hard"
+note = "with feature.trend_state eq UPTREND and rollup.momentum@v1.rel_volume gte 1.25"
+
+[[field]]
+name = "feature.strong_close"
+theme = "volume and liquidity"
+reads = "True when the session closed in the top 30% of its range (rollup.trend_stats@v2.close_range_pos at least 0.7) with a body of at least half the range (rollup.candle@v1.body_share at least 0.5): buyers held into the close and the day was not a doji or a long-wick spike. False otherwise; null for a bar with no range."
+caveats = [
+  "One day: a strong close on a quiet day means little. Pair with rollup.momentum@v1.rel_volume gte 1.25 or rollup.candle@v1.body_vs_avg_20d gte 1.",
+  "The close can be strong because the day opened far below it (a gap up, an earnings day): check rollup.earnings@v1.last_earnings_date and rollup.gaps@v1.gap_open_pct.",
+  "The 0.7 and 0.5 are fixed; for other cuts use the two fields directly.",
+]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques", "O'Neil (2009), How to Make Money in Stocks: the close in the upper part of the day's range on a breakout"]
+[[field.use]]
+for = "closed strong with conviction"
+op = "eq"
+value = true
+mode = "hard"
+note = "with rollup.momentum@v1.rel_volume gte 1.25 on a breakout day"
+
+# Liquidity: the dollars traded and the option-chain tiers a position can be sized against
+# (theme "volume and liquidity"; moved here from liquidity.toml).
+
+[[field]]
+name = "rollup.price_stats@v2.adv_usd_20d"
+theme = "volume and liquidity"
+reads = "Average dollars traded a day over 20 sessions (close times volume). The usual sizing rule is to hold no more than 1% to 2% of a day's volume, so the threshold follows from the position: a $50,000 position wants about $5M a day, $500,000 wants $50M. $5M is 'some volume', $50M is liquid, $100M and above is very liquid; under $1M a day is where spreads and slippage dominate any edge."
+caveats = [
+  "An ETF's on-screen volume understates its liquidity: market makers create and redeem shares, so a fund with thin volume can still absorb a large order if its holdings are liquid. For funds (instrument.is_etf eq true) a low ADV is not disqualifying by itself.",
+  "One event day (earnings, an index inclusion) lifts a 20-day average for 20 sessions; a name slightly over a threshold may be thinner than it looks. Check rollup.momentum@v1.rel_volume history through rollup.price_moves@v1.one_day_move.",
+  "Dollar volume, not shares: a $2 stock trading 10M shares is $20M a day, the same as a $200 stock trading 100k shares, and the $2 one has a far wider spread. Pair with rollup.price_stats@v2.close.",
+]
+sources = [
+  "The 1% to 2% of ADV sizing rule: https://daytradingtoolkit.com/dictionary/liquidity",
+  "Position-level liquidity (days to exit, share of daily volume): https://www.alphatheory.com/blog/managing-portfolio-liquidity-position-level-calculation",
+]
+[[field.use]]
+for = "liquid (a $500k position)"
+op = "gte"
+value = 50000000
+mode = "soft"
+tolerance = { relative = 0.2 }
+on_miss = "LIQUIDITY_RISK"
+note = "'very liquid' 100000000; 'some volume' 5000000; or feature.liquidity_class in [HIGH, MEDIUM]"
+[[field.use]]
+for = "tradable at all (a small account)"
+op = "gte"
+value = 5000000
+mode = "soft"
+tolerance = { relative = 0.2 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.price_stats@v2.close"
+theme = "volume and liquidity"
+reads = "The session's closing price in dollars. Under $5 is 'penny' territory (many brokers and funds exclude it; the tick is a large share of the price); under $10 spreads and ATR as a share of price are elevated; a price floor is almost always a hard gate."
+caveats = [
+  "A high price is not 'expensive' and a low price is not 'cheap'; valuation is feature.pe_ratio and size is feature.market_cap.",
+  "Split-adjusted history: a stock that reverse-split 1:10 last month shows a continuous series and a 'high' price with the same thin market it had before.",
+]
+sources = ["Broker and index conventions (the $5 penny-stock line)"]
+[[field.use]]
+for = "a price floor"
+op = "gt"
+value = 10
+mode = "hard"
+note = "5 for a looser floor; 'penny stocks' is close lt 5"
+
+[[field]]
+name = "feature.liquidity_class"
+theme = "volume and liquidity"
+reads = "HIGH when every HIGH threshold holds ($100M a day, close at least $10, option tier A, chain open interest 50k and volume 5k), MEDIUM when every MEDIUM one does ($10M, $5, tier A or B, open interest 5k), else LOW; UNKNOWN when an input is missing. A composite for stock plus options liquidity in one word."
+caveats = [
+  "It bundles option liquidity: a very liquid stock with no options is LOW. For a stock-only screen use rollup.price_stats@v2.adv_usd_20d instead.",
+  "UNKNOWN, not LOW, when the chain run did not cover the session; a hard 'in [HIGH, MEDIUM]' rejects those names on a day the chains failed.",
+]
+sources = ["Site thresholds (config/site/features/company/liquidity.toml)"]
+[[field.use]]
+for = "liquid stock and options"
+op = "in"
+value = ["HIGH", "MEDIUM"]
+mode = "hard"
+
+[[field]]
+name = "feature.option_tier"
+theme = "volume and liquidity"
+reads = "The worse of the put and call liquidity tiers at the target expiry, A (tight, deep) to D (no usable options). A and B are tradable for a retail account; C fills badly; D has no usable series. The tiers come from the near-the-money spread as a share of the mid, open interest and volume."
+caveats = [
+  "Graded at the target expiry (30 to 45 days); a weekly or a far LEAPS series can be worse. For a specific expiry read rollup.option_liquidity@v1.put_spread_pct and call_spread_pct.",
+  "Null when the session's chain run failed for the name (STALE_DATA, FETCH_ERROR), which is not the same as D; a hard criterion rejects it that day.",
+]
+sources = [
+  "Options liquidity checklist (volume, open interest, spread, size): https://www.tastylive.com/concepts-strategies/options-liquidity",
+  "Spread as a share of the premium (a $0.20 spread on a $2 option is 10% round trip): https://www.thetaedge.ai/blog/assess-liquidity-trading-options",
+]
+[[field.use]]
+for = "tradable options"
+op = "in"
+value = ["A", "B"]
+mode = "hard"
+note = "add instrument.optionable eq true; A alone for 'tight spreads'"
+
+[[field]]
+name = "feature.option_chain_oi"
+theme = "volume and liquidity"
+reads = "Open interest summed over the chain: contracts outstanding. Thousands is a thin chain, tens of thousands is tradable, hundreds of thousands and above is an index-like chain. It measures depth for exiting a position; a strike you trade can still be empty, so it is a gate, not a guarantee."
+caveats = [
+  "0 when the session's chain run did not list the name (no options), null when the run failed; the two differ.",
+  "Open interest piles up at a few strikes and expiries; the chain total says little about the strike you want. Check rollup.option_liquidity@v1.put_strike_oi for the target strike.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "a chain with depth"
+op = "gte"
+value = 10000
+mode = "soft"
+tolerance = { relative = 0.3 }
+on_miss = "LIQUIDITY_RISK"
+note = "50000 for 'deep'; the site's HIGH class uses 50000, MEDIUM 5000"
+
+[[field]]
+name = "feature.option_chain_volume"
+theme = "volume and liquidity"
+reads = "Contracts traded across the chain on the session. Hundreds is quiet, a few thousand is active, tens of thousands is heavy. Volume is one day's activity, open interest the standing depth; both low means fills at the market maker's price."
+caveats = [
+  "An earnings week or an expiry Friday multiplies option volume; check rollup.earnings@v1.days_to_earnings before reading a spike as unusual activity.",
+  "0 when the run did not list the name, null when it failed.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "active options"
+op = "gte"
+value = 1000
+mode = "soft"
+tolerance = { relative = 0.3 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_spread_pct"
+theme = "volume and liquidity"
+reads = "The bid-ask spread of the short put at the target expiry as a share of its mid, on the stored after-close quote: 0.10 means a $0.20 spread on a $2.00 option, the round-trip cost of being wrong by nothing. Under 0.10 is tight, 0.10 to 0.20 is tradable with limit orders, above 0.30 the spread eats the premium."
+caveats = [
+  "Stored after the close, when market makers widen quotes: a wide reading can be a quiet print, a tight one can be stale. Judge a trade on a live quote (the chain's live read) and keep this one as a score, as the VRP scanner does.",
+  "The strike is the group's own short strike, not necessarily the one you would trade; rollup.put_wing@v1.best_put_spread_pct is the spread at the best put.",
+  "Null without a two-sided quote at the target expiry (rollup.option_liquidity@v1.liq_status says why).",
+]
+sources = ["Spread as a share of the premium: https://www.thetaedge.ai/blog/assess-liquidity-trading-options"]
+[[field.use]]
+for = "a tradable spread (scored)"
+op = "lt"
+value = 0.15
+mode = "score"
+tolerance = 0.15
+note = "full points under 15% of mid, none at 30%"
+[[field.use]]
+for = "tight spreads"
+op = "lte"
+value = 0.10
+mode = "soft"
+tolerance = 0.05
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_zone_oi"
+theme = "volume and liquidity"
+reads = "Open interest of the target expiry's puts with a delta between 0.15 and 0.40: the standing depth where a short put would be sold. Hundreds is thin, a few thousand is tradable, tens of thousands is deep. A chain can carry a large total (feature.option_chain_oi) with nothing in this zone."
+caveats = [
+  "Open interest is yesterday's standing book, not today's activity; pair with rollup.put_wing@v1.best_put_volume for whether anyone trades it.",
+  "Null without a target expiry or a standard series (rollup.option_liquidity@v1.liq_status).",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "depth where a put would be sold"
+op = "gte"
+value = 2000
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.put_wing@v1.best_put_oi"
+theme = "volume and liquidity"
+reads = "Open interest of the best put: the put at the target expiry nearest the 8 to 15 delta band (rollup.put_wing@v1.best_put_strike and best_put_delta name it). Above 1,000 contracts is the VRP scanner's full-score level; under 100 the exit depends on one market maker."
+caveats = [
+  "A single strike's open interest moves with one institutional position; a round 5,000 at one strike with 50 at its neighbours is one trade, not a liquid wing. Check rollup.put_wing@v1.wing_oi for the band's total.",
+  "Null when no put at the target expiry has our delta in 0.05 to 0.35 (rollup.put_wing@v1.wing_status NO_STRIKE).",
+]
+sources = ["docs/screeners/vrp-scanner.md (owner decision 2026-10-04: liquidity scored, not gated)"]
+[[field.use]]
+for = "a put with standing depth (scored)"
+op = "gt"
+value = 1000
+mode = "score"
+tolerance = { relative = 1.0 }
+note = "full points above 1,000 contracts, none at 0"
+
+[[field]]
+name = "rollup.put_wing@v1.best_put_volume"
+theme = "volume and liquidity"
+reads = "Contracts of the best put traded on the session. Volume is today's activity where open interest is the standing book; a few hundred is active for a single strike, above 1,000 is the VRP scanner's full-score level, 0 on a quiet day is common even on liquid names."
+caveats = [
+  "One day's volume is noisy: an expiry Friday or an earnings week multiplies it, a holiday week halves it. Read it with rollup.put_wing@v1.best_put_oi, which does not reset each day.",
+  "Null without a best put (rollup.put_wing@v1.wing_status).",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "a put that trades (scored)"
+op = "gt"
+value = 1000
+mode = "score"
+tolerance = { relative = 1.0 }
+note = "full points above 1,000 contracts, none at 0"
+
+[[field]]
+name = "rollup.put_wing@v1.best_put_spread_pct"
+theme = "volume and liquidity"
+reads = "The best put's bid-ask spread as a share of its mid on the stored after-close quote: 0.15 means the spread is 15% of the premium. Under 0.15 is the VRP scanner's full-score level, 0.30 and above scores nothing; the trade itself is judged on a live quote."
+caveats = [
+  "After-close quotes are wide by nature; the live spread during the session is what a fill costs. Score it, never gate on it (owner decision 2026-10-04).",
+  "A cheap far-out-of-the-money put has a wide spread in percent of a tiny mid even when the dollar spread is a nickel; read rollup.put_wing@v1.best_put_mid with it.",
+  "Null without a best put (rollup.put_wing@v1.wing_status).",
+]
+sources = ["docs/screeners/vrp-scanner.md; https://www.thetaedge.ai/blog/assess-liquidity-trading-options"]
+[[field.use]]
+for = "a fillable spread (scored)"
+op = "lt"
+value = 0.15
+mode = "score"
+tolerance = 0.15
+note = "full points under 15% of mid, none at 30%"
+
+[[field]]
+name = "rollup.put_wing@v1.delta_band_distance"
+theme = "volume and liquidity"
+reads = "How far the best put's delta is from the 8 to 15 delta band: 0 inside it, else the distance to the nearer edge (a 20 delta put reads 0.05, a 5 delta put 0.03). The VRP scanner scores it rather than gating: a 20 delta put still scores, a 25 delta one less, and nothing is filtered on delta."
+caveats = [
+  "The best put is chosen among our 0.05 to 0.35 delta puts, so the field never exceeds 0.20; a name whose only puts are nearer the money has no best put at all (null, rollup.put_wing@v1.wing_status NO_STRIKE).",
+  "Delta is ours (ADR 0021), from the stored chain: on a name whose price moved after the close the band has moved too; confirm on a live quote.",
+]
+sources = ["docs/screeners/vrp-scanner.md (owner decision 2026-10-04: strike choice scored)"]
+[[field.use]]
+for = "a put in the 8 to 15 delta band (scored)"
+op = "lte"
+value = 0
+mode = "score"
+tolerance = 0.20
+note = "full points inside the band, none at 0.20 away"
+
+[[field]]
+name = "feature.option_chain_known"
+theme = "volume and liquidity"
+reads = "True when the session's chain run says what the name's options are: its fetch succeeded, or it did not list the name at all (no options). False when the fetch failed for the name (STALE_DATA, FETCH_ERROR, NOT_ATTEMPTED). It separates 'no options' (known, true with a tier of D) from 'we do not know today'."
+caveats = [
+  "Null when the chains step did not run for the session at all; the option fields are then null for every name, and a hard option criterion empties the screen. A soft criterion lists the names instead.",
+]
+sources = ["ADR 0043 (the chains step's acceptance); config/site/features/company/liquidity.toml"]
+[[field.use]]
+for = "the options are known today"
+op = "eq"
+value = true
+mode = "soft"
+tolerance = 0
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "feature.liquidity_high"
+theme = "volume and liquidity"
+reads = "True when every HIGH threshold holds: $100M a day of stock volume, a close of at least $10, option tier A on both sides, 50,000 of chain open interest and 5,000 of chain volume. The flag behind feature.liquidity_class HIGH: a name that absorbs a large position in stock and options alike."
+caveats = [
+  "Null (not false) when a threshold cannot be checked because an input is unknown, usually the options on a day the chain fetch failed; feature.liquidity_class says UNKNOWN then.",
+  "Stock-only screens do not need the option conditions: use rollup.price_stats@v2.adv_usd_20d.",
+]
+sources = ["config/site/features/company/liquidity.toml (the HIGH params)"]
+[[field.use]]
+for = "the most liquid names"
+op = "eq"
+value = true
+mode = "hard"
+note = "or feature.liquidity_class eq HIGH"
+
+[[field]]
+name = "feature.liquidity_medium"
+theme = "volume and liquidity"
+reads = "True when every MEDIUM threshold holds: $10M a day, a close of at least $5, option tier A or B, 5,000 of chain open interest. The flag behind feature.liquidity_class MEDIUM: tradable for a retail account in both stock and options."
+caveats = [
+  "A name that is HIGH is MEDIUM too (the thresholds nest); 'MEDIUM but not HIGH' needs both flags.",
+  "Null when an input is unknown.",
+]
+sources = ["config/site/features/company/liquidity.toml (the MEDIUM params)"]
+[[field.use]]
+for = "tradable in stock and options"
+op = "eq"
+value = true
+mode = "hard"
+note = "or feature.liquidity_class in [HIGH, MEDIUM]"

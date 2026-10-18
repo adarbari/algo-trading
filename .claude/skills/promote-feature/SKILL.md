@@ -53,7 +53,7 @@ This skill decides the class, then hands the building to `add-feature` (and `add
    catalogue or `promoted_to` is missing / present with another status. An accepted formula
    with no backlog item needs none.
 2. `make features-doc` (regenerates `docs/data/features.md` and `docs/data/field-guide.md`).
-3. **Field guide**: a `[[field]]` in `config/site/field_guide/<theme>.toml` naming the feature:
+3. **Field guide**: a `[[field]]` in `config/site/field_guide/<group>/<file>.toml` naming the feature:
    how to read it, `[[field.use]]` per intent, caveats, sources (`add-feature` step 4).
 4. **Phrasebook**, when traders have a word for it: `[[phrase]]` in `config/site/phrasebook.toml`
    (`say`, `fields`, `hint`). Add a structured meaning when the word is exact: a

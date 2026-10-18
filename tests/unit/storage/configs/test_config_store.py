@@ -120,6 +120,17 @@ def test_the_guide_playbooks_are_site_only_under_the_guide_folder(root: Path) ->
     assert store.load("alice", "guide_playbooks", "pullback") is None  # never a user's
 
 
+def test_the_field_guide_is_filed_in_group_folders_and_read_in_stem_order(root: Path) -> None:
+    base = root / "site" / "field_guide"
+    for folder, stem in (("chart", "momentum-2"), ("chart", "momentum"), ("company", "events")):
+        (base / folder).mkdir(parents=True, exist_ok=True)
+        (base / folder / f"{stem}.toml").write_text(f'name = "{stem}"\n')
+    store = FileConfigStore(root)
+    assert store.names("site", "field_guide") == ["events", "momentum", "momentum-2"]  # by stem
+    assert store.load("site", "field_guide", "momentum-2") == {"name": "momentum-2"}
+    assert store.load("alice", "field_guide", "momentum") is None  # never a user's
+
+
 def test_the_guide_ideas_are_site_only_one_file_per_family(root: Path) -> None:
     (root / "site" / "guide" / "ideas").mkdir(parents=True)
     (root / "site" / "guide" / "ideas" / "events.toml").write_text('family = "B"\n')

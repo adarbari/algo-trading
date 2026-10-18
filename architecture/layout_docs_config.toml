@@ -18,7 +18,23 @@ purpose = "L3 site settings: one <name>.toml per settings group, each loaded by 
 
 [[config_dir]]
 path = "config/site/field_guide"
-purpose = "L3 field guide, one <theme>.toml per theme (the situations sit in instrument.toml; statements.toml holds the SEC statement groups, analyst.toml the analyst consensus fields and, while the other files sit at the 1000-line cap, the edge build's entries under their own themes; events.toml and levels.toml also hold edge build entries, filed under their own themes, while the other files sit at the cap): how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
+purpose = "L3 field guide: how to read each catalogue field, the criterion per intent, caveats, and the situations (loaded by config/site/settings.py load_field_guide through the config store, one level of subfolders; ADR 0041 amended). One folder per theme group of config/site/guide/sections.toml (tradeable, chart, options, company), no file beside them. A file is <stem>.toml plus <stem>-2.toml, cut at an entry so each stays under 900 lines (the 1000-line cap with room to add); a stem is unique across the folders (the config store names a file by its stem) and the files load in stem order, so <stem>-2 follows <stem> and the order of fields and situations is the order of reading; a theme can span files, and the situations sit in tradeable/instrument-2.toml"
+
+[[config_dir]]
+path = "config/site/field_guide/tradeable"
+purpose = "L3 field guide files of the theme group Who is tradeable (instrument gates); each <stem>.toml with its <stem>-2.toml, under 900 lines each"
+
+[[config_dir]]
+path = "config/site/field_guide/chart"
+purpose = "L3 field guide files of the theme group The chart (momentum and trend, price levels, volume and liquidity, volatility); each <stem>.toml with its <stem>-2.toml, under 900 lines each"
+
+[[config_dir]]
+path = "config/site/field_guide/options"
+purpose = "L3 field guide files of the theme group Options (implied volatility, option chain and short strikes, put wing, walls and expiries); each <stem>.toml with its <stem>-2.toml, under 900 lines each"
+
+[[config_dir]]
+path = "config/site/field_guide/company"
+purpose = "L3 field guide files of the theme group The company and its calendar (events, fundamentals, statements, analyst); each <stem>.toml with its <stem>-2.toml, under 900 lines each"
 
 [[config_dir]]
 path = "config/site/features"
@@ -174,7 +190,23 @@ purpose = "data specs: layers, storage, instruments, vendors, nightly footprint,
 
 [[docs_dir]]
 path = "docs/data/field-guide"
-purpose = "the field guide, one generated page per theme (make features-doc from config/site/field_guide/; the index is docs/data/field-guide.md)"
+purpose = "the field guide, generated pages in one folder per theme group (make features-doc from config/site/field_guide/; the index is docs/data/field-guide.md)"
+
+[[docs_dir]]
+path = "docs/data/field-guide/tradeable"
+purpose = "generated field guide pages of the theme group Who is tradeable (instrument gates), one per theme, a long theme in parts (<theme>-2.md; at most 900 lines each)"
+
+[[docs_dir]]
+path = "docs/data/field-guide/chart"
+purpose = "generated field guide pages of the theme group The chart (momentum and trend, price levels, volume and liquidity, volatility), one per theme, a long theme in parts (<theme>-2.md; at most 900 lines each)"
+
+[[docs_dir]]
+path = "docs/data/field-guide/options"
+purpose = "generated field guide pages of the theme group Options (implied volatility, option chain and short strikes, put wing, walls and expiries), one per theme, a long theme in parts (<theme>-2.md; at most 900 lines each)"
+
+[[docs_dir]]
+path = "docs/data/field-guide/company"
+purpose = "generated field guide pages of the theme group The company and its calendar (events, fundamentals, statements, analyst), one per theme, a long theme in parts (<theme>-2.md; at most 900 lines each)"
 
 [[docs_dir]]
 path = "docs/screeners"

@@ -2,8 +2,8 @@
 (``docs/screeners/rules.md``), two worked examples, the caller's field catalogue in catalogue
 order (name, type, unit, description, the values of a category), the site phrasebook (trader
 vocabulary -> fields, ``config/site/phrasebook.toml``; a phrase keeps only the fields this
-catalogue has), the site field guide (``config/site/field_guide/*.toml``: how to read a field,
-the usual criterion per intent, the caveats, and the situations that fool several thresholds;
+catalogue has), the site field guide (``config/site/field_guide/<group>/*.toml``: how to read a
+field, the usual criterion per intent, the caveats, and the situations that fool several thresholds;
 only entries over this catalogue's fields, sources left out) and the sentence. Rendered with no
 timestamps or ids, so the same catalogue, phrasebook and guide give the same bytes (a provider's
 prompt cache hits and a recorded test stays valid). The prompt carries no market data, results
