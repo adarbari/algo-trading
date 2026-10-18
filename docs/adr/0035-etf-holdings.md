@@ -159,6 +159,16 @@ holdings and the date they are as of. Only SPY's holdings were fetched, as a mem
   file already covers are in that count and were in scope before.
 - Storage: about 100 rows per fund, 37 bytes a row measured; a full pass over the ~1,100
   covered funds is ~110k rows, ~4 MB. Raw files add about 12 MB a night, kept 14 days.
+- **Amendment 2026-10-17 (EB D4): shares outstanding.** The iShares file's header block states
+  `Shares Outstanding`; the State Street workbook and the ProShares file state none, and no
+  file has NAV or AUM (checked on the recorded fixtures), so those issuers' funds have no
+  count and no workaround is built (blocked: no paid or scraped source). The task stages one
+  `holdings/etf_shares` row per accepted iShares read (one row per fund and the file's as-of
+  date; `known_from` the session of the New York date of the fetch (next session on a non-session day), never before the as-of date; readers
+  `data.funds.shares`). `[etf_holdings] daily_funds` (a few dozen iShares funds the
+  flow-pressure edges need) are read every night outside the weekly slots and the cap, the
+  other iShares funds weekly. Flows are not stored (change in shares times the stored close).
+  History accrues from the first night; nothing is backfilled.
 - Known limits and follow-ups: N-PORT filers that print tickers skip the CUSIP bridge, and the
   `invCountry == US` test keeps US-listed companies domiciled abroad name-only on the
   N-PORT lines that do carry a ticker; their State Street lines are linked (decision 4);
