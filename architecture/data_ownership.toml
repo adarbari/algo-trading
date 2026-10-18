@@ -144,6 +144,7 @@ owner = ["src/algotrade/storage/backends/*", "src/algotrade/storage/tables/reade
 allowed = [
     "src/algotrade/storage/tables/interfaces.py",  # declares partition_seq on TableStore
     "src/algotrade/data/outcomes/reading.py",  # the outcome partitions' stamps, for the harness's legs
+    "src/algotrade/data/outcomes/residuals.py",  # the residual partitions' stamps, likewise
     "src/algotrade/services/evaluation/cross_section/legs/reuse.py",  # checks a stored leg's reads against the partitions' stamps
 ]
 section = "docs/adr/0022-atomic-run-publication.md#decision"

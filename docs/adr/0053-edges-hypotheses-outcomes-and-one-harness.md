@@ -762,11 +762,12 @@ factor-neutral.
    import contract, importable only from `services/evaluation`).
 2. **The maths.** `residual = fwd_return - sum_k beta_k x factor_k return`, the factor returns the
    simple returns over S..end of the proxies of `factor_betas@v1` (market SPY; size IWM - SPY;
-   momentum MTUM - SPY; value VLUE - SPY; the sector SPDR - SPY only for a name whose
-   `beta_sector` is set, i.e. a point-in-time sector exists). `end` is T, or a delisted name's last
+   momentum MTUM - SPY; value VLUE - SPY). `end` is T, or a delisted name's last
    bar, as in the forward row. The betas come from log returns and the window sums simple
-   returns: a first-order match, stated rather than hidden. The four betas are the four-factor
-   fit's and `beta_sector` the five-factor fit's, as `factor_betas@v1` stores them.
+   returns: a first-order match, stated rather than hidden. The sector loading is
+   left out (review decision): `factor_betas@v1` stores the four betas of one four-factor fit and
+   `beta_sector` from a different five-factor fit, so adding it counts sector exposure twice.
+   Sector would need a `factor_betas@v2` storing all five betas of the five-factor fit.
 3. **Point in time.** The betas are the `factor_betas@v1` rows of the session before S
    (`previous_session(S)`), estimated on the 252 sessions ending there, read through
    `data.rollups` and the same session's `relative_strength@v1` `sector_etf`. Nothing of the
@@ -790,18 +791,25 @@ factor-neutral.
    horizons whose edges measure it. A read that did not attach them (the training frame, the
    paper settlement) fails loudly for a residual edge instead of reading the excess return.
 6. **The verdict says so.** `EdgeFacts.neutral`: the headline names the figure "factor-neutral:
-   market, size, momentum, value and sector taken off". The Guide term `outcome_residual_return`
+   market, size, momentum and value taken off". The Guide term `outcome_residual_return`
    explains it; `tests/architecture/guide/test_outcome_measures.py` fails until every
    `EXCESS_MEASURES` value has its term.
-7. **Known limits.** (a) The leg-reuse stamps (ADR 0063) cover `forward_returns@v2` partitions
-   only: a residual partition written or restated after a leg was stored does not invalidate it
-   (a leg measured before the backfill holds `NO_RESIDUAL_ROW` sessions). Run the backfill before
-   the first harness run of a residual edge; adding the residual partitions to the stamps is a
-   follow-up. (b) No workflow step runs the task yet: a nightly step after `outcomes` and
-   `rollups` (needs `factor_betas@v1`) is a follow-up. (c) The sector SPDR term mixes two fits'
-   betas (point 2); a single five-factor fit for every named sector is a candidate change to
-   `factor_betas@v1`. (d) Delisted names are residualised over their own window, so their
-   delisting return is not in it (as in the forward row).
+7. **Leg reuse and settlement.** The leg-reuse stamps (ADR 0063) cover the residual partitions
+   when any plan measures a residual return: each partition's sequence is the forward one times
+   `SEQ_SCALE` plus the residual one, and a (S, horizon) stamp is the later of the two
+   `knowledge_ts`, so a backfill of the residual grain re-measures exactly the legs stored with
+   `NO_RESIDUAL_ROW` (an edge that does not measure it is unaffected). The paper settlement
+   (`forward/settle.py`) attaches the residual rows for a residual edge: a trade whose residual
+   row is not stored stays open until the grace window ends, then is skipped with the reason; it
+   never reads the excess return and never stops the other edges' settlement. The training frame
+   still refuses a residual edge loudly (no attach there).
+8. **The nightly step.** `residual-returns` (needs `outcomes` and `rollups`, optional) runs the
+   task each night and is accepted by `check_residual_returns`: every forward outcome of the
+   session's windows has a residual row (FAIL otherwise), UNMEASURED rows are a WARN naming
+   their reasons (the ETFs themselves have no betas row, so a WARN is the normal state).
+9. **Not here.** Sector: a `factor_betas@v2` storing all five betas of the five-factor fit would
+   be needed to add it (point 2). Delisted names are residualised over their own window, so
+   their delisting return is not in it (as in the forward row).
 
 ## Amendment 2026-10-18: buy/hold bands for turnover-aware cost (edge build H7)
 

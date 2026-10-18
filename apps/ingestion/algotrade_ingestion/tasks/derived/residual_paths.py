@@ -6,8 +6,10 @@ its factor loadings explain over the same sessions.
 
 ``end`` is T, or a delisted name's last bar (the window the forward row measured). The factor
 returns are the simple returns over S..end of the ETF proxies of ``factor_betas@v1``: market
-SPY, size IWM minus SPY, momentum MTUM minus SPY, value VLUE minus SPY, and, only for a name
-whose betas carry a ``beta_sector`` (a point-in-time sector exists), its sector SPDR minus SPY.
+SPY, size IWM minus SPY, momentum MTUM minus SPY, value VLUE minus SPY. The sector loading is
+left out on purpose: ``factor_betas@v1`` stores the four betas of one four-factor fit and
+``beta_sector`` from a different five-factor fit, so adding it would count sector exposure twice
+(a ``factor_betas@v2`` storing all five betas of the five-factor fit is needed to add sector).
 The betas are those the caller read from the session before S: estimated on the 252 sessions
 ending there, so they never see a return of the window (the betas come from log returns, the
 window sums simple ones: a first-order match, stated, not hidden).
@@ -73,10 +75,9 @@ def residual_rows(
     ``outcome_status``, ``outcome_reason``) -> one row per name, ``COLUMNS``.
 
     ``closes``: sessions x instruments over exactly S..T, the names and the ETFs (``wide_closes``);
-    ``etf``: ticker -> instrument id of the factor ETFs and the sector SPDRs the session knows;
-    ``betas``: ``factor_betas@v1`` rows at ``beta_session`` indexed by instrument id (plus
-    ``sector_etf``, the ticker ``relative_strength@v1`` gives), or None when no partition is
-    stored there."""
+    ``etf``: ticker -> instrument id of the factor ETFs the session knows;
+    ``betas``: ``factor_betas@v1`` rows at ``beta_session`` indexed by instrument id, or None
+    when no partition is stored there."""
     ids = forward["instrument_id"].astype(str).to_numpy()
     n = len(ids)
     status = forward["outcome_status"].to_numpy(dtype=object).copy()
@@ -129,7 +130,7 @@ def _fill(
     )
     found = pd.DataFrame(index=pd.Index(names)) if betas is None else betas.reindex(names)
     columns = ("beta_mkt", "beta_size", "beta_mom", "beta_value")
-    values = {c: _numbers(found, c) for c in (*columns, "beta_sector")}
+    values = {c: _numbers(found, c) for c in columns}
     state = found["factor_status"].to_numpy(dtype=object) if "factor_status" in found else None
     absent = np.ones(len(live), dtype=bool) if betas is None else ~pd.Index(names).isin(betas.index)
     refuse(absent, NO_BETAS)
@@ -143,21 +144,6 @@ def _fill(
     explained = values["beta_mkt"] * spy
     for ticker, column in FACTORS:
         explained = explained + values[column] * (ends[ticker] - spy)
-    sector_beta = values["beta_sector"]
-    tickers = found["sector_etf"].to_numpy(dtype=object) if "sector_etf" in found else None
-    has_sector = np.isfinite(sector_beta)
-    if tickers is not None and has_sector.any():
-        sector_end = np.full(len(live), np.nan)
-        for ticker in {
-            t for t, w in zip(tickers, has_sector, strict=True) if w and isinstance(t, str)
-        }:
-            mine = tickers == ticker
-            sector_end[mine] = _cumulative(closes, etf.get(ticker))[last][mine]
-        refuse(has_sector & ~np.isfinite(sector_end), NO_FACTOR_BAR)
-        with np.errstate(invalid="ignore"):
-            explained = explained + np.where(has_sector, sector_beta * (sector_end - spy), 0.0)
-    elif has_sector.any():  # a sector loading with no sector ETF named: not a four-factor residual
-        refuse(has_sector, NO_BETAS)
     done = live[pending]
     factor[done] = explained[pending]
     residual[done] = forward["fwd_return"].to_numpy(dtype=float)[done] - explained[pending]

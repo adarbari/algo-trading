@@ -7,7 +7,7 @@ A forward row with no residual row is UNMEASURED with the reason ``NO_RESIDUAL_R
 not run for its window): never a zero, never the excess return in its place. ``as_of`` keeps only
 rows known by then (row by row)."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import date, datetime
 
 import pandas as pd
@@ -21,6 +21,36 @@ _STORED = (
     "instrument_id", "session_date", "horizon_sessions", "fwd_residual_return", "outcome_status",
     "outcome_reason", "knowledge_ts",
 )  # fmt: skip
+
+
+def residual_seqs(reader: StoreReader, sessions: Iterable[date]) -> dict[date, int]:
+    """The commit sequence of each start session's committed residual partition (those of
+    ``sessions`` that exist), read before the rows so a later commit changes it (ADR 0063)."""
+    wanted = sorted(set(sessions))
+    if not wanted:
+        return {}
+    found = reader.partition_seq(RESIDUAL_RETURNS, wanted[0], wanted[-1])
+    return {d: q for d, q in found.items() if d in set(wanted)}
+
+
+def residual_known(
+    reader: StoreReader, sessions: Iterable[date], as_of: datetime
+) -> dict[tuple[date, int], datetime]:
+    """Per (start session, horizon) of ``sessions`` the latest ``knowledge_ts`` known by
+    ``as_of`` among its residual rows (a restated or late backfilled row moves it)."""
+    latest: dict[tuple[date, int], datetime] = {}
+    for day in sorted(set(sessions)):
+        frame = reader.table_range(
+            RESIDUAL_RETURNS, day, day, as_of, columns=("instrument_id", "horizon_sessions")
+        )
+        if frame is None or frame.empty:
+            continue
+        known = pd.to_datetime(frame["knowledge_ts"], utc=True)
+        for horizon, stamp in zip(frame["horizon_sessions"], known.dt.to_pydatetime(), strict=True):
+            key = (day, int(horizon))
+            if key not in latest or stamp > latest[key]:
+                latest[key] = stamp
+    return latest
 
 
 def read_residuals(

@@ -10,14 +10,17 @@ from datetime import date
 import pandas as pd
 import pytest
 
+from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.time.calendar import previous_session, sessions_ending
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.readers import StoreReader
+from algotrade.storage.tables.schemas import FORWARD_RETURNS
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.derived.outcomes import DEFAULT_HORIZON
+from algotrade_ingestion.tasks.derived.outcomes import DEFAULT_HORIZON, compute_outcomes
 from algotrade_ingestion.tasks.derived.residual_returns import (
     FACTOR_BETAS,
     TABLE,
+    check_residual_returns,
     compute_residual_returns,
     residual_horizons,
 )
@@ -135,3 +138,23 @@ def test_a_window_not_closed_is_refused() -> None:
         compute_residual_returns(
             task_ctx(writer, clock=lambda: pd.Timestamp("2026-10-02T12:00Z")), END
         )
+
+
+def test_the_acceptance_check_warns_on_gaps_and_fails_on_a_missing_row() -> None:
+    writer, reader, _ = _store()
+    assert check_residual_returns(reader, END, SourcesSettings())[0].status == "FAIL"  # no run
+    ctx = task_ctx(writer)
+    compute_outcomes(ctx, END)
+    compute_residual_returns(ctx, END)
+    (warn,) = check_residual_returns(reader, END, SourcesSettings())
+    assert warn.status == "WARN" and "NO_BETAS" in warn.detail  # the ETFs have no betas rows
+    start = sessions_ending(END, H + 1)[0]
+    extra = reader.table(FORWARD_RETURNS, start)
+    assert extra is not None
+    extra = extra[extra["horizon_sessions"] == H].head(1).assign(instrument_id="EQ:ZZ")
+    extra = extra.assign(
+        run_id="late", knowledge_ts=pd.Timestamp(END, tz="UTC") + pd.Timedelta(days=2)
+    )
+    writer.write_table(FORWARD_RETURNS, start, "late", extra)  # a forward row the run never saw
+    (fail,) = check_residual_returns(reader, END, SourcesSettings())
+    assert fail.status == "FAIL" and "without a residual row" in fail.detail

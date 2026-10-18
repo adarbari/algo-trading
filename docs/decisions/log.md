@@ -634,3 +634,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the session before S is D for the usual offset of 1 and never holds a window return for a larger one; the sector term is what the plan lists, and the mixed-fit inconsistency is small and visible; a nightly step needs the workflow-step tests and a real-store cost measurement the PR cannot run.
+
+## 2026-10-18 | EB H11 (residual returns) review | Four-factor betas only, stamps, nightly step, settlement
+- Question: how to resolve the architect's four findings on the residual-returns grain (sector counted twice, stale legs, no nightly step, settlement raising for a residual edge)?
+- Options: sector from `beta_sector` / drop it until a five-beta `factor_betas@v2`; leave the stamps / add the residual partitions to them; follow-up step / the step now; attach residuals in settlement / catch the error per edge.
+- Decision: residual on the four-factor betas only (market, size, momentum, value; a `factor_betas@v2` with all five betas of one fit is needed for sector; this supersedes the 2026-10-18 entry's sector choice); the stamps cover the residual partitions when a plan measures them (combined sequence and `knowledge_ts`); the optional nightly step `residual-returns` with an acceptance check; settlement attaches the residual rows, an unstored one waits and is skipped with a reason after the grace window.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the stored sector slope is from a different fit than the other four, so adding it counts sector exposure twice; a leg stored before the backfill must not stand for ever; an unscheduled grain goes stale; one residual edge must not stop every followed edge's settlement.

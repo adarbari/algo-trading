@@ -20,14 +20,13 @@ see_also = ["edge", "base_rate", "win_rate", "verdict"]
 [[term]]
 id = "outcome_residual_return"
 term = "Outcome: Residual return (factor-neutral)"
-short = "An excess-return edge whose value is the return left after market, size, momentum, value and sector moves are taken off."
+short = "An excess-return edge whose value is the return left after market, size, momentum and value moves are taken off."
 body = """
 The edge names the measure residual return. The value for a pick is its return over the holding
 period minus what its factor loadings explain. That is the loading on each factor times that
 factor's return over the same days. The factors are ETF proxies. They are the market (SPY), size
-(IWM minus SPY), momentum (MTUM minus SPY) and value (VLUE minus SPY). A name with a sector on that
-date also gets its sector fund minus SPY. The loadings come from the 252 sessions ending before the
-entry session, so nothing of the holding period is in them. The figure is factor-neutral. An edge
+(IWM minus SPY), momentum (MTUM minus SPY) and value (VLUE minus SPY). Sector exposure is not
+taken off. The loadings come from the 252 sessions ending before the entry session, so nothing of the holding period is in them. The figure is factor-neutral. An edge
 that only holds a cheap, small or high-momentum basket earns about zero here. Cost is charged once,
 as for an excess return. It is a return, so its windows add up to a curve. A name the factors cannot
 cover is unmeasured, never a zero and never a market-only residual. That covers windows before 2013

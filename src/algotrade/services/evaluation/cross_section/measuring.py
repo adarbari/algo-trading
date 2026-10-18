@@ -511,7 +511,8 @@ def _measure(
     todo = reuse.days
     legs = [lg for p in plans for b in p.blocks for lg in b if todo is None or lg.decision in todo]
     days = sorted({leg.decision for leg in legs})
-    out.seqs = outcome_seqs(reader, {leg.entry for leg in legs})  # before any outcome row is read
+    residuals = any(needs_residual(p.scope.edge) for p in plans)  # their stamps count too
+    out.seqs = outcome_seqs(reader, {leg.entry for leg in legs}, residuals)  # before any row read
     failed: dict[int, MissingDataError] = {}
     out.closed.update({p.horizon: set(reuse.closed.get(p.horizon, ())) for p in plans})
     for at in range(0, len(days), CHUNK_SESSIONS):

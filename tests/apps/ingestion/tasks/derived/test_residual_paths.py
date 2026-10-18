@@ -1,7 +1,8 @@
 """The residual-return arithmetic on a hand-built panel with known answers: the return minus the
 loadings times the factor returns of the window (size, momentum and value as ETF minus SPY), the
-sector term only for a name with a sector loading, a DELISTED name measured over its own window,
-and every gap an UNMEASURED row with its reason, never a market-only residual and never a zero."""
+no sector term (the stored sector loading is from another fit), a DELISTED name measured over
+its own window, and every gap an UNMEASURED row with its reason, never a market-only residual
+and never a zero."""
 
 from datetime import date
 
@@ -75,12 +76,12 @@ def test_the_residual_is_the_return_minus_the_loadings_times_the_factor_returns(
     assert list(out.reset_index().columns) == list(COLUMNS)
 
 
-def test_a_sector_loading_adds_the_sector_etf_minus_spy_and_only_then() -> None:
+def test_a_sector_loading_is_ignored_it_would_count_sector_exposure_twice() -> None:
     sector = {"EQ:A": {"beta_sector": 0.4, "factor_status": "OK", "sector_etf": "XLK"}}
     out = _run({"EQ:A": A, "EQ:B": A}, _forward("EQ:A", "EQ:B"), _betas({**sector, "EQ:B": {}}))
-    assert out.loc["EQ:A", "fwd_factor_return"] - out.loc["EQ:B", "fwd_factor_return"] == (
-        pytest.approx(0.4 * (0.20 - 0.10))
-    )  # B has no sector (NO_SECTOR): the four factors alone, still measured
+    assert out.loc["EQ:A", "fwd_factor_return"] == pytest.approx(
+        out.loc["EQ:B", "fwd_factor_return"]
+    )
 
 
 def test_a_delisted_name_is_measured_over_its_own_window_not_the_full_one() -> None:
@@ -141,12 +142,6 @@ def test_a_factor_etf_gap_at_the_window_end_is_no_factor_bar() -> None:
     closes = wide_closes(pd.DataFrame(rows), WINDOW, "close")
     out = residual_rows(_forward("EQ:A"), closes, WINDOW, ETF, _betas({"EQ:A": {}}), BEFORE)
     assert out.set_index("instrument_id").loc["EQ:A", "outcome_reason"] == NO_FACTOR_BAR
-
-
-def test_a_sector_loading_whose_etf_has_no_bar_is_unmeasured() -> None:
-    sector = {"EQ:A": {"beta_sector": 0.4, "factor_status": "OK", "sector_etf": "XLF"}}
-    out = _run({"EQ:A": A}, _forward("EQ:A"), _betas(sector))
-    assert out.loc["EQ:A", "outcome_reason"] == NO_FACTOR_BAR  # XLF is not in the reference
 
 
 def test_an_unmeasured_forward_row_is_carried_with_its_reason() -> None:

@@ -576,7 +576,7 @@ def _judge_one(
     basis = _basis_words((c.variant, c.horizon))
     tags = ["short leg"] if oos.side == "short" else []
     if facts.neutral:  # the figure is the return left after the ETF factor loadings
-        tags.append("factor-neutral: market, size, momentum, value and sector taken off")
+        tags.append("factor-neutral: market, size, momentum and value taken off")
     held = f" ({', '.join(tags)})" if tags else ""
     body = (
         f"Out-of-sample, {basis}{held}: win rate {_pct(oos.hit_rate)} against a base rate of "

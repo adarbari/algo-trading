@@ -9,15 +9,16 @@ the horizons are the open edges' that measure ``residual_return``, with the harn
 window of S..T over h sessions is written to partition S.
 Per name the row carries the return minus the loadings times the factor returns of the window
 (``residual_paths``), from the ``factor_betas@v1`` rows of the session before S (252 sessions
-ending there: nothing of the window is in them) and ``relative_strength@v1``'s ``sector_etf`` at
-the same session. A name the betas or the factor ETFs cannot cover is UNMEASURED with a reason
+ending there: nothing of the window is in them). A name the betas or the factor ETFs cannot
+cover is UNMEASURED with a reason
 (MTUM and VLUE start in 2013, so earlier windows all say ``NO_FACTOR_HISTORY``); the forward
 grain's rows are untouched, so no stored leg is invalidated.
 
 ``--from/--to`` backfills run each window-end session as its own run, as ``outcomes`` does, and
 need ``factor_betas@v1`` stored for the sessions before each S (``algotrade-ingest rollups
 --only factor_betas@v1 --from ... --to ...``): without it every name is ``NO_BETAS``. The nightly
-(no ``--from``) recomputes the last ``RECHECK + 1`` window ends. No workflow step runs it yet.
+(no ``--from``) recomputes the last ``RECHECK + 1`` window ends; the nightly step of the same
+name runs it after ``outcomes`` and ``rollups`` and accepts it with ``check_residual_returns``.
 """
 
 from collections.abc import Sequence
@@ -27,6 +28,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import CLOSED, EXCESS_MEASURES
 from algotrade.config.edges.loading import Documents, load_edges
+from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.time.calendar import (
     close_time,
     previous_session,
@@ -37,9 +39,8 @@ from algotrade.data import StoreReader
 from algotrade.data.prices import SessionBars
 from algotrade.data.rollups import rollup_rows
 from algotrade.features.rollups.relative.factor_betas import BETAS
-from algotrade.features.rollups.relative.relative_strength import ETFS
-from algotrade.storage.runs import RunRecord
-from algotrade.storage.tables.schemas import RESIDUAL_RETURNS
+from algotrade.storage.runs import RunRecord, RunStatus
+from algotrade.storage.tables.schemas import FORWARD_RETURNS, RESIDUAL_RETURNS
 from algotrade_ingestion.tasks.derived.outcome_paths import wide_closes, window_rows
 from algotrade_ingestion.tasks.derived.outcomes import (
     CHUNK,
@@ -54,13 +55,13 @@ from algotrade_ingestion.tasks.derived.outcomes import (
 )
 from algotrade_ingestion.tasks.derived.residual_paths import FACTOR_ETFS, residual_rows
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_ingestion.tasks.maintenance.quality import Check
 
 TASK = "residual-returns"
 SOURCE = "residual_returns"
 TABLE = RESIDUAL_RETURNS
 TABLES = (TABLE,)
 FACTOR_BETAS = "rollups/instrument/factor_betas@v1"  # the group's table (features.rollups.relative)
-RELATIVE = "rollups/instrument/relative_strength@v1"
 
 
 def residual_horizons(configs: Documents | None = None) -> list[int]:
@@ -116,7 +117,7 @@ def _one(
         for h, window in windows(run, end, horizons, first, nightly):
             names, _ = universe_ids(run.reader, window.start, not nightly)
             resolver = run.resolver(window.start)
-            etf = {t: resolver.id_for(t) for t in (*FACTOR_ETFS, *ETFS) if resolver.knows(t)}
+            etf = {t: resolver.id_for(t) for t in FACTOR_ETFS if resolver.knows(t)}
             prices = panel.window(window.start, end)
             forward, _ = window_rows(prices, window, names, None, left, panel.flagged)
             before = previous_session(window.start)  # the betas known before the entry close
@@ -145,17 +146,55 @@ def _one(
 
 def _betas_at(reader: StoreReader, day: date) -> pd.DataFrame | None:
     """``factor_betas@v1``'s rows of exactly ``day`` (never an older partition), indexed by
-    instrument id, with ``relative_strength@v1``'s ``sector_etf`` of that day; None: not stored."""
+    instrument id; None: not stored."""
     rows = rollup_rows(reader, FACTOR_BETAS, day, day)
     if rows is None:
         return None
-    rows = rows[["instrument_id", *BETAS, "factor_status"]].assign(
+    rows = rows[["instrument_id", *BETAS[:4], "factor_status"]].assign(
         instrument_id=lambda f: f["instrument_id"].astype(str)
     )
-    sector = rollup_rows(reader, RELATIVE, day, day)
-    if sector is not None and "sector_etf" in sector.columns:
-        sector = sector[["instrument_id", "sector_etf"]].assign(
-            instrument_id=lambda f: f["instrument_id"].astype(str)
-        )
-        rows = rows.merge(sector, on="instrument_id", how="left")
     return rows.drop_duplicates("instrument_id", keep="last").set_index("instrument_id")
+
+
+def check_residual_returns(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
+    """The acceptance of the ``residual-returns`` step for window end ``session``: for each
+    horizon the run computed, every name the forward outcomes of that window hold has a residual
+    row (counted again here from the stored partitions, not taken from the run), and the run's
+    rows are stored. Names the factors or betas cannot cover are UNMEASURED rows, a WARN naming
+    the reasons, never a failure: they are the grain's honest gaps."""
+    runs = [r for r in reader.runs(TASK, session) if r.status == RunStatus.COMPLETE]
+    if not runs:
+        return [
+            Check("residual-returns", "FAIL", f"no complete residual-returns run for {session}")
+        ]
+    problems: list[str] = []
+    gaps: list[str] = []
+    for key, value in sorted(runs[-1].stats.items()):
+        if not (key.startswith("h") and isinstance(value, dict)):
+            continue
+        start, horizon = date.fromisoformat(value["start"]), int(key[1:])
+        mine = _names(reader.table(TABLE, start), session, horizon)
+        forward = _names(reader.table(FORWARD_RETURNS, start), session, horizon)
+        if forward - mine or len(mine) != value["rows"]:
+            problems.append(
+                f"{key}: {len(forward - mine)} forward rows without a residual row, "
+                f"{len(mine)} of {value['rows']} rows stored"
+            )
+        if value["unmeasured"]:
+            gaps.append(f"{key}: {value['unmeasured']}")
+    if problems:
+        return [Check("residual-returns", "FAIL", "; ".join(problems))]
+    detail = f"every forward outcome of {session}'s windows has a residual row"
+    if gaps:
+        return [Check("residual-returns", "WARN", f"{detail}; unmeasured: {'; '.join(gaps)}")]
+    return [Check("residual-returns", "PASS", detail)]
+
+
+def _names(frame: pd.DataFrame | None, session: date, horizon: int) -> set[str]:
+    """The instrument ids of ``frame``'s rows of one window end and horizon."""
+    if frame is None:
+        return set()
+    keep = (pd.to_datetime(frame["window_end"]).dt.date == session) & (
+        frame["horizon_sessions"] == horizon
+    )
+    return set(frame.loc[keep, "instrument_id"].astype(str))

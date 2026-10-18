@@ -11,9 +11,11 @@ from datetime import date, datetime
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
+from algotrade.data.outcomes.residuals import residual_known, residual_seqs
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import FORWARD_RETURNS
 
+SEQ_SCALE = 1_000_000  # ``outcome_seqs(residuals=True)``: forward sequence x this + residual's
 OUTCOME_FIELDS = (
     "fwd_return", "fwd_excess_return", "fwd_max_return", "fwd_max_drawdown", "fwd_realised_vol",
     "outcome_status", "outcome_reason",
@@ -26,14 +28,23 @@ def stored_sessions(reader: StoreReader) -> list[date]:
     return list(reader.dates(FORWARD_RETURNS))
 
 
-def outcome_seqs(reader: StoreReader, sessions: Iterable[date]) -> dict[date, int]:
+def outcome_seqs(
+    reader: StoreReader, sessions: Iterable[date], residuals: bool = False
+) -> dict[date, int]:
     """The commit sequence of each start session's committed outcome partition (those of
-    ``sessions`` that exist), read before the rows so a later commit changes it (ADR 0063)."""
+    ``sessions`` that exist), read before the rows so a later commit changes it (ADR 0063).
+    ``residuals``: the run reads the residual partitions too, so each sequence is the forward
+    one scaled by ``SEQ_SCALE`` plus the residual partition's (0 when none): a backfill of
+    either changes it, and a leg stored with ``NO_RESIDUAL_ROW`` is measured again."""
     wanted = sorted(set(sessions))
     if not wanted:
         return {}
     found = reader.partition_seq(FORWARD_RETURNS, wanted[0], wanted[-1])
-    return {d: s for d, s in found.items() if d in set(wanted)}
+    own = {d: s for d, s in found.items() if d in set(wanted)}
+    if not residuals:
+        return own
+    extra = residual_seqs(reader, wanted)
+    return {d: s * SEQ_SCALE + extra.get(d, 0) for d, s in own.items()}
 
 
 def outcome_stamps(
@@ -42,6 +53,7 @@ def outcome_stamps(
     as_of: datetime,
     benchmark: str = "SPY",
     names_for: Collection[int] = (),
+    residuals: bool = False,
 ) -> tuple[dict[tuple[date, int], datetime], dict[tuple[date, int], frozenset[str]]]:
     """Per (start session, horizon) of ``sessions`` with a ``benchmark`` row known by ``as_of``:
     the latest ``knowledge_ts`` among those rows (which windows are closed, and when the newest
@@ -72,6 +84,10 @@ def outcome_stamps(
             if key[1] in names_for:
                 names.setdefault(key, set()).add(str(name))
             if key not in latest or stamp > latest[key]:
+                latest[key] = stamp
+    if residuals:  # a residual row known later than the forward one moves the stamp
+        for key, stamp in residual_known(reader, sessions, as_of).items():
+            if key in latest and stamp > latest[key]:
                 latest[key] = stamp
     return latest, {k: frozenset(v) for k, v in names.items()}
 
