@@ -29,6 +29,16 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
 - ``events/earnings``  ``events.stored_events``: every calendar row known on or before the
                        session (``known_from``, else the session that stored it: ADR 0050),
                        as stored (what was known then); ``None`` when there is none
+- ``events/fund_nav``  ``events.stored_events``: every closed-end fund NAV row known on or before
+                       the session (``known_from``: the session after the NAV date, later for a
+                       restated NAV), as stored, so a compute reads NAVs by their own date
+                       (``cef_nav@v1``; the Tiingo licence is personal, ADR 0028); ``None`` when
+                       none is stored
+- ``holdings/etf_shares``
+                       ``funds.shares.share_versions``: every iShares shares-outstanding row (every
+                       version of a restated count) known on or before the session, sorted by
+                       ``known_from``; a compute keeps the latest version of each fund and
+                       ``as_of`` (``etf_flows@v1``); ``None`` when none is stored
 - ``filings/walk``     ``events.filing_walks``: the clean daily-index walks of the filings task
                        (``session_date`` of the run, ``walked_to``), only runs of sessions on or
                        before the session; ``None`` when there is none. How far the stored
@@ -141,6 +151,8 @@ from algotrade.data.events import (
 )
 from algotrade.data.funds.holdings import TABLE as HOLDINGS
 from algotrade.data.funds.holdings import funds_holdings
+from algotrade.data.funds.shares import TABLE as ETF_SHARES
+from algotrade.data.funds.shares import share_versions
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.macro.series import known_window, stored_vintages
 from algotrade.data.prices import DateWindow, SessionBars, session_bars, window_closes
@@ -305,6 +317,13 @@ def _event_snapshots(table: str, from_first_session: bool = False) -> Loader:
         return _Snapshots(frame, _days(frame[KNOWN_FROM]))  # known on or before
 
     return load
+
+
+def _etf_share_versions(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    """Every version of every fund's shares-outstanding row known by the chunk's last session,
+    ordered by ``known_from``: ``at`` keeps those known by the session (ADR 0050)."""
+    frame = share_versions(reader, sessions[-1])
+    return _Snapshots(frame, _days(frame["known_from"]) if len(frame) else np.array([], "M8[D]"))
 
 
 def _filing_walks(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
@@ -483,6 +502,8 @@ def _group_rows(
 INPUTS: Mapping[str, Loader] = {
     BARS: _bars,
     "events/earnings": _event_snapshots("events/earnings"),
+    "events/fund_nav": _event_snapshots("events/fund_nav"),
+    ETF_SHARES: _etf_share_versions,
     "filings/walk": _filing_walks,
     "chains/status": _partition(chain_status),
     "chains/option_quotes": _partition(option_quotes),

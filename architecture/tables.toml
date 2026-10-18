@@ -288,6 +288,16 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the next earnings date's shift from the year-ago report plus 364 days and the session it was first stored; reads events/earnings as earnings@v1"
 
 [[table]]
+name = "rollups/instrument/cef_nav@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "a closed-end fund's NAV, its premium or discount to NAV on the NAV's own date and the discount's z-score over 252 sessions (E4); reads events/fund_nav (known_from) and bars/1d; personal licence (Tiingo)"
+
+[[table]]
+name = "rollups/instrument/etf_flows@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "an iShares fund's shares outstanding and its change over 21 sessions (E4); reads holdings/etf_shares (known_from, every restated version)"
+
+[[table]]
 name = "rollups/instrument/earnings_gap_volume@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the last earnings report's window volume over the 20 sessions before it (E3); reads events/earnings and bars/1d through earnings_reaction's window rule"
