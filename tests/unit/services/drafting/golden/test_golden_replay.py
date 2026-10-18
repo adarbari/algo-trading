@@ -9,6 +9,7 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.core.model.completion import Completion
 from algotrade.services.configs import field_catalog
+from algotrade.services.drafting.contract.missing_notes import CLAIMS_MISSING_PASSES
 from algotrade.services.drafting.golden.golden import (
     GoldenCase,
     load_cases,
@@ -96,6 +97,8 @@ def test_a_contract_answer_through_the_whole_draft_meets_the_case(
     assert result.passed, f"{slug}/{case.id}: {result}"
     assert not any(f.name in json.dumps(draft.document) for f in draft.formulas)
     assert '"part"' not in json.dumps(draft.document)  # a tag never enters the saved spec
+    for note in draft.notes:  # missing data never passes, an exclusion included (ADR 0015, 0071)
+        assert not CLAIMS_MISSING_PASSES.search(note), f"{slug}/{case.id}: {note}"
     if case.explained:
         graded = score_parts(case.explained, draft.parts)
         assert graded.passed, f"{slug}/{case.id}: {graded}"

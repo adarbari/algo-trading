@@ -70,6 +70,10 @@ from algotrade.services.drafting.contract.gaps import (
     unresolved_of,
 )
 from algotrade.services.drafting.contract.groups import group_parts, prune_groups
+from algotrade.services.drafting.contract.missing_notes import (
+    exclusion_notes,
+    without_false_claims,
+)
 from algotrade.services.drafting.contract.suggestions import (
     DroppedSuggestion,
     Suggestion,
@@ -414,7 +418,8 @@ def _draft(
         [alt.criterion for term in unresolved for alt in term.alternatives],
     )
     notes = (
-        *notes_of(proposal), *formulas.notes, *unresolved_notes, *missing_notes, *reset_notes
+        *without_false_claims(notes_of(proposal)), *formulas.notes, *unresolved_notes,
+        *missing_notes, *reset_notes,
     )  # fmt: skip
     tie = proposal.get("tie_break")
     items = items_of(
@@ -435,7 +440,7 @@ def _draft(
         document, why = with_groups(
             ctx, screener_id, document, [{**carried, **grouping.groups}, carried]
         )
-        notes = (*notes, *grouping.notes, *why)
+        notes = (*notes, *grouping.notes, *why, *exclusion_notes(document))
     return ScreenDraft(
         screener_id, document, dropped, notes,
         formulas=formulas.formulas, formulas_dropped=formulas.dropped,

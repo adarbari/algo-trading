@@ -50,29 +50,7 @@
     ],
     "contract": true,
     "explained": {
-      "parts": [
-        {
-          "words": "stocks above $10",
-          "kind": "applied",
-          "origin": "words",
-          "join": null,
-          "join_words": ""
-        },
-        {
-          "words": "RSI14 under 30",
-          "kind": "applied",
-          "origin": "words",
-          "join": "and_not",
-          "join_words": "except those with"
-        },
-        {
-          "words": "rising volume",
-          "kind": "applied",
-          "origin": "words",
-          "join": "and",
-          "join_words": "and"
-        }
-      ],
+      "parts": [],
       "model_share": 1.0,
       "not_understood": 0
     },
