@@ -229,6 +229,19 @@ nohup sh -c 'for i in 1 2 3 4 5 6 7 8; do .venv/bin/algotrade-ingest run filings
   > var/logs/filings-history.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/filings-history.status' >/dev/null 2>&1 &
 ```
 
+The Form 4 `insider` history (EB D6: SEC's quarterly Insider Transactions Data Sets from 2010, each
+filing's acceptance time from its issuer's submissions; needs the listing history for the ids) runs a
+year per published run (a run's rows are held in memory; a quarter an earlier run read is skipped, so
+a killed loop restarts where it stopped; a quarter SEC has not published yet is read by a later run):
+
+```bash
+nohup sh -c 'for y in $(seq 2010 2026); do .venv/bin/algotrade-ingest run insider --since $y-01-01 --until $y-12-31; done \
+  > var/logs/insider-history.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/insider-history.status' >/dev/null 2>&1 &
+```
+
+The nightly `insider` step then keeps it current from the daily index and each filing's XML (at most
+4,000 filings a night; the walk resumes the next night).
+
 The 10-K / 10-Q item text (`filing-text`, edge build D10, `events/filing_text`; Items 1, 1A, 3, 7, 7A,
 9A of a 10-K and I-2, I-3, II-1, II-1A of a 10-Q) is one document request a filing (about 160k for the
 universe from 2010, at SEC's 5 a second plus parsing: 15-30 hours, 3-4 GB of Parquet; check `df` first).

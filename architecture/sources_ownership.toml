@@ -53,6 +53,14 @@ section = "docs/data/vendors.md#10-k--10-q-item-sections-sec-edgar-edge-build-d1
 detect = [{ call = "html_to_text" }, { call = "extract_text" }, { call = "extract_items" }]
 
 [[responsibility]]
+id = "finra-sources"
+description = "Fetch and normalise FINRA's Query API (anonymous): consolidated short interest per settlement date and Reg SHO daily short-sale volume per trade date, read page by page as one payload; a GET URL with equal.<field> filters is sent as the POST body the API filters by (client.py); each row's known_from is the session after FINRA's publication (schedule.py: the 7th business day after settlement; the trade date for volume); the nightly short-interest and short-volume tasks store what they return (EB D9)"
+owner = ["libs/sources/algotrade_sources/vendors/finra/*"]
+allowed = ["libs/sources/algotrade_sources/framework/registry.py"]  # builds the sources and their POST transport
+section = "docs/edge-ideas/build-plan.md#3-finra-short-interest-bi-monthly-and-daily-short-sale-volume"
+detect = [{ string_prefix = "https://api.finra.org" }]
+
+[[responsibility]]
 id = "rate-limiting"
 description = "Pace requests to a vendor: one limiter per key, shared across threads and processes (file lock under var/run/limits)"
 owner = ["libs/sources/algotrade_sources/framework/limiter.py"]

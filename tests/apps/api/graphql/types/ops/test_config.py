@@ -20,7 +20,8 @@ def test_config_list(graph: Graph) -> None:
     configs = {c["configId"]: c for c in body["data"]["configs"]}
     ta = {"breakout", "pullback", "support_reversal", "exhaustion", "trend_continuation",
           "range_breakout", "failed_breakout", "oversold_reversal", "momentum_12_1",
-          "size_small", "pead_small_cap", "eap_all", "eap_volume"}  # fmt: skip
+          "size_small", "pead_small_cap", "eap_all", "eap_volume", "ivol_high", "max_ret_high",
+          "amihud_illiquid", "beta_low"}  # fmt: skip
     assert set(configs) == {"short_premium_liquidity", "sma_trend", "vrp_scanner", "vrp_iv_hv"} | ta
     assert (configs["sma_trend"]["kind"], configs["sma_trend"]["scope"]) == ("strategy", "site")
     assert configs["sma_trend"]["selection"] == "liquid_optionable"

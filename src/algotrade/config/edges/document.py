@@ -45,7 +45,9 @@ and the key.
     universe          a selection preset name, or an inline selection (``[universe] where``)
     top_k             an integer >= 1, or ``"all"`` (every qualified name)
     screeners         the screener presets that implement it (empty while a candidate waits)
-    baselines         screener presets run on the same sessions (quality bar 9)
+    baselines         screener presets run on the same sessions (quality bar 9); the one entry
+                      ``"@standard"`` stands for ``verdict.toml [decoys] standard`` (the decoy
+                      battery, ADR 0053 amendment 2026-10-18), expanded where the edge loads
     status            researching | candidate | evidenced | live | retired | rejected | blocked
     family            optional "A".."I": the idea catalogue's family (docs/edge-ideas/); the
                       edges page groups by it
@@ -198,6 +200,7 @@ QUALITY_BAR = (
 )
 PUBLISHED_MEASURES = ("mean_excess", "decile_spread", "lift_pts")
 PUBLISHED_KEYS = ("measure", "value", "horizon_sessions", "sample", "source", "leg")
+STANDARD = "@standard"  # in ``baselines``: the site's standard decoys (``expand_baselines``)
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
@@ -461,7 +464,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         universe=universe,
         top_k=top_k,
         screeners=_ids(t, "screeners"),
-        baselines=_ids(t, "baselines"),
+        baselines=_ids(t, "baselines", (STANDARD,)),
         status=status,
         sources=sources,
         quality_bar=_quality_bar(t, closed),
@@ -947,8 +950,22 @@ def _basis_horizon(t: Table, outcome: Outcome) -> int | None:
     return horizon
 
 
-def _ids(t: Table, key: str) -> tuple[str, ...]:
-    found = tuple(validate_id("screener", s) for s in t.strings(key, ()))
+def expand_baselines(
+    baselines: tuple[str, ...], standard: tuple[str, ...], screeners: tuple[str, ...]
+) -> tuple[str, ...]:
+    """``baselines`` with ``STANDARD`` replaced, in place, by the site's standard decoys: those
+    not already listed and not the edge's own screeners (a screener is never its own baseline)."""
+    if STANDARD not in baselines:
+        return baselines
+    listed = {*baselines, *screeners}
+    out: list[str] = []
+    for b in baselines:
+        out += [d for d in standard if d not in listed and d not in out] if b == STANDARD else [b]
+    return tuple(out)
+
+
+def _ids(t: Table, key: str, tokens: tuple[str, ...] = ()) -> tuple[str, ...]:
+    found = tuple(s if s in tokens else validate_id("screener", s) for s in t.strings(key, ()))
     if len(set(found)) != len(found):
         raise ConfigurationError(f"{t.where} {key}: a screener is listed twice: {list(found)}")
     return found

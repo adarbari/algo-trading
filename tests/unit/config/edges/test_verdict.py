@@ -106,3 +106,17 @@ def test_a_short_leg_has_its_own_published_haircut_beside_the_others() -> None:
     assert d.published_haircut("long") == 0.333
     read = VerdictSettings.from_document({"published_haircut": {"short": 0.4}})
     assert read.published_haircut("short") == 0.4 and read.published_haircut("long_short") == 0.5
+
+
+def test_the_standard_decoys_default_read_and_reject_a_bad_list() -> None:
+    standard = VerdictSettings.from_document(None).decoys_standard
+    assert standard[:2] == ("size_small", "momentum_12_1") and len(standard) == 6
+    read = VerdictSettings.from_document({"decoys": {"standard": ["size_small", "beta_low"]}})
+    assert read.decoys_standard == ("size_small", "beta_low")
+    for bad in (["a", "a"], [1], "size_small"):
+        with pytest.raises(ConfigurationError, match="standard"):
+            VerdictSettings.from_document({"decoys": {"standard": bad}})
+    with pytest.raises(ConfigurationError, match="invalid screener id"):
+        VerdictSettings.from_document({"decoys": {"standard": ["Not An Id"]}})
+    with pytest.raises(ConfigurationError, match="decoys"):
+        VerdictSettings.from_document({"decoys": {"typo": []}})

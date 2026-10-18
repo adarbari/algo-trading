@@ -136,6 +136,34 @@ def test_filing_rows_round_trip_and_merge_on_the_accession(backend: Backend) -> 
         )
 
 
+def test_insider_rows_round_trip_and_a_restated_line_sits_beside_its_predecessor(
+    backend: Backend,
+) -> None:
+    row = {
+        "instrument_id": "EQ:EXMP", "ts": T0, "known_from": pd.Timestamp(2026, 9, 30),
+        "accession": "0000999001-26-000001", "line": 1, "owner_cik": "0000888001", "form": "4",
+        "issuer_cik": "0000999001", "filing_date": pd.Timestamp(2026, 9, 30),
+        "period_of_report": pd.Timestamp(2026, 9, 28), "amends_date": None,
+        "transaction_date": pd.Timestamp(2026, 9, 28), "derivative": False,
+        "transaction_code": "P", "acquired_disposed": "A", "shares": 1000.0, "price": 12.5,
+        "shares_after": 26000.0, "direct_indirect": "D", "is_director": True,
+        "is_officer": True, "is_ten_pct_owner": False, "is_other": False,
+        "officer_title": "CFO", "plan_10b5_1": None, "owner_count": 1,
+    }  # fmt: skip
+    table = "events/insider_transaction"
+    backend.tables.write(table, D1, "r1", stamped([row], D1, "r1"))
+    again = {**row, "known_from": pd.Timestamp(2026, 10, 13), "price": 12.0}
+    backend.tables.write(table, D1, "r2", stamped([again], D1, "r2"))
+    out = backend.tables.read(table, D1)
+    assert out is not None and sorted(out["price"]) == [12.0, 12.5]  # known_from is in the key
+    assert out["plan_10b5_1"].isna().all() and out["line"].dtype == "int64"
+    backend.tables.write(table, D1, "r3", stamped([row], D1, "r3"))  # a rerun: the same keys
+    rerun = backend.tables.read(table, D1)
+    assert rerun is not None and len(rerun) == 2
+    with pytest.raises(DataValidationError, match="known_from: nulls"):
+        backend.tables.write(table, D2, "r4", stamped([{**row, "known_from": None}], D2, "r4"))
+
+
 def test_every_fixed_table_declares_its_required_columns() -> None:
     for name in ("universe", "chains/option_quotes", "instruments/reference", "bars/1d"):
         spec = spec_for(name)
