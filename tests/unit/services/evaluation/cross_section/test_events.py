@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.edges.document import EVENT_CLASSES
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.evaluation.cross_section import events
 from algotrade.services.evaluation.cross_section.events import (
@@ -28,7 +29,7 @@ def test_the_count_field_and_offset_decide_which_names_have_the_event() -> None:
     assert EVENT_FIELDS["earnings_expected"].target(-5) == 6  # sessions_to_expected = 1 - offset
     assert EVENT_FIELDS["earnings_expected"].target(0) == 1  # S = A, D = A - 1
     with pytest.raises(ConfigurationError, match="no declared field"):
-        event_field("ex_dividend")
+        event_field("ex_dividend")  # removed class: no field
 
 
 def test_only_names_at_the_declared_count_have_the_event_and_the_rest_are_excluded_by_reason() -> (
@@ -121,3 +122,10 @@ def test_one_pass_over_several_universes_equals_separate_reads_and_reads_the_fie
     together = read_events_for(w.reader, "earnings_reaction", 1, DAYS[:4], universes)
     assert together == separate
     assert reads == list(DAYS[:4])  # each decision session read once, whatever the universes
+
+
+def test_every_declared_event_class_has_a_field_to_read() -> None:
+    """B2 (EB H0): a class a document may name (``EVENT_CLASSES``) the harness cannot read
+    validated, then failed at run time (ex_dividend, index_change, macro_release had no
+    field). ex_dividend and macro_release are removed until EB H4 builds their fields."""
+    assert set(EVENT_CLASSES) == set(EVENT_FIELDS)

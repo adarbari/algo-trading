@@ -67,6 +67,12 @@ EVENT_FIELDS: Mapping[str, EventField] = {
         sign=-1,
         announced_ahead=True,
     ),
+    "index_change": EventField(
+        "rollup.index_changes@v1.sessions_since_index_change",
+        "rollup.index_changes@v1.last_index_change_date",
+        sign=1,
+        announced_ahead=False,
+    ),
 }
 
 

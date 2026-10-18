@@ -28,8 +28,10 @@ def root(tmp_path: Path) -> Path:
         ("bob", "drift", '[follow]\nstate = "retired"\nsince = "2026-09-01"\n'),
     ):
         folder = tmp_path / ("site" if user == "site" else f"users/{user}") / "edges"
+        if user == "site":  # site/edges/<id>/edge.toml
+            folder = folder / name
         folder.mkdir(parents=True, exist_ok=True)
-        (folder / f"{name}.toml").write_text(text)
+        (folder / ("edge.toml" if user == "site" else f"{name}.toml")).write_text(text)
     return tmp_path
 
 

@@ -285,7 +285,7 @@ id = "verdict_criteria"
 term = "What the verdict tests"
 short = "The table of every test behind the verdict: its value, what it needs, and pass, fail, not measured or does not apply."
 body = """
-Open Details to see it. The tests come in two groups: the seven Promising tests, then the six
+Open Details to see it. The tests come in two groups: the seven Promising tests, then the seven
 Works tests. Each row shows the test, its Value for this edge, what is Needed and the Result. Not
 measured means the run did not store the figure, which is different from a fail; it keeps the
 verdict at Not enough data. Does not apply means the test has nothing to test: the two decoy tests
@@ -295,7 +295,7 @@ for nor against the verdict and is not a pass. All Promising tests passing means
 tests as well means Works. Example: vrp_short_premium fails three tests: trades (3 against at
 least 40), the decile t (-1.66 against 2) and the deflated Sharpe (0.00 against 0.8). It passes
 the win rate, baselines and keeps-its-size tests, and does not measure the overfitting
-probability. A pass means a threshold was crossed, not that the edge is proven.
+probability. Works asks for a t of 3 on two series. One is the top-vs-bottom decile spread. The other is the picks series: the t-ratio of the Sharpe ratio of the picks' own session values. Promising asks a t of 2 of the first only. A pass means a threshold was crossed, not that the edge is proven.
 """
 next = "Next, read the first failing row: it is the reason line under the verdict badge."
 see_also = ["verdict", "sharpe_ratio", "deflated_sharpe", "overfitting_probability", "baselines", "win_rate"]
