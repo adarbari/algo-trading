@@ -1,6 +1,6 @@
-"""The rule-screen spec (ADR 0029, 0030): criteria, tolerance bands, flags, columns
-and the tie-break, as frozen values. Parsed and validated by ``config.strategy.screen_spec``;
-evaluated by ``strategies.screeners.rules``."""
+"""The rule-screen spec (ADR 0029, 0030, 0071): criteria, boolean groups of them, tolerance
+bands, flags, columns and the tie-break, as frozen values. Parsed and validated by
+``config.strategy.screen_spec``; evaluated by ``strategies.screeners.rules``."""
 
 from dataclasses import dataclass
 from enum import StrEnum
@@ -50,6 +50,20 @@ class Criterion:
         return self.rule.field
 
 
+GROUP_KINDS = ("all", "any", "none")  # AND, OR, NOT-ANY of the members
+
+
+@dataclass(frozen=True)
+class CriterionGroup:
+    """A boolean group of criteria (ADR 0071) by reference: ``members`` are criterion or
+    group ids, in the file's order. A group has no mode of its own; its members keep theirs."""
+
+    id: str
+    kind: str  # one of GROUP_KINDS
+    members: tuple[str, ...]
+    enabled: bool = True
+
+
 @dataclass(frozen=True)
 class ScreenSpec:
     """One rule screen. ``criteria`` keep the file's order (it is the funnel order)."""
@@ -62,6 +76,7 @@ class ScreenSpec:
     tie_break: str | None = None  # field sorting rows with equal scores
     tie_break_descending: bool = True
     notes: tuple[str, ...] = ()  # what the screen does not cover (data, shown as "Not covered")
+    groups: tuple[CriterionGroup, ...] = ()  # ADR 0071; a group with no parent is a gate
 
     def fields(self) -> tuple[str, ...]:
         """Every field the screen reads, sorted (what the view must hold)."""

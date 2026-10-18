@@ -243,7 +243,7 @@ detect = [{ call = "fit_probit" }, { call = "false_alarms" }]
 
 [[responsibility]]
 id = "rule-screen-evaluation"
-description = "Evaluate a rule screen (ADR 0029): each criterion's outcome, distance and penalty (HARD / SOFT tolerance band / SCORE), the row decision incl. SKIPPED, the distance score, rank and tie-break, tiers / flags / classify / columns, and the run summary (passed, skipped by reason, narrow misses)"
+description = "Evaluate a rule screen (ADR 0029): each criterion's outcome, distance and penalty (HARD / SOFT tolerance band / SCORE), boolean groups of criteria (ADR 0071: a verdict per criterion combined by all / any / none, a gate per top-level group), the row decision incl. SKIPPED, the distance score, rank and tie-break, tiers / flags / classify / columns, and the run summary (passed, skipped by reason, narrow misses)"
 owner = ["src/algotrade/strategies/screeners/rules/*"]
 section = "docs/screeners/rules.md#decision"
 detect = [{ call = "evaluate_screen" }, { call = "evaluate_criterion" }, { call = "summarise" }]

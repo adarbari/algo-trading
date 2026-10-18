@@ -14,7 +14,9 @@ from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import Rule
 from algotrade.core.model.screen_spec import Mode, Tolerance
-from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.services.configs import resolve_config
+from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
+from tests.conftest import REPO_ROOT
 
 CATALOG = FieldCatalog.build(
     {"vol@v1": {"iv30": "float", "spread": "float", "oi": "int", "near": "str"}}
@@ -313,3 +315,60 @@ def test_a_screen_without_notes_hashes_as_before_and_notes_join_the_hash() -> No
     mine = resolve("mine", UserContext("u1"), _store(doc).load, catalog=CATALOG)
     assert mine.screen_spec.notes == ("no support lines",)
     assert mine.hash != site.hash
+
+
+# The hash of ``spec_doc()`` as a site screener, recomputed with the code before groups
+# existed (ADR 0071): a spec with no ``[groups]`` is hashed byte for byte as it always was.
+SPEC_DOC_HASH = "bb5a8c30e5f7ca96e00c23fc070896c9dbd4fac3e29619473d0f0c55633a7371"
+
+
+def test_a_spec_without_groups_hashes_as_before_groups_existed() -> None:
+    site = _store().load("site", "strategies", "vrp")
+    store = MemoryConfigStore(
+        {("site", "screeners", "scr"): {**site, "id": "scr", "selection": None}}
+    )
+    assert resolve("scr", UserContext(SITE_USER), store.load).hash == SPEC_DOC_HASH
+
+
+def test_every_site_preset_has_the_canonical_form_it_had_before_groups() -> None:
+    """No preset has ``groups``, so none gained a key: the canonical JSON is the old shape."""
+
+    store = FileConfigStore(REPO_ROOT / "config", local=False)
+    names = store.names("site", "screeners")
+    assert names
+    for name in names:
+        resolved = resolve_config(store, name, UserContext(SITE_USER))
+        canonical = resolved.canonical()
+        c = resolved.config
+        before = {  # the pre-groups form of ``ResolvedConfig.canonical``
+            "id": c.id,
+            "kind": c.kind,
+            "impl": c.impl,
+            "params": dict(sorted(c.params.items())),
+            "selection": canonical["selection"],
+            "exports": list(c.exports),
+            "settings": resolved.settings,
+            "rules": c.rules,
+        }
+        if resolved.features:
+            before["features"] = canonical["features"]
+        assert "groups" not in c.rules, name
+        assert canonical == before, name
+        assert resolved.screen_spec.groups == (), name
+
+
+def test_groups_resolve_through_the_layers_and_join_the_hash() -> None:
+    groups = {"either": {"any": ["iv30", "spread", "oi"]}}
+    site_doc = {"id": "vrp", "kind": "screener", "impl": "rules", **spec_doc(groups=groups)}
+    plain = {"id": "vrp", "kind": "screener", "impl": "rules", **spec_doc()}
+    mine = {"id": "mine", "extends": "vrp", "criteria": {"oi": {"enabled": False}}}
+    store = MemoryConfigStore(
+        {("site", "strategies", "vrp"): site_doc, ("u1", "strategies", "mine"): mine}
+    )
+    site = resolve("vrp", UserContext(SITE_USER), store.load, catalog=CATALOG)
+    assert site.screen_spec.groups[0].members == ("iv30", "spread", "oi")
+    assert "groups" in site.canonical()["rules"]
+    user = resolve("mine", UserContext("u1"), store.load, catalog=CATALOG)
+    assert user.screen_spec.groups[0].members == ("iv30", "spread")  # oi left before sizing
+    bare = MemoryConfigStore({("site", "strategies", "vrp"): plain})
+    assert resolve("vrp", UserContext(SITE_USER), bare.load).hash != site.hash
