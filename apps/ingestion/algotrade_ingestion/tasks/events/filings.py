@@ -3,16 +3,18 @@
 
 **Forms** (``series.FILING_FORMS``): 8-K and 8-K/A (items kept; the current item numbers start
 2004-08-23, the depth of the backfill, ``HISTORY_SINCE``), NT 10-K / NT 10-Q late-filing
-notices, SC TO-I issuer tender offers, Form 25 delisting notices (``25`` by the issuer,
-``25-NSE`` by the exchange: also filed for a bond or preferred, so a row alone does not say the
-common stock left), 424B4 final prospectuses and Form 10 (``10-12B``) registrations. Each is
-public at its acceptance, so ``known_from`` is one rule for all (below). A filing accepted
-17:30-22:00 New York time carries ``known_from`` S but is listed in the daily index of S+1 only:
-the nightly of S misses it (the walk of S+1 reads it), a backfill includes it. Only names in the
+notices, SC TO-I issuer and SC TO-T third-party tender offers, Form 25 delisting notices
+(``25`` by the issuer, ``25-NSE`` by the exchange: also filed for a bond or preferred, so a row
+alone does not say the common stock left), 424B4 final prospectuses and Form 10 (``10-12B``)
+registrations. Each is public at its acceptance, so ``known_from`` is one rule for all (below).
+A filing accepted 17:30-22:00 New York time is listed in the daily index of the next business day
+only: the nightly of its day misses it (the walk of the next reads it), a backfill includes it.
+Only names in the
 universe snapshot the run reads are fetched: a name already delisted is not.
-A run records ``stats["forms"] = FORMS_TAG``: a run that read a CIK before the form set grew
-does not count as having covered it (``asked_since``), so one backfill from ``HISTORY_SINCE``
-re-reads every CIK once for the new forms.
+A run records ``stats["forms"] = FORMS_TAG`` (the form set and ``KNOWN_FROM_RULE``): a run that
+read a CIK before the form set grew, or before the ``known_from`` rule changed, does not count as
+having covered it (``asked_since``), so one backfill re-reads every CIK once; the rows it writes
+supersede the stored ones (same ``accession``, later ``knowledge_ts``).
 
 **Names**: the session's universe snapshot minus the funds (``security_type`` ETF / ETN: a fund
 files no 8-K), each name's CIK from ``instruments/company`` as of the session. Share classes of
@@ -47,13 +49,18 @@ Two ways to read SEC, one row shape (``_one_cik`` is the only writer of rows):
 - **Since** (per CIK): ``--since`` for every CIK, else each CIK's latest stored acceptance (its
   New York date, so the day's later filings are read again), else 2018-01-01. Every filing read
   is written again each run (the table merges on ``instrument_id`` + ``accession``).
-- **``events/filing``**: ``ts`` is the acceptance instant (UTC), ``known_from`` the session of
-  the acceptance time in New York: an acceptance after the close was public that evening, so it
-  is that day's session. ``items`` keeps SEC's string ("2.02,9.01").
+- **``events/filing``**: ``ts`` is the acceptance instant (UTC), ``known_from`` the first session
+  whose close is strictly after it (``acceptance_sessions``): an acceptance before the close
+  counts that session, one at or after it (16:30), on a weekend or on a holiday the NEXT session (a
+  daily close is the cut a feature read at D is made at, so a filing public at 16:30 is not
+  known to D's close). The rule before EB H4 was the New York DAY of the acceptance, which did
+  the opposite after 16:00 and gave a weekend filing a non-session ``known_from``. ``items`` keeps
+  SEC's string ("2.02,9.01").
 - **Earnings**: an ``8-K`` (not an amendment) whose items include 2.02 is also one
   ``events/earnings`` row with ``source = "sec_8k"``: ``earnings_date`` the acceptance date in
   New York; ``time`` ``pre_market`` before 09:30 New York time, ``after_hours`` from 16:00, else
-  ``intraday``; ``reported`` true; ``known_from`` that date; ``fiscal_quarter`` null (the
+  ``intraday``; ``reported`` true; ``known_from`` the acceptance's session (the filing rule above;
+  ``earnings_date`` stays the New York date); ``fiscal_quarter`` null (the
   calendar's label names a quarter end; the 8-K's ``report_date`` is the release date, another
   thing, so the per-quarter precedence of ADR 0050 is the rollup's to derive). ``ts`` is the
   acceptance instant (one at exactly midnight UTC is written one second later), so it never
@@ -77,7 +84,7 @@ import pandas as pd
 
 from algotrade.core.model.instruments import pad_cik
 from algotrade.core.time.calendar import EXCHANGE_TZ, is_weekend
-from algotrade.data.events import ALL_TIME
+from algotrade.data.events import ALL_TIME, acceptance_sessions
 from algotrade.data.reference import companies, load_universe
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.schemas import EARNINGS_8K_SOURCE
@@ -103,7 +110,10 @@ TABLE = "events/filing"  # the table this task owns (architecture/tables.toml)
 EARNINGS = "events/earnings"  # also written: the Item 2.02 rows (its writers: tables.toml)
 DEFAULT_SINCE = date(2018, 1, 1)
 HISTORY_SINCE = date(2004, 8, 23)  # the backfill's depth: SEC's current 8-K item numbers start here
-FORMS_TAG = ",".join(sorted(FILING_FORMS))  # the form set a run read: a changed set changes the tag
+KNOWN_FROM_RULE = "known_from=acceptance_session"  # EB H4: the rule rows are stamped with
+# The form set and the known_from rule a run read: a change to either changes the tag, so a
+# backfill is not skipped as already covered.
+FORMS_TAG = ",".join(sorted(FILING_FORMS)) + f"|{KNOWN_FROM_RULE}"
 FUND_TYPES = ("ETF", "ETN")  # security types that file no 8-K
 STALE_DAYS = 7  # business days after which a missing daily index is an error, not "not yet"
 RESULTS_ITEM = "2.02"
@@ -219,7 +229,7 @@ def filing_rows(filings: pd.DataFrame, instrument_id: str) -> pd.DataFrame:
             "items": filings["items"].fillna(""),
             "report_date": _days(filings["report_date"]),
             "primary_document": filings["primary_document"],
-            "known_from": acceptance_day(ts),
+            "known_from": acceptance_sessions(ts),
         },
         columns=COLUMNS,
     ).reset_index(drop=True)
@@ -250,7 +260,7 @@ def earnings_rows(filings: pd.DataFrame, name: Listed) -> pd.DataFrame:
             "time": release_time(ts),
             "fiscal_quarter": None,  # the calendar's label (a quarter end); an 8-K has none
             "reported": True,
-            "known_from": day,
+            "known_from": acceptance_sessions(ts),
         },
         columns=EARNINGS_COLUMNS,
     )

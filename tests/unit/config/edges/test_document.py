@@ -561,3 +561,27 @@ def test_expand_baselines_keeps_the_token_place_and_drops_repeats_and_own_screen
     )  # fmt: skip
     assert expand_baselines(("size_small",), standard, ()) == ("size_small",)  # no token: as is
     assert expand_baselines((), standard, ()) == ()
+
+
+def test_an_event_schedule_may_name_a_subtype_of_the_class() -> None:
+    e = parse(schedule="on_event:filing_8k:4.02")
+    assert (e.event_class, e.event_subtype, e.base) == ("filing_8k", "4.02", "event")
+    plain = parse(schedule="on_event:index_change")
+    assert (plain.event_class, plain.event_subtype) == ("index_change", None)
+    assert parse(schedule="on_event:index_change:deletion").event_subtype == "deletion"
+    assert parse(schedule="every_session").event_subtype is None
+
+
+@pytest.mark.parametrize(
+    ("schedule", "message"),
+    [
+        ("on_event:index_change:sideways", "'sideways' is not a subtype of 'index_change'"),
+        ("on_event:nt_late_filing:x", "is not a subtype of 'nt_late_filing' \\(known: none\\)"),
+        ("on_event:filing_8k", "needs a subtype, one of"),
+        ("on_event:filing_8k:9.99", "'9.99' is not a subtype of 'filing_8k'"),
+        ("on_event:insider_buy", "schedule: expected one of"),
+    ],
+)
+def test_an_unknown_or_missing_subtype_fails_closed(schedule: str, message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        parse(schedule=schedule)

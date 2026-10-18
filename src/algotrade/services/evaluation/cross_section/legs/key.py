@@ -57,12 +57,17 @@ def leg_key(
     base: str,
     picks: str,
     cost_levels: tuple[float, ...],
+    event_subtype: str | None = None,
 ) -> str:
     """The key of a leg (``top_k``, ``base`` and ``picks`` of the scope's edge cut its picks and
     names and are not in the trial hash for ``main``): ``universe`` is ``universe_hash``,
-    ``expr_defs_hash`` is ``expression_hash``, ``cost_levels`` the site's cost grid in bp."""
+    ``expr_defs_hash`` is ``expression_hash``, ``cost_levels`` the site's cost grid in bp.
+    ``event_subtype`` joins the digest only when set, so the keys of every schedule without one
+    (and the legs stored under them) are unchanged."""
+    subtype = {"event_subtype": event_subtype} if event_subtype else {}
     return _digest(
         {
+            **subtype,
             "trial": trial_hash,
             "universe": universe,
             "iv_field": iv_field,

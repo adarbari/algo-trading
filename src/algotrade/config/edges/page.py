@@ -5,7 +5,15 @@ writes it; a test keeps the committed page up to date."""
 
 from collections.abc import Iterable
 
-from algotrade.config.edges.document import EVENT_CLASSES, STATUSES, Edge, Outcome, event_class
+from algotrade.config.edges.document import (
+    EVENT_CLASSES,
+    EVENT_SUBTYPES,
+    STATUSES,
+    Edge,
+    Outcome,
+    event_class,
+    event_subtype,
+)
 from algotrade.core.model.predicates import Group, Rule
 
 PATH = "docs/edges.md"
@@ -123,9 +131,11 @@ def _outcome(o: Outcome, event: bool) -> str:
 
 
 def _schedule(schedule: str, brief: bool) -> str:
-    event = event_class(schedule)
+    event, sub = event_class(schedule), event_subtype(schedule)
     if event is not None:
-        return f"on each `{event}`" + ("" if brief else f" ({EVENT_CLASSES[event]})")
+        named = f"{event}:{sub}" if sub else event
+        detail = EVENT_CLASSES[event] + (f"; {EVENT_SUBTYPES[event][sub]}" if sub else "")
+        return f"on each `{named}`" + ("" if brief else f" ({detail})")
     return schedule.replace("_", " ")
 
 

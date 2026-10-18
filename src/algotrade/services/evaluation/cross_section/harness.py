@@ -649,15 +649,19 @@ def _events(
     reader: StoreReader, session: SessionReads, scopes: Sequence[_Scope], days: Sequence[date]
 ) -> dict[str, EventSchedule]:
     """The event names by decision session of each scope with an event schedule (by scope key;
-    the others are absent). Scopes with the same event class and offset share one read of the
-    event fields."""
-    groups: dict[tuple[str, int], list[_Scope]] = {}
+    the others are absent). Scopes with the same event class, subtype and offset share one read of
+    the event fields."""
+    groups: dict[tuple[str, str | None, int], list[_Scope]] = {}
     for scope in scopes:
         if scope.edge.event_class is not None:
-            key = (scope.edge.event_class, scope.edge.outcome.start_offset_sessions)
+            key = (
+                scope.edge.event_class,
+                scope.edge.event_subtype,
+                scope.edge.outcome.start_offset_sessions,
+            )
             groups.setdefault(key, []).append(scope)
     found: dict[str, EventSchedule] = {}
-    for (cls, offset), members in groups.items():
+    for (cls, subtype, offset), members in groups.items():
         found.update(
             read_events_for(
                 reader,
@@ -665,6 +669,7 @@ def _events(
                 offset,
                 days,
                 {m.key: partial(session.eligible, m.universe) for m in members},
+                subtype,
             )
         )
     return found

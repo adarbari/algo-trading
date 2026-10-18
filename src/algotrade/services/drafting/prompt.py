@@ -33,7 +33,7 @@ from algotrade.config.site.field_guide import (
     Situation,
 )
 from algotrade.config.site.llm import Phrase
-from algotrade.services.drafting.parts.connectors import join_text
+from algotrade.services.drafting.parts.connectors import NEGATIONS, exclusion_text, join_text
 from algotrade.services.drafting.retrieval import FIELD_REF, Slice, select_slice
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
@@ -49,7 +49,10 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 # 10: connectors are rendered from ``parts/connectors.py`` (only the and-type ones are left out of
 # words; a negation or an or stays in the condition); one condition one contiguous part.
 # 11: "all but" / "anything but" / "everything but" are except joins.
-PROMPT_VERSION = "11"
+# 12: an "or" and an exclusion are left out of the words between two parts and the server groups
+# the parts (ADR 0071); only maths over fields stays one boolean formula.
+# 13: a side of an "or" that needs maths makes the whole "or" ONE part with ONE boolean formula.
+PROMPT_VERSION = "13"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 
@@ -59,7 +62,9 @@ TASK = """\
 You turn a trader's sentence into the criteria of a rule screen over a catalogue of stored
 fields. Answer with ONE JSON object and nothing else (no prose, no code fence).
 
-A rule screen is a list of criteria; an instrument is picked when every criterion holds.
+A rule screen is a list of criteria; an instrument is picked when every criterion holds. "Or" and
+"except" are not criteria: each side is its own criterion in its own part and the server groups
+them (see "parts").
 Each criterion is an object with:
 - "id": a short unique slug (a-z, 0-9, _), e.g. "price", "iv_rank"
 - "field": exactly one field name from the catalogue below, spelled exactly
@@ -112,12 +117,22 @@ Answer shape:
 most), what we read this as, with only numbers its criteria hold (10% is 0.1)}. No overlaps. A part
 is one condition and its words are contiguous: when the instrument word sits inside a condition
 ("cheap stocks on P/E"), the whole phrase is one part. Leave out of the words only the
-connector that joins a part to the previous one (@@JOINS@@: the server reads it) and filler such
-as "show me" or "I'm looking for". A negation or an "or" stays inside the words of the condition
-it changes (@@KEEPS@@): "not overbought" and "except those reporting earnings this week" are
-each one part, and "X or Y" is one part covering both sides. Words you cannot map are still a
-part, with no item. Every criterion, formula, missing, unresolved, suggestion and the tie_break
-carries "part"; scaffolding (status ACTIVE) goes with the part naming the kind of instrument.
+connector that joins a part to the previous one (@@JOINS@@: the server reads it), an "or" between
+two parts (@@ORS@@) and an exclusion between two parts (@@EXCLUDES@@), and filler such as "show
+me" or "I'm looking for". Each side of an "or" is its own part with its own criterion, never one
+boolean formula: "RSI under 30 or near the 52-week low" is p1 "RSI under 30" and p2 "near the
+52-week low", the "or" left out. An excluded condition is its own part, drafted as it reads (never
+negated): "except penny stocks" is the criterion for a penny stock in a part whose words leave
+"except" out, and the server turns it into "none of". Words of preference ("ideally",
+"preferably") stay in the words of their part, whose criterion is score. A negation that belongs
+to one condition (@@NEGATIONS@@: "not overbought", "no earnings this week") stays in its words, with
+its criterion negated. A formula cannot be one side of an "or" (the server cannot group it): when
+maths over fields is needed on ANY side, the whole "or" is ONE part, its words covering both sides
+("the 20 day return beats the 60 day return or RSI14 under 30"), with ONE boolean formula holding
+both sides ("a > b or rsi < 30") and no other criterion for them. Words you cannot map
+are still a part, with no item. Every criterion, formula, missing, unresolved, suggestion and the
+tie_break carries "part"; scaffolding (status ACTIVE) goes with the part naming the kind of
+instrument.
 
 Each part of the sentence goes in one place. A: a criterion on a catalogue field (preferred). B: a
 formula, only when maths over fields says it and no field does. C: missing, when neither can. Never
@@ -147,7 +162,12 @@ default to the criteria, so do not list it there. Not for a term the phrasebook 
 settles.
 """
 
-TASK = TASK.replace("@@JOINS@@", join_text()).replace("@@KEEPS@@", join_text("or", "and_not"))
+TASK = (
+    TASK.replace("@@JOINS@@", join_text())
+    .replace("@@ORS@@", join_text("or"))
+    .replace("@@EXCLUDES@@", exclusion_text())
+    .replace("@@NEGATIONS@@", ", ".join(NEGATIONS))
+)
 
 # Two worked examples (sentence -> answer), rendered into the task so a smaller model sees the
 # shape and the judgement expected. Their fields exist in the site catalogue (a test checks).
