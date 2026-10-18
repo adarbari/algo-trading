@@ -41,7 +41,7 @@ def row(variant: str = "scr", role: str = "screener", kind: str = "frozen", **ov
         "slice_kind": kind, "slice_value": kind, "sessions": 60, "picks": 600, "hits": 360,
         "trials": 3, "pre_snapshot_sessions": 0, "hit_rate": 0.60, "base_rate": 0.50,
         "lift": 1.2, "mean_excess_picks": 0.01, "decile_spread": 0.05, "decile_t": 2.5,
-        "effect_size": 0.3, "sharpe": 1.0, "deflated_sharpe": 0.9, "pbo": 0.3,
+        "effect_size": 0.3, "sharpe": 1.0, "deflated_sharpe": 0.9, "pbo": 0.3, "picks_t": 3.0,
     }  # fmt: skip
     base.update(over)
     return EdgeRow(**base)  # type: ignore[arg-type]
@@ -147,6 +147,28 @@ def test_works_boundaries() -> None:
     assert verdict(result(oos=thin, whole=whole), draws=draws(100)).verdict == PROMISING
     few_oos = {**strong, "sessions": 39}  # below the Promising minimum too (both are 40)
     assert verdict(result(oos=few_oos, whole=whole), draws=draws(100)).verdict == NOT_ENOUGH
+
+
+def test_works_needs_a_t_of_three_on_the_picks_series_as_well_as_the_decile_spread() -> None:
+    """Owner 2026-10-17 (ADR 0065 amendment): both t series gate Works; Promising asks only the
+    decile t."""
+    strong = {"decile_t": 3.5, "decile_spread": 0.9}
+    whole = {"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2}
+
+    def judged(picks_t: float | None):
+        return verdict(result(oos={**strong, "picks_t": picks_t}, whole=whole), draws=draws(100))
+
+    assert judged(3.0).verdict == WORKS
+    low = judged(2.99)
+    assert low.verdict == PROMISING
+    assert "Picks-series t" in low.rationale
+    crit = {c.id: c for c in low.criteria}
+    assert (crit["works_picks_t"].status, crit["works_picks_t"].threshold) == ("fail", "at least 3")
+    unstored = judged(None)  # a run from before the column
+    assert unstored.verdict == PROMISING
+    assert {c.id: c.status for c in unstored.criteria}["works_picks_t"] == "not_measured"
+    promising = {c.id: c.status for c in low.criteria if c.level == "promising"}
+    assert set(promising.values()) <= {"pass", "not_applicable"}  # the picks t never blocks it
 
 
 def test_win_rate_not_above_base_is_not_working() -> None:

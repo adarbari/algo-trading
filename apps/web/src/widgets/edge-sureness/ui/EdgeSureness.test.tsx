@@ -87,6 +87,27 @@ describe('EdgeSureness', () => {
     expect(rows[3]).toHaveTextContent('Live · n=0Not measured live');
   });
 
+  it('sets the published figure beside what to expect of it, as the server words it', () => {
+    hooks.useEdgeDecay.mockReturnValue(
+      fakeQuery({
+        ...DECAY_FIXTURE,
+        expected: {
+          leg: 'long_short',
+          haircut: 0.5,
+          value: 2,
+          realised: 1,
+          share: 0.5,
+          summary: 'Published 4 points, expect 2 points (50% off for a long-short figure).',
+        },
+      }),
+    );
+    render(<EdgeSureness edgeId="momentum_12_1" verdict={momentum.verdict} />);
+    expect(
+      screen.getByText('Published 4 points, expect 2 points (50% off for a long-short figure).'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('help published_haircut')).toBeInTheDocument();
+  });
+
   it('links the published figure to its source', () => {
     hooks.useEdgeDecay.mockReturnValue(
       fakeQuery({
