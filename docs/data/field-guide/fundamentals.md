@@ -909,7 +909,7 @@ Sources: Asness, Frazzini and Pedersen (2019), Review of Accounting Studies 24(1
 
 ### `feature.net_issuance_pct_12m`
 
-**How to read it.** The log change of the share count over a year, the form Pontiff and Woodgate use. -0.03 is about 3% of the shares bought back and +0.10 about 10% more shares issued. Negative is a net buyer of its own stock and around 0 is stable. Above +0.05 is a steady issuer. Above +0.20 is a heavy one: an offering, an acquisition in stock or heavy compensation. In the research the issuers underperform and the repurchasers outperform. It ranks like feature.shares_change_yoy. It is the form the issuance edge sorts on.
+**How to read it.** The log change of the share count over a year, the form Pontiff and Woodgate use. A value of -0.03 is about 3% of the shares bought back and +0.10 about 10% more shares issued. Negative is a net buyer of its own stock and around 0 is stable. Above +0.05 is a steady issuer. Above +0.20 is a heavy one: an offering, an acquisition in stock or heavy compensation. In the research the issuers underperform and the repurchasers outperform. It ranks like feature.shares_change_yoy. It is the form the issuance edge sorts on.
 
 **The criterion per intent**
 
