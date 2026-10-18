@@ -463,6 +463,13 @@ TASKS: dict[str, Task] = {
                 ),
                 Param("items", ("--items",), str, "item ids kept, comma list (1A,7 / I-2,II-1A)"),
                 Param("force", ("--force",), None, "fetch filings and CIKs already read again"),
+                Param(
+                    "allow_gap",
+                    ("--allow-gap",),
+                    str,
+                    "backfill: weekdays (YYYY-MM-DD,...) with no daily index you verified SEC was "
+                    "closed on",
+                ),
             ),
         ),
         Task(

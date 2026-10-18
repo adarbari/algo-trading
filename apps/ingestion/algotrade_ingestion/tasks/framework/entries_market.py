@@ -143,6 +143,7 @@ def run_filing_text(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("limit"),
         symbols(p, "items"),
         bool(p.get("force")),
+        symbols(p, "allow_gap"),
     )
 
 

@@ -351,6 +351,31 @@ def test_sec_holidays_are_the_federal_closures_with_weekend_observance() -> None
     assert date(2020, 6, 19) not in sec_holidays(2020) and date(2025, 1, 9) in sec_holidays(2025)
 
 
+SPECIAL = [
+    *(date(2010, 2, d) for d in range(8, 12)),
+    date(2012, 10, 29), date(2012, 10, 30), date(2012, 12, 24), date(2014, 12, 26),
+    date(2015, 12, 24), date(2017, 1, 20), date(2018, 12, 5), date(2018, 12, 24),
+    date(2019, 12, 24), date(2020, 12, 24), date(2021, 1, 20), date(2024, 12, 24),
+    date(2025, 1, 9), date(2025, 12, 24), date(2025, 12, 26),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("day", SPECIAL, ids=str)
+def test_every_special_closure_is_a_sec_holiday_of_its_year(day: date) -> None:
+    assert day in sec_holidays(day.year) and day.isoweekday() < 6
+
+
+def test_allow_gap_accepts_a_verified_weekday_and_the_error_names_the_date_and_the_flag() -> None:
+    gap = feed()
+    gap.unpublished = {date(2026, 2, 3)}  # a business day with no index
+    with pytest.raises(IndexGapError, match=r"2026-02-03.*--allow-gap 2026-02-03"):
+        run(store(), gap)
+    record = run(store(), gap, allow_gap=("2026-02-03",))
+    assert record.status is RunStatus.COMPLETE
+    assert record.stats["index_gaps_allowed"] == ["2026-02-03"]
+    assert record.stats["index_holidays"] == 1  # the allowed day is counted with the closures
+
+
 def test_a_holiday_without_an_index_is_skipped_but_any_other_missing_day_fails_the_run() -> None:
     sec = feed()
     sec.unpublished = {date(2026, 1, 19)}  # Martin Luther King Jr. Day

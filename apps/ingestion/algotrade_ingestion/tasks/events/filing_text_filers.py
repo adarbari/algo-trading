@@ -17,7 +17,7 @@ of walking the days again (a backfill is many runs of ``--limit`` CIKs). A windo
 recording run's own session is walked again.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -32,13 +32,33 @@ from algotrade_sources.framework.series import (
     DailyIndexRequest,
 )
 
-MOURNING_DAYS = frozenset({date(2018, 12, 5), date(2025, 1, 9)})  # SEC closed: Bush, Carter
+SPECIAL_CLOSURES = frozenset(
+    {
+        *(date(2010, 2, d) for d in range(8, 12)),  # winter storm
+        date(2012, 10, 29),  # Hurricane Sandy
+        date(2012, 10, 30),
+        date(2012, 12, 24),  # executive-order closures
+        date(2014, 12, 26),
+        date(2015, 12, 24),
+        date(2018, 12, 24),
+        date(2019, 12, 24),
+        date(2020, 12, 24),
+        date(2024, 12, 24),
+        date(2025, 12, 24),
+        date(2025, 12, 26),
+        date(2018, 12, 5),  # national days of mourning: Bush, Carter
+        date(2025, 1, 9),
+        date(2017, 1, 20),  # Inauguration Days that fell on a weekday
+        date(2021, 1, 20),
+    }
+)
 WINDOW_KEY = "filers_window"
 CIKS_KEY = "filer_ciks"
 
 
 class IndexGapError(RuntimeError):
-    """A weekday that is no SEC holiday has no published form index."""
+    """A weekday that is no SEC holiday has no published form index (``--allow-gap`` lists one an
+    operator has verified)."""
 
 
 def _observed(day: date) -> date:
@@ -52,7 +72,8 @@ def _observed(day: date) -> date:
 
 def sec_holidays(year: int) -> set[date]:
     """The weekdays SEC is closed in ``year``: the federal holidays (a Saturday one is observed
-    the Friday before, a Sunday one the Monday after) and the national days of mourning."""
+    the Friday before, a Sunday one the Monday after) and the executive-order, mourning,
+    inauguration and weather closures of ``SPECIAL_CLOSURES``."""
     fixed = [date(year, 1, 1), date(year, 7, 4), date(year, 11, 11), date(year, 12, 25)]
     if year >= 2021:
         fixed.append(date(year, 6, 19))  # Juneteenth
@@ -66,7 +87,7 @@ def sec_holidays(year: int) -> set[date]:
     ]
     observed = {_observed(d) for d in fixed}
     return {d for d in observed | set(named) if not is_weekend(d)} | {
-        d for d in MOURNING_DAYS if d.year == year
+        d for d in SPECIAL_CLOSURES if d.year == year
     }
 
 
@@ -96,10 +117,17 @@ def cached_filers(runs: Sequence[RunRecord], since: date, until: date) -> list[s
     return None
 
 
-def walk_index(run: IngestRun, index: Source, since: date, until: date) -> Filers:
+def walk_index(
+    run: IngestRun,
+    index: Source,
+    since: date,
+    until: date,
+    allowed: Collection[date] = (),
+) -> Filers:
     """The filers of ``since..until`` read from the daily index, a weekday at a time (module doc).
     A block or a failing day raises, so does a weekday with no index that is no SEC holiday (the
-    run's own day may not be published yet): the list is never a partial one."""
+    run's own day may not be published yet) unless an operator verified it and listed it in
+    ``allowed`` (``--allow-gap``): the list is never a partial one."""
     ciks: set[str] = set()
     closed: list[date] = []
     days = 0
@@ -110,12 +138,15 @@ def walk_index(run: IngestRun, index: Source, since: date, until: date) -> Filer
         payload = index.fetch(request)  # no raw copy: the day's file is every form
         days += 1
         if payload is None:
-            if day in sec_holidays(day.year) | sec_holidays(day.year + 1):  # Dec 31 observed
+            if day in allowed or day in sec_holidays(day.year) | sec_holidays(day.year + 1):
                 closed.append(day)
                 continue
             if day >= run.session:  # today's index comes after the close
                 continue
-            raise IndexGapError(f"no daily index for {day}, a weekday that is no SEC holiday")
+            raise IndexGapError(
+                f"no daily index for {day}, a weekday that is no SEC holiday: if SEC was closed "
+                f"(verified by hand), pass --allow-gap {day}"
+            )
         normalized = index.normalize(request, payload)
         assert normalized is not None
         ciks.update(str(c) for c in normalized.parsed[DAILY_INDEX_FRAME]["cik"])
@@ -123,9 +154,15 @@ def walk_index(run: IngestRun, index: Source, since: date, until: date) -> Filer
 
 
 def discover(
-    run: IngestRun, index: Source, runs: Sequence[RunRecord], since: date, until: date
+    run: IngestRun,
+    index: Source,
+    runs: Sequence[RunRecord],
+    since: date,
+    until: date,
+    allowed: Collection[date] = (),
 ) -> Filers:
-    """The filers of ``since..until``: an earlier run's recorded list, else the index walk."""
+    """The filers of ``since..until``: an earlier run's recorded list, else the index walk
+    (``allowed``: verified weekdays with no index, ``--allow-gap``)."""
     if (found := cached_filers(runs, since, until)) is not None:
         return Filers(found, True, 0, [])
-    return walk_index(run, index, since, until)
+    return walk_index(run, index, since, until, allowed)

@@ -62,8 +62,10 @@ filing SEC lists no primary document for, are stored as one row with a null item
 ``SHORT`` section, never guessed text. Only a listing or a blocked / failing document counts toward
 ``STOP_AFTER_FAILED`` CIKs in a row (SEC blocking us: the run ends PARTIAL); a CIK that failed
 before goes last in a backfill, so one bad filing never starves the others. A day of the form index
-that fails, or a weekday without an index that is no SEC holiday (``filing_text_filers.py``), fails
-the run before any CIK is read (a filer list is never cached with an unexplained gap).
+that fails, or a weekday without an index that is no SEC closure (``filing_text_filers.py``:
+federal holidays, executive-order, mourning, inauguration and weather closures), fails the run
+before any CIK is read (a filer list is never cached with an unexplained gap); an operator who
+verified a closure by hand passes ``--allow-gap YYYY-MM-DD[,...]``.
 
 Items: per CIK ``OK: <from>..<to> (<n> filings)``, ``NO_DATA`` (SEC has no filings for the CIK) or
 ``FETCH_ERROR``. ``stats``: the window, ``tag``, filers found (and whether from an earlier run),
@@ -561,11 +563,13 @@ def ingest_filing_text(
     limit: int | None = None,
     items: Sequence[str] = (),
     force: bool = False,
+    allow_gap: Sequence[str] = (),
 ) -> RunRecord:
     """Store the item sections of the periodic filings of every filer (module doc): the backfill
     window ``since..until`` (the filers of the daily index, ``--limit`` CIKs a run), or, without
     ``since``, the nightly increment of the due CIKs. ``items``: the ids kept (default
-    ``DEFAULT_ITEMS``)."""
+    ``DEFAULT_ITEMS``); ``allow_gap``: ISO weekdays with no daily index an operator verified
+    (SEC closed), which the walk then accepts."""
     until = until or session
     if since is not None and until < since:
         raise ValueError(f"--to {until} is before --from {since}")
@@ -584,7 +588,9 @@ def ingest_filing_text(
             candidates = None
         else:
             assert since is not None
-            found = discover(run, index, runs, since, until)
+            found = discover(
+                run, index, runs, since, until, [date.fromisoformat(d) for d in allow_gap]
+            )
             candidates = found.ciks
             if not found.cached:
                 run.stats.update({WINDOW_KEY: _window(since, until), CIKS_KEY: found.ciks})
@@ -629,6 +635,7 @@ def ingest_filing_text(
             filers_cached=found.cached if found else None,
             index_days=found.days if found else None,
             index_holidays=len(found.holidays) if found else None,
+            index_gaps_allowed=list(allow_gap),
             ciks=len(todo),
             skipped_covered=plan.skipped,
             pending=plan.pending,
