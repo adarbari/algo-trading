@@ -1,0 +1,44 @@
+# L3 site setting: the Guide glossary, edges: the calendar windows an edge schedule may use (ADR 0051, ADR 0053). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; one term per window of src/algotrade/core/time/windows.py
+# (id = calendar_<window>), kept complete by tests/architecture/guide/test_calendar_windows_guide.py.
+
+[[term]]
+id = "calendar_turn_of_month"
+term = "Turn of the month"
+short = "The edge is held for the last trading day of a month and the first three of the next."
+body = """
+This schedule opens one trade a month. The screen runs two sessions before the month's last. The entry is the session before the last. The trade is held for 4 sessions: the last session and the three after it. Pay and pension money tends to arrive then, and some traders say it lifts prices. The calendar fixes the dates ahead, so nothing about the window is known late. Windows never overlap, so each month is one independent trade. Example: for February 2026 the window is 27 February and 2, 3 and 4 March. A year holds 12 windows, so even ten years give only about 120 trades. Treat a result from fewer than 100 as noise. Don't read a small lift as proof: one strong year can carry it. Check the out-of-sample figure and the result by year instead.
+"""
+next = "Open the edge's result and read the out-of-sample lift and the trades behind it."
+see_also = ["base_rate", "out_of_sample", "calendar_quarter_end"]
+
+[[term]]
+id = "calendar_opex_week"
+term = "Option expiry week"
+short = "The edge is held for the five sessions that end on a month's standard option expiry, normally the third Friday."
+body = """
+This schedule opens one trade a month, held for 5 sessions up to and including the monthly option expiry. In that week dealers who sold options adjust their stock hedges, which can move large and heavily optioned stocks more than the rest. The expiry is the third Friday, or the Thursday when the Friday is a market holiday. After a Thursday expiry the window starts on the Friday before, so it still has 5 sessions. Windows never overlap, so each month is one independent trade. Example: the window of January 2026 is 12 to 16 January. A year holds 12 windows, so fewer than 100 trades is noise. A pattern that appears only in large stocks may be a size effect, not an expiry effect. Compare the picks with the base rate of the same week.
+"""
+next = "Compare the picks with the base rate of the same week, then check the result by year."
+see_also = ["base_rate", "out_of_sample", "calendar_turn_of_month"]
+
+[[term]]
+id = "calendar_quarter_end"
+term = "Quarter-end window"
+short = "The edge is held for the last five trading days of March, June, September and December."
+body = """
+This schedule opens one trade a quarter, held for 5 sessions that end on the quarter's last session. Funds that rebalance or tidy their books at quarter end can push stocks they bought or sold in the quarter. The calendar fixes the window ahead, so nothing about it is known late. Windows are a quarter apart, so each is one independent trade. Example: the window of March 2026 is 25, 26, 27, 30 and 31 March. A year holds only 4 windows, so ten years give about 40 trades, which is thin. Treat a result from fewer than 40 as noise. Don't compare picks with last quarter's winners alone: a loser that rebounds in the next quarter's first days is outside this window. Read the lift with the trades behind it.
+"""
+next = "Read the lift together with the trades behind it, and wait for more quarters before trusting it."
+see_also = ["base_rate", "out_of_sample", "calendar_turn_of_month"]
+
+[[term]]
+id = "calendar_pre_holiday"
+term = "Before a holiday"
+short = "The edge is held for the one trading day before a scheduled market holiday."
+body = """
+This schedule opens a trade for the single session before each scheduled full-day closure, about nine a year. Traders who avoid holding through a closed market may leave prices a little higher that day. Only closures the calendar set ahead count: Thanksgiving and Christmas do, a day of mourning or a storm closure does not. The window is 1 session long, so the horizon is 1. Windows are distinct days, so they never overlap. Example: for Independence Day 2026, observed on Friday 3 July, the window is Thursday 2 July. One day is a small move, so costs can erase a small lift. Check the edge's cost estimate before reading the result.
+"""
+next = "Open the edge's cost estimate and compare it with the lift."
+see_also = ["base_rate", "out_of_sample", "calendar_turn_of_month"]
