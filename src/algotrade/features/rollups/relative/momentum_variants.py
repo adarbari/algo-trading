@@ -19,7 +19,7 @@ from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.market.tickers import BARS, SYMBOL_IDS, Matrix, ticker_ids
-from algotrade.features.rollups.price.episodes import BETA_SESSIONS, beta_corr
+from algotrade.features.rollups.price.episodes import beta_corr
 from algotrade.features.rollups.price.price_stats import panel, symbol_column, traded_rows
 from algotrade.features.rollups.price.trend_stats import LONG, SKIP
 from algotrade.features.rollups.relative.relative_strength import (
@@ -36,10 +36,7 @@ MONTH = 20  # sessions of the 1-month return (price_stats.ret_20d)
 LOOKBACK = LONG  # earlier sessions read: the 12-1 window starts 252 sessions back
 _GAP = "a session in the window has no bar (a gap), or the history is shorter"
 _NO_SPY = f"{BENCHMARK} is not in the symbol map or has no bars, or its own window has a gap"
-_BETA = (
-    f"the instrument has fewer than 200 of the {BETA_SESSIONS} returns of the beta window "
-    f"(or SPY does)"
-)
+_BETA = "the instrument has fewer than 200 of the window's returns (or SPY does)"
 _MKT = f"{BENCHMARK}'s"
 
 FEATURES = (
@@ -48,8 +45,9 @@ FEATURES = (
         "The 12-1 momentum net of the market: ln(close 21 sessions back / close 252 sessions "
         f"back) minus beta times {_MKT} same log return, beta the OLS slope of the instrument's "
         f"daily log returns on {_MKT} over that same window (no intercept is removed). 0.15 is "
-        "15 points of log return beyond what the market's own move explains; the factor "
-        "literature ranks on this instead of the raw 12-1 to cut the market's share",
+        "15 points of log return beyond what the market's own move explains. A market-only, "
+        "unscaled approximation of Blitz, Huij and Martens' residual momentum (they use 36-month "
+        "Fama-French residuals scaled by their stdev)",
         f"a session from 252 to 21 sessions back has no bar for the instrument ({_GAP}), "
         f"{_NO_SPY}, or {_BETA}",
         valid_range=(-5, 5), inputs=(f"{BARS}.close", f"{SYMBOL_IDS}.instrument_id"),

@@ -675,8 +675,8 @@ tolerance = 0
 
 [[field]]
 name = "rollup.momentum_variants@v1.resid_mom_12_1"
-theme = "volatility"
-reads = "The 12-1 momentum with the market taken out: the log return from 252 to 21 sessions back minus the name's beta times SPY's log return over the same window. 0.15 means the name gained 15 points beyond what its market exposure explains; near 0 means the year was the market's move. Blitz, Huij and Martens find the residual version earns about the same return with roughly half the volatility and fewer momentum crashes, because the market leg (a high-beta name in a rally) is removed."
+theme = "momentum and trend"
+reads = "The 12-1 momentum with the market taken out: the log return from 252 to 21 sessions back minus the name's beta times SPY's log return over the same window. 0.15 means the name gained 15 points beyond what its market exposure explains; near 0 means the year was the market's move. Blitz, Huij and Martens (2011) rank on residual returns to take the market leg out; this is a simpler, market-only version (one SPY beta over the window, no intercept, unscaled), not their 36-month Fama-French residual scaled by its standard deviation."
 caveats = [
   "Only the market is removed, not the sector or style: a name that rode a hot sector still reads as a winner. Compare rollup.momentum_variants@v1.sector_ret_252d to see how much of the year was its sector.",
   "The beta is estimated on the same window it is applied to, so it is noisy for a young listing or a name with thin bars; it needs 200 daily returns that overlap SPY's. Check rollup.price_history@v1.range_status.",
@@ -697,8 +697,8 @@ note = "a score over the universe; gate rollup.trend_stats@v2.mom_12_1 gt 0 as w
 
 [[field]]
 name = "feature.mom_12_1_vol_scaled"
-theme = "volatility"
-reads = "The 12-1 momentum divided by the 60-session realised volatility: the return per unit of risk. 1.0 means the 12-1 return equals one year of one-stdev moves; a calm name up 20% reads higher than a wild one up 20%. Barroso and Santa-Clara scale momentum by its own recent risk, which more than doubles the Sharpe of the long-short factor and removes most of the crash risk."
+theme = "momentum and trend"
+reads = "The 12-1 momentum divided by the 60-session realised volatility: the return per unit of risk. 1.0 means the 12-1 return equals one year of one-stdev moves; a calm name up 20% reads higher than a wild one up 20%. This is a stock-level scaling (12-1 over the name's own hv60), not Barroso and Santa-Clara's, who scale the long-short momentum portfolio by its own 126-day volatility."
 caveats = [
   "Low volatility inflates the ratio: a near-flat utility with a 5% return and 8% volatility outranks a real winner. Gate on rollup.trend_stats@v2.mom_12_1 above 0.15 as well.",
   "hv60 is the last quarter's volatility, not the window's: a name that was wild during the year and is calm now scores high. Check rollup.vol_stats@v1.hv60 against rollup.price_stats@v2.hv20.",
@@ -718,7 +718,7 @@ note = "a score; gate rollup.trend_stats@v2.mom_12_1 gt 0 as well"
 
 [[field]]
 name = "rollup.momentum_variants@v1.fip_12_1"
-theme = "volatility"
+theme = "momentum and trend"
 reads = "Information discreteness of the 12-1 path: the sign of the 12-1 return times the share of down days minus the share of up days in that window. Below 0 the winner climbed on many small up days (continuous information, 'frog in the pan'); above 0 it got there on a few big jumps. -0.2 is 20 points more up days than down days in an up move. Da, Gurun and Warachka find continuous winners keep going, jumpy ones reverse, so the better winners have the lower value."
 caveats = [
   "It counts days, not size: five big up days and a hundred tiny down days read as discrete however the size shakes out. Read it with rollup.trend_stats@v2.mom_12_1 for the amount.",
@@ -739,7 +739,7 @@ note = "with rollup.trend_stats@v2.mom_12_1 gt 0.2 as the gate; alone it also pi
 
 [[field]]
 name = "rollup.momentum_variants@v1.resid_ret_20d"
-theme = "volatility"
+theme = "momentum and trend"
 reads = "The last month's return with the market taken out: the log return over 20 sessions minus beta_252d times SPY's over the same sessions. 0.10 means the name beat its market exposure by 10 points this month. The one-month return reverses (Jegadeesh 1990), and Blitz, Huij, Lansdorp and Verbeek find the residual version reverses more cleanly because a market rally does not make every high-beta name a short; the high values are the reversal candidates, the low ones the buys."
 caveats = [
   "News moves the name as well as noise: an earnings gap or a takeover in the month does not reverse. Check rollup.price_moves@v1.one_day_move and the earnings dates before shorting a high value.",
@@ -761,7 +761,7 @@ note = "with rollup.price_stats@v2.adv_usd_20d as a liquidity gate; the buys are
 
 [[field]]
 name = "rollup.momentum_variants@v1.sector_ret_252d"
-theme = "volatility"
+theme = "momentum and trend"
 reads = "The 252-session return of the instrument's sector ETF: how the whole sector did over a year (0.20 up 20%). Moskowitz and Grinblatt find industry momentum explains much of single-stock momentum: sectors that did well keep doing well for months, so a name in a strong sector has a tailwind of its own."
 caveats = [
   "The sector is the SEC SIC code's eleven coarse groups, not an industry: a biotech and a hospital chain share Health Care. rollup.relative_strength@v1.sector_etf names the ETF used.",
@@ -781,7 +781,7 @@ note = "a score beside the name's own momentum, never alone"
 
 [[field]]
 name = "rollup.momentum_variants@v1.rs_sector_20d"
-theme = "volatility"
+theme = "momentum and trend"
 reads = "The last month's return against the sector ETF's: (1 + the name's 20-session return) / (1 + the ETF's) - 1. 0.05 beat its sector by 5 points; -0.05 lagged by 5. It is the one-month return with the industry move taken out (Hou and Moskowitz style), the sector standing in for the industry; the extremes reverse more than the raw return does."
 caveats = [
   "The sector is coarse (eleven ETFs), so a name in a small industry that moved on its own news reads as large; check rollup.price_moves@v1.one_day_move for a single big day.",
