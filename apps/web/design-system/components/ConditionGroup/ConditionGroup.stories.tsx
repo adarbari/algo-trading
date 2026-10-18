@@ -81,8 +81,18 @@ export const ReadOnly: Story = {
   },
 };
 
+/** The Guide button sits beside the row, outside its toggle button. */
+export const ReadOnlyWithInfo: Story = {
+  args: {
+    ...ReadOnly.args,
+    info: <InfoButton label="About any of" onClick={() => undefined} />,
+  },
+};
+
 export const ReadOnlyOpen: Story = { args: { ...ReadOnly.args, defaultOpen: true } };
 
 export const Narrow: Story = { ...WithActions, decorators: [narrow] };
 
 export const ReadOnlyNarrow: Story = { ...ReadOnlyOpen, decorators: [narrow] };
+
+export const ReadOnlyWithInfoNarrow: Story = { ...ReadOnlyWithInfo, decorators: [narrow] };

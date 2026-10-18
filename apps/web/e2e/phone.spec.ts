@@ -308,6 +308,26 @@ test('Edge builder: the six steps fit a phone, the steps scroll sideways and a s
   expect(errors).toEqual([]);
 });
 
+test('Builder: a condition group is one column that fits the screen (ADR 0071)', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await mockBuilderApi(page);
+  await page.goto('/screeners/my-vrp/edit');
+  await page.getByRole('button', { name: 'Either this or the previous' }).first().tap();
+  const group = page.getByRole('region', { name: /or/ }).filter({ hasText: 'Any of' });
+  await expect(group).toBeVisible();
+  const width = page.viewportSize()?.width ?? 0;
+  const box = await group.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    width,
+  );
+  await expect(group.getByRole('button', { name: 'Ungroup' })).toBeInViewport();
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('Describe it: the review fits the screen and the formula dialog fills it', async ({
   page,
 }) => {

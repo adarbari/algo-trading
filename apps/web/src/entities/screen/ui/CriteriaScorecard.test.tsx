@@ -1,3 +1,4 @@
+import { Stack, Text } from '@algotrade/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -66,5 +67,58 @@ describe('CriteriaScorecard', () => {
   it('says so when there is nothing to show', () => {
     render(<CriteriaScorecard screenerId="vrp" entries={[]} />);
     expect(screen.getByText('No criteria.')).toBeInTheDocument();
+  });
+
+  it('draws a group (ADR 0071) through the host, its members rendered under it', async () => {
+    const entries = [
+      { id: 'optionable', field: 'instrument.optionable', outcome: 'PASS', value: true },
+      { id: 'iv30', field: 'rollup.iv30@v1.iv30', outcome: 'FAIL', value: 0.2, group: 'either' },
+      { id: 'ratio', field: 'feature.iv_hv_ratio', outcome: 'PASS', value: 1.4, group: 'either' },
+      { id: 'later', field: 'rollup.iv30@v1.iv30', outcome: 'PASS', value: 0.9 },
+    ];
+    const groups = [
+      {
+        id: 'either',
+        kind: 'any',
+        members: ['iv30', 'ratio'],
+        outcome: 'PASS',
+        decidedBy: 'ratio',
+      },
+    ];
+    const { container } = render(
+      <CriteriaScorecard
+        screenerId="vrp"
+        entries={entries}
+        groups={groups}
+        renderGroup={({ group, names, decidedBy, members }) => (
+          <Stack aria-label={`${group.kind}: ${names.join(' / ')}`} as="section">
+            <Text>{`${group.outcome ?? ''} via ${decidedBy ?? ''}`}</Text>
+            {members}
+          </Stack>
+        )}
+      />,
+    );
+    const gate = screen.getByRole('region', { name: 'any: IV30 / IV/HV' });
+    expect(gate).toHaveTextContent('PASS via IV/HV');
+    expect(gate).toHaveTextContent('≥ 50%');
+    expect(gate).toHaveTextContent('Missed');
+    // The loose criterion after it stays a row of its own, below the gate.
+    expect(container).toHaveTextContent(/IV30.*Missed.*IV30.*Passed/s);
+    await expectNoA11yViolations(container);
+  });
+
+  it('lists the criteria flat when the host draws no groups', () => {
+    const entries = [
+      { id: 'iv30', field: 'rollup.iv30@v1.iv30', outcome: 'PASS', value: 1.1, group: 'either' },
+      { id: 'ratio', field: 'feature.iv_hv_ratio', outcome: 'PASS', value: 1.4, group: 'either' },
+    ];
+    render(
+      <CriteriaScorecard
+        screenerId="vrp"
+        entries={entries}
+        groups={[{ id: 'either', kind: 'any', members: ['iv30', 'ratio'] }]}
+      />,
+    );
+    expect(screen.getByLabelText('Criteria')).toHaveTextContent('IV/HV');
   });
 });
