@@ -226,11 +226,13 @@ vocabulary. `FeatureValue.value is None` always comes with `unknown` set.
 | `PRE_SNAPSHOT` | identity came from a later snapshot (survivorship) |
 | `NOT_APPLICABLE` | the feature is not defined for this instrument (not optionable; an ETF has no earnings); shown "n/a" (ADR 0042) |
 | `ILLIQUID` | an option feature null because the chain is too thin to price (`iv30_status` NO_QUOTES / WIDE_SPREADS / ILLIQUID); shown "Illiquid" (ADR 0042) |
+| `NOT_COVERED` | the analyst source does not cover the name, or it was never asked (a feature's `uncovered_statuses`: `NOT_COVERED`, `NOT_FETCHED`); shown "Not covered"; the admin cause tells the two apart (ADR 0072) |
 | `EXPLAINED` | the null is itself a fact, `Unknown.reason` says which `NullReason` (`NO_TRADE`, `NOT_ANNOUNCED`, `NEW_LISTING`, `FEW_BARS`) from the feature's status column; tables carry it in `reasons[i][j]` (ADR 0046) |
 
 `features(names)` returns `NO_PARTITION`, `NO_ROW`, `NULL`, `NOT_APPLICABLE`, `ILLIQUID` and
-`EXPLAINED` (precedence: no partition, a present value, not applicable, illiquid, explained, no
-row, null; ADRs 0042, 0046). A name the caller's
+`NOT_COVERED` and
+`EXPLAINED` (precedence: no partition, a present value, not applicable, illiquid, not covered,
+explained, no row, null; ADRs 0042, 0046, 0072). A name the caller's
 catalogue lacks is a request error (`UNKNOWN_FEATURE`, naming it) when the client asked for it;
 `NOT_IN_CATALOGUE` is for names the server reads on its own (a saved view's columns, PR 8).
 `LICENCE` (ADR 0069) hides a field the caller's licences do not cover from
@@ -243,7 +245,7 @@ universe (PR 5); `instrument.*` values and `Instrument` say which snapshot throu
 `Unknown(code, cause, reason)`: `cause` is the leaf the construction site knows, a `CauseLink`
 naming the table and session (`"rollups/instrument/earnings@v1 has no partition for
 2026-10-03"`; ADR 0056). Every `Unknown` also has a public `kind` (`SYSTEM`, `NOT_STORED`,
-`NOT_APPLICABLE`, `ILLIQUID`, `LICENCE`, `NOT_RUN`: from the code alone) and the `guide_term`
+`NOT_APPLICABLE`, `ILLIQUID`, `LICENCE`, `NOT_COVERED`, `NOT_RUN`: from the code alone) and the `guide_term`
 that explains it; a table list a page would show is `Unavailable(kind, features, guide_term)`
 (`services/read/availability/`). The chain behind a gap (`explain`: source -> step -> table ->
 features, from the nightly run record's recorded step tables) is served only to admins:

@@ -16,11 +16,25 @@ owner = [
     "apps/ingestion/algotrade_ingestion/tasks/analyst/probe.py",
 ]
 allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py",  # counts its FMP calls the same way, and reads the verdicts
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task
     "src/algotrade/storage/tables/schemas.py",  # declares the table's schema
 ]
 section = "docs/adr/0068-analyst-data-vendors.md#decision"
 detect = [{ string = "analyst/vendor_access" }, { call = "fmp_calls_today" }]
+
+[[responsibility]]
+id = "analyst-estimate-snapshots"
+description = "Append tonight's FMP (annual estimates, price-target consensus, grades consensus) and Finnhub (recommendation trend) analyst data of a rotating slice of names to our own point-in-time history (analyst/estimate_snapshots): ts = fetch instant, knowledge_ts = publish instant, never a vendor date, never replacing an earlier session's rows; the rotation reads back the run records' items; FMP within [fmp] daily_budget; a nightly optional step (ADR 0068)"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task
+    "src/algotrade/storage/tables/schemas.py",  # declares the table's schema
+    "src/algotrade/data/analyst/reading.py",  # the one read of the table (analyst-snapshot-reading)
+    "src/algotrade/features/rollups/consensus/analyst_status.py",  # names the feature input table its groups read
+]
+section = "docs/adr/0068-analyst-data-vendors.md#decision"
+detect = [{ string = "analyst/estimate_snapshots" }]
 
 [[responsibility]]
 id = "bad-bar-detection"
@@ -150,6 +164,7 @@ id = "ingestion-step-dispatch"
 description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly, post-session): tasks are declared once in the registry; nightly is an ordered list of isolated task steps; the post-session workflow (ADR 0070) holds the steps that do not decide a session (descriptions, verify, edge-eval), runs for the last nightly-done session once, and decides when the weekly edge audit is due"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_*.py",  # the registry's run wrappers, split by domain
     "apps/ingestion/algotrade_ingestion/workflows/*",
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
@@ -216,6 +231,13 @@ description = "Add the point-in-time columns (session_date, knowledge_ts, source
 owner = ["apps/ingestion/algotrade_ingestion/tasks/framework/run.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "stamp" }]
+
+[[responsibility]]
+id = "statements-backlog-priority"
+description = "In which order the shares task fetches the statements backlog and a --limit chunk (ADR 0067 amendment 2026-10-17): the event scope, the S&P 500, then the rest, optionable and liquid names first, by dollar volume and market cap, ties by CIK, every input as of the day before the session; it reorders only, never changes what is due"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/reference/shares.py"]
+section = "docs/adr/0067-sec-financial-statements-table.md#decision"
+detect = [{ call = "priority_order" }]
 
 [[responsibility]]
 id = "vendor-listing-perma-ticker"

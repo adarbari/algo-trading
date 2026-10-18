@@ -13,7 +13,9 @@ spaces requests across every worker thread **and every process** on the machine 
 per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and the nightly
 run never exceed a vendor's limit together. The pace is **adaptive** between the section's
 `min_interval_s` (floor) and `max_interval_s` (ceiling): a 429 holds every process for its
-`Retry-After` and multiplies the interval by `[http] backoff_factor`; more than
+`Retry-After` (at most 300 s; a vendor asking for more, e.g. a day, is given up on at once: the
+request fails with `GaveUpError`, holding nothing, and the run's item budgets move on) and
+multiplies the interval by `[http] backoff_factor`; more than
 `max_error_rate` errors over the last `error_window` responses slows it down the same way;
 `speedup_after` clean responses in a row speed it up by `speedup_factor`, never below the
 floor (see [configuration.md](../configuration.md#vendor-pacing)). The IB Gateway session
@@ -42,7 +44,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
 | Risk-free rates (option pricing) | **U.S. Treasury daily par yield curve** (official, free, no key; one CSV per year) | FRED (`DGS*`, needs a key), SOFR (overnight only) | Implemented, phase 2b.1 (ADR 0021) |
-| Analyst estimates, price targets, ratings (free tier) | **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters and the by-hand `analyst-probe` implemented (ADR 0068); the feature groups and nightly fetch follow |
+| Analyst estimates, price targets, ratings (free tier) | **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters, the by-hand `analyst-probe` and the nightly `analyst-snapshot` implemented (ADR 0068); the feature groups `analyst_estimates@v1`, `analyst_targets@v1`, `analyst_ratings@v1`, `analyst_revisions@v1` are built (docs/data/layers.md) |
 | Synthetic | `sources/fixtures/` (golden datasets) | — | Lets the whole pipeline run in CI with no account |
 
 ## Cboe delayed-quotes feed (primary for options)
@@ -180,10 +182,10 @@ listing; overall: the share of delisted names with bars to their end date, the g
 a recycled ticker leaks another company's rows). It writes no table: the raw payloads are in
 `raw/source=tiingo`. At most 200 unique symbols of the free tier's 500 a month.
 
-## Analyst data: FMP and Finnhub (adapters and the probe implemented, ADR 0068)
+## Analyst data: FMP and Finnhub (adapters, probe, nightly snapshot and feature groups implemented, ADR 0068)
 
 Both are free-tier, personal-licence vendors (`[fmp]`, `[finnhub]` in `config/site/sources.toml`,
-`licence = "personal"`), keyed in `.env`; nothing is stored from the adapters yet. Endpoints and
+`licence = "personal"`), keyed in `.env`; what is stored is under "What is stored and when" below. Endpoints and
 answers verified 2026-10-16 on the owner's free keys (AAPL); the plans change, so the table
 `analyst/vendor_access` (the `analyst-probe` task, run by hand) is the record, not this page.
 
@@ -223,8 +225,19 @@ Host `https://finnhub.io/api/v1`; key `ALGOTRADE_FINNHUB_API_KEY` in an `X-Finnh
 
 ### What is stored and when
 
-Nothing yet beyond `analyst/vendor_access`. History starts at the first fetch: neither vendor
-serves a point-in-time history, so none is backdated (ADR 0068).
+`analyst/vendor_access` (the by-hand probe) and `analyst/estimate_snapshots` (the nightly optional
+`analyst-snapshot` step). The snapshot asks FMP for three calls a name (price-target consensus, grades
+consensus, annual estimates) as far as `[fmp] daily_budget` allows, due names first (never fetched, then
+the stalest past `[fmp] refresh_days`), and Finnhub for one call a name (`[finnhub] per_night`, due on its
+own `[finnhub] refresh_days`); a name FMP refuses (402) is `NOT_COVERED` and waits four windows. Each
+attempt of a vendor for a name also stores a `kind = "coverage"` row (`period = "current"`, `status`
+OK / EMPTY / NOT_COVERED / FAILED), so a refused name is told from one not yet fetched or one whose call
+failed from the store alone. With neither key set the nightly step is skipped with a WARN, not failed. The step runs after the
+screens and stops calling after `[fmp] run_budget_s` (1500 s; the names left are `OVER_BUDGET` and the
+next night continues). A name's cadence is dated by the run's session, from any of its FMP calls. Names: S&P 500 members plus the event-study
+scope list. Rows are appended per session (`ts` = fetch instant, `knowledge_ts` = publish instant),
+licence `personal`. History starts at the first fetch: neither vendor serves a point-in-time history, so
+none is backdated (ADR 0068).
 
 ## Company and fund descriptions (implemented, ADR 0034)
 
@@ -519,7 +532,7 @@ at about 400 to 500 rows per company instead of several thousand (a full re-pars
 are ignored, so those issuers have no financials (null, not an error).
 
 **Statement lines (`instruments/statements`, ADR 0067).** The same document, parsed a second time
-by `statement_concepts.py` + `company_facts.parse_statements`: 16 concepts, 35 us-gaap tags, USD only,
+by `statement_concepts.py` + `company_facts.parse_statements`: 16 concepts, 39 us-gaap tags, USD only,
 periodic forms only. Every tag found is stored in `tag` (the first filing of a period plus later
 filings that changed the value, per tag), and no tag is chosen over another here: the roll-up that
 reads a concept ranks them. The list is best tag first; for alternatives of one figure it is the
@@ -539,7 +552,7 @@ output.
 | `capex` | duration | `PaymentsToAcquirePropertyPlantAndEquipment`, `PaymentsToAcquireProductiveAssets` |
 | `cash` | instant | `CashAndCashEquivalentsAtCarryingValue`, `CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents` |
 | `sti` | instant | `ShortTermInvestments`, `MarketableSecuritiesCurrent` |
-| `debt` | instant | the parts: `LongTermDebt`, `LongTermDebtNoncurrent`, `LongTermDebtCurrent`, `DebtCurrent`, `ShortTermBorrowings`, `CommercialPaper` |
+| `debt` | instant | the parts: `LongTermDebt`, `LongTermDebtNoncurrent`, `LongTermDebtCurrent`, `DebtCurrent`, `ShortTermBorrowings`, `CommercialPaper`, `LongTermDebtAndCapitalLeaseObligations`, `LongTermDebtAndCapitalLeaseObligationsCurrent`, `LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities`, `DebtLongtermAndShorttermCombinedAmount` |
 | `assets` | instant | `Assets` |
 | `liabilities` | instant | `Liabilities`, `LiabilitiesAndStockholdersEquity` (stored so a roll-up can derive liabilities) |
 | `equity` | instant | `StockholdersEquity`, `StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest` |
@@ -585,14 +598,16 @@ download: about 30 to 40 minutes, ~1 GB of gzip raw kept 7 days, `[sec_edgar] ra
 `algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v3`.
 A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks. The
 `instruments/statements` backlog (CIKs with share counts and no statements marker yet) is fetched
-`[sec_edgar] statements_backfill_per_night` (400) a night, so it finishes in about 15 to 20 nights
-by itself; the roll-up that reads it waits for the last of them.
+`[sec_edgar] statements_backfill_per_night` (400) a night (5,260 CIKs), so it finishes in about 14 nights
+by itself, the event scope and the S&P 500 first, then optionable liquid names (ADR 0067); the roll-up that reads it waits for the last of them.
 
 **Adding the financials to a store that already has share counts:** a CIK is refetched only
 on its 30-day slot, so run `algotrade-ingest shares --force` once (same cost; only facts not
 stored yet are written), then `algotrade-ingest rollups --from <first session> --to <last
 session> --only financials@v2` (compute alone measured at about 3 s for a synthetic frame of 6000 companies; not yet measured end to end). A CIK
 that has not been refetched yet shows `NO_FACTS` financials.
+A change to the tag lists bumps `STATEMENT_TAGS_VERSION_DATE` (`statement_concepts.py`): the `shares` task counts a
+statements marker older than it as backlog and refetches it under the nightly cap, no `--force`.
 
 ### Refreshes spread over the window
 
@@ -601,7 +616,7 @@ Incremental SEC tasks (`company-details`, `shares`) refetch a CIK once per refre
 (`crc32(CIK) % window`; `tasks/framework/refresh.py`). After a one-night backfill the CIKs
 come due spread evenly over the next 30 nights (~200 a night) instead of all on night 30; a
 slot day without a run is picked up by the next run. New CIKs always come first, then the
-stalest, so `--limit` works through a backlog oldest first; `--force` refetches all.
+stalest, so `--limit` works through a backlog oldest first; `--force` refetches all. The `shares` task's statements backlog (CIKs new to a table) is ordered by priority instead of CIK (ADR 0067).
 
 ## IBKR
 

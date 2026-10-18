@@ -25,7 +25,14 @@ from algotrade.features.framework.declaration import FeatureGroup, Superseded
 from algotrade.features.framework.feature import Feature
 from algotrade.features.framework.graph import dependency_order
 from algotrade.features.rollups.activity import vol_stats, volume_profile
-from algotrade.features.rollups.consensus import earnings_revisions, earnings_surprise
+from algotrade.features.rollups.consensus import (
+    analyst_estimates,
+    analyst_ratings,
+    analyst_revisions,
+    analyst_targets,
+    earnings_revisions,
+    earnings_surprise,
+)
 from algotrade.features.rollups.corporate import (
     dividend_schedule,
     dividends,
@@ -77,7 +84,12 @@ from algotrade.features.rollups.price import (
 )
 from algotrade.features.rollups.reference import fund_reference
 from algotrade.features.rollups.relative import relative_strength
-from algotrade.features.rollups.statements import balance_sheet, cash_flow, income_statement
+from algotrade.features.rollups.statements import (
+    balance_sheet,
+    cash_flow,
+    growth_history,
+    income_statement,
+)
 
 GROUPS: dict[str, FeatureGroup] = {
     g.key: g
@@ -92,6 +104,10 @@ GROUPS: dict[str, FeatureGroup] = {
             earnings_expected.GROUP,
             earnings_surprise.GROUP,
             earnings_revisions.GROUP,
+            analyst_estimates.GROUP,
+            analyst_targets.GROUP,
+            analyst_ratings.GROUP,
+            analyst_revisions.GROUP,
             dividends.GROUP,
             dividend_schedule.GROUP,
             iv30.GROUP,
@@ -102,6 +118,7 @@ GROUPS: dict[str, FeatureGroup] = {
             income_statement.GROUP,
             cash_flow.GROUP,
             balance_sheet.GROUP,
+            growth_history.GROUP,
             put_wing.GROUP,
             call_wing.GROUP,
             price_moves.GROUP,

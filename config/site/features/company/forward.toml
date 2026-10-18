@@ -1,0 +1,59 @@
+# L3 site setting: expression features (ADR 0023), the "forward" theme: formulas over the analyst
+# consensus groups (rollup.analyst_estimates@v1, rollup.analyst_targets@v1; ADR 0068) and the
+# reported figures they are compared with. Every feature here reads a personal-use source, so it
+# inherits licence "personal" (ADR 0069: the strictest of its inputs): a viewer without the
+# licence never sees a value, and a hard criterion on it reads UNKNOWN.
+#
+# FY1 is the first fiscal year ending after the last reported year, so at a fiscal-year roll (the
+# session the 10-K becomes public) FY1 moves one year on and every FY1 ratio jumps once: a change
+# of year, not of the estimate. Annual estimates only (the vendor's quarterly estimates are a
+# paid plan). Most names are not covered by the free vendor key: the estimates are then not
+# stored (estimates_status NOT_COVERED or NOT_FETCHED), the group's values are null and so is
+# every result. A missing value is null, never zero. An ADR is left out of the ratios against a
+# reported figure or a USD price of the ordinary share (its per-share figures are per ordinary
+# share and the ratio to the ADR is not stored), the same rule as pe_ratio.
+
+[forward_pe]
+expr = 'if(analyst_estimates.eps_fy1 > 0 and price_stats.close > 0 and analyst_estimates.estimates_status == "OK" and not financials.is_adr, price_stats.close / analyst_estimates.eps_fy1, null)'
+dtype = "float"
+unit = "ratio"
+description = "Forward P/E: close / the analysts' average EPS estimate for FY1 (the first fiscal year not yet reported); 15 means fifteen times expected earnings. Annual estimates only. Jumps once at the fiscal-year roll, when FY1 moves on. Null for a loss and for an ADR"
+null_meaning = "estimates_status is not OK (NOT_COVERED: the free vendor key covers few names; NOT_FETCHED: never asked; STALE: the snapshot is over 21 days old), eps_fy1 is null or not positive (a forecast loss), the close is not positive, or the instrument is an ADR (its EPS is per ordinary share and the ADR ratio is not stored)"
+valid_range = [0, inf]
+version = 1
+
+[forward_pe_fy2]
+expr = 'if(analyst_estimates.eps_fy2 > 0 and price_stats.close > 0 and analyst_estimates.estimates_status == "OK" and not financials.is_adr, price_stats.close / analyst_estimates.eps_fy2, null)'
+dtype = "float"
+unit = "ratio"
+description = "Forward P/E on FY2 (the fiscal year after FY1): close / the analysts' average EPS estimate for it. Annual estimates only. Jumps once at the fiscal-year roll, when FY2 moves on. Null for a loss and for an ADR"
+null_meaning = "estimates_status is not OK (NOT_COVERED: the free vendor key covers few names; NOT_FETCHED: never asked; STALE), eps_fy2 is null (the vendor lists only one forward year, common for thinly covered names) or not positive, the close is not positive, or the instrument is an ADR"
+valid_range = [0, inf]
+version = 1
+
+[forward_eps_growth]
+expr = 'if(financials.eps_diluted_ttm > 0 and not financials.eps_stale and analyst_estimates.estimates_status == "OK" and not financials.is_adr, analyst_estimates.eps_fy1 / financials.eps_diluted_ttm - 1, null)'
+dtype = "float"
+unit = "decimal"
+description = "Expected EPS growth: the analysts' FY1 EPS estimate / diluted EPS over the trailing twelve months - 1; 0.20 is 20% more. Annual estimates only. Jumps once at the fiscal-year roll, when FY1 moves on. Below -1 means a forecast loss"
+null_meaning = "estimates_status is not OK (NOT_COVERED: the free vendor key covers few names; NOT_FETCHED; STALE), eps_fy1 is null, eps_diluted_ttm is null or not positive (a growth rate off a loss is not shown), eps_stale (the reported EPS ended more than stale_days before the session), or the instrument is an ADR"
+valid_range = [-inf, inf]
+version = 1
+
+[forward_revenue_growth]
+expr = 'if(financials.revenue_ttm > 0 and financials.financials_status != "STALE" and analyst_estimates.estimates_status == "OK" and not financials.is_adr, analyst_estimates.revenue_fy1 / financials.revenue_ttm - 1, null)'
+dtype = "float"
+unit = "decimal"
+description = "Expected revenue growth: the analysts' FY1 revenue estimate / revenue over the trailing twelve months - 1; 0.10 is 10% more. Annual estimates only. Jumps once at the fiscal-year roll, when FY1 moves on"
+null_meaning = "estimates_status is not OK (NOT_COVERED: the free vendor key covers few names; NOT_FETCHED; STALE), revenue_fy1 is null, revenue_ttm is null or not positive, the reported revenue is STALE, or the instrument is an ADR (a foreign filer's revenue is in its own currency, the ratio would mix currencies)"
+valid_range = [-1, inf]
+version = 1
+
+[target_upside]
+expr = 'if(analyst_targets.targets_status == "OK" and analyst_targets.target_consensus > 0 and price_stats.close > 0, analyst_targets.target_consensus / price_stats.close - 1, null)'
+dtype = "float"
+unit = "decimal"
+description = "Upside to the analysts' price target: the average target / close - 1; 0.15 means the target is 15% above the close, negative when the close is above it. The target has no date of its own"
+null_meaning = "targets_status is not OK (NOT_COVERED: the free vendor key covers few names; NOT_FETCHED: never asked; STALE: the snapshot is over 21 days old), target_consensus is null or not positive, or the close is not positive"
+valid_range = [-1, inf]
+version = 1

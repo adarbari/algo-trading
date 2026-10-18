@@ -14,7 +14,7 @@ an older balance sheet is never shown beside it. Each core line takes its own la
 status is OK only when all three end on ``bs_as_of``, else PARTIAL shows one is behind.
 
     cash, sti                 cash and equivalents; short-term investments (one tag, never summed)
-    total_debt, debt_basis    the parts of ONE filing by rule a / b / c; NOT_TAGGED is null, never 0
+    total_debt, debt_basis    the parts of ONE filing by rule a to g; NOT_TAGGED is null, never 0
     total_assets, stockholders_equity   Assets; StockholdersEquity, else incl. noncontrolling
     total_liabilities         Liabilities (REPORTED), else total less equity (DERIVED), else NONE
     current_assets, current_liabilities   AssetsCurrent, LiabilitiesCurrent
@@ -54,7 +54,7 @@ from algotrade.features.rollups.statements.lines import (
 NAME = "balance_sheet"
 VERSION = 1
 STATUSES = ("OK", "PARTIAL", "NO_FACTS", "STALE")
-DEBT_BASES = ("a", "b", "c", "NOT_TAGGED")
+DEBT_BASES = ("a", "b", "c", "d", "e", "f", "g", "NOT_TAGGED")
 LIABILITIES_BASES = ("REPORTED", "DERIVED", "NONE")
 COLUMN_OF = {  # line -> its column
     "cash": "cash",
@@ -100,14 +100,19 @@ FEATURES = (
         "Debt at the balance sheet date (bs_as_of), added up from the parts of ONE filing by the "
         "first rule that applies (debt_basis): a) LongTermDebt plus short-term borrowings, else "
         "commercial paper; b) LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term "
-        "borrowings, else commercial paper; c) DebtCurrent plus LongTermDebtNoncurrent",
+        "borrowings, else commercial paper; c) DebtCurrent plus LongTermDebtNoncurrent; d) "
+        "LongTermDebtAndCapitalLeaseObligations plus its current part plus short-term "
+        "borrowings, else commercial paper; e) that noncurrent figure plus DebtCurrent; f) "
+        "the same including current maturities plus short-term borrowings, else commercial "
+        "paper; g) DebtLongtermAndShorttermCombinedAmount (finance leases are in d, e and f "
+        "and in the DebtCurrent of c and e; operating leases never)",
         _WHY + "; or no filing has a complete set of debt parts (debt_basis NOT_TAGGED): a "
         "filer without the tags looks like a debt-free one, so the value is null, never zero",
         valid_range=(0, None), inputs=INPUTS,
     ),
     Feature(
         "debt_basis", "str", "category",
-        "Which rule built total_debt: a, b or c, or NOT_TAGGED when no filing has a complete "
+        "Which rule built total_debt: a to g, or NOT_TAGGED when no filing has a complete "
         "set of parts (total_debt is null)",
         "never when a balance sheet is filed; null with NO_FACTS", "label",
         categories=DEBT_BASES, inputs=INPUTS,

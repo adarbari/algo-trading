@@ -75,5 +75,26 @@ export const Dense: Story = {
   },
 };
 
+/** Nine stats (the Financials key metrics): one row from 1200 px, three to a row below it. */
+export const Many: Story = {
+  args: {
+    label: 'Key financials',
+    items: [
+      { label: 'P/E ratio', value: 24.3, format: { kind: 'number' } },
+      { label: 'Forward P/E', value: 21.8, format: { kind: 'number' } },
+      { label: 'Revenue growth (YoY)', value: 0.061, format: { kind: 'delta' } },
+      { label: 'Forward revenue growth', value: 0.048, format: { kind: 'delta' } },
+      { label: 'EPS growth (YoY)', value: 0.093, format: { kind: 'delta' } },
+      { label: 'Operating margin', value: 0.294, format: { kind: 'percent' } },
+      { label: 'Debt to equity', value: 1.8, format: { kind: 'number' } },
+      { label: 'Free cash flow', value: 9.1e9, format: { kind: 'currency-compact' } },
+      { label: 'Last EPS surprise', value: 0.047, format: { kind: 'delta' } },
+    ],
+  },
+};
+
+/** Nine stats in a phone-width container (375 px): two to a row, not nine stacked. */
+export const NarrowMany: Story = { ...Many, decorators: [narrow] };
+
 /** A phone-width container (375 px): the stats stack in one column. */
 export const Narrow: Story = { decorators: [narrow] };

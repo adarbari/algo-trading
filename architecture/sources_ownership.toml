@@ -10,7 +10,7 @@ scope = ["libs/sources/"]
 
 [[responsibility]]
 id = "analyst-vendor-sources"
-description = "Fetch and normalise analyst data from FMP (analyst estimates, price targets, the ratings summary) and Finnhub (recommendation trends), and their access probes (one request per endpoint); the FMP key is added to the query by the registry's transport and never held here; nothing is stored from these sources yet (ADR 0068)"
+description = "Fetch and normalise analyst data from FMP (analyst estimates, price targets, the ratings summary) and Finnhub (recommendation trends), and their access probes (one request per endpoint); the FMP key is added to the query by the registry's transport and never held here; the nightly analyst-snapshot task stores what they return (ADR 0068)"
 owner = [
     "libs/sources/algotrade_sources/vendors/finnhub/*",
     "libs/sources/algotrade_sources/vendors/fmp/*",

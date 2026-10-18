@@ -53,9 +53,13 @@ def test_a_valid_feature_has_no_problems() -> None:
         ({"inputs": ("close",)}, "neither"),
         ({"licence": "public"}, "licence 'public' must be one of"),
         ({"applies_to": "stocks"}, "applies_to 'stocks' must be one of"),
-        ({"null_status": "status"}, "goes with illiquid_statuses or explained_statuses"),
+        (
+            {"null_status": "status"},
+            "goes with illiquid_statuses, uncovered_statuses or explained_statuses",
+        ),
         ({"illiquid_statuses": ("A",)}, "goes with"),
         ({"explained_statuses": ("NO_TRADE",)}, "goes with"),
+        ({"uncovered_statuses": ("NOT_COVERED",)}, "goes with"),
         ({"null_status": "s", "explained_statuses": ("STALE",)}, "['STALE'] are not NullReason"),
         (
             {
@@ -63,13 +67,26 @@ def test_a_valid_feature_has_no_problems() -> None:
                 "illiquid_statuses": ("NO_TRADE",),
                 "explained_statuses": ("NO_TRADE",),
             },
-            "either illiquid or explained",
+            "never more than one",
+        ),
+        (
+            {
+                "null_status": "s",
+                "illiquid_statuses": ("X",),
+                "uncovered_statuses": ("X",),
+            },
+            "never more than one",
         ),
         ({"null_status": "iv30.status@x"}, "null_status 'iv30.status@x' is not"),
     ],
 )
 def test_problems_are_named(changes: dict[str, Any], problem: str) -> None:
     assert any(problem in p for p in feature_problems(_feature(**changes)))
+
+
+def test_uncovered_statuses_need_a_status_column_and_travel_in_the_rule() -> None:
+    f = _feature(null_status="status", uncovered_statuses=("NOT_COVERED", "NOT_FETCHED"))
+    assert feature_problems(f) == []
 
 
 def test_explained_statuses_are_null_reasons() -> None:

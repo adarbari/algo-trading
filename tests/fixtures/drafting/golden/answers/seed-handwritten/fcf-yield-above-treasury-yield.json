@@ -26,21 +26,10 @@
   ],
   "tie_break": null,
   "notes": [
-    "neither side of the comparison is a stored field"
+    "the free cash flow yield is feature.fcf_yield, but the 10 year treasury yield is not a stored field, so the comparison cannot be drafted"
   ],
   "formulas": [],
   "missing": [
-    {
-      "key": "free_cash_flow_yield",
-      "new_key_slug": null,
-      "span": "free cash flow yield",
-      "description": "Free cash flow per share over the price",
-      "why_needed": "the left side of the comparison",
-      "closest": [
-        "div_yield"
-      ],
-      "feasibility": "NEEDS_SOURCE"
-    },
     {
       "key": "treasury_10y_level",
       "new_key_slug": null,

@@ -7,8 +7,9 @@
       {
         "span": "free cash flow yield",
         "bucket": "C",
-        "fields": [],
-        "key": "free_cash_flow_yield"
+        "fields": [
+          "feature.fcf_yield"
+        ]
       },
       {
         "span": "the 10 year treasury yield",

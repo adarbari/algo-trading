@@ -147,13 +147,14 @@ VENDOR_EXTRAS = {
         "refresh_days",
         "facts_refresh_days",
         "statements_backfill_per_night",
+        "statements_priority_min_adv_usd",
         "fund_quarters",
     ),
     "treasury": ("lookback_days",),
     "fred": ("base_url",),
     "tiingo": ("licence", "monthly_symbol_budget"),
-    "fmp": ("licence", "daily_budget"),
-    "finnhub": ("licence",),
+    "fmp": ("licence", "daily_budget", "refresh_days", "run_budget_s"),
+    "finnhub": ("licence", "per_night", "refresh_days"),
     "etf_holdings": ETF_KEYS,
     **VENDOR_FLAGS,
     "ibkr": (
@@ -220,6 +221,7 @@ class SourcesSettings:
     sec_refresh_days: int = 30
     sec_facts_refresh_days: int = 30
     sec_statements_backfill_per_night: int = 400  # ADR 0067 (0: no cap)
+    sec_statements_priority_min_adv_usd: float = 10_000_000.0  # liquid: 20-day $ volume (ADR 0067)
     sec_fund_quarters: int = 6  # SEC prospectus data sets read for ETF descriptions (ADR 0034)
     descriptions_per_night: int = 100  # Massive ticker overviews the nightly requests (0: none)
     descriptions_refresh_days: int = 365  # refetch a stock's description after this many days
@@ -233,7 +235,11 @@ class SourcesSettings:
     fmp_daily_budget: int = (
         200  # [fmp] daily_budget: FMP calls a UTC day the analyst tasks may spend
     )
+    fmp_refresh_days: int = 7  # [fmp] refresh_days: refetch cadence of a name
+    fmp_run_budget_s: int = 1500  # [fmp] run_budget_s: analyst-snapshot stops calling after this
     finnhub_licence: str = "personal"  # [finnhub] licence (ADR 0068)
+    finnhub_per_night: int = 300  # [finnhub] per_night: names read a night
+    finnhub_refresh_days: int = 7  # [finnhub] refresh_days: refetch cadence of a name
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
     limits_dir: str = "var/run/limits"
@@ -263,6 +269,8 @@ class SourcesSettings:
     min_calendar_future_dates: int = 1  # macro-calendar: dates each FRED release must list ahead
     max_filings_failed: float = 0.05  # filings: share of CIKs whose SEC fetch failed
     filings_backfill_per_night: int = 50  # filings: CIKs new to the universe read in full a night
+    max_analyst_failed: float = 0.20  # analyst-snapshot: share of the night's calls that failed
+    max_analyst_backlog: float = 0.25  # analyst-snapshot: share of in-scope names FMP was not asked
     coverage: tuple[CoverageRule, ...] = DEFAULT_COVERAGE  # [quality.coverage.<group>.<column>]
     ibkr: IbkrSettings = field(default_factory=IbkrSettings)
     etf: EtfHoldingsSettings = field(default_factory=EtfHoldingsSettings)  # [etf_holdings]
@@ -311,6 +319,8 @@ class SourcesSettings:
                 "max_ibkr_vol_rejected",
                 *("max_macro_stale_share", "min_calendar_future_dates", "max_filings_failed"),
                 "filings_backfill_per_night",
+                "max_analyst_failed",
+                "max_analyst_backlog",
                 "coverage",
             ],
         )
@@ -352,6 +362,9 @@ class SourcesSettings:
             sec_statements_backfill_per_night=_extra(vendors, "sec_edgar").integer(
                 "statements_backfill_per_night", d.sec_statements_backfill_per_night, 0
             ),
+            sec_statements_priority_min_adv_usd=_extra(vendors, "sec_edgar").number(
+                "statements_priority_min_adv_usd", d.sec_statements_priority_min_adv_usd, 0.0
+            ),
             sec_fund_quarters=_extra(vendors, "sec_edgar").integer(
                 "fund_quarters", d.sec_fund_quarters, 0
             ),
@@ -371,6 +384,14 @@ class SourcesSettings:
             ),
             fmp_licence=_extra(vendors, "fmp").choice("licence", d.fmp_licence, LICENCES),
             fmp_daily_budget=_extra(vendors, "fmp").integer("daily_budget", d.fmp_daily_budget, 0),
+            fmp_refresh_days=_extra(vendors, "fmp").integer("refresh_days", d.fmp_refresh_days, 1),
+            fmp_run_budget_s=_extra(vendors, "fmp").integer("run_budget_s", d.fmp_run_budget_s, 1),
+            finnhub_per_night=_extra(vendors, "finnhub").integer(
+                "per_night", d.finnhub_per_night, 0
+            ),
+            finnhub_refresh_days=_extra(vendors, "finnhub").integer(
+                "refresh_days", d.finnhub_refresh_days, 1
+            ),
             finnhub_licence=_extra(vendors, "finnhub").choice(
                 "licence", d.finnhub_licence, LICENCES
             ),
@@ -419,6 +440,8 @@ class SourcesSettings:
                 "min_calendar_future_dates", d.min_calendar_future_dates, 0
             ),
             max_filings_failed=quality.fraction("max_filings_failed", d.max_filings_failed),
+            max_analyst_failed=quality.fraction("max_analyst_failed", d.max_analyst_failed),
+            max_analyst_backlog=quality.fraction("max_analyst_backlog", d.max_analyst_backlog),
             filings_backfill_per_night=quality.integer(
                 "filings_backfill_per_night", d.filings_backfill_per_night, 0
             ),
