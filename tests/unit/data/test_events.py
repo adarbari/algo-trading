@@ -6,7 +6,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from algotrade.data import StoreReader
-from algotrade.data.events import read_events
+from algotrade.data.events import latest_versions, read_events
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import T0, stamped
@@ -187,3 +187,36 @@ def test_a_nightly_window_run_does_not_hide_the_backfilled_dividends() -> None:
     assert trailing.runs == ["ca1"]
     ahead = read_events(reader, "events/dividend", session, date(2026, 11, 1))
     assert list(ahead.frame["instrument_id"]) == ["EQ:XOM"]
+
+
+def lockup(version: str, known: date, days: int | None) -> dict[str, object]:
+    """An ``events/ipo_lockup`` row of one prospectus (``cik`` + ``accession``): the table key
+    holds ``known_from``, so every version is kept."""
+    return {
+        "instrument_id": None, "ts": pd.Timestamp("2026-06-12T21:30:00Z"), "known_from": known,
+        "cik": "0001111111", "accession": "0001193125-26-100001", "filing_date": date(2026, 6, 15),
+        "is_ipo": True, "early_release": False, "extraction": "EXTRACTED", "rules_version": version,
+        "lockup_days": days,
+    }  # fmt: skip
+
+
+def test_latest_versions_reads_the_version_known_by_the_session() -> None:
+    """A re-extraction is a new version with a later ``known_from``: a session before it reads
+    the earlier version, a later one the new, and a session before both reads nothing."""
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    first, restated = date(2026, 6, 12), date(2026, 10, 5)
+    writer.write_table(
+        "events/ipo_lockup", BACKFILLED_ON, "r1", stamped([lockup("v1", first, 180)], first, "r1")
+    )
+    later = T0 + timedelta(days=1)
+    row = stamped([lockup("v2", restated, 90)], restated, "r2", later)
+    writer.write_table("events/ipo_lockup", restated, "r2", row)
+    reader, key = StoreReader(backend), ["cik", "accession"]
+    assert latest_versions(reader, "events/ipo_lockup", key, date(2026, 6, 11)).empty
+    old = latest_versions(reader, "events/ipo_lockup", key, date(2026, 10, 4))
+    assert list(old["rules_version"]) == ["v1"] and list(old["lockup_days"]) == [180]
+    new = latest_versions(reader, "events/ipo_lockup", key, date(2026, 10, 5))
+    assert list(new["rules_version"]) == ["v2"] and list(new["known_from"]) == [restated]
+    assert list(latest_versions(reader, "events/ipo_lockup", key)["lockup_days"]) == [90]
+    assert latest_versions(reader, "events/filing", ["accession"]).empty  # nothing stored

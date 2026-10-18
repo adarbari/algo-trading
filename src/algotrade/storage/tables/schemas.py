@@ -560,6 +560,21 @@ FILING_EVENTS = fixed(
     runs="merge",
     key=("instrument_id", "accession"),
 )
+# L1: the IPO facts and lock-up expiry of each 424B4 prospectus (ADR 0050, edge build D8; rules in
+# ``tasks/events/ipo_lockups.py``): one row per (``cik``, ``accession``), keyed by the ISSUER's CIK
+# (a new issuer is in no universe yet: ``instrument_id`` is null until a run finds it). ``ts`` is
+# the acceptance instant, ``known_from`` its New York session; a re-extraction that changed a
+# value is a new version with a later ``known_from``, part of the merge key so it never replaces
+# the version an earlier session read (readers: ``data.events.latest_versions``).
+IPO_LOCKUP_EVENTS = fixed(
+    "events/ipo_lockup", "event", ("ts", KNOWN_FROM, "cik", "accession", "extraction"),
+    "ts timestamp_utc!", f"{KNOWN_FROM} date!", "cik string!", "accession string!",
+    "extraction string!", "rules_version string!", "filing_date date!", "is_ipo bool!",
+    "early_release bool!", "prospectus_date date", "lockup_expiry date", "offer_price float64",
+    "lockup_days int64", *strings("instrument_id", "issuer_name", "primary_document", "ticker"),
+    *strings("exchange", "lockup_terms", "early_release_text", "reason"),
+    runs="merge", key=("cik", "accession", KNOWN_FROM),
+)  # fmt: skip
 MACRO_SERIES = fixed(
     "macro/series",
     "reference",
@@ -781,6 +796,7 @@ KNOWN: dict[str, TableSpec] = {
         EARNINGS_EVENTS,
         MACRO_RELEASE_EVENTS,
         FILING_EVENTS,
+        IPO_LOCKUP_EVENTS,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the

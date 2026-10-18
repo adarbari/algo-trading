@@ -17,7 +17,7 @@ from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.analyst import probe as analyst_probe
 from algotrade_ingestion.tasks.analyst import snapshot as analyst_snapshot
 from algotrade_ingestion.tasks.derived import history_copy, market_rollups, outcomes, rollups
-from algotrade_ingestion.tasks.events import filings
+from algotrade_ingestion.tasks.events import filings, ipo_lockups
 from algotrade_ingestion.tasks.framework import (
     entries_market,
     entries_ops,
@@ -351,6 +351,33 @@ TASKS: dict[str, Task] = {
                 ),
                 Param("symbols", ("--symbols",), str, "only these tickers (default: the universe)"),
                 Param("limit", ("--limit",), int, "per-CIK reads: fetch at most N CIKs this run"),
+            ),
+        ),
+        Task(
+            "ipo-lockups",
+            "IPO facts and lock-up expiry dates from EDGAR 424B4 final prospectuses "
+            "(events/ipo_lockup): the prospectuses EDGAR full-text search lists for a month at a "
+            "time, each read once (the submissions for the acceptance, the document for the "
+            "terms); no --since reads the last 30 days (the nightly), --since 2005-01-01 is the "
+            "backfill (resumable, --limit caps the prospectuses read)",
+            ipo_lockups,
+            (ipo_lockups.TABLE,),
+            entries_market.run_ipo_lockups,
+            sources=("sec_prospectus_search", "sec_filings", "sec_prospectus"),
+            settings="sources.toml [sec_edgar]",
+            params=(
+                SESSION,
+                Param(
+                    "since",
+                    ("--since",),
+                    date.fromisoformat,
+                    "first filing date (default: 30 days before the session; the backfill "
+                    "starts 2005-01-01)",
+                ),
+                Param(
+                    "until", ("--until",), date.fromisoformat, "last filing date (default --date)"
+                ),
+                Param("limit", ("--limit",), int, "read at most N prospectuses this run"),
             ),
         ),
         Task(

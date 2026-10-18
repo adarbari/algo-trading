@@ -50,3 +50,58 @@ def submissions(
             "filings": {"recent": {"accessionNumber": [], "form": []}, "files": []},
         }
     ).encode()
+
+
+def search_page(hits: Iterable[tuple[str, str, str, str]], total: int | None = None) -> bytes:
+    """One page of EDGAR full-text search (``efts``). hits: (adsh, cik, file_date, name); several
+    hits of one accession are several documents of the filing."""
+    rows = [
+        {
+            "_id": f"{adsh}:d.htm",
+            "_source": {
+                "adsh": adsh,
+                "ciks": [cik],
+                "display_names": [f"{name}  (CIK {cik})"],
+                "file_date": filed,
+                "form": "424B4",
+            },
+        }
+        for adsh, cik, filed, name in hits
+    ]
+    count = len(rows) if total is None else total
+    return json.dumps(
+        {"hits": {"total": {"value": count, "relation": "eq"}, "hits": rows}}
+    ).encode()
+
+
+COVER = (
+    "<html><body><p>PROSPECTUS</p><p>{shares} Shares</p><p>Class A Common Stock</p>"
+    "<p>This is the initial public offering of our Class A common stock. Prior to this offering, "
+    "there was no public market for our common stock. We have been approved to list our Class A "
+    "common stock on the Nasdaq Global Select Market under the symbol &#8220;{ticker}&#8221;.</p>"
+    "<table><tr><td></td><td>Per Share</td><td>Total</td></tr>"
+    "<tr><td>Initial public offering price</td><td>$</td><td>{price}</td><td>$</td><td>360,000,000"
+    "</td></tr></table><p>Prospectus dated {dated}</p>"
+)
+LOCKUP = (
+    "<p>We, our directors, executive officers and holders of substantially all of our "
+    "securities have agreed with the underwriters that, subject to certain exceptions, we and "
+    "they will not, for a period of {term} after the date of this prospectus, sell any shares. "
+    "Goldman Sachs may, in its sole discretion, release any of the securities subject to these "
+    "lock-up agreements at any time.</p>"
+)
+
+
+def prospectus(
+    ticker: str = "ABCD",
+    price: str = "18.00",
+    dated: str = "June 12, 2026",
+    terms: tuple[str, ...] = ("180 days",),
+    repeat: int = 3,
+    extra: str = "",
+) -> bytes:
+    """A 424B4 main document: an IPO cover and the lock-up paragraph (``terms`` each stated
+    ``repeat`` times, as a prospectus repeats it in every section)."""
+    lock = "".join(LOCKUP.format(term=t) for t in terms for _ in range(repeat))
+    cover = COVER.format(shares="20,000,000", ticker=ticker, price=price, dated=dated)
+    return f"{cover}{lock}{extra}</body></html>".encode()
