@@ -615,6 +615,17 @@ def test_a_calendar_schedule_takes_its_window_length_as_the_one_horizon() -> Non
     assert parse(**_calendar("pre_holiday", [1])).outcome.horizon_sessions == (1,)
 
 
+@pytest.mark.parametrize(("window", "length"), [("pre_month_end", 3), ("year_turn", 10)])
+def test_the_h5_calendar_windows_load_with_their_length_as_the_horizon(
+    window: str, length: int
+) -> None:
+    edge = parse(**_calendar(window, [length]))
+    assert edge.schedule == f"calendar:{window}"
+    assert edge.outcome.horizon_sessions == (length,)
+    with pytest.raises(ConfigurationError, match=f"calendar:{window} is {length} sessions long"):
+        parse(**_calendar(window, [length + 1]))
+
+
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
