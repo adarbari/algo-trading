@@ -209,6 +209,26 @@ iv_batch = 50                    # IV streams open together (paper accounts have
 iv_history_days = 730            # calendar days of IV history a backfill fetches (2 years)
 iv_backfill_per_night = 100      # underlyings without IV history the nightly backfills (0: off;
                                  # 100 x 1 request x 10 s = ~17 min a night)
+# Nightly futures curves (`futures-curves`, read-only, personal licence): the front `futures_front`
+# unexpired contracts of each root, last / prior settle / volume / open interest, so the curve
+# (basis, roll yield) is rebuilt from our own history, which accrues from the first night. ROOT:EXCHANGE
+# [:TRADING_CLASS]; a root the gateway or the account's market data does not serve is skipped with a reason.
+futures_front = 6
+futures_roots = [
+    "CL:NYMEX",  # WTI crude
+    "NG:NYMEX",  # natural gas
+    "GC:COMEX",  # gold
+    "HG:COMEX",  # copper
+    "ZC:CBOT",   # corn
+    "ZS:CBOT",   # soybeans
+    "ZW:CBOT",   # wheat
+    "SB:NYBOT",  # sugar no. 11
+    "ZT:CBOT",   # 2y note
+    "ZF:CBOT",   # 5y note
+    "ZN:CBOT",   # 10y note
+    "ZB:CBOT",   # 30y bond
+    "VX:CFE",    # VIX futures (needs CFE market data)
+]
 # The API's live option quotes (ADR 0028; GET /chains/{id}/live): read through the same facade on
 # its own client id (ALGOTRADE_IBKR_API_CLIENT_ID, default ALGOTRADE_IBKR_CLIENT_ID + 1); when the
 # gateway is down the API serves the stored delayed chain with a status instead.

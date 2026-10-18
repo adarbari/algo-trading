@@ -400,6 +400,13 @@ def test_ibkr_and_verification_settings() -> None:
     assert (ibkr.contracts_refresh_days, ibkr.contracts_batch, ibkr.iv_batch) == (30, 25, 50)
     assert (ibkr.iv_history_days, ibkr.iv_backfill_per_night) == (730, 100)
     assert ibkr.historical_min_interval_s == 10.0  # the default is not lowered
+    roots = {r.symbol: r for r in ibkr.futures_roots}
+    assert ibkr.futures_front == 6 and {"CL", "NG", "GC", "HG", "ZN", "ZB", "VX"} <= set(roots)
+    assert (roots["SB"].exchange, roots["SB"].trading_class) == ("NYBOT", "SB")
+    named = SourcesSettings.from_document({"ibkr": {"futures_roots": ["vx:cfe:VX"]}})
+    assert named.ibkr.futures_roots[0].trading_class == "VX"
+    with pytest.raises(ConfigurationError, match="ROOT:EXCHANGE"):
+        SourcesSettings.from_document({"ibkr": {"futures_roots": ["CL"]}})
     trial = SourcesSettings.from_document({"ibkr": {"historical_min_interval_s": 5}})
     assert trial.ibkr.historical_min_interval_s == 5.0  # the owner's trial pace
     assert sources.max_verify_failures == 0.10
