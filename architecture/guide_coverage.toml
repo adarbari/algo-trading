@@ -34,7 +34,7 @@
 non_sections = []
 
 [panels]
-tags = ["Banner", "Panel", "PartCard", "StatusStrip"]
+tags = ["Banner", "ConditionGroup", "Panel", "PartCard", "StatusStrip"]
 
 # ------------------------------------------------------------------ enums and status fields
 
@@ -65,6 +65,11 @@ exempt = "Guide-internal: the kinds of the Guide's own entries"
 [[enum]]
 source = "graphql:FeatureFormat"
 exempt = "a display hint for the column (percent, date, ...), never shown as a word"
+
+[[enum]]
+source = "graphql:ScreenGroup.kind"
+values_from = "python:algotrade.core.model.screen_spec:GROUP_KINDS"
+values = { all = "term:group_all", any = "term:group_any", none = "term:group_none" }
 
 [[enum]]
 source = "graphql:Edge.status"

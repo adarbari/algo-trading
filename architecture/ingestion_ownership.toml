@@ -80,7 +80,7 @@ detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
 
 [[responsibility]]
 id = "filing-ingestion"
-description = "Store the SEC 8-K and 8-K/A filings of every operating company in the universe (the session's universe snapshot without ETFs / ETNs) in events/filing (ADR 0050, tasks/events/filings.py): the names' CIKs from the company details as of the session; the backfill is one SEC submissions request per CIK (plus the older pages when --since precedes the recent block; one whose stored filings already reach --since is skipped, --limit caps a run), the nightly reads EDGAR's daily form index for each weekday since the latest stored filing day and asks only the CIKs that filed (an unpublished day is read again, a stale one fails, a failing day stops the walk); each row with its acceptance instant, items and known_from (the acceptance's session in New York); and the Item 2.02 results releases as events/earnings rows with source sec_8k (earnings_date the acceptance date in New York, time pre_market / intraday / after_hours by the acceptance clock, reported true, known_from the same date). The per-quarter precedence between those rows and the calendar's belongs to the earnings rollup, not the writer"
+description = "Store the SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I, Form 25 / 25-NSE, 424B4, Form 10 10-12B) of every operating company in the universe (the session's universe snapshot without ETFs / ETNs) in events/filing (ADR 0050, tasks/events/filings.py): the names' CIKs from the company details as of the session; the backfill is one SEC submissions request per CIK (plus the older pages when --since precedes the recent block; a CIK an earlier run of the current form set (FORMS_TAG) read from --since or earlier is skipped, stored rows never count, --limit caps a run), the nightly reads EDGAR's daily form index for each weekday since the latest stored filing day and asks only the CIKs that filed (an unpublished day is read again, a stale one fails, a failing day stops the walk); each row with its acceptance instant, items and known_from (the acceptance's session in New York); and the Item 2.02 results releases as events/earnings rows with source sec_8k (earnings_date the acceptance date in New York, time pre_market / intraday / after_hours by the acceptance clock, reported true, known_from the same date). The per-quarter precedence between those rows and the calendar's belongs to the earnings rollup, not the writer"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/events/*"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
@@ -248,7 +248,7 @@ owner = [
     "libs/sources/algotrade_sources/vendors/cboe/vx_futures.py",
 ]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/vx_schemas.py",  # declares the table
     "src/algotrade/data/volatility.py",  # the one read (data.volatility.vx_futures)
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (vx_futures_fresh, WARN-only)
 ]

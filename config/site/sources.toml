@@ -87,6 +87,16 @@ fallback_scope = "liquid"        # which funds SEC N-PORT (months-old, quarterly
                                  # (~4k funds, a long first pass); "off" = daily files only
 fallback_min_adv_usd = 5_000_000 # "liquid": ADV (price_stats.adv_usd_20d) from which a fund is read;
                                  # about 940 non-optionable ETFs trade at least $5M a day, 640 $10M
+# iShares funds read EVERY night (one request each, outside the weekly slots and the per_night cap):
+# their daily shares outstanding feed ETF flow pressure (holdings/etf_shares, EB D4). The core
+# equity, country, rates, credit and EM funds of docs/edge-ideas/trend-macro.md's ETF map. SLV and
+# IAU publish no file (metal trusts); SSGA and ProShares files carry no shares outstanding.
+daily_funds = [
+    "IVV", "IWM", "IJH", "IJR", "IWD", "IWF", "EFA", "EEM", "IEMG", "INDA", "MCHI", "FXI",
+    "EWJ", "EWG", "EWU", "EWZ", "EWY", "EWT", "EWA", "EWC", "EWH", "EWS", "EWW", "EWQ",
+    "EWI", "EWP", "EWL", "EWD", "EWN", "EWM", "SHY", "SHV", "IEF", "TLT", "TIP", "LQD",
+    "HYG", "AGG", "EMB",
+]
 
 [cboe_vx]                        # VIX futures by expiry (EB D3): one static CSV per contract on Cboe's CDN
 enabled = true
