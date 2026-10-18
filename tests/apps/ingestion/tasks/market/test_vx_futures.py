@@ -183,6 +183,27 @@ def test_an_expiry_not_yet_past_is_asked_again_and_only_new_rows_are_written() -
     assert old is not None and set(old["knowledge_ts"]) == {FETCHED}  # never restated
 
 
+def test_a_forced_restatement_may_change_a_count_between_na_and_a_value() -> None:
+    backend = MemoryBackend()
+    day = date(2013, 5, 22)
+    na = b"\n".join([files.VX_HEADER.encode(), b"2013-05-22,F (Jan 2014),1,1,1,1,15.0,0,5,0,"])
+    full = na + b"7\n"
+    ingest_vx_futures(_ctx(backend), _source({"2013-05-22": na + b"\n"}, []), SESSION, day, day)
+    fetch = datetime(2013, 6, 10, 23, tzinfo=UTC)
+    for payload, changed in ((full, True), (na + b"\n", True)):
+        record = ingest_vx_futures(
+            _ctx(backend, fetch),
+            _source({"2013-05-22": payload}, []),
+            date(2013, 6, 10),
+            day,
+            day,
+            force=True,
+        )
+        assert record.status is RunStatus.COMPLETE and changed
+        assert record.items["2013-05-22"] == "OK: 1 rows through 2013-05-22"
+        fetch += timedelta(days=1)
+
+
 def test_fetch_errors_make_the_run_partial_and_stop_after_a_streak() -> None:
     urls: list[str] = []
     record = ingest_vx_futures(

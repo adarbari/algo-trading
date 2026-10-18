@@ -35,7 +35,7 @@ import re
 from collections.abc import Mapping
 from datetime import date, timedelta
 from functools import partial
-from typing import cast
+from typing import Any, cast
 
 import pandas as pd
 
@@ -134,6 +134,13 @@ def _history(runs: list[RunRecord]) -> tuple[dict[date, date], set[date]]:
 VALUES = ("open", "high", "low", "close", "settle", "change", "volume", "efp", "open_interest")
 
 
+def _equal(new: Any, old: Any) -> bool:
+    """NA-safe equality of two stored values (an Int64 count may be NA on either side)."""
+    if pd.isna(new) or pd.isna(old):
+        return bool(pd.isna(new) and pd.isna(old))
+    return bool(new == old)
+
+
 def _restated(run: IngestRun, rows: pd.DataFrame) -> pd.DataFrame:
     """``--force``: only the rows that are new or differ from the stored ones. A restated row is
     known from the session AFTER the fetch's own day (``next_session(exchange_date(clock))``) when
@@ -161,10 +168,7 @@ def _restated(run: IngestRun, rows: pd.DataFrame) -> pd.DataFrame:
             keep.append(True)
             known.append(row.known_from)
             continue
-        same = all(
-            (pd.isna(getattr(row, c)) and pd.isna(before[c])) or getattr(row, c) == before[c]
-            for c in VALUES
-        )
+        same = all(_equal(getattr(row, c), before[c]) for c in VALUES)
         keep.append(not same)
         known.append(max(cast(date, row.known_from), learned))
     out = rows.assign(known_from=known)
