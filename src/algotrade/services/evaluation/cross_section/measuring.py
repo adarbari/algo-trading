@@ -199,8 +199,10 @@ def _stat(
         chosen = [i for i in in_universe if i in pickable]
         legs = [(LONG, chosen if edge.top_k is None else chosen[: edge.top_k])]
     else:  # a short leg is ranked by score: too few scores and there is no honest bottom
+        if thin:  # fail closed: the session is not measured, as an incomplete screen is not
+            return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
         in_universe = []
-        legs = [] if thin else _side_picks(edge, run.scores, pickable, adv, adv_floor)
+        legs = _side_picks(edge, run.scores, pickable, adv, adv_floor)
     picks = [i for _, ids_ in legs for i in ids_]
     pick_set = set(picks)
     unmeasured = set(res.index[res["excluded"] == UNMEASURED])  # a window over a bad bar (ADR 0061)

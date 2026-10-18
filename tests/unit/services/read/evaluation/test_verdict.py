@@ -9,6 +9,7 @@ from algotrade.services.read.evaluation.runs import EdgeRow, _lost
 from algotrade.services.read.evaluation.verdict import (
     ALL,
     BOTH,
+    DIAGNOSTIC,
     IN_SAMPLE,
     NOT_ENOUGH,
     NOT_WORKING,
@@ -599,7 +600,7 @@ def test_a_long_short_result_is_a_diagnostic_and_never_the_basis() -> None:
     """Owner decision 2026-10-17: a spread is not a verdict basis, however good it looks."""
     spread = [replace(r, side="long_short") for r in result()]
     v = verdict(spread)
-    assert v.verdict == WAITING and v.side == "long_short" and v.basis is None
+    assert v.verdict == DIAGNOSTIC and v.side == "long_short" and v.basis is None
     assert "diagnostic" in v.rationale and "no verdict rests on it" in v.rationale
 
 

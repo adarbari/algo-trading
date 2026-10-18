@@ -114,5 +114,5 @@ its own in-sample and out-of-sample figures like a long one, over liquid names o
 leg's dollar-volume floor and the assumed borrow cost are in its figures, `verdict.toml`).
 A `long_short` candidate is never a basis (owner decision 2026-10-17: a spread cannot be traded
 by buying alone and the broker access is read-only); an edge whose candidates are all
-`long_short` has no basis and waits, with that reason. Promising still needs t >= 2 and Works
+`long_short` has no basis; its verdict is Diagnostic only, a state of its own, not Waiting on data. Promising still needs t >= 2 and Works
 t >= 3 on both t series. The verdict and the edge page carry the basis's side.

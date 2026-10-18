@@ -186,3 +186,21 @@ def test_a_leg_key_does_not_change_for_a_long_edge_and_does_for_a_short_ones_flo
     args = ("t", "u", "iv", None, 1, 10, "e", 5, "event", "event", (0.0, 15.0))
     assert leg_key(*args) == leg_key(*args, None)
     assert leg_key(*args, 5e6) != leg_key(*args, 1e6) != leg_key(*args)
+
+
+def test_a_session_with_too_few_scores_has_no_short_leg_and_is_not_measured() -> None:
+    """Fail closed: with 6 of 20 names scored there is no honest bottom, so a short or long-short
+    session is left out (``excluded_coverage``) while a long edge still counts its picks."""
+    nan = float("nan")
+    w = build_world(price_of=lambda d, i: 100.0 + 10 * i if i < 6 else nan)
+    for side in ("short", "long_short", "long"):
+        e = edge(outcome={"kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+                          "start_offset_sessions": 1, "side": side}, top_k=3)  # fmt: skip
+        ev = evaluate_edge(
+            w.reader, w.results, w.configs, UserContext("site"), e, DAYS[0], DAYS[-1], AS_OF
+        )
+        (r,) = ev.results
+        if side == "long":
+            assert r.measures[0].picks > 0
+        else:
+            assert all(s.excluded_coverage and not s.picks for s in r.stats), side

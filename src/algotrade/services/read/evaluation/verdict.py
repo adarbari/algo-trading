@@ -55,7 +55,8 @@ PROMISING: Final = "promising"
 NOT_WORKING: Final = "not_working"
 NOT_ENOUGH: Final = "not_enough_data"
 WAITING: Final = "waiting_on_data"
-ORDER: Final = (WAITING, NOT_ENOUGH, NOT_WORKING, PROMISING, WORKS)  # worst to best
+DIAGNOSTIC: Final = "diagnostic_only"  # a long-short result: a spread is never a verdict basis
+ORDER: Final = (DIAGNOSTIC, WAITING, NOT_ENOUGH, NOT_WORKING, PROMISING, WORKS)  # worst to best
 PASS, FAIL, NOT_MEASURED, NOT_APPLICABLE = "pass", "fail", "not_measured", "not_applicable"
 CRITERION_STATUSES: Final = (
     PASS,
@@ -641,6 +642,11 @@ def _waiting(edge_id: str, reason: str, side: str = "long") -> EdgeVerdict:
     return EdgeVerdict(edge_id, WAITING, reason, reason, reason, side=side)
 
 
+def _diagnostic(edge_id: str) -> EdgeVerdict:
+    reason = DIAGNOSTIC_SIDE
+    return EdgeVerdict(edge_id, DIAGNOSTIC, reason, reason, reason, side="long_short")
+
+
 def _rank(lift_pts: float | None) -> float:
     return float("-inf") if lift_pts is None else lift_pts
 
@@ -790,7 +796,7 @@ def judge(
         return _waiting(edge_id, "No official result yet")
     found = _candidates(rows)
     if found and all(c.oos.side == "long_short" for c in found):
-        return _waiting(edge_id, DIAGNOSTIC_SIDE, "long_short")  # never a verdict basis
+        return _diagnostic(edge_id)  # never a verdict basis
     choice = basis if basis is not None else choose_basis(rows, t, declared, decoys)
     if choice.key is None:
         lost = f": {'; '.join(lost_inputs)}" if lost_inputs and not found else ""

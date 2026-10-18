@@ -22,6 +22,7 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     DAYS,
     IDS,
     build_world,
+    edge,
     edge_document,
     outcome_row,
 )
@@ -435,3 +436,12 @@ def test_a_record_that_was_broken_starts_afresh_when_the_edge_records_again() ->
     site_night(candidate, DAYS[1])  # a complete night that does not list the edge breaks the run
     _, again = site_night(d, DAYS[3])  # DAYS[0]'s cadence says not due; a fresh start is due
     assert again.stats["tonight"]["drift"]["state"] == "signalled"
+
+
+def test_a_long_outcome_hashes_as_it_did_before_sides() -> None:
+    """Every open paper trade carries the hash it was signalled under: sides must not change a
+    long outcome's, or each would be skipped as "the edge's outcome changed"."""
+    assert outcome_hash(edge()) == "f2eb66386449"
+    short = edge(outcome={"kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+                          "start_offset_sessions": 1, "side": "short"}, top_k=5)  # fmt: skip
+    assert outcome_hash(short) != outcome_hash(edge())

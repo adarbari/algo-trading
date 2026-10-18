@@ -549,7 +549,9 @@ key when the side is `long` (`identity_dict`), so no stored leg or run is recomp
    (Sharpe, deflated Sharpe, PBO) read the spread.
 3. **Borrow** is an assumption: `[edge_costs] borrow_bps_annual` (default 100 bp a year) in
    `config/site/verdict.toml`, or the outcome's own `borrow_bps_annual`, scaled by
-   `horizon / 252`. No borrow data exists; the Guide says so. The resolved rate is in the trial
+   `horizon / 252`. No borrow data exists; the Guide says so. Limitation: a hard-to-borrow name
+   costs more than the flat rate and is not excluded (nothing stored says which names are); the
+   dollar-volume floor stands in for it, and a short result is read with that in mind. The resolved rate is in the trial
    hash and the liquidity floor in the leg key of a non-long edge only.
 4. **Random picks** follow the side with the same seeded generator: `short` draws from the liquid
    pickable names and its value is the short's; `long_short` is two draws, the long's then the
@@ -559,6 +561,6 @@ key when the side is `long` (`identity_dict`), so no stored leg or run is recomp
    back as null), `results/edge_trades.side` and `results/edge_eval.side` (null in rows from
    before: read as `long`). The ledger lists both legs of a `long_short` run, ordered by side.
 6. **Read**: a `long_short` result is a diagnostic and never a verdict basis (owner decision
-   2026-10-17): its verdict is Waiting on data with that reason and `EdgeVerdict.side`; a `short`
+   2026-10-17): its verdict is its own state, Diagnostic only (`diagnostic_only`, Guide term `verdict_diagnostic_only`), with `EdgeVerdict.side`; a `short`
    result is judged like any, its headline says "(short leg)". The edge page shows the side
    beside the basis, with a Guide entry per value (`side_long`, `side_short`, `side_long_short`).

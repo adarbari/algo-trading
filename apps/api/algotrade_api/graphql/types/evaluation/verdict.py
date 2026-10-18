@@ -480,7 +480,8 @@ class EdgeDecay:
 
 @strawberry.type(
     description="An edge's verdict, judged on its official result (the canonical run): "
-    "`verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` "
+    "`verdict` is works, promising, not_working, not_enough_data, waiting_on_data or "
+    "diagnostic_only; `rationale` "
     "the first failing criterion in words; `headline` the page's sentence and `result` the "
     "list's one-liner; `basis` the screen and holding period it rests on (`basisWhy`: for a "
     "basis chosen among several, the in-sample lifts it was chosen on). The figures are the "

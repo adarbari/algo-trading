@@ -18,7 +18,7 @@ read a badge as an instruction to act.
 """
 see_also = [
   "verdict_works", "verdict_promising", "verdict_not_working", "verdict_not_enough_data",
-  "verdict_waiting_on_data", "verdict_criteria", "verdict_basis", "official_result", "edge_status",
+  "verdict_waiting_on_data", "verdict_diagnostic_only", "verdict_criteria", "verdict_basis", "official_result", "edge_status",
 ]
 
 [[term]]
@@ -279,6 +279,21 @@ read an edge in this state as failed.
 """
 next = "A backtest at the edge's out-of-sample start creates the official result: Run backtest for your own edge, Run as site for an admin."
 see_also = ["verdict", "official_result", "edge_backtests", "run_backtest"]
+
+[[term]]
+id = "verdict_diagnostic_only"
+term = "Verdict: Diagnostic only"
+short = "The edge's outcome is a long-short spread, which measures the ranking and is never a verdict basis."
+body = """
+Shown when every result of the edge is a long-short spread. A spread says whether the ranking
+separates the best names from the worst. It cannot be traded by buying alone, and the broker
+access here is read-only, so no verdict rests on it. The figures are still on the page. Judge the
+long leg or the short leg on its own by giving the edge a long or a short outcome. Example: a
+positive spread with a flat long leg means the edge is a short idea. Don't read this badge as a
+failure or as a pass.
+"""
+next = "Add a short or long outcome variant to get a verdict on one leg."
+see_also = ["verdict", "side_long_short", "side_short", "verdict_basis"]
 
 [[term]]
 id = "verdict_criteria"

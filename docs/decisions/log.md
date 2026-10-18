@@ -506,3 +506,19 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the tag does not split finance from operating leases in the filer's figure; excluding it would leave about 70 of 259 untagged companies null.
+
+## 2026-10-17 | PR #646 (EB H3 outcome sides) | A long-short edge's verdict state
+- Question: what does an edge whose outcome is a long-short spread show as its verdict, given a spread is never a basis?
+- Options: Waiting on data with a reason / its own state, Diagnostic only.
+- Decision: its own state, `diagnostic_only`, with a Guide entry; the figures stay on the page.
+- decided by: architect, for the owner (away)
+- status: pending owner confirmation
+- Reasoning: Waiting on data says a result is coming; a spread's never becomes a verdict, so the word would mislead.
+
+## 2026-10-17 | PR #646 (EB H3 outcome sides) | Assumed borrow cost of a short leg
+- Question: what borrow cost does a short leg pay, and are hard-to-borrow names excluded?
+- Options: flat 100 bp a year, no exclusion / flat rate plus a hard-to-borrow exclusion / no borrow cost.
+- Decision: 100 bp a year (`verdict.toml [edge_costs] borrow_bps_annual`, per outcome overridable), no hard-to-borrow exclusion; the $5M ADV floor stands in. The limitation is recorded in ADR 0053.
+- decided by: architect, for the owner (away)
+- status: pending owner confirmation
+- Reasoning: no borrow data is stored, so any exclusion would be a guess; a flat assumption is stated and visible.
