@@ -254,4 +254,4 @@ def test_a_restatement_with_a_past_to_is_known_from_the_fetch_session_not_to(
     run(writer, restated, since=date(2026, 9, 28), until=past, force=True)
     frame = stored(writer)
     row = frame[(frame["instrument_id"] == "EQ:PHK") & (frame["nav"] == 99.0)].iloc[0]
-    assert row["known_from"] == date(2026, 10, 2)  # the fetch's session, not 2026-10-01 (next)
+    assert row["known_from"] == date(2026, 10, 5)  # the session after the fetch (Fri 10-02)

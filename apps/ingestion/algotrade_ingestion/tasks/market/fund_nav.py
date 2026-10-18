@@ -50,7 +50,7 @@ from typing import cast
 
 import pandas as pd
 
-from algotrade.core.time.calendar import exchange_date, is_session, next_session
+from algotrade.core.time.calendar import exchange_date, next_session
 from algotrade.data.reference import instruments
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
@@ -133,10 +133,10 @@ def _known_from(day: date) -> date:
 
 
 def _learned_on(run: IngestRun) -> date:
-    """The first session on or after the exchange date of the run's clock: when this run learned
-    what it fetched, whatever ``--to`` says (a past ``--to`` is not a past fetch)."""
-    today = exchange_date(run.clock())
-    return today if is_session(today) else next_session(today)
+    """The first session strictly after the exchange date of the run's clock: the same rule as a
+    fresh NAV's ``known_from`` (the next session), whatever ``--to`` says (a past ``--to`` is
+    not a past fetch)."""
+    return next_session(exchange_date(run.clock()))
 
 
 def nav_rows(
