@@ -507,6 +507,15 @@ follow-up PR).
 - status: final
 - Reasoning: the tag does not split finance from operating leases in the filer's figure; excluding it would leave about 70 of 259 untagged companies null.
 
+## 2026-10-17 | PR #643 (FINRA short interest / short volume) | Learned fits blocked, harness scoring allowed
+- Question: FINRA's website terms (restriction (m)) bar use with machine learning / predictive analytics; the API terms we pull under do not. Does the ban stop only learned models, or also the edge harness scoring rule screeners built on these tables?
+- Options: (a) block learned fits only (edge-scorer training frame, winners-study discovery probit in `services/evaluation/discovery` / `quant.probit`), harness may score screeners using them / (b) also stop the harness from scoring such screeners.
+- Decision: (a), applied to every FINRA-derived feature whatever its source (API or cdn backfill files), as one licence tag on the feature groups with a fitness test that no training frame or probit input reads a tagged feature; the FINRA rows never reach the TextModel seam. The edge harness may score rule screeners that use them.
+- decided by: Fable on the owner's behalf
+- status: final
+- confirmed: owner 2026-10-18
+- Reasoning: the clause targets a program that learns or predicts from the data, and it sits only in the website terms (the cdn files), not the API terms. The harness evaluates a fixed, human-written rule after the fact (hit rate vs base rate, lift, deciles); nothing is fitted and no estimate becomes a model, so it is an audit, not predictive analytics. Use is personal and non-commercial with no redistribution, so the residual risk is remote, while knowing whether a short-interest screen has an edge is the reason to ingest it. Reversible: (b) is one PR (extend the tag check to the harness) if the owner disagrees. Matches the owner's plan "rule screens only, never a learned scorer".
+
 ## 2026-10-17 | PR #646 (EB H3 outcome sides) | A long-short edge's verdict state
 - Question: what does an edge whose outcome is a long-short spread show as its verdict, given a spread is never a basis?
 - Options: Waiting on data with a reason / its own state, Diagnostic only.

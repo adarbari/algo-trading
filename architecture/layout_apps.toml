@@ -236,6 +236,11 @@ purpose = "reference-data tasks: universe, instrument ids, classification, histo
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/shorting"
+purpose = "FINRA short-interest tasks (EB D9): short interest into events/short_interest and the daily short-sale volume into events/short_volume, one loop over dates; both tables are no_ml"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/verification"
 purpose = "verification tasks: compare stored values with an independent live source (IBKR, read-only), the sample and the graded checks"
 kind = "task-domain"
