@@ -33,6 +33,7 @@ from functools import lru_cache
 from zoneinfo import ZoneInfo
 
 EXCHANGE_TZ = ZoneInfo("America/New_York")
+REGULAR_OPEN = time(9, 30)
 REGULAR_CLOSE = time(16, 0)
 EARLY_CLOSE = time(13, 0)
 DEFAULT_SETTLE = timedelta(minutes=30)
@@ -152,6 +153,14 @@ def close_time(day: date) -> datetime:
     return datetime.combine(day, local, EXCHANGE_TZ).astimezone(UTC)
 
 
+def open_time(day: date) -> datetime:
+    """When the session ``day`` opens (09:30 New York, every session), as an aware UTC datetime.
+    ``day`` must be a session."""
+    if not is_session(day):
+        raise ValueError(f"{day} is not a session")
+    return datetime.combine(day, REGULAR_OPEN, EXCHANGE_TZ).astimezone(UTC)
+
+
 def previous_session(day: date) -> date:
     """The last session strictly before ``day``."""
     day -= timedelta(1)
@@ -233,6 +242,16 @@ def russell_reconstitution(year: int) -> date:
 def exchange_date(now: datetime) -> date:
     """The calendar date in New York at ``now`` (an aware datetime)."""
     return now.astimezone(EXCHANGE_TZ).date()
+
+
+def last_opened_session(now: datetime) -> date:
+    """The most recent session that has opened at or before ``now`` (an aware datetime): the
+    session whose day a fact that became known at ``now`` first reaches, because the NEXT
+    session opens after it."""
+    day = exchange_date(now)
+    if not is_session(day) or open_time(day) > now:
+        day = previous_session(day)
+    return day
 
 
 def last_closed_session(now: datetime, settle: timedelta = DEFAULT_SETTLE) -> date:

@@ -44,3 +44,9 @@ No stored feature declares `uncovered_statuses` yet: this ADR adds the mechanism
 Guide term; the analyst reader and feature groups use it later. A screen treats NOT_COVERED as
 missing data (a hard criterion rejects). The GraphQL enums `UnavailableKind` and `UnknownCode`
 gain `NOT_COVERED`, the web words it as "Not covered".
+
+**Update (the analyst reader PR):** `analyst_estimates@v1` and `analyst_targets@v1` are the first features
+to declare `uncovered_statuses` (`NOT_COVERED`, `NOT_FETCHED`). The never-asked backlog of decision 6 is the
+`analyst_backlog` acceptance check on the `analyst-snapshot` step (`tasks/analyst/backlog.py`, WARN only, `[quality]
+max_analyst_backlog`); a fitness test (`tests/apps/ingestion/tasks/analyst/test_backlog.py`) fails when a
+feature declares `NOT_FETCHED` and the step does not run it.

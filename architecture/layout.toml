@@ -138,6 +138,10 @@ path = "src/algotrade/data"
 purpose = "the domain read API: the only way consumers read market data (R1); feature inputs by table name (feature_inputs.py)"
 
 [[dir]]
+path = "src/algotrade/data/analyst"
+purpose = "reads of analyst/estimate_snapshots (our own FMP and Finnhub history, ADR 0068): the latest version of each snapshot row, and the rows a session may see (session_date on or before it, published before the next session's open); data/ is at its module cap, so the reads of this table are a folder"
+
+[[dir]]
 path = "src/algotrade/data/feedback"
 purpose = "reads of the feedback grain (feedback/, ADR 0066): the Describe-it events and the missing-feature requests the API recorded, over a date range, unfiltered; importable only by the read model's viewer-scoped loaders"
 contracts = ["Feedback reads are quarantined: only the read model's feedback loader imports them (ADR 0066)"]
@@ -222,7 +226,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/consensus"
-purpose = "feature groups from analysts' consensus as the earnings calendar stores it (the surprise of the last reports against their forecast, the revision of the next report's forecast across the nightly snapshots): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+purpose = "feature groups from analysts' consensus: as the earnings calendar stores it (the surprise of the last reports against their forecast, the revision of the next report's forecast across the nightly snapshots) and from our own analyst snapshots (FY1 / FY2 estimates, price targets: ADR 0068): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus analyst_status.py, the population and status rules the two analyst groups share"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]

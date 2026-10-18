@@ -10,6 +10,17 @@
 scope = ["src/algotrade/data/", "src/algotrade/storage/"]
 
 [[responsibility]]
+id = "analyst-snapshot-reading"
+description = "Read analyst/estimate_snapshots (our own FMP and Finnhub history, ADR 0068): the latest stored version of each (instrument, source, kind, period, session_date) row (ties by knowledge_ts, ts, run_id; nulls equal in keys), and what a session may see: session_date on or before it AND published before the next session's open, so a late re-run never reaches back; the feature input and the fetch-backlog check read it here, no consumer reads the table itself"
+owner = ["src/algotrade/data/analyst/reading.py"]
+allowed = [
+    "src/algotrade/data/feature_inputs.py",  # the feature input: the window a rollup session sees
+    "apps/ingestion/algotrade_ingestion/tasks/analyst/backlog.py",  # the fetch-backlog check reads which names have a snapshot
+]
+section = "docs/adr/0068-analyst-data-vendors.md#decision"
+detect = [{ call = "stored_snapshots" }, { call = "snapshot_window" }]
+
+[[responsibility]]
 id = "background-recording"
 description = "Write what the API records in the background without ever blocking a request: the one queued batch writer (bounded queue, a daemon thread draining batches, drop and log when full or a write fails, unique run id per batch, flush and close) that the live-quote recorder (ADR 0028) and the text-model usage recorder (ADR 0058) are subclasses of"
 owner = ["src/algotrade/storage/recording.py"]

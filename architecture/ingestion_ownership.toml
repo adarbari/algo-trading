@@ -30,6 +30,8 @@ owner = ["apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task
     "src/algotrade/storage/tables/schemas.py",  # declares the table's schema
+    "src/algotrade/data/analyst/reading.py",  # the one read of the table (analyst-snapshot-reading)
+    "src/algotrade/features/rollups/consensus/analyst_status.py",  # names the feature input table its groups read
 ]
 section = "docs/adr/0068-analyst-data-vendors.md#decision"
 detect = [{ string = "analyst/estimate_snapshots" }]

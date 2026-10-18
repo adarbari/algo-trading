@@ -52,6 +52,12 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        tag, period and filing) FILED on or before the session (point in time by
                        filing date, ADR 0067), sorted by ``filed``, without the stamp columns;
                        ``None`` when there is none
+- ``analyst/estimate_snapshots``
+                       ``analyst.reading.snapshot_window``: our own history of analyst data
+                       (ADR 0068), every kind with its coverage markers, for the session plus
+                       ``lookback`` earlier sessions: the latest version of each row the session
+                       may see (``session_date`` on or before it and published before the next
+                       session's open, so a late re-run never reaches back); ``None`` when none
 - ``instruments/reference``
                        ``reference.instruments``: the snapshot the session sees, only
                        ``instrument_id``, ``security_type`` and, when stored, the fund facts
@@ -106,6 +112,9 @@ import pandas as pd
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.fields import COMPANY_TABLE, group_of_table
 from algotrade.core.time.calendar import sessions_between, sessions_ending
+from algotrade.data.analyst.reading import KINDS as ANALYST_KINDS
+from algotrade.data.analyst.reading import TABLE as ANALYST
+from algotrade.data.analyst.reading import snapshot_window
 from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
 from algotrade.data.events import events_by_event_date, stored_events
 from algotrade.data.funds.holdings import TABLE as HOLDINGS
@@ -286,6 +295,10 @@ def _statement_facts(reader: StoreReader, sessions: Sequence[date], lookback: in
     return _Snapshots(frame, _days(frame["filed"]) if len(frame) else np.array([], "datetime64[D]"))
 
 
+def _analyst_snapshots(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    return snapshot_window(reader, ANALYST_KINDS, sessions_before(sessions[0], lookback))
+
+
 @dataclass(frozen=True)
 class _Vintages:
     """Every stored vintage, read once, sorted by ``vintage_date`` (``days``); ``at`` is what
@@ -421,6 +434,7 @@ INPUTS: Mapping[str, Loader] = {
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,
     STATEMENTS: _statement_facts,
+    ANALYST: _analyst_snapshots,
     "instruments/reference": _partition(_reference_facts),
     HOLDINGS: _partition(_leveraged_holdings),
     "instruments/symbol_ids": _partition(symbol_ids),
