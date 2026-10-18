@@ -777,3 +777,22 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a ticker is reused and renamed, an id is not (ADR 0018); a list with no maintenance rule is a silent survivor filter, so it is named as one; dropping the edge loses a clean, cheap test of a documented structural niche.
+
+## 2026-10-18 | EB H10b (ensembles and the haircut) | What an ensemble counts as and how its members are treated
+- Question: how many trials is a pre-registered grid whose weights are averaged, may a member be the basis, and what does the out-of-sample haircut do?
+- Options: every member a trial plus the ensemble / the ensemble once; a member may be promoted as the basis / never; the haircut a verdict gate / a display; one haircut for every edge / a class per edge.
+- Decision: the ensemble is one trial (its hash is its members' sorted hashes) with the grid size recorded beside it; members run as role `member`, are reported, never a trial or a basis, and members already logged as screeners stay counted; a member that cannot be weighted leaves the ensemble session out; the haircut is display only, in the run's report (`[oos_haircut] trend = 0.45`, the edge's `oos_class`), not in the read model yet.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: averaging removes the choice among members, which is what multiple-testing counts; letting a member be the basis would restore it (ADR 0065); old logs are never rewritten, so the earlier count only errs conservative; a display keeps the haircut out of the verdict until the owner decides it should gate.
+
+## 2026-10-17 | EB D7 (country CAPE) | Barclays Shiller CAPE file used as personal-use data
+- Question: may the stack pull Barclays' public `cape.csv` (26 countries, monthly) although its terms could not be retrieved (the site is a single-page app whose disclaimer text is served only to a browser session)?
+- Options: use it as personal research data, one pull a month, no redistribution, no vendor data committed / wait for the owner to read the terms / use Siblis' free tier (8 snapshots, too thin).
+- Decision: use it under personal use: `licence = "personal"`, `refetch_days = 28`, tests on a hand-built fixture; the owner confirms the disclaimer once in a browser.
+- decided by: Fable on the owner's behalf
+- status: final
+- confirmed: owner 2026-10-18
+- Owner read the disclaimer: personal research use, monthly automated pull, no redistribution, no product built on the index.
+- Clause to respect: no reproduction, distribution or transmission without Barclays' consent, so CAPE values and every feature derived from them are never served to other users (`licence = "personal"`, held only by the owners listed in `config/site/users.toml`, ADR 0069).
+- Reasoning: the file is public and unauthenticated and has been served for years, a monthly pull is a light use, and the series is optional (the macro step is non-critical), so withdrawing it costs one registry block.

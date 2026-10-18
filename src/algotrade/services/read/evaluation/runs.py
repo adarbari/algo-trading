@@ -45,6 +45,7 @@ EDGE_EVAL = "edge_eval"
 EDGE_SERIES = "edge_series"  # the per-session series of a run (ADR 0064)
 MAIN = "main"
 BASELINE = "baseline"
+MEMBER = "member"  # a screener of an ensemble's grid: reported, never a candidate or a trial
 RANDOM = "random"  # the role of a random-pick draw (ED8), never a screener or a baseline
 DECILES = 10
 IN_SAMPLE = "in_sample"  # the slice before the split

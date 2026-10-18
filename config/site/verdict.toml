@@ -43,6 +43,10 @@ short = 0.5                # a short leg: as the spread (ADR 0065 amendment)
 long_short = 0.5           # traded, by the paper's leg (`[published] leg`); shown beside the figure,
 long = 0.333          # never a verdict input
 
+[oos_haircut]              # ADR 0074 amendment: the share of an in-sample Sharpe ratio to expect lost out of
+trend = 0.45               # sample, by the edge's `oos_class`; the run's report shows the in-sample figure,
+                           # this expectation and the out-of-sample one side by side, never a verdict input
+
 [decoys]                   # ADR 0053 amendment 2026-10-18: what `baselines = ["@standard"]` expands to,
 standard = [               # the decoy battery every edge is compared with on the same sessions: the
   "size_small",            # size and momentum yardsticks, then the idiosyncratic-volatility, lottery

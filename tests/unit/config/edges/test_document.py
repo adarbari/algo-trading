@@ -10,9 +10,8 @@ from typing import Any
 
 import pytest
 
-from algotrade.config.edges.chain import tenor_sessions
+from algotrade.config.edges.chain import MODEL_STRUCTURES, tenor_sessions
 from algotrade.config.edges.document import (
-    MODEL_STRUCTURES,
     QUALITY_BAR,
     STATUSES,
     Edge,

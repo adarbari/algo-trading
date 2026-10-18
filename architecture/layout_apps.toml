@@ -193,7 +193,7 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/events"
-purpose = "event-sensitivity tasks (ADR 0050): the filings task (SEC 8-K filings into events/filing, and the Item 2.02 results releases as events/earnings rows) and the insider task (Form 4 transactions into events/insider_transaction, EB D6)"
+purpose = "event-sensitivity tasks (ADR 0050): the filings task (SEC 8-K filings into events/filing, and the Item 2.02 results releases as events/earnings rows) and the insider task (Form 4 transactions into events/insider_transaction, EB D6) and the ipo-lockups task (IPO facts and lock-up expiry dates from 424B4 prospectuses into events/ipo_lockup, with the date rules of the expiry)"
 kind = "task-domain"
 
 [[dir]]

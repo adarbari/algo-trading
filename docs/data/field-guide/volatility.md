@@ -253,6 +253,59 @@ Sources: Ang, Hodrick, Xing and Zhang (2006), The Cross-Section of Volatility an
 
 Sources: Frazzini and Pedersen (2014), Betting Against Beta, Journal of Financial Economics; Black, Jensen and Scholes (1972), The Capital Asset Pricing Model: Some Empirical Tests
 
+### `feature.stock_tsmom_sign`
+
+**How to read it.** The name's own trend as a sign. 1 means the 252-session return is above 0 and the close is above the 200-day average. -1 means both are below. 0 means they disagree. Moskowitz, Ooi and Pedersen hold names with a positive past year, whatever their rank among peers.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a name whose own trend is up | `eq 1` | hard | - | as a filter on a momentum rank; names with no value drop out |
+
+**When the reading lies**
+
+- The return is raw, not in excess of cash, so in a high-rate year a sign of 1 is a weaker claim. Compare trend_stats ret_252d with rollup.trend_stats@v2.ret_252d.
+- Part of its payoff is market timing: most names read 1 after a rising market. Read it beside feature.trend_state and the market's own trend.
+- Null after a gap in the last 253 sessions or a shorter history. It is never 0 for a missing value.
+
+Sources: Moskowitz, Ooi and Pedersen (2012), Time Series Momentum, Journal of Financial Economics; Goyal and Jegadeesh (2018), Cross-Sectional and Time-Series Tests of Return Predictability, Review of Financial Studies
+
+### `rollup.session_returns@v1.overnight_ret_20d`
+
+**How to read it.** The month's return earned overnight, from each close to the next open, compounded over 20 sessions. 0.04 is up 4% overnight in total. Lou, Polk and Skouras found momentum profits arrive overnight and reversal profits arrive during the day.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a month that gained overnight | `gt 0` | hard | - | a decomposition: read with rollup.session_returns@v1.intraday_ret_20d, not as a signal alone |
+
+**When the reading lies**
+
+- A dividend or an earnings gap sits in the overnight part. Check rollup.earnings@v1.last_earnings_date before reading a high value as a trend.
+- Opening prices of thin names are noisy. Gate on rollup.price_stats@v2.adv_usd_20d before ranking by it.
+- Null after a gap, a non-positive price, or a missing open among the last 21 sessions.
+
+Sources: Lou, Polk and Skouras (2019), A Tug of War: Overnight Versus Intraday Expected Returns, Journal of Financial Economics: https://personal.lse.ac.uk/polk/research/TugOfWar.pdf
+
+### `rollup.session_returns@v1.intraday_ret_20d`
+
+**How to read it.** The month's return earned while the market was open, from each open to the same day's close, compounded over 20 sessions. With rollup.session_returns@v1.overnight_ret_20d it makes the 20-session return: one plus each, multiplied, minus one.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a month that gained during the day | `gt 0` | hard | - | a decomposition: the part of the move a market-on-close entry would have missed |
+
+**When the reading lies**
+
+- A name that gained overnight and lost in the day nets close to the old 20-session return. Read both parts before judging the move.
+- Null after a gap, a non-positive price, or a missing open among the last 21 sessions.
+
+Sources: Lou, Polk and Skouras (2019), A Tug of War: Overnight Versus Intraday Expected Returns, Journal of Financial Economics
+
 ### `feature.bb_pct_b`
 
 **How to read it.** %B: where the close sits between the Bollinger bands, 0 at the lower band, 0.5 at the 20-session mean, 1 at the upper band, below 0 or above 1 outside them. Low to high: under 0 is a two-sigma dip against the last month (the mean-reversion long in an uptrend), 0.2 to 0.8 is inside the normal range, above 1 the close has broken out of the band (strength in a trend, exhaustion after a long run). Bollinger's own rules: buy strength when %B exceeds 1 with volume, buy weakness when it is below 0 with a trend behind it.

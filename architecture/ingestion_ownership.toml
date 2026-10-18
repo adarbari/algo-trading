@@ -81,8 +81,9 @@ detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
 [[responsibility]]
 id = "filing-ingestion"
 description = "Store the SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I / SC TO-T, Form 25 / 25-NSE, 424B4, Form 10 10-12B) of every operating company in the universe (the session's universe snapshot without ETFs / ETNs) in events/filing (ADR 0050, tasks/events/filings.py): the names' CIKs from the company details as of the session; the backfill is one SEC submissions request per CIK (plus the older pages when --since precedes the recent block; a CIK an earlier run of the current form set (FORMS_TAG) read from --since or earlier is skipped, stored rows never count, --limit caps a run), the nightly reads EDGAR's daily form index for each weekday since the latest stored filing day and asks only the CIKs that filed (an unpublished day is read again, a stale one fails, a failing day stops the walk); each row with its acceptance instant, items and known_from (the first session whose close is after the acceptance: a filing after the close, on a weekend or a holiday counts from the next session; ADR 0050 amendment 2026-10-18); and the Item 2.02 results releases as events/earnings rows with source sec_8k (earnings_date the acceptance date in New York, time pre_market / intraday / after_hours by the acceptance clock, reported true, known_from the acceptance session). The per-quarter precedence between those rows and the calendar's belongs to the earnings rollup, not the writer"
-owner = ["apps/ingestion/algotrade_ingestion/tasks/events/*"]
+owner = ["apps/ingestion/algotrade_ingestion/tasks/events/filings.py"]
 allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/events/ipo_lockups.py",  # reads its 424B4 rows to report the search gap
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (filings_fetched)
     "src/algotrade/storage/tables/schemas/events.py",  # declares the table
@@ -218,6 +219,22 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py",  # grades coverage per tier
 ]
 detect = [{ call = "Tiers" }, { call = "load_tiers" }]
+
+[[responsibility]]
+id = "ipo-lockup-ingestion"
+description = "Store the IPO facts and lock-up expiry dates of the 424B4 final prospectuses EDGAR full-text search lists (any issuer, a new IPO in no universe yet included) in events/ipo_lockup (ADR 0050, edge build D8, tasks/events/ipo_lockups.py; EDGAR only, Nasdaq's IPO calendar is not captured: its terms forbid automation): one search request a calendar month of the window, then per prospectus the issuer's submissions (acceptance instant, main document; one request per CIK) and the document (the extraction rules and their failure modes live in the vendors/sec_prospectus/prospectus.py source: a fact the text does not state is null with an extraction status and reason, never guessed); rows keyed by CIK + accession with the universe instrument of the CIK as of the session filled when known (also without a fetch for a stored row); known_from the New York session of the acceptance (a backfill included), a changed re-extraction a new version known from the later of that session and the session after the fetch's exchange date; lockup_expiry the first exchange session after the prospectus date plus the term (tasks/events/lockup_dates.py); resumable backfill by --since, the nightly reads the last 30 days"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/events/ipo_lockups.py",
+    "apps/ingestion/algotrade_ingestion/tasks/events/lockup_dates.py",
+    "apps/ingestion/algotrade_ingestion/tasks/events/lockup_rows.py",
+]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (ipo_lockups_fetched, WARN only)
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table
+]
+section = "docs/adr/0050-event-sensitivity.md#decision"
+detect = [{ string = "events/ipo_lockup" }]
 
 [[responsibility]]
 id = "launchd-agents"

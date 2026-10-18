@@ -479,6 +479,29 @@ def check_filings(ctx: TaskContext, session: date) -> list[Check]:
     return [Check("filings_fetched", "FAIL" if share > limit or stopped else "PASS", detail)]
 
 
+IPO_LOCKUPS_TASK = "ipo_lockups"  # the ipo-lockups task's job name (tasks/events/ipo_lockups.py)
+
+
+def check_ipo_lockups(ctx: TaskContext, session: date) -> list[Check]:
+    """The ``ipo-lockups`` step's acceptance, never a FAIL (an optional source of one edge): WARN
+    naming the failed search months and prospectuses of the session's finished run, else PASS.
+    Nothing without a finished run of the session."""
+    done = [
+        r
+        for r in ctx.reader.runs(IPO_LOCKUPS_TASK)
+        if r.status in PUBLISHED and r.session_date == session
+    ]
+    if not done:
+        return []
+    record = max(done, key=lambda r: (r.started_at, r.run_id))
+    bad = [k for k, v in record.items.items() if status_label(v) in FAILURES]
+    hits, read = int(record.stats.get("hits") or 0), int(record.stats.get("read") or 0)
+    detail = f"{hits} prospectuses listed, {read} read, {len(bad)} failed"
+    if bad:
+        return [Check("ipo_lockups_fetched", "WARN", f"{detail}: {', '.join(sorted(bad)[:5])}")]
+    return [Check("ipo_lockups_fetched", "PASS", detail)]
+
+
 def _future_dates(
     reader: StoreReader, releases: list[MacroRelease], session: date
 ) -> dict[str, int]:

@@ -167,3 +167,47 @@ def test_the_default_weighting_stays_out_of_an_identity() -> None:
     assert weighted["weighting"] == "inverse_vol"
     other = book(outcome=outcome(weighting="equal", vol_field=None)).outcome
     assert identity_dict(other.__dict__) != weighted
+
+
+def ensemble(**changes: Any) -> Edge:
+    base = {"screeners": ["mom3", "mom6", "mom9"], "ensemble": {"variants": ["mom3", "mom6"]}}
+    return book(**{**base, **changes})
+
+
+def test_an_ensemble_names_its_grid_among_the_screeners() -> None:
+    e = ensemble()
+    assert e.ensemble == ("mom3", "mom6")  # mom9 is a screener of its own, not a member
+    assert book().ensemble == ()  # none declared
+    assert ensemble(oos_class="trend").oos_class == "trend" and ensemble().oos_class is None
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"ensemble": {"variants": ["mom3"]}}, "two or more distinct screeners"),
+        ({"ensemble": {"variants": ["mom3", "mom3"]}}, "two or more distinct screeners"),
+        ({"ensemble": {"variants": []}}, "two or more distinct screeners"),
+        ({"ensemble": {"variants": ["mom3", "mom12"]}}, "\\['mom12'\\] are not among the edge's"),
+        ({"ensemble": {"variants": ["mom3", "mom6"], "weights": [1, 1]}}, "weights"),
+        ({"screeners": ["ensemble", "mom3"]}, "'ensemble' is the id of an ensemble"),
+        ({"oos_class": "momentum"}, "oos_class: expected one of"),
+    ],
+)
+def test_an_ensemble_or_haircut_class_is_refused_where_it_means_nothing(
+    changes: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        ensemble(**changes)
+
+
+def test_an_ensemble_is_for_a_portfolio_outcome_only() -> None:
+    doc = edge_document(
+        screeners=["a", "b"], top_k=3, ensemble={"variants": ["a", "b"]}, schedule="month_end"
+    )
+    with pytest.raises(ConfigurationError, match="ensemble: only a portfolio_return outcome"):
+        parse_edge(doc, "drift", "drift.toml")
+
+
+def test_an_ensemble_is_part_of_the_run_and_an_empty_one_is_not() -> None:
+    assert "ensemble" not in identity_dict({"ensemble": (), "top_k": 3})
+    assert identity_dict({"ensemble": ("a", "b")})["ensemble"] == ["a", "b"]

@@ -71,3 +71,8 @@
 "distress_ohlson/v1.toml" = "cabfbf9ee0fd9536674af3439c480354654a429b7fad3a12d0eb6fb7dc6dd898"
 "net_share_issuance/v1.toml" = "84e5e9cd43e9e3ce12cc62fecf06ce6bc1b7ba97ffdcda9f42d4b895ad1e3294"
 "qmj/v1.toml" = "7fdff425d47ff78c285a2a10e6f765d29b9e902c27db77cc006fe60eb86d14e3"
+"short_term_momentum_turnover/v1.toml" = "440eaae7f7292a1eef60bcac18bbe4bec91c42e9b280d922400fecb613c47589"
+"momentum_own_trend/v1.toml" = "a12df409b0de9922c61be093089ccdcf9c6cf86395010f45b83b9b2ea70e51c7"
+"momentum_pullback_entry/v1.toml" = "28ce43097d7afa92238adba624b654706200379c7558e3be4cf112aa8c418910"
+"momentum_volume_confirmed/v1.toml" = "dad85a31fcd636e95f8c8cd8e2c10c0e796afda6253b37d218bcb49cda7ad42d"
+"earnings_vwap_overhang/v1.toml" = "59bdbbfda89e7e8a9d1446203e79bfcaf7a93b6388ddcf416c6e2f41acb127df"

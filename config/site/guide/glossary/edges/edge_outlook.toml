@@ -110,3 +110,19 @@ The page also shows the haircut after the variants tried across the whole site. 
 """
 next = "Read the cut against the trial count: a large cut with many variants means the best may be luck."
 see_also = ["sharpe_ratio", "deflated_sharpe", "variants_tried", "robustness", "win_rate", "base_rate"]
+
+[[term]]
+id = "oos_haircut"
+term = "Out-of-sample haircut"
+short = "The share of an in-sample Sharpe ratio expected to be lost out of sample, set beside the figure the frozen period gave."
+body = """
+A rule found in history usually does worse after the fact. The run's report puts three figures side by
+side: the in-sample Sharpe ratio, what it falls to after the edge's class of haircut, and the
+out-of-sample one. Trend rules lose about 45% in the site settings. The class is the edge document's
+oos_class. The Sharpe ratio is per decision session, not annualised. Example: an in-sample 0.30 with a
+45% haircut is expected to be 0.17 out of sample, so an out-of-sample 0.20 is in line and 0.05 is not. It
+is a guide to what is realistic, not a rule: the verdict never reads it, and the out-of-sample figure
+stays the evidence.
+"""
+next = "Set the out-of-sample Sharpe ratio against the expected one, not the in-sample one."
+see_also = ["in_sample", "out_of_sample", "sharpe_ratio", "published_haircut"]

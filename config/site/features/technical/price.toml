@@ -118,3 +118,27 @@ description = "The 12-1 momentum divided by the 60-session realised volatility (
 null_meaning = "mom_12_1 is null (a gap among the last 253 sessions, or a shorter history), hv60 is null (a gap among the last 61 sessions) or 0, or no trend_stats or vol_stats row"
 valid_range = [-100, 100]
 version = 1
+
+# Own-trend and cost-basis signals (docs/edge-ideas/cross-sectional.md stock_time_series_momentum,
+# statarb-technical.md anchored_vwap_reversion_retest).
+[stock_tsmom_sign]
+expr = '''
+if(is_null(trend_stats.ret_252d) or is_null(price_stats.sma_200), null,
+   if(trend_stats.ret_252d > 0 and price_stats.close > price_stats.sma_200, 1,
+      if(trend_stats.ret_252d < 0 and price_stats.close < price_stats.sma_200, -1, 0)))
+'''
+dtype = "float"
+unit = "ratio"
+description = "The name's own trend: 1 when its 252-session return is above 0 and the close is above the 200-session average, -1 when both are below, 0 when they disagree (the time-series momentum sign of Moskowitz, Ooi and Pedersen, confirmed by the average; the raw return is not an excess return over cash)"
+null_meaning = "ret_252d or sma_200 is null (a gap among the last 253 sessions, or a shorter history), or no trend_stats or price_stats row"
+valid_range = [-1, 1]
+version = 1
+
+[capital_gains_overhang]
+expr = "(price_stats.close - anchored_vwap.avwap_earnings) / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "Where the close sits against the volume-weighted average price since the last earnings report: 0.05 is 5% above it, -0.05 is 5% below. A proxy for the capital-gains overhang of Grinblatt and Han, whose reference price is a turnover-weighted average over years of trading"
+null_meaning = "avwap_earnings is null (no report in the last 126 sessions, fewer than 2 sessions since it, a gap in the range, or no volume), or no price_stats row"
+valid_range = [-1000, 1]
+version = 1

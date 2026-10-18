@@ -1,0 +1,87 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: short_term_momentum_turnover (EB E1). Idea
+# page: docs/edge-ideas/cross-sectional.md (short_term_momentum_high_turnover).
+id = "short_term_momentum_high_turnover"
+name = "Short-term momentum in heavily traded stocks"
+thesis = "Among the most heavily traded stocks, last month's winners keep outperforming the market over the next month."
+mechanism = """In heavily traded names the past month's return reflects information absorbed by many
+traders rather than a liquidity shock, so underreaction dominates and the winners continue; in thin
+names liquidity provision dominates and the month reverses (Medhat and Schmeling 2022)."""
+persistence = """Published in 2022 and found in 22 developed markets, so not a one-market artefact, but
+alpha in liquid names is the first that arbitrageurs take; no independent post-2018 evidence is on
+file and the 2021 high-turnover episodes reversed sharply, so persistence is a claim to test."""
+family = "A"
+schedule = "month_end"
+top_k = 25
+baselines = ["momentum_12_1", "size_small"]
+screeners = ["short_term_momentum_turnover"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """The paper's rule is a double sort: among the top turnover decile, long the top past-month
+return decile and short the bottom, held one month. Here the universe is the liquid common stocks
+with 20-session turnover of at least 1% of shares a day, an absolute stand-in for the top turnover
+decile (the decile's own cut moves with the market and is not stored per session), and the picks
+are the 25 best past-month returns of them (a rank, not a decile). ADRs are left out: they have no
+filed share count, so turnover is unknown for them. Turnover is the 20-session average volume over
+the latest filed share count (not the float), as the paper's volume over shares outstanding. The
+main outcome is the long leg only; the variant losers_short holds the bottom 25 of the same names
+short (the paper's other leg), with the site's assumed borrow cost, so the two legs read apart. Both
+compare with every name in the heavy-turnover universe (the base), which isolates the past-month
+effect from the turnover effect. Month-end start sessions, spaced at least 20 sessions apart."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { field = "feature.turnover_20d", op = "gte", value = 0.01 },
+  { field = "rollup.price_stats@v2.ret_20d", op = "gt", value = -1 },
+]
+
+[[variants]]
+id = "losers_short"
+
+[variants.outcome]
+side = "short"
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY over the 20 sessions after the entry close (the session after a
+month-end decision), net of 10 bps a round trip (an assumption, as for 12-1 momentum): a long hold
+of last month's winners among the heavily traded."""
+trigger_timing = """Turnover and the 20-session return are computed from the close of the decision
+session D (rollups, nightly) and the share count as filed by D, so the first fill is the next
+session's close: S = D + 1 (start_offset_sessions = 1); the screen is read at D, the outcome at S."""
+replication = """The source's rule first: double-sort turnover and past-month return deciles, long
+the winners of the top turnover decile and short the losers, hold one month (Medhat and Schmeling
+2022). Here short_term_momentum_turnover takes the liquid common stocks with turnover of at least
+1% a day and ranks them by the 20-session return, and the edge holds the best 25 (the long leg; the
+loser leg is the losers_short variant)."""
+expected_size = """About 1.4% a month for the winners-minus-losers spread in the top turnover decile,
+US 1963 to 2018, with a t statistic above 4 (the page marks the figure approximate and not
+verified, so no published figure is set, and it is a two-group spread, not the long leg). The long
+leg alone is smaller. There is no independent evidence after 2018: expect less, and the harness
+reports the t statistic and the independent sessions beside every number."""
+capacity_costs = """Liquid names only (price over 5 dollars, 50M dollars of 20-day volume): the page
+says the effect is strongest in the most liquid names, so it is cheap to trade at a monthly turnover.
+The 10 bps round trip is the assumption; the short leg adds the assumed borrow cost."""
+failure_modes = """Meme and high-turnover episodes reverse sharply (2021); a turnover cut set too low
+admits names where the month reverses instead; one event can be the whole month's return. Retire
+if the frozen-period excess return of the picks is not above the base rate of every eligible name."""
+decoys = """12-1 momentum (a month's winners are often the year's), the size and volume tilts of
+heavily traded names, and the one-month reversal that dominates in all stocks: the momentum_12_1 and
+size_small baselines run on the same sessions, and the base is the heavy-turnover names themselves."""
+
+[[sources]]
+title = "Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022"
+
+[[sources]]
+title = "Alpha Architect, Short-term Momentum (summary of Medhat and Schmeling 2022)"
+url = "https://alphaarchitect.com/short-term-momentum/"

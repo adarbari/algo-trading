@@ -15,7 +15,8 @@ universe = "liquid_common_stocks"
 top_k = 50
 screeners = [
   "momentum_12_1", "residual_momentum", "volatility_scaled_momentum", "frog_in_the_pan",
-  "momentum_x_quality_interaction", "fifty_two_week_high",
+  "momentum_x_quality_interaction", "fifty_two_week_high", "momentum_own_trend",
+  "momentum_pullback_entry", "momentum_volume_confirmed",
 ]
 baselines = ["size_small"]
 status = "candidate"
@@ -29,7 +30,20 @@ Variants (EB E1a): five more screeners, one trial each: residual_momentum (net o
 volatility_scaled_momentum (12-1 per unit of 60-session volatility; a stand-in for Barroso and
 Santa-Clara's time-series scaling), frog_in_the_pan, momentum_x_quality_interaction and
 fifty_two_week_high. They overlap raw momentum: read each beside momentum_12_1's number. No
-[published] figure: the catalogue's are not marked verified."""
+[published] figure: the catalogue's are not marked verified.
+EB E1 batch C adds three variants as extra screeners, each the same ranking on a narrower set, so each is one
+more trial in the deflated Sharpe ratio and the harness reads them beside the main one:
+momentum_own_trend (the stock_time_series_momentum overlay: only names whose 252-session return is
+above 0 and whose close is above the 200-day average; the sign is the raw return, not an excess
+return over cash, and a risk-free series is a follow-up), momentum_pullback_entry (the
+oversold_in_uptrend_pullback entry: positive momentum in a stacked uptrend 1 to 2 ATRs under the
+20-day average; the idea's every-session schedule is not available to a screener of a month-end
+edge, so only names at a pullback on the month-end session are seen and the list is short) and
+momentum_volume_confirmed (the volume_price_confirmation_obv_cmf variant: positive momentum with
+20-session OBV trend and Chaikin money flow above 0; Lee and Swaminathan find low-volume winners
+persist, the opposite reading of volume). A narrower screener scores fewer names than the base, so
+the harness reports its picks and lift but no decile spread. The question for each is whether it
+adds to momentum_12_1 (a better entry, lower risk), not whether it beats cash."""
 
 [scorer]  # ED7: the fields a learned scorer is fitted on (edge_scores.toml, fit-edge-scorer)
 features = [
@@ -96,3 +110,16 @@ value = 0.0131
 horizon_sessions = 20
 sample = 25
 source = 0
+
+[[sources]]
+title = "Moskowitz, T., Ooi, Y. and Pedersen, L., Time Series Momentum, Journal of Financial Economics, 2012"
+url = "https://doi.org/10.1016/j.jfineco.2011.11.003"
+
+[[sources]]
+title = "Goyal, A. and Jegadeesh, N., Cross-Sectional and Time-Series Tests of Return Predictability: What Is the Difference?, Review of Financial Studies, 2018"
+
+[[sources]]
+title = "Lee, C. and Swaminathan, B., Price Momentum and Trading Volume, Journal of Finance, 2000"
+
+[[sources]]
+title = "Han, Y., Zhou, G. and Zhu, Y., A Trend Factor: Any Economic Gains from Using Information over Investment Horizons?, Journal of Financial Economics, 2016"

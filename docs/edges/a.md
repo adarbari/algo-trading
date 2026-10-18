@@ -11,9 +11,10 @@ Back to the [index of every edge](../edges.md).
 | Composite value among cash-profitable names (`composite_value`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `composite_value` |
 | Financial distress (an avoid list) (`distress_failure_probability`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `distress_ohlson` |
 | Industry momentum (`industry_momentum`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `industry_momentum` |
-| 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1`, `residual_momentum`, `volatility_scaled_momentum`, `frog_in_the_pan`, `momentum_x_quality_interaction`, `fifty_two_week_high` |
+| 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1`, `residual_momentum`, `volatility_scaled_momentum`, `frog_in_the_pan`, `momentum_x_quality_interaction`, `fifty_two_week_high`, `momentum_own_trend`, `momentum_pullback_entry`, `momentum_volume_confirmed` |
 | Net share issuance (`net_share_issuance`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `net_share_issuance` |
 | Quality minus junk (`quality_minus_junk`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `qmj` |
+| Short-term momentum in heavily traded stocks (`short_term_momentum_high_turnover`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `short_term_momentum_turnover` |
 | Short-term residual reversal (`short_term_residual_reversal`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `residual_reversal`, `sector_reversal` |
 
 ## Asset growth (an avoid list) (`asset_growth`)
@@ -214,11 +215,11 @@ Back to the [index of every edge](../edges.md).
 - **Schedule:** month end
 - **Universe:** preset `liquid_common_stocks`
 - **Top K:** 50
-- **Screeners:** `momentum_12_1`, `residual_momentum`, `volatility_scaled_momentum`, `frog_in_the_pan`, `momentum_x_quality_interaction`, `fifty_two_week_high`
+- **Screeners:** `momentum_12_1`, `residual_momentum`, `volatility_scaled_momentum`, `frog_in_the_pan`, `momentum_x_quality_interaction`, `fifty_two_week_high`, `momentum_own_trend`, `momentum_pullback_entry`, `momentum_volume_confirmed`
 - **Baselines:** `size_small`
 - **Frozen period:** from 2026-04-01
 - **Published:** decile spread 1.31% over 20 sessions (Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993, 25 years)
-- **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). Variants (EB E1a): five more screeners, one trial each: residual_momentum (net of beta x SPY), volatility_scaled_momentum (12-1 per unit of 60-session volatility; a stand-in for Barroso and Santa-Clara's time-series scaling), frog_in_the_pan, momentum_x_quality_interaction and fifty_two_week_high. They overlap raw momentum: read each beside momentum_12_1's number. No [published] figure: the catalogue's are not marked verified.
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). Variants (EB E1a): five more screeners, one trial each: residual_momentum (net of beta x SPY), volatility_scaled_momentum (12-1 per unit of 60-session volatility; a stand-in for Barroso and Santa-Clara's time-series scaling), frog_in_the_pan, momentum_x_quality_interaction and fifty_two_week_high. They overlap raw momentum: read each beside momentum_12_1's number. No [published] figure: the catalogue's are not marked verified. EB E1 batch C adds three variants as extra screeners, each the same ranking on a narrower set, so each is one more trial in the deflated Sharpe ratio and the harness reads them beside the main one: momentum_own_trend (the stock_time_series_momentum overlay: only names whose 252-session return is above 0 and whose close is above the 200-day average; the sign is the raw return, not an excess return over cash, and a risk-free series is a follow-up), momentum_pullback_entry (the oversold_in_uptrend_pullback entry: positive momentum in a stacked uptrend 1 to 2 ATRs under the 20-day average; the idea's every-session schedule is not available to a screener of a month-end edge, so only names at a pullback on the month-end session are seen and the list is short) and momentum_volume_confirmed (the volume_price_confirmation_obv_cmf variant: positive momentum with 20-session OBV trend and Chaikin money flow above 0; Lee and Swaminathan find low-volume winners persist, the opposite reading of volume). A narrower screener scores fewer names than the base, so the harness reports its picks and lift but no decile spread. The question for each is whether it adds to momentum_12_1 (a better entry, lower risk), not whether it beats cash.
 
 **Quality bar**
 
@@ -239,6 +240,10 @@ Back to the [index of every edge](../edges.md).
 - Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, Journal of Financial Economics, 1998 <https://doi.org/10.1016/S0304-405X(98)00027-0>
 - Asness, C., Frazzini, A., Israel, R. and Moskowitz, T., Fact, Fiction and Momentum Investing, AQR / Journal of Portfolio Management, 2014 <https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Momentum-Investing>
 - Quantpedia, Momentum Factor Effect in Stocks (strategy page) <https://quantpedia.com/strategies/momentum-factor-effect-in-stocks/>
+- Moskowitz, T., Ooi, Y. and Pedersen, L., Time Series Momentum, Journal of Financial Economics, 2012 <https://doi.org/10.1016/j.jfineco.2011.11.003>
+- Goyal, A. and Jegadeesh, N., Cross-Sectional and Time-Series Tests of Return Predictability: What Is the Difference?, Review of Financial Studies, 2018
+- Lee, C. and Swaminathan, B., Price Momentum and Trading Volume, Journal of Finance, 2000
+- Han, Y., Zhou, G. and Zhu, Y., A Trend Factor: Any Economic Gains from Using Information over Investment Horizons?, Journal of Financial Economics, 2016
 
 ## Net share issuance (`net_share_issuance`)
 
@@ -302,6 +307,36 @@ Back to the [index of every edge](../edges.md).
 - Asness, C., Frazzini, A. and Pedersen, L., Quality Minus Junk, Review of Accounting Studies, 2019
 - Novy-Marx, R., The Quality Dimension of Value Investing, working paper, 2014
 - Alpha Architect, Value and Quality Stocks (summary of the AQR data) <https://alphaarchitect.com/value-and-quality-stocks/>
+
+## Short-term momentum in heavily traded stocks (`short_term_momentum_high_turnover`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Among the most heavily traded stocks, last month's winners keep outperforming the market over the next month.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 50000000` and `feature.turnover_20d gte 0.01` and `rollup.price_stats@v2.ret_20d gt -1`
+- **Top K:** 25
+- **Screeners:** `short_term_momentum_turnover`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The paper's rule is a double sort: among the top turnover decile, long the top past-month return decile and short the bottom, held one month. Here the universe is the liquid common stocks with 20-session turnover of at least 1% of shares a day, an absolute stand-in for the top turnover decile (the decile's own cut moves with the market and is not stored per session), and the picks are the 25 best past-month returns of them (a rank, not a decile). ADRs are left out: they have no filed share count, so turnover is unknown for them. Turnover is the 20-session average volume over the latest filed share count (not the float), as the paper's volume over shares outstanding. The main outcome is the long leg only; the variant losers_short holds the bottom 25 of the same names short (the paper's other leg), with the site's assumed borrow cost, so the two legs read apart. Both compare with every name in the heavy-turnover universe (the base), which isolates the past-month effect from the turnover effect. Month-end start sessions, spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** In heavily traded names the past month's return reflects information absorbed by many traders rather than a liquidity shock, so underreaction dominates and the winners continue; in thin names liquidity provision dominates and the month reverses (Medhat and Schmeling 2022).
+2. **Persistence:** Published in 2022 and found in 22 developed markets, so not a one-market artefact, but alpha in liquid names is the first that arbitrageurs take; no independent post-2018 evidence is on file and the 2021 high-turnover episodes reversed sharply, so persistence is a claim to test.
+3. **Outcome:** Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption, as for 12-1 momentum): a long hold of last month's winners among the heavily traded.
+4. **Trigger timing:** Turnover and the 20-session return are computed from the close of the decision session D (rollups, nightly) and the share count as filed by D, so the first fill is the next session's close: S = D + 1 (start_offset_sessions = 1); the screen is read at D, the outcome at S.
+5. **Faithful replication:** The source's rule first: double-sort turnover and past-month return deciles, long the winners of the top turnover decile and short the losers, hold one month (Medhat and Schmeling 2022). Here short_term_momentum_turnover takes the liquid common stocks with turnover of at least 1% a day and ranks them by the 20-session return, and the edge holds the best 25 (the long leg; the loser leg is the losers_short variant).
+6. **Expected size and sample:** About 1.4% a month for the winners-minus-losers spread in the top turnover decile, US 1963 to 2018, with a t statistic above 4 (the page marks the figure approximate and not verified, so no published figure is set, and it is a two-group spread, not the long leg). The long leg alone is smaller. There is no independent evidence after 2018: expect less, and the harness reports the t statistic and the independent sessions beside every number.
+7. **Capacity and costs:** Liquid names only (price over 5 dollars, 50M dollars of 20-day volume): the page says the effect is strongest in the most liquid names, so it is cheap to trade at a monthly turnover. The 10 bps round trip is the assumption; the short leg adds the assumed borrow cost.
+8. **Failure modes and retirement:** Meme and high-turnover episodes reverse sharply (2021); a turnover cut set too low admits names where the month reverses instead; one event can be the whole month's return. Retire if the frozen-period excess return of the picks is not above the base rate of every eligible name.
+9. **Decoys:** 12-1 momentum (a month's winners are often the year's), the size and volume tilts of heavily traded names, and the one-month reversal that dominates in all stocks: the momentum_12_1 and size_small baselines run on the same sessions, and the base is the heavy-turnover names themselves.
+
+**Sources**
+
+- Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022
+- Alpha Architect, Short-term Momentum (summary of Medhat and Schmeling 2022) <https://alphaarchitect.com/short-term-momentum/>
 
 ## Short-term residual reversal (`short_term_residual_reversal`)
 
