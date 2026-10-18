@@ -104,3 +104,12 @@ description = "The front-expiry premium: the ATM vol at the next expiry over the
 null_meaning = "iv_next or iv30 is null (no spot, no chain, or no usable ATM vol at the next expiry or at 30 days)"
 valid_range = [0, inf]
 version = 1
+
+[option_stock_volume_ratio]
+expr = "if(chain_flow.flow_status == \"OK\" and chain_flow.call_volume + chain_flow.put_volume > 0, 100 * (chain_flow.call_volume + chain_flow.put_volume) / volume.session_volume, null)"
+dtype = "float"
+unit = "ratio"
+description = "Johnson-So option-to-stock volume ratio: shares the session's option volume controls (call + put contracts x 100, every expiry; chain_flow) over the stock's share volume that session (volume), 0.05 is option volume worth 5% of the shares traded; high O/S has predicted lower returns, mostly as a filter. Chain flow is stored from 2026-10-02 only, so there is no history before that date"
+null_meaning = "no option chain for the session (chain_flow NO_CHAIN), or no option volume on it (a chain whose quotes carry no volume reads null, not 0), or no stock volume for the session (zero volume is null, never infinity)"
+valid_range = [0, inf]
+version = 1

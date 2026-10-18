@@ -40,6 +40,7 @@ LEVEL_WORDS: Final = {
     "not_working": "Not working",
     "not_enough_data": "Not enough data",
     "waiting_on_data": "Waiting on data",
+    "diagnostic_only": "Diagnostic only",
 }
 FILL_FLOOR: Final = 0.25  # the lowest share of decision sessions a projection counts on measuring
 

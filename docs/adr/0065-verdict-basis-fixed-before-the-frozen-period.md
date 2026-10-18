@@ -105,3 +105,14 @@ to expect lost once traded (McLean and Pontiff: about a third after publication)
 carries `expected` (the figure after the haircut, the out-of-sample bar and its share of it) and
 the edge page says "Published x, expect y" under the decay bars. **Display only**: no verdict
 criterion reads it, and changing a share needs no run.
+
+## Amendment 2026-10-17: the basis names a side (outcome sides, ADR 0053 amendment)
+
+The basis is chosen among candidates of the main edge variant, whose outcome has one side
+(`long`, `short` or `long_short`). A `short` candidate may be a basis: it is ranked and judged on
+its own in-sample and out-of-sample figures like a long one, over liquid names only (the short
+leg's dollar-volume floor and the assumed borrow cost are in its figures, `verdict.toml`).
+A `long_short` candidate is never a basis (owner decision 2026-10-17: a spread cannot be traded
+by buying alone and the broker access is read-only); an edge whose candidates are all
+`long_short` has no basis; its verdict is Diagnostic only, a state of its own, not Waiting on data. Promising still needs t >= 2 and Works
+t >= 3 on both t series. The verdict and the edge page carry the basis's side.
