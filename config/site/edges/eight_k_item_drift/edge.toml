@@ -14,7 +14,7 @@ event studies, not a traded record."""
 family = "B"
 schedule = "on_event:filing_8k:4.02"
 top_k = 20
-base = "event"
+base = "universe"
 screeners = ["eight_k_adverse_items"]
 baselines = ["size_small"]
 status = "candidate"
@@ -73,7 +73,7 @@ can avoid the name more cheaply than short it: the avoid list is the usable form
 failure_modes = """The drift is a short-horizon claim and the 20-session window can hold a rebound; most
 of the move can already be in the price at the next close; a company filing 4.02 for a minor
 correction looks the same as a large restatement; distressed names carry the average. Retire if
-the frozen-period short return of the picks is not above the base rate of the other 4.02 filers."""
+the frozen-period short return of the picks is not above the base rate of every eligible name."""
 decoys = """Small size, low price and distress drive both the filing and the drift: the size
 baseline. Overlaps the late-filer edge (a restatement often follows an NT filing) and the event
 sensitivity track (ADR 0050), which already attributes unscheduled moves from 8-K items."""

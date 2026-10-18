@@ -14,7 +14,7 @@ claim to test, not a given."""
 family = "B"
 schedule = "on_event:nt_late_filing"
 top_k = 20
-base = "event"
+base = "universe"
 screeners = ["nt_late_filer"]
 baselines = ["size_small"]
 status = "candidate"
@@ -69,8 +69,7 @@ site's assumed 100 bps a year; only names trading $5M a day or more are shorted.
 for an individual is the exclusion list."""
 failure_modes = """A boilerplate notice and a legitimate specific one look the same without the text;
 confounded by distress, low price and small size; the drift may already be in the price by the next
-close. Retire if the frozen-period short return of the picks is not above the base rate of the
-other late filers."""
+close. Retire if the frozen-period short return of the picks is not above the base rate of every eligible name."""
 decoys = """Distress, low price and small size: the size baseline. Overlaps the 8-K Item 4.02 edge
 (a restatement often follows a late filing)."""
 

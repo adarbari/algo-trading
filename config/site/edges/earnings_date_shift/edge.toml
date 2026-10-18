@@ -13,7 +13,7 @@ funds cannot size it; it costs one round trip a quarter per name and liquid name
 family = "B"
 schedule = "on_event:earnings_date_shift:earlier"
 top_k = 20
-base = "event"
+base = "universe"
 screeners = ["earnings_date_early"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
@@ -70,7 +70,7 @@ shorting is not needed."""
 failure_modes = """A calendar that moves a date for a reason that is not news (a fiscal-year
 change, a merger, a vendor's re-estimate), a scheduled date that is not confirmed, and the paper's
 sensitivity to how the expected date is defined (Skinner 2021). Retire if the frozen-period excess
-return of the picks is not above the base rate of the other advancers."""
+return of the picks is not above the base rate of every eligible name."""
 decoys = """Advancers may simply be past winners: the 12-1 momentum baseline; small names
 shift dates more often: the size baseline. Overlaps momentum at earnings only through holding over
 the announcement."""
@@ -85,13 +85,3 @@ url = "https://www.abfer.org/media/abfer-events-2021/annual-conference/slides-ac
 
 [[sources]]
 title = "deHaan, E., Shevlin, T. and Thornock, J., Journal of Accounting and Economics, 2015 (advance-notice length and bad news)"
-
-# The literature's figure (ADR 0064): advancers minus delayers, about 260 bp in the month after
-# the revision (Johnson and So 2018, as summarised by Wall Street Horizon and MIT DSpace), before
-# costs. A spread of two groups, not a decile spread; read it as the size to expect.
-[published]
-measure = "decile_spread"
-value = 0.026
-horizon_sessions = 20
-source = 0
-leg = "long_short"

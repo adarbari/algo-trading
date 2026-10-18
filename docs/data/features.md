@@ -249,7 +249,7 @@ How much volume the last earnings report drew against the volume before it. Stor
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
-| `reaction_volume_ratio` | window | float32 | ratio | open | >= 0 | Mean dollar volume of the last report's window (the sessions before, of and after it) divided by the mean dollar volume of the 20 sessions before the window | no report known by the session has a closed reaction window, or a bar of the window or of the 20 sessions before it is missing, or the history is shorter | `bars/1d.close`, `bars/1d.volume`, `events/earnings.ts` |
+| `reaction_volume_ratio` | window | float32 | ratio | open | >= 0 | Mean dollar volume of the last report's window (the sessions before, of and after it) divided by the mean dollar volume of the 20 sessions ending at the one before the report | no report known by the session has a closed reaction window, or a bar of the window or of the 20 sessions before it is missing, or the history is shorter | `bars/1d.close`, `bars/1d.volume`, `events/earnings.ts` |
 
 ## `ibkr_iv@v1`
 

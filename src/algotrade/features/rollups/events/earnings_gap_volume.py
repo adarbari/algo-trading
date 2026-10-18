@@ -7,8 +7,8 @@ report counts once ``known_from <= session`` and its window E-1 .. E+1 has close
 describes the same report as ``reaction_excess_return`` and ``sessions_since_reaction``:
 
     reaction_volume_ratio   the mean dollar volume of the sessions E-1, E and E+1 divided by the
-                            mean dollar volume of the 20 sessions ending at E-1 (the event's own
-                            volume left out of the base), for the last counted report
+                            mean dollar volume of the 20 sessions ending at E-1 inclusive (the
+                            report day and after are left out), for the last counted report
 
 ``earnings_reaction@v1.earnings_volume_ratio`` is the mean of four reports' ratios, a habit of the
 name; this is the last report's, the event itself. One row per instrument traded on the session;
@@ -39,7 +39,7 @@ FEATURES = (
     Feature(
         "reaction_volume_ratio", "float32", "ratio",
         "Mean dollar volume of the last report's window (the sessions before, of and after it) "
-        "divided by the mean dollar volume of the 20 sessions before the window",
+        "divided by the mean dollar volume of the 20 sessions ending at the one before the report",
         "no report known by the session has a closed reaction window, or a bar of the window or "
         "of the 20 sessions before it is missing, or the history is shorter",
         valid_range=(0, None),
