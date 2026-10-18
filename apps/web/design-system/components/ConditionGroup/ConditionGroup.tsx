@@ -74,7 +74,7 @@ export function ConditionGroup({
   const headingId = useId();
   const [open, setOpen] = useState(defaultOpen);
   const members = (
-    <ol className={styles.members} aria-label={typeof title === 'string' ? title : undefined}>
+    <ol className={styles.members} aria-label={readOnly && typeof title === 'string' ? title : undefined}>
       {Children.toArray(children).map((child, index) => (
         <li className={styles.member} key={index}>
           {index > 0 ? (
