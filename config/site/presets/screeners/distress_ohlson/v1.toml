@@ -1,0 +1,53 @@
+# Financial distress by the Ohlson O-score, v1 (Ohlson 1980; the catalogue builds only what the
+# stored statements support: rollup.mispricing@v1.ohlson_o omits two terms and the price-index
+# deflator, and Campbell, Hilscher and Szilagyi's market terms are not built at all): every stock
+# with a score, ranked by it, LOWEST first: the safest on top, the most distressed last. A
+# missing score never passes (ADR 0030). The most distressed (the bottom of this ranking) are
+# the avoid list. What it does not check: market-based distress (volatility, price, relative
+# size), banks (the score is null for them), or a rescue already announced.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "distress_ohlson"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Distress (Ohlson O-score, safest first)"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.ohlson]
+field = "rollup.mispricing@v1.ohlson_o"
+op = "not_null"
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+ohlson_o = "rollup.mispricing@v1.ohlson_o"
+debt_to_equity = "feature.debt_to_equity"
+interest_cover = "feature.interest_cover"
+
+[rank]
+tie_break = "rollup.mispricing@v1.ohlson_o"
+tie_break_order = "asc"

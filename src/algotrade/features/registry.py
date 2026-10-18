@@ -111,6 +111,7 @@ from algotrade.features.rollups.statements import (
     growth_history,
     income_statement,
     mispricing,
+    qmj,
 )
 
 GROUPS: dict[str, FeatureGroup] = {
@@ -149,6 +150,7 @@ GROUPS: dict[str, FeatureGroup] = {
             balance_sheet.GROUP,
             growth_history.GROUP,
             mispricing.GROUP,
+            qmj.GROUP,
             put_wing.GROUP,
             call_wing.GROUP,
             price_moves.GROUP,

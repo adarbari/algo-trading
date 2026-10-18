@@ -5,10 +5,47 @@ Back to the [index of every edge](../edges.md).
 
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
+| Asset growth (an avoid list) (`asset_growth`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `asset_growth` |
 | Low beta and low volatility (`betting_against_beta_low_vol`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `low_beta`, `low_volatility` |
+| Cash-based operating profitability (`cash_based_operating_profitability`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cash_op_profitability` |
+| Composite value among cash-profitable names (`composite_value`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `composite_value` |
+| Financial distress (an avoid list) (`distress_failure_probability`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `distress_ohlson` |
 | Industry momentum (`industry_momentum`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `industry_momentum` |
 | 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1`, `residual_momentum`, `volatility_scaled_momentum`, `frog_in_the_pan`, `momentum_x_quality_interaction`, `fifty_two_week_high` |
+| Net share issuance (`net_share_issuance`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `net_share_issuance` |
+| Quality minus junk (`quality_minus_junk`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `qmj` |
 | Short-term residual reversal (`short_term_residual_reversal`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `residual_reversal`, `sector_reversal` |
+
+## Asset growth (an avoid list) (`asset_growth`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Companies whose total assets grew fastest over the last year underperform the market over the following months, and slow growers outperform.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `asset_growth`
+- **Baselines:** `size_small`, `momentum_12_1`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). The main outcome is the avoid list: the bottom 50 of the ranking (the fastest asset growers) held short, minus the excess return, with the site's borrow cost (ADR 0053 amendment, outcome sides; a short result on liquid names may be a verdict basis, owner decision O2). The long side (slowest growers) and the spread are variants; the spread is diagnostic only. asset_growth is total assets over the assets a year back (within 40 days of a year) less one, from facts accepted by the session; an acquisition and an offering both lift it and nothing separates them.
+
+**Quality bar**
+
+1. **Mechanism:** Managers over-invest and build empires, and investors extrapolate growth; on the rational side, low discount rates cause high investment (Cooper, Gulen and Schill 2008). The effect also captures financing: the asset growers are often issuers (Cooper, Gulen and Ion).
+2. **Persistence:** Known as the investment factor (the CMA factor of Fama and French 2015) yet still priced in large caps through the 2010s, because it is mostly a short-leg, glamour-avoidance effect: the fast growers are costly to short, and an avoid list asks nobody to.
+3. **Outcome:** Minus the excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision) of the 50 fastest asset growers among the liquid common stocks, less 10 bps a round trip and the assumed borrow cost: the value of avoiding them.
+4. **Trigger timing:** Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** Cooper, Gulen and Schill: asset growth = total assets(t-1) / total assets(t-2) - 1; deciles sorted in June, held 12 months, equal- and value-weighted. Here the stored year-over-year growth to the latest balance sheet at each month end, the fastest 50 as the avoid list, held 20 and 60 sessions: a monthly, not annual, sort.
+6. **Expected size and sample:** The decile spread was about 1.7% a month equal-weighted and 1.0% value-weighted, 1968-2003 (approximate, not verified against the paper); the investment factor has been weak since 2017 (about 0.2% a month 2008-2024, approximate). On liquid names the short leg is a fraction of that. A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
+7. **Capacity and costs:** An avoid list, not a short book: the cost of the main outcome is the borrow assumption (verdict.toml) plus 10 bps a round trip; fast growers are often hard to borrow, which is exactly why the premium persists, so the result is the value of not owning them, not a tradable short.
+8. **Failure modes and retirement:** Growth rallies (2020-2021 asset-heavy growth) punish the avoid list; acquisitive growers and fresh offerings are read as the same thing. Retire if the frozen-period short-side result is not above zero.
+9. **Decoys:** Net share issuance and the value tilt (issuers are the fast growers; the net_share_issuance edge), size, and acquisitions (test excluding the largest jumps).
+
+**Sources**
+
+- Cooper, M., Gulen, H. and Schill, M., Asset Growth and the Cross-Section of Stock Returns, Journal of Finance, 2008 <https://quantpedia.com/strategies/asset-growth-effect>
+- Cooper, M., Gulen, H. and Ion, M., The Use of Asset Growth in Empirical Asset Pricing Models, working paper, 2019 <https://finance.unibocconi.eu/sites/default/files/files/media/attachments/Cooper_Gulen_Ion_Manuscript20190507084119.pdf>
+- Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies, 2020 <https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html>
 
 ## Low beta and low volatility (`betting_against_beta_low_vol`)
 
@@ -41,6 +78,101 @@ Back to the [index of every edge](../edges.md).
 - Novy-Marx, R. and Velikov, M., Betting Against Betting Against Beta, Journal of Financial Economics, 2022 <https://alphaarchitect.com/betting-against-beta-bab-construction/>
 - Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk without Lower Return, Journal of Portfolio Management, 2007
 - S&P Dow Jones Indices, Expectations and Anomalies, Indexology Blog, 2025 <https://www.indexologyblog.com/2025/04/09/expectations-and-anomalies/>
+
+## Cash-based operating profitability (`cash_based_operating_profitability`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Stocks that earn the most cash operating profit on their assets keep outperforming the market over the following months.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `cash_op_profitability`
+- **Baselines:** `size_small`, `momentum_12_1`
+- **Frozen period:** from 2026-04-01
+- **Published:** decile spread 0.47% over 20 sessions (Ball, G., Gerakos, J., Linnainmaa, J. and Nikolaev, V., Accruals, cash flows, and operating profitability in the cross section of stock returns, Journal of Financial Economics, 2016, 51 years)
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). cash_op_profitability is built from stored lines (EBIT less the gap between net income and operating cash flow, over total assets): the paper's line by line accrual changes and its R&D add-back are not stored, so it is a proxy, not a replication; decile sorts are the harness's, not the paper's NYSE breakpoints. long_short, where run, is diagnostic only (ADR 0053 amendment, outcome sides).
+
+**Quality bar**
+
+1. **Mechanism:** Investors extrapolate reported earnings; the accrual part of earnings mean-reverts, and the cash part is durable. Removing accruals from profitability keeps the signal of lasting cash generation and drops the part that reverses, so holders of low-profit story stocks are systematically on the wrong side (Ball, Gerakos, Linnainmaa and Nikolaev 2016).
+2. **Persistence:** Profitability is partly a risk-like premium (profitable firms are not cheap; Fama and French adopted it as a factor in 2015) and partly a limit to arbitrage on the short side. It is well known yet the long leg, quality growth, is a comfortable trade, so there is little pressure to arbitrage it away.
+3. **Outcome:** Excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions).
+4. **Trigger timing:** Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** The published rule: sort on cash-based operating profitability (operating profit less accruals, over total assets) and hold the top decile, rebalanced annually after the filings (Ball et al. 2016). Here the top 50 of the liquid common stocks, ranked on a stored-line proxy; the proxy and what it omits are in the field's description and the notes, and the source's own number is the published figure beside the result.
+6. **Expected size and sample:** The published long-short decile spread is 0.47% a month (value-weighted, 1963-2014, t = 3.2), a three-factor alpha of 90 bp a month for the high decile; profitability premia after publication are smaller (McLean and Pontiff 2016 put the average haircut near 58%). A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
+7. **Capacity and costs:** Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume): the signal moves slowly, turnover is low and the spread is small; the 10 bps round trip is the assumption. No short leg in the main outcome.
+8. **Failure modes and retirement:** Profitability is a quality tilt: it lags in junk rallies and value reversals, and a growth or mega-cap tech tilt can stand in for it. Retire if the frozen-period decile spread is not above zero or the top 50 does not beat the buy-and-hold mean of the eligible names.
+9. **Decoys:** A growth and large-cap tech tilt (the size and 12-1 momentum baselines on the same sessions), gross profitability and accruals taken alone (the composite_mispricing_score components), and the quality composite (quality_minus_junk): the test is whether cash profitability adds beyond them.
+
+**Sources**
+
+- Ball, G., Gerakos, J., Linnainmaa, J. and Nikolaev, V., Accruals, cash flows, and operating profitability in the cross section of stock returns, Journal of Financial Economics, 2016 <https://doi.org/10.1016/j.jfineco.2016.03.002>
+- Novy-Marx, R., The Other Side of Value: The Gross Profitability Premium, Journal of Financial Economics, 2013 <https://www.nber.org/system/files/working_papers/w15940/w15940.pdf>
+- Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022 <https://papers.ssrn.com/abstract=3604626>
+
+## Composite value among cash-profitable names (`composite_value`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Cheap stocks that are also cash-profitable outperform the market over the following months.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `composite_value`
+- **Baselines:** `cash_op_profitability`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). A variant of cash_based_operating_profitability filed as its own edge so that edge's published figure is not read against this rule: the screener holds names with positive cash-based operating profitability and a positive composite_value_yield (the mean of EBIT / enterprise value and the free cash flow yield, a catalogue formalisation with no book to market or growth part), cheapest first; cash_op_profitability is the baseline, so the harness shows whether cheapness adds to profitability. No published figure is carried: the sources give approximate sizes only. long_short, where run, is diagnostic only.
+
+**Quality bar**
+
+1. **Mechanism:** Investors extrapolate past growth and overpay for glamour; cheap names are priced for decline, and pairing cheapness with profitability removes the value traps whose low price reflects a shrinking business (Lakonishok, Shleifer and Vishny 1994; Novy-Marx 2013).
+2. **Persistence:** Value alone has had a Sharpe near zero in the US since 2007 and is cheap itself (Israel, Laursen and Richardson 2021); the cheap-and-profitable combination is the robust trade in the research and is uncomfortable to hold in growth rallies, which keeps it from being arbitraged away.
+3. **Outcome:** Excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions).
+4. **Trigger timing:** Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** Lakonishok, Shleifer and Vishny: deciles on book to market, earnings to price, cash flow to price and sales growth, annual. Here the top 50 by a two-part yield (EBIT to enterprise value and free cash flow to market value) among names with positive cash-based operating profitability, monthly: a partial replication without the book to market and growth parts.
+6. **Expected size and sample:** Value-minus-glamour was about 10% a year, 1968-1990 (approximate, not verified), and the HML factor about 0.3% a month 1963-2024 and near zero since 2007 (approximate). Combined with profitability the catalogue expects a modest premium. A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
+7. **Capacity and costs:** Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume): low turnover, small spreads; the 10 bps round trip is the assumption. No short leg in the main outcome.
+8. **Failure modes and retirement:** Cheap names cluster in cyclical sectors at peak earnings (a high yield on peak profit) and lag in growth rallies. Retire if the frozen-period decile spread is not above zero or the top 50 does not beat the buy-and-hold mean of the eligible names.
+9. **Decoys:** The profitability tilt alone (the cash_op_profitability baseline), sector and interest-rate exposure, and size (the size baseline on the same sessions).
+
+**Sources**
+
+- Lakonishok, J., Shleifer, A. and Vishny, R., Contrarian Investment, Extrapolation, and Risk, Journal of Finance, 1994
+- Asness, C. and Frazzini, A., The Devil in HML's Details, Journal of Portfolio Management, 2013
+- Novy-Marx, R., The Other Side of Value: The Gross Profitability Premium, Journal of Financial Economics, 2013 <https://www.nber.org/system/files/working_papers/w15940/w15940.pdf>
+
+## Financial distress (an avoid list) (`distress_failure_probability`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Stocks with the highest predicted bankruptcy risk underperform the market over the following months, and the safest outperform.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `distress_ohlson`
+- **Baselines:** `size_small`, `momentum_12_1`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). Only what the stored statements support is built: ohlson_o is a simplified Ohlson O-score (the INTWO and CHIN terms need last year's net income and the price-index deflator is a per-session constant, all omitted), a rank input, not a probability. Campbell, Hilscher and Szilagyi's failure probability needs market terms (excess return, volatility, relative size, market to book, price) from another group and is not built; this edge is therefore the accounting-only distress screen (Ohlson 1980 and Dichev 1998 style), and the harness's verdict on it says nothing about the market-based model. The main outcome is the avoid list: the 50 most distressed held short (ADR 0053 amendment, outcome sides; owner decision O2), with the long side and the spread as variants (diagnostic only).
+
+**Quality bar**
+
+1. **Mechanism:** Investors overpay for the option-like upside of distressed equity (lottery demand), and limits to arbitrage (hard to short, low institutional ownership) keep the price from falling to value (Campbell, Hilscher and Szilagyi 2008; Dichev 1998).
+2. **Persistence:** Short-side and small-cap concentrated, and weaker after 2008: Hou, Xue and Zhang find distress anomalies largely insignificant value-weighted, and 2020-2021 showed the crash risk of the short leg. What persists is the avoid list: it asks nobody to short, and distressed names stay costly to short.
+3. **Outcome:** Minus the excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision) of the 50 highest O-score names among the liquid common stocks, less 10 bps a round trip and the assumed borrow cost: the value of avoiding them.
+4. **Trigger timing:** Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** Campbell, Hilscher and Szilagyi: a dynamic logit of 12-month failure on accounting and market terms, deciles, monthly rebalance, long low-distress and short high-distress. Here the Ohlson O-score alone from stored statements, the 50 highest as the avoid list: a partial replication, with the omitted terms named above and in the field's description.
+6. **Expected size and sample:** The top 5% distressed stocks earned about 0.7% a month below the bottom (Campbell, Hilscher and Szilagyi 2008, 1981-2003; approximate, not verified), concentrated in small caps and weaker value-weighted (Hou, Xue and Zhang 2020). On liquid names expect little. A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
+7. **Capacity and costs:** An avoid list, not a short book: distressed names are hard and expensive to borrow, which is why the premium persists; the cost of the main outcome is the borrow assumption plus 10 bps a round trip, so the result is the value of not owning them.
+8. **Failure modes and retirement:** Distressed rallies (2020-2021) and rescue financings reverse the short leg violently; an accounting-only score misses market-implied distress. Retire if the frozen-period short-side result is not above zero.
+9. **Decoys:** Low-price, idiosyncratic-volatility and lottery names (the same cluster), size and leverage; the size and 12-1 momentum baselines on the same sessions.
+
+**Sources**
+
+- Campbell, J., Hilscher, J. and Szilagyi, J., In Search of Distress Risk, Journal of Finance, 2008
+- Campbell, J., Hilscher, J. and Szilagyi, J., Predicting Financial Distress and the Performance of Distressed Stocks, Journal of Investment Management, 2011 <https://joim.com/article/predicting-financial-distress-and-the-performance-of-distressed-stocks/>
+- Dichev, I., Is the Risk of Bankruptcy a Systematic Risk?, Journal of Finance, 1998
+- Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies, 2020 <https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html>
 
 ## Industry momentum (`industry_momentum`)
 
@@ -107,6 +239,69 @@ Back to the [index of every edge](../edges.md).
 - Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, Journal of Financial Economics, 1998 <https://doi.org/10.1016/S0304-405X(98)00027-0>
 - Asness, C., Frazzini, A., Israel, R. and Moskowitz, T., Fact, Fiction and Momentum Investing, AQR / Journal of Portfolio Management, 2014 <https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Momentum-Investing>
 - Quantpedia, Momentum Factor Effect in Stocks (strategy page) <https://quantpedia.com/strategies/momentum-factor-effect-in-stocks/>
+
+## Net share issuance (`net_share_issuance`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Companies that shrink their share count outperform the market over the following months, and companies that issue shares underperform.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `net_share_issuance`
+- **Baselines:** `size_small`, `momentum_12_1`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). The score is the log change of the split-adjusted share count over a year (net_issuance_pct_12m, Pontiff and Woodgate's definition) from the cover-page or weighted-average count of fundamentals@v4 (a cover count against a cover count, never mixed); the screener ranks lowest first, so the main outcome holds the top 50 net repurchasers. The issuers are the variant issuers_short (the bottom 50 held short, an avoid list: ADR 0053 amendment, outcome sides, with the site's borrow cost); the spread is diagnostic only. The 3-year composite issuance of Daniel and Titman is not built (it needs a five-year return history joined to market value).
+
+**Quality bar**
+
+1. **Mechanism:** Managers time the market: they issue when they believe shares are overvalued and repurchase when undervalued, and investors do not discount the signal fully. Issuers are also often glamour, high-asset-growth names (Pontiff and Woodgate 2008).
+2. **Persistence:** One of the few anomalies Fama and French (2008) found in every size group. It is partly mechanical dilution and partly informed managers, and it persists because the short leg (serial issuers) is costly to short and the long leg (steady repurchasers) is a boring trade; it moves slowly, so it is cheap to trade.
+3. **Outcome:** Excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions); the short variant is minus that excess return, less cost and borrow.
+4. **Trigger timing:** Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** Pontiff and Woodgate: net issuance is the log change of the split-adjusted shares outstanding over the prior 12 months; decile sorts, one-month hold, monthly rebalance. Here the top 50 (the most negative) of the liquid common stocks, held 20 and 60 sessions: a long-only slice of their decile, since a net buyback is the actionable side for an individual.
+6. **Expected size and sample:** Issuance predicts returns more significantly than size, book to market or momentum after 1970 (Pontiff and Woodgate 2008; the abstract states no decile spread and none is cited here). The effect is concentrated in issuers (the short leg) and in small caps, so on liquid names expect less. A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
+7. **Capacity and costs:** Large and liquid names only; the count changes slowly, turnover is low. The short variant needs borrow (an assumed cost from verdict.toml) and heavy issuers can be hard to borrow: it is an avoid list, not a trade. 10 bps round trip is the assumption.
+8. **Failure modes and retirement:** Buyback names are not a uniform tilt: they cluster in mature cash-rich companies and lag growth rallies (the S&P 500 Buyback Index lagged the index in the decade to 2024); a cover-page count artefact or an acquisition paid in shares is read as an issue. Retire if the frozen-period decile spread is not above zero or the top 50 does not beat the buy-and-hold mean of the eligible names.
+9. **Decoys:** Asset growth and the value tilt (issuers are high asset growers; the asset_growth edge and the 12-1 momentum and size baselines on the same sessions), and an acquisition-driven count change (test excluding the largest rises).
+
+**Sources**
+
+- Pontiff, J. and Woodgate, A., Share Issuance and Cross-Sectional Returns, Journal of Finance, 2008 <https://doi.org/10.1111/j.1540-6261.2008.01335.x>
+- Fama, E. and French, K., Dissecting Anomalies, Journal of Finance, 2008
+- Daniel, K. and Titman, S., Market Reactions to Tangible and Intangible Information, Journal of Finance, 2006
+- Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022 <https://papers.ssrn.com/abstract=3604626>
+
+## Quality minus junk (`quality_minus_junk`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Stocks with high profitability and low leverage and distress risk keep outperforming the market, and junk lags.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `qmj`
+- **Baselines:** `size_small`, `momentum_12_1`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). qmj_score is built from what the stored statements support: profitability in full (gross profit over assets, ROE, ROA, cash flow over assets, gross margin, low accruals) and safety only as low leverage and low Ohlson O-score; the paper's growth part (five-year changes), low beta, Altman Z and earnings volatility are not built (no stored five-year history of the measures, beta and volatility are price based and another group). Not size-neutral and not within industry, as the paper is. long_short, where run, is diagnostic only.
+
+**Quality bar**
+
+1. **Mechanism:** Quality is under-priced relative to its justified premium: investors overpay for junk because of lottery preferences and benchmark-relative incentives, and leverage-constrained managers prefer high-beta junk to levering up quality (Asness, Frazzini and Pedersen 2019).
+2. **Persistence:** Risk explanations are weak (quality has lower beta and did well in crises) and the long leg is a boring large-cap tilt that mandates do not chase; crowding has grown since quality ETFs (2015) but the 2010s and 2022 still paid. The premium is largely profitability (Novy-Marx 2014), which is why the harness tests whether the composite beats cash profitability alone.
+3. **Outcome:** Excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions).
+4. **Trigger timing:** Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** Asness, Frazzini and Pedersen: quality = z(profitability) + z(growth) + z(safety), long the top 30%, short the bottom 30%, size-neutral, monthly rebalance on data lagged to be public. Here the top 50 of the liquid common stocks on qmj_score (profitability and a leverage-and-distress safety, no growth part): a partial replication, with the omissions named in the field and the notes.
+6. **Expected size and sample:** About 0.39% a month for the US long-short factor, t above 5 (Asness, Frazzini and Pedersen 2019; approximate, not re-verified), 4.7% a year 1964-2023 by the AQR data; a long-only top 50 earns a fraction of the spread. A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
+7. **Capacity and costs:** Huge capacity on the mega-cap long leg; price over 5 dollars and 50M dollars of 20-day volume here. Turnover is low; the 10 bps round trip is the assumption. No short leg in the main outcome.
+8. **Failure modes and retirement:** Quality lags when junk rallies (2023's mega-cap tech was high quality, but low-quality rebounds and rate shocks hurt it) and when it is expensive. Retire if the frozen-period decile spread is not above zero or the top 50 does not beat the buy-and-hold mean of the eligible names.
+9. **Decoys:** Cash-based operating profitability alone (Novy-Marx finds most quality definitions are dominated by gross profitability), low volatility and low beta, and a large-cap growth tilt (the size and 12-1 momentum baselines on the same sessions).
+
+**Sources**
+
+- Asness, C., Frazzini, A. and Pedersen, L., Quality Minus Junk, Review of Accounting Studies, 2019
+- Novy-Marx, R., The Quality Dimension of Value Investing, working paper, 2014
+- Alpha Architect, Value and Quality Stocks (summary of the AQR data) <https://alphaarchitect.com/value-and-quality-stocks/>
 
 ## Short-term residual reversal (`short_term_residual_reversal`)
 
