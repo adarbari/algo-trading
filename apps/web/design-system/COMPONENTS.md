@@ -946,12 +946,12 @@ Source: `design-system/components/LinkCard`
 |---|---|---|---|
 | `href` | `string` | yes | An in-app path or anchor. |
 | `title` | `string` | yes | The page's name: the link text. |
-| `kicker` | `string` | no | The question the page answers, small and muted above the title. |
-| `description` | `string` | no | What the page is about, a sentence or two. |
-| `exampleLabel` | `string` | no | A marker for the example line ("e.g."); shown before `example`. |
-| `example` | `string` | no | An example, one line, muted. |
-| `headingLevel` | `HeadingLevel` | no | Outline level of the title (default 3). |
-| `footer` | `ReactNode` | no | A row of pills under the text, composed by the caller (StatusBadge, Chip). |
+| `kicker` | `string \| undefined` | no | The question the page answers, small and muted above the title. |
+| `description` | `string \| undefined` | no | What the page is about, a sentence or two. |
+| `exampleLabel` | `string \| undefined` | no | A marker for the example line ("e.g."); shown before `example`. |
+| `example` | `string \| undefined` | no | An example, one line, muted. |
+| `headingLevel` | `HeadingLevel \| undefined` | no | Outline level of the title (default 3). |
+| `footer` | `ReactNode \| undefined` | no | A row of pills under the text, composed by the caller (StatusBadge, Chip). |
 
 ### LinkedProse
 
