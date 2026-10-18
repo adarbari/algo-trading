@@ -60,8 +60,8 @@ id = "trend"
 title = "Trend"
 presets = [
   "trend_continuation", "pullback", "momentum_12_1", "size_small", "ivol_high", "max_ret_high",
-  "amihud_illiquid", "beta_low", "short_term_momentum_turnover", "momentum_own_trend",
-  "momentum_pullback_entry", "momentum_volume_confirmed",
+  "amihud_illiquid", "beta_low", "etf_flow_pressure", "short_term_momentum_turnover",
+  "momentum_own_trend", "momentum_pullback_entry", "momentum_volume_confirmed",
 ]
 
 [[family]]
@@ -77,7 +77,7 @@ presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reve
 [[family]]
 id = "income"
 title = "Option income"
-presets = ["vrp_scanner", "vrp_iv_hv"]
+presets = ["vrp_scanner", "vrp_iv_hv", "vrp_cross_section", "iv_rank_high"]
 
 [[family]]
 id = "events"

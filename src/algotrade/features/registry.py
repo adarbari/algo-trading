@@ -101,7 +101,12 @@ from algotrade.features.rollups.price import (
     trend_stats,
     volume,
 )
-from algotrade.features.rollups.reference import fund_reference, share_classes
+from algotrade.features.rollups.reference import (
+    cef_nav,
+    etf_flows,
+    fund_reference,
+    share_classes,
+)
 from algotrade.features.rollups.relative import (
     factor_betas,
     momentum_variants,
@@ -190,6 +195,8 @@ GROUPS: dict[str, FeatureGroup] = {
             indicators.GROUP,
             regime.GROUP,
             fund_reference.GROUP,
+            cef_nav.GROUP,
+            etf_flows.GROUP,
             share_classes.GROUP,
             relative_strength.GROUP,
             momentum_variants.GROUP,
