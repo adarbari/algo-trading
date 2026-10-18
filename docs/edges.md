@@ -9,6 +9,10 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 | Edge | Family | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|---|
+| Low beta and low volatility (`betting_against_beta_low_vol`) | A | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `low_beta`, `low_volatility` |
+| Industry momentum (`industry_momentum`) | A | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `industry_momentum` |
+| 12-1 momentum (`momentum_12_1`) | A | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1`, `residual_momentum`, `volatility_scaled_momentum`, `frog_in_the_pan`, `momentum_x_quality_interaction`, `fifty_two_week_high` |
+| Short-term residual reversal (`short_term_residual_reversal`) | A | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `residual_reversal`, `sector_reversal` |
 | Dividend-month premium (`dividend_month_premium`) | B | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `dividend_month` |
 | Earnings-date advances (`earnings_date_shift`) | B | candidate | on each `earnings_date_shift:earlier` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `earnings_date_early` |
 | Earnings gap on heavy volume (`earnings_gap_volume_drift`) | B | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `earnings_gap_volume`, `earnings_gap_only` |
@@ -29,13 +33,139 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 | Thematic ETF launch fade (`thematic_etf_launch_fade`) | H | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 | Call-put IV spread into earnings (`pre_earnings_cp_iv_spread`) | I | candidate | on each `earnings_expected` | excess return, over 3 sessions, vs SPY, starting -1 sessions from the event, costs 10 bps | `cp_iv_spread`, `cp_iv_spread_rise` |
 | Earnings announcement premium (`earnings_announcement_premium`) | - | candidate | on each `earnings_expected` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event, costs 10 bps | `eap_all`, `eap_volume` |
-| 12-1 momentum (`momentum_12_1`) | - | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1` |
 | 12-1 momentum among names that just reported (`momentum_at_earnings`) | - | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 15 bps | `momentum_12_1` |
 | Small-cap post-earnings drift (`small_cap_earnings_drift`) | - | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 40 bps | `pead_small_cap` |
 | Volatility risk premium (`vrp_short_premium`) | - | candidate | every session | expires otm, over 15, 21, 31 sessions, entered 1 session after the decision session, short put struck at delta 0.3, not assigned at the horizon | `vrp_iv_hv` |
 | Leveraged ETF rebalancing (`leveraged_etf_rebalancing`) | - | rejected | every session | excess return, over 1 session, vs SPY, entered 1 session after the decision session | none yet |
 | S&P 500 index changes (`sp500_index_changes`) | - | rejected | on each `index_change` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event | none yet |
 | Russell reconstitution (`russell_reconstitution`) | - | blocked | on each `index_change` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event | none yet |
+
+## Low beta and low volatility (`betting_against_beta_low_vol`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Stocks with low market beta or low volatility earn more for the risk they carry than high-beta stocks.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `low_beta`, `low_volatility`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The claim is about return per unit of risk, and the harness scores excess return over SPY: a low-beta book expects a lower excess return than the market in a rising market and a higher one in a falling one by construction, so read the sign with the market of the sessions in mind (the by-regime split), not alone. low_beta ranks beta_252d (positive betas only, lowest first; no shrinkage toward 1 and no leverage), low_volatility ranks hv60 (the longest stored window; the paper sorts on 3-year volatility). The build plan's condition, a 24-month market uptrend before holding low beta, needs a feature that is not stored (mkt_uptrend_24m) and is not built. Month-end start sessions at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Investors who cannot lever buy high-beta stocks to reach a higher return, bidding them up, and benchmarked managers avoid the tracking error of low-beta stocks; lottery demand adds to the high-volatility end (Frazzini and Pedersen 2014; Blitz and van Vliet 2007).
+2. **Persistence:** The constraints persist, but the anomaly is crowded (low-volatility funds took large inflows in 2012-2019), valuations rose, and low-volatility indexes lagged their parents from late 2019 to 2024 and did not protect in March 2020. Betting Against Beta's reported Sharpe came largely from micro-cap weights (Novy-Marx and Velikov 2022).
+3. **Outcome:** Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip. It is a raw return, not a risk-adjusted one: the claim's own measure is not in the harness, a gap the notes and the regime split cover.
+4. **Trigger timing:** beta_252d and hv60 are computed from the close of the decision session D (nightly rollup), so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1) and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** Frazzini and Pedersen rank on a shrunk beta, rank-weight long low-beta and short high-beta, and lever each side to a beta of 1; Blitz and van Vliet go long the lowest decile of 3-year volatility. Here: long-only, the lowest 50 by beta_252d (or hv60) of the liquid common stocks, unlevered: the closest stored rule, not the papers'.
+6. **Expected size and sample:** Frazzini and Pedersen report a Sharpe of 0.78 for the levered long-short factor in 1926-2012 with an insignificant Fama-French five-factor alpha of 16 bp a month (Novy-Marx and Velikov's critique); an unlevered long-only book mainly lowers drawdown. Over 25 years a low- volatility index had a volatility of 11.6% against 15.3% and a beta of 0.7 (S&P, 2025). In raw excess return over SPY the expected size is about zero or negative in a bull market.
+7. **Capacity and costs:** Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume); turnover is low (a beta moves slowly); capacity is large, and crowding is the cost: the 10 bps round trip is the assumption.
+8. **Failure modes and retirement:** Crowding and a bond-proxy trade (utilities and staples rally when rates fall and lag when they rise), and a sharp market rebound that favours high beta. Retire if the picks do not beat the buy-and-hold mean of the eligible names on risk-adjusted terms in the frozen period.
+9. **Decoys:** Quality (low-beta names are profitable ones), size, value, interest-rate sensitivity of the defensive sectors, and the market's own drift (the buy-and-hold of the eligible names), which a low-beta book trails in a rising market by construction.
+
+**Sources**
+
+- Frazzini, A. and Pedersen, L., Betting Against Beta, Journal of Financial Economics, 2014
+- Novy-Marx, R. and Velikov, M., Betting Against Betting Against Beta, Journal of Financial Economics, 2022 <https://alphaarchitect.com/betting-against-beta-bab-construction/>
+- Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk without Lower Return, Journal of Portfolio Management, 2007
+
+## Industry momentum (`industry_momentum`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Stocks in the sectors that rose most over the past year keep outperforming the market over the next month.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `industry_momentum`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The stored industry is the sector fund (11 sectors of the SEC SIC code, momentum_variants@v1 sector_ret_252d), coarser than the paper's 20 industries, and the formation window is 12 months (the Quantpedia sector-rotation rule) rather than the paper's six. Every name of one sector shares the ranking value, so a top-50 pick list is 50 names of the strongest sector in instrument order: the decile spread across all names is the read of the sector effect, the top-50 mean only a check. The paper's second leg (industry-relative monthly reversal) is not built: rs_sector_20d is stored, a screener on it is a follow-up. Month-end start sessions at least 20 sessions apart, like momentum_12_1. Stored history is short (sector_ret_252d is stored from about 2025-10), so the harness's session count, not the t statistic, is the first read.
+
+**Quality bar**
+
+1. **Mechanism:** Industry-wide news diffuses slowly and institutions rotate between sectors gradually, so a sector's past return predicts its next one (Moskowitz and Grinblatt 1999); analysts update their sector views late.
+2. **Persistence:** Contested. Later work finds industry momentum is largely spanned by factor momentum (Arnott, Clements, Kalesnik and Linnainmaa 2023) and not robust across subsamples (Grobys, Ruotsalainen and Aijo 2018). It survives because it is cheap and simple, with nothing to arbitrage away but a crowded sector rotation: expect a weak edge.
+3. **Outcome:** Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (the assumption of momentum_12_1).
+4. **Trigger timing:** sector_ret_252d is computed from the close of the decision session D (nightly rollup), so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1) and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** Moskowitz and Grinblatt's rule ranks industries by the past 6-month return, longs the top three and shorts the bottom three, holding six months. Here the ranking is the 12-month return of the sector fund (Quantpedia's sector rotation), long only, held one month: the closest stored rule, not the paper's.
+6. **Expected size and sample:** The paper reports about 0.4% a month for the top-minus-bottom three industries in 1963-1995 (not re-verified here); the sector-fund version is reported positive but with a low Sharpe (about 0.3 to 0.5) after 2000 (Quantpedia, not verified). With under a year of stored sector returns the harness cannot tell that from zero; it reports the t statistic and the sessions beside it.
+7. **Capacity and costs:** Large liquid names only (price over 5 dollars, 50M dollars of 20-day volume); turnover is low because a sector's rank changes slowly; the 10 bps round trip is the assumption.
+8. **Failure modes and retirement:** Factor momentum and the stock-level momentum subsume it (a sector's past winners are the stock momentum winners), and a run of one sector (technology after 2010) can pass for the rule. Retire if the frozen-period decile spread is not above zero or the top picks do not beat the buy-and-hold mean of the eligible names.
+9. **Decoys:** Stock momentum (compare momentum_12_1 on the same sessions), the size tilt of a sector (size_small), a single sector's run over the sample (read the result by year), and the market's own drift (the buy-and-hold of the eligible names).
+
+**Sources**
+
+- Moskowitz, T. and Grinblatt, M., Do Industries Explain Momentum?, Journal of Finance, 1999 <https://ideas.repec.org/a/bla/jfinan/v54y1999i4p1249-1290.html>
+- Arnott, R., Clements, M., Kalesnik, V. and Linnainmaa, J., Factor Momentum, Review of Financial Studies, 2023
+- Grobys, K., Ruotsalainen, J. and Aijo, J., Risk-managed industry momentum and momentum crashes, Quantitative Finance, 2018 <https://ideas.repec.org/a/taf/quantf/v18y2018i10p1715-1733.html>
+
+## 12-1 momentum (`momentum_12_1`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Stocks that rose most over the past year, leaving out the last month, keep outperforming the market over the next month.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `momentum_12_1`, `residual_momentum`, `volatility_scaled_momentum`, `frog_in_the_pan`, `momentum_x_quality_interaction`, `fifty_two_week_high`
+- **Baselines:** `size_small`
+- **Frozen period:** from 2026-04-01
+- **Published:** decile spread 1.31% over 20 sessions (Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993, 25 years)
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). Variants (EB E1a): five more screeners, one trial each: residual_momentum (net of beta x SPY), volatility_scaled_momentum (12-1 per unit of 60-session volatility; a stand-in for Barroso and Santa-Clara's time-series scaling), frog_in_the_pan, momentum_x_quality_interaction and fifty_two_week_high. They overlap raw momentum: read each beside momentum_12_1's number. No [published] figure: the catalogue's are not marked verified.
+
+**Quality bar**
+
+1. **Mechanism:** Investors underreact to news and herd into winners; limits to arbitrage and disposition effects slow the price from reaching its value (Jegadeesh and Titman 1993; Barberis, Shleifer and Vishny 1998).
+2. **Persistence:** The premium is large, old and widely known, and has survived two decades after its publication in most markets, but it crashes in sharp market rebounds (Daniel and Moskowitz 2016): the risk that keeps arbitrageurs from removing it.
+3. **Outcome:** Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions).
+4. **Trigger timing:** mom_12_1 is computed from the close of the decision session D (rollups, nightly), so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1) and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** The published rule: rank by the return from 12 months to 1 month back and hold the top decile (Jegadeesh and Titman 1993); here the top 50 of the liquid common stocks (liquid_common_stocks).
+6. **Expected size and sample:** Historically about 1% a month for the winner-minus-loser decile spread in large US stocks, smaller since 2000 (Daniel and Moskowitz 2016). Ten independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
+7. **Capacity and costs:** Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume): turnover is monthly and spreads are small; the 10 bps round trip is the assumption.
+8. **Failure modes and retirement:** Momentum crashes: sharp market rebounds after a drawdown reverse winners and losers (Daniel and Moskowitz 2016). Retire if the frozen-period decile spread is not above zero or the top decile does not beat the buy-and-hold mean of the eligible names.
+9. **Decoys:** The same signal in the market's own drift (compare with buy-and-hold of the eligible names), the size and quality tilts of past winners, and the 52-week-high effect (a different screen on the same sessions).
+
+**Sources**
+
+- Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993 <https://doi.org/10.1111/j.1540-6261.1993.tb04702.x>
+- Daniel, K. and Moskowitz, T., Momentum Crashes, Journal of Financial Economics, 2016 <https://doi.org/10.1016/j.jfineco.2015.12.002>
+- Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, Journal of Financial Economics, 1998 <https://doi.org/10.1016/S0304-405X(98)00027-0>
+- Asness, C., Frazzini, A., Israel, R. and Moskowitz, T., Fact, Fiction and Momentum Investing, AQR / Journal of Portfolio Management, 2014 <https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Momentum-Investing>
+- Quantpedia, Momentum Factor Effect in Stocks (strategy page) <https://quantpedia.com/strategies/momentum-factor-effect-in-stocks/>
+
+## Short-term residual reversal (`short_term_residual_reversal`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Large stocks that fell most last month against what the market (or their sector) explains rise over the next month.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `residual_reversal`, `sector_reversal`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Two screeners, one trial each: residual_reversal ranks on the 20-session return net of beta x SPY (resid_ret_20d; the paper also strips size and value, not stored) and sector_reversal on the return against the sector fund (rs_sector_20d), the lowest first (the long side). The paper's large-cap cut is the ADV gate of liquid_common_stocks, the nearest stored rule. Names that moved on an earnings report are not excluded (a news move drifts, it does not reverse): the harness's reading by earnings proximity is a follow-up. The costs bind: monthly turnover is high, so the 10 bps round trip is the assumption to test, and the harness's cost curve shows the break-even. Month-end start sessions at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Uninformed order imbalances (fund flows, index trades, forced sellers) push a name away from where its market and sector exposure put it; liquidity providers are paid to lean against the move, and the residual is the part of the move no news explains (Nagel 2012; Blitz, Huij, Lansdorp and Verbeek 2013).
+2. **Persistence:** The return is compensation for inventory risk in a stress, so it survives being known, but the raw one-month reversal has shrunk since the 1990s as market making got cheaper and is near zero after costs (Chen and Velikov 2023); only the residual in liquid names is claimed to survive. It is the least capacity of the anomalies (Frazzini, Israel and Moskowitz 2015), and high-turnover names show short-term momentum instead (Medhat and Schmeling 2022).
+3. **Outcome:** Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption, tested against the cost curve).
+4. **Trigger timing:** resid_ret_20d and rs_sector_20d are computed from the close of the decision session D (nightly rollup), so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1), which also keeps the bid-ask bounce of D's close out of the window; the screen is read at D, the outcome at S.
+5. **Faithful replication:** Blitz and co-authors regress 36 months of returns on the Fama-French factors, take last month's residual, long the lowest decile and short the highest, held one month, large caps only. Here: the long side only, the market residual (or the sector-relative return) from stored features, the lowest 50 of the liquid common stocks.
+6. **Expected size and sample:** The paper reports roughly twice the risk-adjusted return of the raw reversal and a significant net return in large caps after 1990 (not re-verified here); the weekly version on the 100 largest stocks earned 29 bps a week net in 1990-2009 and was negative in a 1,500-stock universe (Quantpedia, verified; a different horizon and universe). After 2010 no public net figure is verified: expect a small number the harness reports beside its t statistic and sessions.
+7. **Capacity and costs:** Capacity is the lowest of the anomalies (about 9 billion dollars across the US, Frazzini, Israel and Moskowitz 2015) and the whole return is cost: the 10 bps round trip is the assumption, and a single wide spread on a loser's rebound day can erase a month.
+8. **Failure modes and retirement:** A loser on news does not reverse (the bounce is a drift the other way), and a market that keeps falling keeps its losers falling. Retire if the frozen-period decile spread is not above zero or the picks do not beat the buy-and-hold mean of the eligible names net of costs.
+9. **Decoys:** Plain one-month return (reversal without the residual), size and liquidity tilts, the earnings reaction (a name that just reported), and the low-beta effect (the residual of a high-beta name is not a loser).
+
+**Sources**
+
+- Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets, 2013 <https://repub.eur.nl/pub/40707>
+- Chen, A. and Velikov, M., Zeroing In on the Expected Returns of Anomalies, Journal of Financial and Quantitative Analysis, 2023
+- Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022 <https://alphaarchitect.com/short-term-momentum/>
 
 ## Dividend-month premium (`dividend_month_premium`)
 
@@ -667,40 +797,6 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - Savor, P. and Wilson, M., Earnings Announcements and Systematic Risk, Journal of Finance, 2016 <https://doi.org/10.1111/jofi.12361>
 - Barber, B., De George, E., Lehavy, R. and Trueman, B., The Earnings Announcement Premium Around the Globe, Journal of Financial Economics, 2013 <https://doi.org/10.1016/j.jfineco.2012.10.006>
 - Quantpedia, Earnings Announcement Premium (strategy page) <https://quantpedia.com/strategies/earnings-announcement-premium/>
-
-## 12-1 momentum (`momentum_12_1`)
-
-**Status:** candidate. **Thesis:** Stocks that rose most over the past year, leaving out the last month, keep outperforming the market over the next month.
-
-- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
-- **Schedule:** month end
-- **Universe:** preset `liquid_common_stocks`
-- **Top K:** 50
-- **Screeners:** `momentum_12_1`
-- **Baselines:** `size_small`
-- **Frozen period:** from 2026-04-01
-- **Published:** decile spread 1.31% over 20 sessions (Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993, 25 years)
-- **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment).
-
-**Quality bar**
-
-1. **Mechanism:** Investors underreact to news and herd into winners; limits to arbitrage and disposition effects slow the price from reaching its value (Jegadeesh and Titman 1993; Barberis, Shleifer and Vishny 1998).
-2. **Persistence:** The premium is large, old and widely known, and has survived two decades after its publication in most markets, but it crashes in sharp market rebounds (Daniel and Moskowitz 2016): the risk that keeps arbitrageurs from removing it.
-3. **Outcome:** Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions).
-4. **Trigger timing:** mom_12_1 is computed from the close of the decision session D (rollups, nightly), so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1) and the window runs from S's close; the screen is read at D, the outcome at S.
-5. **Faithful replication:** The published rule: rank by the return from 12 months to 1 month back and hold the top decile (Jegadeesh and Titman 1993); here the top 50 of the liquid common stocks (liquid_common_stocks).
-6. **Expected size and sample:** Historically about 1% a month for the winner-minus-loser decile spread in large US stocks, smaller since 2000 (Daniel and Moskowitz 2016). Ten independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
-7. **Capacity and costs:** Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume): turnover is monthly and spreads are small; the 10 bps round trip is the assumption.
-8. **Failure modes and retirement:** Momentum crashes: sharp market rebounds after a drawdown reverse winners and losers (Daniel and Moskowitz 2016). Retire if the frozen-period decile spread is not above zero or the top decile does not beat the buy-and-hold mean of the eligible names.
-9. **Decoys:** The same signal in the market's own drift (compare with buy-and-hold of the eligible names), the size and quality tilts of past winners, and the 52-week-high effect (a different screen on the same sessions).
-
-**Sources**
-
-- Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993 <https://doi.org/10.1111/j.1540-6261.1993.tb04702.x>
-- Daniel, K. and Moskowitz, T., Momentum Crashes, Journal of Financial Economics, 2016 <https://doi.org/10.1016/j.jfineco.2015.12.002>
-- Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, Journal of Financial Economics, 1998 <https://doi.org/10.1016/S0304-405X(98)00027-0>
-- Asness, C., Frazzini, A., Israel, R. and Moskowitz, T., Fact, Fiction and Momentum Investing, AQR / Journal of Portfolio Management, 2014 <https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Momentum-Investing>
-- Quantpedia, Momentum Factor Effect in Stocks (strategy page) <https://quantpedia.com/strategies/momentum-factor-effect-in-stocks/>
 
 ## 12-1 momentum among names that just reported (`momentum_at_earnings`)
 
