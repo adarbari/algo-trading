@@ -507,6 +507,15 @@ follow-up PR).
 - status: final
 - Reasoning: the tag does not split finance from operating leases in the filer's figure; excluding it would leave about 70 of 259 untagged companies null.
 
+## 2026-10-17 | PR #643 (FINRA short interest / short volume) | Learned fits blocked, harness scoring allowed
+- Question: FINRA's website terms (restriction (m)) bar use with machine learning / predictive analytics; the API terms we pull under do not. Does the ban stop only learned models, or also the edge harness scoring rule screeners built on these tables?
+- Options: (a) block learned fits only (edge-scorer training frame, winners-study discovery probit in `services/evaluation/discovery` / `quant.probit`), harness may score screeners using them / (b) also stop the harness from scoring such screeners.
+- Decision: (a), applied to every FINRA-derived feature whatever its source (API or cdn backfill files), as one licence tag on the feature groups with a fitness test that no training frame or probit input reads a tagged feature; the FINRA rows never reach the TextModel seam. The edge harness may score rule screeners that use them.
+- decided by: Fable on the owner's behalf
+- status: final
+- confirmed: owner 2026-10-18
+- Reasoning: the clause targets a program that learns or predicts from the data, and it sits only in the website terms (the cdn files), not the API terms. The harness evaluates a fixed, human-written rule after the fact (hit rate vs base rate, lift, deciles); nothing is fitted and no estimate becomes a model, so it is an audit, not predictive analytics. Use is personal and non-commercial with no redistribution, so the residual risk is remote, while knowing whether a short-interest screen has an edge is the reason to ingest it. Reversible: (b) is one PR (extend the tag check to the harness) if the owner disagrees. Matches the owner's plan "rule screens only, never a learned scorer".
+
 ## 2026-10-17 | PR #646 (EB H3 outcome sides) | A long-short edge's verdict state
 - Question: what does an edge whose outcome is a long-short spread show as its verdict, given a spread is never a basis?
 - Options: Waiting on data with a reason / its own state, Diagnostic only.
@@ -529,6 +538,14 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a partial fix would leave the same one-session look-ahead in four groups that share the input and its backfill.
+
+## 2026-10-18 | EB H6 (decoy battery) | What the decoy battery is, and what it changes
+- Question: how are the standard decoys named, ranked and compared, and what do the stratified draws change?
+- Options: `@standard` expanded at load into `Edge.baselines` / expanded inside the harness; the stratified draws as a second set in the same leg row / a second leg row; overlap and spread gap in the job report / a new `edge_eval` column.
+- Decision: expand at load (the run hash then follows the list, no existing edge's hash moves); store the stratified sums in new `strat_*` columns of the same leg row (leg v3, `LEG_VERSION` 3) and as `random_sector:<screener>` rows of role `random`, so every reader of the uniform draws is untouched; report the Jaccard overlap and the spread gap in the `edge-eval` job result and text report only; `beta_low` ranks by `factor_betas.beta_mkt` (five-factor), `ivol_high` by the residual volatility, MAX over 21 sessions, Amihud over 63; the existing edges keep their baseline lists.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the smallest change that keeps hashes stable, adds no table, and leaves what users see (the verdict reads the uniform draws) as it is until the owner decides whether the stratified percentile joins it.
 
 ## 2026-10-18 | EB H4 (event-class framework) | Subtypes, the filing group, and what is left out
 - Question: how are subtypes read, which classes ship on stored data, and does the folder cap force a new feature-group folder?
@@ -562,6 +579,14 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: settled by the architect reviewer of #644 (the format accepts no `architect` decider); the edge can be scored now instead of from November; the read-only broker boundary is untouched (it reads a stored rollup).
+
+## 2026-10-18 | EB H6 (decoy battery, architect review) | Factor betas without a sector, and unmeasured decoys
+- Question: how do ivol and beta exist over history when the sector map starts 2026-10-02, and how is a decoy with no figure counted?
+- Options: five-factor fit for all (empty history) / four-factor fit for every name with `beta_sector` only where a sector exists; leave a figure-less decoy out / count it as not measured.
+- Decision: four-factor fit (market, size, momentum, value) for `ivol_252d` and four betas, `beta_sector` from a five-factor fit where a sector exists (else NO_SECTOR), `relative_strength@v1` required; a decoy with no lift or spread is "not measured" ("n of m measured") in the verdict and flagged in the decoy report; the stratified draws read the later sector snapshot before 2026-10-02, as the screeners do (accepted).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the history the decoys are measured over has no sector; a gate on it would empty two decoys, and a silent omission would let "beats every baseline" pass untested.
 
 ## 2026-10-17 | EB H8 (option model P&L) | Short delta-hedged side, stored basis, short put
 - Question: how is the short side of the delta-hedged straddle expressed, where does `basis = "model"` live, and when does the short-put P&L land?

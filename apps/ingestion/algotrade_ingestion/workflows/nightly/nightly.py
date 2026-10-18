@@ -280,6 +280,11 @@ NIGHTLY: tuple[Step, ...] = (
         critical=False,
         accept_with=(check_analyst_snapshot, check_analyst_backlog, check_finnhub_backlog),
     ),
+    # FINRA short interest and daily short-sale volume (EB D9), both tables no_ml. Optional: an
+    # outage only warns; each reads a window of dates not stored yet, so a catch-up session
+    # repeats nothing, and a date FINRA has not published is NO_DATA and asked again.
+    Step("short-interest", needs=("universe-build",), requires=universe_exists, critical=False),
+    Step("short-volume", needs=("universe-build",), requires=universe_exists, critical=False),
     # `edge-eval`, `descriptions` and `verify` are the post-session workflow's (ADR 0070): they
     # do not feed the session's reads, so they no longer delay its COMPLETE record.
     # The derived history copies (ADR 0060), last: every step that publishes the copied tables

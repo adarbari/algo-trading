@@ -36,6 +36,7 @@ from algotrade.services.evaluation.cross_section.legs.audit import (
 from algotrade.services.evaluation.cross_section.legs.store import read_legs
 from algotrade.services.evaluation.cross_section.random_picks import DEFAULT_DRAWS, RANDOM
 from algotrade.services.evaluation.cross_section.results import (
+    decoys,
     edge_eval_frame,
     historical_identity,
     iv_coverage,
@@ -214,6 +215,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         "lost_sessions": lost_sessions(evaluation),
         "iv_coverage": iv_coverage(evaluation),
         "report_containment": report_containment(evaluation),
+        "decoys": decoys(evaluation),
         "rows": records(rows[rows["role"] != RANDOM]),  # the draws are stored, not reported
     }
 

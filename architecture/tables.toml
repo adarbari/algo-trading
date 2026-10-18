@@ -137,6 +137,18 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/events/filings.py"
 note = "ADR 0050: SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I / SC TO-T, 25 / 25-NSE, 424B4, 10-12B) of every operating company in the universe by acceptance time; known_from = the first session whose close is after the acceptance (an acceptance after the close, on a weekend or a holiday counts from the next session; ADR 0050 amendment, EB H4)"
 
 [[table]]
+name = "events/short_interest"
+owner = "apps/ingestion/algotrade_ingestion/tasks/shorting/short_interest.py"
+no_ml = true
+note = "EB D9: FINRA short interest twice a month by settlement date; known_from = the session after the 7th business day (publication); no_ml: the finra.org terms bar machine learning, so no learned scorer reads it (tests/architecture/data/test_no_ml_tables.py)"
+
+[[table]]
+name = "events/short_volume"
+owner = "apps/ingestion/algotrade_ingestion/tasks/shorting/short_volume.py"
+no_ml = true
+note = "EB D9: FINRA Reg SHO daily short-sale volume by trade date (facilities summed, off-exchange only); known_from = the session after the trade date; no_ml, as events/short_interest"
+
+[[table]]
 name = "events/fund_nav"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/fund_nav.py"
 note = "Edge build D5: the daily NAV per share of a closed-end fund from Tiingo's Nasdaq MFQS X<ticker>X series, keyed by the FUND's instrument_id + series, session_date = the NAV date, known_from = the next session after it, knowledge_ts = the fetch; a restated NAV replaces the row with known_from = the restating run's session; readers go through data/events with through=S, never a raw partition read"
@@ -393,6 +405,14 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
 name = "rollups/instrument/momentum_variants@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/factor_betas@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/illiquidity@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]

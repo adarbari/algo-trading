@@ -58,7 +58,10 @@ themes = ["events", "fundamentals", "statements", "analyst"]
 [[family]]
 id = "trend"
 title = "Trend"
-presets = ["trend_continuation", "pullback", "momentum_12_1", "size_small", "residual_momentum", "volatility_scaled_momentum", "frog_in_the_pan", "momentum_x_quality_interaction", "fifty_two_week_high", "industry_momentum", "low_beta", "low_volatility"]
+presets = [
+  "trend_continuation", "pullback", "momentum_12_1", "size_small", "ivol_high", "max_ret_high",
+  "amihud_illiquid", "beta_low",
+]
 
 [[family]]
 id = "breakouts"
@@ -79,3 +82,12 @@ presets = ["vrp_scanner", "vrp_iv_hv"]
 id = "events"
 title = "Earnings events"
 presets = ["pead_small_cap", "eap_all", "eap_volume"]
+
+[[family]]
+id = "factors"
+title = "Factors"
+presets = [
+  "residual_momentum", "volatility_scaled_momentum", "frog_in_the_pan",
+  "momentum_x_quality_interaction", "fifty_two_week_high", "industry_momentum", "low_beta",
+  "low_volatility",
+]

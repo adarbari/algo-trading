@@ -35,10 +35,10 @@ def test_the_guide_index_in_the_spec_order(graph: Graph) -> None:
     assert counts["regime"] == len(index["indicators"]) + len(index["episodes"])
     assert [g["id"] for g in index["themeGroups"]] == ["tradeable", "chart", "options", "company"]
     trend = index["families"][0]
-    assert (trend["title"], [p["id"] for p in trend["playbooks"]][:4]) == (
-        "Trend",
-        ["trend_continuation", "pullback", "momentum_12_1", "size_small"],
-    )  # fmt: skip  (the first four: the edge variants follow)
+    assert (trend["title"], [p["id"] for p in trend["playbooks"]]) == (
+        "Trend", ["trend_continuation", "pullback", "momentum_12_1", "size_small", "ivol_high",
+                  "max_ret_high", "amihud_illiquid", "beta_low"],
+    )  # fmt: skip
     assert index["indicators"][0]["plainName"] and index["episodes"][0]["name"]
     fields = [i["fields"] for i in index["intents"]]
     assert fields == sorted(fields, reverse=True)
