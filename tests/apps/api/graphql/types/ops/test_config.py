@@ -25,7 +25,11 @@ def test_config_list(graph: Graph) -> None:
           "nt_late_filer", "tender_offer_filed", "sp500_deletion", "pre_earnings_runup",
           "earnings_gap_volume", "earnings_gap_only", "short_term_momentum_turnover",
           "momentum_own_trend", "momentum_pullback_entry", "momentum_volume_confirmed",
-          "earnings_vwap_overhang"}  # fmt: skip
+          "earnings_vwap_overhang",
+          "cp_iv_spread", "cp_iv_spread_rise", "iv_smirk", "iv_change_call", "iv_change_ibkr",
+          "option_stock_volume", "retail_option_attention", "lottery_max", "volume_shock",
+          "volume_shock_no_news", "dividend_month", "mispricing_composite",
+          "pre_earnings_reversal", "earnings_neutral_reversal"}  # fmt: skip
     assert set(configs) == {"short_premium_liquidity", "sma_trend", "vrp_scanner", "vrp_iv_hv"} | ta
     assert (configs["sma_trend"]["kind"], configs["sma_trend"]["scope"]) == ("strategy", "site")
     assert configs["sma_trend"]["selection"] == "liquid_optionable"
