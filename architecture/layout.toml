@@ -503,7 +503,12 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/guide"
-purpose = "the Guide's read objects (ADR 0051), session-free: GuideIndex (sections with entry counts, field theme groups, intents, situations, playbooks by family, regime indicators and episodes), GuideField (a field's FeatureInfo with what the server derives for it: related fields, the playbooks that use it, the situations that fool it), GuidePlaybookDetail and GuideSituationDetail (a playbook's and a situation's page), the indicator and episode pages, GuideTerm and GuideStartPage (the glossary and Start here pages, written.py), the one Guide search (search.py) and the one splitter of prose at the catalogue names it mentions; at its module cap (10): the next kind splits the folder"
+purpose = "the Guide's read objects (ADR 0051), session-free: GuideIndex (sections with entry counts, field theme groups, intents, situations, playbooks by family, regime indicators and episodes), GuideField (a field's FeatureInfo with what the server derives for it: related fields, the playbooks that use it, the situations that fool it), GuidePlaybookDetail and GuideSituationDetail (a playbook's and a situation's page), the indicator and episode pages, GuideTerm and GuideStartPage (the glossary and Start here pages, written.py), the one Guide search (search.py) and the one splitter of prose at the catalogue names it mentions; at its module cap (10): the next kind splits the folder (edges/ holds the Edges section)"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/guide/edges"
+purpose = "the Guide's Edges section as read objects (ADR 0051), from the site's edge documents alone and with no harness result or live number: the site edges with the tags the Guide derives (site_edges.py, schedule.py, universe.py), one edge's page (edge.py), one mechanism's page (mechanism.py) and the section's index (index.py); never imports the session, a store, services/read/evaluation or an outcome (a fitness test)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

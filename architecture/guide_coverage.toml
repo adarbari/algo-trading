@@ -77,6 +77,16 @@ values_from = "python:algotrade.config.edges.document:STATUSES"
 values = { researching = "term:edge_status", candidate = "term:edge_status", evidenced = "term:edge_status", live = "term:edge_status", retired = "term:edge_status", rejected = "term:edge_status", blocked = "term:edge_status" }
 
 [[enum]]
+source = "graphql:GuideEdgeRow.status"
+values_from = "python:algotrade.config.edges.document:STATUSES"
+values = { researching = "term:edge_status", candidate = "term:edge_status", evidenced = "term:edge_status", live = "term:edge_status", retired = "term:edge_status", rejected = "term:edge_status", blocked = "term:edge_status" }
+
+[[enum]]
+source = "graphql:GuideStatusCount.status"
+values_from = "python:algotrade.config.edges.document:STATUSES"
+values = { researching = "term:edge_status", candidate = "term:edge_status", evidenced = "term:edge_status", live = "term:edge_status", retired = "term:edge_status", rejected = "term:edge_status", blocked = "term:edge_status" }
+
+[[enum]]
 source = "graphql:Edge.state"
 values_from = "python:algotrade.config.edges.follow:LEGACY"
 values = { researching = "term:edge_state", following = "term:follow_edge", rejected = "term:edge_state", retired = "term:edge_state", trial = "term:forward_test" }

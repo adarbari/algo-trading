@@ -26,12 +26,14 @@ export type FeatureFormat =
 
 /** The kinds of Guide entry `guideEntries` reads */
 export type GuideEntryKind =
+  | 'EDGE'
   | 'EPISODE'
   | 'INDICATOR'
+  | 'MECHANISM'
   | 'START'
   | 'TERM';
 
-/** One entry a page asks for: its `kind` and its `id` (an indicator's key, an episode's slug, a term's or Start here page's id) */
+/** One entry a page asks for: its `kind` and its `id` (an indicator's key, an episode's slug, a mechanism's or site edge's id, a term's or Start here page's id) */
 export type GuideRef = {
   id: string;
   kind: GuideEntryKind;

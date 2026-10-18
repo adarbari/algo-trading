@@ -7,6 +7,7 @@ import time
 
 import pytest
 
+from algotrade.config.site.guide.start import ENTRY_KINDS
 from algotrade.services.read.context import StoreContext
 from algotrade.services.read.guide.search import (
     SNIPPET,
@@ -107,8 +108,7 @@ def test_a_prose_snippet_is_cut_around_the_first_word() -> None:
 def test_the_shipped_guide(site: StoreContext) -> None:
     entries = guide_entries(site)
     kinds = [e.kind for e in entries]
-    assert kinds == sorted(kinds, key=["start", "indicator", "episode", "playbook", "field",
-                                       "situation", "term"].index)  # fmt: skip
+    assert kinds == sorted(kinds, key=ENTRY_KINDS.index)
     titles = entry_titles(site)
     assert titles[("term", "not_run")] == "NOT_RUN"
     assert titles[("field", ADV)] == ADV

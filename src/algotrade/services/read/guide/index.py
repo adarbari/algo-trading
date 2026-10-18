@@ -3,7 +3,8 @@
 groups with the number of guided fields per theme, the intents a trader has (each with the
 number of fields offering a criterion for it, most first), the situations with the number of
 fields each fools, the playbooks by family, the regime indicators and reference episodes as
-their config holds them, the Start here pages in order and the glossary terms in file order.
+their config holds them, the mechanisms of the Edges section with the number of edges on each
+(``edges/index.py``), the Start here pages in order and the glossary terms in file order.
 Counts are computed here, never in the browser (ADR 0038)."""
 
 from collections import Counter
@@ -17,6 +18,11 @@ from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.config.site.settings import load_field_guide
 from algotrade.services.read.context import Stores
+from algotrade.services.read.guide.edges.index import (
+    GuideMechanismEntry,
+    edge_entries,
+    mechanism_entries,
+)
 from algotrade.services.read.guide.playbooks import SitePlaybook, site_playbooks
 
 
@@ -128,6 +134,7 @@ class GuideIndex:
     episodes: tuple[GuideEpisode, ...]
     start_pages: tuple[GuideStartEntry, ...]
     terms: tuple[GuideTermEntry, ...]
+    mechanisms: tuple[GuideMechanismEntry, ...] = ()
 
 
 def load_guide_index(ctx: Stores) -> GuideIndex:
@@ -150,6 +157,7 @@ def load_guide_index(ctx: Stores) -> GuideIndex:
     counts = {
         "start": len(start),
         "regime": len(indicators) + len(episodes),
+        "edges": edge_entries(ctx),
         "playbooks": len(playbooks),
         "fields": len(guide.fields),
         "situations": len(guide.situations),
@@ -174,6 +182,7 @@ def load_guide_index(ctx: Stores) -> GuideIndex:
         episodes=episodes,
         start_pages=start,
         terms=terms,
+        mechanisms=mechanism_entries(ctx),
     )
 
 

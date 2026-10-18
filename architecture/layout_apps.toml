@@ -82,7 +82,12 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 
 [[dir]]
 path = "apps/api/algotrade_api/graphql/types/guide"
-purpose = "GraphQL types of the Guide (mirrors services/read/guide, ADR 0051): GuideIndex, GuideField with its playbook uses and situations, GuidePlaybookDetail, GuideSituationDetail and GuideProse (prose split at catalogue names)"
+purpose = "GraphQL types of the Guide (mirrors services/read/guide, ADR 0051): GuideIndex, GuideField with its playbook uses and situations, GuidePlaybookDetail, GuideSituationDetail and GuideProse (prose split at catalogue names); at its module cap: the Edges section's types are in edges/"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/guide/edges"
+purpose = "GraphQL types of the Guide's Edges section (mirrors services/read/guide/edges, ADR 0051): GuideEdgeIndex (mechanism cards, filters, edges set aside), GuideMechanism and GuideEdgeEntry with the GuideEdgeRow that lists an edge; no harness result"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
