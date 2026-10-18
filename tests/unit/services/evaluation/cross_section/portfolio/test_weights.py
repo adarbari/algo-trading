@@ -6,6 +6,7 @@ import pytest
 from algotrade.services.evaluation.cross_section.portfolio.weights import (
     NO_SCORE,
     NO_VOL,
+    average_books,
     book_weights,
 )
 
@@ -72,3 +73,14 @@ def test_slots_a_book_does_not_fill_are_cash_not_renormalised() -> None:
     assert dict(full) == {"A": 0.5, "B": 0.5}  # a full book has no cash
     explicit, _ = book_weights(["A", "CASH"], "equal", {}, {}, slots=4)
     assert dict(explicit) == pytest.approx({"A": 0.25, "CASH": 0.75})  # CASH is a slot too
+
+
+def test_an_ensemble_averages_its_members_books_name_by_name() -> None:
+    a = (("X", 0.5), ("Y", 0.5))
+    b = (("X", 0.5), ("Z", 0.25), ("CASH", 0.25))
+    avg = dict(average_books([a, b]))
+    assert avg == pytest.approx({"X": 0.5, "Y": 0.25, "Z": 0.125, "CASH": 0.125})
+    assert sum(avg.values()) == pytest.approx(1.0)  # an average of books that add to one
+    assert average_books([a, b]) == average_books([b, a])  # never depends on the members' order
+    assert [i for i, _ in average_books([a, b])] == ["X", "Y", "CASH", "Z"]  # best weight, then id
+    assert average_books([]) == ()

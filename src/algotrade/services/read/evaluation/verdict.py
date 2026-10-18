@@ -68,6 +68,7 @@ CRITERION_STATUSES: Final = (
     NOT_MEASURED,
     NOT_APPLICABLE,
 )  # a criterion's status, each explained in the Guide
+NOT_CANDIDATES: Final = ("baseline", runs.MEMBER)  # roles that are never a verdict's basis
 IN_SAMPLE, OUT_OF_SAMPLE, BOTH, ALL = "in_sample", "out_of_sample", "both", "all"
 NO_DECOYS = "no decoys declared"  # the value of a decoy criterion that does not apply
 DIAGNOSTIC_SIDE = (
@@ -227,7 +228,7 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
     main = [r for r in rows if r.edge_variant == runs.MAIN and not r.exploratory]
     found = []
     for variant, horizon in sorted(
-        {(r.variant, r.horizon_sessions) for r in main if r.role != "baseline"}
+        {(r.variant, r.horizon_sessions) for r in main if r.role not in NOT_CANDIDATES}
     ):
         mine = [r for r in main if r.variant == variant and r.horizon_sessions == horizon]
         oos = [r for r in mine if r.slice_kind == "frozen"]
@@ -245,7 +246,7 @@ def _candidates(rows: Sequence[EdgeRow]) -> list[_Candidate]:
         trials = {
             (r.edge_variant, r.variant)
             for r in rows
-            if r.role not in (runs.BASELINE, runs.RANDOM)
+            if r.role not in (runs.BASELINE, runs.RANDOM, runs.MEMBER)
             and r.slice_kind == "all"
             and r.horizon_sessions == horizon
             and not r.exploratory
@@ -843,7 +844,7 @@ def choose_basis(
     named = {
         (r.variant, r.horizon_sessions)
         for r in main
-        if r.role != "baseline" and r.slice_kind in (runs.IN_SAMPLE, ALL)
+        if r.role not in NOT_CANDIDATES and r.slice_kind in (runs.IN_SAMPLE, ALL)
     }
     keys = sorted(
         k for k in named if declared.screener in (None, k[0]) and declared.horizon in (None, k[1])
@@ -860,7 +861,7 @@ def choose_basis(
     ins = {
         (r.variant, r.horizon_sessions): r
         for r in main
-        if r.role != "baseline" and r.slice_kind == runs.IN_SAMPLE
+        if r.role not in NOT_CANDIDATES and r.slice_kind == runs.IN_SAMPLE
     }
     # a model screener's in-sample row is its training fit (``in_sample``): never ranked, so a
     # model is the basis only when it is the one candidate left (``promoted``)

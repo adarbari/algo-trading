@@ -23,7 +23,11 @@ from algotrade.services.evaluation.cross_section.harness import (
     VariantResult,
 )
 from algotrade.services.evaluation.cross_section.legs.store import legs_frame, write_legs
-from algotrade.services.evaluation.cross_section.measures import BUCKETS, SliceMeasure
+from algotrade.services.evaluation.cross_section.measures import (
+    BUCKETS,
+    SCREENER,
+    SliceMeasure,
+)
 from algotrade.services.evaluation.cross_section.random_picks import RANDOM
 from algotrade.services.evaluation.cross_section.reporting.decoys import decoy_overlaps
 from algotrade.storage.runs import RunRecord, start_run
@@ -150,6 +154,7 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
         "variant": r.variant,
         "role": r.role,
         "config_hash": r.config_hash,
+        "grid": r.grid,  # an ensemble: the pre-registered grid it counts once (ADR 0074)
         "horizon": r.horizon,
         "sessions": m.sessions,
         "picks": m.picks,
@@ -234,6 +239,38 @@ def iv_coverage(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
                 }
             )
     return out
+
+
+def oos_haircuts(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
+    """Per trial of the edge itself (a screener or an ensemble, per horizon) with an in-sample and
+    an out-of-sample slice, the in-sample Sharpe ratio, what it is expected to fall to after the
+    haircut of the edge's ``oos_class`` (``verdict.toml [oos_haircut]``) and the out-of-sample one
+    (``None`` for a slice with no figure, never 0). Display only: no verdict reads it, and an edge
+    with no ``oos_class`` has none (ADR 0074 amendment)."""
+    share = evaluation.oos_haircut
+    if share is None:
+        return []
+    found = []
+    for r in evaluation.results:
+        if r.edge_variant != MAIN or r.role != SCREENER:
+            continue
+        by = {m.slice_kind: m for m in r.measures}
+        before = by["in_sample"].sharpe if "in_sample" in by else None
+        after = next((by[k].sharpe for k in ("frozen", "split") if k in by), None)
+        if before is None and after is None:
+            continue
+        found.append(
+            {
+                "variant": r.variant,
+                "horizon": r.horizon,
+                "haircut": share,
+                "in_sample_sharpe": before,
+                "expected_sharpe": None if before is None else before * (1.0 - share),
+                "out_of_sample_sharpe": after,
+                "grid": r.grid,
+            }
+        )
+    return found
 
 
 def survivorship(evaluation: EdgeEvaluation) -> dict[int, tuple[int, int]]:

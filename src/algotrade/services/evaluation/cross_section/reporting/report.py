@@ -31,6 +31,22 @@ def _cell(row: Mapping[str, Any], key: str, fmt: str) -> str:
     return "-" if value is None else fmt.format(value)
 
 
+def _sharpe(value: float | None) -> str:
+    return "-" if value is None else f"{value:+.3f}"
+
+
+def _haircut_line(h: Mapping[str, Any]) -> str:
+    """One trial's in-sample Sharpe ratio beside what a haircut of ``h['haircut']`` leaves of it
+    and the out-of-sample one (per decision session, not annualised; display, never a gate)."""
+    grid = f" (an ensemble of {h['grid']})" if h.get("grid") else ""
+    return (
+        f"OOS HAIRCUT: {h['variant']}{grid} h={h['horizon']}: in-sample Sharpe "
+        f"{_sharpe(h['in_sample_sharpe'])}, expect {_sharpe(h['expected_sharpe'])} after a "
+        f"{h['haircut']:.0%} haircut, out-of-sample {_sharpe(h['out_of_sample_sharpe'])} "
+        f"(display only: no verdict reads it)"
+    )
+
+
 def _gap(value: float | None) -> str:
     return "-" if value is None else f"{value:+.4f}"
 
@@ -85,6 +101,8 @@ def render_edge_report(result: Mapping[str, Any]) -> str:
             f"overlap {shown} (Jaccard at D, {d['sessions']} sessions); spread less the decoy's "
             f"{_gap(d['spread_gap'])} all, {_gap(d['spread_gap_oos'])} out of sample{flag}"
         )
+    for h in result.get("oos_haircut", []):
+        lines.append(_haircut_line(h))
     rows: Sequence[Mapping[str, Any]] = result["rows"]
     header = "| " + " | ".join(label for _, label, _ in COLUMNS) + " |"
     divider = "|" + "|".join("---" for _ in COLUMNS) + "|"

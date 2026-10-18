@@ -17,7 +17,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.identity import LONG, LONG_SHORT, SHORT, identity_dict
-from algotrade.config.edges.portfolio import CASH, PORTFOLIO_KIND, blend
+from algotrade.config.edges.portfolio import CASH, ENSEMBLE, PORTFOLIO_KIND, blend
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
@@ -75,7 +75,11 @@ from algotrade.services.evaluation.cross_section.portfolio.session import (
     session_value,
     window_returns,
 )
-from algotrade.services.evaluation.cross_section.portfolio.weights import book_weights
+from algotrade.services.evaluation.cross_section.portfolio.weights import (
+    Weights,
+    average_books,
+    book_weights,
+)
 from algotrade.services.evaluation.cross_section.random_picks import (
     RandomStat,
     generator,
@@ -108,9 +112,23 @@ NO_ENTRY_BAR = "no_entry_bar"  # a pick's reason when its name has no outcome ro
 
 @dataclass(frozen=True)
 class Variant:
+    """One screener or baseline of the run; the ``ensemble`` variant (ADR 0074) has the screeners
+    of its pre-registered grid as ``members`` (their ``role`` is ``member``) and, as ``config``,
+    the first one's (only its kind is read)."""
+
     id: str
-    role: str  # "screener" | "baseline"
+    role: str  # "screener" | "baseline" | "member"
     config: ResolvedConfig
+    members: tuple["Variant", ...] = ()
+
+    @property
+    def hash(self) -> str:
+        """What the variant's trial is: its config's hash; an ensemble's is that of its grid (the
+        members' hashes, in no order: an average does not depend on it)."""
+        if not self.members:
+            return self.config.hash
+        grid = json.dumps(sorted(m.config.hash for m in self.members))
+        return hashlib.sha256(f"{ENSEMBLE}:{grid}".encode()).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -191,6 +209,8 @@ def _stat(
     (bp), whose hits a return outcome's leg also counts. ``adv_floor``: the least 20-day dollar
     volume of a name a short leg may hold (``_side_picks``)."""
     edge, day = scope.edge, leg.decision
+    if variant.members:
+        return _ensemble_stat(scope, session, variant, leg, horizon, rows, event_names)
     run, eligible = session.run(variant, day), session.eligible(scope.universe, day)
     if (
         run is None or run.coverage not in MEASURED_COVERAGE
@@ -285,24 +305,34 @@ def _stat(
     )
 
 
-def _portfolio_stat(
-    scope: _Scope,
-    session: SessionReads,
-    run: RankedRun,
-    names: Names,
-    leg: Leg,
-    horizon: int,
-    rows: pd.DataFrame,
-) -> SessionStat:
-    """One ``portfolio_return`` session (ADR 0074): the qualified names among the pickable ones,
-    best first, ``top_k`` of them, weighted at D (``portfolio/weights.py``) and valued at S against
-    the blended benchmark with the cash at the bill yield read at D (``portfolio/session.py``).
-    No picks is a cash session, not an excluded one."""
-    o, day = scope.edge.outcome, leg.decision
+def _book(
+    scope: _Scope, session: SessionReads, run: RankedRun, names: Names, day: date
+) -> tuple[Weights, str]:
+    """The book one screener's run gives at D: the qualified names among the pickable ones, best
+    first, ``top_k`` of them, weighted (``portfolio/weights.py``); ``()`` and the reason when it
+    cannot be formed. No picks is a cash book."""
+    o = scope.edge.outcome
     chosen = [i for i in run.qualified if i in names.pickable]
     picks = chosen if scope.edge.top_k is None else chosen[: scope.edge.top_k]
     vols = session.numbers(o.vol_field, frozenset(picks), day) if o.vol_field and picks else {}
-    weights, why = book_weights(picks, o.weighting, run.scores, vols, scope.edge.top_k)
+    return book_weights(picks, o.weighting, run.scores, vols, scope.edge.top_k)
+
+
+def _valued(
+    scope: _Scope,
+    session: SessionReads,
+    leg: Leg,
+    horizon: int,
+    rows: pd.DataFrame,
+    weights: Weights,
+    why: str,
+    deciles: tuple[float, ...] = (),
+    ranked: int = 0,
+) -> SessionStat:
+    """The statistic of a session whose book is ``weights`` (``why``: it could not be formed),
+    valued at S against the blended benchmark with the cash at the bill yield read at D
+    (``portfolio/session.py``)."""
+    o, day = scope.edge.outcome, leg.decision
     regime = session.label(day)
     if why:
         return portfolio_stat(day, regime, None, why, (), o.cost_bps)
@@ -315,14 +345,62 @@ def _portfolio_stat(
         window_returns(rows),
         cash_return(session.bill_yield(day), horizon) if held_cash else None,
     )
+    return portfolio_stat(day, regime, value, why, weights, o.cost_bps, deciles, ranked)
+
+
+def _portfolio_stat(
+    scope: _Scope,
+    session: SessionReads,
+    run: RankedRun,
+    names: Names,
+    leg: Leg,
+    horizon: int,
+    rows: pd.DataFrame,
+) -> SessionStat:
+    """One ``portfolio_return`` session (ADR 0074): one screener's book, valued at S; the decile
+    figures are its ranking of the eligible names, when enough were scored."""
+    weights, why = _book(scope, session, run, names, leg.decision)
     scored = {i: v for i, v in run.scores.items() if i in names.ids}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(names.ids)  # too few scores to rank
     deciles = (
         ()
-        if thin
-        else ranking_deciles(rows[rows["instrument_id"].isin(names.ids)], scored, o.cost_bps)
+        if thin or why
+        else ranking_deciles(
+            rows[rows["instrument_id"].isin(names.ids)], scored, scope.edge.outcome.cost_bps
+        )
     )
-    return portfolio_stat(day, regime, value, why, weights, o.cost_bps, deciles, len(scored))
+    return _valued(scope, session, leg, horizon, rows, weights, why, deciles, len(scored))
+
+
+def _ensemble_stat(
+    scope: _Scope,
+    session: SessionReads,
+    variant: Variant,
+    leg: Leg,
+    horizon: int,
+    rows: pd.DataFrame,
+    event_names: frozenset[str] | None,
+) -> SessionStat:
+    """One session of an ensemble (ADR 0074 amendment): the average of its members' books, valued
+    as one. A member whose screen could not be read, or whose book cannot be formed, leaves the
+    session out (never a book of the members that could): the grid is pre-registered whole. There
+    is no single ranking, so no decile figures."""
+    day = leg.decision
+    eligible = session.eligible(scope.universe, day)
+    names = names_for(scope.edge, eligible, event_names)
+    books: list[Weights] = []
+    for member in variant.members:
+        run = session.run(member, day)
+        if run is None or run.coverage not in MEASURED_COVERAGE:
+            lost = session.lost.get((member.id, day))
+            if lost is not None:
+                session.lost[variant.id, day] = lost  # counted as the lost session it is
+            return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
+        book, why = _book(scope, session, run, names, day)
+        if why:
+            return _valued(scope, session, leg, horizon, rows, (), f"{why}:{member.id}")
+        books.append(book)
+    return _valued(scope, session, leg, horizon, rows, average_books(books), "")
 
 
 def _side_picks(
@@ -763,7 +841,7 @@ def _trial_hash(scope: _Scope, variant: Variant) -> str:
     horizon is another trial. The split is not part of it: an exploratory run adds no trial (its
     "all" slice, which the deflated Sharpe ratio reads, does not depend on the split)."""
     payload: list[Any] = [
-        variant.config.hash,
+        variant.hash,
         scope.key,
         identity_dict(asdict(scope.edge.outcome)),
         scope.edge.universe,

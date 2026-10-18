@@ -5,7 +5,7 @@
 outcome kinds and the harness), [0063](0063-incremental-edge-evaluation.md) (a leg's contents,
 leg v5) and [0065](0065-verdict-basis-fixed-before-the-frozen-period.md) (what Promising and
 Works rest on for a book). Part (a) of EB H10; the pre-registered ensemble and the out-of-sample
-haircut are part (b) and amend this ADR when they land.
+haircut are part (b), recorded below as the amendment of EB H10b.
 
 ## Context
 Every outcome so far values one name at a time: a pick is held alone and the edge is the mean of
@@ -80,4 +80,27 @@ belongs in it.
   Treasury curve; missing history is `no_benchmark_row` / `no_cash_yield` with the reason, never a
   zero. Tiingo history (D0) is not needed to build or test; it decides how much a run can measure.
 - Deferred: cost-sensitivity rows and a break-even for a book; the per-reason counts of excluded
-  sessions on the edge page; the ensemble and the out-of-sample haircut (part b).
+  sessions on the edge page.
+
+## Amendment (2026-10-18, EB H10b): the ensemble and the out-of-sample haircut
+10. **`[ensemble] variants = ["mom3", "mom6", ...]`**, for a `portfolio_return` edge: a
+    pre-registered grid (at least two distinct screeners, all listed in `screeners`; `ensemble` is
+    the combined variant's reserved id). Each session the harness forms every member's book at D,
+    averages the weights name by name (`average_books`; cash included, so the average adds to one)
+    and values the average as one book. A member that cannot be read or weighted leaves the session
+    out (`<reason>:<member>`); the grid is whole or it is not measured. The ensemble has no single
+    ranking, so no decile figures.
+11. **One trial.** The ensemble is a variant of role `screener` and its trial hash is the sorted
+    hashes of its members', so adding or changing a member is another trial. The members run as
+    role `member`: reported with their own rows, never a trial (`_prior_trials`, the deflated
+    Sharpe peers, `trials`) and never a verdict basis (`choose_basis` and the candidates skip the
+    role; a declared `promoted` member finds no candidate). The trial log records the ensemble once
+    with `grid`, the size of its grid, beside it. Members already logged as screeners in earlier
+    runs stay counted (a conservative count, never rewritten). `ensemble` is a run input; the
+    licence of the ensemble is the strictest of its members'.
+12. **Out-of-sample haircut.** `verdict.toml [oos_haircut] trend = 0.45` (the share of an in-sample
+    Sharpe ratio to expect lost out of sample) and the edge's `oos_class = "trend"` (bookkeeping,
+    not a run input). The run's report prints, for each trial of the edge itself, the in-sample
+    Sharpe ratio, what it becomes after the haircut and the out-of-sample one, per decision session
+    and not annualised: display, never a verdict input. The read model and the edge page do not
+    show it yet.

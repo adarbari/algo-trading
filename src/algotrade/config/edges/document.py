@@ -120,6 +120,8 @@ from algotrade.config.edges.portfolio import (
     benchmark_of,
     check_base,
     check_portfolio,
+    ensemble_of,
+    oos_class_of,
     weighting_of,
 )
 from algotrade.config.edges.verdict import LEGS
@@ -223,7 +225,7 @@ KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
-    "extends", "follow", "audit", "published", "family",
+    "extends", "follow", "audit", "published", "family", "ensemble", "oos_class",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -370,6 +372,9 @@ class Edge:
     extends: str | None = None  # a user's copy: the edge it is layered over
     follow: Follow = field(default_factory=Follow)  # the user's bookmark of a site edge
     audit: Audit = field(default_factory=Audit)  # the server's bookkeeping of an own edge
+    # ADR 0074: the screeners a book averages into ONE variant; the class of its haircut
+    ensemble: tuple[str, ...] = ()
+    oos_class: str | None = None
     # The frozen_from of the site edge this one is a copy of (its own for a site edge): a copy
     # whose frozen_from differs is exploratory (its split is the user's, ADR 0053 amendment).
     site_frozen_from: date | None = None
@@ -469,6 +474,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     named.check_time_series(base, window_name(schedule) in WINDOW_NAMES, universe, where)
     picks = _picks(t, schedule, base)
     sources = _sources(t)
+    screeners = _ids(t, "screeners")
     top_k = _top_k(t)
     variants = _variants(t, schedule, edge_id, universe, base, picks)
     for held, held_base in ((outcome, base), *((v.outcome, v.base or base) for v in variants)):
@@ -494,7 +500,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         schedule=schedule,
         universe=universe,
         top_k=top_k,
-        screeners=_ids(t, "screeners"),
+        screeners=screeners,
         baselines=_ids(t, "baselines", (STANDARD,)),
         status=status,
         sources=sources,
@@ -506,6 +512,8 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         base=base,
         picks=picks,
         variants=variants,
+        ensemble=ensemble_of(t, screeners, outcome.kind),
+        oos_class=oos_class_of(t),
         scorer_features=_scorer_features(t),
         evidence=_evidence(t),
         published=_published(t, outcome, len(sources)),

@@ -698,3 +698,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: architect review of PR 666; the cash rule is set before any edge stores legs, so no leg is invalidated.
+
+## 2026-10-18 | EB H10b (ensembles and the haircut) | What an ensemble counts as and how its members are treated
+- Question: how many trials is a pre-registered grid whose weights are averaged, may a member be the basis, and what does the out-of-sample haircut do?
+- Options: every member a trial plus the ensemble / the ensemble once; a member may be promoted as the basis / never; the haircut a verdict gate / a display; one haircut for every edge / a class per edge.
+- Decision: the ensemble is one trial (its hash is its members' sorted hashes) with the grid size recorded beside it; members run as role `member`, are reported, never a trial or a basis, and members already logged as screeners stay counted; a member that cannot be weighted leaves the ensemble session out; the haircut is display only, in the run's report (`[oos_haircut] trend = 0.45`, the edge's `oos_class`), not in the read model yet.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: averaging removes the choice among members, which is what multiple-testing counts; letting a member be the basis would restore it (ADR 0065); old logs are never rewritten, so the earlier count only errs conservative; a display keeps the haircut out of the verdict until the owner decides it should gate.

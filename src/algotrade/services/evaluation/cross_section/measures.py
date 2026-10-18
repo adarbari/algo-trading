@@ -628,6 +628,7 @@ def _since(day: date, stat: SessionStat) -> bool:
 
 SCREENER = "screener"  # the role of a trial; a baseline is a comparison, never a trial
 BASELINE = "baseline"
+MEMBER = "member"  # a screener of an ensemble's grid: reported, never a trial nor a basis (0074)
 
 
 class Scored(Protocol):

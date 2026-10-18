@@ -61,3 +61,17 @@ def book_weights(
     if cash:
         book.append((CASH, cash))
     return tuple(book), ""
+
+
+def average_books(books: Sequence[Weights]) -> Weights:
+    """The books of an ensemble's members averaged into one (each member counts alike): a name's
+    weight is its mean over the members (zero where a member does not hold it), ``CASH`` included,
+    so the result adds to one. Best-weighted first, ties by id: the order never depends on the
+    members' order."""
+    if not books:
+        return ()
+    total: dict[str, float] = {}
+    for book in books:
+        for name, weight in book:
+            total[name] = total.get(name, 0.0) + weight / len(books)
+    return tuple(sorted(total.items(), key=lambda p: (-p[1], p[0])))
