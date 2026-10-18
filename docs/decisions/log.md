@@ -825,3 +825,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a document that states what it cannot measure is better than none, and a stored-group change for a highly correlated member is cost without information.
+
+## 2026-10-18 | EB E5 (etf_macro bridge) | Field guide entries ship with the first edge that screens on the columns
+- Question: does the etf_macro@v1 PR carry field guide entries for its 32 columns?
+- Options: entries now (needs a split of the field guide folders, both at their caps) / entries with the folder split or the first edge PR that screens on them.
+- Decision: the entries ship with the folder split or the first edge PR that screens on a bridge column; no site preset screens on them yet, so nothing requires one.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the field guide folders are at their file caps and a guide entry without a user of the field is untestable prose.

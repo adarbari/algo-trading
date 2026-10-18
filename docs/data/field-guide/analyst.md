@@ -450,7 +450,7 @@ Sources: Brav and Lehavy (2003), An empirical analysis of analysts' target price
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| cheap against operating profit | `lt 10` | soft | 2 | a loss-making company has no multiple, so a hard rule drops it |
+| cheap against operating profit | `lt 10` | soft | 2 | illustrative screen, not a published cut-off: Loughran and Wellman sort names into groups by the multiple and set no level, and 10 is a round figure for the cheap end; a loss-making company has no multiple, so a hard rule drops it |
 
 **When the reading lies**
 

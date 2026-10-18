@@ -108,7 +108,7 @@ LEVELS: dict[str, tuple[Use, tuple[int, ...], str, tuple[float, float], str]] = 
             "Cboe VIX close (20 = 20% implied vol)"),
     "dfii10": (Use("DFII10", percent=True), (200,), "decimal", (-0.05, 0.1),
                "10-year TIPS real yield"),
-    "wti": (Use("DCOILWTICO", DELAYED), (200,), "usd_per_share", (0, 300),
+    "wti": (Use("DCOILWTICO", DELAYED), (200,), "usd_per_share", (-50, 300),
             "WTI crude spot, USD a barrel"),
     "usd_broad": (Use("DTWEXBGS", DELAYED), (200,), "index_points", (50, 200),
                   "Fed nominal broad US dollar index (Jan 2006 = 100)"),

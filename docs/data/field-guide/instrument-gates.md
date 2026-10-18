@@ -27,7 +27,7 @@ Sources: Site convention (docs/data/instruments.md; ADR 0018, FIGI ids)
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a small-cap tilt | `gte 0.3` | soft | 0.1 | a loading against IWM minus SPY, not a size rank |
+| a small-cap tilt | `gte 0.3` | soft | 0.1 | illustrative screen, not a published cut-off: 0.3 is a clear lean on a one-year fit; a loading against IWM minus SPY, not a size rank |
 
 **When the reading lies**
 
@@ -45,7 +45,7 @@ Sources: Fama and French (1993), Common risk factors in the returns on stocks an
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a name that trades like recent winners | `gte 0.3` | soft | 0.1 | a loading against MTUM minus SPY |
+| a name that trades like recent winners | `gte 0.3` | soft | 0.1 | illustrative screen, not a published cut-off: 0.3 is a clear lean on a one-year fit; a loading against MTUM minus SPY |
 
 **When the reading lies**
 
@@ -63,7 +63,7 @@ Sources: Carhart (1997), On persistence in mutual fund performance, JF 52(1); th
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a name that trades like cheap stocks | `gte 0.3` | soft | 0.1 | a loading against VLUE minus SPY, not a valuation |
+| a name that trades like cheap stocks | `gte 0.3` | soft | 0.1 | illustrative screen, not a published cut-off: 0.3 is a clear lean on a one-year fit; a loading against VLUE minus SPY, not a valuation |
 
 **When the reading lies**
 
@@ -81,7 +81,7 @@ Sources: Fama and French (1993), Common risk factors in the returns on stocks an
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a name that moves with its sector | `gte 0.5` | soft | 0.2 | low values mean the name ignores its sector; check factor_status for NO_SECTOR |
+| a name that moves with its sector | `gte 0.5` | soft | 0.2 | illustrative screen, not a published cut-off: half the sector ETF move marks a name that follows its sector; check factor_status for NO_SECTOR |
 
 **When the reading lies**
 
@@ -99,7 +99,7 @@ Sources: Site convention over the select-sector SPDR ETFs (rollup.relative_stren
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a regression on a full year of sessions | `gte 250` | hard | - | under about 250 the betas are noisy |
+| a regression on a full year of sessions | `gte 250` | hard | - | illustrative screen: 250 is about a full year of sessions; below it the fit has fewer observations than the window and wider error |
 
 **When the reading lies**
 
@@ -205,7 +205,7 @@ Sources: iShares fund files (issuer's daily shares outstanding), edge build D4
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| issuers with more than one share class | `gte 2` | hard | - | then read sibling_status; three or more is AMBIGUOUS |
+| issuers with more than one share class | `gte 2` | hard | - | two or more classes is the definition of a pair candidate; then read sibling_status, as three or more is AMBIGUOUS |
 
 **When the reading lies**
 
@@ -214,66 +214,6 @@ Sources: iShares fund files (issuer's daily shares outstanding), edge build D4
 - It counts the classes in the snapshot the session sees; a class added or dropped shows from that snapshot, never from today's reference.
 
 Sources: Site convention over the instrument reference (issuer CIK and share-class FIGI)
-
-### `rollup.etf_macro@v1.vx_basis`
-
-**How to read it.** How far the first monthly VIX future sits above the VIX: 0.05 means it settles 5 percent over spot (contango, the usual state); below 0 is backwardation, stress. Carried by SPY.
-
-**When the reading lies**
-
-- Null unless the futures' trade date is the VIX observation date, so a gap day is unknown, not zero. The futures are monthly expiries after the session only, so the basis jumps when the front contract rolls.
-
-Sources: Cboe VIX futures settlements and the VIX close, both personal use (decision log 2026-10-18)
-
-### `rollup.etf_macro@v1.vx_roll`
-
-**How to read it.** The second monthly VIX future over the first, minus 1: the one-month roll of the curve. Above 0 a long VIX position pays the roll; it is the cost the VIX funds bleed. Carried by SPY.
-
-**When the reading lies**
-
-- Null with fewer than two monthly futures after the session or no settle (settles before May 2013 are null). It is a curve slope at one close, not a forecast of the VIX.
-
-Sources: Cboe VIX futures settlements, personal use
-
-### `rollup.etf_macro@v1.cape`
-
-**How to read it.** The country's cyclically adjusted price over ten-year real earnings, on its fund's row: 12 is cheap, 30 is dear against that country's own history. Rank across countries or against its own past, not against a global number.
-
-**When the reading lies**
-
-- The history is revised in place, so a backfill reads today's estimate, not what was known then: a historical test is optimistic. Null when the latest month is over 100 days old (rollup.etf_macro@v1.cape stops updating) or the fund is not a country fund.
-
-Sources: Barclays Shiller CAPE file (personal research use, never served to other users); Shiller (2000), Irrational Exuberance
-
-### `rollup.etf_macro@v1.fx_carry`
-
-**How to read it.** The currency's 3-month interbank rate minus the US one: 0.02 means holding it earns 2 points a year more than dollars. Positive is the carry side, negative the funding side. Carried by the six currency funds.
-
-**When the reading lies**
-
-- Null for the euro and the pound until fresher series are stored, and when either rate is over 100 days old. The fund's own price excludes the interest it earns, so carry is not its return.
-
-Sources: OECD 3-month interbank rates via FRED; Lustig, Roussanov and Verdelhan (2011), Common risk factors in currency markets, RFS 24
-
-### `rollup.etf_macro@v1.hy_oas`
-
-**How to read it.** The high-yield bond spread over Treasuries, on HYG's row: 0.04 is 4 percent, calm; above 0.08 is a credit scare. Its 50- and 200-observation means (hy_oas_ma50, hy_oas_ma200) give the trend.
-
-**When the reading lies**
-
-- A spread above its 200-day mean is stress rising; the level alone says nothing about direction. Null when the series is over 7 days old. Personal-use data: never served to other users.
-
-Sources: ICE BofA US High Yield Index OAS via FRED (personal use)
-
-### `rollup.etf_macro@v1.vix`
-
-**How to read it.** The VIX close on SPY's row: 12 is calm, 30 stressed, 40 panic. Its 50- and 200-observation means are the trend references; vix9d, vix3m, vix6m and vvix give the term structure.
-
-**When the reading lies**
-
-- A spike resolves within days, so a level above its mean is a regime read, not a signal by itself. Null when the VIX is over 7 days old.
-
-Sources: Cboe VIX close via FRED (personal use)
 
 ### `rollup.short_interest@v1.short_position`
 
