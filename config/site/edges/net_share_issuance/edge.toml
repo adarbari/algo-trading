@@ -52,6 +52,22 @@ title = "Daniel, K. and Titman, S., Market Reactions to Tangible and Intangible 
 title = "Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022"
 url = "https://papers.ssrn.com/abstract=3604626"
 
+[[sources]]
+title = "Pontiff, J. and Woodgate, A. (2008), Share Issuance and Cross-sectional Returns, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v63y2008i2p921-945.html"
+
+[[sources]]
+title = "Fama, E. and French, K. (2008), Dissecting Anomalies, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v63y2008i4p1653-1678.html"
+
+[[sources]]
+title = "Daniel, K. and Titman, S. (2003), Market Reactions to Tangible and Intangible Information, NBER working paper 9743 (Journal of Finance 2006)"
+url = "https://www.nber.org/papers/w9743"
+
+[[sources]]
+title = "Daniel, K. and Titman, S. (2006), Market Reactions to Tangible and Intangible Information, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v61y2006i4p1605-1643.html"
+
 [[variants]]
 id = "issuers_short"
 [variants.outcome]

@@ -78,6 +78,19 @@ url = "https://github.com/OpenSourceAP/CrossSection"
 # The literature's figure (ADR 0064): Gervais, Kaniel and Mingelgrin's high-minus-low volume
 # portfolio over 20 trading days, large firms, 0.50% per dollar long, 1963-1996, before costs
 # (Table 2). It is a spread of the extremes of the paper's own reference period.
+
+[[sources]]
+title = "Gervais, S., Kaniel, R. and Mingelgrin, D. (2001), The High-Volume Return Premium, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v56y2001i3p877-919.html"
+
+[[sources]]
+title = "Kaniel, R., Ozoguz, A. and Starks, L. (2012), The high volume return premium: Cross-country evidence, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v103y2012i2p255-279.html"
+
+[[sources]]
+title = "Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html"
+
 [published]
 measure = "decile_spread"
 value = 0.005

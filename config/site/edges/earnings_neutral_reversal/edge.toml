@@ -79,6 +79,19 @@ url = "https://quantpedia.com/strategies/reversal-during-earnings-announcements/
 # The literature's figure (ADR 0064): So and Wang's low-minus-high 3-day return of the largest size
 # quintile around the report, 1.45% against 0.22% in pseudo-announcement windows, 1996-2011,
 # before costs. A long-short spread of the extreme quintiles.
+
+[[sources]]
+title = "So, E. and Wang, S. (2014), News-Driven Return Reversals: Liquidity Provision Ahead of Earnings Announcements, Journal of Financial Economics (MIT open access)"
+url = "https://dspace.mit.edu/handle/1721.1/119665"
+
+[[sources]]
+title = "Nagel, S. (2011), Evaporating Liquidity, NBER working paper 17653 (Review of Financial Studies 2012)"
+url = "https://www.nber.org/papers/w17653"
+
+[[sources]]
+title = "Da, Z., Liu, Q. and Schaumburg, E. (2011), Decomposing Short-Term Return Reversal, Federal Reserve Bank of New York staff report 513 (Management Science 2014, as A Closer Look at the Short-Term Return Reversal)"
+url = "https://www.newyorkfed.org/research/staff_reports/sr513.html"
+
 [published]
 measure = "decile_spread"
 value = 0.0145
