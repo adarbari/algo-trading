@@ -1,0 +1,50 @@
+# Nearness to the 52-week high (edge momentum_12_1, a variant): every tradeable name with a
+# 52-week high, ranked by how close the close is to it, closest first (George and Hwang 2004: the
+# ratio of price to the 52-week high). Only asks that the value exists (a missing value never
+# passes, ADR 0030). What it does not check: the paper's 6-month hold, recency of the high.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "fifty_two_week_high"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Nearness to the 52-week high"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1, so the variants compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.pct_from_high]
+field = "feature.pct_from_high_52w"
+op = "gt"
+value = -1
+
+[columns]
+close = "rollup.price_stats@v2.close"
+pct_from_high_52w = "feature.pct_from_high_52w"
+mom_12_1 = "rollup.trend_stats@v2.mom_12_1"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "feature.pct_from_high_52w"
