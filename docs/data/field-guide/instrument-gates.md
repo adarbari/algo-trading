@@ -440,7 +440,7 @@ Sources: Site convention (docs/data/instruments.md; Nasdaq Trader symbol directo
 
 **When the reading lies**
 
-- A ticker can be reused after a delisting and changes when a company renames itself; a backtest reads the snapshot of its own session, and a newly listed name is missing from a hand list until it is added.
+- A ticker can be reused after a delisting and changes when a company renames itself. A backtest reads the snapshot of its own session. A newly listed name is missing from a hand list until it is added.
 - A list by ticker says nothing about what the name is: check the company before trusting a name that only matches by spelling.
 
 Sources: Site convention (docs/data/instruments.md)

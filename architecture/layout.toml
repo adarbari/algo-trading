@@ -155,6 +155,10 @@ path = "src/algotrade/data/futures"
 purpose = "reads of rates/futures_curve (the nightly IBKR futures curve snapshots, personal licence): a range of stored sessions and one root's curve with its roll yield; data/ is at its module cap, so the reads of this table are a folder"
 
 [[dir]]
+path = "src/algotrade/data/insiders"
+purpose = "reads of events/insider_transaction (Form 4, EB D6): the lines a session may see (known_from on or before it), each line's latest version, the originals a known 4/A replaced; data/ is at its module cap, so the reads of this table are a folder"
+
+[[dir]]
 path = "src/algotrade/data/listings"
 purpose = "reads of instruments/listing_history and instruments/index_membership (ADR 0018 amendment): the universe as it was on a session (universe_asof), from the latest listing and S&P 500 membership snapshots, which it names"
 

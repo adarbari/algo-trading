@@ -7,15 +7,18 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.declaration import FeatureGroup, Input
 from algotrade.features.framework.feature import Feature
 from algotrade.features.site import site_features
+from algotrade.services.evaluation.discovery import frame as frame_module
 from algotrade.services.evaluation.discovery.frame import (
     EDGE_SCORE,
     MATCHING_VARIABLE,
+    NO_ML,
     assemble,
     read_values,
     usable_fields,
@@ -55,6 +58,18 @@ def test_edge_score_excluded() -> None:
     assert ("feature.edge_score_x", EDGE_SCORE) in got.excluded
     assert ("feature.over_score", EDGE_SCORE) in got.excluded
     assert CLOSE in got.fields
+
+
+def test_a_feature_over_a_no_ml_table_is_excluded(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The proposer fits a probit on every usable field, so a field computed from a table whose
+    source bars machine learning (FINRA's) never reaches it. Catches: a short-interest feature
+    among the tells."""
+    table = "bars/1d"
+    monkeypatch.setattr(frame_module, "NO_ML_TABLES", frozenset({table}))
+    fs = SITE.with_user([define("close_twice", "price_stats.close * 2")])
+    got = usable_fields(fs, S, everywhere(fs))
+    assert CLOSE not in got.fields and "feature.close_twice" not in got.fields
+    assert (CLOSE, NO_ML) in got.excluded and ("feature.close_twice", NO_ML) in got.excluded
 
 
 def test_the_matching_variable_and_features_derived_from_it_are_excluded() -> None:

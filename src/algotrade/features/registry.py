@@ -24,7 +24,12 @@ from collections.abc import Mapping
 from algotrade.features.framework.declaration import FeatureGroup, Superseded
 from algotrade.features.framework.feature import Feature
 from algotrade.features.framework.graph import dependency_order
-from algotrade.features.rollups.activity import max_return, vol_stats, volume_profile
+from algotrade.features.rollups.activity import (
+    illiquidity,
+    max_return,
+    vol_stats,
+    volume_profile,
+)
 from algotrade.features.rollups.consensus import (
     analyst_estimates,
     analyst_ratings,
@@ -94,7 +99,11 @@ from algotrade.features.rollups.price import (
     volume,
 )
 from algotrade.features.rollups.reference import fund_reference
-from algotrade.features.rollups.relative import momentum_variants, relative_strength
+from algotrade.features.rollups.relative import (
+    factor_betas,
+    momentum_variants,
+    relative_strength,
+)
 from algotrade.features.rollups.statements import (
     balance_sheet,
     cash_flow,
@@ -177,6 +186,8 @@ GROUPS: dict[str, FeatureGroup] = {
             fund_reference.GROUP,
             relative_strength.GROUP,
             momentum_variants.GROUP,
+            factor_betas.GROUP,
+            illiquidity.GROUP,
         ),
         # iv30@v1, put_wing@v1 and call_wing@v1 read the materialised div_yield@v1 (FeatureSet
         # orders it)

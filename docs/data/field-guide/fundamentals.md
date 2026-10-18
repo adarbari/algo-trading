@@ -881,9 +881,9 @@ Sources: Ohlson (1980), Journal of Accounting Research 18(1), Financial Ratios a
 
 **When the reading lies**
 
-- A formalisation, not the paper's composite: the research composites use book to market, earnings, cash flow and sales growth; this has the first two yields only, and averages the yields themselves, so a very high yield in one part dominates the mean.
+- A formalisation, not the paper's composite. The research composites use book to market, earnings, cash flow and sales growth. This has two yields only and averages the yields themselves, so a very high yield in one part dominates the mean.
 - A very high yield is often a peak-earnings cyclical or a company the market expects to shrink: check feature.revenue_cagr_3y and feature.cash_op_profitability.
-- Null for a company with an operating loss, a negative enterprise value, no capex line, a stale statement or no market value, and for banks; a missing value is a gap, not a pass.
+- Null for a company with an operating loss, a negative enterprise value, no capex line, a stale statement or no market value, and for banks. A missing value is a gap, not a pass.
 - Enterprise value ignores minority interest and preferred stock, and both yields use the latest filings, up to four months old.
 
 Sources: Lakonishok, Shleifer and Vishny (1994), Journal of Finance 49(5), Contrarian Investment, Extrapolation, and Risk; Asness and Frazzini (2013), Journal of Portfolio Management 39(4), The Devil in HML's Details
@@ -900,7 +900,7 @@ Sources: Lakonishok, Shleifer and Vishny (1994), Journal of Finance 49(5), Contr
 
 **When the reading lies**
 
-- Built from what is stored: profitability in full (gross profit over assets, ROE, ROA, cash flow over assets, gross margin, low accruals) but safety only as leverage and distress; the paper's growth part and its beta and earnings-volatility parts are not built, so rollup.qmj@v1.safety_z does not know how steady the earnings are.
+- Built from what is stored. Profitability is complete (gross profit over assets, ROE, ROA, cash flow over assets, gross margin, low accruals). Safety is only leverage and distress. The paper's growth, beta and earnings-volatility parts are not built, so rollup.qmj@v1.safety_z does not know how steady the earnings are.
 - Relative to the session: the score falls when others improve; it has no level and cannot be compared across dates. It ranks across all names, so an asset-light software company outranks a utility on margins.
 - Needs enough profitability parts (four of six) and a cross-section of at least 100 names; a name without them has no score (a gap, not a pass). Banks are scored on the parts they have.
 - Quality is not cheapness: compare feature.pb_ratio and feature.ev_ebit. Statement figures enter from the session after SEC acceptance of the filing and can be four months old.
@@ -909,7 +909,7 @@ Sources: Asness, Frazzini and Pedersen (2019), Review of Accounting Studies 24(1
 
 ### `feature.net_issuance_pct_12m`
 
-**How to read it.** The log change of the share count over a year, the form Pontiff and Woodgate use: -0.03 is about 3% of the shares bought back, +0.10 about 10% more shares issued. Negative is a net buyer of its own stock, around 0 stable, above +0.05 a steady issuer, above +0.20 a heavy one (an offering, an acquisition in stock, heavy compensation); in the research the issuers underperform and the repurchasers outperform. It ranks like feature.shares_change_yoy and is the form the issuance edge sorts on.
+**How to read it.** The log change of the share count over a year, the form Pontiff and Woodgate use. -0.03 is about 3% of the shares bought back and +0.10 about 10% more shares issued. Negative is a net buyer of its own stock and around 0 is stable. Above +0.05 is a steady issuer and above +0.20 a heavy one (an offering, an acquisition in stock, heavy compensation). In the research the issuers underperform and the repurchasers outperform. It ranks like feature.shares_change_yoy and is the form the issuance edge sorts on.
 
 **The criterion per intent**
 
@@ -920,9 +920,9 @@ Sources: Asness, Frazzini and Pedersen (2019), Review of Accounting Studies 24(1
 
 **When the reading lies**
 
-- The counts are the company total from the filings, a cover-page count against a cover-page count or a weighted average against a weighted average, so a company that began tagging the cover page recently is null.
+- The counts are the company total from the filings. A cover-page count is compared with a cover-page count and a weighted average with a weighted average, so a company that began tagging the cover page recently is null.
 - An acquisition paid in shares, a spin-off or a reverse merger changes the count without being a financing decision; a split is adjusted away.
-- A shrinking count can hide issuance: companies buy back what compensation issues, so a flat count is not a company that does nothing; and a buyback funded by debt is not strength (see feature.debt_to_equity).
+- A shrinking count can hide issuance: companies buy back what compensation issues, so a flat count is not a company that does nothing. A buyback funded by debt is not strength (see feature.debt_to_equity).
 - Null for funds, companies without two counts a year apart (recent IPOs and filers) and a stale count.
 
 Sources: Pontiff and Woodgate (2008), Journal of Finance 63(2), Share Issuance and Cross-Sectional Returns
