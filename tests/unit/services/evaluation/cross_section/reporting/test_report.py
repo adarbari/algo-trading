@@ -70,3 +70,40 @@ def test_an_iv_field_with_no_value_in_range_is_a_line_beside_the_zeros() -> None
         "IV FIELD: our_iv30/vrp_rich h=15 reads rollup.iv30@v1.iv30, which has a value at 0 of "
         "31 measured sessions; 155 picks excluded for no implied vol (not misses)"
     ) in render_edge_report(result).splitlines()
+
+
+def test_a_pair_spread_with_no_sibling_data_is_a_line() -> None:
+    gap = {"variant": "main/momo", "horizon": 20, "sessions": 12, "no_sibling_data": 12}
+    result = {
+        "edge": "e", "run_id": "r", "trials": 1, "survivorship": {}, "unclosed_sessions": {},
+        "universe_snapshot": None, "rows": [], "sibling_coverage": [gap],
+    }  # fmt: skip
+    assert (
+        "NO SIBLING DATA: main/momo h=20 has no pair field stored at 12 of 12 measured sessions "
+        "(picks excluded as no_sibling, not misses)"
+    ) in render_edge_report(result).splitlines()
+
+
+def test_each_decoy_reads_as_a_line_with_its_overlap_and_spread_gap() -> None:
+    result = {
+        "edge": "drift", "run_id": "r1", "trials": 1, "universe_snapshot": None,
+        "survivorship": {}, "unclosed_sessions": {}, "rows": [],
+        "decoys": [
+            {"edge_variant": "main", "horizon": 20, "screener": "momo", "decoy": "size_small",
+             "sessions": 9, "overlap": 0.25, "spread_gap": 0.0312, "spread_gap_oos": None},
+            {"edge_variant": "main", "horizon": 20, "screener": "momo", "decoy": "beta_low",
+             "sessions": 0, "overlap": None, "spread_gap": None, "spread_gap_oos": -0.01,
+             "measured": False},
+        ],
+    }  # fmt: skip
+    lines = render_edge_report(result).splitlines()
+    assert (
+        "DECOY: main/momo vs size_small h=20: pick overlap 0.25 (Jaccard at D, 9 sessions); "
+        "spread less the decoy's +0.0312 all, - out of sample"
+    ) in lines
+    assert any(
+        "vs beta_low" in line
+        and "overlap - (" in line
+        and "-0.0100 out of sample NOT MEASURED" in line
+        for line in lines
+    )

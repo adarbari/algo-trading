@@ -304,3 +304,14 @@ def test_window_weights_independent_sessions_and_the_overlap_t() -> None:
     assert es.overlap_t(None, 40, 10) is None and es.overlap_t(4.0, 40, 0) is None
     x = [1.0, 2.0, 3.0, 2.0, 1.5]
     assert es.sharpe_t(x, independent=1) == pytest.approx(es.sharpe_t(x) / math.sqrt(5))
+
+
+def test_welch_t_hand_computed_and_undefined_cases() -> None:
+    # means 3 and 1, sample variances 1 and 1, n 3 and 3: se = sqrt(2/3)
+    diff, t = es.welch_t([2, 3, 4], [0, 1, 2])
+    assert diff == pytest.approx(2.0)
+    assert t == pytest.approx(2.0 / math.sqrt(2 / 3))
+    assert es.welch_t([1.0], [1.0, 2.0]) == (pytest.approx(-0.5), None)
+    assert es.welch_t([1.0, 1.0], [2.0, 2.0]) == (pytest.approx(-1.0), None)
+    assert es.welch_t([], [1.0]) == (None, None)
+    assert es.welch_t([1.0, 2.0, float("nan")], [0.0, 1.0])[0] == pytest.approx(1.0)

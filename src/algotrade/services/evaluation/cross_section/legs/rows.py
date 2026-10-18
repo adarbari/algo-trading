@@ -4,7 +4,8 @@ horizon 0), never null.
 
 ``encode_*`` give a row dict of declared column names, ``decode_*`` read one back from a dict or a
 row of a frame read from the store (lists are arrays, nulls are None or NaN there). A leg round
-trips exactly but for the random draws' sums, stored as float32 (about 4 GB per edge otherwise):
+trips exactly but for the random draws' sums (the uniform and, from leg v3, the sector-stratified
+ones: ``strat_*``), stored as float32 (about 4 GB per edge otherwise):
 the harness measures every leg through ``decode_leg(encode_leg(...))``, so a run that computes a
 leg and a run that reads it hold the same numbers.
 
@@ -14,7 +15,12 @@ counted picks (reason ``""``) are, in order, ``pick_values``. ``pick_flags`` pac
 booleans (``HIT``, ``DELISTED``, ``TOUCH``; the touch is known when its reference is; ``SHORT``:
 a name the leg is short, outcome sides). A ``long_short`` leg keeps its short names' counted values
 in ``short_values`` (null for every other side, so a long leg's row is what it was), the long
-leg's in ``pick_values``; a ``short`` leg's names are all short and their values ``pick_values``."""
+leg's in ``pick_values``; a ``short`` leg's names are all short and their values ``pick_values``.
+
+Leg v4 (ADR 0053 amendment 2026-10-18, buy/hold bands): an edge with ``[outcome] hold_rank`` also
+keeps the names ranked just below its counted picks, ``top_k + 1`` to ``hold_rank``, as ``band_*``
+lists (id, rank, oriented net value, null when the name has no counted value): the values the
+turnover pass (``reporting/turnover.py``) needs for a name held through the band."""
 
 import math
 from collections.abc import Mapping, Sequence
@@ -27,8 +33,8 @@ import pandas as pd
 
 from algotrade.data import ReadRecord
 from algotrade.data.listings.identity import PROXY, TODAY_FLAG
-from algotrade.services.evaluation.cross_section.measures import Pick, SessionStat
-from algotrade.services.evaluation.cross_section.random_picks import RandomStat
+from algotrade.services.evaluation.cross_section.measures import UNCOUNTED_BAND, Pick, SessionStat
+from algotrade.services.evaluation.cross_section.random_picks import RandomStat, SectorDraws
 
 LEG = "leg"
 READS = "reads"
@@ -103,6 +109,12 @@ def _null(value: Any) -> bool:
 
 def _opt(value: Any) -> Any:
     return None if _null(value) else value
+
+
+def _stored(value: Any) -> bool:
+    """``siblings_stored`` of a row: a leg written before the column existed (null) is read as
+    stored, so it claims no gap it never measured."""
+    return True if _null(value) else bool(value)
 
 
 def _int(value: Any) -> int | None:
@@ -209,6 +221,28 @@ def decode_picks(
     return tuple(out)
 
 
+def encode_band(band: Sequence[Pick]) -> dict[str, list[Any] | None]:
+    """A leg's buy/hold band (leg v4) as ``band_*`` lists aligned to ``band_ids``; null for a leg
+    with none, so a leg of an edge without ``hold_rank`` carries nothing new. A name with no
+    counted value has a null value, never 0."""
+    if not band:
+        return {"band_ids": None, "band_ranks": None, "band_values": None}
+    return {
+        "band_ids": [p.instrument_id for p in band],
+        "band_ranks": [p.rank for p in band],
+        "band_values": [p.value for p in band],
+    }
+
+
+def decode_band(row: Mapping[str, Any]) -> tuple[Pick, ...]:
+    """The band of a leg row (none for a row without one, or from before leg v4)."""
+    ids, ranks, values = (_list(row.get(c)) for c in ("band_ids", "band_ranks", "band_values"))
+    return tuple(
+        Pick(str(i), int(r), "" if not _null(v) else UNCOUNTED_BAND, value=_maybe(v))
+        for i, r, v in zip(ids, ranks, values, strict=True)
+    )
+
+
 def _base(
     kind: str,
     user_id: str,
@@ -266,10 +300,15 @@ def encode_leg(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
         pick_touches=s.pick_touches,
         no_implied_vol=s.no_implied_vol,
         implied_stored=s.implied_stored,
+        siblings_stored=s.siblings_stored,
         base_hits_at=list(s.base_hits_at),
         pick_hits_at=list(s.pick_hits_at),
         short_values=None if s.short_values is None else list(s.short_values),
+        portfolio_reason=s.portfolio_reason or None,
+        weight_ids=[i for i, _ in s.weights] if s.weights else None,
+        weight_values=[w for _, w in s.weights] if s.weights else None,
         **encode_picks(s.picks),
+        **encode_band(s.band),
     )
     if r is not None:
         row.update(
@@ -279,6 +318,12 @@ def encode_leg(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
             value_sums=np.asarray(r.value_sums, dtype=np.float32),
             hit_sums=np.asarray(r.hit_sums, dtype=np.float32),
         )
+        if r.sector is not None:  # leg v3: the sector-stratified draws beside the uniform ones
+            row.update(
+                strat_picks=r.sector.picks,
+                strat_value_sums=np.asarray(r.sector.value_sums, dtype=np.float32),
+                strat_hit_sums=np.asarray(r.sector.hit_sums, dtype=np.float32),
+            )
     return row
 
 
@@ -325,10 +370,14 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
         pick_touches=int(row["pick_touches"]),
         no_implied_vol=int(row["no_implied_vol"]),
         implied_stored=bool(row["implied_stored"]),
+        siblings_stored=_stored(row.get("siblings_stored")),
         picks=decode_picks(row, values, shorts),
+        band=decode_band(row),
         base_hits_at=_ints(row.get("base_hits_at")),
         pick_hits_at=_ints(row.get("pick_hits_at")),
         short_values=shorts,
+        weights=_weights(row),
+        portfolio_reason=_opt_text(row.get("portfolio_reason")),
     )
     drawn = None
     if rand is not None:
@@ -339,6 +388,7 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
             hit_sums=np.asarray(row["hit_sums"], dtype=np.float64),
             eligible=int(row["rand_eligible"]),
             base_hits=int(row["rand_base_hits"]),
+            sector=_sector_draws(row),
         )
     return LegRecord(
         key=str(row["leg_key"]),
@@ -355,6 +405,28 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
         snapshot=_opt_day(row.get("screen_snapshot")),
         outcome_seq=_int(row.get("outcome_seq")),
         known=None if _null(row.get("knowledge_ts")) else _moment(row["knowledge_ts"]),
+    )
+
+
+def _weights(row: Mapping[str, Any]) -> tuple[tuple[str, float], ...]:
+    """The book of a ``portfolio_return`` leg (leg v5); empty for any other leg."""
+    ids, values = _list(row.get("weight_ids")), _list(row.get("weight_values"))
+    return tuple((str(i), float(w)) for i, w in zip(ids, values, strict=True))
+
+
+def _opt_text(value: Any) -> str:
+    return "" if _null(value) else str(value)
+
+
+def _sector_draws(row: Mapping[str, Any]) -> SectorDraws | None:
+    """The stratified draws of a leg row (None: a row from before leg v3, or not drawn)."""
+    picks = _int(row.get("strat_picks"))
+    if picks is None:
+        return None
+    return SectorDraws(
+        picks,
+        np.asarray(row["strat_value_sums"], dtype=np.float64),
+        np.asarray(row["strat_hit_sums"], dtype=np.float64),
     )
 
 

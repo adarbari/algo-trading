@@ -23,15 +23,19 @@ import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.document import Edge
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.time.calendar import previous_session, sessions_between
+from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
 from algotrade.services.evaluation.cross_section.hit import apply_outcome, needs_implied_vol
 from algotrade.services.evaluation.cross_section.measuring import BENCHMARK
 from algotrade.services.evaluation.cross_section.picks import eligible
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions, entry_session
+from algotrade.services.evaluation.training.no_ml import refuse_no_ml
+from algotrade.services.evaluation.training.purge import purge_cutoff
+from algotrade.services.features import site_features
 from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.selection import fields_view
 
@@ -53,15 +57,6 @@ class TrainingFrame:
     sessions: int  # decision sessions with at least one training row
 
 
-def purge_cutoff(frozen_from: date, horizon: int) -> date:
-    """The session ``horizon`` sessions before ``frozen_from``: a training window must close before
-    it (purged and embargoed by one horizon)."""
-    day = frozen_from
-    for _ in range(horizon):
-        day = previous_session(day)
-    return day
-
-
 def training_frame(
     reader: StoreReader,
     edge: Edge,
@@ -72,10 +67,13 @@ def training_frame(
 ) -> TrainingFrame:
     """Training rows of ``edge`` over the decision sessions in ``start``..``until`` for the first
     horizon (or ``horizon``). Raises ``ConfigurationError`` for an edge with no ``[scorer]``
-    features, no ``frozen_from``, an event schedule or an outcome that needs an implied vol (not
-    fitted by ED7a), and ``MissingDataError`` when no outcome is stored."""
+    features, a scorer feature computed from a ``no_ml`` table or one the site catalogue does not
+    resolve (``no_ml.py``), no ``frozen_from``, an event schedule or an outcome that
+    needs an implied vol (not fitted by ED7a), and ``MissingDataError`` when no outcome is
+    stored."""
     h = horizon or edge.outcome.horizon_sessions[0]
     _check(edge, h)
+    refuse_no_ml(site_features(), edge.scorer_features, edge.id)  # the catalogue fields_view reads
     assert edge.frozen_from is not None
     cutoff = purge_cutoff(edge.frozen_from, h)
     days = sessions_between(start, until)
@@ -147,6 +145,8 @@ def _check(edge: Edge, horizon: int) -> None:
         raise ConfigurationError(
             f"edge {edge.id}: an outcome that reads an implied vol is not fitted yet"
         )
+    if edge.outcome.kind == PORTFOLIO_KIND:
+        raise ConfigurationError(f"edge {edge.id}: a portfolio book is not fitted per name")
     if horizon not in edge.outcome.horizon_sessions:
         raise ConfigurationError(f"edge {edge.id}: horizon {horizon} is not one of its horizons")
 

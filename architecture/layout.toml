@@ -67,7 +67,7 @@ contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
 path = "src/algotrade/config/edges"
-purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/edges/<id>/edge.toml, layered under a user's config/users/<id>/edges/ (ADR 0015), validated fail closed, checked against the screener and selection presets that exist, rendered to docs/edges.md, the user's bookmark of a site edge and the server-written audit of their own edge (follow.py) and the winners study's settings (winners.py, ADR 0053 amendment 2026-10-09)"
+purpose = "edge documents (ADR 0053 decision 1): the typed Edge of config/site/edges/<id>/edge.toml, layered under a user's config/users/<id>/edges/ (ADR 0015), validated fail closed, checked against the screener and selection presets that exist, rendered to docs/edges.md, the user's bookmark of a site edge and the server-written audit of their own edge (follow.py), the option_pnl outcome's structures, tenor rule and checks (chain.py, EB H13) and the winners study's settings (winners.py, ADR 0053 amendment 2026-10-09)"
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
@@ -155,6 +155,10 @@ path = "src/algotrade/data/futures"
 purpose = "reads of rates/futures_curve (the nightly IBKR futures curve snapshots, personal licence): a range of stored sessions and one root's curve with its roll yield; data/ is at its module cap, so the reads of this table are a folder"
 
 [[dir]]
+path = "src/algotrade/data/insiders"
+purpose = "reads of events/insider_transaction (Form 4, EB D6): the lines a session may see (known_from on or before it), each line's latest version, the originals a known 4/A replaced; data/ is at its module cap, so the reads of this table are a folder"
+
+[[dir]]
 path = "src/algotrade/data/listings"
 purpose = "reads of instruments/listing_history and instruments/index_membership (ADR 0018 amendment): the universe as it was on a session (universe_asof), from the latest listing and S&P 500 membership snapshots, which it names"
 
@@ -164,7 +168,7 @@ purpose = "reads of macro series and index levels (macro/series, ADR 0048): each
 
 [[dir]]
 path = "src/algotrade/data/outcomes"
-purpose = "reads of the outcomes grain (outcomes/instrument/, ADR 0053): what happened after a start session, the one table read across sessions, only by the edge harness"
+purpose = "reads of the outcomes grains (outcomes/instrument/ price windows, reading.py; outcomes/option/ chain P&L of option structures, chain.py; ADR 0053 and its EB H13 amendment): what happened after a start session, the tables read across sessions, only by the edge harness"
 contracts = ["Outcomes are quarantined: only services.evaluation reads them (ADR 0053)"]
 
 [[dir]]
@@ -285,7 +289,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/statements"
-purpose = "feature groups from the SEC financial statements (instruments/statements: income statement and cash flow lines as trailing twelve months, balance sheet lines at the latest date), one module per group (its documented FEATURES, a pure compute and its GROUP declaration), plus growth_history@v2 (the revenue and EPS TTMs 3 and 5 years back, from instruments/shares), mispricing@v1 (the anomaly inputs, quality score and composite rank across the statement groups: a rank needs the whole cross-section), ttm.py, the TTM arithmetic over one concept's periods that financials@v3 also uses, and instants.py, the latest-instant and debt rules of the balance sheet"
+purpose = "feature groups from the SEC financial statements (instruments/statements: income statement and cash flow lines as trailing twelve months, balance sheet lines at the latest date), one module per group (its documented FEATURES, a pure compute and its GROUP declaration), plus growth_history@v2 (the revenue and EPS TTMs 3 and 5 years back, from instruments/shares), mispricing@v1 (the anomaly inputs, quality score and composite rank across the statement groups: a rank needs the whole cross-section), qmj@v1 (quality minus junk z-scores over the same measures), ttm.py, the TTM arithmetic over one concept's periods that financials@v3 also uses, and instants.py, the latest-instant and debt rules of the balance sheet"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
@@ -295,7 +299,7 @@ contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow
 
 [[dir]]
 path = "src/algotrade/quant/edges"
-purpose = "the statistics that judge an edge's screeners (ADR 0053; split from quant, at its module cap): lift, effect size, deciles, Sharpe, deflated Sharpe, PBO and the live win-rate band (statistics.py); sign stability, rank-correlation clusters and the permutation null of the discovery study (discovery.py)"
+purpose = "the statistics that judge an edge's screeners (ADR 0053; split from quant, at its module cap): lift, effect size, deciles, Sharpe, deflated Sharpe, PBO and the live win-rate band (statistics.py); sign stability, rank-correlation clusters and the permutation null of the discovery study (discovery.py); the maths of a chain P&L: two-sided mids, long P&L, our own delta of a leg, the daily delta-hedged P&L (chain_pnl.py, EB H13)"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]
@@ -347,11 +351,11 @@ contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation"
-purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/); the forward paper record of the edges a user follows (forward/); learned edge scorers (training/); the winners study's discovery (discovery/)"
+purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history; the edge harness (cross_section/) and its time-series base (time_series/); the forward paper record of the edges a user follows (forward/); learned edge scorers (training/); the winners study's discovery (discovery/)"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section"
-purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run planning its legs and assembling the evaluation (harness.py), the measuring of those legs over chunks of sessions, the one reader of outcomes with the harness (measuring.py), what it reads once per session (reads/), the key of a reusable leg (legs/), its results/edge_eval rows (results.py); the text report and the report-containment diagnostic of an earnings_expected edge are in reporting/"
+purpose = "the edge harness (ADR 0053): an edge's decision and entry sessions (sessions.py), the event names an event schedule triggers on, read from a declared field at the decision session (events.py), each screener's picks and the eligible names at them, the hit of a stored outcome, per-slice measures with independent sessions, the run planning its legs and assembling the evaluation (harness.py), the measuring of those legs over chunks of sessions, the one reader of outcomes with the harness (measuring.py), what it reads once per session (reads/), a portfolio_return book's weights and value (portfolio/), the key of a reusable leg (legs/), its results/edge_eval rows (results.py); the text report and the report-containment diagnostic of an earnings_expected edge are in reporting/"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/detail"
@@ -360,6 +364,10 @@ purpose = "the framing of what an edge evaluation publishes beside its measures 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/legs"
 purpose = "the reuse of a screener's per-session statistics between edge evaluations (ADR 0063): the leg key, what a leg is a function of besides its session (key.py), a leg, a session's reads log and its outcome read as stored rows (rows.py) and their write and read-back in results/edge_legs (store.py), and which stored legs a run reuses and which it retires (reuse.py)"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/cross_section/portfolio"
+purpose = "the portfolio_return outcome of the edge harness (ADR 0074): the weights of a book of picks at D under each weighting and the cash position (weights.py), one session's value against a blended benchmark built from its constituents' own outcome rows, cash at the T-bill yield, and the decile figures that are N/A under about 20 names (session.py); the weight-change turnover cost is reporting/turnover.py"
 
 [[dir]]
 path = "src/algotrade/services/evaluation/cross_section/reads"
@@ -376,6 +384,11 @@ purpose = "the ED6 winners study's discovery (ADR 0053 amendment 2026-10-09): th
 [[dir]]
 path = "src/algotrade/services/evaluation/forward"
 purpose = "the forward paper record (ADR 0053 amendment 2026-10-09): a followed edge's tonight picks by the harness's own picker (signals.py), the open trades a stored outcome closes (settle.py, with the harness and the training frame an importer of outcomes) and one night's rows and run record published atomically into results/edge_paper (results.py)"
+
+[[dir]]
+path = "src/algotrade/services/evaluation/time_series"
+purpose = "the time-series base of the edge evaluation (ADR 0073): an edge timed by a calendar window and judged against the same instrument's returns outside every window; the windows and their tiled out-of-window stretches from the calendar alone (periods.py), the one reader of outcomes, symbol ids and the bill rate (harness.py), the in-window against out-of-window measures as the rows the verdict reads (measures.py), the seeded random window sets (random_windows.py) and one edge's evaluation (evaluate.py)"
+contracts = ["Time-series evaluation reads outcomes only through its harness seam (ADR 0073)"]
 
 [[dir]]
 path = "src/algotrade/services/evaluation/training"

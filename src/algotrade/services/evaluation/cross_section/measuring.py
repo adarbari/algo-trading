@@ -15,22 +15,27 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.config.edges.document import (
-    LONG,
-    LONG_SHORT,
-    SHORT,
-    Edge,
-    identity_dict,
-)
+from algotrade.config.edges.chain import CHAIN_KIND
+from algotrade.config.edges.document import Edge
+from algotrade.config.edges.identity import LONG, LONG_SHORT, SHORT, identity_dict
+from algotrade.config.edges.portfolio import CASH, PORTFOLIO_KIND, blend
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
+    CHAIN_COLUMNS,
     OUTCOME_FIELDS,
+    RESIDUAL_FIELDS,
+    attach_residuals,
+    chain_seqs,
+    missing_chain,
     missing_outcomes,
     outcome_seqs,
+    read_chain_stored,
+    read_residuals,
     read_stored,
+    select_chain,
     select_outcomes,
 )
 from algotrade.engines.screening.runner import RunCoverage
@@ -40,9 +45,12 @@ from algotrade.services.evaluation.cross_section.hit import (
     INVALID_IMPLIED_VOL,
     NO_IMPLIED_VOL,
     UNMEASURED,
+    Pairs,
     apply_outcome,
     is_return,
     needs_implied_vol,
+    needs_pairs,
+    needs_residual,
     short_view,
 )
 from algotrade.services.evaluation.cross_section.legs.key import (
@@ -62,10 +70,20 @@ from algotrade.services.evaluation.cross_section.legs.rows import (
     encode_leg,
 )
 from algotrade.services.evaluation.cross_section.measures import (
+    UNCOUNTED_BAND,
     Pick,
     SessionStat,
     decile_means,
 )
+from algotrade.services.evaluation.cross_section.picks import RankedRun
+from algotrade.services.evaluation.cross_section.portfolio.session import (
+    cash_return,
+    portfolio_stat,
+    ranking_deciles,
+    session_value,
+    window_returns,
+)
+from algotrade.services.evaluation.cross_section.portfolio.weights import book_weights
 from algotrade.services.evaluation.cross_section.random_picks import (
     RandomStat,
     generator,
@@ -158,7 +176,14 @@ def _outcomes(
             if needs_implied_vol(scope.edge)
             else None
         )
-        return apply_outcome(scope.edge, inside, implied).set_index("instrument_id")
+        pairs = (
+            Pairs(
+                session.siblings(scope.edge.outcome.pair_field or "", eligible, day), eligible, rows
+            )
+            if needs_pairs(scope.edge)
+            else None
+        )
+        return apply_outcome(scope.edge, inside, implied, pairs).set_index("instrument_id")
 
     return session.outcomes(scope.key, horizon, day, score)
 
@@ -187,6 +212,8 @@ def _stat(
     ):  # read incomplete data: not measured, counted
         return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
     names = names_for(scope.edge, eligible, event_names)
+    if edge.outcome.kind == PORTFOLIO_KIND:
+        return _portfolio_stat(scope, session, run, names, leg, horizon, rows)
     pickable, ids = names.pickable, names.ids
     scored = {i: v for i, v in run.scores.items() if i in ids}
     thin = len(scored) < MIN_SCORE_COVERAGE * len(ids)  # too few scores to rank: no deciles
@@ -194,15 +221,17 @@ def _stat(
     counted = res[res["excluded"] == ""]
     adv = session.adv(eligible, day)
     side = edge.outcome.side
+    hold = edge.outcome.hold_rank  # a buy/hold band: the names ranked top_k + 1 .. hold are stored
     if side == LONG:
         in_universe = [i for i in run.qualified if i in eligible]
         chosen = [i for i in in_universe if i in pickable]
         legs = [(LONG, chosen if edge.top_k is None else chosen[: edge.top_k])]
+        below = chosen[edge.top_k : hold] if hold is not None and edge.top_k else []
     else:  # a short leg is ranked by score: too few scores and there is no honest bottom
         if thin:  # fail closed: the session is not measured, as an incomplete screen is not
             return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
         in_universe = []
-        legs = _side_picks(edge, run.scores, pickable, adv, adv_floor)
+        legs, below = _side_picks(edge, run.scores, pickable, adv, adv_floor, hold)
     picks = [i for _, ids_ in legs for i in ids_]
     pick_set = set(picks)
     unmeasured = set(res.index[res["excluded"] == UNMEASURED])  # a window over a bad bar (ADR 0061)
@@ -255,6 +284,7 @@ def _stat(
         pick_touches=int(counted.loc[got, "touch"].fillna(0).sum()),
         no_implied_vol=sum(1 for i in picks if i in no_iv),
         implied_stored=any(v is not None for v in implied.values()),
+        siblings_stored=_siblings_stored(edge, session, eligible, day),
         picks=tuple(
             p
             for side_, ids_ in legs
@@ -262,6 +292,7 @@ def _stat(
         ),
         base_hits_at=tuple(int(hits.sum()) for hits in levels),
         pick_hits_at=tuple(int(hits.loc[got].sum()) for hits in levels),
+        band=_band(below, (edge.top_k or 0) + 1, base),
         short_values=(
             tuple(float(v) for v in views[SHORT].loc[short_got, "oriented"])
             if side == LONG_SHORT
@@ -270,27 +301,97 @@ def _stat(
     )
 
 
+def _siblings_stored(
+    edge: Edge, session: SessionReads, eligible: frozenset[str], day: date
+) -> bool:
+    """Whether a ``pair_spread``'s ``pair_field`` has a value for some eligible name at D (true
+    for every other outcome): a field stored for no name would read as a quiet ``no_sibling``."""
+    if not needs_pairs(edge):
+        return True
+    siblings = session.siblings(edge.outcome.pair_field or "", eligible, day)
+    return any(v is not None for v in siblings.values())
+
+
+def _portfolio_stat(
+    scope: _Scope,
+    session: SessionReads,
+    run: RankedRun,
+    names: Names,
+    leg: Leg,
+    horizon: int,
+    rows: pd.DataFrame,
+) -> SessionStat:
+    """One ``portfolio_return`` session (ADR 0074): the qualified names among the pickable ones,
+    best first, ``top_k`` of them, weighted at D (``portfolio/weights.py``) and valued at S against
+    the blended benchmark with the cash at the bill yield read at D (``portfolio/session.py``).
+    No picks is a cash session, not an excluded one."""
+    o, day = scope.edge.outcome, leg.decision
+    chosen = [i for i in run.qualified if i in names.pickable]
+    picks = chosen if scope.edge.top_k is None else chosen[: scope.edge.top_k]
+    vols = session.numbers(o.vol_field, frozenset(picks), day) if o.vol_field and picks else {}
+    weights, why = book_weights(picks, o.weighting, run.scores, vols, scope.edge.top_k)
+    regime = session.label(day)
+    if why:
+        return portfolio_stat(day, regime, None, why, (), o.cost_bps)
+    constituents = blend(o.benchmark)
+    held_cash = any(name == CASH for name, _ in weights)
+    value, why = session_value(
+        weights,
+        constituents,
+        session.instruments(tuple(t for t, _ in constituents), leg.entry),
+        window_returns(rows),
+        cash_return(session.bill_yield(day), horizon) if held_cash else None,
+    )
+    scored = {i: v for i, v in run.scores.items() if i in names.ids}
+    thin = len(scored) < MIN_SCORE_COVERAGE * len(names.ids)  # too few scores to rank
+    deciles = (
+        ()
+        if thin
+        else ranking_deciles(rows[rows["instrument_id"].isin(names.ids)], scored, o.cost_bps)
+    )
+    return portfolio_stat(day, regime, value, why, weights, o.cost_bps, deciles, len(scored))
+
+
 def _side_picks(
     edge: Edge,
     scores: Mapping[str, float],
     pickable: frozenset[str],
     adv: Mapping[str, float | None],
     adv_floor: float | None,
-) -> list[tuple[str, list[str]]]:
+    hold: int | None = None,
+) -> tuple[list[tuple[str, list[str]]], list[str]]:
     """The legs of a ``short`` or ``long_short`` outcome at one session (ADR 0053 amendment,
     outcome sides), each ``(side, ids)`` with rank 1 first: the scored pickable names ranked by
     score (never by the rule rank; a name with no score is in neither leg, as the deciles
     leave it out), the long leg the best ``top_k``, the short leg the worst ``top_k`` among the
     names whose 20-day dollar volume at D is known and at least ``adv_floor`` (the microcap short
-    cannot be done by an individual: ``capacity_adv_floor_usd``; unknown volume is not liquid)."""
+    cannot be done by an individual: ``capacity_adv_floor_usd``; unknown volume is not liquid).
+    Also the ids of a ``short`` outcome's buy/hold band, the shortable names ranked ``top_k + 1``
+    to ``hold`` (none for any other side)."""
     assert edge.top_k is not None  # the document requires it for a side other than long
     ranked = sorted((i for i in pickable if i in scores), key=lambda i: (-scores[i], i))
     floor = adv_floor or 0.0
     shortable = [i for i in ranked if (volume := adv.get(i)) is not None and volume >= floor]
     short = shortable[::-1][: edge.top_k]
     if edge.outcome.side == SHORT:
-        return [(SHORT, short)]
-    return [(LONG, ranked[: edge.top_k]), (SHORT, short)]
+        below = shortable[::-1][edge.top_k : hold] if hold is not None else []
+        return [(SHORT, short)], below
+    return [(LONG, ranked[: edge.top_k]), (SHORT, short)], []
+
+
+def _band(ids: Sequence[str], first: int, view: pd.DataFrame) -> tuple[Pick, ...]:
+    """The picks of a buy/hold band, ranks from ``first``: ``view`` is the counted names of the
+    leg's side (oriented as its picks are). A name with no counted value has none, never 0: it
+    cannot be held (``reporting/turnover.py``)."""
+    return tuple(
+        Pick(
+            i,
+            rank,
+            "" if i in view.index else UNCOUNTED_BAND,
+            value=_finite(view.at[i, "oriented"]) if i in view.index else None,
+        )
+        for rank, i in enumerate(ids, start=first)
+    )
 
 
 def _picks(
@@ -369,9 +470,15 @@ def _hits_at(
     return [frame[column] for frame in found]
 
 
-def _drawing(spec: "_RandomSpec", variant: Variant, block: Sequence[Leg]) -> bool:
-    """Whether the screener's legs in ``block`` carry random draws: out of sample only."""
-    return spec.split is not None and variant.role == "screener" and block[0].decision >= spec.split
+def _drawing(spec: "_RandomSpec", variant: Variant, block: Sequence[Leg], edge: Edge) -> bool:
+    """Whether the screener's legs in ``block`` carry random draws: out of sample only, and never
+    for a portfolio_return book (its value is the book's, not a name's: no random names to draw)."""
+    return (
+        spec.split is not None
+        and variant.role == "screener"
+        and block[0].decision >= spec.split
+        and edge.outcome.kind != PORTFOLIO_KIND
+    )
 
 
 def _needs(
@@ -387,7 +494,7 @@ def _needs(
         for variant in variants:
             key = spec.key_for(p.scope, variant)
             for block in p.blocks:
-                drawing = _drawing(spec, variant, block)
+                drawing = _drawing(spec, variant, block, p.scope.edge)
                 for leg in block:
                     names = None if events is None else tuple(sorted(events.names[leg.decision]))
                     id_: LegId = (key, p.scope.key, variant.id, p.horizon, leg.decision)
@@ -459,6 +566,7 @@ class _RandomSpec:
                 self.costs,
                 None if scope.edge.outcome.side == LONG else self.adv_floor,
                 scope.edge.event_subtype,
+                scope.edge.outcome.hold_rank,
             )
         return found
 
@@ -483,7 +591,12 @@ def _measure(
     todo = reuse.days
     legs = [lg for p in plans for b in p.blocks for lg in b if todo is None or lg.decision in todo]
     days = sorted({leg.decision for leg in legs})
-    out.seqs = outcome_seqs(reader, {leg.entry for leg in legs})  # before any outcome row is read
+    residuals = any(needs_residual(p.scope.edge) for p in plans)  # their stamps count too
+    chain = _chain(plans)  # an option_pnl edge reads the chain grain
+    entries = {leg.entry for leg in legs}
+    out.seqs = (  # before any outcome row is read
+        chain_seqs(reader, entries) if chain else outcome_seqs(reader, entries, residuals)
+    )
     failed: dict[int, MissingDataError] = {}
     out.closed.update({p.horizon: set(reuse.closed.get(p.horizon, ())) for p in plans})
     for at in range(0, len(days), CHUNK_SESSIONS):
@@ -513,6 +626,12 @@ def _measure(
     return out
 
 
+def _chain(plans: Sequence[_Plan]) -> bool:
+    """Whether the plans' outcomes are option P&Ls read from the chain grain (an edge's variants
+    are all of one kind, ``config/edges/chain.check_kinds``)."""
+    return any(p.scope.edge.outcome.kind == CHAIN_KIND for p in plans)
+
+
 def _read_closed(
     reader: StoreReader,
     plans: Sequence[_Plan],
@@ -531,7 +650,11 @@ def _read_closed(
         for h in sorted({p.horizon for p in plans})
     }  # fmt: skip
     entries = sorted({d for days in wanted.values() for d in days})
-    stored = read_stored(reader, entries, as_of) if entries else None  # once for the horizons
+    chain = _chain(plans)
+    read = read_chain_stored if chain else read_stored
+    stored = read(reader, entries, as_of) if entries else None  # once for the horizons
+    residual_horizons = {p.horizon for p in plans if needs_residual(p.scope.edge)}
+    residuals = read_residuals(reader, entries, as_of) if entries and residual_horizons else None
     have: set[date] = set()  # the entry sessions with a partition visible at ``as_of``
     if stored is not None:  # plain strings: the ``isin`` over arrow strings is the slow path
         stored = stored.assign(instrument_id=stored["instrument_id"].astype(object))
@@ -541,10 +664,18 @@ def _read_closed(
         if not days:
             continue
         if stored is None or not any(days[0] <= d <= days[-1] for d in have):
-            failed.setdefault(horizon, missing_outcomes(days))  # nothing stored in its span
-            continue
-        frame = select_outcomes(stored, horizon, days, BENCHMARK, as_of)
-        kept = frame[list(OUTCOME_COLUMNS)]  # what apply_outcome reads, no more
+            failed.setdefault(horizon, (missing_chain if chain else missing_outcomes)(days))
+            continue  # nothing stored in its span
+        if chain:
+            frame = select_chain(stored, horizon, days, as_of)
+            columns = list(CHAIN_COLUMNS)
+        else:
+            frame = select_outcomes(stored, horizon, days, BENCHMARK, as_of)
+            columns = list(OUTCOME_COLUMNS)
+            if horizon in residual_horizons:  # a factor-neutral outcome of this horizon (EB H11)
+                frame = attach_residuals(frame, residuals, horizon)
+                columns += RESIDUAL_FIELDS
+        kept = frame[columns]  # what apply_outcome reads, no more
         closed[horizon] = dict(tuple(kept.groupby(frame["session_date"].map(_day))))
         out.closed[horizon] |= set(closed[horizon])
         for entry, rows in closed[horizon].items():
@@ -574,7 +705,7 @@ def _measure_plan(
                 continue
             names = None if events is None else events.names[leg.decision]
             rows = closed[p.horizon][leg.entry]
-            drawing = _drawing(spec, variant, block)
+            drawing = _drawing(spec, variant, block, p.scope.edge)
             with session.attribute(leg.decision):
                 stat = _stat(
                     p.scope, session, variant, leg, p.horizon, rows, names, spec.costs,
@@ -632,13 +763,20 @@ def _measure_random(
     names = names_for(p.scope.edge, eligible, event_names)
     res = _outcomes(p.scope, session, leg, p.horizon, rows, eligible, names.ids)
     counted = res[res["excluded"] == ""]
-    rng = generator(
-        spec.key_for(p.scope, variant), f"{p.scope.key}|{variant.id}", p.horizon, leg.decision
-    )
+    key, label = spec.key_for(p.scope, variant), f"{p.scope.key}|{variant.id}"
+    rng = generator(key, label, p.horizon, leg.decision)
     side = p.scope.edge.outcome.side
-    if side == LONG:
+    if side == LONG:  # the sector-matched draws are the long leg's (a short leg has none)
         return random_stat(
-            leg.decision, counted, names.pickable, len(stat.pick_values), spec.draws, rng
+            leg.decision,
+            counted,
+            names.pickable,
+            len(stat.pick_values),
+            spec.draws,
+            rng,
+            sectors=session.sectors(frozenset(counted.index), leg.decision),
+            pick_ids=[x.instrument_id for x in stat.picks if x.reason == ""],
+            sector_rng=generator(key, f"{label}|sector", p.horizon, leg.decision),
         )
     # The short leg is drawn from the names it could hold (the dollar volume floor), minus the
     # draw; a long-short spread is two draws, the long's then the short's, one generator.

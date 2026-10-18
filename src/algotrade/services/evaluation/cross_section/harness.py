@@ -38,17 +38,20 @@ from datetime import date, datetime
 from functools import partial
 from typing import Any
 
+import numpy as np
+
 from algotrade.config.edges.document import (
     LEGACY_SITE_CUTOFF,
     LEGACY_SITE_OWNERS,
-    LONG,
-    LONG_SHORT,
     MAIN,
+    PAIR_KIND,
     Edge,
     Outcome,
-    identity_dict,
     job_name,
 )
+from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
+from algotrade.config.edges.named import OUT_OF_WINDOW
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -57,6 +60,8 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
+    chain_seqs,
+    chain_stamps,
     outcome_seqs,
     outcome_stamps,
     stored_sessions,
@@ -82,6 +87,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
     is_return,
     needs_implied_vol,
+    needs_residual,
 )
 from algotrade.services.evaluation.cross_section.legs.key import (
     HARNESS_VERSION,
@@ -114,6 +120,7 @@ from algotrade.services.evaluation.cross_section.measures import (
 )
 from algotrade.services.evaluation.cross_section.measuring import (
     Variant,
+    _chain,
     _drawn,
     _measure,
     _Measured,
@@ -125,7 +132,10 @@ from algotrade.services.evaluation.cross_section.measuring import (
 )
 from algotrade.services.evaluation.cross_section.random_picks import (
     DEFAULT_DRAWS,
+    RANDOM,
+    SECTOR_RANDOM,
     SEED_VERSION,
+    RandomStat,
     pool_random,
     random_measures,
 )
@@ -135,10 +145,16 @@ from algotrade.services.evaluation.cross_section.reporting.report_containment im
     containment,
     reports_after,
 )
+from algotrade.services.evaluation.cross_section.reporting.turnover import (
+    apply_hold_bands,
+    apply_rebalances,
+)
 from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
     leg_blocks,
 )
+from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
+from algotrade.services.evaluation.time_series.measures import deflate_trial, pbo_among
 from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -186,6 +202,7 @@ class VariantResult:
     licences: TrialLicences | None = None  # the trial's and its ledger columns' (ADR 0064)
     legs: tuple[LegDetail, ...] = ()  # the main edge variant's measured legs, for the ledger
     side: str = LONG  # the outcome's side (``edge_eval.side``; ADR 0053 amendment)
+    timing: Mapping[str, Any] | None = None  # a time-series edge: timing vs buy-and-hold Sharpe
 
     @property
     def licence(self) -> str | None:
@@ -239,6 +256,7 @@ class RandomPicks:
     variant: str  # the screener the draws are matched to
     config_hash: str  # that screener's trial hash
     draws: tuple[SliceMeasure, ...]
+    kind: str = RANDOM  # ``RANDOM`` (uniform) or ``SECTOR_RANDOM`` (matched to the picks' sectors)
     side: str = LONG
 
 
@@ -272,6 +290,30 @@ class EdgeEvaluation:
     legs_reused: int = 0
     legs_computed: int = 0
     legs_invalidated: Mapping[str, int] = field(default_factory=dict)
+
+
+def _random_sets(
+    edge_variant: str,
+    horizon: int,
+    screener: str,
+    trial: str,
+    pooled: Sequence[RandomStat],
+    side: str = LONG,
+) -> list[RandomPicks]:
+    """The random-pick sets matched to one screener over its pooled blocks: the uniform draws and,
+    when every block holds them (leg v3), the sector-matched ones beside."""
+    if not pooled:
+        return []
+    found = [
+        RandomPicks(edge_variant, horizon, screener, trial, random_measures(pooled), side=side)
+    ]
+    strata = [p.stratified() for p in pooled]
+    if all(x is not None for x in strata):
+        drawn = random_measures([x for x in strata if x is not None])
+        found.append(
+            RandomPicks(edge_variant, horizon, screener, trial, drawn, SECTOR_RANDOM, side)
+        )
+    return found
 
 
 def run_hash(
@@ -362,6 +404,16 @@ def stored_outcome_sessions(reader: StoreReader) -> list[date]:
     return stored_sessions(reader)
 
 
+def _turned_over(o: Outcome, stats: tuple[SessionStat, ...]) -> tuple[SessionStat, ...]:
+    """``stats`` with the net series of an outcome whose cost is its turnover's: a buy/hold band
+    (entries and exits) or a rebalanced portfolio book (the weight change); any other as given."""
+    if o.hold_rank is not None:
+        return apply_hold_bands(stats, o.cost_bps, o.sign)
+    if o.kind == PORTFOLIO_KIND:
+        return apply_rebalances(stats, o.cost_bps)
+    return stats
+
+
 def evaluate_edge(
     reader: StoreReader,
     writer: ResultWriter,
@@ -383,7 +435,12 @@ def evaluate_edge(
     ``random_draws``: random picks drawn per out-of-sample session (``random_picks.py``);
     ``full``: compute every leg, reusing none of the stored ones (``legs/reuse.py``). Raises
     ``ConfigurationError`` for an event class with no declared field and
-    ``MissingDataError`` when no outcome is stored for a horizon."""
+    ``MissingDataError`` when no outcome is stored for a horizon. An edge with ``base =
+    "out_of_window"`` is a time-series edge, measured by ``time_series/`` (``_time_series``)."""
+    if edge.base == OUT_OF_WINDOW:
+        return _time_series(
+            reader, writer, configs, user, edge, start, end, as_of, split_from, random_draws
+        )
     variants = _variants(configs, user, edge)
     split, exploratory = effective_split(split_from, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
@@ -425,15 +482,21 @@ def evaluate_edge(
         stored,
         needs,
         as_of,
-        partial(_outcome_stamps, reader, as_of, _earnings_horizons(plans)),
+        partial(
+            _outcome_stamps,
+            reader,
+            as_of,
+            _earnings_horizons(plans),
+            _chain(plans),
+            residual_plans(plans),
+        ),
         "requested" if full else None,
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
     results, randoms, projected = [], [], projection_count(load_verdict(configs))  # (0064)
     # ``projected``: the decision sessions whose exits are stored, read once per run
     reports = None  # the real report dates, read once and only for an earnings_expected edge
-    starts: dict[int, int] = {}
-    unclosed: dict[int, int] = {}
+    starts, unclosed = dict[int, int](), dict[int, int]()
     for plan in plans:
         scope, horizon = plan.scope, plan.horizon
         needs_iv = needs_implied_vol(scope.edge)
@@ -467,22 +530,20 @@ def evaluate_edge(
                 for block in plan.blocks
                 if _drawn(block, legs, closed)
             ]
-            if pooled:
-                randoms.append(
-                    RandomPicks(
-                        scope.key,
-                        horizon,
-                        variant.id,
-                        _trial_hash(scope, variant),
-                        random_measures(pooled),
-                        scope.edge.outcome.side,
-                    )
-                )
+            randoms += _random_sets(
+                scope.key,
+                horizon,
+                variant.id,
+                _trial_hash(scope, variant),
+                pooled,
+                scope.edge.outcome.result_side,
+            )
             found = stats.legs.get((plan.key, variant.id), {})
             block_stats = tuple(
                 pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
                 for block in kept
             )
+            block_stats = _turned_over(scope.edge.outcome, block_stats)
             measures, costed = _slice_rows(
                 block_stats,
                 split,
@@ -490,7 +551,9 @@ def evaluate_edge(
                 variant.config.config.impl == MODEL_IMPL,
                 edge.frozen_from,
                 CostGrid(scope.edge.outcome.cost_bps, spec.costs, scope.edge.outcome.sign)
-                if is_return(scope.edge) and scope.edge.outcome.side != LONG_SHORT
+                if is_return(scope.edge)
+                and scope.edge.outcome.side != LONG_SHORT
+                and scope.edge.outcome.kind != PORTFOLIO_KIND  # a book's cost is its turnover's
                 else None,  # a spread has no hit rate to cost
                 verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key
                 counts_wins(unit_of(scope.edge)),
@@ -505,7 +568,7 @@ def evaluate_edge(
                     block_stats,
                     measures,
                     edge_variant=scope.key,
-                    side=scope.edge.outcome.side,
+                    side=scope.edge.outcome.result_side,
                     iv_source=scope.iv_field if needs_iv else None,
                     licences=trial_licences(
                         features, scope.edge, scope.universe, variant.config, licences[scope.key]
@@ -564,6 +627,73 @@ def evaluate_edge(
     )
 
 
+def _time_series(
+    reader: StoreReader,
+    writer: ResultWriter,
+    configs: ConfigStore,
+    user: UserContext,
+    edge: Edge,
+    start: date,
+    end: date,
+    as_of: datetime,
+    split_from: date | None,
+    random_draws: int,
+) -> EdgeEvaluation:
+    """A time-series edge (ADR 0073) as an ``EdgeEvaluation``: one trial per named instrument
+    (``variant`` its symbol, ``horizon`` the window's length), its slices and random window sets
+    stored as the rows the verdict reads; no per-session series, legs or ledger (there is no
+    screen to replay)."""
+    split, exploratory = effective_split(split_from, edge)
+    session = SessionReads(reader, site_regime(configs.load).label)
+    run = evaluate_time_series(
+        reader, edge, start, end, as_of, session.label, split, exploratory, random_draws
+    )
+    keys = {
+        r.symbol: hashlib.sha256(
+            f"{edge.id}|{run.window}|{r.symbol}|{HARNESS_VERSION}".encode()
+        ).hexdigest()
+        for r in run.results
+    }
+    tried = {(MAIN, r.symbol, keys[r.symbol], run.horizon) for r in run.results}
+    trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
+    pbo = pbo_among({r.symbol: dict(r.paired) for r in run.results if r.paired})
+    sharpes = [r.measures[0].sharpe for r in run.results if r.measures[0].sharpe is not None]
+    spread = float(np.var(sharpes, ddof=1)) if len(sharpes) > 1 else None  # as ``deflate`` reads it
+    results = [
+        VariantResult(
+            r.symbol, SCREENER, keys[r.symbol], run.horizon, (),
+            (
+                deflate_trial(r.measures[0], [v for _, v in r.paired], trials, pbo, spread),
+                *r.measures[1:],
+            ),
+            lost_sessions=r.lost, timing=r.timing,
+        )
+        for r in run.results
+    ]  # fmt: skip
+    randoms = tuple(
+        RandomPicks(MAIN, run.horizon, r.symbol, keys[r.symbol], r.randoms)
+        for r in run.results
+        if r.randoms
+    )
+    return EdgeEvaluation(
+        edge_id=edge.id,
+        run_hash=run_hash(edge, [], start, end, as_of, split_from=split, random_draws=random_draws),
+        user_id=user.user_id,
+        benchmark=edge.outcome.benchmark,
+        start=start,
+        end=end,
+        as_of=as_of,
+        snapshot=None,
+        results=tuple(results),
+        trials=trials,
+        start_sessions={run.horizon: run.scheduled},
+        unclosed_sessions={run.horizon: run.unclosed},
+        split_from=split,
+        exploratory=exploratory,
+        random_picks=randoms,
+    )
+
+
 def _details(
     blocks: Sequence[Sequence[Leg]],
     pooled: Sequence[SessionStat],
@@ -603,15 +733,29 @@ def _leg_rows(
 
 
 def _outcome_stamps(
-    reader: StoreReader, as_of: datetime, names_for: Collection[int], entries: Collection[date]
+    reader: StoreReader,
+    as_of: datetime,
+    names_for: Collection[int],
+    chain: bool,
+    residuals: bool,
+    entries: Collection[date],
 ) -> tuple[
     dict[tuple[date, int], datetime], dict[tuple[date, int], frozenset[str]], dict[date, int]
 ]:
     """What reuse asks of the outcome partitions of ``entries``: per (S, horizon) the latest
     ``knowledge_ts`` known by ``as_of`` with the names of those rows, and per S the commit
     sequence (the harness is the one reader of outcomes)."""
-    known, names = outcome_stamps(reader, entries, as_of, names_for=names_for)
-    return known, names, outcome_seqs(reader, entries)
+    if chain:  # an option_pnl edge reads the chain grain (EB H13)
+        known, names = chain_stamps(reader, entries, as_of, names_for)
+        return known, names, chain_seqs(reader, entries)
+    known, names = outcome_stamps(reader, entries, as_of, names_for=names_for, residuals=residuals)
+    return known, names, outcome_seqs(reader, entries, residuals)
+
+
+def residual_plans(plans: Sequence[_Plan]) -> bool:
+    """Whether any plan measures a residual return: the stamps then cover the residual
+    partitions too (a backfill of them re-measures the legs that held ``NO_RESIDUAL_ROW``)."""
+    return any(needs_residual(p.scope.edge) for p in plans)
 
 
 def _earnings_horizons(plans: Sequence[_Plan]) -> frozenset[int]:
@@ -652,8 +796,10 @@ def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) 
 def _borrowing(outcome: Outcome, site_default: float) -> Outcome:
     """``outcome`` with the borrow rate its short leg pays made explicit (its own, else the site's
     ``verdict.toml`` default), so the trial hash and the values see one number; a long outcome has
-    no short leg and is returned as it is."""
-    if outcome.side == LONG or outcome.borrow_bps_annual is not None:
+    no short leg and is returned as it is (a pair spread's short leg is the sibling)."""
+    if outcome.borrow_bps_annual is not None or (
+        outcome.side == LONG and outcome.kind != PAIR_KIND
+    ):
         return outcome
     return replace(outcome, borrow_bps_annual=site_default)
 

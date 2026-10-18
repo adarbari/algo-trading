@@ -91,6 +91,16 @@ min_members = 100        # instruments with a known value a percentile rank need
 min_quality_inputs = 4   # of the six quality measures quality_score averages
 min_anomalies = 5        # of the seven anomalies composite_rank averages
 
+["qmj@v1"]
+stale_days = 480         # as mispricing@v1: its measures are read
+history_days = 1100      # as mispricing@v1
+ago_tolerance_days = 40  # as mispricing@v1 (a parameter of the shared measures; qmj does not use the year-ago assets)
+min_members = 100        # instruments with a known value a z-score needs
+min_quality_inputs = 4   # as mispricing@v1 (the shared parameter class; qmj's own minimums are below)
+min_anomalies = 5        # as mispricing@v1
+min_profitability_inputs = 4  # of the six profitability parts
+min_safety_inputs = 1    # of the two safety parts
+
 ["cash_flow@v2"]
 stale_days = 480         # as income_statement@v2
 history_days = 1100

@@ -35,6 +35,8 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | Company details (name, SIC, sector, state, fiscal year end) | SEC EDGAR submissions (free; contact email in the user agent) | Massive ticker details | Implemented, phase 1.7 |
 | Event filings (8-K with items; NT 10-K / NT 10-Q, SC TO-I, Form 25 / 25-NSE, 424B4, Form 10 `10-12B`; with acceptance time) | SEC EDGAR submissions: `filings.recent` plus the older pages in `filings.files` (free; same contact and pacing; `sources/vendors/sec/submissions.py`, `sec_filings`) | none | Adapter implemented; the `filings` task stores it (ADR 0050) |
 | Event-form filers by day (which CIKs filed one of those forms) | SEC EDGAR daily form index `www.sec.gov/Archives/edgar/daily-index/<YYYY>/QTR<n>/form.<YYYYMMDD>.idx` (free; same contact and pacing; `sources/vendors/sec/daily_index.py`, `sec_daily_index`): fixed-width lines, no items or acceptance time, so the nightly asks only the filers' submissions; a day with no index (weekend, holiday, not yet published) answers 403 `AccessDenied` | none | Implemented; the nightly `filings` reads it (ADR 0050) |
+| Form 4 insider transactions, history (2006+; no acceptance time: the sets carry the filing date only) | SEC Insider Transactions Data Sets `www.sec.gov/files/dera/data/insider-transactions-data-sets/<YYYY>q<N>_form345.zip` (free; same contact and pacing; `sources/vendors/sec/form345_bulk.py`, `sec_form345_bulk`): tab-separated tables, `DD-MON-YYYY` dates, published quarterly (a missing file: not yet); the acceptance time of each filing comes from the issuer's submissions (`sec_filings` with the insider forms) | none | Implemented; the `insider` backfill reads it (EB D6) |
+| Form 4 insider transactions, per filing (the nightly) | SEC EDGAR ownership XML `www.sec.gov/Archives/edgar/data/<cik>/<accession>/<file>.xml` (free; same contact and pacing; `sources/vendors/sec/form4_xml.py`, `sec_form4_xml`): the submissions' `primaryDocument` names an `xsl...` HTML rendering, the raw XML is the file name without that directory; the daily form index (`sec_daily_index`, forms `4` and `4/A`) names the day's filers | none | Implemented; the nightly `insider` reads it (EB D6) |
 | Company description (stocks, ADRs) | Massive ticker overview (`/v3/reference/tickers/{ticker}`; one request per ticker; free tier) | none free | Implemented (ADR 0034): capped per night |
 | Fund description (ETFs) | SEC prospectus investment objective (Risk/Return Summary data sets + `company_tickers_mf.json`; official, free) | issuer fund pages (per-site terms, not used) | Implemented (ADR 0034): the objective sentence, ~74% of ETFs |
 | Shares outstanding (market cap) | SEC EDGAR company facts (XBRL; free; same contact and pacing) | Massive ticker details (`share_class_shares_outstanding`) | Implemented, phase 2b.4 |
@@ -45,6 +47,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
 | Risk-free rates (option pricing) | **U.S. Treasury daily par yield curve** (official, free, no key; one CSV per year) | FRED (`DGS*`, needs a key), SOFR (overnight only) | Implemented, phase 2b.1 (ADR 0021) |
 | Analyst estimates, price targets, ratings (free tier) | **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters, the by-hand `analyst-probe` and the nightly `analyst-snapshot` implemented (ADR 0068); the feature groups `analyst_estimates@v1`, `analyst_targets@v1`, `analyst_ratings@v1`, `analyst_revisions@v1` are built (docs/data/layers.md) |
+| Short interest (twice a month) and daily short-sale volume | **FINRA Query API** (`api.finra.org`, anonymous; `consolidatedShortInterest` by `settlementDate`, `regShoDaily` by `tradeReportDate`); `no_ml` tables | `cdn.finra.org` daily files (website terms: no ML, no database), Nasdaq short-interest pages (scraping), FMP (paid) | Implemented (EB D9): `short-interest`, `short-volume` |
 | Synthetic | `sources/fixtures/` (golden datasets) | — | Lets the whole pipeline run in CI with no account |
 
 ## Cboe delayed-quotes feed (primary for options)
@@ -280,6 +283,41 @@ next night continues). A name's cadence is dated by the run's session, from any 
 scope list. Rows are appended per session (`ts` = fetch instant, `knowledge_ts` = publish instant),
 licence `personal`. History starts at the first fetch: neither vendor serves a point-in-time history, so
 none is backdated (ADR 0068).
+
+## FINRA short interest and daily short-sale volume (implemented, EB D9)
+
+Anonymous Query API, `https://api.finra.org/data/group/otcMarket/name/<dataset>` (`[finra]` in
+`config/site/sources.toml`, 1,200 sync requests a minute per IP documented, paced at 0.5 s). A GET
+ignores filters, so a filtered read is a POST with `compareFilters` (the source names the filter in
+the URL, the registry's `query_transport` sends it); pages are 5,000 rows, `offset` stops at
+500,000. No credential is used; if FINRA ever requires one, it is a free Public credential at
+developer.finra.org (an owner action: the secret expires yearly).
+
+| Dataset | Partition | History | Table |
+|---|---|---|---|
+| `consolidatedShortInterest` | `settlementDate` (the 15th and the last business day) | 2017-12-29 onward (211 dates checked 2026-10-17) | `events/short_interest` |
+| `regShoDaily` | `tradeReportDate` (one row per symbol and facility: NCTRF, NQTRF, NYTRF, ADF; we sum them) | a rolling one year | `events/short_volume` |
+
+**`known_from`** (`tasks/shorting/schedule.py`): short interest is published on the 7th business
+day after settlement (schedule page: 2026-09-30 -> 2026-10-09, 2026-10-15 -> 2026-10-26); the time
+of day is not stated, so a row is known from the session after the publication date. Daily
+volume is posted by 18:00 ET and sometimes re-posted, so it is known from the session after the
+trade date. FINRA keeps only the latest revision of a settlement date, so a stored date is never
+refetched (the first-seen value is the point-in-time one; `--force` overrides). Names are the
+reference snapshot's (`SymbolResolver`); unknown tickers are dropped and counted.
+
+**Terms, and why the tables are `no_ml`.** The API terms (finra-api-terms-service, 2026-03-19) and
+the equity-data terms (specific-terms-equity-data, 2022-12-20) carry no machine-learning clause
+and allow non-commercial personal or professional use with FINRA named as the source. The finra.org
+website terms (2023-11-09, which govern the `cdn.finra.org` files) bar use "in conjunction with any
+machine learning, neural network, deep learning, predictive analytics or other artificial
+intelligence" and building a database from the site. We read the API only (so the daily volume
+before the API's rolling year is not backfilled), and mark both tables `no_ml = true` in
+`architecture/tables.toml` as a precaution: rule screens may read them, but no learned scorer may
+(`services/evaluation/training/no_ml.py`, which `training_frame` runs; the rows are never passed
+to the text model either). `tests/architecture/data/test_no_ml_tables.py` keeps the flags and the code
+one set. Quality: the volume covers off-exchange prints only (a venue-biased proxy of shorting, not
+short interest); days to cover uses FINRA's own average daily volume.
 
 ## Company and fund descriptions (implemented, ADR 0034)
 

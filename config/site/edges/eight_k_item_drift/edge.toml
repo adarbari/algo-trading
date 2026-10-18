@@ -1,0 +1,106 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: eight_k_adverse_items (EB E3). Idea page:
+# docs/edge-ideas/events.md (eight_k_item_drift).
+id = "eight_k_item_drift"
+name = "Adverse 8-K item drift"
+thesis = "Stocks that disclose a non-reliance on their prior financials (8-K Item 4.02) keep underperforming the market over the following month."
+mechanism = """8-Ks arrive unscheduled and unstructured, nobody holds a forecast to compare them with,
+and attention is low: the market underreacts to the bad news they carry (Lerman and Livnat 2010);
+an Item 4.02 says the issuer's own audit committee no longer stands behind past numbers."""
+persistence = """Reading items takes parsing and judgement across hundreds of filings a day, and
+desks skip small filers; the trade is on the short side, which is costly and capacity-limited, so
+the mispricing is not competed away quickly. Persistence is a claim to test: the figures below are
+event studies, not a traded record."""
+family = "B"
+schedule = "on_event:filing_8k:4.02"
+top_k = 20
+base = "universe"
+screeners = ["eight_k_adverse_items"]
+baselines = ["size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Short side, owner decision O2 (2026-10-17): a short result on liquid names may be a verdict
+basis; the outcome is minus the excess return over SPY, less cost and the borrow the site assumes
+(verdict.toml: 100 bps a year, no borrow data is stored). Item 4.02 is the sharpest item (the
+strongest figures, and a plain fact needing no text reading); 4.01 (resignation or dismissal) and
+5.02 (forced or routine) need the text model to classify, so they are flagged by
+feature.eight_k_item_flag (4.02, 4.01 or 5.02 within 20 sessions) and tested only when a later PR
+reads the text. The screener ranks by dollar volume so the harness's short leg (the lowest scores)
+takes the most liquid filers first, among names that must also clear the capacity floor
+(capacity_adv_floor_usd). The event is the session the 8-K became known: the first session whose
+close follows the SEC acceptance instant (a 16:30 filing counts from the next session), recomputed
+from the stored acceptance time, never the stored known_from. Filings coverage has a documented
+null history (decision log 2026-10-18: the walks start with the first nightly walk, the D1
+backfill reaches further back), so the independent-event count begins small."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+side = "short"
+cost_bps = 20
+
+[quality_bar]
+outcome = """Minus the excess return over SPY over 20 and 60 sessions after the entry close (the
+session after the filing became known), net of 20 bps a round trip and the assumed borrow: a short
+position held after a non-reliance filing."""
+trigger_timing = """The filing is known from the first session whose close follows its SEC acceptance;
+that session is the anchor and the decision session D = anchor, the entry session S = anchor + 1
+(start_offset_sessions = 1). The names are read at D from filing_events@v1
+(sessions_since_8k_4_02 = 0), never from a filing accepted after D's close. An amendment (8-K/A)
+is no new event."""
+replication = """The source's rule first: the abnormal return after the Item 4.02 filing (sec-api.io
+study of more than 8,000 filings, 2004 to 2023; Audit Analytics 2005 to 2016). Here
+eight_k_adverse_items v1 ranks the liquid filers of the last 20 sessions and the harness shorts the
+20 most liquid."""
+expected_size = """Around 2% over 20 sessions after Item 4.02 (CAR -1.1% on day +1, -2% over 20 days,
+sec-api.io, more than 8,000 filings 2004 to 2023); the Audit Analytics restatement study finds the
+later windows noisy, so the claim is a 20 to 30 session one. A few filers a month among liquid names:
+independent sessions are the binding count."""
+capacity_costs = """Shorting a filer that just disclosed a restatement is the costly side: the borrow can
+be expensive and recalled, and spreads widen on the news; the outcome deducts 20 bps and the
+site's assumed 100 bps a year, and only names trading $5M a day or more are shorted. An individual
+can avoid the name more cheaply than short it: the avoid list is the usable form."""
+failure_modes = """The drift is a short-horizon claim and the 20-session window can hold a rebound; most
+of the move can already be in the price at the next close; a company filing 4.02 for a minor
+correction looks the same as a large restatement; distressed names carry the average. Retire if
+the frozen-period short return of the picks is not above the base rate of every eligible name."""
+decoys = """Small size, low price and distress drive both the filing and the drift: the size
+baseline. Overlaps the late-filer edge (a restatement often follows an NT filing) and the event
+sensitivity track (ADR 0050), which already attributes unscheduled moves from 8-K items."""
+
+[[sources]]
+title = "Lerman, A. and Livnat, J., The New Form 8-K Disclosures, Review of Accounting Studies, 2010"
+url = "https://doi.org/10.1007/s11142-009-9114-7"
+
+[[sources]]
+title = "sec-api.io, Stock Price Reactions to Item 4.02 Disclosures in SEC Form 8-K Filings, 2024"
+url = "https://sec-api.io/resources/stock-price-reactions-to-item-4-02-disclosures-in-sec-form-8-k-filings"
+
+[[sources]]
+title = "Audit Analytics, Long-Term Capital Market Consequences of Financial Restatements, 2019"
+url = "https://blog.auditanalytics.com/long-term-capital-market-consequences-of-financial-restatements/"
+
+[[sources]]
+title = "Whisenant, S., Sankaraguruswamy, S. and Raghunandan, K., Auditing: A Journal of Practice and Theory, 22(1), 2003 (reportable events disclosed at an auditor change)"
+url = "https://papers.ssrn.com/abstract=293404"
+
+# The literature's figure (ADR 0064): the 20-day cumulative abnormal return after an Item 4.02
+# filing, -2% (sec-api.io, more than 8,000 filings 2004 to 2023), the short's gain as a positive
+# number, before costs and borrow. An event study, not a traded portfolio.
+[published]
+measure = "mean_excess"
+value = 0.02
+horizon_sessions = 20
+sample = 19
+source = 1
+leg = "short"

@@ -19,7 +19,12 @@ from algotrade.storage.tables.schemas.events import (
     SNAPSHOT_KINDS,
     VINTAGE_KINDS,
 )
-from algotrade.storage.tables.schemas.outcomes import OUTCOME_STATUSES, outcome_problems
+from algotrade.storage.tables.schemas.outcomes import (
+    OPTION_PNL_SPEC,
+    OUTCOME_STATUSES,
+    option_pnl_problems,
+    outcome_problems,
+)
 from algotrade.storage.tables.schemas.registry import spec_for, table_key
 from algotrade.storage.tables.spec import (
     COMMON,
@@ -102,4 +107,5 @@ VALUE_CHECKS = {
     MACRO_RELEASE_EVENTS.name: release_status_problems,
     ANALYST_VENDOR_ACCESS.name: access_status_problems,
     ANALYST_ESTIMATE_SNAPSHOTS.name: snapshot_kind_problems,
+    OPTION_PNL_SPEC.name: option_pnl_problems,
 }

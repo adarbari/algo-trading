@@ -1,0 +1,64 @@
+# Business development company price to net asset value, v1: the hand list of listed BDCs, keyed
+# by instrument id (resolved from the tickers on the criterion line through the SymbolResolver, so
+# a renamed BDC stays itself; config/site/presets/selections/bdc_listed.toml has the same list and
+# a fitness test keeps them equal) with a positive price to book, ranked by it, LOWEST first: the deepest discount to the
+# last reported net assets on top. feature.pb_ratio is market value over stockholders' equity,
+# which for a BDC is net assets (NAV per share times shares): the NAV is the one in the latest
+# 10-K or 10-Q, public by the session (ADR 0067, acceptance time), and the screen requires that
+# balance sheet to be at most 135 days old (feature.pb_ratio only refuses a 480-day-old one). The
+# share count is the newest cover-page count, which can be a quarter newer than the equity: the
+# ratio mixes two dates. A missing value never passes (ADR 0030). The catalogue's own formalisation of the practitioner metric: the practitioner
+# compares the discount with the name's own three-year average, which needs a NAV history that is
+# not stored. What it does not check: whether NAV is falling (a deep discount is often a credit
+# loss in progress), the dividend, or the interest-rate exposure.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "bdc_price_to_nav"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "BDC price to NAV (cheapest first)"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.bdc]
+field = "instrument.instrument_id"
+op = "in"
+value = ["EQ:BBG000BG22J4", "EQ:BBG000BGJ661", "EQ:BBG000BS21R1", "EQ:BBG000BXT422", "EQ:BBG000C2R8K2", "EQ:BBG000C32KN7", "EQ:BBG000CBNX94", "EQ:BBG000DJYTQ4", "EQ:BBG000F54FK1", "EQ:BBG000PD6X77", "EQ:BBG000PXNF64", "EQ:BBG000Q3RGN4", "EQ:BBG000Q6S3Z2", "EQ:BBG000QJZTT6", "EQ:BBG000QVWX13", "EQ:BBG000R3NQ37", "EQ:BBG000TKZRB3", "EQ:BBG000V86JM5", "EQ:BBG001DFW799", "EQ:BBG001K9JH07", "EQ:BBG001LV74X3", "EQ:BBG001P0TNW2", "EQ:BBG001YCZP63", "EQ:BBG003CNYJ00", "EQ:BBG003LB3TH0", "EQ:BBG004DDDKH1", "EQ:BBG005GXFKJ7", "EQ:BBG005YZ5XC2", "EQ:BBG009KJ66B4", "EQ:BBG009NX1JT8", "EQ:BBG00DB0XYC4", "EQ:BBG00GQVWWP4", "EQ:BBG00JDV0M15", "EQ:BBG00MS80PM3", "EQ:BBG00T6WFZ96", "EQ:BBG00Z6ZX0D7", "EQ:BBG011K51BR7", "EQ:BBG012QFW3F4"]    # NMFC CSWC OXSQ MAIN HTGC GAIN MFIC GLAD BBDC ARCC GBDC PSEC SAR HRZN PNNT OFS OCSL SLRC TSLX FDUS PFLT TCPC FSK WHF SCM GSBD TPVG ICMB CION CCAP OBDC CGBD BCSF BXSL TRIN KBDC LIEN RWAY
+
+[criteria.nav_fresh]
+field = "rollup.qmj@v1.balance_sheet_age_days"
+op = "lte"
+value = 135    # a quarter end plus the 45-day filing deadline: an older book is a missed quarter
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 1_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $0.8M-$1M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.price_to_nav]
+field = "feature.pb_ratio"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+pb_ratio = "feature.pb_ratio"
+market_cap = "feature.market_cap"
+
+[rank]
+tie_break = "feature.pb_ratio"
+tie_break_order = "asc"

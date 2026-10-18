@@ -142,6 +142,12 @@ enabled = true
 min_interval_s = 1.0             # official site, no published limit; stay polite
 lookback_days = 10               # nightly window: the last N calendar days (catches late publications)
 
+[finra]                          # FINRA Query API (api.finra.org), anonymous: short interest and daily short-sale volume (EB D9)
+enabled = true                   # no key; the API terms carry no ML clause but the finra.org terms do: rows are no_ml (docs/data/vendors.md)
+min_interval_s = 0.5             # documented 1,200 requests a minute per IP; a day of volume is up to ~10 pages
+short_interest_lookback_days = 45  # nightly: settlement dates within this many calendar days not stored yet (an unpublished one is NO_DATA)
+short_volume_lookback_days = 10  # nightly: trade dates within this many calendar days not stored yet (the API serves a rolling year)
+
 [fred]                           # FRED / ALFRED economic series with every vintage (ADR 0048); key in .env
 enabled = true                   # ALGOTRADE_FRED_API_KEY (free: fredaccount.stlouisfed.org); no key: the source is skipped
 min_interval_s = 0.5             # FRED allows 120 requests a minute

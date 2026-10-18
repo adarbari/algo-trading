@@ -188,12 +188,12 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/derived"
-purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups) and the history-copy task (the derived read copies, ADR 0060)"
+purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups) and the history-copy task (the derived read copies, ADR 0060) and the forward outcomes tasks (outcomes: price windows from bars; option-outcomes: chain P&L of option windows from the stored chains, ADR 0053 and its EB H13 amendment) with their window arithmetic (outcome_paths, option_paths)"
 kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/events"
-purpose = "event-sensitivity tasks (ADR 0050): the filings task (SEC 8-K filings into events/filing, and the Item 2.02 results releases as events/earnings rows)"
+purpose = "event-sensitivity tasks (ADR 0050): the filings task (SEC 8-K filings into events/filing, and the Item 2.02 results releases as events/earnings rows) and the insider task (Form 4 transactions into events/insider_transaction, EB D6)"
 kind = "task-domain"
 
 [[dir]]
@@ -238,6 +238,11 @@ kind = "task-domain"
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/reference"
 purpose = "reference-data tasks: universe, instrument ids, classification, history, companies, share counts, IBKR contract ids"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/shorting"
+purpose = "FINRA short-interest tasks (EB D9): short interest into events/short_interest and the daily short-sale volume into events/short_volume, one loop over dates; both tables are no_ml"
 kind = "task-domain"
 
 [[dir]]
@@ -298,5 +303,13 @@ reason = "`check_analyst_backlog` and `check_finnhub_backlog` are the analyst-sn
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"
 reason = "`check_outcomes` is the outcomes step's acceptance check (ADR 0053 amendment, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/option_outcomes.py"
+reason = "`check_option_outcomes` is the option-outcomes step's acceptance check (ADR 0053 amendment, EB H13, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/residual_returns.py"
+reason = "`check_residual_returns` is the residual-returns step's acceptance check (ADR 0053 amendment, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
 
 # The web app's folders (the [web] settings and every [[web_dir]], ADR 0025) are in architecture/web_layout.toml.

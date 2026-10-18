@@ -13,6 +13,7 @@ from typing import Any
 from algotrade.config.edges import document, loading
 from algotrade.config.edges.follow import AUDIT
 from algotrade.config.edges.follow import KEY as FOLLOW
+from algotrade.config.edges.portfolio import benchmark_words
 from algotrade.core.time.windows import window_name
 from algotrade.services.read.context import Stores
 
@@ -87,6 +88,8 @@ class EdgeSettings:
     own: Mapping[str, Any] = field(default_factory=dict)
     cost_applies: bool = True  # the outcome's value is a return, so a round-trip cost applies
     outcome_sign: float = 1.0  # -1 for direction ``below``: the stored values are oriented
+    factor_neutral: bool = False  # the outcome is a residual return (EB H11): the verdict says so
+    hold_rank: int | None = None  # a buy/hold band: the cost is charged on entries and exits
 
 
 @dataclass(frozen=True)
@@ -131,6 +134,7 @@ class Edge:
     replaces: str | None = None
     oos_hidden: bool = False
     settings: EdgeSettings | None = None
+    base: str = "universe"  # the document's ``base`` (``out_of_window``: a time-series edge)
     # The basis the document fixes for the verdict (ADR 0065): ``[implementation]`` promoted
     # and horizon (None: not declared; a user's edge never declares one).
     promoted: str | None = None
@@ -171,14 +175,22 @@ def _picks(e: document.Edge) -> str:
     return f"{when.capitalize()} · {top}"
 
 
+_WINS = {
+    "expires_otm": "the option expires worthless",
+    "option_model_pnl": "the modelled straddle P&L is positive (a model, not a quote)",
+    "pair_spread": "the cheap class returns more than its sibling, after costs and borrow",
+    "option_pnl": "the chain P&L is positive (quoted prices, net of the spread)",
+}
+
+
 def _win(o: document.Outcome) -> str:
-    if o.kind == "expires_otm":
-        return "the option expires worthless"
-    if o.kind == "option_model_pnl":
-        return "the modelled straddle P&L is positive (a model, not a quote)"
+    if o.kind in _WINS:
+        return _WINS[o.kind]
     if o.kind == "hit_target":
         return f"{(o.measure or 'the measure').replace('_', ' ')} {o.direction} {o.target:g}"
-    return f"beats {o.benchmark}" if o.benchmark != "none" else "rises"
+    if o.benchmark != "none":
+        return f"beats {benchmark_words(o.benchmark)}"
+    return "rises"
 
 
 def _trade(o: document.Outcome) -> str:
@@ -225,6 +237,8 @@ def _settings(e: document.Edge, own: Mapping[str, Any] | None) -> EdgeSettings:
         cost_bps=e.outcome.cost_bps,
         cost_applies=e.outcome.is_return,
         outcome_sign=e.outcome.sign,
+        factor_neutral=e.outcome.measure in document.EXCESS_MEASURES,
+        hold_rank=e.outcome.hold_rank,
         quality_bar=tuple(EdgeAnswer(k, e.quality_bar.get(k, "")) for k in document.QUALITY_BAR),
         own={k: _json(v) for k, v in (own or {}).items() if k not in (FOLLOW, AUDIT, "status")},
     )
@@ -239,6 +253,7 @@ def _edge(e: document.Edge, mine: bool, own: Mapping[str, Any] | None = None) ->
         mechanism=e.mechanism,
         persistence=e.persistence,
         schedule=e.schedule,
+        base=e.base,
         horizons=e.outcome.horizon_sessions,
         screeners=e.screeners,
         baselines=e.baselines,
