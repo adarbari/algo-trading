@@ -11,6 +11,7 @@ Back to the [index of every edge](../edges.md).
 | Composite value among cash-profitable names (`composite_value`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `composite_value` |
 | Financial distress (an avoid list) (`distress_failure_probability`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `distress_ohlson` |
 | Factor ETF momentum (`factor_momentum`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 20% MTUM, 20% QUAL, 20% VLUE, 20% USMV and 20% IWM, entered 1 session after the decision session, costs 10 bps | `trend_positive_6m`, `trend_positive_12m` |
+| High idiosyncratic volatility and lottery stocks, avoid list (`idiosyncratic_volatility_and_max`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `ivol_avoid`, `lottery_max` |
 | Industry momentum (`industry_momentum`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `industry_momentum` |
 | 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1`, `residual_momentum`, `volatility_scaled_momentum`, `frog_in_the_pan`, `momentum_x_quality_interaction`, `fifty_two_week_high`, `momentum_own_trend`, `momentum_pullback_entry`, `momentum_volume_confirmed` |
 | Net share issuance (`net_share_issuance`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `net_share_issuance` |
@@ -205,6 +206,37 @@ Back to the [index of every edge](../edges.md).
 
 - Ehsani, S. and Linnainmaa, J., Factor Momentum and the Momentum Factor, Journal of Finance, 2022 <https://www.nber.org/papers/w25551>
 - Gupta, T. and Kelly, B., Factor Momentum Everywhere, Journal of Portfolio Management, 2019
+
+## High idiosyncratic volatility and lottery stocks, avoid list (`idiosyncratic_volatility_and_max`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Stocks with the highest idiosyncratic volatility, or an extreme best day last month, underperform the market over the next month, so they are the names to drop from a long list.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 5000000` and `rollup.factor_betas@v1.ivol_252d gt 0` and `rollup.max_return@v1.max_ret_21d gt -1`
+- **Top K:** 30
+- **Screeners:** `ivol_avoid`, `lottery_max`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Two screeners, one trial each, both ranked with the jumpiest name LAST so the harness's short leg (the worst scores) takes them first: ivol_avoid on rollup.factor_betas@v1.ivol_252d (the four-factor residual volatility over 252 sessions) and lottery_max on rollup.max_return@v1.max_ret_21d (the best one-day return of the last 21 sessions; the screener is shared with c31_lottery_options_short, whose own question is the covered-call use). Proxies, each stated: Ang and co-authors measure idiosyncratic volatility over the prior month against the three Fama-French factors, here the 252-session four-factor residual (the stored measure, H6), a slower number; Bali and co-authors sort deciles, the harness takes the 30 worst of the eligible names; the paper's stock universe includes microcaps, this universe floors price at $5 and dollar volume at $5M a day. The outcome is the SHORT on those 30 (side = short, owner decision O2, 2026-10-17: a liquid short may be a verdict basis), outcome minus the excess return over SPY less 10 bps and the site's assumed borrow, which is far below the real borrow of the names the effect lives in; the variant long_short (diagnostic only) reads the spread against the least volatile names. The plan files this as a filter overlay: the use is dropping these names from a long list, which the short result prices. The universe holds only names that carry both scores (ivol_252d above 0 and max_ret_21d stored), so every base name is scored and the short leg is ranked. No [published] figure: the AHXZ spread (about 1 percent a month) is from memory in the idea page, and the one verified MAX figure sits on c31_lottery_options_short, where its screener is the one measured. Month-end start sessions spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Retail demand for lottery-like payoffs bids up volatile, skewed stocks, and short-sale constraints with limits to arbitrage keep the overpricing in place: in these names idiosyncratic risk is the arbitrage risk itself (Ang, Hodrick, Xing and Zhang 2006; Bali, Cakici and Whitelaw 2011; Stambaugh, Yu and Yuan 2015).
+2. **Persistence:** Short-sale constraints and the retail taste for lottery tickets are structural, and the effect lived on after publication (Alpha Architect 2020), but it concentrates in microcaps and hard-to-short names and is weak in value-weighted large caps (Hou, Xue and Zhang); the low-risk theme is mostly a long-leg effect in the later replications. Persistence is a claim to test.
+3. **Outcome:** Minus the excess return over SPY for the 20 sessions after the entry close (the session after a month-end decision), less 10 bps a round trip and the assumed borrow: a short position in the 30 names with the highest idiosyncratic volatility (ivol_avoid) or the highest MAX (lottery_max).
+4. **Trigger timing:** ivol_252d and max_ret_21d are computed from the closes through the decision session D (a month end, nightly rollups); the entry session is S = D + 1 (start_offset_sessions = 1) and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** Ang, Hodrick, Xing and Zhang: the standard deviation of the prior month's three-factor residuals, quintile sorts, one-month hold; Bali, Cakici and Whitelaw: the largest daily return of the prior month, decile sorts, one-month hold, long low and short high. Here: the 30 highest of the eligible stocks on the stored 252-session four-factor residual volatility, and on the stored 21-session MAX, as the short.
+6. **Expected size and sample:** About 1.06 percent a month for the top-minus-bottom quintile of value-weighted idiosyncratic volatility, 1963-2000 (Ang and co-authors, approximate, from memory) and more than 1 percent a month for low-minus-high MAX, 1962-2005 (Bali and co-authors, the paper's abstract); both concentrate in small and illiquid names and are weak in large liquid ones, so expect much less here; the stored history gives about a year of month-ends, under the 40 the bar asks, and the harness reports the count.
+7. **Capacity and costs:** Liquid names at the $5M a day floor trade at a few basis points; the 10 bps round trip is the assumption and the borrow is the site's default. The effect lives where shorting is costly or impossible, so an individual's gain is the avoid list: not owning these names, which costs nothing.
+8. **Failure modes and retirement:** Squeezes (the 2021 meme names) and the premium living only in microcaps: the liquid short may show nothing. The two screeners overlap heavily (a jumpy name has both), so they are one result read twice. Retire if the frozen-period short value is not above zero after borrow, or the picks do not do worse than the buy-and-hold mean of every eligible name.
+9. **Decoys:** Size, price level, distress, illiquidity and low beta (one small-cap cluster), short-term reversal and 12-1 momentum (lottery names are often last month's winners): the size and momentum baselines on the same sessions, and the site's decoy battery, whose ivol_high and max_ret_high rank the same fields the other way.
+
+**Sources**
+
+- Ang, A., Hodrick, R., Xing, Y. and Zhang, X., The Cross-Section of Volatility and Expected Returns, Journal of Finance, 2006
+- Bali, T., Cakici, N. and Whitelaw, R., Maxing Out: Stocks as Lotteries and the Cross-Section of Expected Returns, Journal of Financial Economics, 2011 <https://www.nber.org/papers/w14804>
+- Stambaugh, R., Yu, J. and Yuan, Y., Arbitrage Asymmetry and the Idiosyncratic Volatility Puzzle, Journal of Finance, 2015 <https://ideas.repec.org/a/bla/jfinan/v70y2015i5p1903-1948.html>
 
 ## Industry momentum (`industry_momentum`)
 
