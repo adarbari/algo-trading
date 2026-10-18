@@ -251,6 +251,24 @@ Twelve cases fail every or one repeat (for example `heavy-put-call`, `outperform
 `choppy-micro-caps`, and three of the adversarial `parts-*` cases). No drop in any run was a wrong enum value, so
 showing enum values for index-only fields is not built: re-measure if a drop of that kind appears.
 
+### Groups from connectors (ADR 0071, PR 6, prompts v12-v13)
+
+An "or" and an exclusion between two parts are left out of the words like an "and" (the model drafts
+each side as its own part and criterion; the excluded condition un-negated) and the server reads them
+as the next part's `join` (`parts/spans.py`: one lying alone between two parts is a join; a trailing
+one, a leading negation, and a bare not / no / without or an "or not" between two parts stay a
+visible gap with a doubt). `contract/groups.py` turns the joins into the spec's
+`groups` (`screens._draft`, merged again by a part re-draft): `and` binds tighter than `or`, a part
+with no connector (a comma, "ideally") starts a new condition, an exclusion is its own `none` gate and
+takes the parts an "or" or a plain "and" adds, and a part that only names the kind of instrument is no
+operand. Prompt v13: a side of an "or" that needs a formula makes the whole "or" one part with one boolean
+formula. Only a formula part beside an "or" or an exclusion keeps the draft flat; the verifier
+(`parts/verify.py`, `or_not_formula`) then asks the model for one boolean formula. The golden cases
+`groups-*` pin one tree per phrasing (`expect.groups`, compared by `golden.score(groups=...)`); the
+owner verifies them. Live (claude, 2026-10-18): 9 of 11 passed under v12; the two failures were a
+wrong expectation and a non-maths sentence, fixed, and both pass live (v13). Every other block (a part
+not available, dropped or not understood) keeps the draft flat with a note. The save diff (ADR 0066) lists groups added, removed and changed.
+
 ## Risks
 
 Retrieval misses showing as false "missing" (keep the full field index in the prefix; replay test);

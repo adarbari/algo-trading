@@ -515,3 +515,36 @@ follow-up PR).
 - status: final
 - confirmed: owner 2026-10-18
 - Reasoning: the clause targets a program that learns or predicts from the data, and it sits only in the website terms (the cdn files), not the API terms. The harness evaluates a fixed, human-written rule after the fact (hit rate vs base rate, lift, deciles); nothing is fitted and no estimate becomes a model, so it is an audit, not predictive analytics. Use is personal and non-commercial with no redistribution, so the residual risk is remote, while knowing whether a short-interest screen has an edge is the reason to ingest it. Reversible: (b) is one PR (extend the tag check to the harness) if the owner disagrees. Matches the owner's plan "rule screens only, never a learned scorer".
+
+## 2026-10-17 | EB H2 (SEC acceptance time) | Scope of the acceptance-time fix
+- Question: which groups read facts by SEC acceptance session, and where does the session rule live?
+- Options: only `financials` and `fundamentals` / every group that reads the SEC facts; the rule only in `data.shares` / also in `core/time/calendar.py`.
+- Decision: (3) `growth_history`, `income_statement`, `cash_flow` and `balance_sheet` also move to v2 reading the `_accepted` inputs, one backfill, rollup and retire window; (4) the `instruments/statements_accepted` input stays; (5) `calendar.acceptance_session` (strictly before the close counts that session) is the one scalar rule, for H4's 8-K fix. The 8-K `events/filing` `known_from` has the same bug (the New York acceptance day, not the session whose close it follows); it is fixed in H4, not in this PR.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a partial fix would leave the same one-session look-ahead in four groups that share the input and its backfill.
+
+## 2026-10-18 | EB H4 (event-class framework) | Subtypes, the filing group, and what is left out
+- Question: how are subtypes read, which classes ship on stored data, and does the folder cap force a new feature-group folder?
+- Options: one subtype label field per class (the plan) / per-subtype count and date fields; keep every group in `rollups/corporate` / a folder `rollups/events` for the event-class groups; add `ex_dividend`, `macro_release` and `lockup_expiry` / leave them until their fields exist.
+- Decision: a subtype is its own count and date fields (an 8-K item: the latest filing only would miss an item filed before another 8-K) or a label field that must read a value (index changes, date-shift direction), one mechanism in `EventField.subtypes`; `filing_events@v1` holds the 8-K items 1.02, 2.05, 3.01, 4.01, 4.02, 5.02, NT and tender offers (SC TO-T joins the kept forms); `earnings_date_shift@v1` with a 7-day threshold; `rollups/corporate` is at its 10-module cap, so the event-class groups (and `index_changes`, moved) live in a new `rollups/events` folder; `ex_dividend`, `macro_release`, `lockup_expiry` are left out (ADR 0053 amendment, point 4); filings are read by the acceptance session recomputed from `ts`, never the stored `known_from`.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Architect review (PR 655): keep the six 8-K items (1.03 and 2.06 later), keep the 7-day threshold, approve the `features/rollups/events` folder.
+- Reasoning: the item list and the 7-day threshold are judgement calls the owner may widen; a stale `known_from` left in the store must not leak, so the reader does not trust it; a new folder is the layout rule's answer to a full one.
+
+## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Describe-it precedence of connectors
+- Question: how do "or", "and" and "except" combine in a drafted sentence?
+- Options: and binds tighter than or, a comma or "ideally" starts a new condition, an exclusion is its own gate / a flat left-to-right reading / the model decides per sentence.
+- Decision: and binds tighter than or (as the expression parser does); a comma or "ideally" starts a new condition, so an "or" never reaches across it; "except A or B" is neither; "except A and B" is neither only for a bare "and" (", and" ends the exclusion); "A or B except C" is (A or B) and not C. One golden case per phrasing pins it.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: one rule set gives the same reading every time and a wrong reading is one line and one golden case; the owner verifies the cases in the PR. Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it unchanged: "and" narrows a condition and "or" offers alternatives, the narrower screen costs a few missed names where a wider one buries the idea, and the Builder's plain-English line shows any wrong reading before a save. No golden case changes.
+
+## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Flat fallback when a part cannot sit in a group
+- Question: what does a draft do when an "or" or exclusion has a part that is a formula, a missing request, a dropped criterion or words nothing maps?
+- Options: keep the draft flat as before groups / group the available sides only.
+- Decision: keep it flat; only the formula case gets the verifier's doubt (draft one boolean formula), every other block leaves a visible note ("... is not available, so the 'or' or exclusion is not applied"); two kinds of instrument joined by "or" are doubted (one security_type criterion).
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: grouping the available sides would silently change the meaning (an "or" side dropped makes the other side mandatory). Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it and asked that the note say the other conditions apply on their own (done): blocking the draft would throw away the parts that worked.

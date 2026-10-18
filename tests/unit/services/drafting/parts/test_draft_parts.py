@@ -10,7 +10,8 @@ from typing import Any
 import pytest
 
 from algotrade.config.user import UserContext
-from algotrade.services.drafting.screens import draft_screen
+from algotrade.services.drafting.parts.verify import doubts
+from algotrade.services.drafting.screens import draft_screen, with_groups
 from algotrade.services.feedback.events import document_hash
 from algotrade.services.read.context import ReadContext, open_context
 from algotrade_sources.framework.base import FixtureSource
@@ -247,3 +248,102 @@ def test_a_rewritten_duplicate_formula_does_not_take_a_dropped_criterions_id(
     got = by_id(draft)
     assert (got["p1"].dropped, got["p1"].criteria) == (("close",), ())
     assert (got["p2"].criteria, got["p2"].dropped) == (("close_2",), ())
+
+
+OI_GTE = {"id": "oi", "field": OI, "op": "gte", "value": 1000, "why": "open interest 1000"}
+EITHER = [
+    {"id": "p1", "words": "over $50", "reading": None},
+    {"id": "p2", "words": "open interest of 1000", "reading": None},
+]  # the "or" between them is left out of the words
+
+
+def test_an_or_between_parts_is_a_group_in_the_document_never_a_formula(ctx: ReadContext) -> None:  # noqa: F811
+    """ADR 0071: "A or B" is two criteria and an ``any`` group, validated as finalise would."""
+    answer = proposal({**PRICE_GT, "part": "p1"}, {**OI_GTE, "part": "p2"}, parts=EITHER)
+    draft = draft_screen(ctx, Canned(answer), "my_screen", "over $50 or open interest of 1000")
+    assert draft.document["groups"] == {"any_1": {"any": ["price", "oi"]}}
+    assert [(p.words, p.join) for p in draft.parts or ()] == [
+        ("over $50", None), ("open interest of 1000", "or"),
+    ]  # fmt: skip
+    assert doubts(draft.parts, False, draft.document["criteria"]) == ()
+    assert draft.formulas == () and '"part"' not in json.dumps(draft.document)
+
+
+def test_a_part_keeps_its_mode_inside_a_group(ctx: ReadContext) -> None:  # noqa: F811
+    soft = {**OI_GTE, "mode": "score", "tolerance": 100}
+    answer = proposal({**PRICE_GT, "part": "p1"}, {**soft, "part": "p2"}, parts=EITHER)
+    draft = draft_screen(ctx, Canned(answer), "my_screen", "over $50 or open interest of 1000")
+    assert draft.document["groups"] == {"any_1": {"any": ["price", "oi"]}}
+    assert draft.document["criteria"]["price"].get("mode") is None
+    assert draft.document["criteria"]["oi"]["mode"] == "score"
+
+
+def test_a_formula_part_beside_an_or_keeps_the_draft_flat_and_is_doubted(ctx: ReadContext) -> None:  # noqa: F811
+    """Grouping impossible (a pending formula cannot sit in a group): today's path, and the
+    verifier's doubt, which now fires only here."""
+    parts = [
+        {"id": "p1", "words": "over $50", "reading": None},
+        {"id": "p2", "words": "oi per dollar above 20", "reading": None},
+    ]
+    answer = proposal({**PRICE_GT, "part": "p1"}, formulas=[{**FORMULA, "part": "p2"}], parts=parts)
+    draft = draft_screen(ctx, Canned(answer), "my_screen", "over $50 or oi per dollar above 20")
+    assert "groups" not in draft.document
+    found = doubts(draft.parts, False, draft.document["criteria"])
+    assert [(d.kind, d.ref) for d in found] == [("or_not_formula", "p2")]
+
+
+def test_the_groups_of_the_builders_document_survive_a_sentence_that_adds_no_connector(
+    ctx: ReadContext,  # noqa: F811
+) -> None:
+    current = {
+        "criteria": {"price": {"field": PRICE, "op": "gt", "value": 50},
+                     "oi": {"field": OI, "op": "gte", "value": 1000}},
+        "groups": {"mine": {"any": ["price", "oi"]}},
+    }  # fmt: skip
+    answer = proposal({**PRICE_GT, "part": "p1"}, {**OI_GTE, "part": "p2"}, parts=EITHER)
+    draft = draft_screen(
+        ctx, Canned(answer), "my_screen", "over $50 open interest of 1000", current
+    )
+    assert draft.document["groups"] == {"mine": {"any": ["price", "oi"]}}
+    gone = {**current, "groups": {"mine": {"any": ["price", "ghost"]}}}  # a member the draft lost
+    again = draft_screen(ctx, Canned(answer), "my_screen", "over $50 open interest of 1000", gone)
+    assert "groups" not in again.document
+
+
+def test_groups_the_validator_refuses_leave_the_draft_flat(ctx: ReadContext) -> None:  # noqa: F811
+    base = {"id": "my_screen", "kind": "screener", "impl": "rules",
+            "criteria": {"price": {"field": PRICE, "op": "gt", "value": 50}}}  # fmt: skip
+    bad = {"g": {"any": ["price", "ghost"]}}
+    good = {"g": {"any": ["price", "oi"]}}
+    both = {**base, "criteria": {**base["criteria"], "oi": {"field": OI, "op": "gte", "value": 1}}}
+    flat, why = with_groups(ctx, "my_screen", base, [bad])
+    assert "groups" not in flat and "not applied" in why[0]  # told, never silent
+    grouped, told = with_groups(ctx, "my_screen", both, [bad, good])
+    assert grouped["groups"] == good  # the next one
+    assert "not applied" in told[0]  # the refused first candidate is still told
+    clean, none = with_groups(ctx, "my_screen", both, [good])
+    assert clean["groups"] == good and none == ()
+
+
+def test_a_new_group_never_takes_the_id_of_one_the_builder_has(ctx: ReadContext) -> None:  # noqa: F811
+    current = {
+        "criteria": {"price": {"field": PRICE, "op": "gt", "value": 50},
+                     "oi": {"field": OI, "op": "gte", "value": 1000}},
+        "groups": {"any_1": {"any": ["price", "oi"]}},
+    }  # fmt: skip
+    only_price = proposal({**PRICE_GT, "part": "p1"}, {**OI_GTE, "part": "p2"}, parts=EITHER)
+    draft = draft_screen(
+        ctx, Canned(only_price), "my_screen", "over $50 or open interest of 1000", current
+    )
+    assert draft.document["groups"] == {"any_1": {"any": ["price", "oi"]}}  # carried, not replaced
+
+
+def test_an_or_next_to_a_missing_part_is_told_in_a_note(ctx: ReadContext) -> None:  # noqa: F811
+    parts = [
+        {"id": "p1", "words": "over $50", "reading": None},
+        {"id": "p2", "words": "for a year", "reading": None},
+    ]
+    answer = proposal({**PRICE_GT, "part": "p1"}, missing=[{**GAP, "part": "p2"}], parts=parts)
+    draft = draft_screen(ctx, Canned(answer), "my_screen", "over $50 or for a year")
+    assert "groups" not in draft.document
+    assert any("'for a year' is not available" in n for n in draft.notes)

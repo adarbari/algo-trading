@@ -490,3 +490,67 @@ def test_a_published_leg_defaults_from_the_measure_and_fails_closed() -> None:
     )
     with pytest.raises(ConfigurationError, match="leg"):
         parse(published={**base, "leg": "short"})
+
+
+def _calendar(window: str, horizons: list[int], offset: int = 1) -> dict[str, Any]:
+    outcome = {
+        "kind": "excess_return",
+        "horizon_sessions": horizons,
+        "benchmark": "SPY",
+        "start_offset_sessions": offset,
+    }
+    return {"schedule": f"calendar:{window}", "outcome": outcome}
+
+
+def test_a_calendar_schedule_takes_its_window_length_as_the_one_horizon() -> None:
+    edge = parse(**_calendar("turn_of_month", [4]))
+    assert edge.schedule == "calendar:turn_of_month"
+    assert edge.event_class is None
+    assert edge.base == "universe"
+    assert parse(**_calendar("pre_holiday", [1])).outcome.horizon_sessions == (1,)
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        (_calendar("turn_of_month", [5]), "calendar:turn_of_month is 4 sessions long"),
+        (_calendar("opex_week", [5, 10]), "its one horizon is \\[5\\]"),
+        (_calendar("quarter_end", [5], offset=2), "so 1, got 2"),
+        ({"schedule": "calendar:fomc"}, "schedule: expected one of"),
+    ],
+)
+def test_a_calendar_schedule_refuses_a_horizon_offset_or_window_that_does_not_fit(
+    changes: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        parse(**changes)
+
+
+def test_a_variant_may_not_change_a_calendar_horizon() -> None:
+    variants = [{"id": "long", "outcome": {"horizon_sessions": [20]}}]
+    with pytest.raises(ConfigurationError, match="4 sessions long"):
+        parse(**_calendar("turn_of_month", [4]), variants=variants)
+
+
+def test_an_event_schedule_may_name_a_subtype_of_the_class() -> None:
+    e = parse(schedule="on_event:filing_8k:4.02")
+    assert (e.event_class, e.event_subtype, e.base) == ("filing_8k", "4.02", "event")
+    plain = parse(schedule="on_event:index_change")
+    assert (plain.event_class, plain.event_subtype) == ("index_change", None)
+    assert parse(schedule="on_event:index_change:deletion").event_subtype == "deletion"
+    assert parse(schedule="every_session").event_subtype is None
+
+
+@pytest.mark.parametrize(
+    ("schedule", "message"),
+    [
+        ("on_event:index_change:sideways", "'sideways' is not a subtype of 'index_change'"),
+        ("on_event:nt_late_filing:x", "is not a subtype of 'nt_late_filing' \\(known: none\\)"),
+        ("on_event:filing_8k", "needs a subtype, one of"),
+        ("on_event:filing_8k:9.99", "'9.99' is not a subtype of 'filing_8k'"),
+        ("on_event:insider_buy", "schedule: expected one of"),
+    ],
+)
+def test_an_unknown_or_missing_subtype_fails_closed(schedule: str, message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        parse(schedule=schedule)

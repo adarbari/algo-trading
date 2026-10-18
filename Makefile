@@ -119,7 +119,7 @@ test:            ## everything, with the coverage gate, one worker per CPU (WORK
 TEST_SHARDS = unit-a unit-b unit-c apps rest
 # tests/unit split three ways (the #292 run: unit-a 4.5 min with all of features/, unit-b 1.6):
 # the rollup groups are the slow unit tests, so they are spread over unit-a and unit-b
-TEST_SHARD_unit-a = tests/unit/features/rollups/market tests/unit/features/rollups/price tests/unit/features/rollups/corporate tests/unit/features/rollups/options tests/unit/features/rollups/activity
+TEST_SHARD_unit-a = tests/unit/features/rollups/market tests/unit/features/rollups/price tests/unit/features/rollups/corporate tests/unit/features/rollups/events tests/unit/features/rollups/options tests/unit/features/rollups/activity
 TEST_SHARD_unit-b = tests/unit/features/rollups/consensus tests/unit/features/rollups/positioning tests/unit/features/rollups/levels tests/unit/features/rollups/reference tests/unit/features/rollups/relative tests/unit/features/rollups/statements tests/unit/features/rollups/patterns tests/unit/features/expressions tests/unit/features/framework tests/unit/features/test_catalogue.py tests/unit/features/test_guide.py tests/unit/features/test_site.py tests/unit/features/test_site_forward.py tests/unit/features/test_site_fundamentals.py tests/unit/features/test_site_patterns.py tests/unit/features/test_site_positioning.py tests/unit/features/test_site_relative.py tests/unit/features/test_site_statements.py tests/unit/quant tests/unit/engines tests/unit/strategies tests/unit/analytics
 TEST_SHARD_unit-c = tests/unit/services tests/unit/config tests/unit/data tests/unit/core tests/unit/storage
 TEST_SHARD_apps = tests/apps tests/libs tests/contract tests/architecture
@@ -159,7 +159,7 @@ datasets-build:  ## regenerate golden CSVs from the catalogue (then review + com
 # (tests/integration/test_golden_edge.py::test_the_makefile_range_is_the_catalogue_range checks it).
 GOLDEN_FROM = 2020-01-01
 GOLDEN_TO = 2021-08-10
-GOLDEN_ROLLUPS = price_stats@v2,trend_stats@v2,fundamentals@v3
+GOLDEN_ROLLUPS = price_stats@v2,trend_stats@v2,fundamentals@v4
 GOLDEN_EDGE = momentum_12_1
 GOLDEN_BASELINES = --extra-baseline size_small  # scored on the golden store only, not in the edge document
 

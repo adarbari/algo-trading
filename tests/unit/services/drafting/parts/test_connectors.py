@@ -10,6 +10,8 @@ from algotrade.services.drafting.parts.connectors import (
     GLUE_WORDS,
     JOIN_KINDS,
     JOINS,
+    NEGATIONS,
+    exclusion_text,
     join_text,
     merged,
     read,
@@ -19,13 +21,17 @@ from algotrade.services.drafting.prompt import TASK
 
 
 def test_the_prompt_lists_exactly_the_joins() -> None:
-    """The left-out list is the and-type joins; the kept list the negations and ors."""
+    """Left out between two parts: the and-type joins, the or-words and the exclusion words; kept
+    in the words of one condition: the bare negations (ADR 0071)."""
     ands = [p for p, logic in JOINS.items() if logic == "and"]
-    keeps = [p for p, logic in JOINS.items() if logic != "and"]
-    assert join_text() in TASK and join_text("or", "and_not") in TASK
+    ors = [p for p, logic in JOINS.items() if logic == "or"]
+    excludes = [p for p, logic in JOINS.items() if logic == "and_not" and p not in NEGATIONS]
+    assert join_text() in TASK and join_text("or") in TASK and exclusion_text() in TASK
     assert join_text().split(", ") == ands  # no drift between prompt and server
-    assert join_text("or", "and_not").split(", ") == keeps
-    assert set(ands) | set(keeps) == set(JOINS)
+    assert join_text("or").split(", ") == ors
+    assert exclusion_text().split(", ") == excludes
+    assert set(NEGATIONS) <= {p for p, logic in JOINS.items() if logic == "and_not"}
+    assert set(ands) | set(ors) | set(excludes) | set(NEGATIONS) == set(JOINS)
     assert "@@" not in TASK
 
 
@@ -64,14 +70,28 @@ def test_no_and_connector_or_glue_word_yields_a_not_understood_part(phrase: str)
     assert [p.id for p in got[0]] == ["p1", "p2"]  # no gap: it is a join or glue
 
 
-@pytest.mark.parametrize("phrase", KEPT_PHRASES)
-def test_a_negation_or_an_or_the_model_left_out_stays_visible_as_a_gap(phrase: str) -> None:
-    """Fail closed: a lost negation must never be silent."""
+JOINING = [p for p in KEPT_PHRASES if JOINS[p] == "or" or p not in NEGATIONS]
+
+
+@pytest.mark.parametrize("phrase", JOINING)
+def test_an_or_or_a_negation_between_parts_is_the_join_of_the_next(phrase: str) -> None:
+    """ADR 0071: left out between two parts it is read as the next part's join (never a chip),
+    so the server can group them."""
     got = build_parts(f"liquid stocks {phrase} high yield", RAW, [], [])
     assert got is not None
+    assert [p.id for p in got[0]] == ["p1", "p2"]
+    assert (got[0][1].join, got[0][1].join_words) == (JOINS[phrase], phrase)
+
+
+@pytest.mark.parametrize("phrase", [p for p in KEPT_PHRASES if JOINS[p] == "and_not"])
+def test_a_negation_the_model_left_out_after_the_last_part_stays_visible_as_a_gap(
+    phrase: str,
+) -> None:
+    """Fail closed: a lost negation with nothing after it must never be silent."""
+    got = build_parts(f"liquid stocks {phrase}", RAW[:1], [], [])
+    assert got is not None
     gaps = [p for p in got[0] if p.origin == "gap"]
-    assert [(g.words, g.kind, g.join) for g in gaps] == [(phrase, "not_understood", JOINS[phrase])]
-    assert gaps[0].join_words == phrase
+    assert [(g.words, g.kind, g.join) for g in gaps] == [(phrase, "not_understood", "and_not")]
 
 
 def test_a_curly_apostrophe_is_the_same_filler() -> None:
@@ -89,3 +109,11 @@ def test_like_is_never_glue() -> None:
 def test_all_but_is_an_except_not_a_but(phrase: str) -> None:
     assert JOINS[phrase] == "and_not"
     assert {logic for _, logic in read(phrase.split())} == {"and_not"}
+
+
+@pytest.mark.parametrize("phrase", NEGATIONS)
+def test_a_bare_negation_between_parts_is_a_gap_the_verifier_doubts(phrase: str) -> None:
+    got = build_parts(f"liquid stocks {phrase} high yield", RAW, [], [])
+    assert got is not None
+    gaps = [p for p in got[0] if p.origin == "gap"]
+    assert [(g.words, g.kind) for g in gaps] == [(phrase, "not_understood")]

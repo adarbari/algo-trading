@@ -18,7 +18,7 @@ owner = [
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py",  # counts its FMP calls the same way, and reads the verdicts
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task
-    "src/algotrade/storage/tables/schemas.py",  # declares the table's schema
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table's schema
 ]
 section = "docs/adr/0068-analyst-data-vendors.md#decision"
 detect = [{ string = "analyst/vendor_access" }, { call = "fmp_calls_today" }]
@@ -29,7 +29,7 @@ description = "Append tonight's FMP (annual estimates, price-target consensus, g
 owner = ["apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task
-    "src/algotrade/storage/tables/schemas.py",  # declares the table's schema
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table's schema
     "src/algotrade/data/analyst/reading.py",  # the one read of the table (analyst-snapshot-reading)
     "src/algotrade/features/rollups/consensus/analyst_status.py",  # names the feature input table its groups read
 ]
@@ -59,7 +59,7 @@ owner = [
     "src/algotrade/data/funds/holdings.py",
 ]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/reference.py",  # declares the table
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "src/algotrade/features/rollups/reference/fund_reference.py",  # names its input; read through data.feature_inputs (ADR 0050)
 ]
@@ -80,15 +80,17 @@ detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
 
 [[responsibility]]
 id = "filing-ingestion"
-description = "Store the SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I, Form 25 / 25-NSE, 424B4, Form 10 10-12B) of every operating company in the universe (the session's universe snapshot without ETFs / ETNs) in events/filing (ADR 0050, tasks/events/filings.py): the names' CIKs from the company details as of the session; the backfill is one SEC submissions request per CIK (plus the older pages when --since precedes the recent block; a CIK an earlier run of the current form set (FORMS_TAG) read from --since or earlier is skipped, stored rows never count, --limit caps a run), the nightly reads EDGAR's daily form index for each weekday since the latest stored filing day and asks only the CIKs that filed (an unpublished day is read again, a stale one fails, a failing day stops the walk); each row with its acceptance instant, items and known_from (the acceptance's session in New York); and the Item 2.02 results releases as events/earnings rows with source sec_8k (earnings_date the acceptance date in New York, time pre_market / intraday / after_hours by the acceptance clock, reported true, known_from the same date). The per-quarter precedence between those rows and the calendar's belongs to the earnings rollup, not the writer"
+description = "Store the SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I / SC TO-T, Form 25 / 25-NSE, 424B4, Form 10 10-12B) of every operating company in the universe (the session's universe snapshot without ETFs / ETNs) in events/filing (ADR 0050, tasks/events/filings.py): the names' CIKs from the company details as of the session; the backfill is one SEC submissions request per CIK (plus the older pages when --since precedes the recent block; a CIK an earlier run of the current form set (FORMS_TAG) read from --since or earlier is skipped, stored rows never count, --limit caps a run), the nightly reads EDGAR's daily form index for each weekday since the latest stored filing day and asks only the CIKs that filed (an unpublished day is read again, a stale one fails, a failing day stops the walk); each row with its acceptance instant, items and known_from (the first session whose close is after the acceptance: a filing after the close, on a weekend or a holiday counts from the next session; ADR 0050 amendment 2026-10-18); and the Item 2.02 results releases as events/earnings rows with source sec_8k (earnings_date the acceptance date in New York, time pre_market / intraday / after_hours by the acceptance clock, reported true, known_from the acceptance session). The per-quarter precedence between those rows and the calendar's belongs to the earnings rollup, not the writer"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/events/*"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (filings_fetched)
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/features/rollups/corporate/earnings.py",  # the one reader that must tell the 8-K rows apart (v1 reads the calendar rows only; rollups import no storage, so the source name is spelled there)
     "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py",  # the carry-forward never copies the 8-K rows
     "src/algotrade/services/read/events/filings.py",  # the filings read of InstrumentEvents (known_from <= session), a display read
+    "src/algotrade/data/feature_inputs.py",  # the events/filing input of filing_events@v1: the acceptance session recomputed from ts (EB H4)
+    "src/algotrade/features/rollups/events/filing_events.py",  # the group that reads it: sessions since each kind of filing became known
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ string = "events/filing" }, { string = "sec_8k" }]
@@ -99,7 +101,7 @@ description = "Store FINRA short interest (events/short_interest, one partition 
 owner = ["apps/ingestion/algotrade_ingestion/tasks/shorting/*"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the tasks' tables
-    "src/algotrade/storage/tables/short/schemas.py",  # declares the tables
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the tables
     "libs/sources/algotrade_sources/vendors/finra/short_interest.py",  # the source's frame key
     "libs/sources/algotrade_sources/vendors/finra/short_volume.py",  # the source's frame key
 ]
@@ -115,7 +117,7 @@ owner = [
     "src/algotrade/data/outcomes/*",
 ]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the outcomes tables' one schema
+    "src/algotrade/storage/tables/schemas/outcomes.py",  # declares the outcomes tables' one schema
     "src/algotrade/services/evaluation/cross_section/harness.py",  # the reader of outcomes (ADR 0053)
     "src/algotrade/services/evaluation/cross_section/measuring.py",  # the harness's measuring of legs reads the outcome rows (ADR 0053)
     "src/algotrade/services/evaluation/training/frame.py",  # the other: the labels of a fit (ED7)
@@ -127,19 +129,21 @@ detect = [{ string_prefix = "outcomes/instrument/" }, { call = "window_rows" }, 
 
 [[responsibility]]
 id = "ibkr-enrichment"
-description = "IBKR as an enrichment source, read-only (ADR 0028): conids of the optionable universe (instruments/ibkr_contracts) and IB's implied / historical vol per underlying (volatility/ibkr_iv30: history backfill + nightly snapshot), each read through algotrade.data; features derived from them carry licence = personal"
+description = "IBKR as an enrichment source, read-only (ADR 0028): conids of the optionable universe (instruments/ibkr_contracts) IB's implied / historical vol per underlying (volatility/ibkr_iv30: history backfill + nightly snapshot) and the nightly futures curve snapshots (rates/futures_curve), each read through algotrade.data; features derived from them carry licence = personal"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/reference/ibkr_contracts.py",
     "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py",
+    "apps/ingestion/algotrade_ingestion/tasks/market/futures/curves.py",
     "src/algotrade/data/volatility.py",
+    "src/algotrade/data/futures/curves.py",
 ]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the tables
+    "src/algotrade/storage/tables/schemas/market.py",  # declares the tables
     "src/algotrade/data/reference.py",  # the conid snapshot read (one snapshot rule)
     "src/algotrade/features/rollups/options/ibkr_iv.py",  # names its input; read through data.feature_inputs
 ]
 section = "docs/adr/0028-ibkr-enrichment-source.md#decision"
-detect = [{ string = "instruments/ibkr_contracts" }, { string = "volatility/ibkr_iv30" }]
+detect = [{ string = "instruments/ibkr_contracts" }, { string = "volatility/ibkr_iv30" }, { string = "rates/futures_curve" }]
 
 [[responsibility]]
 id = "ingestion-report"
@@ -198,7 +202,7 @@ id = "live-verification"
 description = "Compare a session's stored values with an independent live source (IBKR): the sample, the checks and their tolerances (verification.toml), the verification/ibkr table; the quality check `verification` grades it and the nightly email reports it"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/verification/*"]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/market.py",  # declares the table
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the session's rows
     "src/algotrade/services/read/ops/quality.py",  # shows the session's rows read-only (Query.verification)
 ]
@@ -212,7 +216,7 @@ owner = ["apps/ingestion/algotrade_ingestion/tasks/macro/*"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the calendar (macro_calendar_future)
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/services/read/events/ahead.py",  # the events-ahead read of the stored calendar (known_from <= session), a display read
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"

@@ -9,8 +9,8 @@ name = "feature.market_cap"
 theme = "fundamentals"
 reads = "Shares outstanding times the close, in dollars. The usual US buckets: micro under $300M, small $300M to $2B, mid $2B to $10B, large $10B to $200B, mega above $200B. They are conventions, not rules: index providers draw the lines differently and names migrate across them as prices move."
 caveats = [
-  "The count is the company total and the price is this share class's, so a company with two listed classes shows the same cap on both only when they trade at the same price. Check rollup.fundamentals@v3.market_cap_status.",
-  "Null for funds (no share count filed), for a stale count (rollup.fundamentals@v3.market_cap_status STALE) and for a company with no SEC filing (foreign private issuers); a hard size gate drops ETFs and many ADRs.",
+  "The count is the company total and the price is this share class's, so a company with two listed classes shows the same cap on both only when they trade at the same price. Check rollup.fundamentals@v4.market_cap_status.",
+  "Null for funds (no share count filed), for a stale count (rollup.fundamentals@v4.market_cap_status STALE) and for a company with no SEC filing (foreign private issuers); a hard size gate drops ETFs and many ADRs.",
   "Cap is size, not quality or liquidity: a $20B name can trade $5M a day (a controlled company) and a $500M name $50M (a meme). Pair with rollup.price_stats@v2.adv_usd_20d.",
 ]
 sources = [
@@ -41,7 +41,7 @@ caveats = [
   "Cyclicals look cheapest at the top of their cycle: an oil producer or a chip maker at a P/E of 6 on peak earnings becomes 18 when earnings normalise without the price moving. Pair a low P/E with feature.revenue_growth_yoy and instrument.sector, or compare against several years of earnings (not stored).",
   "A low P/E is often a value trap: the market has priced in falling earnings, a shrinking industry or heavy debt. A low P/E in feature.trend_state DOWNTREND is the market disagreeing with the ratio.",
   "One-offs inside the twelve months (an asset sale, a tax gain, a write-down) swing EPS and the ratio; nothing here separates them.",
-  "Null for loss makers (EPS at or below 0), ADRs and stale filings: a hard 'pe_ratio lt 15' silently removes every unprofitable company and every ADR. If that is not the intent, use mode score, or add rollup.financials@v2.financials_status.",
+  "Null for loss makers (EPS at or below 0), ADRs and stale filings: a hard 'pe_ratio lt 15' silently removes every unprofitable company and every ADR. If that is not the intent, use mode score, or add rollup.financials@v3.financials_status.",
   "Sector ranges differ by a factor of three (banks and energy low, software high); a single market-wide cut-off mostly selects sectors.",
 ]
 sources = [
@@ -69,9 +69,9 @@ theme = "fundamentals"
 reads = "Trailing-twelve-month revenue against the same twelve months a year earlier, as a fraction: 0.10 is 10% growth. Around 0.03 to 0.05 is nominal GDP-like; above 0.15 is a growth company; above 0.30 is rare outside early-stage names; negative is a shrinking business. It lags: the TTM ends at the last filed quarter, which can be four months old."
 caveats = [
   "Acquisitions inflate reported growth and divestitures deflate it; companies report 'organic' growth for that reason and the catalogue has only the reported figure. A jump from 5% to 40% is usually a deal. Check instrument.sic or the company's filings before reading it as demand.",
-  "A tiny year-ago base makes huge percentages (a company going from $10M to $30M is 200%); pair with feature.market_cap or rollup.financials@v2.revenue_ttm.",
+  "A tiny year-ago base makes huge percentages (a company going from $10M to $30M is 200%); pair with feature.market_cap or rollup.financials@v3.revenue_ttm.",
   "Currency moves show up as growth or shrinkage for companies that earn abroad.",
-  "Null with under two years of filings (recent IPOs, foreign filers, funds): a hard criterion rejects them. rollup.financials@v2.financials_status says why.",
+  "Null with under two years of filings (recent IPOs, foreign filers, funds): a hard criterion rejects them. rollup.financials@v3.financials_status says why.",
 ]
 sources = [
   "Organic versus reported revenue growth, as defined in issuers' filings (e.g. PepsiCo, Moody's 10-K definitions on sec.gov)",
@@ -101,7 +101,7 @@ name = "feature.div_yield"
 theme = "fundamentals"
 reads = "Dividends paid in the trailing twelve months over the close, as a fraction: 0.03 is a 3% yield. The S&P 500 yields about 0.013 to 0.02; 0.03 to 0.05 is a solid income name; above 0.08 is where the market is usually pricing a cut (a yield trap: the yield rose because the price fell on the news that the payout cannot last); above 0.10 is a warning, not an opportunity."
 caveats = [
-  "A yield trap looks best right before the cut: a high yield with feature.trend_state DOWNTREND or rollup.price_stats@v2.ret_60d well below 0 is the market expecting the cut. Pair high-yield rules with a trend filter or with earnings coverage (rollup.financials@v2.eps_diluted_ttm above the dividend).",
+  "A yield trap looks best right before the cut: a high yield with feature.trend_state DOWNTREND or rollup.price_stats@v2.ret_60d well below 0 is the market expecting the cut. Pair high-yield rules with a trend filter or with earnings coverage (rollup.financials@v3.eps_diluted_ttm above the dividend).",
   "A special dividend inflates the trailing twelve months for a year: rollup.dividends@v2.div_count_ttm above 4 for a quarterly payer is the sign.",
   "REITs, MLPs, BDCs and bond or covered-call ETFs yield 0.06 to 0.12 by structure; a market-wide 'above 5%' screen is mostly a list of those. Check instrument.sector and instrument.is_etf.",
   "Null for a non-payer with too little history to say so; 0 for a known non-payer. A hard 'gte 0.03' drops both, which is usually intended.",
@@ -124,13 +124,13 @@ tolerance = 0.01
 note = "with feature.trend_state ne DOWNTREND"
 
 [[field]]
-name = "rollup.financials@v2.eps_diluted_ttm"
+name = "rollup.financials@v3.eps_diluted_ttm"
 theme = "fundamentals"
 reads = "Diluted earnings per share over the trailing twelve months, summed from the quarters and split-adjusted to the session, in dollars; negative for a loss. The numerator's denominator in feature.pe_ratio, which is null for a loss, so this is the field that can say 'unprofitable': under 0 is a loss-maker, which a growth screen may want and a value screen must know about."
 caveats = [
-  "The TTM lags: it ends at the last filed quarter, up to four months old (rollup.financials@v2.ttm_as_of); rollup.financials@v2.eps_stale flags a figure more than 480 days old.",
+  "The TTM lags: it ends at the last filed quarter, up to four months old (rollup.financials@v3.ttm_as_of); rollup.financials@v3.eps_stale flags a figure more than 480 days old.",
   "One-offs (a tax gain, a write-down, an asset sale) swing a year's EPS; nothing here separates them from operations.",
-  "Null for funds, foreign filers and companies without four consecutive quarters or a fiscal year on file (rollup.financials@v2.financials_status).",
+  "Null for funds, foreign filers and companies without four consecutive quarters or a fiscal year on file (rollup.financials@v3.financials_status).",
 ]
 sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
 [[field.use]]
@@ -146,9 +146,9 @@ value = 0
 mode = "hard"
 
 [[field]]
-name = "rollup.financials@v2.net_income_ttm"
+name = "rollup.financials@v3.net_income_ttm"
 theme = "fundamentals"
-reads = "Net income over the trailing twelve months, in dollars; negative for a loss. The company-level profit behind EPS: against rollup.financials@v2.revenue_ttm it gives feature.net_margin (10% is healthy for most industries, 20% and above is software or a franchise, under 0 is a loss), and against feature.market_cap the earnings yield."
+reads = "Net income over the trailing twelve months, in dollars; negative for a loss. The company-level profit behind EPS: against rollup.financials@v3.revenue_ttm it gives feature.net_margin (10% is healthy for most industries, 20% and above is software or a franchise, under 0 is a loss), and against feature.market_cap the earnings yield."
 caveats = [
   "Lags like every TTM figure, and includes one-offs.",
   "Null for funds, foreign filers and incomplete filings; a hard criterion drops every ETF and ADR without US filings.",
@@ -167,9 +167,9 @@ mode = "soft"
 tolerance = { relative = 0.3 }
 
 [[field]]
-name = "rollup.financials@v2.revenue_ttm"
+name = "rollup.financials@v3.revenue_ttm"
 theme = "fundamentals"
-reads = "Revenue over the trailing twelve months, in dollars: the last four discrete quarters, else the latest fiscal year (rollup.financials@v2.ttm_basis says which). Size of the business in sales terms: under $100M is early-stage, $1B is a mid-sized company, above $50B a giant. The denominator of feature.revenue_growth_yoy and the base of the net margin."
+reads = "Revenue over the trailing twelve months, in dollars: the last four discrete quarters, else the latest fiscal year (rollup.financials@v3.ttm_basis says which). Size of the business in sales terms: under $100M is early-stage, $1B is a mid-sized company, above $50B a giant. The denominator of feature.revenue_growth_yoy and the base of the net margin."
 caveats = [
   "Which revenue concept a company reports varies (Revenues, RevenueFromContractWithCustomer, SalesRevenueNet); banks and insurers report revenue differently from industrials, so cross-sector comparisons are rough.",
   "Fiscal-year basis (ttm_basis) lags a quarter-based TTM by up to a year.",
@@ -218,9 +218,9 @@ theme = "fundamentals"
 reads = "Market capitalisation over revenue of the trailing twelve months: the dollars the market pays for each dollar of yearly sales. Under 1 is cheap on sales (a distressed or low-margin business), under 2 is the value end, 2 to 5 is ordinary, 5 to 10 is a growth price that needs sustained growth to be earned, above 10 prices in years of it. Unlike feature.pe_ratio it exists for a loss maker, which is the point of using it."
 caveats = [
   "Sales are not profit: a grocer and a software company trade at very different P/S for good reason. Pair it with feature.net_margin, or compare within instrument.sector; a low P/S on a 1% margin is not cheap.",
-  "Market cap is the company total count times this class's close (rollup.fundamentals@v3.market_cap_status says whether the count is current), while revenue is the company's: misstated when share classes trade at very different prices, and for an ADR whose ratio is not stored.",
+  "Market cap is the company total count times this class's close (rollup.fundamentals@v4.market_cap_status says whether the count is current), while revenue is the company's: misstated when share classes trade at very different prices, and for an ADR whose ratio is not stored.",
   "Banks, insurers and other financials report revenue in ways that do not compare with industrials; the ratio means little there.",
-  "Null for funds, for a stale or missing count, for a missing or stale revenue TTM (rollup.financials@v2.financials_status STALE) and for no revenue: a hard 'lt 2' silently drops all of them. The revenue TTM can be four months old.",
+  "Null for funds, for a stale or missing count, for a missing or stale revenue TTM (rollup.financials@v3.financials_status STALE) and for no revenue: a hard 'lt 2' silently drops all of them. The revenue TTM can be four months old.",
 ]
 sources = [
   "Fisher, Super Stocks (1984): the price-to-sales ratio as a valuation screen",
@@ -233,7 +233,7 @@ op = "lt"
 value = 2
 mode = "soft"
 tolerance = 0.5
-note = "with feature.net_margin gt 0.05 so a cheap ratio is not just a thin margin, and rollup.financials@v2.financials_status eq OK"
+note = "with feature.net_margin gt 0.05 so a cheap ratio is not just a thin margin, and rollup.financials@v3.financials_status eq OK"
 [[field.use]]
 for = "a growth price (5 to 10 times sales), not a bubble"
 op = "between"
@@ -248,9 +248,9 @@ theme = "fundamentals"
 reads = "Net income over revenue of the trailing twelve months, as a fraction: 0.10 is ten cents of profit on each dollar of sales. Under 0 is a loss, 0 to 0.05 is thin (retail, distribution, airlines), 0.10 and above is a healthy business and the line most quality screens draw, 0.20 and above is a franchise (software, payments, a strong brand) that competitors have not been able to compete away."
 caveats = [
   "Margins differ by industry far more than by quality: a 4% grocer is excellent and a 4% software company is broken. Compare within instrument.sector (Damodaran's industry tables show the spread); a market-wide 'above 0.10' mostly selects sectors.",
-  "One-offs (a tax gain, an asset sale, a write-down) move net income and the margin for the twelve months they sit in; a margin far above the company's history is usually one. Pair with rollup.financials@v2.eps_diluted_ttm and its growth feature.eps_growth_yoy.",
+  "One-offs (a tax gain, an asset sale, a write-down) move net income and the margin for the twelve months they sit in; a margin far above the company's history is usually one. Pair with rollup.financials@v3.eps_diluted_ttm and its growth feature.eps_growth_yoy.",
   "Financials report revenue and income in ways that do not compare with industrials; a bank's margin is not an industrial's.",
-  "Null for funds, foreign filers and any company without a revenue or net income TTM (rollup.financials@v2.financials_status); a hard criterion drops them.",
+  "Null for funds, foreign filers and any company without a revenue or net income TTM (rollup.financials@v3.financials_status); a hard criterion drops them.",
 ]
 sources = [
   "Damodaran, margins by industry: https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/margin.html",
@@ -283,7 +283,7 @@ caveats = [
   "A negative payout means the company pays a dividend while its EPS is negative; 'lt 0.6' passes it. Use 'between 0 and 0.6' for a safe dividend, never a one-sided upper bound.",
   "Earnings are not cash: REITs, MLPs and capital-heavy businesses pay out of cash flow and show payouts above 1 for years (depreciation depresses EPS). Check instrument.sector before reading 'above 1' as a coming cut; cash-flow coverage is not stored.",
   "A one-off in the twelve months (a gain, a write-down) swings EPS and the ratio; a payout of 0.2 or 3 for a single year often says that, not the dividend. Compare with feature.eps_growth_yoy.",
-  "Null when the EPS is 0, missing or stale (rollup.financials@v2.eps_stale), for an ADR (EPS per ordinary share, dividend per ADR) and for a payer with too little bar history (rollup.dividends@v2.div_ttm is null): a hard criterion drops all of them.",
+  "Null when the EPS is 0, missing or stale (rollup.financials@v3.eps_stale), for an ADR (EPS per ordinary share, dividend per ADR) and for a payer with too little bar history (rollup.dividends@v2.div_ttm is null): a hard criterion drops all of them.",
 ]
 sources = [
   "Payout ratios above 100% and dividend cuts: https://indexes.morningstar.com/insights/perspective/bltdb6d3e043f097825/not-all-dividend-s",
@@ -309,10 +309,10 @@ name = "feature.eps_growth_yoy"
 theme = "fundamentals"
 reads = "Diluted EPS of the trailing twelve months against the same twelve months a year earlier, as a fraction: 0.25 is +25%. CAN SLIM asks for annual growth of 25% or more (O'Neil's 'A'); 0.10 to 0.25 is steady, under 0 is a decline, and below -1 means the EPS turned negative. The yearly rate is smoother than feature.eps_growth_qtr_yoy and lags it: compare the two for acceleration."
 caveats = [
-  "Null when the EPS a year earlier was 0 or negative: a growth rate from a loss or from nothing is meaningless, so a turnaround (a loss to a profit) is null, not infinite. A hard 'gte 0.25' drops every turnaround and every recent IPO; use rollup.financials@v2.eps_diluted_ttm gt 0 to find the profitable ones separately.",
-  "A small year-ago EPS makes huge percentages (from 0.02 to 0.20 is +900%); pair with rollup.financials@v2.eps_diluted_ttm_year_ago gte a few percent of the price.",
+  "Null when the EPS a year earlier was 0 or negative: a growth rate from a loss or from nothing is meaningless, so a turnaround (a loss to a profit) is null, not infinite. A hard 'gte 0.25' drops every turnaround and every recent IPO; use rollup.financials@v3.eps_diluted_ttm gt 0 to find the profitable ones separately.",
+  "A small year-ago EPS makes huge percentages (from 0.02 to 0.20 is +900%); pair with rollup.financials@v3.eps_diluted_ttm_year_ago gte a few percent of the price.",
   "One-offs (a tax gain, a write-down) and buybacks (fewer shares lift EPS with no profit growth) move EPS; compare with feature.revenue_growth_yoy and feature.shares_change_yoy.",
-  "Null for funds, foreign filers, fewer than two years of reported quarters or fiscal years, and a stale EPS TTM (rollup.financials@v2.eps_stale).",
+  "Null for funds, foreign filers, fewer than two years of reported quarters or fiscal years, and a stale EPS TTM (rollup.financials@v3.eps_stale).",
 ]
 sources = [
   "O'Neil, How to Make Money in Stocks: CAN SLIM 'A', annual earnings growth of 25% or more",
@@ -338,7 +338,7 @@ theme = "fundamentals"
 reads = "Revenue of the latest reported quarter against the same quarter a year earlier, as a fraction: 0.25 is +25%. It is the freshest read of demand the filings give, a quarter nearer than feature.revenue_growth_yoy (which averages four): growth above the yearly rate means it is accelerating, below it that it is slowing. Above 0.25 is fast; negative is shrinking."
 caveats = [
   "One quarter is noisy: a timing shift of an order, a 53-week year (its 14-week fourth quarter lifts the rate by about 8%), an acquisition closing or a currency swing moves it; check feature.revenue_growth_yoy points the same way.",
-  "Quarter dates differ by company: the latest quarter ends up to four months before the session, and a company that has not filed its newest quarter shows the previous one (rollup.financials@v2.qtr_as_of says which).",
+  "Quarter dates differ by company: the latest quarter ends up to four months before the session, and a company that has not filed its newest quarter shows the previous one (rollup.financials@v3.qtr_as_of says which).",
   "The fourth quarter is the annual figure minus the nine months, so it is only known once the 10-K is filed and the nine-month figure exists; null otherwise, and null for a quarter older than 480 days (stale). Null for funds, foreign filers and a year-ago quarter that is missing or not positive.",
 ]
 sources = [
@@ -363,10 +363,10 @@ name = "feature.eps_growth_qtr_yoy"
 theme = "fundamentals"
 reads = "Diluted EPS of the latest reported quarter against the same quarter a year earlier, as a fraction: 0.25 is +25%: CAN SLIM's 'C', current quarterly earnings, which asks for 25% or more (many practitioners want 40% or more for a leader). Compared with feature.eps_growth_yoy: quarterly above the yearly rate is accelerating earnings; below it the growth is fading. A negative value is a decline; below -1 the quarter's EPS turned negative."
 caveats = [
-  "Null when the EPS of the quarter a year earlier was 0 or negative: a growth rate from a loss or from nothing is meaningless, so a company that has recently turned profitable is null, not infinite. A hard 'gte 0.25' drops every turnaround; read rollup.financials@v2.eps_diluted_qtr gt 0 for the first profitable quarter.",
+  "Null when the EPS of the quarter a year earlier was 0 or negative: a growth rate from a loss or from nothing is meaningless, so a company that has recently turned profitable is null, not infinite. A hard 'gte 0.25' drops every turnaround; read rollup.financials@v3.eps_diluted_qtr gt 0 for the first profitable quarter.",
   "One quarter is noisy and one-offs (a tax gain, a write-down, an asset sale) land in a single quarter; confirm with feature.revenue_growth_qtr_yoy (real growth has sales behind it) and feature.eps_growth_yoy.",
   "A small year-ago EPS gives huge percentages; a fourth quarter is derived (annual minus nine months) and, with share count changes, quarterly EPS is not exactly additive.",
-  "The newest quarter can be four months old (rollup.financials@v2.qtr_as_of); null with no derivable quarter, for a stale quarter, for funds and for foreign filers.",
+  "The newest quarter can be four months old (rollup.financials@v3.qtr_as_of); null with no derivable quarter, for a stale quarter, for funds and for foreign filers.",
 ]
 sources = [
   "O'Neil, How to Make Money in Stocks: CAN SLIM 'C', current quarterly earnings per share up 25% or more, preferably accelerating",
@@ -394,8 +394,8 @@ reads = "The share count against the count a year earlier, as a fraction: -0.03 
 caveats = [
   "The counts are the company total from the filings: a cover-page count against a cover-page count, or a weighted average against a weighted average, never one against the other, so a company that began tagging the cover page recently is null. Weighted averages lag a buyback or an offering by about half a period.",
   "A stock split is adjusted away, but a spin-off, a merger or a reverse merger changes the count without being dilution; check feature.market_cap and the filings when the change is above 0.5.",
-  "A shrinking count can hide an offering: companies buy back what compensation issues, so a flat count is not a company that does nothing. Pair with rollup.financials@v2.eps_diluted_ttm growth.",
-  "Null for funds, companies without two counts a year apart (recent IPOs and filers), and a stale count (rollup.fundamentals@v3.market_cap_status STALE).",
+  "A shrinking count can hide an offering: companies buy back what compensation issues, so a flat count is not a company that does nothing. Pair with rollup.financials@v3.eps_diluted_ttm growth.",
+  "Null for funds, companies without two counts a year apart (recent IPOs and filers), and a stale count (rollup.fundamentals@v4.market_cap_status STALE).",
 ]
 sources = [
   "Pontiff and Woodgate (2008), Share Issuance and Cross-Sectional Returns, Journal of Finance: issuers underperform, repurchasers outperform",
@@ -422,9 +422,9 @@ mode = "soft"
 tolerance = 0.03
 
 [[field]]
-name = "rollup.financials@v2.eps_diluted_ttm_year_ago"
+name = "rollup.financials@v3.eps_diluted_ttm_year_ago"
 theme = "fundamentals"
-reads = "Diluted EPS over the trailing twelve months a year earlier (the four quarters ending a year before the EPS TTM, or the previous fiscal year), in dollars, split-adjusted like rollup.financials@v2.eps_diluted_ttm. The base of feature.eps_growth_yoy: positive means a growth rate exists, 0 or negative means it is null."
+reads = "Diluted EPS over the trailing twelve months a year earlier (the four quarters ending a year before the EPS TTM, or the previous fiscal year), in dollars, split-adjusted like rollup.financials@v3.eps_diluted_ttm. The base of feature.eps_growth_yoy: positive means a growth rate exists, 0 or negative means it is null."
 caveats = [
   "Null with fewer than two years of EPS history or a gap in it: a recent IPO, a foreign filer or a broken quarter chain.",
   "Split-adjusted by the filing date, so a filer that restated for a later split is not adjusted twice; the quarterly sum is an approximation across share count changes.",
@@ -437,11 +437,11 @@ value = 0
 mode = "hard"
 
 [[field]]
-name = "rollup.financials@v2.eps_diluted_qtr"
+name = "rollup.financials@v3.eps_diluted_qtr"
 theme = "fundamentals"
 reads = "Diluted EPS of the latest reported quarter, in dollars, split-adjusted to the session; negative for a loss. A 10-Q's three-month figure as filed, or for a 10-K the fourth quarter as the annual figure minus the nine months. The numerator of feature.eps_growth_qtr_yoy and the field that says whether the last quarter was profitable."
 caveats = [
-  "Which quarter it is (rollup.financials@v2.qtr_as_of): up to four months old, and the previous one until the next report is filed.",
+  "Which quarter it is (rollup.financials@v3.qtr_as_of): up to four months old, and the previous one until the next report is filed.",
   "Null with no derivable quarter (a fourth quarter needs the nine-month and annual figures), for a quarter older than 480 days, and for funds and foreign filers; a quarter of revenue and a quarter of EPS always describe the same quarter or one is null.",
 ]
 sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
@@ -452,11 +452,11 @@ value = 0
 mode = "hard"
 
 [[field]]
-name = "rollup.financials@v2.eps_diluted_qtr_year_ago"
+name = "rollup.financials@v3.eps_diluted_qtr_year_ago"
 theme = "fundamentals"
 reads = "Diluted EPS of the same quarter a year earlier, in dollars, split-adjusted to the session. The base of feature.eps_growth_qtr_yoy: positive means a growth rate exists; 0 or negative means it is null (a company that has recently turned profitable has no growth rate, only a sign change)."
 caveats = [
-  "Null when the quarter a year earlier is not known (fewer than five quarters of history or a gap) and whenever rollup.financials@v2.eps_diluted_qtr is null.",
+  "Null when the quarter a year earlier is not known (fewer than five quarters of history or a gap) and whenever rollup.financials@v3.eps_diluted_qtr is null.",
 ]
 sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
 [[field.use]]
@@ -466,11 +466,11 @@ value = 0
 mode = "hard"
 
 [[field]]
-name = "rollup.financials@v2.revenue_qtr"
+name = "rollup.financials@v3.revenue_qtr"
 theme = "fundamentals"
 reads = "Revenue of the latest reported quarter, in dollars: a 10-Q's three-month figure as filed, or for a 10-K the fourth quarter as the annual figure minus the nine months. The numerator of feature.revenue_growth_qtr_yoy and, times four, a rough run rate of the business: under $25M a quarter is small, $250M a quarter is a company of $1B a year."
 caveats = [
-  "Seasonal: a retailer's fourth quarter is not its first; compare a quarter only with the same quarter a year earlier (rollup.financials@v2.revenue_qtr_year_ago).",
+  "Seasonal: a retailer's fourth quarter is not its first; compare a quarter only with the same quarter a year earlier (rollup.financials@v3.revenue_qtr_year_ago).",
   "Null with no derivable quarter, for a stale quarter and for funds and foreign filers.",
 ]
 sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
@@ -482,11 +482,11 @@ mode = "soft"
 tolerance = { relative = 0.3 }
 
 [[field]]
-name = "rollup.financials@v2.revenue_qtr_year_ago"
+name = "rollup.financials@v3.revenue_qtr_year_ago"
 theme = "fundamentals"
 reads = "Revenue of the same quarter a year earlier, in dollars. The base of feature.revenue_growth_qtr_yoy: positive means a growth rate exists."
 caveats = [
-  "Null when the quarter a year earlier is not known (fewer than five quarters of history or a gap) and whenever rollup.financials@v2.revenue_qtr is null.",
+  "Null when the quarter a year earlier is not known (fewer than five quarters of history or a gap) and whenever rollup.financials@v3.revenue_qtr is null.",
 ]
 sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
 [[field.use]]
@@ -496,11 +496,11 @@ value = 0
 mode = "hard"
 
 [[field]]
-name = "rollup.financials@v2.qtr_as_of"
+name = "rollup.financials@v3.qtr_as_of"
 theme = "fundamentals"
-reads = "The end date of the latest reported quarter that rollup.financials@v2.revenue_qtr and rollup.financials@v2.eps_diluted_qtr describe. Up to about four months before the session; the same date for every non-null quarter column of the row."
+reads = "The end date of the latest reported quarter that rollup.financials@v3.revenue_qtr and rollup.financials@v3.eps_diluted_qtr describe. Up to about four months before the session; the same date for every non-null quarter column of the row."
 caveats = [
-  "Not the date it became public: that is later (the filing date), and the session reads only what was filed by it.",
+  "Not the date it became public: that is later. A session reads only what SEC had accepted by its close. A filing accepted at or after 16:00 New York time counts from the next session.",
   "Null when no quarter can be formed or the quarter is older than 480 days.",
 ]
 sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
@@ -510,9 +510,9 @@ op = "not_null"
 mode = "hard"
 
 [[field]]
-name = "rollup.fundamentals@v3.shares_outstanding_year_ago"
+name = "rollup.fundamentals@v4.shares_outstanding_year_ago"
 theme = "fundamentals"
-reads = "The company's share count a year earlier: the count of the same kind (cover page or weighted average) whose period ended 9 to 15 months before rollup.fundamentals@v3.shares_as_of, the one closest to a year, split-adjusted to the session. The base of feature.shares_change_yoy."
+reads = "The company's share count a year earlier: the count of the same kind (cover page or weighted average) whose period ended 9 to 15 months before rollup.fundamentals@v4.shares_as_of, the one closest to a year, split-adjusted to the session. The base of feature.shares_change_yoy."
 caveats = [
   "Null for a recent filer, and for a company that began tagging the cover page less than a year ago (no cover count a year back): the weighted average is not substituted, as the two differ by definition.",
   "A weighted average lags: it is the average over its period, not the count at its end.",
@@ -525,13 +525,13 @@ value = 0
 mode = "hard"
 
 [[field]]
-name = "rollup.financials@v2.financials_status"
+name = "rollup.financials@v3.financials_status"
 theme = "fundamentals"
 reads = "Whether the company's revenue, net income and earnings per share each have a trailing twelve month figure. OK: all three do. PARTIAL: some do, so a ratio built on a missing one is blank. NO_TTM: facts are filed but no figure can be formed, a recent filer without four quarters or a year. NO_FACTS: nothing is filed, as for funds and foreign filers that do not report in dollars. STALE: the first figure ended more than 480 days before the session; the values are shown but old."
 caveats = [
   "OK says the figures exist, not that they are recent. A name stays OK for months after its period ended, and a company between two reports is not stale.",
   "STALE is checked before PARTIAL and OK, so a late filer with all three figures reads STALE. The price to sales ratio, feature.ps_ratio, is blank for it. The price to earnings ratio, feature.pe_ratio, is blank when only the earnings figure is old.",
-  "OK does not make feature.pe_ratio defined. It is also blank for a loss and for an ADR, which rollup.financials@v2.is_adr marks.",
+  "OK does not make feature.pe_ratio defined. It is also blank for a loss and for an ADR, which rollup.financials@v3.is_adr marks.",
 ]
 sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
 [[field.use]]
@@ -626,7 +626,7 @@ mode = "hard"
 [[field]]
 name = "rollup.analyst_estimates@v1.revenue_fy1"
 theme = "fundamentals"
-reads = "The analysts' average estimate of revenue for the first estimate year, in dollars. Against rollup.financials@v2.revenue_ttm it is the growth analysts expect in sales."
+reads = "The analysts' average estimate of revenue for the first estimate year, in dollars. Against rollup.financials@v3.revenue_ttm it is the growth analysts expect in sales."
 caveats = [
   "At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.",
   "The vendor reports in its own currency, which for a foreign filer is not the listing's: check the filing currency before comparing it with a USD price.",
@@ -861,3 +861,131 @@ for = "leave out stale snapshots"
 op = "ne"
 value = "STALE"
 mode = "hard"
+
+# mispricing@v1: the anomaly inputs, the quality score and the composite rank (edge build E1d).
+
+[[field]]
+name = "rollup.mispricing@v1.composite_rank"
+theme = "fundamentals"
+reads = "The composite mispricing rank, 0 to 1. It is the mean percentile rank of seven anomalies: net share issuance, accruals, net operating assets, asset growth, a simplified Ohlson O-score, and inverted gross profitability and return on assets. Each is oriented so that high means overpriced. 1 is the most overpriced name of the session, 0 the most underpriced; 0.5 is the middle. Combining many noisy anomalies predicts returns better than any one, and most of the spread in the literature sits on the overpriced end."
+caveats = [
+  "It is not Stambaugh, Yu and Yuan's composite: four of their eleven anomalies are missing. Composite equity issuance and investment-to-assets need cash-flow detail we do not store. Financial distress needs returns and volatility. Momentum lives in the price fields. rollup.mispricing@v1.composite_inputs says how many of the seven an instrument's rank averages; a rank on five is less reliable than one on seven.",
+  "Missing is left out, never filled. An anomaly a company cannot report (an untagged debt line, no gross profit) drops out of its own mean. Fewer than five of seven gives null. A hard criterion therefore drops those names rather than passing them.",
+  "A rank is relative to the session's cross-section, so it moves when other names move and carries no level. It uses all instruments with statements, across industries and sizes; banks, brokers and insurers have most inputs null and are usually unranked.",
+  "Statement figures enter from the session after SEC acceptance of the filing. A rank can be up to four months stale for a company that has not filed lately. rollup.balance_sheet@v2.bs_as_of shows how old the balance sheet is. Individual anomalies have decayed since publication (accruals especially); the composite holds up better, and it is also the benchmark any other cross-sectional edge has to beat.",
+]
+sources = ["Stambaugh, Yu and Yuan (2015), Journal of Finance 70(5); docs/edge-ideas/altdata-text-ml.md (composite_mispricing_score)"]
+[[field.use]]
+for = "the most underpriced fifth (the long leg)"
+op = "lte"
+value = 0.2
+mode = "hard"
+note = "null (too few anomalies known) never passes"
+[[field.use]]
+for = "the most overpriced fifth (the short leg, or an avoid list)"
+op = "gte"
+value = 0.8
+mode = "hard"
+
+[[field]]
+name = "rollup.mispricing@v1.quality_score"
+theme = "fundamentals"
+reads = "A quality score from 0 to 1. It is the mean percentile rank of six measures among instruments with a value that session. The measures are return on equity, return on assets, gross margin, net margin, operating cash flow over total assets and low debt to equity. 0.8 is better than about 80% of the cross-section on the average measure. Quality names are profitable, cash-generating and conservatively financed; the idea is to hold momentum within them so the junk that drives momentum crashes is excluded."
+caveats = [
+  "QMJ-like, not QMJ. It omits Asness, Frazzini and Pedersen's growth (five-year changes), payout (buybacks, dividends, accruals) and low-beta parts. It uses one year of data with no stability measure. It ranks across industries, so an asset-light software firm outranks a utility on margins. It weights the six measures equally.",
+  "Needs at least four of the six measures. Gross margin is missing for the many filers that do not tag GrossProfit. Debt to equity is missing for those with negative equity or untagged debt. A score therefore rests on different measures for different names. Missing is dropped, never counted as zero; a hard criterion drops names with too few.",
+  "Banks and insurers are scored on the measures they report (return on equity and assets, net margin) and their debt to equity is not comparable; read them separately.",
+  "Statement figures enter from the session after SEC acceptance of the filing and can be four months old; the score is relative to the session's cross-section and has no level.",
+]
+sources = ["Asness, Frazzini and Pedersen (2019), Review of Accounting Studies 24(1), Quality Minus Junk; docs/edge-ideas/cross-sectional.md (momentum_x_quality_interaction)"]
+[[field.use]]
+for = "a high-quality name"
+op = "gte"
+value = 0.7
+mode = "soft"
+tolerance = { relative = 0.1 }
+
+[[field]]
+name = "rollup.mispricing@v1.asset_growth"
+theme = "fundamentals"
+reads = "Growth of total assets over the year to the latest balance sheet: total assets over the same line a year earlier, less one (0.10 is +10%). Firms that expand their balance sheet fast, by acquisition, capex or hoarding, tend to earn lower returns afterwards (Cooper, Gulen and Schill), so high growth counts as overpriced in rollup.mispricing@v1.composite_rank."
+caveats = [
+  "An acquisition or a financing round can double assets overnight without any organic growth; nothing here separates them. Check rollup.balance_sheet@v2.total_assets and the filings.",
+  "The year-ago figure is the balance sheet ending within 40 days of the latest one's date minus 365 days, as restated by any filing accepted by the session. A company with less than a year of filings, or a gap, is null.",
+  "Rate of change of a size measure: a small company swings more than a large one. Banks and insurers grow assets by lending and are not comparable.",
+]
+sources = ["Cooper, Gulen and Schill (2008), Journal of Finance 63(4), Asset Growth and the Cross-Section of Stock Returns"]
+[[field.use]]
+for = "assets not growing fast"
+op = "lte"
+value = 0.2
+mode = "soft"
+tolerance = { relative = 0.5 }
+
+[[field]]
+name = "rollup.mispricing@v1.accruals"
+theme = "fundamentals"
+reads = "Accruals as a share of total assets: net income minus operating cash flow, both over the trailing twelve months, over total assets at the latest balance sheet. Positive means reported earnings exceed the cash behind them (accounting profit not yet realised), negative means cash exceeds earnings. Sloan found high accruals followed by low returns."
+caveats = [
+  "A weak signal on its own: the accruals anomaly has largely vanished in US large caps since about 2002 and is subsumed by cash-based profitability. It is here as one input of rollup.mispricing@v1.composite_rank, not a screen to trade alone.",
+  "Uses the latest total assets, not the average of two years as Sloan did, and the whole income-less-cash gap, not only working-capital accruals; depreciation and large non-cash items move it.",
+  "Net income and operating cash flow come from different groups: check rollup.cash_flow@v2.cf_as_of and rollup.financials@v3.ttm_as_of that they end on the same quarter. Null for banks, brokers and insurers, whose cash flows are not comparable.",
+]
+sources = ["Sloan (1996), The Accounting Review 71(3), Do Stock Prices Fully Reflect Information in Accruals and Cash Flows about Future Earnings"]
+[[field.use]]
+for = "earnings backed by cash"
+op = "lte"
+value = 0
+mode = "soft"
+tolerance = { relative = 0.5 }
+
+[[field]]
+name = "rollup.mispricing@v1.gross_profit_to_assets"
+theme = "fundamentals"
+reads = "Gross profitability: gross profit over the trailing twelve months over total assets at the latest balance sheet (0.30 is 30 cents of gross profit a year per dollar of assets). Novy-Marx found it predicts returns about as well as value, and it hedges value; high is underpriced, so it enters rollup.mispricing@v1.composite_rank inverted."
+caveats = [
+  "Null for the many filers that do not tag GrossProfit, and null is not zero: a hard criterion drops them. Filers draw the line between cost of revenue and operating costs differently, so compare within an industry.",
+  "Asset-heavy businesses score low and asset-light ones high regardless of quality; intangible assets that are not on the balance sheet (brands, software) understate the base.",
+  "Null for banks, brokers and insurers.",
+]
+sources = ["Novy-Marx (2013), Journal of Financial Economics 108(1), The Other Side of Value: The Gross Profitability Premium"]
+[[field.use]]
+for = "a high gross profit on assets"
+op = "gte"
+value = 0.3
+mode = "soft"
+tolerance = { relative = 0.2 }
+
+[[field]]
+name = "rollup.mispricing@v1.net_operating_assets"
+theme = "fundamentals"
+reads = "Net operating assets as a share of total assets. Operating assets are assets less cash; operating liabilities are assets less debt and equity. The difference is debt plus equity less cash, divided by total assets. A high value means the business has tied up much capital in operations beyond what operating liabilities fund. Hirshleifer, Hou, Teoh and Zhang link that to accumulated accruals and low future returns."
+caveats = [
+  "Short-term investments, minority interest and preferred stock are not separated: investments count as operating, so a company holding treasuries looks asset-heavy. The base is the latest total assets, not the year-ago assets of the paper.",
+  "Null when total_debt is null (an untagged debt line is not zero) and for banks, brokers and insurers, whose balance sheets are not operating ones.",
+  "Moves slowly and with every acquisition; a negative value (net cash larger than the capital employed) is possible and valid.",
+]
+sources = ["Hirshleifer, Hou, Teoh and Zhang (2004), Journal of Accounting and Economics 38, Do Investors Overvalue Firms with Bloated Balance Sheets?"]
+[[field.use]]
+for = "a lean balance sheet"
+op = "lte"
+value = 1
+mode = "soft"
+tolerance = { relative = 0.2 }
+
+[[field]]
+name = "rollup.mispricing@v1.ohlson_o"
+theme = "fundamentals"
+reads = "A simplified Ohlson O-score, a bankruptcy-risk index from size, leverage, working capital, current ratio, a negative-equity flag, profitability and cash flow. Higher is riskier; it is a rank input to rollup.mispricing@v1.composite_rank, not a probability and not comparable with the paper's levels."
+caveats = [
+  "Two of Ohlson's terms are omitted because they need last year's net income, which no group stores. They are a loss in both of the last two years and the change in net income. The GNP price-index deflator on the size term is omitted too. The deflator is a constant within a session, so ranks are unaffected, but the level shifts across sessions: compare only within one session.",
+  "Operating cash flow stands in for funds from operations, and total assets are in dollars, not thousands of 1968 dollars; both only shift or rescale the score.",
+  "Null for banks, brokers and insurers, for a filer missing current assets, current liabilities, total liabilities or operating cash flow, and when a statement is stale.",
+]
+sources = ["Ohlson (1980), Journal of Accounting Research 18(1), Financial Ratios and the Probabilistic Prediction of Bankruptcy"]
+[[field.use]]
+for = "a low bankruptcy-risk rank input (compare within one session)"
+op = "lte"
+value = -3
+mode = "soft"
+tolerance = { relative = 0.3 }

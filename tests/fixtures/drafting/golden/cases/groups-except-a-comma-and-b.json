@@ -1,0 +1,94 @@
+{
+  "id": "groups-except-a-comma-and-b",
+  "sentence": "stocks within 5% of their 52 week high except those with market cap under $2B, and IV rank above 80%",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "within 5% of their 52 week high",
+        "bucket": "A",
+        "fields": [
+          "feature.pct_from_high_52w"
+        ],
+        "op": [
+          "gte",
+          "gt"
+        ],
+        "value": -0.05,
+        "tolerance": 0
+      },
+      {
+        "span": "market cap under $2B",
+        "bucket": "A",
+        "fields": [
+          "feature.market_cap"
+        ],
+        "op": [
+          "lt",
+          "lte"
+        ],
+        "value": 2000000000,
+        "tolerance": 0
+      },
+      {
+        "span": "IV rank above 80%",
+        "bucket": "A",
+        "fields": [
+          "feature.iv_rank"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.8,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "stocks",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "within 5% of their 52 week high",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "market cap under $2B",
+          "kind": "applied",
+          "origin": "words",
+          "join": "and_not",
+          "join_words": "except those with"
+        },
+        {
+          "words": "IV rank above 80%",
+          "kind": "applied",
+          "origin": "words",
+          "join": "and",
+          "join_words": ", and"
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 0
+    },
+    "groups": [
+      {
+        "none": [
+          "market cap under $2B"
+        ]
+      }
+    ]
+  }
+}

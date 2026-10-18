@@ -1,0 +1,185 @@
+"""Canonical table schemas: the data contract every writer must satisfy.
+
+Every row carries the point-in-time columns (ADR 0007). Market tables also carry ``ts``.
+Fixed tables declare every column with an abstract type (``COLUMN_TYPES``) and nullability;
+storage backends cast writes to those types (and fail on uncastable data), stamp
+``SCHEMA_VERSION`` and the table name into each file, and cast older files on read.
+Feature, event, catalogue and result tables are open-ended: they need the common columns
+plus ``instrument_id`` (+ ``ts`` for events), which are typed; the rest is defined by the
+feature, event source or screener that produces them.
+
+Each table also declares how its runs combine (``TableSpec.runs``, ``RUN_MODES``): a
+``snapshot`` run is the partition's full contents (the latest run known at ``as_of`` replaces
+the others); a ``merge`` run is a window or increment (reads union every run known at
+``as_of``, the latest run's row winning per ``table_key``). Backends apply it
+(``storage/backends/run_selection.py``).
+
+The schemas are split by table family: ``market``, ``reference``, ``events``, ``results``
+and ``outcomes`` declare the specs, ``registry`` resolves a table name to its spec and
+``validation`` checks a frame against it. This package re-exports every public name, so
+``from algotrade.storage.tables.schemas import X`` keeps working.
+"""
+
+from algotrade.storage.tables.schemas.events import (
+    ACCESS_STATUSES,
+    ALFRED,
+    ANALYST_ESTIMATE_SNAPSHOTS,
+    ANALYST_VENDOR_ACCESS,
+    CARRIED_FROM,
+    COVERAGE_STATUSES,
+    EARNINGS_8K_SOURCE,
+    EARNINGS_EVENTS,
+    FILING_EVENTS,
+    KNOWN_FROM,
+    LAGGED,
+    MACRO_RELEASE_EVENTS,
+    MACRO_SERIES,
+    NO_ML_TABLES,
+    RELEASE_STATUSES,
+    SHORT_INTEREST_EVENTS,
+    SHORT_VOLUME_EVENTS,
+    SNAPSHOT_KINDS,
+    VINTAGE_KINDS,
+)
+from algotrade.storage.tables.schemas.market import (
+    _BAR_TYPES,
+    BAR_COLUMNS,
+    BAR_INTERVALS,
+    CHAIN_STATUS,
+    FUTURES_CURVE,
+    IBKR_CONTRACTS,
+    IBKR_IV30,
+    LIVE_OPTION_QUOTES,
+    OPTION_QUOTES,
+    TREASURY_RATES,
+    UNDERLYING_QUOTES,
+    UNIVERSE,
+    VERIFICATION_IBKR,
+)
+from algotrade.storage.tables.schemas.outcomes import (
+    _OUTCOME_TYPES,
+    FORWARD_RETURNS,
+    OUTCOME_STATUSES,
+    OUTCOMES_PREFIX,
+    UNMEASURED,
+    outcome_problems,
+    outcomes_spec,
+)
+from algotrade.storage.tables.schemas.reference import (
+    ETF_HOLDINGS,
+    ETF_SHARES,
+    ID_MAP,
+    INDEX_MEMBERSHIP,
+    INSTRUMENT_COMPANY,
+    INSTRUMENT_DESCRIPTION,
+    INSTRUMENT_REFERENCE,
+    INSTRUMENT_SHARES,
+    INSTRUMENT_STATEMENTS,
+    LISTING_HISTORY,
+    SYMBOL_HISTORY,
+)
+from algotrade.storage.tables.schemas.registry import (
+    KNOWN,
+    OPEN_PREFIXES,
+    require_retention,
+    result_table,
+    spec_for,
+    table_key,
+)
+from algotrade.storage.tables.schemas.results import (
+    DISPLAY_COLUMN_MODE,
+    FEEDBACK_DRAFTING_EVENTS,
+    FEEDBACK_FEATURE_REQUESTS,
+    GROUP_MODE,
+    RULE_SCREEN,
+    RULE_SCREEN_VALUES,
+    USAGE_LLM_CALLS,
+    is_criterion_row,
+    is_display_column,
+    is_group_row,
+)
+from algotrade.storage.tables.schemas.validation import (
+    VALUE_CHECKS,
+    access_status_problems,
+    bar_problems,
+    release_status_problems,
+    snapshot_kind_problems,
+    validate_frame,
+    vintage_problems,
+)
+
+__all__ = [
+    "ACCESS_STATUSES",
+    "ALFRED",
+    "ANALYST_ESTIMATE_SNAPSHOTS",
+    "ANALYST_VENDOR_ACCESS",
+    "BAR_COLUMNS",
+    "BAR_INTERVALS",
+    "CARRIED_FROM",
+    "CHAIN_STATUS",
+    "COVERAGE_STATUSES",
+    "DISPLAY_COLUMN_MODE",
+    "EARNINGS_8K_SOURCE",
+    "EARNINGS_EVENTS",
+    "ETF_HOLDINGS",
+    "ETF_SHARES",
+    "FEEDBACK_DRAFTING_EVENTS",
+    "FEEDBACK_FEATURE_REQUESTS",
+    "FILING_EVENTS",
+    "FORWARD_RETURNS",
+    "FUTURES_CURVE",
+    "GROUP_MODE",
+    "IBKR_CONTRACTS",
+    "IBKR_IV30",
+    "ID_MAP",
+    "INDEX_MEMBERSHIP",
+    "INSTRUMENT_COMPANY",
+    "INSTRUMENT_DESCRIPTION",
+    "INSTRUMENT_REFERENCE",
+    "INSTRUMENT_SHARES",
+    "INSTRUMENT_STATEMENTS",
+    "KNOWN",
+    "KNOWN_FROM",
+    "LAGGED",
+    "LISTING_HISTORY",
+    "LIVE_OPTION_QUOTES",
+    "MACRO_RELEASE_EVENTS",
+    "MACRO_SERIES",
+    "NO_ML_TABLES",
+    "OPEN_PREFIXES",
+    "OPTION_QUOTES",
+    "OUTCOMES_PREFIX",
+    "OUTCOME_STATUSES",
+    "RELEASE_STATUSES",
+    "RULE_SCREEN",
+    "RULE_SCREEN_VALUES",
+    "SHORT_INTEREST_EVENTS",
+    "SHORT_VOLUME_EVENTS",
+    "SNAPSHOT_KINDS",
+    "SYMBOL_HISTORY",
+    "TREASURY_RATES",
+    "UNDERLYING_QUOTES",
+    "UNIVERSE",
+    "UNMEASURED",
+    "USAGE_LLM_CALLS",
+    "VALUE_CHECKS",
+    "VERIFICATION_IBKR",
+    "VINTAGE_KINDS",
+    "_BAR_TYPES",
+    "_OUTCOME_TYPES",
+    "access_status_problems",
+    "bar_problems",
+    "is_criterion_row",
+    "is_display_column",
+    "is_group_row",
+    "outcome_problems",
+    "outcomes_spec",
+    "release_status_problems",
+    "require_retention",
+    "result_table",
+    "snapshot_kind_problems",
+    "spec_for",
+    "table_key",
+    "validate_frame",
+    "vintage_problems",
+]

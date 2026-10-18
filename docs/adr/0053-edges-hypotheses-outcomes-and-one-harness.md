@@ -522,3 +522,73 @@ for one thing is removed.
    (screener config hash, edge variant, outcome, universe), which does not read the document's
    status or follow fields. Excluding bookkeeping from `run_hash` is a follow-up if the draw
    stability matters.
+
+## Amendment 2026-10-17: calendar windows as schedules (edge build H5a)
+
+The schedule kinds are now `every_session`, `month_end`, `calendar:<window>` and
+`on_event:<class>`. A calendar window is a stretch of sessions the exchange calendar fixes ahead
+of time, a closed set in `core/time/windows.py` (owner `session-calendar`):
+
+| window | placement (from `core/time/calendar.py` alone) | length |
+|---|---|---|
+| `turn_of_month` | the month's last session and the three after it | 4 |
+| `opex_week` | the sessions ending on the monthly option expiry | 5 |
+| `quarter_end` | the last sessions of March, June, September, December | 5 |
+| `pre_holiday` | the session before a scheduled full-day holiday | 1 |
+
+1. **S and D.** A window's entry session S is the session before its first session; D = S - 1
+   as for every schedule, so `start_offset_sessions` must be 1 (a document that says otherwise is
+   refused).
+2. **One horizon.** A window has a fixed length, so the outcome's `horizon_sessions` is exactly
+   `[length]`, validated by the document parser (variants too). No outcome-grain change: the
+   existing `forward_returns` partition at S serves it.
+3. **No overlap, no peeking.** Windows of one kind never overlap by construction. A window rule
+   may use only the calendar, which is known ahead; an unscheduled closure (a day of mourning,
+   a storm) is not a holiday window, and a window tied to an event date is `on_event:<class>`,
+   never a calendar window. A window cut by the end of the evaluated range is not a window.
+4. **Guide.** Each window has its own glossary term `calendar_<window>`, kept complete by a
+   fitness test (`edge.schedule` is a plain String, so `guide_coverage.toml` cannot map it).
+5. The time-series base for one instrument timed by a window (`base = "out_of_window"`) is not
+   part of this amendment; it is a new comparison and gets its own ADR (H5b).
+
+## Amendment 2026-10-18: the event-class list and subtypes are a contract (edge build H4)
+
+`on_event:<class>[:<subtype>]` names what triggers an event schedule. The classes and their
+subtypes are a closed list in `config/edges/document.py` (`EVENT_CLASSES`, `EVENT_SUBTYPES`,
+`SUBTYPE_REQUIRED`) and the harness reads each from a declared field of a feature group
+(`cross_section/events.py`, `EVENT_FIELDS`); fitness tests keep the three equal, require every
+field to be a catalogue feature, and require a Guide term per class and subtype
+(`event_class_<class>[_<subtype>]`). A new class follows one recipe: a stored event table with
+`known_from` (ADR 0050), a feature group read at D with a sessions-since (or sessions-to when
+announced ahead) count and a date, the two entries, and the Guide terms.
+
+| class | subtypes | read from | anchor (the session of `known_from`) |
+|---|---|---|---|
+| `earnings_reaction` | none | `earnings_reaction@v1` | the reaction's last session |
+| `earnings_expected` (announced ahead) | none | `earnings_expected@v1` | the expected date's session |
+| `index_change` | `addition`, `deletion` | `index_changes@v1` | the first session the change is stored (never the announcement) |
+| `filing_8k` | an item: `1.02`, `2.05`, `3.01`, `4.01`, `4.02`, `5.02` (required) | `filing_events@v1` | the session whose close first follows the acceptance |
+| `nt_late_filing` | none | `filing_events@v1` | same (NT 10-K, NT 10-Q) |
+| `tender_offer` | none | `filing_events@v1` | same (SC TO-I, SC TO-T) |
+| `earnings_date_shift` | `later`, `earlier` | `earnings_date_shift@v1` | the session the shifted date was first stored |
+
+1. **Subtypes fail closed.** An unknown subtype, a subtype of a class that has none, and a
+   `SUBTYPE_REQUIRED` class without one are refused by the document parser and by
+   `event_field`. A subtype is its own count and date fields (an 8-K item) or a label field that
+   must read a value (`index_changes@v1.last_index_change`, `earnings_shift_direction`).
+2. **Base.** `base = "event"` is the names with the event at D of the schedule's own class AND
+   subtype (4.02 filers are compared with other 4.02 filers); `base = "universe"` is everyone.
+   A name whose label reads another subtype is no event of this one and is not UNKNOWN; one with
+   no label is UNKNOWN (`no_event_row`). The leg key carries the subtype only when set, so no
+   existing leg is invalidated.
+3. **Known-from rules.** Filings: ADR 0050 amendment 2026-10-18. `earnings_date_shift`: the
+   shift is the next stored report date less the year-ago report plus 364 days, an event when it
+   is at least 7 days; known from the session the date was FIRST stored in a calendar known by
+   S, and a date first stored at or before the first calendar snapshot is never an event
+   (vendor backfills carry no time), so the history starts at our first stored snapshot.
+   `index_change` keeps ADR 0050's first-stored session, later than the announcement (a lag by
+   design: nothing is lookahead, the rebound window starts after the effective date).
+4. **Not in the list yet** (no field to read, each a follow-up): `ex_dividend` (needs a sessions
+   count: `dividend_schedule@v1` counts calendar days), `macro_release` (a market-entity field
+   the harness does not read), `lockup_expiry` (the IPO table of D8 is not merged), `insider_buy`
+   (Form 4, H12), `spin_off` (needs data).

@@ -42,16 +42,29 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        ``lookback`` sessions before the session up to the session (never a
                        later one, e.g. a declared future ex-date), with ``event_date``; an
                        empty frame when there are none
+- ``events/filing``    ``events.events_by_acceptance``: the SEC event filings that became known
+                       (the first session closing after SEC's acceptance, recomputed from the
+                       stored instant, not the stored ``known_from``) from ``lookback``
+                       sessions before the session up to it, with ``event_date`` that session
+                       (``filing_events@v1``; ADR 0050 amendment, EB H4); an empty frame when
+                       there are none
 - ``instruments/shares``
                        ``shares.share_facts``: every stored share-count and financial (revenue,
                        net income, diluted EPS) fact FILED on or before the session (point in
                        time by filing date), sorted by ``filed``; ``None`` when there is none
+- ``instruments/shares_accepted``
+                       the same facts counted from the session each became public (``shares.
+                       known_from``: the first session whose close is after SEC's
+                       acceptance of the filing, else the session after ``filed``), sorted by it
+                       (``financials@v3``, ``fundamentals@v4``; ADR 0067 amendment)
 - ``instruments/statements``
                        ``statements.reading.statement_facts``: every stored statement line (cost
                        of revenue, operating income, cash flow, balance sheet..., one row per
                        tag, period and filing) FILED on or before the session (point in time by
                        filing date, ADR 0067), sorted by ``filed``, without the stamp columns;
                        ``None`` when there is none
+- ``instruments/statements_accepted``
+                       the statement lines counted from ``known_from`` as above
 - ``analyst/estimate_snapshots``
                        ``analyst.reading.snapshot_window``: our own history of analyst data
                        (ADR 0068), every kind with its coverage markers, for the session plus
@@ -116,7 +129,7 @@ from algotrade.data.analyst.reading import KINDS as ANALYST_KINDS
 from algotrade.data.analyst.reading import TABLE as ANALYST
 from algotrade.data.analyst.reading import snapshot_window
 from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
-from algotrade.data.events import events_by_event_date, stored_events
+from algotrade.data.events import events_by_acceptance, events_by_event_date, stored_events
 from algotrade.data.funds.holdings import TABLE as HOLDINGS
 from algotrade.data.funds.holdings import funds_holdings
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
@@ -134,7 +147,7 @@ from algotrade.data.reference import (
 )
 from algotrade.data.rollups import rollup_rows
 from algotrade.data.shares import TABLE as SHARES
-from algotrade.data.shares import share_facts
+from algotrade.data.shares import known_from, share_facts
 from algotrade.data.statements.reading import TABLE as STATEMENTS
 from algotrade.data.statements.reading import statement_facts
 from algotrade.data.volatility import IBKR_IV30, ibkr_iv30
@@ -290,6 +303,26 @@ def _share_facts(reader: StoreReader, sessions: Sequence[date], lookback: int) -
     return _Snapshots(frame, _days(frame["filed"]) if len(frame) else np.array([], "datetime64[D]"))
 
 
+def _by_known_from(frame: pd.DataFrame) -> _Snapshots:
+    """``frame`` ordered by the session each fact became public (``shares.known_from``)."""
+    if frame.empty:
+        return _Snapshots(frame, np.array([], "datetime64[D]"))
+    days = _days(known_from(frame))
+    order = np.argsort(days, kind="stable")
+    return _Snapshots(frame.iloc[order].reset_index(drop=True), days[order])
+
+
+def _share_facts_accepted(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    return _by_known_from(share_facts(reader))
+
+
+def _statement_facts_accepted(
+    reader: StoreReader, sessions: Sequence[date], lookback: int
+) -> Loaded:
+    frame = statement_facts(reader, sessions[-1], columns=[*STATEMENT_COLUMNS, "accepted_ts"])
+    return _by_known_from(frame)
+
+
 def _statement_facts(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
     frame = statement_facts(reader, sessions[-1], columns=STATEMENT_COLUMNS)
     return _Snapshots(frame, _days(frame["filed"]) if len(frame) else np.array([], "datetime64[D]"))
@@ -364,6 +397,14 @@ def _events_by_date(table: str) -> Loader:
     return load
 
 
+def _filings(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    first = sessions_before(sessions[0], lookback)
+    frame = events_by_acceptance(reader, "events/filing", first, sessions[-1])
+    return _Window(frame, _days(frame["event_date"]), need_session=False)
+
+
+SHARES_ACCEPTED = f"{SHARES}_accepted"  # instruments/shares counted from its acceptance session
+STATEMENTS_ACCEPTED = f"{STATEMENTS}_accepted"
 STATEMENT_COLUMNS = ["concept", "tag", "period_start", "period_end", "filed", "value", "accn"]
 REFERENCE_FACTS = ("instrument_id", "security_type", "symbol", "name", "is_leveraged", "is_inverse")
 
@@ -432,9 +473,12 @@ INPUTS: Mapping[str, Loader] = {
     "events/dividend_declared": _event_snapshots("events/dividend", from_first_session=True),
     "events/split": _events_by_date("events/split"),
     "events/index_change": _events_by_date("events/index_change"),
+    "events/filing": _filings,
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,
+    SHARES_ACCEPTED: _share_facts_accepted,
     STATEMENTS: _statement_facts,
+    STATEMENTS_ACCEPTED: _statement_facts_accepted,
     ANALYST: _analyst_snapshots,
     "instruments/reference": _partition(_reference_facts),
     HOLDINGS: _partition(_leveraged_holdings),

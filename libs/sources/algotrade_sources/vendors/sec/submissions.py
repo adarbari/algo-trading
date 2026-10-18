@@ -1,7 +1,7 @@
 """SEC EDGAR submissions as a filing history: the event filings a company made (8-K and 8-K/A
-with their items, NT 10-K / NT 10-Q late-filing notices, SC TO-I issuer tender offers, Form 25
-delisting notices, 424B4 final prospectuses, Form 10 registrations), with the second each was
-accepted (ADR 0050; free, no key).
+with their items, NT 10-K / NT 10-Q late-filing notices, SC TO-I issuer and SC TO-T third-party
+tender offers, Form 25 delisting notices, 424B4 final prospectuses, Form 10 registrations), with
+the second each was accepted (ADR 0050; free, no key).
 
 ``https://data.sec.gov/submissions/CIK##########.json`` holds a company's most recent filings
 (about 1,000, ``filings.recent``) as parallel arrays (``form``, ``filingDate``,
@@ -16,7 +16,8 @@ block; only when ``since`` is before its oldest filing does it also read the old
 reach ``since`` (``filingTo >= since``), one request each. A single document is saved as
 received; with pages they are saved one document after another (one per line), which
 ``normalize`` reads the same way. Every form stays in the raw payload; ``normalize`` keeps the
-rows of ``FORMS`` filed on or after ``since``. Same pacing, ``User-Agent`` (contact from
+rows of ``FORMS`` (``FilingsRequest.forms``; ``None``: every form) filed on or after ``since``.
+Same pacing, ``User-Agent`` (contact from
 ``ALGOTRADE_SEC_CONTACT``) and 404 rule as the other SEC sources (the ``sec`` limiter,
 ``[sec_edgar]``; 404: no filings for this CIK, ``None``).
 
@@ -28,6 +29,7 @@ instrument id belong to the task.
 """
 
 import re
+from collections.abc import Collection
 from datetime import date
 from typing import Any, NoReturn
 
@@ -110,9 +112,11 @@ def older_pages(document: dict[str, Any], since: date | None) -> list[str]:
     return names
 
 
-def parse_filings(payload: bytes, since: date | None = None) -> pd.DataFrame:
-    """The 8-K and 8-K/A rows (``FILING_COLUMNS``) of every document in ``payload`` filed on
-    or after ``since``, sorted by acceptance."""
+def parse_filings(
+    payload: bytes, since: date | None = None, forms: Collection[str] | None = FORMS
+) -> pd.DataFrame:
+    """The rows (``FILING_COLUMNS``) of the ``forms`` (default ``FORMS``; ``None``: every
+    form) of every document in ``payload`` filed on or after ``since``, sorted by acceptance."""
     parts = []
     cik: str | None = None
     for document in parse_documents(payload):
@@ -127,7 +131,8 @@ def parse_filings(payload: bytes, since: date | None = None) -> pd.DataFrame:
     if cik is None:
         raise ValueError("submissions document has no CIK")
     frame = pd.concat(parts, ignore_index=True)
-    frame = frame[frame["form"].isin(FORMS)]
+    if forms is not None:
+        frame = frame[frame["form"].isin(list(forms))]
     out = pd.DataFrame(
         {
             "cik": cik,
@@ -179,7 +184,8 @@ class SecFilings:
         return page
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
-        frame = parse_filings(payload, filings_request(request).since)
+        wanted = filings_request(request)
+        frame = parse_filings(payload, wanted.since, wanted.forms)
         return Normalized(session_date=None, tables={}, parsed={FILINGS_FRAME: frame})
 
 
