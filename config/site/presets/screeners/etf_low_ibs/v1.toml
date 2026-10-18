@@ -1,0 +1,47 @@
+# ETF closing near its daily low (ADR 0053, ADR 0074, EB E5; edge ibs_etf_mean_reversion): an
+# unleveraged ETF whose close sits in the bottom fifth of the session's own high-low range
+# (internal bar strength, (close - low) / (high - low), below 0.2), ranked by it, the lowest first.
+# A bar whose high equals its low has no value and never passes (ADR 0030). No liquidity gate: the
+# edge's own list of index ETFs is the universe. What it does not check: the market regime, the
+# overnight gap or the volume of the day.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "etf_low_ibs"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "ETFs closing near the day's low"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "ETF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.not_leveraged]
+field = "instrument.is_leveraged"
+op = "eq"
+value = false
+
+[criteria.not_inverse]
+field = "instrument.is_inverse"
+op = "eq"
+value = false
+
+# ------------------------------------------------------------------------ the signal
+[criteria.ibs]
+field = "rollup.trend_stats@v2.close_range_pos"
+op = "lt"
+value = 0.2
+
+[columns]
+close = "rollup.price_stats@v2.close"
+close_range_pos = "rollup.trend_stats@v2.close_range_pos"
+
+[rank]
+tie_break = "rollup.trend_stats@v2.close_range_pos"
+tie_break_order = "asc"
