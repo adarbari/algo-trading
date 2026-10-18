@@ -72,12 +72,14 @@ see_also = ["financials_panel", "earnings_surprise", "forecast_revision", "conse
 
 [[term]]
 id = "financials_analyst"
-term = "Analysts: estimates and targets"
-short = "What analysts expect a company to earn and sell this year and next, and the share price they target."
+term = "Analysts: targets, ratings and estimates"
+short = "What analysts expect a company to earn and sell, how they rate it and the share price they target."
 body = """
 This section sets the market's forecasts beside the reported results. The estimates are the analysts' average for the current fiscal year (FY1) and the year after (FY2): earnings per share, revenue and how many analysts stand behind them. The target is the share price analysts expect, with the highest and the lowest. Upside is the average target over the latest close, minus 1.
 
 Most names have no analyst figures here. The free data source covers a minority of mostly large names, and a missing figure never means analysts expect nothing. When every figure is missing for the same reason, the section says it once. Analysts' EPS usually leaves out one-off items, so forward P/E and the P/E of reported earnings are measured differently: compare them as a rough guide. One or two analysts is an opinion, not a consensus. Check the number of analysts before trusting a forward figure.
+
+The ratings are the monthly count of analysts at strong buy, buy, hold, sell and strong sell. The score is their mean, from 1 (strong sell) to 5 (strong buy), with its change over 90 days. The revisions are how the FY1 estimates moved over 30, 60 and 90 days, and how the number of analysts behind them changed. A revision status of BUILDING or NO_PRIOR means we hold too little history for every window yet. It does not mean the estimates did not move.
 """
 see_also = ["financials_panel", "consensus_forecast", "unavailable_not_covered", "financials_valuation", "forecast_revision"]
 

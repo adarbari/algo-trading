@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { NAMES_PER_REQUEST } from '@/entities/instrument';
 
-import { FINANCIALS_PARTS, KEY_METRICS, SECTIONS } from './sections';
+import { FINANCIALS_NAMES, KEY_METRICS, SECTIONS } from './sections';
 
 describe('the key metrics strip', () => {
   it('has the owner nine, in the owner order', () => {
@@ -34,12 +34,21 @@ describe('the analysts section', () => {
     expect(analysts?.collapseGaps).toBeTruthy();
   });
 
-  it('reads the targets, the estimates and the forward formulas, with both statuses', () => {
+  it('reads the targets, the ratings, the estimates and their revisions, with all four statuses', () => {
     expect(analysts?.rows.map((r) => r.name)).toEqual([
       'rollup.analyst_targets@v1.target_consensus',
       'feature.target_upside',
       'rollup.analyst_targets@v1.target_high',
       'rollup.analyst_targets@v1.target_low',
+      'rollup.analyst_ratings@v1.rating_strong_buy',
+      'rollup.analyst_ratings@v1.rating_buy',
+      'rollup.analyst_ratings@v1.rating_hold',
+      'rollup.analyst_ratings@v1.rating_sell',
+      'rollup.analyst_ratings@v1.rating_strong_sell',
+      'rollup.analyst_ratings@v1.rating_count',
+      'rollup.analyst_ratings@v1.rating_score',
+      'rollup.analyst_ratings@v1.rating_score_change_90d',
+      'rollup.analyst_ratings@v1.rating_month',
       'rollup.analyst_estimates@v1.eps_fy1',
       'rollup.analyst_estimates@v1.eps_fy2',
       'rollup.analyst_estimates@v1.fy1_period_end',
@@ -49,10 +58,33 @@ describe('the analysts section', () => {
       'rollup.analyst_estimates@v1.revenue_fy2',
       'rollup.analyst_estimates@v1.eps_fy1_analysts',
       'rollup.analyst_estimates@v1.revenue_fy1_analysts',
+      'rollup.analyst_revisions@v1.eps_fy1_revision_30d',
+      'rollup.analyst_revisions@v1.eps_fy1_revision_60d',
+      'rollup.analyst_revisions@v1.eps_fy1_revision_90d',
+      'rollup.analyst_revisions@v1.revenue_fy1_revision_30d',
+      'rollup.analyst_revisions@v1.revenue_fy1_revision_90d',
+      'rollup.analyst_revisions@v1.eps_fy1_analysts_change_90d',
     ]);
     expect(analysts?.statuses).toEqual([
       'rollup.analyst_estimates@v1.estimates_status',
       'rollup.analyst_targets@v1.targets_status',
+      'rollup.analyst_ratings@v1.ratings_status',
+      'rollup.analyst_revisions@v1.revisions_status',
+    ]);
+  });
+
+  it('shows the score change and every revision signed, and the counts plain', () => {
+    const signed = analysts?.rows.filter((r) => r.signed).map((r) => r.id);
+    expect(signed).toEqual([
+      'upside',
+      'r-score-90',
+      'fwd-eps-growth',
+      'eps-rev-30',
+      'eps-rev-60',
+      'eps-rev-90',
+      'revenue-rev-30',
+      'revenue-rev-90',
+      'eps-analysts-90',
     ]);
   });
 
@@ -63,10 +95,9 @@ describe('the analysts section', () => {
 });
 
 describe('the names the panel sends', () => {
-  it('stay within the API cap per request and cover every strip and section name', () => {
-    expect(FINANCIALS_PARTS).toHaveLength(3);
-    for (const part of FINANCIALS_PARTS) expect(part.length).toBeLessThanOrEqual(NAMES_PER_REQUEST);
-    const sent = new Set(FINANCIALS_PARTS.flat());
+  it('fit one request (ten slots of the API cap) and cover every strip and section name', () => {
+    expect(FINANCIALS_NAMES.length).toBeLessThanOrEqual(10 * NAMES_PER_REQUEST);
+    const sent = new Set(FINANCIALS_NAMES);
     for (const m of KEY_METRICS) expect(sent.has(m.name)).toBe(true);
     for (const section of SECTIONS) {
       for (const name of [...section.statuses, ...section.rows.map((r) => r.name)]) {
@@ -75,10 +106,10 @@ describe('the names the panel sends', () => {
     }
   });
 
-  it('send the analyst names in their own request and no name twice', () => {
-    const [, , analystPart = []] = FINANCIALS_PARTS;
-    expect(analystPart).toContain('rollup.analyst_targets@v1.target_consensus');
-    const all = FINANCIALS_PARTS.flat();
-    expect(new Set(all).size).toBe(all.length);
+  it('send the ratings and revisions names and no name twice', () => {
+    expect(FINANCIALS_NAMES).toContain('rollup.analyst_targets@v1.target_consensus');
+    expect(FINANCIALS_NAMES).toContain('rollup.analyst_ratings@v1.ratings_status');
+    expect(FINANCIALS_NAMES).toContain('rollup.analyst_revisions@v1.eps_fy1_revision_30d');
+    expect(new Set(FINANCIALS_NAMES).size).toBe(FINANCIALS_NAMES.length);
   });
 });
