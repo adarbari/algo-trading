@@ -1,0 +1,79 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea family B (docs/edge-ideas/events.md). Screener:
+# dividend_month (dividend_months@v1).
+id = "dividend_month_premium"
+name = "Dividend-month premium"
+family = "B"
+thesis = "Stocks earn abnormal returns in the months they are expected to pay a dividend, and give some back later."
+mechanism = """Dividend-seeking investors buy ahead of a predictable payout (price pressure), and
+the free-dividend fallacy makes them treat the payout as income: a small, predictable demand shock
+with no information (Hartzmark and Solomon 2013, 2019)."""
+persistence = """The demand is structural (income clienteles, dividend-capture funds) and the
+returns are small per name, so it takes breadth to harvest; there is no risk to be paid for, only
+uninformed demand, which the premium's age (1927 on) suggests has not been arbitraged away."""
+schedule = "month_end"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["dividend_month"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """The expected month is the calendar month after the decision session's own (a month-end
+D reads the coming month): expected_div_month_flag is true when the name had an ex-dividend date
+in that calendar month in at least one of the last 3 years (specials excluded), and the 50 names
+with the most hits rank first. It is the paper's prediction
+simplified: Hartzmark and Solomon derive the month from the last payment and its frequency (3, 6
+or 12 months later); the 3-year history reads the same months for regular payers. The premium is
+strongest between declaration and ex-date; this edge holds the month, not the window. The history is
+bars and dividends back to 2010 or later once the rollup is backfilled (three years of dividends are
+needed first). Month-end start sessions spaced at least 20 sessions apart. Long side only."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY for the 20 sessions after the entry close (the session after a
+month-end decision, so about the expected month), net of 10 bps a round trip."""
+trigger_timing = """The flag is computed from the dividends known by the decision session D (a
+month end) and the 3 years before it, never from the coming month's declared dividend; the entry
+session is S = D + 1."""
+replication = """Hartzmark and Solomon: predicted payers in the month, long, against all other
+stocks (their abnormal return is against the rest of the market); here the 50 names with the most
+expected months among the liquid common stocks that expect a dividend, compared with all eligible
+names."""
+expected_size = """+53 bp a month against all other stocks and +37 bp against payers outside their
+predicted month, 1927-2009 (Hartzmark and Solomon 2013, verified); Chen and Zimmermann carry it as
+DivSeason, long-short 0.36% a month, t = 16. Post-publication decay is not stated in their data."""
+capacity_costs = """Many names and a monthly turn: cost per name is small but trades are many; best
+as a tilt on a long book. 10 bps a round trip is the assumption."""
+failure_modes = """The month's gain being a payer or value tilt, and a premium that decays after
+publication. Retire if the frozen-period excess return is not above the buy-and-hold mean of the
+eligible names, or the expected-month names do no better than payers outside their month."""
+decoys = """The low-volatility and quality tilt of dividend payers, size and value: the 12-1
+momentum and size baselines on the same sessions; the calendar structure (a payer outside its
+month) is the real test."""
+
+[[sources]]
+title = "Hartzmark, S. and Solomon, D., The Dividend Month Premium, Journal of Financial Economics, 2013"
+url = "https://doi.org/10.1016/j.jfineco.2013.02.015"
+
+[[sources]]
+title = "Hartzmark, S. and Solomon, D., The Dividend Disconnect, Journal of Finance, 2019"
+
+[[sources]]
+title = "Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (signal DivSeason)"
+url = "https://github.com/OpenSourceAP/CrossSection"
+
+# The literature's figure (ADR 0064): Hartzmark and Solomon's abnormal return of stocks in their
+# predicted dividend month over all other stocks, 53 bp a month, CRSP 1927-2009, before costs
+# (the long leg).
+[published]
+measure = "mean_excess"
+value = 0.0053
+horizon_sessions = 20
+sample = 83
+source = 0

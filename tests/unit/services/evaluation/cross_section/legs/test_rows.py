@@ -33,7 +33,11 @@ from algotrade.services.evaluation.cross_section.legs.store import (
     read_legs,
     write_legs,
 )
-from algotrade.services.evaluation.cross_section.measures import Pick, SessionStat
+from algotrade.services.evaluation.cross_section.measures import (
+    UNCOUNTED_BAND,
+    Pick,
+    SessionStat,
+)
 from algotrade.services.evaluation.cross_section.random_picks import RandomStat, SectorDraws
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
@@ -299,3 +303,50 @@ def test_a_short_leg_is_all_short_picks_with_their_values_in_pick_values() -> No
     back = decode_leg(encode_leg(short, "site", "drift")).stat
     assert back == short.stat and all(p.side == "short" for p in back.picks)
     assert back.short_values is None
+
+
+def test_a_buy_hold_band_round_trips_and_a_leg_without_one_stores_nothing_new() -> None:
+    """Leg v4: the band's names as ``band_*`` lists, a name with no counted value as a null value
+    (never 0); a leg of an edge without ``hold_rank`` has null columns and reads back with none."""
+    below = (
+        Pick("EQ:F", 6, "", 0.05),
+        Pick("EQ:G", 7, UNCOUNTED_BAND, None),
+        Pick("EQ:H", 8, "", -0.02),
+    )
+    banded = leg(stat=stat(band=below))
+    row = encode_leg(banded, "site", "drift")
+    assert row["band_ids"] == ["EQ:F", "EQ:G", "EQ:H"] and row["band_ranks"] == [6, 7, 8]
+    assert row["band_values"] == [0.05, None, -0.02]
+    assert decode_leg(row).stat == banded.stat and decode_leg(row).stat.band == below
+    plain = encode_leg(leg(), "site", "drift")
+    assert (plain["band_ids"], plain["band_ranks"], plain["band_values"]) == (None, None, None)
+    assert decode_leg(plain).stat.band == ()
+    legacy = {k: v for k, v in plain.items() if not k.startswith("band_")}  # a leg before v4
+    assert decode_leg(legacy).stat.band == ()
+    assert {"band_ids", "band_ranks", "band_values"} <= {c.name for c in EDGE_LEGS.columns}
+
+
+def test_a_portfolio_book_round_trips_and_every_other_leg_stores_nothing_new() -> None:
+    """Leg v5 (ADR 0074): the book's weights as ``weight_ids`` / ``weight_values`` and a session
+    with no value as ``portfolio_reason``; null columns in every other leg, which read back with
+    no book and no reason (a leg from before v5 has no such columns at all)."""
+    book = (("EQ:A", 0.25), ("EQ:B", 0.5), ("CASH", 0.25))
+    held = leg(stat=stat(pick_values=(0.01,), pick_hits=1, picks=(), weights=book))
+    row = encode_leg(held, "site", "drift")
+    assert row["weight_ids"] == ["EQ:A", "EQ:B", "CASH"]
+    assert row["weight_values"] == [0.25, 0.5, 0.25] and row["portfolio_reason"] is None
+    assert decode_leg(row).stat == held.stat and decode_leg(row).stat.weights == book
+    lost = leg(stat=stat(excluded_coverage=1, portfolio_reason="no_benchmark_row:AGG"))
+    again = decode_leg(encode_leg(lost, "site", "drift")).stat
+    assert again.portfolio_reason == "no_benchmark_row:AGG" and again.weights == ()
+    plain = encode_leg(leg(), "site", "drift")
+    assert (plain["weight_ids"], plain["weight_values"], plain["portfolio_reason"]) == (
+        None,
+        None,
+        None,
+    )
+    legacy = {k: v for k, v in plain.items() if not k.startswith(("weight_", "portfolio_"))}
+    assert decode_leg(legacy).stat.weights == ()
+    assert {"weight_ids", "weight_values", "portfolio_reason"} <= {
+        c.name for c in EDGE_LEGS.columns
+    }

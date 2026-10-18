@@ -1,0 +1,27 @@
+# L3 site setting: the Guide's playbook for the site preset fifty_two_week_high (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Typed by src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "fifty_two_week_high"
+version = 1  # the preset version this prose was written for
+summary = "Ranks every tradeable name by how close its close is to its 52-week high, closest first. George and Hwang find traders anchor on the high, so names near it keep rising. It is a candidate edge under test."
+hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, with a 52-week high on record. Every such name qualifies; the one at or nearest its high ranks first."
+not_checked = "It does not check when the high was set, volume, or the market's direction. Names with fewer than 240 bars in the last 252 sessions are left out."
+before_acting = [
+  "Many names tie at 0 on a strong market day (a new high): the order among them is not meaningful, so read the decile spread rather than the top of the list.",
+  "A name at its high after a takeover offer is pinned, not rising: feature.pct_from_high_52w near 0 with an ATR near 0 is the signature.",
+]
+sources = [
+  "George and Hwang, The 52-Week High and Momentum Investing (2004)",
+]
+related = [
+  { id = "momentum_12_1", reason = "the 12-month winners, whatever their distance to the high" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+pct_from_high = "Has a 52-week high to measure from"

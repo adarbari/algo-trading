@@ -18,7 +18,7 @@ purpose = "L3 site settings: one <name>.toml per settings group, each loaded by 
 
 [[config_dir]]
 path = "config/site/field_guide"
-purpose = "L3 field guide, one <theme>.toml per theme (the situations sit in instrument.toml; statements.toml holds the SEC statement groups, analyst.toml the analyst consensus fields): how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
+purpose = "L3 field guide, one <theme>.toml per theme (the situations sit in instrument.toml; statements.toml holds the SEC statement groups, analyst.toml the analyst consensus fields and, while the other files sit at the 1000-line cap, the edge build's fundamentals entries under their own themes): how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
 
 [[config_dir]]
 path = "config/site/features"
@@ -74,7 +74,11 @@ purpose = "the Guide's playbook prose (ADR 0051), one subfolder per playbook fam
 
 [[config_dir]]
 path = "config/site/guide/playbooks/trend"
-purpose = "the Guide's playbooks of the trend families (trend continuation, pullback, 12-1 momentum, size): one <id>.toml per preset the family lists in sections.toml"
+purpose = "the Guide's playbooks of the trend families (trend continuation, pullback, 12-1 momentum, size, the decoys): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/factors"
+purpose = "the Guide's playbooks of the factor family (the 12-1 momentum variants, industry momentum, low beta, low volatility): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/guide/playbooks/breakouts"
@@ -82,15 +86,31 @@ purpose = "the Guide's playbooks of the breakout family (range breakout, breakou
 
 [[config_dir]]
 path = "config/site/guide/playbooks/reversals"
-purpose = "the Guide's playbooks of the reversal family (support reversal, oversold reversal, exhaustion): one <id>.toml per preset the family lists in sections.toml"
+purpose = "the Guide's playbooks of the reversal family (support reversal, oversold reversal, exhaustion, residual and sector reversal): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/guide/playbooks/income"
 purpose = "the Guide's playbooks of the option income family (VRP scanner): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
+path = "config/site/guide/playbooks/options_signals"
+purpose = "the Guide's playbooks of the option-implied signals family (call-put IV spread, smirk, IV change, option-to-stock volume, lottery attention): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/cross_section"
+purpose = "the Guide's playbooks of the cross-section rank family (volume shock, dividend month, composite mispricing): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
 path = "config/site/guide/playbooks/events"
-purpose = "the Guide's playbooks of the earnings events family (post-earnings drift, earnings announcement premium): one <id>.toml per preset the family lists in sections.toml"
+purpose = "the Guide's playbooks of the earnings events family (post-earnings drift, earnings announcement premium, earnings-date advances, pre-earnings run-up, earnings gaps on volume, reversals into a report): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/filings"
+purpose = "the Guide's playbooks of the filings and index changes family (adverse 8-K items, late filers, tender offers, S&P 500 deletions): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/fundamentals"
+purpose = "the Guide's playbooks of the quality and value family (cash-based operating profitability, composite value, quality minus junk, net share issuance, asset growth, distress, BDC price to NAV): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/regime"
@@ -164,6 +184,10 @@ purpose = "the web UI: frontend architecture (layers, rules) and the design syst
 path = "docs/decisions"
 purpose = "the decision log: product-direction and policy decisions, by the owner or by a Fable agent on their behalf, append-only (.claude/skills/review-and-release)"
 kind = "log"
+
+[[docs_dir]]
+path = "docs/edges"
+purpose = "the generated edge pages, one per family (a.md .. i.md, other.md for an edge with no family); rendered by make features-doc from config/site/edges/, indexed by docs/edges.md"
 
 [[docs_dir]]
 path = "docs/edge-ideas"

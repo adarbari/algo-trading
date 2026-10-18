@@ -18,7 +18,8 @@ from algotrade.core.views.market_features import MARKET_FEATURES
 from algotrade.data import StoreReader
 from algotrade.data.listings.membership import TABLE as MEMBERSHIP_TABLE
 from algotrade.data.listings.universe import TABLE as LISTING_TABLE
-from algotrade.data.reference import UNIVERSE_TABLE
+from algotrade.data.rates import curve
+from algotrade.data.reference import UNIVERSE_TABLE, resolver
 from algotrade.services.evaluation.cross_section.historical import (
     HistoricalCaveat,
     IdentityTally,
@@ -68,7 +69,11 @@ class SessionReads:
         self._labels: dict[date, str] = {}
         self._implied: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
         self._adv: dict[tuple[frozenset[str], date], dict[str, float | None]] = {}
+        self._siblings: dict[tuple[str, frozenset[str], date], dict[str, str | None]] = {}
         self._sectors: dict[tuple[frozenset[str], date], dict[str, str | None]] = {}
+        self._numbers: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
+        self._bills: dict[date, float | None] = {}
+        self._tickers: dict[tuple[tuple[str, ...], date], dict[str, str | None]] = {}
         self._outcomes: dict[tuple[str, int, date], pd.DataFrame] = {}
         self._snapshots: set[date] = set()
         self._identity = IdentityTally()
@@ -148,7 +153,11 @@ class SessionReads:
         self._labels.clear()
         self._implied.clear()
         self._adv.clear()
+        self._siblings.clear()
         self._sectors.clear()
+        self._numbers.clear()
+        self._bills.clear()
+        self._tickers.clear()
         self._outcomes.clear()
 
     def label(self, day: date) -> str:
@@ -164,6 +173,15 @@ class SessionReads:
             self._implied[key] = implied_at(self._reader, field_name, ids, day)
         return self._implied[key]
 
+    def siblings(self, field_name: str, ids: frozenset[str], day: date) -> dict[str, str | None]:
+        """The sibling id ``field_name`` gives each of ``ids`` read at D (None: not stored), through
+        the recording reader: a restated reference partition invalidates the legs that read it,
+        and a sibling that changed is the one D saw, never today's (EB H9)."""
+        key = (field_name, ids, day)
+        if key not in self._siblings:
+            self._siblings[key] = strings_at(self._reader, field_name, ids, day)
+        return self._siblings[key]
+
     def adv(self, ids: frozenset[str], day: date) -> dict[str, float | None]:
         """``adv_usd_20d`` of ``ids`` at D (None: not stored, never 0), read once per eligible
         set and session through the recording reader, so a restated liquidity partition
@@ -172,6 +190,39 @@ class SessionReads:
         if key not in self._adv:
             self._adv[key] = numbers_at(self._reader, ADV_FIELD, ids, day)
         return self._adv[key]
+
+    def numbers(self, field_name: str, ids: frozenset[str], day: date) -> dict[str, float | None]:
+        """The declared numeric feature ``field_name`` of ``ids`` at D (None: not stored, never
+        0), read once per set and session through the recording reader (a portfolio book's
+        volatility, ADR 0074)."""
+        key = (field_name, ids, day)
+        if key not in self._numbers:
+            self._numbers[key] = numbers_at(self._reader, field_name, ids, day)
+        return self._numbers[key]
+
+    def bill_yield(self, day: date) -> float | None:
+        """The shortest-tenor Treasury bill yield (a decimal per year) of the curve ``day`` sees,
+        the latest stored on or before it (``data.rates``: known at D); None when no curve is
+        stored or the day is before the first one. What cash earns in a portfolio book (0074)."""
+        if day not in self._bills:
+            try:
+                found = curve(self._reader, day)
+            except MissingDataError:
+                self._bills[day] = None
+            else:  # before the first curve the read falls back to a LATER one: not known at D
+                ok = len(found.frame) and not found.pre_snapshot
+                self._bills[day] = float(found.frame["rate_par"].iloc[0]) if ok else None
+        return self._bills[day]
+
+    def instruments(self, tickers: tuple[str, ...], on: date) -> dict[str, str | None]:
+        """The instrument id each ticker names in the reference snapshot ``on`` sees (None: the
+        snapshot does not know it): how the benchmark's constituents are found, only through the
+        resolver (ADR 0018), never built."""
+        key = (tickers, on)
+        if key not in self._tickers:
+            found = resolver(self._reader, on)
+            self._tickers[key] = {t: found.id_for(t) if found.knows(t) else None for t in tickers}
+        return self._tickers[key]
 
     def sectors(self, ids: frozenset[str], day: date) -> dict[str, str | None]:
         """``instrument.sector`` of ``ids`` at D (None: not stored), read once per set and session
@@ -224,3 +275,13 @@ def numbers_at(
         i: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
         for i, v in values.items()
     }
+
+
+def strings_at(
+    reader: StoreReader, field_name: str, ids: Iterable[str], day: date
+) -> dict[str, str | None]:
+    """The text field ``field_name`` of ``ids`` read at ``day`` (None: not stored or not text)."""
+    wanted = sorted(ids)
+    view, _ = fields_view(reader, (field_name,), day, wanted, historical=True, held=HARNESS_ALL)
+    values = {i: view.get(i, field_name) for i in wanted}
+    return {i: v if isinstance(v, str) and v else None for i, v in values.items()}

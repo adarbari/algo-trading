@@ -2,7 +2,9 @@
 
 from datetime import UTC, date, datetime, timedelta
 
+from algotrade_ingestion.tasks.derived.residual_returns import check_residual_returns
 from algotrade_ingestion.tasks.maintenance.quality import Check
+from algotrade_ingestion.workflows.nightly.nightly import NIGHTLY, SCREENS
 from algotrade_ingestion.workflows.nightly.timing import (
     arrival_line,
     arrival_stats,
@@ -125,3 +127,10 @@ def test_observe_reads_publication_checks() -> None:
     assert observe("chains", [Check("chains_fetch", "PASS", "")]) is None
     assert observe("rollups", stale) is None
     assert minutes_after_close(T0, T0 - timedelta(minutes=58)) == 58.0
+
+
+def test_residual_returns_follows_outcomes_and_rollups_and_never_holds_back_the_screens() -> None:
+    (step,) = [s for s in NIGHTLY if s.name == "residual-returns"]
+    assert set(step.needs) == {"outcomes", "rollups"} and not step.critical
+    assert step.accept == (check_residual_returns,)
+    assert "residual-returns" not in next(s for s in NIGHTLY if s.name == SCREENS).needs

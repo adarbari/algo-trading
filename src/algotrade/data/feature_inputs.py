@@ -420,7 +420,10 @@ def _filings(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Lo
 SHARES_ACCEPTED = f"{SHARES}_accepted"  # instruments/shares counted from its acceptance session
 STATEMENTS_ACCEPTED = f"{STATEMENTS}_accepted"
 STATEMENT_COLUMNS = ["concept", "tag", "period_start", "period_end", "filed", "value", "accn"]
-REFERENCE_FACTS = ("instrument_id", "security_type", "symbol", "name", "is_leveraged", "is_inverse")
+REFERENCE_FACTS = (
+    "instrument_id", "security_type", "symbol", "name", "is_leveraged", "is_inverse", "cik",
+    "share_class_figi",
+)  # fmt: skip
 
 
 def _reference_facts(reader: StoreReader, session: date) -> pd.DataFrame | None:

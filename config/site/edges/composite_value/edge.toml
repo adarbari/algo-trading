@@ -1,0 +1,53 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Catalogue: docs/edge-ideas/ (edge build E2).
+id = "composite_value"
+name = "Composite value among cash-profitable names"
+family = "A"
+thesis = "Cheap stocks that are also cash-profitable outperform the market over the following months."
+mechanism = """Investors extrapolate past growth and overpay for glamour; cheap names are priced for decline, and pairing cheapness with profitability removes the value traps whose low price reflects a shrinking business (Lakonishok, Shleifer and Vishny 1994; Novy-Marx 2013)."""
+persistence = """Value alone has had a Sharpe near zero in the US since 2007 and is cheap itself (Israel, Laursen and Richardson 2021); the cheap-and-profitable combination is the robust trade in the research and is uncomfortable to hold in growth rallies, which keeps it from being arbitraged away."""
+schedule = "month_end"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["composite_value"]
+baselines = ["cash_op_profitability", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). A variant of cash_based_operating_profitability filed as its own edge so that edge's published figure is not read against this rule: the screener holds names with positive cash-based operating profitability and a positive composite_value_yield (the mean of EBIT / enterprise value and the free cash flow yield, a catalogue formalisation with no book to market or growth part), cheapest first; cash_op_profitability is the baseline, so the harness shows whether cheapness adds to profitability. No published figure is carried: the sources give approximate sizes only. long_short, where run, is diagnostic only."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions)."""
+
+trigger_timing = """Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S."""
+
+replication = """Lakonishok, Shleifer and Vishny: deciles on book to market, earnings to price, cash flow to price and sales growth, annual. Here the top 50 by a two-part yield (EBIT to enterprise value and free cash flow to market value) among names with positive cash-based operating profitability, monthly: a partial replication without the book to market and growth parts."""
+
+expected_size = """Value-minus-glamour was about 10% a year, 1968-1990 (approximate, not verified), and the HML factor about 0.3% a month 1963-2024 and near zero since 2007 (approximate). Combined with profitability the catalogue expects a modest premium. A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it."""
+
+capacity_costs = """Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume): low turnover, small spreads; the 10 bps round trip is the assumption. No short leg in the main outcome."""
+
+failure_modes = """Cheap names cluster in cyclical sectors at peak earnings (a high yield on peak profit) and lag in growth rallies. Retire if the frozen-period decile spread is not above zero or the top 50 does not beat the buy-and-hold mean of the eligible names."""
+
+decoys = """The profitability tilt alone (the cash_op_profitability baseline), sector and interest-rate exposure, and size (the size baseline on the same sessions)."""
+
+[[sources]]
+title = "Lakonishok, J., Shleifer, A. and Vishny, R., Contrarian Investment, Extrapolation, and Risk, Journal of Finance, 1994"
+
+[[sources]]
+title = "Asness, C. and Frazzini, A., The Devil in HML's Details, Journal of Portfolio Management, 2013"
+
+[[sources]]
+title = "Novy-Marx, R., The Other Side of Value: The Gross Profitability Premium, Journal of Financial Economics, 2013"
+url = "https://www.nber.org/system/files/working_papers/w15940/w15940.pdf"
+
+[[variants]]
+id = "spread"
+[variants.outcome]
+side = "long_short"

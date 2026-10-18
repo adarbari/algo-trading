@@ -52,7 +52,9 @@ from algotrade.services.jobs import JobContext
 from algotrade.storage.runs import published
 from algotrade_ingestion.tasks.analyst.backlog import check_analyst_backlog, check_finnhub_backlog
 from algotrade_ingestion.tasks.derived.history_copy import check_history_copy
+from algotrade_ingestion.tasks.derived.option_outcomes import check_option_outcomes
 from algotrade_ingestion.tasks.derived.outcomes import check_outcomes
+from algotrade_ingestion.tasks.derived.residual_returns import check_residual_returns
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
 from algotrade_ingestion.tasks.framework.run import (
     RETRYABLE,
@@ -269,6 +271,23 @@ NIGHTLY: tuple[Step, ...] = (
         needs=("bars", "corporate-actions", "bar-quality"),
         critical=False,
         accept=(check_outcomes,),
+    ),
+    # Chain P&L of the option windows the session closes (ADR 0053 amendment, EB H13): the stored
+    # chains of the window's sessions, read only by the edge harness. Optional, forward-only.
+    Step(
+        "option-outcomes",
+        needs=("chains",),
+        critical=False,
+        accept=(check_option_outcomes,),
+    ),
+    # The factor-neutral sibling of the outcomes (ADR 0053 amendment, EB H11): the same windows
+    # less the loadings of factor_betas@v1 (the rollups step) times the ETF factor returns.
+    # Optional: a gap is UNMEASURED rows, a failure never holds back the screens.
+    Step(
+        "residual-returns",
+        needs=("outcomes", "rollups"),
+        critical=False,
+        accept=(check_residual_returns,),
     ),
     # Every session, catch-up too: the screeners read only stored features, and a complete
     # session without screener runs would be served as one (ADR 0062). In a catch-up session the

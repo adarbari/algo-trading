@@ -603,7 +603,7 @@ them standard, measured on the same sessions, and reports how much each overlaps
    leave it out; the decoy report flags a decoy with no common session as not measured.
 6. **`LEG_VERSION` 3.** Every screener's out-of-sample leg now holds the stratified draws, so
    no stored leg is the one a run would compute: all legs recompute once. H7 (buy/hold bands)
-   bumps it again; run the one full re-run after both merge, not after each.
+   bumps it again (to 4); run the one full re-run after both merge, not after each.
 
 ## Amendment 2026-10-18: the event-class list and subtypes are a contract (edge build H4)
 
@@ -744,3 +744,251 @@ column, and reads the stored `forward_returns@v2` window and the implied vol at 
 6. **Not here.** The chain P&L grain (H13) and a short-put P&L (needs a strike key and a put
    price) are a follow-up PR. The short delta-hedged side is its own structure value
    (`delta_hedged_atm_short`), not a `side` key. The stored basis column is left to H13.
+
+## Amendment 2026-10-18: residual returns, a factor-neutral outcome (edge build H11)
+
+A momentum or small-cap edge can look like alpha when it only holds a cheap, small or
+high-momentum basket. The harness gets a second outcome grain whose value is the return left
+after the loadings the name had before the entry session, so the same statistics can be read
+factor-neutral.
+
+1. **A sibling grain, v2 untouched.** `outcomes/instrument/residual_returns@v1`, partition S,
+   runs merge per (instrument, horizon): `fwd_residual_return`, `fwd_factor_return` (the part
+   removed), `beta_session`, `outcome_status` (COMPLETE, DELISTED, UNMEASURED), `outcome_reason`.
+   `forward_returns@v2` is unchanged, so no stored leg is invalidated and a document that never
+   names the measure hashes as before (`measure` is already in the outcome's identity as None).
+   Written only by ingestion (`tasks/derived/residual_returns.py`, a registered task; the arithmetic
+   is `residual_paths.py`), read only through `algotrade.data.outcomes` (`residuals.py`: the same
+   import contract, importable only from `services/evaluation`).
+2. **The maths.** `residual = fwd_return - sum_k beta_k x factor_k return`, the factor returns the
+   simple returns over S..end of the proxies of `factor_betas@v1` (market SPY; size IWM - SPY;
+   momentum MTUM - SPY; value VLUE - SPY). `end` is T, or a delisted name's last
+   bar, as in the forward row. The betas come from log returns and the window sums simple
+   returns: a first-order match, stated rather than hidden. The sector loading is
+   left out (review decision): `factor_betas@v1` stores the four betas of one four-factor fit and
+   `beta_sector` from a different five-factor fit, so adding it counts sector exposure twice.
+   Sector would need a `factor_betas@v2` storing all five betas of the five-factor fit.
+3. **Point in time.** The betas are the `factor_betas@v1` rows of the session before S
+   (`previous_session(S)`), estimated on the 252 sessions ending there, read through
+   `data.rollups`. Nothing of the
+   window enters them; for the usual offset of 1 they are exactly the betas known at the
+   decision session D. A later partition is never read (the exact session, not "on or before").
+4. **Gaps are UNMEASURED with a reason, never market-only, never zero.** `NO_FACTOR_HISTORY` (a
+   factor ETF has no bar at S: MTUM and VLUE start in 2013, so every earlier window; or the betas
+   row says so), `NO_BETAS` (no partition or no row before S, or a non-finite beta),
+   `SHORT_HISTORY` (the betas say too few joint returns), `NO_FACTOR_BAR` (a factor ETF
+   has no bar at the end), `BAD_BAR` (carried from the forward row). The harness treats such a
+   row like an `UNMEASURED` forward row: excluded as `unmeasured`, counted, and a session most of
+   whose picks are unmeasured is not measured. A forward row with no residual row at all
+   (`NO_RESIDUAL_ROW`: the task has not run for its window) is the same.
+5. **The document.** An `excess_return` outcome may set `measure = "residual_return"`
+   (`EXCESS_MEASURES`); any other measure on an `excess_return`, and this one on a `hit_target`,
+   is refused. Everything else is the excess return's: the cost is charged once, a short side
+   is minus the residual less cost and borrow, the trial statistics are over a return. The
+   benchmark key stays (SPY) and is unused by the value. In `hit.py` the field is
+   `fwd_residual_return` where the excess return's is `fwd_excess_return`; `measuring.py` reads
+   the residual rows once beside the forward ones and attaches them (`attach_residuals`) for the
+   horizons whose edges measure it. A read that did not attach them (the training frame, the
+   paper settlement) fails loudly for a residual edge instead of reading the excess return.
+6. **The verdict says so.** `EdgeFacts.neutral`: the headline names the figure "factor-neutral:
+   market, size, momentum and value taken off". The Guide term `outcome_residual_return`
+   explains it; `tests/architecture/guide/test_outcome_measures.py` fails until every
+   `EXCESS_MEASURES` value has its term.
+7. **Leg reuse and settlement.** The leg-reuse stamps (ADR 0063) cover the residual partitions
+   when any plan measures a residual return: each partition's sequence is the forward one times
+   `SEQ_SCALE` plus the residual one, and a (S, horizon) stamp is the later of the two
+   `knowledge_ts`, so a backfill of the residual grain re-measures exactly the legs stored with
+   `NO_RESIDUAL_ROW` (an edge that does not measure it is unaffected). The paper settlement
+   (`forward/settle.py`) attaches the residual rows for a residual edge: a trade whose residual
+   row is not stored stays open until the grace window ends, then is skipped with the reason; it
+   never reads the excess return and never stops the other edges' settlement. The training frame
+   still refuses a residual edge loudly (no attach there).
+8. **The nightly step.** `residual-returns` (needs `outcomes` and `rollups`, optional) runs the
+   task each night and is accepted by `check_residual_returns`: every forward outcome of the
+   session's windows has a residual row (FAIL otherwise), UNMEASURED rows are a WARN naming
+   their reasons (the ETFs themselves have no betas row, so a WARN is the normal state).
+9. **Not here.** Sector: a `factor_betas@v2` storing all five betas of the five-factor fit would
+   be needed to add it (point 2). Delisted names are residualised over their own window, so
+   their delisting return is not in it (as in the forward row).
+
+## Amendment 2026-10-18: `option_pnl`, the chain P&L grain (EB H13)
+
+`option_model_pnl` (amendment 2026-10-17) prices a straddle with a formula because no historical
+option prices exist. Chains are stored from 2026-10-02, so a P&L of real quotes can now accrue.
+It is a second outcomes grain and a second outcome kind; the first is unchanged.
+
+1. **Grain.** `outcomes/option/structure_pnl@v1` (`architecture/tables.toml`, one producer: the
+   ingestion task `option-outcomes`, `tasks/derived/option_outcomes.py`, the window arithmetic in
+   `option_paths.py`, the maths in `quant/edges/chain_pnl.py`). One row per (underlying,
+   start session S, structure, tenor rule, horizon); `session_date = S`, partition S, runs
+   merge on that key. `structure` is the position held *long*: `atm_straddle` or
+   `put_delta_NN`. The document's side and hedging are applied by the harness, so one stored row
+   serves the long, the short and the hedged edge. Columns: the contracts (`call_id`, `put_id`,
+   `expiry`, `strike`), entry spot, mid and ask, exit spot, mid and bid, `exit_kind` (`QUOTE`, or
+   `INTRINSIC` at expiry), the P&L per unit premium (mid, and executable), per underlying (mid),
+   the daily delta-hedged P&L per premium and per underlying, `outcome_status` and
+   `outcome_reason`. The grain is read only through `algotrade.data.outcomes` (`chain.py`), under
+   the same import contract as the price grain: importable only from `services/evaluation`.
+2. **Contracts, from S's chain alone.** The first listed expiry at least `tenor_days` calendar
+   days after S and not before the window's end T. Then the at-the-money strike (the listed
+   strike nearest the underlying's closing quote with a call and a put both two-sided; the lower
+   on a tie) or, for a put, the listed put whose own delta is nearest the target. The underlying
+   is the `close` of the stored quote (the quote's `price` can carry after-hours trades, option
+   quotes are closing quotes), as the positioning features read it.
+3. **Timing and point in time.** The chain for S arrives about 315 minutes after the close, so the
+   entry is knowable only that evening and the decision session is D = S - 1 (the existing
+   offset rule, unchanged). A row's `knowledge_ts` is the latest `knowledge_ts` among the chain
+   partitions it was computed from (the exit session's, S..T), not the write time: a window is
+   known only when its exit chain was. A window whose T has not closed is refused. Past
+   restatements of a chain partition would move the stamp, never the other way round.
+4. **Stale and missing chains.** A name is UNMEASURED, with a reason and no P&L, when the entry
+   or the exit session has no chain for it (`NO_CHAIN:<day>`) or a `STALE_DATA` chain
+   (`STALE_CHAIN:<day>`, ADR 0054's labelling, chronic staleness included), when a contract has
+   no quote at the exit (`NO_EXIT_QUOTE`), or when no expiry can be held (`NO_EXPIRY`) or no
+   strike entered (`NO_ENTRY_QUOTE`). A chain is never filled from an earlier session and a P&L
+   is never zero when it could not be computed. A chain missing or stale on a session *between*
+   the entry and the exit, or a delta that cannot be computed on one (`NO_DELTA:<day>`), costs
+   only the hedged P&L: the row stays COMPLETE, `hedge_reason` is set and the hedged columns
+   are null (architect review 2026-10-18: a stale mid-window day must not blank an unhedged
+   window). The harness excludes a hedged structure's row as unmeasured when `hedge_reason`
+   is set. A name whose chain at S is not `OK` has no row (no position was knowable).
+   Quotes after a large move: at the exit and on hedge sessions a quote with a zero bid and an
+   ask is read as bid 0 and mid ask / 2 (a far out-of-the-money leg is quoted so), never as
+   missing; the entry needs a two-sided quote.
+5. **Hedge.** Daily, at each close from S to T - 1, with *our own* delta: the implied vol that
+   each leg's mid gives (`quant/implied_vol`), then the Black-Scholes delta with r = q = 0 and
+   t in calendar days over 365 (ADR 0021's time convention; the curve's rate and the dividend
+   yield move a one-month delta by under 1% and are left out in v1, accepted at the architect
+   review, so the figure does not depend on the rates and dividend tables). Where no vol solves,
+   the limit: delta 0 for a strictly out-of-the-money leg priced inside its bound, +1 (call) or
+   -1 (put) for an in-the-money leg priced at or below intrinsic, else the day is missing
+   (`NO_DELTA`). Never a vendor Greek. No hedge cost and no financing.
+6. **Value.** The harness value of an `option_pnl` outcome is executable, net of the quoted
+   spread: `sign * pnl_per_underlying` (or the hedged one for `delta_hedged_atm[_short]`) less
+   the half-spread paid at entry (`entry_ask - entry_mid`) and at exit (`exit_mid - exit_bid`)
+   over `entry_spot`; `sign` is -1 for a short structure. For an unhedged short this is exactly
+   bid in, ask out (the stored quote is symmetric around the mid). `cost_bps` is charged once on
+   top. Unit `pnl`, so the trial statistics read the picks' mean P&L, never the win rate
+   (`counts_wins` is false), as for `option_model_pnl`.
+7. **Document.** `[outcome] kind = "option_pnl"` (`config/edges/chain.py`): `structure` in
+   `atm_straddle_long | atm_straddle_short | delta_hedged_atm | delta_hedged_atm_short |
+   put_short`, `tenor_days` (required, calendar days), `strike_delta` for `put_short` only,
+   `benchmark = "none"`, no implied-vol field. An edge and its `[[variants]]` are all
+   `option_pnl` or none is: the harness reads one grain per run. The short put that the H8
+   amendment left to a follow-up lands here, as a chain P&L. The writer takes its structures,
+   tenors and horizons from the open edge documents, like the price grain.
+8. **Basis.** `Outcome.basis` is `"chain"` for this kind (`"model"` for the formula's). No stored
+   `results/edge_eval` column carries it: the basis follows the document's kind, which is in
+   the outcome hash, so a run's outcome cannot be mistaken for the other basis. The Guide terms
+   `chain_basis`, `outcome_option_pnl`, `put_short` and the status terms explain it.
+9. **Forward-only.** Chains exist from 2026-10-02, after the frozen split 2026-04-01 and every
+   other frozen period. There is no backfill; results are UNMEASURED or insufficient (fewer
+   independent sessions than the quality bar's count) until history accrues. The Guide entry and
+   the verdict's own insufficiency text say so; nothing is imputed from the model P&L.
+10. **Not here.** Hedging cost, financing, margin, early exercise and the fill below the quote.
+    A structure other than the five above (a strangle, a spread) is a later `structure` value.
+
+## Amendment 2026-10-18: buy/hold bands for turnover-aware cost (edge build H7)
+
+`[outcome] hold_rank` (optional integer) turns an edge's flat cost into a turnover-aware one: a
+name enters at rank <= `top_k` and is held while its rank is <= `hold_rank`.
+
+1. **Document rule.** `hold_rank >= top_k` and `top_k` is an integer (config error otherwise, for
+   the edge and for each variant's outcome). Allowed only for a `long` or `short`
+   `excess_return`, on `month_end`, or `every_session` at `horizon_sessions = [1]`: a band carries
+   a name from one decision session to the next. The schedule limit is stricter than needed (windows
+   never overlap on a plain schedule); loosening it is a later PR. Refused for
+   `long_short` (a spread: no cost rows, and two legs with no single book to turn over), a
+   `hit_target`, an event or a calendar schedule. Unset, nothing changes: `identity_dict` drops
+   the key, so the run and trial hashes of every existing edge are as they were. Set, it is part
+   of the trial and the run, and of the leg key.
+2. **What a leg holds (leg v4, ADR 0063 amendment).** A leg stays one session's own: the counted
+   picks (ranks `1..top_k`) and, from a `hold_rank`, the band's names (`top_k + 1..hold_rank`)
+   with their oriented net values (`band_ids`, `band_ranks`, `band_values`; a name with no counted
+   value has a null value, never 0 and is never held). The `short` band is the next-worst liquid
+   names. `LEG_VERSION` 4; an edge without a band stores null columns.
+3. **The turnover pass** (`reporting/turnover.py`) runs over a variant's decision sessions in
+   order, after the legs are decoded, so legs and picks stay independent (ADR 0063): held at a
+   session = the counted picks plus the band names the previous session held. An entry pays half
+   a round trip and an exit half; a name held through pays none. A session the screen did not
+   measure (coverage) closes every position; the last session's names exit, charged. It sets
+   `banded_values` (each held name's value net of its own entries and exits) and `round_trips` on
+   the stat, never stored. The decile spread, hit rate, base rate, lift and every gross figure
+   are untouched; the net series (`pick_mean`, so Sharpe, deflated Sharpe, PBO), `mean_excess_picks`
+   and the cost rows use the banded values. The cost rows scale the mean's slope in the cost by
+   the turnover (`round_trips` per held name), so each is exact; the break-even is the gross mean
+   over that turnover (`break_even_cost(..., trips)`), read from the slope of the stored cost rows
+   (no stored column). Hit counts at the cost levels stay per round-trip trade, and the
+   trade ledger and `bh_mean` (the floor) stay as the legs have them: follow-ups.
+4. **Side interplay.** `long`: the band follows the qualified order. `short`: the worst-ranked
+   liquid names; a short's borrow still accrues for every held period (only the trading cost
+   changes). `long_short`: refused (item 1).
+5. **One full re-run.** `LEG_VERSION` 3 (H6) and 4 (this) both invalidate every stored leg once:
+   the owner pays one full re-run after both merge: `algotrade-backtest evaluate-edges --full` (every
+   open edge; `--edge ID` for one), from the main checkout's environment against the real store.
+6. **Accepted limits (architect review, non-blocking).** A month end the schedule skips counts a
+   name as held through it at no cost. A period with a single cost row has no slope, so the
+   break-even falls back to a full round trip per name: conservative. No exit reason is recorded
+   per name. `LEG_VERSION` 4 recomputes every leg (item 5).
+
+## Amendment 2026-10-18: `pair_spread`, the cheap share class against its sibling (EB H9)
+
+A fifth outcome kind, harness-side like `option_model_pnl`: no grain, no table and no column of
+`outcomes` changes. It builds on the sides amendment (a second leg, borrow on the short one) and
+adds one feature group, `share_classes@v1`, that names each name's sibling.
+
+1. **Document.** `[outcome] kind = "pair_spread"` names `pair_field`, a declared string feature
+   read at D that gives each name's sibling id (`rollup.share_classes@v1.sibling_id`; never a
+   hand list of `EQ:` strings, ADR 0018). It takes `benchmark = "none"` (both legs are raw
+   returns), `side = "long"` (the default: the picks are the cheap legs, the sibling is the short
+   leg), no `max_drawdown`, and the optional `borrow_bps_annual` of the rich leg (default from
+   `verdict.toml`, filled by `_borrowing` as for a short). `pair_field` is refused on any other
+   kind. It joins the identity of an outcome only when set (`identity_dict`), so no stored leg
+   or run of another kind is recomputed.
+2. **Value** (`cross_section/hit.py`): a row is one share class read as the cheap leg of its
+   pair; `value = fwd_return(name) - fwd_return(sibling) - 2 * cost_bps / 1e4 - borrow`, the
+   borrow `borrow_bps_annual / 1e4 * horizon / 252` on the sibling, and a hit is `value > 0`.
+   Both legs' returns come from the same `forward_returns@v2` partition at S (the harness hands
+   the whole horizon's rows to `Pairs`, not only the base names). Two round trips are charged
+   because a pair has two legs; the document's `cost_bps` is per leg. The cost grid does not
+   apply (`is_return` is false, as for a model P&L); the series unit is `pnl`, and `counts_wins`
+   is false: the trial statistics read the picks' mean spread.
+3. **The pair is read at D.** `SessionReads.siblings` reads `pair_field` at the decision session
+   through the recording reader, so a restated reference partition invalidates the legs that read
+   it and a reclassification after D never changes a window (test: partitions after D poisoned,
+   result unchanged; D poisoned, result changes). `share_classes@v1` itself is computed from the
+   `instruments/reference` snapshot the session sees: a sibling is the other `share_class_figi`
+   of the same `cik` among operating companies, PAIRED only for exactly two classes with one id
+   each, AMBIGUOUS (no sibling named) for three or more or a class under several ids. The id is
+   the row's own `instrument_id`, never built from a ticker. It also stores `spread_z_252d`, the
+   z-score of today's `ln(close / sibling close)` against its last 252 sessions (negative: cheap
+   against the sibling), which a screener ranks on.
+4. **Eligible pairs and exclusions.** A name is excluded with its reason (never a zero, never a
+   miss, counted beside the other exclusions): `no_sibling` (none stored at D, or itself),
+   `sibling_not_eligible` (the sibling is outside the universe at D: a pair needs both legs
+   tradable), `sibling_mismatch` (the sibling's own sibling at D is not the name),
+   `no_sibling_row` (no outcome row at S), `sibling_unmeasured` (an UNMEASURED window), and
+   `missing_value` (a null return). The base is the same value of every eligible name (each
+   class against its sibling), so it is the spread of a random side of the pair and its hit rate
+   sits near one half minus the costs; a pair appears twice in it, once from each side.
+   **No sibling data.** A session whose `pair_field` has a value for no eligible name (an unbuilt
+   or all-null `share_classes` group) is flagged: `SessionStat.siblings_stored`, stored in the
+   nullable `edge_legs.siblings_stored` column (a leg from before it reads as stored; leg keys,
+   hashes and `LEG_VERSION` are unchanged), reported by `sibling_coverage` and a "NO SIBLING DATA"
+   line, like the implied-vol gap.
+5. **Few pairs.** About 15 to 25 issuers qualify, so a session has a handful of pairs. Sessions
+   are spaced a horizon apart as for every schedule (`every_session`, `month_end`: independent
+   windows, `sessions` beside every figure), and the counts of picks and eligible names stay
+   shown per session. No minimum is enforced; the page shows the counts and the verdict rules
+   of ADR 0065 apply.
+6. **Verdict.** A pair spread is a two-leg spread: its results are stored and judged under the
+   side `long_short` (`Outcome.result_side`), so its verdict is Diagnostic only (the owner
+   decision of 2026-10-17: a long-short spread is never a verdict basis), and the paper record
+   does not trade it (it would buy the cheap legs only). Its `side` in the document stays
+   `long`. Guide entries: `outcome_pair_spread` and `share_class_pair` (the PAIRED / AMBIGUOUS
+   statuses), mapped in `guide_coverage.toml` and checked by
+   `tests/architecture/guide/test_pair_spread_guide.py`.
+7. **Not here.** ETF-versus-NAV style two-leg ideas (the second leg an instrument that is not a
+   share class) need a different `pair_field` producer and no harness change; none is built.
+   A hedge ratio other than one-to-one (the legs are equal-dollar by construction of the
+   spread of returns) and a borrow rate per name are not modelled.

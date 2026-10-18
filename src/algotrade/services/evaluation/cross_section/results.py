@@ -165,6 +165,7 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
         "no_entry_bar": sum(s.no_entry_bar for s in r.stats),
         "excluded_coverage": m.excluded_coverage,
         "lost_sessions": dict(r.lost_sessions),  # table with no data -> decision sessions
+        "timing": None if r.timing is None else dict(r.timing),  # time-series edge (ADR 0073)
         "report_containment": None
         if r.report_containment is None
         else asdict(r.report_containment),
@@ -230,6 +231,27 @@ def iv_coverage(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
                     "sessions": len(measured),
                     "stored": stored,
                     "picks": dropped,
+                }
+            )
+    return out
+
+
+def sibling_coverage(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
+    """Per variant and horizon of a pair spread, the measured sessions and those at which its
+    ``pair_field`` had a value for no eligible name (an unbuilt or empty ``share_classes``
+    group): their picks read ``no_sibling``, which would otherwise look like a normal session.
+    Only where the field fell short."""
+    out = []
+    for r in evaluation.results:
+        measured = [s for s in r.stats if not s.excluded_coverage]
+        lacking = sum(not s.siblings_stored for s in measured)
+        if lacking:
+            out.append(
+                {
+                    "variant": f"{r.edge_variant}/{r.variant}",
+                    "horizon": r.horizon,
+                    "sessions": len(measured),
+                    "no_sibling_data": lacking,
                 }
             )
     return out

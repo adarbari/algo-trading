@@ -51,6 +51,7 @@ from algotrade.features.rollups.corporate import (
 )
 from algotrade.features.rollups.events import (
     earnings_date_shift,
+    earnings_gap_volume,
     filing_activity,
     filing_events,
     index_changes,
@@ -98,7 +99,7 @@ from algotrade.features.rollups.price import (
     trend_stats,
     volume,
 )
-from algotrade.features.rollups.reference import fund_reference
+from algotrade.features.rollups.reference import fund_reference, share_classes
 from algotrade.features.rollups.relative import (
     factor_betas,
     momentum_variants,
@@ -110,6 +111,7 @@ from algotrade.features.rollups.statements import (
     growth_history,
     income_statement,
     mispricing,
+    qmj,
 )
 
 GROUPS: dict[str, FeatureGroup] = {
@@ -136,6 +138,7 @@ GROUPS: dict[str, FeatureGroup] = {
             index_changes.GROUP,
             filing_events.GROUP,
             earnings_date_shift.GROUP,
+            earnings_gap_volume.GROUP,
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,
@@ -147,6 +150,7 @@ GROUPS: dict[str, FeatureGroup] = {
             balance_sheet.GROUP,
             growth_history.GROUP,
             mispricing.GROUP,
+            qmj.GROUP,
             put_wing.GROUP,
             call_wing.GROUP,
             price_moves.GROUP,
@@ -182,6 +186,7 @@ GROUPS: dict[str, FeatureGroup] = {
             indicators.GROUP,
             regime.GROUP,
             fund_reference.GROUP,
+            share_classes.GROUP,
             relative_strength.GROUP,
             momentum_variants.GROUP,
             factor_betas.GROUP,

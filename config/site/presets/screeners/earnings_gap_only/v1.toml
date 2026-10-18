@@ -1,0 +1,53 @@
+# Earnings gap, any volume (ADR 0053, EB E3; control of edge earnings_gap_volume_drift): the same names
+# as earnings_gap_volume without the volume criterion: a common stock trading at least $5M a day whose
+# last report moved it at least 10% more than SPY over the reaction window. The edge asks whether
+# volume-confirmed gaps drift more than same-size gaps; this screen is the other side of that
+# comparison. Ranked by the reaction, largest first. A missing value never passes (ADR 0030).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "earnings_gap_only"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Earnings gap, any volume"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 5_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.reaction_status]
+field = "rollup.earnings_reaction@v1.reaction_status"
+op = "eq"
+value = "OK"
+
+[criteria.reaction]
+field = "rollup.earnings_reaction@v1.reaction_excess_return"
+op = "gte"
+value = 0.10
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+reaction_excess_return = "rollup.earnings_reaction@v1.reaction_excess_return"
+sessions_since_reaction = "rollup.earnings_reaction@v1.sessions_since_reaction"
+
+[rank]
+tie_break = "rollup.earnings_reaction@v1.reaction_excess_return"
+tie_break_order = "desc"

@@ -603,6 +603,22 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the nightly starts about 18:00 New York time and SEC lists 17:30-22:00 acceptances in the next day's index, so S's own 8-Ks are usually unstored when the nightly runs; counting through S read 0 live and 1 on a recompute. The span through S-1 gives the same value live and in a backtest. A history before the first nightly walk reads null. Known limits: the session after a market day EDGAR was closed reads null, and on a SEC-only holiday Friday an after-17:30 acceptance can be missing from the walked index until the next walk.
 
+## 2026-10-18 | EB H7 (buy/hold bands) | Where a band applies, long_short, and what the net series is
+- Question: which edges may carry `hold_rank`, what happens for `long_short`, how is a name's cost split between entry and exit, and which figures follow the banded series?
+- Options: allow a band on every schedule / only where decision sessions do not overlap; a band on both legs of a spread / refuse it; the whole round trip at entry / half in, half out; replace `pick_values` (and so every statistic) / keep gross figures and bind only the net series.
+- Decision: `long` and `short` `excess_return` with an integer `top_k`, on `month_end` or `every_session` at horizon 1; `long_short`, event and calendar schedules refused in the document; an entry and an exit each pay half a round trip, the last session exits (charged) and a coverage gap closes every position; hit rate, lift, decile spread, effect size and the floor stay the legs' own, the net series (Sharpe, deflated Sharpe, PBO, `mean_excess_picks`), the cost rows and the break-even follow the band; the break-even's turnover is read from the slope of the stored cost rows, no new column; hit counts at cost levels and the trade ledger stay per round-trip trade (follow-up).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the schedule limit is stricter than needed (plain-schedule windows never overlap; loosening is a later PR); a spread has no cost rows and no single book; half and half makes a name held through pay exactly one trip over its stay; gross figures must not move so the verdict's evidence is the same picks, and only what a trader pays changes.
+
+## 2026-10-18 | EB H7 (buy/hold bands) | One full re-run after LEG_VERSION 4
+- Question: who pays the re-run that LEG_VERSION 3 (H6) and 4 (H7) each force?
+- Options: a re-run after each / one after both.
+- Decision: one full re-run after both merge (`algotrade-backtest evaluate-edges --full`; the PR gives the command); H7 does not run it against the real store.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: every stored leg is recomputed by either bump, so two runs would spend the same hours twice.
+
 ## 2026-10-18 | PR #651 (D6, Form 4 insider transactions) | Storing the reporting owner's CIK and officer title
 - Question: may the insider transaction table store `owner_cik` and `officer_title` (public EDGAR fields that identify a natural person), or only a hashed owner key plus role flags?
 - Options: store `owner_cik` + `officer_title` as filed / store a salted hash of the owner CIK + role flags only / store role flags only (no per-person key).
@@ -610,3 +626,147 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the owner CIK is an SEC public identifier the data set is keyed on; a hash buys nothing (the hash of a public id is trivially reversible against EDGAR) and loses the join to later filings, amendments (4/A) and the deep-dive dossier. Officer title is attribute data a cluster-buy edge weighs (CEO / CFO buys vs. director buys), stored as filed with no name. The cluster-insider-buy edge needs a distinct-insider count, so a stable per-person key is functionally required. Data never enters the public repo (store is local, git-ignored); the read model serves aggregates. Precedent: ADR 0040 keeps emails (private personal data) out of the repo, not public filing data out of the store. Erasure and shorter retention are owner-only decisions (log 2026-10-11), so the default event retention stands until the owner says otherwise.
+
+## 2026-10-18 | EB H11 (residual returns) | Betas read before S, sector term, no nightly step yet
+- Question: which session's betas measure a window's residual, what to do with the sector loading, and does the task join the nightly workflow in this PR?
+- Options: betas at D / at the session before S / at S; the four-factor residual only / add the sector term where `beta_sector` is set (two fits' betas) / a single five-factor fit; a nightly step now / the task and its backfill command first.
+- Decision: the betas of `previous_session(S)` (exact partition, never an older one), the sector SPDR term only where `beta_sector` is set (the brief's rule, with the two-fit mix stated in the ADR), the task registered with its backfill command and no workflow step in this PR; the leg-reuse stamps do not cover the residual partitions (ADR 0053 amendment, limit a).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the session before S is D for the usual offset of 1 and never holds a window return for a larger one; the sector term is what the plan lists, and the mixed-fit inconsistency is small and visible; a nightly step needs the workflow-step tests and a real-store cost measurement the PR cannot run.
+
+## 2026-10-18 | EB H11 (residual returns) review | Four-factor betas only, stamps, nightly step, settlement
+- Question: how to resolve the architect's four findings on the residual-returns grain (sector counted twice, stale legs, no nightly step, settlement raising for a residual edge)?
+- Options: sector from `beta_sector` / drop it until a five-beta `factor_betas@v2`; leave the stamps / add the residual partitions to them; follow-up step / the step now; attach residuals in settlement / catch the error per edge.
+- Decision: residual on the four-factor betas only (market, size, momentum, value; a `factor_betas@v2` with all five betas of one fit is needed for sector; this supersedes the 2026-10-18 entry's sector choice); the stamps cover the residual partitions when a plan measures them (combined sequence and `knowledge_ts`); the optional nightly step `residual-returns` with an acceptance check; settlement attaches the residual rows, an unstored one waits and is skipped with a reason after the grace window.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the stored sector slope is from a different fit than the other four, so adding it counts sector exposure twice; a leg stored before the backfill must not stand for ever; an unscheduled grain goes stale; one residual edge must not stop every followed edge's settlement.
+
+## 2026-10-18 | EB H5b (time-series base) | How a window edge is declared and judged
+- Question: how does a raw-return, named-instrument edge fit the edge document and the verdict without a new outcome kind or stored column?
+- Options: a new outcome kind `raw_return` and a new `edge_eval` column for the timing Sharpe / keep `excess_return` over benchmark `none` (legal only with `base = "out_of_window"`), named instruments as one `instrument.symbol in [...]` rule, the Welch t in the verdict's existing t slot and the timing Sharpe in the run record.
+- Decision: the second: no new outcome kind, no schema change; `decile_t` carries the Welch t (Promising t >= 2, Works t >= 3), `hit_rate` / `base_rate` the positive-window shares, `sharpe` / `picks_t` / the deflated Sharpe the in-window series, the random window sets are `role = random` rows; no variants and no per-session series, legs or ledger for such an edge.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the verdict, trial log and frozen split are reused unchanged, so a window edge cannot be judged more leniently than a cross-section one; a stored column and a series for a screen-less edge are a schema decision for when a page shows them. Known gap: the timing-versus-buy-and-hold Sharpe is in the run record only.
+
+## 2026-10-18 | EB H5b (time-series base) | The outcomes seam is a forbidden contract, not a widened one
+- Question: the plan says to widen "only cross_section/harness.py reads outcomes" to name `time_series/harness.py`.
+- Options: widen the named-modules list only / also add an import-linter contract confining the new package.
+- Decision: both: `time_series/harness.py` joins the named modules of `test_edge_outcomes_expressible.py`, and a forbidden contract keeps every other module of `services.evaluation.time_series` off `algotrade.data.outcomes`; the protected-module contract of 0053 (only `services.evaluation`) is unchanged.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the package-level contract already admits all of `services.evaluation`, so widening it would change nothing; the per-package contract is what makes "one reader" true for the new folder.
+
+## 2026-10-18 | EB H5b (PR 660 review) | The paired series carries the Sharpe, t and deflated Sharpe
+- Question: the in-window Sharpe, picks t and deflated Sharpe on raw window returns read drift, not timing.
+- Options: raw in-window series / each window minus the first stretch tiled right after it (unpaired windows counted, never filled).
+- Decision: the paired series; `decile_t` stays the Welch t, worded "In-window minus out-of-window t (Welch)" through `EdgeFacts.base`; several instruments deflate with the variance of their Sharpe ratios; `year_part` / `regime_part` slices added; Guide term `base_out_of_window`.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a rising instrument would otherwise pass Works on drift alone; the paired difference removes the instrument's drift without a model.
+
+## 2026-10-18 | EB E3 (event edges and avoid lists) | Short-side edges, a delayed tender entry, and what is filed blocked
+- Question: how are the avoid-list edges tested, how is a tender offer's "after expiry" entry expressed, and what happens to ideas whose event class or data is missing?
+- Options: avoid lists as a long edge read for a negative lift / as `side = "short"` (O2); tender entry at the filing / 21 sessions after it / wait for an expiry field; missing classes skipped / filed `blocked` with the reason / classes added in this PR.
+- Decision: 8-K Item 4.02 and NT late filers are `side = "short"` edges over event names, ranked by dollar volume (the harness's short leg takes the lowest scores, so the screeners order ascending and the most liquid filer is shorted first); the tender edge enters 21 sessions after the filing (a tender offer stays open at least 20 business days; the expiry date is not stored, extensions enter early, and SC TO-T joins SC TO-I in one column); spinoff_drift, reverse_split_distress_filter and thematic_etf_launch_fade are filed `blocked` with what is missing (the classes spinoff, reverse_split and etf_launch in `EVENT_CLASSES` and `EVENT_FIELDS`, which this PR does not touch); `eight_k_item_flag` flags 4.02, 4.01 and 5.02 within 20 sessions for the avoid screen while the edge tests 4.02 only; `earnings_gap_volume@v1` adds the last report's volume ratio (the four-report mean in `earnings_reaction@v1` is a habit of the name, not the event).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a long edge reads an avoid list's confirmation as a negative lift (Not working), the short side states the same claim so that it passes; a dense-score short leg over a universe fills up with unflagged names when few are flagged, so a non-event schedule cannot test a small flagged set; entering at the filing would trade the offer's own period, not the post-expiry dip the thesis is about; a blocked document keeps the thesis, the bar and the missing pieces on file without a placeholder passing as a test.
+
+## 2026-10-18 | EB H10 (portfolio outcomes) | What a book is judged on and how it is built
+- Question: how is an allocation edge (a weighted book against a blended benchmark) measured, and what do Promising and Works rest on when there is no base rate over names?
+- Options: a new outcome kind in the harness / a path in the backtest engine; a mix read from the grain / computed from the constituents' rows; slots a `top_k` leaves unfilled go to cash / are left out; win rate and lift against the benchmark's hit rate / no base rate; Works on the decile t as for a ranking / on the picks-series t.
+- Decision: a `portfolio_return` kind in the harness (ADR 0074); the mix computed from the constituents' own `fwd_return` at the same S through the resolver (a missing constituent leaves the session out with its reason); unfilled slots are NOT put to cash (only a `CASH` pick or an empty pick set is); no base rate, lift or random draws for a book; Promising needs the picks-series t of 2 and Works of 3, with the decile t beside it only when about 20 names are ranked; decoys compared on the mean excess return of their own books.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the harness already owns the frozen split, the trial log and the verdict, and the engine none; a base rate over ten ETFs is a coin flip and a decile of ten names is one name; putting unfilled slots to cash is a policy (a defensive default that changes what the screen means), so it waits for the owner; failing closed on a missing input keeps a book from being quietly re-weighted.
+
+## 2026-10-18 | EB H10 (portfolio outcomes) | Leg v5 without a LEG_VERSION bump
+- Question: does adding the book's weights to a leg need another full re-run of every stored leg?
+- Options: bump `LEG_VERSION` to 5 / add nullable columns and leave the version.
+- Decision: nullable columns (`weight_ids`, `weight_values`, `portfolio_reason`), no bump; the default weighting stays out of an outcome's identity.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: no existing leg's content or key changes (a bump recomputes every leg for nothing); a portfolio edge's legs are new keys anyway. H6 and H7's bumps already force the one full re-run.
+
+## 2026-10-18 | EB H10 (portfolio outcomes) | Unfilled slots are cash; Works for a book without deciles
+- Question: when fewer names qualify than `top_k`, is the book re-normalised over them or is the rest cash? What does Works rest on for a book with no deciles?
+- Options: re-normalise / unfilled slots in cash; picks-series t alone / both t series always.
+- Decision: each unfilled slot is `1 / top_k` in cash (re-normalising puts the whole book in one name); a day before the first stored Treasury curve has no yield (no look-ahead); Works for a book rests on the picks-series t of 3 when there are no deciles, with deciles both t series.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: architect review of PR 666; the cash rule is set before any edge stores legs, so no leg is invalidated.
+
+## 2026-10-18 | EB H13 (chain P&L grain) | One UNMEASURED status per row, executable value, hedge with r = q = 0
+- Question: when a hedge-day chain is missing or stale, is only the hedged P&L unmeasured or the whole row; is the harness value mid or executable; which rate and yield does our own hedge delta use?
+- Options: hedged columns null, unhedged kept / the whole row UNMEASURED; mid-to-mid / ask in, bid out (half-spreads on the hedged value); the Treasury curve and dividend yield / r = q = 0.
+- Decision: the whole row is UNMEASURED with the first reason (`STALE_CHAIN:<day>`, `NO_CHAIN:<day>`, `NO_DELTA:<day>`, `NO_EXIT_QUOTE`), every P&L null; the harness value is executable (a long pays the ask in and bid out, a short the reverse, the hedged value less the same half-spreads) while the mid P&L columns stay stored; the delta uses r = q = 0 and calendar days over 365.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: one status then means one thing and the spec's "never a zero, never a silently filled stale chain" holds for every column; option spreads are the main cost of this trade, so a mid value would overstate it; a one-month delta moves under 1% with the curve and the yield, and r = q = 0 keeps the grain independent of the rates and dividend tables (ADR 0053 amendment 2026-10-18, item 5). The cost of the first choice is that a stale mid-window day also unmeasures an unhedged window.
+
+## 2026-10-18 | EB H13 (chain P&L grain) | The basis is declared at filing; no stored basis column
+- Question: with no pre-frozen chain history, how is the verdict's basis fixed, and does `results/edge_eval` get a stored `basis` column (H8 left it for H13)?
+- Options: rank candidates on an in-sample slice that does not exist / the basis declared at filing, every row out of sample; a stored column / the basis from the document's kind, which is in the outcome hash.
+- Decision: the basis is the declared screen and horizon (several undeclared candidates: Waiting on data); every chain row is out of sample; `Outcome.basis` is `"chain"` and no `edge_eval` column is added; how the Promising and Works rules read an empty in-sample t is left open for the architect review.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: ranking needs the in-sample history the grain cannot have, and `choose_basis` already takes one declared candidate; a column on a stored results table is a schema change for a label the outcome hash already fixes, so a run cannot be mistaken for the other basis.
+
+## 2026-10-18 | EB H13 (chain P&L grain) | Structures, tenor rule and where the grain is read
+- Question: which structures and which tenor rule does the first chain grain offer, and does a mixed edge (price and chain variants) run?
+- Options: only the straddles / also the short put by delta; the expiry nearest the tenor / the first at least the tenor out and not before the window's end; mixed edges allowed / refused.
+- Decision: five structures (`atm_straddle_long|short`, `delta_hedged_atm[_short]`, `put_short` by delta), the grain stores the long position (`atm_straddle`, `put_delta_NN`); the first listed expiry at least `tenor_days` out and not before T; an edge and its `[[variants]]` are all `option_pnl` or none is.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: one stored row serves the long, short and hedged edge; an expiry before T could not be held to the exit; the harness reads one outcome grain per run (reuse stamps and commit sequences are per grain), so mixing is refused at filing instead of silently reading the wrong table.
+
+## 2026-10-18 | EB H13 (architect review of #664) | Hedge-day gaps cost only the hedged P&L; bid-0 quotes and delta limits
+- Question: does a missing or stale chain on a session between entry and exit unmeasure the whole row, and how are far out-of-the-money and deep in-the-money legs read after a large move?
+- Options: the whole row UNMEASURED (first entry) / only the hedged P&L, with a `hedge_reason`; a bid-0 quote and an unsolved vol are missing / a bid-0 quote reads as mid ask / 2 and an unsolved vol takes the delta limit (0, +-1).
+- Decision: only the hedged P&L is lost (`hedge_reason` set, the row COMPLETE, a hedged structure's harness row excluded as unmeasured); bid-0 quotes and delta limits as above. This overrules the first H13 entry's "whole row UNMEASURED". r = q = 0 is accepted for v1.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the architect review showed the biggest moves would otherwise become NO_EXIT_QUOTE / NO_DELTA and flatter the short straddle, and a stale mid-window day would blank an unhedged window for no reason.
+
+## 2026-10-18 | EB H13 (architect review of #664) | A chain edge can be Promising, never Works, until the verdict-basis rule says more
+- Question: how do the verdict rules read an empty in-sample t for a chain basis declared at filing?
+- Options: leave it open / the in-sample-lift criterion not applicable and a Works criterion that stays unmet.
+- Decision: "out-of-sample lift keeps its size" is not applicable for a chain edge (Promising reachable); a Works criterion "basis fixed on an in-sample period" stays unmet (Works unreachable) until a later amendment of the verdict-basis rule; written into that amendment and the Guide.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: Promising can be read on the out-of-sample figures alone, but Works needs a basis not chosen after seeing the result, which the rule can only vouch for with an in-sample period.
+
+## 2026-10-18 | EB H9 (pair spread) | Result side, costs, base and eligibility of a pair
+- Question: how is a pair spread judged, what does it charge, what is its base and which pairs count?
+- Options: verdict-eligible as a long outcome / diagnostic only like `long_short`; one round trip / two; the base as one value per pair / per name against its sibling; a sibling outside the universe counts / is excluded.
+- Decision: results stored and judged as `long_short` (`Outcome.result_side`: Diagnostic only, not paper traded) while the document's `side` stays `long`; `cost_bps` per leg (two round trips) plus borrow on the sibling; the base is every eligible name against its own sibling (a pair twice, once per side), so its hit rate is near one half; a pair needs both legs in the universe at D and each naming the other (`sibling_not_eligible`, `sibling_mismatch`), and an issuer with three or more classes or a class under several ids is AMBIGUOUS, never guessed.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the spec builds the pair on `long_short` and the owner decision of 2026-10-17 makes a spread diagnostic only, so a pair spread is never a verdict basis unless the owner says so; two legs cost two trades; per-name orientation is the one base that a random side of the pair produces; a one-sided or mismatched pair would pair a name with the wrong class.
+
+## 2026-10-18 | PR #661 review (EB H9) | Pair tests, verdict, and two follow-ups
+- Question: where do the pair harness tests live, is a pair spread ever a verdict basis, and are per-reason exclusion counts and a sibling ADV floor in this PR?
+- Options: split the test folder now / in the next PR touching it; diagnostic only / verdict-eligible; counts and floor now / follow-up.
+- Decision: tests stay in `test_harness_trials.py` (split the folder by kind in the next PR touching it); a pair spread stays Diagnostic only through `result_side`; per-reason exclusion counts (today folded into `excluded_missing`, the reason is on each pick) and an ADV floor on the sibling (short) leg are follow-ups. A reference snapshot without `cik` / `share_class_figi` is MissingDataError, never an empty pair set.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the architect review found `REFERENCE_FACTS` dropped the ids so every pick read `no_sibling`; the loader now carries them. The folder split and the two counts touch other modules and need their own review.
+
+## 2026-10-18 | PR #661 CI (EB H9) | A reference snapshot without issuer or class ids
+- Question: does `share_classes@v1` raise MissingDataError when the reference snapshot has no `cik` / `share_class_figi` column?
+- Options: raise / return no rows.
+- Decision: no rows (every read is UNKNOWN; a pair pick reads `no_sibling`, counted), reversing the earlier review ask.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the ingestion nightly end-to-end tests build a reference without those columns and the critical rollups step failed, holding back the workflow; a snapshot built without issuer ids is a normal state, not a broken one.
+
+## 2026-10-18 | EB E2 (PR 667 review) | How the BDC universe is defined
+- Question: how is the universe of the BDC price-to-NAV edge defined, when the reference has no BDC type and the SEC company table no SIC for them?
+- Options: a ticker list with a maintenance rule / key the list by instrument_id / drop the edge.
+- Decision: key by instrument_id: the tickers are resolved once through the SymbolResolver and the ids are committed in the selection preset and the screener (a fitness test keeps them equal); the edge notes say history before the frozen period is survivor-only (BDCs merged away are missing; renamed ones such as ORCC to OBDC 2023 and AINV to MFIC 2022 are the same id). The screener also requires the balance sheet to be at most 135 days old (`rollup.qmj@v1.balance_sheet_age_days`) and discloses that the cover-page share count and the balance-sheet equity can differ by a quarter.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a ticker is reused and renamed, an id is not (ADR 0018); a list with no maintenance rule is a silent survivor filter, so it is named as one; dropping the edge loses a clean, cheap test of a documented structural niche.

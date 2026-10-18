@@ -1,0 +1,56 @@
+# Momentum among quality names (edge momentum_12_1, a variant): names with a quality score of at
+# least 0.5 (above the median of the mean percentile rank of profitability, margins, cash flow and
+# low debt), ranked by 12-1 momentum: momentum screened for quality as Alpha Architect's QMOM
+# does, keeping the junk that drives momentum crashes out. A missing score never passes (ADR 0030).
+# What it does not check: value, the quality score's coverage (financial names may lack inputs).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "momentum_x_quality_interaction"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Momentum among quality names"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1, so the variants compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.quality]
+field = "rollup.mispricing@v1.quality_score"
+op = "gte"
+value = 0.5
+
+[criteria.mom_12_1]
+field = "rollup.trend_stats@v2.mom_12_1"
+op = "gt"
+value = -1
+
+[columns]
+close = "rollup.price_stats@v2.close"
+mom_12_1 = "rollup.trend_stats@v2.mom_12_1"
+quality_score = "rollup.mispricing@v1.quality_score"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.trend_stats@v2.mom_12_1"
