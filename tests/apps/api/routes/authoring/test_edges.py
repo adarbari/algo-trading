@@ -51,9 +51,9 @@ LIST = "{ edges { id mine status followed } }"
 
 @pytest.fixture
 def client(writer_client: TestClient, root: Path) -> TestClient:
-    folder = root / "site" / "edges"
+    folder = root / "site" / "edges" / "drift"
     folder.mkdir(parents=True)
-    (folder / "drift.toml").write_text(SITE_EDGE)
+    (folder / "edge.toml").write_text(SITE_EDGE)
     return writer_client
 
 
