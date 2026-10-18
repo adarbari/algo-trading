@@ -1,0 +1,167 @@
+# Researched, not built: family A (cross sectional) of the edge-idea catalogue, one [[idea]] each (ADR 0051; keys in config/site/guide/ideas.py).
+
+family = "A"
+
+[[idea]]
+id = "intangibles_adjusted_value"
+title = "Value that counts intangibles as assets"
+mechanism_kind = "mispriced_fundamentals"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan; its capitalised research stock needs several years of statement history before the signal is usable."
+
+[[idea]]
+id = "same_month_seasonality"
+title = "Same calendar month return seasonality"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Published evidence is weak and our history is too short to measure it, so it stays a low-priority idea."
+
+[[idea]]
+id = "size_conditional_on_quality"
+title = "Small caps, but only quality ones"
+mechanism_kind = "mispriced_fundamentals"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Published evidence is weak, and our universe holds few small names, so it is not worth a build slot."
+
+[[idea]]
+id = "piotroski_f_score"
+title = "Financial-strength score within cheap stocks"
+mechanism_kind = "mispriced_fundamentals"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The published edge has faded, so it would be built only as a baseline other ideas must beat."
+
+[[idea]]
+id = "accruals"
+title = "Earnings made of accruals, not cash"
+mechanism_kind = "mispriced_fundamentals"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The edge has faded; the cash-based profitability edge already absorbs it, so it is kept only as a control."
+
+[[idea]]
+id = "long_term_reversal"
+title = "Three to five year losers beat winners"
+mechanism_kind = "liquidity_provision"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Published evidence is weak and it needs years of history per test, so it is a low-priority idea."
+
+[[idea]]
+id = "amihud_illiquidity_premium"
+title = "Premium for hard-to-trade stocks"
+mechanism_kind = "paid_for_risk"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The premium has faded; it is worth keeping only as a control variable for other edges."
+
+[[idea]]
+id = "low_turnover_premium"
+title = "Share turnover as a stock trait"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Published evidence is weak; it is useful only to condition momentum, so it is not built on its own."
+
+[[idea]]
+id = "analyst_coverage_conditioned_momentum"
+title = "Momentum is stronger in thinly covered stocks"
+mechanism_kind = "slow_to_update"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned as a momentum variant, but it needs a point-in-time history of analyst counts, which we only now begin to accumulate."
+
+[[idea]]
+id = "rd_intensity"
+title = "Research spending relative to market value"
+mechanism_kind = "mispriced_fundamentals"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan; it runs on stored statement data and waits its turn behind the stronger ideas."
+
+[[idea]]
+id = "dividend_initiation_omission_drift"
+title = "Dividend starts and stops as signals"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Published evidence is weak, so it is not built."
+
+[[idea]]
+id = "stock_split_drift"
+title = "Drift after a stock split"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak and fading evidence, and too few independent large-company events to test it."
+
+[[idea]]
+id = "low_priced_stocks"
+title = "Low nominal share price"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Published evidence is weak; it is useful only as a filter, so it is not built as an edge."
+
+[[idea]]
+id = "fifty_two_week_low_proximity"
+title = "Nearness to the 52-week low"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak as a stand-alone idea; the 52-week high ranking already covers its mirror image, so it is not filed separately."
+
+[[idea]]
+id = "earnings_and_margin_stability"
+title = "Stable earnings and margins as quality"
+mechanism_kind = "mispriced_fundamentals"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak on its own; the catalogue folds it into the composite quality idea instead of building it separately."
+
+[[idea]]
+id = "customer_supplier_momentum"
+title = "Suppliers follow their customers' returns"
+mechanism_kind = "slow_to_update"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but it needs a table of each company's main customers, which would be read from annual filings and is not built yet."
+
+[[idea]]
+id = "volatility_scaled_momentum"
+title = "Volatility-scaled momentum"
+mechanism_kind = "slow_to_update"
+filed_as = "momentum_12_1"
+
+[[idea]]
+id = "residual_momentum"
+title = "Momentum on factor-residual returns"
+mechanism_kind = "slow_to_update"
+filed_as = "momentum_12_1"
+
+[[idea]]
+id = "frog_in_the_pan"
+title = "Smooth-path momentum"
+mechanism_kind = "slow_to_update"
+filed_as = "momentum_12_1"
+
+[[idea]]
+id = "fifty_two_week_high"
+title = "Nearness to the 52-week high"
+mechanism_kind = "slow_to_update"
+filed_as = "momentum_12_1"
+
+[[idea]]
+id = "stock_time_series_momentum"
+title = "Single-stock absolute momentum"
+mechanism_kind = "slow_to_update"
+filed_as = "momentum_12_1"
+
+[[idea]]
+id = "momentum_x_quality_interaction"
+title = "Momentum conditioned on quality"
+mechanism_kind = "slow_to_update"
+filed_as = "momentum_12_1"

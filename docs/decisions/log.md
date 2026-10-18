@@ -890,6 +890,21 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: a document that states what it cannot measure is better than none, and a stored-group change for a highly correlated member is cost without information.
 
+## 2026-10-18 | EB E5 (etf_macro bridge) | Field guide entries ship with the first edge that screens on the columns
+- Question: does the etf_macro@v1 PR carry field guide entries for its 32 columns?
+- Options: entries now (needs a split of the field guide folders, both at their caps) / entries with the folder split or the first edge PR that screens on them.
+- Decision: the entries ship with the folder split or the first edge PR that screens on a bridge column; no site preset screens on them yet, so nothing requires one.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the field guide folders are at their file caps and a guide entry without a user of the field is untestable prose.
+
+## 2026-10-18 | EB E5 (etf_macro bridge) | The bridge fields stay out of the Describe-it prompt
+- Question: do the 32 etf_macro@v1 columns enter the natural-language drafting index?
+- Options: raise the 13k-token budget / keep the group out of the drafting prompt until an edge screens on it.
+- Decision: keep the group out (`services/drafting/prompt.py UNDRAFTED_GROUPS`, a fitness test checks the list and that the prompt honours it); the columns stay in the catalogue, Explore and the Builder. They return to the index, by removing the group from the list, when the first edge screens on them. The budget is not raised.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the columns apply to about 30 carrier funds and are not for drafts yet; their index lines pushed two golden cases' fields (atr_pct, days_to_earnings) out of the slice.
 ## 2026-10-18 | EB E5 (canary) | The canary gate reads its signal at D and fails closed
 - Question: how does a risk-off gate on a book read its scouts and choose its defensive asset without look-ahead or a silent default?
 - Options: read the signal at D / at S; a missing scout counts as positive / leaves the session out; the defensive asset fixed / the highest signal among a declared few; chosen always / only when the gate is on.
