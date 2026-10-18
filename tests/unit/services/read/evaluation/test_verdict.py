@@ -724,3 +724,18 @@ def test_a_residual_return_verdict_says_the_figure_is_factor_neutral() -> None:
         "e", [replace(r, side="short") for r in result()], SPLIT, T, facts=EdgeFacts(neutral=True)
     )
     assert "(short leg, factor-neutral" in both.headline
+
+
+def test_the_book_flag_reaches_the_in_sample_ranking_of_the_basis() -> None:
+    """``choose_basis(portfolio=True)`` ranks candidates by the book's criteria (the picks-series
+    t), not the long rule's: the larger in-sample mean alone does not win a book's basis."""
+    rows = [
+        row(variant=v, kind=k, **{**NO_BASE, "mean_excess_picks": m, "picks_t": pt, "pbo": 0.3})
+        for v, m, pt in (("weak", 0.009, 0.5), ("sound", 0.003, 3.5))
+        for k in ("frozen", "all", "in_sample")
+    ]
+    assert choose_basis(rows, T, decoys=False).key == ("weak", 20)  # as a long edge: larger mean
+    assert choose_basis(rows, T, decoys=False, portfolio=True).key == (
+        "sound",
+        20,
+    )  # as a book: the t decides
