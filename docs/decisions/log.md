@@ -897,3 +897,10 @@ follow-up PR).
 - status: pending owner confirmation
 - Note: planned by the architect agent on the owner's behalf; CLAUDE.md's settled line names `field_guide/*.toml`; the owner may reword it to `field_guide/**/*.toml` (this PR does not edit CLAUDE.md).
 - Reasoning: the cap is a settled rule, the move costs no behaviour, and the groups are the ones the Guide already shows.
+## 2026-10-18 | EB E5 (canary) | The canary gate reads its signal at D and fails closed
+- Question: how does a risk-off gate on a book read its scouts and choose its defensive asset without look-ahead or a silent default?
+- Options: read the signal at D / at S; a missing scout counts as positive / leaves the session out; the defensive asset fixed / the highest signal among a declared few; chosen always / only when the gate is on.
+- Decision: scouts resolved to ids and the field read at D, never S; the risk-off share is `min(1, bad / breadth)` and the book is `(1 - f) * book + f * defensive`; a missing scout or defensive value is `no_canary:<T>` / `no_defensive:<T>` and leaves the session out; the defensive asset (`CASH`, or the highest signal, ties by ticker) is resolved only when the share is above zero; the canary table is in the outcome hash only when present.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a signal read at S would trade on the window it is measured over; a missing scout read as positive would be a silent decision to stay invested. Architect design of 2026-10-18 (ADR 0074 item 17).
