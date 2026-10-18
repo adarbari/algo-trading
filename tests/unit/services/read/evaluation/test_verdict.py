@@ -757,3 +757,25 @@ def test_the_book_flag_reaches_the_in_sample_ranking_of_the_basis() -> None:
         "sound",
         20,
     )  # as a book: the t decides
+
+
+def test_an_ensemble_member_is_never_the_basis_however_good_its_in_sample_figures() -> None:
+    """ADR 0074 amendment: the grid's screeners are reported, but the ensemble is what is judged."""
+    rows = book_result() + [
+        row(variant="mom6", role="member", kind=k, **{**NO_BASE, "mean_excess_picks": m})
+        for k, m in (("frozen", 0.02), ("all", 0.02), ("in_sample", 0.05))
+    ]
+    assert choose_basis(rows, T).key == ("scr", 20)  # not the member with the larger figures
+    judged = verdict(rows, facts=BOOK)
+    assert judged.basis is not None and "mom6" not in judged.basis
+    # a declared basis naming a member finds no candidate at all
+    assert choose_basis(rows, T, Declared("mom6", None)).key is None
+
+
+def test_a_member_does_not_count_as_a_peer_trial_of_the_ensemble() -> None:
+    """The ensemble is a lone trial at its horizon (PBO not applicable) with its members beside."""
+    rows = book_result(oos={"picks_t": 3.2, "pbo": None}, whole={"pbo": None}) + [
+        row(variant="mom6", role="member", kind=k, **NO_BASE) for k in ("frozen", "all")
+    ]
+    crit = {c.id: c for c in verdict(rows, facts=BOOK).criteria}
+    assert crit["pbo"].status == "not_applicable" and crit["works_pbo"].status == "not_applicable"

@@ -120,6 +120,8 @@ from algotrade.config.edges.portfolio import (
     benchmark_of,
     check_base,
     check_portfolio,
+    ensemble_of,
+    oos_class_of,
     weighting_of,
 )
 from algotrade.config.edges.verdict import LEGS
@@ -141,12 +143,6 @@ CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not
 OUTCOME_KINDS = (
     "excess_return", "hit_target", "expires_otm", "option_model_pnl", PORTFOLIO_KIND,
     chain.CHAIN_KIND, "pair_spread",
-)  # fmt: skip
-STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
-# An option_model_pnl outcome's position: one at-the-money straddle held to the horizon's close,
-# long or short, or delta-hedged, long or short (ADR 0053 amendment 2026-10-17).
-MODEL_STRUCTURES = (
-    "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
 )  # fmt: skip
 MODEL_KIND, PAIR_KIND = "option_model_pnl", "pair_spread"  # pair: cheap return less sibling's
 MODEL_BASIS = "model"  # what a price from a model, not a quote, is labelled (results and UI)
@@ -224,7 +220,7 @@ KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
-    "extends", "follow", "audit", "published", "family",
+    "extends", "follow", "audit", "published", "family", "ensemble", "oos_class",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -377,6 +373,9 @@ class Edge:
     extends: str | None = None  # a user's copy: the edge it is layered over
     follow: Follow = field(default_factory=Follow)  # the user's bookmark of a site edge
     audit: Audit = field(default_factory=Audit)  # the server's bookkeeping of an own edge
+    # ADR 0074: the screeners a book averages into ONE variant; the class of its haircut
+    ensemble: tuple[str, ...] = ()
+    oos_class: str | None = None
     # The frozen_from of the site edge this one is a copy of (its own for a site edge): a copy
     # whose frozen_from differs is exploratory (its split is the user's, ADR 0053 amendment).
     site_frozen_from: date | None = None
@@ -476,6 +475,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     named.check_time_series(base, window_name(schedule) in WINDOW_NAMES, universe, where)
     picks = _picks(t, schedule, base)
     sources = _sources(t)
+    screeners = _ids(t, "screeners")
     top_k = _top_k(t)
     variants = _variants(t, schedule, edge_id, universe, base, picks)
     chain.check_kinds(where, {outcome.kind, *(v.outcome.kind for v in variants)})
@@ -502,7 +502,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         schedule=schedule,
         universe=universe,
         top_k=top_k,
-        screeners=_ids(t, "screeners"),
+        screeners=screeners,
         baselines=_ids(t, "baselines", (STANDARD,)),
         status=status,
         sources=sources,
@@ -514,6 +514,8 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         base=base,
         picks=picks,
         variants=variants,
+        ensemble=ensemble_of(t, screeners, outcome.kind),
+        oos_class=oos_class_of(t),
         scorer_features=_scorer_features(t),
         evidence=_evidence(t),
         published=_published(t, outcome, len(sources)),
@@ -751,7 +753,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
     drawdown = o.number("max_drawdown", None, 0)
     if drawdown is not None and not 0 < drawdown <= 1:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
-    structure, strike_delta, otm_pct, iv_field = _expires_otm(o, kind)
+    structure, strike_delta, otm_pct, iv_field = chain.option_fields(o, kind)
     if kind == MODEL_KIND:
         chain.check_tenor(o, horizons, iv_field)
     side = o.choice("side", LONG, SIDES)
@@ -782,39 +784,6 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         weighting=weighting,
         vol_field=vol_field,
     )
-
-
-def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:
-    """``(structure, strike_delta, otm_pct, iv_field)``: a structure only for the option kinds."""
-    delta, pct = o.number("strike_delta", None), o.number("otm_pct", None)
-    iv_field = _prose(o, "iv_field") or None
-    structures = chain.structures_of(kind, STRUCTURES, MODEL_STRUCTURES)
-    structure = o.choice("structure", "", structures) if "structure" in o.names() else None
-    if kind == chain.CHAIN_KIND:
-        return chain.check_chain(o, structure, delta, pct, iv_field)
-    if kind not in ("expires_otm", MODEL_KIND, chain.CHAIN_KIND):
-        for key, value in (("structure", structure), ("strike_delta", delta), ("otm_pct", pct)):
-            if value is not None:
-                raise ConfigurationError(f"{o.where} {key}: only an expires_otm outcome has one")
-        return None, None, None, iv_field
-    if structure is None:
-        _missing(o, "structure")
-    if kind == "option_model_pnl":
-        for key, value in (("strike_delta", delta), ("otm_pct", pct)):
-            if value is not None:
-                raise ConfigurationError(
-                    f"{o.where} {key}: an option_model_pnl is at the money, it has no strike"
-                )
-    elif (delta is None) == (pct is None):
-        raise ConfigurationError(
-            f"{o.where}: an expires_otm outcome names exactly one of strike_delta and otm_pct"
-        )
-    for key, value in (("strike_delta", delta), ("otm_pct", pct)):
-        if value is not None and not 0 < value < 1:
-            raise ConfigurationError(f"{o.where} {key}: expected a fraction in (0, 1), got {value}")
-    if iv_field is None:
-        raise ConfigurationError(f"{o.where} iv_field: required for an {kind} outcome")
-    return structure, delta, pct, iv_field
 
 
 def _horizons(o: Table) -> tuple[int, ...]:
