@@ -592,3 +592,45 @@ announced ahead) count and a date, the two entries, and the Guide terms.
    count: `dividend_schedule@v1` counts calendar days), `macro_release` (a market-entity field
    the harness does not read), `lockup_expiry` (the IPO table of D8 is not merged), `insider_buy`
    (Form 4, H12), `spin_off` (needs data).
+
+## Amendment 2026-10-17: outcome sides (owner decision 2026-10-17, `docs/decisions/log.md`)
+
+An outcome has a **side**, `[outcome] side = "long" | "short" | "long_short"` (default `long`; a
+`[[variants]]` row may override it, each a trial as before). Edges that never name one are
+byte-identical to before: the side keys are left out of the trial hash, the run hash and the leg
+key when the side is `long` (`identity_dict`), so no stored leg or run is recomputed.
+
+1. **`short`**: the picks are the bottom `top_k` of the scored, pickable names of the screen's
+   ranking (by score, as the deciles, never the rule rank), among names whose 20-day dollar
+   volume at D is known and at least `capacity_adv_floor_usd` (`verdict.toml`: the existing
+   liquidity threshold; an unknown volume is not liquid, and no short leg is drawn from a
+   microcap). The value of a pick is `-excess_return - cost_bps - borrow`; a hit is a value above
+   zero. The base rate is the share of every eligible name that would have hit the same way, so
+   the lift still compares the picks with doing it blindly. The decile spread (`top - bottom`,
+   long oriented) is the ranking's and does not change with the side. A short edge needs an
+   `excess_return` outcome, no `max_drawdown` (the dip of a short is the rally) and an integer
+   `top_k`. Unscored names are in neither leg, a session with too few scores has no legs (the
+   `MIN_SCORE_COVERAGE` rule, fail closed), and a delisted name is measured to its last bar.
+2. **`long_short`**: the session value is the mean of the top `top_k` plus the mean of the short
+   leg (each net of its costs, the short leg of borrow), `SessionStat.spread_value`; a session
+   with no counted name in either leg has no value, never half a spread. It has no base rate: the
+   hit rate, base rate, lift, effect size and equal-weight floor are null (the Guide term
+   `side_long_short` says why, they are never 0), and it has no cost rows. The trial statistics
+   (Sharpe, deflated Sharpe, PBO) read the spread.
+3. **Borrow** is an assumption: `[edge_costs] borrow_bps_annual` (default 100 bp a year) in
+   `config/site/verdict.toml`, or the outcome's own `borrow_bps_annual`, scaled by
+   `horizon / 252`. No borrow data exists; the Guide says so. Limitation: a hard-to-borrow name
+   costs more than the flat rate and is not excluded (nothing stored says which names are); the
+   dollar-volume floor stands in for it, and a short result is read with that in mind. The resolved rate is in the trial
+   hash and the liquidity floor in the leg key of a non-long edge only.
+4. **Random picks** follow the side with the same seeded generator: `short` draws from the liquid
+   pickable names and its value is the short's; `long_short` is two draws, the long's then the
+   short's, summed (`random_picks.long_short_stat`).
+5. **Storage**: `results/edge_legs.short_values` (null for every other side; the picks'
+   `SHORT` flag bit says which leg a pick is on; no `LEG_VERSION` bump: an absent field reads
+   back as null), `results/edge_trades.side` and `results/edge_eval.side` (null in rows from
+   before: read as `long`). The ledger lists both legs of a `long_short` run, ordered by side.
+6. **Read**: a `long_short` result is a diagnostic and never a verdict basis (owner decision
+   2026-10-17): its verdict is its own state, Diagnostic only (`diagnostic_only`, Guide term `verdict_diagnostic_only`), with `EdgeVerdict.side`; a `short`
+   result is judged like any, its headline says "(short leg)". The edge page shows the side
+   beside the basis, with a Guide entry per value (`side_long`, `side_short`, `side_long_short`).

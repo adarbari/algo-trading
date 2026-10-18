@@ -58,8 +58,8 @@ COLUMNS = [
 ]
 
 
-def parse_listings(payload: bytes) -> tuple[pd.DataFrame, dict[str, int]]:
-    """The ZIP (or the bare CSV) -> (``COLUMNS`` rows kept, rows dropped by reason)."""
+def read_listing_csv(payload: bytes) -> pd.DataFrame:
+    """The ZIP (or the bare CSV) -> the file's rows as text, ``HEADER`` columns checked."""
     if zipfile.is_zipfile(io.BytesIO(payload)):
         with zipfile.ZipFile(io.BytesIO(payload)) as archive:
             names = [n for n in archive.namelist() if n.lower().endswith(".csv")]
@@ -70,6 +70,12 @@ def parse_listings(payload: bytes) -> tuple[pd.DataFrame, dict[str, int]]:
     missing = [c for c in HEADER if c not in raw.columns]
     if missing:
         raise ValueError(f"supported tickers CSV lacks columns {missing}")
+    return raw
+
+
+def parse_listings(payload: bytes) -> tuple[pd.DataFrame, dict[str, int]]:
+    """The ZIP (or the bare CSV) -> (``COLUMNS`` rows kept, rows dropped by reason)."""
+    raw = read_listing_csv(payload)
     ticker = raw["ticker"].str.strip().str.upper()
     exchange = raw["exchange"].str.strip().str.upper().map(EXCHANGES)
     asset = raw["assetType"].str.strip().str.upper().map(ASSET_TYPES)

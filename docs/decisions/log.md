@@ -507,6 +507,21 @@ follow-up PR).
 - status: final
 - Reasoning: the tag does not split finance from operating leases in the filer's figure; excluding it would leave about 70 of 259 untagged companies null.
 
+## 2026-10-17 | PR #646 (EB H3 outcome sides) | A long-short edge's verdict state
+- Question: what does an edge whose outcome is a long-short spread show as its verdict, given a spread is never a basis?
+- Options: Waiting on data with a reason / its own state, Diagnostic only.
+- Decision: its own state, `diagnostic_only`, with a Guide entry; the figures stay on the page.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: Waiting on data says a result is coming; a spread's never becomes a verdict, so the word would mislead.
+
+## 2026-10-17 | PR #646 (EB H3 outcome sides) | Assumed borrow cost of a short leg
+- Question: what borrow cost does a short leg pay, and are hard-to-borrow names excluded?
+- Options: flat 100 bp a year, no exclusion / flat rate plus a hard-to-borrow exclusion / no borrow cost.
+- Decision: 100 bp a year (`verdict.toml [edge_costs] borrow_bps_annual`, per outcome overridable), no hard-to-borrow exclusion; the $5M ADV floor stands in. The limitation is recorded in ADR 0053.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: no borrow data is stored, so any exclusion would be a guess; a flat assumption is stated and visible.
 ## 2026-10-17 | EB H2 (SEC acceptance time) | Scope of the acceptance-time fix
 - Question: which groups read facts by SEC acceptance session, and where does the session rule live?
 - Options: only `financials` and `fundamentals` / every group that reads the SEC facts; the rule only in `data.shares` / also in `core/time/calendar.py`.
@@ -539,3 +554,11 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: grouping the available sides would silently change the meaning (an "or" side dropped makes the other side mandatory). Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it and asked that the note say the other conditions apply on their own (done): blocking the draft would throw away the parts that worked.
+
+## 2026-10-17 | PR #644 (E1c option-implied features) | IBKR IV30 change as a personal-licence feature
+- Question: does the IV-change edge (c03) get a long-history IBKR variant beside the chain-derived one?
+- Options: chain-derived only (history from 2026-10-02) / also `ibkr_iv_chg_5d` and `ibkr_iv_chg_21d` from IBKR's IV30 history (about 502 sessions).
+- Decision: add `ibkr_iv_history@v1` with both, `licence = "personal"`, optional like `ibkr_iv@v1`; `cp_iv_history@v1` stays open. Its guide entries say IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: settled by the architect reviewer of #644 (the format accepts no `architect` decider); the edge can be scored now instead of from November; the read-only broker boundary is untouched (it reads a stored rollup).

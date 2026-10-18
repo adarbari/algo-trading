@@ -17,6 +17,7 @@ from algotrade_ingestion.tasks.market import (
     bars_history,
     corporate_actions,
     earnings,
+    fund_nav,
     option_chains,
     rates,
     vx_futures,
@@ -62,6 +63,19 @@ def run_bars_history(ctx: TaskContext, p: Params) -> RunRecord:
         bool(p.get("include_tiers")),
         p.get("fill"),
         bool(p.get("from_listings")),
+    )
+
+
+def run_fund_nav(ctx: TaskContext, p: Params) -> RunRecord:
+    return fund_nav.ingest_fund_nav(
+        ctx,
+        ctx.sources["tiingo_nav"],
+        ctx.sources["tiingo_nav_tickers"],
+        p.get("end") or session_of(p),
+        p.get("start"),
+        symbols(p),
+        bool(p.get("force")),
+        p.get("limit"),
     )
 
 

@@ -21,7 +21,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.config.edges.document import Edge
+from algotrade.config.edges.document import Edge, identity_dict
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
@@ -64,7 +64,7 @@ class Settled:
 
 def outcome_hash(edge: Edge) -> str:
     """A fingerprint of the edge's ``[outcome]``: what a hit means."""
-    text = json.dumps(asdict(edge.outcome), sort_keys=True, default=str)
+    text = json.dumps(identity_dict(asdict(edge.outcome)), sort_keys=True, default=str)
     return hashlib.sha256(text.encode()).hexdigest()[:12]
 
 
