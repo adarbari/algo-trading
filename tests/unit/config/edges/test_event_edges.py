@@ -184,7 +184,10 @@ def test_the_etf_flow_base_is_the_funds_that_carry_a_score() -> None:
     assert len(base & scored) < MIN_SCORE_COVERAGE * len(base)
 
 
-SPARSE = ("insider_opportunistic_cluster_buys", "short_squeeze_days_to_cover")
+SPARSE = (
+    "insider_opportunistic_cluster_buys", "short_squeeze_days_to_cover",
+    "analyst_revision_momentum", "target_price_implied_return", "dual_class_spread_reversion",
+)  # fmt: skip
 
 
 @pytest.mark.parametrize("edge_id", SPARSE)
@@ -198,3 +201,25 @@ def test_a_sparse_score_edge_gates_its_universe_on_the_score(edge_id: str) -> No
     field = tomllib.loads(path.read_text())["rank"]["tie_break"]
     gated = [r for r in edge.universe.where.rules() if r.field == field]  # type: ignore[union-attr]
     assert gated and gated[0].op == "gte", f"{edge_id}: gate the universe on {field}"
+
+
+def test_the_stock_leftover_edges_rank_the_short_leg_and_gate_the_universe() -> None:
+    """EB E3b: ivol_avoid and lottery_max rank the jumpiest name last (the short leg takes the worst
+    scores) and the avoid-list universe requires both scores; the news-conditioned
+    reversal's main universe has no news gate (the baseline would pick the same names), only its
+    short variants."""
+    edges = {e.id: e for e in load_edges(STORE)}
+    avoid = edges["idiosyncratic_volatility_and_max"]
+    assert avoid.outcome.side == "short" and avoid.base == "universe"
+    gated = {r.field for r in avoid.universe.where.rules()}  # type: ignore[union-attr]
+    for screener in avoid.screeners:
+        field, order = _rank(screener)
+        assert order == "asc" and field in gated, screener
+    news = edges["news_conditioned_reversal"]
+    assert _rank(news.screeners[0])[1] == "asc"
+    gate = (
+        "feature.news_free_5d"  # not in the main universe: the baseline would pick the same names
+    )
+    assert gate not in {r.field for r in news.universe.where.rules()}  # type: ignore[union-attr]
+    for v in news.variants:  # a short leg ranks by score over every pickable name: gate it there
+        assert gate in {r.field for r in v.universe.where.rules()}  # type: ignore[union-attr]

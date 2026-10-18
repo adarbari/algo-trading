@@ -486,7 +486,7 @@ Sources: Site convention over the stored earnings calendars (ADR 0050)
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a report date that moved in the last five sessions | `lte 5` | hard | - | the news is freshest in the first sessions after the move |
+| a report date that moved in the last five sessions | `lte 5` | hard | - | illustrative screen: five sessions is one trading week, the window in which the move is still news; no published cut-off |
 
 **When the reading lies**
 

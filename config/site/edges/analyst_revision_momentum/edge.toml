@@ -1,0 +1,97 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: eps_revision_up (new, EB E3b; analyst_revisions@v1,
+# personal licence). Idea page: docs/edge-ideas/events.md (analyst_revision_momentum). Same pattern as
+# etf_flow_pressure: the history starts after frozen_from, so the verdict accrues over months.
+id = "analyst_revision_momentum"
+name = "Analyst earnings-estimate revision momentum"
+family = "B"
+thesis = "Stocks whose consensus earnings estimate for the current year was revised up over the last month keep outperforming the market over the next one to three months."
+mechanism = """Analysts herd and under-revise, anchoring on their last number, so each revision is a partial step toward the
+truth and revisions predict revisions; investors wait for the reported number (Chan, Jegadeesh and
+Lakonishok 1996; Gleason and Lee 2003)."""
+persistence = """Revision signals are old and sold as ranks (Zacks, StarMine) yet survive because turnover is moderate and the
+effect lives in mid and small caps, crowded in large ones; the post-2005 decline across all anomalies roughly
+halves a published spread (Chen and Zimmermann 2022). Persistence is a claim to test."""
+schedule = "month_end"
+top_k = 10
+base = "universe"
+screeners = ["eps_revision_up"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """No exploration period exists: our own nightly snapshots of FMP's annual estimates (analyst_estimates, EB D2) start on
+2026-10-19 at the earliest, after frozen_from, and a revision needs an earlier snapshot of the same fiscal year,
+so the 30-day column is null until about 2026-11-18 and the 90-day one until about 2027-01-17. Every
+measurable session is therefore frozen-period data, and the verdict accrues over months: the bar's 40
+independent months is about three and a half years away and the harness reports the count beside every
+number. Licence: the estimates are a personal-licence feed (ADRs 0068 and 0069), so this edge's rows
+are for the owner's own use. The universe holds only names that carry a 30-day revision (the free vendor key
+covers few names, and a revision is null for the rest), so every base name is scored (the roadmap's measurement of 2026-10-16: the free vendor key covers 15 of 104 scope names; a covered base of about 20 would make 20 picks the whole base and the lift about 0, so top_k is 10; nothing in the harness enforces it, but the lift is expected to be reliable only with a base of at least 2 x top_k, 20 names) and the short variant is
+ranked; the base is the covered names. Proxies, each stated: the source's REV6 sums six months of changes
+in the consensus scaled by price, here a 30-day percent change of the current fiscal year's EPS estimate (the
+longer windows are stored and are follow-ups); no breadth (the share of analysts moving up) and no
+dispersion; a free-tier consensus is a small subset of the analysts, so a revision can be one analyst's. The
+outcome is the long on the 10 largest upward revisions; the variant downgrades_short is the short on the 10
+largest downward ones among liquid names (owner decision O2, 2026-10-17: a verdict basis), net of cost and the
+assumed borrow; long_short is diagnostic only. A session before the data exists has an empty eligible set and is recorded as no_picks, not as measured. Month-end start sessions at least 20 sessions apart."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
+  { field = "rollup.analyst_revisions@v1.eps_fy1_revision_30d", op = "gte", value = -10000 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[[variants]]
+id = "downgrades_short"
+[variants.outcome]
+side = "short"
+
+[[variants]]
+id = "long_short"
+[variants.outcome]
+side = "long_short"
+
+[quality_bar]
+outcome = """Excess return over SPY over 20 and 60 sessions after the entry close (the session after a month-end decision),
+net of 10 bps a round trip: a long hold of the 10 names with the largest upward revision of the current-year EPS estimate over
+the last 30 days."""
+trigger_timing = """A revision is read from our own snapshots: the newest snapshot a session sees against the one 30 days earlier
+for the same fiscal year, each snapshot counting from the session that stored it (the reader hides one taken after the
+next open), never from the vendor's date; the revision is read at D (a month end) and the entry session is S = D + 1
+(start_offset_sessions = 1)."""
+replication = """Chan, Jegadeesh and Lakonishok's REV6: the sum of six months of consensus changes over price, deciles, held 6 to 12
+months. Here: the 30-day percent change of the current fiscal year's EPS estimate (analyst_revisions@v1), the 10 largest
+upward among the covered liquid stocks, held 20 and 60 sessions. The paper's decile spread is from memory, so nothing is filed
+under [published]."""
+expected_size = """About 7 to 8 percent over 12 months for the REV6 decile spread (Chan and co-authors 1996, from memory, not verified);
+across about 200 signals the median post-2005 anomaly fell from 48 to 19 basis points a month (Chen, Lopez-Lira and
+Zimmermann, verified), so expect about half. With history from 2026-10-19 and a first 30-day value about 2026-11-18, no
+measurement exists yet."""
+capacity_costs = """Covered stocks above $5M a day, long only, capacity of tens of thousands of dollars a name; monthly turnover is
+moderate. The 10 bps round trip is the assumption; the short variant pays the site's assumed borrow."""
+failure_modes = """Revisions follow price (analysts chase the move), so the picks are a momentum bet: the 12-1 momentum screen is the baseline;
+a revision after a report is the earnings surprise again (PEAD); one analyst moving a thin consensus; the free vendor's
+coverage skews to large names where the effect is weakest. Retire if the frozen-period excess return of the picks is not above
+the base rate of every covered name."""
+decoys = """12-1 momentum and post-earnings drift (both correlate with revisions: the test is incremental to them), size, and the
+earnings surprise: the size and momentum baselines on the same sessions."""
+
+[[sources]]
+title = "Chan, L., Jegadeesh, N. and Lakonishok, J., Momentum Strategies, Journal of Finance, 1996"
+
+[[sources]]
+title = "Gleason, C. and Lee, C., Analyst Forecast Revisions and Market Price Discovery, The Accounting Review, 2003"
+
+[[sources]]
+title = "Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022"
+url = "https://papers.ssrn.com/abstract=3604626"
