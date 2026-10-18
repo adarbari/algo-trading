@@ -15,7 +15,12 @@ counted picks (reason ``""``) are, in order, ``pick_values``. ``pick_flags`` pac
 booleans (``HIT``, ``DELISTED``, ``TOUCH``; the touch is known when its reference is; ``SHORT``:
 a name the leg is short, outcome sides). A ``long_short`` leg keeps its short names' counted values
 in ``short_values`` (null for every other side, so a long leg's row is what it was), the long
-leg's in ``pick_values``; a ``short`` leg's names are all short and their values ``pick_values``."""
+leg's in ``pick_values``; a ``short`` leg's names are all short and their values ``pick_values``.
+
+Leg v4 (ADR 0053 amendment 2026-10-18, buy/hold bands): an edge with ``[outcome] hold_rank`` also
+keeps the names ranked just below its counted picks, ``top_k + 1`` to ``hold_rank``, as ``band_*``
+lists (id, rank, oriented net value, null when the name has no counted value): the values the
+turnover pass (``reporting/turnover.py``) needs for a name held through the band."""
 
 import math
 from collections.abc import Mapping, Sequence
@@ -28,7 +33,7 @@ import pandas as pd
 
 from algotrade.data import ReadRecord
 from algotrade.data.listings.identity import PROXY, TODAY_FLAG
-from algotrade.services.evaluation.cross_section.measures import Pick, SessionStat
+from algotrade.services.evaluation.cross_section.measures import UNCOUNTED_BAND, Pick, SessionStat
 from algotrade.services.evaluation.cross_section.random_picks import RandomStat, SectorDraws
 
 LEG = "leg"
@@ -210,6 +215,28 @@ def decode_picks(
     return tuple(out)
 
 
+def encode_band(band: Sequence[Pick]) -> dict[str, list[Any] | None]:
+    """A leg's buy/hold band (leg v4) as ``band_*`` lists aligned to ``band_ids``; null for a leg
+    with none, so a leg of an edge without ``hold_rank`` carries nothing new. A name with no
+    counted value has a null value, never 0."""
+    if not band:
+        return {"band_ids": None, "band_ranks": None, "band_values": None}
+    return {
+        "band_ids": [p.instrument_id for p in band],
+        "band_ranks": [p.rank for p in band],
+        "band_values": [p.value for p in band],
+    }
+
+
+def decode_band(row: Mapping[str, Any]) -> tuple[Pick, ...]:
+    """The band of a leg row (none for a row without one, or from before leg v4)."""
+    ids, ranks, values = (_list(row.get(c)) for c in ("band_ids", "band_ranks", "band_values"))
+    return tuple(
+        Pick(str(i), int(r), "" if not _null(v) else UNCOUNTED_BAND, value=_maybe(v))
+        for i, r, v in zip(ids, ranks, values, strict=True)
+    )
+
+
 def _base(
     kind: str,
     user_id: str,
@@ -271,6 +298,7 @@ def encode_leg(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
         pick_hits_at=list(s.pick_hits_at),
         short_values=None if s.short_values is None else list(s.short_values),
         **encode_picks(s.picks),
+        **encode_band(s.band),
     )
     if r is not None:
         row.update(
@@ -333,6 +361,7 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
         no_implied_vol=int(row["no_implied_vol"]),
         implied_stored=bool(row["implied_stored"]),
         picks=decode_picks(row, values, shorts),
+        band=decode_band(row),
         base_hits_at=_ints(row.get("base_hits_at")),
         pick_hits_at=_ints(row.get("pick_hits_at")),
         short_values=shorts,

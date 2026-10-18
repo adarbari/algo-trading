@@ -20,15 +20,17 @@ and the key.
                       ``iv_field`` is allowed on a ratio measure too (default: the run's); an
                       ``option_model_pnl`` outcome (a model P&L, basis ``model``) names its
                       ``structure`` (MODEL_STRUCTURES), the ``iv_field`` and ``benchmark =
-                      "none"``, and takes no strike; an ``option_pnl`` outcome (a P&L of the
-                      stored chains, basis ``chain``) is in ``chain.py``;
+                      "none"``, and takes no strike; ``option_pnl``: see ``chain.py``;
                       ``side`` (SIDES; ADR 0053 amendment, outcome sides): ``long`` (default),
                       ``short`` (the picks are the bottom ``top_k`` of the ranked, liquid names;
                       the value is minus the excess return, less cost and borrow) or
                       ``long_short`` (the top ``top_k`` minus the bottom: a spread, diagnostic
                       only); a side other than long needs an ``excess_return`` outcome, no
                       ``max_drawdown``, an integer ``top_k``; optional ``borrow_bps_annual``
-                      (default from ``verdict.toml``) is the short leg's assumed borrow cost
+                      (default from ``verdict.toml``) is the short leg's assumed borrow cost;
+                      optional ``hold_rank`` (buy/hold band, ADR 0053 amendment 2026-10-18): held
+                      while rank <= this (>= ``top_k``, an integer); cost on entries and exits
+                      only; see ``_hold_rank`` for where it is allowed
     schedule          ``every_session`` | ``month_end`` | ``calendar:<window>`` (WINDOW_NAMES: a
                       stretch the calendar fixes, whose length is the one horizon) |
                       ``on_event:<class>[:<subtype>]`` (EVENT_CLASSES; EVENT_SUBTYPES)
@@ -99,16 +101,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
-from algotrade.config.edges.chain import (
-    CHAIN_BASIS,
-    CHAIN_KIND,
-    CHAIN_STRUCTURES,
-    chain_tenor,
-    check_chain,
-    check_kinds,
-    check_model_tenor,
-)
+from algotrade.config.edges import chain
 from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
+from algotrade.config.edges.model_tenor import check_tenor
 from algotrade.config.edges.verdict import LEGS
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Selection, parse_selection
@@ -125,7 +120,7 @@ MIN_INDEPENDENT_SESSIONS = 40  # the quality bar's count: a fit and a promotion 
 FAMILIES = tuple("ABCDEFGHI")  # the idea catalogue's families (docs/edge-ideas/)
 STATUSES = ("researching", "candidate", "evidenced", "live", "retired", "rejected", "blocked")
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
-OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm", "option_model_pnl", CHAIN_KIND)
+OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm", "option_model_pnl", chain.CHAIN_KIND)
 STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
 # An option_model_pnl outcome's position: one at-the-money straddle held to the horizon's close,
 # long or short, or delta-hedged, long or short (ADR 0053 amendment 2026-10-17).
@@ -214,7 +209,7 @@ KEYS = (
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
-    "side", "borrow_bps_annual", "tenor_days",
+    "side", "borrow_bps_annual", "tenor_days", "hold_rank",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -249,6 +244,7 @@ class Outcome:
     side: str = LONG  # SIDES; a short leg pays ``borrow_bps_annual`` (None: the site's default)
     borrow_bps_annual: float | None = None
     tenor_days: int | None = None  # an option_pnl's tenor rule (config/edges/chain.py)
+    hold_rank: int | None = None  # buy/hold band: held while rank <= this (None: no band)
 
     @property
     def is_return(self) -> bool:
@@ -257,9 +253,8 @@ class Outcome:
 
     @property
     def basis(self) -> str | None:
-        """``"model"`` for a modelled P&L (``option_model_pnl``), ``"chain"`` for a P&L of stored
-        quotes (``option_pnl``), else None."""
-        return {MODEL_KIND: MODEL_BASIS, CHAIN_KIND: CHAIN_BASIS}.get(self.kind)
+        """``"model"`` (``option_model_pnl``), ``"chain"`` (``option_pnl``), else None."""
+        return {MODEL_KIND: MODEL_BASIS, chain.CHAIN_KIND: chain.CHAIN_BASIS}.get(self.kind)
 
     @property
     def sign(self) -> float:
@@ -453,13 +448,18 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     sources = _sources(t)
     top_k = _top_k(t)
     variants = _variants(t, schedule, edge_id, universe, base, picks)
-    if why := check_kinds({outcome.kind, *(v.outcome.kind for v in variants)}):
-        raise ConfigurationError(f"{where} variants: {why}")
+    chain.check_kinds(where, {outcome.kind, *(v.outcome.kind for v in variants)})
     for held in (outcome, *(v.outcome for v in variants)):
         if held.side != LONG and top_k is None:
             raise ConfigurationError(
                 f"{where} top_k: a {held.side!r} outcome ranks the names, so it needs an "
                 f"integer top_k, not 'all'"
+            )
+        if held.hold_rank is not None and (top_k is None or held.hold_rank < top_k):
+            raise ConfigurationError(
+                f"{where} hold_rank: {held.hold_rank} must be an integer >= top_k "
+                f"({'all' if top_k is None else top_k}); a name is held down to that rank, "
+                f"entered at top_k"
             )
     edge = Edge(
         id=edge_id,
@@ -662,7 +662,7 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
     )
     if kind == "excess_return" and benchmark == "none":
         raise ConfigurationError(f"{o.where} benchmark: an excess return needs SPY, not 'none'")
-    if kind in (MODEL_KIND, CHAIN_KIND) and benchmark != "none":
+    if kind in (MODEL_KIND, chain.CHAIN_KIND) and benchmark != "none":
         raise ConfigurationError(
             f"{o.where} benchmark: an {kind} is a P&L on the underlying, "
             f"it has no benchmark: use 'none'"
@@ -707,12 +707,12 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
     if drawdown is not None and not 0 < drawdown <= 1:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
     structure, strike_delta, otm_pct, iv_field = _expires_otm(o, kind)
-    tenor = chain_tenor(o, kind)
     if kind == MODEL_KIND:
-        check_model_tenor(o, horizons, iv_field)
+        check_tenor(o, horizons, iv_field)
     side = o.choice("side", LONG, SIDES)
     borrow = o.number("borrow_bps_annual", None, 0)
     _check_side(o, side, borrow, kind, drawdown)
+    hold_rank = _hold_rank(o, side, kind, schedule, horizons)
     return Outcome(
         kind=kind,
         horizon_sessions=horizons,
@@ -729,7 +729,8 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
         iv_field=iv_field,
         side=side,
         borrow_bps_annual=borrow,
-        tenor_days=tenor,
+        tenor_days=chain.chain_tenor(o, kind),
+        hold_rank=hold_rank,
     )
 
 
@@ -748,17 +749,41 @@ def _check_side(
         )
 
 
+def _hold_rank(
+    o: Table, side: str, kind: str, schedule: str, horizons: tuple[int, ...]
+) -> int | None:
+    """The outcome's buy/hold band rank (None: no band). Refused for a spread (``long_short`` has
+    no cost rows), a return that is not an excess return and an event or calendar schedule. The
+    schedule limit (``month_end``, or ``every_session`` at one session) is stricter than needed:
+    windows never overlap on a plain schedule (``sessions.py``), so loosening it is a later PR."""
+    if "hold_rank" not in o.names():
+        return None
+    rank = o.integer("hold_rank", 1, 1)
+    if side == LONG_SHORT or kind != "excess_return":
+        raise ConfigurationError(
+            f"{o.where} hold_rank: a band is for a long or short excess_return (a long_short "
+            f"spread has no cost rows to turn over)"
+        )
+    if schedule not in SCHEDULES or (schedule == "every_session" and horizons != (1,)):
+        raise ConfigurationError(
+            f"{o.where} hold_rank: for now the schedule is month_end, or every_session at "
+            f"horizon_sessions = [1] (kept stricter than needed), got {schedule!r} with "
+            f"{list(horizons)}"
+        )
+    return rank
+
+
 def identity_dict(value: Any) -> Any:
-    """``value`` (an ``asdict`` of an edge or outcome) without the side keys of a long outcome:
-    a document that never named a side hashes as it did before sides, so no stored leg or
-    run is recomputed by their arrival (ADR 0053 amendment, outcome sides)."""
+    """``value`` (an ``asdict`` of an edge or outcome) without the side keys of a long outcome
+    and an unset ``hold_rank``: a document that never named a side or a band hashes as it did
+    before them, so no stored leg or run is recomputed by their arrival (ADR 0053 amendments)."""
     if isinstance(value, dict):
         long = value.get("side") == LONG and value.get("borrow_bps_annual") is None
         bare = ("side", "borrow_bps_annual") if long else ()
-        return {  # also an unset ``tenor_days`` (EB H13): older documents hash as they did
+        return {
             k: identity_dict(v)
             for k, v in value.items()
-            if k not in bare and not (k == "tenor_days" and v is None)
+            if k not in bare and not (k in ("tenor_days", "hold_rank") and v is None)
         }
     if isinstance(value, (list, tuple)):
         return [identity_dict(v) for v in value]
@@ -766,19 +791,15 @@ def identity_dict(value: Any) -> Any:
 
 
 def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:
-    """``(structure, strike_delta, otm_pct, iv_field)`` of an outcome: a structure only for
-    ``expires_otm`` (exactly one of two strikes) and ``option_model_pnl`` (no strike); the
-    implied vol field is required for both."""
+    """``(structure, strike_delta, otm_pct, iv_field)``: a structure only for the option kinds."""
     names = o.names()
     delta, pct = o.number("strike_delta", None), o.number("otm_pct", None)
     iv_field = _prose(o, "iv_field") or None
-    options = ("expires_otm", MODEL_KIND, CHAIN_KIND)
-    by_kind = {"expires_otm": STRUCTURES, CHAIN_KIND: CHAIN_STRUCTURES}
-    structures = by_kind.get(kind, MODEL_STRUCTURES)
+    structures = chain.structures_of(kind, STRUCTURES, MODEL_STRUCTURES)
     structure = o.choice("structure", "", structures) if "structure" in names else None
-    if kind == CHAIN_KIND:
-        return check_chain(o, structure, delta, pct, iv_field)
-    if kind not in options:
+    if kind == chain.CHAIN_KIND:
+        return chain.check_chain(o, structure, delta, pct, iv_field)
+    if kind not in ("expires_otm", MODEL_KIND, chain.CHAIN_KIND):
         for key, value in (("structure", structure), ("strike_delta", delta), ("otm_pct", pct)):
             if value is not None:
                 raise ConfigurationError(f"{o.where} {key}: only an expires_otm outcome has one")

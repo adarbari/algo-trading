@@ -141,6 +141,7 @@ from algotrade.services.evaluation.cross_section.reporting.report_containment im
     containment,
     reports_after,
 )
+from algotrade.services.evaluation.cross_section.reporting.turnover import apply_hold_bands
 from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
     leg_blocks,
@@ -511,6 +512,10 @@ def evaluate_edge(
                 pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
                 for block in kept
             )
+            if scope.edge.outcome.hold_rank is not None:  # the net series of a buy/hold band
+                block_stats = apply_hold_bands(
+                    block_stats, scope.edge.outcome.cost_bps, scope.edge.outcome.sign
+                )
             measures, costed = _slice_rows(
                 block_stats,
                 split,

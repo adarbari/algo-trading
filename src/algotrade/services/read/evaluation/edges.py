@@ -87,6 +87,7 @@ class EdgeSettings:
     own: Mapping[str, Any] = field(default_factory=dict)
     cost_applies: bool = True  # the outcome's value is a return, so a round-trip cost applies
     outcome_sign: float = 1.0  # -1 for direction ``below``: the stored values are oriented
+    hold_rank: int | None = None  # a buy/hold band: the cost is charged on entries and exits
 
 
 @dataclass(frozen=True)
@@ -227,6 +228,7 @@ def _settings(e: document.Edge, own: Mapping[str, Any] | None) -> EdgeSettings:
         cost_bps=e.outcome.cost_bps,
         cost_applies=e.outcome.is_return,
         outcome_sign=e.outcome.sign,
+        hold_rank=e.outcome.hold_rank,
         quality_bar=tuple(EdgeAnswer(k, e.quality_bar.get(k, "")) for k in document.QUALITY_BAR),
         own={k: _json(v) for k, v in (own or {}).items() if k not in (FOLLOW, AUDIT, "status")},
     )
