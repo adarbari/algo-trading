@@ -221,13 +221,13 @@ purpose = "market-data tasks: bars, corporate actions, earnings, option chains, 
 kind = "task-domain"
 
 [[dir]]
-path = "apps/ingestion/algotrade_ingestion/tasks/market/volatility"
-purpose = "volatility tasks: Cboe VIX futures by expiry (the VIX-family indices are macro series); tasks/market is at its module cap, so these are a folder"
+path = "apps/ingestion/algotrade_ingestion/tasks/market/futures"
+purpose = "futures tasks: the nightly futures curve snapshots from IB Gateway (read-only, personal licence); tasks/market is at its module cap, so these are a folder"
 kind = "task-domain"
 
 [[dir]]
-path = "apps/ingestion/algotrade_ingestion/tasks/market/futures"
-purpose = "futures tasks: the nightly futures curve snapshots from IB Gateway (read-only, personal licence); tasks/market is at its module cap, so these are a folder"
+path = "apps/ingestion/algotrade_ingestion/tasks/market/volatility"
+purpose = "volatility tasks: Cboe VIX futures by expiry (the VIX-family indices are macro series); tasks/market is at its module cap, so these are a folder"
 kind = "task-domain"
 
 [[dir]]
