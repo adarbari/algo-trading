@@ -37,6 +37,7 @@ from algotrade_sources.framework.http import (
     Http,
     HttpError,
     RetryPolicy,
+    Transport,
     json_post_transport,
     pause,
     urllib_transport,
@@ -49,6 +50,9 @@ from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource, miss
 from algotrade_sources.vendors.finnhub import client as finnhub_client
 from algotrade_sources.vendors.finnhub.probe import FinnhubProbe
 from algotrade_sources.vendors.finnhub.recommendations import FinnhubRecommendations
+from algotrade_sources.vendors.finra import client as finra_client
+from algotrade_sources.vendors.finra.short_interest import FinraShortInterest
+from algotrade_sources.vendors.finra.short_volume import FinraShortVolume
 from algotrade_sources.vendors.fmp import client as fmp_client
 from algotrade_sources.vendors.fmp.estimates import FmpAnalystEstimates
 from algotrade_sources.vendors.fmp.probe import FmpProbe
@@ -196,6 +200,9 @@ class SourceSpec:
     # appends it to every URL, so sources, retry messages and raw paths never hold it.
     query_param: str | None = None
     options: Callable[[RegistrySettings], dict[str, Any]] = _no_options  # keyword args of build
+    # A vendor read by a POST the source names as a GET URL (FINRA's filters): builds the
+    # transport from the headers in place of ``urllib_transport``.
+    transport: Callable[[dict[str, str]], Transport] | None = None
 
 
 def _bearer(key: str | None) -> dict[str, str]:
@@ -364,6 +371,21 @@ SOURCES: dict[str, SourceSpec] = {
             for name, build in (
                 ("finnhub_probe", FinnhubProbe),
                 ("finnhub_recommendations", FinnhubRecommendations),
+            )
+        ),
+        *(
+            SourceSpec(
+                name,
+                "finra",
+                "finra",
+                build,
+                0.5,  # documented 1,200 sync requests a minute per IP; stay far under it
+                tries=4,
+                transport=finra_client.query_transport,
+            )
+            for name, build in (
+                ("finra_short_interest", FinraShortInterest),
+                ("finra_short_volume", FinraShortVolume),
             )
         ),
         SourceSpec("sp500_history", "sp500_history", "sp500_history", Sp500Membership, 1.0),
@@ -544,7 +566,8 @@ def build_sources(
             limiter(key, pacing(spec, settings))
             breakers[key] = CircuitBreaker(key, settings.http_breaker_failures)
         secret = env(spec.env_var) if spec.env_var else None
-        transport = urllib_transport(headers=spec.headers(secret))
+        headers = spec.headers(secret)
+        transport = spec.transport(headers) if spec.transport else urllib_transport(headers=headers)
         if spec.query_param and secret:
             transport = with_query_param(transport, spec.query_param, secret)
         http = Http(

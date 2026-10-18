@@ -137,6 +137,18 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/events/filings.py"
 note = "ADR 0050: SEC 8-K and 8-K/A filings of every operating company in the universe by acceptance time; known_from = the acceptance's session (New York)"
 
 [[table]]
+name = "events/short_interest"
+owner = "apps/ingestion/algotrade_ingestion/tasks/shorting/short_interest.py"
+no_ml = true
+note = "EB D9: FINRA short interest twice a month by settlement date; known_from = the session after the 7th business day (publication); no_ml: the finra.org terms bar machine learning, so no learned scorer reads it (tests/architecture/test_no_ml_tables.py)"
+
+[[table]]
+name = "events/short_volume"
+owner = "apps/ingestion/algotrade_ingestion/tasks/shorting/short_volume.py"
+no_ml = true
+note = "EB D9: FINRA Reg SHO daily short-sale volume by trade date (facilities summed, off-exchange only); known_from = the session after the trade date; no_ml, as events/short_interest"
+
+[[table]]
 name = "events/reference_change"
 owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"

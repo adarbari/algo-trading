@@ -151,6 +151,7 @@ VENDOR_EXTRAS = {
         "fund_quarters",
     ),
     "treasury": ("lookback_days",),
+    "finra": ("short_interest_lookback_days", "short_volume_lookback_days"),
     "fred": ("base_url",),
     "tiingo": ("licence", "monthly_symbol_budget"),
     "fmp": ("licence", "daily_budget", "refresh_days", "run_budget_s"),
@@ -226,6 +227,8 @@ class SourcesSettings:
     descriptions_per_night: int = 100  # Massive ticker overviews the nightly requests (0: none)
     descriptions_refresh_days: int = 365  # refetch a stock's description after this many days
     treasury_lookback_days: int = 10
+    finra_short_interest_lookback_days: int = 45  # [finra]: nightly window of settlement dates
+    finra_short_volume_lookback_days: int = 10  # [finra]: nightly window of trade dates
     fred_base_url: str = "https://api.stlouisfed.org/fred"  # [fred] base_url (ADR 0048)
     tiingo_licence: str = "personal"  # [tiingo] licence: what its bars are licensed for (ADR 0028)
     tiingo_monthly_symbol_budget: int = (
@@ -376,6 +379,12 @@ class SourcesSettings:
             ),
             treasury_lookback_days=_extra(vendors, "treasury").integer(
                 "lookback_days", d.treasury_lookback_days, 1
+            ),
+            finra_short_interest_lookback_days=_extra(vendors, "finra").integer(
+                "short_interest_lookback_days", d.finra_short_interest_lookback_days, 1
+            ),
+            finra_short_volume_lookback_days=_extra(vendors, "finra").integer(
+                "short_volume_lookback_days", d.finra_short_volume_lookback_days, 1
             ),
             fred_base_url=_extra(vendors, "fred").text("base_url", d.fred_base_url),
             tiingo_licence=_extra(vendors, "tiingo").choice("licence", d.tiingo_licence, LICENCES),

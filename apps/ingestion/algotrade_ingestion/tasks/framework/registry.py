@@ -63,6 +63,7 @@ from algotrade_ingestion.tasks.reference import (
     universe_build,
     universe_import,
 )
+from algotrade_ingestion.tasks.shorting import short_interest, short_volume
 from algotrade_ingestion.tasks.verification import verify
 
 __all__ = (
@@ -361,6 +362,28 @@ TASKS: dict[str, Task] = {
             sources=("treasury",),
             settings="sources.toml [treasury] lookback_days",
             params=(SESSION, FROM, TO, Param("force", ("--force",), None, "rewrite stored")),
+        ),
+        Task(
+            "short-interest",
+            "FINRA short interest (twice a month, one request per settlement date) into "
+            "events/short_interest; --from backfills (the API holds 2017-12-29 onward); no_ml",
+            short_interest,
+            ("events/short_interest",),
+            short_interest.run,
+            sources=(short_interest.SOURCE,),
+            settings="sources.toml [finra]",
+            params=(SESSION, FROM, TO, Param("force", ("--force",), None, "refetch stored dates")),
+        ),
+        Task(
+            "short-volume",
+            "FINRA Reg SHO daily short-sale volume (one request per trade date) into "
+            "events/short_volume; the API serves a rolling year; no_ml",
+            short_volume,
+            ("events/short_volume",),
+            short_volume.run,
+            sources=(short_volume.SOURCE,),
+            settings="sources.toml [finra]",
+            params=(SESSION, FROM, TO, Param("force", ("--force",), None, "refetch stored dates")),
         ),
         Task(
             "corporate-actions",

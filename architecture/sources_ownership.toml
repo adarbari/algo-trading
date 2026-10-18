@@ -20,6 +20,14 @@ section = "docs/adr/0068-analyst-data-vendors.md#decision"
 detect = [{ string_prefix = "https://financialmodelingprep.com" }, { string_prefix = "https://finnhub.io" }]
 
 [[responsibility]]
+id = "finra-sources"
+description = "Fetch and normalise FINRA's Query API (anonymous): consolidated short interest per settlement date and Reg SHO daily short-sale volume per trade date, read page by page as one payload; a GET URL with equal.<field> filters is sent as the POST body the API filters by (client.py); each row's known_from is the session after FINRA's publication (schedule.py: the 7th business day after settlement; the trade date for volume); the nightly short-interest and short-volume tasks store what they return (EB D9)"
+owner = ["libs/sources/algotrade_sources/vendors/finra/*"]
+allowed = ["libs/sources/algotrade_sources/framework/registry.py"]  # builds the sources and their POST transport
+section = "docs/edge-ideas/build-plan.md#3-finra-short-interest-bi-monthly-and-daily-short-sale-volume"
+detect = [{ string_prefix = "https://api.finra.org" }]
+
+[[responsibility]]
 id = "broker-read-only"
 description = "The only code that talks to a broker API (ib_async), READ-ONLY market data: the IbkrMarketData facade guards the IB object (market-data calls only) and never sends an order, account or position request; tests/libs/sources/vendors/ibkr/test_read_only_guard.py fails on any order / account API reference anywhere"
 owner = ["libs/sources/algotrade_sources/vendors/ibkr/gateway.py"]
