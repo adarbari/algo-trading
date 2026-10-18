@@ -168,6 +168,8 @@ VENDOR_EXTRAS = {
         "iv_batch",
         "iv_history_days",
         "iv_backfill_per_night",
+        "futures_roots",
+        "futures_front",
         *("live_cache_s", "live_strikes", "live_max_strikes", "live_timeout_s", "live_retry_s"),
     ),
 }
