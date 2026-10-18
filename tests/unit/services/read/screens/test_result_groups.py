@@ -54,7 +54,7 @@ def test_a_group_row_is_a_screen_group_never_a_criterion(
     assert all(not is_group_row(c.mode) for c in found.criteria)
     assert found.groups == (
         ScreenGroup("dip", "all", ("rsi", "vol"), "oversold", "FAIL", "vol"),
-        ScreenGroup("oversold", "any", ("low", "dip"), None, "FAIL", "low"),
+        ScreenGroup("oversold", "any", ("dip", "low"), None, "FAIL", "low"),
     )
 
 

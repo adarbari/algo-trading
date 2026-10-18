@@ -283,6 +283,17 @@ def _groups(values: Sequence[Mapping[str, Any]], hidden: frozenset[str]) -> tupl
         str(v["criterion_id"]): str(v["field"]) for v in values if is_criterion_row(v["mode"])
     }
 
+    first = {cid: n for n, cid in enumerate(fields)}  # criteria are stored in spec order
+
+    def position(node: str) -> int:
+        """Funnel position: a criterion's, a group's its first descendant's (as plan does)."""
+        if node not in first:
+            first[node] = min((position(m) for m in children.get(node, ())), default=0)
+        return first[node]
+
+    for kids in children.values():
+        kids.sort(key=position)  # stored order of the group rows is not the funnel's
+
     def shows_hidden(gid: str) -> bool:
         return any(
             (fields[m] in hidden) if m in fields else shows_hidden(m) for m in children.get(gid, ())

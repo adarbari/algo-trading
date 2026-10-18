@@ -117,7 +117,8 @@ def values_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
                     "group_id": parent.get(r.criterion.id),
                 }
             )
-        for g in _groups(row.gate_results):
+        for found in _groups(row.gate_results):
+            g = found.as_written  # a group under a none is stored as written, not negated
             records.append(
                 {
                     "instrument_id": row.instrument_id,

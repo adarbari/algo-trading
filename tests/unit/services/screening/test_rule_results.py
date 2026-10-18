@@ -68,3 +68,16 @@ def test_nested_groups_name_their_parent_and_none_stores_the_original_members() 
     assert members["a"]["group_id"] == "inner"
     assert members["a"]["outcome"] == "PASS"  # the criterion as written, not its negation
     assert members["a"]["value_num"] == 2.0
+
+
+def test_a_group_under_none_is_stored_as_written_not_negated() -> None:
+    """Fix for: a group nested under ``none`` was stored with its negated verdict (inner
+    all[a, b] PASS decided by b while b fails)."""
+    out = frames(
+        {"top": {"none": ["inner"]}, "inner": {"all": ["a", "b"]}}, {"a": 2, "b": 0, "c": 2}
+    )
+    values = out["rule_screen_values"]
+    inner = rows(values, "group")["inner"]
+    members = rows(values, "hard")
+    assert (inner["field"], inner["outcome"], inner["value_str"]) == ("all", "FAIL", "b")
+    assert members["b"]["outcome"] == "FAIL" and members["a"]["outcome"] == "PASS"
