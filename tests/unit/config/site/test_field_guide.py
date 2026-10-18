@@ -1,4 +1,4 @@
-"""``config/site/field_guide/*.toml`` (ADR 0041 amended): entries and situations in file
+"""``config/site/field_guide/<group>/*.toml`` (ADR 0041 amended): entries and situations in file
 order, each use a criterion the rule grammar takes (op, value, mode, tolerance, on_miss),
 errors naming the entry; the shipped files load and guide every entry fully."""
 
@@ -153,19 +153,33 @@ def test_the_guide_is_read_once_per_store(monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_the_shipped_guide_is_complete() -> None:
     store = FileConfigStore(REPO_ROOT / "config")
+    # one name per file, two files per stem across the group folders; "-" sorts below letters, so
+    # a stem's -2 part follows it and the order of reading is today's
     assert store.names("site", "field_guide") == [
         "analyst",
+        "analyst-2",
         "events",
+        "events-2",
         "fundamentals",
+        "fundamentals-2",
         "instrument",
+        "instrument-2",
         "levels",
+        "levels-2",
         "momentum",
+        "momentum-2",
         "options-chain",
+        "options-chain-2",
         "options-wing",
+        "options-wing-2",
         "statements",
+        "statements-2",
         "trend",
+        "trend-2",
         "volatility",
+        "volatility-2",
         "volume",
+        "volume-2",
     ]
     assert store.load("alice", "field_guide", "momentum") is None  # site-only
     guide = load_field_guide(store)

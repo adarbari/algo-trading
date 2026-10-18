@@ -1,0 +1,523 @@
+# Continues trend.toml: the same keys, the same theme; see its header.
+
+[[field]]
+name = "rollup.trend_stats@v2.close_range_pos"
+theme = "momentum and trend"
+reads = "Where today's close sits in today's high-low range, 0 at the low of the day, 1 at the high. Above 0.7 the session closed strong (buyers held into the close), below 0.3 it closed weak; around 0.5 the day was indecisive. A breakout that closes above 0.7 on volume is a far better candidate than one that spiked intraday and closed in the lower half (a shooting star)."
+caveats = [
+  "One day: a strong close on a quiet day means little. Pair with rollup.momentum@v1.rel_volume.",
+  "Null when the bar has no range (high equals low: a halted or untraded session).",
+]
+sources = ["Candlestick close location (Nison, Japanese Candlestick Charting Techniques); the 'closing range' in O'Neil's breakout rules"]
+[[field.use]]
+for = "closed strong (a breakout or reversal day)"
+op = "gte"
+value = 0.7
+mode = "soft"
+tolerance = 0.1
+note = "with rollup.momentum@v1.rel_volume gte 1.25; for a reversal day 0.6 is enough"
+[[field.use]]
+for = "closed weak (a failed breakout)"
+op = "lte"
+value = 0.3
+mode = "soft"
+tolerance = 0.1
+note = "with feature.breakout_magnitude_20d gt 0 for the shooting-star breakout"
+
+[[field]]
+name = "feature.pct_vs_ema_20"
+theme = "momentum and trend"
+reads = "Close over the 20-session EMA minus one: 0.02 is 2% above the fast average. Within about one ATR of it (feature.stretch_sma20_atr is the same distance in ATRs) is a pullback entry; far above is extended; below it the short-term trend has paused."
+caveats = [
+  "Percent means different things on different names: 3% is a day's range on a high-beta name and a week's on a utility. Use feature.stretch_sma20_atr when comparing across names.",
+  "Null when ema_20 is unknown (fewer than 20 consecutive bars).",
+]
+sources = ["Moving average (exponential), Wikipedia: https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average"]
+[[field.use]]
+for = "above the 20 EMA (short-term trend intact)"
+op = "gt"
+value = 0.0
+mode = "hard"
+note = "with rollup.bands@v2.ema20_slope_5d gt 0"
+[[field.use]]
+for = "not extended from the 20 EMA"
+op = "lte"
+value = 0.05
+mode = "soft"
+tolerance = 0.02
+note = "feature.stretch_sma20_atr lte 2 is the ATR-scaled version"
+
+[[field]]
+name = "feature.pct_vs_ema_50"
+theme = "momentum and trend"
+reads = "Close over the 50-session EMA minus one: the intermediate-term distance. Above 0 the name is above its quarterly trend line; within about 3% of it in an uptrend is the swing pullback zone; 15% and more above it is extended for most large caps."
+caveats = [
+  "Null when ema_50 is unknown (fewer than 50 consecutive bars).",
+]
+sources = ["Moving average (exponential), Wikipedia: https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average"]
+[[field.use]]
+for = "above the 50 EMA"
+op = "gt"
+value = 0.0
+mode = "hard"
+note = "with feature.ema_stack eq BULL for alignment"
+
+[[field]]
+name = "feature.pct_vs_ema_200"
+theme = "momentum and trend"
+reads = "Close over the 200-session EMA minus one: the long-term distance. Above 0 is a bull trend for the name; 30% and more above it is a stretched year; 20% below it is a bear trend. Nearly identical to feature.pct_vs_sma_200 on most names."
+caveats = [
+  "Null when ema_200 is unknown (fewer than 200 consecutive bars: a listing under ten months old).",
+]
+sources = ["Faber (2007), A Quantitative Approach to Tactical Asset Allocation"]
+[[field.use]]
+for = "above the 200 EMA (long-term uptrend)"
+op = "gt"
+value = 0.0
+mode = "hard"
+note = "the regime gate of the trend screens"
+
+[[field]]
+name = "feature.ema_stack"
+theme = "momentum and trend"
+reads = "The EMA alignment: BULL when EMA20 > EMA50 > EMA200 (the averages stacked in order, the shape of an established uptrend), BEAR when EMA20 < EMA50 < EMA200, else MIXED (a crossing in progress or a range). feature.trend_state is the same idea on the close and the SMAs (close > SMA50 > SMA200), so BULL here with UPTREND there is full alignment."
+caveats = [
+  "Alignment lags: a stack stays BULL for weeks after a top. Pair with rollup.bands@v2.ema20_slope_5d or feature.pct_vs_ema_20 for the turn.",
+  "Null when an EMA is unknown (fewer than 200 consecutive bars).",
+]
+sources = ["Moving average ribbons and alignment (Guppy, Trend Trading)"]
+[[field.use]]
+for = "an aligned uptrend"
+op = "eq"
+value = "BULL"
+mode = "hard"
+note = "the gate of the pullback and continuation screens; add feature.trend_state eq UPTREND for the close as well"
+[[field.use]]
+for = "an aligned downtrend (short setups)"
+op = "eq"
+value = "BEAR"
+mode = "hard"
+note = "with feature.breakdown_20d for the trigger"
+
+[[field]]
+name = "feature.dist_to_high_20d"
+theme = "price levels"
+reads = "Close over the 20-session high minus one, at or below 0: the pullback from the channel high as a fraction, -0.05 is 5% below it, 0 is a close at the high. The breakout screens want it near 0; the pullback screens want a modest negative value (-0.03 to -0.08 on a large cap) with the trend intact. feature.pullback_atr_20d is the same depth in ATRs."
+caveats = [
+  "One intraday spike sets the high for 20 sessions, so a name quietly rising can read 5% 'below its high' for weeks; check rollup.trend_stats@v2.sessions_since_high_20d.",
+  "Null when high_20d is unknown (a gap among the last 20 sessions).",
+]
+sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
+[[field.use]]
+for = "within a few percent of the 20-session high"
+op = "gte"
+value = -0.03
+mode = "soft"
+tolerance = 0.02
+note = "feature.breakout_magnitude_20d gt 0 is the actual breakout; feature.dist_to_high_50d gte -0.03 for the 50-session version"
+[[field.use]]
+for = "a shallow pullback"
+op = "between"
+value = [-0.08, -0.02]
+mode = "soft"
+tolerance = 0.02
+note = "with feature.ema_stack eq BULL; use feature.pullback_atr_20d to scale by volatility"
+
+[[field]]
+name = "feature.dist_to_high_50d"
+theme = "price levels"
+reads = "Close over the 50-session high minus one, at or below 0: how far the close sits under the quarterly high. 'Within X% of the 50-day high' is the breakout screens' second condition (near 0 means the 20-session breakout is also at a quarterly high, not a bounce inside a longer decline)."
+caveats = [
+  "Null when high_50d is unknown (a gap among the last 50 sessions).",
+]
+sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
+[[field.use]]
+for = "within a few percent of the 50-session high"
+op = "gte"
+value = -0.05
+mode = "soft"
+tolerance = 0.02
+note = "with feature.breakout_20d for a breakout that is also a quarterly high"
+
+[[field]]
+name = "feature.dist_to_low_20d"
+theme = "price levels"
+reads = "Close over the 20-session low minus one, at or above 0: how far the close has lifted off the channel low, 0.10 is 10% above it. Near 0 is a close at a 20-session low (a breakdown or a capitulation); a bounce that lifts 1 to 2 ATRs off the low is the reversal screens' trigger."
+caveats = [
+  "Null when low_20d is unknown (a gap among the last 20 sessions).",
+]
+sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
+[[field.use]]
+for = "at or near a 20-session low"
+op = "lte"
+value = 0.02
+mode = "soft"
+tolerance = 0.01
+note = "with feature.trend_state eq UPTREND for a dip; alone it lists breakdowns"
+
+[[field]]
+name = "feature.dist_to_low_50d"
+theme = "price levels"
+reads = "Close over the 50-session low minus one, at or above 0: how far the close sits above the quarterly low. Near 0 is a quarterly low; 0.20 and more means the name has recovered a fifth off its low."
+caveats = [
+  "Null when low_50d is unknown (a gap among the last 50 sessions).",
+]
+sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
+[[field.use]]
+for = "well off its quarterly low"
+op = "gte"
+value = 0.10
+mode = "soft"
+tolerance = 0.05
+note = "a filter for trend screens against names still at their lows"
+
+[[field]]
+name = "feature.pullback_atr_20d"
+theme = "price levels"
+reads = "The pullback from the 20-session high measured in Wilder ATR(14): 1.5 means the close sits one and a half average days' range under the channel high. 0 is at the high; up to about 1.5 is the shallow pullback the swing screens buy; 3 and more is a correction, not a pullback. Scaled by volatility, so the same threshold works on a utility and a biotech."
+caveats = [
+  "A gap down puts the close many ATRs under the high in a day; the ATR then widens and the number shrinks without a rally. Check rollup.price_moves@v1.one_day_move.",
+  "Null when high_20d or atr_14 is unknown, or the ATR is 0.",
+]
+sources = ["Raschke and Connors (1995), Street Smarts: ATR-scaled pullbacks"]
+[[field.use]]
+for = "a shallow pullback (swing entry)"
+op = "lte"
+value = 1.5
+mode = "soft"
+tolerance = 0.5
+note = "with feature.ema_stack eq BULL and rollup.trend_stats@v2.sessions_since_high_20d between 2 and 10"
+
+[[field]]
+name = "feature.pct_52w_range"
+theme = "price levels"
+reads = "Where the close sits in its 52-week range, 0 at the low, 1 at the high: the 52-week percentile of the price. Above 0.8 the name trades in the top fifth of its year (George and Hwang's nearness-to-high effect, where momentum lives); below 0.2 in the bottom fifth. feature.near_52w is the labelled version (HIGH / LOW within 10%)."
+caveats = [
+  "The range is set by two days a year ago as much as by today: a spike high makes the whole year read 'low in the range'. Check feature.dist_52w for the distance to the nearer extreme.",
+  "Null when the 52-week high or low is unknown (fewer than 240 bars in the last 252 sessions) or they coincide.",
+]
+sources = ["George and Hwang (2004), The 52-Week High and Momentum Investing"]
+[[field.use]]
+for = "in the top of its yearly range"
+op = "gte"
+value = 0.8
+mode = "soft"
+tolerance = 0.1
+note = "a momentum score; feature.pct_from_high_52w gte -0.10 is the 'within 10% of the high' gate"
+
+[[field]]
+name = "feature.breakout_magnitude_20d"
+theme = "price levels"
+reads = "How far the close sits above (positive) or below (negative) the highest high of the 20 sessions before today, as a fraction: 0.02 is a 2% breakout, -0.01 a close 1% under the level. A breakout of 1 to 3% that closed strong (rollup.trend_stats@v2.close_range_pos) on volume is the textbook entry; 8% and more in one day is a gap that may already be extended (feature.stretch_sma20_atr)."
+caveats = [
+  "A positive value with low volume (rollup.momentum@v1.rel_volume under 1.25) is the breakout that fails most; feature.breakout_20d requires the volume.",
+  "The level excludes today; it can be yesterday's spike, so a 'breakout' can be a return to where the name was two days ago. Check feature.dist_to_high_50d.",
+  "Null when prior_high_20d is unknown (a gap among the 20 sessions before today).",
+]
+sources = ["O'Neil (2009), How to Make Money in Stocks: buying within 5% of the pivot"]
+[[field.use]]
+for = "a fresh breakout (not extended)"
+op = "between"
+value = [0.0, 0.05]
+mode = "soft"
+tolerance = 0.02
+note = "with rollup.momentum@v1.rel_volume gte 1.25 and rollup.trend_stats@v2.close_range_pos gte 0.7"
+[[field.use]]
+for = "a failed breakout (back under the level)"
+op = "lt"
+value = 0.0
+mode = "hard"
+note = "with rollup.momentum@v1.prior_high_20d gt rollup.price_stats@v2.close yesterday: use rollup.trend_stats@v2.ret_1d lt 0 and feature.dist_to_high_20d gte -0.03"
+
+[[field]]
+name = "feature.breakout_50d"
+theme = "price levels"
+reads = "True when the close is above the highest high of the previous 50 sessions on at least 1.5 times average volume: the quarterly breakout, the Turtles' slower system (55 days) and the level where a 20-session breakout becomes a trend rather than a range swing. Fewer and better signals than feature.breakout_20d."
+caveats = [
+  "A takeover announcement or an earnings gap is a 50-session breakout on volume with no follow-through to come; check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date.",
+  "Null when the prior high or the volume ratio is unknown and the known side does not already say false.",
+]
+sources = ["Faith (2007), Way of the Turtle: System 2 (55-day breakout)"]
+[[field.use]]
+for = "a quarterly breakout on volume"
+op = "eq"
+value = true
+mode = "hard"
+note = "with feature.stretch_sma20_atr lte 3 so the breakout is not already a climax"
+
+[[field]]
+name = "feature.breakdown_20d"
+theme = "price levels"
+reads = "True when the close is below the lowest low of the previous 20 sessions on at least 1.5 times average volume: the mirror of feature.breakout_20d, the short-setup trigger and, for a long, the stop that was hit. In an uptrend it marks the end of the leg; in a downtrend it is the next leg down."
+caveats = [
+  "A capitulation day is a breakdown on volume and often the low; pair with rollup.trend_stats@v2.close_range_pos (a close near the day's high after a breakdown is a reversal, not a breakdown).",
+  "An ex-dividend day or an index event can print a volume breakdown on a flat chart; check rollup.dividends@v2.last_ex_date and rollup.trend_stats@v2.ret_1d.",
+  "Null when the prior low or the volume ratio is unknown and the known side does not already say false.",
+]
+sources = ["Faith (2007), Way of the Turtle: the 20-day channel exit"]
+[[field.use]]
+for = "a breakdown on volume (short setup)"
+op = "eq"
+value = true
+mode = "hard"
+note = "with feature.ema_stack eq BEAR for a trend short; with feature.trend_state eq UPTREND it is a stop-out list"
+
+# Levels PR (levels/ folder): the retest state and its flags (the level fields are in levels.toml).
+
+[[field]]
+name = "rollup.retest@v1.retest_state"
+theme = "momentum and trend"
+reads = "What the latest 20-session breakout of the last 60 sessions did since. RETESTING: today's low came back to within half an ATR above the breakout level and the close held it (the entry traders wait for). HELD: an earlier session did that and no close since went below the level. FRESH: price has not come back to the level. FAILED: some close since the breakout is below its level. NONE: no breakout in the window. NO_ATR: the ATR is unknown, so the retest tolerance is too."
+caveats = [
+  "FAILED includes a single close below the level on any day since the breakout, even if price recovered the next day; rollup.retest@v1.failed_breakouts_252d is how often the name's breakouts failed within 20 sessions.",
+  "RETESTING is today's bar only: a low in the band with a weak close at or above the level is still RETESTING, so check the close against feature.dist_to_support_atr or the session's range.",
+  "The breakout is the close above the prior 20-session high, with no volume condition; a thin-volume breakout fails more often (rollup.momentum@v1.rel_volume).",
+  "NONE and NO_ATR are not failures: a hard 'eq HELD' rejects them, which is usually intended.",
+]
+sources = ["docs/data/swing.md; Bulkowski, Encyclopedia of Chart Patterns (pullbacks and throwbacks to a breakout); Edwards and Magee, Technical Analysis of Stock Trends"]
+[[field.use]]
+for = "a breakout that came back and held"
+op = "in"
+value = ["RETESTING", "HELD"]
+mode = "hard"
+note = "feature.breakout_retest_held is the HELD half"
+[[field.use]]
+for = "buying the retest today"
+op = "eq"
+value = "RETESTING"
+mode = "hard"
+note = "with feature.trend_state eq UPTREND"
+[[field.use]]
+for = "a breakout that has not failed"
+op = "ne"
+value = "FAILED"
+mode = "soft"
+tolerance = 0
+
+[[field]]
+name = "feature.pct_vs_sma_150"
+theme = "momentum and trend"
+reads = "Close over the 150-session (30-week) average minus one: 0.08 is 8% above it. Above 0 is the first line of Minervini's trend template (close above the 150 and 200-day averages, the 150 above the 200, the 50 above both) and Weinstein's stage-2 condition; well above it (0.25 and more) the name is extended from its seven-month base."
+caveats = [
+  "Null when sma_150 is unknown (a gap among the last 150 sessions, or a listing under seven months old).",
+]
+sources = ["Minervini (2013), Trade Like a Stock Market Wizard: the trend template"]
+[[field.use]]
+for = "above the 30-week average (trend template)"
+op = "gt"
+value = 0.0
+mode = "hard"
+note = "with feature.pct_vs_sma_200 gt 0 and feature.ema_stack eq BULL for the rest of the template"
+
+[[field]]
+name = "rollup.trend_stats@v2.trend_r2_90d"
+theme = "momentum and trend"
+reads = "How well a straight line fits the log price over the last 90 sessions, 0 to 1: the R-squared of the regression of log close on time. Above 0.8 the trend has been smooth (few deep pullbacks: the kind a trend follower can hold); 0.4 to 0.8 a trend with noise; below 0.3 no trend worth the name, whatever the return. It says nothing about direction: read it with rollup.trend_stats@v2.reg_slope_90d_ann (the pace) or feature.clenow_momentum_90d (both at once)."
+caveats = [
+  "One gap (an earnings jump) in the window breaks the line: a name up 30% in a day and flat otherwise has a low R-squared and a high slope. Check rollup.price_moves@v1.one_day_move.",
+  "A smooth decline fits a line as well as a smooth rise; the sign is in the slope.",
+  "Null after a gap in the last 90 sessions, a shorter history, or a close that never moved.",
+]
+sources = ["Clenow (2015), Stocks on the Move: the exponential regression slope x R-squared ranking"]
+[[field.use]]
+for = "a smooth trend"
+op = "gte"
+value = 0.7
+mode = "soft"
+tolerance = 0.1
+note = "with rollup.trend_stats@v2.reg_slope_90d_ann gt 0 for a smooth uptrend"
+
+[[field]]
+name = "rollup.trend_stats@v2.reg_slope_90d_ann"
+theme = "momentum and trend"
+reads = "The pace of the last 90 sessions' trend as a yearly rate: the slope of the regression line through the log close, annualised, so 0.40 means the trend, continued for a year, would return 40%. It is the return the trend implies, not the return made (a single jump adds little to the slope); Clenow ranks names by this times rollup.trend_stats@v2.trend_r2_90d (feature.clenow_momentum_90d). Above about 0.3 is a strong trend in an ordinary year, above 1.0 a parabolic one."
+caveats = [
+  "A slope with a low R-squared is a line through noise: gate on rollup.trend_stats@v2.trend_r2_90d gte 0.5 before reading the pace.",
+  "It describes the last 90 sessions and turns slowly; a name that broke down two weeks ago still shows a positive slope. Check rollup.trend_stats@v2.ret_10d.",
+  "Null after a gap in the last 90 sessions or a shorter history.",
+]
+sources = ["Clenow (2015), Stocks on the Move"]
+[[field.use]]
+for = "a strong trend pace"
+op = "gte"
+value = 0.3
+mode = "soft"
+tolerance = 0.1
+note = "with rollup.trend_stats@v2.trend_r2_90d gte 0.6; the combined score is feature.clenow_momentum_90d"
+
+[[field]]
+name = "feature.clenow_momentum_90d"
+theme = "momentum and trend"
+reads = "Clenow's momentum score: the annualised regression slope over 90 sessions times its R-squared, so a smooth 40%-a-year trend scores about 0.36 while a jerky one with the same slope scores half that. Rank the universe by it and buy the top decile (Clenow's rule, with the 100-day average and a 15% gap filter); above about 0.25 is a candidate in an ordinary year, negative is a downtrend."
+caveats = [
+  "A one-day gap inside the window lowers the R-squared more than it raises the slope, so gap-driven names rank low; that is the intended filter, but check rollup.price_moves@v1.one_day_move when a strong name is missing.",
+  "Null when either input is unknown (a gap among the last 90 sessions, or a flat close).",
+]
+sources = ["Clenow (2015), Stocks on the Move: the ranking formula and the 90-day window"]
+[[field.use]]
+for = "momentum ranking (smooth and fast)"
+op = "gte"
+value = 0.25
+mode = "score"
+tolerance = 0.1
+note = "the gate is feature.pct_vs_sma_200 gt 0 (or sma_100 in Clenow's book) and market.market_trend@v2.spx_close_vs_sma200 gt 0"
+
+[[field]]
+name = "rollup.trend_stats@v2.high_100d"
+theme = "momentum and trend"
+reads = "The highest daily high of the last 100 sessions (about five months), in dollars per share, today's high included. With the 20 and 50-session highs it dates the current advance: the close at all three is a fresh leg, at the 20 but not the 100 a rally inside a longer range. Compare with the close as a share: rollup.price_stats@v2.close / high_100d - 1."
+caveats = [
+  "A single spike high (an earnings gap that reversed) sets the level for 100 sessions; feature.dist_to_resistance uses the confirmed swing pivot instead.",
+  "Null after a gap in the last 100 sessions or a shorter history.",
+]
+sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
+[[field.use]]
+for = "has a 100-session channel"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close in a rule"
+
+[[field]]
+name = "rollup.trend_stats@v2.low_100d"
+theme = "momentum and trend"
+reads = "The lowest daily low of the last 100 sessions, in dollars per share, today's low included: the floor of the five-month range. The close at it is a five-month low; the distance above it (close / low_100d - 1) is how much of the range the name has recovered."
+caveats = [
+  "One capitulation wick sets the level for 100 sessions; rollup.swing_levels@v1.swing_low is the confirmed support instead.",
+  "Null after a gap in the last 100 sessions or a shorter history.",
+]
+sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
+[[field.use]]
+for = "has a 100-session channel"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close in a rule"
+
+[[field]]
+name = "rollup.trend_stats@v2.high_200d"
+theme = "momentum and trend"
+reads = "The highest daily high of the last 200 sessions, in dollars per share, today's high included: close to the 52-week high (rollup.price_stats@v2.high_52w covers 252 sessions and needs 240 bars), so use it on names too young or gappy for the 52-week figure."
+caveats = [
+  "Null after a gap in the last 200 sessions or a shorter history; the 52-week high tolerates 12 missing bars, this does not.",
+]
+sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
+[[field.use]]
+for = "has a 200-session channel"
+op = "not_null"
+mode = "hard"
+note = "prefer feature.pct_from_high_52w for the 52-week distance"
+
+[[field]]
+name = "rollup.trend_stats@v2.low_200d"
+theme = "momentum and trend"
+reads = "The lowest daily low of the last 200 sessions, in dollars per share, today's low included: the ten-month floor, close to rollup.price_stats@v2.low_52w."
+caveats = [
+  "Null after a gap in the last 200 sessions or a shorter history.",
+]
+sources = ["Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian"]
+[[field.use]]
+for = "has a 200-session channel"
+op = "not_null"
+mode = "hard"
+note = "prefer feature.pct_from_low_52w for the 52-week distance"
+
+[[field]]
+name = "rollup.trend_stats@v2.prior_high_50d"
+theme = "momentum and trend"
+reads = "The highest daily high of the 50 sessions before today (today excluded), in dollars per share: the level a 50-session breakout close has to clear. feature.breakout_50d is the rule (close above it on 1.5x volume); rollup.momentum@v1.prior_high_20d is the 20-session version."
+caveats = [
+  "It excludes today on purpose: today's high is always at or above today's close, so a channel that included it could never be broken by the close.",
+  "Null after a gap in the 50 sessions before today or a shorter history.",
+]
+sources = ["Faith (2007), Way of the Turtle: the 55-day breakout (System 2)"]
+[[field.use]]
+for = "has a 50-session breakout level"
+op = "not_null"
+mode = "hard"
+note = "the rule is feature.breakout_50d"
+
+[[field]]
+name = "rollup.trend_stats@v2.prior_low_20d"
+theme = "momentum and trend"
+reads = "The lowest daily low of the 20 sessions before today (today excluded), in dollars per share: the level a 20-session breakdown close has to break. feature.breakdown_20d is the rule (close below it on 1.5x volume); for a long it is the stop most swing systems place right under."
+caveats = [
+  "Null after a gap in the 20 sessions before today or a shorter history.",
+]
+sources = ["Faith (2007), Way of the Turtle: the 20-day channel exit"]
+[[field.use]]
+for = "has a 20-session breakdown level"
+op = "not_null"
+mode = "hard"
+note = "the rule is feature.breakdown_20d; the distance above it is rollup.price_stats@v2.close / prior_low_20d - 1"
+
+[[field]]
+name = "rollup.trend_stats@v2.prior_low_50d"
+theme = "momentum and trend"
+reads = "The lowest daily low of the 50 sessions before today (today excluded), in dollars per share: the intermediate breakdown level, and the stop a position-trade places under."
+caveats = [
+  "Null after a gap in the 50 sessions before today or a shorter history.",
+]
+sources = ["Faith (2007), Way of the Turtle"]
+[[field.use]]
+for = "has a 50-session breakdown level"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close in a rule"
+
+[[field]]
+name = "rollup.reverse_splits@v1.sessions_since_reverse_split"
+theme = "instrument gates"
+reads = "Exchange sessions from the ex-date of the latest reverse split up to the session. 0 means it took effect today. 5 is a week ago. The read goes back one year."
+caveats = [
+  "Null means no reverse split was stored in the last 252 sessions, not that none happened. Funds reverse-split often, so screen operating companies only.",
+]
+sources = ["Desai and Jain (1997), Long-Run Common Stock Returns Following Stock Splits and Reverse Splits, Journal of Business"]
+[[field.use]]
+for = "a reverse split in the last 20 sessions"
+op = "lte"
+value = 20
+mode = "hard"
+note = "illustrative: about a month, while the move is still news; no published cut-off"
+
+[[field]]
+name = "rollup.reverse_splits@v1.last_reverse_split_date"
+theme = "instrument gates"
+reads = "The ex-date of the latest reverse split: the first session at the new share price. Only splits with an ex-date on or before the session count, so a declared one is never read early."
+caveats = [
+  "Null when no reverse split was stored in the last 252 sessions. A vendor can give a date a day off the real ex-date.",
+]
+sources = ["Site convention over the stored splits (ADR 0075)"]
+[[field.use]]
+for = "names that reverse-split within a year"
+op = "not_null"
+mode = "hard"
+note = "null means none stored in the window, not that none happened"
+
+[[field]]
+name = "rollup.reverse_splits@v1.reverse_split_ratio"
+theme = "instrument gates"
+reads = "New shares per old share of the latest reverse split. 0.1 means one new share for ten old, a 1-for-10. It is always below 1. A forward split has a ratio above 1 and is not read here."
+caveats = [
+  "The ratio is the stored one. A vendor row that records a reverse split as a forward ratio is not read as one. Null when no reverse split was stored in the window.",
+]
+sources = ["Desai and Jain (1997), Long-Run Common Stock Returns Following Stock Splits and Reverse Splits, Journal of Business"]
+[[field.use]]
+for = "a split of one for ten or deeper"
+op = "lte"
+value = 0.1
+mode = "hard"
+note = "illustrative: deep ratios are the weakest names; no published cut-off"
+
+[[field]]
+name = "rollup.reverse_splits@v1.reverse_splits_1y"
+theme = "instrument gates"
+reads = "How many reverse splits the name had in the last 252 sessions. 1 is a single split. 2 or more marks a company that had to do it again after a long decline."
+caveats = [
+  "Counts the splits stored. A vendor with a shallow history can miss an early one. Null when the name had none in the window.",
+]
+sources = ["Site convention over the stored splits (ADR 0075)"]
+[[field.use]]
+for = "names that reverse-split more than once in a year"
+op = "gte"
+value = 2
+mode = "hard"
+note = "illustrative screen for repeat splitters; names with none drop out"

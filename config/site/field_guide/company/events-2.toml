@@ -1,0 +1,493 @@
+# Continues events.toml: the same keys, the same theme; see its header.
+
+[[field]]
+name = "rollup.earnings_revisions@v1.next_eps_forecast"
+theme = "events"
+reads = "The consensus forecast of earnings per share, in dollars per share, for the next report, as the calendar showed it on the session. Apple's was 1.99 on 2026-10-15. The revisions are measured on this figure."
+caveats = [
+  "A forecast built from one or two analysts moves with each of them. Read rollup.earnings_revisions@v1.estimate_count beside it.",
+  "Null when the calendar lists the report with no forecast, which is common for small names.",
+]
+sources = ["Nasdaq earnings calendar (the stored events/earnings rows)"]
+[[field.use]]
+for = "names whose next report has a consensus forecast"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_revisions@v1.estimate_count"
+theme = "events"
+reads = "How many analysts' estimates the next report's forecast averages. Apple's forecast averages 7, Microsoft's 13. A count of 1 or 2 is a thinly covered name. More estimates make a forecast steadier and a revision more meaningful."
+caveats = [
+  "It counts the estimates the calendar's vendor holds, not every analyst on the Street.",
+  "Null when the calendar gave no count for the next report.",
+]
+sources = ["Nasdaq earnings calendar (the stored events/earnings rows)"]
+[[field.use]]
+for = "a forecast with several analysts behind it"
+op = "gte"
+value = 5
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_revisions@v1.forecast_revision_7d"
+theme = "events"
+reads = "How much the consensus forecast for the next report moved in a week, in percent of the old forecast, for the same fiscal quarter. A value of +5 means analysts raised it by 5%. A value of -12.5 means they cut it: Tesla's went from 0.24 to 0.21 in the week to 2026-10-15. Zero is common, since most forecasts do not move in a week."
+caveats = [
+  "A small forecast makes a big percentage: a move from 0.06 to 0.15 is +150. The figure is null when the old forecast is below five cents. Read it beside rollup.earnings_revisions@v1.next_eps_forecast.",
+  "A forecast whose sign the calendar lost on one night shows as a revision of about -200 or +200. Treat a move that large between a positive and a negative forecast as a data error.",
+  "One analyst moving a forecast built from two estimates shifts it a lot. Read rollup.earnings_revisions@v1.estimate_count, and prefer 5 or more.",
+  "Null while rollup.earnings_revisions@v1.revision_status is not OK, and when the fiscal quarter changed between the two snapshots: a quarter roll is not a revision. A hard criterion rejects those names.",
+]
+sources = [
+  "Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003)",
+  "Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect",
+]
+[[field.use]]
+for = "analysts raising the forecast for the coming report"
+op = "gte"
+value = 2
+mode = "hard"
+note = "with rollup.earnings_revisions@v1.estimate_count gte 5 and rollup.earnings_revisions@v1.revision_status eq OK"
+
+[[field]]
+name = "rollup.earnings_revisions@v1.forecast_revision_30d"
+theme = "events"
+reads = "How much the consensus forecast for the next report moved in 30 days, in percent of the old forecast, for the same fiscal quarter. It reads like rollup.earnings_revisions@v1.forecast_revision_7d over a longer window, so a steady drift shows where a week looks flat. It is null for every name until about 2026-11-01, because the snapshots start on 2026-10-02."
+caveats = [
+  "The same quarter has to be in the snapshot 30 days back. A name whose quarter appeared on the calendar later reads null.",
+  "A long window mixes old and new moves. For a report under a week away, a flat 7-day figure inside a large 30-day one means the move is over.",
+]
+sources = ["Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003)"]
+[[field.use]]
+for = "names whose next forecast rose 3% or more in 30 days"
+op = "gte"
+value = 3
+mode = "hard"
+note = "history starts 2026-10-02, so the field is null before about 2026-11-01"
+
+[[field]]
+name = "rollup.earnings_revisions@v1.estimate_count_change_30d"
+theme = "events"
+reads = "How many more (positive) or fewer (negative) analysts' estimates the next report's forecast averages than 30 days ago, for the same fiscal quarter. A value of +3 means three more analysts now publish a forecast. It is null until about 2026-11-01, when the snapshots reach back 30 days."
+caveats = [
+  "Coverage grows toward a report as analysts publish, so a rise is the normal course. Compare names reporting in the same week.",
+  "Null when either snapshot gave no count, or the quarter is not in the snapshot 30 days back.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_revisions@v1)"]
+[[field.use]]
+for = "names gaining analyst coverage for the next report"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.filing_activity@v1.filing_count_5d"
+theme = "events"
+reads = "How many 8-K and 8-K/A filings the company had accepted over the 5 sessions ending at the previous session, counted from the first session that closed after each acceptance. The span ends the day before the session, never on it. An 8-K is the SEC's current report: results, deals, management changes, material agreements. 0 means it filed nothing. 1 is routine for most companies. 3 or more is a busy corporate week."
+caveats = [
+  "The span stops at the previous session because the nightly runs before SEC lists the evening's filings. SEC lists the evening's filings in the next day's index. Counting through the session would read 0 tonight and 1 tomorrow. This count is the same on every recompute.",
+  "Null means the table cannot say none. Either no clean nightly walk of the SEC index has reached the previous session. Or nothing is stored for the company (never fetched, or never filed). Or the stored history starts after the span.",
+  "Null is also the answer on a night the filings step failed or was skipped, and on the session after a market day EDGAR was closed (Columbus Day, Veterans Day). On a Friday that only SEC observed as a holiday, an acceptance after 17:30 can be missing until the next walk. A zero would wrongly read as no news. The count appears once a later walk covers the day.",
+  "News with no 8-K is not counted: an analyst note, a press story, a rumour, a competitor's results. A zero is 'no company filing', not 'no news'. rollup.filing_activity@v1.earnings_in_5d adds the report windows, and feature.news_free_5d combines both.",
+  "An Item 2.02 results release is an 8-K, so an earnings week shows at least one filing.",
+]
+sources = [
+  "Form 8-K, SEC investor bulletin: https://www.sec.gov/files/form8-k.pdf",
+]
+[[field.use]]
+for = "no company filing in the week"
+op = "eq"
+value = 0
+mode = "hard"
+note = "or feature.news_free_5d eq true, which also checks the earnings windows"
+
+[[field]]
+name = "rollup.filing_activity@v1.earnings_in_5d"
+theme = "events"
+reads = "True when an earnings report's reaction window touches the last 5 sessions. The window runs from the session before the report to the session after it. So the company reported in those sessions, or on the session before the first of them. False is a week with no report. Null means no report is known for the company at all."
+caveats = [
+  "Null means no report date is known for the name (an ETF, or a company the calendar never listed). It does not mean no report. A hard 'eq false' drops it.",
+  "Only reports known on the session count. A report date the calendar published later is not in a past session's reading.",
+  "The window follows the earnings calendar (see rollup.earnings@v1.last_earnings_date). A report the calendar missed still shows in rollup.filing_activity@v1.filing_count_5d as an 8-K.",
+]
+sources = [
+  "Bernard and Thomas (1989), Post-earnings-announcement drift: the E-1 to E+1 window",
+]
+[[field.use]]
+for = "no earnings in the week"
+op = "eq"
+value = false
+mode = "hard"
+note = "or feature.news_free_5d eq true, which also checks the 8-K filings"
+
+[[field]]
+name = "rollup.dividend_months@v1.div_month_hits_3y"
+theme = "events"
+reads = "Out of the last 3 years, how many had an ex-dividend date in the calendar month after the session's month. 3 is a name that pays in that month every year, a quarterly payer's regular month. 0 is a name that never did. Special distributions are left out."
+caveats = [
+  "Null for a name with fewer than 240 bars in the last 252 sessions and no hit. It is too new, or the corporate-actions history may not reach it. A payer with a hit has a value at any age, and the count covers only the years it has.",
+  "It reads the past only. A dividend announced since, or a changed schedule, is not here until its ex-date passes. rollup.dividend_schedule@v1.next_ex_date holds the declared date, but only 30 days ahead.",
+  "The month is the one after the session's month, not the next 30 days. On the 28th it is four days away. On the 1st it is a month away. A monthly payer hits every month.",
+  "A payer's ex-date moves by a few days and can cross a month end. A hit of 2 out of 3 can be a date that slipped.",
+]
+sources = [
+  "Hartzmark and Solomon (2013), The dividend month premium, Journal of Financial Economics",
+]
+[[field.use]]
+for = "pays in the coming month, every year"
+op = "gte"
+value = 3
+mode = "soft"
+tolerance = 1
+note = "or rollup.dividend_months@v1.expected_div_month_flag eq true for at least one year"
+
+[[field]]
+name = "rollup.dividend_months@v1.expected_div_month_flag"
+theme = "events"
+reads = "True when the name had an ex-dividend date in the calendar month after the session's month, in at least one of the last 3 years. A dividend is expected in the coming month. That is the case the dividend-month premium is about: stocks earn more in the months they are expected to pay. False is a month the name has not paid in within 3 years. Null means its history cannot say."
+caveats = [
+  "Null for a name too new, or without bars covering the history, and with no hit. False only for a name whose history was long enough to see.",
+  "Expected from the pattern, not announced. A payer that cut or skipped its dividend still reads true. One that began paying reads false until a year has passed. Check rollup.dividend_schedule@v1.dividend_status.",
+  "True is common. A quarterly payer is true for a third of the months and a monthly payer for all of them. Rank by rollup.dividend_months@v1.div_month_hits_3y rather than treat it as rare.",
+]
+sources = [
+  "Hartzmark and Solomon (2013), The dividend month premium, Journal of Financial Economics",
+]
+[[field.use]]
+for = "a dividend is expected next month"
+op = "eq"
+value = true
+mode = "hard"
+note = "the month is the one after the session's, as known on the session"
+
+[[field]]
+name = "feature.volume_shock"
+theme = "volume and liquidity"
+reads = "True when the session's volume is 2 or more standard deviations above the 20 sessions before it (rollup.volume@v1.volume_z_20d at least 2). That is unusually high volume, the premise of the volume-shock return premium. False is anything below. Null when the z-score is unknown. The bar is lower than feature.volume_climax (3), so it fires on busy days too. params.min_z sets it."
+caveats = [
+  "Most volume shocks have a reason: earnings, a filing or a headline. Read it with feature.news_free_5d, or use feature.volume_shock_no_news, which does.",
+  "Expiry Fridays and index rebalances print shocks with no company news behind them. A flat close (rollup.momentum@v1.ret_5d near 0) points to one.",
+  "On thin names a single block trade is a shock. Gate on rollup.price_stats@v2.adv_usd_20d.",
+  "Null after a gap in the last 21 sessions, a shorter history, or a flat base with no spread to scale by.",
+]
+sources = [
+  "Gervais, Kaniel and Mingelgrin (2001), The high-volume return premium, Journal of Finance",
+]
+[[field.use]]
+for = "unusually high volume today"
+op = "eq"
+value = true
+mode = "hard"
+note = "pair with feature.news_free_5d eq true for volume without news"
+
+[[field]]
+name = "feature.news_free_5d"
+theme = "events"
+reads = "True when the company filed no 8-K through the previous session and no earnings reaction window touched the last 5 sessions, as known on the session. That is rollup.filing_activity@v1.filing_count_5d at 0 and rollup.filing_activity@v1.earnings_in_5d false. Nothing identifiable explains a move in the week. The 8-K part stops at the previous session; the earnings part includes the session. False when either happened. Null when it cannot be told and neither term already says false."
+caveats = [
+  "It is the absence of company filings and report dates, not of news. A press story, an analyst call, a rumour, a peer's results or a macro release still moves a name in a news-free week.",
+  "Null is common before the filings backfill, when no clean nightly walk has reached the previous session, and for names with no stored filing. A hard 'eq true' keeps only names where the absence is known.",
+  "A past session is read as it was. A filing accepted after it, or a report date published later, never changes it.",
+]
+sources = [
+  "Gervais, Kaniel and Mingelgrin (2001), The high-volume return premium, Journal of Finance",
+]
+[[field.use]]
+for = "no 8-K and no earnings in the week"
+op = "eq"
+value = true
+mode = "hard"
+note = "null (unknown) names drop out"
+
+[[field]]
+name = "feature.volume_shock_no_news"
+theme = "volume and liquidity"
+reads = "True when the session's volume is a shock (feature.volume_shock) and the week was news free (feature.news_free_5d). That is high volume with no company event to explain it, the setup of the volume-shock premium. False when either is not. Null when one is unknown and the other is not false."
+caveats = [
+  "A news-free flag is the absence of filings and report dates only. Other news can sit behind the volume. Read the close (rollup.momentum@v1.ret_5d) and gate on rollup.price_stats@v2.adv_usd_20d.",
+  "The premium is a drift after the shock, measured over a month in the literature's 1963-1996 sample. The sign flips at some horizons (short-term reversal), so the horizon belongs with the rule.",
+  "Rare by construction: a few names a day. The unknown names are not counted as false.",
+]
+sources = [
+  "Gervais, Kaniel and Mingelgrin (2001), The high-volume return premium, Journal of Finance",
+]
+[[field.use]]
+for = "high volume with no company event"
+op = "eq"
+value = true
+mode = "hard"
+note = "the unknown names drop out"
+
+[[field]]
+name = "rollup.max_return@v1.max_ret_21d"
+theme = "events"
+reads = "The best single day of the last 21 sessions, close to close, as a fraction. 0.10 is a name that gained 10% in one day within the month. Below about 0.03 is a quiet month for a large cap. 0.10 and above is a lottery-like day. 0.20 and above is a name traded as a lottery ticket. Negative means every day lost."
+caveats = [
+  "A name with one huge news day (a takeover bid, an FDA decision, earnings) tops the list without being a lottery stock. Check rollup.earnings@v1.last_earnings_date and rollup.price_moves@v1.one_day_move.",
+  "Low-priced and thin names post 10% days on noise. Gate on rollup.price_stats@v2.close and rollup.price_stats@v2.adv_usd_20d.",
+  "Signed: a 15% crash day does not count here. rollup.price_moves@v1.one_day_move takes the largest absolute move.",
+  "Null after a gap in the last 22 closes or a shorter history.",
+]
+sources = [
+  "Bali, Cakici and Whitelaw (2011), Maxing out: stocks as lotteries and the cross-section of expected returns, Journal of Financial Economics",
+]
+[[field.use]]
+for = "avoid lottery-like names"
+op = "lte"
+value = 0.05
+mode = "soft"
+tolerance = 0.02
+note = "a filter for avoid-lists; the decile rank is the signal in the literature"
+
+[[field]]
+name = "rollup.earnings_neutral_reversal@v1.ret_ex_earnings_20d"
+theme = "events"
+reads = "The last 20 sessions' return with the daily returns of every earnings reaction window left out. A window runs from the close before a report to the close after it. The value is the month's move that earnings did not make. It equals rollup.price_stats@v2.ret_20d when no report fell in the window. A large negative value is a name that fell on no earnings news, a reversal candidate."
+caveats = [
+  "Null when a close is missing in the 21, the history is shorter, or no earnings report is known for the name at all. The calendar cannot say it did not report. A name the calendar missed is null, not neutral.",
+  "It removes the report's own two returns, not the days around it. Drift after the window (rollup.earnings_reaction@v1.sessions_since_reaction) is still in.",
+  "Other news is still in the return: a deal, a downgrade, guidance outside the report. rollup.filing_activity@v1.filing_count_5d shows the last week's 8-Ks only.",
+  "Only reports known on the session are removed, so a past session is read as it was.",
+]
+sources = [
+  "Jegadeesh (1990), Evidence of predictable behavior of security returns; Chan (2003), Stock price reaction to news and no-news; Savor (2012), Stock returns after major price shocks",
+]
+[[field.use]]
+for = "a month-long fall that earnings did not cause"
+op = "lte"
+value = -0.1
+mode = "soft"
+tolerance = 0.03
+note = "a reversal candidate; compare rollup.price_stats@v2.ret_20d"
+
+[[field]]
+name = "rollup.earnings_neutral_reversal@v1.earnings_days_excluded"
+theme = "events"
+reads = "How many of the last 20 daily returns an earnings reaction window left out of rollup.earnings_neutral_reversal@v1.ret_ex_earnings_20d. 0 means no report fell in the window. 2 is one report with both its reaction days. 1 is a report on the session itself, whose next day has not happened, or on a non-session day."
+caveats = [
+  "Null where ret_ex_earnings_20d is null: a gap in the closes, a short history, or no report known for the name.",
+  "More than 2 means two reports in a month, a correction or a rare double date. Treat the return with care.",
+]
+sources = [
+  "Bernard and Thomas (1989), Post-earnings-announcement drift: the E-1 to E+1 window",
+]
+[[field.use]]
+for = "the return is the plain month's (no report in it)"
+op = "eq"
+value = 0
+mode = "soft"
+tolerance = 0
+note = "then rollup.price_stats@v2.ret_20d equals ret_ex_earnings_20d"
+
+[[field]]
+name = "rollup.earnings_date_shift@v1.earnings_shift_direction"
+theme = "events"
+reads = "Whether the next report date moved a week or more from last year's. The value earlier means the date is at least seven days before the year-ago report plus 364 days. The value later means at least seven days after. Null: no next date, no year-ago report, or a move under a week. Johnson and So found that early scheduling goes with good news. Late scheduling goes with bad."
+caveats = [
+  "The calendar here is scheduled, never confirmed by the company. A date can move again, so read rollup.earnings_date_shift@v1.sessions_since_earnings_shift for how fresh the shift is.",
+  "The history starts at the first stored calendar snapshot. A date first stored at or before it says nothing about when it became known, so it is never a shift.",
+]
+sources = ["Johnson and So (2018), Time Will Tell: Information in the Timing of Scheduled Earnings News, Journal of Financial and Quantitative Analysis"]
+[[field.use]]
+for = "a report scheduled earlier than last year"
+op = "eq"
+value = "earlier"
+mode = "hard"
+note = "names with no shift or no year-ago report drop out"
+
+[[field]]
+name = "rollup.earnings_date_shift@v1.earnings_date_shift_days"
+theme = "events"
+reads = "Calendar days the next report date lies after the year-ago report plus 364 days. -10 is ten days earlier than a year ago. +10 is ten days later. Under a week either way is calendar noise, so rollup.earnings_date_shift@v1.earnings_shift_direction is null there."
+caveats = [
+  "Null when there is no next date or no report a year ago within 45 days of the same weekday. A new listing or a company that changed its fiscal calendar has none.",
+  "A fiscal-year change or a merger moves every date for a reason that is not news. Read rollup.earnings_expected@v1.expected_basis to see how the date is known.",
+]
+sources = ["Johnson and So (2018), Time Will Tell: Information in the Timing of Scheduled Earnings News"]
+[[field.use]]
+for = "the largest advance first"
+op = "lte"
+value = -7
+mode = "hard"
+note = "rank ascending to put the biggest advance first"
+
+[[field]]
+name = "feature.eight_k_item_flag"
+theme = "events"
+reads = "True when an 8-K with Item 4.02, 4.01 or 5.02 became known in the last 20 sessions. Item 4.02 is non-reliance on prior financials. Item 4.01 is a change of auditor. Item 5.02 is an officer or director leaving or joining. Each counts from the first session whose close follows its SEC acceptance. False when the name has other tracked filings only. Null when the filings group has no row for it."
+caveats = [
+  "Item 5.02 also reports routine retirements and new hires, and 4.01 a planned auditor rotation. The flag cannot tell a forced exit from a routine one without reading the text.",
+  "Null is common: a name with no tracked 8-K item, late-filing notice or tender offer in 60 sessions has no row, and that is unknown, not clean. A hard 'eq true' keeps only the flagged.",
+]
+sources = ["Lerman and Livnat (2010), The New Form 8-K Disclosures, Review of Accounting Studies"]
+[[field.use]]
+for = "an adverse 8-K item this month (an avoid list)"
+op = "eq"
+value = true
+mode = "hard"
+note = "pair with rollup.price_stats@v2.adv_usd_20d to keep the names you could trade"
+
+[[field]]
+name = "rollup.filing_events@v1.sessions_since_late_filing"
+theme = "events"
+reads = "Exchange sessions since the latest NT 10-K or NT 10-Q (a Form 12b-25 late-filing notice) became known: 0 is today. It counts from the first session whose close follows the SEC acceptance. Null when none became known in the last 60 sessions. A company files one when it cannot file its annual or quarterly report on time."
+caveats = [
+  "The reason is in the text of the notice, which is not stored. A routine delay and an accounting problem look the same here.",
+  "Small and distressed companies file most of them. Gate on rollup.price_stats@v2.adv_usd_20d, or the screen holds names you cannot trade.",
+]
+sources = ["Dee, Hillison and Pacini (2010), Research in Accounting Regulation, on the reaction to late-filing notices by stated reason"]
+[[field.use]]
+for = "a late-filing notice in the last month"
+op = "lte"
+value = 20
+mode = "hard"
+note = "null (none known) names drop out"
+
+[[field]]
+name = "rollup.filing_events@v1.sessions_since_tender_offer"
+theme = "events"
+reads = "Exchange sessions since the latest SC TO-I (the issuer's own tender offer) or SC TO-T (a third party's) became known: 0 is today. Null when none became known in the last 60 sessions. A tender offer stays open at least 20 business days, so a name 20 or more sessions on is at or past the expiry."
+caveats = [
+  "The two forms are one column. A third-party offer for the company is a takeover, a different event from a self-tender: read the name's price against the offer before treating it as a buyback.",
+  "An extension keeps the offer open past 20 sessions, so a count above 20 does not prove it has expired. The expiry date is not stored.",
+]
+sources = ["Lakonishok and Vermaelen (1990), Anomalous price behavior around repurchase tender offers, Journal of Finance"]
+[[field.use]]
+for = "a tender offer past its minimum open period"
+op = "gte"
+value = 20
+mode = "hard"
+note = "null (none known) names drop out; the group looks back 60 sessions"
+
+[[field]]
+name = "rollup.index_changes@v1.last_index_change"
+theme = "events"
+reads = "The latest S&P 500 membership change of the name in the last 60 sessions: sp500_added (joined) or sp500_removed (left). Null when there was none. The date is the session the change was first stored, which is after the announcement, so this is a late read of the news."
+caveats = [
+  "A name leaves the index when it is bought, merged or shrinks. A removal after a takeover is not a demotion: rollup.price_stats@v2.close null or a delisted status exposes it.",
+  "The announcement is days before the date stored here. The announcement effect, which has faded, is already in the price.",
+]
+sources = ["Greenwood and Sammon (2022), The Disappearing Index Effect"]
+[[field.use]]
+for = "a name that left the S&P 500"
+op = "eq"
+value = "sp500_removed"
+mode = "hard"
+note = "pair with rollup.index_changes@v1.sessions_since_index_change for how recent"
+
+[[field]]
+name = "rollup.index_changes@v1.sessions_since_index_change"
+theme = "events"
+reads = "Exchange sessions from the session the latest S&P 500 membership change was first stored up to the session: 0 is the day it was stored. Null when the name had no change in the last 60 sessions."
+caveats = [
+  "The stored date lags the announcement and the effective date. A change stored 5 sessions ago was public before that.",
+  "Names that changed twice show only the latest change. Read rollup.index_changes@v1.last_index_change to see which way.",
+]
+sources = ["Greenwood and Sammon (2022), The Disappearing Index Effect"]
+[[field.use]]
+for = "a change in the last month"
+op = "lte"
+value = 20
+mode = "hard"
+note = "null (no change) names drop out"
+
+[[field]]
+name = "rollup.earnings_expected@v1.sessions_to_expected_report"
+theme = "events"
+reads = "Exchange sessions after the session up to the report date the session can expect: 0 reports today, 6 is a week away. The date is announced or the year-ago report plus 364 days, as rollup.earnings_expected@v1.expected_basis says."
+caveats = [
+  "A year-ago date can miss by days or weeks. For a window that must hold the report, read rollup.earnings_expected@v1.expected_basis eq SCHEDULED.",
+  "Null when no date is known. Options names report on a different calendar than the underlying in rare cases, so check rollup.earnings@v1.days_to_earnings if you hold options.",
+]
+sources = ["Aboody, Lehavy and Trueman (2010), Limited attention and the earnings announcement returns of past stock market winners, Review of Accounting Studies"]
+[[field.use]]
+for = "a report in the next week or so"
+op = "lte"
+value = 10
+mode = "hard"
+note = "null (no date) names drop out"
+
+[[field]]
+name = "rollup.earnings_gap_volume@v1.reaction_volume_ratio"
+theme = "events"
+reads = "How much the last report traded. It is the mean dollars a day over the three sessions around it (before, of and after) divided by the mean of the 20 sessions before that. 3 means the report drew three times the normal volume. 1 is an ordinary few days. It is the last report only, unlike rollup.earnings_reaction@v1.earnings_volume_ratio."
+caveats = [
+  "A heavy ratio can be an offering, a deal or an index change in the same window, not the report. Read rollup.earnings_reaction@v1.reaction_excess_return for what the price did.",
+  "Null when a bar of the window or of the 20 sessions before it is missing, or the history is short. A hard 'gte' drops those names.",
+]
+sources = ["Bernard and Thomas (1989), Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium?, Journal of Accounting Research"]
+[[field.use]]
+for = "a report that drew heavy volume"
+op = "gte"
+value = 3
+mode = "hard"
+note = "the episodic-pivot variant of the earnings drift screen asks 3"
+
+# Edge build entries (short-interest dates and the earnings date shift), filed under their own themes.
+
+[[field]]
+name = "rollup.short_interest@v1.short_position"
+theme = "instrument gates"
+reads = "Shares sold short at the latest settlement date whose report was public by the session (FINRA, all markets). 2,000,000 against a share count of 40 million is 5% of the company short. The figure is a stock, not a flow: it says how large the bet is, not whether it is growing."
+caveats = [
+  "It is old by design: FINRA publishes on the 8th business day after the settlement date, so the figure is about two weeks old when it first shows. A squeeze can have come and gone; rollup.short_interest@v1.short_interest_date says which day it describes.",
+  "Reports come twice a month, so the figure holds still for about 10 sessions and then jumps; don't read a day-to-day change into it.",
+  "Null when no report became public in the last 30 sessions: unknown, never 'no shorts'. FINRA data is not for ML use here: rule screens only, no learned scorer reads it.",
+  "It counts short positions, not borrow cost or the float; read feature.short_interest_ratio and rollup.short_interest@v1.days_to_cover for the crowding.",
+]
+sources = ["FINRA, Equity short interest data and publication schedule: https://www.finra.org/finra-data/browse-catalog/equity-short-interest"]
+[[field.use]]
+for = "names with a public short-interest report"
+op = "not_null"
+mode = "hard"
+note = "rule screens only: FINRA data is not for ML use"
+
+[[field]]
+name = "rollup.short_interest@v1.short_interest_date"
+theme = "instrument gates"
+reads = "The settlement date the latest public short-interest report describes. It is about two weeks before the report was public (T+8 business days). A session late in the month shows the figure of the 15th or the month end before it. The age of the short data is the session minus this date."
+caveats = [
+  "Check it before trusting the short fields: a date more than 20 sessions old means FINRA's next report is missing for the name, and the figures are stale.",
+  "It is the date of the figure, not of its publication; a screen at the session sees only what was public then, never a report that came out later.",
+  "Null when no report was public in the last 30 sessions (unknown, never 'no shorts'). FINRA data is not for ML use here.",
+]
+sources = ["FINRA, Equity short interest data and publication schedule: https://www.finra.org/finra-data/browse-catalog/equity-short-interest"]
+[[field.use]]
+for = "names with a public short-interest report"
+op = "not_null"
+mode = "hard"
+note = "compare the date with the session to see how old the figure is; rule screens only"
+
+[[field]]
+name = "rollup.earnings_date_shift@v1.earnings_shift_known_date"
+theme = "analyst"
+reads = "The session the next report date was first stored in a calendar known by the session: when the market could first have seen that the date had moved. A date that moved a week later and first appeared on the 3rd is known from the 3rd, even if the move was decided earlier. It is set only for a date at least 7 days from the same weekday a year ago."
+caveats = [
+  "The history starts with the first stored calendar snapshot. A date first stored then says nothing about when it became known (vendor backfills carry no time), so it is never an event.",
+  "Dates are the calendar's scheduled ones; the Nasdaq calendar does not confirm a date, so a move can be an estimate being revised, not a decision.",
+  "Null with no next date, no report a year ago to compare with, or a shift under 7 days.",
+]
+sources = ["Site convention over the stored earnings calendars (ADR 0050)"]
+[[field.use]]
+for = "names whose report date moved by a week or more"
+op = "not_null"
+mode = "hard"
+note = "null means the date did not move, or no year-ago report to compare with"
+
+[[field]]
+name = "rollup.earnings_date_shift@v1.sessions_since_earnings_shift"
+theme = "analyst"
+reads = "Exchange sessions from the session the shifted report date became known up to the session: 0 means it became known today; 5 is a week ago. It measures how fresh the news of the move is; the event reads best in the first sessions after it."
+caveats = [
+  "Null without a shift of at least 7 days (rollup.earnings_date_shift@v1.earnings_shift_direction null), so a hard criterion drops every name with a normal date.",
+  "A later date resets the count if the date moves again, so a name whose date keeps changing shows small values for the wrong reason; check rollup.earnings_date_shift@v1.earnings_shift_known_date.",
+  "The date is scheduled, not confirmed; the report can still move. With few shifted names in a window the evidence is thin.",
+]
+sources = ["Site convention over the stored earnings calendars (ADR 0050)"]
+[[field.use]]
+for = "a report date that moved in the last five sessions"
+op = "lte"
+value = 5
+mode = "hard"
+note = "illustrative screen: five sessions is one trading week, the window in which the move is still news; no published cut-off"

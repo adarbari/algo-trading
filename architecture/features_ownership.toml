@@ -47,14 +47,14 @@ detect = [
 
 [[responsibility]]
 id = "feature-metadata"
-description = "Feature definitions and their catalogue: each stored column is a Feature (kind, dtype, unit, description, null meaning, range, categories, inputs) declared in its group, each expression feature one built from its site definition; the registry and the FeatureSet index them and catalogue.py renders docs/data/features.md (ADR 0023); guide.py renders docs/data/field-guide.md from the site field guide (ADR 0041)"
+description = "Feature definitions and their catalogue: each stored column is a Feature (kind, dtype, unit, description, null meaning, range, categories, inputs) declared in its group, each expression feature one built from its site definition; the registry and the FeatureSet index them and catalogue.py renders docs/data/features.md (ADR 0023); guide.py renders docs/data/field-guide.md and the per-group theme pages, a long theme split into parts, from the site field guide (ADR 0041)"
 owner = [
     "src/algotrade/features/framework/feature.py",
     "src/algotrade/features/rollups/*",
     "src/algotrade/features/expressions/definitions.py",
     "src/algotrade/features/registry.py",
     "src/algotrade/features/catalogue.py",
-    "src/algotrade/features/guide.py",  # renders docs/data/field-guide.md from the site field guide (ADR 0041)
+    "src/algotrade/features/guide.py",  # renders docs/data/field-guide.md and the per-group theme pages from the site field guide (ADR 0041)
 ]
 section = "docs/adr/0023-feature-store.md#decision"
 detect = [{ call = "Feature" }, { string = "docs/data/features.md" }]

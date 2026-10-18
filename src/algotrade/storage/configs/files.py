@@ -6,7 +6,8 @@ site/<name>.local.toml                     this machine's values over site/<name
                                            (git-ignored; merged key by key, tables merged)
 site/features/<kind>/<theme>.toml          L3 expression features, one folder per kind of theme
                                            (kind ``features``; the theme name is unique)
-site/field_guide/<theme>.toml              L3 field guide (kind ``field_guide``, ADR 0041)
+site/field_guide/<group>/<file>.toml       L3 field guide, one folder per theme group (kind
+                                           ``field_guide``, ADR 0041; the file name is unique)
 site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind ``regime``)
 site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
 site/guide/sections.toml                   L3 Guide order, groups (kind ``guide``, ADR 0051)
@@ -70,7 +71,11 @@ SITE_FOLDERS = {
     "guide_ideas": "guide/ideas",
     "edges": "edges",
 }
-NESTED = (PLAYBOOKS, "features")  # site kinds filed in one level of subfolders, by name
+NESTED = (
+    PLAYBOOKS,
+    "features",
+    "field_guide",
+)  # site kinds filed in one level of subfolders, by name
 SITE_ONLY = (  # never a user's
     "defaults", "settings", "field_guide", "regime", "events", "studies", "guide",
     "guide_playbooks", "guide_glossary", "guide_glossary_edges", "guide_mechanisms", "guide_ideas",
