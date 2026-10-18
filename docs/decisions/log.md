@@ -545,6 +545,7 @@ follow-up PR).
 - Decision: use it under personal use: `licence = "personal"`, `refetch_days = 28`, tests on a hand-built fixture; the owner confirms the disclaimer once in a browser.
 - decided by: Fable on the owner's behalf
 - status: final
-- confirmed: owner 2026-10-18 (read the disclaimer: personal research use, monthly automated pull, no redistribution, no product built on the index)
+- confirmed: owner 2026-10-18
+- Owner read the disclaimer: personal research use, monthly automated pull, no redistribution, no product built on the index.
 - Clause to respect: no reproduction, distribution or transmission without Barclays' consent, so CAPE values and every feature derived from them are never served to other users (`licence = "personal"`, held only by the owners listed in `config/site/users.toml`, ADR 0069).
 - Reasoning: the file is public and unauthenticated and has been served for years, a monthly pull is a light use, and the series is optional (the macro step is non-critical), so withdrawing it costs one registry block.
