@@ -103,6 +103,7 @@ class SessionStat:
     pick_touches: int = 0  # expires_otm: counted picks whose strike was touched intraday
     no_implied_vol: int = 0  # picks excluded for a missing or invalid implied vol at D
     implied_stored: bool = False  # the outcome's iv_field has a value for some eligible name at D
+    siblings_stored: bool = True  # pair_spread: its pair_field has a value for some name at D
     picks: tuple[Pick, ...] = ()  # every pick, counted ones aligned with ``pick_values`` (v2)
     # Hits at each level of the site's cost grid (``VerdictSettings.cost_levels_bps``, in the leg
     # key) instead of the document's cost: over every counted eligible name and over the picks;
@@ -122,6 +123,13 @@ class SessionStat:
     band: tuple[Pick, ...] = ()
     banded_values: tuple[float, ...] | None = None
     round_trips: float | None = None
+    # ``portfolio_return`` only (ADR 0074): the book's weights at D by instrument id (``CASH`` is
+    # the T-bill share), summing to one, stored with the leg (leg v5); ``pick_values`` is then the
+    # one session value. ``portfolio_reason``: why a session has no value (the session is then
+    # ``excluded_coverage``): a held name or a benchmark constituent with no return at S, no
+    # volatility or score to weight by, no bill yield for the cash.
+    weights: tuple[tuple[str, float], ...] = ()
+    portfolio_reason: str = ""
 
     @property
     def net_values(self) -> tuple[float, ...]:
@@ -203,6 +211,7 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         pick_touches=sum(leg.pick_touches for leg in legs),
         no_implied_vol=sum(leg.no_implied_vol for leg in legs),
         implied_stored=any(leg.implied_stored for leg in legs),
+        siblings_stored=all(leg.siblings_stored for leg in legs),
         picks=tuple(p for leg in legs for p in leg.picks),
         base_hits_at=_sum_levels([leg.base_hits_at for leg in legs]),
         pick_hits_at=_sum_levels([leg.pick_hits_at for leg in legs]),
@@ -384,7 +393,18 @@ def _measure(
     )
     if any(r.short_values is not None for r in rows):
         return _long_short(measure, means)
+    if any(r.weights for r in rows):
+        return _portfolio(measure)
     return measure
+
+
+def _portfolio(measure: SliceMeasure) -> SliceMeasure:
+    """``measure`` of a ``portfolio_return`` outcome (ADR 0074): the base is the blended benchmark
+    itself (a value of zero by construction), so there is no base rate, lift, effect size or
+    equal-weight floor (None, never 0); the hit rate is the share of sessions that beat it. The
+    decile figures are the screen's ranking over the eligible names, present only when enough were
+    ranked."""
+    return replace(measure, base_hits=0, base_rate=None, lift=None, bh_mean=None, effect_size=None)
 
 
 def _long_short(measure: SliceMeasure, spreads: Sequence[float]) -> SliceMeasure:

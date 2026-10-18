@@ -43,15 +43,15 @@ import numpy as np
 from algotrade.config.edges.document import (
     LEGACY_SITE_CUTOFF,
     LEGACY_SITE_OWNERS,
-    LONG,
-    LONG_SHORT,
     MAIN,
+    PAIR_KIND,
     Edge,
     Outcome,
     job_name,
 )
-from algotrade.config.edges.identity import identity_dict
+from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
 from algotrade.config.edges.named import OUT_OF_WINDOW
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -60,6 +60,8 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
+    chain_seqs,
+    chain_stamps,
     outcome_seqs,
     outcome_stamps,
     stored_sessions,
@@ -118,6 +120,7 @@ from algotrade.services.evaluation.cross_section.measures import (
 )
 from algotrade.services.evaluation.cross_section.measuring import (
     Variant,
+    _chain,
     _drawn,
     _measure,
     _Measured,
@@ -142,7 +145,10 @@ from algotrade.services.evaluation.cross_section.reporting.report_containment im
     containment,
     reports_after,
 )
-from algotrade.services.evaluation.cross_section.reporting.turnover import apply_hold_bands
+from algotrade.services.evaluation.cross_section.reporting.turnover import (
+    apply_hold_bands,
+    apply_rebalances,
+)
 from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
     leg_blocks,
@@ -398,6 +404,16 @@ def stored_outcome_sessions(reader: StoreReader) -> list[date]:
     return stored_sessions(reader)
 
 
+def _turned_over(o: Outcome, stats: tuple[SessionStat, ...]) -> tuple[SessionStat, ...]:
+    """``stats`` with the net series of an outcome whose cost is its turnover's: a buy/hold band
+    (entries and exits) or a rebalanced portfolio book (the weight change); any other as given."""
+    if o.hold_rank is not None:
+        return apply_hold_bands(stats, o.cost_bps, o.sign)
+    if o.kind == PORTFOLIO_KIND:
+        return apply_rebalances(stats, o.cost_bps)
+    return stats
+
+
 def evaluate_edge(
     reader: StoreReader,
     writer: ResultWriter,
@@ -466,7 +482,14 @@ def evaluate_edge(
         stored,
         needs,
         as_of,
-        partial(_outcome_stamps, reader, as_of, _earnings_horizons(plans), residual_plans(plans)),
+        partial(
+            _outcome_stamps,
+            reader,
+            as_of,
+            _earnings_horizons(plans),
+            _chain(plans),
+            residual_plans(plans),
+        ),
         "requested" if full else None,
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
@@ -513,17 +536,14 @@ def evaluate_edge(
                 variant.id,
                 _trial_hash(scope, variant),
                 pooled,
-                scope.edge.outcome.side,
+                scope.edge.outcome.result_side,
             )
             found = stats.legs.get((plan.key, variant.id), {})
             block_stats = tuple(
                 pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
                 for block in kept
             )
-            if scope.edge.outcome.hold_rank is not None:  # the net series of a buy/hold band
-                block_stats = apply_hold_bands(
-                    block_stats, scope.edge.outcome.cost_bps, scope.edge.outcome.sign
-                )
+            block_stats = _turned_over(scope.edge.outcome, block_stats)
             measures, costed = _slice_rows(
                 block_stats,
                 split,
@@ -531,7 +551,9 @@ def evaluate_edge(
                 variant.config.config.impl == MODEL_IMPL,
                 edge.frozen_from,
                 CostGrid(scope.edge.outcome.cost_bps, spec.costs, scope.edge.outcome.sign)
-                if is_return(scope.edge) and scope.edge.outcome.side != LONG_SHORT
+                if is_return(scope.edge)
+                and scope.edge.outcome.side != LONG_SHORT
+                and scope.edge.outcome.kind != PORTFOLIO_KIND  # a book's cost is its turnover's
                 else None,  # a spread has no hit rate to cost
                 verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key
                 counts_wins(unit_of(scope.edge)),
@@ -546,7 +568,7 @@ def evaluate_edge(
                     block_stats,
                     measures,
                     edge_variant=scope.key,
-                    side=scope.edge.outcome.side,
+                    side=scope.edge.outcome.result_side,
                     iv_source=scope.iv_field if needs_iv else None,
                     licences=trial_licences(
                         features, scope.edge, scope.universe, variant.config, licences[scope.key]
@@ -714,6 +736,7 @@ def _outcome_stamps(
     reader: StoreReader,
     as_of: datetime,
     names_for: Collection[int],
+    chain: bool,
     residuals: bool,
     entries: Collection[date],
 ) -> tuple[
@@ -722,6 +745,9 @@ def _outcome_stamps(
     """What reuse asks of the outcome partitions of ``entries``: per (S, horizon) the latest
     ``knowledge_ts`` known by ``as_of`` with the names of those rows, and per S the commit
     sequence (the harness is the one reader of outcomes)."""
+    if chain:  # an option_pnl edge reads the chain grain (EB H13)
+        known, names = chain_stamps(reader, entries, as_of, names_for)
+        return known, names, chain_seqs(reader, entries)
     known, names = outcome_stamps(reader, entries, as_of, names_for=names_for, residuals=residuals)
     return known, names, outcome_seqs(reader, entries, residuals)
 
@@ -770,8 +796,10 @@ def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) 
 def _borrowing(outcome: Outcome, site_default: float) -> Outcome:
     """``outcome`` with the borrow rate its short leg pays made explicit (its own, else the site's
     ``verdict.toml`` default), so the trial hash and the values see one number; a long outcome has
-    no short leg and is returned as it is."""
-    if outcome.side == LONG or outcome.borrow_bps_annual is not None:
+    no short leg and is returned as it is (a pair spread's short leg is the sibling)."""
+    if outcome.borrow_bps_annual is not None or (
+        outcome.side == LONG and outcome.kind != PAIR_KIND
+    ):
         return outcome
     return replace(outcome, borrow_bps_annual=site_default)
 

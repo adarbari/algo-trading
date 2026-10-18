@@ -674,3 +674,91 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a long edge reads an avoid list's confirmation as a negative lift (Not working), the short side states the same claim so that it passes; a dense-score short leg over a universe fills up with unflagged names when few are flagged, so a non-event schedule cannot test a small flagged set; entering at the filing would trade the offer's own period, not the post-expiry dip the thesis is about; a blocked document keeps the thesis, the bar and the missing pieces on file without a placeholder passing as a test.
+
+## 2026-10-18 | EB H10 (portfolio outcomes) | What a book is judged on and how it is built
+- Question: how is an allocation edge (a weighted book against a blended benchmark) measured, and what do Promising and Works rest on when there is no base rate over names?
+- Options: a new outcome kind in the harness / a path in the backtest engine; a mix read from the grain / computed from the constituents' rows; slots a `top_k` leaves unfilled go to cash / are left out; win rate and lift against the benchmark's hit rate / no base rate; Works on the decile t as for a ranking / on the picks-series t.
+- Decision: a `portfolio_return` kind in the harness (ADR 0074); the mix computed from the constituents' own `fwd_return` at the same S through the resolver (a missing constituent leaves the session out with its reason); unfilled slots are NOT put to cash (only a `CASH` pick or an empty pick set is); no base rate, lift or random draws for a book; Promising needs the picks-series t of 2 and Works of 3, with the decile t beside it only when about 20 names are ranked; decoys compared on the mean excess return of their own books.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the harness already owns the frozen split, the trial log and the verdict, and the engine none; a base rate over ten ETFs is a coin flip and a decile of ten names is one name; putting unfilled slots to cash is a policy (a defensive default that changes what the screen means), so it waits for the owner; failing closed on a missing input keeps a book from being quietly re-weighted.
+
+## 2026-10-18 | EB H10 (portfolio outcomes) | Leg v5 without a LEG_VERSION bump
+- Question: does adding the book's weights to a leg need another full re-run of every stored leg?
+- Options: bump `LEG_VERSION` to 5 / add nullable columns and leave the version.
+- Decision: nullable columns (`weight_ids`, `weight_values`, `portfolio_reason`), no bump; the default weighting stays out of an outcome's identity.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: no existing leg's content or key changes (a bump recomputes every leg for nothing); a portfolio edge's legs are new keys anyway. H6 and H7's bumps already force the one full re-run.
+
+## 2026-10-18 | EB H10 (portfolio outcomes) | Unfilled slots are cash; Works for a book without deciles
+- Question: when fewer names qualify than `top_k`, is the book re-normalised over them or is the rest cash? What does Works rest on for a book with no deciles?
+- Options: re-normalise / unfilled slots in cash; picks-series t alone / both t series always.
+- Decision: each unfilled slot is `1 / top_k` in cash (re-normalising puts the whole book in one name); a day before the first stored Treasury curve has no yield (no look-ahead); Works for a book rests on the picks-series t of 3 when there are no deciles, with deciles both t series.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: architect review of PR 666; the cash rule is set before any edge stores legs, so no leg is invalidated.
+
+## 2026-10-18 | EB H13 (chain P&L grain) | One UNMEASURED status per row, executable value, hedge with r = q = 0
+- Question: when a hedge-day chain is missing or stale, is only the hedged P&L unmeasured or the whole row; is the harness value mid or executable; which rate and yield does our own hedge delta use?
+- Options: hedged columns null, unhedged kept / the whole row UNMEASURED; mid-to-mid / ask in, bid out (half-spreads on the hedged value); the Treasury curve and dividend yield / r = q = 0.
+- Decision: the whole row is UNMEASURED with the first reason (`STALE_CHAIN:<day>`, `NO_CHAIN:<day>`, `NO_DELTA:<day>`, `NO_EXIT_QUOTE`), every P&L null; the harness value is executable (a long pays the ask in and bid out, a short the reverse, the hedged value less the same half-spreads) while the mid P&L columns stay stored; the delta uses r = q = 0 and calendar days over 365.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: one status then means one thing and the spec's "never a zero, never a silently filled stale chain" holds for every column; option spreads are the main cost of this trade, so a mid value would overstate it; a one-month delta moves under 1% with the curve and the yield, and r = q = 0 keeps the grain independent of the rates and dividend tables (ADR 0053 amendment 2026-10-18, item 5). The cost of the first choice is that a stale mid-window day also unmeasures an unhedged window.
+
+## 2026-10-18 | EB H13 (chain P&L grain) | The basis is declared at filing; no stored basis column
+- Question: with no pre-frozen chain history, how is the verdict's basis fixed, and does `results/edge_eval` get a stored `basis` column (H8 left it for H13)?
+- Options: rank candidates on an in-sample slice that does not exist / the basis declared at filing, every row out of sample; a stored column / the basis from the document's kind, which is in the outcome hash.
+- Decision: the basis is the declared screen and horizon (several undeclared candidates: Waiting on data); every chain row is out of sample; `Outcome.basis` is `"chain"` and no `edge_eval` column is added; how the Promising and Works rules read an empty in-sample t is left open for the architect review.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: ranking needs the in-sample history the grain cannot have, and `choose_basis` already takes one declared candidate; a column on a stored results table is a schema change for a label the outcome hash already fixes, so a run cannot be mistaken for the other basis.
+
+## 2026-10-18 | EB H13 (chain P&L grain) | Structures, tenor rule and where the grain is read
+- Question: which structures and which tenor rule does the first chain grain offer, and does a mixed edge (price and chain variants) run?
+- Options: only the straddles / also the short put by delta; the expiry nearest the tenor / the first at least the tenor out and not before the window's end; mixed edges allowed / refused.
+- Decision: five structures (`atm_straddle_long|short`, `delta_hedged_atm[_short]`, `put_short` by delta), the grain stores the long position (`atm_straddle`, `put_delta_NN`); the first listed expiry at least `tenor_days` out and not before T; an edge and its `[[variants]]` are all `option_pnl` or none is.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: one stored row serves the long, short and hedged edge; an expiry before T could not be held to the exit; the harness reads one outcome grain per run (reuse stamps and commit sequences are per grain), so mixing is refused at filing instead of silently reading the wrong table.
+
+## 2026-10-18 | EB H13 (architect review of #664) | Hedge-day gaps cost only the hedged P&L; bid-0 quotes and delta limits
+- Question: does a missing or stale chain on a session between entry and exit unmeasure the whole row, and how are far out-of-the-money and deep in-the-money legs read after a large move?
+- Options: the whole row UNMEASURED (first entry) / only the hedged P&L, with a `hedge_reason`; a bid-0 quote and an unsolved vol are missing / a bid-0 quote reads as mid ask / 2 and an unsolved vol takes the delta limit (0, +-1).
+- Decision: only the hedged P&L is lost (`hedge_reason` set, the row COMPLETE, a hedged structure's harness row excluded as unmeasured); bid-0 quotes and delta limits as above. This overrules the first H13 entry's "whole row UNMEASURED". r = q = 0 is accepted for v1.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the architect review showed the biggest moves would otherwise become NO_EXIT_QUOTE / NO_DELTA and flatter the short straddle, and a stale mid-window day would blank an unhedged window for no reason.
+
+## 2026-10-18 | EB H13 (architect review of #664) | A chain edge can be Promising, never Works, until the verdict-basis rule says more
+- Question: how do the verdict rules read an empty in-sample t for a chain basis declared at filing?
+- Options: leave it open / the in-sample-lift criterion not applicable and a Works criterion that stays unmet.
+- Decision: "out-of-sample lift keeps its size" is not applicable for a chain edge (Promising reachable); a Works criterion "basis fixed on an in-sample period" stays unmet (Works unreachable) until a later amendment of the verdict-basis rule; written into that amendment and the Guide.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: Promising can be read on the out-of-sample figures alone, but Works needs a basis not chosen after seeing the result, which the rule can only vouch for with an in-sample period.
+
+## 2026-10-18 | EB H9 (pair spread) | Result side, costs, base and eligibility of a pair
+- Question: how is a pair spread judged, what does it charge, what is its base and which pairs count?
+- Options: verdict-eligible as a long outcome / diagnostic only like `long_short`; one round trip / two; the base as one value per pair / per name against its sibling; a sibling outside the universe counts / is excluded.
+- Decision: results stored and judged as `long_short` (`Outcome.result_side`: Diagnostic only, not paper traded) while the document's `side` stays `long`; `cost_bps` per leg (two round trips) plus borrow on the sibling; the base is every eligible name against its own sibling (a pair twice, once per side), so its hit rate is near one half; a pair needs both legs in the universe at D and each naming the other (`sibling_not_eligible`, `sibling_mismatch`), and an issuer with three or more classes or a class under several ids is AMBIGUOUS, never guessed.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the spec builds the pair on `long_short` and the owner decision of 2026-10-17 makes a spread diagnostic only, so a pair spread is never a verdict basis unless the owner says so; two legs cost two trades; per-name orientation is the one base that a random side of the pair produces; a one-sided or mismatched pair would pair a name with the wrong class.
+
+## 2026-10-18 | PR #661 review (EB H9) | Pair tests, verdict, and two follow-ups
+- Question: where do the pair harness tests live, is a pair spread ever a verdict basis, and are per-reason exclusion counts and a sibling ADV floor in this PR?
+- Options: split the test folder now / in the next PR touching it; diagnostic only / verdict-eligible; counts and floor now / follow-up.
+- Decision: tests stay in `test_harness_trials.py` (split the folder by kind in the next PR touching it); a pair spread stays Diagnostic only through `result_side`; per-reason exclusion counts (today folded into `excluded_missing`, the reason is on each pick) and an ADV floor on the sibling (short) leg are follow-ups. A reference snapshot without `cik` / `share_class_figi` is MissingDataError, never an empty pair set.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the architect review found `REFERENCE_FACTS` dropped the ids so every pick read `no_sibling`; the loader now carries them. The folder split and the two counts touch other modules and need their own review.
+
+## 2026-10-18 | PR #661 CI (EB H9) | A reference snapshot without issuer or class ids
+- Question: does `share_classes@v1` raise MissingDataError when the reference snapshot has no `cik` / `share_class_figi` column?
+- Options: raise / return no rows.
+- Decision: no rows (every read is UNKNOWN; a pair pick reads `no_sibling`, counted), reversing the earlier review ask.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the ingestion nightly end-to-end tests build a reference without those columns and the critical rollups step failed, holding back the workflow; a snapshot built without issuer ids is a normal state, not a broken one.

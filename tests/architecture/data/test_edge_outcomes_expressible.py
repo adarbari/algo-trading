@@ -13,17 +13,23 @@ import pytest
 
 from algotrade.config.edges.document import ANNOUNCED_AHEAD, CLOSED, MODEL_STRUCTURES, Edge
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.edges.portfolio import MIX, PORTFOLIO_KIND
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
-from algotrade.data.outcomes import OUTCOME_FIELDS
+from algotrade.data.outcomes import CHAIN_FIELDS, OUTCOME_FIELDS
 from algotrade.services.configs import field_catalog
 from algotrade.services.evaluation.cross_section.events import event_field
 from algotrade.services.evaluation.cross_section.harness import MIXED_SOURCE_IV
 from algotrade.services.evaluation.cross_section.hit import (
+    CHAIN_PNL_FIELDS,
     EXPIRES_OTM_FIELDS,
     IMPLIED_VOL_FIELD,
     MEASURE_FIELDS,
     MODEL_PNL_FIELDS,
+    PAIR_FIELDS,
+)
+from algotrade.services.evaluation.cross_section.portfolio.session import (
+    FIELDS as PORTFOLIO_FIELDS,
 )
 from algotrade.services.evaluation.cross_section.sessions import decision_sessions
 from algotrade.storage.configs.files import FileConfigStore
@@ -42,6 +48,8 @@ FORWARD = (
 TIME_SERIES = "src/algotrade/services/evaluation/time_series/harness.py"  # ADR 0073's seam
 PROTECTED = "algotrade.data.outcomes"
 
+OWN_FIELDS = ("expires_otm", "option_model_pnl", "option_pnl", PORTFOLIO_KIND, "pair_spread")
+
 
 def _ids() -> list[str]:
     return [e.id for e in EDGES]
@@ -59,15 +67,17 @@ def test_the_measure_and_the_path_condition_are_stored_outcome_fields(edge: Edge
             fields: tuple[str, ...] = MODEL_PNL_FIELDS[o.structure]
         elif o.kind == "expires_otm":
             fields = EXPIRES_OTM_FIELDS
+        elif o.kind == "pair_spread":
+            fields = PAIR_FIELDS
+        elif o.kind == "option_pnl":  # the chain grain's own fields (checked below)
+            fields = ()
+        elif o.kind == PORTFOLIO_KIND:
+            fields = PORTFOLIO_FIELDS
         else:
             fields = MEASURE_FIELDS[o.measure or "excess_return"]
         stored = [f for f in fields if f != IMPLIED_VOL_FIELD]
         assert set(stored) <= set(OUTCOME_FIELDS), f"{edge.id}: {fields} are not outcome fields"
-    fields = (
-        MEASURE_FIELDS[_measure(edge)]
-        if edge.outcome.kind not in ("expires_otm", "option_model_pnl")
-        else ()
-    )
+    fields = MEASURE_FIELDS[_measure(edge)] if edge.outcome.kind not in OWN_FIELDS else ()
     stored = [f for f in fields if f != IMPLIED_VOL_FIELD]
     assert set(stored) <= set(OUTCOME_FIELDS), f"{edge.id}: {fields} are not outcome fields"
     if edge.outcome.max_drawdown is not None:
@@ -82,12 +92,18 @@ def test_every_model_structure_names_the_stored_fields_it_reads() -> None:
         assert set(fields) <= set(OUTCOME_FIELDS), f"{structure}: {fields} are not outcome fields"
 
 
+def test_an_option_pnl_outcome_reads_only_fields_the_chain_grain_writes() -> None:
+    """``option_pnl`` adds a grain (ADR 0053 amendment, EB H13): the fields its value reads are
+    the ones ``outcomes/option/structure_pnl@v1`` carries to the harness."""
+    assert set(CHAIN_PNL_FIELDS) <= set(CHAIN_FIELDS)
+
+
 @pytest.mark.parametrize("edge", EDGES, ids=_ids())
 def test_horizons_and_benchmark_are_written_by_the_outcomes_task(edge: Edge) -> None:
     horizons, benchmarks = horizons_and_benchmarks(STORE)
     assert set(edge.outcome.horizon_sessions) <= set(horizons), f"{edge.id}: {horizons}"
-    if edge.outcome.benchmark != "none":
-        assert edge.outcome.benchmark in benchmarks
+    if edge.outcome.benchmark != "none" and not edge.outcome.benchmark.startswith(MIX):
+        assert edge.outcome.benchmark in benchmarks  # a mix is computed from its constituents
 
 
 def test_the_implied_vol_a_ratio_measure_divides_by_is_in_the_catalogue() -> None:
@@ -103,6 +119,35 @@ def test_every_option_outcome_iv_field_is_a_catalogue_feature_with_a_licence(edg
         if o.kind in ("expires_otm", "option_model_pnl"):
             assert o.iv_field is not None and o.iv_field not in MIXED_SOURCE_IV
             catalogue.check_field(o.iv_field, f"{edge.id} iv_field")
+
+
+def test_the_pair_spread_reads_only_stored_fields_and_a_declared_text_feature() -> None:
+    """A pair spread reads each leg's return from the outcomes partition (no new grain), and its
+    ``pair_field`` is read at D: a catalogue feature of text type, never a hand list of ids."""
+    assert set(PAIR_FIELDS) <= set(OUTCOME_FIELDS)
+    kind = field_catalog(STORE).check_field("rollup.share_classes@v1.sibling_id", "pair field")
+    assert kind == "str"
+
+
+@pytest.mark.parametrize("edge", EDGES, ids=_ids())
+def test_every_pair_field_is_a_text_catalogue_feature(edge: Edge) -> None:
+    catalogue = field_catalog(STORE)
+    for o in (edge.outcome, *(v.outcome for v in edge.variants)):
+        if o.kind == "pair_spread":
+            assert o.pair_field is not None
+            assert catalogue.check_field(o.pair_field, f"{edge.id} pair_field") == "str"
+
+
+@pytest.mark.parametrize("edge", EDGES, ids=_ids())
+def test_every_portfolio_vol_field_is_a_catalogue_feature(edge: Edge) -> None:
+    """A portfolio_return book sized by inverse volatility reads one declared feature at D."""
+    for o in (edge.outcome, *(v.outcome for v in edge.variants)):
+        if o.vol_field is not None:
+            field_catalog(STORE).check_field(o.vol_field, f"{edge.id} vol_field")
+
+
+def test_a_book_reads_only_stored_outcome_fields() -> None:
+    assert set(PORTFOLIO_FIELDS) <= set(OUTCOME_FIELDS)
 
 
 def _stored(field: str) -> bool:

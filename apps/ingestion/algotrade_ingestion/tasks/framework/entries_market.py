@@ -6,7 +6,13 @@ from algotrade.config.site.events.releases import load_macro_releases
 from algotrade.config.site.settings import load_macro
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.derived import market_rollups, outcomes, residual_returns, rollups
+from algotrade_ingestion.tasks.derived import (
+    market_rollups,
+    option_outcomes,
+    outcomes,
+    residual_returns,
+    rollups,
+)
 from algotrade_ingestion.tasks.events import filings, insider
 from algotrade_ingestion.tasks.framework.params import Params, session_of, symbols
 from algotrade_ingestion.tasks.framework.run import TaskContext
@@ -158,6 +164,10 @@ def run_market_rollups(ctx: TaskContext, p: Params) -> RunRecord:
 
 def run_outcomes(ctx: TaskContext, p: Params) -> RunRecord:
     return outcomes.compute_outcomes(ctx, session_of(p), p.get("start"), p.get("end"))
+
+
+def run_option_outcomes(ctx: TaskContext, p: Params) -> RunRecord:
+    return option_outcomes.compute_option_outcomes(ctx, session_of(p), p.get("start"), p.get("end"))
 
 
 def run_residual_returns(ctx: TaskContext, p: Params) -> RunRecord:
