@@ -34,6 +34,26 @@ next = "Read the lift together with the trades behind it, and wait for more quar
 see_also = ["base_rate", "out_of_sample", "calendar_turn_of_month"]
 
 [[term]]
+id = "calendar_pre_month_end"
+term = "Last three sessions of the month"
+short = "The edge is held for the last three trading days of every month."
+body = """
+This schedule opens one trade a month, held for 3 sessions that end on the month's last session. Funds that tidy their books before the month closes can push prices in those days. The calendar fixes the window ahead, so nothing about it is known late. Windows are a month apart, so each is one independent trade. Example: the window of February 2026 is 25, 26 and 27 February. A year holds 12 windows, so ten years give about 120 trades. Treat a result from fewer than 100 as noise. It is not the month-end rebalance schedule, which trades once at month end. Check the out-of-sample figure and the result by year before trusting a small lift.
+"""
+next = "Open the edge's result and read the out-of-sample lift and the trades behind it."
+see_also = ["base_rate", "out_of_sample", "calendar_turn_of_month"]
+
+[[term]]
+id = "calendar_year_turn"
+term = "Turn of the year"
+short = "The edge is held for the last five trading days of December and the first five of January."
+body = """
+This schedule opens one trade a year, held for 10 sessions: the last 5 of December and the first 5 of January. Tax selling, window dressing and new-year buying are said to move prices around the turn. The calendar fixes the window ahead, so nothing about it is known late. The window belongs to the year that December is in. Example: the window of 2025 runs from 24 December 2025 to 8 January 2026. A year holds only 1 window, so ten years give 10 trades, which is far too few to trust. Treat any result as a hint to watch, not a finding. Read the lift together with the trades behind it.
+"""
+next = "Read the lift together with the trades behind it, and wait for more years before trusting it."
+see_also = ["base_rate", "out_of_sample", "calendar_quarter_end"]
+
+[[term]]
 id = "calendar_pre_holiday"
 term = "Before a holiday"
 short = "The edge is held for the one trading day before a scheduled market holiday."
