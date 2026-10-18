@@ -2,10 +2,11 @@
 own year (the fields of the ``closed_end_fund_discounts`` and ``cef_distribution_trap`` edges, EB
 E4).
 
-Inputs: ``events/fund_nav`` (the daily NAV per share from Tiingo's Nasdaq MFQS series, edge build
-D5; every row with ``known_from <= session``, the NAV known from the session after its date) and
-``bars/1d`` (split-adjusted as of the session, the last 252 sessions). One row per fund with a NAV
-dated within those 252 sessions; a fund that has no NAV stored has none.
+Inputs: ``events/fund_nav`` (the daily NAV per share from Tiingo's Nasdaq MFQS series, edge
+build D5; every row with ``known_from <= session``, the NAV known from the session after its date),
+``bars/1d`` (split-adjusted as of the session, the last 252 sessions) and ``events/split``
+(optional; see Splits). One row per fund with a NAV dated within those 252 sessions; a fund that
+has no NAV stored has none.
 
 A fund's NAV is struck after the close of its NAV date ``d``, so the premium or discount pairs the
 NAV with the close of the SAME date ``d`` (never the session's close against a NAV a day old, which
@@ -28,10 +29,14 @@ is null as well with fewer than 120 discounts in the window or no spread (UNKNOW
 NAV restated later replaces the original from the session that learned of it (D5): an earlier
 session never sees it.
 
-Caveats the maths does not remove: ``bars/1d`` is split-adjusted as of the session and the NAV is
-not, so a fund that split or reverse-split inside the window shows a false discount until the NAV
-history is read through the same adjustment (read ``valid_range`` as a sanity bound, not a filter);
-and the NAV is the issuer's own, struck once a day, so a fund holding foreign or illiquid assets is
+Splits: ``bars/1d`` is split-adjusted as of the session and the NAV is as struck, so each NAV is
+divided by the ratio of every split (``events/split``, by event date) of its fund dated after the
+NAV and on or before the session, the adjustment ``dividends@v2`` applies to dividends. A 1:10
+reverse split (ratio 0.1) after a NAV of 10 gives an adjusted NAV of 100, level with the
+adjusted close. ``nav_per_share`` stays the NAV as struck. A fund with no split row reads as
+unsplit, so a split the store lacks still skews its discount.
+
+The NAV is the issuer's own, struck once a day, so a fund holding foreign or illiquid assets is
 priced against a NAV stale at the close.
 """
 
@@ -48,6 +53,7 @@ NAME = "cef_nav"
 VERSION = 1
 NAV = "events/fund_nav"
 BARS = "bars/1d"
+SPLITS = "events/split"
 WINDOW = 252  # sessions the z-score reads, the session included
 STALE_SESSIONS = 5  # a NAV older than this many sessions is no current discount
 MIN_OBSERVATIONS = 120  # discounts the z-score needs
@@ -77,7 +83,7 @@ FEATURES = (
         "the latest NAV is more than 5 sessions before the session, the fund has no bar on its "
         "date, or the NAV is not positive",
         valid_range=(-0.95, 5), licence="personal",
-        inputs=(f"{NAV}.nav", f"{NAV}.ts", f"{BARS}.close"),
+        inputs=(f"{NAV}.nav", f"{NAV}.ts", f"{BARS}.close", f"{SPLITS}.ratio"),
     ),
     Feature(
         "cef_discount_zscore", "float32", "ratio",
@@ -86,7 +92,7 @@ FEATURES = (
         "cef_discount_to_nav is null, fewer than 120 discounts are in the window, or they are "
         "all equal",
         valid_range=(-10, 10), licence="personal",
-        inputs=(f"{NAV}.nav", f"{NAV}.ts", f"{BARS}.close"),
+        inputs=(f"{NAV}.nav", f"{NAV}.ts", f"{BARS}.close", f"{SPLITS}.ratio"),
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
@@ -105,14 +111,31 @@ def _latest_navs(frame: pd.DataFrame, first: date) -> pd.DataFrame:
     return rows[["instrument_id", "day", "nav"]].reset_index(drop=True)
 
 
-def _discounts(navs: pd.DataFrame, bars: pd.DataFrame) -> pd.DataFrame:
+def _split_factor(navs: pd.DataFrame, splits: pd.DataFrame | None) -> np.ndarray:
+    """Per NAV row: the product of the ratios of its fund's splits dated after the NAV (strictly:
+    a NAV struck on the split date is post-split) and on or before the session (``splits`` holds
+    only those the session knows)."""
+    factor = np.ones(len(navs))
+    if splits is None or splits.empty:
+        return factor
+    ids, days = navs["instrument_id"].to_numpy(), navs["day"].to_numpy()
+    for fund, when, ratio in zip(
+        splits["instrument_id"], splits["event_date"], splits["ratio"].astype(float), strict=True
+    ):
+        factor[(ids == fund) & (days < when)] *= ratio
+    return factor
+
+
+def _discounts(
+    navs: pd.DataFrame, bars: pd.DataFrame, splits: pd.DataFrame | None = None
+) -> pd.DataFrame:
     """Each NAV paired with the close of its own date: ``discount`` (NaN: no bar that day or the
-    NAV is not positive)."""
+    NAV is not positive), the NAV first put in the closes' split terms."""
     closes = bars[["instrument_id", "session_date", "close"]].copy()
     closes["day"] = pd.to_datetime(closes["session_date"]).dt.date
     merged = navs.merge(closes[["instrument_id", "day", "close"]], how="left",
                         on=["instrument_id", "day"])  # fmt: skip
-    nav = merged["nav"].astype(float).where(merged["nav"] > 0)
+    nav = merged["nav"].astype(float).where(merged["nav"] > 0) / _split_factor(merged, splits)
     merged["discount"] = merged["close"].astype(float) / nav - 1.0
     return merged
 
@@ -129,7 +152,8 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     if navs is None or navs.empty:
         return pd.DataFrame({c: [] for c in columns})
     bars = inputs.get(BARS)
-    paired = _discounts(navs, bars) if bars is not None else navs.assign(discount=np.nan)
+    splits = inputs.get(SPLITS)
+    paired = _discounts(navs, bars, splits) if bars is not None else navs.assign(discount=np.nan)
     paired = paired.sort_values(["instrument_id", "day"], kind="stable")
     rows = []
     for fund, group in paired.groupby("instrument_id", sort=True):
@@ -162,6 +186,7 @@ GROUP = FeatureGroup(
     (
         Input(NAV),
         Input(BARS, lookback=WINDOW - 1, required=False),
+        Input(SPLITS, lookback=WINDOW, required=False),
     ),
     FEATURES,
     compute,

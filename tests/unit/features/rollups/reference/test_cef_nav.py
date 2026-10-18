@@ -33,8 +33,12 @@ def _bars(close: dict[tuple[str, date], float]) -> pd.DataFrame:
     )
 
 
-def _row(navs: pd.DataFrame, bars: pd.DataFrame | None, fund: str = FUND) -> pd.Series:
-    out = compute({cef_nav.NAV: navs, cef_nav.BARS: bars}, SESSION, None)
+def _row(
+    navs: pd.DataFrame, bars: pd.DataFrame | None, fund: str = FUND,
+    splits: pd.DataFrame | None = None,
+) -> pd.Series:  # fmt: skip
+    inputs = {cef_nav.NAV: navs, cef_nav.BARS: bars, cef_nav.SPLITS: splits}
+    out = compute(inputs, SESSION, None)
     return out.set_index("instrument_id").loc[fund]
 
 
@@ -107,3 +111,19 @@ def test_no_nav_in_the_window_is_no_row() -> None:
     out = compute({cef_nav.NAV: _nav([(FUND, DAYS[0] - pd.Timedelta(days=30), 10.0, None)]),
                    cef_nav.BARS: None}, SESSION, None)  # fmt: skip
     assert out.empty and list(out.columns) == ["instrument_id", *cef_nav.COLUMNS]
+
+
+def test_a_reverse_split_after_the_nav_is_taken_out_of_the_discount_and_the_z_score() -> None:
+    """Closes are split-adjusted as of the session, the NAV is as struck: a 1:10 reverse split
+    (ratio 0.1) after the NAV dates puts the closes x10, so the NAV is divided by 0.1 too."""
+    days = DAYS[-MIN_OBSERVATIONS - 1 : -1]
+    split_day = days[-1]  # after every NAV but the last, which is struck on the split date
+    splits = pd.DataFrame({"instrument_id": [FUND], "event_date": [split_day], "ratio": [0.1]})
+    closes = {(FUND, d): (95.0 if d < split_day else 9.5) for d in days}  # adjusted history
+    navs = _nav([(FUND, d, 10.0, None) for d in days])
+    row = _row(navs, _bars(closes), splits=splits)
+    # the pre-split NAVs read as 100 against closes of 95; the last (post-split) as 10 against 9.5
+    assert row["cef_discount_to_nav"] == pytest.approx(-0.05)
+    assert pd.isna(row["cef_discount_zscore"])  # a flat -5% year has no spread
+    unadjusted = _row(navs, _bars(closes))  # without the split row the history is a false jump
+    assert unadjusted["cef_discount_zscore"] < -5

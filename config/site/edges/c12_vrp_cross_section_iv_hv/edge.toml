@@ -99,7 +99,9 @@ number and the edge waits for a verdict."""
 capacity_costs = """Single-name option spreads are 5 to 10% of premium, which the 35 bps cost reflects; the
 model has no hedge cost, margin or assignment risk. An individual sells a handful of straddles or
 strangles, far below the open interest of names with $50M of daily stock volume; undefined risk
-needs margin and the stomach for gaps."""
+needs margin and the stomach for gaps. The flat cost is a fraction of the stock price, not of the premium: it is about 5% of an
+at-the-money straddle's premium only at 30% implied volatility, so it flatters high-implied-volatility
+picks, whose premium and spread are larger (at 60% the same 35 bps is about 2.5% of premium)."""
 failure_modes = """Losses arrive together in volatility spikes: a short straddle is short the left and the
 right tail, so the mean P&L, not the hit rate, decides. A report inside the month raises implied
 volatility for a known reason (the no_earnings variant tests it). Retire if the picks' mean P&L in

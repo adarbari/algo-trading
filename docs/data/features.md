@@ -485,14 +485,14 @@ Which stock or basket a leveraged or inverse fund tracks, from its holdings and 
 
 ## `cef_nav@v1`
 
-How far a closed-end fund trades from its net asset value, and against its own year. Stored as `rollups/instrument/cef_nav@v1`; reads `events/fund_nav`, `bars/1d` (optional).
+How far a closed-end fund trades from its net asset value, and against its own year. Stored as `rollups/instrument/cef_nav@v1`; reads `events/fund_nav`, `bars/1d` (optional), `events/split` (optional).
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
 | `nav_per_share` | window | float32 | usd_per_share | personal | >= 0 | The latest net asset value per share known by the session, as the issuer struck it (not split-adjusted) | no NAV is stored for the fund, or none dated within the last 252 sessions | `events/fund_nav.nav` |
 | `nav_date` | window | date | date | personal |  | The date that NAV was struck (known from the session after it) | no NAV is stored for the fund, or none dated within the last 252 sessions | `events/fund_nav.ts` |
-| `cef_discount_to_nav` | window | float32 | decimal | personal | -0.95 .. 5 | The fund's close on the NAV's date over that NAV, minus 1: negative is a discount (-0.10: the shares cost 10% less than the assets), positive a premium | the latest NAV is more than 5 sessions before the session, the fund has no bar on its date, or the NAV is not positive | `events/fund_nav.nav`, `events/fund_nav.ts`, `bars/1d.close` |
-| `cef_discount_zscore` | window | float32 | ratio | personal | -10 .. 10 | The discount minus its mean over the NAV dates of the last 252 sessions, over their standard deviation: negative is a wider discount than the fund's own year | cef_discount_to_nav is null, fewer than 120 discounts are in the window, or they are all equal | `events/fund_nav.nav`, `events/fund_nav.ts`, `bars/1d.close` |
+| `cef_discount_to_nav` | window | float32 | decimal | personal | -0.95 .. 5 | The fund's close on the NAV's date over that NAV, minus 1: negative is a discount (-0.10: the shares cost 10% less than the assets), positive a premium | the latest NAV is more than 5 sessions before the session, the fund has no bar on its date, or the NAV is not positive | `events/fund_nav.nav`, `events/fund_nav.ts`, `bars/1d.close`, `events/split.ratio` |
+| `cef_discount_zscore` | window | float32 | ratio | personal | -10 .. 10 | The discount minus its mean over the NAV dates of the last 252 sessions, over their standard deviation: negative is a wider discount than the fund's own year | cef_discount_to_nav is null, fewer than 120 discounts are in the window, or they are all equal | `events/fund_nav.nav`, `events/fund_nav.ts`, `bars/1d.close`, `events/split.ratio` |
 
 ## `etf_flows@v1`
 

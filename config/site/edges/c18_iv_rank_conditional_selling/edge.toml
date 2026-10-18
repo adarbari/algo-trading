@@ -63,7 +63,9 @@ sessions give about 24 independent 21-session windows, under the 40 the bar asks
 verdict."""
 capacity_costs = """Single-name option spreads of 5 to 10% of premium, which the 35 bps cost approximates;
 undefined risk needs margin. An individual sells a few positions, far below the open interest of names
-trading $50M a day."""
+trading $50M a day. The flat cost is a fraction of the stock price, not of the premium: it is about 5% of an
+at-the-money straddle's premium only at 30% implied volatility, so it flatters high-implied-volatility
+picks, whose premium and spread are larger (at 60% the same 35 bps is about 2.5% of premium)."""
 failure_modes = """High rank clusters in crashes: the sale is short volatility into a spike, so the mean P&L and
 the drawdown decide, not the hit rate. Retire if the frozen-period mean P&L of the gated names is
 not above the mean of every liquid optionable name, or the gate does not beat vrp_iv_hv on the same

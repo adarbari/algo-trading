@@ -4,13 +4,23 @@ screener ranks best first, every non-blocked event edge declares a field the har
 blocked one says what is missing."""
 
 import tomllib
+from datetime import date
 
 import pytest
 
 from algotrade.config.edges.chain import tenor_sessions
 from algotrade.config.edges.document import CLOSED, MODEL_KIND, Edge
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.strategy.schema import Selection
+from algotrade.config.user import UserContext
+from algotrade.core.model.predicates import Group
+from algotrade.core.views.feature_view import FeatureView
+from algotrade.engines.selection.evaluate import evaluate_selection
+from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section.measuring import MIN_SCORE_COVERAGE
 from algotrade.storage.configs.files import FileConfigStore
+from algotrade.strategies.screeners import Decision
+from algotrade.strategies.screeners.rules import evaluate_screen
 from tests.conftest import REPO_ROOT
 
 STORE = FileConfigStore(REPO_ROOT / "config", local=False)
@@ -145,3 +155,30 @@ def test_the_etf_flow_screener_orders_so_the_heaviest_creation_is_shorted_first(
     }
     variants = {v.id: v.outcome.side for v in edge.variants}
     assert variants == {"long_redemptions": "long", "long_short": "long_short"}
+
+
+def test_the_etf_flow_base_is_the_funds_that_carry_a_score() -> None:
+    """The harness ranks a short leg only when 80% of the base is scored (MIN_SCORE_COVERAGE);
+    only iShares funds have a count, so the base must be those funds, not every liquid ETF."""
+    edge = E4_EDGES["etf_flow_pressure"]
+    spec = resolve_config(STORE, "etf_flow_pressure", UserContext("site")).screen_spec
+    value = {"eq": lambda v: v, "gt": lambda v: v + 1, "gte": lambda v: v, "in": lambda v: v[0]}
+    row = {r.field: value[r.op](r.value) for r in edge.universe.where.rules()}  # type: ignore[union-attr]
+    row.update({c.rule.field: value[c.rule.op](c.rule.value) for c in spec.criteria})
+    no_count = {k: v for k, v in row.items() if "etf_flows" not in k}
+    names = {f"EQ:ISH{i}": row for i in range(4)} | {f"EQ:OTHER{i}": no_count for i in range(12)}
+    view = FeatureView(date(2026, 11, 20), names)
+    eligible = set(evaluate_selection(edge.universe, view).instruments)  # type: ignore[arg-type]
+    scored = {
+        r.instrument_id
+        for r in evaluate_screen(spec, view).rows
+        if r.decision is Decision.QUALIFIED
+    }
+    assert eligible == {f"EQ:ISH{i}" for i in range(4)}
+    assert len(eligible & scored) >= MIN_SCORE_COVERAGE * len(eligible)
+    where = edge.universe.where  # type: ignore[union-attr]
+    loose = Selection(
+        "loose", Group("all", tuple(r for r in where.rules() if "etf_flows" not in r.field))
+    )
+    base = set(evaluate_selection(loose, view).instruments)  # without the rule: 16 names, 4 scored
+    assert len(base & scored) < MIN_SCORE_COVERAGE * len(base)

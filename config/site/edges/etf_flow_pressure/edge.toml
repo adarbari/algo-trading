@@ -15,10 +15,14 @@ family = "D"
 schedule = "month_end"
 top_k = 10
 screeners = ["etf_flow_pressure"]
-baselines = []
+baselines = ["momentum_12_1"]
 status = "candidate"
 frozen_from = 2026-04-01
-notes = """iShares funds only: the share count comes from iShares' own daily files (EB D4); SPDR,
+notes = """The universe is the iShares funds: a fund must have a stored count (the last universe rule,
+etf_shares_outstanding above 0), because the harness ranks a short leg only when at least 80% of the
+base carries a score (MIN_SCORE_COVERAGE) and only iShares funds have one; with every liquid ETF in
+the base each session would be dropped for thin coverage. A fund whose latest count is older than 30
+days has no row and leaves the base. iShares funds only: the share count comes from iShares' own daily files (EB D4); SPDR,
 Vanguard, Invesco and every other issuer's funds are absent, not neutral. The stored history starts with the
 first nightly run on about 2026-10-17, and the change is 21 sessions, so the first value is about
 2026-11-17 and no independent month exists yet: the edge waits for months of counts to accrue (the harness
@@ -30,7 +34,8 @@ over SPY, less cost and the assumed borrow; the long variant (the heaviest redem
 spread (diagnostic only) are variants. The rank is the screener's: the harness's short leg is the
 lowest scores, and etf_flow_pressure ranks ascending on the change, so the heaviest creation is shorted
 first. A flow is a share change here, not dollars: the page's flow is the share change times NAV, and
-a price rise alone draws money in, so a fund can show creation because it rose (momentum overlaps)."""
+a price rise alone draws money in, so a fund can show creation because it rose (momentum overlaps: the 12-1 momentum screen is a baseline, a stock ranking that gives an ETF base
+only the names it qualifies, so read it as the decoy on the sessions both measure)."""
 
 [universe.where]
 all = [
@@ -40,6 +45,7 @@ all = [
   { field = "instrument.is_inverse", op = "eq", value = false },
   { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
   { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 20_000_000 },
+  { field = "rollup.etf_flows@v1.etf_shares_outstanding", op = "gt", value = 0 },
 ]
 
 [outcome]

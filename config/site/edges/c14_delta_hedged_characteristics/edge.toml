@@ -71,7 +71,9 @@ spread (Cao and Han 2013). IV30 history is 502 sessions, about 23 independent mo
 the bar asks: the edge waits for a verdict."""
 capacity_costs = """Daily hedging across 50 names is heavy for one person; the practical use is to pick which
 names to sell covered calls or strangles on (an overlay on c12). Spreads on single-name options and the
-hedge are the binding cost; the model charges 35 bps and no hedge cost."""
+hedge are the binding cost; the model charges 35 bps and no hedge cost. The flat cost is a fraction of the stock price, not of the premium: it is about 5% of an
+at-the-money straddle's premium only at 30% implied volatility, so it flatters high-implied-volatility
+picks, whose premium and spread are larger (at 60% the same 35 bps is about 2.5% of premium)."""
 failure_modes = """The speculative names are the ones that gap: one takeover bid or a 40% move wipes the
 premium of many windows, so the mean P&L decides, not the hit rate. Retire if the frozen-period mean
 P&L of the picks is not above the mean of every liquid optionable name, or it does not beat the c12 ranking on
