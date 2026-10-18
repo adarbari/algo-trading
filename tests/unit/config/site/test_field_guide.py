@@ -154,11 +154,11 @@ def test_the_guide_is_read_once_per_store(monkeypatch: pytest.MonkeyPatch) -> No
 def test_the_shipped_guide_is_complete() -> None:
     store = FileConfigStore(REPO_ROOT / "config")
     assert store.names("site", "field_guide") == [
+        "analyst",
         "events",
         "fundamentals",
         "instrument",
         "levels",
-        "liquidity",
         "momentum",
         "options-chain",
         "options-wing",
