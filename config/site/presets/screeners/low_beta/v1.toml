@@ -1,0 +1,52 @@
+# Low beta (edge betting_against_beta_low_vol): every tradeable name with a positive 252-session
+# beta against SPY, ranked by it, lowest first (Frazzini and Pedersen 2014 rank on a shrunk beta
+# and lever each leg; a plain long-only low-beta book here). A non-positive beta on a year of
+# daily returns is noise, not the lowest beta, so it does not pass. What it does not check:
+# beta shrinkage, a 24-month market uptrend (the condition is not stored).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "low_beta"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Low beta"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1, so the variants compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.beta_252d]
+field = "rollup.episode_behaviour@v1.beta_252d"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+beta_252d = "rollup.episode_behaviour@v1.beta_252d"
+hv60 = "rollup.vol_stats@v1.hv60"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.episode_behaviour@v1.beta_252d"
+tie_break_order = "asc"

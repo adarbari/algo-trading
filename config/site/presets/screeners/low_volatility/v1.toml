@@ -1,0 +1,51 @@
+# Low volatility (edge betting_against_beta_low_vol): every tradeable name with a 60-session
+# realised volatility, ranked by it, calmest first (Blitz and van Vliet 2007 sort on 3-year
+# volatility; 60 sessions is the longest stored window, so it follows recent calm, not the
+# long record). A missing value never passes (ADR 0030). What it does not check: beta, quality.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "low_volatility"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Low volatility"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1, so the variants compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.hv60]
+field = "rollup.vol_stats@v1.hv60"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+hv60 = "rollup.vol_stats@v1.hv60"
+beta_252d = "rollup.episode_behaviour@v1.beta_252d"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.vol_stats@v1.hv60"
+tie_break_order = "asc"
