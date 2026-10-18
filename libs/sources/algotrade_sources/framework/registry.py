@@ -85,6 +85,7 @@ from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_sources.vendors.tiingo.listings import TiingoSupportedTickers
 from algotrade_sources.vendors.tiingo.meta import TiingoListingMeta
+from algotrade_sources.vendors.tiingo.nav import TiingoFundNav, TiingoNavTickers
 from algotrade_sources.vendors.tiingo.prices import TiingoDailyPrices
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 
@@ -311,6 +312,28 @@ SOURCES: dict[str, SourceSpec] = {
             "tiingo",
             "tiingo",
             TiingoSupportedTickers,
+            72.0,
+            env_names.TIINGO_API_KEY,
+            "create a free Tiingo account (tiingo.com) and add the key to .env",
+            _token,
+            tries=4,
+        ),
+        SourceSpec(
+            "tiingo_nav",
+            "tiingo",
+            "tiingo",
+            TiingoFundNav,
+            72.0,
+            env_names.TIINGO_API_KEY,
+            "create a free Tiingo account (tiingo.com) and add the key to .env",
+            _token,
+            tries=4,
+        ),
+        SourceSpec(
+            "tiingo_nav_tickers",
+            "tiingo",
+            "tiingo",
+            TiingoNavTickers,
             72.0,
             env_names.TIINGO_API_KEY,
             "create a free Tiingo account (tiingo.com) and add the key to .env",

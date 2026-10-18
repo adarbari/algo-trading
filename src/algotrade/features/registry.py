@@ -24,7 +24,7 @@ from collections.abc import Mapping
 from algotrade.features.framework.declaration import FeatureGroup, Superseded
 from algotrade.features.framework.feature import Feature
 from algotrade.features.framework.graph import dependency_order
-from algotrade.features.rollups.activity import vol_stats, volume_profile
+from algotrade.features.rollups.activity import max_return, vol_stats, volume_profile
 from algotrade.features.rollups.consensus import (
     analyst_estimates,
     analyst_ratings,
@@ -34,6 +34,7 @@ from algotrade.features.rollups.consensus import (
     earnings_surprise,
 )
 from algotrade.features.rollups.corporate import (
+    dividend_months,
     dividend_schedule,
     dividends,
     earnings,
@@ -45,6 +46,7 @@ from algotrade.features.rollups.corporate import (
 )
 from algotrade.features.rollups.events import (
     earnings_date_shift,
+    filing_activity,
     filing_events,
     index_changes,
 )
@@ -60,6 +62,7 @@ from algotrade.features.rollups.market import (
 from algotrade.features.rollups.options import (
     call_wing,
     ibkr_iv,
+    ibkr_iv_history,
     iv30,
     iv_history,
     nearest_expiry,
@@ -70,6 +73,8 @@ from algotrade.features.rollups.options import (
 from algotrade.features.rollups.patterns import candle
 from algotrade.features.rollups.positioning import (
     chain_flow,
+    cp_iv,
+    cp_iv_history,
     flow_history,
     implied_move,
     iv_term,
@@ -79,6 +84,7 @@ from algotrade.features.rollups.positioning import (
 from algotrade.features.rollups.price import (
     anchored_vwap,
     bands,
+    earnings_neutral_reversal,
     episodes,
     momentum,
     price_history,
@@ -116,12 +122,15 @@ GROUPS: dict[str, FeatureGroup] = {
             analyst_revisions.GROUP,
             dividends.GROUP,
             dividend_schedule.GROUP,
+            dividend_months.GROUP,
+            filing_activity.GROUP,
             index_changes.GROUP,
             filing_events.GROUP,
             earnings_date_shift.GROUP,
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,
+            ibkr_iv_history.GROUP,
             fundamentals.GROUP,
             financials.GROUP,
             income_statement.GROUP,
@@ -132,6 +141,8 @@ GROUPS: dict[str, FeatureGroup] = {
             put_wing.GROUP,
             call_wing.GROUP,
             price_moves.GROUP,
+            max_return.GROUP,
+            earnings_neutral_reversal.GROUP,
             momentum.GROUP,
             volume.GROUP,
             bands.GROUP,
@@ -151,6 +162,8 @@ GROUPS: dict[str, FeatureGroup] = {
             implied_move.GROUP,
             skew.GROUP,
             skew_history.GROUP,
+            cp_iv.GROUP,
+            cp_iv_history.GROUP,
             iv_term.GROUP,
             nearest_expiry.GROUP,
             trend.GROUP,

@@ -30,6 +30,9 @@ from algotrade.storage.tables.spec import fixed, floats, strings
 # ``pick_adv_low``: the median 20-day dollar volume of the slice's counted picks, how many have
 # one and how many are below the site's ``capacity_adv_floor_usd``; null in rows written before
 # the columns and on cost and random rows.
+# ``side`` (ADR 0053 amendment, outcome sides): the outcome's side, ``long``, ``short`` or
+# ``long_short``; null in rows written before sides, read as ``long``. A ``long_short`` row has no
+# hit rate, base rate or lift (null: a spread has none); a ``short`` row's are the short's.
 EDGE_EVAL = fixed(
     "results/edge_eval",
     "results",
@@ -39,7 +42,7 @@ EDGE_EVAL = fixed(
     ),
     *strings("edge_id", "user_id", "variant", "slice_kind", "slice_value"),
     *strings("role", "config_hash", "run_config_hash", "benchmark"),
-    *strings("edge_variant", "iv_source", "licence"),
+    *strings("edge_variant", "iv_source", "licence", "side"),
     "horizon_sessions int64!",
     "range_from date!",
     "range_to date",
@@ -74,7 +77,7 @@ EDGE_EVAL = fixed(
 # session is before the run's split (false without one), never re-derived by a reader; ``status``:
 # measured | excluded_coverage | lost_input (``lost_table``: an admin cause) | no_picks. Nulls, not
 # zeros, where nothing was measured; values are oriented, net of cost, in ``unit`` (excess_return
-# | return | cushion | ratio).
+# | return | cushion | ratio | pnl).
 EDGE_SERIES = fixed(
     "results/edge_series",
     "results",
@@ -183,6 +186,7 @@ EDGE_LEGS = fixed(
     "screen_snapshot date",
     "outcomes_as_of timestamp_utc",
     "pick_values float64[]",
+    "short_values float64[]",  # a long-short leg's short names' values; null for every other side
     "deciles float64[]",
     "pick_reference float64[]",
     "event_ids string[]",
@@ -225,7 +229,9 @@ EDGE_LEGS = fixed(
 # of D's inputs is accepted, ADR 0064), not necessarily as first published. ``value`` is
 # oriented and net of the document's cost, ``gross_value`` the stored excess return before cost
 # (return outcomes), ``max_drawdown`` the window's dip, ``adv_usd_20d`` the ADV at D (null: not
-# stored).
+# stored). ``side``: ``long`` or ``short`` per pick (a ``long_short`` run lists both legs; null in
+# rows written before sides, read as ``long``); a short pick's ``value`` and ``hit`` are the
+# short's (``gross_value`` stays the stored excess return).
 # ``licence`` is the trial's (the strictest of its implied-vol field, screen and universe
 # features); ``value_licence``, ``score_licence`` and ``adv_licence`` are the licences of those
 # columns (``value`` with ``gross_value``, ``reference`` and ``touch``): a reader redacts a
@@ -240,7 +246,7 @@ EDGE_TRADES = fixed(
     ),
     "instrument_id string!",
     *strings("edge_id", "user_id", "edge_variant", "variant", "role", "config_hash"),
-    *strings("run_config_hash", "benchmark", "status", "excluded_reason"),
+    *strings("run_config_hash", "benchmark", "status", "excluded_reason", "side"),
     *strings("licence", "value_licence", "score_licence", "adv_licence"),
     "horizon_sessions int64!",
     "range_from date!",

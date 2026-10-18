@@ -23,6 +23,7 @@ export const VERDICT_ORDER = [
   'not_working',
   'not_enough_data',
   'waiting_on_data',
+  'diagnostic_only',
 ] as const;
 
 const VERDICT_LABELS: Record<string, string> = {
@@ -31,6 +32,7 @@ const VERDICT_LABELS: Record<string, string> = {
   not_working: 'Not working',
   not_enough_data: 'Not enough data',
   waiting_on_data: 'Waiting on data',
+  diagnostic_only: 'Diagnostic only',
 };
 
 const VERDICT_TONES: Record<string, StatusTone> = {
@@ -39,6 +41,7 @@ const VERDICT_TONES: Record<string, StatusTone> = {
   not_working: 'negative',
   not_enough_data: 'info',
   waiting_on_data: 'neutral',
+  diagnostic_only: 'neutral',
 };
 
 export const verdictLabel = (verdict: string): string => VERDICT_LABELS[verdict] ?? verdict;
@@ -110,6 +113,11 @@ const LABEL_TEXTS: Record<string, string> = {
 };
 
 export const labelText = (label: string): string => LABEL_TEXTS[label] ?? label;
+
+/** The side of the verdict's outcome, named when it is not the usual long side (`long`). */
+const SIDE_LABELS: Record<string, string> = { short: 'Short', long_short: 'Long-short' };
+
+export const sideLabel = (side: string): string | null => SIDE_LABELS[side] ?? null;
 
 /** The list's views (a link keeps one): everything, the user's own edges, followed, rejected. */
 export const EDGE_VIEWS = [

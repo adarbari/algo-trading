@@ -12,7 +12,9 @@ Outputs are float arrays (0-d for scalar inputs). Greeks are the raw derivatives
 per 1.00 of vol (divide by 100 for "per vol point"), ``theta`` per YEAR of calendar time
 passing (divide by 365 for "per day"; it is ``-dV/dt``), ``rho`` per 1.00 of rate.
 Strikes and the risk-neutral chance of finishing out of the money (``strike_from_delta``,
-``prob_otm``, ``prob_between``; r = q = 0) serve the edge harness's ``expires_otm`` outcome.
+``prob_otm``, ``prob_between``; r = q = 0) serve the edge harness's ``expires_otm`` outcome;
+``atm_straddle_price`` / ``atm_straddle_vega`` and ``delta_hedged_vega_pnl`` its
+``option_model_pnl`` outcome (a model price, never a quote).
 At expiry (or zero vol) the price is the discounted intrinsic value of the forward, delta is
 a step, and gamma and vega are 0.
 """
@@ -286,3 +288,31 @@ def prob_between(
     put = prob_otm(price, put_strike, sigma, t_years, "put")
     call = prob_otm(price, call_strike, sigma, t_years, "call")
     return np.maximum(put + call - 1.0, 0.0)
+
+
+def atm_straddle_price(sigma: ArrayLike, t_years: ArrayLike, price: ArrayLike = 1.0) -> Array:
+    """The at-the-money straddle (strike = ``price``, r = q = 0) in closed form:
+    ``2 price (2 N(s sqrt(t) / 2) - 1)``, call and put worth the same at the forward. For
+    ``price = 1`` it is a fraction of the entry price. NaN where sigma or t is not positive."""
+    _, sd = _spread(sigma, t_years)
+    return np.asarray(2.0 * np.asarray(price) * (2.0 * norm_cdf(0.5 * sd) - 1.0), dtype=np.float64)
+
+
+def atm_straddle_vega(sigma: ArrayLike, t_years: ArrayLike, price: ArrayLike = 1.0) -> Array:
+    """``d(straddle price) / d sigma`` (per 1.00 of vol) of ``atm_straddle_price``:
+    ``2 price sqrt(t) n(s sqrt(t) / 2)``. NaN where sigma or t is not positive."""
+    _, sd = _spread(sigma, t_years)
+    years = np.asarray(t_years, dtype=np.float64)
+    root = np.sqrt(np.where(np.isfinite(sd), years, np.nan))
+    return np.asarray(2.0 * np.asarray(price) * root * norm_pdf(0.5 * sd), dtype=np.float64)
+
+
+def delta_hedged_vega_pnl(realised: ArrayLike, implied: ArrayLike) -> Array:
+    """The P&L of a continuously delta-hedged long option per unit of its vega, to the usual
+    gamma-P&L approximation: ``(realised^2 - implied^2) / (2 implied)`` (close to ``realised -
+    implied`` when they are near). Multiply by the position's vega for money. NaN where
+    ``implied`` is not positive."""
+    rv = np.asarray(realised, dtype=np.float64)
+    iv = np.asarray(implied, dtype=np.float64)
+    iv = np.where(iv > 0, iv, np.nan)
+    return np.asarray((rv * rv - iv * iv) / (2.0 * iv), dtype=np.float64)

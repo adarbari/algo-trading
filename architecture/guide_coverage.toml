@@ -123,7 +123,7 @@ exempt = "a catalogue field name; the field's own help explains it"
 [[enum]]
 source = "graphql:EdgeVerdict.verdict"
 values_from = "python:algotrade.services.read.evaluation.verdict:ORDER"
-values = { works = "term:verdict_works", promising = "term:verdict_promising", not_working = "term:verdict_not_working", not_enough_data = "term:verdict_not_enough_data", waiting_on_data = "term:verdict_waiting_on_data" }
+values = { works = "term:verdict_works", promising = "term:verdict_promising", not_working = "term:verdict_not_working", not_enough_data = "term:verdict_not_enough_data", waiting_on_data = "term:verdict_waiting_on_data", diagnostic_only = "term:verdict_diagnostic_only" }
 
 [[enum]]
 source = "graphql:VerdictCriterion.status"
@@ -195,6 +195,11 @@ source = "graphql:EdgeDrawdown.state"
 values_from = "python:algotrade.services.read.edge_evidence.drawdown:DRAWDOWN_STATES"
 values = { measured = "term:drawdown", not_stored = "term:cost_state", not_a_return = "term:not_a_return" }
 names = { not_a_return = "not a return" }
+
+[[enum]]
+source = "graphql:EdgeSettings.kind"
+values_from = "python:algotrade.config.edges.document:OUTCOME_KINDS"
+values = { excess_return = "term:outcome_excess_return", hit_target = "term:outcome_hit_target", expires_otm = "term:outcome_expires_otm", option_model_pnl = "term:outcome_option_model_pnl" }
 
 [[enum]]
 source = "graphql:EdgeCosts.state"
@@ -359,7 +364,7 @@ ids = ["edge_builder_idea", "edge_builder_screens", "edge_builder_picks", "edge_
 
 [baseline]
 # The pins: each baseline's size; a PR only lowers them (adding to a baseline fails).
-max_enums = 33
+max_enums = 32
 max_sections = 5
 max_panels = 66
 enums = [
@@ -370,7 +375,6 @@ enums = [
   "graphql:Config.kind",
   "graphql:EdgeRow.sliceKind",
   "graphql:EdgeRun.status",
-  "graphql:EdgeSettings.kind",
   "graphql:Episode.kind",
   "graphql:Event.kind",
   "graphql:FailureGroup.statuses",
