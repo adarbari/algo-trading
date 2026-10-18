@@ -248,3 +248,94 @@ session's chain was stored, which is in the evening. Don't read one complete win
 """
 next = "Read the mean value across windows and how many were measured."
 see_also = ["outcome_option_pnl", "chain_outcome_unmeasured", "chain_basis"]
+
+[[term]]
+id = "outcome_portfolio_return"
+term = "Outcome: Portfolio return"
+short = "A book of the screen's picks works when it beats a blended benchmark over the holding period, after the cost of changing the book."
+body = """
+This outcome judges a whole allocation, such as an ETF rotation, not each pick on its own. At each
+rebalance the picks are weighted into one book. The value of the session is the book's return from
+the entry close to the close at the horizon, minus the return of the benchmark over the same days.
+A session wins when that is above zero after the cost. Cost is paid only on the weight that
+changes between rebalances, so a book that holds still pays nothing. There is no base rate: the
+benchmark is the base, and a session that cannot be valued is left out with its reason, never
+counted as zero. With fewer than about 20 ranked names there are no deciles either. Example: a
+60% stock and 40% bond mix returns 1.0% and the book 1.8%, so the session is worth 0.8%. Don't
+read a high win rate as size: read the mean excess return and the t of the series.
+"""
+next = "Read the mean excess return and its t, then the blended benchmark and the weighting it used."
+see_also = ["blended_benchmark", "weighting_equal", "cash_position", "outcome_excess_return", "base_rate", "win_rate"]
+
+[[term]]
+id = "blended_benchmark"
+term = "Blended benchmark"
+short = "A fixed mix of instruments, such as 60% SPY and 40% AGG, that a book must beat."
+body = """
+A rotation between stocks and bonds is not fairly compared with stocks alone. The edge names its
+own mix, written as each ticker and its weight, and the weights add to one. The mix's return is the
+weighted return of the constituents over the same window as the book's. Each constituent is read
+from the stored outcome rows at the entry session. A session where a constituent has no row is left
+out with the reason, never filled with a guess. The mix is not rebalanced inside the window.
+Example: SPY returns 2% and AGG 0%, so a 60/40 mix returns 1.2%. A passive mix is hard to beat
+after costs, so a book that only matches it has no edge.
+"""
+next = "Check that the mix is what a passive holder of the same assets would have owned."
+see_also = ["outcome_portfolio_return", "outcome_excess_return"]
+
+[[term]]
+id = "weighting_equal"
+term = "Weighting: Equal"
+short = "Every name in the book has the same weight, one over the number of picks."
+body = """
+The book splits itself evenly across the names the screen picks at the decision session. It needs
+nothing but the picks, so it has no input that can be missing. It ignores how risky or how highly
+ranked each name is. Example: three picks have a third each. A few volatile names can then
+dominate the book's swings.
+"""
+next = "Compare it with inverse volatility if the picks differ a lot in risk."
+see_also = ["weighting_inverse_vol", "weighting_score", "outcome_portfolio_return"]
+
+[[term]]
+id = "weighting_inverse_vol"
+term = "Weighting: Inverse volatility"
+short = "Each name's weight is proportional to one over its volatility, so calmer names get more."
+body = """
+The edge names the volatility feature it reads, and the value known at the decision session
+sets the weights. A name twice as volatile gets half the weight, so each name contributes a
+similar amount of risk. A name with no usable volatility makes the whole session unmeasured, with
+the reason: the book is never quietly built from the names that have one. Example: names with
+10% and 20% volatility get two thirds and one third. Don't read the weights as a forecast: they
+only size the names by past movement.
+"""
+next = "Check that the volatility feature is known at the decision session for every pick."
+see_also = ["weighting_equal", "weighting_score", "outcome_portfolio_return"]
+
+[[term]]
+id = "weighting_score"
+term = "Weighting: By score"
+short = "Each name's weight is proportional to the screen's score, so the best-ranked names get more."
+body = """
+The screen's score at the decision session sets the weights, so a name with twice the score has
+twice the weight. A score is a ranking key, not a size, so every pick needs a positive score. A
+pick without one makes the session unmeasured, with the reason. Example: scores of 3 and 1 give
+three quarters and one quarter. Weighting by score can concentrate the book in one name, and the
+size of a score is only meaningful if the screen was built to carry it.
+"""
+next = "Use it only for a screen whose score is a size, and compare it with equal weights."
+see_also = ["weighting_equal", "weighting_inverse_vol", "outcome_portfolio_return"]
+
+[[term]]
+id = "cash_position"
+term = "Cash position"
+short = "Money a book does not invest, which earns the Treasury bill yield known at the decision session."
+body = """
+A trend filter can send a book to cash. A pick named CASH earns the bill yield read at the decision
+session, scaled to the holding period as the yield times the sessions held over 252. Each place the screen leaves unfilled (fewer qualify than the edge's top K) is cash too. A session with
+no picks at all is a cash session: the whole book is in cash and is measured, not left out. Cash
+costs nothing to enter or leave. If no yield is stored for the session, the session is left out with
+the reason, never given a zero return. Example: a 4% yield over 21 sessions earns 0.33%. The
+benchmark never holds cash, so a book in cash is judged on what it missed or avoided.
+"""
+next = "Look at how often the book was in cash and what the benchmark did in those sessions."
+see_also = ["outcome_portfolio_return", "blended_benchmark"]

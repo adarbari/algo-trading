@@ -43,15 +43,14 @@ import numpy as np
 from algotrade.config.edges.document import (
     LEGACY_SITE_CUTOFF,
     LEGACY_SITE_OWNERS,
-    LONG,
-    LONG_SHORT,
     MAIN,
     Edge,
     Outcome,
     job_name,
 )
-from algotrade.config.edges.identity import identity_dict
+from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
 from algotrade.config.edges.named import OUT_OF_WINDOW
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -145,7 +144,10 @@ from algotrade.services.evaluation.cross_section.reporting.report_containment im
     containment,
     reports_after,
 )
-from algotrade.services.evaluation.cross_section.reporting.turnover import apply_hold_bands
+from algotrade.services.evaluation.cross_section.reporting.turnover import (
+    apply_hold_bands,
+    apply_rebalances,
+)
 from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
     leg_blocks,
@@ -401,6 +403,16 @@ def stored_outcome_sessions(reader: StoreReader) -> list[date]:
     return stored_sessions(reader)
 
 
+def _turned_over(o: Outcome, stats: tuple[SessionStat, ...]) -> tuple[SessionStat, ...]:
+    """``stats`` with the net series of an outcome whose cost is its turnover's: a buy/hold band
+    (entries and exits) or a rebalanced portfolio book (the weight change); any other as given."""
+    if o.hold_rank is not None:
+        return apply_hold_bands(stats, o.cost_bps, o.sign)
+    if o.kind == PORTFOLIO_KIND:
+        return apply_rebalances(stats, o.cost_bps)
+    return stats
+
+
 def evaluate_edge(
     reader: StoreReader,
     writer: ResultWriter,
@@ -530,10 +542,7 @@ def evaluate_edge(
                 pool_stats([found[leg.decision] for leg in block if leg.entry in closed])
                 for block in kept
             )
-            if scope.edge.outcome.hold_rank is not None:  # the net series of a buy/hold band
-                block_stats = apply_hold_bands(
-                    block_stats, scope.edge.outcome.cost_bps, scope.edge.outcome.sign
-                )
+            block_stats = _turned_over(scope.edge.outcome, block_stats)
             measures, costed = _slice_rows(
                 block_stats,
                 split,
@@ -541,7 +550,9 @@ def evaluate_edge(
                 variant.config.config.impl == MODEL_IMPL,
                 edge.frozen_from,
                 CostGrid(scope.edge.outcome.cost_bps, spec.costs, scope.edge.outcome.sign)
-                if is_return(scope.edge) and scope.edge.outcome.side != LONG_SHORT
+                if is_return(scope.edge)
+                and scope.edge.outcome.side != LONG_SHORT
+                and scope.edge.outcome.kind != PORTFOLIO_KIND  # a book's cost is its turnover's
                 else None,  # a spread has no hit rate to cost
                 verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key
                 counts_wins(unit_of(scope.edge)),

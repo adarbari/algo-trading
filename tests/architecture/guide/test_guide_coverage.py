@@ -24,7 +24,7 @@ from typing import Any
 import graphql
 import pytest
 
-from algotrade.config.edges.document import SIDES
+from algotrade.config.edges.identity import SIDES
 from algotrade.config.site.guide.glossary import load_guide_glossary
 from algotrade.config.site.guide.start import ENTRY_KINDS
 from algotrade.config.user import SITE_USER, UserContext

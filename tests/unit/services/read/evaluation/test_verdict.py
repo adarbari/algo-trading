@@ -656,6 +656,84 @@ def test_a_chain_edge_can_be_promising_but_never_works_without_an_in_sample_basi
     assert plain.verdict == NOT_ENOUGH and "basis_in_sample" not in {c.id for c in plain.criteria}
 
 
+# portfolio_return (ADR 0074): a book beats a blended benchmark, with no base rate over names
+BOOK = EdgeFacts(portfolio=True, benchmark="a blend of 60% SPY and 40% AGG")
+NO_BASE = {
+    "base_rate": None, "lift": None, "decile_spread": None, "decile_t": None,
+    "hit_rate": 0.62, "mean_excess_picks": 0.004,
+}  # fmt: skip
+
+
+def book_result(
+    oos: dict[str, object] | None = None,
+    baselines: tuple[float, ...] = (0.001, 0.002),
+    whole: dict[str, object] | None = None,
+) -> list[EdgeRow]:
+    rows = result(
+        oos={**NO_BASE, **(oos or {})},
+        whole={"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2, **NO_BASE, **(whole or {})},
+        insample={**NO_BASE, "mean_excess_picks": 0.003},
+        baselines=(),
+    )
+    return rows + [
+        row(variant=f"b{i}", role="baseline", kind="frozen", **{**NO_BASE, "mean_excess_picks": m})
+        for i, m in enumerate(baselines)
+    ]
+
+
+def test_a_book_is_judged_on_its_t_and_its_decoys_not_on_a_base_rate_or_random_picks() -> None:
+    v = verdict(book_result(oos={"picks_t": 3.2}), facts=BOOK)  # no draws: random does not apply
+    assert v.verdict == WORKS
+    crit = {c.id: c for c in v.criteria}
+    for gone in ("win_rate", "oos_lift", "random", "decile_t", "works_t"):
+        assert crit[gone].status == "not_applicable", gone
+    assert crit["promising_picks_t"].threshold == "at least 2"
+    assert (crit["works_picks_t"].status, crit["baselines"].status) == ("pass", "pass")
+    assert crit["baselines"].label == "Mean excess return against every baseline"
+    assert "blend of 60% SPY and 40% AGG" in v.headline and "62%" in v.headline
+    assert v.result == "Beat the benchmark in 62% of sessions"
+
+
+def test_a_books_works_needs_a_picks_t_of_three_and_promising_one_of_two() -> None:
+    between = verdict(book_result(oos={"picks_t": 2.5}), facts=BOOK)
+    assert between.verdict == PROMISING and "Picks-series t" in between.rationale
+    low = verdict(book_result(oos={"picks_t": 1.9}), facts=BOOK)
+    assert low.verdict == NOT_WORKING  # below the not-working line on the series that carries it
+    unstored = verdict(book_result(oos={"picks_t": None}), facts=BOOK)
+    assert unstored.verdict == NOT_ENOUGH
+    assert {c.id: c.status for c in unstored.criteria}["promising_picks_t"] == "not_measured"
+
+
+def test_a_book_that_a_decoy_book_beats_is_not_promising() -> None:
+    v = verdict(book_result(oos={"picks_t": 3.2}, baselines=(0.001, 0.009)), facts=BOOK)
+    assert v.verdict == NOT_WORKING and "baseline" in v.rationale.lower()
+
+
+def test_a_book_with_enough_names_keeps_its_decile_criteria_beside_the_picks_t() -> None:
+    """With about 20 names ranked the deciles exist: Works then needs both t series."""
+    ranked = {"decile_t": 3.5, "decile_spread": 0.05, "picks_t": 3.2}
+    both = verdict(book_result(oos=ranked), facts=BOOK)
+    crit = {c.id: c.status for c in both.criteria}
+    assert crit["decile_t"] != "not_applicable" and crit["works_t"] == "pass"
+    weak = verdict(book_result(oos={**ranked, "decile_t": 2.5}), facts=BOOK)
+    assert weak.verdict == PROMISING and "decile t" in weak.rationale.lower()
+
+
+def test_a_book_is_not_judged_by_the_long_rule_when_not_flagged() -> None:
+    """The same rows without the flag read as any other edge: no base rate, nothing passes."""
+    plain = verdict(book_result(oos={"picks_t": 3.2}))
+    assert plain.verdict != WORKS
+
+
+def test_the_in_sample_basis_of_several_books_is_the_one_with_the_larger_mean_excess() -> None:
+    rows = book_result() + [
+        row(variant="scr2", kind=k, **{**NO_BASE, "mean_excess_picks": m, "sessions": 60})
+        for k, m in (("frozen", 0.004), ("all", 0.004), ("in_sample", 0.009))
+    ]
+    choice = choose_basis(rows, T)
+    assert choice.key == ("scr2", 20) and "scr2" not in choice.reason
+
+
 def test_a_residual_return_verdict_says_the_figure_is_factor_neutral() -> None:
     v = judge("e", result(), SPLIT, T, facts=EdgeFacts(neutral=True))
     assert "factor-neutral" in v.headline
@@ -664,3 +742,18 @@ def test_a_residual_return_verdict_says_the_figure_is_factor_neutral() -> None:
         "e", [replace(r, side="short") for r in result()], SPLIT, T, facts=EdgeFacts(neutral=True)
     )
     assert "(short leg, factor-neutral" in both.headline
+
+
+def test_the_book_flag_reaches_the_in_sample_ranking_of_the_basis() -> None:
+    """``choose_basis(portfolio=True)`` ranks candidates by the book's criteria (the picks-series
+    t), not the long rule's: the larger in-sample mean alone does not win a book's basis."""
+    rows = [
+        row(variant=v, kind=k, **{**NO_BASE, "mean_excess_picks": m, "picks_t": pt, "pbo": 0.3})
+        for v, m, pt in (("weak", 0.009, 0.5), ("sound", 0.003, 3.5))
+        for k in ("frozen", "all", "in_sample")
+    ]
+    assert choose_basis(rows, T, decoys=False).key == ("weak", 20)  # as a long edge: larger mean
+    assert choose_basis(rows, T, decoys=False, portfolio=True).key == (
+        "sound",
+        20,
+    )  # as a book: the t decides

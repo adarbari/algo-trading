@@ -45,6 +45,8 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   borrow ``borrow_bps_annual / 1e4 * horizon / 252`` (an assumption: no borrow data is stored);
   ``short_hit`` is ``short_value > 0`` (the name underperformed by more than the costs). The
   long columns are unchanged: the deciles and the base are over them whatever the side.
+- ``portfolio_return`` (ADR 0074) is not valued here: a book is one value per session, from its
+  weights and a blended benchmark (``cross_section/portfolio``); ``apply_outcome`` refuses it.
 - ``max_drawdown`` set: a hit also needs ``fwd_max_drawdown <= max_drawdown``.
 
 A row whose value cannot be computed is *excluded with a reason*, never a miss and never a
@@ -250,8 +252,10 @@ def _model_outcome(
 
 def chain_rows(edge: Edge, outcomes: pd.DataFrame) -> pd.DataFrame:
     """The rows of ``outcomes`` (the chain grain's, every structure and tenor) the edge's
-    ``option_pnl`` outcome names: one per instrument."""
+    ``option_pnl`` outcome names: one per instrument; any other outcome's rows unchanged."""
     o = edge.outcome
+    if o.kind != CHAIN_KIND:
+        return outcomes
     held = grain_structure(o.structure or "", o.strike_delta)
     keep = (outcomes["structure"] == held) & (outcomes["tenor_days"] == o.tenor_days)
     return outcomes[keep]
@@ -336,6 +340,15 @@ def _unmeasured(edge: Edge, outcomes: pd.DataFrame) -> np.ndarray:
     return mask
 
 
+def _refuse_book(edge: Edge) -> None:
+    """A ``portfolio_return`` is valued as a book (``cross_section/portfolio``), never by name."""
+    if edge.outcome.kind == "portfolio_return":
+        raise ConfigurationError(
+            f"{edge.id}: a portfolio_return is valued as a book (cross_section/portfolio), "
+            f"never name by name"
+        )
+
+
 def apply_outcome(
     edge: Edge, outcomes: pd.DataFrame, implied: Mapping[str, float | None] | None = None
 ) -> pd.DataFrame:
@@ -344,7 +357,8 @@ def apply_outcome(
     and whether the name was delisted. ``implied``: the IV at S by instrument id (needed when
     ``needs_implied_vol``)."""
     o = edge.outcome
-    outcomes = chain_rows(edge, outcomes) if o.kind == CHAIN_KIND else outcomes
+    outcomes = chain_rows(edge, outcomes)
+    _refuse_book(edge)
     n = len(outcomes)
     excluded = np.full(n, "", dtype=object)
     reference = np.full(n, np.nan)

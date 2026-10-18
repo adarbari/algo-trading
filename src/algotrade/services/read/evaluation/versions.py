@@ -18,6 +18,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
 from algotrade.config.edges import loading
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.site.settings import load_verdict as load_verdict_settings
 from algotrade.services.read.context import Stores
 from algotrade.services.read.evaluation import runs, verdict
@@ -130,7 +131,7 @@ def load_verdict(ctx: Stores, edge: Edge) -> verdict.EdgeVerdict:
         settings,
         run.lost_inputs,
         decoys=decoys,
-        basis=verdict.choose_basis(_own(served), settings, _declared(edge), decoys),
+        basis=verdict.choose_basis(_own(served), settings, _declared(edge), decoys, _is_book(edge)),
         facts=verdict.EdgeFacts(
             edge.published,
             edge.schedule,
@@ -188,11 +189,18 @@ def _pick(
     return found[0] if len(found) == 1 else None
 
 
+def _is_book(edge: Edge) -> bool:
+    """The edge's outcome is a portfolio_return book (ADR 0074)."""
+    return edge.settings is not None and edge.settings.kind == PORTFOLIO_KIND
+
+
 def basis_of(ctx: Stores, edge: Edge, rows: Sequence[EdgeRow]) -> verdict.BasisChoice:
     """The (screen, horizon) every line of a comparison is read at: the verdict's basis of
     ``edge``'s ``rows`` (ADR 0065: declared, else the best in-sample; never out-of-sample)."""
     settings = load_verdict_settings(ctx.configs)
-    return verdict.choose_basis(_own(rows), settings, _declared(edge), bool(edge.baselines))
+    return verdict.choose_basis(
+        _own(rows), settings, _declared(edge), bool(edge.baselines), _is_book(edge)
+    )
 
 
 def _line(
