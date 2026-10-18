@@ -56,6 +56,7 @@ owner = ["src/algotrade/services/evaluation/cross_section/*"]
 allowed = [
     "src/algotrade/storage/tables/edge_schemas.py",  # declares results/edge_eval's one schema
     "src/algotrade/services/jobs/handlers.py",  # the edge-eval job kind (ADR 0010) runs the harness
+    "src/algotrade/services/evaluation/time_series/measures.py",  # a time-series edge's trial statistics: the deflated Sharpe ratio and PBO (ADR 0073)
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "evaluate_edge" }, { call = "deflated_sharpe" }, { call = "pbo_cscv" }, { string = "results/edge_eval" }]
@@ -109,6 +110,16 @@ allowed = [
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-08-ed7a-the-first-learned-scorer-a-probit-in-site-config"
 detect = [{ call = "fit_scorer" }, { call = "training_frame" }, { call = "render_scorer" }, { call = "merge_scorers" }]
+
+[[responsibility]]
+id = "edge-time-series-evaluation"
+description = "Judge an edge timed by a calendar window against the same instrument's returns outside it (ADR 0073, `base = \"out_of_window\"`): the periods of the window and the same-length stretches tiled outside every window (placed from the calendar alone), the raw outcome returns read at each period's entry session through the one outcomes seam, the symbols of its named universe resolved through SymbolResolver, the in-window against out-of-window measures per slice (mean difference, Welch t, positive-window share against the base's, effect size, Sharpe, the timing Sharpe against buy-and-hold with the bill known at the decision session) over independent periods, and the seeded random window sets; its result is wrapped as the edge's evaluation by the edge harness"
+owner = ["src/algotrade/services/evaluation/time_series/*"]
+allowed = [
+    "src/algotrade/services/evaluation/cross_section/harness.py",  # the caller: evaluate_edge wraps the result as an EdgeEvaluation
+]
+section = "docs/adr/0073-calendar-schedules-and-the-time-series-base.md#decision"
+detect = [{ call = "evaluate_time_series" }, { call = "random_windows" }, { call = "timing_sharpes" }, { call = "pbo_among" }, { call = "out_of_window_stretches" }]
 
 [[responsibility]]
 id = "event-scope"

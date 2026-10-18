@@ -33,7 +33,9 @@ and the key.
                       ``on_event:<class>[:<subtype>]`` (EVENT_CLASSES; EVENT_SUBTYPES)
     base              what the picks are compared with: ``event`` (the names with the event at
                       D, of the schedule's own class and subtype; default for an event
-                      schedule) | ``universe`` (every eligible name)
+                      schedule) | ``universe`` (every eligible name) | ``out_of_window`` (a
+                      time-series edge, ADR 0073: a calendar schedule, up to 10 named
+                      instruments, ``named.py``, no variants)
     picks             where an event schedule's picks come from: ``event`` (the qualified names
                       within the event names; default) | ``universe`` (the qualified names of
                       every eligible name on the event sessions; a decoy). Plain schedules
@@ -97,6 +99,7 @@ from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
 from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
+from algotrade.config.edges.named import OUT_OF_WINDOW, named_symbols
 from algotrade.config.edges.verdict import LEGS
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Selection, parse_selection
@@ -132,7 +135,7 @@ BENCHMARKS = ("SPY", "none")
 LONG, SHORT, LONG_SHORT = "long", "short", "long_short"
 SIDES = (LONG, SHORT, LONG_SHORT)  # which names an outcome holds and in which direction
 SCHEDULES = ("every_session", "month_end")
-BASES = ("event", "universe")
+BASES = ("event", "universe", OUT_OF_WINDOW)
 PICKS = ("event", "universe")  # where an event schedule's picks may come from
 MAIN = "main"  # the edge itself, as the key of a results row (a variant has its own id)
 ON_EVENT = "on_event:"
@@ -437,9 +440,16 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     status = t.choice("status", "", STATUSES) if "status" in doc else _missing(t, "status")
     closed = status in CLOSED
     schedule = _schedule(t)
-    outcome = _outcome(t, schedule)
-    universe = _universe(t, edge_id)
     base = _base(t, schedule)
+    outcome = _outcome(t, schedule, base)
+    universe = _universe(t, edge_id)
+    if base == OUT_OF_WINDOW:
+        if not isinstance(universe, Selection):
+            raise ConfigurationError(
+                f"{where} universe: base 'out_of_window' names its instruments inline "
+                f"([universe] where = ...), not a preset"
+            )
+        named_symbols(universe, f"{where} universe")
     picks = _picks(t, schedule, base)
     sources = _sources(t)
     top_k = _top_k(t)
@@ -622,6 +632,8 @@ def _base(t: Table, schedule: str, default: str | None = None) -> str:
     )
     if base == "event" and not event:
         raise ConfigurationError(f"{t.where} base: 'event' needs an on_event schedule")
+    if base == OUT_OF_WINDOW and window_name(schedule) not in WINDOW_NAMES:
+        raise ConfigurationError(f"{t.where} base: 'out_of_window' needs a calendar schedule")
     return base
 
 
@@ -636,21 +648,31 @@ def _picks(t: Table, schedule: str, base: str, default: str = "event") -> str:
     return picks
 
 
-def _outcome(t: Table, schedule: str) -> Outcome:
+def _outcome(t: Table, schedule: str, base: str = "universe") -> Outcome:
     if t.raw("outcome") is None:
         _missing(t, "outcome")
-    return _outcome_of(t.table("outcome", OUTCOME_KEYS), schedule)
+    return _outcome_of(t.table("outcome", OUTCOME_KEYS), schedule, base)
 
 
-def _outcome_of(o: Table, schedule: str) -> Outcome:
+def _raw_returns(o: Table, kind: str, benchmark: str, timed: bool) -> None:
+    """An excess return needs SPY; a time-series edge's (ADR 0073) is the raw return, only."""
+    if kind == "excess_return" and benchmark == "none" and not timed:
+        raise ConfigurationError(f"{o.where} benchmark: an excess return needs SPY, not 'none'")
+    if timed and (kind != "excess_return" or benchmark != "none"):
+        raise ConfigurationError(
+            f"{o.where} kind: base 'out_of_window' compares raw returns: kind "
+            f"'excess_return' with benchmark 'none', got {kind!r} over {benchmark!r}"
+        )
+
+
+def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
     kind = o.choice("kind", "", OUTCOME_KINDS) if "kind" in o.names() else _missing(o, "kind")
     benchmark = (
         o.choice("benchmark", "", BENCHMARKS)
         if "benchmark" in o.names()
         else _missing(o, "benchmark")
     )
-    if kind == "excess_return" and benchmark == "none":
-        raise ConfigurationError(f"{o.where} benchmark: an excess return needs SPY, not 'none'")
+    _raw_returns(o, kind, benchmark, base == OUT_OF_WINDOW)
     if kind == "option_model_pnl" and benchmark != "none":
         raise ConfigurationError(
             f"{o.where} benchmark: an option_model_pnl is a P&L on the underlying, "
@@ -866,6 +888,8 @@ def _variants(
         )  # a variant of another kind drops the base's kind-specific keys
         merged = Table({**kept, **{k: over.raw(k) for k in over.names()}}, f"{v.where} outcome")
         v_base = _base(v, schedule) if "base" in v.names() else None
+        if OUT_OF_WINDOW in (v_base, edge_base):
+            raise ConfigurationError(f"{v.where}: a time-series edge has no variants")
         _picks(v, schedule, v_base or edge_base, edge_picks)  # the effective pair is checked
         found.append(
             EdgeVariant(

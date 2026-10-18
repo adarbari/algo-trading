@@ -49,6 +49,7 @@ from algotrade.config.edges.document import (
     identity_dict,
     job_name,
 )
+from algotrade.config.edges.named import OUT_OF_WINDOW
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -139,6 +140,8 @@ from algotrade.services.evaluation.cross_section.sessions import (
     Leg,
     leg_blocks,
 )
+from algotrade.services.evaluation.time_series.evaluate import evaluate_time_series
+from algotrade.services.evaluation.time_series.measures import deflate_trial, pbo_among
 from algotrade.services.features import catalogue
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -186,6 +189,7 @@ class VariantResult:
     licences: TrialLicences | None = None  # the trial's and its ledger columns' (ADR 0064)
     legs: tuple[LegDetail, ...] = ()  # the main edge variant's measured legs, for the ledger
     side: str = LONG  # the outcome's side (``edge_eval.side``; ADR 0053 amendment)
+    timing: Mapping[str, Any] | None = None  # a time-series edge: timing vs buy-and-hold Sharpe
 
     @property
     def licence(self) -> str | None:
@@ -383,7 +387,12 @@ def evaluate_edge(
     ``random_draws``: random picks drawn per out-of-sample session (``random_picks.py``);
     ``full``: compute every leg, reusing none of the stored ones (``legs/reuse.py``). Raises
     ``ConfigurationError`` for an event class with no declared field and
-    ``MissingDataError`` when no outcome is stored for a horizon."""
+    ``MissingDataError`` when no outcome is stored for a horizon. An edge with ``base =
+    "out_of_window"`` is a time-series edge, measured by ``time_series/`` (``_time_series``)."""
+    if edge.base == OUT_OF_WINDOW:
+        return _time_series(
+            reader, writer, configs, user, edge, start, end, as_of, split_from, random_draws
+        )
     variants = _variants(configs, user, edge)
     split, exploratory = effective_split(split_from, edge)
     label = site_regime(configs.load).label  # the site's, not a user's
@@ -561,6 +570,71 @@ def evaluate_edge(
         legs_reused=len(reuse.reused),
         legs_computed=len(stats.rows),
         legs_invalidated=dict(reuse.invalidated),
+    )
+
+
+def _time_series(
+    reader: StoreReader,
+    writer: ResultWriter,
+    configs: ConfigStore,
+    user: UserContext,
+    edge: Edge,
+    start: date,
+    end: date,
+    as_of: datetime,
+    split_from: date | None,
+    random_draws: int,
+) -> EdgeEvaluation:
+    """A time-series edge (ADR 0073) as an ``EdgeEvaluation``: one trial per named instrument
+    (``variant`` its symbol, ``horizon`` the window's length), its slices and random window sets
+    stored as the rows the verdict reads; no per-session series, legs or ledger (there is no
+    screen to replay)."""
+    split, exploratory = effective_split(split_from, edge)
+    session = SessionReads(reader, site_regime(configs.load).label)
+    run = evaluate_time_series(
+        reader, edge, start, end, as_of, session.label, split, exploratory, random_draws
+    )
+    keys = {
+        r.symbol: hashlib.sha256(
+            f"{edge.id}|{run.window}|{r.symbol}|{HARNESS_VERSION}".encode()
+        ).hexdigest()
+        for r in run.results
+    }
+    tried = {(MAIN, r.symbol, keys[r.symbol], run.horizon) for r in run.results}
+    trials = len(tried | _prior_trials(writer, edge.id, user.user_id))
+    pbo = pbo_among({r.symbol: dict(r.in_window) for r in run.results if r.in_window})
+    results = [
+        VariantResult(
+            r.symbol, SCREENER, keys[r.symbol], run.horizon, (),
+            (
+                deflate_trial(r.measures[0], [v for _, v in r.in_window], trials, pbo),
+                *r.measures[1:],
+            ),
+            lost_sessions=r.lost, timing=r.timing,
+        )
+        for r in run.results
+    ]  # fmt: skip
+    randoms = tuple(
+        RandomPicks(MAIN, run.horizon, r.symbol, keys[r.symbol], r.randoms)
+        for r in run.results
+        if r.randoms
+    )
+    return EdgeEvaluation(
+        edge_id=edge.id,
+        run_hash=run_hash(edge, [], start, end, as_of, split_from=split, random_draws=random_draws),
+        user_id=user.user_id,
+        benchmark=edge.outcome.benchmark,
+        start=start,
+        end=end,
+        as_of=as_of,
+        snapshot=None,
+        results=tuple(results),
+        trials=trials,
+        start_sessions={run.horizon: run.scheduled},
+        unclosed_sessions={run.horizon: run.unclosed},
+        split_from=split,
+        exploratory=exploratory,
+        random_picks=randoms,
     )
 
 
