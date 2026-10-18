@@ -26,6 +26,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
     MEASURE_FIELDS,
     MODEL_PNL_FIELDS,
+    PAIR_FIELDS,
 )
 from algotrade.services.evaluation.cross_section.portfolio.session import (
     FIELDS as PORTFOLIO_FIELDS,
@@ -47,7 +48,7 @@ FORWARD = (
 TIME_SERIES = "src/algotrade/services/evaluation/time_series/harness.py"  # ADR 0073's seam
 PROTECTED = "algotrade.data.outcomes"
 
-OWN_FIELDS = ("expires_otm", "option_model_pnl", "option_pnl", PORTFOLIO_KIND)
+OWN_FIELDS = ("expires_otm", "option_model_pnl", "option_pnl", PORTFOLIO_KIND, "pair_spread")
 
 
 def _ids() -> list[str]:
@@ -66,6 +67,8 @@ def test_the_measure_and_the_path_condition_are_stored_outcome_fields(edge: Edge
             fields: tuple[str, ...] = MODEL_PNL_FIELDS[o.structure]
         elif o.kind == "expires_otm":
             fields = EXPIRES_OTM_FIELDS
+        elif o.kind == "pair_spread":
+            fields = PAIR_FIELDS
         elif o.kind == "option_pnl":  # the chain grain's own fields (checked below)
             fields = ()
         elif o.kind == PORTFOLIO_KIND:
@@ -116,6 +119,23 @@ def test_every_option_outcome_iv_field_is_a_catalogue_feature_with_a_licence(edg
         if o.kind in ("expires_otm", "option_model_pnl"):
             assert o.iv_field is not None and o.iv_field not in MIXED_SOURCE_IV
             catalogue.check_field(o.iv_field, f"{edge.id} iv_field")
+
+
+def test_the_pair_spread_reads_only_stored_fields_and_a_declared_text_feature() -> None:
+    """A pair spread reads each leg's return from the outcomes partition (no new grain), and its
+    ``pair_field`` is read at D: a catalogue feature of text type, never a hand list of ids."""
+    assert set(PAIR_FIELDS) <= set(OUTCOME_FIELDS)
+    kind = field_catalog(STORE).check_field("rollup.share_classes@v1.sibling_id", "pair field")
+    assert kind == "str"
+
+
+@pytest.mark.parametrize("edge", EDGES, ids=_ids())
+def test_every_pair_field_is_a_text_catalogue_feature(edge: Edge) -> None:
+    catalogue = field_catalog(STORE)
+    for o in (edge.outcome, *(v.outcome for v in edge.variants)):
+        if o.kind == "pair_spread":
+            assert o.pair_field is not None
+            assert catalogue.check_field(o.pair_field, f"{edge.id} pair_field") == "str"
 
 
 @pytest.mark.parametrize("edge", EDGES, ids=_ids())

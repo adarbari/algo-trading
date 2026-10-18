@@ -234,6 +234,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "ADR 0050: the stock or basket each leveraged or inverse fund tracks"
 
 [[table]]
+name = "rollups/instrument/share_classes@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0053 amendment (EB H9): the other listed share class of an issuer (one CIK, two share-class FIGIs, read from the reference snapshot the session sees) and the z-score of the pair's price ratio"
+
+[[table]]
 name = "rollups/instrument/dividends@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 

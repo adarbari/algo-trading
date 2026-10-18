@@ -164,6 +164,10 @@ def _outcome(o: Outcome, event: bool) -> str:
     if o.kind == "option_model_pnl":
         shape = (o.structure or "").replace("_", " ")
         parts.append(f"modelled P&L of an {shape} (basis {o.basis}, not a quote)")
+    elif o.kind == "pair_spread":
+        parts.append(
+            f"the cheap share class against its sibling from {o.pair_field}, short leg pays borrow"
+        )
     elif o.kind == "option_pnl":
         shape = (o.structure or "").replace("_", " ")
         parts.append(

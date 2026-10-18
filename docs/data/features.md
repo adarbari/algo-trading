@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-578 stored features in 71 groups, in dependency order; 149 expression features.
+582 stored features in 72 groups, in dependency order; 149 expression features.
 
 ## `option_liquidity@v1`
 
@@ -482,6 +482,17 @@ Which stock or basket a leveraged or inverse fund tracks, from its holdings and 
 | `reference_kind` | label | str | category | open | single_stock, index, sector, commodity, none | What the fund tracks: a single stock, an index, a sector, a commodity, or none (volatility funds, rates funds, funds nothing is known of) | never (none is a value) | `holdings/etf.asset_class`, `holdings/etf.sector`, `instruments/reference.name` |
 | `reference_source` | label | str | category | open | holdings, name_rule | What settled the link, or for a basket its kind: the holdings table or the name rule | reference_kind is none: nothing settled it | `holdings/etf.holding_id`, `instruments/reference.name` |
 | `reference_status` | label | str | category | open | LINKED, BASKET, UNLISTED, NO_REFERENCE | LINKED: one stock found; BASKET: an index, sector or commodity fund; UNLISTED: a stock is named that the reference does not list; NO_REFERENCE: neither holdings nor the name say what it tracks | never | `holdings/etf.holding_id` |
+
+## `share_classes@v1`
+
+The other listed share class of an issuer and where the pair's price ratio stands. Stored as `rollups/instrument/share_classes@v1`; reads `instruments/reference`, `bars/1d` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `sibling_id` | label | str | text | open |  | The issuer's other listed share class (an instrument id of the reference snapshot the session sees): the one class sharing its issuer CIK with a different share-class FIGI | the issuer has one class listed, or the reference has no issuer or class id for it; or the classes are not a pair (see sibling_status) | `instruments/reference.cik`, `instruments/reference.share_class_figi` |
+| `class_count` | window | int | count | open | >= 2 | How many share classes of the issuer the reference lists (operating companies only) | the issuer has one class listed, or the reference has no issuer or class id for it | `instruments/reference.cik`, `instruments/reference.share_class_figi` |
+| `sibling_status` | label | str | category | open | PAIRED, AMBIGUOUS | PAIRED: exactly two classes, one instrument each; AMBIGUOUS: three or more classes, or a class under several ids, so no pair is named | the issuer has one class listed, or the reference has no issuer or class id for it | `instruments/reference.cik`, `instruments/reference.share_class_figi` |
+| `spread_z_252d` | window | float32 | ratio | open | -20 .. 20 | Where today's ln(close / sibling close) stands against its own last 252 sessions: (today - mean) / standard deviation. -2 is two standard deviations cheaper than its usual gap to the sibling, +2 as much richer | the status is not PAIRED, either class has fewer than 200 of the last 253 sessions with a bar, or the ratio has no spread over them | `bars/1d.close`, `instruments/reference.share_class_figi` |
 
 ## `relative_strength@v1`
 

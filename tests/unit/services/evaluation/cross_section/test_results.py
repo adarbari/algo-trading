@@ -15,6 +15,7 @@ from algotrade.data import dates_digest
 from algotrade.quant.edges.statistics import break_even_cost
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
 from algotrade.services.evaluation.cross_section.legs.rows import (
+    _stored,
     decode_leg,
     decode_reads,
     encode_leg,
@@ -24,6 +25,7 @@ from algotrade.services.evaluation.cross_section.results import (
     edge_eval_frame,
     iv_coverage,
     records,
+    sibling_coverage,
     survivorship,
     write_edge_eval,
 )
@@ -237,6 +239,49 @@ def test_an_iv_field_stored_part_of_the_range_counts_the_sessions_that_have_it()
     assert 0 < gap["stored"] < gap["sessions"] and gap["picks"] > 0
     assert iv_coverage(evaluate(iv_world(DAYS[0]), outcome=OTM, variants=variants)) == []
     assert iv_coverage(evaluate(iv_world(None))) == []  # an outcome that reads no implied vol
+
+
+PAIR = {
+    "kind": "pair_spread", "horizon_sessions": [2], "benchmark": "none", "start_offset_sessions": 1,
+    "pair_field": "rollup.share_classes@v1.sibling_id", "borrow_bps_annual": 0,
+}  # fmt: skip
+
+
+def pair_world(filled_from: date | None) -> World:
+    """The sibling field is a partition of nulls (an empty group) before ``filled_from`` and a
+    neighbour pairing from it (None: nulls throughout)."""
+    w = build_world()
+    for day in [*DAYS, DAYS[-1] + timedelta(days=1)]:
+        filled = filled_from is not None and day >= filled_from
+        rows = [
+            {"instrument_id": iid, "sibling_id": IDS[i ^ 1] if filled else None}
+            for i, iid in enumerate(IDS)
+        ]
+        w.write_rollup("rollups/instrument/share_classes@v1", day, rows)
+    return w
+
+
+def test_a_pair_spread_with_no_sibling_data_says_so_not_a_normal_session() -> None:
+    ev = evaluate(pair_world(None), outcome=PAIR)
+    (gap,) = sibling_coverage(ev)
+    assert (gap["variant"], gap["horizon"]) == ("main/momo", 2)
+    assert gap["no_sibling_data"] == gap["sessions"] > 0
+    assert all(not s.siblings_stored for s in ev.results[0].stats)
+
+
+def test_sibling_data_stored_part_of_the_range_counts_only_the_sessions_without_it() -> None:
+    (gap,) = sibling_coverage(evaluate(pair_world(DAYS[4]), outcome=PAIR))
+    assert 0 < gap["no_sibling_data"] < gap["sessions"]
+    assert sibling_coverage(evaluate(pair_world(DAYS[0]), outcome=PAIR)) == []
+    assert sibling_coverage(evaluate(build_world())) == []  # an outcome with no pair field
+
+
+def test_the_sibling_flag_survives_the_stored_leg_and_an_old_leg_claims_no_gap() -> None:
+    ev = evaluate(pair_world(None), outcome=PAIR)
+    w_stats = ev.results[0].stats
+    assert w_stats and not any(s.siblings_stored for s in w_stats)  # decoded from the leg rows
+    assert _stored(None) is True and _stored(float("nan")) is True  # a leg from before the column
+    assert _stored(False) is False
 
 
 def test_the_legs_are_stored_with_the_run_and_hold_what_its_rows_were_measured_from(

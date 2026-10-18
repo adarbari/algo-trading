@@ -930,3 +930,65 @@ name enters at rank <= `top_k` and is held while its rank is <= `hold_rank`.
    name as held through it at no cost. A period with a single cost row has no slope, so the
    break-even falls back to a full round trip per name: conservative. No exit reason is recorded
    per name. `LEG_VERSION` 4 recomputes every leg (item 5).
+
+## Amendment 2026-10-18: `pair_spread`, the cheap share class against its sibling (EB H9)
+
+A fifth outcome kind, harness-side like `option_model_pnl`: no grain, no table and no column of
+`outcomes` changes. It builds on the sides amendment (a second leg, borrow on the short one) and
+adds one feature group, `share_classes@v1`, that names each name's sibling.
+
+1. **Document.** `[outcome] kind = "pair_spread"` names `pair_field`, a declared string feature
+   read at D that gives each name's sibling id (`rollup.share_classes@v1.sibling_id`; never a
+   hand list of `EQ:` strings, ADR 0018). It takes `benchmark = "none"` (both legs are raw
+   returns), `side = "long"` (the default: the picks are the cheap legs, the sibling is the short
+   leg), no `max_drawdown`, and the optional `borrow_bps_annual` of the rich leg (default from
+   `verdict.toml`, filled by `_borrowing` as for a short). `pair_field` is refused on any other
+   kind. It joins the identity of an outcome only when set (`identity_dict`), so no stored leg
+   or run of another kind is recomputed.
+2. **Value** (`cross_section/hit.py`): a row is one share class read as the cheap leg of its
+   pair; `value = fwd_return(name) - fwd_return(sibling) - 2 * cost_bps / 1e4 - borrow`, the
+   borrow `borrow_bps_annual / 1e4 * horizon / 252` on the sibling, and a hit is `value > 0`.
+   Both legs' returns come from the same `forward_returns@v2` partition at S (the harness hands
+   the whole horizon's rows to `Pairs`, not only the base names). Two round trips are charged
+   because a pair has two legs; the document's `cost_bps` is per leg. The cost grid does not
+   apply (`is_return` is false, as for a model P&L); the series unit is `pnl`, and `counts_wins`
+   is false: the trial statistics read the picks' mean spread.
+3. **The pair is read at D.** `SessionReads.siblings` reads `pair_field` at the decision session
+   through the recording reader, so a restated reference partition invalidates the legs that read
+   it and a reclassification after D never changes a window (test: partitions after D poisoned,
+   result unchanged; D poisoned, result changes). `share_classes@v1` itself is computed from the
+   `instruments/reference` snapshot the session sees: a sibling is the other `share_class_figi`
+   of the same `cik` among operating companies, PAIRED only for exactly two classes with one id
+   each, AMBIGUOUS (no sibling named) for three or more or a class under several ids. The id is
+   the row's own `instrument_id`, never built from a ticker. It also stores `spread_z_252d`, the
+   z-score of today's `ln(close / sibling close)` against its last 252 sessions (negative: cheap
+   against the sibling), which a screener ranks on.
+4. **Eligible pairs and exclusions.** A name is excluded with its reason (never a zero, never a
+   miss, counted beside the other exclusions): `no_sibling` (none stored at D, or itself),
+   `sibling_not_eligible` (the sibling is outside the universe at D: a pair needs both legs
+   tradable), `sibling_mismatch` (the sibling's own sibling at D is not the name),
+   `no_sibling_row` (no outcome row at S), `sibling_unmeasured` (an UNMEASURED window), and
+   `missing_value` (a null return). The base is the same value of every eligible name (each
+   class against its sibling), so it is the spread of a random side of the pair and its hit rate
+   sits near one half minus the costs; a pair appears twice in it, once from each side.
+   **No sibling data.** A session whose `pair_field` has a value for no eligible name (an unbuilt
+   or all-null `share_classes` group) is flagged: `SessionStat.siblings_stored`, stored in the
+   nullable `edge_legs.siblings_stored` column (a leg from before it reads as stored; leg keys,
+   hashes and `LEG_VERSION` are unchanged), reported by `sibling_coverage` and a "NO SIBLING DATA"
+   line, like the implied-vol gap.
+5. **Few pairs.** About 15 to 25 issuers qualify, so a session has a handful of pairs. Sessions
+   are spaced a horizon apart as for every schedule (`every_session`, `month_end`: independent
+   windows, `sessions` beside every figure), and the counts of picks and eligible names stay
+   shown per session. No minimum is enforced; the page shows the counts and the verdict rules
+   of ADR 0065 apply.
+6. **Verdict.** A pair spread is a two-leg spread: its results are stored and judged under the
+   side `long_short` (`Outcome.result_side`), so its verdict is Diagnostic only (the owner
+   decision of 2026-10-17: a long-short spread is never a verdict basis), and the paper record
+   does not trade it (it would buy the cheap legs only). Its `side` in the document stays
+   `long`. Guide entries: `outcome_pair_spread` and `share_class_pair` (the PAIRED / AMBIGUOUS
+   statuses), mapped in `guide_coverage.toml` and checked by
+   `tests/architecture/guide/test_pair_spread_guide.py`.
+7. **Not here.** ETF-versus-NAV style two-leg ideas (the second leg an instrument that is not a
+   share class) need a different `pair_field` producer and no harness change; none is built.
+   A hedge ratio other than one-to-one (the legs are equal-dollar by construction of the
+   spread of returns) and a borrow rate per name are not modelled.

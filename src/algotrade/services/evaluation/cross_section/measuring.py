@@ -45,9 +45,11 @@ from algotrade.services.evaluation.cross_section.hit import (
     INVALID_IMPLIED_VOL,
     NO_IMPLIED_VOL,
     UNMEASURED,
+    Pairs,
     apply_outcome,
     is_return,
     needs_implied_vol,
+    needs_pairs,
     needs_residual,
     short_view,
 )
@@ -174,7 +176,14 @@ def _outcomes(
             if needs_implied_vol(scope.edge)
             else None
         )
-        return apply_outcome(scope.edge, inside, implied).set_index("instrument_id")
+        pairs = (
+            Pairs(
+                session.siblings(scope.edge.outcome.pair_field or "", eligible, day), eligible, rows
+            )
+            if needs_pairs(scope.edge)
+            else None
+        )
+        return apply_outcome(scope.edge, inside, implied, pairs).set_index("instrument_id")
 
     return session.outcomes(scope.key, horizon, day, score)
 
@@ -275,6 +284,7 @@ def _stat(
         pick_touches=int(counted.loc[got, "touch"].fillna(0).sum()),
         no_implied_vol=sum(1 for i in picks if i in no_iv),
         implied_stored=any(v is not None for v in implied.values()),
+        siblings_stored=_siblings_stored(edge, session, eligible, day),
         picks=tuple(
             p
             for side_, ids_ in legs
@@ -289,6 +299,17 @@ def _stat(
             else None
         ),
     )
+
+
+def _siblings_stored(
+    edge: Edge, session: SessionReads, eligible: frozenset[str], day: date
+) -> bool:
+    """Whether a ``pair_spread``'s ``pair_field`` has a value for some eligible name at D (true
+    for every other outcome): a field stored for no name would read as a quiet ``no_sibling``."""
+    if not needs_pairs(edge):
+        return True
+    siblings = session.siblings(edge.outcome.pair_field or "", eligible, day)
+    return any(v is not None for v in siblings.values())
 
 
 def _portfolio_stat(

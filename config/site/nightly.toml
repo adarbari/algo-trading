@@ -93,6 +93,7 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/retest@v1",
     "rollups/instrument/cp_iv@v1",
     "rollups/instrument/cp_iv_history@v1",
+    "rollups/instrument/share_classes@v1",
     "rollups/instrument/skew@v1",
     "rollups/instrument/skew_history@v1",
     "rollups/instrument/swing_levels@v1",

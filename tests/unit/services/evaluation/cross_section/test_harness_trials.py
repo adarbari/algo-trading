@@ -3,8 +3,11 @@
 The site's trial log reads the records of the legacy owners (``LEGACY_SITE_OWNERS``) from before
 ``LEGACY_SITE_CUTOFF`` as its own, each trial once; a trial's statistics read the series its
 unit calls for; and the sides of an outcome (ADR 0053 amendment) measured end to end on the small
-world: the bottom of the ranking among liquid names, the spread, the borrow, the ledger."""
+world: the bottom of the ranking among liquid names, the spread, the borrow, the ledger; and
+the ``pair_spread`` outcome (EB H9): the cheap class against its sibling by hand, the rich leg's
+borrow, the sibling read at the decision session, a sibling with no stored row."""
 
+import math
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -32,6 +35,7 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
     DAYS,
     IDS,
+    N,
     World,
     build_world,
     edge,
@@ -289,6 +293,98 @@ def test_a_short_edge_holds_the_worst_names_through_its_band() -> None:
     assert r.stats[0].band[0].value == pytest.approx(
         0.045 - 0.002
     )  # a short earns minus the return
+
+
+STARTS = [DAYS[0], DAYS[2], DAYS[4], DAYS[6]]  # every 2nd session of Sept 1-10
+
+
+def run_pair(w: World, e=None) -> EdgeEvaluation:  # type: ignore[no-untyped-def]
+    user = UserContext("site")
+    return evaluate_edge(
+        w.reader, w.results, w.configs, user, e or edge(), DAYS[0], DAYS[-1], AS_OF
+    )
+
+
+SIBLING = "rollup.share_classes@v1.sibling_id"
+PAIR_OUTCOME = {
+    "kind": "pair_spread", "horizon_sessions": [2], "benchmark": "none", "pair_field": SIBLING,
+    "start_offset_sessions": 1, "borrow_bps_annual": 0,
+}  # fmt: skip
+
+
+def pair_world(partner: dict[date, int] | None = None) -> World:
+    """Every name's sibling: the neighbour of its pair (0-1, 2-3, ...), or ``partner[day]``'s
+    shift (name i with i + shift) on a day listed, to show which partition is read."""
+    w = build_world()
+    for day in [*DAYS, DAYS[-1] + timedelta(days=1)]:
+        shift = (partner or {}).get(day)
+        rows = [
+            {"instrument_id": iid, "sibling_id": IDS[(i + 1) % N if i % 2 == 0 else i - 1]}
+            if shift is None
+            else {"instrument_id": iid, "sibling_id": IDS[(i + shift) % N]}
+            for i, iid in enumerate(IDS)
+        ]
+        w.write_rollup("rollups/instrument/share_classes@v1", day, rows)
+    return w
+
+
+def test_a_pair_spread_run_measures_the_cheap_class_against_its_sibling_by_hand() -> None:
+    """Name i earns (i - 9.5)%. The picks 15..19 each against their pair neighbour: 15 beats 14
+    by 1 point, 16 trails 17 by 1, 17 beats 16, 18 trails 19, 19 beats 18: the mean is +0.2 points,
+    three of five hit. Judged as a spread: the stored side is long_short (a diagnostic)."""
+    ev = run_pair(pair_world(), edge(outcome=PAIR_OUTCOME))
+    (r,) = ev.results
+    m = r.measures[0]
+    assert (m.sessions, m.picks, m.hits) == (4, 20, 12)
+    assert m.mean_excess_picks == pytest.approx(0.002)
+    assert m.eligible == 80 and m.base_rate == pytest.approx(0.5)  # a name and its mirror
+    assert r.side == "long_short"
+    assert edge_eval_frame(ev, "run-1", AS_OF)["side"].eq("long_short").all()
+    assert [s.session for s in r.stats] == STARTS  # a horizon apart: the windows never overlap
+    first = r.stats[0].picks
+    assert [p.reason for p in first] == [""] * 5  # every pick has its pair
+
+
+def test_the_rich_legs_borrow_is_paid_and_the_site_default_fills_an_unset_rate() -> None:
+    free = run_pair(pair_world(), edge(outcome=PAIR_OUTCOME)).results[0].measures[0]
+    dear = {**PAIR_OUTCOME, "borrow_bps_annual": 2520}  # 25.2% a year over 2 of 252 sessions
+    paid = run_pair(pair_world(), edge(outcome=dear)).results[0].measures[0]
+    assert free.mean_excess_picks - paid.mean_excess_picks == pytest.approx(0.252 * 2 / 252)
+    unset = {k: v for k, v in PAIR_OUTCOME.items() if k != "borrow_bps_annual"}
+    site = run_pair(pair_world(), edge(outcome=unset)).results[0].measures[0]
+    assert site.mean_excess_picks < free.mean_excess_picks  # the verdict.toml default applies
+
+
+def test_a_pair_spread_reads_the_sibling_at_the_decision_session_never_a_later_one() -> None:
+    e = edge(outcome=PAIR_OUTCOME)
+    clean = run_pair(pair_world(), e)
+    later = {d: 2 for d in DAYS if d not in STARTS}  # a reclassification after every D
+    assert run_pair(pair_world(later), e).results == clean.results
+    at_d = dict.fromkeys(STARTS, 2)  # ... and one at D itself changes the answer
+    assert run_pair(pair_world(at_d), e).results != clean.results
+
+
+def test_a_pick_whose_sibling_has_no_stored_row_is_excluded_with_a_reason() -> None:
+    def rows(day: date) -> list[dict[str, Any]]:
+        return [outcome_row(iid, i, day) for i, iid in enumerate(IDS) if i != 18]  # 18: no row
+
+    first = run_pair(build_pair_without(rows), edge(outcome=PAIR_OUTCOME)).results[0].stats[0]
+    reasons = {p.instrument_id: p.reason for p in first.picks}
+    assert reasons[IDS[19]] == "no_sibling_row"  # 19's sibling is 18
+    assert reasons[IDS[18]] == "no_entry_bar"  # 18 itself has no row at all
+    assert first.excluded_missing >= 1 and first.pick_values
+    assert all(math.isfinite(v) for v in first.pick_values)
+
+
+def build_pair_without(rows_of: Any) -> World:
+    w = build_world(rows_of=rows_of)
+    for day in [*DAYS, DAYS[-1] + timedelta(days=1)]:
+        rows = [
+            {"instrument_id": iid, "sibling_id": IDS[(i + 1) % N if i % 2 == 0 else i - 1]}
+            for i, iid in enumerate(IDS)
+        ]
+        w.write_rollup("rollups/instrument/share_classes@v1", day, rows)
+    return w
 
 
 CHAIN_OUTCOME = {

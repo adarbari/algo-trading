@@ -855,3 +855,42 @@ def test_every_shipped_edge_with_a_band_keeps_it_at_or_below_top_k() -> None:
             got = parse_edge(doc, path.parent.name, str(path))
             assert got.outcome.hold_rank is None or got.top_k is not None
             assert got.outcome.hold_rank is None or got.outcome.hold_rank >= (got.top_k or 0)
+
+
+def _pair(**changes: Any) -> dict[str, Any]:
+    base = {"kind": "pair_spread", "benchmark": "none"}
+    return _outcome(**{"pair_field": "rollup.share_classes@v1.sibling_id", **base, **changes})
+
+
+def test_a_pair_spread_names_its_pair_field_and_the_borrow_of_the_rich_leg() -> None:
+    got = parse(top_k=5, outcome=_pair(borrow_bps_annual=60, cost_bps=10)).outcome
+    assert got.kind == "pair_spread" and got.pair_field == "rollup.share_classes@v1.sibling_id"
+    assert got.borrow_bps_annual == 60.0 and got.side == "long"
+    assert got.result_side == "long_short"  # judged as a spread: a diagnostic, never a basis
+    assert parse().outcome.result_side == "long" and parse().outcome.pair_field is None
+
+
+@pytest.mark.parametrize(
+    ("outcome", "message"),
+    [
+        (_pair(pair_field=None), "pair_field: required"),
+        (_pair(benchmark="SPY"), "needs benchmark = 'none'"),
+        (_pair(side="short"), "needs an excess_return outcome"),
+        (_pair(max_drawdown=0.2), "needs benchmark = 'none'"),
+        (_outcome(pair_field="rollup.share_classes@v1.sibling_id"), "only a pair_spread"),
+        (_outcome(borrow_bps_annual=50), "only a short leg pays borrow"),
+    ],
+)
+def test_a_pair_spread_is_refused_what_a_two_leg_spread_cannot_be(
+    outcome: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        parse(top_k=5, outcome=outcome)
+
+
+def test_a_document_with_no_pair_field_hashes_as_it_did_before_pairs() -> None:
+    """No stored leg or run is recomputed by the arrival of pair_field: its identity has no key
+    for it unless it is set."""
+    assert "pair_field" not in identity_dict(asdict(parse().outcome))
+    pair = parse(top_k=5, outcome=_pair()).outcome
+    assert identity_dict(asdict(pair))["pair_field"] == "rollup.share_classes@v1.sibling_id"

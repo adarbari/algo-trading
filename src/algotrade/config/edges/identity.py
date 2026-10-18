@@ -1,7 +1,7 @@
-"""The side of an outcome and the identity of an edge document: what a short, long-short or
-banded outcome may combine with (``check_side``, ``hold_rank_of``) and ``identity_dict``, which
-drops the keys an outcome that never named them would not have had, so a hash is stable across the
-arrival of a key."""
+"""The side of an outcome and the identity of an edge document: what a short, long-short, banded
+or pair outcome may combine with (``check_side``, ``hold_rank_of``, ``pair_field_of``) and
+``identity_dict``, which drops the keys an outcome that never named them would not have had, so a
+hash is stable across the arrival of a key."""
 
 from collections.abc import Sequence
 from typing import Any
@@ -25,7 +25,7 @@ def identity_dict(value: Any) -> Any:
             k: identity_dict(v)
             for k, v in value.items()
             if not (long and k in ("side", "borrow_bps_annual"))
-            and not (k in ("tenor_days", "hold_rank") and v is None)
+            and not (k in ("tenor_days", "hold_rank", "pair_field") and v is None)
             and not (plain and k in ("weighting", "vol_field"))
         }
     if isinstance(value, (list, tuple)):
@@ -39,7 +39,7 @@ def check_side(
     """A short or long-short outcome is an excess return with no drawdown limit (the dip of a
     short is the rally, which the store keeps apart); the borrow cost belongs to a short leg."""
     if side == LONG:
-        if borrow is not None:
+        if borrow is not None and kind != "pair_spread":  # a pair's rich leg pays borrow
             raise ConfigurationError(f"{o.where} borrow_bps_annual: only a short leg pays borrow")
         return
     if kind != "excess_return" or drawdown is not None:
@@ -75,3 +75,23 @@ def hold_rank_of(
             f"{list(horizons)}"
         )
     return rank
+
+
+def pair_field_of(
+    o: Table, is_pair: bool, benchmark: str, side: str, drawdown: float | None
+) -> str | None:
+    """The ``pair_field`` of an outcome table: the picks of a pair spread are the cheap legs (side
+    ``long``), both legs are raw returns and a spread's dip is not stored."""
+    named = " ".join(o.text("pair_field", "").split()) if o.raw("pair_field") is not None else ""
+    if not is_pair:
+        if named:
+            raise ConfigurationError(f"{o.where} pair_field: only a pair_spread outcome has one")
+        return None
+    if not named:
+        raise ConfigurationError(f"{o.where} pair_field: required")
+    if benchmark != "none" or side != "long" or drawdown is not None:
+        raise ConfigurationError(
+            f"{o.where}: a pair_spread needs benchmark = 'none', side long (the picks are the "
+            f"cheap legs; the sibling is the short leg) and no max_drawdown"
+        )
+    return named
