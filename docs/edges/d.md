@@ -5,7 +5,39 @@ Back to the [index of every edge](../edges.md).
 
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
+| ETF flow pressure (`etf_flow_pressure`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `etf_flow_pressure` |
 | High-volume return premium (`high_volume_return_premium`) | candidate | every session | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `volume_shock`, `volume_shock_no_news` |
+| Closed-end fund discount reversion (`closed_end_fund_discounts`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
+
+## ETF flow pressure (`etf_flow_pressure`)
+
+**Status:** candidate. **Family:** D. **Thesis:** ETFs that took in the most money over the last month, measured by the change in their shares outstanding, underperform the market over the next one to three months.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'ETF'` and `instrument.status eq 'ACTIVE'` and `instrument.is_leveraged eq False` and `instrument.is_inverse eq False` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 20000000` and `rollup.etf_flows@v1.etf_shares_outstanding gt 0`
+- **Top K:** 10
+- **Screeners:** `etf_flow_pressure`
+- **Baselines:** `momentum_12_1`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The universe is the iShares funds: a fund must have a stored count (the last universe rule, etf_shares_outstanding above 0), because the harness ranks a short leg only when at least 80% of the base carries a score (MIN_SCORE_COVERAGE) and only iShares funds have one; with every liquid ETF in the base each session would be dropped for thin coverage. A fund whose latest count is older than 30 days has no row and leaves the base. iShares funds only: the share count comes from iShares' own daily files (EB D4); SPDR, Vanguard, Invesco and every other issuer's funds are absent, not neutral. The stored history starts with the first nightly run on about 2026-10-17, and the change is 21 sessions, so the first value is about 2026-11-17 and no independent month exists yet: the edge waits for months of counts to accrue (the harness reports the count). This is the fund-level version, the Brown, Davies and Ringgenberg result for ETFs themselves; the constituent version (aggregate each stock's ETF flow pressure from holdings, then long low and short high) needs ETF ownership per stock and is a follow-up. Short side, owner decision O2 (2026-10-17): the ETFs shorted are liquid ($20M a day), outcome minus the excess return over SPY, less cost and the assumed borrow; the long variant (the heaviest redemptions) and the long-short spread (diagnostic only) are variants. The rank is the screener's: the harness's short leg is the lowest scores, and etf_flow_pressure ranks ascending on the change, so the heaviest creation is shorted first. A flow is a share change here, not dollars: the page's flow is the share change times NAV, and a price rise alone draws money in, so a fund can show creation because it rose (momentum overlaps: the 12-1 momentum screen is a baseline, a stock ranking that gives an ETF base only the names it qualifies, so read it as the decoy on the sessions both measure).
+
+**Quality bar**
+
+1. **Mechanism:** ETF creations and redemptions carry demand that is partly non-fundamental (retail and allocator flows), pushed into the basket by authorised participants who hedge by trading it; the pressure is temporary and reverses (Ben-David, Franzoni and Moussawi 2018; Brown, Davies and Ringgenberg 2021).
+2. **Persistence:** ETF flows are growing, not shrinking, and the reversal is spread across many funds and horizons, which is costly to harvest in full; the evidence is 2000s to 2010s samples, with no public decay study yet, so persistence is a claim to test.
+3. **Outcome:** Minus the excess return over SPY over 20 and 60 sessions after the entry close, net of 10 bps a round trip and the assumed borrow: a short position in the iShares funds with the heaviest net creation of the last 21 sessions.
+4. **Trigger timing:** The issuer's count is known from the session of the fetch that stored it (holdings/etf_shares known_from, a restated count from the session that fetched it), never from the issuer's own date. The change is read at D (the last session of the month) and the entry session is S = D + 1 (start_offset_sessions = 1).
+5. **Faithful replication:** The source's rule: ETF-level flows (the change in shares outstanding) predict negative subsequent ETF returns; sorted monthly, long the low-flow and short the high-flow funds, 1 to 3 months (Brown, Davies and Ringgenberg 2021; the spread is not verified, so nothing is filed under [published]). Here etf_flow_pressure v1 ranks the unleveraged ETFs with a 21-session share change and the harness shorts the top 10 creations.
+6. **Expected size and sample:** The papers report a reversal of several percent a year for the long-short flow sort (recalled, not verified). Only the iShares subset has counts, a few hundred funds, so a decile is a few dozen; with history from 2026-10-17 the bar's 40 independent months is about three and a half years away.
+7. **Capacity and costs:** ETFs with $20M a day trade at a few basis points; the 10 bps round trip is the assumption, and the short side adds the site's assumed borrow (verdict.toml). An individual's size is far below the volume; the crowded thematic funds are the hardest to borrow.
+8. **Failure modes and retirement:** Flow chases performance: inflows go to recent winners, so the sort is a momentum bet with the sign reversed; a fund with a one-off creation (a seed, a conversion) shows a flow that is not demand; a restated count. Retire if the frozen-period short return of the picks is not above the mean of every eligible ETF.
+9. **Decoys:** Short-term reversal and sector momentum (inflows follow winners): the 12-1 momentum and size screens are stock rankings, so the decoy here is the ETF's own past return; compare the long variant (buy the redemptions) with the short.
+
+**Sources**
+
+- Ben-David, I., Franzoni, F. and Moussawi, R., Do ETFs Increase Volatility?, Journal of Finance, 2018
+- Brown, D., Davies, S. and Ringgenberg, M., ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance, 2021
 
 ## High-volume return premium (`high_volume_return_premium`)
 
@@ -38,3 +70,36 @@ Back to the [index of every edge](../edges.md).
 - Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001 <https://rodneywhitecenter.wharton.upenn.edu/wp-content/uploads/2014/04/9901.pdf>
 - Kaniel, R., Ozoguz, A. and Starks, L., The High Volume Return Premium: Cross-Country Evidence, Journal of Financial Economics, 2012
 - Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (the signal catalogue; no volume-shock predictor of this paper) <https://github.com/OpenSourceAP/CrossSection>
+
+## Closed-end fund discount reversion (`closed_end_fund_discounts`)
+
+**Status:** blocked. **Family:** D. **Thesis:** Closed-end funds trading at an unusually wide discount to their own net asset value, against their own history, outperform the market as the discount narrows.
+
+**Why blocked:** Closed-end funds are not in the covered universe, so they have no bars, no outcomes and no screener rows. Universe coverage is the stock, ADR and ETF types of ADR 0013 (security_types in config/site/universe.toml); a fund the vendor types as FUND is stored in the reference as CEF and "drops out of the default coverage" (docs/data/instruments.md). The NAV side exists (events/fund_nav, EB D5: 273 of 332 CEFs mapped, history to 2004, licence personal) and so does cef_nav@v1, which pairs a NAV with a close, but a discount needs the fund's close from bars/1d. Unblock by an owner decision: add the CEF type to security_types (or the funds to include_symbols) with an ADR 0013 amendment, accept about 330 more symbols in the nightly bars and the Tiingo monthly symbol budget (docs/data/vendors.md), and run bars-history for them. The screener is then written over rollup.cef_nav@v1.cef_discount_zscore.
+
+- **Outcome:** excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'CEF'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 3` and `rollup.price_stats@v2.adv_usd_20d gte 500000`
+- **Top K:** 10
+- **Screeners:** none yet
+- **Baselines:** `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Long only, as the source's short leg is unnecessary for an individual (the page). Tested against SPY, which is a mismatch for a bond or municipal fund (a benchmark by fund category is a follow-up); a leveraged fund's discount also carries rate and credit beta. Proxies, each stated: the source's relative discount is a sort on the discount against its history, here the 252-session z-score (cef_nav@v1); the NAV is the issuer's own, struck after the close and known from the next session (known_from), so the discount pairs the NAV with the close of the NAV's own date, one session old at the decision; the BDC half is out (their NAV is quarterly, from 10-Q filings). Fund edges are keyed by instrument_id (ADR 0018), never by hand-listed tickers. The activism half (13D filings by fund) is cef_activist_target_prediction, not filed here.
+
+**Quality bar**
+
+1. **Mechanism:** Retail-held and without creation or redemption, closed-end funds trade on sentiment, not on the value of their assets (Lee, Shleifer and Thaler 1991); activists such as Saba and Bulldog force tender offers and open-endings that roughly halve the discount (Bradley, Brav, Goldstein and Jiang 2010).
+2. **Persistence:** A small, retail, illiquid market that institutions avoid, with capacity of about $1M to $10M for the strategy; part of the discount is a fair cash-flow drag (fees, leverage, payout policy), so the discount does not close fully and is not arbitraged away. No systematic 2015 to 2024 study was found; 2024 press reports funds buying wide discounts.
+3. **Outcome:** Excess return over SPY over 60, 125 and 250 sessions after the entry close, net of 50 bps a round trip: a long hold in the funds with the widest discount against their own year.
+4. **Trigger timing:** The NAV is struck after the close of its date and known from the next session (events/fund_nav known_from); the discount pairs it with the close of its own date. The rank is read at D (the last session of the month) from the latest NAV known by D, at most five sessions old, and the entry session is S = D + 1 (start_offset_sessions = 1).
+5. **Faithful replication:** The source's rule: sort funds on the discount relative to its history, long the widest quintile and short the narrowest, 18.2% a year and Sharpe 1.9 over 1998-2011 (Patro, Piccotti and Wu; a two-group long-short figure, not filed under [published]). Here the long side only: the 10 funds with the lowest discount z-score over 252 sessions.
+6. **Expected size and sample:** 18.2% a year for the long-short quintile spread in-sample (Patro et al., via Quantpedia, not verified in the paper); activism cuts discounts to about half (Bradley et al. 2010). Funds with a mapped NAV number about 273, so a decile is under 30 names; 40 independent month-ends need over three years of history, which the NAV series (to 2004) supplies once bars exist.
+7. **Capacity and costs:** Spreads of 0.3 to 1% on small funds; capacity $20k to $100k a fund, hundreds of funds. The filter keeps funds trading $500k a day and the cost is 50 bps a round trip.
+8. **Failure modes and retirement:** A discount that is fair (a fund that cut its payout or lost its manager) never closes; a rate rise hits levered bond funds across the board; a stale NAV makes a discount that is not there. Retire if the frozen-period excess return of the picks is not above the mean of every eligible fund.
+9. **Decoys:** Leverage (most funds are about 30% levered: rate and credit beta), the payout-rate trap (the next edge, cef_distribution_trap), duration of the bond and municipal funds, and small-size tilt: the size baseline; compare funds of one category in a follow-up.
+
+**Sources**
+
+- Lee, C., Shleifer, A. and Thaler, R., Investor Sentiment and the Closed-End Fund Puzzle, Journal of Finance, 1991
+- Bradley, M., Brav, A., Goldstein, I. and Jiang, W., Activist Arbitrage: A Study of Open-Ending Attempts of Closed-End Funds, Journal of Financial Economics, 2010
+- Patro, D., Piccotti, L. and Wu, Y., closed-end fund discounts (Quantpedia strategy summary) <https://hedgefundalpha.com/strategies/closed-end-fund-discounts/>
