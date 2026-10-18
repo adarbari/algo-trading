@@ -163,7 +163,7 @@ def canary_of(o: Table, kind: str) -> Canary | None:
     c = o.table("canary", ("tickers", "field", "breadth", "defensive"))
     tickers, defensive = c.strings("tickers", ()), c.strings("defensive", ())
     for key, found in (("tickers", tickers), ("defensive", defensive)):
-        plain = [t for t in found if t != CASH or key == "defensive"]
+        plain = [t for t in found if t != CASH]
         if not found or len(set(found)) != len(found):
             raise ConfigurationError(f"{c.where} {key}: expected one or more distinct symbols")
         if not all(_TICKER.fullmatch(t) for t in plain):
@@ -175,7 +175,8 @@ def canary_of(o: Table, kind: str) -> Canary | None:
         raise ConfigurationError(
             f"{c.where} breadth: {breadth} is more than the {len(tickers)} canaries"
         )
-    return Canary(tickers, c.line("field"), breadth, defensive)
+    # sorted: the order written decides nothing (the tie-break is by ticker), so it is no trial
+    return Canary(tuple(sorted(tickers)), c.line("field"), breadth, tuple(sorted(defensive)))
 
 
 def check_portfolio(

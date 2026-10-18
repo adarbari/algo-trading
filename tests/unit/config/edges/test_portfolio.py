@@ -300,14 +300,17 @@ def test_a_canary_parses_and_is_part_of_the_identity() -> None:
     choice; no canary, no key in the identity (no existing hash moves)."""
     o = book(outcome=outcome(canary={**CANARY, "defensive": ["CASH"]})).outcome
     c = o.canary
-    assert c is not None and (c.tickers, c.breadth, c.defensive) == (("VWO", "BND"), 2, ("CASH",))
+    assert c is not None and (c.tickers, c.breadth, c.defensive) == (("BND", "VWO"), 2, ("CASH",))
     assert c.field == "rollup.trend_stats@v2.ret_1d"
-    assert identity_dict(asdict(o))["canary"]["tickers"] == ["VWO", "BND"]
+    assert identity_dict(asdict(o))["canary"]["tickers"] == ["BND", "VWO"]
     assert "canary" not in identity_dict(asdict(book().outcome))
     other = book(outcome=outcome(canary={**CANARY, "defensive": ["SHY", "IEF"]})).outcome
-    assert other.canary is not None and other.canary.defensive == ("SHY", "IEF")
+    assert other.canary is not None and other.canary.defensive == ("IEF", "SHY")  # sorted
     assert identity_dict(asdict(other)) != identity_dict(asdict(o))
-    assert book(outcome=outcome(canary={**CANARY, "defensive": ["CASH"], "breadth": 1}))
+    reordered = book(
+        outcome=outcome(canary={**CANARY, "tickers": ["BND", "VWO"], "defensive": ["IEF", "SHY"]})
+    ).outcome
+    assert identity_dict(asdict(reordered)) == identity_dict(asdict(other))  # order is no trial
 
 
 @pytest.mark.parametrize(
