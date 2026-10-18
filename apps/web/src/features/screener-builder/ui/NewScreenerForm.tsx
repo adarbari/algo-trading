@@ -22,9 +22,12 @@ export function NewScreenerForm({ onCreated, onCancel }: NewScreenerFormProps) {
   const mine = useMyScreeners();
   const [id, setId] = useState('');
   const create = useCreateScreener();
+  // Once our own save lands, the refreshed lists hold the id: that is the new draft, not a clash.
+  const saving = create.isPending || create.isSuccess;
   const taken =
-    (screeners.data ?? []).some((s) => s.configId === id && s.scope !== 'site') ||
-    (mine.data ?? []).some((s) => s.screenerId === id);
+    !saving &&
+    ((screeners.data ?? []).some((s) => s.configId === id && s.scope !== 'site') ||
+      (mine.data ?? []).some((s) => s.screenerId === id));
   const idError =
     id !== '' && !isScreenId(id)
       ? 'Use 1-64 of a-z, 0-9, _ and -.'
