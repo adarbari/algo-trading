@@ -476,6 +476,7 @@ export const DECAY_FIXTURE = {
   unit: 'points',
   basisHorizon: 20,
   published: null,
+  expected: null,
   bars: [
     { period: 'published', value: null, n: null, state: 'not_given' },
     { period: 'in_sample', value: 6, n: 64, state: 'measured' },
