@@ -137,6 +137,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/events/filings.py"
 note = "ADR 0050: SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I / SC TO-T, 25 / 25-NSE, 424B4, 10-12B) of every operating company in the universe by acceptance time; known_from = the first session whose close is after the acceptance (an acceptance after the close, on a weekend or a holiday counts from the next session; ADR 0050 amendment, EB H4)"
 
 [[table]]
+name = "events/filing_text"
+owner = "apps/ingestion/algotrade_ingestion/tasks/events/filing_text.py"
+note = "Edge build D10: the plain text of the Item sections of every 10-K / 10-K/A / 10-Q / 10-Q/A of the universe's operating companies (never the HTML), one row per instrument, accession, item, parser_version and known_from (every version stays), partitioned by the filing's acceptance session; known_from = acceptance_sessions(ts) for a filing's first extraction, max(that, the session after the fetch) for a later row that changes or adds a text (a parser bump never rewrites history as known earlier), the stored stamp kept for an identical one; readers go through data/filing_text (known_from <= S, the latest version per item), never a raw partition read"
+
+[[table]]
 name = "events/short_interest"
 owner = "apps/ingestion/algotrade_ingestion/tasks/shorting/short_interest.py"
 no_ml = true

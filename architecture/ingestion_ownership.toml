@@ -99,6 +99,18 @@ section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ string = "events/filing" }, { string = "sec_8k" }]
 
 [[responsibility]]
+id = "filing-text-ingestion"
+description = "Store the Item sections of every 10-K / 10-K/A / 10-Q / 10-Q/A of the universe's operating companies in events/filing_text (edge build D10, tasks/events/filing_text.py): a CIK's periodic filings listed from the sec_filings source, one document request each, a filing already stored at the current parser version with its wanted items skipped, a CIK read OK for a covering window by an earlier run of the same tag (parser version + items) skipped, --limit CIKs a backfill run; known_from is the acceptance session for a filing's first extraction, max(acceptance session, the session after the exchange date of the run's clock: the FETCH, never --to) for a later row that changes or adds a text, the stored stamp for an identical one; a CIK whose listing or document fails is a failed item (never an empty answer) and the nightly increment reads only the CIKs due a report. The similarity features over the texts are track E, not this task"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/events/filing_text.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's table
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_market.py",  # its entry
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the table
+]
+section = "docs/data/vendors.md#10-k--10-q-item-sections-sec-edgar-edge-build-d10"
+detect = [{ call = "text_rows" }, { call = "complete_filings" }]
+
+[[responsibility]]
 id = "finra-short-ingestion"
 description = "Store FINRA short interest (events/short_interest, one partition per settlement date) and Reg SHO daily short-sale volume (events/short_volume, one per trade date) for the universe's names (tasks/shorting/): one source request per date not stored yet, tickers resolved through the session's reference (unknown ones dropped and counted), a nightly window of recent dates and a resumable --from backfill, an unpublished date NO_DATA; a stored short-interest date is never refetched, so the first-seen value is the point-in-time one. Both tables are no_ml (architecture/tables.toml): no learned scorer reads them (EB D9)"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/shorting/*"]

@@ -28,9 +28,11 @@ the 424B4 final prospectuses mentioning a lock-up filed in a window, ``parsed[HI
 ``HIT_COLUMNS`` (``sec_prospectus/prospectus_search.py``); ``ProspectusRequest`` asks for one
 prospectus's main document, ``parsed[IPO_FRAME]`` with the IPO facts read from its text
 (``sec_prospectus/prospectus.py``). They live here so a task builds its requests without importing a
-vendor module.
+vendor module. ``FilingTextRequest`` asks for the item sections of one 10-K / 10-Q (edge build D10):
+``parsed[FILING_TEXT_FRAME]`` with ``FILING_TEXT_COLUMNS`` (``sec_text/filing_text.py``).
 """
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
 
@@ -50,9 +52,31 @@ RELEASE_FRAME = "release_dates"  # key of ``Normalized.parsed`` holding a releas
 FILING_FORMS = (
     "8-K", "8-K/A", "NT 10-K", "NT 10-Q", "SC TO-I", "SC TO-T", "25", "25-NSE", "424B4", "10-12B",
 )  # fmt: skip
+# The periodic reports (edge build D10): a 10-K / 10-Q and their amendments, each its own filing
+# with its own accession and acceptance time (a 10-K/A is never merged into its 10-K).
+PERIODIC_FORMS = ("10-K", "10-K/A", "10-Q", "10-Q/A")
 FILINGS_FRAME = "filings"  # key of ``Normalized.parsed`` holding a company's filing rows (ADR 0050)
 DAILY_INDEX_FRAME = "daily_index"  # key of ``Normalized.parsed`` holding a day's 8-K filers
 DAILY_INDEX_COLUMNS = ("cik", "form", "accession", "filing_date")
+# The item sections of a periodic report (edge build D10): the parser's version (any change that
+# can change a stored text bumps it: the task treats a new version as a revision), the item ids of
+# a 10-K and of a 10-Q in filing order (a 10-Q's carry the part: ``I-2`` MD&A, ``II-1A`` risk
+# factors) and the ones kept by default: business, risk factors, legal proceedings, MD&A, market
+# risk and controls of a 10-K; MD&A, market risk, legal proceedings and risk-factor changes of a
+# 10-Q. The notes to the statements are the Financial Statement and Notes data sets', not the
+# parser's (track E).
+FILING_TEXT_PARSER_VERSION = 1
+TEN_K_ITEMS = (
+    "1", "1A", "1B", "1C", "2", "3", "4", "5", "6", "7", "7A", "8", "9", "9A", "9B", "9C",
+    "10", "11", "12", "13", "14", "15", "16",
+)  # fmt: skip
+TEN_Q_ITEMS = ("I-1", "I-2", "I-3", "I-4", "II-1", "II-1A", "II-2", "II-3", "II-4", "II-5", "II-6")
+DEFAULT_10K = ("1", "1A", "3", "7", "7A", "9A")
+DEFAULT_10Q = ("I-2", "I-3", "II-1", "II-1A")
+FILING_TEXT_FRAME = "filing_text"  # key of ``Normalized.parsed`` holding one report's item rows
+FILING_TEXT_COLUMNS = (
+    "item", "text", "char_count", "quality", "reason", "method", "parser_version",
+)  # fmt: skip
 # Form 4 (EB D6): insider transactions of an issuer, ``Form 4`` and its amendment. One frame shape
 # for the quarterly bulk sets and a filing's XML: a row per transaction line and reporting owner.
 INSIDER_FORMS = ("4", "4/A")
@@ -158,6 +182,19 @@ IPO_COLUMNS = (
 
 
 @dataclass(frozen=True, kw_only=True)
+class FilingTextRequest(FetchRequest):
+    """The item sections of one periodic report. ``key`` is the accession; ``cik`` (digits),
+    ``form`` and ``primary_document`` (the file name SEC's submissions JSON gives) say where the
+    document is; ``items`` the item ids kept (``1A``, ``7`` for a 10-K, ``I-2``, ``II-1A`` for a
+    10-Q; empty: the form's default list; ``vendors/sec_text/filing_items.py``)."""
+
+    cik: str
+    form: str
+    primary_document: str
+    items: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, kw_only=True)
 class DailyIndexRequest(FetchRequest):
     """One filing day of the SEC daily form index (``key`` is the day, ISO); ``day`` is the
     date SEC filed under (a filing accepted after 17:30 New York time is dated the next business
@@ -217,3 +254,21 @@ def normalise_series_frame(frame: pd.DataFrame) -> pd.DataFrame:
     )
     out = out.sort_values(["series", "obs_date", "vintage_date"], kind="stable")
     return out.drop_duplicates().reset_index(drop=True)
+
+
+def is_quarterly(form: str) -> bool:
+    """Whether ``form`` is a 10-Q or 10-Q/A (else a 10-K family form)."""
+    return form.upper().startswith("10-Q")
+
+
+def item_order(form: str) -> tuple[str, ...]:
+    """The item ids of ``form`` in filing order."""
+    return TEN_Q_ITEMS if is_quarterly(form) else TEN_K_ITEMS
+
+
+def items_for(form: str, requested: Collection[str]) -> tuple[str, ...]:
+    """The items to keep for ``form``: the ``requested`` ids that belong to its family (an id with
+    a part, ``I-2``, is a 10-Q's), else the form's defaults."""
+    asked = {r.strip().upper() for r in requested}
+    kept = tuple(i for i in item_order(form) if i in asked)
+    return kept or (DEFAULT_10Q if is_quarterly(form) else DEFAULT_10K)

@@ -179,6 +179,10 @@ NIGHTLY: tuple[Step, ...] = (
     # IPO facts and lock-up expiry dates from EDGAR 424B4 prospectuses (ADR 0050, edge build D8):
     # the last 30 days' prospectuses, each read once. Optional and WARN-only: one edge reads it.
     Step("ipo-lockups", latest_only=LAST_MONTH, critical=False, accept_with=(check_ipo_lockups,)),
+    # The Item sections of the 10-K / 10-Q of the CIKs due a report (edge build D10), each read from
+    # its latest stored filing: optional and WARN-only (a PARTIAL run with nothing stored yet or a
+    # full disk is a WARN, a failed night is read again); history accrues for track E.
+    Step("filing-text", needs=("filings",), latest_only=NEW_SINCE_STORED, critical=False),
     Step("earnings", accept=(check_earnings,), task_complete=True),
     Step("bars", accept=(check_bars, check_bars_resolved)),
     Step("rates", task_complete=True),

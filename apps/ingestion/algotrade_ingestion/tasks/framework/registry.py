@@ -24,7 +24,7 @@ from algotrade_ingestion.tasks.derived import (
     residual_returns,
     rollups,
 )
-from algotrade_ingestion.tasks.events import filings, insider, ipo_lockups
+from algotrade_ingestion.tasks.events import filing_text, filings, insider, ipo_lockups
 from algotrade_ingestion.tasks.framework import (
     entries_market,
     entries_ops,
@@ -433,6 +433,36 @@ TASKS: dict[str, Task] = {
                     "until", ("--until",), date.fromisoformat, "last filing date (default --date)"
                 ),
                 Param("limit", ("--limit",), int, "read at most N prospectuses this run"),
+            ),
+        ),
+        Task(
+            "filing-text",
+            "item sections of the 10-K / 10-Q of every operating company (events/filing_text: "
+            "1, 1A, 3, 7, 7A, 9A of a 10-K; I-2, I-3, II-1, II-1A of a 10-Q); --from [--to] "
+            "backfills a filing-date window (--limit CIKs a run, resumable; history from "
+            "2010: newest windows first), the default is the nightly increment of the CIKs "
+            "due a report",
+            filing_text,
+            (filing_text.TABLE,),
+            entries_market.run_filing_text,
+            sources=("sec_filings", "sec_filing_text"),
+            settings="sources.toml [sec_edgar]",
+            params=(
+                SESSION,
+                Param(
+                    "start",
+                    ("--from",),
+                    date.fromisoformat,
+                    "backfill: filings filed on or after this date (default: the nightly "
+                    "increment of the CIKs due a report)",
+                ),
+                TO,
+                Param("symbols", ("--symbols",), str, "only these tickers (default: the universe)"),
+                Param(
+                    "limit", ("--limit",), int, "backfill: at most N CIKs this run (default 100)"
+                ),
+                Param("items", ("--items",), str, "item ids kept, comma list (1A,7 / I-2,II-1A)"),
+                Param("force", ("--force",), None, "fetch filings and CIKs already read again"),
             ),
         ),
         Task(

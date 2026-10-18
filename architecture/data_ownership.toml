@@ -68,6 +68,16 @@ detect = [
 ]
 
 [[responsibility]]
+id = "filing-text-reading"
+description = "Read events/filing_text (edge build D10): the rows known on a session (effective known_from = the stored stamp floored by the acceptance session recomputed from ts), per instrument, accession and item the latest version (known_from, parser_version, knowledge_ts; null items equal), a filing's null-item row dropped when it has an item row; every stored version for the producer. No consumer reads the table itself"
+owner = ["src/algotrade/data/filing_text/reading.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/events/filing_text.py",  # the producer reads what it already holds, to skip it and to stamp a revision
+]
+section = "docs/data/storage.md#how-runs-combine"
+detect = [{ call = "stored_filing_text" }, { call = "latest_filing_versions" }, { call = "effective_known_from" }]
+
+[[responsibility]]
 id = "historical-identity"
 description = "The names and identity fields of a session before the first reference snapshot (ADR 0053 amendment 2026-10-09, ED6): universe_asof's listings alive on the session (the delisted too) in place of the earliest snapshot's names, a name alive in today's snapshot keeping today's row (optionable, security_type: a disclosed lookahead tilt), a delisted one counted as a common stock with its optionable decided by the universe's own close and adv_usd_20d floors (a universe without them is a ConfigurationError, never a number of our own); the edge harness and the training frame only (historical=True), the run's caveat (rule, sessions, names by path) persisted in its run record and shown in its report"
 owner = ["src/algotrade/data/listings/identity.py", "src/algotrade/services/evaluation/cross_section/historical.py"]
