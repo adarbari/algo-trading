@@ -1,5 +1,6 @@
-"""Outcome table schema (ADR 0053): the one schema of ``outcomes/instrument/<name>@v<N>`` and its
-row checks.
+"""Outcome table schemas (ADR 0053): the one schema of ``outcomes/instrument/<name>@v<N>`` and its
+row checks, and the chain P&L grain ``outcomes/option/structure_pnl@v1`` (ADR 0053 amendment,
+EB H13).
 """
 
 import pandas as pd
@@ -7,6 +8,8 @@ import pandas as pd
 from algotrade.storage.tables.spec import (
     TableSpec,
     fixed,
+    floats,
+    strings,
 )
 
 # Outcomes (ADR 0053): what happened after a start session S, read only by the harness
@@ -89,4 +92,92 @@ def outcome_problems(frame: pd.DataFrame) -> list[str]:
             problems.append(f"{column} must be null when UNMEASURED")
         if values[measured].isna().any():
             problems.append(f"{column} is null on a measured outcome")
+    return problems
+
+
+# Chain P&L (ADR 0053 amendment, EB H13): what one option structure bought at the close of a start
+# session S and sold at the close of S + h sessions earned, from the stored chains (quotes, never a
+# model price). One row per (underlying, structure, tenor rule, horizon); the partition is S; each
+# night writes the windows it closes, so runs merge (the latest wins). ``structure`` is the
+# position held long (``atm_straddle``; ``put_delta_NN``: the put whose own delta is -NN/100); the
+# edge document's side and hedging are applied by the harness. ``knowledge_ts`` is the latest
+# ``knowledge_ts`` among the chain partitions the row was computed from (the exit's), never the
+# write time. UNMEASURED: a reason and no P&L (the entry or exit chain missing or STALE_DATA, ADR
+# 0054, or no exit quote; never a zero, never an older chain in its place). A chain missing or
+# stale on a session between them, or a delta that cannot be computed there, costs only the
+# hedged P&L: ``hedge_reason`` is set and the hedged columns are null, the row stays COMPLETE.
+OPTION_PNL = "outcomes/option/structure_pnl@v1"  # the grain is its own family, not instrument/
+OPTION_PNL_STATUSES = frozenset({"COMPLETE", "UNMEASURED"})
+# Why a window is UNMEASURED: the code before the colon of ``outcome_reason`` (a session follows
+# NO_CHAIN, STALE_CHAIN and NO_DELTA); each has its Guide entry (``chain_outcome_unmeasured``).
+OPTION_PNL_REASONS = (
+    "NO_CHAIN", "STALE_CHAIN", "NO_EXIT_QUOTE", "NO_DELTA", "NO_EXPIRY", "NO_ENTRY_QUOTE", "NO_PNL",
+)  # fmt: skip
+EXIT_KINDS = frozenset({"QUOTE", "INTRINSIC"})  # exit at the quoted bid, or intrinsic at expiry
+UNHEDGED_COLUMNS = ("pnl_per_premium", "pnl_exec_per_premium", "pnl_per_underlying")
+HEDGED_COLUMNS = ("hedged_pnl_per_premium", "hedged_pnl_per_underlying")
+PNL_COLUMNS = (*UNHEDGED_COLUMNS, *HEDGED_COLUMNS)
+
+_OPTION_PNL_TYPES = (
+    "instrument_id string!",  # the underlying (EQ:<FIGI>)
+    "ts timestamp_utc!",  # the close of S
+    "structure string!",
+    "tenor_days int64!",  # the tenor rule: the first expiry at least this many calendar days out
+    "horizon_sessions int64!",
+    "window_end date!",  # T: the h-th exchange session after S
+    *strings("call_id", "put_id"),  # the contracts held (null for the leg a structure lacks)
+    "expiry date",
+    *floats("strike", "entry_spot", "entry_mid", "entry_ask", "exit_spot", "exit_mid", "exit_bid"),
+    "exit_kind string",  # EXIT_KINDS
+    *floats(*PNL_COLUMNS),
+    "outcome_status string!",  # OPTION_PNL_STATUSES
+    "outcome_reason string",  # UNMEASURED only
+    "hedge_reason string",  # COMPLETE only: why the hedged columns are null (a hedge session)
+)
+# pnl_per_premium: long, mid in and mid out, over the entry mid; pnl_exec_per_premium: bought at the
+# ask, sold at the bid (intrinsic at expiry), over the ask; pnl_per_underlying: the mid P&L over
+# the entry spot; hedged_*: the mid P&L less a daily delta hedge of the underlying at each
+# session's close with our own delta (``quant/edges/chain_pnl``), per premium and per underlying.
+
+OPTION_PNL_SPEC = fixed(
+    OPTION_PNL, "option_outcome", ("instrument_id", "ts", "structure", "tenor_days",
+    "horizon_sessions", "window_end"), *_OPTION_PNL_TYPES, runs="merge",
+    key=("instrument_id", "structure", "tenor_days", "horizon_sessions"),
+)  # fmt: skip
+
+
+def option_pnl_problems(frame: pd.DataFrame) -> list[str]:
+    """A COMPLETE chain outcome has its unhedged P&L and exit kind, and its hedged P&L unless a
+    ``hedge_reason`` says why not; an UNMEASURED one has a reason and no P&L (never a zero)."""
+    status = frame["outcome_status"].astype(str)
+    problems = []
+    bad = sorted(set(status) - OPTION_PNL_STATUSES)
+    if bad:
+        problems.append(f"outcome_status must be one of {sorted(OPTION_PNL_STATUSES)}: {bad}")
+    unmeasured = (status == UNMEASURED).to_numpy()
+    reason = frame["outcome_reason"] if "outcome_reason" in frame.columns else None
+    if unmeasured.any() and (reason is None or reason[unmeasured].isna().any()):
+        problems.append("an UNMEASURED outcome needs an outcome_reason")
+    hedge = (
+        frame["hedge_reason"].notna()
+        if "hedge_reason" in frame.columns
+        else pd.Series(False, index=frame.index)
+    )
+    for column in UNHEDGED_COLUMNS:
+        values = frame[column]
+        if values[unmeasured].notna().any():
+            problems.append(f"{column} must be null when UNMEASURED")
+        if values[~unmeasured].isna().any():
+            problems.append(f"{column} is null on a COMPLETE outcome")
+    for column in HEDGED_COLUMNS:
+        values = frame[column]
+        if values[unmeasured].notna().any():
+            problems.append(f"{column} must be null when UNMEASURED")
+        if values[~unmeasured & ~hedge.to_numpy()].isna().any():
+            problems.append(f"{column} is null on a COMPLETE outcome with no hedge_reason")
+        if values[hedge.to_numpy()].notna().any():
+            problems.append(f"{column} must be null when hedge_reason is set")
+    kinds = frame["exit_kind"]
+    if (~unmeasured).any() and not set(kinds[~unmeasured].astype(str)) <= EXIT_KINDS:
+        problems.append(f"exit_kind must be one of {sorted(EXIT_KINDS)} on a COMPLETE outcome")
     return problems

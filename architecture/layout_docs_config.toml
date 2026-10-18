@@ -18,7 +18,7 @@ purpose = "L3 site settings: one <name>.toml per settings group, each loaded by 
 
 [[config_dir]]
 path = "config/site/field_guide"
-purpose = "L3 field guide, one <theme>.toml per theme (the situations sit in instrument.toml; statements.toml holds the SEC statement groups, analyst.toml the analyst consensus fields; instrument.toml also holds the volatility and the edge build's fundamentals entries under their own themes while those files sit at the 1000-line cap): how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
+purpose = "L3 field guide, one <theme>.toml per theme (the situations sit in instrument.toml; statements.toml holds the SEC statement groups, analyst.toml the analyst consensus fields and, while the other files sit at the 1000-line cap, the edge build's fundamentals entries under their own themes): how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
 
 [[config_dir]]
 path = "config/site/features"
@@ -74,7 +74,11 @@ purpose = "the Guide's playbook prose (ADR 0051), one subfolder per playbook fam
 
 [[config_dir]]
 path = "config/site/guide/playbooks/trend"
-purpose = "the Guide's playbooks of the trend families (trend continuation, pullback, 12-1 momentum, size): one <id>.toml per preset the family lists in sections.toml"
+purpose = "the Guide's playbooks of the trend families (trend continuation, pullback, 12-1 momentum, size, the decoys): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/factors"
+purpose = "the Guide's playbooks of the factor family (the 12-1 momentum variants, industry momentum, low beta, low volatility): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/guide/playbooks/breakouts"
@@ -82,7 +86,7 @@ purpose = "the Guide's playbooks of the breakout family (range breakout, breakou
 
 [[config_dir]]
 path = "config/site/guide/playbooks/reversals"
-purpose = "the Guide's playbooks of the reversal family (support reversal, oversold reversal, exhaustion): one <id>.toml per preset the family lists in sections.toml"
+purpose = "the Guide's playbooks of the reversal family (support reversal, oversold reversal, exhaustion, residual and sector reversal): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/guide/playbooks/income"
@@ -180,6 +184,10 @@ purpose = "the web UI: frontend architecture (layers, rules) and the design syst
 path = "docs/decisions"
 purpose = "the decision log: product-direction and policy decisions, by the owner or by a Fable agent on their behalf, append-only (.claude/skills/review-and-release)"
 kind = "log"
+
+[[docs_dir]]
+path = "docs/edges"
+purpose = "the generated edge pages, one per family (a.md .. i.md, other.md for an edge with no family); rendered by make features-doc from config/site/edges/, indexed by docs/edges.md"
 
 [[docs_dir]]
 path = "docs/edge-ideas"

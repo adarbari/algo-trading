@@ -51,6 +51,7 @@ def test_the_shipped_sections_follow_the_spec() -> None:
         "filings",
         "options_signals",
         "cross_section",
+        "factors",
         "fundamentals",
     ]
     assert shipped.families[1].presets == ("range_breakout", "breakout", "failed_breakout")

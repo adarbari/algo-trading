@@ -234,6 +234,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "ADR 0050: the stock or basket each leveraged or inverse fund tracks"
 
 [[table]]
+name = "rollups/instrument/share_classes@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0053 amendment (EB H9): the other listed share class of an issuer (one CIK, two share-class FIGIs, read from the reference snapshot the session sees) and the z-score of the pair's price ratio"
+
+[[table]]
 name = "rollups/instrument/dividends@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
@@ -616,6 +621,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"
 name = "outcomes/instrument/forward_returns@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"
 note = "ADR 0053: forward outcomes per (instrument, start session, horizon, benchmark); read only by the edge harness through algotrade.data.outcomes"
+
+[[table]]
+name = "outcomes/option/structure_pnl@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/option_outcomes.py"
+note = "ADR 0053 amendment (EB H13): chain P&L per (underlying, start session, structure, tenor rule, horizon) from the stored chains, forward-only from 2026-10-02; read only by the edge harness through algotrade.data.outcomes"
 
 [[table]]
 name = "outcomes/instrument/residual_returns@v1"
