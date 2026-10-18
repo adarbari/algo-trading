@@ -537,7 +537,7 @@ contracts = [
 
 [[dir]]
 path = "src/algotrade/storage/tables"
-purpose = "market and result tables: the schema vocabulary (spec.py), the schemas (schemas.py; the edge harness result tables in edge_schemas.py, the VIX futures table in vx_schemas.py), store protocols, reader / writer facades"
+purpose = "market and result tables: the schema vocabulary (spec.py), the schemas (schemas.py; the edge harness result tables in edge_schemas.py), store protocols, reader / writer facades"
 contracts = [
     "Only the ingestion app writes market and feature data (ADR 0005)",
     "R1: only algotrade.data reads market data (consumers never import storage readers)",

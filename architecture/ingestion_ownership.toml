@@ -248,7 +248,7 @@ owner = [
     "libs/sources/algotrade_sources/vendors/cboe/vx_futures.py",
 ]
 allowed = [
-    "src/algotrade/storage/tables/vx_schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
     "src/algotrade/data/volatility.py",  # the one read (data.volatility.vx_futures)
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (vx_futures_fresh, WARN-only)
 ]
