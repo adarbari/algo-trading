@@ -70,6 +70,22 @@ def test_a_known_amendment_replaces_the_originals_it_names() -> None:
     assert seen_after["accession"].tolist() == ["A2"] and seen_after["shares"].tolist() == [900.0]
 
 
+def test_a_second_amendment_replaces_the_first_so_the_shares_count_once() -> None:
+    original = row("A1", date(2026, 9, 30))
+    first = row("A2", date(2026, 10, 7), form="4/A", amends_date=date(2026, 9, 30), shares=900.0,
+                ts=pd.Timestamp("2026-10-06T14:00:00Z"))  # fmt: skip
+    second = row("A3", date(2026, 10, 9), form="4/A", amends_date=date(2026, 9, 30), shares=800.0,
+                 ts=pd.Timestamp("2026-10-08T14:00:00Z"))  # fmt: skip
+    found = reader((S1, [original]), (S2, [first]), (S3, [second]))
+    assert read_insider_transactions(found, through=date(2026, 10, 6))["accession"].tolist() == [
+        "A1"
+    ]
+    between = read_insider_transactions(found, through=date(2026, 10, 8))
+    assert between["accession"].tolist() == ["A2"] and between["shares"].tolist() == [900.0]
+    after = read_insider_transactions(found, through=date(2026, 10, 9))
+    assert after["accession"].tolist() == ["A3"] and after["shares"].tolist() == [800.0]
+
+
 def test_an_amendment_that_names_no_original_or_another_one_replaces_nothing() -> None:
     kept = row("A1", date(2026, 9, 30))
     unnamed = row("A2", date(2026, 10, 1), form="4/A", amends_date=None)

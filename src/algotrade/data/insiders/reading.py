@@ -11,8 +11,10 @@ new one after, never the new one early.
 
 **Amendments.** A 4/A replaces the originals it names, once the 4/A itself is known: the rows of
 form ``4`` with the same issuer, owner and report period and a ``filing_date`` equal to the 4/A's
-``amends_date`` drop out of the result. (Two Form 4s of one owner, issuer and period filed on the
-same day are one original here: a 4/A naming that day replaces both, the conservative reading.)
+``amends_date`` drop out of the result, and so does an earlier 4/A of the same report and
+``amends_date`` once a later one (by acceptance) is known: amended shares count once.
+(Two Form 4s of one owner, issuer and period filed on the same day are one original here: a
+4/A naming that day replaces both, the conservative reading.)
 A 4/A with no ``amends_date`` replaces nothing.
 
 ``ts`` is the acceptance instant (UTC). The columns are the table's; the roles, the transaction
@@ -33,18 +35,31 @@ REPORT_KEY = ["instrument_id", "owner_cik", "period_of_report"]
 
 
 def _superseded(frame: pd.DataFrame) -> pd.Series:
-    """Which rows of form ``4`` a known 4/A replaces (module doc)."""
-    amendments = frame[(frame["form"] == "4/A") & frame["amends_date"].notna()]
-    originals = frame["form"] == "4"
-    if amendments.empty or not originals.any():
+    """Which rows a known 4/A replaces (module doc): the originals it names, and any earlier 4/A
+    of the same report and original filing date (a later amendment restates the earlier one)."""
+    amended = (frame["form"] == "4/A") & frame["amends_date"].notna()
+    if not amended.any():
         return pd.Series(False, index=frame.index)
 
     def keys(rows: pd.DataFrame, filed: str) -> pd.MultiIndex:
         columns = [rows[c].astype(str) for c in REPORT_KEY]
         return pd.MultiIndex.from_arrays([*columns, pd.to_datetime(rows[filed]).dt.strftime("%F")])
 
-    hit = keys(frame, "filing_date").isin(keys(amendments, "amends_date"))
-    return pd.Series(hit & originals.to_numpy(), index=frame.index)
+    amendments = frame[amended]
+    original = (frame["form"] == "4") & keys(frame, "filing_date").isin(
+        keys(amendments, "amends_date")
+    )
+    latest = (
+        amendments.assign(
+            _key=list(keys(amendments, "amends_date")),
+            _ts=pd.to_datetime(amendments["ts"], utc=True),
+        )
+        .groupby("_key")["_ts"]
+        .transform("max")
+    )
+    older = pd.Series(False, index=frame.index)
+    older[amendments.index] = (pd.to_datetime(amendments["ts"], utc=True) < latest).to_numpy()
+    return pd.Series(original.to_numpy() | older.to_numpy(), index=frame.index)
 
 
 def read_insider_transactions(
