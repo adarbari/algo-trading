@@ -472,6 +472,11 @@ name = "holdings/etf"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py"
 
 [[table]]
+name = "holdings/etf_shares"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py"
+note = "EB D4: an ETF's shares outstanding from the iShares file the holdings task already reads (one row per fund and as-of date, known_from = the session of the New York date of the fetch); read through data/funds/shares.py"
+
+[[table]]
 name = "macro/series"
 owner = "apps/ingestion/algotrade_ingestion/tasks/macro/series.py"
 note = "ADR 0048: FRED / ALFRED and published series with their vintages; read through data/macro"
