@@ -9,6 +9,7 @@ Back to the [index of every edge](../edges.md).
 | Earnings-date advances (`earnings_date_shift`) | candidate | on each `earnings_date_shift:earlier` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `earnings_date_early` |
 | Earnings gap on heavy volume (`earnings_gap_volume_drift`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `earnings_gap_volume`, `earnings_gap_only` |
 | Adverse 8-K item drift (`eight_k_item_drift`) | candidate | on each `filing_8k:4.02` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `eight_k_adverse_items` |
+| Opportunistic insider cluster buys (`insider_opportunistic_cluster_buys`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps | `insider_cluster_buys` |
 | Late filers (NT 10-K and NT 10-Q) (`late_filer_nt_drift`) | candidate | on each `nt_late_filing` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `nt_late_filer` |
 | Pre-earnings run-up in past winners (`pre_earnings_runup_winners`) | candidate | on each `earnings_expected` | excess return, over 5 sessions, vs SPY, starting -6 sessions from the event, costs 10 bps | `pre_earnings_runup` |
 | S&P 500 deletions rebound (`sp500_deletions_long`) | candidate | on each `index_change:deletion` | excess return, over 20, 60, 250 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `sp500_deletion` |
@@ -141,6 +142,36 @@ Back to the [index of every edge](../edges.md).
 - sec-api.io, Stock Price Reactions to Item 4.02 Disclosures in SEC Form 8-K Filings, 2024 <https://sec-api.io/resources/stock-price-reactions-to-item-4-02-disclosures-in-sec-form-8-k-filings>
 - Audit Analytics, Long-Term Capital Market Consequences of Financial Restatements, 2019 <https://blog.auditanalytics.com/long-term-capital-market-consequences-of-financial-restatements/>
 - Whisenant, S., Sankaraguruswamy, S. and Raghunandan, K., Auditing: A Journal of Practice and Theory, 22(1), 2003 (reportable events disclosed at an auditor change) <https://papers.ssrn.com/abstract=293404>
+
+## Opportunistic insider cluster buys (`insider_opportunistic_cluster_buys`)
+
+**Status:** candidate. **Family:** B. **Thesis:** Stocks that several insiders buy on the open market within a month, at times that are not routine for them, outperform the market over the next months.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 1000000` and `rollup.insider_buys@v1.insider_cluster_buy_count gte 1`
+- **Top K:** 20
+- **Screeners:** `insider_cluster_buys`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Filed as a cross-section screen, not an on_event edge: no insider_filing event class is declared in config/edges/document.py (EVENT_CLASSES), so the event is read as a feature at each month end. A cluster is three or more distinct insiders with an open-market purchase (Form 4 code P) known in the last 30 calendar days, and an opportunistic buyer is one who did not trade in the same calendar month of each of the three previous years (Cohen, Malloy and Pomorski's rule over the owner's own Form 4 lines, from the 2006 bulk history); a buyer without a trade in each of the three previous years is unclassified, never opportunistic, so the screen drops a name whose buyers are all new. The filings count from known_from, the first session whose close follows SEC's acceptance (a filing accepted after the close counts from the next session), never the transaction or filing date; each session sees only filings known by it (a nightly read is exactly the rule's; a multi-session backfill omits a line restated or amended after a session, never reads one early). A filing with several reporting owners (a fund, its general partner and a managing member) counts one buyer. The picks are the 20 names with the most buyers, compared with every name with an insider purchase (base = universe). The universe is common stocks above 5 dollars trading 1M dollars a day with at least one insider purchase known in the last 30 days (insider_cluster_buy_count of 1 or more), so the base is 'any insider bought': every base name carries the score the harness ranks (a universe of all stocks would score only the few with a purchase and the harness would count every session too thin), and the control is honest: does a cluster of opportunistic buyers beat any insider purchase. The studies find the effect in smaller firms; the floor keeps the end an individual can trade. A purchase under a 10b5-1 plan (a checkbox since April 2023) is not screened out: the column shows it. The published 82 bp a month is a two-group alpha of opportunistic against routine, which the harness does not measure, so no [published] figure. The Form 4 history is stored from 2006, but outcomes before 2018 need the D0 Tiingo backfill (due 2026-11-09): verdicts are UNMEASURED until then. Month-end start sessions spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Insiders know their firm and buying with their own money is costly, so a purchase carries information; routine trades are liquidity and diversification noise that dilutes it, and the signal is concentrated in smaller firms (Cohen, Malloy and Pomorski 2012; Lakonishok and Lee 2001).
+2. **Persistence:** A Form 4 is public within two business days, yet the signal needs a filter (routine against opportunistic, a cluster of buyers, the 10b5-1 flag) that most retail screens skip, and small-cap capacity is limited. The studies' samples end in 2007 and 1995; a post-2010 test is not on file, so persistence is a claim to test.
+3. **Outcome:** Excess return over SPY over 20 and 60 sessions after the entry close (the session after a month-end decision), net of 20 bps a round trip, a small-cap-sized cost assumption.
+4. **Trigger timing:** Every purchase is counted from known_from at D, the first session whose close follows SEC's acceptance of the Form 4, so a filing accepted after the close of D is read at D + 1 at the earliest; the entry session is S = D + 1 (start_offset_sessions = 1). The opportunistic class reads only filings known by D, and a restated line shows its old version until its own known_from.
+5. **Faithful replication:** The source's rule: long the opportunistic purchases of insiders, routine ones ignored (Cohen, Malloy and Pomorski 2012); the cluster of three or more buyers in 30 days is the practitioner rule. Here insider_cluster_buys v1 takes the common stocks above the floor meeting both and the harness holds the 20 with the most buyers among the names with a purchase; the studies' value-weighted portfolios of all opportunistic buyers are not replicated.
+6. **Expected size and sample:** About 82 bp a month of value-weighted alpha for opportunistic buyers against about zero for routine ones, 1986-2007 (Cohen, Malloy and Pomorski 2012, verified); a post-2010 out-of-sample test is not on file, and most of the signal is in small firms this universe leaves out. About ten independent month-ends of cluster names a year, so the sample is small.
+7. **Capacity and costs:** Small and mid caps, long only, capacity of tens of thousands of dollars a name; the 1M dollar floor keeps names where the effect is weaker than in microcaps. The outcome deducts 20 bps a round trip; insiders buy after falls, so spreads are often wide.
+8. **Failure modes and retirement:** Insiders buy after declines, so the picks are a reversal and value bet; a buyer with no three-year record cannot be classified and is dropped; a 10b5-1 plan buy says little. Retire if the frozen-period excess return of the picks is not above the base rate of every eligible name.
+9. **Decoys:** Long-term reversal and value (insiders buy cheap names), size, and 12-1 momentum: the size and momentum baselines on the same sessions; opportunistic against routine is the study's own control.
+
+**Sources**
+
+- Cohen, L., Malloy, C. and Pomorski, L., Decoding Inside Information, Journal of Finance, 2012 <https://www.nber.org/papers/w16454>
+- Lakonishok, J. and Lee, I., Are Insider Trades Informative?, Review of Financial Studies, 2001 <https://doi.org/10.1093/rfs/14.1.79>
 
 ## Late filers (NT 10-K and NT 10-Q) (`late_filer_nt_drift`)
 

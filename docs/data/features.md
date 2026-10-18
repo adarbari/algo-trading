@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-596 stored features in 77 groups, in dependency order; 156 expression features.
+602 stored features in 79 groups, in dependency order; 157 expression features.
 
 ## `option_liquidity@v1`
 
@@ -231,6 +231,26 @@ Sessions since each kind of SEC event filing (8-K items, late-filing notices, te
 | `last_late_filing_date` | window | date | date | open |  | The session the latest NT 10-K or NT 10-Q late-filing notice became known (after the close of the session its filing was accepted in, else the next) | no late-filing notice became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
 | `sessions_since_tender_offer` | window | int | sessions | open | >= 0 | Exchange sessions from the session the latest SC TO-I or SC TO-T tender offer became known up to the session (0: it became known today) | no tender offer became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
 | `last_tender_offer_date` | window | date | date | open |  | The session the latest SC TO-I or SC TO-T tender offer became known (after the close of the session its filing was accepted in, else the next) | no tender offer became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+
+## `insider_buys@v1`
+
+Open-market insider purchases known in the last 30 days: how many insiders, whether they are opportunistic, whether under a 10b5-1 plan. Stored as `rollups/instrument/insider_buys@v1`; reads `events/insider_transaction` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `insider_cluster_buy_count` | window | int | count | open | >= 0 | Distinct insiders with an open-market purchase (Form 4 code P) that became known in the last 30 calendar days; three or more is a cluster | no open-market insider purchase became known in the last 30 days, or no Form 4 history is stored for the session: never read as no insider buying | `events/insider_transaction.transaction_code`, `events/insider_transaction.owner_cik`, `events/insider_transaction.known_from`, `events/insider_transaction.transaction_date`, `events/insider_transaction.accession`, `events/insider_transaction.owner_count` |
+| `insider_opportunistic_flag` | window | bool | flag | open |  | A buyer in the window is an opportunistic trader, not a routine one: true when one is; false when every classified buyer is routine (traded in the same calendar month in each of the three previous years, Cohen, Malloy and Pomorski 2012) | no open-market insider purchase became known in the last 30 days, or no Form 4 history is stored for the session: never read as no insider buying; or no buyer has a trade in each of the three years before the purchase's year (unclassified) | `events/insider_transaction.transaction_code`, `events/insider_transaction.owner_cik`, `events/insider_transaction.known_from`, `events/insider_transaction.transaction_date`, `events/insider_transaction.accession`, `events/insider_transaction.owner_count`, `events/insider_transaction.derivative` |
+| `plan_10b5_1_flag` | window | bool | flag | open |  | A purchase in the window was made under a Rule 10b5-1 trading plan (the filing's own checkbox, on Form 4 since April 2023) | no open-market insider purchase became known in the last 30 days, or no Form 4 history is stored for the session: never read as no insider buying; or no purchase in the window carries the checkbox (a filing before April 2023) | `events/insider_transaction.transaction_code`, `events/insider_transaction.owner_cik`, `events/insider_transaction.known_from`, `events/insider_transaction.transaction_date`, `events/insider_transaction.accession`, `events/insider_transaction.owner_count`, `events/insider_transaction.plan_10b5_1` |
+
+## `short_interest@v1`
+
+The latest FINRA short interest public by the session: shares short, days to cover and its settlement date. Stored as `rollups/instrument/short_interest@v1`; reads `events/short_interest` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `short_position` | window | float | shares | open | >= 0 | Shares sold short at the latest settlement date public by the session (FINRA, all markets) | no short-interest report became public in the last 30 sessions: never read as no shorts | `events/short_interest.short_position` |
+| `days_to_cover` | window | float | sessions | open | >= 0 | FINRA's days to cover: the short position over the average daily share volume of the report's period; 5 means five average sessions of volume to buy it all back | no short-interest report became public in the last 30 sessions: never read as no shorts; or FINRA gives no average volume for the report | `events/short_interest.days_to_cover` |
+| `short_interest_date` | window | date | date | open |  | The settlement date of the latest short-interest report public by the session; the figure is the settlement date's, about two weeks before it became public | no short-interest report became public in the last 30 sessions: never read as no shorts | `events/short_interest.ts` |
 
 ## `earnings_date_shift@v1`
 
@@ -1294,6 +1314,12 @@ Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on rea
 | `recession_prob_high` | expression | bool | flag | open |  | The Chauvet-Piger smoothed recession probability is above 20% (params.above): a reference, not a driver | no RECPROUSM156N observation known by the session (no FRED key) | `market_macro.recession_prob_smoothed > above` (above = 0.2) | virtual |
 | `bear_prob_6m` | expression | float | decimal | personal | 0 .. 1 | Bear-state probit: the probability that the S&P 500 is in a bear market 126 sessions (six months) on, ncdf(b0 + b_curve x curve_10y3m + b_cpi x cpi_yoy + b_hy x hy_oas); bear_prob_source says whether the coefficients were fitted and through when (sessions up to fitted_through are in-sample) | market_macro.curve_10y3m, cpi_yoy or hy_oas is null for the session (hy_oas starts in 1997) | `ncdf(b0 + b_curve * market_macro.curve_10y3m + b_cpi * market_macro.cpi_yoy + b_hy * market_macro.hy_oas)` (b0 = -1.0, b_curve = -40.0, b_cpi = 15.0, b_hy = 10.0) | virtual |
 | `bear_prob_source` | label | str | category | personal | fitted, literature | Where bear_prob_6m's coefficients come from: fitted (the episode scorecard's fit on the stored history through params.fitted_through; sessions up to it are in-sample) or literature (literature-order values, not fitted) | bear_prob_6m is null | `if(is_null(bear_prob_6m), null, if(fitted == 1 and fitted_through != "", "fitted", "literature"))` (fitted = 0, fitted_through = '') | virtual |
+
+### `shorting.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `short_interest_ratio` | expression | float | decimal | open | >= 0 | Shares sold short as a share of the company's shares outstanding: the latest FINRA short position public by the session over the latest share count; 0.10 means 10% of the shares are short (shares outstanding, not the float) | no short-interest report became public in the last 30 sessions, or no current share count (market_cap_status is not OK: no count, or a stale one) | `if(fundamentals.market_cap_status == "OK", short_interest.short_position / fundamentals.shares_outstanding, null)` | virtual |
 
 ### `statements.toml`
 

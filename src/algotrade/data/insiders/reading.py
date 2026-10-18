@@ -17,11 +17,15 @@ form ``4`` with the same issuer, owner and report period and a ``filing_date`` e
 4/A naming that day replaces both, the conservative reading.)
 A 4/A with no ``amends_date`` replaces nothing.
 
+``buyer_histories`` hands the feature group ``insider_buys@v1`` the owners with a recent purchase
+and their open-market history, one point-in-time view per session.
+
 ``ts`` is the acceptance instant (UTC). The columns are the table's; the roles, the transaction
 code (``P`` open-market purchase, ``S`` sale, ...) and the 10b5-1 flag are the caller's to
 interpret.
 """
 
+from collections.abc import Sequence
 from datetime import date, datetime
 
 import pandas as pd
@@ -62,6 +66,19 @@ def _superseded(frame: pd.DataFrame) -> pd.Series:
     return pd.Series(original.to_numpy() | older.to_numpy(), index=frame.index)
 
 
+def known_lines(frame: pd.DataFrame, through: date | None) -> pd.DataFrame:
+    """The lines of the raw ``frame`` known on or before ``through`` (None: all), each line's
+    latest version, without the originals a known 4/A replaced (module doc), sorted by
+    (``instrument_id``, ``ts``, ``accession``, ``line``, ``owner_cik``)."""
+    if through is not None:
+        frame = frame[pd.to_datetime(frame["known_from"]) <= pd.Timestamp(through)]
+    frame = frame.sort_values(["known_from", "knowledge_ts"], kind="stable")
+    frame = frame.drop_duplicates(LINE_KEY, keep="last").reset_index(drop=True)
+    frame = frame[~_superseded(frame)]
+    order = ["instrument_id", "ts", "accession", "line", "owner_cik"]
+    return frame.sort_values(order, kind="stable").reset_index(drop=True)
+
+
 def read_insider_transactions(
     reader: StoreReader,
     instruments: list[str] | None = None,
@@ -75,10 +92,47 @@ def read_insider_transactions(
     frame = reader.table_range(TABLE, *ALL_TIME, as_of, instruments)
     if frame is None or frame.empty:
         return pd.DataFrame(columns=[*LINE_KEY, "known_from"])
-    if through is not None:
-        frame = frame[pd.to_datetime(frame["known_from"]) <= pd.Timestamp(through)]
-    frame = frame.sort_values(["known_from", "knowledge_ts"], kind="stable")
-    frame = frame.drop_duplicates(LINE_KEY, keep="last").reset_index(drop=True)
-    frame = frame[~_superseded(frame)]
-    order = ["instrument_id", "ts", "accession", "line", "owner_cik"]
-    return frame.sort_values(order, kind="stable").reset_index(drop=True)
+    return known_lines(frame, through)
+
+
+BUY_WINDOW_DAYS = 30  # calendar days of known_from a purchase counts as recent (the cluster window)
+HISTORY_COLUMNS = [
+    "instrument_id", "owner_cik", "transaction_date", "transaction_code", "derivative",
+    "plan_10b5_1", "known_from", "accession", "owner_count",
+]  # fmt: skip
+PAIR = ["instrument_id", "owner_cik"]
+OPEN_MARKET = ("P", "S")  # an open-market purchase or sale (Form 4 transaction codes)
+
+
+def buyer_histories(reader: StoreReader, sessions: Sequence[date]) -> pd.DataFrame:
+    """For each session, the open-market history of the owners who bought lately: every
+    non-derivative open-market line (code P or S) of each (issuer, owner) with a purchase known
+    within ``BUY_WINDOW_DAYS`` calendar days up to it, as that session saw it (``known_lines``
+    at the session: a restated line shows its old version, an original a later 4/A replaced
+    still shows), with ``as_of`` the session. A backfill therefore equals the nightly of each
+    session. The table is first narrowed to the pairs with any purchase version known in the
+    window of the sessions (safe: an amendment matches only the same issuer and owner), so each
+    session resolves a small frame. Empty (``HISTORY_COLUMNS`` + ``as_of``) when nothing is
+    stored or nobody bought."""
+    empty = pd.DataFrame(columns=[*HISTORY_COLUMNS, "as_of"])
+    raw = reader.table_range(TABLE, *ALL_TIME, None, None)
+    if raw is None or raw.empty or not sessions:
+        return empty
+    window = pd.Timedelta(days=BUY_WINDOW_DAYS)
+    known = pd.to_datetime(raw["known_from"])
+    bought = (raw["transaction_code"] == "P") & (known > pd.Timestamp(min(sessions)) - window)
+    pairs = raw.loc[bought & (known <= pd.Timestamp(max(sessions))), PAIR].drop_duplicates()
+    if pairs.empty:
+        return empty
+    subset = raw.merge(pairs, on=PAIR)
+    parts = []
+    for session in sessions:
+        seen = known_lines(subset, session)
+        seen = seen[(seen["transaction_code"].isin(OPEN_MARKET)) & ~seen["derivative"]]
+        recent = pd.to_datetime(seen["known_from"]) > pd.Timestamp(session) - window
+        buyers = seen.loc[recent & (seen["transaction_code"] == "P"), PAIR]
+        if buyers.empty:
+            continue
+        kept = seen.merge(buyers.drop_duplicates(), on=PAIR)
+        parts.append(kept[HISTORY_COLUMNS].assign(as_of=session))
+    return pd.concat(parts, ignore_index=True) if parts else empty

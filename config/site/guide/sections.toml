@@ -87,7 +87,7 @@ presets = ["pead_small_cap", "eap_all", "eap_volume", "earnings_date_early", "pr
 [[family]]
 id = "filings"
 title = "Filings and index changes"
-presets = ["eight_k_adverse_items", "nt_late_filer", "tender_offer_filed", "sp500_deletion"]
+presets = ["eight_k_adverse_items", "nt_late_filer", "tender_offer_filed", "sp500_deletion", "insider_cluster_buys"]
 
 [[family]]
 id = "options_signals"
@@ -97,7 +97,7 @@ presets = ["cp_iv_spread", "cp_iv_spread_rise", "iv_smirk", "iv_change_call", "i
 [[family]]
 id = "cross_section"
 title = "Cross-section ranks"
-presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite", "short_term_momentum_turnover"]
+presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite", "short_term_momentum_turnover", "short_squeeze_dtc"]
 
 [[family]]
 id = "factors"

@@ -7,6 +7,10 @@ Back to the [index of every edge](../edges.md).
 |---|---|---|---|---|
 | ETF flow pressure (`etf_flow_pressure`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `etf_flow_pressure` |
 | High-volume return premium (`high_volume_return_premium`) | candidate | every session | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `volume_shock`, `volume_shock_no_news` |
+| Option-expiration week (`option_expiration_week`) | candidate | calendar:opex week | excess return, over 5 sessions, entered 1 session after the decision session | none yet |
+| Quarter-end rebalancing (`quarter_end_rebalancing`) | candidate | calendar:quarter end | excess return, over 5 sessions, entered 1 session after the decision session | none yet |
+| Crowded shorts by days to cover (`short_squeeze_days_to_cover`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `short_squeeze_dtc` |
+| Turn of the month (`turn_of_the_month`) | candidate | calendar:turn of month | excess return, over 4 sessions, entered 1 session after the decision session | none yet |
 | Closed-end fund discount reversion (`closed_end_fund_discounts`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
 
 ## ETF flow pressure (`etf_flow_pressure`)
@@ -70,6 +74,130 @@ Back to the [index of every edge](../edges.md).
 - Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001 <https://rodneywhitecenter.wharton.upenn.edu/wp-content/uploads/2014/04/9901.pdf>
 - Kaniel, R., Ozoguz, A. and Starks, L., The High Volume Return Premium: Cross-Country Evidence, Journal of Financial Economics, 2012
 - Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (the signal catalogue; no volume-shock predictor of this paper) <https://github.com/OpenSourceAP/CrossSection>
+
+## Option-expiration week (`option_expiration_week`)
+
+**Status:** candidate. **Family:** D. **Thesis:** Large US stocks and the index earn more in the five sessions ending on the monthly option expiry than in the same number of sessions elsewhere.
+
+- **Outcome:** excess return, over 5 sessions, entered 1 session after the decision session
+- **Schedule:** calendar:opex week
+- **Universe:** `instrument.symbol in ('SPY', 'AAPL', 'MSFT', 'AMZN', 'JPM', 'XOM')`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09). The window is the calendar's opex_week (core/time/windows.py): the 5 sessions ending on the month's option expiry; S is the Friday before. The universe is SPY and five large caps (AAPL, MSFT, AMZN, JPM, XOM), six trials: a PROXY for the paper's S&P 100 stocks, named from today's largest names, so it carries hindsight (they are large because they rose) and is a few names, not the cross-section. The paper's filter on a high option-volume ratio is not replicated, and the open-interest conditioned variant the page marks as unpublished is deferred. The source's return in the week after (weak) is not measured. Opex weeks overlap the FOMC cycle in some months and quarterly triple-witching weeks overlap the S&P rebalance. No cost is deducted from a timed position (ADR 0073). No [published] figure: the practitioner numbers on file are a timing rule's own calculation, not an in-window minus out-of-window mean.
+
+**Quality bar**
+
+1. **Mechanism:** Option market makers rebalance their delta hedges as time decay speeds into the expiry, and implied volatility falls over the week; both push optionable large caps up (Stivers and Sun 2013).
+2. **Persistence:** Dealer hedging is mechanical and the effect is a few tens of basis points, below what large arbitrage capital pursues; but the authors' sample ends in 2008 and the one practitioner test on file reports a deterioration since about 2021, so persistence is a claim to test.
+3. **Outcome:** The instrument's raw return (benchmark none) over the 5 sessions ending on the monthly expiry, from the close of the Friday before, against its own return over the same number of sessions outside every window; no cost is deducted from a timed position (ADR 0073).
+4. **Trigger timing:** The monthly expiry is fixed by the exchange calendar ahead of time (the third Friday, the Thursday before when it is a holiday), so nothing is read at D: S is the session before the window's first one (the Friday before expiration week) and D = S - 1.
+5. **Faithful replication:** Stivers and Sun: long S&P 100 stocks from the close of the Friday before expiration week through the expiry close. Here SPY and five large caps stand in for the S&P 100, without the high option-volume filter.
+6. **Expected size and sample:** The paper's expiration-week spread was about 68 to 71 bp over its two halves (1996-2008, Quantpedia's summary of the paper; not a harness figure); a practitioner test of SPY since the 1990s reports 0.2 percent on average per opex week, deteriorating over the last four years. Expect little in index funds today.
+7. **Capacity and costs:** Unlimited capacity in large caps and the index; 12 trades a year; cost 1 to 2 bps a side, not deducted in this version. Long only.
+8. **Failure modes and retirement:** Decay once the effect is known and dealer hedging shrinks; the hindsight in the choice of names. Retire if the frozen-period in-window minus out-of-window mean is not above zero for SPY, or the Welch t over the independent windows stays under 2.
+9. **Decoys:** The FOMC cycle (an FOMC often lands in opex week), turn of the month in some months, triple- witching weeks (S&P rebalance), and large-cap beta; the paired series and the random draws separate the week from any five sessions.
+
+**Sources**
+
+- Stivers, C. and Sun, L., Option Expiration Week Effect, Journal of Banking and Finance, 2013 <https://ideas.repec.org/a/eee/jbfina/v37y2013i11p4226-4240.html>
+- Quantpedia, Option Expiration Week Effect <https://quantpedia.com/strategies/option-expiration-week-effect>
+- QuantifiedStrategies, The Options Expiration Week Effect <https://quantifiedstrategies.substack.com/p/the-options-expiration-week-effect-aa2>
+
+## Quarter-end rebalancing (`quarter_end_rebalancing`)
+
+**Status:** candidate. **Family:** D. **Thesis:** US equity and bond funds earn different returns over the last five sessions of a quarter than over the same number of sessions elsewhere, because balanced funds and pensions must rebalance.
+
+- **Outcome:** excess return, over 5 sessions, entered 1 session after the decision session
+- **Schedule:** calendar:quarter end
+- **Universe:** `instrument.symbol in ('SPY', 'AGG')`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09). This is the unconditional version only: every quarter-end window, whichever asset led. The source's signal (the quarter's equity-minus-bond return, the pension_rebalance_signal feature) is not built in v1: without it the sign of the effect is mixed across quarters (sell equities after an equity rally, buy them after a fall), so the in-window minus out-of-window mean may sit near zero even if the conditional effect is real; read the verdict as a test of 'is the window itself different', not of Harvey et al.'s rule. The window is the calendar's quarter_end (core/time/windows.py): the last 5 sessions of March, June, September and December; S is the session before the first of them. The source's month-end and 1 to 3 session windows are not in the closed set of windows. SPY and AGG (the aggregate bond fund, a stand-in for the bond leg) are two trials; the paper's -17 bp next-day figure is conditional and is not set as [published]. About 30 windows since 2018: the independent count is small, and only the Tiingo history reaches the 40 the bar asks. No cost is deducted from a timed position (ADR 0073).
+
+**Quality bar**
+
+1. **Mechanism:** Calendar and threshold rebalancing by target-date, balanced and pension funds is mandated and large; when equities have beaten bonds over the quarter the funds must sell equities and buy bonds into the last sessions, and the sign is public once the quarter's relative return is known (Harvey, Mazzoleni and Melone 2025).
+2. **Persistence:** Policy bands and calendar rules change slowly, so the flow persists; the authors estimate the cost to the funds near 16 billion dollars a year, which front-runners already capture, so the part left for an individual is small and is a claim to test. The funds bear the cost, not the trader.
+3. **Outcome:** The fund's raw return (benchmark none) over the 5 sessions of the quarter-end window from the entry close, against its own return over the same number of sessions outside every window; no cost is deducted from a timed position (ADR 0073).
+4. **Trigger timing:** The window is fixed by the exchange calendar (the last 5 sessions of a quarter's last month), so nothing is read at D: S is the session before the first of them and D = S - 1. The source's signal (the quarter's relative equity return, known at the decision) would be read at D and is not part of v1.
+5. **Faithful replication:** The source's rule: short equities and buy bonds into the last 1 to 2 sessions when equities are overweight, the reverse after (Harvey, Mazzoleni and Melone 2025). Here only the unconditional window is measured, in SPY and AGG, so it is a coarse test of the same flow.
+6. **Expected size and sample:** The paper's headline is minus 17 bp for equities the next day when they are overweight (press coverage of the paper; not a harness figure), and the flow is partial: Dutch pensions rebalance about 39 percent of the excess equity return a quarter (Bikker, Broeders and de Dreu 2010). The unconditional 5-session mean is expected to be small and noisy.
+7. **Capacity and costs:** Index and bond funds with unlimited capacity, four windows a year; a long-only tilt away from equities needs a bond fund as the other leg. Costs are small per trade and not deducted in this version.
+8. **Failure modes and retirement:** The flow is front-run, so the effect is smaller than the paper's cost estimate; the sign flips with the quarter's winner, which the unconditional window cannot see. Retire if the frozen-period in-window minus out-of-window mean is not different from zero in either fund or the Welch t stays under 2 over the independent windows.
+9. **Decoys:** Turn of the month (the last sessions of the quarter are also a month end, opposite sign in the final days) and the general one-month index reversal; the paired series against the stretch after each window and the 1,000 random draws separate the window from any five sessions.
+
+**Sources**
+
+- Harvey, C., Mazzoleni, M. and Melone, A., The Unintended Consequences of Rebalancing, NBER working paper 33554, 2025 <https://www.nber.org/papers/w33554>
+- Bikker, J., Broeders, D. and de Dreu, J., Stock market performance and pension fund investment policy: rebalancing, free float, or market timing?, International Journal of Central Banking, 2010
+- CXO Advisory, Exploiting predictable institutional portfolio rebalancing <https://cxoadvisory.com/calendar-effects/exploiting-predictable-institutional-portfolio-rebalancing>
+
+## Crowded shorts by days to cover (`short_squeeze_days_to_cover`)
+
+**Status:** candidate. **Family:** D. **Thesis:** Stocks with a large short position relative to their volume underperform the market over the next month, an avoid list for long-only buyers, with the squeeze as its tail risk.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 5000000` and `rollup.short_interest@v1.days_to_cover gte 0`
+- **Top K:** 30
+- **Screeners:** `short_squeeze_dtc`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The outcome is the SHORT on the 30 names with the highest days to cover among the eligible names, common stocks above 5 dollars trading 5M dollars a day (side = short, net of the site's borrow assumption): the source's low-minus-high sort read as an avoid list; the harness does not pay a borrow fee a real short may face for crowded names, which can be far above the default, and an individual cannot usually short them. Rule screen only, no learned scorer: the FINRA terms bar machine learning over the data (the table is no_ml). What is measured is the 30 highest days to cover among the eligible names: the short leg is ranked by the screener's score over every eligible name, so the screener's own floors (5 percent of the shares outstanding short, 3 days of volume to cover) shape the screen's list, not the measured leg. The universe holds only names with a FINRA report (days_to_cover present), so every base name is scored. The figures are FINRA's: short interest at a settlement date, public about ten days later. known_from is the session after the 7th business day after the settlement date (the publication schedule), never the settlement date, so each month-end decision reads the latest report public by then (the one settled mid-month, or the earlier month-end one); the figure is about two weeks to six weeks old when read. FINRA revises a report; the store keeps the first-seen value, which is the point-in-time one. Short interest is read as a share of the shares outstanding of all classes, not the float. The published 1.2 percent a month of Hong et al. is a low-minus-high spread and is from memory in the idea page, so no [published] figure. The history is FINRA's from 2017-12-29 (the API's first partition) and outcomes need the D0 Tiingo backfill (due 2026-11-09): verdicts are UNMEASURED until then. Month-end start sessions spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Short sellers are informed but constrained by borrow cost and recall risk, and a high days to cover means a crowded position that takes many sessions to unwind (Hong, Li, Ni, Scheinkman and Yan 2015; Boehmer, Huszar and Jordan 2010).
+2. **Persistence:** Borrow and recall constraints are structural, and the short side is where arbitrageurs refuse to go because a squeeze is unbounded (the 2021 meme squeezes); but the reported premium has weakened since publication in aggregate studies (not verified), so persistence is a claim to test.
+3. **Outcome:** The short's value: minus the excess return over SPY for the 20 sessions after the entry close (the session after a month-end decision), less 10 bps a round trip and the assumed borrow cost.
+4. **Trigger timing:** The latest short-interest report public by the decision session D (a month end) is read: a report counts from known_from, the session after the 7th business day after its settlement date, never from the settlement date; the entry session is S = D + 1 (start_offset_sessions = 1). The figure describes the settlement date, which is about two weeks before it became public.
+5. **Faithful replication:** The source's rule: sort on days to cover, long low and short high (Hong et al. 2015); here the 30 highest days to cover among the eligible stocks with a short-interest report, as the short (the screener's 5 percent and 3 day floors do not select the measured leg). The long leg (low days to cover) is not filed.
+6. **Expected size and sample:** About 1.2 percent a month for the low-minus-high spread, 1988-2012 (Hong et al. 2015; the idea page marks the figure as from memory, not verified); post-publication weakening is not verified. The short side here is half the spread at most, and costly to hold.
+7. **Capacity and costs:** An individual cannot usually short the names with the heaviest short interest: borrow is costly or unavailable, and a recall or a squeeze is unbounded. The edge is an avoid list for long-only buyers more than a trade; the outcome deducts 10 bps a round trip and the assumed borrow.
+8. **Failure modes and retirement:** A squeeze (the 2021 meme names) loses a short several times over in a month; the borrow fee is understated for crowded names; the figure is weeks old. Retire if the frozen-period short value is not above zero after borrow, or the high days-to-cover names do not do worse than the buy-and-hold mean of the eligible names.
+9. **Decoys:** Lottery and high-volatility stocks, retail attention and momentum (heavily shorted names are often past losers): the size and 12-1 momentum baselines on the same sessions.
+
+**Sources**
+
+- Hong, H., Li, W., Ni, S., Scheinkman, J. and Yan, P., Days to Cover and Stock Returns, NBER working paper 21166, 2015 <https://www.nber.org/papers/w21166>
+- Boehmer, E., Huszar, Z. and Jordan, B., The good news in short interest, Journal of Financial Economics, 2010
+- Rapach, D., Ringgenberg, M. and Zhou, G., Short interest and aggregate stock returns, Journal of Financial Economics, 2016
+
+## Turn of the month (`turn_of_the_month`)
+
+**Status:** candidate. **Family:** D. **Thesis:** Broad US equity funds earn more over the last session of a month and the first three of the next than over the same number of sessions elsewhere.
+
+- **Outcome:** excess return, over 4 sessions, entered 1 session after the decision session
+- **Schedule:** calendar:turn of month
+- **Universe:** `instrument.symbol in ('SPY', 'QQQ', 'IWM')`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09): the stored outcome history of the three funds is too short to measure a window edge before it (about 24 month ends from 2024-10). The window is the calendar's turn_of_month (core/time/windows.py): the month's last session and the three after it, 4 sessions; the entry session S is the session before the last (the close of T-1) and the decision session D is the one before S. The value is the fund's raw return over the window, compared with its own non-overlapping 4-session stretches outside every window (ADR 0073); the harness also pairs each window with the stretch right after it, so a rising fund does not pass on its drift. SPY, QQQ and IWM are three trials, not one (deflated Sharpe ratio). No cost is deducted from a timed position in this version (ADR 0073); the page's 1 to 2 bp a side is small against a 4-session window. The source's 7-day variant and its rule of holding cash outside the window are not filed; the Sharpe ratio of that timing is in the run record. No [published] figure: the whole-sample numbers on file are of the timing rule's total return, which the harness does not measure.
+
+**Quality bar**
+
+1. **Mechanism:** Month-end cash arrives in payroll, 401(k) and pension accounts and is invested on a schedule, and settlement conventions make the selling before month end and the buying after it predictable (McConnell and Xu 2008; Etula, Rinne, Suominen and Vaittinen 2020).
+2. **Persistence:** The flow is mandated by contribution schedules, not chosen, and is small per day, so arbitrage capital does not fully absorb it; it was found in about 30 markets. After 2010 only whole-sample figures are on file and no recent-decade split is published, so persistence is a claim to test.
+3. **Outcome:** The fund's raw return (benchmark none) over the 4 sessions of the turn-of-month window from the entry close, against its own return over the same number of sessions outside every window; no cost is deducted from a timed position (ADR 0073).
+4. **Trigger timing:** The window is fixed by the exchange calendar ahead of time (the month's last session and the three after it), so nothing is read at D: the entry session S is the session before the last session of the month (start_offset_sessions = 1 from D = S - 1) and the return runs from S's close over 4 sessions. No fact after D places a window or a stretch of the base.
+5. **Faithful replication:** The source's rule: hold the index from the close of the last trading day (or T-1) through the third session of the new month, cash otherwise (McConnell and Xu 2008). Here the three funds are held over the same four sessions, and the cash leg is only in the run record's timing Sharpe ratio.
+6. **Expected size and sample:** McConnell and Xu (2008), 1926-2005: essentially all of the equity premium accrues in these four days; the practitioner pages give only whole-sample timing returns (about 7 percent a year, against 7.5 percent buy and hold, invested a third of the time). A recent-decade split is not on file. About 100 windows since 2018 give a t statistic that cannot separate a few basis points a day from zero.
+7. **Capacity and costs:** Unlimited capacity in three index funds, about 12 round trips a year, cost 1 to 2 bps a side; long only. No cost is deducted in this version; the premium per window is a few tens of basis points before the 4-session hold's market risk.
+8. **Failure modes and retirement:** The effect is small against the funds' own drift and volatility and sits on the same dates as quarter-end and month-end index flows. Retire if the frozen-period in-window minus out-of-window mean is not above zero for SPY, or the Welch t over the independent windows stays under 2.
+9. **Decoys:** Quarter-end rebalancing and the December and January effects share these dates, and the windows are in the market's beta (compare the paired series with the stretch after each window): test against the 'any 4-session window' null, which the 1,000 random draws of the harness are.
+
+**Sources**
+
+- McConnell, J. and Xu, W., Equity Returns at the Turn of the Month, Financial Analysts Journal, 2008
+- Etula, E., Rinne, K., Suominen, M. and Vaittinen, L., Dash for Cash: Monthly Market Impact of Institutional Liquidity Needs, Review of Financial Studies, 2020 <https://aaltodoc.aalto.fi/items/00fea0ae-963b-444c-8221-912121905b98>
+- Quantpedia, Turn of the Month in Equity Indexes <https://quantpedia.com/strategies/turn-of-the-month-in-equity-indexes>
 
 ## Closed-end fund discount reversion (`closed_end_fund_discounts`)
 

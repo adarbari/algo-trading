@@ -17,6 +17,9 @@ from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.shares import TABLE as SHARES
 from algotrade.data.statements.reading import TABLE as STATEMENTS
 from algotrade.features.rollups.reference.share_classes import pairs
+from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.tables.readers import StoreReader
+from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import (
     END,
     series,
@@ -600,3 +603,22 @@ def test_reference_input_carries_the_issuer_and_class_ids_the_share_class_pairs_
     assert seen is not None
     found = pairs(seen).set_index("instrument_id")
     assert found.at["EQ:GOOGL", "sibling_id"] == "EQ:GOOG" and "EQ:AAPL" not in found.index
+
+
+def test_short_interest_is_seen_from_its_publication_session_not_its_settlement_date() -> None:
+    settled, published = date(2026, 9, 15), date(2026, 9, 25)
+    frame = stamped(
+        [{"instrument_id": "EQ:A", "ts": pd.Timestamp(settled, tz="UTC"), "known_from": published,
+          "short_position": 100, "days_to_cover": 2.0}],
+        published, "r",
+    )  # fmt: skip
+    backend = MemoryBackend()
+    StoreWriter(backend).write_table("events/short_interest", published, "r", frame)
+    reader = StoreReader(backend)
+    loaded = inputs.load_input(reader, "events/short_interest", [published], 30)
+    before = inputs.load_input(reader, "events/short_interest", [date(2026, 9, 24)], 30)
+    seen = loaded.at(published, 30)
+    assert seen is not None and list(seen["short_position"]) == [100]
+    assert len(before.at(date(2026, 9, 24), 30)) == 0  # settled by then, not public yet
+    empty = inputs.load_input(StoreReader(MemoryBackend()), "events/short_interest", [published], 5)
+    assert len(empty.at(published, 5)) == 0

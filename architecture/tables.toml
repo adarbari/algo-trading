@@ -298,6 +298,16 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "sessions since each kind of SEC event filing (8-K items, NT late-filing notices, tender offers) became known; reads events/filing by the acceptance session recomputed from ts (never the stored known_from)"
 
 [[table]]
+name = "rollups/instrument/insider_buys@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "open-market insider purchases known in the last 30 days (distinct buyers, opportunistic or routine, 10b5-1 plan); reads events/insider_transaction through data.insiders per session, never a purchase before its known_from (E6)"
+
+[[table]]
+name = "rollups/instrument/short_interest@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the latest FINRA short interest public by the session (shares short, days to cover, settlement date); reads events/short_interest by known_from (publication), so a figure counts only from its publication session; a no_ml source: no learned scorer reads it (E6)"
+
+[[table]]
 name = "rollups/instrument/earnings_date_shift@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the next earnings date's shift from the year-ago report plus 364 days and the session it was first stored; reads events/earnings as earnings@v1"

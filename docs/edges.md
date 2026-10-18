@@ -26,6 +26,7 @@ Each edge's full section is on its family page (docs/edges/).
 | Earnings-date advances (`earnings_date_shift`) | candidate | [family B](edges/b.md) |
 | Earnings gap on heavy volume (`earnings_gap_volume_drift`) | candidate | [family B](edges/b.md) |
 | Adverse 8-K item drift (`eight_k_item_drift`) | candidate | [family B](edges/b.md) |
+| Opportunistic insider cluster buys (`insider_opportunistic_cluster_buys`) | candidate | [family B](edges/b.md) |
 | Late filers (NT 10-K and NT 10-Q) (`late_filer_nt_drift`) | candidate | [family B](edges/b.md) |
 | Pre-earnings run-up in past winners (`pre_earnings_runup_winners`) | candidate | [family B](edges/b.md) |
 | S&P 500 deletions rebound (`sp500_deletions_long`) | candidate | [family B](edges/b.md) |
@@ -41,6 +42,10 @@ Each edge's full section is on its family page (docs/edges/).
 | Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`) | blocked | [family C](edges/c.md) |
 | ETF flow pressure (`etf_flow_pressure`) | candidate | [family D](edges/d.md) |
 | High-volume return premium (`high_volume_return_premium`) | candidate | [family D](edges/d.md) |
+| Option-expiration week (`option_expiration_week`) | candidate | [family D](edges/d.md) |
+| Quarter-end rebalancing (`quarter_end_rebalancing`) | candidate | [family D](edges/d.md) |
+| Crowded shorts by days to cover (`short_squeeze_days_to_cover`) | candidate | [family D](edges/d.md) |
+| Turn of the month (`turn_of_the_month`) | candidate | [family D](edges/d.md) |
 | Closed-end fund discount reversion (`closed_end_fund_discounts`) | blocked | [family D](edges/d.md) |
 | Composite mispricing score (`composite_mispricing_score`) | candidate | [family F](edges/f.md) |
 | Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | candidate | [family G](edges/g.md) |

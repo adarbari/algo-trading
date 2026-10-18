@@ -1,0 +1,76 @@
+# Edge document (ADR 0053, ADR 0073; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/calendar-flows.md
+# (option_expiration_week). A time-series edge: no screener, the instruments are the universe.
+id = "option_expiration_week"
+name = "Option-expiration week"
+family = "D"
+thesis = "Large US stocks and the index earn more in the five sessions ending on the monthly option expiry than in the same number of sessions elsewhere."
+mechanism = """Option market makers rebalance their delta hedges as time decay speeds into the
+expiry, and implied volatility falls over the week; both push optionable large caps up
+(Stivers and Sun 2013)."""
+persistence = """Dealer hedging is mechanical and the effect is a few tens of basis points, below
+what large arbitrage capital pursues; but the authors' sample ends in 2008 and the one practitioner
+test on file reports a deterioration since about 2021, so persistence is a claim to test."""
+schedule = "calendar:opex_week"
+top_k = "all"
+screeners = []
+base = "out_of_window"
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09). The window
+is the calendar's opex_week (core/time/windows.py): the 5 sessions ending on the month's option
+expiry; S is the Friday before. The universe is SPY and five large caps (AAPL, MSFT, AMZN, JPM,
+XOM), six trials: a PROXY for the paper's S&P 100 stocks, named from today's largest names, so it
+carries hindsight (they are large because they rose) and is a few names, not the cross-section.
+The paper's filter on a high option-volume ratio is not replicated, and the open-interest
+conditioned variant the page marks as unpublished is deferred. The source's return in the week
+after (weak) is not measured. Opex weeks overlap the FOMC cycle in some months and quarterly
+triple-witching weeks overlap the S&P rebalance. No cost is deducted from a timed position
+(ADR 0073). No [published] figure: the practitioner numbers on file are a timing rule's own
+calculation, not an in-window minus out-of-window mean."""
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SPY", "AAPL", "MSFT", "AMZN", "JPM", "XOM"] },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [5]
+benchmark = "none"
+start_offset_sessions = 1
+
+[quality_bar]
+outcome = """The instrument's raw return (benchmark none) over the 5 sessions ending on the monthly
+expiry, from the close of the Friday before, against its own return over the same number of sessions
+outside every window; no cost is deducted from a timed position (ADR 0073)."""
+trigger_timing = """The monthly expiry is fixed by the exchange calendar ahead of time (the third
+Friday, the Thursday before when it is a holiday), so nothing is read at D: S is the session before
+the window's first one (the Friday before expiration week) and D = S - 1."""
+replication = """Stivers and Sun: long S&P 100 stocks from the close of the Friday before expiration
+week through the expiry close. Here SPY and five large caps stand in for the S&P 100, without the
+high option-volume filter."""
+expected_size = """The paper's expiration-week spread was about 68 to 71 bp over its two halves (1996-2008,
+Quantpedia's summary of the paper; not a harness figure); a practitioner test of SPY since the 1990s
+reports 0.2 percent on average per opex week, deteriorating over the last four years. Expect little
+in index funds today."""
+capacity_costs = """Unlimited capacity in large caps and the index; 12 trades a year; cost 1 to 2 bps a
+side, not deducted in this version. Long only."""
+failure_modes = """Decay once the effect is known and dealer hedging shrinks; the hindsight in the choice
+of names. Retire if the frozen-period in-window minus out-of-window mean is not above zero for SPY, or
+the Welch t over the independent windows stays under 2."""
+decoys = """The FOMC cycle (an FOMC often lands in opex week), turn of the month in some months, triple-
+witching weeks (S&P rebalance), and large-cap beta; the paired series and the random draws separate
+the week from any five sessions."""
+
+[[sources]]
+title = "Stivers, C. and Sun, L., Option Expiration Week Effect, Journal of Banking and Finance, 2013"
+url = "https://ideas.repec.org/a/eee/jbfina/v37y2013i11p4226-4240.html"
+
+[[sources]]
+title = "Quantpedia, Option Expiration Week Effect"
+url = "https://quantpedia.com/strategies/option-expiration-week-effect"
+
+[[sources]]
+title = "QuantifiedStrategies, The Options Expiration Week Effect"
+url = "https://quantifiedstrategies.substack.com/p/the-options-expiration-week-effect-aa2"

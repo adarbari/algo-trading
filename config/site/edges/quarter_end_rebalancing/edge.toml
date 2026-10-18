@@ -1,0 +1,82 @@
+# Edge document (ADR 0053, ADR 0073; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/calendar-flows.md
+# (quarter_end_rebalancing). A time-series edge: no screener, the instruments are the universe.
+id = "quarter_end_rebalancing"
+name = "Quarter-end rebalancing"
+family = "D"
+thesis = "US equity and bond funds earn different returns over the last five sessions of a quarter than over the same number of sessions elsewhere, because balanced funds and pensions must rebalance."
+mechanism = """Calendar and threshold rebalancing by target-date, balanced and pension funds is
+mandated and large; when equities have beaten bonds over the quarter the funds must sell equities
+and buy bonds into the last sessions, and the sign is public once the quarter's relative return
+is known (Harvey, Mazzoleni and Melone 2025)."""
+persistence = """Policy bands and calendar rules change slowly, so the flow persists; the authors
+estimate the cost to the funds near 16 billion dollars a year, which front-runners already capture,
+so the part left for an individual is small and is a claim to test. The funds bear the cost, not
+the trader."""
+schedule = "calendar:quarter_end"
+top_k = "all"
+screeners = []
+base = "out_of_window"
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09). This is the
+unconditional version only: every quarter-end window, whichever asset led. The source's signal
+(the quarter's equity-minus-bond return, the pension_rebalance_signal feature) is not built in v1:
+without it the sign of the effect is mixed across quarters (sell equities after an equity rally,
+buy them after a fall), so the in-window minus out-of-window mean may sit near zero even if the
+conditional effect is real; read the verdict as a test of 'is the window itself different', not of
+Harvey et al.'s rule. The window is the calendar's quarter_end (core/time/windows.py): the last 5
+sessions of March, June, September and December; S is the session before the first of them. The
+source's month-end and 1 to 3 session windows are not in the closed set of windows. SPY and AGG
+(the aggregate bond fund, a stand-in for the bond leg) are two trials; the paper's -17 bp
+next-day figure is conditional and is not set as [published]. About 30 windows since 2018: the
+independent count is small, and only the Tiingo history reaches the 40 the bar asks. No cost is
+deducted from a timed position (ADR 0073)."""
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SPY", "AGG"] },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [5]
+benchmark = "none"
+start_offset_sessions = 1
+
+[quality_bar]
+outcome = """The fund's raw return (benchmark none) over the 5 sessions of the quarter-end window
+from the entry close, against its own return over the same number of sessions outside every window;
+no cost is deducted from a timed position (ADR 0073)."""
+trigger_timing = """The window is fixed by the exchange calendar (the last 5 sessions of a quarter's
+last month), so nothing is read at D: S is the session before the first of them and D = S - 1.
+The source's signal (the quarter's relative equity return, known at the decision) would be read
+at D and is not part of v1."""
+replication = """The source's rule: short equities and buy bonds into the last 1 to 2 sessions when
+equities are overweight, the reverse after (Harvey, Mazzoleni and Melone 2025). Here only the
+unconditional window is measured, in SPY and AGG, so it is a coarse test of the same flow."""
+expected_size = """The paper's headline is minus 17 bp for equities the next day when they are overweight
+(press coverage of the paper; not a harness figure), and the flow is partial: Dutch pensions
+rebalance about 39 percent of the excess equity return a quarter (Bikker, Broeders and de Dreu
+2010). The unconditional 5-session mean is expected to be small and noisy."""
+capacity_costs = """Index and bond funds with unlimited capacity, four windows a year; a long-only
+tilt away from equities needs a bond fund as the other leg. Costs are small per trade and not
+deducted in this version."""
+failure_modes = """The flow is front-run, so the effect is smaller than the paper's cost estimate; the
+sign flips with the quarter's winner, which the unconditional window cannot see. Retire if the
+frozen-period in-window minus out-of-window mean is not different from zero in either fund or the
+Welch t stays under 2 over the independent windows."""
+decoys = """Turn of the month (the last sessions of the quarter are also a month end, opposite sign in
+the final days) and the general one-month index reversal; the paired series against the stretch after
+each window and the 1,000 random draws separate the window from any five sessions."""
+
+[[sources]]
+title = "Harvey, C., Mazzoleni, M. and Melone, A., The Unintended Consequences of Rebalancing, NBER working paper 33554, 2025"
+url = "https://www.nber.org/papers/w33554"
+
+[[sources]]
+title = "Bikker, J., Broeders, D. and de Dreu, J., Stock market performance and pension fund investment policy: rebalancing, free float, or market timing?, International Journal of Central Banking, 2010"
+
+[[sources]]
+title = "CXO Advisory, Exploiting predictable institutional portfolio rebalancing"
+url = "https://cxoadvisory.com/calendar-effects/exploiting-predictable-institutional-portfolio-rebalancing"
