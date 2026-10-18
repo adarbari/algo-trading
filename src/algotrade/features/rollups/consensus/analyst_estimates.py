@@ -2,7 +2,7 @@
 
 Inputs: ``analyst/estimate_snapshots`` as the session sees it (our own nightly history of FMP's
 annual estimates: ``data.analyst.reading``), the session's ``universe`` (one row per equity) and
-``financials@v2`` for the last fiscal year end known. Annual estimates only (``kind =
+``financials@v3`` for the last fiscal year end known. Annual estimates only (``kind =
 estimates_annual``), FMP only; the rows are the vendor's newest snapshot of the name, so the
 fiscal years are the ones listed in ONE fetch. Every feature is derived from a personal-use
 source: ``licence = "personal"`` (ADR 0068, ADR 0069).
@@ -15,12 +15,12 @@ source: ``licence = "personal"`` (ADR 0068, ADR 0069).
     estimates_status                 OK / STALE / NOT_COVERED / NOT_FETCHED (``analyst_status``)
 
 FY1 is the first estimate year ending MORE THAN ``fy_slack_days`` (60, under 85) after the later of
-the last fiscal year end of an annual report known at the session (``financials@v2``'s
+the last fiscal year end of an annual report known at the session (``financials@v3``'s
 ``revenue_fy_end``) and the last quarter's end (``qtr_as_of``: a filer with no revenue or annual
 fact still has quarters, and a stale year end must not make the year just reported FY1); the slack
 absorbs a 52/53-week year whose vendor date differs by days. Without a known
 annual report or quarter FY1 is the first estimate year ending after the session. Without
-``financials@v2`` for the session no year is served (the columns are null). FY2 is the next listed.
+``financials@v3`` for the session no year is served (the columns are null). FY2 is the next listed.
 **At the fiscal-year roll FY1 moves when the 10-K becomes known**, so a forward P/E over FY1 jumps
 once, on the session the filing is public: it is a change of the year, not of the estimate.
 
@@ -52,13 +52,13 @@ from algotrade.features.rollups.consensus.analyst_status import (
 
 NAME = "analyst_estimates"
 VERSION = 1
-FINANCIALS = "rollups/instrument/financials@v2"
+FINANCIALS = "rollups/instrument/financials@v3"
 _P: Licence = "personal"
 _SNAP = f"{SNAPSHOTS}."
 _WHY = (
     "analyst_status is STALE (the newest snapshot is older than stale_days), NOT_COVERED (the "
     "vendor has no estimates for the name) or NOT_FETCHED (never asked: the nightly rotation "
-    "has not reached it); or financials@v2 has no row for the session (no fiscal year end is "
+    "has not reached it); or financials@v3 has no row for the session (no fiscal year end is "
     "known, so no year is served); or the snapshot lists no year ending after the last report"
 )
 _STATUS = "estimates_status"
@@ -194,7 +194,7 @@ def compute(inputs: Inputs, session: date, p: EstimatesParams) -> pd.DataFrame:
     out[_STATUS] = status["status"]
     out["estimates_age_days"] = pd.to_numeric(status["age_days"])
     financials = inputs.get(FINANCIALS)
-    # without financials@v2 for the session no year end is known: FY1 would silently mean the
+    # without financials@v3 for the session no year end is known: FY1 would silently mean the
     # session's year for some names and the filer's for others, so no year is served
     served = (
         set(status.loc[status["status"] == OK, "instrument_id"])
