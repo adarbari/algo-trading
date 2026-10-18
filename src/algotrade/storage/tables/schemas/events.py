@@ -118,7 +118,7 @@ INSIDER_EVENTS = fixed(
     "transaction_code string", "acquired_disposed string", "shares float64", "price float64",
     "shares_after float64", "direct_indirect string", "is_director bool!", "is_officer bool!",
     "is_ten_pct_owner bool!", "is_other bool!", "officer_title string", "plan_10b5_1 bool",
-    "owner_count int64!", runs="merge",
+    "owner_count int64!", "owner_name string", runs="merge",
     key=("instrument_id", "accession", "line", "owner_cik", KNOWN_FROM),
 )  # fmt: skip
 
