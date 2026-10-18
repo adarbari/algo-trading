@@ -40,11 +40,11 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/analyst_revisions@v1",
     "rollups/instrument/analyst_targets@v1",
     "rollups/instrument/anchored_vwap@v2",   # 68 MB
-    "rollups/instrument/balance_sheet@v1",
+    "rollups/instrument/balance_sheet@v2",
     "rollups/instrument/bands@v2",   # 223 MB
     "rollups/instrument/call_wing@v1",
     "rollups/instrument/candle@v1",   # 82 MB
-    "rollups/instrument/cash_flow@v1",
+    "rollups/instrument/cash_flow@v2",
     "rollups/instrument/chain_flow@v1",
     "rollups/instrument/dividend_schedule@v1",
     "rollups/instrument/dividends@v2",
@@ -55,20 +55,21 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/earnings_schedule@v1",
     "rollups/instrument/earnings_surprise@v1",
     "rollups/instrument/episode_behaviour@v1",   # 42 MB
-    "rollups/instrument/financials@v2",
+    "rollups/instrument/financials@v3",
     "rollups/instrument/flow_history@v1",
     "rollups/instrument/fund_reference@v1",
-    "rollups/instrument/fundamentals@v3",
+    "rollups/instrument/fundamentals@v4",
     "rollups/instrument/gaps@v1",   # 43 MB
-    "rollups/instrument/growth_history@v1",
+    "rollups/instrument/growth_history@v2",
     "rollups/instrument/ibkr_iv@v1",
     "rollups/instrument/implied_move@v1",
-    "rollups/instrument/income_statement@v1",
+    "rollups/instrument/income_statement@v2",
     "rollups/instrument/index_changes@v1",
     "rollups/instrument/iv30@v1",
     "rollups/instrument/iv_history@v2",
     "rollups/instrument/iv_term@v1",
     "rollups/instrument/momentum@v1",   # 142 MB
+    "rollups/instrument/momentum_variants@v1",
     "rollups/instrument/nearest_expiry@v1",
     "rollups/instrument/oi_walls@v1",
     "rollups/instrument/option_liquidity@v1",

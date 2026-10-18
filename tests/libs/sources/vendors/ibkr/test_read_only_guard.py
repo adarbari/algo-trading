@@ -40,7 +40,7 @@ GENERIC = frozenset(
     {"Order", "Trade", "Fill", "Execution", "portfolio", "positions", "executions", "fills",
      "trades", "orders", "pnl", "PortfolioItem", "Position", "AccountValue"}
 )  # fmt: skip
-ALLOWED_IMPORTS = frozenset({"IB", "Stock", "Option"})
+ALLOWED_IMPORTS = frozenset({"IB", "Stock", "Option", "Future"})
 
 
 def code_files() -> list[Path]:

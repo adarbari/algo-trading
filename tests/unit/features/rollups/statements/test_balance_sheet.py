@@ -1,4 +1,4 @@
-"""balance_sheet@v1: latest instant, look-ahead, tag rank, debt rules a to g in one filing,
+"""balance_sheet@v2: latest instant, look-ahead, tag rank, debt rules a to g in one filing,
 derived liabilities, the statuses and the financial flag."""
 
 from datetime import date, timedelta

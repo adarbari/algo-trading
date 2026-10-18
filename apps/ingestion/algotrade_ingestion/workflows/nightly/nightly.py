@@ -70,6 +70,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_chains,
     check_earnings,
     check_filings,
+    check_futures_curves,
     check_ibkr_vols,
     check_ipo_lockups,
     check_macro,
@@ -140,6 +141,19 @@ NIGHTLY: tuple[Step, ...] = (
         latest_only=SNAPSHOT,
         accept=(check_universe, check_reference_classification),
         task_complete=True,
+    ),
+    # The futures curves (read-only IBKR, personal licence): the front contracts of each
+    # configured root. EARLY in the order, right after the universe: its prices are only the
+    # session's own until each contract's next session opens (18:00 New York at the earliest;
+    # 16:30 New York is the earliest start of the day), so the heavy steps must not delay it.
+    # Optional like ibkr-iv: SKIPPED with a WARN without the gateway, a root without data
+    # permission is a WARN, never a FAIL; nothing reads it yet (history accrues), so no step
+    # needs it.
+    Step(
+        "futures-curves",
+        latest_only=SNAPSHOT,
+        critical=False,
+        accept=(check_futures_curves,),
     ),
     # Reference data (ADR 0039: moves to the weekly `reference` workflow in WF4): optional.
     Step("company-details", latest_only=SNAPSHOT, critical=False),

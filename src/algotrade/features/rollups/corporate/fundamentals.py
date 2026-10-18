@@ -1,10 +1,15 @@
-"""``fundamentals@v3``: shares outstanding, the count a year earlier and the market-cap status.
+"""``fundamentals@v4``: shares outstanding, the count a year earlier and the market-cap status.
 
-Inputs: ``instruments/shares`` (SEC company facts; every fact FILED on or before the session,
-point in time by filing date), the session's ``price_stats@v2`` close, and ``events/split``
-by event date. One row per instrument with a close or a share count on the session.
+Inputs: ``instruments/shares`` (SEC company facts) read as ``instruments/shares_accepted``: every
+fact public at the session's CLOSE, point in time by the instant SEC ACCEPTED the filing
+(16:00 New York time, 13:00 on an early close; a fact without an acceptance time counts from
+the session after its filing date), the session's ``price_stats@v2`` close, and ``events/split``
+by event date. v3 counted every fact ``filed <= session``, a date: a filing accepted after
+the close counted at that close, a one-session lookahead (ADR 0067 amendment; ``financials@v3``
+has the same fix); no column changed. One row per instrument with a close or a share count on
+the session.
 
-Which count (per instrument, among facts filed on or before the session):
+Which count (per instrument, among facts public by the session's close):
 
 - ``dei`` (cover-page ``EntityCommonStockSharesOutstanding``): the latest filed (then the
   latest period end), used while the company still tags it, i.e. its latest ``dei`` fact was
@@ -32,7 +37,7 @@ it for splits before they file).
 
 ``shares_outstanding_year_ago`` is the count of the same concept as the chosen one (a cover
 count against a cover count, a weighted average against a weighted average: the two differ by
-definition) among the facts filed on or before the session, whose period ended 9 to 15 months
+definition) among the facts public by the session's close, whose period ended 9 to 15 months
 before ``shares_as_of``, the one closest to a year before it (a later filing of the same period,
 an amendment, wins a tie); null when there is none. It is split-adjusted by the same rule as
 the current count, to the session's share terms, so a split in between does not read as
@@ -54,15 +59,15 @@ from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.feature import Feature
 
 NAME = "fundamentals"
-VERSION = 3
-SHARES = "instruments/shares"
+VERSION = 4
+SHARES = "instruments/shares_accepted"  # by acceptance session, not by filing date
 PRICE_STATS = "rollups/instrument/price_stats@v2"
 SPLITS = "events/split"
 DEI, WEIGHTED = "dei", "weighted_basic"
 YEAR = 365  # days before shares_as_of the year-ago count's period ideally ended
 YEAR_AGO = (274, 456)  # days before shares_as_of that period may end: 9 to 15 months
 
-_NO_SHARES = "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
+_NO_SHARES = "no share-count fact public by the session's close (ETFs, funds, no CIK): NO_SHARES"
 _FACTS = (f"{SHARES}.shares", f"{SHARES}.concept", f"{SHARES}.filed", f"{SHARES}.period_end")
 
 FEATURES = (
@@ -89,7 +94,9 @@ FEATURES = (
         _NO_SHARES, inputs=(f"{SHARES}.period_end",),
     ),
     Feature(
-        "shares_filed", "date", "date", "The filing date that made the count public",
+        "shares_filed", "date", "date",
+        "The filing date of the filing that made the count public (it counts from the session "
+        "whose close is after SEC's acceptance of it)",
         _NO_SHARES, inputs=(f"{SHARES}.filed",),
     ),
     Feature(
@@ -102,7 +109,7 @@ FEATURES = (
         "OK; NO_SHARES (no count); STALE (period end more than stale_days, 400, before the "
         "session; the count is still shown); NO_PRICE (no close)",
         "never", "label", categories=("OK", "NO_SHARES", "STALE", "NO_PRICE"),
-        inputs=("fundamentals.shares_outstanding@v3", "price_stats.close@v2"),
+        inputs=("fundamentals.shares_outstanding@v4", "price_stats.close@v2"),
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
@@ -131,7 +138,7 @@ def _latest(facts: pd.DataFrame, concept: str) -> pd.DataFrame:
 
 def choose(facts: pd.DataFrame | None) -> pd.DataFrame:
     """Per instrument: the count to use (``instrument_id``, ``shares``, ``period_end``,
-    ``filed``, ``concept``) among ``facts`` (already filed on or before the session)."""
+    ``filed``, ``concept``) among ``facts`` (already public by the session's close)."""
     columns = ["instrument_id", "shares", "period_end", "filed", "concept"]
     if facts is None or facts.empty:
         return pd.DataFrame(columns=columns)
@@ -146,7 +153,7 @@ def choose(facts: pd.DataFrame | None) -> pd.DataFrame:
 
 def year_ago(facts: pd.DataFrame | None, chosen: pd.DataFrame) -> pd.DataFrame:
     """Per chosen count: the count of the same concept a year earlier among ``facts`` (already
-    filed on or before the session): the fact whose period ended ``YEAR_AGO`` days before the
+    public by the session's close): the fact whose period ended ``YEAR_AGO`` days before the
     chosen count's, the one closest to ``YEAR``, the latest filed on a tie. Columns as
     ``choose``; instruments with no such count are absent."""
     columns = ["instrument_id", "shares", "period_end", "filed", "concept"]
@@ -219,7 +226,7 @@ GROUP = FeatureGroup(
     NAME,
     VERSION,
     "Shares outstanding and the count a year earlier (SEC company facts, point in time by "
-    "filing date) and its status",
+    "SEC acceptance) and its status",
     (
         Input(PRICE_STATS),
         Input(SHARES, required=False),
