@@ -4,9 +4,12 @@
  * user's overrides; the criteria shown are the working copy resolved through its layers (the
  * API's `working`), with the draft's own changes merged on top by id. Pure.
  */
-import { feature, type gqlTypes } from '@/shared/api';
+import type { gqlTypes } from '@/shared/api';
 
 import { groupsOf, pruneGroups, type CriterionGroup } from '../lib/groups';
+import { blankDocument, toDocument } from '../lib/blank';
+import { isScreenId } from '../lib/screen-id';
+import { MODES, type CriterionMode } from '../lib/modes';
 
 type ServedDetail = NonNullable<gqlTypes.ScreenDetailQuery['screenDetail']>;
 type Table = Record<string, unknown>;
@@ -20,7 +23,6 @@ export type ScreenerListItem = gqlTypes.MyScreensQuery['myScreens'][number];
 export type ScreenerSummary = gqlTypes.ScreenerConfigsQuery['configs'][number];
 export type PresetPin = NonNullable<ServedDetail['preset']>;
 
-export type CriterionMode = 'hard' | 'soft' | 'score';
 export type MissDecision = 'WATCH' | 'LIQUIDITY_RISK' | 'EVENT_RISK';
 /** A number (absolute, in the field's unit) or a share of the threshold. */
 export type Tolerance = number | { relative: number };
@@ -48,10 +50,7 @@ export interface ScreenDocument extends Record<string, unknown> {
   groups?: Record<string, Record<string, unknown>>;
 }
 
-/** The keys the authoring flow manages (a draft never carries them). */
-const MANAGED_KEYS = ['version', 'schedule'];
-
-export const MODES: readonly CriterionMode[] = ['hard', 'soft', 'score'];
+export { MODES, type CriterionMode };
 export const MISS_DECISIONS: readonly MissDecision[] = ['WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK'];
 
 /** Ops that take no threshold. */
@@ -60,32 +59,9 @@ export const NO_VALUE_OPS: readonly string[] = ['is_null', 'not_null'];
 const tableOf = (value: unknown): CriteriaTable =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as CriteriaTable) : {};
 
-/** A document without the keys the authoring flow manages. */
-export function toDocument(source: Readonly<Record<string, unknown>>, id: string): ScreenDocument {
-  const kept = Object.fromEntries(
-    Object.entries(source).filter(([key]) => key !== 'id' && !MANAGED_KEYS.includes(key)),
-  );
-  return { id, ...kept };
-}
+export { toDocument };
 
-/**
- * Who a new screener screens (ADR 0030): a rule screen has no selection, so it opens with the
- * base gates as criteria. They are ordinary criteria: edit or remove any of them.
- */
-const BASE_CRITERIA: CriteriaTable = {
-  security_type: {
-    field: feature('instrument.security_type'),
-    op: 'in',
-    value: ['COMMON_STOCK', 'ADR', 'ETF'],
-  },
-  status: { field: feature('instrument.status'), op: 'eq', value: 'ACTIVE' },
-  optionable: { field: feature('instrument.optionable'), op: 'eq', value: true },
-};
-
-/** A blank draft: a rule screen with the base gates. */
-export function blankDocument(id: string): ScreenDocument {
-  return { id, kind: 'screener', impl: 'rules', criteria: structuredClone(BASE_CRITERIA) };
-}
+export { blankDocument };
 
 /** The criterion of a `[criteria.<id>]` table (unknown keys left out). */
 export function toCriterion(id: string, table: Record<string, unknown>): Criterion {
@@ -245,8 +221,7 @@ export function criterionOfError(message: string | null | undefined): string | n
   return /\.criteria\.([A-Za-z0-9_-]+)\./.exec(message ?? '')?.[1] ?? null;
 }
 
-/** A screen id the API accepts: 1-64 of [a-z0-9_-]. */
-export const isScreenId = (id: string): boolean => /^[a-z0-9_-]{1,64}$/.test(id);
+export { isScreenId };
 
 /** The tie-break column of the draft (`[rank] tie_break`), if any. */
 export function tieBreakOf(

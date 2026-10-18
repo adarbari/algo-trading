@@ -41,20 +41,22 @@ export {
 export {
   CONNECTOR_LABEL,
   DECIDED_BY_LABEL,
+  KIND_LABEL,
+  KIND_TERM,
+  type GroupKind,
+} from './lib/group-labels';
+export {
   eitherWithPrevious,
   excludeCriterion,
   excludeGroup,
   groupsOf,
   groupText,
   joinTarget,
-  KIND_LABEL,
-  KIND_TERM,
   layoutOf,
   newGroupId,
   ownGroupIds,
   ungroup,
   type CriterionGroup,
-  type GroupKind,
   type LayoutNode,
 } from './lib/groups';
 export {

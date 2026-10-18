@@ -5,31 +5,9 @@
  * one read-only gate), and the pure document edits behind its actions (either this or the
  * previous, exclude, ungroup). Generic over the document so it never imports the spec model.
  */
-export type GroupKind = 'all' | 'any' | 'none';
+import { GROUP_KINDS, type GroupKind } from './group-labels';
 
-export const GROUP_KINDS: readonly GroupKind[] = ['all', 'any', 'none'];
-
-export const KIND_LABEL: Record<GroupKind, string> = {
-  all: 'All of',
-  any: 'Any of',
-  none: 'None of',
-};
-
-export const CONNECTOR_LABEL: Record<GroupKind, string> = {
-  all: 'and',
-  any: 'or',
-  none: 'and not',
-};
-
-/** The Guide term of each kind. */
-export const KIND_TERM: Record<GroupKind, string> = {
-  all: 'group_all',
-  any: 'group_any',
-  none: 'group_none',
-};
-
-/** The word before the member that decided a group's outcome in a pick's scorecard. */
-export const DECIDED_BY_LABEL = 'Decided by';
+export { GROUP_KINDS, type GroupKind };
 
 /** The fewest members a group of that kind needs (the server's size rule). */
 const MIN_MEMBERS: Record<GroupKind, number> = { all: 2, any: 2, none: 1 };
