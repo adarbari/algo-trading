@@ -47,8 +47,9 @@ rest). Per run:
 - the iShares file's header also states the fund's **shares outstanding** (as of the file's date,
   rounded to creation units; State Street's and ProShares' files have none): each accepted read
   also stages one ``holdings/etf_shares`` row (``shares_frame``), so there is no second download.
-  ``known_from`` is the New York date of the fetch instant, never before the file's date (ADR
-  0050: the first session the count was knowable; the file's date is only when it is as of, and
+  ``known_from`` is the session of the New York date of the fetch instant (the next session when
+  that day is not one), never before the file's date (ADR 0050: the first session the count was
+  knowable; the file's date is only when it is as of, and
   issuers publish it the same evening or the next morning). The funds of ``[etf_holdings]
   daily_funds`` (iShares ones the flow-pressure edges need) are read every night outside the
   weekly slots and the ``per_night`` cap (``daily_due``), the rest weekly: a fund's count series
@@ -68,7 +69,7 @@ from typing import Any, Self
 
 import pandas as pd
 
-from algotrade.core.time.calendar import EXCHANGE_TZ
+from algotrade.core.time.calendar import EXCHANGE_TZ, is_session, next_session
 from algotrade.data.funds.holdings import Bridge, cusip_of, holdings_status, known_cusips
 from algotrade.data.reference import instruments, snapshot
 from algotrade.data.resolver import SymbolResolver
@@ -511,9 +512,11 @@ def shares_frame(
     iid: str, symbol: str, as_of: date, shares: float, fetched: datetime
 ) -> pd.DataFrame:
     """The ``holdings/etf_shares`` row of one fund read at ``fetched`` (a UTC instant): the
-    file's count and date, ``known_from`` the New York date of the fetch (a file read before the
-    date it says it is as of is not believable earlier than that date)."""
+    file's count and date, ``known_from`` the session of the New York date of the fetch (the next
+    one when that day is a weekend or holiday; never before the as-of date)."""
     known = max(fetched.astimezone(EXCHANGE_TZ).date(), as_of)
+    if not is_session(known):  # known_from is a session (ADR 0050): a weekend or holiday fetch
+        known = next_session(known)  # is known from the next one
     return pd.DataFrame(
         {
             "instrument_id": [iid],

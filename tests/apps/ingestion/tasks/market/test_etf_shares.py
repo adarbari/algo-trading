@@ -79,3 +79,13 @@ def test_daily_due_takes_only_ishares_funds_not_read_today_and_not_held() -> Non
     due = daily_due(["D", "C", "B", "A", "Z"], covered, read, DAY, hold)  # type: ignore[arg-type]
     assert due == ["B"]
     assert daily_due(["C"], covered, {}, DAY + timedelta(days=2), hold) == ["C"]  # type: ignore[arg-type]
+
+
+def test_a_weekend_fetch_is_known_from_the_next_session() -> None:
+    saturday = datetime(2026, 10, 3, 15, tzinfo=UTC)  # Saturday 11:00 in New York
+    frame = shares_frame("EQ:X", "X", date(2026, 10, 2), 5.0, saturday)
+    assert frame["known_from"][0] == date(2026, 10, 5)  # the Monday
+    friday_night = datetime(2026, 10, 3, 1, tzinfo=UTC)  # Friday 21:00 in New York
+    assert shares_frame("EQ:X", "X", date(2026, 10, 2), 5.0, friday_night)["known_from"][0] == (
+        date(2026, 10, 2)
+    )

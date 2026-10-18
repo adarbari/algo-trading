@@ -447,18 +447,19 @@ ETF_HOLDINGS = fixed(
     runs="merge",
     key=("instrument_id", "as_of", "rank"),
 )
-# L2: an ETF's shares outstanding as its issuer's daily file states them (EB D4; ADR 0035's
-# ``etf-holdings`` task reads the file, so there is no second download): one row per fund x
-# issuer as-of date. Only iShares' file carries the count (its header block); State Street's and
-# ProShares' files do not. ``as_of`` is the file's date, ``ts`` that date at UTC midnight (a
-# count as of a session's close, not an instant). ``known_from`` is the first session the row was
-# knowable (ADR 0050): the New York date of the fetch instant (``knowledge_ts``), never before
-# ``as_of``; readers apply ``known_from <= S`` (``data.funds.shares``). A file read again for
-# the same ``as_of`` writes a row with a later ``known_from``, which readers ignore. Counts are
-# rounded to creation units by the issuer. History accrues from the first nightly that stores
-# it; nothing is backfilled. Flows are NOT stored: the change in shares times the stored close
-# approximates them (it ignores the intraday NAV and the creation / redemption price). Runs
-# are increments (a few funds each), so they merge on (fund, as_of).
+# L2: an ETF's shares outstanding as its issuer's daily file states them (EB D4; ADR 0035's ``etf-
+# holdings`` task reads the file, so there is no second download): one row per fund x issuer as-of
+# date. Only iShares' file carries the count (its header block); State Street's and ProShares'
+# files do not. ``as_of`` is the file's date, ``ts`` that date at UTC midnight (a count as of a
+# session's close, not an instant). ``known_from`` is the first session the row was knowable (ADR
+# 0050): the session of the New York date of the fetch instant (``knowledge_ts``; the next session
+# on a weekend or holiday), never before ``as_of``; readers apply ``known_from <= S``
+# (``data.funds.shares``). A file read again for the same ``as_of`` writes a row with a later
+# ``known_from``; readers take the latest they may see. Counts are rounded to creation units by
+# the issuer. History accrues from the first nightly that stores it; nothing is backfilled. Flows
+# are NOT stored: the change in shares times the stored close approximates them (it ignores the
+# intraday NAV and the creation / redemption price). Runs are increments (a few funds each), so
+# they merge on (fund, as_of).
 ETF_SHARES = fixed(
     "holdings/etf_shares",
     "holdings",

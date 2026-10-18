@@ -39,13 +39,16 @@ def test_a_row_is_invisible_before_its_known_from_whatever_its_as_of() -> None:
     assert list(seen["shares_outstanding"]) == [100.0] and list(seen["as_of"]) == [D1]
 
 
-def test_a_second_read_of_the_same_date_never_moves_known_from_later() -> None:
+def test_a_restated_count_is_seen_from_the_session_it_was_fetched() -> None:
     reader = store(
         (D2, "r1", [row(FUND, D1, 100.0, D2)], at(D2)),
-        (D3, "r2", [row(FUND, D1, 100.0, D3)], at(D3)),
+        (D3, "r2", [row(FUND, D1, 104.0, D3)], at(D3)),
     )
+    before = etf_shares(reader, [FUND], D1, D2)
+    assert list(before["shares_outstanding"]) == [100.0]
     seen = etf_shares(reader, [FUND], D1, D3)
-    assert len(seen) == 1 and list(seen["known_from"]) == [D2]
+    assert len(seen) == 1 and list(seen["known_from"]) == [D3]
+    assert list(seen["shares_outstanding"]) == [104.0]
 
 
 def test_a_series_is_by_fund_then_date_and_limited_to_the_funds_asked() -> None:

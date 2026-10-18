@@ -4,9 +4,9 @@ One row per fund and issuer as-of date, written by the ``etf-holdings`` task fro
 file it already reads. A reader on session ``S`` sees only what was knowable then: rows with
 ``known_from <= S`` (the first session the count could have been known, ADR 0050; the file's
 ``as_of`` is not it: issuers publish the same evening or next morning). A file read again for
-an ``as_of`` leaves a second row with a later ``known_from``; the earliest one stands, so a
-value is never seen before it was first fetched. Flows are not stored: the change in shares
-times the stored close approximates them.
+an ``as_of`` leaves a second row with a later ``known_from``; a reader keeps the latest row it
+may see (``known_from <= S``), so a restated count is seen from the session it was fetched.
+Flows are not stored: the change in shares times the stored close approximates them.
 """
 
 from collections.abc import Collection
@@ -39,7 +39,7 @@ def etf_shares(
     frame["as_of"] = pd.to_datetime(frame["as_of"]).dt.date
     frame["known_from"] = pd.to_datetime(frame["known_from"]).dt.date
     frame = frame[(frame["known_from"] <= on) & (frame["as_of"] >= since)]
-    first = frame.sort_values(["known_from", "knowledge_ts", "run_id"], kind="stable")
-    first = first.drop_duplicates(["instrument_id", "as_of"], keep="first")
-    out = first.reindex(columns=list(COLUMNS))
+    latest = frame.sort_values(["known_from", "knowledge_ts", "run_id"], kind="stable")
+    latest = latest.drop_duplicates(["instrument_id", "as_of"], keep="last")
+    out = latest.reindex(columns=list(COLUMNS))
     return out.sort_values(["instrument_id", "as_of"], kind="stable").reset_index(drop=True)

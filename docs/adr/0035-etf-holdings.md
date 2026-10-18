@@ -164,7 +164,7 @@ holdings and the date they are as of. Only SPY's holdings were fetched, as a mem
   file has NAV or AUM (checked on the recorded fixtures), so those issuers' funds have no
   count and no workaround is built (blocked: no paid or scraped source). The task stages one
   `holdings/etf_shares` row per accepted iShares read (one row per fund and the file's as-of
-  date; `known_from` the New York date of the fetch, never before the as-of date; readers
+  date; `known_from` the session of the New York date of the fetch (next session on a non-session day), never before the as-of date; readers
   `data.funds.shares`). `[etf_holdings] daily_funds` (a few dozen iShares funds the
   flow-pressure edges need) are read every night outside the weekly slots and the cap, the
   other iShares funds weekly. Flows are not stored (change in shares times the stored close).
