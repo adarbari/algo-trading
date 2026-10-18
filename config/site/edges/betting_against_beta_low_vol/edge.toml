@@ -64,6 +64,7 @@ which a low-beta book trails in a rising market by construction."""
 
 [[sources]]
 title = "Frazzini, A. and Pedersen, L., Betting Against Beta, Journal of Financial Economics, 2014"
+url = "https://www.nber.org/papers/w16601"
 
 [[sources]]
 title = "Novy-Marx, R. and Velikov, M., Betting Against Betting Against Beta, Journal of Financial Economics, 2022"
@@ -71,7 +72,16 @@ url = "https://alphaarchitect.com/betting-against-beta-bab-construction/"
 
 [[sources]]
 title = "Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk without Lower Return, Journal of Portfolio Management, 2007"
+url = "https://repub.eur.nl/pub/10460"
 
 [[sources]]
 title = "S&P Dow Jones Indices, Expectations and Anomalies, Indexology Blog, 2025"
 url = "https://www.indexologyblog.com/2025/04/09/expectations-and-anomalies/"
+
+[[sources]]
+title = "Baker, M., Bradley, B. and Wurgler, J. (2011), Benchmarks as Limits to Arbitrage: Understanding the Low-Volatility Anomaly, Financial Analysts Journal"
+url = "https://ideas.repec.org/a/taf/ufajxx/v67y2011i1p40-54.html"
+
+[[sources]]
+title = "Bali, T., Brown, S., Murray, S. and Tang, Y. (2017), A Lottery-Demand-Based Explanation of the Beta Anomaly, Journal of Financial and Quantitative Analysis"
+url = "https://ideas.repec.org/a/cup/jfinqa/v52y2017i06p2369-2397_00.html"

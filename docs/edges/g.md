@@ -39,8 +39,9 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Grinblatt, M. and Han, B., Prospect theory, mental accounting, and momentum, Journal of Financial Economics, 2005 <https://doi.org/10.1016/j.jfineco.2004.06.007>
-- An, L., Asset pricing when traders sell extreme winners and losers, Review of Financial Studies, 2016
+- An, L., Asset pricing when traders sell extreme winners and losers, Review of Financial Studies, 2016 <https://eng.pbcsf.tsinghua.edu.cn/info/1075/1547.htm>
 - Shannon, B., Maximum Trading Gains with Anchored VWAP, 2023
+- Hong, H. and Stein, J. (1999), A Unified Theory of Underreaction, Momentum Trading, and Overreaction in Asset Markets, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v54y1999i6p2143-2184.html>
 
 ## Reversal into earnings (`earnings_neutral_reversal`)
 
@@ -72,6 +73,8 @@ Back to the [index of every edge](../edges.md).
 
 - So, E. and Wang, S., News-Driven Return Reversals: Liquidity Provision Ahead of Earnings Announcements, Journal of Financial Markets, 2014 <https://papers.ssrn.com/abstract=2275982>
 - Quantpedia, Reversal During Earnings Announcements (strategy page) <https://quantpedia.com/strategies/reversal-during-earnings-announcements/>
+- Nagel, S. (2011), Evaporating Liquidity, NBER working paper 17653 (Review of Financial Studies 2012) <https://www.nber.org/papers/w17653>
+- Da, Z., Liu, Q. and Schaumburg, E. (2011), Decomposing Short-Term Return Reversal, Federal Reserve Bank of New York staff report 513 (Management Science 2014, as A Closer Look at the Short-Term Return Reversal) <https://www.newyorkfed.org/research/staff_reports/sr513.html>
 
 ## Index ETF weak-close reversal (`ibs_etf_mean_reversion`)
 
@@ -102,6 +105,10 @@ Back to the [index of every edge](../edges.md).
 
 - Pagonidis, A., The IBS Effect: Mean Reversion in Equity ETFs, SSRN, 2013
 - Connors, L. and Alvarez, C., Short Term Trading Strategies That Work, TradingMarkets, 2009
+- Jegadeesh, N. (1990), Evidence of Predictable Behavior of Security Returns, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v45y1990i3p881-98.html>
+- Nagel, S. (2011), Evaporating Liquidity, NBER working paper 17653 (Review of Financial Studies 2012) <https://www.nber.org/papers/w17653>
+- Quantpedia, Short-Term Reversal Effect in Stocks (strategy page on de Groot, Huij and Zhou, Journal of Banking and Finance 2012) <https://quantpedia.com/strategies/short-term-reversal-in-stocks/>
+- Campbell, J., Grossman, S. and Wang, J. (1992), Trading Volume and Serial Correlation in Stock Returns, NBER working paper 4193 (Quarterly Journal of Economics 1993) <https://www.nber.org/papers/w4193>
 
 ## Residual reversal on names with no news (`news_conditioned_reversal`)
 
@@ -130,10 +137,11 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Chan, W., Stock Price Reaction to News and No-News: Drift and Reversal after Headlines, Journal of Financial Economics, 2003
-- Pritamani, M. and Singal, V., Return Predictability Following Large Price Changes and Information Releases, Journal of Banking and Finance, 2001
-- Da, Z., Liu, Q. and Schaumburg, E., A Closer Look at the Short-Term Return Reversal, Management Science, 2014
+- Chan, W., Stock Price Reaction to News and No-News: Drift and Reversal after Headlines, Journal of Financial Economics, 2003 <https://academicnewsletter.sufe.edu.cn/info/357702>
+- Pritamani, M. and Singal, V., Return Predictability Following Large Price Changes and Information Releases, Journal of Banking and Finance, 2001 <https://ideas.repec.org/a/eee/jbfina/v25y2001i4p631-656.html>
+- Da, Z., Liu, Q. and Schaumburg, E., A Closer Look at the Short-Term Return Reversal, Management Science, 2014 <https://www.newyorkfed.org/research/staff_reports/sr513.html>
 - Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets, 2013 <https://repub.eur.nl/pub/40707>
+- Cox, D. and Peterson, D. (1994), Stock Returns Following Large One-Day Declines, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v49y1994i1p255-67.html>
 
 ## Momentum winners in a volatility squeeze (`volatility_contraction_expansion`)
 
@@ -163,5 +171,7 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Bollinger, J., Bollinger on Bollinger Bands, McGraw-Hill, 2001
-- Bajgrowicz, P. and Scaillet, O., Technical Trading Revisited: False Discoveries, Persistence Tests, and Transaction Costs, Journal of Financial Economics, 2012
+- Bajgrowicz, P. and Scaillet, O., Technical Trading Revisited: False Discoveries, Persistence Tests, and Transaction Costs, Journal of Financial Economics, 2012 <https://ideas.repec.org/a/eee/jfinec/v106y2012i3p473-491.html>
 - Crabel, T., Day Trading with Short Term Price Patterns and Opening Range Breakout, Traders Press, 1990
+- Lo, A., Mamaysky, H. and Wang, J. (2000), Foundations of Technical Analysis: Computational Algorithms, Statistical Inference, and Empirical Implementation, NBER working paper 7613 (Journal of Finance 2000) <https://www.nber.org/papers/w7613>
+- Brock, W., Lakonishok, J. and LeBaron, B. (1992), Simple Technical Trading Rules and the Stochastic Properties of Stock Returns, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v47y1992i5p1731-64.html>

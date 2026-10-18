@@ -77,10 +77,12 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Frazzini, A. and Pedersen, L., Betting Against Beta, Journal of Financial Economics, 2014
+- Frazzini, A. and Pedersen, L., Betting Against Beta, Journal of Financial Economics, 2014 <https://www.nber.org/papers/w16601>
 - Novy-Marx, R. and Velikov, M., Betting Against Betting Against Beta, Journal of Financial Economics, 2022 <https://alphaarchitect.com/betting-against-beta-bab-construction/>
-- Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk without Lower Return, Journal of Portfolio Management, 2007
+- Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk without Lower Return, Journal of Portfolio Management, 2007 <https://repub.eur.nl/pub/10460>
 - S&P Dow Jones Indices, Expectations and Anomalies, Indexology Blog, 2025 <https://www.indexologyblog.com/2025/04/09/expectations-and-anomalies/>
+- Baker, M., Bradley, B. and Wurgler, J. (2011), Benchmarks as Limits to Arbitrage: Understanding the Low-Volatility Anomaly, Financial Analysts Journal <https://ideas.repec.org/a/taf/ufajxx/v67y2011i1p40-54.html>
+- Bali, T., Brown, S., Murray, S. and Tang, Y. (2017), A Lottery-Demand-Based Explanation of the Beta Anomaly, Journal of Financial and Quantitative Analysis <https://ideas.repec.org/a/cup/jfinqa/v52y2017i06p2369-2397_00.html>
 
 ## Cash-based operating profitability (`cash_based_operating_profitability`)
 
@@ -141,9 +143,10 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Lakonishok, J., Shleifer, A. and Vishny, R., Contrarian Investment, Extrapolation, and Risk, Journal of Finance, 1994
-- Asness, C. and Frazzini, A., The Devil in HML's Details, Journal of Portfolio Management, 2013
+- Lakonishok, J., Shleifer, A. and Vishny, R., Contrarian Investment, Extrapolation, and Risk, Journal of Finance, 1994 <https://www.nber.org/papers/w4360>
+- Asness, C. and Frazzini, A., The Devil in HML's Details, Journal of Portfolio Management, 2013 <https://www.aqr.com/Insights/Research/Journal-Article/The-Devil-in-HMLs-Details>
 - Novy-Marx, R., The Other Side of Value: The Gross Profitability Premium, Journal of Financial Economics, 2013 <https://www.nber.org/system/files/working_papers/w15940/w15940.pdf>
+- Ball, R., Gerakos, J., Linnainmaa, J. and Nikolaev, V. (2016), Accruals, Cash Flows, and Operating Profitability in the Cross Section of Stock Returns, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v121y2016i1p28-45.html>
 
 ## Financial distress (an avoid list) (`distress_failure_probability`)
 
@@ -172,9 +175,9 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Campbell, J., Hilscher, J. and Szilagyi, J., In Search of Distress Risk, Journal of Finance, 2008
+- Campbell, J., Hilscher, J. and Szilagyi, J., In Search of Distress Risk, Journal of Finance, 2008 <https://ideas.repec.org/a/bla/jfinan/v63y2008i6p2899-2939.html>
 - Campbell, J., Hilscher, J. and Szilagyi, J., Predicting Financial Distress and the Performance of Distressed Stocks, Journal of Investment Management, 2011 <https://joim.com/article/predicting-financial-distress-and-the-performance-of-distressed-stocks/>
-- Dichev, I., Is the Risk of Bankruptcy a Systematic Risk?, Journal of Finance, 1998
+- Dichev, I., Is the Risk of Bankruptcy a Systematic Risk?, Journal of Finance, 1998 <https://academicnewsletter.sufe.edu.cn/info/361843>
 - Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies, 2020 <https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html>
 
 ## Factor ETF momentum (`factor_momentum`)
@@ -205,7 +208,9 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Ehsani, S. and Linnainmaa, J., Factor Momentum and the Momentum Factor, Journal of Finance, 2022 <https://www.nber.org/papers/w25551>
-- Gupta, T. and Kelly, B., Factor Momentum Everywhere, Journal of Portfolio Management, 2019
+- Gupta, T. and Kelly, B., Factor Momentum Everywhere, Journal of Portfolio Management, 2019 <https://www.aqr.com/Insights/Research/Working-Paper/Factor-Momentum-Everywhere>
+- Asness, C., Frazzini, A., Israel, R. and Moskowitz, T. (2014), Fact, Fiction and Momentum Investing, Journal of Portfolio Management (AQR page) <https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Momentum-Investing>
+- Moskowitz, T. and Grinblatt, M. (1999), Do Industries Explain Momentum?, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v54y1999i4p1249-1290.html>
 
 ## High idiosyncratic volatility and lottery stocks, avoid list (`idiosyncratic_volatility_and_max`)
 
@@ -234,9 +239,11 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Ang, A., Hodrick, R., Xing, Y. and Zhang, X., The Cross-Section of Volatility and Expected Returns, Journal of Finance, 2006
+- Ang, A., Hodrick, R., Xing, Y. and Zhang, X., The Cross-Section of Volatility and Expected Returns, Journal of Finance, 2006 <https://ideas.repec.org/a/bla/jfinan/v61y2006i1p259-299.html>
 - Bali, T., Cakici, N. and Whitelaw, R., Maxing Out: Stocks as Lotteries and the Cross-Section of Expected Returns, Journal of Financial Economics, 2011 <https://www.nber.org/papers/w14804>
 - Stambaugh, R., Yu, J. and Yuan, Y., Arbitrage Asymmetry and the Idiosyncratic Volatility Puzzle, Journal of Finance, 2015 <https://ideas.repec.org/a/bla/jfinan/v70y2015i5p1903-1948.html>
+- Bali, T., Brown, S., Murray, S. and Tang, Y. (2017), A Lottery-Demand-Based Explanation of the Beta Anomaly, Journal of Financial and Quantitative Analysis <https://ideas.repec.org/a/cup/jfinqa/v52y2017i06p2369-2397_00.html>
+- Hou, K., Xue, C. and Zhang, L. (2020), Replicating Anomalies, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html>
 
 ## Industry momentum (`industry_momentum`)
 
@@ -336,8 +343,8 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Pontiff, J. and Woodgate, A., Share Issuance and Cross-Sectional Returns, Journal of Finance, 2008 <https://doi.org/10.1111/j.1540-6261.2008.01335.x>
-- Fama, E. and French, K., Dissecting Anomalies, Journal of Finance, 2008
-- Daniel, K. and Titman, S., Market Reactions to Tangible and Intangible Information, Journal of Finance, 2006
+- Fama, E. and French, K., Dissecting Anomalies, Journal of Finance, 2008 <https://ideas.repec.org/a/bla/jfinan/v63y2008i4p1653-1678.html>
+- Daniel, K. and Titman, S., Market Reactions to Tangible and Intangible Information, Journal of Finance, 2006 <https://ideas.repec.org/a/bla/jfinan/v61y2006i4p1605-1643.html>
 - Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022 <https://papers.ssrn.com/abstract=3604626>
 
 ## Quality minus junk (`quality_minus_junk`)
@@ -367,9 +374,11 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Asness, C., Frazzini, A. and Pedersen, L., Quality Minus Junk, Review of Accounting Studies, 2019
+- Asness, C., Frazzini, A. and Pedersen, L., Quality Minus Junk, Review of Accounting Studies, 2019 <https://ideas.repec.org/a/spr/reaccs/v24y2019i1d10.1007_s11142-018-9470-2.html>
 - Novy-Marx, R., The Quality Dimension of Value Investing, working paper, 2014
 - Alpha Architect, Value and Quality Stocks (summary of the AQR data) <https://alphaarchitect.com/value-and-quality-stocks/>
+- Novy-Marx, R. (2010), The Other Side of Value: Good Growth and the Gross Profitability Premium, NBER working paper 15940 (Journal of Financial Economics 2013) <https://www.nber.org/papers/w15940>
+- Ball, R., Gerakos, J., Linnainmaa, J. and Nikolaev, V. (2016), Accruals, Cash Flows, and Operating Profitability in the Cross Section of Stock Returns, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v121y2016i1p28-45.html>
 
 ## Short-term momentum in heavily traded stocks (`short_term_momentum_high_turnover`)
 
@@ -398,8 +407,10 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022
+- Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022 <https://openaccess.city.ac.uk/id/eprint/31278/>
 - Alpha Architect, Short-term Momentum (summary of Medhat and Schmeling 2022) <https://alphaarchitect.com/short-term-momentum/>
+- Jegadeesh, N. (1990), Evidence of Predictable Behavior of Security Returns, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v45y1990i3p881-98.html>
+- Avramov, D., Chordia, T. and Goyal, A. (2006), Liquidity and Autocorrelations in Individual Stock Returns, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v61y2006i5p2365-2394.html>
 
 ## Short-term residual reversal (`short_term_residual_reversal`)
 
@@ -429,6 +440,6 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets, 2013 <https://repub.eur.nl/pub/40707>
-- Chen, A. and Velikov, M., Zeroing In on the Expected Returns of Anomalies, Journal of Financial and Quantitative Analysis, 2023
+- Chen, A. and Velikov, M., Zeroing In on the Expected Returns of Anomalies, Journal of Financial and Quantitative Analysis, 2023 <https://www.cambridge.org/core/product/identifier/S0022109022000874/type/journal_article>
 - Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022 <https://alphaarchitect.com/short-term-momentum/>
-- Nagel, S., Evaporating Liquidity, Review of Financial Studies, 2012
+- Nagel, S., Evaporating Liquidity, Review of Financial Studies, 2012 <https://www.nber.org/papers/w17653>

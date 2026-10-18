@@ -68,9 +68,9 @@ high-beta name is not a loser)."""
 title = "Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets, 2013"
 url = "https://repub.eur.nl/pub/40707"
 
-
 [[sources]]
 title = "Chen, A. and Velikov, M., Zeroing In on the Expected Returns of Anomalies, Journal of Financial and Quantitative Analysis, 2023"
+url = "https://www.cambridge.org/core/product/identifier/S0022109022000874/type/journal_article"
 
 [[sources]]
 title = "Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022"
@@ -78,3 +78,4 @@ url = "https://alphaarchitect.com/short-term-momentum/"
 
 [[sources]]
 title = "Nagel, S., Evaporating Liquidity, Review of Financial Studies, 2012"
+url = "https://www.nber.org/papers/w17653"

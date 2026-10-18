@@ -70,6 +70,7 @@ url = "https://rodneywhitecenter.wharton.upenn.edu/wp-content/uploads/2014/04/99
 
 [[sources]]
 title = "Kaniel, R., Ozoguz, A. and Starks, L., The High Volume Return Premium: Cross-Country Evidence, Journal of Financial Economics, 2012"
+url = "https://ideas.repec.org/a/eee/jfinec/v103y2012i2p255-279.html"
 
 [[sources]]
 title = "Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (the signal catalogue; no volume-shock predictor of this paper)"
@@ -78,6 +79,11 @@ url = "https://github.com/OpenSourceAP/CrossSection"
 # The literature's figure (ADR 0064): Gervais, Kaniel and Mingelgrin's high-minus-low volume
 # portfolio over 20 trading days, large firms, 0.50% per dollar long, 1963-1996, before costs
 # (Table 2). It is a spread of the extremes of the paper's own reference period.
+
+[[sources]]
+title = "Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html"
+
 [published]
 measure = "decile_spread"
 value = 0.005

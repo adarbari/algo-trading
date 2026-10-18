@@ -74,3 +74,15 @@ url = "https://www.cambridge.org/core/journals/journal-of-financial-and-quantita
 [[sources]]
 title = "Alpha Architect, Equity Term Structure and Option Returns (summary)"
 url = "https://alphaarchitect.com/2014/01/equity-term-structure-and-option-returns/"
+
+[[sources]]
+title = "Coval, J. and Shumway, T. (2001), Expected Option Returns, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v56y2001i3p983-1009.html"
+
+[[sources]]
+title = "Goyal, A. and Saretto, A. (2009), Cross-section of option returns and volatility, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html"
+
+[[sources]]
+title = "Bakshi, G. and Kapadia, N. (2003), Delta-Hedged Gains and the Negative Market Volatility Risk Premium, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v16y2003i2p527-566.html"

@@ -90,6 +90,12 @@ title = "So, E. and Wang, S., News-driven return reversals: Liquidity provision 
 # The literature's figure (ADR 0064): the market-adjusted return of top-decile prior-12-month
 # winners in the 5 days before the announcement, +1.58% (Aboody, Lehavy and Trueman 2010), before
 # costs.
+url = "https://dspace.mit.edu/handle/1721.1/119665"
+
+[[sources]]
+title = "Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html"
+
 [published]
 measure = "mean_excess"
 value = 0.0158

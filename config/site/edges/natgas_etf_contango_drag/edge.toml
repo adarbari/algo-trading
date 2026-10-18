@@ -65,9 +65,15 @@ decoys = """The energy market's own direction: in the funds' falling years cash 
 
 [[sources]]
 title = "Erb, C. and Harvey, C., The Strategic and Tactical Value of Commodity Futures, Financial Analysts Journal, 2006"
+url = "https://ideas.repec.org/a/taf/ufajxx/v62y2006i2p69-97.html"
 
 [[sources]]
 title = "Gorton, G., Hayashi, F. and Rouwenhorst, K., The Fundamentals of Commodity Futures Returns, Review of Finance, 2013"
+url = "https://www.nber.org/papers/w13249"
 
 [[sources]]
 title = "Guedj, I., Li, G. and McCann, C., Futures-based commodity ETFs, Journal of Index Investing, 2011"
+
+[[sources]]
+title = "Fuertes, A.-M., Miffre, J. and Rallis, G. (2010), Tactical allocation in commodity futures markets: Combining momentum and term structure signals, Journal of Banking and Finance (City Research Online)"
+url = "https://openaccess.city.ac.uk/id/eprint/6416/"
