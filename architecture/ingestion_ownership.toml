@@ -247,6 +247,8 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (ipo_lockups_fetched, WARN only)
     "src/algotrade/storage/tables/schemas/events.py",  # declares the table
+    "src/algotrade/data/feature_inputs.py",  # the events/ipo_lockup input of ipo_lockups@v1: the latest version known by each session (ADR 0075)
+    "src/algotrade/features/rollups/events/ipo_lockups.py",  # the group that reads it: the sessions to the nearest lock-up expiry; computes only, never writes
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ string = "events/ipo_lockup" }]

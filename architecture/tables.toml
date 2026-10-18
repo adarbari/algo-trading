@@ -328,6 +328,16 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the last earnings report's window volume over the 20 sessions before it (E3); reads events/earnings and bars/1d through earnings_reaction's window rule"
 
 [[table]]
+name = "rollups/instrument/ipo_lockups@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0075: the nearest IPO lock-up expiry of an instrument, the sessions to it (negative after, down to -20) and its release terms; reads events/ipo_lockup as the latest version known by the session, the CIK mapped to an instrument through instruments/company as of the session"
+
+[[table]]
+name = "rollups/instrument/reverse_splits@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0075: the latest reverse split of an instrument (ratio below 1, new shares per old), the sessions since its ex-date and the count in a year; reads events/split by event date up to the session"
+
+[[table]]
 name = "rollups/instrument/fundamentals@v4"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 

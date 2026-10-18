@@ -941,3 +941,47 @@ op = "gte"
 value = 0.15
 mode = "soft"
 tolerance = 0.05
+
+[[field]]
+name = "rollup.ipo_lockups@v1.lockup_days"
+theme = "instrument gates"
+reads = "The lock-up term the prospectus states, in calendar days. 180 is the usual term. The term counts from the prospectus date, not from the first day of trading."
+caveats = [
+  "Null when the prospectus gives the term in a form the extraction does not read.",
+]
+sources = ["Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)"]
+[[field.use]]
+for = "the usual 180-day term"
+op = "eq"
+value = 180
+mode = "hard"
+note = "illustrative: the most common term; names with another term or none drop out"
+
+[[field]]
+name = "rollup.ipo_lockups@v1.ipo_offer_price"
+theme = "instrument gates"
+reads = "The IPO offer price per share, in dollars, from the final prospectus. Compare it with the latest close to see how far the stock has moved since the offering."
+caveats = [
+  "Null when the prospectus gives a range or no final price the extraction can read. The price is not adjusted for later splits.",
+]
+sources = ["Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)"]
+[[field.use]]
+for = "names with a stated offer price"
+op = "not_null"
+mode = "hard"
+note = "null means no price could be read from the prospectus"
+
+[[field]]
+name = "feature.reverse_split_recent"
+theme = "instrument gates"
+reads = "True when the name had a reverse split with an ex-date in the last 252 sessions, a year. Null when none is stored, which is not the same as no reverse split."
+caveats = [
+  "Funds reverse-split too, so an edge on this flag names the operating-company universe. A hard 'eq true' keeps only names with a stored split.",
+]
+sources = ["Desai and Jain (1997), Long-Run Common Stock Returns Following Stock Splits and Reverse Splits, Journal of Business"]
+[[field.use]]
+for = "names that reverse-split within a year"
+op = "eq"
+value = true
+mode = "hard"
+note = "names with no stored split drop out"

@@ -59,6 +59,8 @@ from algotrade.features.rollups.events import (
     filing_events,
     index_changes,
     insider_buys,
+    ipo_lockups,
+    reverse_splits,
     short_interest,
 )
 from algotrade.features.rollups.levels import gaps, pivot_strength, retest, swing_levels
@@ -149,6 +151,8 @@ GROUPS: dict[str, FeatureGroup] = {
             index_changes.GROUP,
             filing_events.GROUP,
             insider_buys.GROUP,
+            ipo_lockups.GROUP,
+            reverse_splits.GROUP,
             short_interest.GROUP,
             earnings_date_shift.GROUP,
             earnings_gap_volume.GROUP,
