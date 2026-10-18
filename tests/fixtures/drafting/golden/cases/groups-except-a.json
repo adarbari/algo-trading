@@ -53,11 +53,11 @@
           "join_words": ""
         },
         {
-          "words": "IV rank above 80%",
+          "words": "those with IV rank above 80%",
           "kind": "applied",
           "origin": "words",
           "join": "and_not",
-          "join_words": "except those with"
+          "join_words": "except"
         }
       ],
       "model_share": 1.0,

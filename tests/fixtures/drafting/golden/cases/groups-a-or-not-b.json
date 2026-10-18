@@ -53,23 +53,23 @@
           "join_words": "with"
         },
         {
-          "words": "or not",
-          "kind": "not_understood",
-          "origin": "gap",
-          "join": "and_not",
-          "join_words": "or not"
-        },
-        {
-          "words": "within 5% of their 52 week high",
+          "words": "not within 5% of their 52 week high",
           "kind": "applied",
           "origin": "words",
-          "join": null,
-          "join_words": ""
+          "join": "or",
+          "join_words": "or"
         }
       ],
       "model_share": 1.0,
-      "not_understood": 1
+      "not_understood": 0
     },
-    "groups": []
+    "groups": [
+      {
+        "any": [
+          "rising volume",
+          "not within 5% of their 52 week high"
+        ]
+      }
+    ]
   }
 }

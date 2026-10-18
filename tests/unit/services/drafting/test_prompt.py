@@ -198,7 +198,7 @@ def test_users_share_the_site_prefix_and_own_features_come_last() -> None:
 
 
 def test_the_sliced_prompt_is_an_index_then_only_the_slice() -> None:
-    assert PROMPT_VERSION == "12"
+    assert PROMPT_VERSION == "13"
     names = {"rollup.b@v1.x"}
     assert index_line(info("instrument.a", "str", unit="category")) == "a|str|category"
     assert index_group("rollup.price_stats@v2.close") == ("rollup.price_stats@v2.", "close")

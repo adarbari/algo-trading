@@ -52,14 +52,7 @@
     "explained": {
       "parts": [
         {
-          "words": "stocks",
-          "kind": "applied",
-          "origin": "words",
-          "join": null,
-          "join_words": ""
-        },
-        {
-          "words": "above $10",
+          "words": "stocks above $10",
           "kind": "applied",
           "origin": "words",
           "join": null,

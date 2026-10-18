@@ -51,7 +51,8 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 # 11: "all but" / "anything but" / "everything but" are except joins.
 # 12: an "or" and an exclusion are left out of the words between two parts and the server groups
 # the parts (ADR 0071); only maths over fields stays one boolean formula.
-PROMPT_VERSION = "12"
+# 13: a side of an "or" that needs maths makes the whole "or" ONE part with ONE boolean formula.
+PROMPT_VERSION = "13"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 
@@ -125,8 +126,10 @@ negated): "except penny stocks" is the criterion for a penny stock in a part who
 "except" out, and the server turns it into "none of". Words of preference ("ideally",
 "preferably") stay in the words of their part, whose criterion is score. A negation that belongs
 to one condition (@@NEGATIONS@@: "not overbought", "no earnings this week") stays in its words, with
-its criterion negated. Only when maths over fields is needed on a side of an "or" (the "or" is
-inside a formula) draft the whole of it as ONE part with ONE boolean formula. Words you cannot map
+its criterion negated. A formula cannot be one side of an "or" (the server cannot group it): when
+maths over fields is needed on ANY side, the whole "or" is ONE part, its words covering both sides
+("the 20 day return beats the 60 day return or RSI14 under 30"), with ONE boolean formula holding
+both sides ("a > b or rsi < 30") and no other criterion for them. Words you cannot map
 are still a part, with no item. Every criterion, formula, missing, unresolved, suggestion and the
 tie_break carries "part"; scaffolding (status ACTIVE) goes with the part naming the kind of
 instrument.

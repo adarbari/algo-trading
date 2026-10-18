@@ -1,14 +1,14 @@
 {
   "id": "groups-maths-stays-formula",
-  "sentence": "stocks where the close is more than twice the 52-week low or RSI14 under 30",
+  "sentence": "stocks where the 20 day return beats the 60 day return or RSI14 under 30",
   "split": "train",
   "expect": {
     "parts": [
       {
-        "span": "the close is more than twice the 52-week low or RSI14 under 30",
+        "span": "20 day return beats the 60 day return or RSI14 under 30",
         "bucket": "B",
         "fields": [],
-        "expr": "price_stats.close > 2 * price_stats.low_52w or momentum.rsi_14 < 30",
+        "expr": "price_stats.ret_20d > price_stats.ret_60d or momentum.rsi_14 < 30",
         "op": "eq",
         "value": true,
         "tolerance": 0
@@ -29,7 +29,7 @@
           "join_words": ""
         },
         {
-          "words": "close is more than twice the 52-week low or RSI14 under 30",
+          "words": "the 20 day return beats the 60 day return or RSI14 under 30",
           "kind": "formula",
           "origin": "words",
           "join": null,

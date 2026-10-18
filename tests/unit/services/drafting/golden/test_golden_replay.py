@@ -108,8 +108,7 @@ def test_a_contract_answer_through_the_whole_draft_meets_the_case(
 GROUPED = [(c, slug, text) for c, slug, text in CONTRACT if c.groups is not None]
 
 
-DOUBTED = {  # grouping impossible: a left-out negation mixed with an or, two kinds joined by or
-    "groups-a-or-not-b": ["connector_left_out"],
+DOUBTED = {  # grouping impossible: two kinds of instrument joined by "or"
     "groups-stocks-or-etfs": ["or_not_formula"],
 }
 
@@ -137,7 +136,7 @@ def test_the_group_cases_cover_every_phrasing_the_owner_verifies() -> None:
         "groups-maths-stays-formula": (),
         "groups-except-a-and-b": ({"none": ["RSI14 under 30", "rising volume"]},),
         "groups-except-a-comma-and-b": ({"none": ["market cap under $2B"]},),
-        "groups-a-or-not-b": (),
+        "groups-a-or-not-b": ({"any": ["rising volume", "not within 5% of their 52 week high"]},),
         "groups-stocks-or-etfs": (),
     }
 

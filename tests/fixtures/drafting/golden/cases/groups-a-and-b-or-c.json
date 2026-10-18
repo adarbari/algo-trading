@@ -52,14 +52,7 @@
     "explained": {
       "parts": [
         {
-          "words": "stocks",
-          "kind": "applied",
-          "origin": "words",
-          "join": null,
-          "join_words": ""
-        },
-        {
-          "words": "above SMA50",
+          "words": "stocks above SMA50",
           "kind": "applied",
           "origin": "words",
           "join": null,
