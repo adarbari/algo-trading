@@ -868,3 +868,61 @@ Sources: Hirshleifer, Hou, Teoh and Zhang (2004), Journal of Accounting and Econ
 - Null for banks, brokers and insurers, for a filer missing current assets, current liabilities, total liabilities or operating cash flow, and when a statement is stale.
 
 Sources: Ohlson (1980), Journal of Accounting Research 18(1), Financial Ratios and the Probabilistic Prediction of Bankruptcy
+
+### `feature.composite_value_yield`
+
+**How to read it.** What the company earns for each dollar of its value, on two yields averaged: operating profit over enterprise value and free cash flow over market value. 0.08 is 8 cents a year; above 0.10 is cheap by either measure, below 0.04 is dear. Value is high-is-cheap here, the opposite of ev_ebit, so a screen for cheap names asks for a high number.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| cheap on earnings and cash flow | `gte 0.08` | soft | 0.25 x the threshold | - |
+
+**When the reading lies**
+
+- A formalisation, not the paper's composite: the research composites use book to market, earnings, cash flow and sales growth; this has the first two yields only, and averages the yields themselves, so a very high yield in one part dominates the mean.
+- A very high yield is often a peak-earnings cyclical or a company the market expects to shrink: check feature.revenue_cagr_3y and feature.cash_op_profitability.
+- Null for a company with an operating loss, a negative enterprise value, no capex line, a stale statement or no market value, and for banks; a missing value is a gap, not a pass.
+- Enterprise value ignores minority interest and preferred stock, and both yields use the latest filings, up to four months old.
+
+Sources: Lakonishok, Shleifer and Vishny (1994), Journal of Finance 49(5), Contrarian Investment, Extrapolation, and Risk; Asness and Frazzini (2013), Journal of Portfolio Management 39(4), The Devil in HML's Details
+
+### `rollup.qmj@v1.qmj_score`
+
+**How to read it.** Quality minus junk as a z-score across the day's cross-section: 0 is the middle, 1 is one standard deviation above, -1 below. High is quality (profitable, cash-generating, little debt and distress risk), low is junk. 1 and above is the top sixth of the cross-section; the idea (Asness, Frazzini and Pedersen) is to prefer quality and avoid junk at any price.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a high-quality name | `gte 0.5` | soft | 0.3 | - |
+
+**When the reading lies**
+
+- Built from what is stored: profitability in full (gross profit over assets, ROE, ROA, cash flow over assets, gross margin, low accruals) but safety only as leverage and distress; the paper's growth part and its beta and earnings-volatility parts are not built, so rollup.qmj@v1.safety_z does not know how steady the earnings are.
+- Relative to the session: the score falls when others improve; it has no level and cannot be compared across dates. It ranks across all names, so an asset-light software company outranks a utility on margins.
+- Needs enough profitability parts (four of six) and a cross-section of at least 100 names; a name without them has no score (a gap, not a pass). Banks are scored on the parts they have.
+- Quality is not cheapness: compare feature.pb_ratio and feature.ev_ebit. Statement figures enter from the session after SEC acceptance of the filing and can be four months old.
+
+Sources: Asness, Frazzini and Pedersen (2019), Review of Accounting Studies 24(1), Quality Minus Junk; Novy-Marx (2014), Journal of Financial Economics 112(1), The Quality Dimension of Value Investing
+
+### `feature.net_issuance_pct_12m`
+
+**How to read it.** The log change of the share count over a year, the form Pontiff and Woodgate use: -0.03 is about 3% of the shares bought back, +0.10 about 10% more shares issued. Negative is a net buyer of its own stock, around 0 stable, above +0.05 a steady issuer, above +0.20 a heavy one (an offering, an acquisition in stock, heavy compensation); in the research the issuers underperform and the repurchasers outperform. It ranks like feature.shares_change_yoy and is the form the issuance edge sorts on.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| buying back shares | `lte -0.01` | soft | 0.01 | - |
+| no heavy issuance | `lte 0.1` | soft | 0.03 | - |
+
+**When the reading lies**
+
+- The counts are the company total from the filings, a cover-page count against a cover-page count or a weighted average against a weighted average, so a company that began tagging the cover page recently is null.
+- An acquisition paid in shares, a spin-off or a reverse merger changes the count without being a financing decision; a split is adjusted away.
+- A shrinking count can hide issuance: companies buy back what compensation issues, so a flat count is not a company that does nothing; and a buyback funded by debt is not strength (see feature.debt_to_equity).
+- Null for funds, companies without two counts a year apart (recent IPOs and filers) and a stale count.
+
+Sources: Pontiff and Woodgate (2008), Journal of Finance 63(2), Share Issuance and Cross-Sectional Returns

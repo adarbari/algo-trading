@@ -427,3 +427,20 @@ Sources: Sector rotation by relative strength: https://school.stockcharts.com/do
 - A company that moves its listing changes value on the snapshot after the move; a backtest reads the snapshot of its own session.
 
 Sources: Site convention (docs/data/instruments.md; Nasdaq Trader symbol directory)
+
+### `instrument.symbol`
+
+**How to read it.** The ticker. Identity, not a measure: used to gate a screen to a hand list of names (the listed business development companies of the bdc_price_to_nav screener), so hard, never soft or scored. A list is only as current as its last edit.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| one of these tickers | `in ["MAIN", "ARCC"]` | hard | - | - |
+
+**When the reading lies**
+
+- A ticker can be reused after a delisting and changes when a company renames itself; a backtest reads the snapshot of its own session, and a newly listed name is missing from a hand list until it is added.
+- A list by ticker says nothing about what the name is: check the company before trusting a name that only matches by spelling.
+
+Sources: Site convention (docs/data/instruments.md)

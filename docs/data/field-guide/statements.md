@@ -948,3 +948,23 @@ Sources: SEC EDGAR company facts, the statement lines of instruments/statements 
 - Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.
 
 Sources: SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md); CFA Institute curriculum, compound annual growth rate as the standard multi-year growth measure
+
+### `feature.cash_op_profitability`
+
+**How to read it.** Cash operating profit on each dollar of assets: operating income less the accruals in earnings (net income minus operating cash flow), over total assets, 0.15 is 15 cents a year. Ball, Gerakos, Linnainmaa and Nikolaev find it subsumes the profitability and accruals premiums: above 0.15 is a strongly cash-profitable business, 0.05 to 0.15 ordinary, below 0 a business that loses cash at the operating level.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a cash-profitable business | `gte 0.1` | soft | 0.3 x the threshold | - |
+| a positive cash operating profit | `gt 0` | hard | - | - |
+
+**When the reading lies**
+
+- Built from what is stored: the paper adds up line by line accrual changes (receivables, inventory, payables and others) and adds R&D back; this uses the whole gap between net income and operating cash flow and keeps R&D in operating income, so a research-heavy name reads lower than in the paper.
+- Null for banks, brokers and insurers (EBIT is null by design), for any name whose income statement, net income and operating cash flow do not end on the same quarter, and for a stale statement; a missing value is a gap, not a pass.
+- Profitable is not cheap: pair with feature.composite_value_yield. A name just past a big one-off (an impairment in operating income, a legal settlement in cash flow) can swing a quarter's worth of the value.
+- Statement figures enter from the session after SEC acceptance of the filing and can be four months old.
+
+Sources: Ball, Gerakos, Linnainmaa and Nikolaev (2016), Journal of Financial Economics 121(1), Accruals, cash flows, and operating profitability in the cross section of stock returns

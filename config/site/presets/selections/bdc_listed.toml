@@ -1,0 +1,14 @@
+# Listed business development companies (BDCs), a hand list: the reference snapshot carries no BDC
+# type and the SEC company table no SIC for them (the BDC's own N-54A election leaves it blank), so
+# the list is the names checked against the reference on 2026-10-18. Active common stocks that
+# trade at least $1M a day. The same list is the criterion of the bdc_price_to_nav screener
+# (a fitness test keeps them equal). The universe of the bdc_price_to_nav_reversion edge.
+name = "bdc_listed"
+
+[where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.symbol", op = "in", value = ["NMFC", "CSWC", "OXSQ", "MAIN", "HTGC", "GAIN", "MFIC", "GLAD", "BBDC", "ARCC", "GBDC", "PSEC", "SAR", "HRZN", "PNNT", "OFS", "OCSL", "SLRC", "TSLX", "FDUS", "PFLT", "TCPC", "FSK", "WHF", "SCM", "GSBD", "TPVG", "ICMB", "CION", "CCAP", "OBDC", "CGBD", "BCSF", "BXSL", "TRIN", "KBDC", "LIEN", "RWAY"] },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 1_000_000 },
+]

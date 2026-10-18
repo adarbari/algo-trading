@@ -18,7 +18,7 @@ purpose = "L3 site settings: one <name>.toml per settings group, each loaded by 
 
 [[config_dir]]
 path = "config/site/field_guide"
-purpose = "L3 field guide, one <theme>.toml per theme (the situations sit in instrument.toml; statements.toml holds the SEC statement groups, analyst.toml the analyst consensus fields): how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
+purpose = "L3 field guide, one <theme>.toml per theme (the situations sit in instrument.toml; statements.toml holds the SEC statement groups, analyst.toml the analyst consensus fields; instrument.toml also holds the volatility and the edge build's fundamentals entries under their own themes while those files sit at the 1000-line cap): how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
 
 [[config_dir]]
 path = "config/site/features"
@@ -91,6 +91,10 @@ purpose = "the Guide's playbooks of the option income family (VRP scanner): one 
 [[config_dir]]
 path = "config/site/guide/playbooks/events"
 purpose = "the Guide's playbooks of the earnings events family (post-earnings drift, earnings announcement premium): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/fundamentals"
+purpose = "the Guide's playbooks of the quality and value family (cash-based operating profitability, composite value, quality minus junk, net share issuance, asset growth, distress, BDC price to NAV): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/regime"

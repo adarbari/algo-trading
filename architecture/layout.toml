@@ -285,7 +285,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/statements"
-purpose = "feature groups from the SEC financial statements (instruments/statements: income statement and cash flow lines as trailing twelve months, balance sheet lines at the latest date), one module per group (its documented FEATURES, a pure compute and its GROUP declaration), plus growth_history@v2 (the revenue and EPS TTMs 3 and 5 years back, from instruments/shares), mispricing@v1 (the anomaly inputs, quality score and composite rank across the statement groups: a rank needs the whole cross-section), ttm.py, the TTM arithmetic over one concept's periods that financials@v3 also uses, and instants.py, the latest-instant and debt rules of the balance sheet"
+purpose = "feature groups from the SEC financial statements (instruments/statements: income statement and cash flow lines as trailing twelve months, balance sheet lines at the latest date), one module per group (its documented FEATURES, a pure compute and its GROUP declaration), plus growth_history@v2 (the revenue and EPS TTMs 3 and 5 years back, from instruments/shares), mispricing@v1 (the anomaly inputs, quality score and composite rank across the statement groups: a rank needs the whole cross-section), qmj@v1 (quality minus junk z-scores over the same measures), ttm.py, the TTM arithmetic over one concept's periods that financials@v3 also uses, and instants.py, the latest-instant and debt rules of the balance sheet"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]

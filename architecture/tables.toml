@@ -289,6 +289,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the Stambaugh-Yuan anomaly inputs, a QMJ-like quality score and the cross-sectional composite mispricing rank from the statement groups"
 
 [[table]]
+name = "rollups/instrument/qmj@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "quality minus junk: profitability, leverage-and-distress safety and combined z-scores across the cross-section, from the statement groups"
+
+[[table]]
 name = "rollups/instrument/balance_sheet@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the latest balance sheet lines (instants) from instruments/statements (ADR 0067)"

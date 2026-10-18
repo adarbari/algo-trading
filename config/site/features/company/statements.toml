@@ -170,3 +170,30 @@ description = "Diluted EPS compound annual growth over five years: (eps_diluted_
 null_meaning = "eps_diluted_ttm or its five-year-ago value is null (fewer than five years of history, or a gap), either is zero or negative (a rate from or to a loss is meaningless: null, not negative), or the EPS is STALE"
 valid_range = [-1, inf]
 version = 1
+
+[cash_op_profitability]
+expr = 'if(balance_sheet.total_assets > 0 and balance_sheet.bs_status != "STALE" and one_of(income_statement.is_status, "OK", "PARTIAL") and cash_flow.cf_status != "STALE" and financials.financials_status != "STALE" and income_statement.is_ttm_as_of == financials.ttm_as_of and financials.ttm_as_of == cash_flow.cf_as_of, (income_statement.ebit_ttm - (financials.net_income_ttm - cash_flow.ocf_ttm)) / balance_sheet.total_assets, null)'
+dtype = "float"
+unit = "decimal"
+description = "Cash-based operating profitability (Ball, Gerakos, Linnainmaa and Nikolaev): operating income less the accruals in earnings, over total assets; (EBIT over the trailing twelve months - (net income - operating cash flow over the same window)) / total assets at the latest balance sheet. 0.10 is 10 cents of cash operating profit a year on each dollar of assets. OMITS the paper's line by line accrual changes (receivables, inventory, prepaid, deferred revenue, payables, accrued expenses: not stored) and uses the whole gap between net income and operating cash flow instead; it keeps R&D inside operating income (the paper adds it back: R&D is not stored)"
+null_meaning = "ebit_ttm, net_income_ttm or ocf_ttm is null (no TTM, an untagged line, or a bank, broker or insurer: is_status FINANCIAL), total_assets is null or not positive, any of the four statement groups is STALE, or the income statement, net income and operating cash flow do not end on the same quarter (is_ttm_as_of, ttm_as_of and cf_as_of differ)"
+valid_range = [-inf, inf]
+version = 1
+
+[ev_ebit]
+expr = 'if(one_of(income_statement.is_status, "OK", "PARTIAL") and income_statement.ebit_ttm > 0 and enterprise_value > 0, enterprise_value / income_statement.ebit_ttm, null)'
+dtype = "float"
+unit = "ratio"
+description = "Enterprise value to EBIT: enterprise_value / operating income over the trailing twelve months; 12 means the whole business is priced at twelve years of operating profit before interest and tax"
+null_meaning = "enterprise_value or ebit_ttm is null (see each; a bank, broker or insurer has no EBIT), the operating income or the enterprise value is not positive (a negative multiple is not shown), or the income statement is STALE"
+valid_range = [0, inf]
+version = 1
+
+[composite_value_yield]
+expr = "(1 / ev_ebit + fcf_yield) / 2"
+dtype = "float"
+unit = "decimal"
+description = "A two-part value yield: the mean of the operating earnings yield (EBIT / enterprise value, the inverse of ev_ebit) and fcf_yield; 0.08 is 8 cents a year on each dollar of the company's value on the average of the two. High is cheap. A catalogue formalisation of the multi-ratio value composite (Lakonishok, Shleifer and Vishny use book, earnings and cash flow to price, plus sales growth): it has no book to market or growth part, and averages the yields themselves, not their ranks"
+null_meaning = "ev_ebit or fcf_yield is null (see each): a company with a loss, no capex line, a stale statement or no market value has no composite"
+valid_range = [-inf, inf]
+version = 1

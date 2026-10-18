@@ -79,3 +79,8 @@ presets = ["vrp_scanner", "vrp_iv_hv"]
 id = "events"
 title = "Earnings events"
 presets = ["pead_small_cap", "eap_all", "eap_volume"]
+
+[[family]]
+id = "fundamentals"
+title = "Quality and value"
+presets = ["cash_op_profitability", "composite_value", "qmj", "net_share_issuance", "asset_growth", "distress_ohlson", "bdc_price_to_nav"]
