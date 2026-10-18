@@ -2,6 +2,7 @@
 parses closed, the weighting and its volatility feature agree, a book is long, banded by nothing and
 rebalanced on a schedule whose windows never overlap, and ``base = "benchmark"`` is its alone."""
 
+from dataclasses import asdict
 from typing import Any
 
 import pytest
@@ -289,3 +290,51 @@ def test_a_trend_book_declares_its_ensemble_of_lookbacks() -> None:
     assert len(trend) >= 7
     for e in trend:
         assert len(e.ensemble) >= 2 and set(e.ensemble) <= set(e.screeners), e.id
+
+
+CANARY = {"tickers": ["VWO", "BND"], "field": "rollup.trend_stats@v2.ret_1d", "breadth": 2}
+
+
+def test_a_canary_parses_and_is_part_of_the_identity() -> None:
+    """ADR 0074 amendment item 17: the canaries, the field read at D, the breadth and the defensive
+    choice; no canary, no key in the identity (no existing hash moves)."""
+    o = book(outcome=outcome(canary={**CANARY, "defensive": ["CASH"]})).outcome
+    c = o.canary
+    assert c is not None and (c.tickers, c.breadth, c.defensive) == (("BND", "VWO"), 2, ("CASH",))
+    assert c.field == "rollup.trend_stats@v2.ret_1d"
+    assert identity_dict(asdict(o))["canary"]["tickers"] == ["BND", "VWO"]
+    assert "canary" not in identity_dict(asdict(book().outcome))
+    other = book(outcome=outcome(canary={**CANARY, "defensive": ["SHY", "IEF"]})).outcome
+    assert other.canary is not None and other.canary.defensive == ("IEF", "SHY")  # sorted
+    assert identity_dict(asdict(other)) != identity_dict(asdict(o))
+    reordered = book(
+        outcome=outcome(canary={**CANARY, "tickers": ["BND", "VWO"], "defensive": ["IEF", "SHY"]})
+    ).outcome
+    assert identity_dict(asdict(reordered)) == identity_dict(asdict(other))  # order is no trial
+
+
+@pytest.mark.parametrize(
+    ("canary", "message"),
+    [
+        ({**CANARY, "tickers": []}, "tickers: expected one or more distinct"),
+        ({**CANARY, "tickers": ["VWO", "VWO"]}, "tickers: expected one or more distinct"),
+        ({**CANARY, "tickers": ["VWO", "eq:bnd"]}, "are not plain symbols"),
+        ({**CANARY, "tickers": ["VWO", "CASH"]}, "CASH is only the whole defensive choice"),
+        ({**CANARY, "defensive": []}, "defensive: expected one or more distinct"),
+        ({**CANARY, "defensive": ["CASH", "SHY"]}, "CASH is only the whole defensive choice"),
+        ({**CANARY, "breadth": 0}, "breadth"),
+        ({**CANARY, "breadth": 3}, "more than the 2 canaries"),
+        ({k: v for k, v in CANARY.items() if k != "field"}, "field: expected a non-empty string"),
+        ({**CANARY, "defensive": ["CASH"], "weights": [1]}, "weights"),
+    ],
+)
+def test_a_bad_canary_is_refused(canary: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        book(outcome=outcome(canary={"defensive": ["CASH"], **canary}))
+
+
+def test_only_a_portfolio_outcome_has_a_canary() -> None:
+    doc = edge_document(schedule="month_end", top_k=3)
+    doc["outcome"] = {**doc["outcome"], "canary": {**CANARY, "defensive": ["CASH"]}}
+    with pytest.raises(ConfigurationError, match="canary: only a portfolio_return outcome"):
+        parse_edge(doc, "drift", "drift.toml")
