@@ -25,6 +25,7 @@ from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from typing import Final
 
+from algotrade.config.edges.document import MODEL_KIND
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.config.site.settings import load_verdict
 from algotrade.services.read.context import Stores
@@ -461,9 +462,10 @@ class EdgeFacts:
 
 def counts_wins(edge: Edge) -> bool:
     """Whether the edge's trial statistics (Sharpe, deflated Sharpe, PBO, haircut) are of the
-    session's excess wins: its outcome is not a return (a cushion or a ratio; ADR 0064 amendment
-    2026-10-11). An edge with no resolved settings is read as a return."""
-    return edge.settings is not None and not edge.settings.cost_applies
+    session's excess wins: its outcome is not a return (a cushion or a ratio, not a model P&L;
+    ADR 0064 amendment 2026-10-11). An edge with no resolved settings is read as a return."""
+    s = edge.settings
+    return s is not None and not s.cost_applies and s.kind != MODEL_KIND  # a model P&L is a return
 
 
 def projection_of(whole: EdgeRow) -> Projection:

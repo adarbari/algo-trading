@@ -22,9 +22,9 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   ``|fwd_return| - straddle_price(iv, T)`` (held to the horizon's close), ``atm_straddle_short``
   its negative, ``delta_hedged_atm`` the long straddle hedged continuously,
   ``vega * (fwd_realised_vol^2 - iv^2) / (2 iv)`` with the straddle's vega at entry
-  (``quant/black_scholes``). ``cost_bps`` is charged once, in bps of ``P`` (the excess return's
-  convention); no hedging cost, spread or fill is modelled and the cost grid does not apply
-  (it scales a stored return). A hit is ``value > 0``.
+  (``quant/black_scholes``), ``delta_hedged_atm_short`` its negative. ``cost_bps`` is charged
+  once, in bps of ``P`` (the excess return's convention); no hedging cost, spread or fill is
+  modelled and the cost grid does not apply (it scales a stored return). A hit is ``value > 0``.
 - ``max_drawdown`` set: a hit also needs ``fwd_max_drawdown <= max_drawdown``.
 
 A row whose value cannot be computed is *excluded with a reason*, never a miss and never a
@@ -64,6 +64,7 @@ MODEL_PNL_FIELDS: Mapping[str, tuple[str, ...]] = {
     "atm_straddle_long": ("fwd_return",),
     "atm_straddle_short": ("fwd_return",),
     "delta_hedged_atm": ("fwd_realised_vol",),
+    "delta_hedged_atm_short": ("fwd_realised_vol",),
 }  # the stored fields each option_model_pnl structure reads, beside the implied vol
 MISSING_VALUE = "missing_value"  # a row, but the measure is null (no benchmark bar, no vol)
 NO_IMPLIED_VOL = "no_implied_vol"  # the implied vol at S is missing or not positive
@@ -152,10 +153,11 @@ def _model_pnl(edge: Edge, outcomes: pd.DataFrame, iv: np.ndarray) -> np.ndarray
     o = edge.outcome
     assert o.structure is not None
     years = _numbers(outcomes, "horizon_sessions") / TRADING_DAYS
-    if o.structure == "delta_hedged_atm":
+    if o.structure.startswith("delta_hedged_atm"):
         gross = atm_straddle_vega(iv, years) * delta_hedged_vega_pnl(
             _numbers(outcomes, "fwd_realised_vol"), iv
         )
+        gross = -gross if o.structure.endswith("_short") else gross
     else:
         long = np.abs(_numbers(outcomes, "fwd_return")) - atm_straddle_price(iv, years)
         gross = -long if o.structure == "atm_straddle_short" else long

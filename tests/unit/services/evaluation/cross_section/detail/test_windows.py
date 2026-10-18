@@ -33,11 +33,12 @@ def test_the_unit_follows_the_outcome() -> None:
            "otm_pct": 0.1, "iv_field": "feature.x"}  # fmt: skip
     otm = {k: v for k, v in otm.items() if k not in ("direction", "target")}
     assert unit_of(edge(outcome=otm)) == "cushion"
-    model = {"kind": "option_model_pnl", "horizon_sessions": [2], "start_offset_sessions": 1,
+    model = {"kind": "option_model_pnl", "horizon_sessions": [21], "start_offset_sessions": 1,
              "benchmark": "none", "structure": "atm_straddle_long",
-             "iv_field": "feature.x"}  # fmt: skip
+             "iv_field": "feature.iv30"}  # fmt: skip
     assert unit_of(edge(outcome=model)) == "pnl"
-    assert counts_wins("pnl") and counts_wins("cushion") and not counts_wins("return")
+    assert counts_wins("cushion") and counts_wins("ratio")
+    assert not counts_wins("pnl") and not counts_wins("return")
 
 
 def test_n_is_the_largest_count_a_criterion_asks_of_a_quarter_fill() -> None:

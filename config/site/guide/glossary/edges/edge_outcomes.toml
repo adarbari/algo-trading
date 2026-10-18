@@ -60,6 +60,8 @@ position is modelled (long, short or delta-hedged). The cost in basis points of 
 is charged once; no hedging cost is modelled. A volatility or window that is missing makes the
 pick unmeasured, with the reason, never a zero. The implied volatility keeps its source's licence. Example: at 30% implied volatility over 21 sessions a straddle costs 6.9% of the
 price, so a stock that moves 10% earns a long straddle 3.1%.
+The implied volatility is a 30-day figure. The edge's horizons must therefore lie between 10 and
+42 sessions. A shorter or longer window would price the wrong option, so the document is refused.
 Don't read it as money earned: it is a model of the structure on the stored data.
 """
 next = "Check the structure and the basis label before comparing it with an excess-return edge."
@@ -74,8 +76,9 @@ The modelled position loses the straddle's price if the stock ends where it star
 the move beyond that price in either direction. Its value is the absolute return less the
 model price at the implied volatility. Example: at 30% implied volatility over 21 sessions the
 price is 6.9% of the stock; a 2% move loses 4.9%, a 12% move gains 5.1%. It is the position of a
-trader who expects a larger move than options price, for instance before earnings. Most windows
-lose a little and a few win a lot, so the hit rate alone says little.
+trader who expects a larger move than options price. Most windows lose a little and a few win a
+lot, so the hit rate alone says little. The edge's horizon must be near the implied volatility's
+30 days, so a window of a few sessions around a report cannot be modelled this way.
 """
 next = "Read the mean value and how often it is above zero; a model, so no fill or spread is in it."
 see_also = ["outcome_option_model_pnl", "model_basis", "straddle_short"]
@@ -107,8 +110,24 @@ for small gaps. It is positive when the stock moved more than options priced and
 Example: realised 34% against implied 30% over 21 sessions is worth about 1% of the price.
 It overstates the gain a little for large gaps and ignores hedging costs and jumps between hedges.
 """
-next = "Read it as the variance risk premium's size; the short side is its negative."
-see_also = ["outcome_option_model_pnl", "model_basis", "straddle_long"]
+next = "Read it as the variance risk premium's size; the short side is its own structure."
+see_also = ["outcome_option_model_pnl", "model_basis", "straddle_long", "delta_hedged_straddle_short"]
+
+[[term]]
+id = "delta_hedged_straddle_short"
+term = "Structure: Short delta-hedged at-the-money straddle"
+short = "The hedged straddle sold: it earns the gap when options price more movement than the stock delivers."
+body = """
+The modelled value is exactly the delta-hedged long straddle's value with the sign reversed. It
+is positive when the stock moved less than options priced, the variance risk premium that a seller
+collects, and negative when it moved more. The hedge removes the direction, so one large move
+does not dominate, but the hedged seller still loses when volatility jumps. Example: realised 26%
+against implied 30% over 21 sessions earns about 1% of the price; realised 34% loses about 1%.
+The model ignores hedging costs and jumps between hedges, so a real seller earns less.
+Don't size a real position from a modelled average.
+"""
+next = "Read the mean value and the worst windows before the hit rate."
+see_also = ["outcome_option_model_pnl", "model_basis", "delta_hedged_straddle", "win_rate"]
 
 [[term]]
 id = "model_basis"

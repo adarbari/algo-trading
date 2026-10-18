@@ -106,8 +106,17 @@ CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not
 OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm", "option_model_pnl")
 STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
 # An option_model_pnl outcome's position: one at-the-money straddle held to the horizon's close,
-# long or short, or the long one delta-hedged (ADR 0053 amendment 2026-10-17).
-MODEL_STRUCTURES = ("atm_straddle_long", "atm_straddle_short", "delta_hedged_atm")
+# long or short, or delta-hedged, long or short (ADR 0053 amendment 2026-10-17).
+MODEL_STRUCTURES = (
+    "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
+)  # fmt: skip
+# The implied vol is one tenor (``iv30``: 30 calendar days, about 21 sessions) and prices every
+# horizon of the outcome, so a horizon far from it prices the wrong option: an option_model_pnl
+# horizon must lie within ``[tenor / 2, tenor * 2]`` sessions of the field's tenor, read from its
+# name (a field with no ``iv<days>`` in its name has no known tenor and is refused).
+TRADING_DAYS_PER_YEAR, CALENDAR_DAYS_PER_YEAR = 252, 365
+_IV_TENOR = re.compile(r"(?<![a-z0-9])iv(\d+)(?![0-9])")
+MODEL_KIND = "option_model_pnl"
 MODEL_BASIS = "model"  # what a price from a model, not a quote, is labelled (results and UI)
 BENCHMARKS = ("SPY", "none")
 SCHEDULES = ("every_session", "month_end")
@@ -194,7 +203,7 @@ class Outcome:
     @property
     def basis(self) -> str | None:
         """``"model"`` when the value is priced by a model (``option_model_pnl``), else None."""
-        return MODEL_BASIS if self.kind == "option_model_pnl" else None
+        return MODEL_BASIS if self.kind == MODEL_KIND else None
 
     @property
     def sign(self) -> float:
@@ -589,6 +598,8 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
     if drawdown is not None and not 0 < drawdown <= 1:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
     structure, strike_delta, otm_pct, iv_field = _expires_otm(o, kind)
+    if kind == MODEL_KIND:
+        _check_tenor(o, horizons, iv_field)
     return Outcome(
         kind=kind,
         horizon_sessions=horizons,
@@ -604,6 +615,34 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
         otm_pct=otm_pct,
         iv_field=iv_field,
     )
+
+
+def tenor_sessions(iv_field: str) -> int | None:
+    """The tenor of an implied-vol field in sessions (``iv30`` is 30 calendar days: 21), from its
+    name; None when the name carries none."""
+    found = _IV_TENOR.search(iv_field.lower())
+    if found is None:
+        return None
+    return round(int(found.group(1)) * TRADING_DAYS_PER_YEAR / CALENDAR_DAYS_PER_YEAR)
+
+
+def _check_tenor(o: Table, horizons: tuple[int, ...], iv_field: str | None) -> None:
+    """Refuse an ``option_model_pnl`` horizon the field's one tenor cannot price (module docs)."""
+    if iv_field is None:
+        return  # required, and reported, by ``_expires_otm``
+    tenor = tenor_sessions(iv_field)
+    if tenor is None:
+        raise ConfigurationError(
+            f"{o.where} iv_field: {iv_field!r} names no tenor (iv<days>), so an option_model_pnl "
+            f"cannot tell which horizons its vol prices"
+        )
+    low, high = tenor // 2, tenor * 2
+    bad = [h for h in horizons if not low <= h <= high]
+    if bad:
+        raise ConfigurationError(
+            f"{o.where} horizon_sessions: {bad} are outside {low}..{high} sessions, what the "
+            f"{tenor}-session tenor of {iv_field!r} prices; use a field of the horizon's tenor"
+        )
 
 
 def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:

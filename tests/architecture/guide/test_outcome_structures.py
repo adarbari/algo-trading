@@ -14,6 +14,7 @@ STRUCTURE_TERMS = {
     "atm_straddle_long": "straddle_long",
     "atm_straddle_short": "straddle_short",
     "delta_hedged_atm": "delta_hedged_straddle",
+    "delta_hedged_atm_short": "delta_hedged_straddle_short",
 }
 BASIS_TERMS = {MODEL_BASIS: "model_basis"}
 FIX = "write the term in config/site/guide/glossary/edges/edge_outcomes.toml and map it here"

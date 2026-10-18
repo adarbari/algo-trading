@@ -66,7 +66,7 @@ class SeriesFacts:
 def unit_of(edge: Edge) -> str:
     """What an oriented value of ``edge``'s outcome is: an excess return over the benchmark, a
     plain return (no benchmark), the cushion to the nearest strike, a vol ratio or a model P&L
-    (a fraction of the entry price; not a stored return, so it counts wins like a cushion)."""
+    (a fraction of the entry price, a return like the others for the statistics)."""
     o = edge.outcome
     if o.kind == "expires_otm":
         return CUSHION
@@ -79,8 +79,10 @@ def unit_of(edge: Edge) -> str:
 
 def counts_wins(unit: str | None) -> bool:
     """Whether the trial statistics of a value in ``unit`` read the session's excess wins, not the
-    value (ADR 0064 amendment 2026-10-11): a cushion, a ratio or a model P&L is not a return."""
-    return unit in (CUSHION, RATIO, PNL)
+    value (ADR 0064 amendment 2026-10-11): a cushion or a ratio is not a return. A model P&L is
+    one (a fraction of the entry price): its trials read the picks' mean, never the win rate (a
+    short straddle that wins 80% of windows and loses on average must not read as evidence)."""
+    return unit in (CUSHION, RATIO)
 
 
 def exit_session(entry: date, horizon: int) -> date:

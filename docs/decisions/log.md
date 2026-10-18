@@ -514,3 +514,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a partial fix would leave the same one-session look-ahead in four groups that share the input and its backfill.
+
+## 2026-10-17 | EB H8 (option model P&L) | Short delta-hedged side, stored basis, short put
+- Question: how is the short side of the delta-hedged straddle expressed, where does `basis = "model"` live, and when does the short-put P&L land?
+- Options: a `side` key / a separate structure value; a stored `edge_eval` basis column now / with the chain P&L grain (H13); short put in H8 / a follow-up PR.
+- Decision: a separate structure value `delta_hedged_atm_short` (Guide entry, coverage, fitness test; no `side` key); the stored basis column waits for H13 (today `Outcome.basis`, page text and Guide); the short-put P&L is a follow-up PR.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a value per structure keeps every position one enum value with its own Guide entry; a column on a stored table is a schema change that belongs with the chain grain; a put needs a strike key and a put price that H8's three straddle structures do not.

@@ -15,6 +15,7 @@ from algotrade.config.edges.document import (
     Edge,
     Published,
     parse_edge,
+    tenor_sessions,
 )
 from algotrade.config.edges.follow import AUDIT_LABELS, BOOKMARK_LABELS, Follow
 from algotrade.config.strategy.schema import Selection
@@ -404,6 +405,32 @@ def test_only_an_option_model_pnl_outcome_is_labelled_model() -> None:
 def test_an_option_model_pnl_outcome_fails_closed(changes: dict[str, Any], match: str) -> None:
     with pytest.raises(ConfigurationError, match=match):
         parse_edge(model(**changes), "drift", WHERE)
+
+
+@pytest.mark.parametrize("horizons", [[10], [21], [42], [10, 21, 42]])
+def test_an_option_model_pnl_horizon_within_half_to_double_the_iv_tenor_parses(
+    horizons: list[int],
+) -> None:
+    assert parse_edge(model(horizon_sessions=horizons), "drift", WHERE).outcome.horizon_sessions
+
+
+@pytest.mark.parametrize("horizons", [[1], [5], [9], [43], [21, 63]])
+def test_an_option_model_pnl_horizon_the_30_day_iv_cannot_price_is_refused(
+    horizons: list[int],
+) -> None:
+    with pytest.raises(ConfigurationError, match=r"outside 10\.\.42 sessions"):
+        parse_edge(model(horizon_sessions=horizons), "drift", WHERE)
+
+
+def test_an_option_model_pnl_iv_field_with_no_tenor_in_its_name_is_refused() -> None:
+    with pytest.raises(ConfigurationError, match="names no tenor"):
+        parse_edge(model(iv_field="feature.my_iv"), "drift", WHERE)
+
+
+def test_the_tenor_of_an_iv_field_is_read_from_its_name() -> None:
+    assert tenor_sessions("rollup.iv30@v1.iv30") == 21
+    assert tenor_sessions("rollup.ibkr_iv@v1.iv30_ibkr") == 21
+    assert tenor_sessions("rollup.ibkr_iv@v1.rank") is None
 
 
 def test_an_expires_otm_structure_is_not_a_model_one_and_the_reverse() -> None:

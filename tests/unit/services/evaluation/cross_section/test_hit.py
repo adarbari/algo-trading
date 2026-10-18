@@ -268,6 +268,14 @@ def test_a_delta_hedged_straddle_earns_the_vega_form_and_its_sign_follows_realis
     assert list(out["hit"]) == [True, False, False]  # equal is a miss
 
 
+def test_the_short_delta_hedged_straddle_is_the_exact_negative_of_the_long_one() -> None:
+    r = otm_rows([0.0] * 3, fwd_realised_vol=[0.40, 0.30, 0.20])
+    long = apply_outcome(model_edge(structure="delta_hedged_atm"), r, ivs(3))
+    short = apply_outcome(model_edge(structure="delta_hedged_atm_short"), r, ivs(3))
+    assert np.allclose(short["value"], -long["value"])
+    assert list(short["hit"]) == [False, False, True]  # a calm window pays the seller
+
+
 def test_the_cost_is_charged_once_in_bps_of_the_entry_price_whatever_the_structure() -> None:
     r = otm_rows([0.10, 0.10])
     gross = apply_outcome(model_edge(structure="atm_straddle_short"), r, ivs(2))["value"]
