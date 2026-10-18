@@ -77,7 +77,7 @@ import pandas as pd
 
 from algotrade.core.model.instruments import pad_cik
 from algotrade.core.time.calendar import EXCHANGE_TZ, is_weekend
-from algotrade.data.events import ALL_TIME
+from algotrade.data.events import ALL_TIME, filing_walks
 from algotrade.data.reference import companies, load_universe
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.schemas import EARNINGS_8K_SOURCE
@@ -319,12 +319,8 @@ def last_walked(run: IngestRun) -> date | None:
     """The last index day an earlier nightly read cleanly (no failed day or index-asked CIK):
     where the next walk starts. Stored filing dates do not say: a per-CIK run (``--symbols``,
     ``--limit``) or a failed CIK moves them past days never read."""
-    walked = [
-        date.fromisoformat(r.stats["walked_to"])
-        for r in previous_runs(run)
-        if r.stats.get("walked_to")
-    ]
-    return max(walked, default=None)
+    walks = filing_walks(run.reader)  # the one clean-walk rule, also read by filing_activity
+    return None if walks.empty else walks["walked_to"].max()
 
 
 def order_and_skip(
