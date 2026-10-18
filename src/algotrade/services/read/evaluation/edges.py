@@ -133,6 +133,7 @@ class Edge:
     replaces: str | None = None
     oos_hidden: bool = False
     settings: EdgeSettings | None = None
+    base: str = "universe"  # the document's ``base`` (``out_of_window``: a time-series edge)
     # The basis the document fixes for the verdict (ADR 0065): ``[implementation]`` promoted
     # and horizon (None: not declared; a user's edge never declares one).
     promoted: str | None = None
@@ -243,6 +244,7 @@ def _edge(e: document.Edge, mine: bool, own: Mapping[str, Any] | None = None) ->
         mechanism=e.mechanism,
         persistence=e.persistence,
         schedule=e.schedule,
+        base=e.base,
         horizons=e.outcome.horizon_sessions,
         screeners=e.screeners,
         baselines=e.baselines,

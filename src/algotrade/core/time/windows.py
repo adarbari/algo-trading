@@ -18,6 +18,12 @@ outcome window starts at S's close) and its decision session D is the one before
 Windows of one kind never overlap: ``turn_of_month`` windows are a month apart, ``opex_week``
 windows end on different months' expiries, ``quarter_end`` windows a quarter apart and
 ``pre_holiday`` windows are single sessions of distinct days.
+
+``out_of_window_stretches`` tiles the sessions outside every window of a range into stretches of a
+window's length, the base of a time-series edge (ADR 0073): from the session after each window,
+consecutive stretches of ``length`` sessions until the next window, a used session or the end of
+the range; one that would not fit whole is dropped. Only windows (known ahead by the calendar)
+place a stretch, so no stretch depends on anything after the range's end.
 Pure Python, no pandas.
 """
 
@@ -91,6 +97,26 @@ def windows(name: str, first: date, last: date) -> list[list[date]]:
         if w[0] >= first and w[-1] <= last
     }  # a set: the eve of January 1 comes from two years
     return [list(w) for w in sorted(found)]
+
+
+def out_of_window_stretches(placed: list[list[date]], length: int, last: date) -> list[list[date]]:
+    """The non-overlapping stretches of ``length`` sessions that end by ``last`` and
+    touch no session of ``placed`` (the windows of the range), in order, tiled from the session
+    after each window. Deterministic: a function of the windows and the range only."""
+    if length < 1:
+        raise ValueError(f"a stretch is at least 1 session, got {length}")
+    taken = {d for w in placed for d in w}
+    stretches: list[list[date]] = []
+    for window in sorted(placed, key=lambda w: w[0]):
+        cursor = next_session(window[-1])
+        while True:
+            stretch = _starting_at(cursor, length)
+            if stretch[-1] > last or any(d in taken for d in stretch):
+                break
+            stretches.append(stretch)
+            taken.update(stretch)
+            cursor = next_session(stretch[-1])
+    return sorted(stretches, key=lambda s: s[0])
 
 
 def entry_session(window: list[date]) -> date:
