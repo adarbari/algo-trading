@@ -112,12 +112,15 @@ def portfolio_stat(
     cost_bps: float | None,
     deciles: tuple[float, ...] = (),
     ranked: int = 0,
+    book_vol: float | None = None,
+    risk_off: float | None = None,
 ) -> SessionStat:
     """The session's statistic: one value (the session's, net of one round trip of the document's
     cost; the picks of a book are one position) and a hit when it is positive. A session with no
     value is not measured (``excluded_coverage``) and says why (``portfolio_reason``). ``deciles``:
     the decile means of the screen's ranking (``ranking_deciles``; empty: not applicable),
-    ``ranked`` the names they are over."""
+    ``ranked`` the names they are over. ``book_vol`` / ``risk_off``: the overlays' figures kept
+    with the leg (ADR 0074 amendment)."""
     if value is None:
         return SessionStat(session=day, regime=regime, excluded_coverage=1, portfolio_reason=reason)
     net = value - (cost_bps or 0.0) / 1e4
@@ -131,4 +134,6 @@ def portfolio_stat(
         top_decile=deciles[0] if deciles else None,
         spread=deciles[0] - deciles[-1] if deciles else None,
         ranked=ranked if deciles else 0,
+        book_vol=book_vol,
+        risk_off=risk_off,
     )
