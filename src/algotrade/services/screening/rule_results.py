@@ -7,11 +7,11 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import FieldValue
 from algotrade.services.views import to_value
-from algotrade.storage.tables.schemas import DISPLAY_COLUMN_MODE
+from algotrade.storage.tables.schemas import DISPLAY_COLUMN_MODE, GROUP_MODE
 from algotrade.strategies.screeners.rules import RULES, RuleRow, RuleScreenResult
+from algotrade.strategies.screeners.rules.groups import Gate, GroupResult
 
 RULE_SCREEN = "rule_screen"  # results/<name> (storage/tables/schemas.py)
 RULE_SCREEN_VALUES = "rule_screen_values"
@@ -53,20 +53,26 @@ def _str(value: FieldValue) -> str | None:
 
 
 def _ids(row: RuleRow, outcome: str) -> str:
-    return ",".join(r.criterion.id for r in row.results if r.gating and r.outcome == outcome)
+    """The gates (ungrouped criteria and top-level groups, ADR 0071) that ended ``outcome``."""
+    return ",".join(g.id for g in row.gate_results if g.gating and g.outcome.value == outcome)
 
 
-def _refuse_groups(result: RuleScreenResult) -> None:
-    """Group rows land with ADR 0071 PR 3; until then members would be stored as gates."""
-    if result.spec.groups:
-        raise ConfigurationError(
-            f"{result.spec.id}: a screen with groups cannot be stored yet (group rows land "
-            "with ADR 0071 PR 3)"
-        )
+def _groups(gates: tuple[Gate, ...]) -> list[GroupResult]:
+    """Every group result of the row's gate tree, a group before its nested ones."""
+    found: list[GroupResult] = []
+    for gate in gates:
+        if isinstance(gate, GroupResult):
+            found.append(gate)
+            found.extend(_groups(gate.members))
+    return found
+
+
+def _parents(result: RuleScreenResult) -> dict[str, str]:
+    """Each criterion's and group's parent group id (gates have none)."""
+    return {m: g.id for g in result.spec.groups for m in g.members}
 
 
 def screen_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
-    _refuse_groups(result)
     records = [
         {
             "instrument_id": row.instrument_id,
@@ -92,7 +98,7 @@ def screen_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
 
 
 def values_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
-    _refuse_groups(result)
+    parent = _parents(result)
     records: list[dict[str, object]] = []
     for row in result.rows:
         for r in row.results:
@@ -108,6 +114,24 @@ def values_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
                     "distance": r.distance,
                     "normalised": r.normalised,
                     "penalty": r.penalty,
+                    "group_id": parent.get(r.criterion.id),
+                }
+            )
+        for found in _groups(row.gate_results):
+            g = found.as_written  # a group under a none is stored as written, not negated
+            records.append(
+                {
+                    "instrument_id": row.instrument_id,
+                    "criterion_id": g.id,
+                    "field": g.group.kind,
+                    "mode": GROUP_MODE,
+                    "value_num": None,
+                    "value_str": g.decided_by,
+                    "outcome": g.outcome.value,
+                    "distance": None,
+                    "normalised": None,
+                    "penalty": g.verdict.penalty,
+                    "group_id": parent.get(g.id),
                 }
             )
         for (name, value), (_, field) in zip(row.columns, result.spec.columns, strict=True):
@@ -123,6 +147,7 @@ def values_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
                     "distance": None,
                     "normalised": None,
                     "penalty": None,
+                    "group_id": None,
                 }
             )
     return stamp.apply(pd.DataFrame.from_records(records))

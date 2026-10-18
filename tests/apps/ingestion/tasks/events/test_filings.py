@@ -27,6 +27,7 @@ from algotrade_ingestion.tasks.events.filings import (
     DEFAULT_SINCE,
     EARNINGS,
     EARNINGS_COLUMNS,
+    FORMS_TAG,
     TABLE,
     TASK,
     Listed,
@@ -213,7 +214,7 @@ def test_micron_filings_and_results_from_the_recorded_payload() -> None:
     writer, feed = store(), Feed()
     record = run(writer, feed, ("MU",))
     assert record.status is RunStatus.COMPLETE and record.items["0000723125"].startswith(
-        "OK: 5 8-K"
+        "OK: 5 filings"
     )
     assert len(feed.urls) == 1  # since 2018 is inside the recent block: no older page
     filings = read(writer, TABLE, ["EQ:MU"])
@@ -517,7 +518,7 @@ def test_the_nightly_asks_only_the_ciks_the_index_shows_and_stops_at_the_last_da
     assert [u.rsplit("/", 1)[1] for u in feed.urls] == ["CIK0001652044.json"]  # not MU, not 55555
     items = record.items
     assert items["idx:2026-10-06"].startswith("NO_DATA") and "holiday" in items["idx:2026-10-06"]
-    assert items["idx:2026-10-07"] == "OK: 2 CIKs with an 8-K"  # the 10-K line is no filer
+    assert items["idx:2026-10-07"] == "OK: 2 CIKs with an event form"  # the 10-K line is no filer
     assert items["idx:2026-10-08"].startswith("NO_DATA: not published yet")
     assert items["0001652044"].startswith("OK")
     stored = read(writer, TABLE, ["EQ:GOOGL", "EQ:GOOG"]).set_index("accession")
@@ -658,3 +659,45 @@ def test_the_nightly_reads_in_full_the_ciks_it_never_read_up_to_the_cap() -> Non
         set(read(writer, TABLE, ["EQ:MU"])["accession"])
         and len(read(writer, TABLE, ["EQ:GOOG"])) == 9
     )
+
+
+# ----------------------------------------------------------------------------- the event forms
+
+EVENT_FILINGS = [
+    ("N1", "2026-10-05T21:30:00.000Z", "2026-10-06", "", "NT 10-Q", ""),  # 17:30 ET
+    ("T1", "2026-10-05T12:00:00.000Z", "2026-10-05", "", "SC TO-I", ""),
+    ("F1", "2026-10-05T18:03:54.000Z", "2026-10-05", "", "25-NSE", ""),
+    ("P1", "2026-10-05T03:20:22.000Z", "2026-10-05", "", "424B4", ""),  # 23:20 ET on the 4th
+    ("X1", "2026-10-05T14:00:00.000Z", "2026-10-05", "", "10-12B", ""),
+    ("E1", "2026-10-05T20:02:00.000Z", "2026-10-05", "2.02", "8-K", ""),
+]
+
+
+def test_event_forms_are_stored_with_the_same_known_from_rule_and_make_no_earnings_rows() -> None:
+    writer, feed = store(), Feed(alpha=EVENT_FILINGS)
+    record = run(writer, feed, ("GOOGL",))
+    assert record.items[ALPHA] == "OK: 6 filings, 1 results"
+    filings = read(writer, TABLE, ["EQ:GOOGL"]).set_index("accession")
+    assert filings["form"].to_dict() == {
+        "P1": "424B4", "T1": "SC TO-I", "X1": "10-12B", "F1": "25-NSE", "E1": "8-K", "N1": "NT 10-Q"
+    }  # fmt: skip
+    assert filings.loc["P1", "known_from"] == date(2026, 10, 4)  # accepted 23:20 ET on the 4th
+    assert filings.loc["N1", "known_from"] == date(2026, 10, 5)  # 17:30 ET, the acceptance's day
+    assert filings.loc["F1", "filing_date"] == date(2026, 10, 5)
+    assert filings.loc["F1", "items"] == ""
+    results = read(writer, EARNINGS, ["EQ:GOOGL"])
+    assert len(results) == 1  # only the 8-K Item 2.02 is a results release
+
+
+def test_a_run_of_the_older_form_set_is_not_coverage_so_the_backfill_rereads_the_ciks() -> None:
+    writer = store()
+    run(writer, Feed(), (), since=date(2026, 1, 15))
+    again = Feed()
+    assert run(writer, again, (), since=date(2026, 1, 15)).stats["skipped_covered"] == 4
+    for record in writer.runs_for(TASK):  # what the runs before this form set recorded
+        record.stats.pop("forms", None)
+        writer.save_run(record)
+    reread = Feed()
+    record = run(writer, reread, (), since=date(2026, 1, 15))
+    assert record.stats["skipped_covered"] == 0 and record.stats["ciks"] == 4
+    assert record.stats["forms"] == FORMS_TAG

@@ -17,7 +17,8 @@ site/guide/glossary/edges/<theme>.toml     L3 Guide glossary of the edges (kind
                                            ``guide_glossary_edges``)
 site/guide/playbooks/<family>/<id>.toml    L3 Guide playbook prose, one folder per family (kind
                                            ``guide_playbooks``; the name is the id)
-site/edges/<id>.toml                       L3 edge documents (kind ``edges``, ADR 0053)
+site/edges/<id>/edge.toml                  L3 edge documents, one folder per edge (kind ``edges``,
+                                           ADR 0053; the folder is the edge's home for its notes)
 site/presets/strategies/<id>.toml          L3 shared strategy / screener configs
 site/presets/selections/<id>.toml          L3 shared selections
 users/<user>/strategies/<id>.toml          L4 (git-ignored locally)
@@ -69,6 +70,7 @@ SITE_ONLY = (  # never a user's
     "guide_playbooks", "guide_glossary", "guide_glossary_edges",
 )  # fmt: skip
 DRAFT = "draft.toml"
+EDGE_FILE = "edge.toml"  # site/edges/<id>/edge.toml
 _ID_NAME = re.compile(r"[a-z0-9_-]{1,64}")  # core.model.ids: other names are not screens
 _VERSION_FILE = re.compile(r"v([1-9][0-9]{0,8})\.toml")
 
@@ -127,13 +129,19 @@ class FileConfigStore:
             if kind == "settings":
                 return self.root / SITE / f"{validate_id(kind, name)}.toml"
             if kind in SITE_FOLDERS:
-                path = self.root / SITE / SITE_FOLDERS[kind] / f"{validate_id(kind, name)}.toml"
-                return self._nested_path(path) if kind in NESTED else path
+                return self._site_folder_path(kind, name)
             return self.root / SITE / "presets" / kind / f"{validate_id(kind, name)}.toml"
         user = validate_id("user", scope)
         if kind in USER_FILES:  # one file per user: users/<id>/<kind>.toml
             return self.root / "users" / user / f"{kind}.toml"
         return self.root / "users" / user / kind / f"{validate_id(kind, name)}.toml"
+
+    def _site_folder_path(self, kind: str, name: str) -> Path:
+        folder = self.root / SITE / SITE_FOLDERS[kind]
+        if kind == "edges":  # site/edges/<id>/edge.toml
+            return folder / validate_id(kind, name) / EDGE_FILE
+        path = folder / f"{validate_id(kind, name)}.toml"
+        return self._nested_path(path) if kind in NESTED else path
 
     def _nested_path(self, flat: Path) -> Path:
         """``site/guide/playbooks/<family>/<id>.toml``, ``site/features/<kind>/<theme>.toml``:
@@ -217,6 +225,13 @@ class FileConfigStore:
         if kind in NESTED and (scope == SITE or kind == PLAYBOOKS):  # a user's features: flat
             base = self.root / SITE / SITE_FOLDERS[kind]
             return sorted(p.stem for p in base.glob("*/*.toml")) if scope == SITE else []
+        return self._file_names(scope, kind)
+
+    def _file_names(self, scope: str, kind: str) -> list[str]:
+        """The ids of the one-file-per-id kinds: a site edge is the folder of its edge.toml."""
+        if kind == "edges" and scope == SITE:
+            base = self.root / SITE / "edges"
+            return sorted(p.parent.name for p in base.glob(f"*/{EDGE_FILE}"))
         directory = self._path(scope, kind, "x").parent
         return sorted(p.stem for p in directory.glob("*.toml")) if directory.exists() else []
 

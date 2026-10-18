@@ -447,6 +447,32 @@ ETF_HOLDINGS = fixed(
     runs="merge",
     key=("instrument_id", "as_of", "rank"),
 )
+# L2: an ETF's shares outstanding as its issuer's daily file states them (EB D4; ADR 0035's ``etf-
+# holdings`` task reads the file, so there is no second download): one row per fund x issuer as-of
+# date. Only iShares' file carries the count (its header block); State Street's and ProShares'
+# files do not. ``as_of`` is the file's date, ``ts`` that date at UTC midnight (a count as of a
+# session's close, not an instant). ``known_from`` is the first session the row was knowable (ADR
+# 0050): the session of the New York date of the fetch instant (``knowledge_ts``; the next session
+# on a weekend or holiday), never before ``as_of``; readers apply ``known_from <= S``
+# (``data.funds.shares``). A file read again for the same ``as_of`` writes a row with a later
+# ``known_from``; readers take the latest they may see. Counts are rounded to creation units by
+# the issuer. History accrues from the first nightly that stores it; nothing is backfilled. Flows
+# are NOT stored: the change in shares times the stored close approximates them (it ignores the
+# intraday NAV and the creation / redemption price). Runs are increments (a few funds each), so
+# they merge on (fund, as_of).
+ETF_SHARES = fixed(
+    "holdings/etf_shares",
+    "holdings",
+    ("instrument_id", "ts", "as_of", "shares_outstanding", "known_from"),
+    "instrument_id string!",
+    "symbol string",
+    "ts timestamp_utc!",
+    "as_of date!",
+    "shares_outstanding float64!",
+    "known_from date!",
+    runs="merge",
+    key=("instrument_id", "as_of"),
+)
 # L1: economic series and index levels (ADR 0048), one row per series x observation date x
 # vintage. ``instrument_id`` is ``MACRO:<KEY>`` or ``IDX:<KEY>`` (``core.model.instruments``);
 # ``series`` is the vendor's code (FRED ``NASDAQCOM``, Stooq ``^SPX``). ``vintage_date`` is the
@@ -658,9 +684,13 @@ RULE_SCREEN = fixed(
     runs="merge",
     key=("user_id", "config_id", "instrument_id"),
 )
-# One row per (instrument, criterion) and per display column (``mode = "column"``,
-# ``outcome = "INFO"``): the value, PASS / NEAR / FAIL / MISSING, distance and penalty.
+# One row per (instrument, criterion), per display column (``mode = "column"``, ``outcome =
+# "INFO"``) and per criterion group (``mode = "group"``, ADR 0071: ``field`` the kind, the
+# verdict's outcome and penalty, ``value_str`` the deciding member's id): the value, PASS / NEAR /
+# FAIL / MISSING, distance and penalty. ``group_id`` is the row's parent group (null: a gate, or
+# a partition from before groups).
 DISPLAY_COLUMN_MODE = "column"
+GROUP_MODE = "group"
 
 
 def is_display_column(mode: object) -> bool:
@@ -668,6 +698,19 @@ def is_display_column(mode: object) -> bool:
     columns (``[columns]``) rather than a criterion's outcome: the one predicate its writer
     and its readers share."""
     return mode == DISPLAY_COLUMN_MODE
+
+
+def is_group_row(mode: object) -> bool:
+    """Whether a ``results/rule_screen_values`` row of ``mode`` is a criterion group's verdict
+    (ADR 0071), not a criterion's outcome: a reader of criteria skips it as it skips display
+    columns (``is_display_column``)."""
+    return mode == GROUP_MODE
+
+
+def is_criterion_row(mode: object) -> bool:
+    """Whether a row of ``mode`` is a criterion's outcome (neither a display column nor a
+    group): what every criterion reader keeps."""
+    return not (is_display_column(mode) or is_group_row(mode))
 
 
 RULE_SCREEN_VALUES = fixed(
@@ -684,6 +727,7 @@ RULE_SCREEN_VALUES = fixed(
     "value_str string",
     "outcome string!",
     *floats("distance", "normalised", "penalty"),
+    "group_id string",  # the parent group (ADR 0071); null: a gate, or a partition before groups
     runs="merge",
     key=("user_id", "config_id", "instrument_id", "mode", "criterion_id"),
 )
@@ -730,6 +774,7 @@ KNOWN: dict[str, TableSpec] = {
         FEEDBACK_DRAFTING_EVENTS,
         FEEDBACK_FEATURE_REQUESTS,
         ETF_HOLDINGS,
+        ETF_SHARES,
         MACRO_SERIES,
         ANALYST_VENDOR_ACCESS,
         ANALYST_ESTIMATE_SNAPSHOTS,
