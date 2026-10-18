@@ -1,23 +1,23 @@
 /**
- * Financials: a company's reported results and the market's forecasts for the latest session,
- * from one GraphQL read (`useInstrumentFacts`, three requests under the API's name cap). A strip
- * of the key metrics leads, then six compact sections (growth, profitability, balance sheet and
- * cash flow, valuation, earnings, analysts) in columns that stack on a phone. Every row is
- * shown: a value the session does not have reads as the word for its kind with its Guide term
- * button; a section whose every row is the same gap (an uncovered name's analysts) says it once.
- * Status and basis fields are badges in the section header. A fund has no financials and says
- * so with the panel's empty state.
+ * Financials: a company's reported results and the market's forecasts for the latest session.
+ * `useFeatureValues` reads every figure in one request, so all of them are for one session;
+ * `useInstrumentFacts` gives only the name and the fund flag. A strip of the key metrics leads,
+ * then six compact sections (growth, profitability, balance sheet and cash flow, valuation,
+ * earnings, analysts) in columns that stack on a phone. Every row is shown: a value the session
+ * does not have reads as the word for its kind with its Guide term button; a section whose
+ * every row is the same gap (an uncovered name's analysts) says it once. Status and basis
+ * fields are badges in the section header. A fund has no financials and says so with the
+ * panel's empty state.
  */
 import { Grid, Heading, KeyValue, Panel, StatStrip, StatusBadge, Stack } from '@algotrade/ui';
-import { useMemo } from 'react';
 
 import { unknownWord } from '@/entities/availability';
 import { isUnknown, type Values } from '@/entities/feature';
-import { useInstrumentFacts } from '@/entities/instrument';
+import { useFeatureValues, useInstrumentFacts } from '@/entities/instrument';
 import { GuideHelp, termHelp } from '@/features/guide-help';
 
 import { commonGap, gapItem, rowItem, statItem, type RowHelp } from '../model/rows';
-import { FINANCIALS_PARTS, KEY_METRICS, SECTIONS, type SectionSpec } from '../model/sections';
+import { FINANCIALS_NAMES, KEY_METRICS, SECTIONS, type SectionSpec } from '../model/sections';
 import { financialsTone } from '../model/tones';
 
 export interface FinancialsPanelProps {
@@ -74,27 +74,14 @@ function Section({ section, values }: { section: SectionSpec; values: Values }) 
 }
 
 export function FinancialsPanel({ symbol }: FinancialsPanelProps) {
-  const first = useInstrumentFacts(symbol, FINANCIALS_PARTS[0] ?? []);
-  const second = useInstrumentFacts(symbol, FINANCIALS_PARTS[1] ?? []);
-  const third = useInstrumentFacts(symbol, FINANCIALS_PARTS[2] ?? []);
-  const instrument = first.data?.instrument;
-  const balance = second.data?.instrument;
-  const analysts = third.data?.instrument;
-  const values = useMemo<Values>(
-    () =>
-      new Map(
-        [
-          ...(instrument?.features ?? []),
-          ...(balance?.features ?? []),
-          ...(analysts?.features ?? []),
-        ].map((v) => [v.name, v]),
-      ),
-    [instrument, balance, analysts],
-  );
+  const identity = useInstrumentFacts(symbol, []);
+  const facts = useFeatureValues(symbol, FINANCIALS_NAMES);
+  const instrument = identity.data?.instrument;
+  const values: Values = facts.values;
   const state =
-    first.isError || second.isError || third.isError
+    identity.isError || facts.isError
       ? 'error'
-      : first.isPending || second.isPending || third.isPending
+      : identity.isPending || facts.isPending
         ? 'loading'
         : !instrument || instrument.isEtf
           ? 'empty'
@@ -116,9 +103,8 @@ export function FinancialsPanel({ symbol }: FinancialsPanelProps) {
         </Stack>
       }
       onRetry={() => {
-        void first.refetch();
-        void second.refetch();
-        void third.refetch();
+        void identity.refetch();
+        void facts.refetch();
       }}
     >
       <Stack gap={4}>
