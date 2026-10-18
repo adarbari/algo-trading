@@ -145,6 +145,7 @@ Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built
 | `candle@v1` | `body_share`, `upper_wick_share`, `lower_wick_share`, `body_vs_avg_20d` (float32); `bar_relation`, `prev_bar_relation`, `candle` (labels) |
 | `vol_stats@v1` | `atr_5`, `atr_20`, `hv10`, `hv60`, `hv20_pctile_252d`, `adv_shares_60d`, `volume_pctile_252d` (float32); `pocket_pivot` (bool) |
 | `relative_strength@v1` | `rs_spy_63d`, `rs_spy_252d`, `rs_spy_trend_20d`, `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d`, `sector_ret_63d`, `rs_sector_63d` (float32); `rs_line_high_252d` (bool); `sector_etf` (str); `sector_rank_63d` (int) |
+| `momentum_variants@v1` | `relative/` | `resid_mom_12_1`, `fip_12_1`, `resid_ret_20d`, `sector_ret_252d`, `rs_sector_20d` | built |
 | `anchored_vwap@v2` | `avwap_earnings`, `avwap_swing_low`, `avwap_swing_high` (float32); `avwap_anchor_date` (date) |
 | `oi_walls@v1` | `wall_status` (str); `call_wall`, `put_wall` (float32); `call_wall_oi`, `put_wall_oi` (int) |
 | `nearest_expiry@v1` | `expiry_date` (date); `dte`, `sessions_to_expiry` (int) |
