@@ -13,7 +13,9 @@ spaces requests across every worker thread **and every process** on the machine 
 per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and the nightly
 run never exceed a vendor's limit together. The pace is **adaptive** between the section's
 `min_interval_s` (floor) and `max_interval_s` (ceiling): a 429 holds every process for its
-`Retry-After` and multiplies the interval by `[http] backoff_factor`; more than
+`Retry-After` (at most 300 s; a vendor asking for more, e.g. a day, is given up on at once: the
+request fails with `GaveUpError`, holding nothing, and the run's item budgets move on) and
+multiplies the interval by `[http] backoff_factor`; more than
 `max_error_rate` errors over the last `error_window` responses slows it down the same way;
 `speedup_after` clean responses in a row speed it up by `speedup_factor`, never below the
 floor (see [configuration.md](../configuration.md#vendor-pacing)). The IB Gateway session
