@@ -9,7 +9,8 @@ from tests.conftest import REPO_ROOT
 
 SCANNED = ("src/algotrade", "apps", "libs")
 EXEMPT = (
-    "src/algotrade/storage/tables/schemas.py",  # defines the predicates
+    "src/algotrade/storage/tables/schemas/results.py",  # defines the predicates
+    "src/algotrade/storage/tables/schemas/registry.py",  # registers the spec; reads no rows
     "src/algotrade/services/screening/rule_results.py",  # the writer
     "src/algotrade/services/screening/run.py",  # publishes the writer's frames; reads none
 )
