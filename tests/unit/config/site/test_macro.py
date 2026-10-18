@@ -48,9 +48,13 @@ def test_the_shipped_registry() -> None:
         "IDX:COMP": "NASDAQCOM",
         "IDX:VIX": "VIXCLS",
         "IDX:VIX3M": "VXVCLS",
+        "IDX:VIX9D": "VIX9D",  # Cboe's own files (EB D3): the code is the key
+        "IDX:VIX6M": "VIX6M",
+        "IDX:VVIX": "VVIX",
     }
     personal = {s.key for s in macro.series if s.licence == "personal"}
     third_party = {"BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "COMP", "VIX", "VIX3M", "SPX"}
+    third_party |= {"VIX9D", "VIX6M", "VVIX"}
     assert personal == third_party  # third-party series on FRED
     unrevised = {  # FRED's daily market series: never revised, so one plain request each
         "T10Y3M", "T10Y2Y", "BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "DFII10", "RRPONTSYD",
