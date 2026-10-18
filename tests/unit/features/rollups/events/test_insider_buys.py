@@ -13,11 +13,13 @@ A, B, C = "EQ:A", "EQ:B", "EQ:C"
 
 
 def line(iid: str, owner: str, traded: date, code: str = "P", known: date | None = None,
-         plan: bool | None = None) -> dict[str, object]:  # fmt: skip
+         plan: bool | None = None, accession: str | None = None,
+         owners: int = 1) -> dict[str, object]:  # fmt: skip
     return {
         "instrument_id": iid, "owner_cik": owner, "transaction_date": traded,
         "transaction_code": code, "derivative": False, "plan_10b5_1": plan,
         "known_from": known or date(2026, 9, 28), "as_of": SESSION,
+        "accession": accession or f"{owner}-{traded}-{code}", "owner_count": owners,
     }  # fmt: skip
 
 
@@ -59,21 +61,36 @@ def test_a_purchase_known_before_the_window_or_a_sale_alone_gives_no_row() -> No
 def test_a_trader_in_the_same_month_every_year_is_routine_and_the_rest_opportunistic() -> None:
     routine = [line(A, "r", date(y, 9, 20), code="S") for y in (2023, 2024, 2025)]
     a_buy = line(A, "r", date(2026, 9, 25))
-    # opportunistic: the same record length but the months differ (2024 is missing)
-    odd = [line(B, "o", date(2023, 9, 20), code="S"), line(B, "o", date(2025, 3, 2), code="S")]
+    # opportunistic: a trade in each of the three years, but not in the purchase's month
+    odd = [line(B, "o", date(2023, 9, 20), code="S"), line(B, "o", date(2024, 3, 2), code="S"),
+           line(B, "o", date(2025, 3, 2), code="S")]  # fmt: skip
     b_buy = line(B, "o", date(2026, 9, 25))
     out = compute(*routine, a_buy, *odd, b_buy)
     assert is_false(out.at[A, "insider_opportunistic_flag"])
     assert is_true(out.at[B, "insider_opportunistic_flag"])
 
 
-def test_an_owner_with_under_three_years_of_record_is_unclassified_never_opportunistic() -> None:
-    out = compute(line(A, "new", date(2026, 9, 25)), line(A, "new", date(2025, 6, 1), code="S"))
+def test_an_owner_missing_a_year_is_unclassified_never_opportunistic() -> None:
+    # no record at all, a short record, and a gap year (2024 missing): none can be called
+    short = [line(A, "new", date(2025, 6, 1), code="S")]
+    gap = [line(B, "gap", date(2023, 9, 20), code="S"), line(B, "gap", date(2025, 9, 20), code="S")]
+    out = compute(
+        line(A, "new", date(2026, 9, 25)), *short, line(B, "gap", date(2026, 9, 25)), *gap
+    )
     assert pd.isna(out.at[A, "insider_opportunistic_flag"])
+    assert pd.isna(out.at[B, "insider_opportunistic_flag"])
     # one classed routine buyer beside an unclassed one: false, the unclassed ignored
-    rows = [line(B, "r", date(y, 9, 20), code="S") for y in (2023, 2024, 2025)]
-    out = compute(*rows, line(B, "r", date(2026, 9, 25)), line(B, "new", date(2026, 9, 26)))
-    assert is_false(out.at[B, "insider_opportunistic_flag"])
+    rows = [line(C, "r", date(y, 9, 20), code="S") for y in (2023, 2024, 2025)]
+    out = compute(*rows, line(C, "r", date(2026, 9, 25)), line(C, "new", date(2026, 9, 26)))
+    assert is_false(out.at[C, "insider_opportunistic_flag"])
+
+
+def test_a_joint_filing_counts_one_buyer_so_it_cannot_make_a_cluster_alone() -> None:
+    joint = [line(A, o, date(2026, 9, 25), accession="J1", owners=3) for o in ("f", "g", "m")]
+    out = compute(*joint)
+    assert out.at[A, "insider_cluster_buy_count"] == 1
+    mixed = [*joint, line(A, "o2", date(2026, 9, 25)), line(A, "o3", date(2026, 9, 26))]
+    assert compute(*mixed).at[A, "insider_cluster_buy_count"] == 3
 
 
 def test_the_plan_flag_is_true_with_a_plan_buy_false_without_and_null_when_never_stated() -> None:

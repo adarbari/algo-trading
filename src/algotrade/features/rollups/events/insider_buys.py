@@ -13,17 +13,23 @@ Per instrument with a purchase in the window (a name with none has no row: UNKNO
 buying"):
 
     insider_cluster_buy_count   distinct owners with a purchase known in the window (a cluster is
-                                three or more; the practitioner rule, not a stored threshold)
+                                three or more; the practitioner rule, not a stored threshold);
+                                a joint filing counts once
     insider_opportunistic_flag  an owner who bought is opportunistic (Cohen, Malloy and
                                 Pomorski 2012): true when one is; false when every classified
                                 buyer is routine; null when no buyer can be classified
     plan_10b5_1_flag            a purchase in the window was made under a Rule 10b5-1 plan
 
 Routine (Cohen, Malloy and Pomorski): the owner traded (bought or sold) in the same calendar
-month of each of the three years before the purchase's year. An owner is classified only with
-a trade in the store in or before the year three years before the purchase's year; an owner
-with a shorter record is unclassified, never opportunistic by default. Their trade is the
-transaction date of an open-market line known by the session.
+month of each of the three years before the purchase's year. An owner is classified only with a
+trade in each of those three years (routine when the month was the same each year, else
+opportunistic); an owner missing a year, also one whose record in the store starts later, is
+unclassified, never opportunistic by default. A trade is the transaction date of an open-market
+line known by the session.
+
+A Form 4 filed jointly (a fund, its general partner and a managing member) is stored once per
+reporting owner (``owner_count`` above one): the purchase counts as one buyer, the first owner by
+CIK, so a joint purchase cannot make a cluster alone.
 """
 
 from datetime import date
@@ -42,7 +48,7 @@ YEARS = 3  # the routine rule's look-back years
 
 _INPUTS = (
     f"{EVENTS}.transaction_code", f"{EVENTS}.owner_cik", f"{EVENTS}.known_from",
-    f"{EVENTS}.transaction_date",
+    f"{EVENTS}.transaction_date", f"{EVENTS}.accession", f"{EVENTS}.owner_count",
 )  # fmt: skip
 _NONE = (
     f"no open-market insider purchase became known in the last {BUY_WINDOW_DAYS} days, or no "
@@ -60,7 +66,7 @@ FEATURES = (
         "A buyer in the window is an opportunistic trader, not a routine one: true when one is; "
         "false when every classified buyer is routine (traded in the same calendar month in each "
         "of the three previous years, Cohen, Malloy and Pomorski 2012)",
-        _NONE + "; or no buyer has a Form 4 record reaching three years before the purchase's "
+        _NONE + "; or no buyer has a trade in each of the three years before the purchase's "
         "year (unclassified)", inputs=(*_INPUTS, f"{EVENTS}.derivative"),
     ),
     Feature(
@@ -94,12 +100,21 @@ def _classes(buys: pd.DataFrame, history: pd.DataFrame) -> pd.Series:
     ):
         trades = months.get((str(iid), str(owner)), set())
         day = pd.Timestamp(traded)
-        if not trades or min(y for y, _ in trades) > day.year - YEARS:
-            out.append(None)  # a record too short to call
+        years = {y for y, _ in trades}
+        if not all(day.year - k in years for k in range(1, YEARS + 1)):
+            out.append(None)  # no trade in one of the three years: not classifiable
         else:
             routine = all((day.year - k, day.month) in trades for k in range(1, YEARS + 1))
             out.append(not routine)
     return pd.Series(out, index=buys.index, dtype=object)
+
+
+def _one_buyer_per_filing(buys: pd.DataFrame) -> pd.DataFrame:
+    """A filing with several reporting owners counts its first owner (by CIK) only: the stored
+    lines repeat per owner, and one joint purchase is one decision."""
+    ordered = buys.sort_values("owner_cik", kind="stable")
+    repeat = ordered.duplicated(["instrument_id", "accession"]) & (ordered["owner_count"] > 1)
+    return ordered[~repeat]
 
 
 def _any_true(values: pd.Series) -> bool | None:
@@ -119,6 +134,7 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     buys = history[recent & (history["transaction_code"] == PURCHASE) & ~history["derivative"]]
     if buys.empty:
         return pd.DataFrame(columns=columns)
+    buys = _one_buyer_per_filing(buys)
     buys = buys.assign(_class=_classes(buys, history))
     grouped = buys.groupby("instrument_id")
     out = pd.DataFrame(

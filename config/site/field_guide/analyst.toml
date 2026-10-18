@@ -593,3 +593,83 @@ op = "lte"
 value = 0.1
 mode = "soft"
 tolerance = 0.03
+
+[[field]]
+name = "rollup.insider_buys@v1.insider_cluster_buy_count"
+theme = "events"
+reads = "How many different insiders bought on the open market in the last 30 days, counted from the session each filing became public. 1 is one buyer; 3 or more is a cluster. A name with no purchase in the window has no row."
+caveats = [
+  "A name with no row is not 'no insider buying': the field is null, and a hard 'gte' drops it. Several lines from one insider count once.",
+  "A filing accepted after the close counts from the next session, so a buy two days ago may not show yet. Read rollup.insider_buys@v1.insider_opportunistic_flag for whether the buyers are routine.",
+]
+sources = ["Lakonishok and Lee (2001), Are Insider Trades Informative?, Review of Financial Studies"]
+[[field.use]]
+for = "a cluster of insiders buying"
+op = "gte"
+value = 3
+mode = "hard"
+note = "the practitioner rule; the studies do not fix a count"
+
+[[field]]
+name = "rollup.insider_buys@v1.insider_opportunistic_flag"
+theme = "events"
+reads = "True when a buyer in the window trades at irregular times, not the same calendar month every year (routine). It needs a trade in each of the three years before; routine is the same month each year. Opportunistic buys carried the signal in the study."
+caveats = [
+  "Null when no buyer has a trade in each of the three previous years: such an insider cannot be classed, and a hard 'eq true' drops the name.",
+  "False means every classed buyer is routine; an unclassed buyer beside them is ignored. The record starts in 2006, so read it beside rollup.insider_buys@v1.insider_cluster_buy_count.",
+]
+sources = ["Cohen, Malloy and Pomorski (2012), Decoding Inside Information, Journal of Finance"]
+[[field.use]]
+for = "opportunistic insider buying"
+op = "eq"
+value = true
+mode = "hard"
+note = "routine buyers had no signal in the study"
+
+[[field]]
+name = "rollup.insider_buys@v1.plan_10b5_1_flag"
+theme = "events"
+reads = "True when a purchase in the window was made under a Rule 10b5-1 plan, set up in advance. A planned buy says little about what the insider knows now, so a screen for informed buying leaves them out."
+caveats = [
+  "The checkbox exists on Form 4 only since April 2023. Null means no purchase in the window carries it, so older filings are never read as unplanned.",
+  "A hard 'eq false' drops every null name, which is every filing before 2023. Read the column beside the screen instead, or use the test only for recent sessions.",
+]
+sources = ["SEC (2022), Insider Trading Arrangements and Related Disclosures, Release 33-11138"]
+[[field.use]]
+for = "a purchase made outside a plan"
+op = "eq"
+value = false
+mode = "hard"
+note = "drops every name with no value, which is every filing before April 2023"
+
+[[field]]
+name = "rollup.short_interest@v1.days_to_cover"
+theme = "events"
+reads = "FINRA's days to cover: shares sold short divided by the average daily share volume of the report's period. 5 means five average sessions of volume to buy the short position back. High values mean a crowded short."
+caveats = [
+  "The figure is the settlement date's, about two weeks old when it becomes public (rollup.short_interest@v1.short_interest_date). A squeeze can have come and gone.",
+  "Null when no report became public in the last 30 sessions or FINRA gives no volume. The data may not train a learned scorer; rule screens only.",
+]
+sources = ["Hong, Li, Ni, Scheinkman and Yan (2015), Days to Cover and Stock Returns, NBER working paper 21166"]
+[[field.use]]
+for = "a crowded short"
+op = "gte"
+value = 5
+mode = "hard"
+note = "the studies sort into groups; the threshold is a screen choice"
+
+[[field]]
+name = "feature.short_interest_ratio"
+theme = "events"
+reads = "Shares sold short as a share of the shares outstanding: 0.10 is 10% of the company short. It uses the latest public FINRA report and the latest share count. High values mean heavy short bets against the company."
+caveats = [
+  "It divides by shares outstanding of every class, not the float, so it understates the crowding of a stock with locked-up shares or a second class.",
+  "Null with no recent report or no current share count; a hard 'gte' drops those names. FINRA data may not train a learned scorer.",
+]
+sources = ["Boehmer, Huszar and Jordan (2010), The good news in short interest, Journal of Financial Economics"]
+[[field.use]]
+for = "heavily shorted"
+op = "gte"
+value = 0.1
+mode = "hard"
+note = "10% of the shares outstanding"

@@ -10,7 +10,7 @@ not_checked = "It does not read the size of the purchases, whether the buyers ar
 before_acting = [
   "Insiders often buy after a price fall, so the name may simply be cheap: read rollup.trend_stats@v2.mom_12_1 beside it.",
   "A filing accepted after the close counts from the next session, and the trade itself is up to two business days older than the filing.",
-  "A buyer with under three years of filings on record cannot be called routine or not: rollup.insider_buys@v1.insider_opportunistic_flag is then empty and the name drops out.",
+  "A buyer without a trade in each of the last three years cannot be called routine or not: rollup.insider_buys@v1.insider_opportunistic_flag is then empty and the name drops out.",
 ]
 sources = [
   "Cohen, Malloy and Pomorski, Decoding Inside Information (2012)",

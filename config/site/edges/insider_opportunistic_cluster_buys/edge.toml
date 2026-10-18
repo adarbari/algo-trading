@@ -25,15 +25,20 @@ declared in config/edges/document.py (EVENT_CLASSES), so the event is read as a 
 month end. A cluster is three or more distinct insiders with an open-market purchase (Form 4 code
 P) known in the last 30 calendar days, and an opportunistic buyer is one who did not trade in the
 same calendar month of each of the three previous years (Cohen, Malloy and Pomorski's rule over
-the owner's own Form 4 lines, from the 2006 bulk history); a buyer with a shorter record is
-unclassified, never opportunistic, so the screen drops a name whose buyers are all new. The
+the owner's own Form 4 lines, from the 2006 bulk history); a buyer without a trade in each of the three previous
+years is unclassified, never opportunistic, so the screen drops a name whose buyers are all new. The
 filings count from known_from, the first session whose close follows SEC's acceptance (a filing
 accepted after the close counts from the next session), never the transaction or filing date;
-each session reads the table as that session saw it (a restated line shows its old version
-until its own known_from). The picks are the 20 names with the most buyers, compared with every
-eligible name (base = universe: the screen selects a small subset, so a base of the same names
-would give no lift). The universe is common stocks above 5 dollars trading 1M dollars a day: the studies find the
-effect in the smaller firms, and the floor keeps the end an individual can trade. A purchase under a 10b5-1 plan (a checkbox since April 2023) is not screened out: the column shows it. The
+each session sees only filings known by it (a nightly read is exactly the rule's; a multi-session
+backfill omits a line restated or amended after a session, never reads one early). A filing with
+several reporting owners (a fund, its general partner and a managing member) counts one buyer. The picks are the 20 names with the most buyers, compared with every
+name with an insider purchase (base = universe). The universe is common stocks above 5 dollars trading 1M dollars
+a day with at least one insider purchase known in the last 30 days (insider_cluster_buy_count of 1
+or more), so the base is 'any insider bought': every base name carries the score the harness ranks
+(a universe of all stocks would score only the few with a purchase and the harness would count
+every session too thin), and the control is honest: does a cluster of opportunistic buyers beat
+any insider purchase. The studies find the effect in smaller firms; the floor keeps the end an
+individual can trade. A purchase under a 10b5-1 plan (a checkbox since April 2023) is not screened out: the column shows it. The
 published 82 bp a month is a two-group alpha of opportunistic against routine, which the harness
 does not measure, so no [published] figure. The Form 4 history is stored from 2006, but outcomes
 before 2018 need the D0 Tiingo backfill (due 2026-11-09): verdicts are UNMEASURED until then.
@@ -45,6 +50,7 @@ all = [
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
   { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
   { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 1_000_000 },
+  { field = "rollup.insider_buys@v1.insider_cluster_buy_count", op = "gte", value = 1 },
 ]
 
 [outcome]
@@ -64,7 +70,7 @@ only filings known by D, and a restated line shows its old version until its own
 replication = """The source's rule: long the opportunistic purchases of insiders, routine ones ignored
 (Cohen, Malloy and Pomorski 2012); the cluster of three or more buyers in 30 days is the practitioner
 rule. Here insider_cluster_buys v1 takes the common stocks above the floor meeting both and the harness holds
-the 20 with the most buyers; the studies' value-weighted portfolios of all opportunistic buyers are
+the 20 with the most buyers among the names with a purchase; the studies' value-weighted portfolios of all opportunistic buyers are
 not replicated."""
 expected_size = """About 82 bp a month of value-weighted alpha for opportunistic buyers against about zero for
 routine ones, 1986-2007 (Cohen, Malloy and Pomorski 2012, verified); a post-2010 out-of-sample test is

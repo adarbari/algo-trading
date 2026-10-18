@@ -122,10 +122,22 @@ def test_buyer_histories_hold_the_open_market_lines_of_recent_buyers_as_each_ses
     assert seen[seen["as_of"] == date(2026, 11, 2)].empty  # the purchase is over 30 days old
 
 
-def test_a_buyer_history_never_shows_a_restated_line_early() -> None:
+def test_a_later_filing_never_appears_in_an_earlier_session() -> None:
+    early = row("A1", date(2026, 9, 30))
+    late = row("A2", date(2026, 10, 7), owner_cik="0000888002", line=1)
+    found = reader((S1, [early]), (S2, [late]))
+    seen = buyer_histories(found, [date(2026, 10, 6), date(2026, 10, 7)])
+    on_6 = seen[seen["as_of"] == date(2026, 10, 6)]
+    on_7 = seen[seen["as_of"] == date(2026, 10, 7)]
+    assert set(on_6["owner_cik"]) == {"0000888001"}
+    assert set(on_7["owner_cik"]) == {"0000888001", "0000888002"}
+
+
+def test_a_restated_line_is_never_read_early_and_a_single_session_sees_its_old_version() -> None:
     old = row("A1", date(2026, 9, 30), price=12.5)
     new = row("A1", date(2026, 10, 7), price=12.0)
     found = reader((S1, [old]), (S2, [new]))
-    seen = buyer_histories(found, [date(2026, 10, 6), date(2026, 10, 7)])
-    assert len(seen) == 2  # one line per session: the old version, then the restated one
+    assert len(buyer_histories(found, [date(2026, 10, 6)])) == 1  # the nightly: the old version
+    both = buyer_histories(found, [date(2026, 10, 6), date(2026, 10, 7)])
+    assert both[both["as_of"] == date(2026, 10, 7)]["known_from"].tolist() == [date(2026, 10, 7)]
     assert buyer_histories(reader(), [S1]).empty

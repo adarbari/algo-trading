@@ -24,8 +24,11 @@ eligible names, common stocks above 5 dollars trading 5M dollars a day (side = s
 sort read as an avoid list; the harness does not pay a borrow fee a real short may face for
 crowded names, which can be far above the default, and an individual cannot usually short them.
 Rule screen only, no learned scorer: the FINRA terms bar machine learning over the data (the
-table is no_ml), and the screener asks 5 percent of the shares outstanding short and 3 days of
-volume to cover. The figures are FINRA's: short interest at a settlement date, public about ten
+table is no_ml). What is measured is the 30 highest days to cover among the eligible names: the
+short leg is ranked by the screener's score over every eligible name, so the screener's own
+floors (5 percent of the shares outstanding short, 3 days of volume to cover) shape the screen's
+list, not the measured leg. The universe holds only names with a FINRA report (days_to_cover
+present), so every base name is scored. The figures are FINRA's: short interest at a settlement date, public about ten
 days later. known_from is the session after the 7th business day after the settlement date (the
 publication schedule), never the settlement date, so each month-end decision reads the latest
 report public by then (the one settled mid-month, or the earlier month-end one); the figure is
@@ -42,6 +45,7 @@ all = [
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
   { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
   { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
+  { field = "rollup.short_interest@v1.days_to_cover", op = "gte", value = 0 },
 ]
 
 [outcome]
@@ -61,8 +65,8 @@ read: a report counts from known_from, the session after the 7th business day af
 date, never from the settlement date; the entry session is S = D + 1 (start_offset_sessions = 1).
 The figure describes the settlement date, which is about two weeks before it became public."""
 replication = """The source's rule: sort on days to cover, long low and short high (Hong et al. 2015); here
-the 30 highest of the eligible stocks with at least 5 percent of the shares short and 3 days
-to cover, as the short. The long leg (low days to cover) is not filed."""
+the 30 highest days to cover among the eligible stocks with a short-interest report, as the short
+(the screener's 5 percent and 3 day floors do not select the measured leg). The long leg (low days to cover) is not filed."""
 expected_size = """About 1.2 percent a month for the low-minus-high spread, 1988-2012 (Hong et al. 2015;
 the idea page marks the figure as from memory, not verified); post-publication weakening is not
 verified. The short side here is half the spread at most, and costly to hold."""
