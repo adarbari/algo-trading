@@ -86,6 +86,8 @@ from algotrade_sources.vendors.sec.fund_objectives import (
 )
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.sec.submissions import SecFilings
+from algotrade_sources.vendors.sec_prospectus.prospectus import SecProspectus
+from algotrade_sources.vendors.sec_prospectus.prospectus_search import SecProspectusSearch
 from algotrade_sources.vendors.sp500_history.membership import Sp500Membership
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
@@ -273,6 +275,8 @@ SOURCES: dict[str, SourceSpec] = {
         _sec("sec_submissions", SecSubmissions),
         _sec("sec_filings", SecFilings),
         _sec("sec_daily_index", SecDailyIndex, not_found=missing_index),
+        _sec("sec_prospectus_search", SecProspectusSearch),
+        _sec("sec_prospectus", SecProspectus),
         _sec("sec_form4_xml", SecForm4Xml),
         _sec("sec_form345_bulk", SecForm345Bulk),
         _sec("sec_company_facts", SecCompanyFacts),

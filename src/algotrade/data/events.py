@@ -125,6 +125,27 @@ def read_events(
     return Events(frame, sorted(map(str, frame["run_id"].unique())))
 
 
+def latest_versions(
+    reader: StoreReader,
+    table: str,
+    key: Sequence[str],
+    through: date | None = None,
+    as_of: datetime | None = None,
+) -> pd.DataFrame:
+    """The rows of ``table`` known on or before ``through`` (None: every row), the latest stored
+    version of each ``key`` among them: how a table keyed by something other than
+    (``instrument_id``, ``ts``) is read (``events/ipo_lockup``: ``cik`` + ``accession``). A
+    version known later than ``through`` is skipped, so the version before it is the one read.
+    Sorted by ``key``; empty (no columns) when nothing is stored."""
+    frame = reader.table_range(table, *ALL_TIME, as_of)
+    if frame is None or frame.empty:
+        return pd.DataFrame()
+    frame = _known_by(frame, through).assign(**{KNOWN_FROM: lambda f: known_from(f).dt.date})
+    frame = frame.sort_values(["knowledge_ts", "run_id"], kind="stable")
+    frame = frame.drop_duplicates(list(key), keep="last")
+    return frame.sort_values(list(key), kind="stable").reset_index(drop=True)
+
+
 def events_by_acceptance(
     reader: StoreReader, table: str, start: date, end: date, as_of: datetime | None = None
 ) -> pd.DataFrame:
