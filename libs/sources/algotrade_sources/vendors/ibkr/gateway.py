@@ -46,8 +46,9 @@ import socket
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from ib_async import IB, Future, Option, Stock
 
@@ -221,6 +222,34 @@ def _expiry(contract: Any) -> date | None:
     month (``202611``)."""
     text = str(contract.lastTradeDateOrContractMonth)
     return date(int(text[:4]), int(text[4:6]), int(text[6:8])) if len(text) >= 8 else None
+
+
+def next_session_open(trading_hours: Any, time_zone: Any, session: date) -> str | None:
+    """When the contract's trading session AFTER ``session``'s starts (UTC ISO), from IB's
+    ``ContractDetails.tradingHours`` (``20261001:1700-20261002:1600;20261003:CLOSED;...`` in the
+    contract's ``timeZoneId``): a segment's END date is its trade date, the next open segment
+    after the one ending on ``session`` is the next session. IB rolls the ``close`` tick when
+    the contract's OWN next session starts, which differs by exchange (CME equity-style
+    contracts 18:00 New York, CBOT grains 20:00, ICE sugar the next morning, a holiday Monday
+    from the Sunday evening). ``None`` when the hours are missing or unparsable, or ``session``
+    or the session after it is not listed: the caller fails closed."""
+    try:
+        zone = ZoneInfo(str(time_zone))
+        segments = []
+        for part in str(trading_hours or "").split(";"):
+            if not part or part.endswith("CLOSED"):
+                continue
+            first, last = part.split("-")
+            start = datetime.strptime(first, "%Y%m%d:%H%M").replace(tzinfo=zone)
+            end = datetime.strptime(last, "%Y%m%d:%H%M").replace(tzinfo=zone)
+            segments.append((start, end))
+    except (ValueError, KeyError, OSError):  # ZoneInfoNotFoundError is a KeyError
+        return None
+    segments.sort()
+    own = [i for i, (_, end) in enumerate(segments) if end.date() == session]
+    if not own or own[0] + 1 >= len(segments):
+        return None
+    return segments[own[0] + 1][0].astimezone(UTC).isoformat()
 
 
 @dataclass
@@ -574,21 +603,25 @@ class IbkrMarketData:
         ``None`` where IB sent none. ``LookupError`` when IB lists no contract for the root."""
         details = self._call("reqContractDetails", Future(root, exchange=exchange, currency="USD"))
         # contractMonth is the delivery month (CLZ6: 202612), not the last trade date's month
-        listed = [(d.contract, d.contractMonth) for d in details or []
-                  if d.contract.tradingClass == trading_class]  # fmt: skip
-        live = [(c, m) for c, m in listed if (_expiry(c) or session) >= session]
-        live.sort(key=lambda cm: (_expiry(cm[0]) or date.max, cm[0].lastTradeDateOrContractMonth))
+        listed = [d for d in details or [] if d.contract.tradingClass == trading_class]
+        live = [d for d in listed if (_expiry(d.contract) or session) >= session]
+        live.sort(
+            key=lambda d: (_expiry(d.contract) or date.max, d.contract.lastTradeDateOrContractMonth)
+        )
         if not live:
             raise LookupError(f"IBKR lists no {root} ({trading_class}) futures on {exchange}")
         chosen = live[: max(1, front)]
-        tickers = self._stream_futures([c for c, _ in chosen])
+        tickers = self._stream_futures([d.contract for d in chosen])
         return [
             {
-                "conid": int(c.conId),
-                "local_symbol": str(c.localSymbol or ""),
-                "contract_month": str(m or c.lastTradeDateOrContractMonth)[:6],
-                "expiry": e.isoformat() if (e := _expiry(c)) else None,
-                "multiplier": _number(c.multiplier or None),
+                "conid": int(d.contract.conId),
+                "local_symbol": str(d.contract.localSymbol or ""),
+                "contract_month": str(d.contractMonth or d.contract.lastTradeDateOrContractMonth)[
+                    :6
+                ],
+                "expiry": e.isoformat() if (e := _expiry(d.contract)) else None,
+                "multiplier": _number(d.contract.multiplier or None),
+                "next_open": next_session_open(d.tradingHours, d.timeZoneId, session),
                 "last": _settle(t.last),
                 "close": _settle(t.close),
                 "bid": _price(t.bid),
@@ -596,7 +629,7 @@ class IbkrMarketData:
                 "volume": _price(t.volume),
                 "open_interest": _price(getattr(t, "futuresOpenInterest", None)),
             }
-            for (c, m), t in zip(chosen, tickers, strict=True)
+            for d, t in zip(chosen, tickers, strict=True)
         ]
 
     def _stream_futures(self, contracts: list[Any]) -> list[Any]:

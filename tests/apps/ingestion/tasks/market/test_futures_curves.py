@@ -18,10 +18,8 @@ from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.market.futures_curves import (
-    LAST,
-    SETTLE,
     nightly_curves,
-    price_window,
+    settle_cutoff,
 )
 from tests.helpers.fake_ib import FakeIB
 from tests.helpers.ibkr_store import SESSION, ibkr_source
@@ -33,6 +31,18 @@ ROOTS = (
     FuturesRoot("VX", "CFE", "VX"),
 )
 NAN = float("nan")
+# IB tradingHours, in each contract's time zone: a segment's end date is its trade date. Friday
+# 2026-10-02's session is followed by the Sunday evening one (CME 17:00 Chicago = 18:00 New York).
+CME = ("20261001:1700-20261002:1600;20261003:CLOSED;20261004:1700-20261005:1600;"
+       "20261005:1700-20261006:1600", "America/Chicago")  # fmt: skip
+GRAINS = ("20261001:1900-20261002:1320;20261003:CLOSED;20261004:1900-20261005:1320;"
+          "20261005:1900-20261006:1320", "America/Chicago")  # fmt: skip
+SUGAR = ("20261002:0330-20261002:1300;20261003:CLOSED;20261005:0330-20261005:1300;"
+         "20261006:0330-20261006:1300", "America/New_York")  # fmt: skip
+# Labor Day 2026-09-07: Friday 09-04's next session opens Sunday 17:00 Chicago (the NYSE
+# calendar's next session is Tuesday), and Monday's holiday session settles by 12:00 New York.
+LABOR_DAY = ("20260903:1700-20260904:1600;20260905:CLOSED;20260906:1700-20260907:1200;"
+             "20260907:1700-20260908:1600", "America/Chicago")  # fmt: skip
 
 
 def fake() -> FakeIB:
@@ -41,6 +51,7 @@ def fake() -> FakeIB:
             "CL": [("20261022", "CL"), ("20261120", "CL"), ("20261218", "CL"), ("20270120", "CL")],
             "ZN": [("20261219", "ZN"), ("20270319", "ZN")],  # listed, but no price arrives
         },
+        fut_hours={"CL": CME, "ZN": CME},
         fut_quotes={
             ("CL", "20261022"): (70.0, 69.0, 900.0, 4000.0),
             ("CL", "20261120"): (NAN, 70.5, 500.0, 3000.0),  # no trade yet: IB's close
@@ -117,63 +128,116 @@ def at(year: int, month: int, day: int, hour: int, minute: int = 0) -> datetime:
     return datetime(year, month, day, hour, minute, tzinfo=EXCHANGE_TZ)
 
 
+QUOTES = {  # (last, close, volume, open interest): `last` is S+1's trade once its session opened
+    ("CL", "20261022"): (70.0, 69.0, 1.0, 1.0),
+    ("ZC", "20261214"): (450.0, 449.0, 1.0, 1.0),
+    ("SB", "20261030"): (15.0, 14.5, 1.0, 1.0),
+}
+
+
+def exchanges(hours: dict[str, tuple[str, str]]) -> FakeIB:
+    return FakeIB(
+        futures={
+            "CL": [("20261022", "CL")],
+            "ZC": [("20261214", "ZC")],
+            "SB": [("20261030", "SB")],
+        },
+        fut_hours=hours,
+        fut_quotes=QUOTES,
+    )
+
+
+def run_at(now: datetime, ib: FakeIB, session: date = SESSION) -> tuple[RunRecord, StoreReader]:
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    roots = tuple(FuturesRoot(r, "X", r) for r in ("CL", "ZC", "SB"))
+    ibkr = replace(IbkrSettings(), futures_roots=roots, futures_front=1, stream_wait_s=0.05)
+    ctx = task_ctx(
+        writer, reader, clock=lambda: now.astimezone(UTC), settings=SourcesSettings(ibkr=ibkr)
+    )
+    return nightly_curves(ctx, ibkr_source(ib, stream_wait_s=0.05), session), reader
+
+
+def kinds(record: RunRecord) -> dict[str, str]:
+    """root -> ``price_kind`` stored (or ``NO_DATA``) from the run's items."""
+    return {
+        k[5:]: v.split()[-1] if v.startswith("OK") else "NO_DATA" for k, v in record.items.items()
+    }
+
+
+HOURS = {"CL": CME, "ZC": GRAINS, "SB": SUGAR}
+
+
 @pytest.mark.parametrize(
-    ("session", "now", "kind"),
+    ("now", "expected"),
     [
-        (SESSION, at(2026, 10, 2, 16, 30), LAST),  # the earliest nightly start, Friday
-        (SESSION, at(2026, 10, 2, 17, 30), LAST),  # Globex halted 17:00-18:00
-        (SESSION, at(2026, 10, 3, 12), LAST),  # Saturday: Friday's evening trade is the last
-        (SESSION, at(2026, 10, 4, 17, 59), LAST),  # just before the Sunday reopen
-        (SESSION, at(2026, 10, 4, 18, 0), SETTLE),  # the reopen: `last` is Monday's now
-        (SESSION, at(2026, 10, 5, 13, 59), SETTLE),  # before Monday's own settlement bound
-        (SESSION, at(2026, 10, 5, 14, 0), None),  # `close` may be Monday's settle
-        (date(2026, 10, 6), at(2026, 10, 6, 17, 59), LAST),  # a Tuesday, same evening
-        (date(2026, 10, 6), at(2026, 10, 6, 18, 5), SETTLE),
-        (date(2026, 10, 6), at(2026, 10, 7, 14, 1), None),
+        (at(2026, 10, 2, 16, 30), {"CL": "last", "ZC": "last", "SB": "last"}),  # earliest start
+        (at(2026, 10, 3, 12), {"CL": "last", "ZC": "last", "SB": "last"}),  # Saturday
+        (at(2026, 10, 4, 17, 59), {"CL": "last", "ZC": "last", "SB": "last"}),
+        # Sunday 18:05: CME reopened (its close rolled), the grains (20:00) and sugar did not
+        (at(2026, 10, 4, 18, 5), {"CL": "settle", "ZC": "last", "SB": "last"}),
+        (at(2026, 10, 4, 20, 5), {"CL": "settle", "ZC": "settle", "SB": "last"}),
+        (at(2026, 10, 5, 3, 35), {"CL": "settle", "ZC": "settle", "SB": "settle"}),
+        (at(2026, 10, 5, 11, 59), {"CL": "settle", "ZC": "settle", "SB": "settle"}),
+        (at(2026, 10, 5, 12, 0), {"CL": "NO_DATA", "ZC": "NO_DATA", "SB": "NO_DATA"}),
     ],
 )
-def test_price_window(session: date, now: datetime, kind: str | None) -> None:
-    assert price_window(session, now.astimezone(UTC)) == kind
-
-
-def run_at(now: datetime) -> tuple[RunRecord, FakeIB, StoreReader]:
-    ctx, reader = market()
-    ib = fake()
-    record = nightly_curves(
-        replace(ctx, clock=lambda: now.astimezone(UTC)),
-        ibkr_source(ib, stream_wait_s=0.05),
-        SESSION,
-    )
-    return record, ib, reader
-
-
-def test_after_the_reopen_only_the_close_is_stored_as_the_settle() -> None:
-    record, _, reader = run_at(at(2026, 10, 4, 18, 5))  # Sunday evening catch-up
+def test_each_contracts_kind_follows_its_own_next_open(
+    now: datetime, expected: dict[str, str]
+) -> None:
+    record, reader = run_at(now, exchanges(HOURS))
+    assert kinds(record) == expected
     frame = futures_curve(reader, SESSION, SESSION)
-    assert list(frame["price"]) == [69.0, 70.5, 70.8]  # IB close; `last` (70, 71) is ignored
-    assert set(frame["price_kind"]) == {"settle"}
-    assert record.items["root:CL"] == "OK: 3/3 settle" and record.status is RunStatus.COMPLETE
+    for root, kind in expected.items():
+        if kind == "NO_DATA":
+            assert root not in set(frame["root"])
+            continue
+        [row] = frame[frame["root"] == root].to_dict("records")
+        assert row["price_kind"] == kind
+        assert row["price"] == (row["last"] if kind == "last" else row["close"])
+        assert row["next_open"].tzinfo is not None
 
 
-def test_before_the_reopen_the_last_is_stored_and_the_close_ignored() -> None:
-    record, _, reader = run_at(at(2026, 10, 2, 16, 30))
-    frame = futures_curve(reader, SESSION, SESSION)
-    assert list(frame["price"].dropna()) == [70.0, 71.0] and set(frame["price_kind"].dropna()) == {
-        "last"
-    }
-    assert record.items["root:CL"] == "OK: 2/3 last"
-
-
-def test_a_catch_up_after_the_next_settlement_bound_stores_nothing() -> None:
-    record, ib, reader = run_at(at(2026, 10, 5, 14, 0))
+def test_a_read_after_the_bound_does_not_open_the_gateway() -> None:
+    ib = exchanges(HOURS)
+    record, reader = run_at(at(2026, 10, 5, 12, 0), ib)
     assert record.status is RunStatus.PARTIAL and "reqContractDetails" not in ib.calls
     assert futures_curve(reader, SESSION, SESSION).empty
-    assert all(v.startswith("NO_DATA: read after 2026-10-05 14:00") for v in record.items.values())
+    assert all(v.startswith("NO_DATA: read after 2026-10-05 12:00") for v in record.items.values())
+    assert settle_cutoff(SESSION) == at(2026, 10, 5, 12)  # Friday -> Monday
+
+
+def test_a_holiday_monday_opens_on_sunday_and_settles_before_noon_that_day() -> None:
+    session = date(2026, 9, 4)
+    ib = exchanges({"CL": LABOR_DAY, "ZC": LABOR_DAY, "SB": LABOR_DAY})
+    sunday, monday = at(2026, 9, 6, 18, 5), at(2026, 9, 7, 11, 59)
+    assert kinds(run_at(sunday, ib, session)[0])["CL"] == "settle"  # not next_session based
+    assert kinds(run_at(monday, ib, session)[0])["CL"] == "settle"
+    assert settle_cutoff(session) == at(2026, 9, 7, 12)  # Monday, though the NYSE is shut
+    friday = run_at(at(2026, 9, 4, 16, 30), ib, session)[0]
+    assert kinds(friday)["CL"] == "last"
+
+
+@pytest.mark.parametrize(
+    "hours",
+    [
+        ("", ""),
+        ("garbage", "America/Chicago"),
+        (CME[0], "Nowhere/Land"),
+        (CME[0].split(";")[0], CME[1]),
+    ],
+)
+def test_missing_or_unparsable_trading_hours_fail_closed(hours: tuple[str, str]) -> None:
+    record, reader = run_at(
+        at(2026, 10, 2, 16, 30), exchanges({"CL": hours, "ZC": GRAINS, "SB": SUGAR})
+    )
+    assert record.items["root:CL"].startswith("NO_DATA: tradingHours missing or unparsable")
+    assert set(futures_curve(reader, SESSION, SESSION)["root"]) == {"ZC", "SB"}  # others stored
 
 
 def test_the_id_is_built_from_the_delivery_month_not_the_last_trade_month() -> None:
     ctx, reader = market()
-    ib = FakeIB(futures={"CL": [("20261120", "CL", "202612")]},
+    ib = FakeIB(futures={"CL": [("20261120", "CL", "202612")]}, fut_hours={"CL": CME},
                 fut_quotes={("CL", "20261120"): (70.0, 69.0, 1.0, 1.0)})  # fmt: skip
     nightly_curves(ctx, ibkr_source(ib, stream_wait_s=0.05), SESSION, ["CL"])
     [row] = futures_curve(reader, SESSION, SESSION).to_dict("records")

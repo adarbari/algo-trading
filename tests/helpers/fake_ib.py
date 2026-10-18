@@ -88,6 +88,8 @@ class FakeIB:
     # futures: root -> [(last trade date, trading class[, contract month])] listed;
     # fut_quotes: (root, date) -> (last, close, volume, open interest), NaN: no tick arrives
     futures: Mapping[str, Sequence[tuple[str, ...]]] = field(default_factory=dict)
+    # fut_hours: root -> (``tradingHours``, ``timeZoneId``) of its contracts (default: none)
+    fut_hours: Mapping[str, tuple[str, str]] = field(default_factory=dict)
     fut_quotes: Mapping[tuple[str, str], tuple[float, float, float, float]] = field(
         default_factory=dict
     )
@@ -131,6 +133,8 @@ class FakeIB:
         return [
             SimpleNamespace(
                 contractMonth=(rest[0] if rest else day[:6]),
+                tradingHours=self.fut_hours.get(contract.symbol, ("", ""))[0],
+                timeZoneId=self.fut_hours.get(contract.symbol, ("", ""))[1],
                 contract=SimpleNamespace(
                     symbol=contract.symbol,
                     conId=5000 + i,

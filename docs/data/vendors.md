@@ -626,20 +626,22 @@ maintained fork of `ib_insync`). **Read-only by construction**, three layers:
 | `option/<SYM>/<expiry>/<C|P>/<strike>`: a snapshot quote | `qualifyContracts` + `reqTickers` | `ibkr` |
 | `futures/<ROOT>/<EXCHANGE>/<CLASS>/<N>`: the N nearest unexpired contracts of a futures root and their quotes (the nightly `futures-curves` task, table `rates/futures_curve`; `[ibkr] futures_roots`, `futures_front`) | `reqContractDetails` (a contract lookup) + `reqMktData` tick 588 streamed, then `cancelMktData` | `ibkr` |
 
-- **Futures curves** (EB D11): a row's `price` depends on the read clock (`price_window` in
-  `tasks/market/futures_curves.py`), one `price_kind` per root and session. (a) Before Globex
-  reopens (18:00 New York; it halts 17:00-18:00; the nightly starts from 16:30 New York): `last`,
-  the session's own last trade, `price_kind = last` (IB's `close` is still the day before's
-  settle). (b) From the reopen until 14:00 New York on the next session (a conservative bound:
-  that session's own settlement comes from about 14:30 New York): `close` is exactly the
-  session's exchange settle, `price_kind = settle`; `last` is contaminated by the next trade
-  date's trading and is ignored. (c) Later: nothing is stored, every root `NO_DATA` with the
-  reason (a catch-up too late). `contract_month` is the delivery month
-  (`ContractDetails.contractMonth`; CLZ6 stops trading in November but is `2026-12`). Roots whose
-  exchange the account has no market data for come back with no price and are a `NO_DATA` item
-  (WARN `futures_roots_served`), never a failure. History accrues from the first night; IB's
-  expired-contract history (`includeExpired`, about 2 years, paced as historical requests) is
-  not used, a backfill would be a separate task.
+- **Futures curves** (EB D11): a row's `price` depends on the read clock against the contract's
+  OWN next session open (`next_open`, from `ContractDetails.tradingHours`; IB rolls its `close`
+  tick then, and it differs: CME 18:00 New York, CBOT grains ZC/ZS/ZW 20:00, ICE sugar SB the next
+  morning (no overnight session), a holiday Monday from the Sunday evening), one `price_kind` per
+  root and session. (a) Before `next_open`: `last`, the session's own last trade, `price_kind =
+  last` (IB's `close` is still the day before's settle). (b) From it until 12:00 New York on the
+  next weekday (`SETTLE_BOUND`, before the earliest next settlement: sugar about 12:55, gold
+  13:30, crude 14:30, the Treasury futures about 15:00): `close` is exactly the session's exchange
+  settle, `price_kind = settle`; `last` is the next trade date's trading and ignored. (c) Later:
+  nothing is stored, every root `NO_DATA` with the reason (a catch-up too late). A root whose
+  `tradingHours` are missing or unparsable (or whose contracts disagree) is `NO_DATA` too: fail
+  closed. `contract_month` is the delivery month (`ContractDetails.contractMonth`; CLZ6 stops
+  trading in November but is `2026-12`). Roots whose exchange the account has no market data for
+  come back with no price and are a `NO_DATA` item (WARN `futures_roots_served`), never a
+  failure. History accrues from the first night; IB's expired-contract history (`includeExpired`,
+  about 2 years, paced as historical requests) is not used, a backfill would be a separate task.
 - **Pacing** (`[ibkr]`): every message waits `min_interval_s = 0.02` (IB allows 50
   messages/s); every historical request also waits `historical_min_interval_s = 10` (60 per
   10 minutes, never two identical requests within 10 s). Two shared limiter keys, `ibkr` and

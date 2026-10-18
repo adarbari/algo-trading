@@ -49,8 +49,8 @@ BATCH = "+"  # joins the symbols of a batch key
 VOL_COLUMNS = ("iv30_ibkr", "hv30_ibkr")
 QUOTE_COLUMNS = ("strike", "right", "listed", "conid", "bid", "ask", "last", "close", "volume",
                  "iv", "delta")  # fmt: skip
-FUTURES_COLUMNS = ("conid", "local_symbol", "contract_month", "expiry", "multiplier", "last",
-                   "close", "bid", "ask", "volume", "open_interest")  # fmt: skip
+FUTURES_COLUMNS = ("conid", "local_symbol", "contract_month", "expiry", "multiplier", "next_open",
+                   "last", "close", "bid", "ask", "volume", "open_interest")  # fmt: skip
 # Request keys double as raw storage keys, which may not contain "/" (storage/backends).
 SEP = "__"
 DEFAULT_SESSIONS = 260

@@ -288,11 +288,11 @@ IBKR_IV30 = fixed(
 # read-only; licence: personal use): a row per listed contract among the root's front months,
 # ``instrument_id`` = ``FUT:<root>:<YYYY-MM>`` with ``parent_id`` = ``FUT:<root>`` (ADR 0009;
 # docs/data/instruments.md). ``price`` is ONE ``price_kind`` per root and
-# session, by the read clock: ``last`` (read before Globex reopens at 18:00 New York: the
-# session's own last trade), ``settle`` (read from the reopen until 14:00 New York on the next
-# session: IB's close, exactly the exchange settle); nothing is stored later. ``contract_month``
-# is the delivery month (not the last trade date's); ``ts`` is when the stream was read. A run
-# is the whole partition.
+# session, by the read clock against ``next_open`` (the contract's own next session start, IB
+# ``tradingHours``): ``last`` (read before it: the session's own last trade), ``settle`` (read
+# from it until 12:00 New York on the next weekday: IB's close, exactly the exchange settle);
+# nothing is stored later or without ``tradingHours``. ``contract_month`` is the delivery month
+# (not the last trade date's); ``ts`` is when the stream was read. A run is the whole partition.
 FUTURES_CURVE = fixed(
     "rates/futures_curve",
     "curve",
@@ -303,6 +303,7 @@ FUTURES_CURVE = fixed(
     "root string!",
     "contract_month string!",
     "expiry date",
+    "next_open timestamp_utc",
     "conid int64",
     "local_symbol string",
     "price_kind string",

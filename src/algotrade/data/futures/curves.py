@@ -20,7 +20,7 @@ from algotrade.storage.tables.readers import StoreReader
 FUTURES_CURVE = "rates/futures_curve"
 COLUMNS = (
     "session_date", "instrument_id", "parent_id", "root", "contract_month", "expiry", "conid",
-    "local_symbol", "price_kind", "price", "last", "close", "bid", "ask", "volume",
+    "local_symbol", "next_open", "price_kind", "price", "last", "close", "bid", "ask", "volume",
     "open_interest", "multiplier", "ts", "knowledge_ts", "source", "run_id",
 )  # fmt: skip
 
@@ -66,9 +66,9 @@ def curve_of(frame: pd.DataFrame, root: str, session: date) -> pd.DataFrame:
     """One root's curve on one session: its rows by expiry with a price, plus ``days`` (to
     expiry) and ``roll_yield`` (annualised, ``ln(front / this) / years``, 0 on the front
     contract: positive in backwardation, negative in contango). The prices are one
-    ``price_kind`` per root and session: ``settle`` (read after Globex reopened, before 14:00
-    New York on the next session: the exchange settle) or ``last`` (read before the reopen:
-    the session's evening last trade, not the settle)."""
+    ``price_kind`` per root and session: ``settle`` (read after the contract's next session
+    opened, before 12:00 New York on the next weekday: the exchange settle) or ``last`` (read
+    before it: the session's evening last trade, not the settle)."""
     rows = frame[(frame["root"] == root) & (frame["session_date"] == session)]
     rows = rows[rows["price"].notna() & rows["expiry"].notna()].sort_values("expiry")
     rows = rows.reset_index(drop=True)

@@ -142,10 +142,11 @@ NIGHTLY: tuple[Step, ...] = (
     ),
     # The futures curves (read-only IBKR, personal licence): the front contracts of each
     # configured root. EARLY in the order, right after the universe: its prices are only the
-    # session's own until Globex reopens at 18:00 New York (16:30 New York is the earliest start
-    # of the day), so the heavy steps must not delay it. Optional like ibkr-iv: SKIPPED with a
-    # WARN without the gateway, a root without data permission is a WARN, never a FAIL; nothing
-    # reads it yet (history accrues), so no step needs it.
+    # session's own until each contract's next session opens (18:00 New York at the earliest;
+    # 16:30 New York is the earliest start of the day), so the heavy steps must not delay it.
+    # Optional like ibkr-iv: SKIPPED with a WARN without the gateway, a root without data
+    # permission is a WARN, never a FAIL; nothing reads it yet (history accrues), so no step
+    # needs it.
     Step(
         "futures-curves",
         latest_only=SNAPSHOT,
