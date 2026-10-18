@@ -11,12 +11,11 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from algotrade.quant.edges.statistics import lift
 from algotrade.services.evaluation.cross_section.measures import SliceMeasure
 from algotrade.services.evaluation.cross_section.random_picks import (
     DEFAULT_DRAWS,
-    DRAW,
     SEED_VERSION,
+    draw_measure,
 )
 from algotrade.services.evaluation.time_series.measures import Obs
 
@@ -50,32 +49,9 @@ def random_windows(
     for draw in range(draws):
         rate = float(hits[draw]) / k
         out.append(
-            SliceMeasure(
-                slice_kind=DRAW,
-                slice_value=str(draw),
-                sessions=k,
-                picks=k,
-                hits=int(hits[draw]),
-                hit_rate=rate,
-                eligible=len(outside),
-                base_hits=base_hits,
-                base_rate=base_rate,
-                lift=lift(rate, base_rate),
-                mean_excess_picks=float(means[draw]),
-                bh_mean=None,
-                top_decile_mean=None,
-                decile_spread=None,
-                decile_t=None,
-                decile_sessions=0,
-                effect_size=None,
-                sharpe=None,
-                unscored=0,
-                excluded_score_coverage=0,
-                excluded_unclosed=0,
-                excluded_missing=0,
-                excluded_coverage=0,
-                delisted=0,
-                pre_snapshot_sessions=0,
+            draw_measure(
+                draw, k, k, rate, int(hits[draw]), len(outside), base_hits, base_rate,
+                float(means[draw]),
             )
-        )
+        )  # fmt: skip
     return tuple(out)
