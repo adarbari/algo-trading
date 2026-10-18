@@ -22,6 +22,8 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.values import Unknown, UnknownCode
 
 FILING_TABLE = "events/filing"
+# The table also holds NT, SC TO-I, 25, 424B4 and 10-12B rows; this read shows the 8-Ks only.
+EIGHT_K_FORMS = ("8-K", "8-K/A")
 # The first item of an 8-K in words (SEC Form 8-K items); others read "Item <n>".
 ITEM_LABELS = {
     "1.01": "Material agreement",
@@ -94,8 +96,9 @@ def load_filings(
     frame = read_events(ctx.reader, FILING_TABLE, *ALL_TIME, ids, through=day).frame
     start = months_before(day, months)
     filings: dict[str, list[Filing]] = {iid: [] for iid in ids}
-    seen = {str(i) for i in frame["instrument_id"]}
+    seen = {str(i) for i in frame["instrument_id"]}  # asked about, whatever forms it filed
     if not frame.empty:
+        frame = frame[frame["form"].isin(EIGHT_K_FORMS)]
         accepted = pd.to_datetime(frame["ts"], utc=True)
         known = known_from(frame).dt.date
         rows = zip(frame.to_dict("records"), accepted, known, strict=True)

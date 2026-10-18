@@ -1,5 +1,18 @@
-"""The ``filings`` task: SEC 8-K filings of every operating company in the universe ->
+"""The ``filings`` task: the SEC event filings of every operating company in the universe ->
 ``events/filing``, and their Item 2.02 results releases -> ``events/earnings`` (ADR 0050).
+
+**Forms** (``series.FILING_FORMS``): 8-K and 8-K/A (items kept; the current item numbers start
+2004-08-23, the depth of the backfill, ``HISTORY_SINCE``), NT 10-K / NT 10-Q late-filing
+notices, SC TO-I issuer tender offers, Form 25 delisting notices (``25`` by the issuer,
+``25-NSE`` by the exchange: also filed for a bond or preferred, so a row alone does not say the
+common stock left), 424B4 final prospectuses and Form 10 (``10-12B``) registrations. Each is
+public at its acceptance, so ``known_from`` is one rule for all (below). A filing accepted
+17:30-22:00 New York time carries ``known_from`` S but is listed in the daily index of S+1 only:
+the nightly of S misses it (the walk of S+1 reads it), a backfill includes it. Only names in the
+universe snapshot the run reads are fetched: a name already delisted is not.
+A run records ``stats["forms"] = FORMS_TAG``: a run that read a CIK before the form set grew
+does not count as having covered it (``asked_since``), so one backfill from ``HISTORY_SINCE``
+re-reads every CIK once for the new forms.
 
 **Names**: the session's universe snapshot minus the funds (``security_type`` ETF / ETN: a fund
 files no 8-K), each name's CIK from ``instruments/company`` as of the session. Share classes of
@@ -18,7 +31,7 @@ Two ways to read SEC, one row shape (``_one_cik`` is the only writer of rows):
 - **Daily index** (the nightly, once filings are stored and without ``--since``): for each
   weekday from the latest stored ``filing_date`` (inclusive: a rerun changes nothing) through
   the session, the ``sec_daily_index`` source reads that day's form index; the universe CIKs
-  with an 8-K or 8-K/A on it are the only ones asked for their submissions (the index has no
+  with an event form on it are the only ones asked for their submissions (the index has no
   items or acceptance time). A day without an index is ``NO_DATA`` (a weekend or holiday when a
   later day is published, else "not published yet": the next run reads it again, because the
   start stays the latest stored day); one older than ``STALE_DAYS`` business days with nothing
@@ -48,7 +61,7 @@ Two ways to read SEC, one row shape (``_one_cik`` is the only writer of rows):
   session's partition like the calendar's; the one report per quarter is chosen by the rollup,
   not here.
 
-Items: per CIK ``OK: <n> 8-K, <m> results`` (none is still ``OK``), ``NO_DATA`` (SEC has no
+Items: per CIK ``OK: <n> filings, <m> results`` (none is still ``OK``), ``NO_DATA`` (SEC has no
 filings for the CIK) or ``FETCH_ERROR``; per index day ``idx:<date>``. A name the universe does
 not hold is ``UNKNOWN`` (``sym:<SYMBOL>``). ``stats``: ``ciks`` / ``ciks_failed`` (submissions
 requests) and ``days`` / ``days_failed`` (index requests) are what the ``filings_fetched``
@@ -79,6 +92,7 @@ from algotrade_ingestion.tasks.framework.run import (
 from algotrade_sources.framework.base import Source
 from algotrade_sources.framework.series import (
     DAILY_INDEX_FRAME,
+    FILING_FORMS,
     FILINGS_FRAME,
     DailyIndexRequest,
     FilingsRequest,
@@ -88,6 +102,8 @@ TASK = "filings"
 TABLE = "events/filing"  # the table this task owns (architecture/tables.toml)
 EARNINGS = "events/earnings"  # also written: the Item 2.02 rows (its writers: tables.toml)
 DEFAULT_SINCE = date(2018, 1, 1)
+HISTORY_SINCE = date(2004, 8, 23)  # the backfill's depth: SEC's current 8-K item numbers start here
+FORMS_TAG = ",".join(sorted(FILING_FORMS))  # the form set a run read: a changed set changes the tag
 FUND_TYPES = ("ETF", "ETN")  # security types that file no 8-K
 STALE_DAYS = 7  # business days after which a missing daily index is an error, not "not yet"
 RESULTS_ITEM = "2.02"
@@ -280,7 +296,8 @@ def previous_runs(run: IngestRun) -> list[RunRecord]:
 
 
 def asked_since(run: IngestRun) -> dict[str, date]:
-    """CIK -> the earliest date an earlier run read it from (item ``OK`` or ``NO_DATA``): a
+    """CIK -> the earliest date an earlier run of the current form set (``FORMS_TAG``) read it
+    from (item ``OK`` or ``NO_DATA``): a
     per-CIK run covers every CIK it asked from its ``covers_since``, a nightly only the CIKs it
     read in full (``backfilled``, from ``DEFAULT_SINCE``)."""
     out: dict[str, date] = {}
@@ -290,6 +307,8 @@ def asked_since(run: IngestRun) -> dict[str, date]:
             start, ciks = date.fromisoformat(stats["covers_since"]), list(record.items)
         else:
             start, ciks = DEFAULT_SINCE, list(stats.get("backfilled") or [])
+        if stats.get("forms") != FORMS_TAG:  # read before the form set grew: not covered
+            continue
         for cik in ciks:
             if status_label(record.items.get(cik, "")) in ("OK", "NO_DATA"):
                 out[cik] = min(start, out.get(cik, start))
@@ -315,16 +334,13 @@ def order_and_skip(
     asked: dict[str, date],
 ) -> tuple[dict[str, list[Listed]], int]:
     """The CIKs to ask, never-stored ones first, and how many were skipped: with an explicit
-    ``since``, a CIK is covered when every name already has a stored filing on or before it,
-    or an earlier run read the CIK (``OK`` / ``NO_DATA``) from a date on or before it."""
+    ``since``, a CIK is covered when an earlier run of the current form set read it (``OK`` /
+    ``NO_DATA``) from a date on or before it. A stored filing says nothing here: rows of the
+    older set (8-K only) reach back without the other forms."""
     first = stored.groupby("instrument_id")["filing_date"].min().to_dict() if len(stored) else {}
 
     def covered(cik: str, names: list[Listed]) -> bool:
-        if explicit is None:
-            return False
-        if cik in asked and asked[cik] <= explicit:
-            return True
-        return all(first.get(n.instrument_id, date.max) <= explicit for n in names)
+        return explicit is not None and cik in asked and asked[cik] <= explicit
 
     def untouched(names: list[Listed]) -> bool:
         return not any(n.instrument_id in first for n in names)
@@ -362,7 +378,7 @@ def filing_days(first: date, last: date) -> list[date]:
 def read_index_days(
     run: IngestRun, index: Source, days: list[date]
 ) -> tuple[dict[date, set[str]], int]:
-    """Each day's 8-K filer CIKs by day for the days with a published index (module doc), and
+    """Each day's event-form filer CIKs by day for the days with a published index (module doc), and
     the days asked. Records one ``idx:<date>`` item per day; a failing day stops the walk."""
     filers: dict[date, set[str]] = {}
     unpublished: list[date] = []
@@ -382,7 +398,7 @@ def read_index_days(
         assert normalized is not None
         ciks = set(normalized.parsed[DAILY_INDEX_FRAME]["cik"])
         filers[day] = ciks
-        run.record_item(f"{INDEX_PREFIX}{day}", f"OK: {len(ciks)} CIKs with an 8-K")
+        run.record_item(f"{INDEX_PREFIX}{day}", f"OK: {len(ciks)} CIKs with an event form")
         for gap in unpublished:  # a later day exists: the gap was a weekend or holiday
             run.record_item(f"{INDEX_PREFIX}{gap}", "NO_DATA: no index (a holiday)")
         unpublished.clear()
@@ -405,7 +421,7 @@ def _one_cik(
     since: date,
     until: date | None = None,
 ) -> str:
-    """Fetch one CIK's 8-Ks (filed on or before ``until`` when given), stage its filing and
+    """Fetch one CIK's event filings (filed on or before ``until`` when given), stage its and
     earnings rows -> the item status."""
     request = FilingsRequest(key=cik, session_date=run.session, since=since)
     try:
@@ -422,7 +438,7 @@ def _one_cik(
         run.stage(TABLE, cik, rows, source.name)
     if len(results):
         run.stage(EARNINGS, cik, results, EARNINGS_8K_SOURCE)
-    return f"OK: {len(filings)} 8-K, {int(is_results_release(filings).sum())} results"
+    return f"OK: {len(filings)} filings, {int(is_results_release(filings).sum())} results"
 
 
 def _ask(
@@ -457,7 +473,7 @@ def ingest_filings(
     limit: int | None = None,
     index: Source | None = None,
 ) -> RunRecord:
-    """Store the 8-K filings of the universe's operating companies (module doc): per CIK from
+    """Store the event filings of the universe's operating companies (module doc): per CIK from
     ``since`` (at most ``limit`` CIKs), or, without ``since`` and with filings stored, the CIKs
     the daily ``index`` shows filing since the latest stored day."""
     with IngestRun(ctx, TASK, session) as run:
@@ -515,6 +531,7 @@ def ingest_filings(
             walked_to=last_day.isoformat() if last_day and clean else None,
             backfilled=backfilled,
             covers_since=covers.isoformat() if covers else None,
+            forms=FORMS_TAG,
             filings=written,
             results=results,
             items=run.counts(),

@@ -34,10 +34,13 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 
 def render(edges: Iterable[Edge]) -> str:
-    found = sorted(edges, key=lambda e: (STATUSES.index(e.status), e.id))
-    lines = [HEADER, "| Edge | Status | Schedule | Outcome | Screeners |", "|---|---|---|---|---|"]
+    found = sorted(edges, key=lambda e: (e.family or "~", STATUSES.index(e.status), e.id))
+    grouped = any(e.family for e in found)  # the Family column and order show once one is set
+    head = ["Edge", *(["Family"] if grouped else []), "Status", "Schedule", "Outcome", "Screeners"]
+    lines = [HEADER, "| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
     lines += [
-        f"| {e.name} (`{e.id}`) | {e.status} | {_schedule(e.schedule, brief=True)} "
+        f"| {e.name} (`{e.id}`) | {(e.family or '-') + ' | ' if grouped else ''}{e.status} "
+        f"| {_schedule(e.schedule, brief=True)} "
         f"| {_outcome(e.outcome, e.event_class is not None)} "
         f"| {_ids(e.screeners)} |"
         for e in found
@@ -52,7 +55,9 @@ def _section(e: Edge) -> list[str]:
     lines = [
         f"## {e.name} (`{e.id}`)",
         "",
-        f"**Status:** {e.status}. **Thesis:** {e.thesis}",
+        f"**Status:** {e.status}. "
+        + (f"**Family:** {e.family}. " if e.family else "")
+        + f"**Thesis:** {e.thesis}",
         "",
     ]
     if e.rejection_reason:
