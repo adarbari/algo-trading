@@ -132,8 +132,10 @@ INSIDER_EVENTS = fixed(
 # of the same filing (a new ``parser_version``, an item added to the kept list) that differs from
 # the stored one carries max(its acceptance session, the next session after the fetch), so a
 # parser change never rewrites history as known earlier; one that is identical keeps the stored
-# row's ``known_from``. ``parser_version`` is in the key: both versions stay and the reader
-# (``data.filing_text``) takes, per item, the latest known on or before its session.
+# row's ``known_from``. ``parser_version`` and ``known_from`` are in the key: every version stays,
+# even a same-version rewrite that changes a text, so a read before its stamp still finds the
+# earlier text; the reader (``data.filing_text``) takes, per item, the latest known on or before
+# its session.
 FILING_TEXT_EVENTS = fixed(
     "events/filing_text",
     "event",
@@ -154,7 +156,7 @@ FILING_TEXT_EVENTS = fixed(
     "reason string",
     "method string!",
     runs="merge",
-    key=("instrument_id", "accession", "item", "parser_version"),
+    key=("instrument_id", "accession", "item", "parser_version", KNOWN_FROM),
 )
 
 # L1: a closed-end fund's daily NAV (edge build D5), keyed by the FUND's id; ``ts`` = the NAV date

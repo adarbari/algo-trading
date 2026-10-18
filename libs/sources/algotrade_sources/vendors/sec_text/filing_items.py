@@ -205,7 +205,9 @@ def extract_text(text: str, form: str, wanted: Collection[str]) -> list[dict[str
     (``NO_ITEMS``); a wanted item without a header is a ``NOT_FOUND`` row."""
     found = sections(text, form)
     if not found:
-        return [_row(None, None, NO_ITEMS, "no Item headers found in the document")]
+        return [
+            _row(None, None, NO_ITEMS, f"no Item headers found ({len(text)} characters of text)")
+        ]
     rows = []
     for item in item_order(form):
         if item not in wanted:

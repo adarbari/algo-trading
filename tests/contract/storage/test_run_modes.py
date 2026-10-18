@@ -218,7 +218,7 @@ def write_filing_text(
 def test_the_table_merges_on_the_item_and_version_key_with_the_stamps_required() -> None:
     spec = spec_for(FILING_TEXT)
     assert (spec.grain, spec.runs) == ("event", "merge")
-    assert spec.key == ("instrument_id", "accession", "item", "parser_version")
+    assert spec.key == ("instrument_id", "accession", "item", "parser_version", "known_from")
     nullable = {c.name: c.nullable for c in spec.columns}
     assert not nullable["known_from"] and not nullable["parser_version"] and not nullable["ts"]
     assert nullable["item"] and nullable["text"] and nullable["reason"]
@@ -271,3 +271,11 @@ def test_a_row_without_its_acceptance_instant_or_known_from_is_rejected(backend:
     for column in ("ts", "known_from", "accession", "parser_version"):
         with pytest.raises(DataValidationError):
             write_filing_text(backend, "bad", [filing_row("1A", "x", **{column: None})])
+
+
+def test_a_same_version_rewrite_that_changes_a_text_keeps_the_earlier_row(backend: Backend) -> None:
+    write_filing_text(backend, "r1", [filing_row("1A", "old")])
+    revised = filing_row("1A", "new", known_from=date(2026, 10, 5))
+    write_filing_text(backend, "r2", [revised], FILING_LATER)
+    merged = backend.tables.read(FILING_TEXT, FILING_DAY)
+    assert merged is not None and sorted(merged["text"]) == ["new", "old"]  # both known stamps

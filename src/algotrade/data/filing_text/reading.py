@@ -91,11 +91,16 @@ def stored_filing_text(
     instrument_ids: Sequence[str],
     columns: Sequence[str] = KEY_COLUMNS,
     as_of: datetime | None = None,
+    start: date | None = None,
+    end: date | None = None,
 ) -> pd.DataFrame:
     """Every stored row of ``instrument_ids`` as stored (every version, any ``known_from``),
     with ``columns`` (default ``KEY_COLUMNS``; add ``text`` for a comparison) plus the stamps;
-    the producer's read of what it already holds. Empty when nothing is stored."""
-    frame = reader.table_range(TABLE, *ALL_TIME, as_of, list(instrument_ids), list(columns))
+    the producer's read of what it already holds, from the acceptance-session partitions of
+    ``start..end`` (default: all). Empty when nothing is stored."""
+    frame = reader.table_range(
+        TABLE, start or ALL_TIME[0], end or ALL_TIME[1], as_of, list(instrument_ids), list(columns)
+    )
     if frame is None or frame.empty:
         return pd.DataFrame({c: [] for c in (*columns, "knowledge_ts", "session_date")})
     return frame.reset_index(drop=True)

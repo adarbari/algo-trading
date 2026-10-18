@@ -6,15 +6,15 @@ inline-XBRL HTML file of 0.3-10 MB, at
 Same pacing, ``User-Agent`` and ``sec`` limiter as the other SEC sources (``[sec_edgar]``,
 10 requests a second at most).
 
-**The raw payload is the extraction, never the HTML.** ``fetch`` downloads the document, runs
-``filing_items.extract_items`` and returns a compact JSON document (the accession, the form, the
-parser version and the item rows); that is what ``IngestRun.fetch`` saves under ``raw/``, and
-``normalize`` rebuilds the frame from it alone. The HTML is dropped after parsing: 100+ GB over the
-history, never committed, and the parser is deterministic, so a new parser version is a refetch.
+**The payload is the extraction, never the HTML.** ``fetch`` downloads the document, runs
+``filing_items.extract_text`` and returns a compact JSON document (the accession, the form, the
+parser version and the item rows); ``normalize`` rebuilds the frame from it alone. The HTML is
+dropped after parsing: 100+ GB over the history, never committed, and the parser is deterministic,
+so a new parser version is a refetch. The task saves no raw copy (it would be the table again).
 
-**Failure is an error, never an empty answer.** A 404, a block page, an answer too short to be a
-filing or a document without any text raises (the task fails the item and a rerun asks again);
-only a parse that finds no item header at all is an answer (one ``NO_ITEMS`` row).
+**Failure is an error, never an empty answer.** A 404, an empty body or a block page raises (the
+task fails the item and a rerun asks again). A short document or one with no item header (an
+exhibit-only 10-K/A) is an answer: one ``NO_ITEMS`` row, or ``SHORT`` sections, never guessed text.
 
 ``normalize`` returns ``parsed["filing_text"]`` (``FILING_TEXT_COLUMNS``), one row per item kept:
 ``item``, ``text``, ``char_count``, ``quality``, ``reason``, ``method``, ``parser_version``.
@@ -47,8 +47,6 @@ DATASET = "filing_text"
 DOCUMENT_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{document}"
 _ACCESSION = re.compile(r"\d{10}-\d{2}-\d{6}")
 _DOCUMENT = re.compile(r"[A-Za-z0-9][\w.\-]*\.(?:htm|html|txt)")  # a file name, never a path
-MIN_DOCUMENT_BYTES = 5_000  # a filing is never smaller; SEC's block and error pages are
-MIN_TEXT_CHARS = 2_000  # the visible text of a real report is never this short
 _BLOCKED = (b"Request Rate Threshold", b"Undeclared Automated Tool")  # SEC's 200-status block pages
 
 
@@ -97,11 +95,9 @@ class SecFilingText:
         body = self._http.get(document_url(wanted))
         if body is None:
             return None
-        if len(body) < MIN_DOCUMENT_BYTES or any(mark in body[:20_000] for mark in _BLOCKED):
-            raise TransientFetchError(f"SEC document {wanted.key}: {len(body)} bytes, not a filing")
+        if not body.strip() or any(mark in body[:20_000] for mark in _BLOCKED):
+            raise TransientFetchError(f"SEC document {wanted.key}: empty or a block page")
         text = html_to_text(body)
-        if len(text) < MIN_TEXT_CHARS:
-            raise ValueError(f"SEC document {wanted.key} holds no report text")
         rows = extract_text(text, wanted.form, items_for(wanted.form, wanted.items))
         document = {
             "accession": wanted.key,

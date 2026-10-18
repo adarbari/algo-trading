@@ -11,6 +11,9 @@ session's universe snapshot minus the funds, each CIK from ``instruments/company
 session (``events/filings.py``'s ``universe_names`` / ``ciks_of``: the same names as the 8-K
 history, share classes of one CIK get a row set each from one fetch). Rows carry the stable FIGI
 instrument id; no ticker is resolved, so a recycled ticker never names another company.
+**Not covered yet: names delisted before the first universe snapshot** (the snapshots start
+2026-10-02): no stored table maps a delisted listing to a CIK (``instruments/listing_history`` has
+none), so the history has survivorship bias until a clean CIK source exists (roadmap, EB D10).
 
 **Two modes**, one row shape:
 
@@ -20,10 +23,15 @@ instrument id; no ticker is resolved, so a recycled ticker never names another c
   skipped, so the loop restarts where it stopped. Within a CIK the newest filing goes first. History
   from 2010: run the windows newest first (``README.md`` "Long runs": 2021-, 2016-2020, 2010-2015),
   so recent years are usable early.
-- **Nightly increment** (no ``--from``): the last ``LOOKBACK_DAYS`` days for the CIKs that are DUE
-  (a filing stored, the latest older than ``DUE_DAYS``: a report is due every ~91 days), at most
-  ``NIGHTLY_CIKS``, oldest first. With nothing stored it does nothing and the run is PARTIAL
-  (a WARN: run the backfill first). A CIK with no filing yet stored is the backfill's.
+- **Nightly increment** (no ``--from``): the CIKs that are DUE (a filing stored, the latest filed
+  at least ``DUE_DAYS`` ago: a report is due every ~91 days) and not asked within ``RECHECK_DAYS``,
+  the longest unchecked first (``last_checked``: a CIK that never files again takes its turn like
+  the rest), at most ``NIGHTLY_CIKS``. Each is read from its latest STORED filing day, never a fixed
+  window, so a CIK reached late loses no filing. With nothing stored it does nothing and the run is
+  PARTIAL (a WARN: run the backfill first). A CIK with no filing yet stored is the backfill's.
+- **Disk**: the run ends PARTIAL when the store's volume has under ``[sec_edgar]
+  filing_text_min_free_gb`` free (default 5). No raw copy is saved (the payload is the extraction
+  the rows store).
 
 **known_from** (the one rule of ``events/filing``, EB H4): the acceptance SESSION
 (``acceptance_sessions``: an acceptance after the close, on a weekend or a holiday counts from the
@@ -33,16 +41,18 @@ is known from there, backfilled or not. A LATER extraction of a filing that alre
 item identical to the stored latest (``text`` and ``quality``, NA-safe) keeps the stored row's
 ``known_from``; one that changed or is new takes ``max(acceptance session, next session after the
 exchange date of the run's clock)``, the FETCH's session, never ``--to`` (``_learned_on``), so a
-parser change never rewrites history as known earlier. A same-version rewrite of a changed item
-replaces its row (the key has no ``knowledge_ts``) and its earlier text is not served: the cost of
-the key, as for ``events/fund_nav``. Reads take, per item, the latest version known on or before
+parser change never rewrites history as known earlier. ``known_from`` is in the table key, so a
+rewrite that changes a text is a new row beside the old one (a read before its stamp still finds
+the old text). Reads take, per item, the latest version known on or before
 the session (``data.filing_text``).
 
-**Failure is an item failure**: a listing that fails, a document that 404s, is blocked, is too
-short or holds no text fails the CIK (``FETCH_ERROR``); the filings that did succeed are stored
-and a rerun asks only for the missing ones. A document with no item header at all is stored as one
-row with a null item (``NO_ITEMS``), never guessed text. ``STOP_AFTER_FAILED`` CIKs failing in a
-row end the run PARTIAL (SEC blocking us).
+**Failure is an item failure**: a listing that fails, a document that 404s or is blocked fails the
+CIK (``FETCH_ERROR``); the filings that did succeed are stored and a rerun asks only for the missing
+ones. A document that is short or has no item header at all (an exhibit-only 10-K/A), and a
+filing SEC lists no primary document for, are stored as one row with a null item (``NO_ITEMS``) or a
+``SHORT`` section, never guessed text. Only a listing or a blocked / failing document counts toward
+``STOP_AFTER_FAILED`` CIKs in a row (SEC blocking us: the run ends PARTIAL); a CIK that failed
+before goes last in a backfill, so one bad filing never starves the others.
 
 Items: per CIK ``OK: <from>..<to> (<n> filings)``, ``NO_DATA`` (SEC has no filings for the CIK) or
 ``FETCH_ERROR``. ``stats``: the window, ``tag``, filings listed / fetched / already stored, rows
@@ -50,10 +60,12 @@ written, ``revised`` rows (a stamp later than the acceptance session), rows by `
 ``pending`` CIKs left.
 """
 
+import shutil
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -69,6 +81,7 @@ from algotrade.data.filing_text.reading import (
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.events.filings import Listed, ciks_of, universe_names
 from algotrade_ingestion.tasks.framework.run import (
+    FAILURES,
     FETCH_ERROR,
     IngestRun,
     NoResponseError,
@@ -76,25 +89,29 @@ from algotrade_ingestion.tasks.framework.run import (
     finished_runs,
     status_label,
 )
-from algotrade_sources.framework.base import Source
+from algotrade_sources.framework.base import Source, TransientFetchError
 from algotrade_sources.framework.series import (
-    FILING_TEXT_PARSER_VERSION as PARSER_VERSION,
-)
-from algotrade_sources.framework.series import (
+    FILING_TEXT_COLUMNS,
+    FILING_TEXT_FRAME,
     FILINGS_FRAME,
     PERIODIC_FORMS,
     FilingsRequest,
     FilingTextRequest,
     items_for,
 )
+from algotrade_sources.framework.series import (
+    FILING_TEXT_PARSER_VERSION as PARSER_VERSION,
+)
 
 TASK = "filing_text"
 TABLE = "events/filing_text"  # the table this task owns (architecture/tables.toml)
-LOOKBACK_DAYS = 14  # the nightly window
 DUE_DAYS = 60  # a CIK is asked nightly once its latest stored report is this old
-NIGHTLY_CIKS = 600  # at most this many due CIKs a night (oldest first)
+NIGHTLY_CIKS = 600  # at most this many due CIKs a night (the longest unchecked first)
+RECHECK_DAYS = 3  # a CIK checked within this many days is not asked again by the nightly
+MARGIN = timedelta(days=7)  # stored rows are read for a window widened by this (acceptance session)
+GB = 1024**3
 BACKFILL_CIKS = 100  # CIKs per backfill run when --limit is not given
-STOP_AFTER_FAILED = 3  # CIKs failing in a row end the run
+STOP_AFTER_FAILED = 3  # CIKs failing in a row for a listing or a blocked document end the run
 CHECKPOINT_EVERY = 10
 DONE = ("OK", "NO_DATA")
 ROW_COLUMNS = [*COLUMNS, "method", "session_date"]  # the reader's columns + what the writer stamps
@@ -246,28 +263,93 @@ def text_rows(
     return out[ROW_COLUMNS]
 
 
-def stored_latest(run: IngestRun, ids: Sequence[str]) -> pd.DataFrame:
-    """The latest stored version of each item of ``ids`` (with ``text``), every ``known_from``."""
-    stored = stored_filing_text(run.reader, ids, (*KEY_COLUMNS, "text"))
+def stored_latest(
+    run: IngestRun, ids: Sequence[str], start: date | None = None, end: date | None = None
+) -> pd.DataFrame:
+    """The latest stored version of each item of ``ids`` (with ``text``), every ``known_from``,
+    from the acceptance-session partitions of ``start..end`` (widened by ``MARGIN``)."""
+    stored = stored_filing_text(run.reader, ids, (*KEY_COLUMNS, "text"), start=start, end=end)
     return latest_filing_versions(stored) if len(stored) else stored
 
 
-def due_ciks(
-    ciks: dict[str, list[Listed]], stored: pd.DataFrame, session: date
-) -> dict[str, list[Listed]]:
-    """The CIKs the nightly asks: a report stored, the latest accepted (New York date) at least
-    ``DUE_DAYS`` before ``session``, oldest first, at most ``NIGHTLY_CIKS``."""
+def latest_filing_day(stored: pd.DataFrame) -> dict[str, date]:
+    """Instrument id -> the New York date of its latest stored acceptance."""
     if stored.empty:
         return {}
     local = pd.to_datetime(stored["ts"], utc=True).dt.tz_convert(EXCHANGE_TZ).dt.date
-    last = local.groupby(stored["instrument_id"]).max()
-    latest = {
-        cik: max(last[n.instrument_id] for n in names if n.instrument_id in last.index)
-        for cik, names in ciks.items()
-        if any(n.instrument_id in last.index for n in names)
+    return {str(i): d for i, d in local.groupby(stored["instrument_id"]).max().items()}
+
+
+def last_checked(runs: Sequence[RunRecord]) -> dict[str, date]:
+    """CIK -> the session of the latest finished run that asked for it (any outcome: a CIK that
+    failed is not first in line the next night, and one that never files again takes its turn)."""
+    out: dict[str, date] = {}
+    for record in sorted(runs, key=lambda r: r.session_date):
+        for key in record.items:
+            if not key.startswith("sym:"):
+                out[key] = record.session_date
+    return out
+
+
+def failed_before(runs: Sequence[RunRecord]) -> set[str]:
+    """CIKs whose latest recorded item is a failure: a backfill puts them last, so one bad filing
+    never keeps good CIKs from their turn."""
+    state: dict[str, bool] = {}
+    for record in sorted(runs, key=lambda r: (r.started_at, r.run_id)):
+        for key, status in record.items.items():
+            state[key] = status_label(status) in FAILURES
+    return {k for k, bad in state.items() if bad}
+
+
+def due_ciks(
+    ciks: dict[str, list[Listed]],
+    stored: pd.DataFrame,
+    checked: dict[str, date],
+    session: date,
+) -> dict[str, tuple[list[Listed], date]]:
+    """The CIKs the nightly asks -> (names, the date to read from): a report stored, the latest
+    filed at least ``DUE_DAYS`` before ``session``, not asked within ``RECHECK_DAYS``; the longest
+    unchecked first, at most ``NIGHTLY_CIKS``. Each is read from its latest STORED filing day,
+    never a fixed window, so a CIK reached late loses no filing."""
+    last = latest_filing_day(stored)
+    rows = []
+    for cik, names in ciks.items():
+        days = [last[n.instrument_id] for n in names if n.instrument_id in last]
+        if not days:
+            continue
+        newest = max(days)
+        looked = checked.get(cik)
+        if newest <= session - timedelta(days=DUE_DAYS) and (
+            looked is None or looked <= session - timedelta(days=RECHECK_DAYS)
+        ):
+            rows.append((looked or date.min, newest, cik))
+    rows.sort()
+    return {cik: (ciks[cik], newest) for _, newest, cik in rows[:NIGHTLY_CIKS]}
+
+
+def free_gb(path: Path) -> float:
+    """Free space on the volume holding ``path`` (GB)."""
+    return shutil.disk_usage(path).free / GB
+
+
+def store_path(ctx: TaskContext) -> Path | None:
+    """Where the local store lives (None for a store with no directory: memory)."""
+    root = getattr(ctx.writer.backend.tables, "root", None)
+    return root if isinstance(root, Path) and root.exists() else None
+
+
+def no_document(filing: Filing) -> pd.DataFrame:
+    """The frame of a filing SEC lists no primary document for: one ``NO_ITEMS`` row saying so."""
+    row = {
+        "item": None,
+        "text": None,
+        "char_count": 0,
+        "quality": "NO_ITEMS",
+        "reason": "SEC lists no primary document",
+        "method": "none",
+        "parser_version": PARSER_VERSION,
     }
-    due = sorted((d, cik) for cik, d in latest.items() if d <= session - timedelta(days=DUE_DAYS))
-    return {cik: ciks[cik] for _, cik in due[:NIGHTLY_CIKS]}
+    return pd.DataFrame([row], columns=list(FILING_TEXT_COLUMNS))
 
 
 def read_done(runs: Sequence[RunRecord], tag: str, since: date, until: date) -> set[str]:
@@ -297,6 +379,27 @@ class Counts:
     def __init__(self) -> None:
         self.listed = self.fetched = self.skipped = self.rows = self.revised = 0
         self.quality: dict[str, int] = {}
+        self.blocked = False  # this CIK's failure was the listing or a blocked document
+
+
+def _blocking(exc: Exception) -> bool:
+    """Whether ``exc`` says SEC is blocking or failing us (a block page, a request given up on,
+    which carries the last HTTP ``status``), not that this one document is bad (a 404, a parse)."""
+    return isinstance(exc, TransientFetchError) or hasattr(exc, "status")
+
+
+def _document(text: Source, request: FilingTextRequest) -> pd.DataFrame:
+    """One document's item frame. No raw copy is saved (``IngestRun.fetch`` would): the payload is
+    the extraction the rows below store, so a copy is the table again, and the disk is short. A
+    404 raises ``LookupError``, a block or a server failure ``TransientFetchError`` /
+    ``GaveUpError``."""
+    payload = text.fetch(request)
+    if payload is None:
+        raise LookupError("SEC has no such document (404)")
+    normalized = text.normalize(request, payload)
+    assert normalized is not None
+    frame: pd.DataFrame = normalized.parsed[FILING_TEXT_FRAME]
+    return frame
 
 
 def _one_cik(
@@ -314,6 +417,7 @@ def _one_cik(
     """One CIK's periodic filings in ``window``: list, fetch each not already stored, stage
     their rows -> the item status."""
     since, until = window
+    counts.blocked = False
     try:
         normalized = run.fetch(
             listing,
@@ -321,6 +425,9 @@ def _one_cik(
         )
     except NoResponseError:
         return f"NO_DATA: {_window(since, until)} (SEC has no filings for this CIK)"
+    except Exception:
+        counts.blocked = True
+        raise
     assert normalized is not None
     filings = listed_filings(normalized.parsed[FILINGS_FRAME], since, until)
     ids = [n.instrument_id for n in names]
@@ -334,24 +441,21 @@ def _one_cik(
             continue
         try:
             if filing.primary_document is None:
-                raise ValueError("SEC lists no primary document")
-            got = run.fetch(
-                text,
-                FilingTextRequest(
+                extracted = no_document(filing)
+            else:
+                request = FilingTextRequest(
                     key=filing.accession,
                     session_date=run.session,
                     cik=cik,
                     form=filing.form,
                     primary_document=filing.primary_document,
                     items=tuple(requested),
-                ),
-            )
-            assert got is not None
-            counts.fetched += 1
-            rows = text_rows(
-                got.parsed["filing_text"], filing, ids, held["latest"](), _learned_on(run)
-            )
+                )
+                extracted = _document(text, request)
+                counts.fetched += 1
+            rows = text_rows(extracted, filing, ids, held["latest"](), _learned_on(run))
         except Exception as exc:  # one filing failing must not drop the others
+            counts.blocked |= _blocking(exc)
             failures.append(f"{filing.accession}: {exc}")
             continue
         counts.rows += len(rows)
@@ -366,6 +470,52 @@ def _one_cik(
             f"{FETCH_ERROR}: {len(failures)} of {len(filings)} filings failed, first {failures[0]}"
         )
     return f"OK: {_window(since, until)} ({len(filings)} filings)"
+
+
+@dataclass(frozen=True)
+class Plan:
+    """The CIKs a run asks (``todo``), the window of each, and the counts for ``stats``."""
+
+    todo: dict[str, list[Listed]]
+    windows: dict[str, tuple[date, date]]
+    skipped: int
+    pending: int
+
+
+def _select(
+    run: IngestRun,
+    ciks: dict[str, list[Listed]],
+    session: date,
+    since: date | None,
+    until: date,
+    limit: int | None,
+    force: bool,
+    tag: str,
+) -> Plan:
+    """The nightly's due CIKs (each from its latest stored filing), or the backfill's CIKs not yet
+    read for the window (failed ones last, ``limit`` of them)."""
+    runs = finished_runs(run.writer, TASK)
+    if since is None:
+        every = [n.instrument_id for group in ciks.values() for n in group]
+        known = stored_filing_text(run.reader, every, ("instrument_id", "ts"))
+        if known.empty:
+            run.partial("nothing stored yet: run the backfill (--from)")
+        due = due_ciks(ciks, known, last_checked(runs), session)
+        return Plan(
+            {cik: names for cik, (names, _) in due.items()},
+            {cik: (start, until) for cik, (_, start) in due.items()},
+            0,
+            0,
+        )
+    done = set() if force else read_done(runs, tag, since, until)
+    bad = failed_before(runs)
+    left = {c: n for c, n in ciks.items() if c not in done}
+    left = dict(sorted(left.items(), key=lambda item: item[0] in bad))  # failed ones last
+    cap = limit or BACKFILL_CIKS
+    todo = dict(list(left.items())[:cap])
+    return Plan(
+        todo, dict.fromkeys(todo, (since, until)), len(ciks) - len(left), max(0, len(left) - cap)
+    )
 
 
 def ingest_filing_text(
@@ -394,48 +544,43 @@ def ingest_filing_text(
         ciks = ciks_of(run, covered.listed)
         nightly = since is None
         counts = Counts()
-        every = [n.instrument_id for group in ciks.values() for n in group]
-        if nightly:
-            window = (session - timedelta(days=LOOKBACK_DAYS), session)
-            known = stored_filing_text(run.reader, every, ("instrument_id", "ts"))
-            todo = due_ciks(ciks, known, session)
-            if known.empty:
-                run.partial("nothing stored yet: run the backfill (--from)")
-            skipped, pending = 0, 0
-        else:
-            assert since is not None
-            window = (since, until)
-            done = set() if force else read_done(finished_runs(run.writer, TASK), tag, since, until)
-            left = {c: n for c, n in ciks.items() if c not in done}
-            skipped, pending = len(ciks) - len(left), max(0, len(left) - (limit or BACKFILL_CIKS))
-            todo = dict(list(left.items())[: limit or BACKFILL_CIKS])
+        plan = _select(run, ciks, session, since, until, limit, force, tag)
+        todo, windows = plan.todo, plan.windows
+        starts = [w[0] for w in windows.values()]
+        low, high = (min(starts), until) if starts else (until, until)
+        window = (low, high)
         ids = [n.instrument_id for group in todo.values() for n in group]
-        keys = stored_filing_text(run.reader, ids, (*KEY_COLUMNS, "form"))
+        start, end = low - MARGIN, high + MARGIN
+        keys = stored_filing_text(run.reader, ids, (*KEY_COLUMNS, "form"), start=start, end=end)
         cache: dict[str, pd.DataFrame] = {}
 
         def latest() -> pd.DataFrame:  # the text of what is stored: read once, only when needed
             if "frame" not in cache:
                 cache["frame"] = (
-                    stored_latest(run, ids)
+                    stored_latest(run, ids, start, end)
                     if len(keys)
                     else pd.DataFrame({c: [] for c in (*KEY_COLUMNS, "text")})
                 )
             return cache["frame"]
 
         held = {"keys": keys, "latest": latest}
-        failed_in_a_row = 0
+        floor, path = ctx.settings.sec_filing_text_min_free_gb, store_path(ctx)
+        blocked_in_a_row = 0
         for i, (cik, group) in enumerate(todo.items(), 1):
-            status = run.attempt(
-                cik,
-                partial(
-                    _one_cik, run, listing, text, cik, group, window, items, force, held, counts
-                ),
-            )
-            failed_in_a_row = failed_in_a_row + 1 if status_label(status) == FETCH_ERROR else 0
+            if path is not None and (free := free_gb(path)) < floor:
+                run.partial(
+                    f"stopped: {free:.1f} GB free is under {floor:g} GB "
+                    "(sources.toml [sec_edgar] filing_text_min_free_gb)"
+                )
+                break
+            args = (run, listing, text, cik, group, windows[cik], items, force, held, counts)
+            status = run.attempt(cik, partial(_one_cik, *args))
+            failed = status_label(status) == FETCH_ERROR and counts.blocked
+            blocked_in_a_row = blocked_in_a_row + 1 if failed else 0
             if i % CHECKPOINT_EVERY == 0:
                 run.checkpoint()
-            if failed_in_a_row >= STOP_AFTER_FAILED:
-                run.partial(f"stopped: {failed_in_a_row} CIKs failed in a row ({status})")
+            if blocked_in_a_row >= STOP_AFTER_FAILED:
+                run.partial(f"stopped: {blocked_in_a_row} CIKs failed in a row ({status})")
                 break
         published = run.publish_sessions(TABLE)
         run.stats.update(
@@ -444,8 +589,8 @@ def ingest_filing_text(
             tag=tag,
             names=len(covered.listed),
             ciks=len(todo),
-            skipped_covered=skipped,
-            pending=pending,
+            skipped_covered=plan.skipped,
+            pending=plan.pending,
             filings_listed=counts.listed,
             filings_fetched=counts.fetched,
             filings_already_stored=counts.skipped,

@@ -1,6 +1,7 @@
 """The SEC filing-text source (edge build D10): the archive URL built from the accession and the
-submissions JSON's file name, the raw payload being the extraction (never the HTML), and every
-failure an error (404, a block page, a stub, a textless document), never an empty answer."""
+submissions JSON's file name, the payload being the extraction (never the HTML), a 404, an empty
+body or a block page an error, and a short or textless document one NO_ITEMS row (never guessed
+text)."""
 
 import json
 
@@ -102,16 +103,31 @@ def test_a_404_is_no_response_not_an_empty_answer() -> None:
 
 @pytest.mark.parametrize(
     "body",
+    [b"<html>" + b"Request Rate Threshold Exceeded " * 300 + b"</html>", b"  \n "],
+    ids=["block page", "empty body"],
+)
+def test_a_block_page_or_an_empty_body_is_an_error(body: bytes) -> None:
+    with pytest.raises(TransientFetchError):
+        source(body).fetch(request())
+
+
+@pytest.mark.parametrize(
+    "body",
     [
-        b"<html>" + b"Request Rate Threshold Exceeded " * 300 + b"</html>",
         b"<html><body>stub</body></html>",
         b"<html><body>" + b"<script>var x = 1;</script>" * 400 + b"</body></html>",
     ],
-    ids=["block page", "stub", "no report text"],
+    ids=["stub", "no report text"],
 )
-def test_a_block_page_a_stub_or_a_textless_document_is_an_error(body: bytes) -> None:
-    with pytest.raises((TransientFetchError, ValueError)):
-        source(body).fetch(request())
+def test_a_short_or_textless_document_is_one_no_items_row_never_an_error(body: bytes) -> None:
+    adapter = source(body)
+    payload = adapter.fetch(request(form="10-K/A"))
+    assert payload is not None
+    frame = adapter.normalize(request(), payload).parsed[FILING_TEXT_FRAME]  # type: ignore[union-attr]
+    assert len(frame) == 1 and pd.isna(frame["item"].iloc[0]) and pd.isna(frame["text"].iloc[0])
+    assert (
+        frame["quality"].iloc[0] == "NO_ITEMS" and "characters of text" in frame["reason"].iloc[0]
+    )
 
 
 def test_a_server_error_is_an_error() -> None:

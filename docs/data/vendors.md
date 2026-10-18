@@ -185,7 +185,10 @@ zstd Parquet, so about 90 KB per filer-year: 2,000 filers over 2010-2025 is abou
 names over their history about 3.6 GB. History: 4 CIK windows newest first, about 160k documents
 at 5 a second plus parse time, 15-30 hours detached (README "Long runs"); the nightly increment
 is optional and WARN-only. Readers go through `data.filing_text` (`known_from <= S`, the latest
-version per item).
+version per item). **Survivorship (must-do before the backfill):** the names are the universe
+snapshot's, so a company delisted before 2026-10-02 is not covered; `instruments/listing_history`
+has no CIK and no honest name-to-CIK mapping exists in the store, so the history waits for a CIK
+source (also D1's Form 25 follow-up).
 
 ### S&P 500 membership history (fja05680/sp500; edges ED6b-3)
 

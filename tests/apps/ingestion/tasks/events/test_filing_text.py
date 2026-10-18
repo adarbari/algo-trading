@@ -428,29 +428,53 @@ def test_the_nightly_with_nothing_stored_is_a_warn_not_a_failure() -> None:
     assert "run the backfill" in record.stats["partial"][0]
 
 
-def test_the_nightly_asks_only_the_ciks_due_a_report_over_the_last_fortnight() -> None:
+def test_the_nightly_asks_only_the_ciks_due_a_report_each_from_its_latest_stored_filing() -> None:
     writer = store()
-    run(writer, feed([K1]), requested_symbols=("GOOGL", "MU"), since=date(2026, 1, 1))
-    new = ("0001652044-26-000099", "2026-09-30T13:00:00.000Z", "2026-09-30", "10-Q", "new.htm")
+    run(writer, feed([K1]), requested_symbols=("GOOGL", "GOOG", "MU"), since=date(2026, 1, 1))
+    new = ("0001652044-26-000099", "2026-08-20T13:00:00.000Z", "2026-08-20", "10-Q", "new.htm")
     sec = Feed([K1, new], {**DOCUMENTS, "new.htm": TEN_Q})
-    record = run(writer, sec, session=date(2026, 10, 2), since=None)
+    # six weeks after the filing: a fixed fortnight window would have lost it
+    record = run(writer, sec, session=date(2026, 10, 9), since=None)
     assert record.status is RunStatus.COMPLETE and record.stats["mode"] == "nightly"
-    assert record.stats["window"] == "2026-09-18..2026-10-02"
-    assert record.stats["ciks"] == 1  # MU's 10-Q is 57 days old: not due yet
+    assert record.stats["window"] == "2026-02-10..2026-10-09"
+    assert record.stats["ciks"] == 2  # both are over 60 days old; MU's 10-Q is stored already
     assert [u.rsplit("/", 1)[-1] for u in sec.document_urls] == ["new.htm"]
     accessions = set(rows(writer)["accession"])
     assert "0001652044-26-000099" in accessions and K1[0] in accessions
-    due = task.due_ciks({"A": [Listed("EQ:GOOGL", "GOOGL")]}, pd.DataFrame(), SESSION)
-    assert due == {}
 
 
-def test_due_ciks_orders_oldest_first_and_skips_a_recent_filer() -> None:
-    names = {c: [Listed(f"EQ:{c}", c)] for c in ("OLD", "OLDER", "FRESH", "NEVER")}
-    ts = {"EQ:OLD": "2026-06-01", "EQ:OLDER": "2026-03-01", "EQ:FRESH": "2026-09-20"}
+def test_a_cik_checked_within_the_recheck_days_is_not_asked_again() -> None:
+    writer = store()
+    run(writer, feed([K1]), requested_symbols=("GOOGL",), since=date(2026, 1, 1))
+    sec = feed([K1])
+    record = run(writer, sec, session=SESSION, since=None)  # the same session: just checked
+    assert record.stats["ciks"] == 0 and sec.urls == []
+
+
+def test_due_ciks_reads_from_the_latest_stored_day_and_the_longest_unchecked_goes_first() -> None:
+    names = {c: [Listed(f"EQ:{c}", c)] for c in ("OLD", "OLDER", "FRESH", "NEVER", "ASKED")}
+    ts = {"EQ:OLD": "2026-06-01", "EQ:OLDER": "2026-03-01", "EQ:FRESH": "2026-09-20",
+          "EQ:ASKED": "2026-01-05"}  # fmt: skip
     stored = pd.DataFrame(
         {"instrument_id": list(ts), "ts": [pd.Timestamp(d, tz=UTC) for d in ts.values()]}
     )
-    assert list(task.due_ciks(names, stored, SESSION)) == ["OLDER", "OLD"]
+    checked = {"OLD": date(2026, 9, 1), "ASKED": SESSION}
+    due = task.due_ciks(names, stored, checked, SESSION)
+    assert list(due) == ["OLDER", "OLD"]  # never checked first; ASKED today; FRESH not due
+    assert due["OLDER"][1] == date(2026, 2, 28) and due["OLD"][1] == date(2026, 5, 31)  # New York
+    assert task.due_ciks(names, pd.DataFrame(), {}, SESSION) == {}
+
+
+def test_a_never_filing_cik_does_not_hold_the_head_of_the_line_every_night() -> None:
+    names = {f"C{i}": [Listed(f"EQ:C{i}", f"C{i}")] for i in range(3)}
+    ts = {f"EQ:C{i}": "2026-01-05" for i in range(3)}
+    stored = pd.DataFrame(
+        {"instrument_id": list(ts), "ts": [pd.Timestamp(d, tz=UTC) for d in ts.values()]}
+    )
+    first = task.due_ciks(names, stored, {}, SESSION)
+    asked = {c: SESSION - timedelta(days=10 - i) for i, c in enumerate(["C0", "C1"])}
+    later = task.due_ciks(names, stored, asked, SESSION)
+    assert next(iter(later)) == "C2" and next(iter(first)) == "C0"
 
 
 def test_a_fund_and_an_unknown_ticker_are_never_fetched() -> None:
@@ -463,3 +487,84 @@ def test_a_fund_and_an_unknown_ticker_are_never_fetched() -> None:
 def test_a_window_that_ends_before_it_starts_is_refused() -> None:
     with pytest.raises(ValueError):
         run(store(), feed(), since=date(2026, 5, 1), until=date(2026, 4, 1))
+
+
+# ------------------------------------------------------------------ bad filings, blocks, disk
+
+
+def test_a_filing_with_no_primary_document_is_a_no_items_row_not_a_failure() -> None:
+    writer = store()
+    listing = submissions(ALPHA, [KA]).replace(
+        b'"primaryDocument": ["ka.htm"]', b'"primaryDocument": [null]'
+    )
+    sec = Feed([KA], DOCUMENTS)
+    sec.lists[ALPHA] = listing
+    record = run(writer, sec, requested_symbols=("GOOGL",))
+    assert record.status is RunStatus.COMPLETE and sec.document_urls == []
+    frame = rows(writer, ["EQ:GOOGL"])
+    assert (
+        frame["quality"].tolist() == ["NO_ITEMS"]
+        and "no primary document" in frame["reason"].iloc[0]
+    )
+
+
+def test_an_exhibit_only_amendment_is_a_stored_row_and_the_cik_stays_ok() -> None:
+    page = b"<html><body>" + b"<p>Exhibit 31 certification.</p>" * 40 + b"</body></html>"
+    writer = store()
+    record = run(writer, Feed([KA], {**DOCUMENTS, "ka.htm": page}), requested_symbols=("GOOGL",))
+    assert record.items["0001652044"].startswith("OK") and record.status is RunStatus.COMPLETE
+
+
+def test_missing_documents_never_stop_the_run_but_blocked_ones_do() -> None:
+    writer = store()
+    names = {}
+    # four CIKs would be needed: use the two real ones with every document missing (404): both
+    # fail, neither is a block, so the run reaches both
+    record = run(writer, Feed([K1], {}), requested_symbols=("GOOGL", "MU"))
+    assert sum(s.startswith("FETCH_ERROR") for s in record.items.values()) == 2
+    assert "stopped" not in " ".join(record.stats.get("partial", []))
+    assert names == {}
+
+
+def test_a_blocked_listing_counts_toward_the_stop_and_the_run_ends_partial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    writer = store()
+    monkeypatch.setattr(task, "STOP_AFTER_FAILED", 1)
+
+    class Down(Feed):
+        def __call__(self, url: str) -> bytes:
+            if "/submissions/" in url:
+                raise HttpError(500)
+            return super().__call__(url)
+
+    record = run(writer, Down([K1], DOCUMENTS), requested_symbols=("GOOGL", "MU"))
+    assert any("stopped: 1 CIKs failed in a row" in p for p in record.stats["partial"])
+    assert sum(s.startswith("FETCH_ERROR") for s in record.items.values()) == 1
+
+
+def test_a_cik_that_failed_before_goes_last_in_the_next_backfill() -> None:
+    writer = store()
+    run(writer, Feed([K1], {}), requested_symbols=("GOOGL",))  # GOOGL's document 404s
+    sec = feed([K1])
+    record = run(writer, sec, requested_symbols=("GOOGL", "MU"), limit=1)
+    assert list(record.items) == ["0000723125"]  # MU first; the failed CIK waits its turn
+    assert record.stats["pending"] == 1
+
+
+def test_the_run_ends_partial_when_the_disk_is_short(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    writer = store()
+    monkeypatch.setattr(task, "store_path", lambda ctx: tmp_path)
+    monkeypatch.setattr(task, "free_gb", lambda path: 1.0)
+    sec = feed()
+    record = run(writer, sec, requested_symbols=("GOOGL",))
+    assert record.status is RunStatus.PARTIAL and sec.urls == []
+    assert "1.0 GB free is under 5 GB" in record.stats["partial"][0]
+    monkeypatch.setattr(task, "free_gb", lambda path: 50.0)
+    assert run(writer, feed(), requested_symbols=("GOOGL",)).status is RunStatus.COMPLETE
+
+
+def test_the_disk_floor_is_a_site_setting() -> None:
+    assert SourcesSettings().sec_filing_text_min_free_gb == 5.0

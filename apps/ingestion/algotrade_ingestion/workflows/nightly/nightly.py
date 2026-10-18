@@ -123,12 +123,6 @@ PURGE = "purge-raw"
 # catch-up skipped its screens and served a complete session without screener runs).
 SNAPSHOT = "the source serves only its current snapshot"
 NEW_SINCE_STORED = "it reads every filing since the latest stored one, so one run covers all"
-LOOKBACK_WINDOW = (
-    "it reads the last 14 days of reports, so the latest session's run covers this one"
-)
-LOOKBACK_WINDOW = (
-    "it reads the last 14 days of reports, so the latest session's run covers this one"
-)
 FORWARD_RECORD = "paper picks are made only on the night they are for (a later one is no record)"
 WHOLE_YEAR = "it copies the whole year in one run, so the latest session's run covers this one"
 MARKET_DATA = ("bars", "rates", "corporate-actions", "earnings", "chains")
@@ -178,10 +172,10 @@ NIGHTLY: tuple[Step, ...] = (
     # index, each filing's XML; a night reads at most a few days, the next goes on. Optional: no
     # edge reads it until the history is backfilled (`algotrade-ingest insider --since`).
     Step("insider", latest_only=NEW_SINCE_STORED, critical=False),
-    # The Item sections of the 10-K / 10-Q the CIKs due a report filed in the last 14 days (edge
-    # build D10): optional and WARN-only (a PARTIAL run with nothing stored yet is a WARN, a failed
-    # night is read again); nothing reads it nightly yet (history accrues for track E).
-    Step("filing-text", needs=("filings",), latest_only=LOOKBACK_WINDOW, critical=False),
+    # The Item sections of the 10-K / 10-Q of the CIKs due a report (edge build D10), each read from
+    # its latest stored filing: optional and WARN-only (a PARTIAL run with nothing stored yet or a
+    # full disk is a WARN, a failed night is read again); history accrues for track E.
+    Step("filing-text", needs=("filings",), latest_only=NEW_SINCE_STORED, critical=False),
     Step("earnings", accept=(check_earnings,), task_complete=True),
     Step("bars", accept=(check_bars, check_bars_resolved)),
     Step("rates", task_complete=True),
