@@ -8,6 +8,7 @@ a fake transport, so no test needs the network.
 """
 
 import gzip
+import math
 import random
 import threading
 import time
@@ -16,7 +17,10 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Literal, Protocol
+
+from algotrade_sources.framework.limiter import MAX_RETRY_AFTER_S
 
 DEFAULT_USER_AGENT = "algotrade-ingestion/0.1 (+https://github.com/adarbari/algo-trading)"
 # api.nasdaq.com rejects non-browser user agents.
@@ -47,6 +51,26 @@ type Transport = Callable[[str], bytes]
 type Sleep = Callable[[float], None]
 
 
+def parse_retry_after(header: str | None, now: float | None = None) -> float | None:
+    """Seconds a ``Retry-After`` header asks for: delta-seconds (``"120"``, ``"1.5"``) or an
+    HTTP-date (relative to ``now``, default the wall clock). ``None`` for a missing, garbled,
+    negative, non-finite or already-past value, so the caller's default back-off applies. A
+    huge value is returned as is: ``get_with_retry`` gives up on anything over
+    ``MAX_RETRY_AFTER_S`` instead of waiting."""
+    if not header or not header.strip():
+        return None
+    text = header.strip()
+    try:
+        seconds = float(text)
+    except ValueError:
+        try:  # the IMF-fixdate form, e.g. "Wed, 21 Oct 2015 07:28:00 GMT"
+            when = datetime.strptime(text, "%a, %d %b %Y %H:%M:%S GMT").replace(tzinfo=UTC)
+        except ValueError:
+            return None
+        seconds = when.timestamp() - (time.time() if now is None else now)
+    return seconds if math.isfinite(seconds) and seconds > 0 else None
+
+
 def urllib_transport(
     user_agent: str = DEFAULT_USER_AGENT,
     timeout: float = 60.0,
@@ -66,8 +90,7 @@ def urllib_transport(
                 return gzip.decompress(body) if encoding == "gzip" else body
         except urllib.error.HTTPError as exc:
             header = exc.headers.get("Retry-After") if exc.headers else None
-            retry = float(header) if header and header.isdigit() else None
-            raise HttpError(exc.code, retry, _error_body(exc)) from exc
+            raise HttpError(exc.code, parse_retry_after(header), _error_body(exc)) from exc
 
     return get
 
@@ -120,8 +143,7 @@ def json_post_transport(
                 return answer
         except urllib.error.HTTPError as exc:
             header = exc.headers.get("Retry-After") if exc.headers else None
-            retry = float(header) if header and header.isdigit() else None
-            raise HttpError(exc.code, retry, _error_body(exc)) from exc
+            raise HttpError(exc.code, parse_retry_after(header), _error_body(exc)) from exc
 
     return post
 
@@ -245,7 +267,8 @@ def get_with_retry(
     Retry-After (or an exponential back-off): through ``limiter.throttled`` when there is a
     limiter, so every thread and process holds, else by sleeping here. Other failures back off
     linearly. Gives up after ``policy.tries`` attempts, or when the next wait would pass
-    ``policy.max_total_s``, or when ``breaker`` opens.
+    ``policy.max_total_s``, or when ``breaker`` opens, or at once on a 429 whose Retry-After is
+    over ``MAX_RETRY_AFTER_S``.
     """
     started = clock()
     last_error: Exception | None = None
@@ -266,7 +289,7 @@ def get_with_retry(
                 _report(limiter, "missing")
                 return None
             last_error = exc
-            delay, pause = _backoff(exc, policy, attempt, limiter)
+            delay, pause = _backoff(exc, policy, attempt, limiter, url)
         except (OSError, TimeoutError) as exc:
             last_error, delay = exc, _linear(policy, attempt)
             _report(limiter, "error")
@@ -292,15 +315,29 @@ def _status(error: Exception | None) -> int | None:
 
 
 def _backoff(
-    exc: HttpError, policy: RetryPolicy, attempt: int, limiter: AdaptivePacer | None
+    exc: HttpError,
+    policy: RetryPolicy,
+    attempt: int,
+    limiter: AdaptivePacer | None,
+    url: str,
 ) -> tuple[float, bool]:
     """(delay before the next attempt, whether to sleep it here). A 429 waits out Retry-After
     (else an exponential back-off) through the limiter, which holds every process; other
-    errors back off linearly here."""
+    errors back off linearly here. A Retry-After over ``MAX_RETRY_AFTER_S`` is not waited
+    for and holds nothing: the request is given up on (a vendor that bans for a day must not
+    park the nightly and its lock)."""
     if exc.status != 429:
         _report(limiter, "error")
         return _linear(policy, attempt), True
-    delay = exc.retry_after or min(policy.max_delay, 5 * 2**attempt)
+    asked = exc.retry_after if exc.retry_after and exc.retry_after > 0 else None  # NaN, <= 0: none
+    if asked is not None and asked > MAX_RETRY_AFTER_S:
+        _report(limiter, "error")
+        raise GaveUpError(
+            f"giving up on {url}: HTTP 429 with Retry-After {asked:.0f}s, over the "
+            f"{MAX_RETRY_AFTER_S:.0f}s cap",
+            429,
+        )
+    delay = asked or min(policy.max_delay, 5 * 2**attempt)
     if limiter is None:
         return delay, True
     limiter.throttled(delay)
