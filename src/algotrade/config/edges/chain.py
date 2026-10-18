@@ -1,0 +1,133 @@
+"""The option outcomes of an edge document beyond ``expires_otm``: the horizon check of
+``option_model_pnl`` (``tenor_sessions``, ``check_tenor``: its implied-vol field's tenor) and the
+``option_pnl`` outcome of an edge document (ADR 0053 amendment, EB H13): a P&L of an option
+structure from the stored chains (``outcomes/option/structure_pnl@v1``), basis ``chain``, beside
+``option_model_pnl`` (a modelled P&L, basis ``model``).
+
+    structure     one of ``CHAIN_STRUCTURES``: an at-the-money straddle held long or short,
+                  delta-hedged daily long or short (our own delta from each session's chain), or a
+                  short put chosen by its own delta (``strike_delta``, required for it only)
+    tenor_days    the tenor rule: the contracts expire on the first listed date at least this many
+                  calendar days after the entry session and not before the window's end
+    horizon_sessions, benchmark ``"none"``, ``start_offset_sessions``, ``cost_bps``, ``side`` as
+                  for any outcome; it reads no implied-vol field and sets no ``otm_pct``
+
+The grain is forward-only: chains are stored from 2026-10-02, after every frozen split, so no
+pre-frozen basis exists and every row is out of sample (ADR 0065 amendment).
+"""
+
+import re
+
+from algotrade.config.site.fields import Table
+from algotrade.core.model.errors import ConfigurationError
+
+CHAIN_KIND = "option_pnl"
+CHAIN_BASIS = "chain"  # what a P&L of quoted prices is labelled (results and UI)
+CHAIN_STRUCTURES = (
+    "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
+    "put_short",
+)  # fmt: skip
+SHORT_STRUCTURES = ("atm_straddle_short", "delta_hedged_atm_short", "put_short")
+HEDGED_STRUCTURES = ("delta_hedged_atm", "delta_hedged_atm_short")
+MAX_TENOR_DAYS = 400
+
+
+def grain_structure(structure: str, strike_delta: float | None) -> str:
+    """The structure the grain stores (held long) for a document ``structure``: ``atm_straddle``,
+    or ``put_delta_NN`` for the short put of delta ``NN / 100``."""
+    if structure == "put_short":
+        assert strike_delta is not None
+        return f"put_delta_{round(strike_delta * 100):02d}"
+    return "atm_straddle"
+
+
+def check_chain(
+    o: Table, structure: str | None, delta: float | None, pct: float | None, iv_field: str | None
+) -> tuple[str, float | None, float | None, str | None]:
+    """``(structure, strike_delta, otm_pct, iv_field)`` of an ``option_pnl`` outcome, or a
+    ``ConfigurationError`` naming the file and key."""
+    if structure is None:
+        raise ConfigurationError(f"{o.where} structure: required for an option_pnl outcome")
+    if pct is not None or iv_field is not None:
+        key = "otm_pct" if pct is not None else "iv_field"
+        raise ConfigurationError(f"{o.where} {key}: an option_pnl reads quoted prices, it has none")
+    if structure == "put_short":
+        if delta is None or not 0.05 <= round(delta, 2) <= 0.5:
+            raise ConfigurationError(
+                f"{o.where} strike_delta: a put_short names the put's delta, 0.05 to 0.5, "
+                f"got {delta}"
+            )
+        delta = round(delta, 2)
+    elif delta is not None:
+        raise ConfigurationError(f"{o.where} strike_delta: only a put_short has a strike")
+    return structure, delta, None, None
+
+
+def chain_tenor(o: Table, kind: str) -> int | None:
+    """The ``tenor_days`` of an ``option_pnl`` outcome (required, 1 to ``MAX_TENOR_DAYS``); None
+    for any other kind, which may not name one."""
+    if kind != CHAIN_KIND:
+        if "tenor_days" in o.names():
+            raise ConfigurationError(f"{o.where} tenor_days: only an option_pnl outcome has one")
+        return None
+    days = o.integer("tenor_days", 0)
+    if not 1 <= days <= MAX_TENOR_DAYS:
+        raise ConfigurationError(
+            f"{o.where} tenor_days: required, calendar days from 1 to {MAX_TENOR_DAYS}, got {days}"
+        )
+    return days
+
+
+def check_kinds(where: str, kinds: set[str]) -> None:
+    """Refuse an edge whose outcome and variants mix ``option_pnl`` (another grain) with others."""
+    if chain_kind_mixed(kinds):
+        raise ConfigurationError(
+            f"{where} variants: an edge's outcome and its variants are all option_pnl or none is "
+            f"(another grain)"
+        )
+
+
+def chain_kind_mixed(kinds: set[str]) -> bool:
+    return CHAIN_KIND in kinds and len(kinds) > 1
+
+
+def structures_of(kind: str, otm: tuple[str, ...], model: tuple[str, ...]) -> tuple[str, ...]:
+    """The structure values an outcome of ``kind`` may name (``otm``: expires_otm's, ``model``:
+    option_model_pnl's)."""
+    return {"expires_otm": otm, CHAIN_KIND: CHAIN_STRUCTURES}.get(kind, model)
+
+
+# The implied vol is one tenor (``iv30``: 30 calendar days, about 21 sessions) and prices every
+# horizon of the outcome, so a horizon far from it prices the wrong option: an option_model_pnl
+# horizon must lie within ``[tenor / 2, tenor * 2]`` sessions of the field's tenor, read from its
+# name (a field with no ``iv<days>`` in its name has no known tenor and is refused).
+TRADING_DAYS_PER_YEAR, CALENDAR_DAYS_PER_YEAR = 252, 365
+_IV_TENOR = re.compile(r"(?<![a-z0-9])iv(\d+)(?![0-9])")
+
+
+def tenor_sessions(iv_field: str) -> int | None:
+    """The tenor of an implied-vol field in sessions (``iv30`` is 30 calendar days: 21), from its
+    name; None when the name carries none."""
+    found = _IV_TENOR.search(iv_field.lower())
+    if found is None:
+        return None
+    return round(int(found.group(1)) * TRADING_DAYS_PER_YEAR / CALENDAR_DAYS_PER_YEAR)
+
+
+def check_tenor(o: Table, horizons: tuple[int, ...], iv_field: str | None) -> None:
+    """Refuse an ``option_model_pnl`` horizon the field's one tenor cannot price (module top)."""
+    if iv_field is None:
+        return  # required, and reported, by ``_expires_otm``
+    tenor = tenor_sessions(iv_field)
+    if tenor is None:
+        raise ConfigurationError(
+            f"{o.where} iv_field: {iv_field!r} names no tenor (iv<days>), so an option_model_pnl "
+            f"cannot tell which horizons its vol prices"
+        )
+    low, high = tenor // 2, tenor * 2
+    bad = [h for h in horizons if not low <= h <= high]
+    if bad:
+        raise ConfigurationError(
+            f"{o.where} horizon_sessions: {bad} are outside {low}..{high} sessions, what the "
+            f"{tenor}-session tenor of {iv_field!r} prices; use a field of the horizon's tenor"
+        )

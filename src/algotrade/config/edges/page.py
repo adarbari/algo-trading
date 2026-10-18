@@ -164,11 +164,11 @@ def _outcome(o: Outcome, event: bool) -> str:
     if o.kind == "option_model_pnl":
         shape = (o.structure or "").replace("_", " ")
         parts.append(f"modelled P&L of an {shape} (basis {o.basis}, not a quote)")
-    elif o.kind == "option_pnl":  # ported from #664 (H13) so either merge order works
+    elif o.kind == "option_pnl":
         shape = (o.structure or "").replace("_", " ")
         parts.append(
             f"P&L of a {shape} from the stored chains (basis {o.basis}, quoted prices, "
-            f"{getattr(o, 'tenor_days', None)}-day tenor, forward-only from 2026-10-02)"
+            f"{o.tenor_days}-day tenor, forward-only from 2026-10-02)"
         )
     elif o.structure is not None:
         strike = (

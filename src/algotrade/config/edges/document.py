@@ -20,8 +20,8 @@ and the key.
                       ``otm_pct`` (a fraction in (0, 1)) and the ``iv_field`` it reads at D;
                       ``iv_field`` is allowed on a ratio measure too (default: the run's); an
                       ``option_model_pnl`` outcome (a model P&L, basis ``model``) names its
-                      ``structure`` (MODEL_STRUCTURES), the ``iv_field`` and ``benchmark =
-                      "none"``, and takes no strike;
+                      ``structure`` (MODEL_STRUCTURES), ``iv_field``, ``benchmark = "none"``, no
+                      strike; ``option_pnl``: ``chain.py``;
                       ``side`` (SIDES; ADR 0053 amendment, outcome sides): ``long`` (default),
                       ``short`` (the picks are the bottom ``top_k`` of the ranked, liquid names;
                       the value is minus the excess return, less cost and borrow) or
@@ -103,7 +103,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
-from algotrade.config.edges import named
+from algotrade.config.edges import chain, named
 from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
 from algotrade.config.edges.identity import (
     LONG,
@@ -113,7 +113,6 @@ from algotrade.config.edges.identity import (
     check_side,
     hold_rank_of,
 )
-from algotrade.config.edges.model_tenor import check_tenor
 from algotrade.config.edges.portfolio import (
     BENCHMARK_BASE,
     PORTFOLIO_KIND,
@@ -140,6 +139,7 @@ STATUSES = ("researching", "candidate", "evidenced", "live", "retired", "rejecte
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
 OUTCOME_KINDS = (
     "excess_return", "hit_target", "expires_otm", "option_model_pnl", PORTFOLIO_KIND,
+    chain.CHAIN_KIND,
 )  # fmt: skip
 STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
 # An option_model_pnl outcome's position: one at-the-money straddle held to the horizon's close,
@@ -228,7 +228,7 @@ KEYS = (
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
-    "side", "borrow_bps_annual", "hold_rank", "weighting", "vol_field",
+    "side", "borrow_bps_annual", "tenor_days", "hold_rank", "weighting", "vol_field",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -262,6 +262,7 @@ class Outcome:
     iv_field: str | None = None
     side: str = LONG  # SIDES; a short leg pays ``borrow_bps_annual`` (None: the site's default)
     borrow_bps_annual: float | None = None
+    tenor_days: int | None = None  # an option_pnl's tenor rule (chain.py)
     hold_rank: int | None = None  # buy/hold band: held while rank <= this (None: no band)
     # A portfolio_return book (ADR 0074): how the picks are weighted, and for ``inverse_vol`` the
     # declared feature whose value at D is each name's volatility.
@@ -275,8 +276,7 @@ class Outcome:
 
     @property
     def basis(self) -> str | None:
-        """``"model"`` when the value is priced by a model (``option_model_pnl``), else None."""
-        return MODEL_BASIS if self.kind == MODEL_KIND else None
+        return {MODEL_KIND: MODEL_BASIS, chain.CHAIN_KIND: chain.CHAIN_BASIS}.get(self.kind)
 
     @property
     def sign(self) -> float:
@@ -471,6 +471,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     sources = _sources(t)
     top_k = _top_k(t)
     variants = _variants(t, schedule, edge_id, universe, base, picks)
+    chain.check_kinds(where, {outcome.kind, *(v.outcome.kind for v in variants)})
     for held, held_base in ((outcome, base), *((v.outcome, v.base or base) for v in variants)):
         check_base(held.kind, held_base, where)
         if held.side != LONG and top_k is None:
@@ -707,9 +708,9 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
     kind = o.choice("kind", "", OUTCOME_KINDS) if "kind" in o.names() else _missing(o, "kind")
     benchmark = _benchmark(o, kind)
     named.check_raw_returns(o.where, kind, benchmark, base == named.OUT_OF_WINDOW)
-    if kind == "option_model_pnl" and benchmark != "none":
+    if kind in (MODEL_KIND, chain.CHAIN_KIND) and benchmark != "none":
         raise ConfigurationError(
-            f"{o.where} benchmark: an option_model_pnl is a P&L on the underlying, "
+            f"{o.where} benchmark: an {kind} is a P&L on the underlying, "
             f"it has no benchmark: use 'none'"
         )
     horizons = _horizons(o)
@@ -745,7 +746,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
     structure, strike_delta, otm_pct, iv_field = _expires_otm(o, kind)
     if kind == MODEL_KIND:
-        check_tenor(o, horizons, iv_field)
+        chain.check_tenor(o, horizons, iv_field)
     side = o.choice("side", LONG, SIDES)
     borrow = o.number("borrow_bps_annual", None, 0)
     check_side(o, side, borrow, kind, drawdown)
@@ -768,6 +769,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         iv_field=iv_field,
         side=side,
         borrow_bps_annual=borrow,
+        tenor_days=chain.chain_tenor(o, kind),
         hold_rank=hold_rank,
         weighting=weighting,
         vol_field=vol_field,
@@ -775,16 +777,14 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
 
 
 def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:
-    """``(structure, strike_delta, otm_pct, iv_field)`` of an outcome: a structure only for
-    ``expires_otm`` (exactly one of two strikes) and ``option_model_pnl`` (no strike); the
-    implied vol field is required for both."""
-    names = o.names()
+    """``(structure, strike_delta, otm_pct, iv_field)``: a structure only for the option kinds."""
     delta, pct = o.number("strike_delta", None), o.number("otm_pct", None)
     iv_field = _prose(o, "iv_field") or None
-    options = ("expires_otm", "option_model_pnl")
-    structures = STRUCTURES if kind == "expires_otm" else MODEL_STRUCTURES
-    structure = o.choice("structure", "", structures) if "structure" in names else None
-    if kind not in options:
+    structures = chain.structures_of(kind, STRUCTURES, MODEL_STRUCTURES)
+    structure = o.choice("structure", "", structures) if "structure" in o.names() else None
+    if kind == chain.CHAIN_KIND:
+        return chain.check_chain(o, structure, delta, pct, iv_field)
+    if kind not in ("expires_otm", MODEL_KIND, chain.CHAIN_KIND):
         for key, value in (("structure", structure), ("strike_delta", delta), ("otm_pct", pct)):
             if value is not None:
                 raise ConfigurationError(f"{o.where} {key}: only an expires_otm outcome has one")

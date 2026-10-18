@@ -199,7 +199,7 @@ names = { not_a_return = "not a return" }
 [[enum]]
 source = "graphql:EdgeSettings.kind"
 values_from = "python:algotrade.config.edges.document:OUTCOME_KINDS"
-values = { excess_return = "term:outcome_excess_return", hit_target = "term:outcome_hit_target", expires_otm = "term:outcome_expires_otm", option_model_pnl = "term:outcome_option_model_pnl", portfolio_return = "term:outcome_portfolio_return" }
+values = { excess_return = "term:outcome_excess_return", hit_target = "term:outcome_hit_target", expires_otm = "term:outcome_expires_otm", option_model_pnl = "term:outcome_option_model_pnl", option_pnl = "term:outcome_option_pnl", portfolio_return = "term:outcome_portfolio_return" }
 
 [[enum]]
 source = "graphql:EdgeCosts.state"
