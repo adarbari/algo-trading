@@ -44,7 +44,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
 | Risk-free rates (option pricing) | **U.S. Treasury daily par yield curve** (official, free, no key; one CSV per year) | FRED (`DGS*`, needs a key), SOFR (overnight only) | Implemented, phase 2b.1 (ADR 0021) |
-| Analyst estimates, price targets, ratings (free tier) | **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters, the by-hand `analyst-probe` and the nightly `analyst-snapshot` implemented (ADR 0068); the feature groups follow |
+| Analyst estimates, price targets, ratings (free tier) | **FMP** `/stable` (`analyst-estimates` annual, `price-target-consensus`, `grades-consensus`; key in the query string; personal licence) and **Finnhub** (`stock/recommendation`); what each key may call is `analyst/vendor_access` | the paid tiers of both (`period=quarter`, Finnhub `stock/price-target`: DENIED on the free plan) | Adapters, the by-hand `analyst-probe` and the nightly `analyst-snapshot` implemented (ADR 0068); the feature groups `analyst_estimates@v1`, `analyst_targets@v1`, `analyst_ratings@v1`, `analyst_revisions@v1` are built (docs/data/layers.md) |
 | Synthetic | `sources/fixtures/` (golden datasets) | — | Lets the whole pipeline run in CI with no account |
 
 ## Cboe delayed-quotes feed (primary for options)
@@ -163,10 +163,10 @@ listing; overall: the share of delisted names with bars to their end date, the g
 a recycled ticker leaks another company's rows). It writes no table: the raw payloads are in
 `raw/source=tiingo`. At most 200 unique symbols of the free tier's 500 a month.
 
-## Analyst data: FMP and Finnhub (adapters and the probe implemented, ADR 0068)
+## Analyst data: FMP and Finnhub (adapters, probe, nightly snapshot and feature groups implemented, ADR 0068)
 
 Both are free-tier, personal-licence vendors (`[fmp]`, `[finnhub]` in `config/site/sources.toml`,
-`licence = "personal"`), keyed in `.env`; nothing is stored from the adapters yet. Endpoints and
+`licence = "personal"`), keyed in `.env`; what is stored is under "What is stored and when" below. Endpoints and
 answers verified 2026-10-16 on the owner's free keys (AAPL); the plans change, so the table
 `analyst/vendor_access` (the `analyst-probe` task, run by hand) is the record, not this page.
 
