@@ -16,6 +16,7 @@ import { GuideHelp, termHelp } from '@/features/guide-help';
 
 import { rowItem, statItem, type RowHelp } from '../model/rows';
 import { FINANCIALS_PARTS, KEY_METRICS, SECTIONS } from '../model/sections';
+import { financialsTone } from '../model/tones';
 
 export interface FinancialsPanelProps {
   symbol: string;
@@ -32,7 +33,7 @@ function Badge({ values, name }: { values: Values; name: string }) {
   const word = known ? String(served.value) : unknownWord(served?.unknown);
   return (
     <Stack direction="row" gap={1} align="center">
-      <StatusBadge>{word}</StatusBadge>
+      <StatusBadge tone={known ? financialsTone(word) : 'neutral'}>{word}</StatusBadge>
       {HELP.field(name)}
       {!known && served?.unknown ? HELP.term(served.unknown.guideTerm) : null}
     </Stack>

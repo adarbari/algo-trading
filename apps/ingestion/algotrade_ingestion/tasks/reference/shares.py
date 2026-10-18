@@ -69,6 +69,7 @@ class SharesSources:
     liquid_adv_usd: float = (
         10_000_000.0  # 20-day dollar volume from which an optionable name is liquid
     )
+    tags_date: date = date.min  # statements fetched before it are backlog (the source's date)
 
 
 @dataclass(frozen=True)
@@ -325,21 +326,32 @@ def _due(
     is due when either table is (the older latest fetch decides; one table's marker missing
     makes it new there). Only the backlog (shares stored, statements never) is capped, in its
     ``priority`` order (default: CIK order): a CIK new to both or due for shares is never
-    deferred, and the cap defers the lowest priority."""
+    deferred, and the cap defers the lowest priority. A statements marker older than ``tags_date``
+    (parsed with an older tag list) is backlog too: due now, in that order, under the same cap."""
     both = {c: min(f[c] for f in fetched) for c in fetched[0] if all(c in f for f in fetched)}
     due = due_keys(ciks, both, session, sources.refresh_days, force)
+    wanted = set(ciks)
+    old_tags = (
+        {}
+        if force
+        else {c: d for c, d in fetched[1].items() if d < sources.tags_date and c in wanted}
+    )
     rank = {c: i for i, c in enumerate(priority or [])}
     new = sorted(
-        (c for c in due if force or c not in both), key=lambda c: (rank.get(c, len(rank)), c)
+        {c for c in due if force or c not in both} | (set(old_tags) - set(due)),
+        key=lambda c: (rank.get(c, len(rank)), c),
     )
     due = new + [
         c for c in due if not force and c in both
     ]  # new to a table by priority, then the stalest
     cap = sources.backfill_per_night
-    if force or cap <= 0:
+    if cap <= 0:
         return due, 0
     shares_due = set(due_keys(ciks, fetched[0], session, sources.refresh_days, force))
-    backlog = [c for c in due if c in fetched[0] and c not in fetched[1] and c not in shares_due]
+    backlog = [
+        c for c in due
+        if c in fetched[0] and (c not in fetched[1] or c in old_tags) and c not in shares_due
+    ]  # fmt: skip
     deferred = set(backlog[cap:])
     return [c for c in due if c not in deferred], len(deferred)
 
