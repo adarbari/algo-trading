@@ -12,12 +12,20 @@ date is after D is not known at D and is excluded the same way. An event is coun
 name within ``DEDUPE_SESSIONS`` sessions: a PRIOR_YEAR expectation that turns SCHEDULED, or a
 report date that moves, can match on two decision sessions (even across a quarter end), and
 only the earlier one counts.
+
+**Subtypes** (``on_event:<class>:<subtype>``, EB H4): a class may declare ``subtypes``, each its own
+count and date fields (an 8-K item) or a ``field`` that must read ``value`` (an index addition:
+``last_index_change`` reads ``sp500_added``) beside the class's own. An unknown subtype, or none
+for a class whose fields are all per subtype, is a ``ConfigurationError``; a name whose count
+is at the target but whose subtype field is another value is no event of this subtype (not
+UNKNOWN), one with no value there is UNKNOWN (``NO_EVENT_ROW``).
 """
 
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import date
+from typing import Any
 
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.time.calendar import sessions_to
@@ -25,6 +33,8 @@ from algotrade.data import StoreReader
 from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.selection import fields_view
 
+ADDED, REMOVED = "sp500_added", "sp500_removed"  # ``index_changes@v1.last_index_change``
+SHIFT_DIRECTION = "rollup.earnings_date_shift@v1.earnings_shift_direction"
 DEDUPE_SESSIONS = 40  # one report per name in this many sessions
 NO_EVENT_ROW = "no_event_row"  # eligible at D, but the event field has no value for the name
 NOT_KNOWN_AT_D = "event_not_known_at_decision"  # the field's event date is after D
@@ -40,18 +50,37 @@ class EventDayMissingError(MissingDataError):
 
 
 @dataclass(frozen=True)
+class Subtype:
+    """One subtype of a class: its own ``count`` and ``date`` fields (None: the class's), and,
+    when set, the label ``field`` that must read ``value`` for the name to have it."""
+
+    count: str | None = None
+    date: str | None = None
+    field: str | None = None
+    value: str | None = None
+
+
+@dataclass(frozen=True)
 class EventField:
     """Where one event class is read: ``count`` (the field whose value says how far D is from
     the anchor, scaled by ``sign``), ``date`` (the event's date), and whether the event is
-    announced ahead (its date may be after D; otherwise it must be on or before D)."""
+    announced ahead (its date may be after D; otherwise it must be on or before D).
+    ``subtypes``: the class's subtypes (module doc); ``where``: the (field, value) a resolved
+    subtype requires. An empty ``count`` means every field is per subtype."""
 
     count: str
     date: str
     sign: int
     announced_ahead: bool
+    subtypes: Mapping[str, Subtype] = field(default_factory=dict)
+    where: tuple[str, str] | None = None
 
     def target(self, offset: int) -> int:
         return self.sign * (offset - 1)
+
+    def fields(self) -> tuple[str, ...]:
+        """The field names one read of this (resolved) class needs."""
+        return (self.count, self.date, *(self.where[:1] if self.where else ()))
 
 
 EVENT_FIELDS: Mapping[str, EventField] = {
@@ -72,8 +101,44 @@ EVENT_FIELDS: Mapping[str, EventField] = {
         "rollup.index_changes@v1.last_index_change_date",
         sign=1,
         announced_ahead=False,
+        subtypes={
+            "addition": Subtype(field="rollup.index_changes@v1.last_index_change", value=ADDED),
+            "deletion": Subtype(field="rollup.index_changes@v1.last_index_change", value=REMOVED),
+        },
     ),
-}
+    "filing_8k": EventField(
+        "", "", sign=1, announced_ahead=False,
+        subtypes={
+            item: Subtype(
+                count=f"rollup.filing_events@v1.sessions_since_8k_{item.replace('.', '_')}",
+                date=f"rollup.filing_events@v1.last_8k_{item.replace('.', '_')}_date",
+            )
+            for item in ("1.02", "2.05", "3.01", "4.01", "4.02", "5.02")
+        },
+    ),
+    "nt_late_filing": EventField(
+        "rollup.filing_events@v1.sessions_since_late_filing",
+        "rollup.filing_events@v1.last_late_filing_date",
+        sign=1,
+        announced_ahead=False,
+    ),
+    "tender_offer": EventField(
+        "rollup.filing_events@v1.sessions_since_tender_offer",
+        "rollup.filing_events@v1.last_tender_offer_date",
+        sign=1,
+        announced_ahead=False,
+    ),
+    "earnings_date_shift": EventField(
+        "rollup.earnings_date_shift@v1.sessions_since_earnings_shift",
+        "rollup.earnings_date_shift@v1.earnings_shift_known_date",
+        sign=1,
+        announced_ahead=False,
+        subtypes={
+            "later": Subtype(field=SHIFT_DIRECTION, value="later"),
+            "earlier": Subtype(field=SHIFT_DIRECTION, value="earlier"),
+        },
+    ),
+}  # fmt: skip
 
 
 @dataclass(frozen=True)
@@ -91,14 +156,37 @@ class EventSchedule:
         return dict(total)
 
 
-def event_field(event_class: str) -> EventField:
+def event_field(event_class: str, subtype: str | None = None) -> EventField:
+    """The field of ``event_class`` (resolved for ``subtype``); fail closed on an unknown class
+    or subtype, on a subtype for a class that has none, and on none for a class with only
+    per-subtype fields."""
     try:
-        return EVENT_FIELDS[event_class]
+        declared = EVENT_FIELDS[event_class]
     except KeyError:
         raise ConfigurationError(
             f"event class {event_class!r} has no declared field to read its names from "
             f"(known: {sorted(EVENT_FIELDS)})"
         ) from None
+    if subtype is None:
+        if not declared.count:
+            raise ConfigurationError(
+                f"event class {event_class!r} needs a subtype (known: {sorted(declared.subtypes)})"
+            )
+        return declared
+    chosen = declared.subtypes.get(subtype)
+    if chosen is None:
+        raise ConfigurationError(
+            f"event class {event_class!r} has no subtype {subtype!r} "
+            f"(known: {sorted(declared.subtypes) or 'none'})"
+        )
+    where = (chosen.field, chosen.value) if chosen.field and chosen.value else None
+    return replace(
+        declared,
+        count=chosen.count or declared.count,
+        date=chosen.date or declared.date,
+        subtypes={},
+        where=where,
+    )
 
 
 def read_events(
@@ -107,11 +195,13 @@ def read_events(
     offset: int,
     decisions: Sequence[date],
     eligible_of: Callable[[date], frozenset[str]],
+    subtype: str | None = None,
 ) -> EventSchedule:
     """The event names of ``event_class`` at each of ``decisions`` (ascending), restricted to
     the names ``eligible_of(D)`` gives. The eligible names are only looked up on a session
     where some name has the event; the UNKNOWN count is over them."""
-    return read_events_for(reader, event_class, offset, decisions, {"": eligible_of})[""]
+    found = read_events_for(reader, event_class, offset, decisions, {"": eligible_of}, subtype)
+    return found[""]
 
 
 def read_events_for(
@@ -120,20 +210,19 @@ def read_events_for(
     offset: int,
     decisions: Sequence[date],
     eligible_of: Mapping[str, Callable[[date], frozenset[str]]],
+    subtype: str | None = None,
 ) -> dict[str, EventSchedule]:
     """``read_events`` for several eligible universes (one per key of ``eligible_of``) in one
     pass: the event fields are read once per decision session, not once per universe, and
     each universe keeps its own once-per-name dedupe. Same schedules as separate calls."""
-    spec = event_field(event_class)
+    spec = event_field(event_class, subtype)
     target = spec.target(offset)
     names: dict[str, dict[date, frozenset[str]]] = {k: {} for k in eligible_of}
     unknown: dict[str, dict[date, Mapping[str, int]]] = {k: {} for k in eligible_of}
     last: dict[str, dict[str, date]] = {k: {} for k in eligible_of}  # name -> latest counted D
     for day in decisions:
         try:
-            view, _ = fields_view(
-                reader, (spec.count, spec.date), day, historical=True, held=HARNESS_ALL
-            )
+            view, _ = fields_view(reader, spec.fields(), day, historical=True, held=HARNESS_ALL)
         except MissingDataError as error:
             raise EventDayMissingError(error, day) from error
         reads = {i: _read(view.get(i, spec.count), view.get(i, spec.date)) for i in view}
@@ -144,13 +233,11 @@ def read_events_for(
             known: set[str] = set()
             for i in sorted(eligible(day)):
                 count, when = reads.get(i, (None, None))
-                if count is None:
-                    reasons[NO_EVENT_ROW] += 1
-                elif count == target:
-                    if not spec.announced_ahead and (when is None or when > day):
-                        reasons[NOT_KNOWN_AT_D] += 1
-                    else:
-                        known.add(i)
+                verdict = _verdict(spec, count, when, target, day, _label(view, i, spec))
+                if verdict == KNOWN:
+                    known.add(i)
+                elif verdict:
+                    reasons[verdict] += 1
             seen = last[key]
             fresh = {
                 i for i in known if i not in seen or sessions_to(seen[i], day) >= DEDUPE_SESSIONS
@@ -161,6 +248,37 @@ def read_events_for(
             if fresh:
                 names[key][day] = frozenset(fresh)
     return {k: EventSchedule(names[k], unknown[k]) for k in eligible_of}
+
+
+KNOWN = "known"  # ``_verdict``: the name has the event at D (else a reason, or "" for none)
+
+
+def _label(view: Any, instrument: str, spec: EventField) -> object:
+    """The subtype label field of ``instrument`` (None when the spec has none or it is null)."""
+    return view.get(instrument, spec.where[0]) if spec.where else None
+
+
+def _verdict(
+    spec: EventField,
+    count: int | None,
+    when: date | None,
+    target: int,
+    day: date,
+    label: object,
+) -> str:
+    """``KNOWN``, the UNKNOWN reason of a name with a row that cannot say, or "" (no event of
+    this class and subtype: another count, another subtype)."""
+    if count is None:
+        return NO_EVENT_ROW
+    if count != target:
+        return ""
+    if spec.where and label is None:
+        return NO_EVENT_ROW
+    if spec.where and label != spec.where[1]:
+        return ""
+    if not spec.announced_ahead and (when is None or when > day):
+        return NOT_KNOWN_AT_D
+    return KNOWN
 
 
 def _read(count: object, when: object) -> tuple[int | None, date | None]:
