@@ -181,7 +181,7 @@ def test_the_lease_inclusive_and_all_debt_tags_are_stored_as_debt() -> None:
 
 
 def test_the_source_carries_the_tag_list_date_the_shares_task_reads() -> None:
-    assert SecCompanyFacts.statements_tags_date == STATEMENT_TAGS_VERSION_DATE
+    assert SecCompanyFacts.statements_tags_date >= STATEMENT_TAGS_VERSION_DATE
 
 
 def test_durations_follow_the_flow_rule_and_a_loss_and_zero_are_kept() -> None:

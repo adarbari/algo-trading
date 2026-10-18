@@ -1,4 +1,4 @@
-"""Reading statement lines for the statement groups (``income_statement@v1``, ``cash_flow@v1``).
+"""Reading statement lines for the statement groups (``income_statement@v2``, ``cash_flow@v2``).
 
 Input: ``instruments/statements`` rows (ADR 0067), one per us-gaap tag, period and filing, of the
 concepts a group asks for. Each (concept, tag, period) takes its latest value filed on or
@@ -21,7 +21,7 @@ import pandas as pd
 from algotrade.features.rollups.statements.ttm import Fact, Total, TtmParams, trailing
 
 PRICE_STATS = "rollups/instrument/price_stats@v2"
-STATEMENTS = "instruments/statements"
+STATEMENTS = "instruments/statements_accepted"  # by acceptance session, not filing date
 COMPANY = "instruments/company"
 EPOCH = date(1970, 1, 1)
 PREFIX = "us-gaap:"
