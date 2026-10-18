@@ -77,7 +77,7 @@ EDGE_EVAL = fixed(
 # session is before the run's split (false without one), never re-derived by a reader; ``status``:
 # measured | excluded_coverage | lost_input (``lost_table``: an admin cause) | no_picks. Nulls, not
 # zeros, where nothing was measured; values are oriented, net of cost, in ``unit`` (excess_return
-# | return | cushion | ratio).
+# | return | cushion | ratio | pnl).
 EDGE_SERIES = fixed(
     "results/edge_series",
     "results",
