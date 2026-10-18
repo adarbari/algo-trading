@@ -1,0 +1,72 @@
+# Edge document (ADR 0053, ADR 0074; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/structural-niches.md (natgas_etf_contango_drag).
+# An allocation edge (EB E5): a weighted book of ETFs against a blended benchmark of its own list.
+id = "natgas_etf_contango_drag"
+name = "Natural gas and oil ETF avoid list"
+family = "H"
+thesis = "Funds that roll futures in a market in contango lose value by structure, so a book that holds them only while their own price trend is up loses less than the market."
+mechanism = """A commodity ETF must roll its futures monthly; natural gas has steep seasonal contango, so each roll
+sells low and buys high, and its holders are retail speculators on weather (Erb and Harvey 2006;
+Guedj, Li and McCann 2011)."""
+persistence = """The structure has not changed (UNG has lost most of its value since 2007, not verified), but a cold
+snap can lift the fund by 50 percent, which is the risk that keeps shorts small."""
+schedule = "month_end"
+top_k = 3
+screeners = ["trend_positive_12m"]
+base = "benchmark"
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """DOCUMENTED-LIMIT VARIANT. VERDICTS ARE UNMEASURED until the screen is run and evaluated. An
+allocation edge is long (ADR 0074), so the source's AVOID or SHORT rule cannot be filed as such:
+this document expresses the avoid list as a long book that holds each fund only while its own
+12-month raw return is above 0 and holds cash at the Treasury bill yield for the rest, measured
+against SPY. A fund the structure drags down is mostly out of the book, so the book earns the bill
+where the fund's drift is negative. NOT BUILT: the source's trigger (short when the front and second
+futures are in contango beyond the cost of carry) needs the Henry Hub futures curve, which is not
+stored (the D11 history); the price-drift version (the fund against the spot price) needs the spot
+series. The value against SPY mixes the avoid decision with the energy market's own direction and
+with SPY's, so a pass is not evidence of a contango drag. The short side with a borrow cost
+(Quantpedia's UNG and BOIL) is not expressible here: an excess-return short over three names has no
+decile figures. Three funds, price only, cost_bps 20 a round trip assumed. Leveraged BOIL and KOLD
+are excluded by the screen."""
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["UNG", "USO", "DBO"] },
+]
+
+[outcome]
+kind = "portfolio_return"
+horizon_sessions = [21]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 20
+weighting = "equal"
+
+[quality_bar]
+outcome = """The book's return over the 21 sessions from the close after each month end, less SPY's, net of the
+cost on the weight change; a fund with a falling trend is held as cash. Price only: the stored
+forward return is close to close and carries no dividend or distribution, so the book and the
+benchmark both miss their yield and cash earns the Treasury bill."""
+trigger_timing = """The 12-month raw return is read at the month-end close D; the book is held from the next session's
+close S for 21 sessions. No fact after D enters a pick."""
+replication = """The source's rule is a futures-curve trigger on the single ETP (Erb and Harvey 2006; Gorton, Hayashi
+and Rouwenhorst 2013). Here only the trend filter and a cash position exist, so the replication is
+partial: it tests whether staying out of a drag fund after a falling year helps."""
+expected_size = """Guedj, Li and McCann (2011) document the roll losses in UNG and USO; no recent split is on file. The
+size of a trend-filtered avoidance is not published."""
+capacity_costs = """Capacity is small to moderate in three funds; a few switches a year; cost_bps 20 assumed. The
+source's short side needs borrow (1 to 5 percent on UNG, not verified): not charged."""
+failure_modes = """A cold-snap rally while the book is in cash costs a month against SPY; the result rests on three
+funds and a few years of falling prices. Retire if the frozen-period picks-series t is under 2."""
+decoys = """SPY's own direction (the benchmark) and the energy market's: the funds' falling years make cash look
+good by construction. Read it beside commodity_roll_momentum's energy funds."""
+
+[[sources]]
+title = "Erb, C. and Harvey, C., The Strategic and Tactical Value of Commodity Futures, Financial Analysts Journal, 2006"
+
+[[sources]]
+title = "Gorton, G., Hayashi, F. and Rouwenhorst, K., The Fundamentals of Commodity Futures Returns, Review of Finance, 2013"
+
+[[sources]]
+title = "Guedj, I., Li, G. and McCann, C., Futures-based commodity ETFs, Journal of Index Investing, 2011"

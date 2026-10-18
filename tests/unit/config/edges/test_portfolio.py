@@ -8,6 +8,7 @@ import pytest
 
 from algotrade.config.edges.document import Edge, parse_edge
 from algotrade.config.edges.identity import identity_dict
+from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.portfolio import (
     CASH,
     benchmark_words,
@@ -15,6 +16,8 @@ from algotrade.config.edges.portfolio import (
     parse_mix,
 )
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.storage.configs.files import FileConfigStore
+from tests.conftest import REPO_ROOT
 from tests.unit.services.evaluation.cross_section.conftest import edge_document
 
 
@@ -211,3 +214,33 @@ def test_an_ensemble_is_for_a_portfolio_outcome_only() -> None:
 def test_an_ensemble_is_part_of_the_run_and_an_empty_one_is_not() -> None:
     assert "ensemble" not in identity_dict({"ensemble": (), "top_k": 3})
     assert identity_dict({"ensemble": ("a", "b")})["ensemble"] == ["a", "b"]
+
+
+BOOKS = [
+    e
+    for e in load_edges(FileConfigStore(REPO_ROOT / "config", local=False))
+    if e.outcome.kind == "portfolio_return"
+]
+
+
+def test_the_shipped_allocation_edges_are_allocation_edges() -> None:
+    """EB E5: ten documents ship a book of ETFs; every one has a preset for each screener it
+    lists, a book no larger than its universe, and a benchmark whose weights add to one."""
+    assert len(BOOKS) >= 10
+    for e in BOOKS:
+        symbols = {r.value for r in e.universe.where.rules()}  # type: ignore[union-attr]
+        names = [n for r in e.universe.where.rules() for n in r.value]  # type: ignore[union-attr]
+        assert symbols and e.top_k is not None and e.top_k <= len(names), e.id
+        for screener in e.screeners:
+            path = REPO_ROOT / f"config/site/presets/screeners/{screener}/v1.toml"
+            assert path.exists(), f"{e.id}: no preset {screener}"
+        assert abs(sum(w for _, w in blend(e.outcome.benchmark)) - 1.0) < 1e-6, e.id
+
+
+def test_a_trend_book_declares_its_ensemble_of_lookbacks() -> None:
+    """ADR 0074 amendment: an edge of class ``trend`` is read as a grid of lookbacks, one trial,
+    never a single lookback chosen after the fact."""
+    trend = [e for e in BOOKS if e.oos_class == "trend"]
+    assert len(trend) >= 7
+    for e in trend:
+        assert len(e.ensemble) >= 2 and set(e.ensemble) <= set(e.screeners), e.id

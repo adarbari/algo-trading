@@ -10,6 +10,7 @@ Back to the [index of every edge](../edges.md).
 | Cash-based operating profitability (`cash_based_operating_profitability`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cash_op_profitability` |
 | Composite value among cash-profitable names (`composite_value`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `composite_value` |
 | Financial distress (an avoid list) (`distress_failure_probability`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `distress_ohlson` |
+| Factor ETF momentum (`factor_momentum`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 20% MTUM, 20% QUAL, 20% VLUE, 20% USMV and 20% IWM, entered 1 session after the decision session, costs 10 bps | `trend_positive_6m`, `trend_positive_12m` |
 | Industry momentum (`industry_momentum`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `industry_momentum` |
 | 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1`, `residual_momentum`, `volatility_scaled_momentum`, `frog_in_the_pan`, `momentum_x_quality_interaction`, `fifty_two_week_high`, `momentum_own_trend`, `momentum_pullback_entry`, `momentum_volume_confirmed` |
 | Net share issuance (`net_share_issuance`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `net_share_issuance` |
@@ -174,6 +175,36 @@ Back to the [index of every edge](../edges.md).
 - Campbell, J., Hilscher, J. and Szilagyi, J., Predicting Financial Distress and the Performance of Distressed Stocks, Journal of Investment Management, 2011 <https://joim.com/article/predicting-financial-distress-and-the-performance-of-distressed-stocks/>
 - Dichev, I., Is the Risk of Bankruptcy a Systematic Risk?, Journal of Finance, 1998
 - Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies, 2020 <https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html>
+
+## Factor ETF momentum (`factor_momentum`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Factors that did well over the past year keep doing well next month, so holding the two best-trending factor funds beats an equal mix of all five.
+
+- **Outcome:** portfolio return, over 21 sessions, vs a blend of 20% MTUM, 20% QUAL, 20% VLUE, 20% USMV and 20% IWM, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.symbol in ('MTUM', 'QUAL', 'VLUE', 'USMV', 'IWM')`
+- **Top K:** 2
+- **Screeners:** `trend_positive_6m`, `trend_positive_12m`
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** VERDICTS ARE UNMEASURED until the screens are run and evaluated. PROXY: the source builds long-short factor return series for about 20 factors and goes long a factor whose past year is up. This edge uses five long-only ETFs as stand-ins (MTUM momentum, QUAL quality, VLUE value, USMV minimum volatility, IWM size), each the factor's tilt plus the market, so the market is in every leg and the factor momentum is mixed with plain trend; the series with a market-neutral factor return is a data- construction follow-up. The funds start in 2013, so earlier sessions are not measured (a missing benchmark constituent leaves the session out with its reason). The book holds the top two by raw return where above 0 at half each, an unfilled slot cash at the bill yield, against an equal-weight five; no distributions; cost_bps 10 a round trip assumed. The ensemble of 6 and 12 months is ONE trial. The decoy is the page's: momentum applied to ETFs. verdict.toml [oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one beside the result, as display only.
+
+**Quality bar**
+
+1. **Mechanism:** Factor premia are time-varying and persistent (mispricing that corrects slowly, flows into factor products); stock momentum is largely the sum of this factor autocorrelation (Ehsani and Linnainmaa 2022).
+2. **Persistence:** Factor timing is rarely done and the effect sits at a one to twelve month horizon that benchmark- relative managers cannot use; 2023's abrupt flip hurt it, so persistence is a claim to test.
+3. **Outcome:** The two-fund book's return over the 21 sessions from the close after each month end, less an equal mix of the five funds, net of cost on the weight change; an unfilled slot is cash. Price only: the stored forward return is close to close and carries no dividend or distribution, so the book and the benchmark both miss their yield and cash earns the Treasury bill.
+4. **Trigger timing:** Trailing returns are read at the month-end close D; the book is held from the next session's close S for 21 sessions. Nothing after D enters a pick.
+5. **Faithful replication:** Ehsani and Linnainmaa (2022): each month, go long a factor whose past 12-month return is above 0, else short, about 20 factors. Gupta and Kelly (2019) scale by the past 1 or 12 month return. Here: five long-only factor ETFs, top two with positive returns.
+6. **Expected size and sample:** Ehsani and Linnainmaa: a factor earns 6 basis points a month after a losing year and 51 after a winning one (1963 to 2019); Gupta and Kelly report time-series factor momentum Sharpe near 0.8 to 1.0 (approximate). A long-only five-fund book keeps a fraction.
+7. **Capacity and costs:** High capacity in five liquid funds; about 8 switches a year; cost_bps 10 assumed; fund fees differ and are inside the price.
+8. **Failure modes and retirement:** A short life of the funds (from 2013) gives about 150 months at most and few independent factor flips. Retire if the frozen-period picks-series t is under 2.
+9. **Decoys:** Sector and stock momentum applied to ETFs and the market beta inside every factor fund; the equal five-fund benchmark removes the market, not the factors' trends.
+
+**Sources**
+
+- Ehsani, S. and Linnainmaa, J., Factor Momentum and the Momentum Factor, Journal of Finance, 2022 <https://www.nber.org/papers/w25551>
+- Gupta, T. and Kelly, B., Factor Momentum Everywhere, Journal of Portfolio Management, 2019
 
 ## Industry momentum (`industry_momentum`)
 
