@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from algotrade.config.edges.document import Edge
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
@@ -144,6 +145,8 @@ def _check(edge: Edge, horizon: int) -> None:
         raise ConfigurationError(
             f"edge {edge.id}: an outcome that reads an implied vol is not fitted yet"
         )
+    if edge.outcome.kind == PORTFOLIO_KIND:
+        raise ConfigurationError(f"edge {edge.id}: a portfolio book is not fitted per name")
     if horizon not in edge.outcome.horizon_sessions:
         raise ConfigurationError(f"edge {edge.id}: horizon {horizon} is not one of its horizons")
 
