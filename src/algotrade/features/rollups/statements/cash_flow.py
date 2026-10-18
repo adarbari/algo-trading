@@ -1,4 +1,4 @@
-"""``cash_flow@v1``: trailing-twelve-month operating cash flow and capital expenditure.
+"""``cash_flow@v2``: trailing-twelve-month operating cash flow and capital expenditure.
 
 Inputs: ``instruments/statements`` rows of the concepts ``ocf`` and ``capex`` (every fact FILED
 on or before the session, ADR 0067) and the session's ``price_stats@v2`` (it sets which
@@ -43,7 +43,7 @@ from algotrade.features.rollups.statements.lines import (
 from algotrade.features.rollups.statements.ttm import Total
 
 NAME = "cash_flow"
-VERSION = 1
+VERSION = 2
 STATUSES = ("OK", "PARTIAL", "NO_TTM", "NO_FACTS", "STALE")
 # The same lists as ``statement_concepts.py``, best first (a test compares them).
 CONCEPT_TAGS = {
@@ -84,7 +84,7 @@ FEATURES = (
         "cf_as_of", "date", "date",
         "The period end of the first TTM present (operating cash flow, else capex): the last "
         "quarter, or the fiscal year end of an annual one",
-        _WHY, inputs=("instruments/statements.period_end",),
+        _WHY, inputs=(f"{STATEMENTS}.period_end",),
     ),
     Feature(
         "cf_status", "str", "category",
@@ -92,7 +92,7 @@ FEATURES = (
         "different periods); NO_TTM (facts filed, but no TTM); NO_FACTS (no fact filed); STALE "
         "(the first TTM "
         "present ended more than stale_days, 480, before the session; values still shown)",
-        "never", "label", categories=STATUSES, inputs=("instruments/statements.concept",),
+        "never", "label", categories=STATUSES, inputs=(f"{STATEMENTS}.concept",),
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)

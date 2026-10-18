@@ -32,7 +32,7 @@ company's document.
   filing accepted until 17:30 New York time that day, after the 16:00 close. Each fetched CIK's
   submissions (``sec_filings``, every form, back to ``XBRL_SINCE``) are read once and every fact's
   ``accn`` is joined to its ``acceptanceDateTime`` as ``accepted_ts`` (UTC); readers count a fact
-  from the first session whose close is at or after it (``data.shares.known_from``). An accession
+  from the first session whose close is after it (``data.shares.known_from``). An accession
   the submissions do not list, or a run without the source, stores a null: counted from the
   session after ``filed``. A stored fact whose ``accepted_ts`` is null is stored again (same key,
   the merge keeps the newer version) when a fetch now has its acceptance time: that is the

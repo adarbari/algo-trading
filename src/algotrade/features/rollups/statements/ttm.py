@@ -1,5 +1,5 @@
 """Trailing-twelve-month arithmetic over one concept's reported periods, shared by the
-statement rollups (``financials@v3``, ``income_statement@v1``, ``cash_flow@v1``).
+statement rollups (``financials@v3``, ``income_statement@v2``, ``cash_flow@v2``).
 
 A fact is ``(start, end, value, filed, tag rank)`` with dates as epoch days. A discrete quarter
 is a reported three-month fact, else the difference of two year-to-date facts of one fiscal

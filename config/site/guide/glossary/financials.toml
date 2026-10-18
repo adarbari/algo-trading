@@ -33,7 +33,7 @@ short = "How much of each dollar of sales the company keeps as profit."
 body = """
 Profitability divides profit by sales. The net margin is the final cut, after every cost, interest and tax. A margin of 0.10 means ten cents kept per dollar. Margins differ by industry far more than by quality: a grocer near 0.03 can be excellent and a software company near 0.03 is struggling. Compare a company with others in its sector, and with its own past.
 
-A margin far above the company's history is usually a one-off gain, not a better business. Check the cash version too: rollup.cash_flow@v1.ocf_ttm against rollup.financials@v3.net_income_ttm shows whether the profit became cash.
+A margin far above the company's history is usually a one-off gain, not a better business. Check the cash version too: rollup.cash_flow@v2.ocf_ttm against rollup.financials@v3.net_income_ttm shows whether the profit became cash.
 """
 see_also = ["financials_panel", "net_margin", "free_cash_flow", "ttm"]
 
@@ -145,7 +145,7 @@ id = "free_cash_flow"
 term = "Free cash flow"
 short = "The cash a company's operations produced in a year, less what it spent on equipment and buildings."
 body = """
-Free cash flow is the cash from operations (rollup.cash_flow@v1.ocf_ttm) minus capital spending (rollup.cash_flow@v1.capex_ttm), over the trailing twelve months. It is what is left to repay debt, pay dividends, buy back shares or keep. A company with $500M of operating cash and $200M of spending has $300M free.
+Free cash flow is the cash from operations (rollup.cash_flow@v2.ocf_ttm) minus capital spending (rollup.cash_flow@v2.capex_ttm), over the trailing twelve months. It is what is left to repay debt, pay dividends, buy back shares or keep. A company with $500M of operating cash and $200M of spending has $300M free.
 
 It is lumpier than profit: one large building programme makes a healthy company look negative for a year. A positive figure that comes only from not investing cannot last. Compare it over several years, and against rollup.financials@v3.net_income_ttm to see whether profit becomes cash.
 """

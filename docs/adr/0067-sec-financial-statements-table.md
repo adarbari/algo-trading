@@ -91,14 +91,14 @@ idea for facts.
   its old row). The `shares` task reads each fetched CIK's submissions (`sec_filings`, every form, back to
   2009) and joins each fact's accession to its `acceptanceDateTime`.
 - A reader counts a fact from `data.shares.known_from`: the first session whose close (16:00 New York,
-  13:00 on an early close, `core/time/calendar.py`) is at or after `accepted_ts`; a fact whose time is
+  13:00 on an early close, `core/time/calendar.py: acceptance_session`) is strictly after `accepted_ts` (a filing
+  accepted exactly at the close counts from the next session); a fact whose time is
   unknown counts from the session after `filed`, never from `filed`.
-- The input is `instruments/shares_accepted` (and `instruments/statements_accepted`), beside the by-filing-date
-  `instruments/shares`: `financials@v3` and `fundamentals@v4` read it, new versions with the same columns
-  (the old tables are superseded in `features/registry.py`, retired after the backfill). Other groups still
-  read by filing date: `growth_history@v1` (shares) and `income_statement@v1`, `cash_flow@v1`,
-  `balance_sheet@v1` (statements) keep the one-session look-ahead until their own version bump; the
-  statements table already carries the time.
+- The inputs are `instruments/shares_accepted` and `instruments/statements_accepted`, beside the
+  by-filing-date `instruments/shares` and `instruments/statements`: every group that reads the facts reads
+  these, as new versions with the same columns (`financials@v3`, `fundamentals@v4`, `growth_history@v2`,
+  `income_statement@v2`, `cash_flow@v2`, `balance_sheet@v2`; the old tables are superseded in
+  `features/registry.py`, retired after the backfill).
 - A transport error of the submissions fails the CIK (nothing staged, due again); a CIK with no submissions
   stores null times. `ACCEPTANCE_VERSION_DATE` makes older fetches backlog under the nightly cap; a stored
   fact without a time is stored again when a fetch now has one.

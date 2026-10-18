@@ -48,7 +48,7 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        time by filing date), sorted by ``filed``; ``None`` when there is none
 - ``instruments/shares_accepted``
                        the same facts counted from the session each became public (``shares.
-                       known_from``: the first session whose close is at or after SEC's
+                       known_from``: the first session whose close is after SEC's
                        acceptance of the filing, else the session after ``filed``), sorted by it
                        (``financials@v3``, ``fundamentals@v4``; ADR 0067 amendment)
 - ``instruments/statements``

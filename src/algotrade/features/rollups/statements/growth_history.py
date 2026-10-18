@@ -1,4 +1,4 @@
-"""``growth_history@v1``: the revenue and diluted EPS trailing twelve months three and five years
+"""``growth_history@v2``: the revenue and diluted EPS trailing twelve months three and five years
 back, the bases of the multi-year growth rates (``revenue_cagr_3y`` and its siblings).
 
 Inputs: ``instruments/shares`` rows of the concepts ``revenue`` and ``eps_diluted`` (the same
@@ -29,6 +29,7 @@ from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.corporate.financials import (
     EPS,
+    FACTS,
     PRICE_STATS,
     REVENUE,
     SPLITS,
@@ -39,10 +40,7 @@ from algotrade.features.rollups.statements.lines import epoch_days, stale_before
 from algotrade.features.rollups.statements.ttm import Fact, TtmParams, trailing, trailing_ago
 
 NAME = "growth_history"
-VERSION = 1
-# Still by filing date (``instruments/shares``): the acceptance-time read of ``financials@v3`` is
-# the follow-up version of this group (ADR 0067 amendment).
-FACTS = "instruments/shares"
+VERSION = 2
 STATUSES = ("OK", "PARTIAL", "NO_TTM", "NO_FACTS", "STALE")
 YEARS = (3, 5)
 CONCEPTS = (REVENUE, EPS)

@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime
 
 import pandas as pd
 
+from algotrade.core.time.calendar import acceptance_session
 from algotrade.data import StoreReader
 from algotrade.data.shares import NEVER, TABLE, known_from, share_facts, stored_shares
 from algotrade.storage.backends.memory import MemoryBackend
@@ -121,7 +122,7 @@ def test_a_filing_accepted_after_the_close_counts_from_the_next_session() -> Non
     tue, wed = date(2026, 8, 4), date(2026, 8, 5)
     assert _known(tue, "2026-08-04T20:30:00Z") == wed  # 16:30 EDT
     assert _known(tue, "2026-08-04T19:59:59Z") == tue  # 15:59:59 EDT: public at the close
-    assert _known(tue, "2026-08-04T20:00:00Z") == tue  # exactly 16:00: at the close
+    assert _known(tue, "2026-08-04T20:00:00Z") == wed  # exactly 16:00: not before the close
     assert _known(tue, "2026-08-04T20:00:01Z") == wed
     assert _known(tue, "2026-08-04T23:30:00Z") == wed  # 19:30 EDT, still Tuesday in New York
 
@@ -135,6 +136,10 @@ def test_acceptance_uses_the_new_york_day_winter_clock_weekends_and_early_closes
     day_after_thanksgiving = date(2025, 11, 28)  # closes 13:00
     assert _known(day_after_thanksgiving, "2025-11-28T18:30:00Z") == date(2025, 12, 1)  # 13:30
     assert _known(day_after_thanksgiving, "2025-11-28T17:30:00Z") == day_after_thanksgiving
+    assert _known(day_after_thanksgiving, "2025-11-28T18:00:00Z") == date(
+        2025, 12, 1
+    )  # exactly 13:00
+    assert _known(day_after_thanksgiving, "2025-11-28T17:59:59Z") == day_after_thanksgiving
 
 
 def test_a_fact_without_an_acceptance_time_counts_from_the_session_after_filed() -> None:
@@ -155,3 +160,11 @@ def test_known_from_is_per_row_over_a_mixed_frame() -> None:
         }
     )
     assert list(known_from(facts)) == [date(2026, 8, 5), date(2026, 8, 4), date(2026, 8, 5)]
+
+
+def test_known_from_agrees_with_the_calendars_acceptance_session() -> None:
+    instants = ["2026-08-04T19:59:59Z", "2026-08-04T20:00:00Z", "2026-08-08T15:00:00Z",
+                "2025-11-28T18:00:00Z", "2026-01-13T21:00:00Z", "2026-07-03T16:59:59Z"]  # fmt: skip
+    for text in instants:
+        ts = pd.Timestamp(text)
+        assert _known(ts.date(), text) == acceptance_session(ts.to_pydatetime()), text

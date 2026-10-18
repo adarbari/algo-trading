@@ -1,4 +1,4 @@
-"""``income_statement@v1``: trailing-twelve-month income statement lines from the SEC statements.
+"""``income_statement@v2``: trailing-twelve-month income statement lines from the SEC statements.
 
 Inputs: ``instruments/statements`` rows of the concepts ``cost_of_revenue``, ``gross_profit``,
 ``operating_income``, ``da``, ``interest_expense``, ``pretax_income`` and ``income_tax`` (every
@@ -48,7 +48,7 @@ from algotrade.features.rollups.statements.lines import (
 from algotrade.features.rollups.statements.ttm import Total
 
 NAME = "income_statement"
-VERSION = 1
+VERSION = 2
 STATUSES = ("OK", "PARTIAL", "NO_TTM", "NO_FACTS", "STALE", "FINANCIAL")
 # Each concept's us-gaap tags, best first (the same lists as ``statement_concepts.py``, which a
 # test compares: a rollup imports no vendor package).
@@ -144,7 +144,7 @@ FEATURES = (
         "The period end of the first TTM present (operating income, else pretax income, tax, "
         "gross profit, cost of revenue, D&A, interest): the last quarter, or the fiscal year end "
         "of an annual one",
-        _WHY, inputs=("instruments/statements.period_end",),
+        _WHY, inputs=(f"{STATEMENTS}.period_end",),
     ),
     Feature(
         "is_status", "str", "category",
@@ -154,7 +154,7 @@ FEATURES = (
         "present ended more than stale_days, 480, before the session; values still shown, and "
         "checked before FINANCIAL); FINANCIAL (SIC 6000 to 6411, current: the EBIT family is "
         "null)",
-        "never", "label", categories=STATUSES, inputs=("instruments/statements.concept",),
+        "never", "label", categories=STATUSES, inputs=(f"{STATEMENTS}.concept",),
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)

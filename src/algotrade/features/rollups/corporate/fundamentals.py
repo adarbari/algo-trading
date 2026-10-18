@@ -96,7 +96,7 @@ FEATURES = (
     Feature(
         "shares_filed", "date", "date",
         "The filing date of the filing that made the count public (it counts from the session "
-        "whose close is at or after SEC's acceptance of it)",
+        "whose close is after SEC's acceptance of it)",
         _NO_SHARES, inputs=(f"{SHARES}.filed",),
     ),
     Feature(

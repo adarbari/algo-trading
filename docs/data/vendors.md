@@ -592,14 +592,14 @@ accepted until 17:30 New York time that day, after the 16:00 close. The `shares`
 CIK's submissions (`sec_filings`, `https://data.sec.gov/submissions/CIK##########.json` and its older pages,
 every form back to 2009: one to a few extra requests per CIK through the shared `sec` limiter) and stores each
 fact's `acceptanceDateTime` as `accepted_ts` (UTC) in `instruments/shares` and `instruments/statements`.
-`financials@v3` and `fundamentals@v4` count a fact from the first session whose close is at or after it.
+`financials@v3`, `fundamentals@v4`, `growth_history@v2`, `income_statement@v2`, `cash_flow@v2` and `balance_sheet@v2` count a fact from the first session whose close is after it.
 Backfill (owner, from the main checkout, once): `ACCEPTANCE_VERSION_DATE` (`company_facts.py`) counts every
 CIK fetched before it as backlog, refetched under the nightly cap (`backfill_per_night`, 400), no command; to do
 it at once run `algotrade-ingest run shares --force` (refetches every CIK, outside the cap; only the facts
 without a time that now have one are written, under their old keys), then
-`algotrade-ingest rollups --from <first session> --to <last session> --only financials@v3,fundamentals@v4`
+`algotrade-ingest rollups --from <first session> --to <last session> --only financials@v3,fundamentals@v4,growth_history@v2,income_statement@v2,cash_flow@v2,balance_sheet@v2`
 and, once those are complete, `algotrade-ingest retire-features --group financials@v2 --dry-run` (then without
-`--dry-run`), the same for `fundamentals@v3`. Facts never refetched keep a null time and count from the
+`--dry-run`), the same for `fundamentals@v3`, `growth_history@v1`, `income_statement@v1`, `cash_flow@v1`, `balance_sheet@v1`. Facts never refetched keep a null time and count from the
 session after `filed` (never the old rule).
 A change to the tag lists bumps `STATEMENT_TAGS_VERSION_DATE` (`statement_concepts.py`): the `shares` task counts a
 statements marker older than it as backlog and refetches it under the nightly cap, no `--force`.

@@ -188,7 +188,7 @@ FEATURES = (
     Feature(
         "ttm_filed", "date", "date",
         "The filing date of the newest filing behind that TTM (it counts from the session whose "
-        "close is at or after SEC's acceptance of it, not from this date)",
+        "close is after SEC's acceptance of it, not from this date)",
         _NO_FACTS, inputs=(f"{FACTS}.filed",),
     ),
     Feature(

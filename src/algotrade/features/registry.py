@@ -177,6 +177,12 @@ SUPERSEDED: dict[str, Superseded] = {
     "financials@v1": Superseded("financials@v3"),
     # v3 reads the facts by SEC acceptance session (same fix); every v2 column is unchanged
     "financials@v2": Superseded("financials@v3"),
+    # the statement groups and growth_history read the facts by SEC acceptance session as well
+    # (ADR 0067 amendment); every v1 column is unchanged, the values are not
+    "growth_history@v1": Superseded("growth_history@v2"),
+    "income_statement@v1": Superseded("income_statement@v2"),
+    "cash_flow@v1": Superseded("cash_flow@v2"),
+    "balance_sheet@v1": Superseded("balance_sheet@v2"),
     "iv_history@v1": Superseded("iv_history@v2"),
     "anchored_vwap@v1": Superseded("anchored_vwap@v2"),
     # v2 adds sma_150 and the regression trend quality (one nightly of v1 rows at most)

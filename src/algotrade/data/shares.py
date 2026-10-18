@@ -16,9 +16,10 @@ filing are two rows, and a null in a key column (a marker's ``tag``, a share cou
 Point in time is the FILING, not the partition: a fact filed in 2025 that a backfill stored in
 2026 was public in 2025, so ``share_facts`` returns every fact and ``known_from`` says from
 which session each counts (``features`` keeps, per session, the facts known from it or before).
-``known_from`` is the first session whose CLOSE is at or after the instant SEC accepted the
-filing (``accepted_ts``; 16:00 New York, 13:00 on an early close): a 10-Q accepted at 16:30 is
-not public at that day's close and counts from the next session. ``filed`` is a date and says
+``known_from`` is the first session whose CLOSE is strictly after the instant SEC accepted the
+filing (``accepted_ts``; 16:00 New York, 13:00 on an early close): a filing accepted at or
+after the close, a 10-Q at 16:30 say, is not public at that session's close and counts from the
+next. ``filed`` is a date and says
 nothing about the hour (SEC dates a filing accepted until 17:30 that day), so a fact without
 ``accepted_ts`` counts from the session after ``filed``, never from ``filed`` itself.
 """
@@ -80,7 +81,7 @@ def share_facts(reader: StoreReader, as_of: datetime | None = None) -> pd.DataFr
 
 def known_from(facts: pd.DataFrame) -> pd.Series:
     """The session each fact of ``facts`` (``filed`` and, when present, ``accepted_ts``) counts
-    from (module doc): the first session whose close is at or after the acceptance instant, else
+    from (module doc): the first session whose close is strictly after the acceptance instant, else
     the first session after ``filed``. A fact with neither is never known (``NEVER``)."""
     if "accepted_ts" in facts.columns:
         accepted = pd.to_datetime(facts["accepted_ts"], utc=True)
@@ -92,7 +93,7 @@ def known_from(facts: pd.DataFrame) -> pd.Series:
     after = {d: next_session(d) for d in days}
     close = {d: close_time(d) for d in set(local.dropna()) if is_session(d)}
     closes = pd.to_datetime(local.map(close), utc=True)  # NaT: accepted on a non-session day
-    on_time = accepted.notna() & (accepted <= closes)
+    on_time = accepted.notna() & (accepted < closes)
     by_acceptance = local.where(on_time, local.map(after))
     out = by_acceptance.where(accepted.notna(), filed.map(after))
     return out.astype(object).where(out.notna(), NEVER)
