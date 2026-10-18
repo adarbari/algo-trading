@@ -17,6 +17,7 @@ from datetime import date
 from typing import Final
 
 from algotrade.quant.edges import paths
+from algotrade.quant.edges.statistics import window_weights
 from algotrade.services.read.availability.cause import run_cause
 from algotrade.services.read.context import Stores
 from algotrade.services.read.edge_evidence.basis import OfficialBasis
@@ -36,7 +37,7 @@ class Window:
     harness's ``before_split``; ``all`` for a run with no split), ``value`` (the picks' mean in a
     return outcome, else the wins above the base rate), the field's ``base_value`` (the mean of
     every eligible name; None for a non-return outcome or when not stored) and ``weight`` (its
-    share when windows are added: ``runs.window_weights``, below 1 where windows overlap)."""
+    share when windows are added: ``window_weights``, below 1 where windows overlap)."""
 
     row: SeriesRow
     period: str
@@ -135,7 +136,7 @@ def _series_of(
 ) -> BasisSeries:
     """The windows and gaps of one screener's (or baseline's) rows at one horizon."""
     unit = _unit(mine)
-    weights = runs.window_weights((r.decision_session for r in mine), key[1])
+    weights = window_weights((r.decision_session for r in mine), key[1])
     windows = [
         w for r in mine if (w := _window(r, unit, split, weights[r.decision_session])) is not None
     ]

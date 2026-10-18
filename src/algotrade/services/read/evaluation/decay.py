@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final
 
+from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.services.read.evaluation import runs
 from algotrade.services.read.evaluation.edges import EdgePublished
 from algotrade.services.read.evaluation.runs import EdgeRow
@@ -55,6 +56,22 @@ class DecayBar:
 
 
 @dataclass(frozen=True)
+class ExpectedFigure:
+    """What to expect of the paper's figure once it is traded (``[published] leg`` and
+    ``verdict.toml [published_haircut]``, ADR 0065 amendment 2026-10-17): ``value`` is the
+    published figure less the ``haircut`` of its ``leg``, in the decay's unit. ``realised`` is the
+    out-of-sample bar's figure and ``share`` its share of ``value`` (None where the bar has no
+    value, or ``value`` is zero). Display only: no verdict criterion reads it."""
+
+    leg: str
+    haircut: float
+    value: float
+    realised: float | None
+    share: float | None
+    summary: str
+
+
+@dataclass(frozen=True)
 class EdgeDecay:
     """The decay of one statistic: ``measure`` (``mean_excess``, ``decile_spread`` or
     ``lift_pts``) in ``unit`` (a return as a fraction, or points), the paper's figure
@@ -66,6 +83,7 @@ class EdgeDecay:
     published: EdgePublished | None
     basis_horizon: int
     bars: tuple[DecayBar, ...]
+    expected: ExpectedFigure | None = None  # the published figure after its leg's haircut
 
 
 def _read(measure: str, row: EdgeRow) -> tuple[float | None, int | None]:
@@ -96,29 +114,57 @@ def _bar(
     return DecayBar(period, value, n, MEASURED)
 
 
+def _shown(value: float, measure: str) -> str:
+    return f"{value:g} points" if measure == "lift_pts" else f"{value * 100:.2f}%"
+
+
+def expected_of(
+    published: EdgePublished, measure: str, oos: DecayBar, settings: VerdictSettings
+) -> ExpectedFigure:
+    """The published figure after its leg's haircut, with the out-of-sample bar against it."""
+    cut = settings.published_haircut(published.leg)
+    value = published.value * (1.0 - cut)
+    realised = oos.value if oos.state == MEASURED else None
+    share = None if realised is None or value == 0.0 else realised / value
+    leg = published.leg.replace("_", "-")
+    text = (
+        f"Published {_shown(published.value, measure)}, expect {_shown(value, measure)} "
+        f"({cut * 100:.0f}% off for a {leg} figure)."
+    )
+    if realised is not None and share is not None:
+        text += f" Out of sample it is {_shown(realised, measure)}, {share * 100:.0f}% of that."
+    return ExpectedFigure(published.leg, cut, value, realised, share, text)
+
+
 def decay_of(
     published: EdgePublished | None,
     horizon: int,
     insample: EdgeRow | None,
     oos: EdgeRow | None,
     hidden: bool = False,
+    settings: VerdictSettings | None = None,
 ) -> EdgeDecay:
     """The decay against the basis rows at ``horizon``: of the edge's ``published`` figure, or
-    with none (``not_given``) of the lift in points."""
+    with none (``not_given``) of the lift in points. With ``settings`` and a published figure,
+    ``expected`` is the figure after the haircut of its leg, set beside the out-of-sample bar."""
     measure = DEFAULT_MEASURE if published is None else published.measure
     first = (
         DecayBar(PUBLISHED, None, None, NOT_GIVEN)
         if published is None
         else DecayBar(PUBLISHED, published.value, None, MEASURED)
     )
+    bars = (
+        first,
+        _bar(IN_SAMPLE, insample, measure, published, horizon, hidden),
+        _bar(OUT_OF_SAMPLE, oos, measure, published, horizon, hidden),
+    )
     return EdgeDecay(
         measure=measure,
         unit=POINTS if measure == "lift_pts" else RETURN,
         published=published,
         basis_horizon=horizon,
-        bars=(
-            first,
-            _bar(IN_SAMPLE, insample, measure, published, horizon, hidden),
-            _bar(OUT_OF_SAMPLE, oos, measure, published, horizon, hidden),
-        ),
+        bars=bars,
+        expected=None
+        if published is None or settings is None
+        else expected_of(published, measure, bars[2], settings),
     )
