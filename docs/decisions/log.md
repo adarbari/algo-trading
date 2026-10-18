@@ -627,6 +627,30 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the owner CIK is an SEC public identifier the data set is keyed on; a hash buys nothing (the hash of a public id is trivially reversible against EDGAR) and loses the join to later filings, amendments (4/A) and the deep-dive dossier. Officer title is attribute data a cluster-buy edge weighs (CEO / CFO buys vs. director buys), stored as filed with no name. The cluster-insider-buy edge needs a distinct-insider count, so a stable per-person key is functionally required. Data never enters the public repo (store is local, git-ignored); the read model serves aggregates. Precedent: ADR 0040 keeps emails (private personal data) out of the repo, not public filing data out of the store. Erasure and shorter retention are owner-only decisions (log 2026-10-11), so the default event retention stands until the owner says otherwise.
 
+## 2026-10-18 | EB H5b (time-series base) | How a window edge is declared and judged
+- Question: how does a raw-return, named-instrument edge fit the edge document and the verdict without a new outcome kind or stored column?
+- Options: a new outcome kind `raw_return` and a new `edge_eval` column for the timing Sharpe / keep `excess_return` over benchmark `none` (legal only with `base = "out_of_window"`), named instruments as one `instrument.symbol in [...]` rule, the Welch t in the verdict's existing t slot and the timing Sharpe in the run record.
+- Decision: the second: no new outcome kind, no schema change; `decile_t` carries the Welch t (Promising t >= 2, Works t >= 3), `hit_rate` / `base_rate` the positive-window shares, `sharpe` / `picks_t` / the deflated Sharpe the in-window series, the random window sets are `role = random` rows; no variants and no per-session series, legs or ledger for such an edge.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the verdict, trial log and frozen split are reused unchanged, so a window edge cannot be judged more leniently than a cross-section one; a stored column and a series for a screen-less edge are a schema decision for when a page shows them. Known gap: the timing-versus-buy-and-hold Sharpe is in the run record only.
+
+## 2026-10-18 | EB H5b (time-series base) | The outcomes seam is a forbidden contract, not a widened one
+- Question: the plan says to widen "only cross_section/harness.py reads outcomes" to name `time_series/harness.py`.
+- Options: widen the named-modules list only / also add an import-linter contract confining the new package.
+- Decision: both: `time_series/harness.py` joins the named modules of `test_edge_outcomes_expressible.py`, and a forbidden contract keeps every other module of `services.evaluation.time_series` off `algotrade.data.outcomes`; the protected-module contract of 0053 (only `services.evaluation`) is unchanged.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the package-level contract already admits all of `services.evaluation`, so widening it would change nothing; the per-package contract is what makes "one reader" true for the new folder.
+
+## 2026-10-18 | EB H5b (PR 660 review) | The paired series carries the Sharpe, t and deflated Sharpe
+- Question: the in-window Sharpe, picks t and deflated Sharpe on raw window returns read drift, not timing.
+- Options: raw in-window series / each window minus the first stretch tiled right after it (unpaired windows counted, never filled).
+- Decision: the paired series; `decile_t` stays the Welch t, worded "In-window minus out-of-window t (Welch)" through `EdgeFacts.base`; several instruments deflate with the variance of their Sharpe ratios; `year_part` / `regime_part` slices added; Guide term `base_out_of_window`.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a rising instrument would otherwise pass Works on drift alone; the paired difference removes the instrument's drift without a model.
+
 ## 2026-10-18 | EB H9 (pair spread) | Result side, costs, base and eligibility of a pair
 - Question: how is a pair spread judged, what does it charge, what is its base and which pairs count?
 - Options: verdict-eligible as a long outcome / diagnostic only like `long_short`; one round trip / two; the base as one value per pair / per name against its sibling; a sibling outside the universe counts / is excluded.
