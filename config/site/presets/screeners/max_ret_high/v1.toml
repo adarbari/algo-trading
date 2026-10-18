@@ -36,14 +36,14 @@ value = 2_000_000
 
 # ------------------------------------------------------------------------ the signal
 [criteria.max_ret]
-field = "rollup.anomaly_stats@v1.max_ret_21d"
+field = "rollup.max_return@v1.max_ret_21d"
 op = "gt"
 value = -1
 
 [columns]
 close = "rollup.price_stats@v2.close"
-max_ret_21d = "rollup.anomaly_stats@v1.max_ret_21d"
+max_ret_21d = "rollup.max_return@v1.max_ret_21d"
 adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
 
 [rank]
-tie_break = "rollup.anomaly_stats@v1.max_ret_21d"
+tie_break = "rollup.max_return@v1.max_ret_21d"

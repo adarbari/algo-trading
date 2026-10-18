@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-571 stored features in 66 groups, in dependency order; 145 expression features.
+577 stored features in 70 groups, in dependency order; 148 expression features.
 
 ## `option_liquidity@v1`
 
@@ -264,6 +264,23 @@ The largest one-day close-to-close move over the last 20 sessions. Stored as `ro
 |---|---|---|---|---|---|---|---|---|
 | `one_day_move` | window | float32 | decimal | open | >= 0 | Largest absolute one-day close-to-close return over the last 20 sessions (split-adjusted as of the session): 0.12 is a 12% move up or down | a session among the last 21 has no close (a gap), or the history is shorter | `bars/1d.close` |
 
+## `max_return@v1`
+
+The best one-day close-to-close return of the last 21 sessions (MAX). Stored as `rollups/instrument/max_return@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `max_ret_21d` | window | float32 | decimal | open | >= -1 | The best one-day close-to-close return of the last 21 sessions (split-adjusted as of the session): 0.12 is a day that gained 12%; negative when every day lost | a session among the last 22 has no close (a gap), or the history is shorter | `bars/1d.close` |
+
+## `earnings_neutral_reversal@v1`
+
+The last 20 sessions' return without the days an earnings report moved the price. Stored as `rollups/instrument/earnings_neutral_reversal@v1`; reads `events/earnings`, `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `ret_ex_earnings_20d` | window | float32 | decimal | open | >= -1 | Return over the last 20 sessions leaving out the daily returns of every earnings reaction window (the close before a report to the close after it): the month's move that earnings did not make | a session among the last 21 has no close (a gap), the history is shorter, or no earnings report is known for the instrument by the session | `bars/1d.close`, `events/earnings.ts` |
+| `earnings_days_excluded` | window | int | count | open | 0 .. 20 | How many of the last 20 daily returns an earnings reaction window left out (0: no report in the window) | a session among the last 21 has no close (a gap), the history is shorter, or no earnings report is known for the instrument by the session | `events/earnings.ts` |
+
 ## `momentum@v1`
 
 Wilder ATR and RSI (14), 5-session return, relative volume and the 20 / 50-session high-low channel. Stored as `rollups/instrument/momentum@v1`; reads `bars/1d`.
@@ -476,13 +493,12 @@ Relative strength against SPY (63 and 252 sessions, the line's 252-session high,
 | `rs_sector_63d` | window | float32 | decimal | open | >= -1 | Relative strength against the sector ETF over 63 sessions: (1 + the instrument's return) / (1 + the ETF's) - 1; above 0 the instrument beat its sector | sector_ret_63d is null, or the instrument's 63-session return is unknown (a session in the window has no bar (a gap), or the history is shorter) | `instruments/company.sector`, `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
 | `sector_rank_63d` | cross_section | int | count | open | 1 .. 11 | The rank of the instrument's sector ETF among the 11 sector ETFs by 63-session return: 1 the strongest sector, 11 the weakest; ETFs with equal returns share the better rank | sector_ret_63d is null, or fewer than min_sector_etfs of the 11 ETFs have a complete 63-session window | `instruments/company.sector`, `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
 
-## `anomaly_stats@v1`
+## `illiquidity@v1`
 
-MAX (the largest daily return of 21 sessions) and Amihud illiquidity (mean |return| per dollar traded over 63 sessions): the ranks of the lottery and illiquidity decoys. Stored as `rollups/instrument/anomaly_stats@v1`; reads `bars/1d`.
+Amihud illiquidity (mean |return| per dollar traded over 63 sessions): the rank of the illiquidity decoy. Stored as `rollups/instrument/illiquidity@v1`; reads `bars/1d`.
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
-| `max_ret_21d` | window | float32 | decimal | open | >= -1 | The largest daily return (close / previous close - 1) of the last 21 sessions, the MAX measure of lottery-like demand: 0.25 is a one-day jump of 25% inside the month; high-MAX stocks have tended to earn less afterwards (Bali, Cakici and Whitelaw 2011) | a session among the last 22 closes has no bar (a session in the window has no bar (a gap), or the history is shorter) | `bars/1d.close` |
 | `amihud_63d` | window | float32 | ratio | open | >= 0 | Amihud illiquidity: the mean over the last 63 sessions of \|daily return\| divided by the session's dollar volume (close x volume) in millions: 0.05 is a 5% move per $1M traded on average. High is illiquid, and illiquid stocks have earned a premium (Amihud 2002) | a session among the last 64 closes has no bar (a session in the window has no bar (a gap), or the history is shorter), or one of the 63 sessions traded no volume | `bars/1d.close`, `bars/1d.volume` |
 
 ## `dividends@v2`
@@ -506,6 +522,24 @@ The next known ex-dividend date, its amount (split-adjusted to the session) and 
 | `next_div_amount` | window | float32 | usd_per_share | open | >= 0 | The next dividend's cash amount per share, in the session's share terms (divided by the splits since the partition that stored it) | no ex-dividend date after the session in the dividend rows stored by it (dividend_status NOT_ANNOUNCED) | `events/dividend_declared.cash_amount`, `events/split.ratio` |
 | `days_to_ex_date` | window | int | days | open | >= 1 | Calendar days from the session to the next ex-dividend date | no ex-dividend date after the session in the dividend rows stored by it (dividend_status NOT_ANNOUNCED) | `events/dividend_declared.ts` |
 | `next_pay_date` | window | date | date | open |  | The next dividend's payment date | no ex-dividend date after the session in the dividend rows stored by it (dividend_status NOT_ANNOUNCED), or the source gives no payment date for it | `events/dividend_declared.pay_date` |
+
+## `dividend_months@v1`
+
+Whether the coming calendar month is one the name pays an ex-dividend date in, from its last 3 years. Stored as `rollups/instrument/dividend_months@v1`; reads `rollups/instrument/price_stats@v2`, `events/dividend` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `div_month_hits_3y` | window | int | count | open | 0 .. 3 | How many of the last 3 years had an ex-dividend date in the calendar month after the session's month (0 to 3; specials excluded) | no ex-dividend date in the coming month of the last 3 years and fewer than 240 bars among the last 252 sessions (too new, or bars do not cover the history, to call it not expected) | `events/dividend.ts` |
+| `expected_div_month_flag` | window | bool | flag | open |  | The calendar month after the session's month is one the name has paid an ex-dividend date in during the last 3 years: a dividend is expected in it | no ex-dividend date in the coming month of the last 3 years and fewer than 240 bars among the last 252 sessions (too new, or bars do not cover the history, to call it not expected) | `events/dividend.ts` |
+
+## `filing_activity@v1`
+
+8-K filings through the previous session and earnings reports in the last 5 sessions, as known on the session. Stored as `rollups/instrument/filing_activity@v1`; reads `rollups/instrument/price_stats@v2`, `events/filing` (optional), `filings/walk` (optional), `events/earnings` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `filing_count_5d` | window | int | count | open | >= 0 | 8-K and 8-K/A filings of the company accepted in the 5 sessions ending at the previous session (accepted before its close), as known on the session (0: it filed nothing) | no clean filings walk reached the previous session, no filing is stored, the filings backfill starts after the span, or the instrument has no filing stored by then (nothing for it) | `events/filing.accession` |
+| `earnings_in_5d` | window | bool | flag | open |  | An earnings report's reaction window (the session before it to the session after it) touches the last 5 sessions: the company reported in them, or the day before the first of them | no earnings report is known for the instrument by the session | `events/earnings.ts` |
 
 ## `ibkr_iv_history@v1`
 
@@ -1261,6 +1295,9 @@ Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on rea
 | `volume_bias` | label | str | category | open | ACCUMULATION, DISTRIBUTION, NEUTRAL | ACCUMULATION when 60% (params.accumulation_at) or more of the last 20 sessions' volume traded on up days, DISTRIBUTION at 40% (params.distribution_at) or less, else NEUTRAL | up_volume_share_20d is null (a gap among the last 21 sessions, a shorter history, or no volume at all over the 20) | `if(is_null(volume.up_volume_share_20d), null, if(volume.up_volume_share_20d >= accumulation_at, "ACCUMULATION", if(volume.up_volume_share_20d <= distribution_at, "DISTRIBUTION", "NEUTRAL")))` (accumulation_at = 0.6, distribution_at = 0.4) | virtual |
 | `volume_trend_20_60` | expression | float | ratio | open | >= 0 | The 20-session average volume / the 60-session average: above 1 activity is building over the quarter, below 1 fading; 1.3 is a clear pick-up | adv_shares_20d or adv_shares_60d is null (a gap among the last 60 sessions, or a shorter history), or the 60-session average is 0 | `volume.adv_shares_20d / vol_stats.adv_shares_60d` | virtual |
 | `turnover_20d` | expression | float | decimal | open | >= 0 | Daily turnover: the 20-session average share volume / shares outstanding, 0.01 means 1% of the company changes hands a day (about a 100-session holding period) | adv_shares_20d is null (a gap among the last 20 sessions), or shares_outstanding is null (no share count filed, or STALE: fundamentals market_cap_status) | `volume.adv_shares_20d / fundamentals.shares_outstanding` | virtual |
+| `volume_shock` | expression | bool | flag | open |  | The session's volume is 2 (params.min_z) or more standard deviations above the 20 sessions before it: the unusually high volume of the volume-shock premium (Gervais, Kaniel and Mingelgrin 2001); a lower bar than volume_climax, which is event-sized | volume_z_20d is null (a gap among the last 21 sessions, a shorter history, or the 20 sessions before all had the same volume) | `volume.volume_z_20d >= min_z` (min_z = 2.0) | virtual |
+| `news_free_5d` | expression | bool | flag | open |  | No 8-K or 8-K/A was filed through the previous session (5 sessions) and no earnings reaction window touched the last 5 sessions, as known on the session: nothing identifiable explains a move in them | filing_count_5d is null (no clean filings walk has reached the previous session, no filing stored for the instrument, or the backfill starts after the span) or earnings_in_5d is null (no earnings report known for it), and the other term does not already make it false | `filing_activity.filing_count_5d == 0 and not filing_activity.earnings_in_5d` | virtual |
+| `volume_shock_no_news` | expression | bool | flag | open |  | A volume shock (volume_shock) with nothing to explain it (news_free_5d): the setup the volume-shock return premium trades | volume_shock or news_free_5d is null and the other term is not false | `volume_shock and news_free_5d` | virtual |
 
 ### `vrp.toml`
 

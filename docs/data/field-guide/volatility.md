@@ -108,24 +108,6 @@ Sources: Ang, Hodrick, Xing and Zhang (2006), The Cross-Section of Volatility an
 
 Sources: Frazzini and Pedersen (2014), Betting Against Beta, Journal of Financial Economics; Black, Jensen and Scholes (1972), The Capital Asset Pricing Model: Some Empirical Tests
 
-### `rollup.anomaly_stats@v1.max_ret_21d`
-
-**How to read it.** The largest one-day return of the last 21 sessions (MAX): 0.30 means the name jumped 30% in a day within the month. Stocks with the biggest recent jumps are the lottery-like ones, bid up by investors who like skewed payoffs. They have earned less afterwards (Bali, Cakici and Whitelaw 2011), which is why the decoy battery ranks by it.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| no recent lottery-like jump | `lte 0.1` | soft | 0.05 | a score over the universe; the decoy battery's max_ret_high ranks the other end |
-
-**When the reading lies**
-
-- One day decides it: an earnings gap or a takeover bid sets the value, not a pattern. Check rollup.earnings@v1.last_earnings_date.
-- Concentrated in small, cheap and illiquid names; compare feature.market_cap and rollup.price_stats@v2.close.
-- Null after any gap among the last 22 closes or a shorter history.
-
-Sources: Bali, Cakici and Whitelaw (2011), Maxing Out: Stocks as Lotteries and the Cross-Section of Expected Returns, Journal of Financial Economics
-
 ### `feature.bb_pct_b`
 
 **How to read it.** %B: where the close sits between the Bollinger bands, 0 at the lower band, 0.5 at the 20-session mean, 1 at the upper band, below 0 or above 1 outside them. Low to high: under 0 is a two-sigma dip against the last month (the mean-reversion long in an uptrend), 0.2 to 0.8 is inside the normal range, above 1 the close has broken out of the band (strength in a trend, exhaustion after a long run). Bollinger's own rules: buy strength when %B exceeds 1 with volume, buy weakness when it is below 0 with a trend behind it.

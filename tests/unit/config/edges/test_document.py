@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from algotrade.config.edges.document import (
+    MODEL_STRUCTURES,
     QUALITY_BAR,
     SIDES,
     STATUSES,
@@ -17,6 +18,7 @@ from algotrade.config.edges.document import (
     expand_baselines,
     identity_dict,
     parse_edge,
+    tenor_sessions,
 )
 from algotrade.config.edges.follow import AUDIT_LABELS, BOOKMARK_LABELS, Follow
 from algotrade.config.strategy.schema import Selection
@@ -385,6 +387,79 @@ def test_only_an_expires_otm_outcome_has_a_structure_or_strike() -> None:
         parse_edge(
             document(schedule="every_session", outcome={**plain, "otm_pct": 0.1}), "drift", WHERE
         )
+
+
+MODEL = {
+    "kind": "option_model_pnl", "horizon_sessions": [10], "benchmark": "none",
+    "start_offset_sessions": 1, "structure": "atm_straddle_long",
+    "iv_field": "rollup.ibkr_iv@v1.iv30_ibkr",
+}  # fmt: skip
+
+
+def model(**changes: Any) -> dict[str, Any]:
+    body = {k: v for k, v in {**MODEL, **changes}.items() if v is not None}
+    return document(schedule="every_session", outcome=body)
+
+
+@pytest.mark.parametrize("structure", MODEL_STRUCTURES)
+def test_an_option_model_pnl_outcome_types_each_structure_and_is_labelled_model(
+    structure: str,
+) -> None:
+    o = parse_edge(model(structure=structure, cost_bps=5), "drift", WHERE).outcome
+    assert (o.structure, o.strike_delta, o.otm_pct, o.cost_bps) == (structure, None, None, 5)
+    assert o.iv_field == "rollup.ibkr_iv@v1.iv30_ibkr"
+    assert o.basis == "model" and not o.is_return
+
+
+def test_only_an_option_model_pnl_outcome_is_labelled_model() -> None:
+    assert parse_edge(otm(), "drift", WHERE).outcome.basis is None
+
+
+@pytest.mark.parametrize(
+    "changes,match",
+    [
+        ({"structure": "put"}, "structure"),  # an expires_otm structure is not a model one
+        ({"structure": None}, "structure: required"),
+        ({"iv_field": None}, "iv_field: required"),
+        ({"strike_delta": 0.3}, "at the money, it has no strike"),
+        ({"otm_pct": 0.05}, "at the money, it has no strike"),
+        ({"benchmark": "SPY"}, "has no benchmark"),
+    ],
+)
+def test_an_option_model_pnl_outcome_fails_closed(changes: dict[str, Any], match: str) -> None:
+    with pytest.raises(ConfigurationError, match=match):
+        parse_edge(model(**changes), "drift", WHERE)
+
+
+@pytest.mark.parametrize("horizons", [[10], [21], [42], [10, 21, 42]])
+def test_an_option_model_pnl_horizon_within_half_to_double_the_iv_tenor_parses(
+    horizons: list[int],
+) -> None:
+    assert parse_edge(model(horizon_sessions=horizons), "drift", WHERE).outcome.horizon_sessions
+
+
+@pytest.mark.parametrize("horizons", [[1], [5], [9], [43], [21, 63]])
+def test_an_option_model_pnl_horizon_the_30_day_iv_cannot_price_is_refused(
+    horizons: list[int],
+) -> None:
+    with pytest.raises(ConfigurationError, match=r"outside 10\.\.42 sessions"):
+        parse_edge(model(horizon_sessions=horizons), "drift", WHERE)
+
+
+def test_an_option_model_pnl_iv_field_with_no_tenor_in_its_name_is_refused() -> None:
+    with pytest.raises(ConfigurationError, match="names no tenor"):
+        parse_edge(model(iv_field="feature.my_iv"), "drift", WHERE)
+
+
+def test_the_tenor_of_an_iv_field_is_read_from_its_name() -> None:
+    assert tenor_sessions("rollup.iv30@v1.iv30") == 21
+    assert tenor_sessions("rollup.ibkr_iv@v1.iv30_ibkr") == 21
+    assert tenor_sessions("rollup.ibkr_iv@v1.rank") is None
+
+
+def test_an_expires_otm_structure_is_not_a_model_one_and_the_reverse() -> None:
+    with pytest.raises(ConfigurationError, match="structure"):
+        parse_edge(otm(structure="atm_straddle_long"), "drift", WHERE)
 
 
 def test_a_variant_overrides_the_strike_and_a_variant_of_another_kind_drops_the_old_keys() -> None:

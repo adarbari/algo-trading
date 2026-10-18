@@ -1,6 +1,5 @@
-"""``anomaly_stats@v1`` on hand-built bars: MAX is the largest daily return of the last 21
-sessions, Amihud the mean absolute return per million dollars over 63; a gap or a session with
-no volume gives null."""
+"""``illiquidity@v1`` on hand-built bars: Amihud is the mean absolute return per million dollars
+over 63 sessions; a gap, a short history or a session with no volume gives null."""
 
 from collections.abc import Mapping, Sequence
 
@@ -11,7 +10,7 @@ import pytest
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data import StoreReader
 from algotrade.features.framework.runner import compute_one
-from algotrade.features.rollups.activity import anomaly_stats as an
+from algotrade.features.rollups.activity import illiquidity as an
 from tests.helpers.rollup_store import END, store, write_bars
 
 N = an.AMIHUD_WINDOW + 1
@@ -36,16 +35,6 @@ def result(reader: StoreReader) -> dict[str, dict[str, object]]:
     frame = compute_one(reader, an.GROUP, END, None).frame
     assert frame is not None
     return frame.set_index("instrument_id").to_dict("index")
-
-
-def test_max_is_the_largest_daily_return_of_the_last_21_sessions() -> None:
-    jumpy, old = flat(), flat()
-    jumpy[N - 10 :] = 130.0  # +30% on one day inside the month
-    old[5:] = 150.0  # +50% but 58 sessions back: outside the 21
-    out = result(build({"EQ:J": jumpy, "EQ:O": old, "EQ:F": flat()}))
-    assert float(out["EQ:J"]["max_ret_21d"]) == pytest.approx(0.30)  # type: ignore[arg-type]
-    assert float(out["EQ:O"]["max_ret_21d"]) == pytest.approx(0.0)  # type: ignore[arg-type]
-    assert float(out["EQ:F"]["max_ret_21d"]) == pytest.approx(0.0)  # type: ignore[arg-type]
 
 
 def test_amihud_is_the_mean_absolute_return_per_million_dollars() -> None:
@@ -74,6 +63,5 @@ def test_a_gap_a_short_history_or_a_session_without_volume_is_null() -> None:
     )
     for iid in ("EQ:G", "EQ:S"):
         assert pd.isna(out[iid]["amihud_63d"]), iid
-    assert pd.isna(out["EQ:G"]["max_ret_21d"])  # the gap is inside the month
-    assert pd.isna(out["EQ:Z"]["amihud_63d"]) and not pd.isna(out["EQ:Z"]["max_ret_21d"])
+    assert pd.isna(out["EQ:Z"]["amihud_63d"])
     assert not pd.isna(out["EQ:OK"]["amihud_63d"])

@@ -23,7 +23,7 @@ from algotrade.services.evaluation.cross_section.sessions import (
 
 PROJECTION_SHARE = 0.25  # the floor of the fill ratio the outlook scales by (ADR 0064, decision 7)
 SESSIONS_PER_YEAR, MONTH_SESSIONS = 250, 21
-EXCESS_RETURN, RETURN, CUSHION, RATIO = "excess_return", "return", "cushion", "ratio"
+EXCESS_RETURN, RETURN, CUSHION, RATIO, PNL = "excess_return", "return", "cushion", "ratio", "pnl"
 
 
 @dataclass(frozen=True)
@@ -65,10 +65,13 @@ class SeriesFacts:
 
 def unit_of(edge: Edge) -> str:
     """What an oriented value of ``edge``'s outcome is: an excess return over the benchmark, a
-    plain return (no benchmark), the cushion to the nearest strike or a vol ratio."""
+    plain return (no benchmark), the cushion to the nearest strike, a vol ratio or a model P&L
+    (a fraction of the entry price, a return like the others for the statistics)."""
     o = edge.outcome
     if o.kind == "expires_otm":
         return CUSHION
+    if o.kind == "option_model_pnl":
+        return PNL
     if is_return(edge):
         return RETURN if o.benchmark == "none" else EXCESS_RETURN
     return RATIO
@@ -76,7 +79,9 @@ def unit_of(edge: Edge) -> str:
 
 def counts_wins(unit: str | None) -> bool:
     """Whether the trial statistics of a value in ``unit`` read the session's excess wins, not the
-    value (ADR 0064 amendment 2026-10-11): a cushion or a ratio is not a return."""
+    value (ADR 0064 amendment 2026-10-11): a cushion or a ratio is not a return. A model P&L is
+    one (a fraction of the entry price): its trials read the picks' mean, never the win rate (a
+    short straddle that wins 80% of windows and loses on average must not read as evidence)."""
     return unit in (CUSHION, RATIO)
 
 

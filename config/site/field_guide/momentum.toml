@@ -839,25 +839,7 @@ tolerance = 0.1
 note = "a score over the universe; compare rollup.episode_behaviour@v1.beta_252d (market only)"
 
 [[field]]
-name = "rollup.anomaly_stats@v1.max_ret_21d"
-theme = "volatility"
-reads = "The largest one-day return of the last 21 sessions (MAX): 0.30 means the name jumped 30% in a day within the month. Stocks with the biggest recent jumps are the lottery-like ones, bid up by investors who like skewed payoffs. They have earned less afterwards (Bali, Cakici and Whitelaw 2011), which is why the decoy battery ranks by it."
-caveats = [
-  "One day decides it: an earnings gap or a takeover bid sets the value, not a pattern. Check rollup.earnings@v1.last_earnings_date.",
-  "Concentrated in small, cheap and illiquid names; compare feature.market_cap and rollup.price_stats@v2.close.",
-  "Null after any gap among the last 22 closes or a shorter history.",
-]
-sources = ["Bali, Cakici and Whitelaw (2011), Maxing Out: Stocks as Lotteries and the Cross-Section of Expected Returns, Journal of Financial Economics"]
-[[field.use]]
-for = "no recent lottery-like jump"
-op = "lte"
-value = 0.10
-mode = "soft"
-tolerance = 0.05
-note = "a score over the universe; the decoy battery's max_ret_high ranks the other end"
-
-[[field]]
-name = "rollup.anomaly_stats@v1.amihud_63d"
+name = "rollup.illiquidity@v1.amihud_63d"
 theme = "volume and liquidity"
 reads = "Amihud illiquidity: the mean over 63 sessions of the day's absolute return per million dollars traded. 0.01 is a 1% move per $1M, a liquid name; 1 is 100% per $1M, so thin a small order moves it. High is illiquid. Illiquid stocks have earned a premium over liquid ones (Amihud 2002), which the decoy battery ranks by; it is also the cost you pay to trade them."
 caveats = [

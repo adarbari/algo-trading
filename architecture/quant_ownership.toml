@@ -17,7 +17,7 @@ detect = [{ import = "scipy.optimize" }, { call_regex = "(^|\\.)(brentq|newton|b
 
 [[responsibility]]
 id = "option-pricing"
-description = "European option prices and Greeks (Black-Scholes-Merton, continuous q and r), delta strikes and out-of-the-money probabilities (ADR 0053 expires_otm), and the normal CDF and its inverse they use"
+description = "European option prices and Greeks (Black-Scholes-Merton, continuous q and r), delta strikes and out-of-the-money probabilities (ADR 0053 expires_otm), the at-the-money straddle's closed-form price and vega and the delta-hedged vega P&L (ADR 0053 option_model_pnl), and the normal CDF and its inverse they use"
 owner = ["src/algotrade/quant/black_scholes.py"]
 section = "docs/adr/0021-option-pricing-conventions.md#model"
 detect = [{ import = "scipy.stats" }, { call = "erfc" }, { call = "erf" }]
