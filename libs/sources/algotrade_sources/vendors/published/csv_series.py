@@ -86,16 +86,24 @@ class PublishedSeries:
 
     def __init__(self, http: Http) -> None:
         self._http = http  # paced by the shared ``published`` limiter (sources.toml)
-        self._bodies: dict[str, bytes | None] = {}  # one file serves many series: one request
+        # One file serves many series: one request per run, a failed one included (a down host
+        # is not retried per series; each series re-raises the same error).
+        self._bodies: dict[str, bytes | Exception | None] = {}
 
     def fetch(self, request: FetchRequest) -> bytes | None:
         series = series_request(request)
         if not series.url.startswith(SCHEMES):
             raise ValueError(f"series {series.key!r}: url must be http(s), got {series.url!r}")
         if series.url not in self._bodies:  # a run reads each file once, however many series
-            body = self._http.get(series.url)
-            self._bodies[series.url] = body if body is not None and body.strip() else None
-        return self._bodies[series.url]  # an empty file: nothing yet
+            try:
+                body = self._http.get(series.url)
+                self._bodies[series.url] = body if body is not None and body.strip() else None
+            except Exception as exc:
+                self._bodies[series.url] = exc
+        cached = self._bodies[series.url]
+        if isinstance(cached, Exception):
+            raise cached
+        return cached  # an empty file: nothing yet
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
         frame = parse_series(series_request(request), payload)

@@ -510,7 +510,7 @@ follow-up PR).
 ## 2026-10-17 | EB D7 (country CAPE) | Barclays Shiller CAPE file used as personal-use data
 - Question: may the stack pull Barclays' public `cape.csv` (26 countries, monthly) although its terms could not be retrieved (the site is a single-page app whose disclaimer text is served only to a browser session)?
 - Options: use it as personal research data, one pull a month, no redistribution, no vendor data committed / wait for the owner to read the terms / use Siblis' free tier (8 snapshots, too thin).
-- Decision: use it under personal use: `licence = "personal"`, `refetch_days = 31`, tests on a hand-built fixture; the owner confirms the disclaimer once in a browser.
+- Decision: use it under personal use: `licence = "personal"`, `refetch_days = 28`, tests on a hand-built fixture; the owner confirms the disclaimer once in a browser.
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the file is public and unauthenticated and has been served for years, a monthly pull is a light use, and the series is optional (the macro step is non-critical), so withdrawing it costs one registry block.

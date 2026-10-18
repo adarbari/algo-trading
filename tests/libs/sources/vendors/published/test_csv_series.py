@@ -187,7 +187,7 @@ def test_the_cape_registry_is_one_personal_file_pulled_monthly() -> None:
         s for s in load_macro(FileConfigStore(REPO / "config")).series if s.key.startswith("CAPE_")
     ]
     assert len(cape) == 26 and {s.url for s in cape} == {cape[0].url}
-    assert {s.licence for s in cape} == {"personal"} and {s.refetch_days for s in cape} == {31}
+    assert {s.licence for s in cape} == {"personal"} and {s.refetch_days for s in cape} == {28}
     assert all(s.pit == "lag" and s.revised and s.release_lag_days == 45 for s in cape)
     assert {s.parser for s in cape} == {"cape_csv"}
 
@@ -203,3 +203,20 @@ def test_one_file_serving_many_series_is_requested_once() -> None:
     for _ in range(3):
         source.fetch(STOOQ)
     assert urls == [STOOQ.url]
+
+
+def test_a_failed_request_is_cached_for_the_run_and_raised_for_each_series() -> None:
+    calls: list[str] = []
+
+    def transport(url: str) -> bytes:
+        calls.append(url)
+        raise OSError("host down")
+
+    source = PublishedSeries(http_for(transport))
+    with pytest.raises(Exception):  # noqa: B017 - the http layer's own error type
+        source.fetch(STOOQ)
+    tried = len(calls)  # the http layer retries within its own request
+    for _ in range(2):
+        with pytest.raises(Exception):  # noqa: B017
+            source.fetch(STOOQ)
+    assert len(calls) == tried

@@ -139,6 +139,8 @@ def test_a_run_stores_every_series_with_its_vintages() -> None:
     assert set(spx["series"]) == {"^SPX"} and set(spx["vintage_kind"]) == {"lagged"}
     assert record.stats["vintages"] == {"GDP_REAL": 6, "T10Y3M": 3, "SPX": 4}
     assert record.stats["skipped_series"] == {}
+    assert record.stats["newest_obs"]["T10Y3M"] == "2026-10-02"  # the file's newest month
+    assert record.stats["fetched_on"] == D1.isoformat()
     stored = StoreReader(ctx.writer._backend).table(TABLE, D1)
     assert stored is not None and set(stored["source"]) == {"fred", "published"}
 
