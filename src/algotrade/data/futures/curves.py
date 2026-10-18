@@ -25,6 +25,22 @@ COLUMNS = (
 )  # fmt: skip
 
 
+def month_label(yyyymm: str) -> str:
+    """IB's delivery month ``202612`` -> ``2026-12``."""
+    return f"{yyyymm[:4]}-{yyyymm[4:6]}"
+
+
+def root_id(root: str) -> str:
+    """The id of a futures root (the ``parent_id`` of its contracts): ``FUT:CL``."""
+    return f"FUT:{root}"
+
+
+def contract_id(root: str, month: str) -> str:
+    """The id of the contract of ``root`` delivering in ``month`` (``2026-12``):
+    ``FUT:CL:2026-12``. The delivery month, not the last trade date's month."""
+    return f"{root_id(root)}:{month}"
+
+
 def futures_curve(
     reader: StoreReader,
     start: date,
@@ -49,7 +65,9 @@ def futures_curve(
 def curve_of(frame: pd.DataFrame, root: str, session: date) -> pd.DataFrame:
     """One root's curve on one session: its rows by expiry with a price, plus ``days`` (to
     expiry) and ``roll_yield`` (annualised, ``ln(front / this) / years``, 0 on the front
-    contract: positive in backwardation, negative in contango)."""
+    contract: positive in backwardation, negative in contango). The prices are an evening
+    snapshot read after the exchange's settlement, not the exchange settle; per root and
+    session they are all one ``price_kind`` (see the table's schema comment)."""
     rows = frame[(frame["root"] == root) & (frame["session_date"] == session)]
     rows = rows[rows["price"].notna() & rows["expiry"].notna()].sort_values("expiry")
     rows = rows.reset_index(drop=True)

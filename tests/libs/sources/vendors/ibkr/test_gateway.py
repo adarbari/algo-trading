@@ -443,3 +443,13 @@ def test_future_streams_are_cancelled_even_when_waiting_fails() -> None:
     with pytest.raises(RuntimeError):
         gw.future_curve("CL", "NYMEX", "CL", 2, SESSION)
     assert fake.calls.count("cancelMktData") == 2
+
+
+def test_contract_month_is_the_delivery_month_not_the_last_trade_months() -> None:
+    # CLZ6 delivers in December but stops trading on 2026-11-20 (the month before)
+    fake = FakeIB(futures={"CL": [("20261120", "CL", "202612")]},
+                  fut_quotes={("CL", "20261120"): (70.0, 69.0, 1.0, 1.0)})  # fmt: skip
+    gw, _, _ = gateway(fake, stream_wait_s=0.2)
+    gw.connect()
+    [row] = gw.future_curve("CL", "NYMEX", "CL", 1, SESSION)
+    assert (row["contract_month"], row["expiry"]) == ("202612", "2026-11-20")

@@ -3,19 +3,20 @@ and open interest), a root without data a NO_DATA item, an unreachable gateway a
 
 import math
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 
 from algotrade.config.site.ibkr import FuturesRoot
 from algotrade.config.site.settings import IbkrSettings, SourcesSettings
+from algotrade.core.time.calendar import EXCHANGE_TZ
 from algotrade.data import StoreReader
 from algotrade.data.futures.curves import curve_of, futures_curve
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.run import TaskContext
-from algotrade_ingestion.tasks.market.futures_curves import nightly_curves
+from algotrade_ingestion.tasks.market.futures_curves import nightly_curves, reopen_cutoff
 from tests.helpers.fake_ib import FakeIB
 from tests.helpers.ibkr_store import SESSION, ibkr_source
 from tests.helpers.ingest_fakes import task_ctx
@@ -58,8 +59,8 @@ def test_stores_the_front_contracts_per_root_with_ids_prices_and_open_interest()
     assert list(frame["instrument_id"]) == ["FUT:CL:2026-10", "FUT:CL:2026-11", "FUT:CL:2026-12"]
     assert set(frame["parent_id"]) == {"FUT:CL"} and set(frame["source"]) == {"ibkr"}
     assert list(frame["expiry"]) == [date(2026, 10, 22), date(2026, 11, 20), date(2026, 12, 18)]
-    assert list(frame["price"]) == [70.0, 70.5, 71.0]
-    assert list(frame["price_kind"]) == ["last", "close", "last"]
+    assert list(frame["price"]) == [69.0, 70.5, 70.8]  # close is on all three, last on two
+    assert set(frame["price_kind"]) == {"close"}  # one kind per root and session
     assert list(frame["open_interest"]) == [4000.0, 3000.0, 2000.0]
     assert frame["knowledge_ts"].notna().all() and frame["ts"].notna().all()
     assert record.items["root:CL"] == "OK: 3/3"
@@ -74,7 +75,7 @@ def test_the_curve_rebuilds_basis_and_roll_yield() -> None:
     curve = curve_of(futures_curve(reader, SESSION, SESSION), "CL", SESSION)
     assert list(curve["days"]) == [20.0, 49.0, 77.0]
     assert curve["roll_yield"].iloc[0] == 0.0
-    expected = math.log(70.0 / 70.5) / (29 / 365)  # contango: negative
+    expected = math.log(69.0 / 70.5) / (29 / 365)  # contango: negative
     assert curve["roll_yield"].iloc[1] == pytest.approx(expected) and expected < 0
     assert curve_of(futures_curve(reader, SESSION, SESSION), "CL", date(2026, 10, 3)).empty
 
@@ -102,3 +103,30 @@ def test_it_never_calls_an_order_or_account_api() -> None:
     nightly_curves(ctx, ibkr_source(ib, stream_wait_s=0.05), SESSION)
     assert not {"placeOrder", "reqPositions", "accountValues", "IB.connect"} & set(ib.calls)
     assert "reqHistoricalData" not in ib.calls  # live streams only: no historical pacing
+
+
+def test_a_read_after_globex_reopened_stores_nothing_for_the_session() -> None:
+    ctx, reader = market()
+    sunday_evening = datetime(2026, 10, 4, 22, 5, tzinfo=UTC)  # 18:05 New York before Monday
+    assert reopen_cutoff(SESSION) == datetime(2026, 10, 4, 18, 0, tzinfo=EXCHANGE_TZ)  # Friday
+    late = replace(ctx, clock=lambda: sunday_evening)
+    ib = fake()
+    record = nightly_curves(late, ibkr_source(ib, stream_wait_s=0.05), SESSION)
+    assert record.status is RunStatus.PARTIAL and "reqContractDetails" not in ib.calls
+    assert futures_curve(reader, SESSION, SESSION).empty
+    assert all(v.startswith("NO_DATA: read after Globex reopened") for v in record.items.values())
+    before = replace(ctx, clock=lambda: datetime(2026, 10, 4, 21, 55, tzinfo=UTC))
+    assert (
+        nightly_curves(before, ibkr_source(fake(), stream_wait_s=0.05), SESSION).stats["served"]
+        == 1
+    )
+
+
+def test_the_id_is_built_from_the_delivery_month_not_the_last_trade_month() -> None:
+    ctx, reader = market()
+    ib = FakeIB(futures={"CL": [("20261120", "CL", "202612")]},
+                fut_quotes={("CL", "20261120"): (70.0, 69.0, 1.0, 1.0)})  # fmt: skip
+    nightly_curves(ctx, ibkr_source(ib, stream_wait_s=0.05), SESSION, ["CL"])
+    [row] = futures_curve(reader, SESSION, SESSION).to_dict("records")
+    assert (row["instrument_id"], row["contract_month"]) == ("FUT:CL:2026-12", "2026-12")
+    assert row["expiry"] == date(2026, 11, 20)

@@ -85,9 +85,9 @@ class FakeIB:
     quotes: Mapping[tuple[str, float, str], tuple[float, float]] = field(default_factory=dict)
     hv: Mapping[str, Sequence[Bar]] = field(default_factory=dict)  # HISTORICAL_VOLATILITY
     vols: Mapping[str, tuple[float, float]] = field(default_factory=dict)  # ticks 106, 104
-    # futures: root -> [(last trade date, trading class)] listed; fut_quotes: (root, date) ->
-    # (last, close, volume, open interest), NaN / None for a tick that does not arrive
-    futures: Mapping[str, Sequence[tuple[str, str]]] = field(default_factory=dict)
+    # futures: root -> [(last trade date, trading class[, contract month])] listed;
+    # fut_quotes: (root, date) -> (last, close, volume, open interest), NaN: no tick arrives
+    futures: Mapping[str, Sequence[tuple[str, ...]]] = field(default_factory=dict)
     fut_quotes: Mapping[tuple[str, str], tuple[float, float, float, float]] = field(
         default_factory=dict
     )
@@ -130,6 +130,7 @@ class FakeIB:
         self.requests.append({"symbol": contract.symbol, "exchange": contract.exchange})
         return [
             SimpleNamespace(
+                contractMonth=(rest[0] if rest else day[:6]),
                 contract=SimpleNamespace(
                     symbol=contract.symbol,
                     conId=5000 + i,
@@ -138,9 +139,9 @@ class FakeIB:
                     tradingClass=trading_class,
                     multiplier="1000",
                     secType="FUT",
-                )
+                ),
             )
-            for i, (day, trading_class) in enumerate(self.futures.get(contract.symbol, ()))
+            for i, (day, trading_class, *rest) in enumerate(self.futures.get(contract.symbol, ()))
         ]
 
     def reqHistoricalData(self, contract: Any, **kwargs: Any) -> list[Any]:  # noqa: N802

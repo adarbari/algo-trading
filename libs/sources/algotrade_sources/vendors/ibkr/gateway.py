@@ -573,18 +573,20 @@ class IbkrMarketData:
         now: last, close (IB's prior settle), bid, ask, day volume and open interest (tick 588),
         ``None`` where IB sent none. ``LookupError`` when IB lists no contract for the root."""
         details = self._call("reqContractDetails", Future(root, exchange=exchange, currency="USD"))
-        listed = [d.contract for d in details or [] if d.contract.tradingClass == trading_class]
-        live = [c for c in listed if (_expiry(c) or session) >= session]
-        live.sort(key=lambda c: (_expiry(c) or date.max, c.lastTradeDateOrContractMonth))
+        # contractMonth is the delivery month (CLZ6: 202612), not the last trade date's month
+        listed = [(d.contract, d.contractMonth) for d in details or []
+                  if d.contract.tradingClass == trading_class]  # fmt: skip
+        live = [(c, m) for c, m in listed if (_expiry(c) or session) >= session]
+        live.sort(key=lambda cm: (_expiry(cm[0]) or date.max, cm[0].lastTradeDateOrContractMonth))
         if not live:
             raise LookupError(f"IBKR lists no {root} ({trading_class}) futures on {exchange}")
         chosen = live[: max(1, front)]
-        tickers = self._stream_futures(chosen)
+        tickers = self._stream_futures([c for c, _ in chosen])
         return [
             {
                 "conid": int(c.conId),
                 "local_symbol": str(c.localSymbol or ""),
-                "contract_month": str(c.lastTradeDateOrContractMonth)[:6],
+                "contract_month": str(m or c.lastTradeDateOrContractMonth)[:6],
                 "expiry": e.isoformat() if (e := _expiry(c)) else None,
                 "multiplier": _number(c.multiplier or None),
                 "last": _settle(t.last),
@@ -594,7 +596,7 @@ class IbkrMarketData:
                 "volume": _price(t.volume),
                 "open_interest": _price(getattr(t, "futuresOpenInterest", None)),
             }
-            for c, t in zip(chosen, tickers, strict=True)
+            for (c, m), t in zip(chosen, tickers, strict=True)
         ]
 
     def _stream_futures(self, contracts: list[Any]) -> list[Any]:

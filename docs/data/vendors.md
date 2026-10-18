@@ -626,12 +626,17 @@ maintained fork of `ib_insync`). **Read-only by construction**, three layers:
 | `option/<SYM>/<expiry>/<C|P>/<strike>`: a snapshot quote | `qualifyContracts` + `reqTickers` | `ibkr` |
 | `futures/<ROOT>/<EXCHANGE>/<CLASS>/<N>`: the N nearest unexpired contracts of a futures root and their quotes (the nightly `futures-curves` task, table `rates/futures_curve`; `[ibkr] futures_roots`, `futures_front`) | `reqContractDetails` (a contract lookup) + `reqMktData` tick 588 streamed, then `cancelMktData` | `ibkr` |
 
-- **Futures curves** (EB D11): IB's `close` tick is the prior settle and `last` the last trade; a row's
-  `price` is the last, else the close (`price_kind`), so a consumer that needs the exchange settle
-  checks which one it got. Roots whose exchange the account has no market data for come back with
-  no price and are a `NO_DATA` item (WARN `futures_roots_served`), never a failure. History accrues
-  from the first night; IB's expired-contract history (`includeExpired`, about 2 years, paced as
-  historical requests) is not used, a backfill would be a separate task.
+- **Futures curves** (EB D11): a row's `price` is an **evening snapshot, not the exchange
+  settle**: IB's `close` tick is the settle before the read time and `last` the last trade at it;
+  per root and session `price` is one of them (`price_kind`, the column present on most
+  contracts), never a mix. Globex reopens 18:00 New York, after which `last` can belong to the
+  next trade date and `close` changes meaning, so a run at or past that instant stores nothing
+  for the session (`NO_DATA`, run PARTIAL): the nightly step must read before 18:00 New York.
+  `contract_month` is the delivery month (`ContractDetails.contractMonth`; CLZ6 stops trading in
+  November but is `2026-12`). Roots whose exchange the account has no market data for come back
+  with no price and are a `NO_DATA` item (WARN `futures_roots_served`), never a failure. History
+  accrues from the first night; IB's expired-contract history (`includeExpired`, about 2 years,
+  paced as historical requests) is not used, a backfill would be a separate task.
 - **Pacing** (`[ibkr]`): every message waits `min_interval_s = 0.02` (IB allows 50
   messages/s); every historical request also waits `historical_min_interval_s = 10` (60 per
   10 minutes, never two identical requests within 10 s). Two shared limiter keys, `ibkr` and
