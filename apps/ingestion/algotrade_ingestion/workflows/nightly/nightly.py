@@ -166,6 +166,10 @@ NIGHTLY: tuple[Step, ...] = (
     # filing, so a night reads the new ones; their Item 2.02 releases are earnings rows. Optional:
     # a failed night is read again the next (the default start is the latest stored filing).
     Step("filings", latest_only=NEW_SINCE_STORED, critical=False, accept_with=(check_filings,)),
+    # SEC Form 4 insider transactions (EB D6): the days since the last clean walk from EDGAR's daily
+    # index, each filing's XML; a night reads at most a few days, the next goes on. Optional: no
+    # edge reads it until the history is backfilled (`algotrade-ingest insider --since`).
+    Step("insider", latest_only=NEW_SINCE_STORED, critical=False),
     Step("earnings", accept=(check_earnings,), task_complete=True),
     Step("bars", accept=(check_bars, check_bars_resolved)),
     Step("rates", task_complete=True),

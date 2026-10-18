@@ -174,6 +174,7 @@ EDGE_PAPER = fixed(
 # hits at each level of the site's cost grid (``base_hits_at``, ``pick_hits_at``); null in v1 rows.
 # Leg v3 (ADR 0053 amendment 2026-10-18): a screener's second set of draws, matched to the picks'
 # sector mix, as ``strat_picks`` / ``strat_value_sums`` / ``strat_hit_sums`` beside ``rand_*``.
+# Leg v4 (ADR 0053 amendment 2026-10-18): the names of a buy/hold band as ``band_*`` lists.
 EDGE_LEGS = fixed(
     "results/edge_legs",
     "results",
@@ -188,6 +189,9 @@ EDGE_LEGS = fixed(
     "screen_snapshot date",
     "outcomes_as_of timestamp_utc",
     "pick_values float64[]",
+    "band_values float64[]",  # leg v4: a buy/hold band's net values (null: no band, or no value)
+    "band_ranks int64[]",
+    "band_ids string[]",
     "short_values float64[]",  # a long-short leg's short names' values; null for every other side
     "deciles float64[]",
     "pick_reference float64[]",

@@ -21,7 +21,9 @@ def test_config_list(graph: Graph) -> None:
     ta = {"breakout", "pullback", "support_reversal", "exhaustion", "trend_continuation",
           "range_breakout", "failed_breakout", "oversold_reversal", "momentum_12_1",
           "size_small", "pead_small_cap", "eap_all", "eap_volume", "ivol_high", "max_ret_high",
-          "amihud_illiquid", "beta_low", "residual_momentum",
+          "amihud_illiquid", "beta_low", "earnings_date_early", "eight_k_adverse_items",
+          "nt_late_filer", "tender_offer_filed", "sp500_deletion", "pre_earnings_runup",
+          "earnings_gap_volume", "earnings_gap_only", "residual_momentum",
           "volatility_scaled_momentum", "frog_in_the_pan", "momentum_x_quality_interaction",
           "fifty_two_week_high", "industry_momentum", "residual_reversal", "sector_reversal",
           "low_beta", "low_volatility"}  # fmt: skip

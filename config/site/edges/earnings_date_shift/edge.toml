@@ -1,0 +1,87 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: earnings_date_early (EB E3). Idea page:
+# docs/edge-ideas/events.md (earnings_date_advance_delay).
+id = "earnings_date_shift"
+name = "Earnings-date advances"
+thesis = "Stocks whose next earnings date is scheduled a week or more earlier than last year's go on to outperform the market in the following month."
+mechanism = """Managers schedule good news early and need extra days for bad news (audit, restatement
+risk, guidance negotiation); the date notice is public weeks ahead but investors read it as a
+calendar item, not as earnings information (Johnson and So 2018)."""
+persistence = """A small, unglamorous signal with a few weeks of life each quarter: it needs an
+expected-date model (vendors sell one) and a one-month trade across thousands of names, so large
+funds cannot size it; it costs one round trip a quarter per name and liquid names qualify."""
+family = "B"
+schedule = "on_event:earnings_date_shift:earlier"
+top_k = 20
+base = "universe"
+screeners = ["earnings_date_early"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Long side only: the advancers. The delayers (shorting later-than-last-year dates) are the
+other half of Johnson and So's spread and need their own screener and a short outcome, so they are
+a follow-up edge, not this one. The date is the Nasdaq calendar's SCHEDULED one: the calendar never
+confirms a date, so the "confirmed date" of the paper is a scheduled date here, and a date can move
+again. The event is the session the shifted date was first stored in a calendar known by the
+session (earnings_date_shift@v1, 7-day threshold, expected date = last year's report plus 364
+days). The history starts at the first stored calendar snapshot (a date first stored at or before it
+says nothing about when it became known), so the events begin the session after it: the harness's
+independent-session count, reported beside every number, is small until the calendar has been
+stored for a few quarters. The hold is 20 sessions from the first close after the date became
+known, not through the report itself (the report can fall later than 20 sessions). Liquid base:
+common stock, active, close above $5, 20-day dollar volume of at least $5M (the capacity floor
+of verdict.toml)."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 20
+
+[quality_bar]
+outcome = """Excess return over SPY over the 20 sessions after the entry close (the session after
+the shifted date first became known), net of 20 bps a round trip (an assumption for names
+trading $5M a day or more)."""
+trigger_timing = """The event is the session the shifted date was first stored (known_from, the
+first calendar snapshot carrying it), the anchor; the decision session is D = anchor and the entry
+session S = anchor + 1 (start_offset_sessions = 1). The names are read at D from
+earnings_date_shift@v1 (sessions_since_earnings_shift = 0, direction earlier), never from a date
+stored after D."""
+replication = """The source's rule first: advancers (a date earlier than the expected one, the
+same weekday as last year's report) against delayers from the day the date is known, held through
+the announcement (Johnson and So 2018). Here earnings_date_early v1 is the long leg only: the
+earlier-shifted names of the liquid base, the 20 with the largest advance."""
+expected_size = """About 260 bp between advancers and delayers in the month after the revision
+(Johnson and So 2018, from the WSH and MIT summaries); the long leg alone is roughly half. A few
+hundred advancers a quarter, in clusters at the quarter's reporting calendar: independent sessions
+are the binding count."""
+capacity_costs = """Small: a one-month trade with one round trip a quarter per name, liquid names
+only ($5M a day), so an individual can trade it; the 20 bps round trip is the assumption and
+shorting is not needed."""
+failure_modes = """A calendar that moves a date for a reason that is not news (a fiscal-year
+change, a merger, a vendor's re-estimate), a scheduled date that is not confirmed, and the paper's
+sensitivity to how the expected date is defined (Skinner 2021). Retire if the frozen-period excess
+return of the picks is not above the base rate of every eligible name."""
+decoys = """Advancers may simply be past winners: the 12-1 momentum baseline; small names
+shift dates more often: the size baseline. Overlaps momentum at earnings only through holding over
+the announcement."""
+
+[[sources]]
+title = "Johnson, T. and So, E., Time Will Tell: Information in the Timing of Scheduled Earnings News, Journal of Financial and Quantitative Analysis, 2018"
+url = "https://doi.org/10.1017/S0022109018000492"
+
+[[sources]]
+title = "Skinner, D., Information in Mandatory and Voluntary Earnings Announcement Date Forecasts, ABFER annual conference slides, 2021"
+url = "https://www.abfer.org/media/abfer-events-2021/annual-conference/slides-accounting/Information-in-Mandatory-and-Voluntary-Earnings-Announcement-Date-Forecasts_Douglas-Skinner.pdf"
+
+[[sources]]
+title = "deHaan, E., Shevlin, T. and Thornock, J., Journal of Accounting and Economics, 2015 (advance-notice length and bad news)"

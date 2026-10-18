@@ -1,0 +1,34 @@
+# L3 site setting: the Guide's playbook for the site preset pre_earnings_runup (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "pre_earnings_runup"
+version = 1  # the preset version this prose was written for
+summary = "Finds liquid stocks with a positive 12-month return and a report due within about two weeks, the strongest past winners first: the finding that attention-grabbing winners rise in the days before earnings. It is a candidate edge under test, not a proven trade."
+hit = "The name is a common stock or ADR closing above $5 that trades at least $50M a day, with a positive return over the 12 months to one month ago, and its next report date is announced or taken from last year and falls within 10 sessions. The strongest 12-1 momentum ranks first."
+not_checked = "It does not know that the date is confirmed (a guessed date can miss the real one), why the stock rose, or what happens after the report: the edge holds only the days before it. It is the screen of the pre-earnings run-up edge, which the harness is still testing."
+before_acting = [
+  "A date taken from last year is a guess: check rollup.earnings_expected@v1.expected_basis, SCHEDULED is announced and PRIOR_YEAR is not.",
+  "The study found the give-back after the report about as large as the run-up before it: close the position before the report.",
+  "The earnings announcement premium is not found in recent studies, and past winners are momentum names, so read the harness's result against the other reporters before trusting a pick.",
+]
+sources = [
+  "Aboody, Lehavy and Trueman, Limited attention and the earnings announcement returns of past stock market winners (2010)",
+]
+related = [
+  { id = "eap_all", reason = "the same window for every reporter" },
+  { id = "momentum_12_1", reason = "a baseline every edge is compared with" },
+]
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+expected_basis = "Its next report date is announced or taken from last year"
+report_soon = "Reports within 10 sessions"
+momentum = "Gained over the 12 months to one month ago"

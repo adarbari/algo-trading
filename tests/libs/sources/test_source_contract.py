@@ -21,6 +21,7 @@ from algotrade_sources.framework.http import RetryPolicy
 from algotrade_sources.framework.series import (
     DailyIndexRequest,
     FilingsRequest,
+    InsiderRequest,
     ReleaseRequest,
     SeriesRequest,
 )
@@ -46,6 +47,8 @@ from algotrade_sources.vendors.published.csv_series import PublishedSeries
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.daily_index import SecDailyIndex
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap
+from algotrade_sources.vendors.sec.form4_xml import SecForm4Xml
+from algotrade_sources.vendors.sec.form345_bulk import SecForm345Bulk
 from algotrade_sources.vendors.sec.fund_objectives import (
     SecFundObjectives,
     SecFundSeries,
@@ -266,6 +269,17 @@ def sec_daily_index() -> Adapter:
     return SecDailyIndex(http_for(lambda url: payload)), request
 
 
+def sec_form4_xml() -> Adapter:
+    payload = (FIXTURES / "sec" / "form4_hand_built_purchase.xml").read_bytes()
+    request = InsiderRequest(key="0000999001-26-000001", cik="0000999001", document="form4.xml")
+    return SecForm4Xml(http_for(lambda url: payload)), request
+
+
+def sec_form345_bulk() -> Adapter:
+    payload = sec_payloads.example_quarter()
+    return SecForm345Bulk(http_for(lambda url: payload)), InsiderRequest(key="2026q3")
+
+
 def published() -> Adapter:
     request = SeriesRequest(
         "SPX", url="https://stooq.com/q/d/l/?s=^spx&i=d", date_column="Date", value_column="Close"
@@ -302,6 +316,8 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "fred_release_dates": fred_release_dates,
     "sec_filings": sec_filings,
     "sec_daily_index": sec_daily_index,
+    "sec_form4_xml": sec_form4_xml,
+    "sec_form345_bulk": sec_form345_bulk,
     "published": published,
     "treasury": treasury,
     "finra_short_interest": finra_short_interest,

@@ -56,7 +56,7 @@ bought. Numbers are wall-clock on GitHub-hosted runners unless marked local.
 
 ### Local fast path
 
-`make changed` runs the mirrored Python tests, then the web checks `scripts/changed_web.py`
+`make changed` runs the mirrored Python tests, then `tests/architecture` and `tests/unit/config` in full (`-n auto`: layout caps, registries, docs and harness tests that CI otherwise catches a push late), then the web checks `scripts/changed_web.py`
 maps from the changed `apps/web` files (slice or component folder -> vitest; page or route ->
 the e2e spec named after it, else `smoke`; story or CSS module -> that component's screenshots,
 printed as a Docker command off Linux; any `.ts` / `.tsx` -> `npm run typecheck`), then the
