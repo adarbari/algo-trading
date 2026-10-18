@@ -138,6 +138,7 @@ def load_verdict(ctx: Stores, edge: Edge) -> verdict.EdgeVerdict:
             measured=lambda: runs.load_measured_sessions(ctx, run),
             wins=verdict.counts_wins(edge),
             chain=verdict.is_chain(edge),
+            base=edge.base,
         ),
     )
     if not hidden or found.verdict in (verdict.WAITING, verdict.DIAGNOSTIC):

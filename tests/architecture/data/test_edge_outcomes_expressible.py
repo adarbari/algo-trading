@@ -40,6 +40,7 @@ DISCOVERY = "src/algotrade/services/evaluation/discovery/labels.py"  # the winne
 FORWARD = (
     "src/algotrade/services/evaluation/forward/settle.py"  # closes a followed edge's paper trades
 )
+TIME_SERIES = "src/algotrade/services/evaluation/time_series/harness.py"  # ADR 0073's seam
 PROTECTED = "algotrade.data.outcomes"
 
 
@@ -166,12 +167,13 @@ def test_only_the_named_modules_read_outcomes() -> None:
                 [node.module or ""] if isinstance(node, ast.ImportFrom) else []
             )
         }  # fmt: skip
-        if rel not in (HARNESS, MEASURING, TRAINING, DISCOVERY, FORWARD) and any(
+        if rel not in (HARNESS, MEASURING, TRAINING, DISCOVERY, FORWARD, TIME_SERIES) and any(
             n == PROTECTED or n.startswith(f"{PROTECTED}.") for n in names
         ):
             offenders.append(rel)
     assert not offenders, (
-        f"only {HARNESS}, {MEASURING}, {TRAINING}, {DISCOVERY}, {FORWARD} may read outcomes: "
+        f"only {HARNESS}, {MEASURING}, {TRAINING}, {DISCOVERY}, {FORWARD}, {TIME_SERIES} may read "
+        f"outcomes: "
         f"{offenders}"
     )
 

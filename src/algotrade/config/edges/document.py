@@ -19,8 +19,8 @@ and the key.
                       ``otm_pct`` (a fraction in (0, 1)) and the ``iv_field`` it reads at D;
                       ``iv_field`` is allowed on a ratio measure too (default: the run's); an
                       ``option_model_pnl`` outcome (a model P&L, basis ``model``) names its
-                      ``structure`` (MODEL_STRUCTURES), the ``iv_field`` and ``benchmark =
-                      "none"``, and takes no strike; ``option_pnl``: see ``chain.py``;
+                      ``structure`` (MODEL_STRUCTURES), ``iv_field``, ``benchmark = "none"``, no
+                      strike; ``option_pnl``: ``chain.py``;
                       ``side`` (SIDES; ADR 0053 amendment, outcome sides): ``long`` (default),
                       ``short`` (the picks are the bottom ``top_k`` of the ranked, liquid names;
                       the value is minus the excess return, less cost and borrow) or
@@ -36,7 +36,8 @@ and the key.
                       ``on_event:<class>[:<subtype>]`` (EVENT_CLASSES; EVENT_SUBTYPES)
     base              what the picks are compared with: ``event`` (the names with the event at
                       D, of the schedule's own class and subtype; default for an event
-                      schedule) | ``universe`` (every eligible name)
+                      schedule) | ``universe`` (every eligible name) | ``out_of_window`` (a
+                      time-series edge: ADR 0073)
     picks             where an event schedule's picks come from: ``event`` (the qualified names
                       within the event names; default) | ``universe`` (the qualified names of
                       every eligible name on the event sessions; a decoy). Plain schedules
@@ -101,7 +102,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
-from algotrade.config.edges import chain
+from algotrade.config.edges import chain, named
 from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
 from algotrade.config.edges.model_tenor import check_tenor
 from algotrade.config.edges.verdict import LEGS
@@ -133,7 +134,7 @@ BENCHMARKS = ("SPY", "none")
 LONG, SHORT, LONG_SHORT = "long", "short", "long_short"
 SIDES = (LONG, SHORT, LONG_SHORT)  # which names an outcome holds and in which direction
 SCHEDULES = ("every_session", "month_end")
-BASES = ("event", "universe")
+BASES = ("event", "universe", named.OUT_OF_WINDOW)
 PICKS = ("event", "universe")  # where an event schedule's picks may come from
 MAIN = "main"  # the edge itself, as the key of a results row (a variant has its own id)
 ON_EVENT = "on_event:"
@@ -243,7 +244,7 @@ class Outcome:
     iv_field: str | None = None
     side: str = LONG  # SIDES; a short leg pays ``borrow_bps_annual`` (None: the site's default)
     borrow_bps_annual: float | None = None
-    tenor_days: int | None = None  # an option_pnl's tenor rule (config/edges/chain.py)
+    tenor_days: int | None = None  # an option_pnl's tenor rule (chain.py)
     hold_rank: int | None = None  # buy/hold band: held while rank <= this (None: no band)
 
     @property
@@ -253,7 +254,6 @@ class Outcome:
 
     @property
     def basis(self) -> str | None:
-        """``"model"`` (``option_model_pnl``), ``"chain"`` (``option_pnl``), else None."""
         return {MODEL_KIND: MODEL_BASIS, chain.CHAIN_KIND: chain.CHAIN_BASIS}.get(self.kind)
 
     @property
@@ -441,9 +441,10 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     status = t.choice("status", "", STATUSES) if "status" in doc else _missing(t, "status")
     closed = status in CLOSED
     schedule = _schedule(t)
-    outcome = _outcome(t, schedule)
-    universe = _universe(t, edge_id)
     base = _base(t, schedule)
+    outcome = _outcome(t, schedule, base)
+    universe = _universe(t, edge_id)
+    named.check_time_series(base, window_name(schedule) in WINDOW_NAMES, universe, where)
     picks = _picks(t, schedule, base)
     sources = _sources(t)
     top_k = _top_k(t)
@@ -647,21 +648,20 @@ def _picks(t: Table, schedule: str, base: str, default: str = "event") -> str:
     return picks
 
 
-def _outcome(t: Table, schedule: str) -> Outcome:
+def _outcome(t: Table, schedule: str, base: str = "universe") -> Outcome:
     if t.raw("outcome") is None:
         _missing(t, "outcome")
-    return _outcome_of(t.table("outcome", OUTCOME_KEYS), schedule)
+    return _outcome_of(t.table("outcome", OUTCOME_KEYS), schedule, base)
 
 
-def _outcome_of(o: Table, schedule: str) -> Outcome:
+def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
     kind = o.choice("kind", "", OUTCOME_KINDS) if "kind" in o.names() else _missing(o, "kind")
     benchmark = (
         o.choice("benchmark", "", BENCHMARKS)
         if "benchmark" in o.names()
         else _missing(o, "benchmark")
     )
-    if kind == "excess_return" and benchmark == "none":
-        raise ConfigurationError(f"{o.where} benchmark: an excess return needs SPY, not 'none'")
+    named.check_raw_returns(o.where, kind, benchmark, base == named.OUT_OF_WINDOW)
     if kind in (MODEL_KIND, chain.CHAIN_KIND) and benchmark != "none":
         raise ConfigurationError(
             f"{o.where} benchmark: an {kind} is a P&L on the underlying, "
@@ -778,7 +778,7 @@ def identity_dict(value: Any) -> Any:
     and an unset ``hold_rank``: a document that never named a side or a band hashes as it did
     before them, so no stored leg or run is recomputed by their arrival (ADR 0053 amendments)."""
     if isinstance(value, dict):
-        long = value.get("side") == LONG and value.get("borrow_bps_annual") is None
+        long = (value.get("side"), value.get("borrow_bps_annual")) == (LONG, None)
         bare = ("side", "borrow_bps_annual") if long else ()
         return {
             k: identity_dict(v)
@@ -792,11 +792,10 @@ def identity_dict(value: Any) -> Any:
 
 def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:
     """``(structure, strike_delta, otm_pct, iv_field)``: a structure only for the option kinds."""
-    names = o.names()
     delta, pct = o.number("strike_delta", None), o.number("otm_pct", None)
     iv_field = _prose(o, "iv_field") or None
     structures = chain.structures_of(kind, STRUCTURES, MODEL_STRUCTURES)
-    structure = o.choice("structure", "", structures) if "structure" in names else None
+    structure = o.choice("structure", "", structures) if "structure" in o.names() else None
     if kind == chain.CHAIN_KIND:
         return chain.check_chain(o, structure, delta, pct, iv_field)
     if kind not in ("expires_otm", MODEL_KIND, chain.CHAIN_KIND):
@@ -876,6 +875,7 @@ def _variants(
         )  # a variant of another kind drops the base's kind-specific keys
         merged = Table({**kept, **{k: over.raw(k) for k in over.names()}}, f"{v.where} outcome")
         v_base = _base(v, schedule) if "base" in v.names() else None
+        named.check_variants(v.where, v_base, edge_base)
         _picks(v, schedule, v_base or edge_base, edge_picks)  # the effective pair is checked
         found.append(
             EdgeVariant(
