@@ -87,6 +87,8 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (filings_fetched)
     "src/algotrade/storage/tables/schemas/events.py",  # declares the table
+    "src/algotrade/data/feature_inputs.py",  # the feature input read of events/filing (stored_events, known_from <= session), as for events/earnings
+    "src/algotrade/features/rollups/events/filing_activity.py",  # reads events/filing as a feature input (known_from <= session); computes only, never writes
     "src/algotrade/features/rollups/corporate/earnings.py",  # the one reader that must tell the 8-K rows apart (v1 reads the calendar rows only; rollups import no storage, so the source name is spelled there)
     "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py",  # the carry-forward never copies the 8-K rows
     "src/algotrade/services/read/events/filings.py",  # the filings read of InstrumentEvents (known_from <= session), a display read
@@ -114,6 +116,19 @@ allowed = [
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ string_prefix = "outcomes/instrument/" }, { call = "window_rows" }, { call = "read_outcomes" }]
+
+[[responsibility]]
+id = "fund-nav-symbol-mapping"
+description = "Which NAV series a closed-end fund has (edge build D5): the funds are the reference's CEF rows (and stocks named Closed End Fund), nav_symbol writes Nasdaq MFQS's X<ticker>X, and map_funds keeps a fund only when Tiingo's NMFQS listing (parse_nav_tickers) holds that symbol, under the FUND's own instrument_id (a NAV symbol is never an instrument and no id is built from it, ADR 0018); the rest are listed as unmapped"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/market/fund_nav.py",
+    "libs/sources/algotrade_sources/vendors/tiingo/nav.py",
+]
+allowed = [
+    "libs/sources/algotrade_sources/framework/registry.py",  # registers the adapters
+]
+section = "docs/data/vendors.md#closed-end-fund-navs-nasdaq-mfqs-xtickerx-on-tiingo-edge-build-d5"
+detect = [{ call = "map_funds" }, { call = "nav_symbol" }, { call = "parse_nav_tickers" }]
 
 [[responsibility]]
 id = "ibkr-enrichment"

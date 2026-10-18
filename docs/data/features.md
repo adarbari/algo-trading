@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-546 stored features in 61 groups, in dependency order; 144 expression features.
+568 stored features in 68 groups, in dependency order; 148 expression features.
 
 ## `option_liquidity@v1`
 
@@ -264,6 +264,23 @@ The largest one-day close-to-close move over the last 20 sessions. Stored as `ro
 |---|---|---|---|---|---|---|---|---|
 | `one_day_move` | window | float32 | decimal | open | >= 0 | Largest absolute one-day close-to-close return over the last 20 sessions (split-adjusted as of the session): 0.12 is a 12% move up or down | a session among the last 21 has no close (a gap), or the history is shorter | `bars/1d.close` |
 
+## `max_return@v1`
+
+The best one-day close-to-close return of the last 21 sessions (MAX). Stored as `rollups/instrument/max_return@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `max_ret_21d` | window | float32 | decimal | open | >= -1 | The best one-day close-to-close return of the last 21 sessions (split-adjusted as of the session): 0.12 is a day that gained 12%; negative when every day lost | a session among the last 22 has no close (a gap), or the history is shorter | `bars/1d.close` |
+
+## `earnings_neutral_reversal@v1`
+
+The last 20 sessions' return without the days an earnings report moved the price. Stored as `rollups/instrument/earnings_neutral_reversal@v1`; reads `events/earnings`, `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `ret_ex_earnings_20d` | window | float32 | decimal | open | >= -1 | Return over the last 20 sessions leaving out the daily returns of every earnings reaction window (the close before a report to the close after it): the month's move that earnings did not make | a session among the last 21 has no close (a gap), the history is shorter, or no earnings report is known for the instrument by the session | `bars/1d.close`, `events/earnings.ts` |
+| `earnings_days_excluded` | window | int | count | open | 0 .. 20 | How many of the last 20 daily returns an earnings reaction window left out (0: no report in the window) | a session among the last 21 has no close (a gap), the history is shorter, or no earnings report is known for the instrument by the session | `events/earnings.ts` |
+
 ## `momentum@v1`
 
 Wilder ATR and RSI (14), 5-session return, relative volume and the 20 / 50-session high-low channel. Stored as `rollups/instrument/momentum@v1`; reads `bars/1d`.
@@ -497,6 +514,33 @@ The next known ex-dividend date, its amount (split-adjusted to the session) and 
 | `next_div_amount` | window | float32 | usd_per_share | open | >= 0 | The next dividend's cash amount per share, in the session's share terms (divided by the splits since the partition that stored it) | no ex-dividend date after the session in the dividend rows stored by it (dividend_status NOT_ANNOUNCED) | `events/dividend_declared.cash_amount`, `events/split.ratio` |
 | `days_to_ex_date` | window | int | days | open | >= 1 | Calendar days from the session to the next ex-dividend date | no ex-dividend date after the session in the dividend rows stored by it (dividend_status NOT_ANNOUNCED) | `events/dividend_declared.ts` |
 | `next_pay_date` | window | date | date | open |  | The next dividend's payment date | no ex-dividend date after the session in the dividend rows stored by it (dividend_status NOT_ANNOUNCED), or the source gives no payment date for it | `events/dividend_declared.pay_date` |
+
+## `dividend_months@v1`
+
+Whether the coming calendar month is one the name pays an ex-dividend date in, from its last 3 years. Stored as `rollups/instrument/dividend_months@v1`; reads `rollups/instrument/price_stats@v2`, `events/dividend` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `div_month_hits_3y` | window | int | count | open | 0 .. 3 | How many of the last 3 years had an ex-dividend date in the calendar month after the session's month (0 to 3; specials excluded) | no ex-dividend date in the coming month of the last 3 years and fewer than 240 bars among the last 252 sessions (too new, or bars do not cover the history, to call it not expected) | `events/dividend.ts` |
+| `expected_div_month_flag` | window | bool | flag | open |  | The calendar month after the session's month is one the name has paid an ex-dividend date in during the last 3 years: a dividend is expected in it | no ex-dividend date in the coming month of the last 3 years and fewer than 240 bars among the last 252 sessions (too new, or bars do not cover the history, to call it not expected) | `events/dividend.ts` |
+
+## `filing_activity@v1`
+
+8-K filings through the previous session and earnings reports in the last 5 sessions, as known on the session. Stored as `rollups/instrument/filing_activity@v1`; reads `rollups/instrument/price_stats@v2`, `events/filing` (optional), `filings/walk` (optional), `events/earnings` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `filing_count_5d` | window | int | count | open | >= 0 | 8-K and 8-K/A filings of the company accepted in the 5 sessions ending at the previous session (accepted before its close), as known on the session (0: it filed nothing) | no clean filings walk reached the previous session, no filing is stored, the filings backfill starts after the span, or the instrument has no filing stored by then (nothing for it) | `events/filing.accession` |
+| `earnings_in_5d` | window | bool | flag | open |  | An earnings report's reaction window (the session before it to the session after it) touches the last 5 sessions: the company reported in them, or the day before the first of them | no earnings report is known for the instrument by the session | `events/earnings.ts` |
+
+## `ibkr_iv_history@v1`
+
+Changes of IBKR's IV30 over 5 and 21 sessions (personal-use licence). Stored as `rollups/instrument/ibkr_iv_history@v1`; reads `rollups/instrument/ibkr_iv@v1`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `ibkr_iv_chg_5d` | window | float32 | decimal | personal | -5 .. 5 | IBKR's 30-day implied vol now minus 5 sessions ago (decimal vol, 0.03 is three vol points); IBKR's IV30 blends calls and puts | IBKR had no IV on the session or on the session 5 sessions earlier (a gap is not filled) | `ibkr_iv.iv30_ibkr@v1` |
+| `ibkr_iv_chg_21d` | window | float32 | decimal | personal | -5 .. 5 | IBKR's 30-day implied vol now minus 21 sessions ago (decimal vol, 0.03 is three vol points); IBKR's IV30 blends calls and puts | IBKR had no IV on the session or on the session 21 sessions earlier (a gap is not filled) | `ibkr_iv.iv30_ibkr@v1` |
 
 ## `fundamentals@v4`
 
@@ -794,6 +838,19 @@ The 25-delta skew at 30 days: (put vol - call vol) / ATM vol from our own delta 
 | `ne_skew` | chain | float32 | ratio | open | -1 .. 2 | The same skew at the next expiry (the first listed with dte >= 1, weeklies included), no interpolation; very short expiries have noisy vols, read ne_dte | no chain or spot, no expiry with dte >= 1, or the next expiry has no ATM vol or no bracketing 25-delta put and call among its smile quotes | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
 | `ne_dte` | chain | int | days | open | >= 1 | Calendar days from the session to the next expiry (the first listed with dte >= 1) | no option chain, or no listed expiry with dte >= 1 | `chains/option_quotes.expiry` |
 
+## `cp_iv@v1`
+
+The call-put IV spread, the OTM-put smirk and the ATM call and put IV at the expiry nearest 30 days, from our own IV per contract. Stored as `rollups/instrument/cp_iv@v1`; reads `chains/option_quotes`, `rates/treasury`, `chains/underlying_quotes` (optional), `rollups/instrument/div_yield@v1` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `cp_iv_status` | label | str | category | open | OK, NO_SPOT, NO_CHAIN, NO_EXPIRY, NO_PAIRS | OK, or the first failing step: NO_SPOT, NO_CHAIN, NO_EXPIRY (none 10..60 days out), NO_PAIRS (an expiry but no call-put pair of the same strike with a quote and open interest on both sides) | never | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `cp_iv_spread` | chain | float32 | decimal | open | -2 .. 2 | Call-put IV spread at the expiry nearest 30 days (10..60): the open-interest-weighted mean of call IV minus put IV over same-strike pairs within 10% of the spot; positive: calls richer than puts (0.02 is two vol points), the Cremers-Weinbaum signal. Chain-derived, so chains are stored nightly from 2026-10-02 only, so there is no history before that date | cp_iv_status is not OK (the status says why) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `atm_call_iv` | chain | float32 | decimal | open | 0 .. 5 | The call IV at the strike nearest the spot (within 5%) at the expiry nearest 30 days (10..60); chain-derived, so chains are stored nightly from 2026-10-02 only, so there is no history before that date | no chain or spot, or no expiry 10..60 days out (cp_iv_status says which), or no call within 5% of the spot with a smile quote | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `atm_put_iv` | chain | float32 | decimal | open | 0 .. 5 | The put IV at the strike nearest the spot (within 5%) at the expiry nearest 30 days (10..60); chain-derived, so chains are stored nightly from 2026-10-02 only, so there is no history before that date | no chain or spot, or no expiry 10..60 days out (cp_iv_status says which), or no put within 5% of the spot with a smile quote | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `iv_smirk` | chain | float32 | decimal | open | -2 .. 5 | The individual-option smirk: the IV of the OTM put with strike 0.80..0.95 of the spot nearest 0.95, minus the ATM call IV (atm_call_iv), at the expiry nearest 30 days (10..60); positive: the put wing is richer than the ATM call, the Xing-Zhang-Zhao SKEW (a steep smirk predicts lower returns). Chain-derived, so chains are stored nightly from 2026-10-02 only, so there is no history before that date | no chain or spot, or no expiry 10..60 days out (cp_iv_status says which), or no OTM put in the band, or atm_call_iv is null | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `cp_iv_dte` | chain | int | days | open | >= 1 | Calendar days from the session to the expiry the cp_iv columns read | no chain or spot, or no expiry 10..60 days out (cp_iv_status says which) | `chains/option_quotes.expiry` |
+
 ## `iv_term@v1`
 
 The at-the-money vol at the next expiry and at a constant 90 days (iv30's method), the two points the term ratios compare with iv30. Stored as `rollups/instrument/iv_term@v1`; reads `chains/option_quotes`, `rates/treasury`, `chains/underlying_quotes` (optional), `rollups/instrument/div_yield@v1` (optional).
@@ -840,6 +897,20 @@ Skew rank and percentile over 252 sessions (provisional after 60). Stored as `ro
 | `skew_percentile_252d` | window | float32 | decimal | open | 0 .. 1 | Skew percentile: the share of the window's earlier skews strictly below today's | skew_rank_status is UNKNOWN (fewer than 60 sessions with a skew; chains are stored nightly from 2026-10-02 only, so every name reads null until about the end of 2026), or there is no skew today (skew_status says why); or no earlier skew | `skew.skew@v1` |
 | `history_days` | window | int | sessions | open | 0 .. 252 | Sessions of the 252-session window with a skew, today included (gaps are not filled) | never | `skew.skew@v1` |
 | `skew_rank_status` | label | str | category | open | UNKNOWN, PROVISIONAL, FULL | UNKNOWN below 60 sessions with a skew (no rank), PROVISIONAL below 252, FULL from 252 | never | `skew.skew@v1` |
+
+## `cp_iv_history@v1`
+
+Changes of the call-put IV spread, the ATM call and put IV (5 and 21 sessions) and IV30 (5 sessions). Stored as `rollups/instrument/cp_iv_history@v1`; reads `rollups/instrument/cp_iv@v1`, `rollups/instrument/iv30@v1`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `cp_iv_spread_chg_5d` | window | float32 | decimal | open | -4 .. 4 | the call-put IV spread now minus 5 sessions ago (decimal vol, 0.03 is three vol points); chain-derived, so chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | no the call-put IV spread on the session or on the session 5 sessions earlier (a gap is not filled); chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | `cp_iv.cp_iv_spread@v1` |
+| `cp_iv_spread_chg_21d` | window | float32 | decimal | open | -4 .. 4 | the call-put IV spread now minus 21 sessions ago (decimal vol, 0.03 is three vol points); chain-derived, so chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | no the call-put IV spread on the session or on the session 21 sessions earlier (a gap is not filled); chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | `cp_iv.cp_iv_spread@v1` |
+| `atm_call_iv_chg_5d` | window | float32 | decimal | open | -5 .. 5 | the ATM call IV now minus 5 sessions ago (decimal vol, 0.03 is three vol points); chain-derived, so chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | no the ATM call IV on the session or on the session 5 sessions earlier (a gap is not filled); chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | `cp_iv.atm_call_iv@v1` |
+| `atm_call_iv_chg_21d` | window | float32 | decimal | open | -5 .. 5 | the ATM call IV now minus 21 sessions ago (decimal vol, 0.03 is three vol points); chain-derived, so chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | no the ATM call IV on the session or on the session 21 sessions earlier (a gap is not filled); chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | `cp_iv.atm_call_iv@v1` |
+| `atm_put_iv_chg_5d` | window | float32 | decimal | open | -5 .. 5 | the ATM put IV now minus 5 sessions ago (decimal vol, 0.03 is three vol points); chain-derived, so chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | no the ATM put IV on the session or on the session 5 sessions earlier (a gap is not filled); chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | `cp_iv.atm_put_iv@v1` |
+| `atm_put_iv_chg_21d` | window | float32 | decimal | open | -5 .. 5 | the ATM put IV now minus 21 sessions ago (decimal vol, 0.03 is three vol points); chain-derived, so chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | no the ATM put IV on the session or on the session 21 sessions earlier (a gap is not filled); chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | `cp_iv.atm_put_iv@v1` |
+| `iv30_chg_5d` | window | float32 | decimal | open | -5 .. 5 | our 30-day ATM IV now minus 5 sessions ago (decimal vol, 0.03 is three vol points); chain-derived, so chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | no our 30-day ATM IV on the session or on the session 5 sessions earlier (a gap is not filled); chains are stored nightly from 2026-10-02 only, so a 5-session change exists from 2026-10-09 and a 21-session one from 2026-11-02 | `iv30.iv30@v1` |
 
 ## Market features
 
@@ -1089,6 +1160,7 @@ Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on rea
 | `skew_rr25` | expression | float | decimal | open | -5 .. 5 | The raw 25-delta risk reversal at 30 days: put vol minus call vol (iv_25p - iv_25c), 0.06 is six vol points; positive: puts richer than calls. skew divides it by the ATM vol, which makes names of different vol level comparable; this keeps the vol points a collar or a put spread is priced in | skew_status is neither OK nor SINGLE_EXPIRY (no spot, no chain, no expiry, no ATM vol or 25-delta wing) | `skew.iv_25p - skew.iv_25c` | virtual |
 | `term_ratio_30_90` | expression | float | ratio | open | >= 0 | The front of the vol term structure over the back: our 30-day ATM vol over the 90-day one (iv30 / iv_90d). Above 1 is backwardation (the front richer than the back: an event or stress is priced near), below 1 contango (the normal shape: more uncertainty the further out) | iv30 or iv_90d is null (no spot, no chain, or no usable ATM vol at 30 or 90 days; a single usable expiry is not a 90-day vol) | `iv30.iv30 / iv_term.iv_90d` | virtual |
 | `term_ratio_next_30` | expression | float | ratio | open | >= 0 | The front-expiry premium: the ATM vol at the next expiry over the 30-day vol (iv_next / iv30). Above 1.2 an event (earnings, a ruling) is priced into the nearest expiry; read skew.ne_dte for how short that expiry is, since a few days out is noisy | iv_next or iv30 is null (no spot, no chain, or no usable ATM vol at the next expiry or at 30 days) | `iv_term.iv_next / iv30.iv30` | virtual |
+| `option_stock_volume_ratio` | expression | float | ratio | open | >= 0 | Johnson-So option-to-stock volume ratio: shares the session's option volume controls (call + put contracts x 100, every expiry; chain_flow) over the stock's share volume that session (volume), 0.05 is option volume worth 5% of the shares traded; high O/S has predicted lower returns, mostly as a filter. Chain flow is stored from 2026-10-02 only, so there is no history before that date | no option chain for the session (chain_flow NO_CHAIN), or no option volume on it (a chain whose quotes carry no volume reads null, not 0), or no stock volume for the session (zero volume is null, never infinity) | `if(chain_flow.flow_status == "OK" and chain_flow.call_volume + chain_flow.put_volume > 0, 100 * (chain_flow.call_volume + chain_flow.put_volume) / volume.session_volume, null)` | virtual |
 
 ### `price.toml`
 
@@ -1200,6 +1272,9 @@ Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on rea
 | `volume_bias` | label | str | category | open | ACCUMULATION, DISTRIBUTION, NEUTRAL | ACCUMULATION when 60% (params.accumulation_at) or more of the last 20 sessions' volume traded on up days, DISTRIBUTION at 40% (params.distribution_at) or less, else NEUTRAL | up_volume_share_20d is null (a gap among the last 21 sessions, a shorter history, or no volume at all over the 20) | `if(is_null(volume.up_volume_share_20d), null, if(volume.up_volume_share_20d >= accumulation_at, "ACCUMULATION", if(volume.up_volume_share_20d <= distribution_at, "DISTRIBUTION", "NEUTRAL")))` (accumulation_at = 0.6, distribution_at = 0.4) | virtual |
 | `volume_trend_20_60` | expression | float | ratio | open | >= 0 | The 20-session average volume / the 60-session average: above 1 activity is building over the quarter, below 1 fading; 1.3 is a clear pick-up | adv_shares_20d or adv_shares_60d is null (a gap among the last 60 sessions, or a shorter history), or the 60-session average is 0 | `volume.adv_shares_20d / vol_stats.adv_shares_60d` | virtual |
 | `turnover_20d` | expression | float | decimal | open | >= 0 | Daily turnover: the 20-session average share volume / shares outstanding, 0.01 means 1% of the company changes hands a day (about a 100-session holding period) | adv_shares_20d is null (a gap among the last 20 sessions), or shares_outstanding is null (no share count filed, or STALE: fundamentals market_cap_status) | `volume.adv_shares_20d / fundamentals.shares_outstanding` | virtual |
+| `volume_shock` | expression | bool | flag | open |  | The session's volume is 2 (params.min_z) or more standard deviations above the 20 sessions before it: the unusually high volume of the volume-shock premium (Gervais, Kaniel and Mingelgrin 2001); a lower bar than volume_climax, which is event-sized | volume_z_20d is null (a gap among the last 21 sessions, a shorter history, or the 20 sessions before all had the same volume) | `volume.volume_z_20d >= min_z` (min_z = 2.0) | virtual |
+| `news_free_5d` | expression | bool | flag | open |  | No 8-K or 8-K/A was filed through the previous session (5 sessions) and no earnings reaction window touched the last 5 sessions, as known on the session: nothing identifiable explains a move in them | filing_count_5d is null (no clean filings walk has reached the previous session, no filing stored for the instrument, or the backfill starts after the span) or earnings_in_5d is null (no earnings report known for it), and the other term does not already make it false | `filing_activity.filing_count_5d == 0 and not filing_activity.earnings_in_5d` | virtual |
+| `volume_shock_no_news` | expression | bool | flag | open |  | A volume shock (volume_shock) with nothing to explain it (news_free_5d): the setup the volume-shock return premium trades | volume_shock or news_free_5d is null and the other term is not false | `volume_shock and news_free_5d` | virtual |
 
 ### `vrp.toml`
 

@@ -825,3 +825,22 @@ Sources: Cboe put/call ratio, a contrarian sentiment gauge: https://www.cboe.com
 - Null on NO_CHAIN or when there is no open interest.
 
 Sources: Site convention
+
+### `feature.option_stock_volume_ratio`
+
+**How to read it.** The option-to-stock volume ratio (Johnson and So): the shares the session's option volume controls (call plus put contracts times 100, every expiry) over the stock's share volume that session. 0.05 is option volume worth 5% of the shares traded; far above a name's usual level is informed option trading. High readings have preceded lower returns over a week to a month, so it is a filter to avoid, not a long signal. Chains are stored from 2026-10-02 only, so this has no history before that date.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| unusually heavy option trading against the stock | `gte 0.1` | soft | 0.02 | to exclude; read against the name's own usual level |
+
+**When the reading lies**
+
+- Only the ratio's rank across names or against the name's own usual level means anything; rollup.flow_history@v1.option_volume_rel_20d is the name against its own volume once it has 10 sessions.
+- It counts hedging and market-making trades as well as informed ones. It cannot tell opening from closing trades, and the published strongest part, opening call buys, is not in our data. Read feature.put_call_volume_ratio for the side.
+- Index-like and meme names run a high ratio all year; a name above its own history is the signal, not a high level.
+- Null with no option chain or no chain volume for the session, or with no stock volume (zero is null, never infinity).
+
+Sources: Johnson and So, The Option to Stock Volume Ratio and Future Returns, JFE 2012: https://academicnewsletter.sufe.edu.cn/info/356813

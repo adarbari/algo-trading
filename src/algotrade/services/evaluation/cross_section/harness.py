@@ -41,8 +41,12 @@ from typing import Any
 from algotrade.config.edges.document import (
     LEGACY_SITE_CUTOFF,
     LEGACY_SITE_OWNERS,
+    LONG,
+    LONG_SHORT,
     MAIN,
     Edge,
+    Outcome,
+    identity_dict,
     job_name,
 )
 from algotrade.config.site.settings import load_verdict
@@ -181,6 +185,7 @@ class VariantResult:
     iv_source: str | None = None  # the run's iv_field when the outcome reads an implied vol
     licences: TrialLicences | None = None  # the trial's and its ledger columns' (ADR 0064)
     legs: tuple[LegDetail, ...] = ()  # the main edge variant's measured legs, for the ledger
+    side: str = LONG  # the outcome's side (``edge_eval.side``; ADR 0053 amendment)
 
     @property
     def licence(self) -> str | None:
@@ -234,6 +239,7 @@ class RandomPicks:
     variant: str  # the screener the draws are matched to
     config_hash: str  # that screener's trial hash
     draws: tuple[SliceMeasure, ...]
+    side: str = LONG
 
 
 @dataclass(frozen=True)
@@ -282,7 +288,7 @@ def run_hash(
     the outcomes' ``as_of``, the run's implied-vol field, its effective split, the random draws
     per session and their seed scheme (``SEED_VERSION``), and the harness version."""
     payload = {
-        "edge": {k: asdict(edge)[k] for k in RUN_INPUTS},
+        "edge": identity_dict({k: asdict(edge)[k] for k in RUN_INPUTS}),
         "iv_field": iv_field,
         "variants": [(v.id, v.config.hash) for v in variants],
         "range": [start, end],
@@ -410,6 +416,7 @@ def evaluate_edge(
         user.user_id,
         edge.id,
         verdict.cost_levels_bps,  # every leg counts hits at the site's cost grid
+        verdict.capacity_adv_floor_usd,  # a short leg's liquidity floor (key of such legs only)
     )
     stored = read_legs(reader, user.user_id, edge.id, start, end)
     needs = _needs(plans, variants, schedules, spec)
@@ -468,6 +475,7 @@ def evaluate_edge(
                         variant.id,
                         _trial_hash(scope, variant),
                         random_measures(pooled),
+                        scope.edge.outcome.side,
                     )
                 )
             found = stats.legs.get((plan.key, variant.id), {})
@@ -482,8 +490,8 @@ def evaluate_edge(
                 variant.config.config.impl == MODEL_IMPL,
                 edge.frozen_from,
                 CostGrid(scope.edge.outcome.cost_bps, spec.costs, scope.edge.outcome.sign)
-                if is_return(scope.edge)
-                else None,
+                if is_return(scope.edge) and scope.edge.outcome.side != LONG_SHORT
+                else None,  # a spread has no hit rate to cost
                 verdict.capacity_adv_floor_usd,  # statistics stage, not in the leg key
                 counts_wins(unit_of(scope.edge)),
                 horizon,
@@ -497,6 +505,7 @@ def evaluate_edge(
                     block_stats,
                     measures,
                     edge_variant=scope.key,
+                    side=scope.edge.outcome.side,
                     iv_source=scope.iv_field if needs_iv else None,
                     licences=trial_licences(
                         features, scope.edge, scope.universe, variant.config, licences[scope.key]
@@ -619,11 +628,18 @@ def iv_field_of(edge: Edge, run_field: str = IMPLIED_VOL_FIELD) -> str:
 def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) -> list[_Scope]:
     """The edge itself (``main``), then each of its ``[[variants]]`` with its overrides. Each
     reads one implied-vol field: its outcome's ``iv_field``, else the run's."""
+    borrow = load_verdict(configs).borrow_bps_annual
+    edge = replace(edge, outcome=_borrowing(edge.outcome, borrow))
     scopes = [_Scope(MAIN, edge, edge_universe(configs, user, edge), iv_field_of(edge, iv_field))]
     for v in edge.variants:
         base, picks = v.base or edge.base, v.picks or edge.picks
         applied = replace(
-            edge, outcome=v.outcome, universe=v.universe, base=base, picks=picks, variants=()
+            edge,
+            outcome=_borrowing(v.outcome, borrow),
+            universe=v.universe,
+            base=base,
+            picks=picks,
+            variants=(),
         )
         field_name = v.outcome.iv_field or iv_field
         marks = (f"base={base}", f"picks={picks}") if v.base or v.picks else ()
@@ -631,6 +647,15 @@ def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) 
             _Scope(v.id, applied, edge_universe(configs, user, applied), field_name, marks)
         )
     return scopes
+
+
+def _borrowing(outcome: Outcome, site_default: float) -> Outcome:
+    """``outcome`` with the borrow rate its short leg pays made explicit (its own, else the site's
+    ``verdict.toml`` default), so the trial hash and the values see one number; a long outcome has
+    no short leg and is returned as it is."""
+    if outcome.side == LONG or outcome.borrow_bps_annual is not None:
+        return outcome
+    return replace(outcome, borrow_bps_annual=site_default)
 
 
 def _events(

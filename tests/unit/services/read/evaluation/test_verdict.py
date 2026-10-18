@@ -9,6 +9,7 @@ from algotrade.services.read.evaluation.runs import EdgeRow, _lost
 from algotrade.services.read.evaluation.verdict import (
     ALL,
     BOTH,
+    DIAGNOSTIC,
     IN_SAMPLE,
     NOT_ENOUGH,
     NOT_WORKING,
@@ -593,3 +594,21 @@ def test_a_lone_trial_has_no_overfitting_test_and_can_still_reach_promising() ->
     assert two.verdict != PROMISING
     # the hard fail still fires when PBO exists
     assert verdict(result(whole={"pbo": 0.51})).verdict == NOT_WORKING
+
+
+def test_a_long_short_result_is_a_diagnostic_and_never_the_basis() -> None:
+    """Owner decision 2026-10-17: a spread is not a verdict basis, however good it looks."""
+    spread = [replace(r, side="long_short") for r in result()]
+    v = verdict(spread)
+    assert v.verdict == DIAGNOSTIC and v.side == "long_short" and v.basis is None
+    assert "diagnostic" in v.rationale and "no verdict rests on it" in v.rationale
+
+
+def test_a_short_result_is_judged_like_any_and_says_it_is_the_short_leg() -> None:
+    short = [replace(r, side="short") for r in result()]
+    v = verdict(short)
+    assert v.verdict == PROMISING and v.side == "short"
+    assert "(short leg)" in v.headline
+    plain = verdict(result())
+    assert plain.side == "long" and "(short leg)" not in plain.headline
+    assert (v.verdict, v.lift_pts, v.decile_t) == (plain.verdict, plain.lift_pts, plain.decile_t)

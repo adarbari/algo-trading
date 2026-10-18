@@ -592,3 +592,101 @@ announced ahead) count and a date, the two entries, and the Guide terms.
    count: `dividend_schedule@v1` counts calendar days), `macro_release` (a market-entity field
    the harness does not read), `lockup_expiry` (the IPO table of D8 is not merged), `insider_buy`
    (Form 4, H12), `spin_off` (needs data).
+
+## Amendment 2026-10-17: outcome sides (owner decision 2026-10-17, `docs/decisions/log.md`)
+
+An outcome has a **side**, `[outcome] side = "long" | "short" | "long_short"` (default `long`; a
+`[[variants]]` row may override it, each a trial as before). Edges that never name one are
+byte-identical to before: the side keys are left out of the trial hash, the run hash and the leg
+key when the side is `long` (`identity_dict`), so no stored leg or run is recomputed.
+
+1. **`short`**: the picks are the bottom `top_k` of the scored, pickable names of the screen's
+   ranking (by score, as the deciles, never the rule rank), among names whose 20-day dollar
+   volume at D is known and at least `capacity_adv_floor_usd` (`verdict.toml`: the existing
+   liquidity threshold; an unknown volume is not liquid, and no short leg is drawn from a
+   microcap). The value of a pick is `-excess_return - cost_bps - borrow`; a hit is a value above
+   zero. The base rate is the share of every eligible name that would have hit the same way, so
+   the lift still compares the picks with doing it blindly. The decile spread (`top - bottom`,
+   long oriented) is the ranking's and does not change with the side. A short edge needs an
+   `excess_return` outcome, no `max_drawdown` (the dip of a short is the rally) and an integer
+   `top_k`. Unscored names are in neither leg, a session with too few scores has no legs (the
+   `MIN_SCORE_COVERAGE` rule, fail closed), and a delisted name is measured to its last bar.
+2. **`long_short`**: the session value is the mean of the top `top_k` plus the mean of the short
+   leg (each net of its costs, the short leg of borrow), `SessionStat.spread_value`; a session
+   with no counted name in either leg has no value, never half a spread. It has no base rate: the
+   hit rate, base rate, lift, effect size and equal-weight floor are null (the Guide term
+   `side_long_short` says why, they are never 0), and it has no cost rows. The trial statistics
+   (Sharpe, deflated Sharpe, PBO) read the spread.
+3. **Borrow** is an assumption: `[edge_costs] borrow_bps_annual` (default 100 bp a year) in
+   `config/site/verdict.toml`, or the outcome's own `borrow_bps_annual`, scaled by
+   `horizon / 252`. No borrow data exists; the Guide says so. Limitation: a hard-to-borrow name
+   costs more than the flat rate and is not excluded (nothing stored says which names are); the
+   dollar-volume floor stands in for it, and a short result is read with that in mind. The resolved rate is in the trial
+   hash and the liquidity floor in the leg key of a non-long edge only.
+4. **Random picks** follow the side with the same seeded generator: `short` draws from the liquid
+   pickable names and its value is the short's; `long_short` is two draws, the long's then the
+   short's, summed (`random_picks.long_short_stat`).
+5. **Storage**: `results/edge_legs.short_values` (null for every other side; the picks'
+   `SHORT` flag bit says which leg a pick is on; no `LEG_VERSION` bump: an absent field reads
+   back as null), `results/edge_trades.side` and `results/edge_eval.side` (null in rows from
+   before: read as `long`). The ledger lists both legs of a `long_short` run, ordered by side.
+6. **Read**: a `long_short` result is a diagnostic and never a verdict basis (owner decision
+   2026-10-17): its verdict is its own state, Diagnostic only (`diagnostic_only`, Guide term `verdict_diagnostic_only`), with `EdgeVerdict.side`; a `short`
+   result is judged like any, its headline says "(short leg)". The edge page shows the side
+   beside the basis, with a Guide entry per value (`side_long`, `side_short`, `side_long_short`).
+
+## Amendment 2026-10-17: `option_model_pnl`, a modelled option P&L (EB H8)
+
+A fourth outcome kind, harness-side like `expires_otm`: it adds no grain, no table and no
+column, and reads the stored `forward_returns@v2` window and the implied vol at D.
+
+1. **Document.** `[outcome] kind = "option_model_pnl"` names `structure` (`atm_straddle_long` |
+   `atm_straddle_short` | `delta_hedged_atm` | `delta_hedged_atm_short`, `MODEL_STRUCTURES`), the `iv_field` it reads at D
+   (required, as for `expires_otm`) and `benchmark = "none"` (a P&L on the underlying has no
+   benchmark); no strike key is allowed (at the money). `cost_bps` is optional. A variant may
+   switch to or from the kind like any other kind change. **One tenor prices every horizon**:
+   the IV field is a 30-day figure (`iv30`, 21 sessions) read once at D, so the parser refuses
+   a horizon outside half to double the field's tenor (10..42 sessions for `iv30`; the tenor is
+   read from an `iv<days>` in the field name, and a name without one is refused). A
+   pre-earnings window of a few sessions is therefore not expressible; it needs a short-tenor
+   IV field first.
+2. **Value** (`cross_section/hit.py`, `T = horizon_sessions / 252`, r = q = 0, per straddle as a
+   fraction of the entry close `P` that `fwd_return` is measured from):
+   - long straddle: `|fwd_return| - straddle_price(iv, T)`; short: its negative;
+   - delta-hedged straddle (long; `delta_hedged_atm_short` is its exact negative):
+     `straddle_vega(iv, T) * (fwd_realised_vol^2 - iv^2) / (2 iv)`,
+     the standard gamma-P&L approximation. The vega-unit P&L per unit of vega is
+     `(rv^2 - iv^2) / (2 iv)` (no `T`: the gamma P&L already carries it); multiplied by the
+     straddle's vega (`2 sqrt(T) n(iv sqrt(T) / 2)`) it is in the same unit as the unhedged
+     value. The design note's `... * T / (2 iv)` is the same quantity before that
+     multiplication and was not carried as a literal.
+   The closed forms (`atm_straddle_price`, `atm_straddle_vega`, `delta_hedged_vega_pnl`) are in
+   `quant/black_scholes.py`, tested against the call-plus-put price, a finite-difference vega
+   and a seeded delta-hedged simulation (a martingale underlying: the hedged long straddle earns
+   in expectation `price(rv) - price(iv)`, which the vega form overshoots by about 7% at
+   rv 34% against iv 30% and matches within 2% at 31%). `fwd_realised_vol` is a demeaned standard deviation of daily
+   returns (ddof = 1): the drift of a trending window is taken out of it, so the realised
+   variance, and with it the gamma P&L, is slightly understated against what a hedger who pays
+   the path's full movement would see.
+3. **Costs.** `cost_bps` is charged once, in bps of `P`, after the sign (the excess return's
+   convention; a short position pays it too). No hedging cost, spread, fill or margin is
+   modelled. The cost grid (`CostGrid`, a sensitivity over a stored gross return) does not
+   apply: `is_return` is false, so `cost_applies` is false, as for `expires_otm`. Unlike a
+   cushion, the value is a P&L: `counts_wins` is false for the `pnl` unit and for an
+   `option_model_pnl` edge's settings, so the trial statistics (Sharpe, deflated Sharpe, PBO,
+   haircut) read the picks' mean P&L per session and never the win rate. A short straddle that
+   wins 80% of its windows and loses on average cannot read as evidence.
+4. **Missing inputs.** A row with no usable IV (`no_implied_vol`, `invalid_implied_vol`), no
+   stored `fwd_return` / `fwd_realised_vol` or no horizon is excluded with its reason
+   (`missing_value`), an `UNMEASURED` window as `unmeasured`; never a zero and never a miss.
+5. **Unit, basis and licence.** The series unit is `pnl`, a return-like unit (`RETURN_UNITS`):
+   the evidence curve adds up the picks' mean P&L against the field's. The outcome is labelled `basis = "model"` (`Outcome.basis`, `MODEL_BASIS`): its text
+   on the edge and builder pages says "model, not a quote", and the Guide terms
+   `outcome_option_model_pnl`, the four structures and `model_basis` explain it. The licence
+   is inherited from the `iv_field` through the existing `needs_implied_vol` path (IBKR-derived
+   IV: `personal`). No stored column carries the basis; a second basis (a chain P&L, the
+   `outcomes/option/structure_pnl@v1` grain of the design note) will need one and its own
+   amendment.
+6. **Not here.** The chain P&L grain (H13) and a short-put P&L (needs a strike key and a put
+   price) are a follow-up PR. The short delta-hedged side is its own structure value
+   (`delta_hedged_atm_short`), not a `side` key. The stored basis column is left to H13.

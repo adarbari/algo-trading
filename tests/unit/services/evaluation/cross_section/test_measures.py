@@ -17,6 +17,7 @@ from algotrade.quant.edges.statistics import (
     sharpe,
     sharpe_t,
 )
+from algotrade.services.evaluation.cross_section.detail.windows import counts_wins
 from algotrade.services.evaluation.cross_section.measures import (
     CostGrid,
     Pick,
@@ -386,6 +387,16 @@ def test_a_session_with_no_counted_pick_has_no_excess_wins() -> None:
     assert trial_value(one, False) == pytest.approx(1.5)
 
 
+def test_a_model_pnl_that_wins_often_but_loses_on_average_is_not_scored_on_its_win_rate() -> None:
+    """An 80%-win short straddle with a negative mean P&L: the unit's trial value is the mean."""
+    session = stat(date(2026, 1, 5), (0.01, 0.01, 0.01, 0.01, -0.09), (0.0,), 4, base_hits=1)
+    assert session.pick_hits == 4 and session.pick_mean < 0
+    value = trial_value(session, counts_wins("pnl"))
+    assert value is not None and value < 0  # the win rate would have read +0.8 - base
+    wins = trial_value(session, counts_wins("cushion"))
+    assert wins is not None and wins > 0
+
+
 @dataclass(frozen=True)
 class Trial:
     """The ``Scored`` side of a harness result."""
@@ -516,3 +527,40 @@ def test_windows_spaced_at_least_a_horizon_apart_are_independent() -> None:
     (m,) = slice_measures(stats, [ALL], horizon=20)
     (naive,) = slice_measures(stats, [ALL])
     assert m.picks_t == pytest.approx(naive.picks_t) and m.decile_t == pytest.approx(naive.decile_t)
+
+
+def _spread_day(day: date, longs: tuple[float, ...], shorts: tuple[float, ...]) -> SessionStat:
+    return stat(day, longs, (0.0, 0.01), 1, base_hits=3, short_values=shorts, spread=0.1)
+
+
+def test_a_long_short_session_is_worth_its_spread_and_never_half_of_one() -> None:
+    both = _spread_day(date(2026, 1, 5), (0.02, 0.04), (0.01, 0.03))
+    assert both.spread_value == pytest.approx(0.03 + 0.02) and both.pick_mean == both.spread_value
+    assert trial_value(both, wins=True) == pytest.approx(0.05)  # not the excess wins
+    assert _spread_day(date(2026, 1, 6), (0.02,), ()).spread_value is None  # no short leg counted
+    assert _spread_day(date(2026, 1, 6), (), (0.02,)).spread_value is None
+    plain = stat(date(2026, 1, 7), (0.02, 0.04), (0.0,), 1)
+    assert plain.short_values is None and plain.pick_mean == pytest.approx(0.03)
+
+
+def test_a_long_short_measure_has_no_hit_rate_base_rate_or_lift_never_zero() -> None:
+    days = [
+        _spread_day(date(2026, 1, 5 + i), (0.02, 0.04), (0.01 + i / 100, 0.03 + i / 100))
+        for i in range(3)
+    ]
+    (m,) = slice_measures(days, [ALL])
+    assert (m.hit_rate, m.base_rate, m.lift, m.effect_size, m.bh_mean) == (None,) * 5
+    assert m.mean_excess_picks == pytest.approx(0.06)  # 0.03 + (0.02, 0.03, 0.04)
+    assert m.sharpe == pytest.approx(sharpe([0.05, 0.06, 0.07]))  # of the spreads
+    assert (m.sessions, m.picks, m.decile_spread) == (3, 6, pytest.approx(0.1))
+    mixed = [*days, stat(date(2026, 1, 9), (0.02,), (0.0,), 1, short_values=(), spread=0.1)]
+    (n,) = slice_measures(mixed, [ALL])
+    assert n.mean_excess_picks == pytest.approx(0.06)  # a session with no short leg is no spread
+
+
+def test_a_pooled_event_block_keeps_its_days_short_legs_only_when_some_day_has_one() -> None:
+    one = _spread_day(date(2026, 1, 5), (0.02,), (0.01,))
+    two = _spread_day(date(2026, 1, 6), (0.04,), (0.03,))
+    assert pool_stats([one, two]).short_values == (0.01, 0.03)
+    plain = stat(date(2026, 1, 5), (0.02,), (0.0,), 1)
+    assert pool_stats([plain, plain]).short_values is None

@@ -11,6 +11,7 @@ from algotrade.quant.edges.statistics import window_weights
 from algotrade.services.read.context import ResultCache
 from algotrade.services.read.evaluation.edges import load_edge, load_edges
 from algotrade.services.read.evaluation.runs import (
+    _row,
     load_canonical_run,
     load_edge_runs,
     load_run_draws,
@@ -361,3 +362,10 @@ def test_the_site_trial_count_recounts_when_a_site_edge_document_changes(
     assert load_site_trials(added) == 12
     closed = _site_docs(status="blocked", rejection_reason="No data.")
     assert load_site_trials(stores(backend, docs=closed, cache=cache)) == 12  # still counted
+
+
+def test_a_row_serves_its_side_and_one_from_before_sides_is_long() -> None:
+    base = row("momo", "all", 0.6, None)
+    assert _row(base).side == "long"  # no column: a run from before sides
+    assert _row({**base, "side": float("nan")}).side == "long"  # a null in a frame is NaN
+    assert _row({**base, "side": "short"}).side == "short"

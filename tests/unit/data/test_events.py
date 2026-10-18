@@ -1,7 +1,7 @@
 """Events are read by EVENT date, from any partition, among the rows known as of a session
 (``known_from``, else the stored session: ADR 0050) (``algotrade.data.events``)."""
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
@@ -10,10 +10,12 @@ from algotrade.data import StoreReader
 from algotrade.data.events import (
     acceptance_sessions,
     events_by_acceptance,
+    filing_walks,
     latest_versions,
     read_events,
 )
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.runs import RunStatus, start_run
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import T0, stamped
 
@@ -290,3 +292,24 @@ def test_latest_versions_reads_the_version_known_by_the_session() -> None:
     assert list(new["rules_version"]) == ["v2"] and list(new["known_from"]) == [restated]
     assert list(latest_versions(reader, "events/ipo_lockup", key)["lockup_days"]) == [90]
     assert latest_versions(reader, "events/filing", ["accession"]).empty  # nothing stored
+
+
+def test_filing_walks_are_the_clean_published_walks_of_the_filings_task() -> None:
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+
+    def save(job: str, day: date, status: RunStatus, walked: str | None) -> None:
+        record = start_run(job, day, datetime(day.year, day.month, day.day, 22, tzinfo=UTC))
+        record.status = status
+        record.stats = {"walked_to": walked}
+        writer.save_run(record)
+
+    save("filings", date(2026, 10, 7), RunStatus.COMPLETE, "2026-10-06")
+    save("filings", date(2026, 10, 8), RunStatus.COMPLETE, None)  # a failed walk: none recorded
+    save("filings", date(2026, 10, 9), RunStatus.FAILED, "2026-10-08")  # published nothing
+    save("market-daily", date(2026, 10, 9), RunStatus.COMPLETE, "2026-10-08")  # another job
+    save("filings", date(2026, 10, 12), RunStatus.COMPLETE, "2026-10-09")
+    frame = filing_walks(StoreReader(backend))
+    assert frame["session_date"].tolist() == [date(2026, 10, 7), date(2026, 10, 12)]
+    assert frame["walked_to"].tolist() == [date(2026, 10, 6), date(2026, 10, 9)]
+    assert filing_walks(StoreReader(MemoryBackend())).empty

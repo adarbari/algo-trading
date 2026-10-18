@@ -592,6 +592,154 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 
 Sources: Site convention (docs/data/features.md, earnings_revisions@v1)
 
+### `rollup.filing_activity@v1.filing_count_5d`
+
+**How to read it.** How many 8-K and 8-K/A filings the company had accepted over the 5 sessions ending at the previous session, counted from the first session that closed after each acceptance. The span ends the day before the session, never on it. An 8-K is the SEC's current report: results, deals, management changes, material agreements. 0 means it filed nothing. 1 is routine for most companies. 3 or more is a busy corporate week.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| no company filing in the week | `eq 0` | hard | - | or feature.news_free_5d eq true, which also checks the earnings windows |
+
+**When the reading lies**
+
+- The span stops at the previous session because the nightly runs before SEC lists the evening's filings. SEC lists the evening's filings in the next day's index. Counting through the session would read 0 tonight and 1 tomorrow. This count is the same on every recompute.
+- Null means the table cannot say none. Either no clean nightly walk of the SEC index has reached the previous session. Or nothing is stored for the company (never fetched, or never filed). Or the stored history starts after the span.
+- Null is also the answer on a night the filings step failed or was skipped, and on the session after a market day EDGAR was closed (Columbus Day, Veterans Day). On a Friday that only SEC observed as a holiday, an acceptance after 17:30 can be missing until the next walk. A zero would wrongly read as no news. The count appears once a later walk covers the day.
+- News with no 8-K is not counted: an analyst note, a press story, a rumour, a competitor's results. A zero is 'no company filing', not 'no news'. rollup.filing_activity@v1.earnings_in_5d adds the report windows, and feature.news_free_5d combines both.
+- An Item 2.02 results release is an 8-K, so an earnings week shows at least one filing.
+
+Sources: Form 8-K, SEC investor bulletin: https://www.sec.gov/files/form8-k.pdf
+
+### `rollup.filing_activity@v1.earnings_in_5d`
+
+**How to read it.** True when an earnings report's reaction window touches the last 5 sessions. The window runs from the session before the report to the session after it. So the company reported in those sessions, or on the session before the first of them. False is a week with no report. Null means no report is known for the company at all.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| no earnings in the week | `eq false` | hard | - | or feature.news_free_5d eq true, which also checks the 8-K filings |
+
+**When the reading lies**
+
+- Null means no report date is known for the name (an ETF, or a company the calendar never listed). It does not mean no report. A hard 'eq false' drops it.
+- Only reports known on the session count. A report date the calendar published later is not in a past session's reading.
+- The window follows the earnings calendar (see rollup.earnings@v1.last_earnings_date). A report the calendar missed still shows in rollup.filing_activity@v1.filing_count_5d as an 8-K.
+
+Sources: Bernard and Thomas (1989), Post-earnings-announcement drift: the E-1 to E+1 window
+
+### `rollup.dividend_months@v1.div_month_hits_3y`
+
+**How to read it.** Out of the last 3 years, how many had an ex-dividend date in the calendar month after the session's month. 3 is a name that pays in that month every year, a quarterly payer's regular month. 0 is a name that never did. Special distributions are left out.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| pays in the coming month, every year | `gte 3` | soft | 1 | or rollup.dividend_months@v1.expected_div_month_flag eq true for at least one year |
+
+**When the reading lies**
+
+- Null for a name with fewer than 240 bars in the last 252 sessions and no hit. It is too new, or the corporate-actions history may not reach it. A payer with a hit has a value at any age, and the count covers only the years it has.
+- It reads the past only. A dividend announced since, or a changed schedule, is not here until its ex-date passes. rollup.dividend_schedule@v1.next_ex_date holds the declared date, but only 30 days ahead.
+- The month is the one after the session's month, not the next 30 days. On the 28th it is four days away. On the 1st it is a month away. A monthly payer hits every month.
+- A payer's ex-date moves by a few days and can cross a month end. A hit of 2 out of 3 can be a date that slipped.
+
+Sources: Hartzmark and Solomon (2013), The dividend month premium, Journal of Financial Economics
+
+### `rollup.dividend_months@v1.expected_div_month_flag`
+
+**How to read it.** True when the name had an ex-dividend date in the calendar month after the session's month, in at least one of the last 3 years. A dividend is expected in the coming month. That is the case the dividend-month premium is about: stocks earn more in the months they are expected to pay. False is a month the name has not paid in within 3 years. Null means its history cannot say.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a dividend is expected next month | `eq true` | hard | - | the month is the one after the session's, as known on the session |
+
+**When the reading lies**
+
+- Null for a name too new, or without bars covering the history, and with no hit. False only for a name whose history was long enough to see.
+- Expected from the pattern, not announced. A payer that cut or skipped its dividend still reads true. One that began paying reads false until a year has passed. Check rollup.dividend_schedule@v1.dividend_status.
+- True is common. A quarterly payer is true for a third of the months and a monthly payer for all of them. Rank by rollup.dividend_months@v1.div_month_hits_3y rather than treat it as rare.
+
+Sources: Hartzmark and Solomon (2013), The dividend month premium, Journal of Financial Economics
+
+### `feature.news_free_5d`
+
+**How to read it.** True when the company filed no 8-K through the previous session and no earnings reaction window touched the last 5 sessions, as known on the session. That is rollup.filing_activity@v1.filing_count_5d at 0 and rollup.filing_activity@v1.earnings_in_5d false. Nothing identifiable explains a move in the week. The 8-K part stops at the previous session; the earnings part includes the session. False when either happened. Null when it cannot be told and neither term already says false.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| no 8-K and no earnings in the week | `eq true` | hard | - | null (unknown) names drop out |
+
+**When the reading lies**
+
+- It is the absence of company filings and report dates, not of news. A press story, an analyst call, a rumour, a peer's results or a macro release still moves a name in a news-free week.
+- Null is common before the filings backfill, when no clean nightly walk has reached the previous session, and for names with no stored filing. A hard 'eq true' keeps only names where the absence is known.
+- A past session is read as it was. A filing accepted after it, or a report date published later, never changes it.
+
+Sources: Gervais, Kaniel and Mingelgrin (2001), The high-volume return premium, Journal of Finance
+
+### `rollup.max_return@v1.max_ret_21d`
+
+**How to read it.** The best single day of the last 21 sessions, close to close, as a fraction. 0.10 is a name that gained 10% in one day within the month. Below about 0.03 is a quiet month for a large cap. 0.10 and above is a lottery-like day. 0.20 and above is a name traded as a lottery ticket. Negative means every day lost.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| avoid lottery-like names | `lte 0.05` | soft | 0.02 | a filter for avoid-lists; the decile rank is the signal in the literature |
+
+**When the reading lies**
+
+- A name with one huge news day (a takeover bid, an FDA decision, earnings) tops the list without being a lottery stock. Check rollup.earnings@v1.last_earnings_date and rollup.price_moves@v1.one_day_move.
+- Low-priced and thin names post 10% days on noise. Gate on rollup.price_stats@v2.close and rollup.price_stats@v2.adv_usd_20d.
+- Signed: a 15% crash day does not count here. rollup.price_moves@v1.one_day_move takes the largest absolute move.
+- Null after a gap in the last 22 closes or a shorter history.
+
+Sources: Bali, Cakici and Whitelaw (2011), Maxing out: stocks as lotteries and the cross-section of expected returns, Journal of Financial Economics
+
+### `rollup.earnings_neutral_reversal@v1.ret_ex_earnings_20d`
+
+**How to read it.** The last 20 sessions' return with the daily returns of every earnings reaction window left out. A window runs from the close before a report to the close after it. The value is the month's move that earnings did not make. It equals rollup.price_stats@v2.ret_20d when no report fell in the window. A large negative value is a name that fell on no earnings news, a reversal candidate.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a month-long fall that earnings did not cause | `lte -0.1` | soft | 0.03 | a reversal candidate; compare rollup.price_stats@v2.ret_20d |
+
+**When the reading lies**
+
+- Null when a close is missing in the 21, the history is shorter, or no earnings report is known for the name at all. The calendar cannot say it did not report. A name the calendar missed is null, not neutral.
+- It removes the report's own two returns, not the days around it. Drift after the window (rollup.earnings_reaction@v1.sessions_since_reaction) is still in.
+- Other news is still in the return: a deal, a downgrade, guidance outside the report. rollup.filing_activity@v1.filing_count_5d shows the last week's 8-Ks only.
+- Only reports known on the session are removed, so a past session is read as it was.
+
+Sources: Jegadeesh (1990), Evidence of predictable behavior of security returns; Chan (2003), Stock price reaction to news and no-news; Savor (2012), Stock returns after major price shocks
+
+### `rollup.earnings_neutral_reversal@v1.earnings_days_excluded`
+
+**How to read it.** How many of the last 20 daily returns an earnings reaction window left out of rollup.earnings_neutral_reversal@v1.ret_ex_earnings_20d. 0 means no report fell in the window. 2 is one report with both its reaction days. 1 is a report on the session itself, whose next day has not happened, or on a non-session day.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the return is the plain month's (no report in it) | `eq 0` | soft | 0 | then rollup.price_stats@v2.ret_20d equals ret_ex_earnings_20d |
+
+**When the reading lies**
+
+- Null where ret_ex_earnings_20d is null: a gap in the closes, a short history, or no report known for the name.
+- More than 2 means two reports in a month, a correction or a rare double date. Treat the return with care.
+
+Sources: Bernard and Thomas (1989), Post-earnings-announcement drift: the E-1 to E+1 window
+
 ### `rollup.episode_behaviour@v1.beta_252d`
 
 **How to read it.** The slope of the name's daily returns on SPY's over the trailing 252 sessions: 1 moves with the market, 1.5 moves half again as much (a 5% market fall is a 7.5% fall here), 0.5 half as much, below 0 against it. Under 0.8 is defensive (utilities, staples, health care), 0.8 to 1.2 average, above 1.2 high beta (technology, discretionary, financials, small caps). A position's market risk is its weight times its beta.

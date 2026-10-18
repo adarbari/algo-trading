@@ -174,6 +174,8 @@ def _picks(e: document.Edge) -> str:
 def _win(o: document.Outcome) -> str:
     if o.kind == "expires_otm":
         return "the option expires worthless"
+    if o.kind == "option_model_pnl":
+        return "the modelled straddle P&L is positive (a model, not a quote)"
     if o.kind == "hit_target":
         return f"{(o.measure or 'the measure').replace('_', ' ')} {o.direction} {o.target:g}"
     return f"beats {o.benchmark}" if o.benchmark != "none" else "rises"

@@ -133,6 +133,22 @@ IPO_LOCKUP_EVENTS = fixed(
     key=("cik", "accession", KNOWN_FROM),
 )
 
+# L1: a closed-end fund's daily NAV (edge build D5), keyed by the FUND's id; ``ts`` = the NAV date
+# (also the partition); known_from: next session after it, after the fetch if restated.
+FUND_NAV_EVENTS = fixed(
+    "events/fund_nav",
+    "event",
+    ("instrument_id", "ts", KNOWN_FROM, "series", "nav"),
+    "instrument_id string!",
+    "ts timestamp_utc!",
+    f"{KNOWN_FROM} date!",
+    "series string!",
+    "nav float64!",
+    "nav_symbol string!",
+    runs="merge",
+    key=("instrument_id", "series", "ts"),
+)
+
 MACRO_SERIES = fixed(
     "macro/series",
     "reference",
