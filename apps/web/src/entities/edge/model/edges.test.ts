@@ -34,6 +34,7 @@ describe('verdict words', () => {
       'Not working',
       'Not enough data',
       'Waiting on data',
+      'Diagnostic only',
     ]);
     expect(verdictTone('works')).toBe('positive');
     expect(verdictTone('not_working')).toBe('negative');

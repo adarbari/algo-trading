@@ -115,6 +115,19 @@ section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ string_prefix = "outcomes/instrument/" }, { call = "window_rows" }, { call = "read_outcomes" }]
 
 [[responsibility]]
+id = "fund-nav-symbol-mapping"
+description = "Which NAV series a closed-end fund has (edge build D5): the funds are the reference's CEF rows (and stocks named Closed End Fund), nav_symbol writes Nasdaq MFQS's X<ticker>X, and map_funds keeps a fund only when Tiingo's NMFQS listing (parse_nav_tickers) holds that symbol, under the FUND's own instrument_id (a NAV symbol is never an instrument and no id is built from it, ADR 0018); the rest are listed as unmapped"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/market/fund_nav.py",
+    "libs/sources/algotrade_sources/vendors/tiingo/nav.py",
+]
+allowed = [
+    "libs/sources/algotrade_sources/framework/registry.py",  # registers the adapters
+]
+section = "docs/data/vendors.md#closed-end-fund-navs-nasdaq-mfqs-xtickerx-on-tiingo-edge-build-d5"
+detect = [{ call = "map_funds" }, { call = "nav_symbol" }, { call = "parse_nav_tickers" }]
+
+[[responsibility]]
 id = "ibkr-enrichment"
 description = "IBKR as an enrichment source, read-only (ADR 0028): conids of the optionable universe (instruments/ibkr_contracts) IB's implied / historical vol per underlying (volatility/ibkr_iv30: history backfill + nightly snapshot) and the nightly futures curve snapshots (rates/futures_curve), each read through algotrade.data; features derived from them carry licence = personal"
 owner = [

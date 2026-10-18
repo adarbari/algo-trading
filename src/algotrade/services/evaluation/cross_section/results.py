@@ -67,6 +67,7 @@ def _row(
     horizon: int,
     result: VariantResult | None = None,
     config_hash: str = "",
+    side: str = "long",
 ) -> dict[str, Any]:
     """One stored row of ``m``; ``result``: the screener or baseline it measured (none for a
     random draw, which has no config)."""
@@ -90,6 +91,7 @@ def _row(
         "in_sample": m.in_sample,
         "range_to": evaluation.end,
         "iv_source": result.iv_source if result else None,
+        "side": result.side if result else side,
         "licence": result.licence if result else None,
         **_projection(m, result),
         # Filled by an expires_otm outcome only (ADR 0053 amendment 2026-10-08).
@@ -117,6 +119,7 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
                     RANDOM,
                     random.horizon,
                     config_hash=random.config_hash,
+                    side=random.side,
                 )
             )
     frame = pd.DataFrame(rows)
