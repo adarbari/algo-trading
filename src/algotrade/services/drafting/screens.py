@@ -72,6 +72,7 @@ from algotrade.services.drafting.contract.gaps import (
 from algotrade.services.drafting.contract.groups import group_parts, prune_groups
 from algotrade.services.drafting.contract.missing_notes import (
     exclusion_notes,
+    field_labels,
     without_false_claims,
 )
 from algotrade.services.drafting.contract.suggestions import (
@@ -440,7 +441,12 @@ def _draft(
         document, why = with_groups(
             ctx, screener_id, document, [{**carried, **grouping.groups}, carried]
         )
-        notes = (*notes, *grouping.notes, *why, *exclusion_notes(document))
+        notes = (
+            *notes,
+            *grouping.notes,
+            *why,
+            *exclusion_notes(document, field_labels(infos, document)),
+        )
     return ScreenDraft(
         screener_id, document, dropped, notes,
         formulas=formulas.formulas, formulas_dropped=formulas.dropped,
