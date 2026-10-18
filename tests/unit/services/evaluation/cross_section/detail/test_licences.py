@@ -27,7 +27,7 @@ def licences(tie_break: str, iv: str | None):  # type: ignore[no-untyped-def]
     store = configs(tie_break)
     resolved = resolve_config(store, "momo", USER)
     universe = parse_selection(ACTIVE, "active")
-    return trial_licences(catalogue(store, "site"), edge(), universe, resolved, iv)
+    return trial_licences(catalogue(store, "site"), edge(), universe, [resolved], iv)
 
 
 def test_an_open_trial_has_open_columns() -> None:

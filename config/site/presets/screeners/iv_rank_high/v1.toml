@@ -1,0 +1,66 @@
+# High implied-volatility rank (ADR 0053, EB E4; edge c18_iv_rank_conditional_selling): a liquid
+# optionable stock, ADR or ETF whose IV rank (feature.iv_rank: IBKR's 252-session rank where it has
+# one, else ours) is at least 0.5, that is, whose 30-day implied volatility is in the upper half of
+# its own year's range: the practitioner's "sell premium when IV rank is above 50" gate. Ranked by
+# the rank, highest first. A missing value never passes (ADR 0030). What it does not check: whether
+# the volatility is high for a known reason (a report inside the month, a takeover, a crash that
+# set the year's range), the premium over realised volatility, or the option chain.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "iv_rank_high"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "High implied-volatility rank"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.optionable]
+field = "instrument.optionable"
+op = "eq"
+value = true
+
+[criteria.not_leveraged]
+field = "instrument.is_leveraged"
+op = "eq"
+value = false
+
+[criteria.not_inverse]
+field = "instrument.is_inverse"
+op = "eq"
+value = false
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.iv_rank]
+field = "feature.iv_rank"
+op = "gte"
+value = 0.5
+
+[columns]
+close = "rollup.price_stats@v2.close"
+iv_rank = "feature.iv_rank"
+iv_rank_source = "feature.iv_rank_source"
+iv30 = "feature.vrp_iv30"
+hv30 = "rollup.price_stats@v2.hv30"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "feature.iv_rank"

@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from algotrade.config.edges.portfolio import OOS_CLASSES
 from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
@@ -32,6 +33,7 @@ KEYS = (
     "live_high",
     "edge_costs",
     "published_haircut",
+    "oos_haircut",
     "decoys",
     "capacity_adv_floor_usd",
     "capacity_position_usd",
@@ -104,7 +106,16 @@ class VerdictSettings:
     # decoy battery every edge is compared with (ADR 0053 amendment 2026-10-18). Baselines are in
     # the run hash, so a changed list is a new run, never a changed trial.
     decoys_standard: tuple[str, ...] = DECOYS_STANDARD
+    # ``[oos_haircut]``: the share of an in-sample Sharpe ratio to expect lost out of sample, by
+    # the edge's ``oos_class`` (``trend``: McLean-Pontiff style decay of a published anomaly; ADR
+    # 0074 amendment). Shown beside the in-sample and out-of-sample Sharpe ratios in the run's
+    # report, never a verdict input.
+    oos_haircut_trend: float = 0.45
     haircut_short: float = 0.5  # as the spread: a short leg is harder to hold (ADR 0065)
+
+    def oos_haircut(self, oos_class: str) -> float:
+        """The share of an in-sample Sharpe ratio expected lost, for an ``OOS_CLASSES`` class."""
+        return {"trend": self.oos_haircut_trend}[oos_class]
 
     def published_haircut(self, leg: str) -> float:
         """The share of a published figure on ``leg`` (``LEGS``) expected to be lost."""
@@ -122,6 +133,7 @@ class VerdictSettings:
         t.only(KEYS)
         cut = t.table("published_haircut", HAIRCUT_KEYS)
         decoys = t.table("decoys", ("standard",))
+        oos = t.table("oos_haircut", OOS_CLASSES)
         return cls(
             min_oos_trades=t.integer("min_oos_trades", d.min_oos_trades, 1),
             works_trades=t.integer("works_trades", d.works_trades, 1),
@@ -151,6 +163,7 @@ class VerdictSettings:
             haircut_short=cut.fraction("short", d.haircut_short),
             haircut_long=cut.fraction("long", d.haircut_long),
             decoys_standard=_decoys(decoys, d.decoys_standard),
+            oos_haircut_trend=oos.fraction("trend", d.oos_haircut_trend),
         )
 
 

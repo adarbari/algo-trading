@@ -4,12 +4,23 @@ screener ranks best first, every non-blocked event edge declares a field the har
 blocked one says what is missing."""
 
 import tomllib
+from datetime import date
 
 import pytest
 
-from algotrade.config.edges.document import CLOSED, Edge
+from algotrade.config.edges.chain import tenor_sessions
+from algotrade.config.edges.document import CLOSED, MODEL_KIND, Edge
 from algotrade.config.edges.loading import load_edges
+from algotrade.config.strategy.schema import Selection
+from algotrade.config.user import UserContext
+from algotrade.core.model.predicates import Group
+from algotrade.core.views.feature_view import FeatureView
+from algotrade.engines.selection.evaluate import evaluate_selection
+from algotrade.services.configs import resolve_config
+from algotrade.services.evaluation.cross_section.measuring import MIN_SCORE_COVERAGE
 from algotrade.storage.configs.files import FileConfigStore
+from algotrade.strategies.screeners import Decision
+from algotrade.strategies.screeners.rules import evaluate_screen
 from tests.conftest import REPO_ROOT
 
 STORE = FileConfigStore(REPO_ROOT / "config", local=False)
@@ -56,3 +67,118 @@ def test_a_long_event_edge_is_a_candidate_on_a_liquid_event_universe(edge: Edge)
 def test_a_blocked_edge_names_what_is_missing(edge: Edge) -> None:
     assert edge.status == "blocked" and not edge.screeners
     assert "EVENT_CLASSES" in edge.rejection_reason
+
+
+# ---- EB E4: option P&L, closed-end fund and ETF flow edges
+E4_OPTION = (
+    "c12_vrp_cross_section_iv_hv", "c13_iv_term_structure_straddles",
+    "c14_delta_hedged_characteristics", "c16_pre_earnings_straddle_buy",
+    "c17_earnings_iv_crush_sell", "c18_iv_rank_conditional_selling",
+)  # fmt: skip
+E4_FUNDS = ("closed_end_fund_discounts", "cef_distribution_trap", "etf_flow_pressure")
+E4 = (*E4_OPTION, *E4_FUNDS)
+E4_EDGES = {e.id: e for e in load_edges(STORE) if e.id in E4}
+BLOCKED = {
+    "c13_iv_term_structure_straddles": "no history",
+    "c16_pre_earnings_straddle_buy": "tenor_sessions",
+    "c17_earnings_iv_crush_sell": "tenor_sessions",
+    "closed_end_fund_discounts": "covered universe",
+    "cef_distribution_trap": "covered universe",
+}  # the keyword each blocked document's reason names
+
+
+def test_every_e4_document_is_filed() -> None:
+    assert set(E4_EDGES) == set(E4)
+
+
+@pytest.mark.parametrize("edge", E4_EDGES.values(), ids=E4_EDGES)
+def test_an_e4_edge_is_a_candidate_or_a_blocked_one_with_its_reason(edge: Edge) -> None:
+    assert str(edge.frozen_from) == "2026-04-01" and edge.family
+    if edge.id in BLOCKED:
+        assert edge.status == "blocked" and BLOCKED[edge.id] in edge.rejection_reason
+    else:
+        assert edge.status == "candidate" and edge.screeners
+
+
+@pytest.mark.parametrize("edge", [E4_EDGES[i] for i in E4_OPTION], ids=E4_OPTION)
+def test_an_option_edge_is_a_model_pnl_whose_notes_say_so(edge: Edge) -> None:
+    """Basis model (owner decision O3: no historical chains): the document names the model, its
+    assumptions and the real-chain P&L (H13) that replaces it; the IV is IBKR's 30-day one."""
+    assert edge.outcome.kind == MODEL_KIND and edge.outcome.basis == "model"
+    assert "model, not a quote" in edge.notes and "H13" in edge.notes
+    assert edge.outcome.iv_field == "rollup.ibkr_iv@v1.iv30_ibkr"
+    assert edge.outcome.benchmark == "none" and edge.outcome.cost_bps
+
+
+@pytest.mark.parametrize(
+    "edge", [E4_EDGES[i] for i in E4_OPTION if i not in BLOCKED], ids=lambda e: e
+)
+def test_a_candidate_option_horizon_is_priced_by_its_30_day_vol(edge: Edge) -> None:
+    tenor = tenor_sessions(edge.outcome.iv_field or "")
+    assert tenor is not None
+    assert all(tenor // 2 <= h <= tenor * 2 for h in edge.outcome.horizon_sessions)
+
+
+@pytest.mark.parametrize("edge", E4_EDGES.values(), ids=E4_EDGES)
+def test_no_two_group_or_unverified_figure_is_published(edge: Edge) -> None:
+    """The sources' figures are decile spreads, long-short quintiles or one-leg premium averages,
+    none of what the harness reports for the picks alone."""
+    assert edge.published is None
+
+
+def test_a_blocked_event_straddle_says_what_its_placeholder_horizon_is() -> None:
+    for edge_id in ("c16_pre_earnings_straddle_buy", "c17_earnings_iv_crush_sell"):
+        edge = E4_EDGES[edge_id]
+        assert edge.status in CLOSED and not edge.screeners
+        assert "placeholder" in edge.rejection_reason
+
+
+def test_the_ranking_edges_compare_with_every_liquid_optionable_name() -> None:
+    """A rank or gate over the optionable universe is read against selling on all of it: the
+    plain schedules' base is the universe, and the gated edge keeps every qualified name."""
+    for edge_id in ("c12_vrp_cross_section_iv_hv", "c14_delta_hedged_characteristics"):
+        assert E4_EDGES[edge_id].base == "universe" and E4_EDGES[edge_id].top_k == 20
+    c18 = E4_EDGES["c18_iv_rank_conditional_selling"]
+    assert c18.base == "universe" and c18.top_k is None and c18.schedule == "every_session"
+
+
+def test_the_etf_flow_screener_orders_so_the_heaviest_creation_is_shorted_first() -> None:
+    """The short leg is the lowest scores (cross_section/measuring.py ``_side_picks``): an
+    ascending order on the change scores a creation low."""
+    edge = E4_EDGES["etf_flow_pressure"]
+    assert edge.outcome.side == "short" and edge.top_k == 10
+    path = REPO_ROOT / "config/site/presets/screeners/etf_flow_pressure/v1.toml"
+    rank = tomllib.loads(path.read_text())["rank"]
+    assert rank == {
+        "tie_break": "rollup.etf_flows@v1.etf_shares_chg_21d",
+        "tie_break_order": "asc",
+    }
+    variants = {v.id: v.outcome.side for v in edge.variants}
+    assert variants == {"long_redemptions": "long", "long_short": "long_short"}
+
+
+def test_the_etf_flow_base_is_the_funds_that_carry_a_score() -> None:
+    """The harness ranks a short leg only when 80% of the base is scored (MIN_SCORE_COVERAGE);
+    only iShares funds have a count, so the base must be those funds, not every liquid ETF."""
+    edge = E4_EDGES["etf_flow_pressure"]
+    spec = resolve_config(STORE, "etf_flow_pressure", UserContext("site")).screen_spec
+    value = {"eq": lambda v: v, "gt": lambda v: v + 1, "gte": lambda v: v, "in": lambda v: v[0]}
+    row = {r.field: value[r.op](r.value) for r in edge.universe.where.rules()}  # type: ignore[union-attr]
+    row.update({c.rule.field: value[c.rule.op](c.rule.value) for c in spec.criteria})
+    no_count = {k: v for k, v in row.items() if "etf_flows" not in k}
+    names = {f"EQ:ISH{i}": row for i in range(4)} | {f"EQ:OTHER{i}": no_count for i in range(12)}
+    view = FeatureView(date(2026, 11, 20), names)
+    eligible = set(evaluate_selection(edge.universe, view).instruments)  # type: ignore[arg-type]
+    scored = {
+        r.instrument_id
+        for r in evaluate_screen(spec, view).rows
+        if r.decision is Decision.QUALIFIED
+    }
+    assert eligible == {f"EQ:ISH{i}" for i in range(4)}
+    assert len(eligible & scored) >= MIN_SCORE_COVERAGE * len(eligible)
+    where = edge.universe.where  # type: ignore[union-attr]
+    loose = Selection(
+        "loose", Group("all", tuple(r for r in where.rules() if "etf_flows" not in r.field))
+    )
+    base = set(evaluate_selection(loose, view).instruments)  # without the rule: 16 names, 4 scored
+    assert len(base & scored) < MIN_SCORE_COVERAGE * len(base)

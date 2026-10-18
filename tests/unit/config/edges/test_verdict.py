@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from algotrade.config.edges.portfolio import OOS_CLASSES
 from algotrade.config.edges.verdict import KEYS, LEGS, VerdictSettings
 from algotrade.core.model.errors import ConfigurationError
 
@@ -120,3 +121,19 @@ def test_the_standard_decoys_default_read_and_reject_a_bad_list() -> None:
         VerdictSettings.from_document({"decoys": {"standard": ["Not An Id"]}})
     with pytest.raises(ConfigurationError, match="decoys"):
         VerdictSettings.from_document({"decoys": {"typo": []}})
+
+
+def test_the_out_of_sample_haircut_has_a_share_per_class_and_is_read_and_bounded() -> None:
+    """ADR 0074 amendment: ``[oos_haircut] trend`` (0.45) is a share, display only."""
+    d = VerdictSettings.from_document(None)
+    assert d.oos_haircut("trend") == 0.45
+    assert (
+        VerdictSettings.from_document({"oos_haircut": {"trend": 0.3}}).oos_haircut("trend") == 0.3
+    )
+    for bad in (1.5, -0.1, "high"):
+        with pytest.raises(ConfigurationError, match="trend"):
+            VerdictSettings.from_document({"oos_haircut": {"trend": bad}})
+    with pytest.raises(ConfigurationError, match="unknown keys"):
+        VerdictSettings.from_document({"oos_haircut": {"momentum": 0.5}})
+    doc = tomllib.loads(Path("config/site/verdict.toml").read_text())
+    assert set(doc["oos_haircut"]) == set(OOS_CLASSES)  # a class has its share in the file

@@ -675,6 +675,13 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: a long edge reads an avoid list's confirmation as a negative lift (Not working), the short side states the same claim so that it passes; a dense-score short leg over a universe fills up with unflagged names when few are flagged, so a non-event schedule cannot test a small flagged set; entering at the filing would trade the offer's own period, not the post-expiry dip the thesis is about; a blocked document keeps the thesis, the bar and the missing pieces on file without a placeholder passing as a test.
 
+## 2026-10-18 | EB E4 (option P&L, closed-end fund and ETF flow edges) | What is a candidate, what is blocked, and the fund features
+- Question: which of the E4 and E6 ideas can be measured by the merged harness today, and how do the fund features read data the universe does not cover?
+- Options: every idea a candidate / a candidate only where the outcome can be priced and the inputs have history, the rest `blocked` with the reason; fund features as a new `applies_to` value / `any` with rows only for funds.
+- Decision: c12, c14, c18 (IBKR IV30, 502 sessions, horizons inside the 10 to 42 sessions the parser prices) and etf_flow_pressure (iShares counts from 2026-10-17, accruing) are candidates; c13 (no long-tenor volatility history), c16 and c17 (a 3-session and a 1-to-2-session position cannot be priced by a 30-day volatility; a short-tenor field is needed), closed_end_fund_discounts and cef_distribution_trap (closed-end funds are not in the covered universe, so no bars; the payout data is not stored either) are `blocked`; c19 (index chains not stored) and etf_premium_discount_reversion (no ETF NAV history) are not filed. `cef_nav@v1` and `etf_flows@v1` carry `applies_to = any` and rows only for funds with a NAV or a count (a new `applies_to` value is a framework change); `cef_nav@v1` is `licence = "personal"` (Tiingo). c14 reuses `ivol_high` on the liquid optionable universe. No figure is filed as `[published]`: the sources' numbers are decile or quintile spreads or one-leg premium averages.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a candidate whose outcome the parser refuses, or whose inputs have no history, would show a verdict-less row for months; a blocked document keeps the thesis, the bar and the unblock path on file. Adding closed-end funds to the universe is an owner decision (coverage, nightly bars and the Tiingo symbol budget; ADR 0013), listed in the hand-back, not decided here.
 ## 2026-10-18 | EB H10 (portfolio outcomes) | What a book is judged on and how it is built
 - Question: how is an allocation edge (a weighted book against a blended benchmark) measured, and what do Promising and Works rest on when there is no base rate over names?
 - Options: a new outcome kind in the harness / a path in the backtest engine; a mix read from the grain / computed from the constituents' rows; slots a `top_k` leaves unfilled go to cash / are left out; win rate and lift against the benchmark's hit rate / no base rate; Works on the decile t as for a ranking / on the picks-series t.
@@ -770,3 +777,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a ticker is reused and renamed, an id is not (ADR 0018); a list with no maintenance rule is a silent survivor filter, so it is named as one; dropping the edge loses a clean, cheap test of a documented structural niche.
+
+## 2026-10-18 | EB H10b (ensembles and the haircut) | What an ensemble counts as and how its members are treated
+- Question: how many trials is a pre-registered grid whose weights are averaged, may a member be the basis, and what does the out-of-sample haircut do?
+- Options: every member a trial plus the ensemble / the ensemble once; a member may be promoted as the basis / never; the haircut a verdict gate / a display; one haircut for every edge / a class per edge.
+- Decision: the ensemble is one trial (its hash is its members' sorted hashes) with the grid size recorded beside it; members run as role `member`, are reported, never a trial or a basis, and members already logged as screeners stay counted; a member that cannot be weighted leaves the ensemble session out; the haircut is display only, in the run's report (`[oos_haircut] trend = 0.45`, the edge's `oos_class`), not in the read model yet.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: averaging removes the choice among members, which is what multiple-testing counts; letting a member be the basis would restore it (ADR 0065); old logs are never rewritten, so the earlier count only errs conservative; a display keeps the haircut out of the verdict until the owner decides it should gate.

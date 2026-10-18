@@ -3,7 +3,7 @@
 from datetime import UTC, date, datetime
 
 from algotrade.data import StoreReader
-from algotrade.data.funds.shares import COLUMNS, TABLE, etf_shares
+from algotrade.data.funds.shares import COLUMNS, TABLE, etf_shares, share_versions
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import stamped
@@ -60,3 +60,22 @@ def test_a_series_is_by_fund_then_date_and_limited_to_the_funds_asked() -> None:
     assert list(seen["as_of"]) == [D1, D2] and set(seen["instrument_id"]) == {FUND}
     assert list(etf_shares(reader, [FUND], D2, D3)["as_of"]) == [D2]
     assert etf_shares(reader, [], D1, D3).empty
+
+
+def test_share_versions_keeps_every_restated_version_known_by_the_day() -> None:
+    """The feature input's read: a restated count sits beside the original, a count not yet known
+    is absent, and rows come by known_from so the input can hand each session its own prefix."""
+    reader = store(
+        (D2, "r1", [row(FUND, D1, 100.0, D2), row(OTHER, D1, 7.0, D2)], at(D2)),
+        (D3, "r2", [row(FUND, D1, 104.0, D3), row(FUND, D2, 110.0, D3)], at(D3)),
+    )
+    assert share_versions(reader, D1).empty
+    seen = share_versions(reader, D3)
+    assert list(seen["known_from"]) == [D2, D2, D3, D3]
+    assert list(seen.loc[seen["instrument_id"] == FUND, "shares_outstanding"]) == [
+        100.0,
+        104.0,
+        110.0,
+    ]
+    assert "knowledge_ts" in seen.columns
+    assert list(share_versions(reader, D2)["known_from"]) == [D2, D2]

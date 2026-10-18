@@ -7,7 +7,7 @@ field, the score from the screen's features, the ADV from its own field. A field
 does not know (a reference field such as ``instrument.status``) is open. A reader redacts a
 per-name value by the licence recorded here, never by a column's name."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from algotrade.config.edges.document import Edge
@@ -49,12 +49,13 @@ def trial_licences(
     features: FeatureSet,
     edge: Edge,
     universe: Selection,
-    config: ResolvedConfig,
+    configs: Sequence[ResolvedConfig],
     iv_licence: str | None,
 ) -> TrialLicences:
-    """The licences of one trial (a screener or baseline of one edge variant); ``iv_licence``:
-    its implied-vol field's (None: the outcome reads none)."""
-    score = _of(features, screen_fields(config, edge))
+    """The licences of one trial (a screener or baseline of one edge variant; an ensemble's are
+    those of every screener of its grid, the strictest); ``iv_licence``: its implied-vol field's
+    (None: the outcome reads none)."""
+    score = strictest(_of(features, screen_fields(c, edge)) for c in configs)
     universe_licence = _of(features, selection_fields(universe))
     value = iv_licence or OPEN
     return TrialLicences(
