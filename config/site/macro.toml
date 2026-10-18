@@ -109,6 +109,60 @@ pit = "lag"
 transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
+# --- Allocation inputs (EB E5 bridge; FRED-checked 2026-10-18): the broad dollar (H.10 posts it weekly)
+# and the OECD 3-month interbank rates (monthly, about two months late) behind fx_carry.
+[[series]]
+key = "DTWEXBGS"                # Nominal broad US dollar index (Fed H.10, 2006-)
+source = "fred"
+kind = "macro"
+cadence = "daily"
+release_lag_days = 10
+pit = "lag"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+[[series]]
+key = "IR3TIB01USM156N"                # US 3-month interbank rate, percent (OECD)
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 60
+pit = "lag"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+[[series]]
+key = "IR3TIB01JPM156N"                # Japan 3-month interbank rate, percent (OECD)
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 60
+pit = "lag"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+[[series]]
+key = "IR3TIB01AUM156N"                # Australia 3-month interbank rate, percent (OECD)
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 60
+pit = "lag"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+[[series]]
+key = "IR3TIB01CAM156N"                # Canada 3-month interbank rate, percent (OECD)
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 60
+pit = "lag"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+[[series]]
+key = "IR3TIB01CHM156N"                # Switzerland 3-month interbank rate, percent (OECD)
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 60
+pit = "lag"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+# Left out, last observation January 2026 (over 120 days): IR3TIB01EZM156N (EUR; fallbacks
+# ECBESTRVOLWGTTRMDMNRT, ECBDFR unchecked), IR3TIB01GBM156N (GBP; fallback IUDSOIA unchecked).
+
 # --- Weekly series (revised: ALFRED vintages)
 
 [[series]]
@@ -537,7 +591,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Australia"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_BRAZIL"
 source = "published"
@@ -554,7 +607,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Brazil"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_CANADA"
 source = "published"
@@ -571,7 +623,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Canada"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_CHINA"
 source = "published"
@@ -588,7 +639,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "China"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_EUROPE"
 source = "published"
@@ -605,7 +655,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Europe"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_FRANCE"
 source = "published"
@@ -622,7 +671,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "France"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_GERMANY"
 source = "published"
@@ -639,7 +687,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Germany"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_HONG_KONG"
 source = "published"
@@ -656,7 +703,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Hong Kong"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_ITALY"
 source = "published"
@@ -673,7 +719,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Italy"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_INDIA"
 source = "published"
@@ -690,7 +735,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "India"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_ISRAEL"
 source = "published"
@@ -707,7 +751,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Israel"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_JAPAN"
 source = "published"
@@ -724,7 +767,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Japan"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_KOREA"
 source = "published"
@@ -741,7 +783,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Korea"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_MEXICO"
 source = "published"
@@ -758,7 +799,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Mexico"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_NETHERLANDS"
 source = "published"
@@ -775,7 +815,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Netherlands"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_POLAND"
 source = "published"
@@ -792,7 +831,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Poland"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_RUSSIA"
 source = "published"
@@ -809,7 +847,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Russia"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_SINGAPORE"
 source = "published"
@@ -826,7 +863,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Singapore"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_SOUTH_AFRICA"
 source = "published"
@@ -843,7 +879,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "South Africa"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_SPAIN"
 source = "published"
@@ -860,7 +895,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Spain"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_SWEDEN"
 source = "published"
@@ -877,7 +911,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Sweden"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_SWITZERLAND"
 source = "published"
@@ -894,7 +927,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Switzerland"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_TAIWAN"
 source = "published"
@@ -911,7 +943,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Taiwan"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_TURKEY"
 source = "published"
@@ -928,7 +959,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "Turkey"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_UK"
 source = "published"
@@ -945,7 +975,6 @@ url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv
 date_column = "Date"
 value_column = "UK"
 parser = "cape_csv"
-
 [[series]]
 key = "CAPE_USA"
 source = "published"

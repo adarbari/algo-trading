@@ -850,6 +850,14 @@ follow-up PR).
 - status: final
 - Reasoning: `closed_end_fund_discounts` (Strong), `cef_distribution_trap` and `muni_cef_december` are blocked because CEFs are not in universe coverage (ADR 0013). Bars already exist for 330 CEFs (the nightly Massive grouped-daily and Tiingo bars-history from 2010), so the Tiingo cost is 0 symbols; the change is the universe coverage amendment, with no deadline pressure. Continuing the Tiingo Power account is to be reconsidered if the CEF (or other) edges prove strong.
 
+## 2026-10-18 | EB E5 (allocation extensions, macro series) | FX 3-month rates and the broad dollar added; two owner calls logged
+- Question: which series feed the etf_macro bridge's dollar and FX carry columns, and what does the allocation overlay measure against?
+- Options: DTWEXBGS + OECD 3-month interbank rates via FRED (free) / a paid FX source; de-risked book judged against the fully invested blend / against a book with CASH as a constituent; revised CAPE history accepted with a caveat / dropped.
+- Decision: add DTWEXBGS (daily, lag 10 days) and the OECD rates for USD, JPY, AUD, CAD and CHF (monthly, lag 60 days), all `pit = "lag"` and open. EUR (IR3TIB01EZM156N) and GBP (IR3TIB01GBM156N) are left out: their last observation is January 2026, so those currencies' `fx_carry` is null until a fresher series is found. Owner decision 1: a de-risked book is still judged against the fully invested blend (CASH becomes a benchmark constituent only if the owner asks). Owner decision 2: the revised CAPE history is accepted for the bridge with a caveat (the backfill is not as-known).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: no paid source is needed; a stale series would make carry look known when it is not; the benchmark stays comparable across edges.
+
 ## 2026-10-18 | EB E5 (PR 680 review) | Allocation edges the harness measures only in part
 - Question: how are the IBS edge (the source day is close(D) to close(D+1), but S = D + 1 at the earliest), the natgas avoid list and the 9-month lookback filed?
 - Options: IBS dropped / filed as a documented-limit variant; natgas against SPY / against the mix of its own funds; a 189-session return column (changes stored group trend_stats@v2) / the 3, 6 and 12 month grid.
