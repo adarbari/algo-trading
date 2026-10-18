@@ -1,0 +1,83 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E4) until a short-tenor implied
+# volatility is stored. Idea page: docs/edge-ideas/options-volatility.md
+# (c16_pre_earnings_straddle_buy).
+id = "c16_pre_earnings_straddle_buy"
+name = "Pre-earnings straddle purchase"
+thesis = "Buying an at-the-money straddle three sessions before a report and selling it at the announcement earns a positive return on small, noisy names because implied volatility under-estimates the event."
+mechanism = """Investors under-estimate event uncertainty where signals are noisy and information is thin;
+the pre-announcement rise in implied volatility plus the move itself more than covers the straddle's
+time decay (Gao, Xing and Zhang 2018)."""
+persistence = """The effect sits in small, illiquid, high-cost names, exactly where option spreads are widest,
+so costs, not competition, keep it in place; the authors say it pays only if costs are low enough.
+Practitioner tests report the pre-earnings ramp thinner in large caps (BSIC, not peer reviewed)."""
+family = "C"
+schedule = "on_event:earnings_expected"
+universe = "liquid_optionable_floored"
+top_k = "all"
+base = "universe"
+picks = "event"
+screeners = []
+baselines = ["vrp_iv_hv"]
+status = "blocked"
+frozen_from = 2026-04-01
+rejection_reason = """The position's horizon cannot be priced. The model P&L prices every horizon with one
+30-day implied volatility (IV30, the only history stored), and the document parser refuses a horizon
+outside 10 to 42 sessions for it (ADR 0053 amendment 2026-10-17, tenor_sessions); the trade is held 3
+sessions, from three sessions before the report to the announcement. The 10-session horizon below is a
+placeholder that keeps the document valid and is not the thesis. Unblock with a short-tenor implied
+volatility field (an iv7-style name the parser can read a tenor from) with history: the nearest-expiry
+vol of iv_term@v1 (iv_next) is stored from 2026-10-02 only and carries no tenor in its name. Then the
+entry is the expected report date's session minus 3 (start_offset_sessions = -3, an event announced
+ahead) and the screener keeps names whose report date is SCHEDULED, not taken from last year."""
+notes = """The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8): the long at-the-money
+straddle priced by Black-Scholes (r = q = 0) from an implied volatility at D, one volatility, no skew, no
+spread beyond cost_bps; no historical chains are stored (owner decision O3) and the real-chain P&L
+(H13) accrues from 2026-10-02. Names are those with an expected report date (scheduled or taken from the
+year-ago report: earnings_expected@v1.expected_basis tells which); about 1,500 reports a quarter in the
+universe. The source finds the return in small names; the universe floors ($5, $50M a day) remove many
+of them, so the filed figure would be the large-cap one, which practitioners find thinner."""
+
+[outcome]
+kind = "option_model_pnl"
+structure = "atm_straddle_long"
+iv_field = "rollup.ibkr_iv@v1.iv30_ibkr"
+horizon_sessions = [10]
+benchmark = "none"
+start_offset_sessions = -3
+cost_bps = 50
+
+[quality_bar]
+outcome = """The model P&L of one long at-the-money straddle from three sessions before the expected
+report to the announcement, as a fraction of the entry price, net of 50 bps: the move and the
+implied volatility's rise less the premium paid. The placeholder horizon is 10 sessions until a
+short-tenor volatility exists."""
+trigger_timing = """The expected report date is known weeks ahead (earnings_expected@v1, known_from <= D);
+the entry session is S = the report session - 3 (start_offset_sessions = -3), the decision session D =
+S - 1, and the straddle is priced with the implied volatility read at D. A date taken from last year
+is a guess: the screener should read only SCHEDULED dates."""
+replication = """The source's rule: an at-the-money straddle in the nearest expiry after the announcement,
+bought at the close three sessions before and sold at the close of the announcement day (the next day
+for an after-close report); average return 3.34% over 1996-2013, stronger in small, high-kurtosis,
+low-volume names (Gao, Xing and Zhang 2018). No screener is written until the horizon can be priced."""
+expected_size = """3.34% per straddle gross over 1996-2013 (Gao, Xing and Zhang 2018, a one-leg average, not
+a measure the harness reports: its P&L is a fraction of the underlying's price, not of the premium, so
+nothing is filed under [published]). About 1,500 reports a quarter in the universe give plenty of
+events, but the IV30 history is 502 sessions."""
+capacity_costs = """Long options with defined risk and no margin; costs are the whole game: restrict to names whose
+straddle spread is under 5% of its price, which removes much of the published edge. The model charges
+50 bps and no spread beyond it."""
+failure_modes = """Implied volatility that has already risen leaves nothing to earn; a report that arrives
+earlier than the guessed date. Retire if the frozen-period mean P&L is not above the mean of every
+liquid optionable name reporting on the same sessions."""
+decoys = """The stock-return earnings announcement premium (separate: found no premium here), the IV crush
+sale (c17, the mirror image by size), and the pre-announcement ramp alone (close the straddle the
+session before the move): test both legs."""
+
+[[sources]]
+title = "Gao, C., Xing, Y. and Zhang, X., Anticipating Uncertainty: Straddles around Earnings Announcements, Journal of Financial and Quantitative Analysis, 2018"
+url = "https://resolve.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/anticipating-uncertainty-straddles-around-earnings-announcements/7B34877AD5E06304BA3C55FBA3219FDD"
+
+[[sources]]
+title = "BSIC, Straddling outside and into earnings (practitioner)"
+url = "https://bsic.it/straddling-outside-and-into-earnings/"

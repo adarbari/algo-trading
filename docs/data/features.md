@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-586 stored features in 73 groups, in dependency order; 154 expression features.
+593 stored features in 75 groups, in dependency order; 154 expression features.
 
 ## `option_liquidity@v1`
 
@@ -482,6 +482,27 @@ Which stock or basket a leveraged or inverse fund tracks, from its holdings and 
 | `reference_kind` | label | str | category | open | single_stock, index, sector, commodity, none | What the fund tracks: a single stock, an index, a sector, a commodity, or none (volatility funds, rates funds, funds nothing is known of) | never (none is a value) | `holdings/etf.asset_class`, `holdings/etf.sector`, `instruments/reference.name` |
 | `reference_source` | label | str | category | open | holdings, name_rule | What settled the link, or for a basket its kind: the holdings table or the name rule | reference_kind is none: nothing settled it | `holdings/etf.holding_id`, `instruments/reference.name` |
 | `reference_status` | label | str | category | open | LINKED, BASKET, UNLISTED, NO_REFERENCE | LINKED: one stock found; BASKET: an index, sector or commodity fund; UNLISTED: a stock is named that the reference does not list; NO_REFERENCE: neither holdings nor the name say what it tracks | never | `holdings/etf.holding_id` |
+
+## `cef_nav@v1`
+
+How far a closed-end fund trades from its net asset value, and against its own year. Stored as `rollups/instrument/cef_nav@v1`; reads `events/fund_nav`, `bars/1d` (optional), `events/split` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `nav_per_share` | window | float32 | usd_per_share | personal | >= 0 | The latest net asset value per share known by the session, as the issuer struck it (not split-adjusted) | no NAV is stored for the fund, or none dated within the last 252 sessions | `events/fund_nav.nav` |
+| `nav_date` | window | date | date | personal |  | The date that NAV was struck (known from the session after it) | no NAV is stored for the fund, or none dated within the last 252 sessions | `events/fund_nav.ts` |
+| `cef_discount_to_nav` | window | float32 | decimal | personal | -0.95 .. 5 | The fund's close on the NAV's date over that NAV, minus 1: negative is a discount (-0.10: the shares cost 10% less than the assets), positive a premium | the latest NAV is more than 5 sessions before the session, the fund has no bar on its date, or the NAV is not positive | `events/fund_nav.nav`, `events/fund_nav.ts`, `bars/1d.close`, `events/split.ratio` |
+| `cef_discount_zscore` | window | float32 | ratio | personal | -10 .. 10 | The discount minus its mean over the NAV dates of the last 252 sessions, over their standard deviation: negative is a wider discount than the fund's own year | cef_discount_to_nav is null, fewer than 120 discounts are in the window, or they are all equal | `events/fund_nav.nav`, `events/fund_nav.ts`, `bars/1d.close`, `events/split.ratio` |
+
+## `etf_flows@v1`
+
+How much an iShares fund's share count changed over about a month (creations less redemptions). Stored as `rollups/instrument/etf_flows@v1`; reads `holdings/etf_shares`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `etf_shares_outstanding` | window | float | count | open | >= 0 | The issuer's latest shares outstanding for the fund known by the session (iShares files only) | the fund has no count dated within the last 30 days: not an iShares fund, or not listed in the issuer's file | `holdings/etf_shares.shares_outstanding` |
+| `etf_shares_asof` | window | date | date | open |  | The issuer's date of that count | the fund has no count dated within the last 30 days | `holdings/etf_shares.as_of` |
+| `etf_shares_chg_21d` | window | float32 | decimal | open | -1 .. 20 | The latest count over the count 21 sessions earlier, minus 1: positive is net creation, negative net redemption | the latest count is more than 7 days old, or no count dated within the 7 days up to the session 21 sessions back is stored (the history starts about 2026-10-17) | `holdings/etf_shares.shares_outstanding`, `holdings/etf_shares.as_of` |
 
 ## `share_classes@v1`
 

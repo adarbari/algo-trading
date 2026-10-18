@@ -1,0 +1,29 @@
+# L3 site setting: the Guide's playbook for the site preset iv_rank_high (ADR 0051; docs/ui/guide.md
+# "The playbook page"). Keys and tests as in playbooks/income/vrp_scanner.toml.
+id = "iv_rank_high"
+version = 1  # the preset version this prose was written for
+summary = "Finds liquid optionable names whose implied volatility is in the upper half of its own year's range: the practitioner's gate for selling premium. It is the screen of a candidate edge under test, not a proven trade."
+hit = "A common stock, ADR or ETF (not leveraged or inverse) with listed options, closing above $5 on at least $50M of 20-day dollar volume, whose IV rank is at least 0.5. The highest rank comes first."
+not_checked = "It does not check why implied volatility is high: a report inside the month, a takeover or a crash can each set it. It does not compare implied with realised volatility, and it reads no option chain."
+before_acting = [
+  "One spike sets the year's maximum and lowers every later rank: read feature.iv_percentile beside feature.iv_rank, the percentile is not moved by one day.",
+  "A report inside the month lifts the rank by itself: check rollup.earnings@v1.days_to_earnings. That premium disappears after the report.",
+  "High-rank periods are when realised volatility is also highest. The harness compares the picks with every liquid optionable name, so read its lift, not the picks' win rate.",
+]
+sources = [
+  "tastylive research on IV rank for premium selling (practitioner, not peer reviewed)",
+]
+related = [
+  { id = "vrp_iv_hv", reason = "the volatility premium, which has academic evidence behind it" },
+  { id = "vrp_cross_section", reason = "ranks on implied over realised instead of on the year's range" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+optionable = "Has listed options"
+not_leveraged = "Not a leveraged fund"
+not_inverse = "Not an inverse fund"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+iv_rank = "Implied volatility in the upper half of its year"
