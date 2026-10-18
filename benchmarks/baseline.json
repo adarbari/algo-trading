@@ -1,6 +1,333 @@
 {
   "schema_version": 1,
   "edges": {
+    "momentum_12_1:fifty_two_week_high@h20/all=all": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463527,
+      "decile_sessions": 6.0,
+      "decile_spread": 0.047253102118985923,
+      "decile_t": 2.6371646016913832,
+      "hit_rate": 0.61,
+      "lift": 1.1178468899521532,
+      "mean_excess_picks": 0.01594685776610615,
+      "picks": 300.0,
+      "sessions": 16.0,
+      "top_decile_mean": 0.024235753226662254
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=all:0": {
+      "base_rate": 0.5535248041775457,
+      "bh_mean": 0.009990060438463528,
+      "decile_sessions": 0.0,
+      "hit_rate": 0.6133333333333333,
+      "lift": 1.1080503144654088,
+      "mean_excess_picks": 0.01694685776610615,
+      "picks": 300.0,
+      "sessions": 16.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=all:10": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463527,
+      "decile_sessions": 0.0,
+      "hit_rate": 0.61,
+      "lift": 1.1178468899521532,
+      "mean_excess_picks": 0.01594685776610615,
+      "picks": 300.0,
+      "sessions": 16.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=all:15": {
+      "base_rate": 0.5439512619669278,
+      "bh_mean": 0.008490060438463527,
+      "decile_sessions": 0.0,
+      "hit_rate": 0.61,
+      "lift": 1.121424,
+      "mean_excess_picks": 0.015446857766106149,
+      "picks": 300.0,
+      "sessions": 16.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=all:30": {
+      "base_rate": 0.5352480417754569,
+      "bh_mean": 0.006990060438463527,
+      "decile_sessions": 0.0,
+      "hit_rate": 0.5933333333333334,
+      "lift": 1.108520325203252,
+      "mean_excess_picks": 0.013946857766106149,
+      "picks": 300.0,
+      "sessions": 16.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=all:50": {
+      "base_rate": 0.5204525674499565,
+      "bh_mean": 0.004990060438463527,
+      "decile_sessions": 0.0,
+      "hit_rate": 0.5866666666666667,
+      "lift": 1.1272240802675586,
+      "mean_excess_picks": 0.011946857766106149,
+      "picks": 300.0,
+      "sessions": 16.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=frozen:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=frozen:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=frozen:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=frozen:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=frozen:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=in_sample:0": {
+      "base_rate": 0.5535248041775457,
+      "bh_mean": 0.009990060438463528,
+      "decile_sessions": 0.0,
+      "hit_rate": 0.6133333333333333,
+      "lift": 1.1080503144654088,
+      "mean_excess_picks": 0.01694685776610615,
+      "picks": 300.0,
+      "sessions": 16.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=in_sample:10": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463527,
+      "decile_sessions": 0.0,
+      "hit_rate": 0.61,
+      "lift": 1.1178468899521532,
+      "mean_excess_picks": 0.01594685776610615,
+      "picks": 300.0,
+      "sessions": 16.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=in_sample:15": {
+      "base_rate": 0.5439512619669278,
+      "bh_mean": 0.008490060438463527,
+      "decile_sessions": 0.0,
+      "hit_rate": 0.61,
+      "lift": 1.121424,
+      "mean_excess_picks": 0.015446857766106149,
+      "picks": 300.0,
+      "sessions": 16.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=in_sample:30": {
+      "base_rate": 0.5352480417754569,
+      "bh_mean": 0.006990060438463527,
+      "decile_sessions": 0.0,
+      "hit_rate": 0.5933333333333334,
+      "lift": 1.108520325203252,
+      "mean_excess_picks": 0.013946857766106149,
+      "picks": 300.0,
+      "sessions": 16.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/cost=in_sample:50": {
+      "base_rate": 0.5204525674499565,
+      "bh_mean": 0.004990060438463527,
+      "decile_sessions": 0.0,
+      "hit_rate": 0.5866666666666667,
+      "lift": 1.1272240802675586,
+      "mean_excess_picks": 0.011946857766106149,
+      "picks": 300.0,
+      "sessions": 16.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/frozen=frozen": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/in_sample=in_sample": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463527,
+      "decile_sessions": 6.0,
+      "decile_spread": 0.047253102118985923,
+      "decile_t": 2.6371646016913832,
+      "hit_rate": 0.61,
+      "lift": 1.1178468899521532,
+      "mean_excess_picks": 0.01594685776610615,
+      "picks": 300.0,
+      "sessions": 16.0,
+      "top_decile_mean": 0.024235753226662254
+    },
+    "momentum_12_1:fifty_two_week_high@h20/regime=UNKNOWN": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463527,
+      "decile_sessions": 6.0,
+      "decile_spread": 0.047253102118985923,
+      "decile_t": 2.6371646016913832,
+      "hit_rate": 0.61,
+      "lift": 1.1178468899521532,
+      "mean_excess_picks": 0.01594685776610615,
+      "picks": 300.0,
+      "sessions": 16.0,
+      "top_decile_mean": 0.024235753226662254
+    },
+    "momentum_12_1:fifty_two_week_high@h20/regime_part=UNKNOWN:in_sample": {
+      "base_rate": 0.5456919060052219,
+      "bh_mean": 0.008990060438463527,
+      "decile_sessions": 6.0,
+      "decile_spread": 0.047253102118985923,
+      "decile_t": 2.6371646016913832,
+      "hit_rate": 0.61,
+      "lift": 1.1178468899521532,
+      "mean_excess_picks": 0.01594685776610615,
+      "picks": 300.0,
+      "sessions": 16.0,
+      "top_decile_mean": 0.024235753226662254
+    },
+    "momentum_12_1:fifty_two_week_high@h20/regime_part=UNKNOWN:out_of_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:fifty_two_week_high@h20/year=2020": {
+      "base_rate": 0.5404040404040404,
+      "bh_mean": 0.008701354993718446,
+      "decile_sessions": 1.0,
+      "decile_spread": 0.10300158324391537,
+      "hit_rate": 0.68,
+      "lift": 1.2583177570093458,
+      "mean_excess_picks": 0.021473535493157652,
+      "picks": 50.0,
+      "sessions": 11.0,
+      "top_decile_mean": 0.053991592051363
+    },
+    "momentum_12_1:fifty_two_week_high@h20/year=2021": {
+      "base_rate": 0.5574229691876751,
+      "bh_mean": 0.00963054982848623,
+      "decile_sessions": 5.0,
+      "decile_spread": 0.036103405894000025,
+      "decile_t": 2.101607044957151,
+      "hit_rate": 0.596,
+      "lift": 1.0692060301507538,
+      "mean_excess_picks": 0.01484152222069585,
+      "picks": 250.0,
+      "sessions": 5.0,
+      "top_decile_mean": 0.018284585461722097
+    },
+    "momentum_12_1:frog_in_the_pan@h20/all=all": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=all:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=all:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=all:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=all:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=all:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=frozen:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=frozen:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=frozen:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=frozen:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=frozen:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=in_sample:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=in_sample:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=in_sample:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=in_sample:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/cost=in_sample:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/frozen=frozen": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/in_sample=in_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/regime=UNKNOWN": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/regime_part=UNKNOWN:in_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/regime_part=UNKNOWN:out_of_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/year=2020": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:frog_in_the_pan@h20/year=2021": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
     "momentum_12_1:momentum_12_1@h20/all=all": {
       "base_rate": 0.5456919060052219,
       "bh_mean": 0.008990060438463524,
@@ -212,6 +539,236 @@
       "picks": 250.0,
       "sessions": 5.0,
       "top_decile_mean": 0.03431121594023941
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/all=all": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=all:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=all:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=all:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=all:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=all:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=frozen:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=frozen:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=frozen:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=frozen:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=frozen:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=in_sample:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=in_sample:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=in_sample:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=in_sample:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/cost=in_sample:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/frozen=frozen": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/in_sample=in_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/regime=UNKNOWN": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/regime_part=UNKNOWN:in_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/regime_part=UNKNOWN:out_of_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/year=2020": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:momentum_x_quality_interaction@h20/year=2021": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/all=all": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=all:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=all:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=all:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=all:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=all:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=frozen:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=frozen:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=frozen:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=frozen:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=frozen:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=in_sample:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=in_sample:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=in_sample:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=in_sample:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/cost=in_sample:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/frozen=frozen": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/in_sample=in_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/regime=UNKNOWN": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/regime_part=UNKNOWN:in_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/regime_part=UNKNOWN:out_of_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/year=2020": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:residual_momentum@h20/year=2021": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
     },
     "momentum_12_1:size_small@h20/all=all": {
       "base_rate": 0.5456919060052219,
@@ -425,6 +982,121 @@
       "picks": 250.0,
       "sessions": 5.0,
       "top_decile_mean": -0.007086027095698352
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/all=all": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=all:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=all:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=all:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=all:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=all:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=frozen:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=frozen:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=frozen:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=frozen:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=frozen:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=in_sample:0": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=in_sample:10": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=in_sample:15": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=in_sample:30": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/cost=in_sample:50": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/frozen=frozen": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/in_sample=in_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/regime=UNKNOWN": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/regime_part=UNKNOWN:in_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/regime_part=UNKNOWN:out_of_sample": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/year=2020": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
+    },
+    "momentum_12_1:volatility_scaled_momentum@h20/year=2021": {
+      "decile_sessions": 0.0,
+      "picks": 0.0,
+      "sessions": 0.0
     }
   },
   "results": {
