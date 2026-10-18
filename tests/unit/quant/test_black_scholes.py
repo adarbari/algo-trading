@@ -146,3 +146,76 @@ def test_a_strike_or_probability_is_nan_without_a_positive_vol_or_time_and_refus
         bs.strike_from_delta(100.0, 0.2, 0.1, 1.2, "put")
     with pytest.raises(ValueError):
         bs.prob_otm(100.0, 90.0, 0.2, 0.1, "straddle")
+
+
+# ---- the at-the-money straddle and the delta-hedged vega P&L (option_model_pnl) ----------
+
+
+@pytest.mark.parametrize("sigma", [0.1, 0.3, 0.8])
+@pytest.mark.parametrize("t", [5 / 252, 21 / 252, 1.0])
+def test_the_atm_straddle_closed_form_is_the_call_plus_the_put(sigma: float, t: float) -> None:
+    call = bs.price(1.0, 1.0, t, 0.0, 0.0, sigma, True)
+    both = call + bs.price(1.0, 1.0, t, 0.0, 0.0, sigma, False)
+    assert float(bs.atm_straddle_price(sigma, t)) == pytest.approx(float(both), rel=1e-12)
+    assert float(bs.atm_straddle_price(sigma, t, price=50.0)) == pytest.approx(50 * float(both))
+
+
+def test_the_atm_straddle_known_value_and_the_small_vol_rule_of_thumb() -> None:
+    # 0.8 s sqrt(t) is the classic ATM straddle price; exact: 2 (2 N(s sqrt(t) / 2) - 1)
+    assert float(bs.atm_straddle_price(0.30, 0.25)) == pytest.approx(0.11957, abs=1e-5)
+    assert float(bs.atm_straddle_price(0.30, 21 / 252)) == pytest.approx(
+        0.8 * 0.30 * (21 / 252) ** 0.5, rel=5e-3
+    )
+
+
+@pytest.mark.parametrize("sigma", [0.15, 0.4])
+def test_the_atm_straddle_vega_matches_the_greeks_and_a_finite_difference(sigma: float) -> None:
+    t = 21 / 252
+    g = bs.greeks(1.0, 1.0, t, 0.0, 0.0, sigma, True)
+    assert float(bs.atm_straddle_vega(sigma, t)) == pytest.approx(2 * float(g.vega), rel=1e-12)
+    h = 1e-6
+    fd = (bs.atm_straddle_price(sigma + h, t) - bs.atm_straddle_price(sigma - h, t)) / (2 * h)
+    assert float(bs.atm_straddle_vega(sigma, t)) == pytest.approx(float(fd), rel=1e-6)
+
+
+def test_the_straddle_is_nan_without_a_positive_vol_or_time() -> None:
+    assert np.isnan(bs.atm_straddle_price([0.0, -1.0, 0.3], [0.1, 0.1, 0.0])).all()
+    assert np.isnan(bs.atm_straddle_vega([0.0, 0.3], [0.1, 0.0])).all()
+    assert np.isnan(bs.delta_hedged_vega_pnl(0.3, [0.0, -0.1])).all()
+
+
+def test_the_delta_hedged_vega_pnl_signs_and_known_value() -> None:
+    pnl = bs.delta_hedged_vega_pnl([0.4, 0.3, 0.2], 0.3)
+    assert pnl[0] > 0 and pnl[1] == 0 and pnl[2] < 0  # long vol earns when realised > implied
+    assert pnl[0] == pytest.approx((0.16 - 0.09) / 0.6)
+    near = float(bs.delta_hedged_vega_pnl(0.31, 0.30))
+    assert near == pytest.approx(0.01, rel=0.02)  # ~ realised - implied when they are close
+
+
+def test_the_vega_pnl_approximation_matches_a_seeded_delta_hedged_simulation() -> None:
+    """A long ATM straddle bought at ``iv`` and delta-hedged daily (deltas at ``iv``) over paths
+    that move at ``rv``: in expectation it earns the straddle's price at ``rv`` less at ``iv``
+    (the underlying is a martingale, the hedge adds zero), which the vega form approximates."""
+    iv, rv, steps, paths = 0.30, 0.34, 21, 40_000
+    years = steps / 252
+    rng = np.random.default_rng(7)
+    dt = 1 / 252
+    shocks = rng.standard_normal((paths, steps))
+    log_moves = -0.5 * rv * rv * dt + rv * np.sqrt(dt) * shocks
+    spot = np.exp(np.concatenate([np.zeros((paths, 1)), np.cumsum(log_moves, axis=1)], axis=1))
+    hedge = np.zeros(paths)
+    for i in range(steps):
+        left = years - i * dt
+        d1 = 0.5 * iv * np.sqrt(left) + np.log(spot[:, i]) / (iv * np.sqrt(left))
+        straddle_delta = 2 * bs.norm_cdf(d1) - 1
+        hedge -= straddle_delta * (spot[:, i + 1] - spot[:, i])
+    pnl = np.abs(spot[:, -1] - 1.0) - float(bs.atm_straddle_price(iv, years)) + hedge
+    exact = float(bs.atm_straddle_price(rv, years) - bs.atm_straddle_price(iv, years))
+    assert pnl.mean() == pytest.approx(exact, abs=4 * pnl.std() / np.sqrt(paths))
+    approx = float(bs.atm_straddle_vega(iv, years) * bs.delta_hedged_vega_pnl(rv, iv))
+    assert approx == pytest.approx(exact, rel=0.10)  # second order: it overshoots a wide gap
+    assert approx == pytest.approx(pnl.mean(), rel=0.12)
+    close = float(bs.atm_straddle_vega(iv, years) * bs.delta_hedged_vega_pnl(0.31, iv))
+    assert close == pytest.approx(
+        float(bs.atm_straddle_price(0.31, years) - bs.atm_straddle_price(iv, years)), rel=0.02
+    )

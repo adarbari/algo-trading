@@ -563,6 +563,13 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: settled by the architect reviewer of #644 (the format accepts no `architect` decider); the edge can be scored now instead of from November; the read-only broker boundary is untouched (it reads a stored rollup).
 
+## 2026-10-17 | EB H8 (option model P&L) | Short delta-hedged side, stored basis, short put
+- Question: how is the short side of the delta-hedged straddle expressed, where does `basis = "model"` live, and when does the short-put P&L land?
+- Options: a `side` key / a separate structure value; a stored `edge_eval` basis column now / with the chain P&L grain (H13); short put in H8 / a follow-up PR.
+- Decision: a separate structure value `delta_hedged_atm_short` (Guide entry, coverage, fitness test; no `side` key); the stored basis column waits for H13 (today `Outcome.basis`, page text and Guide); the short-put P&L is a follow-up PR.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a value per structure keeps every position one enum value with its own Guide entry; a column on a stored table is a schema change that belongs with the chain grain; a put needs a strike key and a put price that H8's three straddle structures do not.
 ## 2026-10-18 | PR #645 (E1b filing_activity) | The 8-K span ends at the previous session
 - Question: may `filing_activity@v1.filing_count_5d` count 8-Ks through the session itself?
 - Options: through S, with coverage read from row presence / through S-1 (filings known before S-1's close), coverage from the filings walk's `walked_to`.

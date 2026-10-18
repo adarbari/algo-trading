@@ -17,6 +17,7 @@ from algotrade.quant.edges.statistics import (
     sharpe,
     sharpe_t,
 )
+from algotrade.services.evaluation.cross_section.detail.windows import counts_wins
 from algotrade.services.evaluation.cross_section.measures import (
     CostGrid,
     Pick,
@@ -384,6 +385,16 @@ def test_a_session_with_no_counted_pick_has_no_excess_wins() -> None:
     one = wins_stat(date(2026, 1, 5), (1.0, 2.0), 1, 4)
     assert trial_value(one, True) == pytest.approx(0.5 - 0.4)
     assert trial_value(one, False) == pytest.approx(1.5)
+
+
+def test_a_model_pnl_that_wins_often_but_loses_on_average_is_not_scored_on_its_win_rate() -> None:
+    """An 80%-win short straddle with a negative mean P&L: the unit's trial value is the mean."""
+    session = stat(date(2026, 1, 5), (0.01, 0.01, 0.01, 0.01, -0.09), (0.0,), 4, base_hits=1)
+    assert session.pick_hits == 4 and session.pick_mean < 0
+    value = trial_value(session, counts_wins("pnl"))
+    assert value is not None and value < 0  # the win rate would have read +0.8 - base
+    wins = trial_value(session, counts_wins("cushion"))
+    assert wins is not None and wins > 0
 
 
 @dataclass(frozen=True)
