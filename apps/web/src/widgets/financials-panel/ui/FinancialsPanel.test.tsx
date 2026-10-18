@@ -3,14 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
-import { FINANCIALS_PARTS, KEY_METRICS, SECTIONS } from '../model/sections';
+import { FINANCIALS_NAMES, KEY_METRICS, SECTIONS } from '../model/sections';
 import { FinancialsPanel } from './FinancialsPanel';
 
-const hooks = vi.hoisted(() => ({ useInstrumentFacts: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useInstrumentFacts: vi.fn(), useFeatureValues: vi.fn() }));
 
 vi.mock('@/entities/instrument', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useInstrumentFacts: hooks.useInstrumentFacts,
+  useFeatureValues: hooks.useFeatureValues,
 }));
 
 vi.mock('@/features/guide-help', async () => {
@@ -64,16 +65,35 @@ const stock = {
   ],
 };
 
+type Facts = ReturnType<typeof fakeQuery<{ session: typeof session; instrument: typeof stock }>>;
+
+/** Serve one fixture the way the panel reads it: the identity apart, the figures by name. */
+function serve(facts: Facts | ReturnType<typeof fakeQuery<undefined>>) {
+  const data = facts.data as { session: typeof session; instrument: typeof stock } | undefined;
+  hooks.useInstrumentFacts.mockReturnValue(
+    fakeQuery(data && { session: data.session, instrument: { ...data.instrument, features: [] } }, {
+      isError: facts.isError,
+    }),
+  );
+  hooks.useFeatureValues.mockReturnValue({
+    values: new Map((data?.instrument.features ?? []).map((v) => [v.name, v])),
+    session: data?.session.date ?? null,
+    isPending: facts.isPending,
+    isError: facts.isError,
+    refetch: facts.refetch,
+  });
+}
+
 beforeEach(() => {
-  hooks.useInstrumentFacts.mockReturnValue(fakeQuery({ session, instrument: stock }));
+  serve(fakeQuery({ session, instrument: stock }));
 });
 
 describe('FinancialsPanel', () => {
-  it('asks for every figure in three requests and leads with the key metrics', async () => {
+  it('asks for every figure in one read of one session and leads with the key metrics', async () => {
     const { container } = render(<FinancialsPanel symbol="KO" />);
-    expect(hooks.useInstrumentFacts).toHaveBeenCalledWith('KO', FINANCIALS_PARTS[0]);
-    expect(hooks.useInstrumentFacts).toHaveBeenCalledWith('KO', FINANCIALS_PARTS[1]);
-    expect(hooks.useInstrumentFacts).toHaveBeenCalledWith('KO', FINANCIALS_PARTS[2]);
+    expect(hooks.useFeatureValues).toHaveBeenCalledWith('KO', FINANCIALS_NAMES);
+    // the identity read asks for no figure
+    expect(hooks.useInstrumentFacts).toHaveBeenCalledWith('KO', []);
     const strip = screen.getByRole('region', { name: 'KO key financials' });
     expect(strip).toHaveTextContent('Operating margin');
     expect(strip).toHaveTextContent('P/E ratio');
@@ -124,7 +144,7 @@ describe('FinancialsPanel', () => {
   });
 
   it('says a fund has no financials', () => {
-    hooks.useInstrumentFacts.mockReturnValue(
+    serve(
       fakeQuery({ session, instrument: { ...stock, symbol: 'SPY', isEtf: true, features: [] } }),
     );
     render(<FinancialsPanel symbol="SPY" />);
@@ -134,13 +154,26 @@ describe('FinancialsPanel', () => {
   });
 
   it('shows loading and error states', () => {
-    hooks.useInstrumentFacts.mockReturnValue(fakeQuery(undefined));
+    serve(fakeQuery(undefined));
     const { unmount } = render(<FinancialsPanel symbol="KO" />);
     expect(screen.getByText('Loading KO…')).toBeInTheDocument();
     unmount();
-    hooks.useInstrumentFacts.mockReturnValue(fakeQuery(undefined, { isError: true }));
+    serve(fakeQuery(undefined, { isError: true }));
     render(<FinancialsPanel symbol="KO" />);
     expect(screen.getByText('KO failed to load.')).toBeInTheDocument();
+  });
+
+  it('retries both reads', () => {
+    const refetch = vi.fn(() => Promise.resolve());
+    serve(fakeQuery(undefined, { isError: true, refetch }));
+    const identityRefetch = vi.fn(() => Promise.resolve());
+    hooks.useInstrumentFacts.mockReturnValue(
+      fakeQuery(undefined, { isError: true, refetch: identityRefetch }),
+    );
+    render(<FinancialsPanel symbol="KO" />);
+    screen.getByRole('button', { name: /retry/i }).click();
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(identityRefetch).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -160,7 +193,7 @@ const withAnalysts = (analysts: readonly (typeof stock.features)[number][]) =>
 
 describe('the analysts section', () => {
   it('shows a covered name row by row with its status badges', () => {
-    hooks.useInstrumentFacts.mockReturnValue(
+    serve(
       withAnalysts([
         known('rollup.analyst_targets@v1.target_consensus', 210, 'CURRENCY', 'usd'),
         known('feature.target_upside', 0.15, 'PERCENT', 'decimal'),
@@ -179,9 +212,7 @@ describe('the analysts section', () => {
   });
 
   it('says it once when the name is not covered, with the kind and its Guide term', async () => {
-    hooks.useInstrumentFacts.mockReturnValue(
-      withAnalysts([...analystNames, ...STATUSES].map(notCovered)),
-    );
+    serve(withAnalysts([...analystNames, ...STATUSES].map(notCovered)));
     const { container } = render(<FinancialsPanel symbol="KO" />);
     const section = screen.getByLabelText('Analysts: targets, ratings and estimates');
     expect(section).toHaveTextContent('Analyst figures');
@@ -196,7 +227,7 @@ describe('the analysts section', () => {
   });
 
   it('keeps a status badge that holds a value beside the collapsed row', () => {
-    hooks.useInstrumentFacts.mockReturnValue(
+    serve(
       withAnalysts([
         ...analystNames.map(notCovered),
         known(STATUSES[0] ?? '', 'NOT_FETCHED', 'TEXT'),
@@ -212,7 +243,7 @@ describe('the analysts section', () => {
   });
 
   it('says a licence gap once too, by its own kind', () => {
-    hooks.useInstrumentFacts.mockReturnValue(withAnalysts(analystNames.map(licence)));
+    serve(withAnalysts(analystNames.map(licence)));
     render(<FinancialsPanel symbol="KO" />);
     const section = screen.getByLabelText('Analysts: targets, ratings and estimates');
     expect(section).toHaveTextContent('Analyst figures');
@@ -223,9 +254,7 @@ describe('the analysts section', () => {
 
   it('keeps every row when the gaps differ in kind or one row has a value', () => {
     const [first = '', second = '', ...others] = analystNames;
-    hooks.useInstrumentFacts.mockReturnValue(
-      withAnalysts([notCovered(first), licence(second), ...others.map(notCovered)]),
-    );
+    serve(withAnalysts([notCovered(first), licence(second), ...others.map(notCovered)]));
     const { unmount } = render(<FinancialsPanel symbol="KO" />);
     let section = screen.getByLabelText('Analysts: targets, ratings and estimates');
     expect(section).toHaveTextContent('Price target (consensus)');
@@ -234,7 +263,7 @@ describe('the analysts section', () => {
     expect(screen.queryByText('Analyst figures')).not.toBeInTheDocument();
     unmount();
 
-    hooks.useInstrumentFacts.mockReturnValue(
+    serve(
       fakeQuery({
         session,
         instrument: {
@@ -259,7 +288,7 @@ describe('the ratings and revisions rows', () => {
   const revisionNames = rows.filter((r) => r.name.includes('analyst_revisions')).map((r) => r.name);
 
   it('shows the five counts, the score, its change and the month, then the revisions, as served', () => {
-    hooks.useInstrumentFacts.mockReturnValue(
+    serve(
       withAnalysts([
         known('rollup.analyst_ratings@v1.rating_strong_buy', 12, 'INTEGER'),
         known('rollup.analyst_ratings@v1.rating_buy', 18, 'INTEGER'),
@@ -292,9 +321,7 @@ describe('the ratings and revisions rows', () => {
   });
 
   it('collapses to the one row when the new rows and every other row share a kind', () => {
-    hooks.useInstrumentFacts.mockReturnValue(
-      withAnalysts([...ratingNames, ...revisionNames, ...analystNames].map(notCovered)),
-    );
+    serve(withAnalysts([...ratingNames, ...revisionNames, ...analystNames].map(notCovered)));
     render(<FinancialsPanel symbol="KO" />);
     const section = screen.getByLabelText('Analysts: targets, ratings and estimates');
     expect(section).toHaveTextContent('Analyst figures');
@@ -306,7 +333,7 @@ describe('the ratings and revisions rows', () => {
     const [rating = '', ...otherRatings] = ratingNames;
     const [revision = '', ...otherRevisions] = revisionNames;
     const rest = analystNames.filter((n) => n !== rating && n !== revision);
-    hooks.useInstrumentFacts.mockReturnValue(
+    serve(
       withAnalysts([
         licence(rating),
         ...otherRatings.map(notCovered),
@@ -321,7 +348,7 @@ describe('the ratings and revisions rows', () => {
     expect(screen.queryByText('Analyst figures')).not.toBeInTheDocument();
     unmount();
 
-    hooks.useInstrumentFacts.mockReturnValue(
+    serve(
       withAnalysts([
         known(revision, 0.02, 'PERCENT', 'decimal'),
         ...otherRevisions.map(notCovered),
@@ -335,7 +362,7 @@ describe('the ratings and revisions rows', () => {
   });
 
   it('keeps the valued ratings and revisions badges beside the collapsed row', () => {
-    hooks.useInstrumentFacts.mockReturnValue(
+    serve(
       withAnalysts([
         ...[...ratingNames, ...revisionNames, ...analystNames].map(notCovered),
         notCovered(STATUSES[0] ?? ''),
@@ -353,7 +380,7 @@ describe('the ratings and revisions rows', () => {
   });
 
   it('has no accessibility violations with the rows shown', async () => {
-    hooks.useInstrumentFacts.mockReturnValue(
+    serve(
       withAnalysts([
         known('rollup.analyst_ratings@v1.rating_score', 4.31, 'NUMBER', 'ratio'),
         known(STATUSES[2] ?? '', 'STALE', 'TEXT'),
@@ -361,31 +388,5 @@ describe('the ratings and revisions rows', () => {
     );
     const { container } = render(<FinancialsPanel symbol="KO" />);
     await expectNoA11yViolations(container);
-  });
-});
-
-describe('the session of the three requests', () => {
-  const at = (date: string, features = stock.features) =>
-    fakeQuery({ session: { ...session, date }, instrument: { ...stock, features } });
-
-  it('shows the panel when every request answers for the same session', () => {
-    hooks.useInstrumentFacts.mockReturnValue(at('2026-10-02'));
-    render(<FinancialsPanel symbol="KO" />);
-    expect(screen.getByRole('heading', { name: 'Growth' })).toBeInTheDocument();
-    expect(screen.queryByText('KO loaded for two different sessions.')).not.toBeInTheDocument();
-  });
-
-  it('shows the error state with its Guide term and retries all three when two differ', () => {
-    const refetch = vi.fn();
-    const lagging = { ...at('2026-10-01'), refetch };
-    hooks.useInstrumentFacts.mockImplementation((_key: string, names: unknown) =>
-      names === FINANCIALS_PARTS[2] ? lagging : { ...at('2026-10-02'), refetch },
-    );
-    render(<FinancialsPanel symbol="KO" />);
-    expect(screen.getByText('KO loaded for two different sessions.')).toBeInTheDocument();
-    expect(screen.getAllByText('term financials_panel')).toHaveLength(2);
-    expect(screen.queryByRole('heading', { name: 'Growth' })).not.toBeInTheDocument();
-    screen.getByRole('button', { name: /retry/i }).click();
-    expect(refetch).toHaveBeenCalledTimes(3);
   });
 });

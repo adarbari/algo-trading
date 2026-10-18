@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { NAMES_PER_REQUEST } from '@/entities/instrument';
 
-import { FINANCIALS_PARTS, KEY_METRICS, SECTIONS } from './sections';
+import { FINANCIALS_NAMES, KEY_METRICS, SECTIONS } from './sections';
 
 describe('the key metrics strip', () => {
   it('has the owner nine, in the owner order', () => {
@@ -95,10 +95,9 @@ describe('the analysts section', () => {
 });
 
 describe('the names the panel sends', () => {
-  it('stay within the API cap per request and cover every strip and section name', () => {
-    expect(FINANCIALS_PARTS).toHaveLength(3);
-    for (const part of FINANCIALS_PARTS) expect(part.length).toBeLessThanOrEqual(NAMES_PER_REQUEST);
-    const sent = new Set(FINANCIALS_PARTS.flat());
+  it('fit one request (ten slots of the API cap) and cover every strip and section name', () => {
+    expect(FINANCIALS_NAMES.length).toBeLessThanOrEqual(10 * NAMES_PER_REQUEST);
+    const sent = new Set(FINANCIALS_NAMES);
     for (const m of KEY_METRICS) expect(sent.has(m.name)).toBe(true);
     for (const section of SECTIONS) {
       for (const name of [...section.statuses, ...section.rows.map((r) => r.name)]) {
@@ -107,13 +106,10 @@ describe('the names the panel sends', () => {
     }
   });
 
-  it('send the analyst names in their own request and no name twice', () => {
-    const [, , analystPart = []] = FINANCIALS_PARTS;
-    expect(analystPart).toContain('rollup.analyst_targets@v1.target_consensus');
-    expect(analystPart).toContain('rollup.analyst_ratings@v1.ratings_status');
-    expect(analystPart).toContain('rollup.analyst_revisions@v1.eps_fy1_revision_30d');
-    expect(analystPart).toHaveLength(32);
-    const all = FINANCIALS_PARTS.flat();
-    expect(new Set(all).size).toBe(all.length);
+  it('send the ratings and revisions names and no name twice', () => {
+    expect(FINANCIALS_NAMES).toContain('rollup.analyst_targets@v1.target_consensus');
+    expect(FINANCIALS_NAMES).toContain('rollup.analyst_ratings@v1.ratings_status');
+    expect(FINANCIALS_NAMES).toContain('rollup.analyst_revisions@v1.eps_fy1_revision_30d');
+    expect(new Set(FINANCIALS_NAMES).size).toBe(FINANCIALS_NAMES.length);
   });
 });

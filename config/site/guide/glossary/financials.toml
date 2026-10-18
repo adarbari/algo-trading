@@ -11,7 +11,7 @@ short = "A company's reported results and the market's forecasts for it, in six 
 body = """
 The panel reads what a company has told the SEC (revenue, profit, debt, cash) and sets it beside what analysts expect and what the share price implies. Growth asks how fast sales and profit are rising. Profitability asks how much of each sales dollar is kept. Balance sheet and cash flow ask whether the company can pay its way. Valuation asks what the market charges for it. Earnings asks whether the last report beat the forecast and which way forecasts are moving. Analysts asks what the forecasts and price targets say about the coming years.
 
-Every figure is the one known by the session's date, by the day the filing was public, so the panel never shows a report the market had not yet seen. A figure the app cannot show is marked with the reason, never filled in. Funds have no financials, and a foreign company that does not report in dollars has none here. The panel reads its parts together. If a nightly update lands between them and two parts are for different sessions, the panel says so and a retry reads them again.
+Every figure is the one known by the session's date, by the day the filing was public, so the panel never shows a report the market had not yet seen. A figure the app cannot show is marked with the reason, never filled in. Funds have no financials, and a foreign company that does not report in dollars has none here.
 """
 see_also = ["financials_growth", "financials_profitability", "financials_balance_cash", "financials_valuation", "financials_earnings", "financials_analyst", "session", "unknown", "ttm"]
 
@@ -79,7 +79,7 @@ This section sets the market's forecasts beside the reported results. The estima
 
 Most names have no analyst figures here. The free data source covers a minority of mostly large names, and a missing figure never means analysts expect nothing. When every figure is missing for the same reason, the section says it once. Analysts' EPS usually leaves out one-off items, so forward P/E and the P/E of reported earnings are measured differently: compare them as a rough guide. One or two analysts is an opinion, not a consensus. Check the number of analysts before trusting a forward figure.
 
-The ratings are the monthly count of analysts at strong buy, buy, hold, sell and strong sell, with the mean score from 1 (strong sell) to 5 (strong buy) and its change over 90 days. The revisions are how the FY1 estimates moved over 30, 60 and 90 days, and how the number of analysts behind them changed. A revision status of BUILDING or NO_PRIOR means we hold too little history for every window yet. It does not mean the estimates did not move.
+The ratings are the monthly count of analysts at strong buy, buy, hold, sell and strong sell. The score is their mean, from 1 (strong sell) to 5 (strong buy), with its change over 90 days. The revisions are how the FY1 estimates moved over 30, 60 and 90 days, and how the number of analysts behind them changed. A revision status of BUILDING or NO_PRIOR means we hold too little history for every window yet. It does not mean the estimates did not move.
 """
 see_also = ["financials_panel", "consensus_forecast", "unavailable_not_covered", "financials_valuation", "forecast_revision"]
 

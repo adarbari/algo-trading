@@ -293,20 +293,10 @@ const namesOf = (sections: readonly SectionSpec[], extra: readonly RowSpec[] = [
   ]),
 ];
 
-const BALANCE = SECTIONS.filter((s) => s.id === 'balance');
-const ANALYSTS = SECTIONS.filter((s) => s.id === 'analysts');
-
 /**
- * The catalogue features the panel asks for, in three requests (the API caps `features(names)`
- * at `NAMES_PER_REQUEST`): the strip and the sections that are neither the balance sheet nor
- * the analysts, then the balance sheet and cash flow, then the analysts. A test keeps each part
- * under the cap.
+ * The catalogue features the panel asks for, in one call of `useFeatureValues`: it carries up to
+ * ten slots of `NAMES_PER_REQUEST` names in one request, so every figure on the panel is for the
+ * one session that request resolved (a nightly publish never leaves two sessions on screen). A
+ * test keeps the list within that one request.
  */
-export const FINANCIALS_PARTS: readonly (readonly SiteFeature[])[] = [
-  namesOf(
-    SECTIONS.filter((s) => s.id !== 'balance' && s.id !== 'analysts'),
-    KEY_METRICS,
-  ),
-  namesOf(BALANCE),
-  namesOf(ANALYSTS),
-];
+export const FINANCIALS_NAMES: readonly SiteFeature[] = namesOf(SECTIONS, KEY_METRICS);
