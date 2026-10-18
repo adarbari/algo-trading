@@ -542,8 +542,8 @@ follow-up PR).
 
 ## 2026-10-18 | PR #645 (E1b filing_activity) | The 8-K span ends at the previous session
 - Question: may `filing_activity@v1.filing_count_5d` count 8-Ks through the session itself?
-- Options: through S, with coverage read from row presence / through S-1's index cut-off, coverage from the filings walk's `walked_to`.
-- Decision: the span ends at S-1 (acceptances through 17:30 New York time on S-1, the 5 sessions ending there), and the value is null unless a clean walk of a session on or before S reached S-1. `feature.news_free_5d` means no 8-K through S-1 and no earnings window in the last 5 sessions.
+- Options: through S, with coverage read from row presence / through S-1 (filings known before S-1's close), coverage from the filings walk's `walked_to`.
+- Decision: the span ends at S-1 (filings that became known on or before S-1, so accepted before S-1's close, over the 5 sessions ending there; only 8-K and 8-K/A rows), and the value is null unless a clean walk of a session on or before S reached S-1. `feature.news_free_5d` means no 8-K through S-1 and no earnings window in the last 5 sessions.
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
-- Reasoning: the nightly starts about 18:00 New York time and SEC lists 17:30-22:00 acceptances in the next day's index, so S's own 8-Ks are usually unstored when the nightly runs; counting through S read 0 live and 1 on a recompute. The span through S-1 gives the same value live and in a backtest. A history before the first nightly walk reads null.
+- Reasoning: the nightly starts about 18:00 New York time and SEC lists 17:30-22:00 acceptances in the next day's index, so S's own 8-Ks are usually unstored when the nightly runs; counting through S read 0 live and 1 on a recompute. The span through S-1 gives the same value live and in a backtest. A history before the first nightly walk reads null. Known limits: the session after a market day EDGAR was closed reads null, and on a SEC-only holiday Friday an after-17:30 acceptance can be missing from the walked index until the next walk.

@@ -3,7 +3,7 @@ because S's index is unread on the night of S), the walk that says how far they 
 earnings reaction windows in the last 5 sessions, and the nulls that stop an unknown being read
 as "no news"."""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 import numpy as np
 import pandas as pd
@@ -33,12 +33,12 @@ FIRST = sessions_ending(SESSION, 6)[0]  # S-5: its first session
 NIGHT = "filings/walk"
 
 
-def _filings(rows: list[tuple[str, date]], hour: float = 12.0) -> pd.DataFrame:
+def _filings(rows: list[tuple[str, date]], hour: float = 12.0, form: str = "8-K") -> pd.DataFrame:
     """(instrument, known_from) rows accepted at ``hour`` New York time on their day (UTC hour
     +4 in October)."""
     frame = [
         {"instrument_id": i, "ts": pd.Timestamp(k, tz="UTC") + pd.Timedelta(hours=hour + 4),
-         "event_date": k, "accession": f"{i}-{k}-{n}", "form": "8-K"}
+         "event_date": k, "accession": f"{i}-{k}-{n}", "form": form}
         for n, (i, k) in enumerate(rows)
     ]  # fmt: skip
     return stamped(frame, SESSION, "f")
@@ -213,3 +213,42 @@ def test_volume_shock_and_news_free_flags() -> None:
         "EQ:UNK": None,
         "EQ:NOVOL": None,
     }
+
+
+def test_only_8k_forms_count() -> None:
+    """events/filing also holds late-filing notices, tender offers, Form 25 and prospectuses."""
+    rows = pd.concat(
+        [
+            _filings([("EQ:A", PREV), ("EQ:B", GRID[0]), ("EQ:C", GRID[0])]),
+            _filings([("EQ:A", PREV), ("EQ:B", PREV)], form="424B4"),
+            _filings([("EQ:B", PREV)], form="NT 10-K"),
+            _filings([("EQ:C", PREV)], form="8-K/A"),
+        ],
+        ignore_index=True,
+    )
+    assert _compute(rows)["filing_count_5d"].tolist() == [1, 0, 1]  # 8-K and 8-K/A only
+
+
+def test_a_1630_acceptance_on_the_previous_session_is_outside_the_span_live_and_recomputed() -> (
+    None
+):
+    """Accepted after S-1's close: known from S, so a night-S run and a recompute agree."""
+    writer, reader = store()
+    write_bars(writer, {"EQ:A": series(260)})
+    accepted = pd.Timestamp(PREV, tz="America/New_York") + pd.Timedelta(hours=16, minutes=30)
+    old = pd.Timestamp(GRID[0], tz="America/New_York") + pd.Timedelta(hours=12)
+    rows = [
+        {"instrument_id": "EQ:A", "ts": accepted.tz_convert("UTC"), "known_from": PREV,
+         "accession": "late", "form": "8-K", "cik": "1", "filing_date": PREV, "items": "7.01"},
+        {"instrument_id": "EQ:A", "ts": old.tz_convert("UTC"), "known_from": GRID[0],
+         "accession": "old", "form": "8-K", "cik": "1", "filing_date": GRID[0], "items": "7.01"},
+    ]  # fmt: skip
+    write_rows(writer, "events/filing", SESSION, rows)  # even a stale stamp: the instant decides
+    for night in (SESSION, SESSION + timedelta(days=3)):  # live, then after later nights
+        record = start_run("filings", night, datetime.combine(night, time(22), tzinfo=UTC))
+        record.finish(datetime.combine(night, time(23), tzinfo=UTC), stats={"walked_to": PREV})
+        writer.save_run(record)
+    out = compute_in_memory(reader, [price_stats.GROUP, GROUP], [SESSION])
+    frame = out[GROUP.key][0].frame
+    assert frame is not None
+    assert frame["filing_count_5d"].tolist() == [0]  # known from S: not in the span

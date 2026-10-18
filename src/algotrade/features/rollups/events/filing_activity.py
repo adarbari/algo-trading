@@ -11,22 +11,24 @@ stored ``known_from``),
 by the first column) and ``price_stats@v2`` for the names traded on the session. One row per
 operating company with a ``price_stats@v2`` row.
 
-    filing_count_5d  8-K and 8-K/A filings of the instrument accepted through the previous
-                     session's index cut-off (17:30 New York time on S-1), over the 5 sessions
-                     ending at S-1: the span ends at S-1, never at S; 0: none
+    filing_count_5d  8-K and 8-K/A filings of the instrument (no other form: ``events/filing``
+                     also holds late-filing notices, tender offers, Form 25 and prospectuses)
+                     accepted before S-1's close, over the 5 sessions ending at S-1: the span
+                     ends at S-1, never at S; 0: none
     earnings_in_5d   whether an earnings report's reaction window (E-1 to E+1,
                      ``earnings_reaction``) touches the last 5 sessions: a report dated on or
                      after the session before the window and on or before the session
 
 Why the filing span ends at S-1: the nightly starts about 18:00 New York time and reads SEC's
-daily index of a day only once it is published. A filing accepted 17:30 to 22:00 is listed in
-the next day's index, so on the night of S the index of S is usually unread and S's own 8-Ks
-are not stored (and the filings step is not critical: a failed night stores none). Counting
-through S would read 0 where a later run reads 1. A filing known on or before S-1 was accepted
-before S-1's close, so S-1's index lists it: the stored filings are complete once the walk has
-read S-1's index, and a recompute after later nights gives the same
-value (``feature.news_free_5d`` therefore means no 8-K through S-1 and no earnings window in the
-last 5 sessions).
+daily index of a day only once it is published. SEC lists a filing accepted after 17:30 in the
+next day's index, and one accepted after the close is known from the next session. So on the
+night of S the index of S is usually unread and S's own 8-Ks are not stored (the filings step
+is not critical: a failed night stores none). Counting through S would read 0 where a later
+run reads 1. A filing known on or before S-1 was accepted before S-1's close, so S-1's index
+lists it. The stored filings are complete once the walk has read S-1's index, and a
+recompute after later nights gives the same value (a 16:30 acceptance on S-1 is known from S:
+outside the span live and on every recompute). ``feature.news_free_5d`` therefore means no 8-K
+through S-1 and no earnings window in the last 5 sessions.
 
 ``filing_count_5d`` is null (UNKNOWN), never zero, when the filings table cannot say "none"
 (fail closed): no clean walk of a session up to S reached S-1 (``walked_to < S-1``, or none),
@@ -52,6 +54,7 @@ NAME = "filing_activity"
 VERSION = 1
 FILINGS = "events/filing"
 WALK = "filings/walk"
+EIGHT_K_FORMS = ("8-K", "8-K/A")
 KNOWN_FROM = earnings.KNOWN_FROM
 WINDOW = 5  # sessions of the window
 LOOKBACK = 250  # sessions of filings read: a name with none in them is unknown, not zero
@@ -66,7 +69,7 @@ FEATURES = (
     Feature(
         "filing_count_5d", "int", "count",
         f"8-K and 8-K/A filings of the company accepted in the {WINDOW} sessions ending at the "
-        "previous session (through its 17:30 New York index cut-off), as known on the session "
+        "previous session (accepted before its close), as known on the session "
         "(0: it filed nothing)",
         _NO_TABLE, valid_range=(0, None), inputs=(f"{FILINGS}.accession",),
     ),
@@ -102,6 +105,9 @@ def filing_counts(
         pd.to_datetime(walks["session_date"]).dt.date <= session
     ]
     if reached.empty or reached.max() < previous:
+        return empty
+    filings = filings[filings["form"].isin(EIGHT_K_FORMS)]  # not the other event forms
+    if filings.empty:
         return empty
     known = pd.to_datetime(filings["event_date"]).dt.date
     complete = filings[known <= previous]
