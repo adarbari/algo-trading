@@ -87,13 +87,13 @@ Sources: Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_chann
 
 - It is the Ang et al. idea, not their number: they remove the Fama-French three factors from a month of daily returns, this removes five ETF proxies over a year.
 - High idiosyncratic volatility also marks small, illiquid and distressed names; compare rollup.price_stats@v2.adv_usd_20d and feature.market_cap before reading it as a signal of its own.
-- Null while rollup.factor_betas@v1.factor_status is not OK: a factor ETF without 200 returns in the window (MTUM and VLUE start in 2013, so older windows are unknown, never a market-only fit), no sector ETF, or fewer than 200 joint sessions.
+- Null while rollup.factor_betas@v1.factor_status is not OK. That means a factor ETF without 200 returns in the window, no sector ETF, or fewer than 200 joint sessions. MTUM and VLUE start in 2013, so older windows are unknown, never a market-only fit.
 
 Sources: Ang, Hodrick, Xing and Zhang (2006), The Cross-Section of Volatility and Expected Returns, Journal of Finance
 
 ### `rollup.factor_betas@v1.beta_mkt`
 
-**How to read it.** The market loading in the five-factor regression: the slope of the name's daily log returns on SPY's with size, momentum, value and sector held in the same fit, over 252 sessions. 1 moves with the market, 0.6 is defensive, 1.5 moves half again as much. It differs from rollup.episode_behaviour@v1.beta_252d, which uses SPY alone, whenever the name leans on a style or a sector. The decoy battery's beta_low ranks the lowest first (Frazzini and Pedersen 2014; Black, Jensen and Scholes 1972).
+**How to read it.** The market loading in the five-factor regression over 252 sessions. It is the slope of the name's daily log returns on SPY's, with size, momentum, value and sector held in the same fit. 1 moves with the market, 0.6 is defensive, 1.5 moves half again as much. It differs from rollup.episode_behaviour@v1.beta_252d, which uses SPY alone, whenever the name leans on a style or a sector. The decoy battery's beta_low ranks the lowest first. See Frazzini and Pedersen (2014) and Black, Jensen and Scholes (1972).
 
 **The criterion per intent**
 
@@ -110,7 +110,7 @@ Sources: Frazzini and Pedersen (2014), Betting Against Beta, Journal of Financia
 
 ### `rollup.anomaly_stats@v1.max_ret_21d`
 
-**How to read it.** The largest one-day return of the last 21 sessions (MAX): 0.30 means the name jumped 30% in a day within the month. Stocks with the biggest recent jumps are the lottery-like ones, bid up by investors who like skewed payoffs, and have earned less afterwards (Bali, Cakici and Whitelaw 2011), which is why the decoy battery ranks by it.
+**How to read it.** The largest one-day return of the last 21 sessions (MAX): 0.30 means the name jumped 30% in a day within the month. Stocks with the biggest recent jumps are the lottery-like ones, bid up by investors who like skewed payoffs. They have earned less afterwards (Bali, Cakici and Whitelaw 2011), which is why the decoy battery ranks by it.
 
 **The criterion per intent**
 

@@ -21,11 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-<<<<<<< HEAD
-527 stored features in 60 groups, in dependency order; 144 expression features.
-=======
-546 stored features in 61 groups, in dependency order; 144 expression features.
->>>>>>> origin/main
+556 stored features in 63 groups, in dependency order; 144 expression features.
 
 ## `option_liquidity@v1`
 
