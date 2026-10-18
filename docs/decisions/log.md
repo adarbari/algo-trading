@@ -570,3 +570,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: settled by the architect reviewer of #644 (the format accepts no `architect` decider); the edge can be scored now instead of from November; the read-only broker boundary is untouched (it reads a stored rollup).
+
+## 2026-10-18 | EB H6 (decoy battery, architect review) | Factor betas without a sector, and unmeasured decoys
+- Question: how do ivol and beta exist over history when the sector map starts 2026-10-02, and how is a decoy with no figure counted?
+- Options: five-factor fit for all (empty history) / four-factor fit for every name with `beta_sector` only where a sector exists; leave a figure-less decoy out / count it as not measured.
+- Decision: four-factor fit (market, size, momentum, value) for `ivol_252d` and four betas, `beta_sector` from a five-factor fit where a sector exists (else NO_SECTOR), `relative_strength@v1` required; a decoy with no lift or spread is "not measured" ("n of m measured") in the verdict and flagged in the decoy report; the stratified draws read the later sector snapshot before 2026-10-02, as the screeners do (accepted).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the history the decoys are measured over has no sector; a gate on it would empty two decoys, and a silent omission would let "beats every baseline" pass untested.

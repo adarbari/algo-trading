@@ -206,7 +206,7 @@ def decoys(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
     """Per screener and decoy (baseline) of an edge variant and horizon: the sessions both held
     picks at, their mean pick overlap (Jaccard at D) and the edge's decile spread less the
     decoy's, whole history and out of sample (``reporting/decoys.py``; none without baselines)."""
-    return [asdict(d) for d in decoy_overlaps(evaluation.results)]
+    return [{**asdict(d), "measured": d.measured} for d in decoy_overlaps(evaluation.results)]
 
 
 def iv_coverage(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:

@@ -51,8 +51,9 @@ CLOSES |= {
     "EQ:A": path(loaded(1.3, 0.4, -0.2, 0.6, 0.5)),
     "EQ:B": path(loaded(0.6, -0.3, 0.1, 0.0, 0.8, "XLV")),
     "EQ:N": path(loaded(1.0, 0.0, 0.0, 0.0, 0.0)),  # no sector
+    "EQ:M": path(loaded(1.2, 0.4, -0.2, 0.6, 0.0)),  # no sector, no sector loading: four factors
 }
-SECTORS = {"EQ:A": "XLK", "EQ:B": "XLV", "EQ:N": None}
+SECTORS = {"EQ:A": "XLK", "EQ:B": "XLV", "EQ:N": None, "EQ:M": None}
 
 
 def build(
@@ -87,26 +88,38 @@ def null(value: object) -> bool:
     return bool(pd.isna(value))
 
 
-def test_the_five_loadings_and_the_residual_volatility_are_recovered() -> None:
-    a = result(build())["EQ:A"]
-    assert a["factor_status"] == fb.OK and a["factor_obs"] == fb.WINDOW
-    for column, truth in zip(fb.BETAS, (1.3, 0.4, -0.2, 0.6, 0.5), strict=True):
-        assert float(a[column]) == pytest.approx(truth, abs=0.1), column  # type: ignore[arg-type]
+def test_the_four_loadings_and_the_residual_volatility_are_recovered_without_a_sector() -> None:
+    m = result(build())["EQ:M"]
+    assert m["factor_status"] == fb.NO_SECTOR and m["factor_obs"] == fb.WINDOW
+    for column, truth in zip(fb.BETAS[:4], (1.2, 0.4, -0.2, 0.6), strict=True):
+        assert float(m[column]) == pytest.approx(truth, abs=0.1), column  # type: ignore[arg-type]
+    assert null(m["beta_sector"])
     # the noise is what the factors leave: NOISE a day, annualised
-    assert float(a[fb.IVOL]) == pytest.approx(NOISE * np.sqrt(fb.ANNUAL), rel=0.12)  # type: ignore[arg-type]
+    assert float(m[fb.IVOL]) == pytest.approx(NOISE * np.sqrt(fb.ANNUAL), rel=0.12)  # type: ignore[arg-type]
 
 
-def test_each_instrument_uses_its_own_sector_etf() -> None:
+def test_beta_sector_comes_from_the_five_factor_fit_of_the_names_own_sector_etf() -> None:
     out = result(build())
+    assert out["EQ:A"]["factor_status"] == fb.OK
+    assert float(out["EQ:A"]["beta_sector"]) == pytest.approx(0.5, abs=0.1)  # type: ignore[arg-type]
     assert float(out["EQ:B"]["beta_sector"]) == pytest.approx(0.8, abs=0.1)  # type: ignore[arg-type]
-    assert float(out["EQ:B"]["beta_mkt"]) == pytest.approx(0.6, abs=0.1)  # type: ignore[arg-type]
+    assert float(out["EQ:A"][fb.IVOL]) > 0
 
 
-def test_an_instrument_with_no_sector_is_unknown_not_market_only() -> None:
+def test_a_history_with_no_sector_map_still_yields_ivol_and_the_four_betas() -> None:
+    """Before the first company snapshot every sector_etf is null: only beta_sector is unknown."""
+    out = result(build(sectors=dict.fromkeys(SECTORS)))
+    for iid in ("EQ:A", "EQ:B", "EQ:N", "EQ:M"):
+        row = out[iid]
+        assert row["factor_status"] == fb.NO_SECTOR and null(row["beta_sector"]), iid
+        assert not null(row["beta_mkt"]) and not null(row[fb.IVOL]), iid
+
+
+def test_an_instrument_with_no_sector_is_no_sector_with_the_rest_set() -> None:
     n = result(build())["EQ:N"]
-    assert n["factor_status"] == fb.NO_SECTOR
-    assert all(null(n[c]) for c in (*fb.BETAS, fb.IVOL))
-    assert n["factor_obs"] == 0
+    assert n["factor_status"] == fb.NO_SECTOR and null(n["beta_sector"])
+    assert float(n["beta_mkt"]) == pytest.approx(1.0, abs=0.1)  # type: ignore[arg-type]
+    assert n["factor_obs"] == fb.WINDOW
 
 
 def test_a_window_before_the_factor_etfs_exist_is_unknown_with_the_reason() -> None:
@@ -124,9 +137,10 @@ def test_a_missing_factor_etf_is_unknown_for_every_instrument() -> None:
     assert {r["factor_status"] for r in out.values()} == {fb.NO_FACTOR_HISTORY}
 
 
-def test_a_sector_etf_without_history_is_no_factor_history_for_its_members() -> None:
+def test_a_sector_etf_without_history_leaves_only_beta_sector_unknown() -> None:
     out = result(build(skip={"EQ:XLK": list(range(0, 100))}))
-    assert out["EQ:A"]["factor_status"] == fb.NO_FACTOR_HISTORY
+    assert out["EQ:A"]["factor_status"] == fb.NO_SECTOR and null(out["EQ:A"]["beta_sector"])
+    assert not null(out["EQ:A"]["beta_mkt"])
     assert out["EQ:B"]["factor_status"] == fb.OK  # the other sector is unaffected
 
 
@@ -139,10 +153,10 @@ def test_a_short_listing_is_unknown_with_short_history() -> None:
 
 
 def test_a_gap_costs_one_observation_not_the_window() -> None:
-    a = result(build(skip={"EQ:A": [50]}))["EQ:A"]
-    assert a["factor_status"] == fb.OK
+    a = result(build(skip={"EQ:M": [50]}))["EQ:M"]
+    assert a["factor_status"] == fb.NO_SECTOR
     assert a["factor_obs"] == fb.WINDOW - 2  # the two returns that touch the missing bar
-    assert float(a["beta_mkt"]) == pytest.approx(1.3, abs=0.1)  # type: ignore[arg-type]
+    assert float(a["beta_mkt"]) == pytest.approx(1.2, abs=0.1)  # type: ignore[arg-type]
 
 
 def test_the_window_never_reads_past_the_session() -> None:

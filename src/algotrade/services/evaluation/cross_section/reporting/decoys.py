@@ -52,6 +52,12 @@ class DecoyOverlap:
     spread_gap: float | None  # the screener's decile spread less the decoy's, whole history
     spread_gap_oos: float | None  # the same on the out-of-sample slice (None: no split)
 
+    @property
+    def measured(self) -> bool:
+        """False when no session had picks on both sides (or no spread): the decoy was not
+        compared with the edge at all, which is not "no overlap"."""
+        return self.sessions > 0 and self.spread_gap is not None
+
 
 def jaccard(a: Iterable[str], b: Iterable[str]) -> float | None:
     """Shared names over names in either; None when both are empty."""

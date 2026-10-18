@@ -87,3 +87,12 @@ def test_each_screener_is_reported_against_each_decoy_of_its_own_variant_and_hor
 
 def test_no_baselines_no_report() -> None:
     assert decoy_overlaps(cast(Any, [result("momo", SCREENER, (stat(D1, "a"),), 0.1, 0.1)])) == ()
+
+
+def test_a_decoy_never_compared_is_flagged_not_read_as_no_overlap() -> None:
+    mine = result("momo", SCREENER, (stat(D1, "a"),), 0.05, 0.04)
+    never = result("beta_low", BASELINE, (stat(D2, "a"),), 0.01, 0.0)  # no common session
+    nospread = result("ivol_high", BASELINE, (stat(D1, "a"),), None, None)
+    ok = result("size_small", BASELINE, (stat(D1, "a"),), 0.01, 0.0)
+    flags = {d.decoy: d.measured for d in decoy_overlaps(cast(Any, [mine, never, nospread, ok]))}
+    assert flags == {"beta_low": False, "ivol_high": False, "size_small": True}

@@ -165,7 +165,9 @@ one; the alternative is cheaper to build.
     (`LEG_VERSION` is in it), so it is never reused.
 12. **The extra read.** The draws read `instrument.sector` at D of the counted names through the
     recording reader, so a restated company snapshot invalidates the legs that drew from it
-    (`inputs`), exactly as the ADV read does. A name with no sector is its own stratum.
+    (`inputs`), exactly as the ADV read does. A name with no sector is its own stratum. Before the
+    first company snapshot the read returns the later snapshot's sector (the reference read's
+    rule), the same sector the screeners see for those sessions: accepted, not a new look-ahead.
 13. **Seeding.** The stratified draws use a second generator seeded as the uniform one with the
     label `<edge variant>|<screener>|sector`; the strata draw in sector-name order, the names in
     id order, so the draws do not depend on the order the names arrive in, the chunking or the

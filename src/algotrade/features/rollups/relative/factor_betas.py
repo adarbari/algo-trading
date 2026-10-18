@@ -1,4 +1,4 @@
-"""``factor_betas@v1``: an instrument's loadings on five free ETF factor proxies over the 252
+"""``factor_betas@v1``: an instrument's loadings on free ETF factor proxies over the 252
 sessions ending at the session, and the volatility its factors leave unexplained (IVOL).
 
 Input: ``bars/1d`` split-adjusted as of the session, 253 closes; ``instruments/symbol_ids``
@@ -13,12 +13,15 @@ The factors are daily log returns of ETFs, no estimation from our survivorship-p
     momentum MTUM - SPY                   value    VLUE - SPY
     sector   the instrument's sector SPDR - SPY
 
-Each instrument is regressed (OLS with an intercept) on the five over the sessions where its
-return and every factor exist; it needs ``MIN_OBS`` of them. ``ivol_252d`` is the standard
-deviation of the residuals (n - 6 degrees of freedom), annualised by sqrt(252). A window the
-factor ETFs do not cover (MTUM and VLUE start in 2013), an instrument without a sector ETF or
-with too short a history is UNKNOWN with its ``factor_status``: never a market-only regression
-presented as the five-factor one.
+Each instrument is regressed (OLS with an intercept) on market, size, momentum and value over the
+sessions where its return and those factors exist; it needs ``MIN_OBS`` of them. The four betas
+and ``ivol_252d`` (the standard deviation of the residuals, n - 5 degrees of freedom, annualised
+by sqrt(252)) come from that fit, so they exist for every name and every history the four ETFs
+cover. ``beta_sector`` comes from the four-factor fit and only where the session has a sector
+ETF for the name (``relative_strength@v1`` ``sector_etf``, null before the first company
+snapshot): else null with status NO_SECTOR, the other columns still set. A window the four
+ETFs do not cover (MTUM and VLUE start in 2013) or a short history is UNKNOWN throughout with
+its ``factor_status``: never a market-only regression presented as the factor one.
 """
 
 from datetime import date
@@ -48,10 +51,15 @@ OK, NO_FACTOR_HISTORY, NO_SECTOR, SHORT_HISTORY = (
 STATUSES = (OK, NO_FACTOR_HISTORY, NO_SECTOR, SHORT_HISTORY)
 BETAS = ("beta_mkt", "beta_size", "beta_mom", "beta_value", "beta_sector")  # the slopes, in order
 _UNKNOWN = (
-    f"factor_status is not OK: a factor ETF ({', '.join(FACTOR_ETFS)}) has fewer than "
-    f"{MIN_OBS} of the window's returns (NO_FACTOR_HISTORY: the store, or the ETF's own "
-    "history, does not cover the window), the instrument has no sector ETF (NO_SECTOR), or "
-    f"fewer than {MIN_OBS} sessions with a return and every factor (SHORT_HISTORY)"
+    f"a factor ETF ({', '.join(FACTOR_ETFS)}) has fewer than {MIN_OBS} of the window's "
+    "returns (NO_FACTOR_HISTORY: the store, or the ETF's own history, does not cover the "
+    f"window), or the instrument has fewer than {MIN_OBS} sessions with a return and every "
+    "factor (SHORT_HISTORY)"
+)
+_SECTOR_UNKNOWN = (
+    f"{_UNKNOWN}, or the instrument has no sector ETF at the session (NO_SECTOR: "
+    "relative_strength@v1's sector_etf is null, as before the first company snapshot), or its "
+    "ETF has too few returns"
 )
 _INPUTS = (f"{BARS}.close", f"{SYMBOL_IDS}.instrument_id", "relative_strength.sector_etf@v1")
 
@@ -60,9 +68,10 @@ def _beta(name: str, meaning: str) -> Feature:
     return Feature(
         name, "float32", "ratio",
         f"{meaning}: the OLS slope of the instrument's daily log returns on that factor, with "
-        f"the other four in the same regression, over the last {WINDOW} sessions. 1 moves one "
-        "for one with the factor",
-        _UNKNOWN, valid_range=(-10, 10), inputs=_INPUTS,
+        f"the other factors in the same regression, over the last {WINDOW} sessions. 1 moves "
+        "one for one with the factor",
+        _SECTOR_UNKNOWN if name == "beta_sector" else _UNKNOWN,
+        valid_range=(-10, 10), inputs=_INPUTS,
     )  # fmt: skip
 
 
@@ -75,8 +84,9 @@ FEATURES = (
     Feature(
         f"ivol_{WINDOW}d", "float32", "decimal",
         "Idiosyncratic volatility: the standard deviation of the daily log returns left after "
-        f"the five factors, over the last {WINDOW} sessions, annualised (x sqrt({ANNUAL})). 0.4 "
-        "is 40% a year of move the market, size, momentum, value and sector do not explain "
+        f"market, size, momentum and value, over the last {WINDOW} sessions, annualised "
+        f"(x sqrt({ANNUAL})). 0.4 "
+        "is 40% a year of move the market, size, momentum and value do not explain "
         "(Ang, Hodrick, Xing and Zhang 2006 use the Fama-French three factors)",
         _UNKNOWN, valid_range=(0, 20), inputs=_INPUTS,
     ),
@@ -88,8 +98,8 @@ FEATURES = (
     ),
     Feature(
         "factor_status", "str", "category",
-        f"OK: the five-factor regression ran; NO_FACTOR_HISTORY: a factor ETF lacks {MIN_OBS} "
-        "returns in the window; NO_SECTOR: the instrument has no sector ETF; SHORT_HISTORY: "
+        f"OK: every column is set; NO_SECTOR: all but beta_sector (no sector ETF at the session); "
+        f"NO_FACTOR_HISTORY: a factor ETF lacks {MIN_OBS} returns in the window; SHORT_HISTORY: "
         f"fewer than {MIN_OBS} joint observations",
         "never", "label", categories=STATUSES, inputs=_INPUTS,
     ),
@@ -158,19 +168,18 @@ def compute(inputs: Inputs, session: date, p: None) -> pd.DataFrame:
         base = np.column_stack(
             [spy, etf[SIZE_ETF] - spy, etf[MOMENTUM_ETF] - spy, etf[VALUE_ETF] - spy]
         )
-        status[:] = NO_SECTOR
-        for sector in sorted({s for s in sectors if s}):
-            members = np.flatnonzero(sectors == sector)
-            if not _covered(etf, sector):
-                status[members] = NO_FACTOR_HISTORY
+        slopes, sd, found = regress(returns, base)  # every name: market, size, momentum, value
+        for k, column in enumerate(BETAS[:4]):
+            values[column] = slopes[k]
+        values[IVOL], obs = sd, found
+        status[:] = np.where(np.isfinite(sd), NO_SECTOR, SHORT_HISTORY)
+        for sector in sorted({s for s in sectors if s and _covered(etf, s)}):
+            members = np.flatnonzero((sectors == sector) & np.isfinite(sd))
+            if not len(members):
                 continue
-            factors = np.column_stack([base, etf[sector] - spy])
-            slopes, sd, found = regress(returns[:, members], factors)
-            for k, column in enumerate(BETAS):
-                values[column][members] = slopes[k]
-            values[IVOL][members] = sd
-            obs[members] = found
-            status[members] = np.where(np.isfinite(sd), OK, SHORT_HISTORY)
+            five = regress(returns[:, members], np.column_stack([base, etf[sector] - spy]))
+            values["beta_sector"][members] = five[0][4]
+            status[members] = np.where(np.isfinite(five[0][4]), OK, NO_SECTOR)
     values["factor_obs"] = obs
     values["factor_status"] = status
     return traded_rows(px, values, COLUMNS)
@@ -196,13 +205,13 @@ def _sector_etfs(ids: np.ndarray, rel: pd.DataFrame | None) -> np.ndarray:
 GROUP = FeatureGroup(
     NAME,
     VERSION,
-    "Loadings on five ETF factor proxies (market, size, momentum, value, sector) over 252 "
-    "sessions and the idiosyncratic volatility they leave: the decoys' beta and IVOL, point "
-    "in time",
+    "Loadings on four ETF factor proxies (market, size, momentum, value) and a sector one over "
+    "252 sessions and the idiosyncratic volatility the four leave: the decoys' beta and IVOL, "
+    "point in time",
     (
         Input(BARS, lookback=WINDOW),
         Input(SYMBOL_IDS, required=False),
-        Input(RELATIVE, required=False),
+        Input(RELATIVE),
     ),
     FEATURES,
     compute,

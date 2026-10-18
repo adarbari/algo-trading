@@ -4,7 +4,7 @@
 id = "ivol_high"
 version = 1  # the preset version this prose was written for
 summary = "Ranks every tradeable stock by the volatility it has left after the market, size, momentum, value and its sector are taken out, most first. It is a yardstick, not a trade idea: an edge whose picks are the jumpy, speculative names must do better than simply buying them."
-hit = "The name is a listed common stock or ADR closing above $3 that trades at least $2M a day, and the five-factor regression ran for it (rollup.factor_betas@v1.factor_status is OK). Every such name qualifies; the order is the point, highest idiosyncratic volatility first."
+hit = "The name is a listed common stock or ADR closing above $3 that trades at least $2M a day, and the four-factor regression ran for it (rollup.factor_betas@v1.factor_status is OK). Every such name qualifies; the order is the point, highest idiosyncratic volatility first."
 not_checked = "It does not check trend, quality, earnings or valuation. It is a decoy of the edge harness's battery, not a trade signal."
 before_acting = [
   "High idiosyncratic volatility goes with small, thin and distressed names: compare rollup.price_stats@v2.adv_usd_20d and feature.market_cap before reading a return.",
@@ -23,4 +23,4 @@ security_type = "A common stock or ADR"
 status = "Still listed and trading"
 price = "Closes above $3"
 adv = "Trades at least $2M a day"
-ivol = "Has a five-factor idiosyncratic volatility"
+ivol = "Has a four-factor idiosyncratic volatility"

@@ -571,12 +571,18 @@ them standard, measured on the same sessions, and reports how much each overlaps
    test (`tests/unit/config/edges/test_decoys.py`) requires every decoy in the list to be a site
    preset with a Guide playbook.
 3. **Their features.** `factor_betas@v1` (relative/): OLS loadings of the daily log returns on
-   five free ETF factors over the 252 sessions ending at D (SPY market; IWM-SPY size; MTUM-SPY
-   momentum; VLUE-SPY value; the sector SPDR-SPY), `ivol_252d` the residual volatility,
-   annualised, `factor_status`. A window the ETFs do not cover (MTUM and VLUE start in 2013), an
-   instrument without a sector ETF or with fewer than 200 joint sessions is UNKNOWN with its
-   status, never a market-only fit. `anomaly_stats@v1` (activity/): `max_ret_21d` and
-   `amihud_63d`. The residual-returns grain (H11) will read the same betas.
+   free ETF factors over the 252 sessions ending at D: SPY market, IWM-SPY size, MTUM-SPY momentum
+   and VLUE-SPY value for every name (`beta_mkt`, `beta_size`, `beta_mom`, `beta_value`, and
+   `ivol_252d`, the residual volatility of that four-factor fit, annualised). `beta_sector` (the
+   sector SPDR-SPY) comes from a five-factor fit and only where the session has a sector ETF for
+   the name; `relative_strength@v1`'s `sector_etf` is null before the first company snapshot
+   (2026-10-02), so over history it is null with `factor_status` `NO_SECTOR` while the other
+   columns stay set (a sector gate on the decoys would have emptied `ivol_high` and `beta_low`
+   across history). A window the four ETFs do not cover (MTUM and VLUE start in 2013) or fewer
+   than 200 joint sessions is UNKNOWN throughout (`NO_FACTOR_HISTORY`, `SHORT_HISTORY`), never a
+   market-only fit. `relative_strength@v1` is a required input, so a missing table is not read as
+   "no sector". `anomaly_stats@v1` (activity/): `max_ret_21d` and `amihud_63d`. The
+   residual-returns grain (H11) will read the same betas.
 4. **The report.** Per screener of an edge variant and horizon and per baseline: the mean over
    the sessions both held picks of the Jaccard index of the pick sets at D, and the edge's decile
    spread less the decoy's (whole history; out of sample when the run has a split). It is in the
@@ -592,7 +598,9 @@ them standard, measured on the same sessions, and reports how much each overlaps
    `strat_picks`, `strat_value_sums` and `strat_hit_sums` beside `rand_*` in `results/edge_legs`
    (leg v3) and as `random_sector:<screener>` draw rows (role `random`) in `results/edge_eval`;
    the verdict still reads the uniform `random:<screener>` rows only, so what users see does not
-   change. Showing the stratified percentile beside it is a follow-up.
+   change. Showing the stratified percentile beside it is a follow-up. The decoy criteria of the
+   verdict count a baseline with no lift or spread as not measured ("n of m measured"), never
+   leave it out; the decoy report flags a decoy with no common session as not measured.
 6. **`LEG_VERSION` 3.** Every screener's out-of-sample leg now holds the stratified draws, so
    no stored leg is the one a run would compute: all legs recompute once. H7 (buy/hold bands)
    bumps it again; run the one full re-run after both merge, not after each.

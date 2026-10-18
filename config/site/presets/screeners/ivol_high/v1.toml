@@ -1,4 +1,4 @@
-# Idiosyncratic-volatility decoy: every tradeable common stock or ADR with a five-factor IVOL
+# Idiosyncratic-volatility decoy: every tradeable common stock or ADR with a four-factor IVOL
 # value, the most volatile after the market, size, momentum, value and sector are taken out
 # first (Ang, Hodrick, Xing and Zhang 2006: high IVOL went with lower returns). A decoy for the
 # edge harness's battery (ADR 0053 amendment 2026-10-18, quality bar 9): an edge whose picks are

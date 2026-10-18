@@ -79,10 +79,11 @@ def render_edge_report(result: Mapping[str, Any]) -> str:
         )
     for d in result.get("decoys", []):
         shown = "-" if d["overlap"] is None else f"{d['overlap']:.2f}"
+        flag = "" if d.get("measured", True) else " NOT MEASURED (no sessions or spread to compare)"
         lines.append(
             f"DECOY: {d['edge_variant']}/{d['screener']} vs {d['decoy']} h={d['horizon']}: pick "
             f"overlap {shown} (Jaccard at D, {d['sessions']} sessions); spread less the decoy's "
-            f"{_gap(d['spread_gap'])} all, {_gap(d['spread_gap_oos'])} out of sample"
+            f"{_gap(d['spread_gap'])} all, {_gap(d['spread_gap_oos'])} out of sample{flag}"
         )
     rows: Sequence[Mapping[str, Any]] = result["rows"]
     header = "| " + " | ".join(label for _, label, _ in COLUMNS) + " |"

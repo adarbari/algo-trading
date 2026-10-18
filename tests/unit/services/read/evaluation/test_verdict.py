@@ -1,5 +1,6 @@
 """The edge verdict rule: one test per verdict and per boundary (ED8)."""
 
+import dataclasses
 from dataclasses import fields, replace
 from datetime import date, timedelta
 
@@ -612,3 +613,25 @@ def test_a_short_result_is_judged_like_any_and_says_it_is_the_short_leg() -> Non
     plain = verdict(result())
     assert plain.side == "long" and "(short leg)" not in plain.headline
     assert (v.verdict, v.lift_pts, v.decile_t) == (plain.verdict, plain.lift_pts, plain.decile_t)
+
+
+def _without_figure(rows: list[EdgeRow], variant: str) -> list[EdgeRow]:
+    return [
+        dataclasses.replace(r, lift=None, decile_spread=None) if r.variant == variant else r
+        for r in rows
+    ]
+
+
+def test_a_decoy_with_no_figure_is_not_measured_never_left_out_of_beats_every_baseline() -> None:
+    """Beating the measured decoys is not beating them all: the criterion reads not measured
+    and says how many were measured; a loss to a measured decoy is still a loss."""
+    rows = _without_figure(result(oos={"lift": 1.5}, baselines=(1.05, 1.1, 1.2)), "b2")
+    by = {c.id: c for c in verdict(rows).criteria}
+    for crit in ("baselines", "works_spread"):
+        assert by[crit].status == "not_measured", crit
+    assert "2 of 3 measured" in by["baselines"].value
+    assert "2 of 3 measured" in by["works_spread"].value
+    lost = _without_figure(result(oos={"lift": 1.0}, baselines=(1.05, 1.1, 1.2)), "b2")
+    assert {c.id: c.status for c in verdict(lost).criteria}["baselines"] == "fail"
+    whole = {c.id: c for c in verdict(result(oos={"lift": 1.5}, baselines=(1.05, 1.1))).criteria}
+    assert whole["baselines"].status == "pass" and "measured" not in whole["baselines"].value

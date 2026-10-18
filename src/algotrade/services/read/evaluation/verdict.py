@@ -289,6 +289,22 @@ def _overfit(id: str, pbo: float | None, bound: float, level: str, alone: bool) 
     return _crit(id, label, _num(pbo), threshold, _at_most(pbo, bound), level)
 
 
+def _beats(own: float | None, others: Sequence[float], declared: int) -> bool | None:
+    """Whether ``own`` beats every one of ``declared`` baselines whose figures are ``others``:
+    None (not measured) without a figure of its own or of any baseline, or when it beats the
+    measured ones but some baseline has no figure; False as soon as a measured one beats it."""
+    if own is None or not others:
+        return None
+    if own <= max(others):
+        return False
+    return True if len(others) == declared else None
+
+
+def _measured(found: int, declared: int) -> str:
+    """`` (n of m measured)`` when a declared baseline has no figure, else nothing."""
+    return f" ({found} of {declared} measured)" if declared and found < declared else ""
+
+
 def _criteria(
     c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool
 ) -> tuple[VerdictCriterion, ...]:
@@ -301,10 +317,10 @@ def _criteria(
     dsr = whole.deflated_sharpe if whole.deflated_sharpe is not None else oos.deflated_sharpe
     lifts = [b.lift for b in c.baselines if b.lift is not None]
     spreads = [b.decile_spread for b in c.baselines if b.decile_spread is not None]
-    beats_all = None if oos.lift is None or not lifts else oos.lift > max(lifts)
-    beats_spread = (
-        None if oos.decile_spread is None or not spreads else oos.decile_spread > max(spreads)
-    )
+    # a baseline with no figure is not measured, never left out: a pass over some of the decoys
+    # is "not measured" (a fail over those measured stays a fail)
+    beats_all = _beats(oos.lift, lifts, len(c.baselines))
+    beats_spread = _beats(oos.decile_spread, spreads, len(c.baselines))
     keeps = None if oos_pts is None or in_pts is None else oos_pts >= t.oos_lift_share * in_pts
     win_ok = None if oos_pts is None else oos_pts > 0
     enough = (
@@ -315,6 +331,8 @@ def _criteria(
     versus = f"{_pct(oos.hit_rate)} against {_pct(oos.base_rate)}"
     random_value, random_beaten = _random(c, t, draws)
     best = f"{_num(oos.lift)} vs best {_num(max(lifts))}" if lifts else "not stored"
+    best += _measured(len(lifts), len(c.baselines))
+    spread_value = _num(oos.decile_spread, 3) + _measured(len(spreads), len(c.baselines))
     # no decoys declared: nothing was tested, so the two decoy criteria do not apply (not a pass)
     against_all = (
         _crit(
@@ -334,7 +352,7 @@ def _criteria(
         _crit(
             "works_spread",
             "Decile spread against every baseline",
-            _num(oos.decile_spread, 3),
+            spread_value,
             "beats every baseline",
             beats_spread,
             WORKS,
