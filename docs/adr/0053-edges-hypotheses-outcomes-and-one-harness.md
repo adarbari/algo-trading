@@ -770,7 +770,7 @@ factor-neutral.
    Sector would need a `factor_betas@v2` storing all five betas of the five-factor fit.
 3. **Point in time.** The betas are the `factor_betas@v1` rows of the session before S
    (`previous_session(S)`), estimated on the 252 sessions ending there, read through
-   `data.rollups` . Nothing of the
+   `data.rollups`. Nothing of the
    window enters them; for the usual offset of 1 they are exactly the betas known at the
    decision session D. A later partition is never read (the exact session, not "on or before").
 4. **Gaps are UNMEASURED with a reason, never market-only, never zero.** `NO_FACTOR_HISTORY` (a
