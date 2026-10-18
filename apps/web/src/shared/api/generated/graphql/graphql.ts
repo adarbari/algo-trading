@@ -193,7 +193,7 @@ export type EdgeResultDecayQueryVariables = Exact<{
 }>;
 
 
-export type EdgeResultDecayQuery = { edgeResult: { decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }> } | null } | null };
+export type EdgeResultDecayQuery = { edgeResult: { decay: { measure: string, unit: string, basisHorizon: number, published: { measure: string, value: number, horizonSessions: number, sample: number | null, source: { title: string, url: string } } | null, bars: Array<{ period: string, value: number | null, n: number | null, state: string }>, expected: { leg: string, haircut: number, value: number, realised: number | null, share: number | null, summary: string } | null } | null } | null };
 
 export type EdgeResultCostsQueryVariables = Exact<{
   id: string;
@@ -968,6 +968,14 @@ export const EdgeResultDecayDocument = new TypedDocumentString(`
         value
         n
         state
+      }
+      expected {
+        leg
+        haircut
+        value
+        realised
+        share
+        summary
       }
     }
   }
