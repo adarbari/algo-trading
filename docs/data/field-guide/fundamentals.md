@@ -60,6 +60,77 @@ Sources: Asness, Frazzini and Pedersen (2019), Review of Accounting Studies 24(1
 
 Sources: Pontiff and Woodgate (2008), Journal of Finance 63(2), Share Issuance and Cross-Sectional Returns
 
+### `rollup.qmj@v1.profitability_z`
+
+**How to read it.** How profitable a company is against the session's other companies, in standard deviations. It averages the z-scores of six measures: gross profit to assets, ROE, ROA, operating cash flow to assets, gross margin and low accruals. 0 is the middle, 1 is one standard deviation above, -1 below. It is the profitability half of the quality-minus-junk score.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a more profitable company than most | `gte 0.5` | soft | 0.25 | read with rollup.qmj@v1.safety_z; a score across the session, not a level |
+
+**When the reading lies**
+
+- A cross-section statistic: it moves when other companies move and carries no level. It is null when fewer than 100 companies have a value that session.
+- Null for ETFs, funds, companies with no CIK or a non-USD report, and when a statement is more than 480 days old. A hard 'gte' drops these names.
+- Needs at least 4 of the 6 measures; a company with an unreported line is scored on fewer, and a bank or insurer is often unscored. Read rollup.qmj@v1.balance_sheet_age_days for how old the statements are.
+
+Sources: Asness, Frazzini and Pedersen (2019), Quality Minus Junk, Review of Accounting Studies 24: https://link.springer.com/article/10.1007/s11142-018-9470-2
+
+### `rollup.qmj@v1.safety_z`
+
+**How to read it.** How safe a company's balance sheet is against the session's others, in standard deviations: the average of the z-scores of low debt to equity and low ohlson_o (a distress score). 1 is one standard deviation safer than the middle; -1 riskier. It is a leverage and distress score, not the paper's safety.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a safer balance sheet than most | `gte 0.5` | soft | 0.25 | a leverage and distress score; read with rollup.qmj@v1.profitability_z |
+
+**When the reading lies**
+
+- It leaves out three parts of the published safety score: low beta, low Altman Z and low earnings volatility. Beta lives in rollup.factor_betas@v1.beta_mkt; a name safe here can still swing with the market.
+- Null for a negative equity, an untagged debt line, or a bank (debt is its product), and under the same statement-age and 100-name rules as rollup.qmj@v1.profitability_z.
+- Don't read a high value as a buy: a safe balance sheet can sit under a collapsing business. Read it with rollup.qmj@v1.profitability_z.
+
+Sources: Asness, Frazzini and Pedersen (2019), Quality Minus Junk, Review of Accounting Studies 24: https://link.springer.com/article/10.1007/s11142-018-9470-2
+
+### `rollup.mispricing@v1.composite_inputs`
+
+**How to read it.** How many of the seven anomalies rollup.mispricing@v1.composite_rank averaged for the name: 5, 6 or 7 when the rank is set. A rank on 7 uses every measure; one on 5 leans on fewer. It is the confidence of the rank, not a signal.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a composite rank built on at least six of seven anomalies | `gte 6` | hard | - | gate for when rollup.mispricing@v1.composite_rank is the decision |
+
+**When the reading lies**
+
+- A rank averaged over 5 can sit at an extreme by chance. Two names with rank 0.9 are not equally reliable if one has 7 inputs and the other 5. Gate on at least 6 when the rank is the decision.
+- Null when the rank is null (fewer than 5 inputs); a hard criterion drops the name.
+
+Sources: Stambaugh, Yu and Yuan (2015), Journal of Finance 70(5)
+
+### `feature.buyback_flag`
+
+**How to read it.** True when the company's share count fell by at least 1% over the year: it bought back more stock than it issued. False means the count held or grew. 0.8% fewer shares is false; 3% fewer is true. It is a flag on feature.shares_change_yoy, measured from share counts, not a repurchase announcement.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| companies shrinking their share count | `eq true` | hard | - | a flag on net share change, not a repurchase announcement |
+
+**When the reading lies**
+
+- Buybacks that only offset stock pay leave the count flat and read false, though cash was spent; a count that fell through a reverse split is not a buyback. Check feature.net_issuance_pct_12m and cash flow.
+- Share counts come from filing cover pages, so a count can lag a quarter. Null when the year-ago count is missing or the current one is stale (rollup.fundamentals@v4.market_cap_status STALE); a hard 'eq true' drops those names.
+- A company can retire stock while borrowing to do it; check feature.debt_to_equity.
+
+Sources: Ikenberry, Lakonishok and Vermaelen (1995), Market underreaction to open market share repurchases, JFE 39; Pontiff and Woodgate (2008), Share issuance and cross-sectional returns, JF 63
+
 ### `feature.market_cap`
 
 **How to read it.** Shares outstanding times the close, in dollars. The usual US buckets: micro under $300M, small $300M to $2B, mid $2B to $10B, large $10B to $200B, mega above $200B. They are conventions, not rules: index providers draw the lines differently and names migrate across them as prices move.

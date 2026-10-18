@@ -78,3 +78,8 @@
 "earnings_vwap_overhang/v1.toml" = "59bdbbfda89e7e8a9d1446203e79bfcaf7a93b6388ddcf416c6e2f41acb127df"
 "insider_cluster_buys/v1.toml" = "b4d2361df163a6609103800a1887ef65b982cb88c820e36a7f78323a1de720e2"
 "short_squeeze_dtc/v1.toml" = "e9f86dc8c300a379b065b30a720a7656524099f0f0e01379b82eba3d25719f29"
+"trend_positive_3m/v1.toml" = "8b0f046f1e3cd56209f10c5ceef74e535f8cccb5beb7eb3c442afe5e8c526cca"
+"trend_positive_6m/v1.toml" = "2985f9dc4bd78bc468f3477f0fba2b7bc2e30ff24d13f8ff6aa9f2b143de2b05"
+"trend_positive_12m/v1.toml" = "6d3c98d62e2e524f209a774854f8f971c86e342ff796bc324fb8422904471a88"
+"etf_above_200d/v1.toml" = "fc3eee69a48bd299b67631d03bbe1c34d7c568c5ee57a8e6e2ab6c5ccbad2976"
+"etf_low_ibs/v1.toml" = "541218d0eb97ba7c1d256ea9f7c255c5552b302daf90818d40e48883797a7793"

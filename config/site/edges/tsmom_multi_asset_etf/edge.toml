@@ -1,0 +1,99 @@
+# Edge document (ADR 0053, ADR 0074; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/trend-macro.md (tsmom_multi_asset_etf).
+# An allocation edge (EB E5): a weighted book of ETFs against a blended benchmark of its own list.
+id = "tsmom_multi_asset_etf"
+name = "Multi-asset ETF trend"
+family = "E"
+thesis = "An ETF whose own trailing return is positive keeps rising over the next month, so holding only the rising funds of nine asset classes, weighted by inverse volatility, beats a 60/40 stock and bond mix."
+mechanism = """Prices under-react to news and then over-react, and mandates and rebalancing rules force
+institutions to sell what rose and buy what fell; hedgers in futures pay speculators to carry trend
+risk (Moskowitz, Ooi and Pedersen 2012; Hurst, Ooi and Pedersen 2017)."""
+persistence = """The premium is paid for deep drawdowns (16 above 10 percent since 2000 in the SG Trend Index, 20
+percent from May 2024 to May 2025) and for years of nothing in the 2010s; allocation is pro-
+cyclical, so outflows follow droughts and keep the premium. Huang, Li, Wang and Zhou (2020) find
+little predictability asset by asset, so persistence is a claim to test."""
+schedule = "month_end"
+top_k = 9
+screeners = [
+  "trend_positive_3m", "trend_positive_6m", "trend_positive_12m",
+]
+base = "benchmark"
+oos_class = "trend"
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history (the outcome rows of all
+nine funds start with the store on 2010-01-04, so that is the common start; the grid needs every fund
+each session, ADR 0074, so the latest-starting fund sets the sample) and the
+parent's evaluation runs. LIMITS, so nothing implies the full source rule: (1) long only: the source
+goes short a falling asset and scales each leg to 40 percent volatility with futures; this book
+holds a rising fund or its slot is cash at the Treasury bill yield, never short and never levered.
+(2) The trend test is a raw price return above 0, not an excess return over the bill, and it uses 3,
+6 and 12 months of 60, 120 and 252 sessions: Hurst, Ooi and Pedersen's 1, 3 and 12 months and the
+9-month member of a 3, 6, 9 and 12 grid are not built (stored return columns are 1, 3, 10, 20, 60,
+120 and 252 sessions; a 189-session column would change a stored feature group). (3) Weights are one
+over hv60 (rollup.vol_stats@v1, 60 sessions of close-to-close volatility read at D), shared among
+the rising funds with each unfilled slot of nine held in cash: relative sizing, not a volatility
+target, so the book's own volatility moves with how many funds rise. (4) Nine funds only, price only
+(no distributions, so bond coupons are missing from the book and the benchmark), cost_bps 6 a round
+trip assumed for liquid ETFs. (5) The benchmark is the page's passive 60/40 of SPY and AGG, two of
+the nine funds, so a book that is half cash is not rewarded for beating a stock-only index. The
+ensemble of the three lookbacks is ONE trial, the members are never a verdict basis, and the harness
+reads the book against its benchmark on the picks-series t (a Promising edge needs t at or above 2,
+Works 3). The trend leg of trend_carry_value_combo is this edge: no separate document, since carry
+needs futures curves and value needs country CAPE, neither stored. No [published] figure: the paper
+Sharpe ratios are of futures books the harness does not measure. verdict.toml [oos_haircut] trend =
+0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one
+beside the result, as display only."""
+
+[ensemble]
+variants = ["trend_positive_3m", "trend_positive_6m", "trend_positive_12m"]
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SPY", "EFA", "EEM", "AGG", "TLT", "IEF", "GLD", "DBC", "VNQ"] },
+]
+
+[outcome]
+kind = "portfolio_return"
+horizon_sessions = [21]
+benchmark = "mix:SPY=0.6,AGG=0.4"
+start_offset_sessions = 1
+cost_bps = 6
+weighting = "inverse_vol"
+vol_field = "rollup.vol_stats@v1.hv60"
+
+[quality_bar]
+outcome = """The book's return over the 21 sessions from the close after each month end, less the return of 60
+percent SPY and 40 percent AGG over the same sessions, net of the cost on the weight change; cash is
+the Treasury bill yield (ADR 0074). Price only: the stored forward return is close to close and
+carries no dividend or distribution, so the book and the benchmark both miss their yield and cash
+earns the Treasury bill."""
+trigger_timing = """The trailing returns and hv60 are read at the month-end close D from stored bars; the book is held
+from the next session's close S (start_offset_sessions = 1) for 21 sessions. No fact after D enters
+a weight or a pick."""
+replication = """The source's rule (Moskowitz, Ooi and Pedersen 2012): the sign of the trailing 12-month excess
+return, each position scaled to 40 percent ex-ante volatility, held a month, over 58 futures. Hurst,
+Ooi and Pedersen (2017) average 1, 3 and 12 months. Here: nine ETFs, long only, 3, 6 and 12 months
+of raw return, inverse-volatility weights, cash for a falling fund."""
+expected_size = """Hurst, Ooi and Pedersen: positive net returns in every decade since 1880 and a net Sharpe ratio near
+0.4 per asset (futures, both sides); the practitioner expectation after decay for a long-only ETF
+version is 0.3 to 0.5. The harness's figure over the ETF history is untested here."""
+capacity_costs = """Capacity is large in nine liquid funds; about one switch per fund a year; a round trip costs a few
+basis points (6 assumed). Tax drag on the switches is the real cost and is not deducted."""
+failure_modes = """Long-only trend is mostly equity beta in a bull market and gives up the short crisis alpha. Retire
+if the frozen-period picks-series t stays under 2, or the ensemble's out-of-sample Sharpe falls
+under the haircut figure (45 percent of the in-sample)."""
+decoys = """Beta (a book that is mostly SPY in rising markets), a 2010s sample dominated by the US bull market,
+and a 1970s-style bond bear it does not contain. The benchmark mix and the decoy battery are the
+nulls; compare the book with SPY alone in the run record."""
+
+[[sources]]
+title = "Moskowitz, T., Ooi, Y. and Pedersen, L., Time Series Momentum, Journal of Financial Economics, 2012"
+
+[[sources]]
+title = "Hurst, B., Ooi, Y. and Pedersen, L., A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management, 2017"
+url = "https://www.TrendFollowing.com/whitepaper/Century_Evidence_Trend_Following.pdf"
+
+[[sources]]
+title = "Huang, D., Li, J., Wang, L. and Zhou, G., Time series momentum: Is it there?, Journal of Financial Economics, 2020"
+url = "https://doi.org/10.1016/j.jfineco.2019.08.004"
