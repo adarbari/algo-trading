@@ -32,7 +32,7 @@ from algotrade.services.evaluation.discovery.controls import assign_cells, draw_
 from algotrade.services.evaluation.discovery.grid import GridSession, read_eligible
 from algotrade.services.evaluation.discovery.labels import Labels, read_labels
 from algotrade.services.features import entity_field_view
-from algotrade.storage.tables.schemas import NO_ML_TABLES
+from algotrade.storage.tables.short.schemas import NO_ML_TABLES
 
 EDGE_SCORE_PREFIX = "edge_score_"
 LIQUIDITY = "price_stats.adv_usd_20d"  # ``<group>.<column>`` of the liquidity matching variable

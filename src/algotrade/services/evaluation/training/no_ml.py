@@ -15,7 +15,7 @@ from collections.abc import Iterable
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.evaluation.discovery.frame import feature_reads
-from algotrade.storage.tables.schemas import NO_ML_TABLES
+from algotrade.storage.tables.short.schemas import NO_ML_TABLES
 
 REFERENCE_FACTS = "instrument"  # ``instrument.*`` fields are reference facts, never restricted
 

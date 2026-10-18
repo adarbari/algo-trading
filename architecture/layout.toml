@@ -545,6 +545,10 @@ contracts = [
 ]
 
 [[dir]]
+path = "src/algotrade/storage/tables/short"
+purpose = "the FINRA short-interest and short-volume event table schemas and the no_ml table set (EB D9; split from schemas.py at its length cap)"
+
+[[dir]]
 path = "src/algotrade/strategies"
 purpose = "pure decision logic, split into trading strategies and screeners"
 contracts = ["Strategies and screeners are pure: they only see core and quant"]

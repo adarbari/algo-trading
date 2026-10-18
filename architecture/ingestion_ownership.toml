@@ -99,7 +99,7 @@ description = "Store FINRA short interest (events/short_interest, one partition 
 owner = ["apps/ingestion/algotrade_ingestion/tasks/shorting/*"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the tasks' tables
-    "src/algotrade/storage/tables/schemas.py",  # declares the tables
+    "src/algotrade/storage/tables/short/schemas.py",  # declares the tables
     "libs/sources/algotrade_sources/vendors/finra/short_interest.py",  # the source's frame key
     "libs/sources/algotrade_sources/vendors/finra/short_volume.py",  # the source's frame key
 ]

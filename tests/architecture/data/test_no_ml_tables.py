@@ -1,6 +1,6 @@
 """The no-ML guard (EB D9): FINRA's website terms bar machine learning over its data, so the
 tables that hold it are ``no_ml = true`` in ``architecture/tables.toml``, the same set the code
-refuses (``schemas.NO_ML_TABLES``), and no learned scorer may read them:
+refuses (``short/schemas.NO_ML_TABLES``), and no learned scorer may read them:
 
 - the flags in ``tables.toml`` and ``NO_ML_TABLES`` are one set, and every flagged table exists;
 - no edge document's ``[scorer] features`` reads a no_ml table through the site catalogue
@@ -17,7 +17,8 @@ from algotrade.config.edges.loading import load_edges
 from algotrade.features.site import site_features
 from algotrade.services.evaluation.training.no_ml import no_ml_reads
 from algotrade.storage.configs.files import FileConfigStore
-from algotrade.storage.tables.schemas import KNOWN, NO_ML_TABLES
+from algotrade.storage.tables.schemas import KNOWN
+from algotrade.storage.tables.short.schemas import NO_ML_TABLES
 from tests.conftest import REPO_ROOT
 
 TABLES = tomllib.loads((REPO_ROOT / "architecture" / "tables.toml").read_text())["table"]

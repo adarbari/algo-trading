@@ -184,7 +184,7 @@ with an HV of 0.55), and 0.0 for a history bar without a value.
 The hiding recorded under "Licence tags" is made, in every path that serves per-name values:
 see [ADR 0069](0069-data-licence-gate.md).
 
-## Amendment 2026-10-17: no_ml tables
+## Amendment 2026-10-17: no-ML tables
 
 A source whose terms bar machine learning over its data (FINRA's website terms, restriction (m);
 EB D9) has its tables flagged `no_ml = true` in `architecture/tables.toml`, the same set as
