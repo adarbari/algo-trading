@@ -1,7 +1,9 @@
-"""``filing_activity@v1``: 8-K counts and earnings reaction windows in the last 5 sessions,
-known_from <= S, and the nulls that stop an unknown being read as "no news"."""
+"""``filing_activity@v1``: 8-K counts over the 5 sessions ending at S-1 (the span ends there
+because S's index is unread on the night of S), the walk that says how far they are complete,
+earnings reaction windows in the last 5 sessions, known_from <= S, and the nulls that stop an
+unknown being read as "no news"."""
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -14,6 +16,7 @@ from algotrade.features.rollups.events.filing_activity import FILINGS, GROUP
 from algotrade.features.rollups.price import price_stats
 from algotrade.features.site import site_features
 from algotrade.storage.configs.files import FileConfigStore
+from algotrade.storage.runs import start_run
 from tests.conftest import REPO_ROOT
 from tests.helpers.rollup_store import END, series, store, write_bars, write_earnings, write_rows
 from tests.helpers.stored_frames import stamped
@@ -25,17 +28,39 @@ STATS = pd.DataFrame(
 )
 
 
-def _filings(rows: list[tuple[str, date]]) -> pd.DataFrame:
+PREV = sessions_ending(SESSION, 2)[0]  # S-1: the filing span ends here
+FIRST = sessions_ending(SESSION, 6)[0]  # S-5: its first session
+NIGHT = "filings/walk"
+
+
+def _filings(rows: list[tuple[str, date]], hour: float = 12.0) -> pd.DataFrame:
+    """(instrument, known_from) rows accepted at ``hour`` New York time on their day (UTC hour
+    +4 in October)."""
     frame = [
-        {"instrument_id": i, "ts": pd.Timestamp(k, tz="UTC"), "known_from": k,
-         "accession": f"{i}-{k}", "form": "8-K"}
-        for i, k in rows
+        {"instrument_id": i, "ts": pd.Timestamp(k, tz="UTC") + pd.Timedelta(hours=hour + 4),
+         "known_from": k, "accession": f"{i}-{k}-{n}", "form": "8-K"}
+        for n, (i, k) in enumerate(rows)
     ]  # fmt: skip
     return stamped(frame, SESSION, "f")
 
 
-def _compute(filings: pd.DataFrame | None, earn: pd.DataFrame | None = None) -> pd.DataFrame:
-    inputs = {filing_activity.PRICE_STATS: STATS, FILINGS: filings, earnings.EVENTS: earn}
+def _walk(walked_to: date | None = PREV, run_session: date = SESSION) -> pd.DataFrame:
+    rows = [] if walked_to is None else [{"session_date": run_session, "walked_to": walked_to}]
+    return pd.DataFrame(rows, columns=["session_date", "walked_to"])
+
+
+def _compute(
+    filings: pd.DataFrame | None,
+    earn: pd.DataFrame | None = None,
+    walk: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    walk = _walk() if walk is None else walk
+    inputs = {
+        filing_activity.PRICE_STATS: STATS,
+        FILINGS: filings,
+        NIGHT: walk,
+        earnings.EVENTS: earn,
+    }
     return filing_activity.compute(inputs, SESSION, None).set_index("instrument_id")
 
 
@@ -48,36 +73,68 @@ def _earn(rows: list[tuple[str, date]]) -> pd.DataFrame:
     return stamped(frame, SESSION, "e")
 
 
-def test_counts_filings_known_in_the_window() -> None:
-    start = sessions_ending(SESSION, 5)[0]
-    old = GRID[0]  # before the window: seen, so a zero is knowable
+def test_counts_filings_over_the_five_sessions_ending_at_the_previous_one() -> None:
+    old = GRID[0]  # before the span: seen, so a zero is knowable
+    out = _compute(_filings([("EQ:A", FIRST), ("EQ:A", PREV), ("EQ:B", old), ("EQ:C", PREV)]))
+    assert out["filing_count_5d"].tolist() == [2, 0, 1]  # the span's first and last day count
+
+
+def test_a_filing_of_the_session_itself_never_counts() -> None:
+    """S's 8-Ks are not stored on the night of S (the index is read once published): the span
+    ends at S-1, so the value is the same before and after they arrive."""
+    base = _filings([("EQ:A", PREV), ("EQ:B", GRID[0]), ("EQ:C", PREV)])
+    late = pd.concat([base, _filings([("EQ:B", SESSION), ("EQ:A", SESSION)])], ignore_index=True)
+    assert _compute(base)["filing_count_5d"].tolist() == [1, 0, 1]
+    assert _compute(late)["filing_count_5d"].tolist() == [1, 0, 1]  # recomputed after S's index
+
+
+def test_a_recompute_after_the_next_nights_data_gives_the_same_value() -> None:
+    base = _filings([("EQ:A", PREV), ("EQ:B", GRID[0]), ("EQ:C", PREV)])
+    after = pd.concat(
+        [base, _filings([("EQ:A", SESSION)]), _filings([("EQ:B", PREV)], hour=19.0)],
+        ignore_index=True,
+    )  # S's filings, and a late S-1 acceptance (after the 17:30 index cut-off, listed in S's index)
+    walks = pd.concat([_walk(PREV), _walk(SESSION, SESSION + timedelta(days=1))])
+    assert _compute(after, walk=walks)["filing_count_5d"].tolist() == [1, 0, 1]
+    assert _compute(base)["filing_count_5d"].tolist() == [1, 0, 1]
+
+
+def test_a_filing_after_the_previous_index_cutoff_is_not_in_the_span() -> None:
     out = _compute(
-        _filings([("EQ:A", start), ("EQ:A", SESSION), ("EQ:B", old), ("EQ:C", SESSION)]),
+        _filings([("EQ:A", PREV), ("EQ:B", GRID[0])]).pipe(
+            lambda f: pd.concat([f, _filings([("EQ:B", PREV)], hour=18.0)], ignore_index=True)
+        )
     )
-    assert out["filing_count_5d"].tolist() == [2, 0, 1]  # the window's first session counts
+    assert out["filing_count_5d"].tolist()[:2] == [1, 0]  # 18:00 on S-1 is in S's index: unread
 
 
-def test_an_instrument_with_no_filing_known_is_unknown_not_zero() -> None:
-    out = _compute(_filings([("EQ:A", SESSION), ("EQ:B", GRID[0])]))
+def test_the_span_is_unknown_unless_the_walk_reached_the_previous_session() -> None:
+    rows = _filings([("EQ:A", PREV), ("EQ:B", GRID[0]), ("EQ:C", PREV)])
+    behind = sessions_ending(SESSION, 3)[0]  # S-2: S-1 is only partly covered
+    for walk in (_walk(behind), _walk(None), pd.DataFrame(columns=["session_date", "walked_to"])):
+        assert _compute(rows, walk=walk)["filing_count_5d"].isna().all()
+    assert not _compute(rows, walk=_walk(SESSION))["filing_count_5d"].isna().any()  # further: ok
+
+
+def test_a_walk_recorded_after_the_session_does_not_cover_it() -> None:
+    rows = _filings([("EQ:A", PREV), ("EQ:B", GRID[0])])
+    later = _walk(SESSION, SESSION + timedelta(days=1))  # a later night's run: not known on S
+    assert _compute(rows, walk=later)["filing_count_5d"].isna().all()
+
+
+def test_an_instrument_with_no_filing_stored_is_unknown_not_zero() -> None:
+    out = _compute(_filings([("EQ:A", PREV), ("EQ:B", GRID[0])]))
     assert out["filing_count_5d"].isna().tolist() == [False, False, True]
 
 
-def test_a_backfill_that_starts_after_the_window_knows_nothing() -> None:
-    out = _compute(_filings([("EQ:A", SESSION), ("EQ:B", SESSION)]))
-    assert out["filing_count_5d"].isna().all()  # nothing stored before the window: no zeros
+def test_a_backfill_that_starts_after_the_span_knows_nothing() -> None:
+    out = _compute(_filings([("EQ:A", PREV), ("EQ:B", PREV)]))
+    assert out["filing_count_5d"].isna().all()  # nothing stored before the span: no zeros
 
 
 def test_no_filing_table_is_all_unknown() -> None:
     assert _compute(None)["filing_count_5d"].isna().all()
     assert _compute(_filings([]).iloc[0:0])["filing_count_5d"].isna().all()
-
-
-def test_a_filing_known_after_the_session_never_counts() -> None:
-    later = SESSION + timedelta(days=3)
-    out = _compute(
-        _filings([("EQ:A", GRID[0]), ("EQ:A", later), ("EQ:B", GRID[0]), ("EQ:C", SESSION)])
-    )
-    assert out["filing_count_5d"].tolist()[:2] == [0, 0]  # the later one is invisible
 
 
 def test_earnings_in_the_window_and_the_session_before_it() -> None:
@@ -100,16 +157,20 @@ def test_earnings_unknown_without_any_report_and_a_future_report_is_not_news() -
 def test_runs_through_the_store_with_known_from() -> None:
     writer, reader = store()
     write_bars(writer, {"EQ:A": series(260), "EQ:B": series(260, 2)})
-    write_rows(  # EQ:A filed on the session, EQ:B long before; the 8-K of EQ:B on D+1 is unknown
+    write_rows(  # EQ:A filed on S-1, EQ:B long before
         writer, "events/filing", SESSION,
         [
-            {"instrument_id": "EQ:A", "ts": pd.Timestamp(SESSION, tz="UTC"), "known_from": SESSION,
-             "accession": "a1", "form": "8-K", "cik": "1", "filing_date": SESSION, "items": "7.01"},
+            {"instrument_id": "EQ:A", "ts": pd.Timestamp(PREV, tz="UTC") + pd.Timedelta(hours=16),
+             "known_from": PREV, "accession": "a1", "form": "8-K", "cik": "1",
+             "filing_date": PREV, "items": "7.01"},
             {"instrument_id": "EQ:B", "ts": pd.Timestamp(GRID[0], tz="UTC"), "known_from": GRID[0],
              "accession": "b1", "form": "8-K", "cik": "2", "filing_date": GRID[0], "items": "7.01"},
         ],
     )  # fmt: skip
     write_earnings(writer, GRID[0], [("EQ:A", GRID[0] - timedelta(days=60), "pre_market")])
+    record = start_run("filings", SESSION, datetime(2026, 10, 2, 22, tzinfo=UTC))
+    record.finish(datetime(2026, 10, 2, 23, tzinfo=UTC), stats={"walked_to": PREV.isoformat()})
+    writer.save_run(record)
     out = compute_in_memory(reader, [price_stats.GROUP, GROUP], [SESSION])
     frame = out[GROUP.key][0].frame
     assert frame is not None
@@ -160,20 +221,3 @@ def test_volume_shock_and_news_free_flags() -> None:
         "EQ:UNK": None,
         "EQ:NOVOL": None,
     }
-
-
-def test_a_session_the_filings_step_did_not_store_is_unknown_not_zero() -> None:
-    previous = GRID[-2]  # the filings stop the session before: the step failed or was skipped
-    out = _compute(_filings([("EQ:A", GRID[0]), ("EQ:B", previous), ("EQ:C", GRID[0])]))
-    assert out["filing_count_5d"].isna().all()  # never zeros, which would read as "no news"
-
-
-def test_a_filing_on_the_session_before_the_window_counts_like_the_earnings_span() -> None:
-    first = sessions_ending(SESSION, 6)[0]  # the span earnings_in_5d uses
-    before = sessions_ending(SESSION, 7)[0]
-    out = _compute(
-        _filings([("EQ:A", first), ("EQ:B", before), ("EQ:B", SESSION), ("EQ:C", SESSION)])
-    )
-    assert out["filing_count_5d"].tolist() == [1, 1, 1]  # EQ:A: only the one before the window
-    out = _compute(_filings([("EQ:A", before), ("EQ:B", SESSION)]))
-    assert out["filing_count_5d"].tolist()[:2] == [0, 1]  # a filing older than the span is out

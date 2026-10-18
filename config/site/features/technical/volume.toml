@@ -66,8 +66,8 @@ version = 1
 expr = "filing_activity.filing_count_5d == 0 and not filing_activity.earnings_in_5d"
 dtype = "bool"
 unit = "flag"
-description = "No 8-K or 8-K/A was filed and no earnings reaction window touched the last 5 sessions, as known on the session: nothing identifiable explains a move in them"
-null_meaning = "filing_count_5d is null (no filing stored for the instrument by the session, or the filings backfill starts after the window) or earnings_in_5d is null (no earnings report known for it), and the other term does not already make it false"
+description = "No 8-K or 8-K/A was filed through the previous session (5 sessions) and no earnings reaction window touched the last 5 sessions, as known on the session: nothing identifiable explains a move in them"
+null_meaning = "filing_count_5d is null (no clean filings walk has reached the previous session, no filing stored for the instrument, or the backfill starts after the span) or earnings_in_5d is null (no earnings report known for it), and the other term does not already make it false"
 version = 1
 
 [volume_shock_no_news]

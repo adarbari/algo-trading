@@ -27,6 +27,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
+from algotrade.storage.runs import published
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import KNOWN_FROM
 
@@ -141,3 +142,20 @@ def events_by_event_date(
     frame = frame.assign(event_date=pd.to_datetime(frame["ts"], utc=True).dt.date)
     frame = frame.sort_values(["event_date", "instrument_id"], kind="stable")
     return frame.reset_index(drop=True)
+
+
+FILINGS_JOB = "filings"  # the ingestion task that writes events/filing: its run records
+
+
+def filing_walks(reader: StoreReader) -> pd.DataFrame:
+    """The clean daily-index walks of the filings task: one row per published run that recorded
+    a ``walked_to`` (the last index day it read with no failed day or CIK), as ``session_date``
+    (the run's session) and ``walked_to``, sorted by ``session_date``. A per-CIK run or a
+    failed walk records none. Empty when there is none."""
+    rows = [
+        {"session_date": r.session_date, "walked_to": date.fromisoformat(r.stats["walked_to"])}
+        for r in reader.runs(FILINGS_JOB)
+        if published(r) and r.stats.get("walked_to")
+    ]
+    frame = pd.DataFrame(rows, columns=["session_date", "walked_to"])
+    return frame.sort_values("session_date", kind="stable").reset_index(drop=True)

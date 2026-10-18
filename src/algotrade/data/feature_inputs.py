@@ -32,6 +32,10 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
 - ``events/filing``    ``events.stored_events``: every 8-K / 8-K/A row known on or before the
                        session (``known_from``, the acceptance's session: ADR 0050), as stored;
                        ``None`` when there is none. The same read as ``events/earnings``
+- ``filings/walk``     ``events.filing_walks``: the clean daily-index walks of the filings task
+                       (``session_date`` of the run, ``walked_to``), only runs of sessions on or
+                       before the session; ``None`` when there is none. How far the stored
+                       filings are complete, which a row cannot say
 - ``chains/*``         ``chains``: the session's own partition, read per session (chains are
                        large; a lookback is not supported)
 - ``events/dividend_declared``
@@ -119,7 +123,7 @@ from algotrade.data.analyst.reading import KINDS as ANALYST_KINDS
 from algotrade.data.analyst.reading import TABLE as ANALYST
 from algotrade.data.analyst.reading import snapshot_window
 from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
-from algotrade.data.events import events_by_event_date, stored_events
+from algotrade.data.events import events_by_event_date, filing_walks, stored_events
 from algotrade.data.funds.holdings import TABLE as HOLDINGS
 from algotrade.data.funds.holdings import funds_holdings
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
@@ -288,6 +292,11 @@ def _event_snapshots(table: str, from_first_session: bool = False) -> Loader:
     return load
 
 
+def _filing_walks(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    frame = filing_walks(reader)
+    return _Snapshots(frame, _days(frame["session_date"]) if len(frame) else np.array([], "M8[D]"))
+
+
 def _share_facts(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
     frame = share_facts(reader)
     return _Snapshots(frame, _days(frame["filed"]) if len(frame) else np.array([], "datetime64[D]"))
@@ -429,6 +438,7 @@ INPUTS: Mapping[str, Loader] = {
     BARS: _bars,
     "events/earnings": _event_snapshots("events/earnings"),
     "events/filing": _event_snapshots("events/filing"),
+    "filings/walk": _filing_walks,
     "chains/status": _partition(chain_status),
     "chains/option_quotes": _partition(option_quotes),
     "chains/underlying_quotes": _partition(underlying_quotes),

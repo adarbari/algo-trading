@@ -594,7 +594,7 @@ Sources: Site convention (docs/data/features.md, earnings_revisions@v1)
 
 ### `rollup.filing_activity@v1.filing_count_5d`
 
-**How to read it.** How many 8-K and 8-K/A filings the company had accepted over the last 5 sessions and the session before them, as known on the session. An 8-K is the SEC's current report: results, deals, management changes, material agreements. 0 means it filed nothing. 1 is routine for most companies. 3 or more is a busy corporate week.
+**How to read it.** How many 8-K and 8-K/A filings the company had accepted over the 5 sessions ending at the previous session, through that day's 17:30 New York index cut-off. The span ends the day before the session, never on it. An 8-K is the SEC's current report: results, deals, management changes, material agreements. 0 means it filed nothing. 1 is routine for most companies. 3 or more is a busy corporate week.
 
 **The criterion per intent**
 
@@ -604,9 +604,9 @@ Sources: Site convention (docs/data/features.md, earnings_revisions@v1)
 
 **When the reading lies**
 
-- Null means the table cannot say none. Either nothing is stored for the company (never fetched, or never filed), or the stored history starts after the window.
-- Null also covers a session whose filings are not stored yet. The nightly filings step is not critical, so on a night it fails or is skipped a zero would wrongly read as no news. A later run stores the filings and the value appears.
-- A filing counts from the session its acceptance made it public. One accepted after the close or over a weekend counts from the first session it was known. A filing accepted after the session never appears on it.
+- The span stops at the previous session because the nightly runs before SEC lists the evening's filings. SEC lists filings accepted after 17:30 in the next day's index. Counting through the session would read 0 tonight and 1 tomorrow. This count is the same on every recompute.
+- Null means the table cannot say none. Either no clean nightly walk of the SEC index has reached the previous session. Or nothing is stored for the company (never fetched, or never filed). Or the stored history starts after the span.
+- Null is also the answer on a night the filings step failed or was skipped. A zero would wrongly read as no news. The count appears once a later walk covers the day.
 - News with no 8-K is not counted: an analyst note, a press story, a rumour, a competitor's results. A zero is 'no company filing', not 'no news'. rollup.filing_activity@v1.earnings_in_5d adds the report windows, and feature.news_free_5d combines both.
 - An Item 2.02 results release is an 8-K, so an earnings week shows at least one filing.
 
@@ -669,7 +669,7 @@ Sources: Hartzmark and Solomon (2013), The dividend month premium, Journal of Fi
 
 ### `feature.news_free_5d`
 
-**How to read it.** True when the company filed no 8-K and no earnings reaction window touched the last 5 sessions, as known on the session. That is rollup.filing_activity@v1.filing_count_5d at 0 and rollup.filing_activity@v1.earnings_in_5d false. Nothing identifiable explains a move in the week. False when either happened. Null when it cannot be told and neither term already says false.
+**How to read it.** True when the company filed no 8-K through the previous session and no earnings reaction window touched the last 5 sessions, as known on the session. That is rollup.filing_activity@v1.filing_count_5d at 0 and rollup.filing_activity@v1.earnings_in_5d false. Nothing identifiable explains a move in the week. The 8-K part stops at the previous session; the earnings part includes the session. False when either happened. Null when it cannot be told and neither term already says false.
 
 **The criterion per intent**
 
@@ -680,7 +680,7 @@ Sources: Hartzmark and Solomon (2013), The dividend month premium, Journal of Fi
 **When the reading lies**
 
 - It is the absence of company filings and report dates, not of news. A press story, an analyst call, a rumour, a peer's results or a macro release still moves a name in a news-free week.
-- Null is common before the filings backfill, on a night the filings step did not store the session, and for names with no stored filing. A hard 'eq true' keeps only names where the absence is known.
+- Null is common before the filings backfill, when no clean nightly walk has reached the previous session, and for names with no stored filing. A hard 'eq true' keeps only names where the absence is known.
 - A past session is read as it was. A filing accepted after it, or a report date published later, never changes it.
 
 Sources: Gervais, Kaniel and Mingelgrin (2001), The high-volume return premium, Journal of Finance
