@@ -15,6 +15,7 @@ from typing import Any
 
 import pandas as pd
 
+from algotrade.config.edges.chain import CHAIN_KIND
 from algotrade.config.edges.document import Edge
 from algotrade.config.edges.identity import LONG, LONG_SHORT, SHORT, identity_dict
 from algotrade.config.edges.portfolio import CASH, PORTFOLIO_KIND, blend
@@ -23,13 +24,18 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
+    CHAIN_COLUMNS,
     OUTCOME_FIELDS,
     RESIDUAL_FIELDS,
     attach_residuals,
+    chain_seqs,
+    missing_chain,
     missing_outcomes,
     outcome_seqs,
+    read_chain_stored,
     read_residuals,
     read_stored,
+    select_chain,
     select_outcomes,
 )
 from algotrade.engines.screening.runner import RunCoverage
@@ -565,7 +571,11 @@ def _measure(
     legs = [lg for p in plans for b in p.blocks for lg in b if todo is None or lg.decision in todo]
     days = sorted({leg.decision for leg in legs})
     residuals = any(needs_residual(p.scope.edge) for p in plans)  # their stamps count too
-    out.seqs = outcome_seqs(reader, {leg.entry for leg in legs}, residuals)  # before any row read
+    chain = _chain(plans)  # an option_pnl edge reads the chain grain
+    entries = {leg.entry for leg in legs}
+    out.seqs = (  # before any outcome row is read
+        chain_seqs(reader, entries) if chain else outcome_seqs(reader, entries, residuals)
+    )
     failed: dict[int, MissingDataError] = {}
     out.closed.update({p.horizon: set(reuse.closed.get(p.horizon, ())) for p in plans})
     for at in range(0, len(days), CHUNK_SESSIONS):
@@ -595,6 +605,12 @@ def _measure(
     return out
 
 
+def _chain(plans: Sequence[_Plan]) -> bool:
+    """Whether the plans' outcomes are option P&Ls read from the chain grain (an edge's variants
+    are all of one kind, ``config/edges/chain.check_kinds``)."""
+    return any(p.scope.edge.outcome.kind == CHAIN_KIND for p in plans)
+
+
 def _read_closed(
     reader: StoreReader,
     plans: Sequence[_Plan],
@@ -613,7 +629,9 @@ def _read_closed(
         for h in sorted({p.horizon for p in plans})
     }  # fmt: skip
     entries = sorted({d for days in wanted.values() for d in days})
-    stored = read_stored(reader, entries, as_of) if entries else None  # once for the horizons
+    chain = _chain(plans)
+    read = read_chain_stored if chain else read_stored
+    stored = read(reader, entries, as_of) if entries else None  # once for the horizons
     residual_horizons = {p.horizon for p in plans if needs_residual(p.scope.edge)}
     residuals = read_residuals(reader, entries, as_of) if entries and residual_horizons else None
     have: set[date] = set()  # the entry sessions with a partition visible at ``as_of``
@@ -625,13 +643,17 @@ def _read_closed(
         if not days:
             continue
         if stored is None or not any(days[0] <= d <= days[-1] for d in have):
-            failed.setdefault(horizon, missing_outcomes(days))  # nothing stored in its span
-            continue
-        frame = select_outcomes(stored, horizon, days, BENCHMARK, as_of)
-        columns = list(OUTCOME_COLUMNS)
-        if horizon in residual_horizons:  # a factor-neutral outcome of this horizon (EB H11)
-            frame = attach_residuals(frame, residuals, horizon)
-            columns += RESIDUAL_FIELDS
+            failed.setdefault(horizon, (missing_chain if chain else missing_outcomes)(days))
+            continue  # nothing stored in its span
+        if chain:
+            frame = select_chain(stored, horizon, days, as_of)
+            columns = list(CHAIN_COLUMNS)
+        else:
+            frame = select_outcomes(stored, horizon, days, BENCHMARK, as_of)
+            columns = list(OUTCOME_COLUMNS)
+            if horizon in residual_horizons:  # a factor-neutral outcome of this horizon (EB H11)
+                frame = attach_residuals(frame, residuals, horizon)
+                columns += RESIDUAL_FIELDS
         kept = frame[columns]  # what apply_outcome reads, no more
         closed[horizon] = dict(tuple(kept.groupby(frame["session_date"].map(_day))))
         out.closed[horizon] |= set(closed[horizon])

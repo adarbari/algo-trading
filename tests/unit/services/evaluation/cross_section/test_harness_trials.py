@@ -1,4 +1,6 @@
-"""The site's trial log reads the records of the legacy owners (``LEGACY_SITE_OWNERS``) from before
+"""An edge on the chain grain (``option_pnl``, EB H13) end to end on the small world.
+
+The site's trial log reads the records of the legacy owners (``LEGACY_SITE_OWNERS``) from before
 ``LEGACY_SITE_CUTOFF`` as its own, each trial once; a trial's statistics read the series its
 unit calls for; and the sides of an outcome (ADR 0053 amendment) measured end to end on the small
 world: the bottom of the ranking among liquid names, the spread, the borrow, the ledger."""
@@ -10,6 +12,8 @@ import numpy as np
 import pytest
 
 from algotrade.config.user import UserContext
+from algotrade.core.model.errors import MissingDataError
+from algotrade.core.time.calendar import next_session
 from algotrade.quant.edges.statistics import sharpe
 from algotrade.services.evaluation.cross_section.detail.trades import trades_frame
 from algotrade.services.evaluation.cross_section.detail.windows import SeriesFacts
@@ -28,6 +32,7 @@ from tests.unit.services.evaluation.cross_section.conftest import (
     AS_OF,
     DAYS,
     IDS,
+    World,
     build_world,
     edge,
     outcome_row,
@@ -284,3 +289,55 @@ def test_a_short_edge_holds_the_worst_names_through_its_band() -> None:
     assert r.stats[0].band[0].value == pytest.approx(
         0.045 - 0.002
     )  # a short earns minus the return
+
+
+CHAIN_OUTCOME = {
+    "kind": "option_pnl", "horizon_sessions": [2], "benchmark": "none", "tenor_days": 30,
+    "structure": "atm_straddle_long", "start_offset_sessions": 1,
+}  # fmt: skip
+
+
+def _chain_row(iid: str, i: int, day: date) -> dict[str, Any]:
+    """Name i earns (i - 9.5)% of the stock on the mid, with a 0.2 half-spread at entry and exit."""
+    pnl = (i - 9.5) / 100
+    return {
+        "instrument_id": iid, "ts": datetime.combine(day, datetime.min.time(), UTC),
+        "structure": "atm_straddle", "tenor_days": 30, "horizon_sessions": 2,
+        "window_end": day + timedelta(days=2), "call_id": "C", "put_id": "P",
+        "expiry": day + timedelta(days=30), "strike": 100.0, "entry_spot": 100.0,
+        "entry_mid": 5.0, "entry_ask": 5.2, "exit_spot": 100.0, "exit_mid": 5.0 + 100 * pnl,
+        "exit_bid": 4.8 + 100 * pnl, "exit_kind": "QUOTE", "pnl_per_premium": pnl / 0.05,
+        "pnl_exec_per_premium": pnl / 0.05, "pnl_per_underlying": pnl,
+        "hedged_pnl_per_premium": pnl, "hedged_pnl_per_underlying": pnl,
+        "outcome_status": "COMPLETE", "outcome_reason": None,
+    }  # fmt: skip
+
+
+def _with_chain_outcomes(w: World) -> World:
+    for day in [*DAYS, next_session(DAYS[-1])]:
+        rows = [_chain_row(iid, i, day) for i, iid in enumerate(IDS)]
+        frame = stamped(rows, day, f"cp-{day}")
+        w.writer.write_table("outcomes/option/structure_pnl@v1", day, f"cp-{day}", frame)
+    return w
+
+
+def test_an_option_pnl_edge_is_scored_on_the_chain_grain_net_of_the_quoted_spread() -> None:
+    w = _with_chain_outcomes(build_world())
+    ev = evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"), edge(outcome=CHAIN_OUTCOME),
+        DAYS[0], DAYS[-1], AS_OF,
+    )  # fmt: skip
+    (r,) = ev.results
+    m = r.measures[0]
+    # the value is the P&L over the entry spot less the half-spreads (0.2 + 0.2 over 100)
+    assert m.mean_excess_picks == pytest.approx((17 - 9.5) / 100 - 0.004)
+    assert (m.sessions, m.picks, m.hits) == (4, 20, 20) and ev.unclosed_sessions == {2: 0}
+
+
+def test_an_option_pnl_edge_with_no_chain_outcome_stored_is_missing_data() -> None:
+    w = build_world()  # price outcomes are stored; the chain grain has none
+    with pytest.raises(MissingDataError, match="option-outcomes"):
+        evaluate_edge(
+            w.reader, w.results, w.configs, UserContext("site"), edge(outcome=CHAIN_OUTCOME),
+            DAYS[0], DAYS[-1], AS_OF,
+        )  # fmt: skip

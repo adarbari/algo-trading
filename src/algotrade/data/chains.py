@@ -8,7 +8,7 @@ Option quote rows are keyed by the contract (``instrument_id``) and carry their
 """
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -28,6 +28,7 @@ LIVE_OPTION_QUOTES = "live/option_quotes"
 # failed or missing fetch is a source problem; a stale chain is the feed serving an older session.
 # A chain stale for more than ``max_chain_stale_sessions`` is labelled CHRONIC (never stored): the
 # feed is not late for the name, it has stopped serving it, which is a fetch failure.
+OK_LABEL = "OK"  # a fetched, current chain
 STALE = "STALE_DATA"
 CHRONIC = "STALE_CHRONIC"
 FETCH_FAILURES = ("FETCH_ERROR", "NOT_ATTEMPTED", CHRONIC)  # FETCH_ERROR includes an open circuit
@@ -51,6 +52,19 @@ def _of_underlyings(
         return frame
     wanted = frame["underlying_id"].astype(str).isin(list(underlying_ids))
     return frame[wanted].reset_index(drop=True)
+
+
+def option_quote_rows(
+    reader: StoreReader,
+    session: date,
+    contract_ids: Collection[str] | None,
+    columns: Sequence[str],
+    as_of: datetime | None = None,
+) -> pd.DataFrame | None:
+    """The ``columns`` of ``session``'s option quotes (``knowledge_ts`` comes with them), limited
+    to ``contract_ids`` (None: every contract), in one column-pruned read."""
+    ids = None if contract_ids is None else sorted(contract_ids)
+    return reader.table_range(OPTION_QUOTES, session, session, as_of, ids, list(columns))
 
 
 def chain_expiries(

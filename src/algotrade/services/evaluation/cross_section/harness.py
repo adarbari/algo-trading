@@ -59,6 +59,8 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
+    chain_seqs,
+    chain_stamps,
     outcome_seqs,
     outcome_stamps,
     stored_sessions,
@@ -117,6 +119,7 @@ from algotrade.services.evaluation.cross_section.measures import (
 )
 from algotrade.services.evaluation.cross_section.measuring import (
     Variant,
+    _chain,
     _drawn,
     _measure,
     _Measured,
@@ -478,7 +481,14 @@ def evaluate_edge(
         stored,
         needs,
         as_of,
-        partial(_outcome_stamps, reader, as_of, _earnings_horizons(plans), residual_plans(plans)),
+        partial(
+            _outcome_stamps,
+            reader,
+            as_of,
+            _earnings_horizons(plans),
+            _chain(plans),
+            residual_plans(plans),
+        ),
         "requested" if full else None,
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
@@ -725,6 +735,7 @@ def _outcome_stamps(
     reader: StoreReader,
     as_of: datetime,
     names_for: Collection[int],
+    chain: bool,
     residuals: bool,
     entries: Collection[date],
 ) -> tuple[
@@ -733,6 +744,9 @@ def _outcome_stamps(
     """What reuse asks of the outcome partitions of ``entries``: per (S, horizon) the latest
     ``knowledge_ts`` known by ``as_of`` with the names of those rows, and per S the commit
     sequence (the harness is the one reader of outcomes)."""
+    if chain:  # an option_pnl edge reads the chain grain (EB H13)
+        known, names = chain_stamps(reader, entries, as_of, names_for)
+        return known, names, chain_seqs(reader, entries)
     known, names = outcome_stamps(reader, entries, as_of, names_for=names_for, residuals=residuals)
     return known, names, outcome_seqs(reader, entries, residuals)
 
