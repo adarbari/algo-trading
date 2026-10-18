@@ -1,4 +1,4 @@
-"""Parse and validate a rule screen (ADR 0029, ``docs/screeners/rules.md``) into a
+"""Parse and validate a rule screen (ADR 0029, 0071, ``docs/screeners/rules.md``) into a
 ``ScreenSpec``. Fails closed: every problem is a ``ConfigurationError`` naming its path, so
 an invalid spec never runs or finalises.
 
@@ -17,6 +17,7 @@ from algotrade.config.strategy.schema import (
     parse_group,
     parse_rule,
 )
+from algotrade.config.strategy.screen_groups import parse_groups
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 from algotrade.core.model.predicates import NUMERIC_OPS, Group, Rule
@@ -164,11 +165,17 @@ def _score_criterion(score: Any, path: str) -> Criterion:
 def parse_screen_spec(config_id: str, raw: Mapping[str, Any], path: str) -> ScreenSpec:
     """``raw``: the rule-screen keys of a merged config (``StrategyConfig.rules``)."""
     criteria_raw = _table(raw.get("criteria", {} if "score" in raw else None), f"{path}.criteria")
-    parsed = (
-        parse_criterion(cid, _table(c, f"{path}.criteria.{cid}"), f"{path}.criteria.{cid}")
+    parsed = [
+        (cid, parse_criterion(cid, _table(c, f"{path}.criteria.{cid}"), f"{path}.criteria.{cid}"))
         for cid, c in criteria_raw.items()
+    ]
+    groups, taken_out = parse_groups(
+        raw.get("groups", {}),
+        (cid for cid, c in parsed if c is not None),
+        (cid for cid, c in parsed if c is None),
+        f"{path}.groups",
     )
-    criteria = tuple(c for c in parsed if c is not None)
+    criteria = tuple(c for _, c in parsed if c is not None and c.id not in taken_out)
     score = raw.get("score")
     if score is not None:
         criteria = (*criteria, _score_criterion(score, path))
@@ -197,6 +204,7 @@ def parse_screen_spec(config_id: str, raw: Mapping[str, Any], path: str) -> Scre
         tie_break=tie_break,
         tie_break_descending=descending,
         notes=_notes(raw.get("notes", []), f"{path}.notes"),
+        groups=groups,
     )
 
 

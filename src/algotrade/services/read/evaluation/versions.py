@@ -285,7 +285,7 @@ def load_published_document(ctx: Stores, edge_id: str) -> str | None:
     """The layered document of the edge ``edge_id`` as the user sees it, as TOML (None: they
     see no such edge): ``extends`` resolved (a copy is one whole document), the user's
     ``[follow]``, ``[audit]`` and ``extends`` left out (the status stays the user's: the admin
-    sets the site's). What an admin lands in ``config/site/edges/<id>.toml``
+    sets the site's). What an admin lands in ``config/site/edges/<id>/edge.toml``
     by pull request: the site's config changes only by PR, so publishing is a read."""
     if load_edge(ctx, edge_id) is None:
         return None

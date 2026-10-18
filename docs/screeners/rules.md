@@ -173,6 +173,65 @@ threshold ("IV30 ≥ 50%"). `tiers`, `classify` and `label` were removed in
 [ADR 0030](../adr/0030-rule-screener-simplification.md); v1 / v2 presets still carry them and
 they are ignored.
 
+## Groups (ADR 0071)
+
+A screen ANDs its criteria. A **group** says "A or B" (`any`), "all of these" nested inside an
+`any` (`all`) or "except these" (`none`): a table that names its members by id, so the criteria
+stay in the one flat `[criteria]` table (layering, `enabled`, the preview memo and the funnel
+order keep working) and every criterion keeps its `hard` / `soft` / `score` mode, tolerance and
+`on_miss` wherever it sits. A group has no mode of its own.
+
+```toml
+[groups.oversold]            # (rsi_low and volume_up) or near_low
+any = ["momentum_dip", "near_low"]
+
+[groups.momentum_dip]
+all = ["rsi_low", "volume_up"]
+
+[groups.no_earnings]         # except earnings_soon
+none = ["earnings_soon"]
+```
+
+A group table holds exactly one of `all` / `any` / `none` (a list of criterion or group ids) and an
+optional `enabled`. Rules, each a fail-closed error naming the path:
+
+- Group ids follow the criterion id rule, share one key space with the criteria and are never
+  `score`; a member is a criterion or group of the same screen.
+- Every criterion and group has at most one parent; groups are acyclic and nest at most 4 deep.
+- `all` and `any` need 2 or more members, `none` 1 or more, at most 12. A member that a layer
+  disabled drops out before these size rules; a disabled group leaves its parent and takes its own
+  members out of the screen.
+- A top-level `all` is refused (it is the screen itself).
+
+A group with no parent is a **gate**: the screen is the implicit `all` of its gates (the ungrouped
+criteria and the top-level groups). A gate sits in the funnel at its first criterion's position and
+the preview funnel shows it as one step; members are evaluated and reported in criteria order.
+
+**Verdicts.** A criterion's verdict is whether it rejects, its penalty and its near-miss `on_miss`
+(Criteria, Decision, Score above). A group combines its members' verdicts, and only the gates'
+verdicts decide the row and its score:
+
+| Group | Rejects | Penalty | `on_miss` |
+|---|---|---|---|
+| `all` | any member rejects | sum of the members' | the most severe |
+| `any` | the best member rejects: one that does not reject comes first, then the lowest penalty, a pass before a near miss, then criteria order | the best member's | the best member's |
+| `none` | `all` over the members negated | | |
+
+`none` pushes the negation down to the criteria (De Morgan: not `all` is `any` of the negations,
+not `any` is `all`). A criterion is negated by its operator (`lt` and `gte`, `gt` and `lte`, `eq`
+and `ne`, `in` and `not_in`, `is_null` and `not_null`; `between` becomes below the low bound or
+above the high one) and keeps its mode, tolerance and `on_miss`, so "except RSI < 30" with
+tolerance 2 is a near miss at RSI 29. Missing data keeps its mode's rule: a `hard` member with no
+value rejects, a `soft` or `score` one costs its full penalty; an `any` of hard members passes on
+one known passing member and rejects when every member fails or is missing, so missing data never
+passes. An `any` with a `score` member never rejects.
+
+With every member `hard`, a group is exactly the three-valued (Kleene) result of the equivalent
+`all` / `any` / `not` formula. Reason lines name the deciding member:
+`oversold near miss via rsi_low (31; tolerance 2)`, `oversold fail: neither momentum_dip (rsi_low
+41) nor near_low (0.12)`. A spec with no `[groups]` has the same canonical JSON, hash and results
+as before groups existed. Storage and reads of group rows follow in a later change.
+
 ## Run summary
 
 Every run, preview and nightly, reports: how many rows passed (QUALIFIED), the count of each

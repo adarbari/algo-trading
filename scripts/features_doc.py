@@ -3,7 +3,7 @@
 repository's config/site/features/*.toml, the field guide (docs/data/field-guide.md) from
 config/site/field_guide/*.toml (the index docs/data/field-guide.md and one page per theme under
 docs/data/field-guide/; a theme page no longer rendered is removed), and the edges page
-(docs/edges.md) from config/site/edges/*.toml (ADR 0053).
+(docs/edges.md) from config/site/edges/*/edge.toml (ADR 0053).
 
 Usage: python scripts/features_doc.py [--check]
 Without --check it also lists the catalogue fields that have no field guide entry.

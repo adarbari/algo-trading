@@ -1,5 +1,6 @@
 """One criterion against one value: PASS, NEAR (within tolerance), FAIL or MISSING, the
-distance from the threshold and the score penalty (ADR 0029, ``docs/screeners/rules.md``).
+distance from the threshold and the score penalty (ADR 0029, ``docs/screeners/rules.md``),
+and its ``Verdict`` (what a gate or a boolean group combines, ADR 0071).
 
 Penalties: a near miss (SOFT or SCORE within tolerance) costs ``NEAR_MISS_PENALTY x
 distance / tolerance``; a SCORE miss beyond its tolerance (or without one) the full
@@ -29,6 +30,23 @@ class Outcome(StrEnum):
 
 
 @dataclass(frozen=True)
+class Verdict:
+    """What a criterion, or a group of them, contributes to the decision and the score: it
+    ``rejects``, its ``penalty`` (0 to 100 per criterion), the near-miss decision ``on_miss``
+    when it is a near miss (``None`` otherwise) and ``missing`` (a soft criterion with no value
+    that does not reject: it costs points and is listed)."""
+
+    rejects: bool
+    penalty: float
+    on_miss: str | None = None
+    missing: bool = False
+
+    @property
+    def near(self) -> bool:
+        return not self.rejects and self.on_miss is not None
+
+
+@dataclass(frozen=True)
 class CriterionResult:
     criterion: Criterion
     value: FieldValue
@@ -38,8 +56,26 @@ class CriterionResult:
     penalty: float = 0.0
 
     @property
+    def id(self) -> str:
+        return self.criterion.id
+
+    @property
     def gating(self) -> bool:
         return self.criterion.mode.gating
+
+    @cached_property
+    def verdict(self) -> Verdict:
+        """Gating FAIL or HARD MISSING rejects; a gating NEAR carries its ``on_miss``; a SOFT
+        MISSING only costs points; a SCORE criterion never gates (ADR 0029, 0030)."""
+        hard_missing = self.outcome is Outcome.MISSING and self.criterion.mode is Mode.HARD
+        rejects = self.gating and (self.outcome is Outcome.FAIL or hard_missing)
+        near = self.gating and self.outcome is Outcome.NEAR
+        missing = self.gating and self.outcome is Outcome.MISSING and not rejects
+        return Verdict(rejects, self.penalty, self.criterion.on_miss if near else None, missing)
+
+    @property
+    def leaf(self) -> "CriterionResult":
+        return self
 
     def threshold(self) -> float | None:
         """The threshold this value missed (the nearer bound for ``between``)."""
