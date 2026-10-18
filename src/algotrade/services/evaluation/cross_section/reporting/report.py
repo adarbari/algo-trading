@@ -70,6 +70,12 @@ def render_edge_report(result: Mapping[str, Any]) -> str:
             f"at {iv['stored']} of {iv['sessions']} measured sessions; {iv['picks']} picks "
             "excluded for no implied vol (not misses)"
         )
+    for sib in result.get("sibling_coverage", []):
+        lines.append(
+            f"NO SIBLING DATA: {sib['variant']} h={sib['horizon']} has no pair field stored at "
+            f"{sib['no_sibling_data']} of {sib['sessions']} measured sessions (picks excluded "
+            "as no_sibling, not misses)"
+        )
     for c in result.get("report_containment", []):
         share = c["contained"] / c["windows"] if c["windows"] else None
         lines.append(

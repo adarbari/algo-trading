@@ -267,6 +267,7 @@ def _stat(
         pick_touches=int(counted.loc[got, "touch"].fillna(0).sum()),
         no_implied_vol=sum(1 for i in picks if i in no_iv),
         implied_stored=any(v is not None for v in implied.values()),
+        siblings_stored=_siblings_stored(edge, session, eligible, day),
         picks=tuple(
             p
             for side_, ids_ in legs
@@ -281,6 +282,17 @@ def _stat(
             else None
         ),
     )
+
+
+def _siblings_stored(
+    edge: Edge, session: SessionReads, eligible: frozenset[str], day: date
+) -> bool:
+    """Whether a ``pair_spread``'s ``pair_field`` has a value for some eligible name at D (true
+    for every other outcome): a field stored for no name would read as a quiet ``no_sibling``."""
+    if not needs_pairs(edge):
+        return True
+    siblings = session.siblings(edge.outcome.pair_field or "", eligible, day)
+    return any(v is not None for v in siblings.values())
 
 
 def _side_picks(

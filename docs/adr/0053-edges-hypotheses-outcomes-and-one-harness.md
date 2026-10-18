@@ -828,6 +828,11 @@ adds one feature group, `share_classes@v1`, that names each name's sibling.
    `missing_value` (a null return). The base is the same value of every eligible name (each
    class against its sibling), so it is the spread of a random side of the pair and its hit rate
    sits near one half minus the costs; a pair appears twice in it, once from each side.
+   **No sibling data.** A session whose `pair_field` has a value for no eligible name (an unbuilt
+   or all-null `share_classes` group) is flagged: `SessionStat.siblings_stored`, stored in the
+   nullable `edge_legs.siblings_stored` column (a leg from before it reads as stored; leg keys,
+   hashes and `LEG_VERSION` are unchanged), reported by `sibling_coverage` and a "NO SIBLING DATA"
+   line, like the implied-vol gap.
 5. **Few pairs.** About 15 to 25 issuers qualify, so a session has a handful of pairs. Sessions
    are spaced a horizon apart as for every schedule (`every_session`, `month_end`: independent
    windows, `sessions` beside every figure), and the counts of picks and eligible names stay

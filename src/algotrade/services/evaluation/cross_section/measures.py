@@ -103,6 +103,7 @@ class SessionStat:
     pick_touches: int = 0  # expires_otm: counted picks whose strike was touched intraday
     no_implied_vol: int = 0  # picks excluded for a missing or invalid implied vol at D
     implied_stored: bool = False  # the outcome's iv_field has a value for some eligible name at D
+    siblings_stored: bool = True  # pair_spread: its pair_field has a value for some name at D
     picks: tuple[Pick, ...] = ()  # every pick, counted ones aligned with ``pick_values`` (v2)
     # Hits at each level of the site's cost grid (``VerdictSettings.cost_levels_bps``, in the leg
     # key) instead of the document's cost: over every counted eligible name and over the picks;
@@ -203,6 +204,7 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         pick_touches=sum(leg.pick_touches for leg in legs),
         no_implied_vol=sum(leg.no_implied_vol for leg in legs),
         implied_stored=any(leg.implied_stored for leg in legs),
+        siblings_stored=all(leg.siblings_stored for leg in legs),
         picks=tuple(p for leg in legs for p in leg.picks),
         base_hits_at=_sum_levels([leg.base_hits_at for leg in legs]),
         pick_hits_at=_sum_levels([leg.pick_hits_at for leg in legs]),
