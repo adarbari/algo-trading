@@ -10,11 +10,14 @@ ROW = "id name thesis mechanism asset assetText side sideTerm holdingSessions ho
 ROW += "holdingBand status"
 INDEX = f"""query I {{
   guideEdgeIndex {{
-    mechanisms {{ id title question short examples count statuses {{ status count }}
+    mechanisms {{ id title question short examples count ideas statuses {{ status count }}
       edges {{ {ROW} }} }}
     filters {{ assets {{ id text count }} sides {{ id text count }} holdings {{ id text count }} }}
     setAsideTitle setAsidePurpose
     setAside {{ edge {{ id status }} why {{ text }} }}
+    notBuiltTitle notBuiltPurpose
+    notBuilt {{ id title mechanism verdict verdictText feasibilityText feasibilityTerm
+      whyNotBuilt }}
   }}
 }}"""
 MECHANISM = f"""query M($id: String!) {{
@@ -23,6 +26,7 @@ MECHANISM = f"""query M($id: String!) {{
     howItWorks {{ text }} whyItSurvives {{ text }} research {{ text }} realVsDecoy {{ text }}
     dont {{ text }} seeAlso stats {{ title value reading source }}
     sources {{ title url reading }} edges {{ {ROW} }}
+    notBuilt {{ id mechanism verdict }}
   }}
 }}"""
 EDGE = f"""query E($id: String!) {{
@@ -59,12 +63,17 @@ def test_the_edge_index(graph: Graph) -> None:
     assert {o["id"] for o in index["filters"]["assets"]} <= {"stocks", "etfs", "options"}
     assert index["setAside"] and all(s["why"]["text"] for s in index["setAside"])
     assert {s["edge"]["status"] for s in index["setAside"]} <= {"rejected", "blocked"}
+    assert index["notBuiltTitle"] and index["notBuilt"]
+    assert sum(m["ideas"] for m in index["mechanisms"]) == len(index["notBuilt"])
+    idea = index["notBuilt"][0]
+    assert idea["whyNotBuilt"] and idea["feasibilityTerm"] == "idea_feasibility"
 
 
 def test_a_mechanism_page(graph: Graph) -> None:
     page = _data(graph, MECHANISM, {"id": "value_gaps"})["guideMechanism"]
     assert page["title"] and page["howItWorks"] and page["dont"]["text"]
     assert page["edges"] and all(e["mechanism"] == "value_gaps" for e in page["edges"])
+    assert all(i["mechanism"] == "value_gaps" for i in page["notBuilt"]) and page["notBuilt"]
     assert page["stats"][0]["title"] and page["sources"][0]["url"].startswith("https://")
 
 

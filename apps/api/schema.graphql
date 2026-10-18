@@ -1301,7 +1301,7 @@ type GuideEdgeFilters {
 }
 
 """
-The Edges section's top page (ADR 0051): the mechanism cards in order, the filters with counts and the edges set aside with their reasons; no live number
+The Edges section's top page (ADR 0051): the mechanism cards in order, the filters with counts, the edges set aside with their reasons and the ideas researched but not built; no live number
 """
 type GuideEdgeIndex {
   mechanisms: [GuideMechanismCard!]!
@@ -1309,6 +1309,9 @@ type GuideEdgeIndex {
   setAsideTitle: String!
   setAsidePurpose: String!
   setAside: [GuideSetAsideEdge!]!
+  notBuiltTitle: String!
+  notBuiltPurpose: String!
+  notBuilt: [GuideIdea!]!
 }
 
 """A site playbook among an edge's screeners: id, name and family"""
@@ -1437,6 +1440,20 @@ type GuideFilterOption {
 }
 
 """
+An idea researched but not built: `mechanism` (the mechanism page's id), the catalogue's `verdict` (strong, promising, weak, decayed, dead or not_graded: the published evidence, never our test) with `verdictText`, `feasibilityText` (what building it would take) with its glossary term and `whyNotBuilt`, one plain sentence
+"""
+type GuideIdea {
+  id: String!
+  title: String!
+  mechanism: String!
+  verdict: String!
+  verdictText: String!
+  feasibilityText: String!
+  feasibilityTerm: String!
+  whyNotBuilt: String!
+}
+
+"""
 What the Guide holds (ADR 0051): the sections in order with entry counts, the field theme groups, the intents (most fields first), the situations, the playbooks by family, the regime indicators, the reference episodes, the mechanisms of the Edges section with their edge counts, the Start here pages in order and the glossary terms
 """
 type GuideIndex {
@@ -1507,7 +1524,7 @@ type GuideLink {
 }
 
 """
-A mechanism's Guide page: the card's `question`, `short` and `examples`, the paragraphs of how it works, why it survives, the research and real against decoy (each linked), the one thing not to read into it (`dont`), glossary terms (`seeAlso`), the stat tiles, the sources and the `edges` that rest on it (every status, Guide order)
+A mechanism's Guide page: the card's `question`, `short` and `examples`, the paragraphs of how it works, why it survives, the research and real against decoy (each linked), the one thing not to read into it (`dont`), glossary terms (`seeAlso`), the stat tiles, the sources, the `edges` that rest on it (every status, Guide order) and the ideas researched but `notBuilt`
 """
 type GuideMechanism {
   id: String!
@@ -1524,10 +1541,11 @@ type GuideMechanism {
   stats: [GuideMechanismStat!]!
   sources: [GuideMechanismSource!]!
   edges: [GuideEdgeRow!]!
+  notBuilt: [GuideIdea!]!
 }
 
 """
-A mechanism's card: its question, one-line hero, examples, how many edges rest on it, the count by status and the edges as rows
+A mechanism's card: its question, one-line hero, examples, how many edges rest on it, the count by status, the edges as rows and how many `ideas` researched but not built rest on it
 """
 type GuideMechanismCard {
   id: String!
@@ -1538,6 +1556,7 @@ type GuideMechanismCard {
   count: Int!
   statuses: [GuideStatusCount!]!
   edges: [GuideEdgeRow!]!
+  ideas: Int!
 }
 
 """
