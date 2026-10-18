@@ -555,6 +555,14 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: grouping the available sides would silently change the meaning (an "or" side dropped makes the other side mandatory). Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it and asked that the note say the other conditions apply on their own (done): blocking the draft would throw away the parts that worked.
 
+## 2026-10-17 | PR #644 (E1c option-implied features) | IBKR IV30 change as a personal-licence feature
+- Question: does the IV-change edge (c03) get a long-history IBKR variant beside the chain-derived one?
+- Options: chain-derived only (history from 2026-10-02) / also `ibkr_iv_chg_5d` and `ibkr_iv_chg_21d` from IBKR's IV30 history (about 502 sessions).
+- Decision: add `ibkr_iv_history@v1` with both, `licence = "personal"`, optional like `ibkr_iv@v1`; `cp_iv_history@v1` stays open. Its guide entries say IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: settled by the architect reviewer of #644 (the format accepts no `architect` decider); the edge can be scored now instead of from November; the read-only broker boundary is untouched (it reads a stored rollup).
+
 ## 2026-10-18 | PR #651 (D6, Form 4 insider transactions) | Storing the reporting owner's CIK and officer title
 - Question: may the insider transaction table store `owner_cik` and `officer_title` (public EDGAR fields that identify a natural person), or only a hashed owner key plus role flags?
 - Options: store `owner_cik` + `officer_title` as filed / store a salted hash of the owner CIK + role flags only / store role flags only (no per-person key).
