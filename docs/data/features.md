@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-586 stored features in 73 groups, in dependency order; 154 expression features.
+596 stored features in 77 groups, in dependency order; 156 expression features.
 
 ## `option_liquidity@v1`
 
@@ -280,6 +280,23 @@ The best one-day close-to-close return of the last 21 sessions (MAX). Stored as 
 |---|---|---|---|---|---|---|---|---|
 | `max_ret_21d` | window | float32 | decimal | open | >= -1 | The best one-day close-to-close return of the last 21 sessions (split-adjusted as of the session): 0.12 is a day that gained 12%; negative when every day lost | a session among the last 22 has no close (a gap), or the history is shorter | `bars/1d.close` |
 
+## `session_returns@v1`
+
+The last 20 sessions' return split into overnight (close to open) and intraday. Stored as `rollups/instrument/session_returns@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `overnight_ret_20d` | window | float32 | decimal | open | >= -1 | The compounded close-to-open return of the last 20 sessions (each open over the previous close, split-adjusted as of the session): 0.04 is a name that gained 4% overnight in total, whatever it did during the days | a session among the last 21 has no bar (a gap), has a non-positive open or close, or the history is shorter | `bars/1d.open`, `bars/1d.close` |
+| `intraday_ret_20d` | window | float32 | decimal | open | >= -1 | The compounded open-to-close return of the last 20 sessions (each close over the same day's open, split-adjusted as of the session): the part of the month's move that happened while the market was open | a session among the last 21 has no bar (a gap), has a non-positive open or close, or the history is shorter | `bars/1d.open`, `bars/1d.close` |
+
+## `signed_volume@v1`
+
+The 20-session on-balance volume change as a share of the volume traded. Stored as `rollups/instrument/signed_volume@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `obv_trend_20d` | window | float32 | decimal | open | -1 .. 1 | The 20-session change of on-balance volume / the volume traded in those sessions (each session's volume counts positive on a close above the previous close, negative below, zero when unchanged): 0.3 is net buying on a third of the volume, -0.3 net selling | a session among the last 21 has no bar (a gap), or the history is shorter, or the last 20 sessions had no volume at all | `bars/1d.close`, `bars/1d.volume` |
+
 ## `earnings_neutral_reversal@v1`
 
 The last 20 sessions' return without the days an earnings report moved the price. Stored as `rollups/instrument/earnings_neutral_reversal@v1`; reads `events/earnings`, `bars/1d`.
@@ -482,6 +499,27 @@ Which stock or basket a leveraged or inverse fund tracks, from its holdings and 
 | `reference_kind` | label | str | category | open | single_stock, index, sector, commodity, none | What the fund tracks: a single stock, an index, a sector, a commodity, or none (volatility funds, rates funds, funds nothing is known of) | never (none is a value) | `holdings/etf.asset_class`, `holdings/etf.sector`, `instruments/reference.name` |
 | `reference_source` | label | str | category | open | holdings, name_rule | What settled the link, or for a basket its kind: the holdings table or the name rule | reference_kind is none: nothing settled it | `holdings/etf.holding_id`, `instruments/reference.name` |
 | `reference_status` | label | str | category | open | LINKED, BASKET, UNLISTED, NO_REFERENCE | LINKED: one stock found; BASKET: an index, sector or commodity fund; UNLISTED: a stock is named that the reference does not list; NO_REFERENCE: neither holdings nor the name say what it tracks | never | `holdings/etf.holding_id` |
+
+## `cef_nav@v1`
+
+How far a closed-end fund trades from its net asset value, and against its own year. Stored as `rollups/instrument/cef_nav@v1`; reads `events/fund_nav`, `bars/1d` (optional), `events/split` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `nav_per_share` | window | float32 | usd_per_share | personal | >= 0 | The latest net asset value per share known by the session, as the issuer struck it (not split-adjusted) | no NAV is stored for the fund, or none dated within the last 252 sessions | `events/fund_nav.nav` |
+| `nav_date` | window | date | date | personal |  | The date that NAV was struck (known from the session after it) | no NAV is stored for the fund, or none dated within the last 252 sessions | `events/fund_nav.ts` |
+| `cef_discount_to_nav` | window | float32 | decimal | personal | -0.95 .. 5 | The fund's close on the NAV's date over that NAV, minus 1: negative is a discount (-0.10: the shares cost 10% less than the assets), positive a premium | the latest NAV is more than 5 sessions before the session, the fund has no bar on its date, or the NAV is not positive | `events/fund_nav.nav`, `events/fund_nav.ts`, `bars/1d.close`, `events/split.ratio` |
+| `cef_discount_zscore` | window | float32 | ratio | personal | -10 .. 10 | The discount minus its mean over the NAV dates of the last 252 sessions, over their standard deviation: negative is a wider discount than the fund's own year | cef_discount_to_nav is null, fewer than 120 discounts are in the window, or they are all equal | `events/fund_nav.nav`, `events/fund_nav.ts`, `bars/1d.close`, `events/split.ratio` |
+
+## `etf_flows@v1`
+
+How much an iShares fund's share count changed over about a month (creations less redemptions). Stored as `rollups/instrument/etf_flows@v1`; reads `holdings/etf_shares`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `etf_shares_outstanding` | window | float | count | open | >= 0 | The issuer's latest shares outstanding for the fund known by the session (iShares files only) | the fund has no count dated within the last 30 days: not an iShares fund, or not listed in the issuer's file | `holdings/etf_shares.shares_outstanding` |
+| `etf_shares_asof` | window | date | date | open |  | The issuer's date of that count | the fund has no count dated within the last 30 days | `holdings/etf_shares.as_of` |
+| `etf_shares_chg_21d` | window | float32 | decimal | open | -1 .. 20 | The latest count over the count 21 sessions earlier, minus 1: positive is net creation, negative net redemption | the latest count is more than 7 days old, or no count dated within the 7 days up to the session 21 sessions back is stored (the history starts about 2026-10-17) | `holdings/etf_shares.shares_outstanding`, `holdings/etf_shares.as_of` |
 
 ## `share_classes@v1`
 
@@ -1239,6 +1277,8 @@ Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on rea
 | `rs_improving` | expression | bool | flag | open |  | Relative strength against SPY is improving: rs_spy_trend_20d above 0 (the 63-session relative strength is higher than it was 20 sessions ago) | rs_spy_trend_20d is null (a gap in either 63-session window, or SPY not in the symbol map), or no relative_strength row | `relative_strength.rs_spy_trend_20d > 0` | virtual |
 | `sector_leader` | expression | bool | flag | open |  | The instrument's sector is one of the three strongest of the eleven sector ETFs over 63 sessions: sector_rank_63d at most 3 (params.leader_rank) | sector_rank_63d is null (no sector or sector ETF, the ETF has no complete window, or fewer than min_sector_etfs ETFs do), or no relative_strength row | `relative_strength.sector_rank_63d <= leader_rank` (leader_rank = 3) | virtual |
 | `mom_12_1_vol_scaled` | expression | float | ratio | open | -100 .. 100 | The 12-1 momentum divided by the 60-session realised volatility (annualised): the return earned per unit of risk the name carries, so a calm 20% outranks a wild 20%; 1.0 is a 12-1 return equal to a year of one-stdev moves | mom_12_1 is null (a gap among the last 253 sessions, or a shorter history), hv60 is null (a gap among the last 61 sessions) or 0, or no trend_stats or vol_stats row | `trend_stats.mom_12_1 / vol_stats.hv60` | virtual |
+| `stock_tsmom_sign` | expression | float | ratio | open | -1 .. 1 | The name's own trend: 1 when its 252-session return is above 0 and the close is above the 200-session average, -1 when both are below, 0 when they disagree (the time-series momentum sign of Moskowitz, Ooi and Pedersen, confirmed by the average; the raw return is not an excess return over cash) | ret_252d or sma_200 is null (a gap among the last 253 sessions, or a shorter history), or no trend_stats or price_stats row | `if(is_null(trend_stats.ret_252d) or is_null(price_stats.sma_200), null, if(trend_stats.ret_252d > 0 and price_stats.close > price_stats.sma_200, 1, if(trend_stats.ret_252d < 0 and price_stats.close < price_stats.sma_200, -1, 0)))` | virtual |
+| `capital_gains_overhang` | expression | float | decimal | open | -1000 .. 1 | Where the close sits against the volume-weighted average price since the last earnings report: 0.05 is 5% above it, -0.05 is 5% below. A proxy for the capital-gains overhang of Grinblatt and Han, whose reference price is a turnover-weighted average over years of trading | avwap_earnings is null (no report in the last 126 sessions, fewer than 2 sessions since it, a gap in the range, or no volume), or no price_stats row | `(price_stats.close - anchored_vwap.avwap_earnings) / price_stats.close` | virtual |
 
 ### `regime.toml`
 

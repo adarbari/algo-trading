@@ -283,7 +283,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/reference"
-purpose = "feature groups from what an instrument is, its reference facts and a fund's holdings (the stock or basket a leveraged fund tracks): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus fund_names.py, the name rules for the fund's ticker and kind it shares"
+purpose = "feature groups from what an instrument is, its reference facts and a fund's holdings and units (the stock or basket a leveraged fund tracks, a closed-end fund's NAV and discount, an iShares fund's share count): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus fund_names.py, the name rules for the fund's ticker and kind it shares"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]

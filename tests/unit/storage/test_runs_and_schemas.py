@@ -180,6 +180,33 @@ def test_insider_rows_key_on_the_line_the_owner_and_known_from() -> None:
     validate_frame("events/insider_transaction", stamped([row, other_owner], day, "r"))
 
 
+def test_ipo_lockup_rows_key_on_the_issuer_cik_and_keep_every_version() -> None:
+    spec = spec_for("events/ipo_lockup")
+    assert spec.grain == "event" and spec.runs == "merge" and not spec.open_ended
+    assert spec.key == ("cik", "accession", "known_from")  # a later version never replaces one
+    assert "instrument_id" not in spec.required  # a new issuer is in no universe yet
+    assert spec.column("instrument_id") is not None and spec.column("instrument_id").nullable
+    assert not spec.column("known_from").nullable and not spec.column("is_ipo").nullable
+    row = {
+        "instrument_id": None, "ts": datetime(2026, 6, 12, 21, 30, tzinfo=UTC),
+        "known_from": date(2026, 6, 12), "cik": "0001111111", "accession": "0001193125-26-100001",
+        "filing_date": date(2026, 6, 15), "is_ipo": True, "early_release": False,
+        "extraction": "NO_LOCKUP", "rules_version": "v1", "lockup_days": None,
+        "lockup_expiry": None, "reason": "no lock-up term counted from the prospectus date",
+    }  # fmt: skip
+    day = date(2026, 10, 5)
+    validate_frame("events/ipo_lockup", stamped([row], day, "r"))
+    restated = {**row, "known_from": date(2026, 10, 5), "lockup_days": 180}  # another version
+    validate_frame("events/ipo_lockup", stamped([row, restated], day, "r"))
+    with pytest.raises(DataValidationError, match="duplicate rows"):
+        validate_frame("events/ipo_lockup", stamped([row, row], day, "r"))
+    with pytest.raises(DataValidationError, match="missing columns"):
+        validate_frame(
+            "events/ipo_lockup",
+            stamped([{k: v for k, v in row.items() if k != "extraction"}], day, "r"),
+        )
+
+
 def test_outcome_tables_are_fixed_merge_tables_keyed_by_horizon_and_benchmark() -> None:
     spec = spec_for(FORWARD_RETURNS)
     assert (spec.grain, spec.runs, spec.open_ended) == ("outcome", "merge", False)

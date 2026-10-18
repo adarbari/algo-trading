@@ -1,0 +1,31 @@
+# L3 site setting: the Guide's playbook for the site preset vrp_cross_section (ADR 0051; docs/ui/guide.md
+# "The playbook page"). Keys and tests as in playbooks/income/vrp_scanner.toml.
+id = "vrp_cross_section"
+version = 1  # the preset version this prose was written for
+summary = "Ranks liquid optionable names by how far their 30-day implied volatility sits above the volatility they delivered, with no minimum gap: the rank is the selection. It is the screen of a candidate edge under test, not a proven trade."
+hit = "A common stock, ADR or ETF (not leveraged or inverse) with listed options, closing above $5 on at least $50M of 20-day dollar volume, whose realised volatility is at least 10% and whose implied volatility is at least as high. Ranked by implied over realised, highest first."
+not_checked = "It does not check a report inside the month, the option chain, the spread or open interest. It ranks on 30-session realised volatility, where the source study used a 12-month one. Whether to sell premium on a name is a separate judgement."
+before_acting = [
+  "A report inside the month inflates implied volatility by itself: read rollup.earnings@v1.days_to_earnings before taking the top of the rank as a premium.",
+  "The top of the rank is the names the market fears most. Selling a straddle there is short the left tail: the harness reports the mean P&L, not the win rate.",
+  "The P&L the harness reports is a model, not a quote: an at-the-money straddle priced from the implied volatility. No spread, margin or hedging cost is in it beyond the stated cost.",
+]
+sources = [
+  "Goyal and Saretto (2009), Cross-section of option returns and volatility, Journal of Financial Economics",
+]
+related = [
+  { id = "vrp_iv_hv", reason = "the same premium with a minimum gap, not a rank" },
+  { id = "iv_rank_high", reason = "selling only when implied volatility is high for the name's year" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+optionable = "Has listed options"
+not_leveraged = "Not a leveraged fund"
+not_inverse = "Not an inverse fund"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+iv30 = "Has an implied volatility"
+hv30 = "Realised volatility of at least 10%"
+iv_hv_ratio = "Implied at least as high as realised"

@@ -51,7 +51,8 @@ def test_the_shipped_registry() -> None:
     }
     personal = {s.key for s in macro.series if s.licence == "personal"}
     third_party = {"BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "COMP", "VIX", "VIX3M", "SPX"}
-    assert personal == third_party  # third-party series on FRED
+    cape = {k for k in macro.keys if k.startswith("CAPE_")}  # Barclays' file: personal use
+    assert len(cape) == 26 and personal == third_party | cape
     unrevised = {  # FRED's daily market series: never revised, so one plain request each
         "T10Y3M", "T10Y2Y", "BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "DFII10", "RRPONTSYD",
         "SPX", "COMP", "VIX", "VIX3M",
@@ -66,7 +67,7 @@ def test_the_shipped_registry() -> None:
     assert min(revised_late.values()) >= 125  # a final value before ALFRED's first vintage
     assert all(s.terms for s in macro.series)
     files = {"EBP", "EBP_RECESSION_PROB", "OFR_FSI", "EPU_DAILY"}  # re-estimated in place
-    assert {s.key for s in macro.series if s.revised} == files
+    assert {s.key for s in macro.series if s.revised} == files | cape
     assert all(macro.by_key(k).pit == "lag" and macro.by_key(k).is_revised for k in files)
     assert macro.by_key("UNRATE").is_revised and not macro.by_key("T10Y3M").is_revised
     assert macro.by_key("EBP").release_lag_days == 45  # the Fed posts irregularly

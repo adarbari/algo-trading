@@ -1,0 +1,100 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: etf_flow_pressure (EB E4). iShares funds only.
+# Idea pages: docs/edge-ideas/calendar-flows.md (etf_flows_to_underlying) and statarb-technical.md
+# (etf_flow_reversal_constituents).
+id = "etf_flow_pressure"
+name = "ETF flow pressure"
+thesis = "ETFs that took in the most money over the last month, measured by the change in their shares outstanding, underperform the market over the next one to three months."
+mechanism = """ETF creations and redemptions carry demand that is partly non-fundamental (retail and allocator
+flows), pushed into the basket by authorised participants who hedge by trading it; the pressure is temporary
+and reverses (Ben-David, Franzoni and Moussawi 2018; Brown, Davies and Ringgenberg 2021)."""
+persistence = """ETF flows are growing, not shrinking, and the reversal is spread across many funds and horizons,
+which is costly to harvest in full; the evidence is 2000s to 2010s samples, with no public decay study
+yet, so persistence is a claim to test."""
+family = "D"
+schedule = "month_end"
+top_k = 10
+screeners = ["etf_flow_pressure"]
+baselines = ["momentum_12_1"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """The universe is the iShares funds: a fund must have a stored count (the last universe rule,
+etf_shares_outstanding above 0), because the harness ranks a short leg only when at least 80% of the
+base carries a score (MIN_SCORE_COVERAGE) and only iShares funds have one; with every liquid ETF in
+the base each session would be dropped for thin coverage. A fund whose latest count is older than 30
+days has no row and leaves the base. iShares funds only: the share count comes from iShares' own daily files (EB D4); SPDR,
+Vanguard, Invesco and every other issuer's funds are absent, not neutral. The stored history starts with the
+first nightly run on about 2026-10-17, and the change is 21 sessions, so the first value is about
+2026-11-17 and no independent month exists yet: the edge waits for months of counts to accrue (the harness
+reports the count). This is the fund-level version, the Brown, Davies and Ringgenberg result for ETFs
+themselves; the constituent version (aggregate each stock's ETF flow pressure from holdings, then
+long low and short high) needs ETF ownership per stock and is a follow-up. Short side, owner
+decision O2 (2026-10-17): the ETFs shorted are liquid ($20M a day), outcome minus the excess return
+over SPY, less cost and the assumed borrow; the long variant (the heaviest redemptions) and the long-short
+spread (diagnostic only) are variants. The rank is the screener's: the harness's short leg is the
+lowest scores, and etf_flow_pressure ranks ascending on the change, so the heaviest creation is shorted
+first. A flow is a share change here, not dollars: the page's flow is the share change times NAV, and
+a price rise alone draws money in, so a fund can show creation because it rose (momentum overlaps: the 12-1 momentum screen is a baseline, a stock ranking that gives an ETF base
+only the names it qualifies, so read it as the decoy on the sessions both measure)."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "ETF" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.is_leveraged", op = "eq", value = false },
+  { field = "instrument.is_inverse", op = "eq", value = false },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 20_000_000 },
+  { field = "rollup.etf_flows@v1.etf_shares_outstanding", op = "gt", value = 0 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+side = "short"
+cost_bps = 10
+
+[[variants]]
+id = "long_redemptions"
+[variants.outcome]
+side = "long"
+
+[[variants]]
+id = "long_short"
+[variants.outcome]
+side = "long_short"
+
+[quality_bar]
+outcome = """Minus the excess return over SPY over 20 and 60 sessions after the entry close, net of 10
+bps a round trip and the assumed borrow: a short position in the iShares funds with the heaviest net
+creation of the last 21 sessions."""
+trigger_timing = """The issuer's count is known from the session of the fetch that stored it (holdings/etf_shares
+known_from, a restated count from the session that fetched it), never from the issuer's own date. The change
+is read at D (the last session of the month) and the entry session is S = D + 1 (start_offset_sessions =
+1)."""
+replication = """The source's rule: ETF-level flows (the change in shares outstanding) predict negative
+subsequent ETF returns; sorted monthly, long the low-flow and short the high-flow funds, 1 to 3 months
+(Brown, Davies and Ringgenberg 2021; the spread is not verified, so nothing is filed under
+[published]). Here etf_flow_pressure v1 ranks the unleveraged ETFs with a 21-session share change and the
+harness shorts the top 10 creations."""
+expected_size = """The papers report a reversal of several percent a year for the long-short flow sort (recalled,
+not verified). Only the iShares subset has counts, a few hundred funds, so a decile is a few dozen; with
+history from 2026-10-17 the bar's 40 independent months is about three and a half years away."""
+capacity_costs = """ETFs with $20M a day trade at a few basis points; the 10 bps round trip is the assumption,
+and the short side adds the site's assumed borrow (verdict.toml). An individual's size is far below the
+volume; the crowded thematic funds are the hardest to borrow."""
+failure_modes = """Flow chases performance: inflows go to recent winners, so the sort is a momentum bet with the
+sign reversed; a fund with a one-off creation (a seed, a conversion) shows a flow that is not demand;
+a restated count. Retire if the frozen-period short return of the picks is not above the mean of every
+eligible ETF."""
+decoys = """Short-term reversal and sector momentum (inflows follow winners): the 12-1 momentum and size
+screens are stock rankings, so the decoy here is the ETF's own past return; compare the long
+variant (buy the redemptions) with the short."""
+
+[[sources]]
+title = "Ben-David, I., Franzoni, F. and Moussawi, R., Do ETFs Increase Volatility?, Journal of Finance, 2018"
+
+[[sources]]
+title = "Brown, D., Davies, S. and Ringgenberg, M., ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance, 2021"

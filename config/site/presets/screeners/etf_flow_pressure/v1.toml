@@ -1,0 +1,62 @@
+# ETF flow pressure (ADR 0053, EB E4; edge etf_flow_pressure): an unleveraged ETF trading at least
+# $20M a day, with an iShares share count 21 sessions apart (rollup.etf_flows@v1), ranked so the
+# heaviest net creation sits LAST: the harness's short leg is the lowest scores, so the funds that
+# took in the most money over the month are shorted first, and the long variant buys the heaviest
+# redemptions. The one criterion only asks that the change exists (a missing value never passes,
+# ADR 0030). iShares funds only: SPDR, Vanguard and other issuers publish no count here, and the
+# stored history starts 2026-10-17. What it does not check: why the shares were created (a price
+# rise draws money), the fund's size, or its holdings.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "etf_flow_pressure"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "ETF flow pressure"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "ETF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.not_leveraged]
+field = "instrument.is_leveraged"
+op = "eq"
+value = false
+
+[criteria.not_inverse]
+field = "instrument.is_inverse"
+op = "eq"
+value = false
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 20_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.shares_change]
+field = "rollup.etf_flows@v1.etf_shares_chg_21d"
+op = "gte"
+value = -1
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+etf_shares_chg_21d = "rollup.etf_flows@v1.etf_shares_chg_21d"
+etf_shares_outstanding = "rollup.etf_flows@v1.etf_shares_outstanding"
+etf_shares_asof = "rollup.etf_flows@v1.etf_shares_asof"
+
+[rank]
+tie_break = "rollup.etf_flows@v1.etf_shares_chg_21d"
+tie_break_order = "asc"

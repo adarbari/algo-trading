@@ -17,6 +17,8 @@
 # revised           true for a pit = "lag" file whose history is re-estimated in place (EBP, OFR
 #                   FSI, EPU): its values are revised although they have no vintages, so the
 #                   regime scorecard reports episodes that relied on them (ALFRED series are)
+# refetch_days      a published file: read again after this many days, not by cadence (default 0:
+#                   the cadence, at most a week); for a file whose terms limit how often we pull
 
 [macro]
 run_budget_s = 900            # the macro task stops fetching series after this many seconds and
@@ -457,3 +459,456 @@ pit = "lag"
 transform = "level"
 licence = "personal"
 terms = "Cboe data via FRED: personal use only (copyright notice on the series page)"
+
+# --- Country CAPE (EB D7; docs/edge-ideas/build-plan.md). Barclays' Shiller CAPE file, one
+# column per country, month-end dates 1981-12-: MSCI country indices in local currency over
+# 10-year real earnings. One file, one request per pull (the adapter reads a URL once per run),
+# pulled at most every 28 days (refetch_days) because its terms are unconfirmed. The file has no
+# vintages and is re-estimated, so each pull stores a changed month as a new `lagged` vintage
+# dated the run's session (never before the fetch), and a month first seen takes
+# month end + release_lag_days: Barclays posts the month-end value within about two weeks of
+# month end (the file's last row has been the previous month-end on the 14th), so 45 days is
+# three times that and errs late. A `0` (before a country's start) and Russia's `#VALUE!` are
+# null values. The country-to-ETF mapping is ours (a feature group, not this file).
+
+[[series]]
+key = "CAPE_AUSTRALIA"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Australia"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_BRAZIL"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Brazil"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_CANADA"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Canada"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_CHINA"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "China"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_EUROPE"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Europe"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_FRANCE"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "France"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_GERMANY"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Germany"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_HONG_KONG"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Hong Kong"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_ITALY"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Italy"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_INDIA"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "India"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_ISRAEL"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Israel"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_JAPAN"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Japan"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_KOREA"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Korea"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_MEXICO"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Mexico"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_NETHERLANDS"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Netherlands"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_POLAND"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Poland"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_RUSSIA"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Russia"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_SINGAPORE"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Singapore"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_SOUTH_AFRICA"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "South Africa"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_SPAIN"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Spain"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_SWEDEN"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Sweden"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_SWITZERLAND"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Switzerland"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_TAIWAN"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Taiwan"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_TURKEY"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "Turkey"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_UK"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "UK"
+parser = "cape_csv"
+
+[[series]]
+key = "CAPE_USA"
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+refetch_days = 28
+pit = "lag"
+transform = "level"
+licence = "personal"
+revised = true
+terms = "Barclays Shiller CAPE file (https://indices.cib.barclays/): terms not published in machine-readable form (decision log 2026-10-17), used as personal research data: one pull a month, never redistributed, nothing committed; cite Barclays and Robert Shiller"
+url = "https://indices.cib.barclays/file.app?action=shared&path=shiller/cape.csv"
+date_column = "Date"
+value_column = "USA"
+parser = "cape_csv"

@@ -74,6 +74,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_filings,
     check_futures_curves,
     check_ibkr_vols,
+    check_ipo_lockups,
     check_macro,
     check_macro_calendar,
     check_market_rollups,
@@ -122,6 +123,7 @@ PURGE = "purge-raw"
 # data for the session (the rollups, the screens) runs for every session (2026-10-16: a
 # catch-up skipped its screens and served a complete session without screener runs).
 SNAPSHOT = "the source serves only its current snapshot"
+LAST_MONTH = "it reads the last 30 filing days whatever the session, so one run covers all"
 NEW_SINCE_STORED = "it reads every filing since the latest stored one, so one run covers all"
 FORWARD_RECORD = "paper picks are made only on the night they are for (a later one is no record)"
 WHOLE_YEAR = "it copies the whole year in one run, so the latest session's run covers this one"
@@ -172,6 +174,9 @@ NIGHTLY: tuple[Step, ...] = (
     # index, each filing's XML; a night reads at most a few days, the next goes on. Optional: no
     # edge reads it until the history is backfilled (`algotrade-ingest insider --since`).
     Step("insider", latest_only=NEW_SINCE_STORED, critical=False),
+    # IPO facts and lock-up expiry dates from EDGAR 424B4 prospectuses (ADR 0050, edge build D8):
+    # the last 30 days' prospectuses, each read once. Optional and WARN-only: one edge reads it.
+    Step("ipo-lockups", latest_only=LAST_MONTH, critical=False, accept_with=(check_ipo_lockups,)),
     # The Item sections of the 10-K / 10-Q of the CIKs due a report (edge build D10), each read from
     # its latest stored filing: optional and WARN-only (a PARTIAL run with nothing stored yet or a
     # full disk is a WARN, a failed night is read again); history accrues for track E.

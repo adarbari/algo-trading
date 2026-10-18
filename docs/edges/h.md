@@ -8,6 +8,7 @@ Back to the [index of every edge](../edges.md).
 | BDC price to NAV reversion (`bdc_price_to_nav_reversion`) | candidate | month end | excess return, over 60 sessions, vs SPY, entered 1 session after the decision session, costs 30 bps | `bdc_price_to_nav` |
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | every session | excess return, over 6, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `retail_option_attention` |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | on each `tender_offer` | excess return, over 60, 250 sessions, vs SPY, starting +21 sessions from the event, costs 20 bps | `tender_offer_filed` |
+| Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
 | Reverse-split distress filter (`reverse_split_distress_filter`) | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 | Thematic ETF launch fade (`thematic_etf_launch_fade`) | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 
@@ -103,6 +104,38 @@ Back to the [index of every edge](../edges.md).
 - Lakonishok, J. and Vermaelen, T., Anomalous price behavior around repurchase tender offers, Journal of Finance, 1990
 - Peyer, U. and Vermaelen, T., The nature and persistence of buyback anomalies, Review of Financial Studies, 2009
 - Fu, F. and Huang, S., The persistence of long-run abnormal returns following stock repurchases and offerings, Management Science, 2016
+
+## Premium closed-end funds that over-distribute (`cef_distribution_trap`)
+
+**Status:** blocked. **Family:** H. **Thesis:** Closed-end funds at a large premium to NAV whose distributions exceed what they earn fall in price when the payout is cut, so they are ones to avoid.
+
+**Why blocked:** Two things are missing. Closed-end funds are not in the covered universe (ADR 0013: security_types of config/site/universe.toml; a fund typed FUND is the reference's CEF and is not in the nightly bars), so there are no closes, outcomes or screener rows; the owner decision and the bars-history run are the same as for closed_end_fund_discounts. And the rule's second half, distribution coverage (the payout against earned income), needs the fund's distribution history and its Section 19(a) notices: no CEF dividend rows are stored (dividends follow the covered universe) and 19(a) notices are not ingested. The premium half is available through cef_nav@v1 (cef_discount_to_nav above 0.10) once bars exist; that alone is a weaker rule than the practitioner's, and a premium-only screener should be filed as that proxy, named.
+
+- **Outcome:** excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'CEF'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 3` and `rollup.price_stats@v2.adv_usd_20d gte 1000000`
+- **Top K:** 10
+- **Screeners:** none yet
+- **Baselines:** `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Short side, owner decision O2 (2026-10-17): a short result on liquid names may be a verdict basis. Small funds are expensive to short (borrow plus the distribution owed) and rarely have an ADV over the capacity floor; the useful form for an individual is an avoid filter on closed_end_fund_discounts, never to buy a premium fund with a payout above its coverage. Fund edges are keyed by instrument_id (ADR 0018), never by hand-listed tickers. Practitioner rule only (premium above 10% and coverage below 90%): no published return, so nothing is filed under [published].
+
+**Quality bar**
+
+1. **Mechanism:** Retail buys the headline yield; return of capital masks the erosion of the asset value, and the cut becomes unavoidable once the NAV has fallen far enough (PIMCO's PGP and PHK are the practitioner cases, with premiums of 40 to 70% and price falls of 20 to 40% on the day).
+2. **Persistence:** Yield-chasing is behavioural and encouraged by sponsors; shorting a premium fund costs borrow plus the distribution owed, so arbitrageurs do not lean on it. Evidence is a case series, not a panel, and no independent 2018 to 2025 panel was found.
+3. **Outcome:** Minus the excess return over SPY over 60, 125 and 250 sessions after the entry close, net of 50 bps a round trip and the assumed borrow: a short position in the premium funds with the weakest payout coverage.
+4. **Trigger timing:** The NAV is known from the session after its date (events/fund_nav known_from) and the premium pairs it with the close of its own date; a distribution notice is public when issued. The rank is read at D (the last session of the month), the entry session is S = D + 1 (start_offset_sessions = 1).
+5. **Faithful replication:** The practitioner rule (Morningstar and CEFA, not verified): premium above 10% and distribution coverage below 90% means a negative expected price return, exit on any announced cut. The premium quintile in Patro, Piccotti and Wu supplies the short leg of their long-short spread (a two-group figure, not filed). No screener is written until closes and payout data exist.
+6. **Expected size and sample:** No published panel number. The case series show price falls of 20 to 40% on a cut day, at funds that held large premiums for years; the premium itself predicts negative price returns in the quintile sort. Few funds ever hold a 10% premium, so the independent count is the binding limit.
+7. **Capacity and costs:** Shorting a small fund costs borrow plus the distribution owed and may not be possible; the 50 bps cost and the site's assumed borrow stand in for it. As an avoid filter capacity is irrelevant.
+8. **Failure modes and retirement:** A premium that persists for years (a fund can stay at a premium while it distributes); a short squeeze in a small fund; a rights offering or merger that resets the premium. Retire if the frozen-period short return of the picks is not above the mean of every eligible fund.
+9. **Decoys:** The mirror of the discount edge (a premium is a narrow discount: compare with closed_end_fund_discounts' ranking on the same sessions), leverage and rate beta, and size.
+
+**Sources**
+
+- Patro, D., Piccotti, L. and Wu, Y., closed-end fund discounts (Quantpedia strategy summary) <https://hedgefundalpha.com/strategies/closed-end-fund-discounts/>
+- SEC, Section 19(a) notices of distribution sources (return of capital disclosure)
 
 ## Reverse-split distress filter (`reverse_split_distress_filter`)
 

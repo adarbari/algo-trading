@@ -23,10 +23,13 @@ asks the SEC filings source for one company's 8-Ks (ADR 0050); its answer is
 ``parsed[FILINGS_FRAME]`` with ``FILING_COLUMNS`` (``vendors/sec/submissions.py``).
 ``DailyIndexRequest`` asks the SEC daily form index for one filing day: which CIKs filed an
 8-K that day, ``parsed[DAILY_INDEX_FRAME]`` with ``DAILY_INDEX_COLUMNS``
-(``vendors/sec/daily_index.py``). ``FilingTextRequest`` asks for the item sections of one 10-K /
-10-Q (edge build D10): ``parsed[FILING_TEXT_FRAME]`` with ``FILING_TEXT_COLUMNS``
-(``vendors/sec_text/filing_text.py``). They live here so a task builds its requests without
-importing a vendor module.
+(``vendors/sec/daily_index.py``). ``ProspectusSearchRequest`` asks EDGAR full-text search for
+the 424B4 final prospectuses mentioning a lock-up filed in a window, ``parsed[HITS_FRAME]`` with
+``HIT_COLUMNS`` (``sec_prospectus/prospectus_search.py``); ``ProspectusRequest`` asks for one
+prospectus's main document, ``parsed[IPO_FRAME]`` with the IPO facts read from its text
+(``sec_prospectus/prospectus.py``). They live here so a task builds its requests without importing a
+vendor module. ``FilingTextRequest`` asks for the item sections of one 10-K / 10-Q (edge build D10):
+``parsed[FILING_TEXT_FRAME]`` with ``FILING_TEXT_COLUMNS`` (``sec_text/filing_text.py``).
 """
 
 from collections.abc import Collection
@@ -74,6 +77,39 @@ FILING_TEXT_FRAME = "filing_text"  # key of ``Normalized.parsed`` holding one re
 FILING_TEXT_COLUMNS = (
     "item", "text", "char_count", "quality", "reason", "method", "parser_version",
 )  # fmt: skip
+# Form 4 (EB D6): insider transactions of an issuer, ``Form 4`` and its amendment. One frame shape
+# for the quarterly bulk sets and a filing's XML: a row per transaction line and reporting owner.
+INSIDER_FORMS = ("4", "4/A")
+INSIDER_FRAME = "insider"
+INSIDER_LINE_COLUMNS = (  # what one transaction line says, in the order lines are numbered by
+    "derivative",
+    "transaction_date",
+    "transaction_code",
+    "acquired_disposed",
+    "shares",
+    "price",
+    "shares_after",
+    "direct_indirect",
+)
+INSIDER_COLUMNS = (
+    "accession",
+    "form",
+    "issuer_cik",
+    "issuer_symbol",
+    "filing_date",
+    "period_of_report",
+    "amends_date",
+    "owner_cik",
+    "is_director",
+    "is_officer",
+    "is_ten_pct_owner",
+    "is_other",
+    "officer_title",
+    "owner_count",
+    "line",
+    *INSIDER_LINE_COLUMNS,
+    "plan_10b5_1",
+)
 # Form 4 (EB D6): insider transactions of an issuer, ``Form 4`` and its amendment. One frame shape
 # for the quarterly bulk sets and a filing's XML: a row per transaction line and reporting owner.
 INSIDER_FORMS = ("4", "4/A")
@@ -157,6 +193,27 @@ class FilingsRequest(FetchRequest):
     forms: tuple[str, ...] | None = FILING_FORMS
 
 
+HITS_FRAME = "prospectus_hits"  # key of ``Normalized.parsed`` holding a window's 424B4 hits
+HIT_COLUMNS = ("cik", "accession", "filing_date", "name")
+IPO_FRAME = "ipo_facts"  # key of ``Normalized.parsed`` holding one prospectus's IPO facts (one row)
+IPO_RULES_VERSION = "v2"  # bump with any extraction rule: the task re-reads rows of an older one
+IPO_EXTRACTED = "EXTRACTED"  # the ``extraction`` status that carries a lock-up term
+IPO_COLUMNS = (
+    "is_ipo",
+    "prospectus_date",
+    "ticker",
+    "exchange",
+    "offer_price",
+    "lockup_n",
+    "lockup_unit",
+    "lockup_terms",
+    "early_release",
+    "early_release_text",
+    "extraction",
+    "reason",
+)
+
+
 @dataclass(frozen=True, kw_only=True)
 class FilingTextRequest(FetchRequest):
     """The item sections of one periodic report. ``key`` is the accession; ``cik`` (digits),
@@ -186,6 +243,25 @@ class InsiderRequest(FetchRequest):
     XML (``key`` = the accession; ``cik`` the issuer's, ``document`` the file under it)."""
 
     cik: str = ""
+    document: str = ""
+
+
+@dataclass(frozen=True, kw_only=True)
+class ProspectusSearchRequest(FetchRequest):
+    """424B4 filings that mention a lock-up, filed from ``start`` through ``end`` (inclusive
+    calendar days; ``key`` is ``start..end``, ISO)."""
+
+    start: date
+    end: date
+
+
+@dataclass(frozen=True, kw_only=True)
+class ProspectusRequest(FetchRequest):
+    """One 424B4: ``key`` is its accession number, ``cik`` the filer's (digits), ``document`` the
+    main document's file name as the submissions list it (empty for an old filing that lists none:
+    the whole submission text is read instead)."""
+
+    cik: str
     document: str = ""
 
 

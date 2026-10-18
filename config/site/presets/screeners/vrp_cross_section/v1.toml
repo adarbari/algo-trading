@@ -1,0 +1,78 @@
+# Per-name volatility premium, ranked (ADR 0053, EB E4; edge c12_vrp_cross_section_iv_hv): a liquid
+# optionable stock, ADR or ETF whose 30-day implied volatility (feature.vrp_iv30: IBKR's before 2026-10-02)
+# is above the volatility it has delivered over 30 sessions, ranked by implied over realised, highest
+# first. Unlike vrp_iv_hv there is no minimum premium: the rank is the selection, which is what the
+# edge tests (whether ranking beats selling every liquid name). Realised vol must be at least 10% a
+# year, so a pinned takeover target (HV near 0.03) cannot top the rank. A missing value never passes
+# (ADR 0030). A PROXY for the source's rule: Goyal and Saretto rank on 12-month realised volatility,
+# this reads the 30-session one the catalogue stores. What it does not check: a report inside the
+# month (the earnings move is part of the implied vol), the option chain, or the spread.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "vrp_cross_section"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Per-name volatility premium (highest first)"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.optionable]
+field = "instrument.optionable"
+op = "eq"
+value = true
+
+[criteria.not_leveraged]
+field = "instrument.is_leveraged"
+op = "eq"
+value = false
+
+[criteria.not_inverse]
+field = "instrument.is_inverse"
+op = "eq"
+value = false
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.iv30]
+field = "feature.vrp_iv30"
+op = "gt"
+value = 0
+
+[criteria.hv30]
+field = "rollup.price_stats@v2.hv30"
+op = "gte"
+value = 0.10
+
+[criteria.iv_hv_ratio]
+field = "feature.vrp_iv_hv_ratio"
+op = "gte"
+value = 1
+
+[columns]
+close = "rollup.price_stats@v2.close"
+iv30 = "feature.vrp_iv30"
+hv30 = "rollup.price_stats@v2.hv30"
+iv_hv_spread = "feature.vrp_iv_hv_spread"
+iv_hv_ratio = "feature.vrp_iv_hv_ratio"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "feature.vrp_iv_hv_ratio"

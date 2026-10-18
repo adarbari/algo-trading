@@ -139,6 +139,8 @@ def test_a_run_stores_every_series_with_its_vintages() -> None:
     assert set(spx["series"]) == {"^SPX"} and set(spx["vintage_kind"]) == {"lagged"}
     assert record.stats["vintages"] == {"GDP_REAL": 6, "T10Y3M": 3, "SPX": 4}
     assert record.stats["skipped_series"] == {}
+    assert record.stats["newest_obs"]["T10Y3M"] == "2026-10-02"  # the file's newest month
+    assert record.stats["fetched_on"] == D1.isoformat()
     stored = StoreReader(ctx.writer._backend).table(TABLE, D1)
     assert stored is not None and set(stored["source"]) == {"fred", "published"}
 
@@ -257,6 +259,10 @@ def test_a_published_file_is_refetched_by_cadence_but_at_most_weekly() -> None:
     )
     assert [refetch_days(s) for s in monthly.series] == [7, 7]
     assert refetch_days(REGISTRY.by_key("SPX")) == 1
+    pulled = MacroSettings.from_document(
+        {"series": [{**SPX, "cadence": "monthly", "refetch_days": 31}]}
+    )
+    assert refetch_days(pulled.series[0]) == 31  # a use-limited file: one pull a month
     ctx = context(Feeds())
     ingest_macro(ctx, REGISTRY, D1, only=["SPX"])
     assert ingest_macro(ctx, REGISTRY, D1).items["SPX"] == "NOT_DUE"

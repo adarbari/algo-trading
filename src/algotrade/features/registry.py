@@ -27,6 +27,8 @@ from algotrade.features.framework.graph import dependency_order
 from algotrade.features.rollups.activity import (
     illiquidity,
     max_return,
+    session_returns,
+    signed_volume,
     vol_stats,
     volume_profile,
 )
@@ -99,7 +101,12 @@ from algotrade.features.rollups.price import (
     trend_stats,
     volume,
 )
-from algotrade.features.rollups.reference import fund_reference, share_classes
+from algotrade.features.rollups.reference import (
+    cef_nav,
+    etf_flows,
+    fund_reference,
+    share_classes,
+)
 from algotrade.features.rollups.relative import (
     factor_betas,
     momentum_variants,
@@ -155,6 +162,8 @@ GROUPS: dict[str, FeatureGroup] = {
             call_wing.GROUP,
             price_moves.GROUP,
             max_return.GROUP,
+            session_returns.GROUP,
+            signed_volume.GROUP,
             earnings_neutral_reversal.GROUP,
             momentum.GROUP,
             volume.GROUP,
@@ -186,6 +195,8 @@ GROUPS: dict[str, FeatureGroup] = {
             indicators.GROUP,
             regime.GROUP,
             fund_reference.GROUP,
+            cef_nav.GROUP,
+            etf_flows.GROUP,
             share_classes.GROUP,
             relative_strength.GROUP,
             momentum_variants.GROUP,
