@@ -65,4 +65,17 @@ must pass with `architecture/known_violations.toml` still empty.
    sanity checks (for example bid ≤ ask, open interest ≥ 0).
 9. **Docs:** update the table in `docs/data/vendors.md`. If the vendor changes a decision,
    write an ADR.
-10. Run `make changed`, then push: CI is the full gate.
+10. **Point-in-time checklist** (twelve architect rounds; `add-dataset` has the storage side):
+    - `known_from` = the next session after the moment the fact was public; an after-close
+      acceptance rolls to the next session (`core.time.calendar.acceptance_session`,
+      `data.events.acceptance_sessions`). It must be a trading session.
+    - A backfilled row is never known earlier than its real publication, never from the fetch day.
+    - A restated row that replaces a stored one gets `max(own session,
+      next_session(exchange_date(run.clock())))`: the FETCH's session, never `--to`.
+    - Resolve ids as_of the row's date. A failed or missing source answer FAILS the item
+      (never cached as empty/OK). Comparisons are NA-safe.
+    - A source under a restricted licence declares `licence` (e.g. `"personal"`, ADR 0028) on its features and notes it in `tables.toml`.
+11. Before you push: `make changed`, then `tests/architecture` and `tests/unit/config` run
+    fully (`make changed` does), new task modules in a NEW folder by kind when the parent is at
+    8+ modules (`make layout`), schemas in the schemas package modules (file-length cap).
+12. Push: CI is the full gate.
