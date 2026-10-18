@@ -169,6 +169,8 @@ EDGE_PAPER = fixed(
 # merge: a leg recomputed by a later run replaces the earlier one under the same key. Leg v2
 # (ADR 0064): every pick as ``pick_*`` lists aligned to ``pick_ids`` (``legs/rows.py``) and the
 # hits at each level of the site's cost grid (``base_hits_at``, ``pick_hits_at``); null in v1 rows.
+# Leg v3 (ADR 0053 amendment 2026-10-18): a screener's second set of draws, matched to the picks'
+# sector mix, as ``strat_picks`` / ``strat_value_sums`` / ``strat_hit_sums`` beside ``rand_*``.
 EDGE_LEGS = fixed(
     "results/edge_legs",
     "results",
@@ -193,8 +195,8 @@ EDGE_LEGS = fixed(
         "pick_hits", "rest_n", "base_hits", "ranked", "unscored", "excluded_score_coverage",
         "excluded_unclosed", "excluded_missing", "excluded_coverage", "excluded_unmeasured",
         "unmeasured_base", "delisted", "outside_universe", "no_entry_bar", "pick_touches",
-        "no_implied_vol", "rand_picks", "rand_eligible", "rand_base_hits", "inputs_seq",
-        "outcome_seq", "id_eligible_flag", "id_eligible_proxy", "id_screened_flag",
+        "no_implied_vol", "rand_picks", "rand_eligible", "rand_base_hits", "strat_picks",
+        "inputs_seq", "outcome_seq", "id_eligible_flag", "id_eligible_proxy", "id_screened_flag",
         "id_screened_proxy",
     )),
     *floats("rest_mean", "rest_m2", "top_decile", "spread"),
@@ -203,6 +205,8 @@ EDGE_LEGS = fixed(
     "tombstone bool",  # a leg row that says its key has no leg any more (ADR 0063 amendment 7)
     "value_sums float32[]",
     "hit_sums float32[]",
+    "strat_value_sums float32[]",  # leg v3: the sector-stratified draws (ADR 0053 amendment)
+    "strat_hit_sums float32[]",
     "read_table string[]",
     "read_kind string[]",
     "read_digest string[]",

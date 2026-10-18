@@ -121,7 +121,10 @@ from algotrade.services.evaluation.cross_section.measuring import (
 )
 from algotrade.services.evaluation.cross_section.random_picks import (
     DEFAULT_DRAWS,
+    RANDOM,
+    SECTOR_RANDOM,
     SEED_VERSION,
+    RandomStat,
     pool_random,
     random_measures,
 )
@@ -234,6 +237,7 @@ class RandomPicks:
     variant: str  # the screener the draws are matched to
     config_hash: str  # that screener's trial hash
     draws: tuple[SliceMeasure, ...]
+    kind: str = RANDOM  # ``RANDOM`` (uniform) or ``SECTOR_RANDOM`` (matched to the picks' sectors)
 
 
 @dataclass(frozen=True)
@@ -266,6 +270,21 @@ class EdgeEvaluation:
     legs_reused: int = 0
     legs_computed: int = 0
     legs_invalidated: Mapping[str, int] = field(default_factory=dict)
+
+
+def _random_sets(
+    edge_variant: str, horizon: int, screener: str, trial: str, pooled: Sequence[RandomStat]
+) -> list[RandomPicks]:
+    """The random-pick sets matched to one screener over its pooled blocks: the uniform draws and,
+    when every block holds them (leg v3), the sector-matched ones beside."""
+    if not pooled:
+        return []
+    found = [RandomPicks(edge_variant, horizon, screener, trial, random_measures(pooled))]
+    strata = [p.stratified() for p in pooled]
+    if all(x is not None for x in strata):
+        drawn = random_measures([x for x in strata if x is not None])
+        found.append(RandomPicks(edge_variant, horizon, screener, trial, drawn, SECTOR_RANDOM))
+    return found
 
 
 def run_hash(
@@ -460,16 +479,9 @@ def evaluate_edge(
                 for block in plan.blocks
                 if _drawn(block, legs, closed)
             ]
-            if pooled:
-                randoms.append(
-                    RandomPicks(
-                        scope.key,
-                        horizon,
-                        variant.id,
-                        _trial_hash(scope, variant),
-                        random_measures(pooled),
-                    )
-                )
+            randoms += _random_sets(
+                scope.key, horizon, variant.id, _trial_hash(scope, variant), pooled
+            )
             found = stats.legs.get((plan.key, variant.id), {})
             block_stats = tuple(
                 pool_stats([found[leg.decision] for leg in block if leg.entry in closed])

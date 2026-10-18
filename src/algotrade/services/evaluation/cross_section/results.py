@@ -25,6 +25,7 @@ from algotrade.services.evaluation.cross_section.harness import (
 from algotrade.services.evaluation.cross_section.legs.store import legs_frame, write_legs
 from algotrade.services.evaluation.cross_section.measures import BUCKETS, SliceMeasure
 from algotrade.services.evaluation.cross_section.random_picks import RANDOM
+from algotrade.services.evaluation.cross_section.reporting.decoys import decoy_overlaps
 from algotrade.storage.runs import RunRecord, start_run
 from algotrade.storage.tables.result_writer import ResultWriter
 
@@ -113,7 +114,7 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
                     evaluation,
                     m,
                     random.edge_variant,
-                    f"{RANDOM}:{random.variant}",
+                    f"{random.kind}:{random.variant}",
                     RANDOM,
                     random.horizon,
                     config_hash=random.config_hash,
@@ -196,6 +197,13 @@ def report_containment(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
         for r in evaluation.results
         if r.report_containment is not None
     ]
+
+
+def decoys(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
+    """Per screener and decoy (baseline) of an edge variant and horizon: the sessions both held
+    picks at, their mean pick overlap (Jaccard at D) and the edge's decile spread less the
+    decoy's, whole history and out of sample (``reporting/decoys.py``; none without baselines)."""
+    return [asdict(d) for d in decoy_overlaps(evaluation.results)]
 
 
 def iv_coverage(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:

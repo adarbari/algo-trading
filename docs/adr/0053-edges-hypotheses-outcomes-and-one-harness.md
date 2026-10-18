@@ -550,3 +550,49 @@ of time, a closed set in `core/time/windows.py` (owner `session-calendar`):
    fitness test (`edge.schedule` is a plain String, so `guide_coverage.toml` cannot map it).
 5. The time-series base for one instrument timed by a window (`base = "out_of_window"`) is not
    part of this amendment; it is a new comparison and gets its own ADR (H5b).
+
+## Amendment 2026-10-18: the decoy battery (edge build H6)
+
+Quality bar 9 asks every edge to beat the cheap explanations of its picks. The battery makes
+them standard, measured on the same sessions, and reports how much each overlaps the edge.
+
+1. **`baselines = ["@standard"]`.** The one token a document's `baselines` may hold besides
+   screener ids. Where the edge loads (`config/edges/loading.py`) it is replaced, in place, by
+   `config/site/verdict.toml [decoys] standard`, dropping a decoy already listed and the edge's
+   own screeners (a screener is never its own baseline). `Edge.baselines` is the expanded list,
+   so the run hash, the evaluation and every reader see plain ids; a changed standard list is a
+   new run (baselines are in `RUN_INPUTS`), never a changed trial (a baseline is not a trial).
+   Existing edges keep their own lists: no trial hash and no run hash of an edge that does not
+   write the token changes.
+2. **The standard decoys.** `size_small`, `momentum_12_1` and four new rank presets, one
+   anomaly each: `ivol_high` (idiosyncratic volatility, Ang et al. 2006), `max_ret_high`
+   (MAX, Bali et al. 2011), `amihud_illiquid` (Amihud 2002), `beta_low` (Black, Jensen and
+   Scholes 1972; Frazzini and Pedersen 2014). `composite_mispricing` joins once filed. A fitness
+   test (`tests/unit/config/edges/test_decoys.py`) requires every decoy in the list to be a site
+   preset with a Guide playbook.
+3. **Their features.** `factor_betas@v1` (relative/): OLS loadings of the daily log returns on
+   five free ETF factors over the 252 sessions ending at D (SPY market; IWM-SPY size; MTUM-SPY
+   momentum; VLUE-SPY value; the sector SPDR-SPY), `ivol_252d` the residual volatility,
+   annualised, `factor_status`. A window the ETFs do not cover (MTUM and VLUE start in 2013), an
+   instrument without a sector ETF or with fewer than 200 joint sessions is UNKNOWN with its
+   status, never a market-only fit. `anomaly_stats@v1` (activity/): `max_ret_21d` and
+   `amihud_63d`. The residual-returns grain (H11) will read the same betas.
+4. **The report.** Per screener of an edge variant and horizon and per baseline: the mean over
+   the sessions both held picks of the Jaccard index of the pick sets at D, and the edge's decile
+   spread less the decoy's (whole history; out of sample when the run has a split). It is in the
+   `edge-eval` job result and its text report (`reporting/decoys.py`), computed from the results
+   the harness holds; no stored table gains a column for it.
+5. **Sector-stratified random picks.** A second random baseline beside the uniform one of ADR 0053
+   ED8: at each out-of-sample session the screener's counted picks are counted per sector
+   (`instrument.sector` at D, `UNKNOWN` for a name with none) and each count is drawn uniformly,
+   without replacement, from that sector's pickable counted names (all of them when fewer).
+   An edge that is only a sector tilt does not beat these. It has its own generator, the session's
+   labelled `sector`, so the uniform draws are unchanged; both are a function of the leg key,
+   the edge variant, the horizon and the session only (ADR 0063). It is stored as
+   `strat_picks`, `strat_value_sums` and `strat_hit_sums` beside `rand_*` in `results/edge_legs`
+   (leg v3) and as `random_sector:<screener>` draw rows (role `random`) in `results/edge_eval`;
+   the verdict still reads the uniform `random:<screener>` rows only, so what users see does not
+   change. Showing the stratified percentile beside it is a follow-up.
+6. **`LEG_VERSION` 3.** Every screener's out-of-sample leg now holds the stratified draws, so
+   no stored leg is the one a run would compute: all legs recompute once. H7 (buy/hold bands)
+   bumps it again; run the one full re-run after both merge, not after each.

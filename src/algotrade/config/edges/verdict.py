@@ -9,6 +9,7 @@ from typing import Any
 
 from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.ids import validate_id
 
 KEYS = (
     "min_oos_trades",
@@ -31,11 +32,15 @@ KEYS = (
     "live_high",
     "edge_costs",
     "published_haircut",
+    "decoys",
     "capacity_adv_floor_usd",
     "capacity_position_usd",
 )
 LEGS = ("long", "long_short")  # ``[published] leg`` (ADR 0065; H3 adds ``short``)
 HAIRCUT_KEYS = LEGS  # ``[published_haircut]``: the share of a published figure lost, by leg
+DECOYS_STANDARD = (
+    "size_small", "momentum_12_1", "ivol_high", "max_ret_high", "amihud_illiquid", "beta_low",
+)  # fmt: skip
 COST_LEVELS = (0.0, 15.0, 30.0, 50.0)  # bp, the site grid (ADR 0064 decision 5; owner 2026-10-10)
 
 
@@ -88,6 +93,10 @@ class VerdictSettings:
     # input (ADR 0065 amendment 2026-10-17).
     haircut_long_short: float = 0.5
     haircut_long: float = 0.333
+    # ``[decoys] standard``: the screener presets ``baselines = ["@standard"]`` expands to, the
+    # decoy battery every edge is compared with (ADR 0053 amendment 2026-10-18). Baselines are in
+    # the run hash, so a changed list is a new run, never a changed trial.
+    decoys_standard: tuple[str, ...] = DECOYS_STANDARD
 
     def published_haircut(self, leg: str) -> float:
         """The share of a published figure on ``leg`` (``LEGS``) expected to be lost."""
@@ -101,6 +110,7 @@ class VerdictSettings:
         t = Table(doc, where)
         t.only(KEYS)
         cut = t.table("published_haircut", HAIRCUT_KEYS)
+        decoys = t.table("decoys", ("standard",))
         return cls(
             min_oos_trades=t.integer("min_oos_trades", d.min_oos_trades, 1),
             works_trades=t.integer("works_trades", d.works_trades, 1),
@@ -125,6 +135,7 @@ class VerdictSettings:
             capacity_position_usd=t.number("capacity_position_usd", d.capacity_position_usd, 1),
             haircut_long_short=cut.fraction("long_short", d.haircut_long_short),
             haircut_long=cut.fraction("long", d.haircut_long),
+            decoys_standard=_decoys(decoys, d.decoys_standard),
         )
 
 
@@ -141,3 +152,12 @@ def _cost_levels(t: Table, d: VerdictSettings) -> tuple[float, ...]:
             f"{t.where} levels_bps: expected distinct non-negative numbers ascending, got {raw!r}"
         )
     return tuple(float(v) for v in raw)
+
+
+def _decoys(t: Table, default: tuple[str, ...]) -> tuple[str, ...]:
+    """``standard``: distinct screener preset ids (that they exist is checked where an edge
+    expands them, and by a fitness test over the shipped files); missing: the default list."""
+    found = tuple(validate_id("screener", s) for s in t.strings("standard", default))
+    if len(set(found)) != len(found):
+        raise ConfigurationError(f"{t.where} standard: a decoy is listed twice: {list(found)}")
+    return found

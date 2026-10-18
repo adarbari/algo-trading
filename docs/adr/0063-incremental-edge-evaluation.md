@@ -155,3 +155,18 @@ one; the alternative is cheaper to build.
     grid never deletes what it does not rewrite). An `earnings_expected` edge is always FULL: its
     report-containment diagnostic reads the names with an entry bar of every window. `--full` and
     the job's `mode = "full"` skip reuse; `make evaluate` (the golden gate) passes `--full`.
+
+## Amendment 2026-10-18: leg v3 holds the sector-stratified draws (edge build H6)
+
+11. **What a leg holds.** From `LEG_VERSION` 3 a screener's out-of-sample leg also holds its
+    sector-stratified random draws (`SectorDraws`: the names per draw and the float32 sums of
+    values and hits, columns `strat_picks`, `strat_value_sums`, `strat_hit_sums`; ADR 0053
+    amendment 2026-10-18). A row from before has none and decodes with none; its key differs
+    (`LEG_VERSION` is in it), so it is never reused.
+12. **The extra read.** The draws read `instrument.sector` at D of the counted names through the
+    recording reader, so a restated company snapshot invalidates the legs that drew from it
+    (`inputs`), exactly as the ADV read does. A name with no sector is its own stratum.
+13. **Seeding.** The stratified draws use a second generator seeded as the uniform one with the
+    label `<edge variant>|<screener>|sector`; the strata draw in sector-name order, the names in
+    id order, so the draws do not depend on the order the names arrive in, the chunking or the
+    run's range. The uniform draws are bit-for-bit those of leg v2.

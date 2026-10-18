@@ -1,0 +1,51 @@
+# Low-beta decoy: every tradeable common stock or ADR with a five-factor market beta, the lowest
+# first (Black, Jensen and Scholes 1972; Frazzini and Pedersen 2014: low-beta stocks earned more
+# than their risk). A decoy for the edge harness's battery (ADR 0053 amendment 2026-10-18,
+# quality bar 9): an edge whose picks are defensive names must beat this ranking on the same
+# sessions. The one criterion only asks that the value exists (a missing beta never passes, ADR
+# 0030). What it does not check: downside risk, quality, valuation.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "beta_low"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Market beta (lowest first)"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as size_small, so the decoys compare on one universe; stocks only: an ETF has no
+# idiosyncratic risk, jumps or Amihud ratio of its own worth ranking against an operating company)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 3
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 2_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.beta]
+field = "rollup.factor_betas@v1.beta_mkt"
+op = "gt"
+value = -100
+
+[columns]
+close = "rollup.price_stats@v2.close"
+beta_mkt = "rollup.factor_betas@v1.beta_mkt"
+ivol_252d = "rollup.factor_betas@v1.ivol_252d"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.factor_betas@v1.beta_mkt"
+tie_break_order = "asc"

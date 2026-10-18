@@ -17,9 +17,11 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.evaluation.cross_section.random_picks import SEED_VERSION
 
-LEG_VERSION = 2  # bump when a change to code (not config) changes what a leg holds
+LEG_VERSION = 3  # bump when a change to code (not config) changes what a leg holds
 # 2 (ADR 0064 decision 4): every pick with its rank, score, reason, gross value, dip, ADV at D;
 # hits at each cost level
+# 3 (ADR 0053 amendment 2026-10-18): a screener out of sample also holds its sector-stratified
+# random draws (``random_picks.SectorDraws``); H7 (buy/hold bands) bumps it again
 HARNESS_VERSION = 2  # 2: the run hash is an allowlist of ``RUN_INPUTS``, not the whole Edge
 
 

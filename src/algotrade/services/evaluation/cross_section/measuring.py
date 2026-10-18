@@ -565,15 +565,18 @@ def _measure_random(
     eligible = session.eligible(p.scope.universe, leg.decision)
     names = names_for(p.scope.edge, eligible, event_names)
     res = _outcomes(p.scope, session, leg, p.horizon, rows, eligible, names.ids)
+    key, label = spec.key_for(p.scope, variant), f"{p.scope.key}|{variant.id}"
+    counted = res[res["excluded"] == ""]
     return random_stat(
         leg.decision,
-        res[res["excluded"] == ""],
+        counted,
         names.pickable,
         len(stat.pick_values),
         spec.draws,
-        generator(
-            spec.key_for(p.scope, variant), f"{p.scope.key}|{variant.id}", p.horizon, leg.decision
-        ),
+        generator(key, label, p.horizon, leg.decision),
+        sectors=session.sectors(frozenset(counted.index), leg.decision),
+        pick_ids=[x.instrument_id for x in stat.picks if x.reason == ""],
+        sector_rng=generator(key, f"{label}|sector", p.horizon, leg.decision),
     )
 
 

@@ -514,3 +514,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a partial fix would leave the same one-session look-ahead in four groups that share the input and its backfill.
+
+## 2026-10-18 | EB H6 (decoy battery) | What the decoy battery is, and what it changes
+- Question: how are the standard decoys named, ranked and compared, and what do the stratified draws change?
+- Options: `@standard` expanded at load into `Edge.baselines` / expanded inside the harness; the stratified draws as a second set in the same leg row / a second leg row; overlap and spread gap in the job report / a new `edge_eval` column.
+- Decision: expand at load (the run hash then follows the list, no existing edge's hash moves); store the stratified sums in new `strat_*` columns of the same leg row (leg v3, `LEG_VERSION` 3) and as `random_sector:<screener>` rows of role `random`, so every reader of the uniform draws is untouched; report the Jaccard overlap and the spread gap in the `edge-eval` job result and text report only; `beta_low` ranks by `factor_betas.beta_mkt` (five-factor), `ivol_high` by the residual volatility, MAX over 21 sessions, Amihud over 63; the existing edges keep their baseline lists.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the smallest change that keeps hashes stable, adds no table, and leaves what users see (the verdict reads the uniform draws) as it is until the owner decides whether the stratified percentile joins it.

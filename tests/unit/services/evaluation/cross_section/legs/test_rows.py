@@ -34,7 +34,7 @@ from algotrade.services.evaluation.cross_section.legs.store import (
     write_legs,
 )
 from algotrade.services.evaluation.cross_section.measures import Pick, SessionStat
-from algotrade.services.evaluation.cross_section.random_picks import RandomStat
+from algotrade.services.evaluation.cross_section.random_picks import RandomStat, SectorDraws
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.edge_schemas import EDGE_LEGS
@@ -73,7 +73,8 @@ def stat(**changes: Any) -> SessionStat:
 
 def draws(n: int = 4) -> RandomStat:
     rng = np.random.default_rng(3)
-    return RandomStat(D, 3, rng.normal(size=n), np.round(rng.uniform(0, 3, size=n)), 20, 9)
+    strat = SectorDraws(2, rng.normal(size=n), np.round(rng.uniform(0, 2, size=n)))
+    return RandomStat(D, 3, rng.normal(size=n), np.round(rng.uniform(0, 3, size=n)), 20, 9, strat)
 
 
 def leg(**changes: Any) -> LegRecord:
@@ -100,6 +101,27 @@ def assert_same(a: LegRecord, b: LegRecord) -> None:
         )  # fmt: skip
         np.testing.assert_array_equal(a.random.value_sums, b.random.value_sums)
         np.testing.assert_array_equal(a.random.hit_sums, b.random.hit_sums)
+        assert (a.random.sector is None) == (b.random.sector is None)
+        if a.random.sector is not None and b.random.sector is not None:
+            assert a.random.sector.picks == b.random.sector.picks
+            np.testing.assert_array_equal(a.random.sector.value_sums, b.random.sector.value_sums)
+            np.testing.assert_array_equal(a.random.sector.hit_sums, b.random.sector.hit_sums)
+
+
+def test_the_sector_stratified_draws_round_trip_as_float32_and_a_v2_row_has_none() -> None:
+    original = leg()
+    row = encode_leg(original, "site", "drift")
+    back = decode_leg(row)
+    assert original.random is not None and original.random.sector is not None
+    assert back.random is not None and back.random.sector is not None
+    assert back.random.sector.picks == 2
+    np.testing.assert_array_equal(
+        back.random.sector.value_sums,
+        original.random.sector.value_sums.astype(np.float32).astype(np.float64),
+    )
+    bare = {k: v for k, v in row.items() if not k.startswith("strat_")}  # a row from leg v2
+    old = decode_leg(bare)
+    assert old.random is not None and old.random.sector is None and old.random.stratified() is None
 
 
 def test_a_leg_round_trips_exactly_but_for_the_draws_as_float32() -> None:
@@ -158,9 +180,15 @@ def _float32(record: LegRecord) -> LegRecord:
     if record.random is None:
         return record
     r = record.random
+
+    def round32(a: Any) -> Any:
+        return a.astype(np.float32).astype(np.float64)
+
+    sector = r.sector and SectorDraws(r.sector.picks, round32(r.sector.value_sums),
+                                      round32(r.sector.hit_sums))  # fmt: skip
     rounded = RandomStat(
-        r.session, r.picks, r.value_sums.astype(np.float32).astype(np.float64),
-        r.hit_sums.astype(np.float32).astype(np.float64), r.eligible, r.base_hits,
+        r.session, r.picks, round32(r.value_sums), round32(r.hit_sums), r.eligible, r.base_hits,
+        sector,
     )  # fmt: skip
     return replace(record, random=rounded)
 

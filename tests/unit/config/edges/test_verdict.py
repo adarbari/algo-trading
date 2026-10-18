@@ -88,3 +88,17 @@ def test_every_key_of_the_verdict_file_is_read_and_every_read_key_is_in_the_file
     assert set(doc) == set(KEYS)
     assert set(doc["published_haircut"]) == set(LEGS)
     assert set(doc["edge_costs"]) == {"levels_bps"}
+
+
+def test_the_standard_decoys_default_read_and_reject_a_bad_list() -> None:
+    standard = VerdictSettings.from_document(None).decoys_standard
+    assert standard[:2] == ("size_small", "momentum_12_1") and len(standard) == 6
+    read = VerdictSettings.from_document({"decoys": {"standard": ["size_small", "beta_low"]}})
+    assert read.decoys_standard == ("size_small", "beta_low")
+    for bad in (["a", "a"], [1], "size_small"):
+        with pytest.raises(ConfigurationError, match="standard"):
+            VerdictSettings.from_document({"decoys": {"standard": bad}})
+    with pytest.raises(ConfigurationError, match="invalid screener id"):
+        VerdictSettings.from_document({"decoys": {"standard": ["Not An Id"]}})
+    with pytest.raises(ConfigurationError, match="decoys"):
+        VerdictSettings.from_document({"decoys": {"typo": []}})

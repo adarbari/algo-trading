@@ -38,3 +38,13 @@ levels_bps = [0, 15, 30, 50] # beside its own cost_bps; in the leg key (a change
 [published_haircut]        # ADR 0065: the share of a paper's figure to expect lost by the time it is
 long_short = 0.5           # traded, by the paper's leg (`[published] leg`); shown beside the figure,
 long = 0.333          # never a verdict input
+
+[decoys]                   # ADR 0053 amendment 2026-10-18: what `baselines = ["@standard"]` expands to,
+standard = [               # the decoy battery every edge is compared with on the same sessions: the
+  "size_small",            # size and momentum yardsticks, then the idiosyncratic-volatility, lottery
+  "momentum_12_1",         # (MAX), illiquidity and low-beta anomalies; each needs a screener preset and
+  "ivol_high",             # a Guide playbook (a fitness test). composite_mispricing joins once filed.
+  "max_ret_high",          # A decoy that is the edge's own screener is dropped for that edge. A changed
+  "amihud_illiquid",       # list is a new run (baselines are in the run hash), never a new trial.
+  "beta_low",
+]
