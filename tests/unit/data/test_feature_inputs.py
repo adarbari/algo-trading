@@ -506,3 +506,51 @@ def test_first_stored_session_is_the_earliest_partition_or_none() -> None:
     days = write_bars(writer, {"EQ:A": series(5)})
     assert inputs.first_stored_session(reader, "bars/1d") == days[0]
     assert inputs.first_stored_session(reader, "universe") is None
+
+
+def _fact(accepted: str | None, filed: date, **extra: object) -> dict[str, object]:
+    return {
+        "instrument_id": "EQ:A", "cik": "0000000001", "concept": "revenue",
+        "tag": "us-gaap:Revenues", "value": 1.0, "unit": "usd", "period_start": date(2026, 4, 1),
+        "period_end": date(2026, 6, 30), "filed": filed, "fetched_on": filed,
+        "accepted_ts": None if accepted is None else pd.Timestamp(accepted), **extra,
+    }  # fmt: skip
+
+
+def test_shares_accepted_counts_a_filing_after_the_close_from_the_next_session() -> None:
+    """``instruments/shares_accepted`` (financials@v3, fundamentals@v4): a 10-Q accepted 16:30
+    New York time on D is invisible at D's close and visible at D+1; the legacy
+    ``instruments/shares`` read (by filing date) shows it at D, the lookahead this fixes."""
+    writer, reader = store()
+    d = date(2026, 8, 4)
+    late, early, unknown = (
+        _fact("2026-08-04T20:30:00Z", d, period_end=date(2026, 6, 30)),
+        _fact("2026-08-04T13:00:00Z", d, period_end=date(2026, 3, 31), value=2.0),
+        _fact(None, d, period_end=date(2025, 12, 31), value=3.0),
+    )
+    rows = [late, early, unknown]
+    writer.write_table(SHARES, d, "r1", stamped(rows, d, "r1"))
+    reader = type(reader)(writer._backend)
+    legacy = inputs.load_input(reader, SHARES, [d], 0).at(d, 0)
+    assert legacy is not None and len(legacy) == 3
+    loaded = inputs.load_input(reader, inputs.SHARES_ACCEPTED, [d], 0)
+    at_close = loaded.at(d, 0)
+    assert at_close is not None and list(at_close["value"]) == [2.0]  # only the 09:00 one
+    after = loaded.at(next_session(d), 0)
+    assert after is not None and sorted(after["value"]) == [1.0, 2.0, 3.0]
+    assert loaded.at(d - timedelta(days=1), 0) is None
+    assert inputs.has_input(inputs.SHARES_ACCEPTED)
+
+
+def test_statements_accepted_follow_the_same_rule_and_an_empty_store_is_none() -> None:
+    writer, reader = store()
+    d = date(2026, 8, 4)
+    row = _fact("2026-08-04T20:30:00Z", d, concept="revenue", period_type="DURATION")
+    writer.write_table(STATEMENTS, d, "r1", stamped([row], d, "r1"))
+    reader = type(reader)(writer._backend)
+    loaded = inputs.load_input(reader, inputs.STATEMENTS_ACCEPTED, [d], 0)
+    assert loaded.at(d, 0) is None
+    seen = loaded.at(next_session(d), 0)
+    assert seen is not None and len(seen) == 1
+    _, empty = store()
+    assert inputs.load_input(empty, inputs.STATEMENTS_ACCEPTED, [d], 0).at(d, 0) is None

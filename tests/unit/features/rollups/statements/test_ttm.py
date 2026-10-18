@@ -1,4 +1,4 @@
-"""ttm.py: the TTM arithmetic moved out of financials@v2 (same objects, same results)."""
+"""ttm.py: the TTM arithmetic moved out of financials@v3 (same objects, same results)."""
 
 from datetime import date
 
