@@ -140,6 +140,8 @@ note = "ADR 0050: SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q
 name = "events/ipo_lockup"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/ipo_lockups.py"
 note = "ADR 0050, edge build D8: the IPO facts and lock-up expiry date of each 424B4 final prospectus, keyed by the issuer's CIK + accession (instrument_id filled when the CIK is in the universe); known_from = the acceptance's session (New York), a changed re-extraction a later version; read with data.events.latest_versions"
+
+[[table]]
 name = "events/fund_nav"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/fund_nav.py"
 note = "Edge build D5: the daily NAV per share of a closed-end fund from Tiingo's Nasdaq MFQS X<ticker>X series, keyed by the FUND's instrument_id + series, session_date = the NAV date, known_from = the next session after it, knowledge_ts = the fetch; a restated NAV replaces the row with known_from = the restating run's session; readers go through data/events with through=S, never a raw partition read"
