@@ -742,7 +742,7 @@ Sources: Bernard and Thomas (1989), Post-earnings-announcement drift: the E-1 to
 
 ### `rollup.earnings_date_shift@v1.earnings_shift_direction`
 
-**How to read it.** Whether the next report date moved a week or more from last year's. earlier: the date is at least seven days before the year-ago report plus 364 days. later: at least seven days after. Null: no next date, no year-ago report to compare, or a move under a week. Johnson and So found early scheduling goes with good news and late scheduling with bad.
+**How to read it.** Whether the next report date moved a week or more from last year's. earlier: the date is at least seven days before the year-ago report plus 364 days. later: at least seven days after. Null: no next date, no year-ago report, or a move under a week. Johnson and So found that early scheduling goes with good news. Late scheduling goes with bad.
 
 **The criterion per intent**
 
@@ -776,7 +776,7 @@ Sources: Johnson and So (2018), Time Will Tell: Information in the Timing of Sch
 
 ### `feature.eight_k_item_flag`
 
-**How to read it.** True when an 8-K with Item 4.02 (non-reliance on prior financials), 4.01 (a change of auditor) or 5.02 (an officer or director leaving or joining) became known in the last 20 sessions. Each counts from the first session whose close follows its SEC acceptance. False when the name has other tracked filings only. Null when the filings group has no row for it.
+**How to read it.** True when an 8-K with Item 4.02, 4.01 or 5.02 became known in the last 20 sessions. Item 4.02 is non-reliance on prior financials. Item 4.01 is a change of auditor. Item 5.02 is an officer or director leaving or joining. Each counts from the first session whose close follows its SEC acceptance. False when the name has other tracked filings only. Null when the filings group has no row for it.
 
 **The criterion per intent**
 
@@ -878,7 +878,7 @@ Sources: Aboody, Lehavy and Trueman (2010), Limited attention and the earnings a
 
 ### `rollup.earnings_gap_volume@v1.reaction_volume_ratio`
 
-**How to read it.** How much the last report traded: the mean dollars a day over the three sessions around it (before, of and after) divided by the mean of the 20 sessions before that. 3 means the report drew three times the normal volume. 1 is an ordinary few days. It is the last report only, unlike rollup.earnings_reaction@v1.earnings_volume_ratio.
+**How to read it.** How much the last report traded. It is the mean dollars a day over the three sessions around it (before, of and after) divided by the mean of the 20 sessions before that. 3 means the report drew three times the normal volume. 1 is an ordinary few days. It is the last report only, unlike rollup.earnings_reaction@v1.earnings_volume_ratio.
 
 **The criterion per intent**
 

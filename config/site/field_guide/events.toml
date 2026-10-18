@@ -767,7 +767,7 @@ note = "then rollup.price_stats@v2.ret_20d equals ret_ex_earnings_20d"
 [[field]]
 name = "rollup.earnings_date_shift@v1.earnings_shift_direction"
 theme = "events"
-reads = "Whether the next report date moved a week or more from last year's. earlier: the date is at least seven days before the year-ago report plus 364 days. later: at least seven days after. Null: no next date, no year-ago report to compare, or a move under a week. Johnson and So found early scheduling goes with good news and late scheduling with bad."
+reads = "Whether the next report date moved a week or more from last year's. earlier: the date is at least seven days before the year-ago report plus 364 days. later: at least seven days after. Null: no next date, no year-ago report, or a move under a week. Johnson and So found that early scheduling goes with good news. Late scheduling goes with bad."
 caveats = [
   "The calendar here is scheduled, never confirmed by the company. A date can move again, so read rollup.earnings_date_shift@v1.sessions_since_earnings_shift for how fresh the shift is.",
   "The history starts at the first stored calendar snapshot. A date first stored at or before it says nothing about when it became known, so it is never a shift.",
@@ -799,7 +799,7 @@ note = "rank ascending to put the biggest advance first"
 [[field]]
 name = "feature.eight_k_item_flag"
 theme = "events"
-reads = "True when an 8-K with Item 4.02 (non-reliance on prior financials), 4.01 (a change of auditor) or 5.02 (an officer or director leaving or joining) became known in the last 20 sessions. Each counts from the first session whose close follows its SEC acceptance. False when the name has other tracked filings only. Null when the filings group has no row for it."
+reads = "True when an 8-K with Item 4.02, 4.01 or 5.02 became known in the last 20 sessions. Item 4.02 is non-reliance on prior financials. Item 4.01 is a change of auditor. Item 5.02 is an officer or director leaving or joining. Each counts from the first session whose close follows its SEC acceptance. False when the name has other tracked filings only. Null when the filings group has no row for it."
 caveats = [
   "Item 5.02 also reports routine retirements and new hires, and 4.01 a planned auditor rotation. The flag cannot tell a forced exit from a routine one without reading the text.",
   "Null is common: a name with no tracked 8-K item, late-filing notice or tender offer in 60 sessions has no row, and that is unknown, not clean. A hard 'eq true' keeps only the flagged.",
@@ -895,7 +895,7 @@ note = "null (no date) names drop out"
 [[field]]
 name = "rollup.earnings_gap_volume@v1.reaction_volume_ratio"
 theme = "events"
-reads = "How much the last report traded: the mean dollars a day over the three sessions around it (before, of and after) divided by the mean of the 20 sessions before that. 3 means the report drew three times the normal volume. 1 is an ordinary few days. It is the last report only, unlike rollup.earnings_reaction@v1.earnings_volume_ratio."
+reads = "How much the last report traded. It is the mean dollars a day over the three sessions around it (before, of and after) divided by the mean of the 20 sessions before that. 3 means the report drew three times the normal volume. 1 is an ordinary few days. It is the last report only, unlike rollup.earnings_reaction@v1.earnings_volume_ratio."
 caveats = [
   "A heavy ratio can be an offering, a deal or an index change in the same window, not the report. Read rollup.earnings_reaction@v1.reaction_excess_return for what the price did.",
   "Null when a bar of the window or of the 20 sessions before it is missing, or the history is short. A hard 'gte' drops those names.",

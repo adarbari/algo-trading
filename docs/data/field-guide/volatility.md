@@ -218,6 +218,41 @@ Sources: docs/market-regime-plan.md
 
 Sources: docs/market-regime-plan.md
 
+### `rollup.factor_betas@v1.ivol_252d`
+
+**How to read it.** The volatility a name has left after the market, size, momentum and value are taken out, annualised, over the last 252 sessions. 0.2 is 20% a year of move nothing in the five factors explains; 0.8 is a name that jumps on its own news. The factors are ETF returns (SPY, IWM, MTUM and VLUE, the last three less SPY), so it is free and known at the session. High idiosyncratic volatility has gone with lower returns afterwards (Ang, Hodrick, Xing and Zhang 2006), which is why the decoy battery ranks by it.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| calm, low idiosyncratic risk | `lte 0.25` | soft | 0.05 | a score over the universe; the decoy battery's ivol_high ranks the other end |
+
+**When the reading lies**
+
+- It is the Ang et al. idea, not their number: they remove the Fama-French three factors from a month of daily returns, this removes four ETF proxies over a year.
+- High idiosyncratic volatility also marks small, illiquid and distressed names; compare rollup.price_stats@v2.adv_usd_20d and feature.market_cap before reading it as a signal of its own.
+- Null while rollup.factor_betas@v1.factor_status is NO_FACTOR_HISTORY or SHORT_HISTORY. That means a factor ETF without 200 returns in the window, or fewer than 200 joint sessions. MTUM and VLUE start in 2013, so older windows are unknown, never a market-only fit.
+
+Sources: Ang, Hodrick, Xing and Zhang (2006), The Cross-Section of Volatility and Expected Returns, Journal of Finance
+
+### `rollup.factor_betas@v1.beta_mkt`
+
+**How to read it.** The market loading in the four-factor regression over 252 sessions. It is the slope of the name's daily log returns on SPY's, with size, momentum and value held in the same fit. 1 moves with the market, 0.6 is defensive, 1.5 moves half again as much. It differs from rollup.episode_behaviour@v1.beta_252d, which uses SPY alone, whenever the name leans on a style or a sector. The decoy battery's beta_low ranks the lowest first. See Frazzini and Pedersen (2014) and Black, Jensen and Scholes (1972).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| defensive (low beta) | `lte 0.8` | soft | 0.1 | a score over the universe; compare rollup.episode_behaviour@v1.beta_252d (market only) |
+
+**When the reading lies**
+
+- A low beta is not low risk: it is average co-movement, and a low-beta name can fall as much as the market in a panic. The low-beta anomaly is partly a utilities and staples tilt.
+- Estimated on the window it is applied to: noisy for a young listing; null while rollup.factor_betas@v1.factor_status is NO_FACTOR_HISTORY or SHORT_HISTORY.
+
+Sources: Frazzini and Pedersen (2014), Betting Against Beta, Journal of Financial Economics; Black, Jensen and Scholes (1972), The Capital Asset Pricing Model: Some Empirical Tests
+
 ### `feature.bb_pct_b`
 
 **How to read it.** %B: where the close sits between the Bollinger bands, 0 at the lower band, 0.5 at the 20-session mean, 1 at the upper band, below 0 or above 1 outside them. Low to high: under 0 is a two-sigma dip against the last month (the mean-reversion long in an uptrend), 0.2 to 0.8 is inside the normal range, above 1 the close has broken out of the band (strength in a trend, exhaustion after a long run). Bollinger's own rules: buy strength when %B exceeds 1 with volume, buy weakness when it is below 0 with a trend behind it.

@@ -4,7 +4,8 @@ horizon 0), never null.
 
 ``encode_*`` give a row dict of declared column names, ``decode_*`` read one back from a dict or a
 row of a frame read from the store (lists are arrays, nulls are None or NaN there). A leg round
-trips exactly but for the random draws' sums, stored as float32 (about 4 GB per edge otherwise):
+trips exactly but for the random draws' sums (the uniform and, from leg v3, the sector-stratified
+ones: ``strat_*``), stored as float32 (about 4 GB per edge otherwise):
 the harness measures every leg through ``decode_leg(encode_leg(...))``, so a run that computes a
 leg and a run that reads it hold the same numbers.
 
@@ -28,7 +29,7 @@ import pandas as pd
 from algotrade.data import ReadRecord
 from algotrade.data.listings.identity import PROXY, TODAY_FLAG
 from algotrade.services.evaluation.cross_section.measures import Pick, SessionStat
-from algotrade.services.evaluation.cross_section.random_picks import RandomStat
+from algotrade.services.evaluation.cross_section.random_picks import RandomStat, SectorDraws
 
 LEG = "leg"
 READS = "reads"
@@ -279,6 +280,12 @@ def encode_leg(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
             value_sums=np.asarray(r.value_sums, dtype=np.float32),
             hit_sums=np.asarray(r.hit_sums, dtype=np.float32),
         )
+        if r.sector is not None:  # leg v3: the sector-stratified draws beside the uniform ones
+            row.update(
+                strat_picks=r.sector.picks,
+                strat_value_sums=np.asarray(r.sector.value_sums, dtype=np.float32),
+                strat_hit_sums=np.asarray(r.sector.hit_sums, dtype=np.float32),
+            )
     return row
 
 
@@ -339,6 +346,7 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
             hit_sums=np.asarray(row["hit_sums"], dtype=np.float64),
             eligible=int(row["rand_eligible"]),
             base_hits=int(row["rand_base_hits"]),
+            sector=_sector_draws(row),
         )
     return LegRecord(
         key=str(row["leg_key"]),
@@ -355,6 +363,18 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
         snapshot=_opt_day(row.get("screen_snapshot")),
         outcome_seq=_int(row.get("outcome_seq")),
         known=None if _null(row.get("knowledge_ts")) else _moment(row["knowledge_ts"]),
+    )
+
+
+def _sector_draws(row: Mapping[str, Any]) -> SectorDraws | None:
+    """The stratified draws of a leg row (None: a row from before leg v3, or not drawn)."""
+    picks = _int(row.get("strat_picks"))
+    if picks is None:
+        return None
+    return SectorDraws(
+        picks,
+        np.asarray(row["strat_value_sums"], dtype=np.float64),
+        np.asarray(row["strat_hit_sums"], dtype=np.float64),
     )
 
 

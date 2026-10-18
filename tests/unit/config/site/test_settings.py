@@ -460,6 +460,7 @@ def test_the_committed_feature_files_load() -> None:
     assert names == [
         "bands",
         "earnings",
+        "filings",
         "forward",
         "fundamentals",
         "liquidity",

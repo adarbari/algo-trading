@@ -54,9 +54,10 @@ def test_the_leg_key_is_stable_and_follows_each_version(monkeypatch: pytest.Monk
         monkeypatch.undo()
 
 
-def test_leg_v2_is_a_new_key_scheme() -> None:
-    """ADR 0064 decision 4: a v1 leg (no picks, no hits per cost level) is never reused."""
-    assert key.LEG_VERSION == 2
+def test_leg_v3_is_a_new_key_scheme() -> None:
+    """ADR 0064 decision 4: a v1 leg (no picks, no hits per cost level) is never reused; ADR 0053
+    amendment 2026-10-18: nor a v2 one (no sector-stratified draws)."""
+    assert key.LEG_VERSION == 3
 
 
 def test_the_universe_hash_follows_the_selection() -> None:
