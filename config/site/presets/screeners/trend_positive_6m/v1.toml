@@ -1,0 +1,45 @@
+# ETFs on a positive 6-month trend (ADR 0053, ADR 0074, EB E5; a screener of the allocation edges
+# that rotate among ETFs): an unleveraged ETF whose 120-session close-to-close return is above 0,
+# ranked by that return, the best first. The return is raw price, not in excess of the Treasury bill
+# the sources compare with, and carries no dividend. A missing value never passes (ADR 0030). It
+# has no liquidity gate: the allocation edge's own list of ETFs is the universe. The 120 sessions stand for six months.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "trend_positive_6m"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "ETFs on a positive 6-month trend"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "ETF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.not_leveraged]
+field = "instrument.is_leveraged"
+op = "eq"
+value = false
+
+[criteria.not_inverse]
+field = "instrument.is_inverse"
+op = "eq"
+value = false
+
+# ------------------------------------------------------------------------ the signal
+[criteria.trend]
+field = "rollup.trend_stats@v2.ret_120d"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+ret_120d = "rollup.trend_stats@v2.ret_120d"
+
+[rank]
+tie_break = "rollup.trend_stats@v2.ret_120d"

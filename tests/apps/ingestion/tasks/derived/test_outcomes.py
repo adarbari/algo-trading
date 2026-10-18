@@ -11,8 +11,10 @@ import pandas as pd
 import pytest
 
 from algotrade.config.edges.document import parse_edge
+from algotrade.config.edges.loading import load_edges
 from algotrade.core.time.calendar import close_time, next_session, sessions_ending
 from algotrade.data.prices import FLAGS_TABLE, raw_bars
+from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
@@ -26,6 +28,7 @@ from algotrade_ingestion.tasks.derived.outcomes import (
     compute_outcomes,
     horizons_and_benchmarks,
 )
+from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.rollup_store import (
     END,
@@ -74,7 +77,17 @@ def _outcomes(reader: StoreReader) -> pd.DataFrame:
 def test_horizons_come_from_the_open_edge_documents() -> None:
     horizons, benchmarks = horizons_and_benchmarks()
     assert DEFAULT_HORIZON in horizons and {6, 60} <= set(horizons)
-    assert 1 not in horizons  # leveraged_etf_rebalancing is rejected
+    edges = load_edges(FileConfigStore(REPO_ROOT / "config", local=False))
+    held = {
+        h for e in edges if e.status not in outcomes_task.CLOSED for h in e.outcome.horizon_sessions
+    }
+    only_closed = (
+        {h for e in edges if e.status in outcomes_task.CLOSED for h in e.outcome.horizon_sessions}
+        - held
+        - {DEFAULT_HORIZON}
+    )
+    assert only_closed and not only_closed & set(horizons)  # a rejected edge's horizon adds none
+    assert 1 in horizons  # ibs_etf_mean_reversion, a candidate, holds one session (EB E5)
     assert benchmarks == ["SPY"]
 
 

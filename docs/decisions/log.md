@@ -817,3 +817,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: `closed_end_fund_discounts` (Strong), `cef_distribution_trap` and `muni_cef_december` are blocked because CEFs are not in universe coverage (ADR 0013). Bars already exist for 330 CEFs (the nightly Massive grouped-daily and Tiingo bars-history from 2010), so the Tiingo cost is 0 symbols; the change is the universe coverage amendment, with no deadline pressure. Continuing the Tiingo Power account is to be reconsidered if the CEF (or other) edges prove strong.
+
+## 2026-10-18 | EB E5 (PR 680 review) | Allocation edges the harness measures only in part
+- Question: how are the IBS edge (the source day is close(D) to close(D+1), but S = D + 1 at the earliest), the natgas avoid list and the 9-month lookback filed?
+- Options: IBS dropped / filed as a documented-limit variant; natgas against SPY / against the mix of its own funds; a 189-session return column (changes stored group trend_stats@v2) / the 3, 6 and 12 month grid.
+- Decision: IBS filed as a documented-limit variant that tests the second-day return, its failure_modes saying the always-held benchmark makes cash days negative by construction; natgas benchmark is the near-equal mix of UNG, USO and DBO, so a positive excess means cash in falling years beat holding them; keep the 3, 6 and 12 month ensemble, no ret_189d (a full-history recompute, catalogue and golden regeneration, every @v2 preset moves; the 9-month return correlates about 0.9 with 6 and 12; a later 4-member grid is a new trial by hash; revisit only if the 3-member ensemble reaches Promising).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a document that states what it cannot measure is better than none, and a stored-group change for a highly correlated member is cost without information.
