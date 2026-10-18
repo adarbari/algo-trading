@@ -904,3 +904,15 @@ def test_a_document_with_no_pair_field_hashes_as_it_did_before_pairs() -> None:
     assert "pair_field" not in identity_dict(asdict(parse().outcome))
     pair = parse(top_k=5, outcome=_pair()).outcome
     assert identity_dict(asdict(pair))["pair_field"] == "rollup.share_classes@v1.sibling_id"
+
+
+def test_the_lockup_and_reverse_split_classes_parse_with_their_subtypes() -> None:
+    """ADR 0075: ``ipo_lockup`` splits by its release terms, ``reverse_split`` has no subtypes."""
+    base = parse(schedule="on_event:ipo_lockup")
+    assert (base.event_class, base.event_subtype, base.base) == ("ipo_lockup", None, "event")
+    assert parse(schedule="on_event:ipo_lockup:early_release").event_subtype == "early_release"
+    assert parse(schedule="on_event:reverse_split").event_class == "reverse_split"
+    with pytest.raises(ConfigurationError, match="'late' is not a subtype of 'ipo_lockup'"):
+        parse(schedule="on_event:ipo_lockup:late")
+    with pytest.raises(ConfigurationError, match="is not a subtype of 'reverse_split'"):
+        parse(schedule="on_event:reverse_split:x")

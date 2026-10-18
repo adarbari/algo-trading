@@ -56,6 +56,12 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        ``lookback`` sessions before the session up to the session (never a
                        later one, e.g. a declared future ex-date), with ``event_date``; an
                        empty frame when there are none
+- ``events/ipo_lockup``
+                       ``events.stored_events`` over every version of each IPO prospectus (keyed
+                       by ``cik`` + ``accession``), each session reading the latest version
+                       known on or before it (``events.latest_of``, the rule of
+                       ``latest_versions``); ``None`` when none is known (``ipo_lockups@v1``,
+                       ADR 0075)
 - ``events/filing``    ``events.events_by_acceptance``: the SEC event filings that became known
                        (the first session closing after SEC's acceptance, recomputed from the
                        stored instant, not the stored ``known_from``) from ``lookback``
@@ -118,7 +124,7 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        a population: it may come from a later snapshot (``pre_snapshot``), so
                        a group counts names over ``universe``, never over these rows
 - ``instruments/company``
-                       ``reference.company_sectors``: ``instrument_id``, ``sector``,
+                       ``reference.company_sectors``: ``instrument_id``, ``cik``, ``sector``,
                        ``industry`` and ``sic`` from the company snapshot on or before the session
                        (read per session); ``None`` before the first snapshot (a later one
                        would show company facts not known then)
@@ -159,6 +165,7 @@ from algotrade.data.events import (
     events_by_acceptance,
     events_by_event_date,
     filing_walks,
+    latest_of,
     read_events,
     stored_events,
 )
@@ -332,6 +339,34 @@ def _event_snapshots(table: str, from_first_session: bool = False) -> Loader:
         return _Snapshots(frame, _days(frame[KNOWN_FROM]))  # known on or before
 
     return load
+
+
+IPO_LOCKUPS = "events/ipo_lockup"
+IPO_LOCKUP_KEY = ("cik", "accession")
+
+
+@dataclass(frozen=True)
+class _Versions:
+    """Every stored version of each row, sorted by a known-on date (``days``); ``at`` keeps the
+    latest version of each ``key`` among those known on or before the session (the read rule of
+    ``events.latest_versions``, once per session: a version known later is skipped, the one
+    before it is read)."""
+
+    frame: pd.DataFrame
+    days: np.ndarray
+    key: tuple[str, ...]
+
+    def at(self, session: date, lookback: int) -> pd.DataFrame | None:
+        end = np.searchsorted(self.days, np.datetime64(session, "D"), side="right")
+        return latest_of(self.frame.iloc[:end], self.key) if end else None
+
+
+def _ipo_lockups(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    """``events/ipo_lockup`` prospectuses, every version known by the chunk's last session; each
+    session reads the latest version known by it (``ipo_lockups@v1``; ADR 0075)."""
+    frame = stored_events(reader, IPO_LOCKUPS, sessions[-1])
+    days = _days(frame[KNOWN_FROM]) if len(frame) else np.array([], "M8[D]")
+    return _Versions(frame, days, IPO_LOCKUP_KEY)
 
 
 def _etf_share_versions(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
@@ -548,6 +583,7 @@ INPUTS: Mapping[str, Loader] = {
     "events/dividend_declared": _event_snapshots("events/dividend", from_first_session=True),
     "events/split": _events_by_date("events/split"),
     "events/index_change": _events_by_date("events/index_change"),
+    IPO_LOCKUPS: _ipo_lockups,
     "events/filing": _filings,
     INSIDERS: _insider_views,
     "events/short_interest": _short_interest,

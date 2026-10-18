@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-602 stored features in 79 groups, in dependency order; 157 expression features.
+611 stored features in 81 groups, in dependency order; 158 expression features.
 
 ## `option_liquidity@v1`
 
@@ -241,6 +241,29 @@ Open-market insider purchases known in the last 30 days: how many insiders, whet
 | `insider_cluster_buy_count` | window | int | count | open | >= 0 | Distinct insiders with an open-market purchase (Form 4 code P) that became known in the last 30 calendar days; three or more is a cluster | no open-market insider purchase became known in the last 30 days, or no Form 4 history is stored for the session: never read as no insider buying | `events/insider_transaction.transaction_code`, `events/insider_transaction.owner_cik`, `events/insider_transaction.known_from`, `events/insider_transaction.transaction_date`, `events/insider_transaction.accession`, `events/insider_transaction.owner_count` |
 | `insider_opportunistic_flag` | window | bool | flag | open |  | A buyer in the window is an opportunistic trader, not a routine one: true when one is; false when every classified buyer is routine (traded in the same calendar month in each of the three previous years, Cohen, Malloy and Pomorski 2012) | no open-market insider purchase became known in the last 30 days, or no Form 4 history is stored for the session: never read as no insider buying; or no buyer has a trade in each of the three years before the purchase's year (unclassified) | `events/insider_transaction.transaction_code`, `events/insider_transaction.owner_cik`, `events/insider_transaction.known_from`, `events/insider_transaction.transaction_date`, `events/insider_transaction.accession`, `events/insider_transaction.owner_count`, `events/insider_transaction.derivative` |
 | `plan_10b5_1_flag` | window | bool | flag | open |  | A purchase in the window was made under a Rule 10b5-1 trading plan (the filing's own checkbox, on Form 4 since April 2023) | no open-market insider purchase became known in the last 30 days, or no Form 4 history is stored for the session: never read as no insider buying; or no purchase in the window carries the checkbox (a filing before April 2023) | `events/insider_transaction.transaction_code`, `events/insider_transaction.owner_cik`, `events/insider_transaction.known_from`, `events/insider_transaction.transaction_date`, `events/insider_transaction.accession`, `events/insider_transaction.owner_count`, `events/insider_transaction.plan_10b5_1` |
+
+## `ipo_lockups@v1`
+
+The nearest IPO lock-up expiry of an instrument, the sessions to it and its release terms. Stored as `rollups/instrument/ipo_lockups@v1`; reads `events/ipo_lockup` (optional), `instruments/company` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `lockup_expiry_date` | window | date | date | open |  | The expiry session of the nearest IPO lock-up (the event's anchor) | no IPO prospectus known by the session whose lock-up expires from 20 sessions ago on, or its CIK is in no company snapshot of the session (the prospectus states no lock-up date, or the issuer is not an instrument yet) | `events/ipo_lockup.lockup_expiry`, `events/ipo_lockup.early_release`, `events/ipo_lockup.lockup_days` |
+| `sessions_to_lockup_expiry` | window | int | sessions | open | >= -20 | Exchange sessions from the session to the lock-up expiry: 0 on the expiry session, negative after it (down to -20) | no IPO prospectus known by the session whose lock-up expires from 20 sessions ago on, or its CIK is in no company snapshot of the session (the prospectus states no lock-up date, or the issuer is not an instrument yet) | `events/ipo_lockup.lockup_expiry`, `events/ipo_lockup.early_release`, `events/ipo_lockup.lockup_days` |
+| `lockup_release_terms` | label | str | category | open | standard, early_release | standard (one expiry date) or early_release (the prospectus lets part of the lock-up end early) | no IPO prospectus known by the session whose lock-up expires from 20 sessions ago on, or its CIK is in no company snapshot of the session (the prospectus states no lock-up date, or the issuer is not an instrument yet) | `events/ipo_lockup.lockup_expiry`, `events/ipo_lockup.early_release`, `events/ipo_lockup.lockup_days` |
+| `lockup_days` | window | int | days | open | >= 1 | The lock-up term the prospectus states, in calendar days | no IPO prospectus known by the session whose lock-up expires from 20 sessions ago on, or its CIK is in no company snapshot of the session (the prospectus states no lock-up date, or the issuer is not an instrument yet), or the term is not stated | `events/ipo_lockup.lockup_expiry`, `events/ipo_lockup.early_release`, `events/ipo_lockup.lockup_days` |
+| `ipo_offer_price` | window | float | usd_per_share | open | >= 0 | The IPO offer price per share | no IPO prospectus known by the session whose lock-up expires from 20 sessions ago on, or its CIK is in no company snapshot of the session (the prospectus states no lock-up date, or the issuer is not an instrument yet), or the price is not stated | `events/ipo_lockup.lockup_expiry`, `events/ipo_lockup.early_release`, `events/ipo_lockup.lockup_days` |
+
+## `reverse_splits@v1`
+
+The latest reverse split of an instrument, its ratio and the sessions since its ex-date. Stored as `rollups/instrument/reverse_splits@v1`; reads `events/split` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `last_reverse_split_date` | window | date | date | open |  | The ex-date of the latest reverse split (the event's anchor) | no reverse split with an ex-date in the last 252 sessions | `events/split.ts`, `events/split.ratio` |
+| `sessions_since_reverse_split` | window | int | sessions | open | >= 0 | Exchange sessions from the latest reverse split's ex-date up to the session (0: the session is the ex-date) | no reverse split with an ex-date in the last 252 sessions | `events/split.ts`, `events/split.ratio` |
+| `reverse_split_ratio` | window | float | ratio | open | 0 .. 1 | New shares per old share of the latest reverse split (0.1: one new share for ten old, a 1-for-10) | no reverse split with an ex-date in the last 252 sessions | `events/split.ts`, `events/split.ratio` |
+| `reverse_splits_1y` | window | int | count | open | >= 1 | Reverse splits with an ex-date in the last 252 sessions | no reverse split with an ex-date in the last 252 sessions | `events/split.ts`, `events/split.ratio` |
 
 ## `short_interest@v1`
 
@@ -1208,6 +1231,12 @@ Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on rea
 | `ema_stack` | label | str | category | open | BULL, BEAR, MIXED | EMA alignment: BULL when EMA20 > EMA50 > EMA200, BEAR when EMA20 < EMA50 < EMA200, else MIXED (an equality is MIXED); trend_state is the same test on the close and the SMAs | an EMA is null (fewer than 200 consecutive bars ending on the session) | `if(is_null(bands.ema_20) or is_null(bands.ema_50) or is_null(bands.ema_200), null, if(bands.ema_20 > bands.ema_50 and bands.ema_50 > bands.ema_200, "BULL", if(bands.ema_20 < bands.ema_50 and bands.ema_50 < bands.ema_200, "BEAR", "MIXED")))` | virtual |
 | `pct_vs_sma_150` | expression | float | decimal | open | >= -1 | Close / 150-session (30-week) moving average - 1: Minervini's template wants it above 0 with sma_150 above sma_200 | sma_150 is null (a gap among the last 150 sessions, or a shorter history), or no price_stats row | `price_stats.close / bands.sma_150 - 1` | virtual |
 | `clenow_momentum_90d` | expression | float | decimal | open | >= -1 | Clenow's momentum score: the annualised regression slope over 90 sessions x its R-squared, rewarding trends that are both fast and smooth (0.30 is a smooth 30%-a-year pace; a volatile name with the same slope scores lower) | trend_r2_90d or reg_slope_90d_ann is null (a gap among the last 90 sessions, a shorter history, or a close that never moved) | `trend_stats.reg_slope_90d_ann * trend_stats.trend_r2_90d` | virtual |
+
+### `corporate_actions.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `reverse_split_recent` | expression | bool | flag | open |  | A reverse split had its ex-date in the last 252 sessions (params.within_sessions), a year; funds reverse-split too, so an edge on it names the operating-company universe | the instrument has no row in reverse_splits (no reverse split with an ex-date on or before the session in the last 252 sessions, or no splits stored): never read as no reverse split | `if(exists(reverse_splits), reverse_splits.sessions_since_reverse_split <= within_sessions, null)` (within_sessions = 252) | virtual |
 
 ### `earnings.toml`
 
