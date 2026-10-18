@@ -13,27 +13,32 @@ and the key.
                       least 1; for an event schedule the event's anchor session + this, D = S - 1;
                       <= 0 only for an event announced ahead), optional target, max_drawdown (a
                       fraction), cost_bps; a hit_target also names its measure (MEASURES) and
-                      direction (``below`` | ``above``); an ``expires_otm`` outcome (the short
+                      direction (``below`` | ``above``); an excess_return's measure may be
+                      ``residual_return`` (factor-neutral); an ``expires_otm`` outcome (the short
                       option is not assigned at the horizon's close: put | call | strangle) names
                       its ``structure``, exactly one of ``strike_delta`` (a delta in (0, 1)) and
                       ``otm_pct`` (a fraction in (0, 1)) and the ``iv_field`` it reads at D;
                       ``iv_field`` is allowed on a ratio measure too (default: the run's); an
                       ``option_model_pnl`` outcome (a model P&L, basis ``model``) names its
-                      ``structure`` (MODEL_STRUCTURES), the ``iv_field`` and ``benchmark =
-                      "none"``, and takes no strike;
+                      ``structure`` (MODEL_STRUCTURES), ``iv_field``, ``benchmark = "none"``, no
+                      strike; ``option_pnl``: ``chain.py``; ``pair_spread``: ``pair_field``;
                       ``side`` (SIDES; ADR 0053 amendment, outcome sides): ``long`` (default),
                       ``short`` (the picks are the bottom ``top_k`` of the ranked, liquid names;
                       the value is minus the excess return, less cost and borrow) or
                       ``long_short`` (the top ``top_k`` minus the bottom: a spread, diagnostic
                       only); a side other than long needs an ``excess_return`` outcome, no
                       ``max_drawdown``, an integer ``top_k``; optional ``borrow_bps_annual``
-                      (default from ``verdict.toml``) is the short leg's assumed borrow cost
+                      (default from ``verdict.toml``) is the short leg's assumed borrow cost;
+                      optional ``hold_rank`` (buy/hold band, ADR 0053 amendment 2026-10-18): held
+                      while rank <= this (>= ``top_k``, an integer); cost on entries and exits
+                      only; see ``_hold_rank`` for where it is allowed
     schedule          ``every_session`` | ``month_end`` | ``calendar:<window>`` (WINDOW_NAMES: a
                       stretch the calendar fixes, whose length is the one horizon) |
                       ``on_event:<class>[:<subtype>]`` (EVENT_CLASSES; EVENT_SUBTYPES)
     base              what the picks are compared with: ``event`` (the names with the event at
                       D, of the schedule's own class and subtype; default for an event
-                      schedule) | ``universe`` (every eligible name)
+                      schedule) | ``universe`` (every eligible name) | ``out_of_window`` (a
+                      time-series edge: ADR 0073)
     picks             where an event schedule's picks come from: ``event`` (the qualified names
                       within the event names; default) | ``universe`` (the qualified names of
                       every eligible name on the event sessions; a decoy). Plain schedules
@@ -45,7 +50,9 @@ and the key.
     universe          a selection preset name, or an inline selection (``[universe] where``)
     top_k             an integer >= 1, or ``"all"`` (every qualified name)
     screeners         the screener presets that implement it (empty while a candidate waits)
-    baselines         screener presets run on the same sessions (quality bar 9)
+    baselines         screener presets run on the same sessions (quality bar 9); the one entry
+                      ``"@standard"`` stands for ``verdict.toml [decoys] standard`` (the decoy
+                      battery, ADR 0053 amendment 2026-10-18), expanded where the edge loads
     status            researching | candidate | evidenced | live | retired | rejected | blocked
     family            optional "A".."I": the idea catalogue's family (docs/edge-ideas/); the
                       edges page groups by it
@@ -96,7 +103,25 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
+from algotrade.config.edges import chain, named
 from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
+from algotrade.config.edges.identity import (
+    LONG,
+    LONG_SHORT,
+    SHORT,
+    SIDES,
+    check_side,
+    hold_rank_of,
+    pair_field_of,
+)
+from algotrade.config.edges.portfolio import (
+    BENCHMARK_BASE,
+    PORTFOLIO_KIND,
+    benchmark_of,
+    check_base,
+    check_portfolio,
+    weighting_of,
+)
 from algotrade.config.edges.verdict import LEGS
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Selection, parse_selection
@@ -113,26 +138,21 @@ MIN_INDEPENDENT_SESSIONS = 40  # the quality bar's count: a fit and a promotion 
 FAMILIES = tuple("ABCDEFGHI")  # the idea catalogue's families (docs/edge-ideas/)
 STATUSES = ("researching", "candidate", "evidenced", "live", "retired", "rejected", "blocked")
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
-OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm", "option_model_pnl")
+OUTCOME_KINDS = (
+    "excess_return", "hit_target", "expires_otm", "option_model_pnl", PORTFOLIO_KIND,
+    chain.CHAIN_KIND, "pair_spread",
+)  # fmt: skip
 STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
 # An option_model_pnl outcome's position: one at-the-money straddle held to the horizon's close,
 # long or short, or delta-hedged, long or short (ADR 0053 amendment 2026-10-17).
 MODEL_STRUCTURES = (
     "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
 )  # fmt: skip
-# The implied vol is one tenor (``iv30``: 30 calendar days, about 21 sessions) and prices every
-# horizon of the outcome, so a horizon far from it prices the wrong option: an option_model_pnl
-# horizon must lie within ``[tenor / 2, tenor * 2]`` sessions of the field's tenor, read from its
-# name (a field with no ``iv<days>`` in its name has no known tenor and is refused).
-TRADING_DAYS_PER_YEAR, CALENDAR_DAYS_PER_YEAR = 252, 365
-_IV_TENOR = re.compile(r"(?<![a-z0-9])iv(\d+)(?![0-9])")
-MODEL_KIND = "option_model_pnl"
+MODEL_KIND, PAIR_KIND = "option_model_pnl", "pair_spread"  # pair: cheap return less sibling's
 MODEL_BASIS = "model"  # what a price from a model, not a quote, is labelled (results and UI)
 BENCHMARKS = ("SPY", "none")
-LONG, SHORT, LONG_SHORT = "long", "short", "long_short"
-SIDES = (LONG, SHORT, LONG_SHORT)  # which names an outcome holds and in which direction
 SCHEDULES = ("every_session", "month_end")
-BASES = ("event", "universe")
+BASES = ("event", "universe", named.OUT_OF_WINDOW, BENCHMARK_BASE)
 PICKS = ("event", "universe")  # where an event schedule's picks may come from
 MAIN = "main"  # the edge itself, as the key of a results row (a variant has its own id)
 ON_EVENT = "on_event:"
@@ -186,6 +206,7 @@ ANNOUNCED_AHEAD = ("earnings_expected",)  # an entry may precede these
 # Quality bar answers 3 to 9 (1 and 2 are the document's mechanism and persistence).
 # What a hit_target compares with its target over the window (ED2 stores each as a field).
 MEASURES = ("excess_return", "realised_to_implied_vol")
+EXCESS_MEASURES = ("residual_return",)  # what an excess_return outcome may name (factor-neutral)
 DIRECTIONS = ("below", "above")
 QUALITY_BAR = (
     "outcome",
@@ -198,6 +219,7 @@ QUALITY_BAR = (
 )
 PUBLISHED_MEASURES = ("mean_excess", "decile_spread", "lift_pts")
 PUBLISHED_KEYS = ("measure", "value", "horizon_sessions", "sample", "source", "leg")
+STANDARD = "@standard"  # in ``baselines``: the site's standard decoys (``expand_baselines``)
 KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
@@ -207,7 +229,7 @@ KEYS = (
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
-    "side", "borrow_bps_annual",
+    "side", "borrow_bps_annual", "tenor_days", "hold_rank", "weighting", "vol_field", "pair_field",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -241,16 +263,27 @@ class Outcome:
     iv_field: str | None = None
     side: str = LONG  # SIDES; a short leg pays ``borrow_bps_annual`` (None: the site's default)
     borrow_bps_annual: float | None = None
+    tenor_days: int | None = None  # an option_pnl's tenor rule (chain.py)
+    pair_field: str | None = None  # a pair_spread's sibling-id feature, read at D
+    hold_rank: int | None = None  # buy/hold band: held while rank <= this (None: no band)
+    # A portfolio_return book (ADR 0074): how the picks are weighted, and for ``inverse_vol`` the
+    # declared feature whose value at D is each name's volatility.
+    weighting: str = "equal"
+    vol_field: str | None = None
+
+    @property
+    def result_side(self) -> str:
+        """The side results are judged under: ``long_short`` (diagnostic only) for a pair spread."""
+        return LONG_SHORT if self.kind == PAIR_KIND else self.side
 
     @property
     def is_return(self) -> bool:
         """The value is the net excess return (a round-trip cost applies to it)."""
-        return self.kind == "excess_return" or self.measure == "excess_return"
+        return self.kind in ("excess_return", PORTFOLIO_KIND) or self.measure == "excess_return"
 
     @property
     def basis(self) -> str | None:
-        """``"model"`` when the value is priced by a model (``option_model_pnl``), else None."""
-        return MODEL_BASIS if self.kind == MODEL_KIND else None
+        return {MODEL_KIND: MODEL_BASIS, chain.CHAIN_KIND: chain.CHAIN_BASIS}.get(self.kind)
 
     @property
     def sign(self) -> float:
@@ -437,18 +470,27 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     status = t.choice("status", "", STATUSES) if "status" in doc else _missing(t, "status")
     closed = status in CLOSED
     schedule = _schedule(t)
-    outcome = _outcome(t, schedule)
+    base = _base(t, schedule, BENCHMARK_BASE if _kind_of(t) == PORTFOLIO_KIND else None)
+    outcome = _outcome(t, schedule, base)
     universe = _universe(t, edge_id)
-    base = _base(t, schedule)
+    named.check_time_series(base, window_name(schedule) in WINDOW_NAMES, universe, where)
     picks = _picks(t, schedule, base)
     sources = _sources(t)
     top_k = _top_k(t)
     variants = _variants(t, schedule, edge_id, universe, base, picks)
-    for held in (outcome, *(v.outcome for v in variants)):
+    chain.check_kinds(where, {outcome.kind, *(v.outcome.kind for v in variants)})
+    for held, held_base in ((outcome, base), *((v.outcome, v.base or base) for v in variants)):
+        check_base(held.kind, held_base, where)
         if held.side != LONG and top_k is None:
             raise ConfigurationError(
                 f"{where} top_k: a {held.side!r} outcome ranks the names, so it needs an "
                 f"integer top_k, not 'all'"
+            )
+        if held.hold_rank is not None and (top_k is None or held.hold_rank < top_k):
+            raise ConfigurationError(
+                f"{where} hold_rank: {held.hold_rank} must be an integer >= top_k "
+                f"({'all' if top_k is None else top_k}); a name is held down to that rank, "
+                f"entered at top_k"
             )
     edge = Edge(
         id=edge_id,
@@ -461,7 +503,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         universe=universe,
         top_k=top_k,
         screeners=_ids(t, "screeners"),
-        baselines=_ids(t, "baselines"),
+        baselines=_ids(t, "baselines", (STANDARD,)),
         status=status,
         sources=sources,
         quality_bar=_quality_bar(t, closed),
@@ -636,24 +678,46 @@ def _picks(t: Table, schedule: str, base: str, default: str = "event") -> str:
     return picks
 
 
-def _outcome(t: Table, schedule: str) -> Outcome:
+def _outcome(t: Table, schedule: str, base: str = "universe") -> Outcome:
     if t.raw("outcome") is None:
         _missing(t, "outcome")
-    return _outcome_of(t.table("outcome", OUTCOME_KEYS), schedule)
+    return _outcome_of(t.table("outcome", OUTCOME_KEYS), schedule, base)
 
 
-def _outcome_of(o: Table, schedule: str) -> Outcome:
+def _kind_of(t: Table) -> object:
+    """The outcome's ``kind`` as written (None: none), to default the base before the outcome."""
+    raw = t.raw("outcome")
+    return raw.get("kind") if isinstance(raw, Mapping) else None
+
+
+def _benchmark(o: Table, kind: str) -> str:
+    if kind == PORTFOLIO_KIND:
+        return benchmark_of(o, BENCHMARKS)
+    if "benchmark" not in o.names():
+        _missing(o, "benchmark")
+    return o.choice("benchmark", "", BENCHMARKS)
+
+
+def _hit_fields(o: Table, kind: str) -> tuple[float | None, str | None, str | None]:
+    allowed = EXCESS_MEASURES if kind == "excess_return" else MEASURES  # but its optional one
+    measure = o.choice("measure", "", allowed) if "measure" in o.names() else None
+    direction = o.choice("direction", "", DIRECTIONS) if "direction" in o.names() else None
+    target, own = o.number("target", None), None if kind == "excess_return" else measure
+    for key, value in {"target": target, "measure": own, "direction": direction}.items():
+        if kind == "hit_target" and value is None:
+            raise ConfigurationError(f"{o.where} {key}: required for a hit_target outcome")
+        if kind != "hit_target" and value is not None:
+            raise ConfigurationError(f"{o.where} {key}: only a hit_target outcome has one")
+    return target, measure, direction
+
+
+def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
     kind = o.choice("kind", "", OUTCOME_KINDS) if "kind" in o.names() else _missing(o, "kind")
-    benchmark = (
-        o.choice("benchmark", "", BENCHMARKS)
-        if "benchmark" in o.names()
-        else _missing(o, "benchmark")
-    )
-    if kind == "excess_return" and benchmark == "none":
-        raise ConfigurationError(f"{o.where} benchmark: an excess return needs SPY, not 'none'")
-    if kind == "option_model_pnl" and benchmark != "none":
+    benchmark = _benchmark(o, kind)
+    named.check_raw_returns(o.where, kind, benchmark, base == named.OUT_OF_WINDOW)
+    if kind in (MODEL_KIND, chain.CHAIN_KIND) and benchmark != "none":
         raise ConfigurationError(
-            f"{o.where} benchmark: an option_model_pnl is a P&L on the underlying, "
+            f"{o.where} benchmark: an {kind} is a P&L on the underlying, "
             f"it has no benchmark: use 'none'"
         )
     horizons = _horizons(o)
@@ -683,24 +747,19 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
             f"ahead ({list(ANNOUNCED_AHEAD)}); {event!r} is known when it happens, so the "
             f"offset from its anchor is >= 1, got {offset}"
         )
-    target = o.number("target", None)
-    measure = o.choice("measure", "", MEASURES) if "measure" in o.names() else None
-    direction = o.choice("direction", "", DIRECTIONS) if "direction" in o.names() else None
-    hit = {"target": target, "measure": measure, "direction": direction}
-    for key, value in hit.items():
-        if kind == "hit_target" and value is None:
-            raise ConfigurationError(f"{o.where} {key}: required for a hit_target outcome")
-        if kind != "hit_target" and value is not None:
-            raise ConfigurationError(f"{o.where} {key}: only a hit_target outcome has one")
+    target, measure, direction = _hit_fields(o, kind)
     drawdown = o.number("max_drawdown", None, 0)
     if drawdown is not None and not 0 < drawdown <= 1:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
     structure, strike_delta, otm_pct, iv_field = _expires_otm(o, kind)
     if kind == MODEL_KIND:
-        _check_tenor(o, horizons, iv_field)
+        chain.check_tenor(o, horizons, iv_field)
     side = o.choice("side", LONG, SIDES)
     borrow = o.number("borrow_bps_annual", None, 0)
-    _check_side(o, side, borrow, kind, drawdown)
+    check_side(o, side, borrow, kind, drawdown)
+    hold_rank = hold_rank_of(o, side, kind, schedule, SCHEDULES, horizons)
+    weighting, vol_field = weighting_of(o, kind)
+    check_portfolio(o, kind, side, drawdown, hold_rank is not None, schedule, SCHEDULES, horizons)
     return Outcome(
         kind=kind,
         horizon_sessions=horizons,
@@ -717,79 +776,23 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
         iv_field=iv_field,
         side=side,
         borrow_bps_annual=borrow,
+        tenor_days=chain.chain_tenor(o, kind),
+        pair_field=pair_field_of(o, kind == PAIR_KIND, benchmark, side, drawdown),
+        hold_rank=hold_rank,
+        weighting=weighting,
+        vol_field=vol_field,
     )
 
 
-def tenor_sessions(iv_field: str) -> int | None:
-    """The tenor of an implied-vol field in sessions (``iv30`` is 30 calendar days: 21), from its
-    name; None when the name carries none."""
-    found = _IV_TENOR.search(iv_field.lower())
-    if found is None:
-        return None
-    return round(int(found.group(1)) * TRADING_DAYS_PER_YEAR / CALENDAR_DAYS_PER_YEAR)
-
-
-def _check_tenor(o: Table, horizons: tuple[int, ...], iv_field: str | None) -> None:
-    """Refuse an ``option_model_pnl`` horizon the field's one tenor cannot price (module docs)."""
-    if iv_field is None:
-        return  # required, and reported, by ``_expires_otm``
-    tenor = tenor_sessions(iv_field)
-    if tenor is None:
-        raise ConfigurationError(
-            f"{o.where} iv_field: {iv_field!r} names no tenor (iv<days>), so an option_model_pnl "
-            f"cannot tell which horizons its vol prices"
-        )
-    low, high = tenor // 2, tenor * 2
-    bad = [h for h in horizons if not low <= h <= high]
-    if bad:
-        raise ConfigurationError(
-            f"{o.where} horizon_sessions: {bad} are outside {low}..{high} sessions, what the "
-            f"{tenor}-session tenor of {iv_field!r} prices; use a field of the horizon's tenor"
-        )
-
-
-def _check_side(
-    o: Table, side: str, borrow: float | None, kind: str, drawdown: float | None
-) -> None:
-    """A short or long-short outcome is an excess return with no drawdown limit (the dip of a
-    short is the rally, which the store keeps apart); the borrow cost belongs to a short leg."""
-    if side == LONG:
-        if borrow is not None:
-            raise ConfigurationError(f"{o.where} borrow_bps_annual: only a short leg pays borrow")
-        return
-    if kind != "excess_return" or drawdown is not None:
-        raise ConfigurationError(
-            f"{o.where} side: {side!r} needs an excess_return outcome with no max_drawdown"
-        )
-
-
-def identity_dict(value: Any) -> Any:
-    """``value`` (an ``asdict`` of an edge or outcome) without the side keys of a long outcome:
-    a document that never named a side hashes as it did before sides, so no stored leg or
-    run is recomputed by their arrival (ADR 0053 amendment, outcome sides)."""
-    if isinstance(value, dict):
-        long = value.get("side") == LONG and value.get("borrow_bps_annual") is None
-        return {
-            k: identity_dict(v)
-            for k, v in value.items()
-            if not (long and k in ("side", "borrow_bps_annual"))
-        }
-    if isinstance(value, (list, tuple)):
-        return [identity_dict(v) for v in value]
-    return value
-
-
 def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:
-    """``(structure, strike_delta, otm_pct, iv_field)`` of an outcome: a structure only for
-    ``expires_otm`` (exactly one of two strikes) and ``option_model_pnl`` (no strike); the
-    implied vol field is required for both."""
-    names = o.names()
+    """``(structure, strike_delta, otm_pct, iv_field)``: a structure only for the option kinds."""
     delta, pct = o.number("strike_delta", None), o.number("otm_pct", None)
     iv_field = _prose(o, "iv_field") or None
-    options = ("expires_otm", "option_model_pnl")
-    structures = STRUCTURES if kind == "expires_otm" else MODEL_STRUCTURES
-    structure = o.choice("structure", "", structures) if "structure" in names else None
-    if kind not in options:
+    structures = chain.structures_of(kind, STRUCTURES, MODEL_STRUCTURES)
+    structure = o.choice("structure", "", structures) if "structure" in o.names() else None
+    if kind == chain.CHAIN_KIND:
+        return chain.check_chain(o, structure, delta, pct, iv_field)
+    if kind not in ("expires_otm", MODEL_KIND, chain.CHAIN_KIND):
         for key, value in (("structure", structure), ("strike_delta", delta), ("otm_pct", pct)):
             if value is not None:
                 raise ConfigurationError(f"{o.where} {key}: only an expires_otm outcome has one")
@@ -866,6 +869,7 @@ def _variants(
         )  # a variant of another kind drops the base's kind-specific keys
         merged = Table({**kept, **{k: over.raw(k) for k in over.names()}}, f"{v.where} outcome")
         v_base = _base(v, schedule) if "base" in v.names() else None
+        named.check_variants(v.where, v_base, edge_base)
         _picks(v, schedule, v_base or edge_base, edge_picks)  # the effective pair is checked
         found.append(
             EdgeVariant(
@@ -947,8 +951,22 @@ def _basis_horizon(t: Table, outcome: Outcome) -> int | None:
     return horizon
 
 
-def _ids(t: Table, key: str) -> tuple[str, ...]:
-    found = tuple(validate_id("screener", s) for s in t.strings(key, ()))
+def expand_baselines(
+    baselines: tuple[str, ...], standard: tuple[str, ...], screeners: tuple[str, ...]
+) -> tuple[str, ...]:
+    """``baselines`` with ``STANDARD`` replaced, in place, by the site's standard decoys: those
+    not already listed and not the edge's own screeners (a screener is never its own baseline)."""
+    if STANDARD not in baselines:
+        return baselines
+    listed = {*baselines, *screeners}
+    out: list[str] = []
+    for b in baselines:
+        out += [d for d in standard if d not in listed and d not in out] if b == STANDARD else [b]
+    return tuple(out)
+
+
+def _ids(t: Table, key: str, tokens: tuple[str, ...] = ()) -> tuple[str, ...]:
+    found = tuple(s if s in tokens else validate_id("screener", s) for s in t.strings(key, ()))
     if len(set(found)) != len(found):
         raise ConfigurationError(f"{t.where} {key}: a screener is listed twice: {list(found)}")
     return found

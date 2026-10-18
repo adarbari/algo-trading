@@ -21,11 +21,14 @@ from algotrade_sources.framework.http import RetryPolicy
 from algotrade_sources.framework.series import (
     DailyIndexRequest,
     FilingsRequest,
+    InsiderRequest,
     ReleaseRequest,
     SeriesRequest,
 )
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
 from algotrade_sources.vendors.finnhub.recommendations import FinnhubRecommendations
+from algotrade_sources.vendors.finra.short_interest import FinraShortInterest
+from algotrade_sources.vendors.finra.short_volume import FinraShortVolume
 from algotrade_sources.vendors.fmp.estimates import FmpAnalystEstimates
 from algotrade_sources.vendors.fmp.targets import FmpPriceTargets, FmpRatings
 from algotrade_sources.vendors.fred.observations import FredObservations
@@ -44,6 +47,8 @@ from algotrade_sources.vendors.published.csv_series import PublishedSeries
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.daily_index import SecDailyIndex
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap
+from algotrade_sources.vendors.sec.form4_xml import SecForm4Xml
+from algotrade_sources.vendors.sec.form345_bulk import SecForm345Bulk
 from algotrade_sources.vendors.sec.fund_objectives import (
     SecFundObjectives,
     SecFundSeries,
@@ -60,6 +65,7 @@ from algotrade_sources.vendors.tiingo.prices import TiingoDailyPrices
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
 from tests.helpers.fake_ib import FakeIB
+from tests.helpers.finra import payloads as finra_payloads
 from tests.helpers.ingest_fakes import http_for
 from tests.helpers.payloads import cboe as fx
 from tests.helpers.payloads import fred as fred_payloads
@@ -232,6 +238,16 @@ def treasury() -> Adapter:
     return TreasuryParYields(http_for(lambda url: payload)), FetchRequest("2025")
 
 
+def finra_short_interest() -> Adapter:
+    payload = finra_payloads.short_interest()
+    return FinraShortInterest(http_for(lambda url: payload)), FetchRequest("2026-09-30")
+
+
+def finra_short_volume() -> Adapter:
+    payload = finra_payloads.short_volume()
+    return FinraShortVolume(http_for(lambda url: payload)), FetchRequest("2026-10-16")
+
+
 def fred() -> Adapter:
     request = SeriesRequest("GDP_REAL", code="GDPC1")
     return FredObservations(http_for(lambda url: fred_payloads.payload())), request
@@ -251,6 +267,17 @@ def sec_daily_index() -> Adapter:
     payload = (FIXTURES / "sec" / "daily_index_form_20260930_trimmed.idx").read_bytes()
     request = DailyIndexRequest(key="2026-09-30", day=date(2026, 9, 30))
     return SecDailyIndex(http_for(lambda url: payload)), request
+
+
+def sec_form4_xml() -> Adapter:
+    payload = (FIXTURES / "sec" / "form4_hand_built_purchase.xml").read_bytes()
+    request = InsiderRequest(key="0000999001-26-000001", cik="0000999001", document="form4.xml")
+    return SecForm4Xml(http_for(lambda url: payload)), request
+
+
+def sec_form345_bulk() -> Adapter:
+    payload = sec_payloads.example_quarter()
+    return SecForm345Bulk(http_for(lambda url: payload)), InsiderRequest(key="2026q3")
 
 
 def published() -> Adapter:
@@ -289,8 +316,12 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "fred_release_dates": fred_release_dates,
     "sec_filings": sec_filings,
     "sec_daily_index": sec_daily_index,
+    "sec_form4_xml": sec_form4_xml,
+    "sec_form345_bulk": sec_form345_bulk,
     "published": published,
     "treasury": treasury,
+    "finra_short_interest": finra_short_interest,
+    "finra_short_volume": finra_short_volume,
     "massive_tickers": massive_tickers,
     "massive_overview": massive_overview,
     "sec_fund_tickers": sec_fund_tickers,

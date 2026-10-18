@@ -44,4 +44,10 @@ settings owner and must drive code (a test checks).
    declaration; add a `Step` to `workflows/nightly/nightly.py` `NIGHTLY` if it runs nightly.
    Helpers it needs stay in the same domain folder (`tests/architecture/test_layout.py`).
    `tests/architecture/test_task_registry.py` checks tables and CLI reachability.
-8. Update `docs/data/storage.md`, run `make changed`, push (CI is the full gate).
+8. **Point-in-time checklist** (the source side is in `add-data-source` step 10):
+   - Readers filter `known_from <= S` and take the latest version per key.
+   - Periodic snapshots are append-only per session; never overwrite an earlier session's rows.
+   - A field known only later (e.g. `instrument_id`) is filled as its own later version, with
+     its own `known_from`, never by rewriting the earlier row.
+   - A table over a restricted-licence source says so in its `tables.toml` note and its features carry `licence` (ADR 0028).
+9. Update `docs/data/storage.md`, run `make changed`, push (CI is the full gate).

@@ -73,6 +73,186 @@ Sources: Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_chann
 
 Sources: Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel
 
+### `rollup.episode_behaviour@v1.beta_252d`
+
+**How to read it.** The slope of the name's daily returns on SPY's over the trailing 252 sessions: 1 moves with the market, 1.5 moves half again as much (a 5% market fall is a 7.5% fall here), 0.5 half as much, below 0 against it. Under 0.8 is defensive (utilities, staples, health care), 0.8 to 1.2 average, above 1.2 high beta (technology, discretionary, financials, small caps). A position's market risk is its weight times its beta.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| defensive (low beta) | `lte 0.8` | soft | 0.1 | with rollup.episode_behaviour@v1.corr_252d gte 0.3 so the low beta is a steady name, not noise |
+| high beta (a market play with leverage) | `gte 1.3` | soft | 0.1 | - |
+| market-like | `between [0.8, 1.2]` | soft | 0.1 | - |
+
+**When the reading lies**
+
+- Beta is average co-movement, not downside behaviour: a low-beta name can fall as much as the market in a panic when correlations go to one. The episode drawdowns (dd_covid_2020 and the others) are the direct measure of that.
+- Trailing a year: a name that changed character (a merger, a new business) carries the old beta for months.
+- Null for young listings (under 200 overlapping returns) and when SPY's bars are missing.
+
+Sources: Sharpe (1964) and the CAPM; beta bands as practitioners use them: https://www.tastylive.com/concepts-strategies/beta
+
+### `rollup.episode_behaviour@v1.corr_252d`
+
+**How to read it.** The correlation of the name's daily returns with SPY's over the trailing 252 sessions, -1 to 1: above 0.7 the name is mostly a market bet, 0.3 to 0.7 ordinary, under 0.3 it has a life of its own (gold miners, biotech, special situations), negative is rare and usually an inverse fund. Beta says how much, correlation says how reliably.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| moves with the market | `gte 0.7` | soft | 0.1 | - |
+| its own story (low correlation) | `lte 0.3` | soft | 0.1 | exclude inverse funds with instrument.is_inverse eq false |
+
+**When the reading lies**
+
+- A low beta with a low correlation is noise, not defence: the regression explains little. Defensive names have a low beta with a decent correlation.
+- Correlations rise toward 1 in a crash, whatever the trailing year said; diversification by low correlation is weakest when it is needed.
+- Null for young listings and when SPY's bars are missing.
+
+Sources: Standard portfolio theory (Markowitz); the correlation-in-crashes observation (Longin and Solnik 2001)
+
+### `rollup.episode_behaviour@v1.dd_covid_2020`
+
+**How to read it.** The worst fall of the name's close from its own running high during the Covid crash (2020-02-19 to 2020-03-23), as a negative fraction: -0.35 means it lost 35% peak to trough. SPY lost about a third; a reading better than -0.25 held up well, worse than -0.50 was hit hard (travel, energy, small caps). The name's realised behaviour in a fast, liquidity-driven crash.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| held up in a fast crash | `gte -0.3` | soft | 0.05 | - |
+| was hit hard (a high-beta or cyclical name) | `lte -0.45` | soft | 0.05 | - |
+
+**When the reading lies**
+
+- Five years old: the company and its shareholders may have changed; it is evidence of the kind of name it was, not a forecast.
+- Null for names listed after the episode or with under 80% of its sessions on file, which a hard criterion rejects: most IPOs since 2020 and every young fund.
+
+Sources: docs/market-regime-plan.md (the episode scorecard, ADR 0047)
+
+### `rollup.episode_behaviour@v1.dd_hikes_2022`
+
+**How to read it.** The worst fall of the name's close from its own running high during the 2022 rate-hike bear market (2022-01-03 to 2022-10-12), as a negative fraction. SPY lost about a quarter; long-duration growth and unprofitable technology lost 50% to 80%, energy and value held or rose. A slow, valuation-driven decline, the opposite kind of episode to Covid.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| held up in a slow bear market | `gte -0.25` | soft | 0.05 | - |
+| was hit hard by rates (long duration) | `lte -0.5` | soft | 0.05 | - |
+
+**When the reading lies**
+
+- A name that did well in 2022 and badly in 2020 (or the reverse) is telling you which kind of drawdown it is exposed to; read the three episodes together.
+- Null for names listed after 2022 or thinly traded through it.
+
+Sources: docs/market-regime-plan.md (the episode scorecard)
+
+### `rollup.episode_behaviour@v1.dd_tariffs_2025`
+
+**How to read it.** The worst fall of the name's close from its own running high during the 2025 tariff shock (2025-02-19 to 2025-04-08), as a negative fraction. SPY lost about a fifth in seven weeks; importers, semiconductors and small caps lost more, domestic defensives less. The most recent episode, so the most representative of today's holders.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| held up in the tariff shock | `gte -0.2` | soft | 0.05 | - |
+| was hit hard by the tariff shock | `lte -0.35` | soft | 0.05 | - |
+
+**When the reading lies**
+
+- Short and sharp, and recovered fast: a deep drawdown here with a quick recovery (rollup.episode_behaviour@v1.recovery_sessions_tariffs_2025) is a liquid high-beta name, not a broken one.
+- Null for names listed after early 2025 or thinly traded through it.
+
+Sources: docs/market-regime-plan.md (the episode scorecard)
+
+### `rollup.episode_behaviour@v1.recovery_sessions_covid_2020`
+
+**How to read it.** Sessions from the Covid trough (2020-03-23) until the close first regained the pre-episode high: 0 means the trough itself was at or above it, about 100 is the index's own recovery (SPY regained its high in August 2020), 250 is a year. Resilience in one number: how long holders waited to be whole.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| recovered as fast as the index or faster | `lte 120` | soft | 30 | - |
+| recovered at all within the horizon | `not_null` | soft | 0 | - |
+
+**When the reading lies**
+
+- Null means not recovered within 400 sessions of the trough, or the session is before the trough: 'never came back' and 'too early to say' look the same, and a hard criterion rejects both.
+- A fast recovery of a shallow drawdown is unremarkable; read with rollup.episode_behaviour@v1.dd_covid_2020.
+
+Sources: docs/market-regime-plan.md; S&P 500 recovery times after bear markets (StockCharts, Bear markets and drawdowns)
+
+### `rollup.episode_behaviour@v1.recovery_sessions_hikes_2022`
+
+**How to read it.** Sessions from the 2022 trough (2022-10-12) until the close first regained the pre-episode high (the early-2022 peak). SPY took about 300 sessions (January 2024); many growth names took longer or have not, which is what a null here means.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| recovered faster than the index | `lte 250` | soft | 50 | - |
+| recovered within the horizon | `not_null` | soft | 0 | - |
+
+**When the reading lies**
+
+- Null is 'not within 400 sessions' as much as 'not yet': for this episode the horizon has passed, so null reads as 'did not recover within about 19 months'.
+
+Sources: docs/market-regime-plan.md
+
+### `rollup.episode_behaviour@v1.recovery_sessions_tariffs_2025`
+
+**How to read it.** Sessions from the tariff-shock trough (2025-04-08) until the close first regained the pre-episode high. SPY needed about 30 sessions; a liquid high-beta name often recovered in a similar time, a name that had something else wrong took much longer.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| recovered with the index | `lte 45` | soft | 15 | - |
+| recovered within the horizon so far | `not_null` | soft | 0 | - |
+
+**When the reading lies**
+
+- The horizon (400 sessions after the trough) runs into late 2026: a null can still be 'not yet'.
+
+Sources: docs/market-regime-plan.md
+
+### `rollup.factor_betas@v1.ivol_252d`
+
+**How to read it.** The volatility a name has left after the market, size, momentum and value are taken out, annualised, over the last 252 sessions. 0.2 is 20% a year of move nothing in the five factors explains; 0.8 is a name that jumps on its own news. The factors are ETF returns (SPY, IWM, MTUM and VLUE, the last three less SPY), so it is free and known at the session. High idiosyncratic volatility has gone with lower returns afterwards (Ang, Hodrick, Xing and Zhang 2006), which is why the decoy battery ranks by it.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| calm, low idiosyncratic risk | `lte 0.25` | soft | 0.05 | a score over the universe; the decoy battery's ivol_high ranks the other end |
+
+**When the reading lies**
+
+- It is the Ang et al. idea, not their number: they remove the Fama-French three factors from a month of daily returns, this removes four ETF proxies over a year.
+- High idiosyncratic volatility also marks small, illiquid and distressed names; compare rollup.price_stats@v2.adv_usd_20d and feature.market_cap before reading it as a signal of its own.
+- Null while rollup.factor_betas@v1.factor_status is NO_FACTOR_HISTORY or SHORT_HISTORY. That means a factor ETF without 200 returns in the window, or fewer than 200 joint sessions. MTUM and VLUE start in 2013, so older windows are unknown, never a market-only fit.
+
+Sources: Ang, Hodrick, Xing and Zhang (2006), The Cross-Section of Volatility and Expected Returns, Journal of Finance
+
+### `rollup.factor_betas@v1.beta_mkt`
+
+**How to read it.** The market loading in the four-factor regression over 252 sessions. It is the slope of the name's daily log returns on SPY's, with size, momentum and value held in the same fit. 1 moves with the market, 0.6 is defensive, 1.5 moves half again as much. It differs from rollup.episode_behaviour@v1.beta_252d, which uses SPY alone, whenever the name leans on a style or a sector. The decoy battery's beta_low ranks the lowest first. See Frazzini and Pedersen (2014) and Black, Jensen and Scholes (1972).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| defensive (low beta) | `lte 0.8` | soft | 0.1 | a score over the universe; compare rollup.episode_behaviour@v1.beta_252d (market only) |
+
+**When the reading lies**
+
+- A low beta is not low risk: it is average co-movement, and a low-beta name can fall as much as the market in a panic. The low-beta anomaly is partly a utilities and staples tilt.
+- Estimated on the window it is applied to: noisy for a young listing; null while rollup.factor_betas@v1.factor_status is NO_FACTOR_HISTORY or SHORT_HISTORY.
+
+Sources: Frazzini and Pedersen (2014), Betting Against Beta, Journal of Financial Economics; Black, Jensen and Scholes (1972), The Capital Asset Pricing Model: Some Empirical Tests
+
 ### `feature.bb_pct_b`
 
 **How to read it.** %B: where the close sits between the Bollinger bands, 0 at the lower band, 0.5 at the 20-session mean, 1 at the upper band, below 0 or above 1 outside them. Low to high: under 0 is a two-sigma dip against the last month (the mean-reversion long in an uptrend), 0.2 to 0.8 is inside the normal range, above 1 the close has broken out of the band (strength in a trend, exhaustion after a long run). Bollinger's own rules: buy strength when %B exceeds 1 with volume, buy weakness when it is below 0 with a trend behind it.

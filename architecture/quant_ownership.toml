@@ -23,6 +23,14 @@ section = "docs/adr/0021-option-pricing-conventions.md#model"
 detect = [{ import = "scipy.stats" }, { call = "erfc" }, { call = "erf" }]
 
 [[responsibility]]
+id = "quant-chain-pnl"
+description = "The maths of a chain P&L (ADR 0053 amendment, EB H13): the two-sided mid of a quote (never of a one-sided or crossed one), a long position's P&L mid to mid and bought at the ask and sold at the bid, intrinsic value at expiry, our own delta of a leg from its mid (the implied vol of the mid, r = q = 0) and the daily delta-hedged P&L of a position over the closes of a window; pure numpy"
+owner = ["src/algotrade/quant/edges/chain_pnl.py"]
+allowed = ["apps/ingestion/algotrade_ingestion/tasks/derived/option_paths.py"]  # the chain P&L writer calls them
+section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#amendment-2026-10-18-optionpnl-the-chain-pl-grain-eb-h13"
+detect = [{ call = "leg_delta" }, { call = "hedged_pnl" }, { call = "long_pnl" }]
+
+[[responsibility]]
 id = "quant-covariance"
 description = "Cross-asset stress from a rolling covariance of a returns panel: Kritzman-Li turbulence (Mahalanobis distance, eigen pseudo-inverse), the absorption ratio and its standardised shift (eigenvalues only)"
 owner = ["src/algotrade/quant/covariance.py"]
@@ -47,11 +55,12 @@ detect = [{ call = "top_episodes" }, { call = "annualised_vol" }, { call = "pool
 
 [[responsibility]]
 id = "quant-edge-statistics"
-description = "The statistics that judge a screener's picks (ADR 0053): lift, Hedges' g, decile spread and its t, Sharpe, the deflated Sharpe ratio, the probability of backtest overfitting (CSCV), the Harvey-Liu haircut Sharpe ratio (ADR 0064) and the usual range of a live win rate (the binomial band of the wins n paper trades would show if the backtest's win rate held)"
+description = "The statistics that judge a screener's picks (ADR 0053): lift, Hedges' g, decile spread and its t, Sharpe, the deflated Sharpe ratio, the probability of backtest overfitting (CSCV), the Harvey-Liu haircut Sharpe ratio (ADR 0064), the Welch t of two samples (a time-series edge's in-window against out-of-window, ADR 0073) and the usual range of a live win rate (the binomial band of the wins n paper trades would show if the backtest's win rate held)"
 owner = ["src/algotrade/quant/edges/statistics.py"]
 allowed = [
     "src/algotrade/services/evaluation/cross_section/measures.py",  # the harness calls these statistics (ADR 0053)
     "src/algotrade/services/evaluation/discovery/tells.py",  # the effect of a tell at a session (ED6)
+    "src/algotrade/services/evaluation/time_series/measures.py",  # a time-series edge's measures (ADR 0073)
 ]
 section = "docs/adr/0053-edges-hypotheses-outcomes-and-one-harness.md#decision"
 detect = [{ call = "decile_spread" }, { call = "standardised_effect" }]

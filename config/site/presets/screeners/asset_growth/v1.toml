@@ -1,0 +1,51 @@
+# Asset growth, v1 (Cooper, Gulen and Schill 2008): every stock with a year of asset growth,
+# ranked by it, LOWEST first: slow growers and shrinkers on top, fast asset builders last. The
+# measure is rollup.mispricing@v1.asset_growth (total assets over the assets a year before, minus
+# one). A missing value never passes (ADR 0030). The fast growers (the bottom of this ranking)
+# are the avoid list. What it does not check: whether the growth was an acquisition or an
+# issue (feature.net_issuance_pct_12m shows the financing), size, or price.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "asset_growth"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Asset growth (shrinkers first)"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.growth]
+field = "rollup.mispricing@v1.asset_growth"
+op = "not_null"
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+asset_growth = "rollup.mispricing@v1.asset_growth"
+net_issuance_pct_12m = "feature.net_issuance_pct_12m"
+
+[rank]
+tie_break = "rollup.mispricing@v1.asset_growth"
+tie_break_order = "asc"

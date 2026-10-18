@@ -187,6 +187,13 @@ protected_modules = ["algotrade.data.outcomes"]
 allowed_importers = ["algotrade.services.evaluation"]
 
 [[tool.importlinter.contracts]]
+name = "Time-series evaluation reads outcomes only through its harness seam (ADR 0073)"
+type = "forbidden"
+source_modules = ["algotrade.services.evaluation.time_series"]
+forbidden_modules = ["algotrade.data.outcomes"]
+ignore_imports = ["algotrade.services.evaluation.time_series.harness -> algotrade.data.outcomes"]
+
+[[tool.importlinter.contracts]]
 name = "Configs are pure: no storage I/O"
 type = "forbidden"
 source_modules = ["algotrade.config"]
@@ -520,6 +527,7 @@ type = "independence"
 modules = [
     "algotrade_sources.vendors.cboe",
     "algotrade_sources.vendors.finnhub",
+    "algotrade_sources.vendors.finra",
     "algotrade_sources.vendors.fmp",
     "algotrade_sources.vendors.fred",
     "algotrade_sources.vendors.ibkr",

@@ -1,0 +1,60 @@
+# Pre-earnings run-up in past winners (ADR 0053, EB E3; edge pre_earnings_runup_winners): a common stock
+# or ADR trading at least $50M a day, closing above $5, whose next report date is known (announced,
+# or the year-ago report plus 364 days) and within 10 sessions. Ranked by the 12-1 momentum, the past
+# winners first: the edge takes the top of them (Aboody, Lehavy and Trueman 2010). A missing value
+# never passes (ADR 0030). What it does not check: the date is confirmed (PRIOR_YEAR is a guess), the
+# attention behind the run-up, or the give-back after the report (the edge's long leg ends before it).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "pre_earnings_runup"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Pre-earnings run-up in past winners"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.expected_basis]
+field = "rollup.earnings_expected@v1.expected_basis"
+op = "in"
+value = ["SCHEDULED", "PRIOR_YEAR"]
+
+[criteria.report_soon]
+field = "rollup.earnings_expected@v1.sessions_to_expected_report"
+op = "lte"
+value = 10
+
+[criteria.momentum]
+field = "rollup.trend_stats@v2.mom_12_1"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+mom_12_1 = "rollup.trend_stats@v2.mom_12_1"
+expected_report_date = "rollup.earnings_expected@v1.expected_report_date"
+sessions_to_expected_report = "rollup.earnings_expected@v1.sessions_to_expected_report"
+
+[rank]
+tie_break = "rollup.trend_stats@v2.mom_12_1"
+tie_break_order = "desc"

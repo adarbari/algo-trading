@@ -231,3 +231,30 @@ def test_event_forms_are_kept_and_amendments_of_them_are_not() -> None:
     assert frame.loc[frame["form"] == "25-NSE", "acceptance_ts"].iloc[0] == pd.Timestamp(
         "2026-09-30T18:03:01Z"
     )
+
+
+def test_the_forms_asked_for_are_the_ones_kept() -> None:
+    doc = {
+        "cik": "999001",
+        "filings": {
+            "recent": {
+                "accessionNumber": ["a-1", "a-2", "a-3"],
+                "form": ["4", "4/A", "8-K"],
+                "filingDate": ["2026-09-30"] * 3,
+                "acceptanceDateTime": ["2026-09-30T20:02:22.000Z"] * 3,
+                "primaryDocument": ["xslF345X05/f4.xml", "xslF345X05/f4a.xml", "x.htm"],
+            },
+            "files": [],
+        },
+    }
+    payload = json.dumps(doc).encode()
+    frame = parse_filings(payload, forms=("4", "4/A"))
+    assert frame["form"].tolist() == ["4", "4/A"]
+    assert frame["primary_document"].tolist() == ["xslF345X05/f4.xml", "xslF345X05/f4a.xml"]
+    assert frame["items"].tolist() == ["", ""] and parse_filings(payload)["form"].tolist() == [
+        "8-K"
+    ]
+    source = SecFilings(http_for(lambda url: payload))
+    asked = FilingsRequest(key="999001", forms=("4",))
+    normalized = source.normalize(asked, payload)
+    assert normalized is not None and normalized.parsed[FILINGS_FRAME]["form"].tolist() == ["4"]

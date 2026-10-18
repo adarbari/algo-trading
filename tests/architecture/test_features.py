@@ -196,7 +196,9 @@ def test_golden_output_has_the_declared_types_and_stays_in_range(
     sessions = golden_reader.dates("bars/1d")[-20:]
     computed = 0
     stored: dict[str, pd.DataFrame | None] = {}
-    groups = list(SITE.groups.values())
+    # share_classes@v1 needs the issuer and class ids, which the hand-built golden reference does
+    # not carry: it raises MissingDataError there (tests/unit/features/rollups/reference).
+    groups = [g for g in SITE.groups.values() if g.key != "share_classes@v1"]
     for key, results in compute_in_memory(golden_reader, groups, sessions).items():
         frames = [r.frame.assign(session_date=r.session) for r in results if r.frame is not None]
         stored[SITE.groups[key].table] = pd.concat(frames) if frames else None

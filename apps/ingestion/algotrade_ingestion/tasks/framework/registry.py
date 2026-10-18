@@ -16,8 +16,15 @@ from pathlib import Path
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.analyst import probe as analyst_probe
 from algotrade_ingestion.tasks.analyst import snapshot as analyst_snapshot
-from algotrade_ingestion.tasks.derived import history_copy, market_rollups, outcomes, rollups
-from algotrade_ingestion.tasks.events import filings
+from algotrade_ingestion.tasks.derived import (
+    history_copy,
+    market_rollups,
+    option_outcomes,
+    outcomes,
+    residual_returns,
+    rollups,
+)
+from algotrade_ingestion.tasks.events import filings, insider
 from algotrade_ingestion.tasks.framework import (
     entries_market,
     entries_ops,
@@ -65,6 +72,7 @@ from algotrade_ingestion.tasks.reference import (
     universe_build,
     universe_import,
 )
+from algotrade_ingestion.tasks.shorting import short_interest, short_volume
 from algotrade_ingestion.tasks.verification import verify
 
 __all__ = (
@@ -375,6 +383,31 @@ TASKS: dict[str, Task] = {
             ),
         ),
         Task(
+            "insider",
+            "SEC Form 4 / 4/A insider transactions (events/insider_transaction): --since backfills "
+            "the quarterly bulk sets from that quarter (acceptance times from the issuers' "
+            "submissions; resumable, --limit quarters, --force rereads), the default reads the "
+            "days since the last clean walk from EDGAR's daily form index and each filing's XML",
+            insider,
+            (insider.TABLE,),
+            entries_market.run_insider,
+            sources=("sec_filings", "sec_form345_bulk", "sec_form4_xml", "sec_daily_index"),
+            settings="sources.toml [sec_edgar]",
+            params=(
+                SESSION,
+                Param(
+                    "since",
+                    ("--since",),
+                    date.fromisoformat,
+                    "backfill: the bulk quarters from the one holding this date (a quarter an "
+                    "earlier run read is skipped); default: the daily walk",
+                ),
+                Param("until", ("--until",), date.fromisoformat, "backfill: last quarter's date"),
+                Param("limit", ("--limit",), int, "backfill: read at most N quarters this run"),
+                Param("force", ("--force",), None, "backfill: also quarters already read"),
+            ),
+        ),
+        Task(
             "rates",
             "Treasury par yield curve: risk-free rates by tenor (one request per year)",
             rates,
@@ -383,6 +416,28 @@ TASKS: dict[str, Task] = {
             sources=("treasury",),
             settings="sources.toml [treasury] lookback_days",
             params=(SESSION, FROM, TO, Param("force", ("--force",), None, "rewrite stored")),
+        ),
+        Task(
+            "short-interest",
+            "FINRA short interest (twice a month, one request per settlement date) into "
+            "events/short_interest; --from backfills (the API holds 2017-12-29 onward); no_ml",
+            short_interest,
+            ("events/short_interest",),
+            short_interest.run,
+            sources=(short_interest.SOURCE,),
+            settings="sources.toml [finra]",
+            params=(SESSION, FROM, TO, Param("force", ("--force",), None, "refetch stored dates")),
+        ),
+        Task(
+            "short-volume",
+            "FINRA Reg SHO daily short-sale volume (one request per trade date) into "
+            "events/short_volume; the API serves a rolling year; no_ml",
+            short_volume,
+            ("events/short_volume",),
+            short_volume.run,
+            sources=(short_volume.SOURCE,),
+            settings="sources.toml [finra]",
+            params=(SESSION, FROM, TO, Param("force", ("--force",), None, "refetch stored dates")),
         ),
         Task(
             "corporate-actions",
@@ -477,6 +532,25 @@ TASKS: dict[str, Task] = {
             outcomes.TABLES,
             entries_market.run_outcomes,
             settings="edges/*.toml (horizons, benchmarks)",
+            params=(SESSION, FROM, TO),
+        ),
+        Task(
+            "option-outcomes",
+            "chain P&L of the option windows a session closes (ADR 0053 amendment); forward-only",
+            option_outcomes,
+            option_outcomes.TABLES,
+            entries_market.run_option_outcomes,
+            settings="edges/*.toml (option_pnl structures, tenors, horizons)",
+            params=(SESSION, FROM, TO),
+        ),
+        Task(
+            "residual-returns",
+            "factor-neutral forward returns of the windows a session closes (ADR 0053); "
+            "--from/--to: window ends; needs factor_betas@v1 stored before each start session",
+            residual_returns,
+            residual_returns.TABLES,
+            entries_market.run_residual_returns,
+            settings="edges/*.toml (horizons of residual_return outcomes)",
             params=(SESSION, FROM, TO),
         ),
         Task(

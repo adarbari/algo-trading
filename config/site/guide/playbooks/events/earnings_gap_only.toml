@@ -1,0 +1,32 @@
+# L3 site setting: the Guide's playbook for the site preset earnings_gap_only (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "earnings_gap_only"
+version = 1  # the preset version this prose was written for
+summary = "Finds liquid stocks that jumped at least 10% more than the market on their latest earnings report, whatever the volume, biggest jump first: the control for the earnings gap on heavy volume screen. It is a candidate edge's comparison, not a trade."
+hit = "The name is a common stock closing above $5 that trades at least $5M a day, whose close after the report beat SPY's by 10% or more measured from the close before it. The biggest reaction ranks first."
+not_checked = "It does not look at the volume the report drew, why the stock moved, or the opening gap. It is the screen the earnings gap edge reads its volume screen against."
+before_acting = [
+  "The reaction runs to the close after the report and you can only buy a session later, so part of the move is gone: see rollup.earnings_reaction@v1.reaction_excess_return.",
+  "Names that gap up without volume often drift less: compare with earnings_gap_volume before relying on a pick.",
+]
+sources = [
+  "Bernard and Thomas, Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium? (1989)",
+]
+related = [
+  { id = "earnings_gap_volume", reason = "the same screen with the volume rule" },
+  { id = "pead_small_cap", reason = "the small-cap post-earnings drift screen" },
+]
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $5M a day"
+reaction_status = "Its last report has a complete reaction window"
+reaction = "Beat SPY by 10% or more over the report"

@@ -155,3 +155,33 @@ one; the alternative is cheaper to build.
     grid never deletes what it does not rewrite). An `earnings_expected` edge is always FULL: its
     report-containment diagnostic reads the names with an entry bar of every window. `--full` and
     the job's `mode = "full"` skip reuse; `make evaluate` (the golden gate) passes `--full`.
+
+## Amendment 2026-10-18: leg v3 holds the sector-stratified draws (edge build H6)
+
+11. **What a leg holds.** From `LEG_VERSION` 3 a screener's out-of-sample leg also holds its
+    sector-stratified random draws (`SectorDraws`: the names per draw and the float32 sums of
+    values and hits, columns `strat_picks`, `strat_value_sums`, `strat_hit_sums`; ADR 0053
+    amendment 2026-10-18). A row from before has none and decodes with none; its key differs
+    (`LEG_VERSION` is in it), so it is never reused.
+12. **The extra read.** The draws read `instrument.sector` at D of the counted names through the
+    recording reader, so a restated company snapshot invalidates the legs that drew from it
+    (`inputs`), exactly as the ADV read does. A name with no sector is its own stratum. Before the
+    first company snapshot the read returns the later snapshot's sector (the reference read's
+    rule), the same sector the screeners see for those sessions: accepted, not a new look-ahead.
+13. **Seeding.** The stratified draws use a second generator seeded as the uniform one with the
+    label `<edge variant>|<screener>|sector`; the strata draw in sector-name order, the names in
+    id order, so the draws do not depend on the order the names arrive in, the chunking or the
+    run's range. The uniform draws are bit-for-bit those of leg v2.
+
+## Amendment 2026-10-18: leg v4 holds a buy/hold band (edge build H7)
+
+14. **What a leg holds.** From `LEG_VERSION` 4 the leg of an edge with `[outcome] hold_rank` also
+    holds the names ranked just below its counted picks, `top_k + 1` to `hold_rank`: `band_ids`,
+    `band_ranks`, `band_values` (oriented net values, null for a name with no counted value) in
+    `results/edge_legs`, null for an edge without a band. A row from before decodes with none; its
+    key differs (`LEG_VERSION`), so it is never reused. `hold_rank` joins the leg key only when
+    set, so no other key moves but by the version.
+15. **Legs and picks stay independent.** Which names a book holds across sessions is not in the
+    leg: the turnover pass over the ordered legs decides it (ADR 0053 amendment 2026-10-18), in
+    reporting, from stored values. A leg of one session never reads another, an incremental run
+    and a full one give the same series, and the pass is deterministic over the decoded legs.

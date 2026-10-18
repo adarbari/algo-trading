@@ -25,6 +25,7 @@ from algotrade.services.evaluation.cross_section.harness import (
 from algotrade.services.evaluation.cross_section.legs.store import legs_frame, write_legs
 from algotrade.services.evaluation.cross_section.measures import BUCKETS, SliceMeasure
 from algotrade.services.evaluation.cross_section.random_picks import RANDOM
+from algotrade.services.evaluation.cross_section.reporting.decoys import decoy_overlaps
 from algotrade.storage.runs import RunRecord, start_run
 from algotrade.storage.tables.result_writer import ResultWriter
 
@@ -115,7 +116,7 @@ def edge_eval_frame(evaluation: EdgeEvaluation, run_id: str, now: datetime) -> p
                     evaluation,
                     m,
                     random.edge_variant,
-                    f"{RANDOM}:{random.variant}",
+                    f"{random.kind}:{random.variant}",
                     RANDOM,
                     random.horizon,
                     config_hash=random.config_hash,
@@ -164,6 +165,7 @@ def _trial(evaluation: EdgeEvaluation, r: VariantResult) -> dict[str, Any]:
         "no_entry_bar": sum(s.no_entry_bar for s in r.stats),
         "excluded_coverage": m.excluded_coverage,
         "lost_sessions": dict(r.lost_sessions),  # table with no data -> decision sessions
+        "timing": None if r.timing is None else dict(r.timing),  # time-series edge (ADR 0073)
         "report_containment": None
         if r.report_containment is None
         else asdict(r.report_containment),
@@ -201,6 +203,13 @@ def report_containment(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
     ]
 
 
+def decoys(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
+    """Per screener and decoy (baseline) of an edge variant and horizon: the sessions both held
+    picks at, their mean pick overlap (Jaccard at D) and the edge's decile spread less the
+    decoy's, whole history and out of sample (``reporting/decoys.py``; none without baselines)."""
+    return [{**asdict(d), "measured": d.measured} for d in decoy_overlaps(evaluation.results)]
+
+
 def iv_coverage(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
     """Per variant and horizon whose outcome reads an implied vol, the measured sessions, those
     at which its ``iv_field`` had a value for some eligible name, and the picks excluded for no
@@ -222,6 +231,27 @@ def iv_coverage(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
                     "sessions": len(measured),
                     "stored": stored,
                     "picks": dropped,
+                }
+            )
+    return out
+
+
+def sibling_coverage(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
+    """Per variant and horizon of a pair spread, the measured sessions and those at which its
+    ``pair_field`` had a value for no eligible name (an unbuilt or empty ``share_classes``
+    group): their picks read ``no_sibling``, which would otherwise look like a normal session.
+    Only where the field fell short."""
+    out = []
+    for r in evaluation.results:
+        measured = [s for s in r.stats if not s.excluded_coverage]
+        lacking = sum(not s.siblings_stored for s in measured)
+        if lacking:
+            out.append(
+                {
+                    "variant": f"{r.edge_variant}/{r.variant}",
+                    "horizon": r.horizon,
+                    "sessions": len(measured),
+                    "no_sibling_data": lacking,
                 }
             )
     return out

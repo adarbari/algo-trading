@@ -1,0 +1,78 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: industry_momentum (EB E1a).
+id = "industry_momentum"
+name = "Industry momentum"
+thesis = "Stocks in the sectors that rose most over the past year keep outperforming the market over the next month."
+mechanism = """Industry-wide news diffuses slowly and institutions rotate between sectors gradually,
+so a sector's past return predicts its next one (Moskowitz and Grinblatt 1999); analysts update
+their sector views late."""
+persistence = """Contested. Later work finds industry momentum is largely spanned by factor momentum
+(Arnott, Clements, Kalesnik and Linnainmaa 2023) and not robust across subsamples (Grobys,
+Ruotsalainen and Aijo 2018). It survives because it is cheap and simple, with nothing to arbitrage
+away but a crowded sector rotation: expect a weak edge."""
+schedule = "month_end"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["industry_momentum"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+family = "A"
+frozen_from = 2026-04-01
+notes = """The stored industry is the sector fund (11 sectors of the SEC SIC code, momentum_variants@v1
+sector_ret_252d), coarser than the paper's 20 industries, and the formation window is 12 months
+(the Quantpedia sector-rotation rule) rather than the paper's six. Every name of one sector
+shares the ranking value, so a top-50 pick list is 50 names of the strongest sector in instrument
+order: the decile spread across all names is the read of the sector effect, the top-50 mean only
+a check. The paper's second leg (industry-relative monthly reversal) is not built: rs_sector_20d
+is stored, a screener on it is a follow-up. Month-end start sessions at least 20 sessions apart,
+like momentum_12_1. Stored history is short (sector_ret_252d is stored from about 2025-10), so
+the harness's session count, not the t statistic, is the first read."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY over the 20 sessions after the entry close (the session after a
+month-end decision), net of 10 bps a round trip (the assumption of momentum_12_1)."""
+trigger_timing = """sector_ret_252d is computed from the close of the decision session D (nightly
+rollup), so the first fill is the next session's close: the entry session is S = D + 1
+(start_offset_sessions = 1) and the window runs from S's close; the screen is read at D, the
+outcome at S."""
+replication = """Moskowitz and Grinblatt's rule ranks industries by the past 6-month return, longs the
+top three and shorts the bottom three, holding six months. Here the ranking is the 12-month return
+of the sector fund (Quantpedia's sector rotation), long only, held one month: the closest
+stored rule, not the paper's."""
+expected_size = """The paper reports about 0.4% a month for the top-minus-bottom three industries in
+1963-1995 (not re-verified here); the sector-fund version is reported positive but with a low
+Sharpe (about 0.3 to 0.5) after 2000 (Quantpedia, not verified). With under a year of stored
+sector returns the harness cannot tell that from zero; it reports the t statistic and the
+sessions beside it."""
+capacity_costs = """Large liquid names only (price over 5 dollars, 50M dollars of 20-day volume);
+turnover is low because a sector's rank changes slowly; the 10 bps round trip is the
+assumption."""
+failure_modes = """Factor momentum and the stock-level momentum subsume it (a sector's past winners are
+the stock momentum winners), and a run of one sector (technology after 2010) can pass for the
+rule. Retire if the frozen-period decile spread is not above zero or the top picks do not beat the
+buy-and-hold mean of the eligible names."""
+decoys = """Stock momentum (compare momentum_12_1 on the same sessions), the size tilt of a sector
+(size_small), a single sector's run over the sample (read the result by year), and the market's
+own drift (the buy-and-hold of the eligible names)."""
+
+[[sources]]
+title = "Moskowitz, T. and Grinblatt, M., Do Industries Explain Momentum?, Journal of Finance, 1999"
+url = "https://ideas.repec.org/a/bla/jfinan/v54y1999i4p1249-1290.html"
+
+[[sources]]
+title = "Arnott, R., Clements, M., Kalesnik, V. and Linnainmaa, J., Factor Momentum, Review of Financial Studies, 2023"
+
+[[sources]]
+title = "Grobys, K., Ruotsalainen, J. and Aijo, J., Risk-managed industry momentum and momentum crashes, Quantitative Finance, 2018"
+url = "https://ideas.repec.org/a/taf/quantf/v18y2018i10p1715-1733.html"
+
+[[sources]]
+title = "Quantpedia, Sector Momentum Rotational System (strategy page)"
+url = "https://quantpedia.com/strategies/sector-momentum-rotational-system"
