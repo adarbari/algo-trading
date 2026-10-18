@@ -313,6 +313,7 @@ type CriterionResult {
   outcome: String!
   value: JSON
   distance: Float
+  group: String
 }
 
 """
@@ -2793,7 +2794,7 @@ type ScreenColumn {
 }
 
 """
-A criterion of a screen, in funnel order: the field it judges, its `mode` and its rule as the config states it: the operator `op` and the threshold `value` in the field's stored unit (a number, a string or boolean, a list for `in` / `between`; null: the operator takes none)
+A criterion of a screen, in funnel order: the field it judges, its `mode` and its rule as the config states it: the operator `op` and the threshold `value` in the field's stored unit (a number, a string or boolean, a list for `in` / `between`; null: the operator takes none); `group` is the id of the group it sits in (null: a gate, ADR 0071)
 """
 type ScreenCriterion {
   id: String!
@@ -2801,6 +2802,7 @@ type ScreenCriterion {
   mode: String!
   op: String!
   value: JSON
+  group: String
 }
 
 """
@@ -2816,6 +2818,18 @@ type ScreenDetail {
   preset: PresetPin
   error: String
   working: JSON
+}
+
+"""
+A group of criteria (ADR 0071): its `kind` (`all`, `any` or `none`), its `members` (criterion and group ids, in funnel order) and its `parent` group (null: a gate). In a result, `outcome` is the group's PASS / NEAR / FAIL / MISSING for the instrument and `decidedBy` the member that decided it; both are null in a screen's definition
+"""
+type ScreenGroup {
+  id: String!
+  kind: String!
+  members: [String!]!
+  parent: String
+  outcome: String
+  decidedBy: String
 }
 
 """
@@ -2849,6 +2863,7 @@ type ScreenResult {
   previousDecision: String
   regime: String
   sizeMultiplier: Float
+  groups: [ScreenGroup!]!
 }
 
 """
@@ -2879,7 +2894,7 @@ type ScreenVersion {
 }
 
 """
-A rule screen as the user sees it (their own config, else the site preset): `owner` is whose runs are its; `criteria` and `displayColumns` the current config's; `latestRun` its run for the session, else `notRun` says why (NOT_RUN); `pickHistory` its picked count per session over a window ending at the session
+A rule screen as the user sees it (their own config, else the site preset): `owner` is whose runs are its; `criteria`, `groups` and `displayColumns` the current config's; `latestRun` its run for the session, else `notRun` says why (NOT_RUN); `pickHistory` its picked count per session over a window ending at the session
 """
 type Screener {
   id: String!
@@ -2890,6 +2905,7 @@ type Screener {
   hash: String!
   criteria: [ScreenCriterion!]!
   displayColumns: [ScreenColumn!]!
+  groups: [ScreenGroup!]!
 
   """Its run for the session; null: not run for it (see `notRun`)"""
   latestRun: ScreenerRun

@@ -265,6 +265,8 @@ tolerance re-evaluates in memory (only the edited criterion); a new publish inva
 Nightly rows go to `results/rule_screen` (one per instrument: decision, score, rank,
 flags, reasons, config id / version / hash),
 `results/rule_screen_values` (one per criterion: value, PASS / NEAR / FAIL / MISSING / INFO,
-distance, penalty); the run summary is in the run record (`stats["summary"]`). Ideas ranks tickers
+distance, penalty, and the group it sits in; one per group, `mode = "group"`: the kind as
+`field`, the verdict's outcome and penalty, the deciding member; `failed` / `near_missed` /
+`missing` list gate ids, ADR 0071); the run summary is in the run record (`stats["summary"]`). Ideas ranks tickers
 across saved screens: one row per ticker, by the highest-priority screener that picked it,
 then score.

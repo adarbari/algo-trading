@@ -658,9 +658,13 @@ RULE_SCREEN = fixed(
     runs="merge",
     key=("user_id", "config_id", "instrument_id"),
 )
-# One row per (instrument, criterion) and per display column (``mode = "column"``,
-# ``outcome = "INFO"``): the value, PASS / NEAR / FAIL / MISSING, distance and penalty.
+# One row per (instrument, criterion), per display column (``mode = "column"``, ``outcome =
+# "INFO"``) and per criterion group (``mode = "group"``, ADR 0071: ``field`` the kind, the
+# verdict's outcome and penalty, ``value_str`` the deciding member's id): the value, PASS / NEAR /
+# FAIL / MISSING, distance and penalty. ``group_id`` is the row's parent group (null: a gate, or
+# a partition from before groups).
 DISPLAY_COLUMN_MODE = "column"
+GROUP_MODE = "group"
 
 
 def is_display_column(mode: object) -> bool:
@@ -668,6 +672,19 @@ def is_display_column(mode: object) -> bool:
     columns (``[columns]``) rather than a criterion's outcome: the one predicate its writer
     and its readers share."""
     return mode == DISPLAY_COLUMN_MODE
+
+
+def is_group_row(mode: object) -> bool:
+    """Whether a ``results/rule_screen_values`` row of ``mode`` is a criterion group's verdict
+    (ADR 0071), not a criterion's outcome: a reader of criteria skips it as it skips display
+    columns (``is_display_column``)."""
+    return mode == GROUP_MODE
+
+
+def is_criterion_row(mode: object) -> bool:
+    """Whether a row of ``mode`` is a criterion's outcome (neither a display column nor a
+    group): what every criterion reader keeps."""
+    return not (is_display_column(mode) or is_group_row(mode))
 
 
 RULE_SCREEN_VALUES = fixed(
@@ -684,6 +701,7 @@ RULE_SCREEN_VALUES = fixed(
     "value_str string",
     "outcome string!",
     *floats("distance", "normalised", "penalty"),
+    "group_id string",  # the parent group (ADR 0071); null: a gate, or a partition before groups
     runs="merge",
     key=("user_id", "config_id", "instrument_id", "mode", "criterion_id"),
 )

@@ -41,13 +41,19 @@ from algotrade.services.read.screens.runs import (
     load_previous_run,
     run_rows,
 )
+from algotrade.services.read.screens.screeners import ScreenGroup
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
-from algotrade.storage.tables.schemas import is_display_column, result_table
+from algotrade.storage.tables.schemas import (
+    is_criterion_row,
+    is_display_column,
+    is_group_row,
+    result_table,
+)
 
 RULE_SCREEN_VALUES = result_table("rule_screen_values")
 VALUE_COLUMNS = (
     "user_id", "config_id", "criterion_id", "mode", "field", "outcome", "value_num", "value_str",
-    "distance",
+    "distance", "group_id",
 )  # fmt: skip
 CHANGES = ("new", "dropped")
 # The typed sort keys (the web's column factory ids); also ``criterion:<id>``,
@@ -70,6 +76,7 @@ class CriterionResult:
     outcome: str
     value: Scalar
     distance: float | None
+    group: str | None = None  # the group it sits in (ADR 0071); None: a gate
 
 
 @dataclass(frozen=True)
@@ -107,6 +114,7 @@ class ScreenResult:
     previous_decision: str | None = None
     regime: str | None = None
     size_multiplier: float | None = None
+    groups: tuple[ScreenGroup, ...] = ()  # the screen's groups, each with its outcome (ADR 0071)
 
 
 @dataclass(frozen=True)
@@ -240,9 +248,10 @@ MISSING = "MISSING"  # a criterion outcome: no value (here: one the viewer may n
 def _criterion(v: Mapping[str, Any], hidden: frozenset[str]) -> CriterionResult:
     """What a criterion judged; a field under a licence the viewer does not hold has no value,
     no distance and is MISSING to them (the stored value is never served)."""
+    group = _parent(v)
     if str(v["field"]) in hidden:
         return CriterionResult(
-            str(v["criterion_id"]), str(v["field"]), str(v["mode"]), MISSING, None, None
+            str(v["criterion_id"]), str(v["field"]), str(v["mode"]), MISSING, None, None, group
         )
     return CriterionResult(
         str(v["criterion_id"]),
@@ -251,7 +260,52 @@ def _criterion(v: Mapping[str, Any], hidden: frozenset[str]) -> CriterionResult:
         str(v["outcome"]),
         _value(v),
         _float(v.get("distance")),
+        group,
     )
+
+
+def _parent(v: Mapping[str, Any]) -> str | None:
+    """The group a stored row sits in (None: a gate, or a partition from before groups)."""
+    found = to_scalar(v.get("group_id"))
+    return None if found is None else str(found)
+
+
+def _groups(values: Sequence[Mapping[str, Any]], hidden: frozenset[str]) -> tuple[ScreenGroup, ...]:
+    """The groups of one instrument's stored rows, in stored order, each with its members (the
+    rows naming it as parent). A group over a field the viewer may not see is MISSING to them
+    and names no deciding member: its outcome would show what the hidden value did."""
+    children: dict[str, list[str]] = {}
+    for v in values:
+        parent = _parent(v)
+        if parent is not None and not is_display_column(v["mode"]):
+            children.setdefault(parent, []).append(str(v["criterion_id"]))
+    fields = {
+        str(v["criterion_id"]): str(v["field"]) for v in values if is_criterion_row(v["mode"])
+    }
+
+    def shows_hidden(gid: str) -> bool:
+        return any(
+            (fields[m] in hidden) if m in fields else shows_hidden(m) for m in children.get(gid, ())
+        )
+
+    out = []
+    for v in values:
+        if not is_group_row(v["mode"]):
+            continue
+        gid = str(v["criterion_id"])
+        withheld = shows_hidden(gid)
+        decided = to_scalar(v.get("value_str"))
+        out.append(
+            ScreenGroup(
+                gid,
+                str(v["field"]),
+                tuple(children.get(gid, ())),
+                _parent(v),
+                MISSING if withheld else str(v["outcome"]),
+                None if withheld or decided is None else str(decided),
+            )
+        )
+    return tuple(out)
 
 
 def _run_fields(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
@@ -268,7 +322,8 @@ def _run_fields(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
             & (stored["config_id"] == run.config_id)
             & (stored["run_id"] == run.run_id)
         ]
-        return frozenset(str(f) for f in mine["field"].dropna().unique())
+        read = mine[~mine["mode"].map(is_group_row).astype(bool)]  # a group's field is its kind
+        return frozenset(str(f) for f in read["field"].dropna().unique())
 
     found: frozenset[str] = ctx.cache.get_or_compute(key, read)
     return found
@@ -335,7 +390,7 @@ def _result(
     hidden: frozenset[str] = frozenset(),
 ) -> ScreenResult:
     withheld = bool(hidden)
-    criteria = tuple(_criterion(v, hidden) for v in values if not is_display_column(v["mode"]))
+    criteria = tuple(_criterion(v, hidden) for v in values if is_criterion_row(v["mode"]))
     columns = tuple(
         ResultColumn(str(v["criterion_id"]), None if str(v["field"]) in hidden else _value(v))
         for v in values
@@ -359,6 +414,7 @@ def _result(
         previous_decision=change[1],
         regime=None if (label := to_scalar(row.get("regime"))) is None else str(label),
         size_multiplier=_float(row.get("size_multiplier")),
+        groups=_groups(values, hidden),
     )
 
 
@@ -474,12 +530,14 @@ def _stored_key(ctx: ReadContext, run: ScreenerRun, key: str) -> Mapping[str, Sc
     out: dict[str, Scalar] = {}
     if not isinstance(stored, Unknown) and not stored.empty:
         column = stored["mode"].map(is_display_column).astype(bool)
+        group = stored["mode"].map(is_group_row).astype(bool)
         mine = stored[
             (stored["user_id"] == run.owner)
             & (stored["config_id"] == run.config_id)
             & (stored["run_id"] == run.run_id)
             & (stored["criterion_id"] == name)
             & (column == (kind == "column"))
+            & ~group  # a group is no criterion (ADR 0071)
         ]
         seen = _records(mine)
         hidden = run_withheld(ctx, run)
