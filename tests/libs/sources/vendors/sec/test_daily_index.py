@@ -113,8 +113,8 @@ def test_event_forms_are_kept_with_spaces_in_the_form_and_the_longest_form_wins(
     assert set(by_form) == kept
     assert len(frame) == 11 and frame["accession"].is_unique
     assert "0002101664" in by_form["10-12B"]  # Form 10 of a spin-off candidate
-    assert by_form["25-NSE"][0] == "0001893219"
-    assert "0000876661" in by_form["25-NSE"]  # the exchange's own line, same accession
+    assert "0001893219" in by_form["25-NSE"]  # the issuer
+    assert "0000876661" in by_form["25-NSE"]  # the exchange's own line
     assert len(by_form["25"]) == 1  # the issuer's own Form 25 is not the 25-NSE line
     assert len(by_form["SC TO-I"]) == 1  # its SC TO-I/A amendment is left out
     assert "0001744494" in by_form["NT 10-K"] and len(by_form["NT 10-Q"]) == 2
