@@ -11,6 +11,10 @@ Each edge's full section is on its family page (docs/edges/).
 
 | Edge | Status | Family page |
 |---|---|---|
+| Low beta and low volatility (`betting_against_beta_low_vol`) | candidate | [family A](edges/a.md) |
+| Industry momentum (`industry_momentum`) | candidate | [family A](edges/a.md) |
+| 12-1 momentum (`momentum_12_1`) | candidate | [family A](edges/a.md) |
+| Short-term residual reversal (`short_term_residual_reversal`) | candidate | [family A](edges/a.md) |
 | Dividend-month premium (`dividend_month_premium`) | candidate | [family B](edges/b.md) |
 | Earnings-date advances (`earnings_date_shift`) | candidate | [family B](edges/b.md) |
 | Earnings gap on heavy volume (`earnings_gap_volume_drift`) | candidate | [family B](edges/b.md) |
@@ -31,7 +35,6 @@ Each edge's full section is on its family page (docs/edges/).
 | Thematic ETF launch fade (`thematic_etf_launch_fade`) | blocked | [family H](edges/h.md) |
 | Call-put IV spread into earnings (`pre_earnings_cp_iv_spread`) | candidate | [family I](edges/i.md) |
 | Earnings announcement premium (`earnings_announcement_premium`) | candidate | [no family](edges/other.md) |
-| 12-1 momentum (`momentum_12_1`) | candidate | [no family](edges/other.md) |
 | 12-1 momentum among names that just reported (`momentum_at_earnings`) | candidate | [no family](edges/other.md) |
 | Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | [no family](edges/other.md) |
 | Volatility risk premium (`vrp_short_premium`) | candidate | [no family](edges/other.md) |

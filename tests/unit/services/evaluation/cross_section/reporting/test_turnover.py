@@ -17,7 +17,10 @@ from algotrade.services.evaluation.cross_section.measures import (
     edge_slices,
     slice_measures,
 )
-from algotrade.services.evaluation.cross_section.reporting.turnover import apply_hold_bands
+from algotrade.services.evaluation.cross_section.reporting.turnover import (
+    apply_hold_bands,
+    apply_rebalances,
+)
 
 COST = 20.0  # bp per round trip; the legs' values are net of one of them (0.002)
 D1, D2, D3 = date(2026, 9, 1), date(2026, 9, 2), date(2026, 9, 3)
@@ -147,3 +150,80 @@ def test_gross_figures_are_unchanged_and_the_net_series_and_break_even_follow_th
     flat_rows = {r.slice_value: r for r in cost_measures(flat, slices, [f], grid)}
     slope = flat_rows["all:0"].mean_excess_picks - flat_rows["all:50"].mean_excess_picks  # type: ignore[operator]
     assert slope == pytest.approx(50 / 1e4)
+
+
+# portfolio_return books (ADR 0074): the weight change is the only cost
+def book(day: date, gross: float, **weights: float) -> SessionStat:
+    """A session whose leg value is net of one full round trip, as every leg stores it."""
+    net = gross - COST / 1e4
+    return SessionStat(
+        session=day, regime="CALM", pick_values=(net,), pick_hits=int(net > 0),
+        weights=tuple(weights.items()),
+    )  # fmt: skip
+
+
+def test_a_book_that_holds_still_pays_only_its_entry_and_its_last_exit() -> None:
+    still = [book(d, 0.01, A=0.5, B=0.5) for d in (D1, D2, D3)]
+    one, two, three = apply_rebalances(still, COST)
+    assert (one.round_trips, two.round_trips, three.round_trips) == pytest.approx((0.5, 0.0, 0.5))
+    # gross 1% less the cost paid: the entry's half at D1, nothing at D2, the exit's half at D3
+    assert one.net_values == pytest.approx((0.01 - 0.5 * COST / 1e4,))
+    assert two.net_values == pytest.approx((0.01,))
+    assert three.net_values == pytest.approx((0.01 - 0.5 * COST / 1e4,))
+    assert one.pick_values == still[0].pick_values  # the legs' gross figures stay as stored
+
+
+def test_a_full_replacement_pays_one_round_trip_and_a_partial_one_its_weight_change() -> None:
+    legs = [book(D1, 0.01, A=1.0), book(D2, 0.01, B=1.0), book(D3, 0.01, A=0.4, B=0.6)]
+    one, two, three = apply_rebalances(legs, COST)
+    # D2: A sold (1) and B bought (1): half of 2 trips-worth = 1.0; D3: |0.4-0| + |0.6-1| = 0.8
+    assert (one.round_trips, two.round_trips, three.round_trips) == pytest.approx(
+        (0.5, 1.0, 0.4 + 0.5)
+    )
+    total = sum(s.round_trips or 0.0 for s in (one, two, three))
+    assert total == pytest.approx(2.4)
+
+
+def test_cash_is_free_to_hold_and_to_leave() -> None:
+    legs = [book(D1, 0.0, CASH=1.0), book(D2, 0.0, A=0.5, CASH=0.5), book(D3, 0.0, CASH=1.0)]
+    one, two, three = apply_rebalances(legs, COST)
+    assert (one.round_trips, two.round_trips, three.round_trips) == pytest.approx(
+        (0.0, 0.25, 0.25)  # A's half is bought at D2 and sold at D3; cash trades nothing
+    )
+    assert one.net_values == pytest.approx((0.0,))  # a cash book pays nothing, not a full trip
+
+
+def test_a_session_with_no_value_breaks_the_chain() -> None:
+    gap = SessionStat(session=D2, regime="CALM", excluded_coverage=1, portfolio_reason="no_vol")
+    one, skipped, three = apply_rebalances(
+        [book(D1, 0.01, A=1.0), gap, book(D3, 0.01, A=1.0)], COST
+    )
+    assert one.round_trips == pytest.approx(1.0)  # bought at D1, sold before the gap
+    assert skipped is gap
+    assert three.round_trips == pytest.approx(1.0)  # bought afresh, sold at the end
+
+
+def test_the_rebalance_pass_is_deterministic_whatever_the_order_given() -> None:
+    legs = [book(D1, 0.01, A=1.0), book(D2, 0.02, B=1.0), book(D3, 0.03, A=1.0)]
+    forward = apply_rebalances(legs, COST)
+    shuffled = apply_rebalances([legs[2], legs[0], legs[1]], COST)
+    assert [s.session for s in shuffled] == [D3, D1, D2]  # the order given, each its own figures
+    assert {s.session: s.net_values for s in shuffled} == {s.session: s.net_values for s in forward}
+
+
+def test_the_net_slice_follows_the_book_and_the_gross_hit_rate_does_not() -> None:
+    legs = [book(d, 0.0025, A=1.0) for d in (D1, D2, D3)]  # 25 bp gross, 20 bp a full round trip
+    sessions = apply_rebalances(legs, COST)
+    measure = slice_measures(sessions, edge_slices(sessions, None, False))[0]
+    assert measure.hit_rate == 1.0  # the legs' own: 5 bp is left after a full round trip each
+    # D1 pays its entry's half, D2 nothing, D3 its exit's half: 20 bp over the three sessions
+    assert measure.mean_excess_picks == pytest.approx((0.0025 * 3 - COST / 1e4) / 3)
+    assert measure.base_rate is None and measure.lift is None  # the benchmark is the base
+    assert (measure.sessions, measure.picks) == (3, 3)
+
+
+def test_the_hit_follows_the_net_value_of_a_book_that_holds_still() -> None:
+    legs = [book(d, 0.0015, A=1.0) for d in (D1, D2, D3)]  # 15 bp gross: lost to a full trip (20)
+    assert [s.pick_hits for s in legs] == [0, 0, 0]
+    one, two, three = apply_rebalances(legs, COST)
+    assert (one.pick_hits, two.pick_hits, three.pick_hits) == (1, 1, 1)  # 15 bp beats 10 / 0 / 10

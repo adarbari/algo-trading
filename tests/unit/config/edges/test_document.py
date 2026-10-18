@@ -13,7 +13,6 @@ import pytest
 from algotrade.config.edges.document import (
     MODEL_STRUCTURES,
     QUALITY_BAR,
-    SIDES,
     STATUSES,
     Edge,
     Published,
@@ -21,7 +20,7 @@ from algotrade.config.edges.document import (
     parse_edge,
 )
 from algotrade.config.edges.follow import AUDIT_LABELS, BOOKMARK_LABELS, Follow
-from algotrade.config.edges.identity import identity_dict
+from algotrade.config.edges.identity import SIDES, identity_dict
 from algotrade.config.edges.model_tenor import tenor_sessions
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError

@@ -1,0 +1,51 @@
+# Sector-neutral reversal (edge short_term_residual_reversal): every tradeable name with a 20-
+# session return against its sector ETF's, ranked by it, the worst against its sector first
+# (the industry-neutral residual reversal; the sector is the SEC SIC code's coarse market sector).
+# A missing value never passes (ADR 0030). What it does not check: beta, earnings in the month.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "sector_reversal"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Sector-neutral reversal"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1, so the variants compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.rs_sector_20d]
+field = "rollup.momentum_variants@v1.rs_sector_20d"
+op = "gt"
+value = -1
+
+[columns]
+close = "rollup.price_stats@v2.close"
+rs_sector_20d = "rollup.momentum_variants@v1.rs_sector_20d"
+mom_12_1 = "rollup.trend_stats@v2.mom_12_1"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.momentum_variants@v1.rs_sector_20d"
+tie_break_order = "asc"

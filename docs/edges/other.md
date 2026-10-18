@@ -6,7 +6,6 @@ Back to the [index of every edge](../edges.md).
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
 | Earnings announcement premium (`earnings_announcement_premium`) | candidate | on each `earnings_expected` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event, costs 10 bps | `eap_all`, `eap_volume` |
-| 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1` |
 | 12-1 momentum among names that just reported (`momentum_at_earnings`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 15 bps | `momentum_12_1` |
 | Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 40 bps | `pead_small_cap` |
 | Volatility risk premium (`vrp_short_premium`) | candidate | every session | expires otm, over 15, 21, 31 sessions, entered 1 session after the decision session, short put struck at delta 0.3, not assigned at the horizon | `vrp_iv_hv` |
@@ -45,40 +44,6 @@ Back to the [index of every edge](../edges.md).
 - Savor, P. and Wilson, M., Earnings Announcements and Systematic Risk, Journal of Finance, 2016 <https://doi.org/10.1111/jofi.12361>
 - Barber, B., De George, E., Lehavy, R. and Trueman, B., The Earnings Announcement Premium Around the Globe, Journal of Financial Economics, 2013 <https://doi.org/10.1016/j.jfineco.2012.10.006>
 - Quantpedia, Earnings Announcement Premium (strategy page) <https://quantpedia.com/strategies/earnings-announcement-premium/>
-
-## 12-1 momentum (`momentum_12_1`)
-
-**Status:** candidate. **Thesis:** Stocks that rose most over the past year, leaving out the last month, keep outperforming the market over the next month.
-
-- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
-- **Schedule:** month end
-- **Universe:** preset `liquid_common_stocks`
-- **Top K:** 50
-- **Screeners:** `momentum_12_1`
-- **Baselines:** `size_small`
-- **Frozen period:** from 2026-04-01
-- **Published:** decile spread 1.31% over 20 sessions (Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993, 25 years)
-- **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment).
-
-**Quality bar**
-
-1. **Mechanism:** Investors underreact to news and herd into winners; limits to arbitrage and disposition effects slow the price from reaching its value (Jegadeesh and Titman 1993; Barberis, Shleifer and Vishny 1998).
-2. **Persistence:** The premium is large, old and widely known, and has survived two decades after its publication in most markets, but it crashes in sharp market rebounds (Daniel and Moskowitz 2016): the risk that keeps arbitrageurs from removing it.
-3. **Outcome:** Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions).
-4. **Trigger timing:** mom_12_1 is computed from the close of the decision session D (rollups, nightly), so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1) and the window runs from S's close; the screen is read at D, the outcome at S.
-5. **Faithful replication:** The published rule: rank by the return from 12 months to 1 month back and hold the top decile (Jegadeesh and Titman 1993); here the top 50 of the liquid common stocks (liquid_common_stocks).
-6. **Expected size and sample:** Historically about 1% a month for the winner-minus-loser decile spread in large US stocks, smaller since 2000 (Daniel and Moskowitz 2016). Ten independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
-7. **Capacity and costs:** Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume): turnover is monthly and spreads are small; the 10 bps round trip is the assumption.
-8. **Failure modes and retirement:** Momentum crashes: sharp market rebounds after a drawdown reverse winners and losers (Daniel and Moskowitz 2016). Retire if the frozen-period decile spread is not above zero or the top decile does not beat the buy-and-hold mean of the eligible names.
-9. **Decoys:** The same signal in the market's own drift (compare with buy-and-hold of the eligible names), the size and quality tilts of past winners, and the 52-week-high effect (a different screen on the same sessions).
-
-**Sources**
-
-- Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993 <https://doi.org/10.1111/j.1540-6261.1993.tb04702.x>
-- Daniel, K. and Moskowitz, T., Momentum Crashes, Journal of Financial Economics, 2016 <https://doi.org/10.1016/j.jfineco.2015.12.002>
-- Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, Journal of Financial Economics, 1998 <https://doi.org/10.1016/S0304-405X(98)00027-0>
-- Asness, C., Frazzini, A., Israel, R. and Moskowitz, T., Fact, Fiction and Momentum Investing, AQR / Journal of Portfolio Management, 2014 <https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Momentum-Investing>
-- Quantpedia, Momentum Factor Effect in Stocks (strategy page) <https://quantpedia.com/strategies/momentum-factor-effect-in-stocks/>
 
 ## 12-1 momentum among names that just reported (`momentum_at_earnings`)
 

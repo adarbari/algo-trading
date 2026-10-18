@@ -13,14 +13,23 @@ the risk that keeps arbitrageurs from removing it."""
 schedule = "month_end"
 universe = "liquid_common_stocks"
 top_k = 50
-screeners = ["momentum_12_1"]
+screeners = [
+  "momentum_12_1", "residual_momentum", "volatility_scaled_momentum", "frog_in_the_pan",
+  "momentum_x_quality_interaction", "fifty_two_week_high",
+]
 baselines = ["size_small"]
 status = "candidate"
+family = "A"
 frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1
 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under
 the 40 the bar asks; the harness reports the count beside every number. The frozen period
-starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment)."""
+starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment).
+Variants (EB E1a): five more screeners, one trial each: residual_momentum (net of beta x SPY),
+volatility_scaled_momentum (12-1 per unit of 60-session volatility; a stand-in for Barroso and
+Santa-Clara's time-series scaling), frog_in_the_pan, momentum_x_quality_interaction and
+fifty_two_week_high. They overlap raw momentum: read each beside momentum_12_1's number. No
+[published] figure: the catalogue's are not marked verified."""
 
 [scorer]  # ED7: the fields a learned scorer is fitted on (edge_scores.toml, fit-edge-scorer)
 features = [

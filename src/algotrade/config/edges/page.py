@@ -16,6 +16,7 @@ from algotrade.config.edges.document import (
     event_class,
     event_subtype,
 )
+from algotrade.config.edges.portfolio import benchmark_words
 from algotrade.core.model.predicates import Group, Rule
 
 PATH = "docs/edges.md"
@@ -154,7 +155,7 @@ def _outcome(o: Outcome, event: bool) -> str:
     plural = "" if o.horizon_sessions == (1,) else "s"
     parts = [o.kind.replace("_", " "), f"over {horizons} session{plural}"]
     if o.benchmark != "none":
-        parts.append(f"vs {o.benchmark}")
+        parts.append(f"vs {benchmark_words(o.benchmark)}")
     if event and o.start_offset_sessions:
         parts.append(f"starting {o.start_offset_sessions:+d} sessions from the event")
     elif not event:
