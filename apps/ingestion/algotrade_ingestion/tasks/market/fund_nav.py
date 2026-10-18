@@ -25,8 +25,8 @@ and pace as ``bars-history``. Rows are staged per fund and published together wh
 - **known_from** is the next session after the NAV date (the NAV is struck after the close and
   the vendor shows it the next day), the same for the nightly fetch and the 2004 backfill;
   ``knowledge_ts`` is the real fetch (publish) instant. A later restatement of a stored NAV
-  replaces the row (merge mode), so it takes ``known_from = max(next session, the run's
-  session)``: an as-of read before that session never sees it, and reads before it see no
+  replaces the row (merge mode), so it takes ``known_from = max(next session, the session
+  of the fetch)``: an as-of read before that session never sees it, and reads before it see no
   NAV for that date (the replaced original is not served: the cost of the one-row key).
 - **Budget**: each fund is one Tiingo symbol (item ``nav:<id>``) counted with ``bars-history``'s
   against ``[tiingo] monthly_symbol_budget`` (``tiingo_budget``); a run fetches no more than the
@@ -50,7 +50,7 @@ from typing import cast
 
 import pandas as pd
 
-from algotrade.core.time.calendar import next_session
+from algotrade.core.time.calendar import exchange_date, is_session, next_session
 from algotrade.data.reference import instruments
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
@@ -132,6 +132,13 @@ def _known_from(day: date) -> date:
     return next_session(day)
 
 
+def _learned_on(run: IngestRun) -> date:
+    """The first session on or after the exchange date of the run's clock: when this run learned
+    what it fetched, whatever ``--to`` says (a past ``--to`` is not a past fetch)."""
+    today = exchange_date(run.clock())
+    return today if is_session(today) else next_session(today)
+
+
 def nav_rows(
     nav: pd.DataFrame,
     fund: Fund,
@@ -143,8 +150,9 @@ def nav_rows(
     """Fetched NAV rows -> (rows to store, rows clipped outside ``first..last``, rows already
     stored with the same NAV). ``stored``: this fund's stored NAV by ``ts``. A NAV that differs
     from a stored one is a restatement: merge mode replaces the original row (the key has no
-    ``knowledge_ts``), so its ``known_from`` is ``max(next session, session)``, the run's
-    session, never a date before the run learned it."""
+    ``knowledge_ts``), so its ``known_from`` is ``max(next session, session)`` with ``session``
+    the one the run learned it on (``_learned_on``: the fetch, never ``--to``), never a date before
+    it was learned."""
     days = nav["ts"].dt.date
     inside = (days >= first) & (days <= last)
     kept = nav[inside]
@@ -214,7 +222,7 @@ def _fetch_fund(
         first,
         last,
         stored.get(fund.instrument_id, {}),
-        run.session,
+        _learned_on(run),
     )
     stats["clipped_rows"] = stats.get("clipped_rows", 0) + clipped
     stats["already_stored_rows"] = stats.get("already_stored_rows", 0) + same

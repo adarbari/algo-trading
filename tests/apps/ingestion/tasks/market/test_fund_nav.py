@@ -242,3 +242,16 @@ def test_a_restated_nav_is_known_from_the_restating_session_not_the_day_after() 
     assert list(rows["known_from"]) == [UNTIL]  # not 2026-10-07, the next session after the NAV
     fresh, _, _ = nav_rows(nav, fund, date(2026, 10, 1), UNTIL, {}, UNTIL)
     assert list(fresh["known_from"]) == [date(2026, 10, 7), date(2026, 10, 8)]
+
+
+def test_a_restatement_with_a_past_to_is_known_from_the_fetch_session_not_to(
+    writer: StoreWriter,
+) -> None:
+    past = date(2026, 10, 7)  # --to in the past; the clock (FIXED, 2026-10-02 22:00 UTC) is Friday
+    vendor = Vendor({"XPHKX": series(20), "XGDLX": series(10)})
+    run(writer, vendor, since=date(2026, 9, 28), until=past)
+    restated = Vendor({"XPHKX": payloads.nav_prices([("2026-09-30", 99.0)]), "XGDLX": series(10)})
+    run(writer, restated, since=date(2026, 9, 28), until=past, force=True)
+    frame = stored(writer)
+    row = frame[(frame["instrument_id"] == "EQ:PHK") & (frame["nav"] == 99.0)].iloc[0]
+    assert row["known_from"] == date(2026, 10, 2)  # the fetch's session, not 2026-10-01 (next)
