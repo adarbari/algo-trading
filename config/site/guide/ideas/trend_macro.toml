@@ -1,0 +1,213 @@
+# Researched, not built: family E (trend macro) of the edge-idea catalogue, one [[idea]] each (ADR 0051; keys in config/site/guide/ideas.py).
+
+family = "E"
+
+[[idea]]
+id = "taa_keller_vaa_daa"
+title = "Vigilant and Defensive Asset Allocation"
+mechanism_kind = "cross_market_trends"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak as published; only its risk-off canary rule is worth testing, and the harness cannot yet express its signal-weighted cash share."
+
+[[idea]]
+id = "carry_multi_asset_etf"
+title = "Carry across asset classes with ETFs"
+mechanism_kind = "paid_for_risk"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "The bond and credit legs look promising, but the foreign-exchange and commodity legs need futures curves that are not stored."
+
+[[idea]]
+id = "commodity_term_structure_roll"
+title = "Commodity roll yield: long backwardation"
+mechanism_kind = "paid_for_risk"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "The roll-yield leg needs futures curves, which are not stored; only the ETF momentum leg of the filed commodity edge is built."
+
+[[idea]]
+id = "bond_curve_timing"
+title = "Bond duration timing from the yield curve"
+mechanism_kind = "cross_market_trends"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan; it runs on the stored Treasury curve and ETF prices."
+
+[[idea]]
+id = "vol_managed_equity"
+title = "Volatility-managed equity exposure"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak as a source of return; planned instead as a position-sizing rule for other edges."
+
+[[idea]]
+id = "risk_parity_etf"
+title = "Risk parity as the base allocation"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "out_of_scope"
+why_not_built = "A portfolio construction rather than an edge, and its key assumption has weakened; used only as a benchmark."
+
+[[idea]]
+id = "sector_momentum_rotation"
+title = "Sector ETF relative-strength rotation"
+mechanism_kind = "slow_to_update"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The effect has faded in the ETF era, so it is low priority."
+
+[[idea]]
+id = "country_cape_value"
+title = "Country rotation on long-run valuation"
+mechanism_kind = "value_gaps"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Its horizon is too long for the harness's minimum event count, and country valuation data is not stored."
+
+[[idea]]
+id = "erp_timing_cape"
+title = "Equity risk premium timing by valuation"
+mechanism_kind = "value_gaps"
+verdict = "dead"
+feasibility = "out_of_scope"
+why_not_built = "Dead as a timing edge, and the horizon is too long; kept only as a regime conditioner."
+
+[[idea]]
+id = "yield_curve_inversion_equity"
+title = "Yield-curve inversion as an equity de-risk signal"
+mechanism_kind = "cross_market_trends"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak as a stand-alone trade; used only as a regime conditioner."
+
+[[idea]]
+id = "macro_regime_conditioner"
+title = "Macro regime gating of risk"
+mechanism_kind = "cross_market_trends"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as a rule that gates other edges, not as an edge of its own."
+
+[[idea]]
+id = "breadth_thrust_entry"
+title = "Breadth thrust as an equity entry"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak with too few events and fitted thresholds; the strict form is rejected as an edge."
+
+[[idea]]
+id = "vix_mean_reversion_entry"
+title = "Buying after a VIX spike"
+mechanism_kind = "liquidity_provision"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but events are few and it needs VIX and three-month VIX history, which are not stored."
+
+[[idea]]
+id = "cross_asset_tsmom_bonds_to_equities"
+title = "Bond returns lead equity returns"
+mechanism_kind = "cross_market_trends"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as a variant of the multi-asset trend edge."
+
+[[idea]]
+id = "oil_shock_equity_lag"
+title = "Oil price changes predict equity returns"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak and low priority; only an industry version, not the index version, is worth testing."
+
+[[idea]]
+id = "defensive_cyclical_rotation"
+title = "Defensive versus cyclical sector rotation"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and it needs a purchasing-managers series that has no free published source."
+
+[[idea]]
+id = "dollar_regime_tilt"
+title = "Dollar strength regime tilt"
+mechanism_kind = "cross_market_trends"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak stand-alone; it is planned only as a conditioner for other edges."
+
+[[idea]]
+id = "copper_gold_yield_lead"
+title = "Copper-to-gold ratio leads yields"
+mechanism_kind = "cross_market_trends"
+verdict = "dead"
+feasibility = "data_ready"
+why_not_built = "Dead as an edge: the ratio showed no lead, so the catalogue rejected it."
+
+[[idea]]
+id = "fed_net_liquidity_equity"
+title = "Fed net liquidity drives equities"
+mechanism_kind = "cross_market_trends"
+verdict = "dead"
+feasibility = "data_ready"
+why_not_built = "Dead and rejected in the catalogue; it is kept only as macro context."
+
+[[idea]]
+id = "betting_against_correlation_etf"
+title = "Betting against correlation"
+mechanism_kind = "paid_for_risk"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "A stock-level factor idea that the catalogue hands to the cross-sectional family, where the low-beta edge is filed."
+
+[[idea]]
+id = "trend_carry_value_combo"
+title = "Trend, carry and value across asset classes"
+mechanism_kind = "cross_market_trends"
+verdict = "strong"
+feasibility = "needs_data"
+why_not_built = "Only the trend leg is built, inside the multi-asset trend edge; carry and value need futures curves and country valuation data."
+
+[[idea]]
+id = "stock_bond_correlation_regime"
+title = "Stock-bond correlation regime switch"
+mechanism_kind = "cross_market_trends"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Promising only as a conditioner for sizing, with too few events to be an edge, so it is not built."
+
+[[idea]]
+id = "gold_real_rate_trend"
+title = "Gold against real yields"
+mechanism_kind = "cross_market_trends"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; the multi-asset trend edge already covers gold trend, so it is not filed separately."
+
+[[idea]]
+id = "taa_ensemble_and_overfitting_guard"
+title = "Guard against overfitting in allocation tests"
+mechanism_kind = "cross_market_trends"
+verdict = "strong"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as a harness rule rather than an edge."
+
+[[idea]]
+id = "sma10_timing_faber"
+title = "Ten-month moving average timing"
+mechanism_kind = "cross_market_trends"
+filed_as = "absolute_momentum_crash_filter"
+
+[[idea]]
+id = "commodity_momentum_etf"
+title = "Commodity momentum with ETFs"
+mechanism_kind = "cross_market_trends"
+filed_as = "commodity_roll_momentum"
+
+[[idea]]
+id = "country_momentum_etf"
+title = "Country ETF momentum"
+mechanism_kind = "cross_market_trends"
+filed_as = "country_etf_momentum_value"
