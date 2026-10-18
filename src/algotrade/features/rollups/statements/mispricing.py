@@ -6,11 +6,13 @@ Inputs: ``balance_sheet@v1``, ``income_statement@v1``, ``cash_flow@v1``, ``finan
 figure enters a session on the day its filing was public, never at its period end), the SEC
 INSTANT facts of ``instruments/statements`` (only for the total assets a year before the balance
 sheet date) and the session's ``price_stats@v2`` (it sets which instruments get a row). A value
-whose statement group is STALE is null, as in the expression features over the same groups.
+whose statement group is STALE is null, as in the expression features over the same groups;
+a balance-sheet measure also needs ``bs_status`` OK (PARTIAL keeps a line at an older date), and
+net income with operating cash flow need ``ttm_as_of`` equal to ``cf_as_of``.
 
 A rank needs the whole cross-section, so the anomalies live here with their ranks (an expression
 feature is one row at a time); the ratios mirror the TOML features ``roe``, ``roa``,
-``gross_margin``, ``net_margin`` and ``debt_to_equity`` (a test compares them).
+``gross_margin``, ``net_margin`` and ``debt_to_equity`` (balance sheet ones stricter: OK only).
 
     total_assets_1y_ago       Assets at the balance sheet a year before bs_as_of (+/- tolerance)
     asset_growth              total_assets / total_assets_1y_ago - 1
@@ -86,7 +88,9 @@ class MispricingParams(TtmParams):
 _STATEMENT = (
     "no balance sheet, income statement, cash flow or net income of the session (ETFs, funds, no "
     "CIK, issuers that report outside USD), or one of them is STALE (its newest period ended "
-    "more than stale_days, 480, before the session)"
+    "more than stale_days, 480, before the session), or the balance sheet is PARTIAL (a core line "
+    "at an older date than bs_as_of), or net income and operating cash flow end on different "
+    "quarters (ttm_as_of differs from cf_as_of)"
 )
 _RANKED = (
     "; or fewer than min_members (100) instruments have a known value of this measure that "
@@ -310,7 +314,7 @@ def measures(inputs: Inputs, session: date, p: MispricingParams) -> pd.DataFrame
          "current_assets", "current_liabilities", "bs_as_of", "is_financial", "bs_status"),
     )  # fmt: skip
     inc = _table(inputs, INCOME, session, ("gross_profit_ttm", "is_ttm_as_of", "is_status"))
-    cf = _table(inputs, CASH_FLOW, session, ("ocf_ttm", "cf_status"))
+    cf = _table(inputs, CASH_FLOW, session, ("ocf_ttm", "cf_as_of", "cf_status"))
     fin = _table(
         inputs, FINANCIALS, session,
         ("net_income_ttm", "revenue_ttm", "ttm_as_of", "financials_status"),
@@ -322,7 +326,9 @@ def measures(inputs: Inputs, session: date, p: MispricingParams) -> pd.DataFrame
     today = stats[stats["session_date"] == session]["instrument_id"].astype(str)
     ids = pd.Index(sorted(set(today) | set(bs.index)), name="instrument_id")
     status = {
-        "bs": _fresh(bs.rename(columns={"bs_status": "status"}), ids),
+        # OK only: PARTIAL keeps a core line at an older date than bs_as_of, so a measure
+        # mixing lines would mix balance sheet dates
+        "bs": bs["bs_status"].reindex(ids) == "OK",
         "inc": _fresh(inc.rename(columns={"is_status": "status"}), ids),
         "cf": _fresh(cf.rename(columns={"cf_status": "status"}), ids),
         "fin": _fresh(fin.rename(columns={"financials_status": "status"}), ids),
@@ -342,6 +348,14 @@ def measures(inputs: Inputs, session: date, p: MispricingParams) -> pd.DataFrame
     ).where(bs_ok)
     ago = ago.where(ago > 0)
     ta_ok = ta.where(bs_ok & (ta > 0))
+    cash_aligned = (
+        (  # net income and operating cash flow end on the same quarter
+            pd.to_datetime(fin["ttm_as_of"].reindex(ids))
+            == pd.to_datetime(cf["cf_as_of"].reindex(ids))
+        )
+        & status["cf"]
+        & fin_ok
+    )
     with np.errstate(divide="ignore", invalid="ignore"):
         ohlson = (
             -1.32 - 0.407 * np.log(ta_ok) + 6.03 * liabilities / ta_ok
@@ -349,7 +363,7 @@ def measures(inputs: Inputs, session: date, p: MispricingParams) -> pd.DataFrame
             - 2.37 * ni / ta_ok - 1.83 * ocf / liabilities
         )  # fmt: skip
     ohlson_ok = (
-        bs_ok & fin_ok & status["cf"] & ~bank & (ca > 0) & (cl > 0) & (liabilities > 0)
+        bs_ok & cash_aligned & ~bank & (ca > 0) & (cl > 0) & (liabilities > 0)
     ) & np.isfinite(ohlson)
     same_end = pd.to_datetime(inc["is_ttm_as_of"].reindex(ids)) == pd.to_datetime(
         fin["ttm_as_of"].reindex(ids)
@@ -358,7 +372,7 @@ def measures(inputs: Inputs, session: date, p: MispricingParams) -> pd.DataFrame
     out = pd.DataFrame(index=ids)
     out["total_assets_1y_ago"] = ago
     out["asset_growth"] = (ta_ok / ago - 1).where(ago.notna())
-    out["accruals"] = _ratio(ni - ocf, ta, bs_ok & fin_ok & status["cf"] & ~bank)
+    out["accruals"] = _ratio(ni - ocf, ta, bs_ok & cash_aligned & ~bank)
     out["gross_profit_to_assets"] = _ratio(gp, ta, bs_ok & status["inc"] & ~bank)
     out["net_operating_assets"] = _ratio(
         debt + equity - _column(bs, "cash", ids), ta, bs_ok & ~bank
@@ -373,8 +387,7 @@ def measures(inputs: Inputs, session: date, p: MispricingParams) -> pd.DataFrame
     out["gross_margin"] = _ratio(gp, revenue, aligned)
     out["net_margin"] = _ratio(ni, revenue, fin_ok)
     out["ocf_to_assets"] = _ratio(ocf, ta, bs_ok & status["cf"])
-    ok_status = bs["bs_status"].reindex(ids) == "OK"
-    out["debt_to_equity"] = _ratio(debt, equity, ok_status)
+    out["debt_to_equity"] = _ratio(debt, equity, bs_ok)
     return out
 
 

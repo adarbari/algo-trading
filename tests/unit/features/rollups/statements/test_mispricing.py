@@ -78,6 +78,7 @@ def frames(**over: dict) -> dict:
             "instrument_id": ids(),
             "session_date": SESSION,
             "ocf_ttm": [100.0 - 25 * i for i in rows],
+            "cf_as_of": AS_OF,
             "cf_status": "OK",
         }
     )
@@ -218,3 +219,25 @@ def test_no_statement_tables_gives_unknown_not_an_error() -> None:
 def test_params_are_validated(bad: dict) -> None:
     with pytest.raises(ValueError):
         mp.MispricingParams(**bad)
+
+
+def test_a_partial_balance_sheet_is_not_mixed_across_dates() -> None:
+    bs = frames()[mp.BALANCE].copy()
+    bs.loc[bs["instrument_id"] == "EQ:2", "bs_status"] = "PARTIAL"
+    row = run(frames(**{mp.BALANCE: bs})).loc["EQ:2"]
+    measures = ["asset_growth", "net_operating_assets", "ohlson_o", "accruals"]
+    assert row[[*measures, "gross_profit_to_assets", "total_assets_1y_ago"]].isna().all()
+    assert pd.isna(row["composite_rank"])
+
+
+def test_net_income_and_cash_flow_must_end_on_the_same_quarter() -> None:
+    cf = frames()[mp.CASH_FLOW].copy()
+    cf["cf_as_of"] = pd.Series(
+        pd.NaT, index=cf.index, dtype="datetime64[ns]"
+    )  # an unknown end is not aligned
+    cf.loc[cf["instrument_id"] == "EQ:1", "cf_as_of"] = pd.Timestamp(AS_OF - timedelta(days=91))
+    cf.loc[cf["instrument_id"] == "EQ:0", "cf_as_of"] = pd.Timestamp(AS_OF)
+    out = run(frames(**{mp.CASH_FLOW: cf}))
+    assert pd.notna(out.loc["EQ:0", "accruals"]) and pd.notna(out.loc["EQ:0", "ohlson_o"])
+    for iid in ("EQ:1", "EQ:2"):
+        assert out.loc[iid, ["accruals", "ohlson_o"]].isna().all()
