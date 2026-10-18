@@ -1,0 +1,75 @@
+{
+  "id": "groups-a-or-not-b",
+  "sentence": "stocks with rising volume or not within 5% of their 52 week high",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "rising volume",
+        "bucket": "A",
+        "fields": [
+          "feature.volume_trend_20_60"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 1.0,
+        "tolerance": 0
+      },
+      {
+        "span": "not within 5% of their 52 week high",
+        "bucket": "A",
+        "fields": [
+          "feature.pct_from_high_52w"
+        ],
+        "op": [
+          "lt",
+          "lte"
+        ],
+        "value": -0.05,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "stocks",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "rising volume",
+          "kind": "applied",
+          "origin": "words",
+          "join": "and",
+          "join_words": "with"
+        },
+        {
+          "words": "not within 5% of their 52 week high",
+          "kind": "applied",
+          "origin": "words",
+          "join": "or",
+          "join_words": "or"
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 0
+    },
+    "groups": [
+      {
+        "any": [
+          "rising volume",
+          "not within 5% of their 52 week high"
+        ]
+      }
+    ]
+  }
+}

@@ -132,6 +132,14 @@ def test_the_draft_is_rendered_compactly_with_every_element() -> None:
     assert judge_user_prompt("s", screen()).startswith("SENTENCE: s\n\nDRAFT:\n")
 
 
+def test_the_boolean_groups_of_a_draft_are_rendered_for_the_judge() -> None:
+    document = {
+        "criteria": {"c1": {"field": "f.a", "op": "gt", "value": 50}},
+        "groups": {"any_1": {"any": ["c1", "c2"]}},
+    }
+    assert 'group any_1 {"any":["c1","c2"]}' in render_draft(screen(document=document))
+
+
 # ------------------------------------------------------------------------------ one judgement
 
 
@@ -163,7 +171,7 @@ def test_an_invalid_verdict_is_repaired_once_else_counted_judge_invalid() -> Non
     status, verdict, cost, asked = judge_once(fixed, "s", screen(), "me", costs)
     assert (status, verdict.perfect, cost, asked) == ("judged", True, 0.01, 2)  # type: ignore[union-attr]
     tag = fixed.tags[0]
-    assert (tag.use_case, tag.user, tag.prompt_version) == ("golden-judge", "me", "1")
+    assert (tag.use_case, tag.user, tag.prompt_version) == ("golden-judge", "me", "2")
     assert judge_once(Checking(["nope"], costs), "s", screen(), None, costs)[0] == "judge_invalid"
     # a single adapter lets the refusal propagate; a model with no answer is unavailable
     assert (
