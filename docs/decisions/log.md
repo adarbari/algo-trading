@@ -515,7 +515,16 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: a partial fix would leave the same one-session look-ahead in four groups that share the input and its backfill.
 
-## 2026-10-17 | PR #645 (E1b filing_activity) | The 8-K span ends at the previous session
+## 2026-10-18 | EB H4 (event-class framework) | Subtypes, the filing group, and what is left out
+- Question: how are subtypes read, which classes ship on stored data, and does the folder cap force a new feature-group folder?
+- Options: one subtype label field per class (the plan) / per-subtype count and date fields; keep every group in `rollups/corporate` / a folder `rollups/events` for the event-class groups; add `ex_dividend`, `macro_release` and `lockup_expiry` / leave them until their fields exist.
+- Decision: a subtype is its own count and date fields (an 8-K item: the latest filing only would miss an item filed before another 8-K) or a label field that must read a value (index changes, date-shift direction), one mechanism in `EventField.subtypes`; `filing_events@v1` holds the 8-K items 1.02, 2.05, 3.01, 4.01, 4.02, 5.02, NT and tender offers (SC TO-T joins the kept forms); `earnings_date_shift@v1` with a 7-day threshold; `rollups/corporate` is at its 10-module cap, so the event-class groups (and `index_changes`, moved) live in a new `rollups/events` folder; `ex_dividend`, `macro_release`, `lockup_expiry` are left out (ADR 0053 amendment, point 4); filings are read by the acceptance session recomputed from `ts`, never the stored `known_from`.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Architect review (PR 655): keep the six 8-K items (1.03 and 2.06 later), keep the 7-day threshold, approve the `features/rollups/events` folder.
+- Reasoning: the item list and the 7-day threshold are judgement calls the owner may widen; a stale `known_from` left in the store must not leak, so the reader does not trust it; a new folder is the layout rule's answer to a full one.
+
+## 2026-10-18 | PR #645 (E1b filing_activity) | The 8-K span ends at the previous session
 - Question: may `filing_activity@v1.filing_count_5d` count 8-Ks through the session itself?
 - Options: through S, with coverage read from row presence / through S-1's index cut-off, coverage from the filings walk's `walked_to`.
 - Decision: the span ends at S-1 (acceptances through 17:30 New York time on S-1, the 5 sessions ending there), and the value is null unless a clean walk of a session on or before S reached S-1. `feature.news_free_5d` means no 8-K through S-1 and no earnings window in the last 5 sessions.

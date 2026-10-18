@@ -43,9 +43,13 @@ from algotrade.features.rollups.corporate import (
     earnings_schedule,
     financials,
     fundamentals,
+)
+from algotrade.features.rollups.events import (
+    earnings_date_shift,
+    filing_activity,
+    filing_events,
     index_changes,
 )
-from algotrade.features.rollups.events import filing_activity
 from algotrade.features.rollups.levels import gaps, pivot_strength, retest, swing_levels
 from algotrade.features.rollups.market import (
     breadth,
@@ -117,6 +121,8 @@ GROUPS: dict[str, FeatureGroup] = {
             dividend_months.GROUP,
             filing_activity.GROUP,
             index_changes.GROUP,
+            filing_events.GROUP,
+            earnings_date_shift.GROUP,
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,

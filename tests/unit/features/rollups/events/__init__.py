@@ -1,1 +1,1 @@
-"""Tests of the event-window feature groups (``features/rollups/events``)."""
+"""Tests of the event-class and event-window feature groups (``features/rollups/events``)."""

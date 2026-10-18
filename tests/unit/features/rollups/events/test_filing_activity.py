@@ -1,7 +1,7 @@
 """``filing_activity@v1``: 8-K counts over the 5 sessions ending at S-1 (the span ends there
 because S's index is unread on the night of S), the walk that says how far they are complete,
-earnings reaction windows in the last 5 sessions, known_from <= S, and the nulls that stop an
-unknown being read as "no news"."""
+earnings reaction windows in the last 5 sessions, and the nulls that stop an unknown being read
+as "no news"."""
 
 from datetime import UTC, date, datetime, timedelta
 
@@ -38,7 +38,7 @@ def _filings(rows: list[tuple[str, date]], hour: float = 12.0) -> pd.DataFrame:
     +4 in October)."""
     frame = [
         {"instrument_id": i, "ts": pd.Timestamp(k, tz="UTC") + pd.Timedelta(hours=hour + 4),
-         "known_from": k, "accession": f"{i}-{k}-{n}", "form": "8-K"}
+         "event_date": k, "accession": f"{i}-{k}-{n}", "form": "8-K"}
         for n, (i, k) in enumerate(rows)
     ]  # fmt: skip
     return stamped(frame, SESSION, "f")
@@ -91,21 +91,12 @@ def test_a_filing_of_the_session_itself_never_counts() -> None:
 def test_a_recompute_after_the_next_nights_data_gives_the_same_value() -> None:
     base = _filings([("EQ:A", PREV), ("EQ:B", GRID[0]), ("EQ:C", PREV)])
     after = pd.concat(
-        [base, _filings([("EQ:A", SESSION)]), _filings([("EQ:B", PREV)], hour=19.0)],
+        [base, _filings([("EQ:A", SESSION)]), _filings([("EQ:B", SESSION)], hour=19.0)],
         ignore_index=True,
-    )  # S's filings, and a late S-1 acceptance (after the 17:30 index cut-off, listed in S's index)
+    )  # S's filings, and a late S-1 acceptance (after the close: known from S)
     walks = pd.concat([_walk(PREV), _walk(SESSION, SESSION + timedelta(days=1))])
     assert _compute(after, walk=walks)["filing_count_5d"].tolist() == [1, 0, 1]
     assert _compute(base)["filing_count_5d"].tolist() == [1, 0, 1]
-
-
-def test_a_filing_after_the_previous_index_cutoff_is_not_in_the_span() -> None:
-    out = _compute(
-        _filings([("EQ:A", PREV), ("EQ:B", GRID[0])]).pipe(
-            lambda f: pd.concat([f, _filings([("EQ:B", PREV)], hour=18.0)], ignore_index=True)
-        )
-    )
-    assert out["filing_count_5d"].tolist()[:2] == [1, 0]  # 18:00 on S-1 is in S's index: unread
 
 
 def test_the_span_is_unknown_unless_the_walk_reached_the_previous_session() -> None:
@@ -163,8 +154,9 @@ def test_runs_through_the_store_with_known_from() -> None:
             {"instrument_id": "EQ:A", "ts": pd.Timestamp(PREV, tz="UTC") + pd.Timedelta(hours=16),
              "known_from": PREV, "accession": "a1", "form": "8-K", "cik": "1",
              "filing_date": PREV, "items": "7.01"},
-            {"instrument_id": "EQ:B", "ts": pd.Timestamp(GRID[0], tz="UTC"), "known_from": GRID[0],
-             "accession": "b1", "form": "8-K", "cik": "2", "filing_date": GRID[0], "items": "7.01"},
+            {"instrument_id": "EQ:B", "known_from": GRID[0], "accession": "b1", "form": "8-K",
+             "cik": "2", "filing_date": GRID[0], "items": "7.01",
+             "ts": pd.Timestamp(GRID[0], tz="UTC") + pd.Timedelta(hours=16)},
         ],
     )  # fmt: skip
     write_earnings(writer, GRID[0], [("EQ:A", GRID[0] - timedelta(days=60), "pre_market")])

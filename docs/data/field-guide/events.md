@@ -594,7 +594,7 @@ Sources: Site convention (docs/data/features.md, earnings_revisions@v1)
 
 ### `rollup.filing_activity@v1.filing_count_5d`
 
-**How to read it.** How many 8-K and 8-K/A filings the company had accepted over the 5 sessions ending at the previous session, through that day's 17:30 New York index cut-off. The span ends the day before the session, never on it. An 8-K is the SEC's current report: results, deals, management changes, material agreements. 0 means it filed nothing. 1 is routine for most companies. 3 or more is a busy corporate week.
+**How to read it.** How many 8-K and 8-K/A filings the company had accepted over the 5 sessions ending at the previous session, counted from the first session that closed after each acceptance. The span ends the day before the session, never on it. An 8-K is the SEC's current report: results, deals, management changes, material agreements. 0 means it filed nothing. 1 is routine for most companies. 3 or more is a busy corporate week.
 
 **The criterion per intent**
 
@@ -604,7 +604,7 @@ Sources: Site convention (docs/data/features.md, earnings_revisions@v1)
 
 **When the reading lies**
 
-- The span stops at the previous session because the nightly runs before SEC lists the evening's filings. SEC lists filings accepted after 17:30 in the next day's index. Counting through the session would read 0 tonight and 1 tomorrow. This count is the same on every recompute.
+- The span stops at the previous session because the nightly runs before SEC lists the evening's filings. SEC lists the evening's filings in the next day's index. Counting through the session would read 0 tonight and 1 tomorrow. This count is the same on every recompute.
 - Null means the table cannot say none. Either no clean nightly walk of the SEC index has reached the previous session. Or nothing is stored for the company (never fetched, or never filed). Or the stored history starts after the span.
 - Null is also the answer on a night the filings step failed or was skipped, and on the session after a market day EDGAR was closed (Columbus Day, Veterans Day). A zero would wrongly read as no news. The count appears once a later walk covers the day.
 - News with no 8-K is not counted: an analyst note, a press story, a rumour, a competitor's results. A zero is 'no company filing', not 'no news'. rollup.filing_activity@v1.earnings_in_5d adds the report windows, and feature.news_free_5d combines both.

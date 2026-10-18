@@ -23,10 +23,11 @@ session shows the split its own adjusted bars used.
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 
+from algotrade.core.time.calendar import EXCHANGE_TZ, close_time, is_session, next_session
 from algotrade.storage.runs import published
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import KNOWN_FROM
@@ -52,8 +53,10 @@ class Events:
 
 
 def event_key(frame: pd.DataFrame) -> list[str]:
-    """``instrument_id`` + ``ts`` (+ ``change`` for tables with several kinds a day)."""
-    return ["instrument_id", "ts", *(["change"] if "change" in frame.columns else [])]
+    """``instrument_id`` + ``ts`` (+ ``change`` for tables with several kinds a day, + ``accession``
+    for filings: two filings accepted the same second are two events)."""
+    extra = [c for c in ("change", "accession") if c in frame.columns]
+    return ["instrument_id", "ts", *extra]
 
 
 def known_from(frame: pd.DataFrame) -> pd.Series:
@@ -70,6 +73,24 @@ def _known_by(frame: pd.DataFrame, through: date | None) -> pd.DataFrame:
     if through is None:
         return frame
     return frame[known_from(frame) <= pd.Timestamp(through)]
+
+
+def acceptance_sessions(ts: pd.Series) -> pd.Series:
+    """The session each acceptance instant of ``ts`` (UTC, aware) is known from: the first
+    session whose close is strictly after it (``calendar.acceptance_session``, vectorised): an
+    acceptance before the close counts that session, one at or after it, on a weekend or on a
+    holiday the next. A missing instant stays null. The one ``known_from`` of a filing (ADR 0050
+    amendment, EB H4): never the New York DAY of the acceptance, which counts a 16:30 filing as
+    public in that day's close and puts a Sunday filing on a non-session."""
+    accepted = pd.to_datetime(ts, utc=True)
+    local = accepted.dt.tz_convert(EXCHANGE_TZ).dt.date
+    days = set(local.dropna())
+    after = {d: next_session(d) for d in days}
+    close = {d: close_time(d) for d in days if is_session(d)}
+    closes = pd.to_datetime(local.map(close), utc=True)  # NaT on a day that is no session
+    on_time = accepted.notna() & (accepted < closes)
+    out = local.where(on_time, local.map(after))
+    return out.astype(object).where(out.notna(), None)
 
 
 def knowledge_bound(table: str, session: date) -> date | None:
@@ -102,6 +123,24 @@ def read_events(
     )
     frame = frame.sort_values(["instrument_id", "ts"], kind="stable").reset_index(drop=True)
     return Events(frame, sorted(map(str, frame["run_id"].unique())))
+
+
+def events_by_acceptance(
+    reader: StoreReader, table: str, start: date, end: date, as_of: datetime | None = None
+) -> pd.DataFrame:
+    """The filings of ``table`` (``events/filing``) that became known in ``start..end``, with an
+    ``event_date`` column: the session each is known from (``acceptance_sessions`` of its ``ts``,
+    never its stored ``known_from``: a row stamped by the old New York-day rule is still read
+    right), sorted by (``event_date``, ``instrument_id``). Never a later one. The latest stored
+    version of each filing, whatever its stamp."""
+    margin = timedelta(days=5)  # a filing is known at most a long weekend after it is accepted
+    frame = read_events(reader, table, start - margin, end, as_of=as_of).frame
+    frame = frame.drop(columns=[c for c in ("session_date", KNOWN_FROM) if c in frame.columns])
+    if frame.empty:
+        return frame.assign(event_date=pd.Series(dtype=object)).reset_index(drop=True)
+    frame = frame.assign(event_date=acceptance_sessions(frame["ts"]))
+    frame = frame[(frame["event_date"] >= start) & (frame["event_date"] <= end)]
+    return frame.sort_values(["event_date", "instrument_id"], kind="stable").reset_index(drop=True)
 
 
 def stored_events(

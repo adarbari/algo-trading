@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-524 stored features in 62 groups, in dependency order; 147 expression features.
+544 stored features in 64 groups, in dependency order; 147 expression features.
 
 ## `option_liquidity@v1`
 
@@ -208,6 +208,40 @@ The latest S&P 500 membership change of an instrument and the sessions since it.
 | `last_index_change_date` | window | date | date | open |  | The date of the latest S&P 500 membership change (the session it was first stored) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
 | `sessions_since_index_change` | window | int | sessions | open | >= 0 | Exchange sessions from the latest S&P 500 membership change up to the session (0: the session is that day) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
 | `last_index_change` | label | str | category | open | sp500_added, sp500_removed | The latest change: sp500_added (joined the index) or sp500_removed (left it) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
+
+## `filing_events@v1`
+
+Sessions since each kind of SEC event filing (8-K items, late-filing notices, tender offers) became known. Stored as `rollups/instrument/filing_events@v1`; reads `events/filing` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `sessions_since_8k_1_02` | window | int | sessions | open | >= 0 | Exchange sessions from the session the latest 8-K with Item 1.02 (termination of a material agreement) became known up to the session (0: it became known today) | no 8-K with Item 1.02 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `last_8k_1_02_date` | window | date | date | open |  | The session the latest 8-K with Item 1.02 (termination of a material agreement) became known (after the close of the session its filing was accepted in, else the next) | no 8-K with Item 1.02 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `sessions_since_8k_2_05` | window | int | sessions | open | >= 0 | Exchange sessions from the session the latest 8-K with Item 2.05 (exit or disposal costs (a restructuring)) became known up to the session (0: it became known today) | no 8-K with Item 2.05 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `last_8k_2_05_date` | window | date | date | open |  | The session the latest 8-K with Item 2.05 (exit or disposal costs (a restructuring)) became known (after the close of the session its filing was accepted in, else the next) | no 8-K with Item 2.05 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `sessions_since_8k_3_01` | window | int | sessions | open | >= 0 | Exchange sessions from the session the latest 8-K with Item 3.01 (a delisting or listing-standard notice) became known up to the session (0: it became known today) | no 8-K with Item 3.01 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `last_8k_3_01_date` | window | date | date | open |  | The session the latest 8-K with Item 3.01 (a delisting or listing-standard notice) became known (after the close of the session its filing was accepted in, else the next) | no 8-K with Item 3.01 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `sessions_since_8k_4_01` | window | int | sessions | open | >= 0 | Exchange sessions from the session the latest 8-K with Item 4.01 (a change of the auditor) became known up to the session (0: it became known today) | no 8-K with Item 4.01 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `last_8k_4_01_date` | window | date | date | open |  | The session the latest 8-K with Item 4.01 (a change of the auditor) became known (after the close of the session its filing was accepted in, else the next) | no 8-K with Item 4.01 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `sessions_since_8k_4_02` | window | int | sessions | open | >= 0 | Exchange sessions from the session the latest 8-K with Item 4.02 (non-reliance on previously issued financial statements) became known up to the session (0: it became known today) | no 8-K with Item 4.02 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `last_8k_4_02_date` | window | date | date | open |  | The session the latest 8-K with Item 4.02 (non-reliance on previously issued financial statements) became known (after the close of the session its filing was accepted in, else the next) | no 8-K with Item 4.02 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `sessions_since_8k_5_02` | window | int | sessions | open | >= 0 | Exchange sessions from the session the latest 8-K with Item 5.02 (the departure or appointment of a director or an officer) became known up to the session (0: it became known today) | no 8-K with Item 5.02 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `last_8k_5_02_date` | window | date | date | open |  | The session the latest 8-K with Item 5.02 (the departure or appointment of a director or an officer) became known (after the close of the session its filing was accepted in, else the next) | no 8-K with Item 5.02 became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `sessions_since_late_filing` | window | int | sessions | open | >= 0 | Exchange sessions from the session the latest NT 10-K or NT 10-Q late-filing notice became known up to the session (0: it became known today) | no late-filing notice became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `last_late_filing_date` | window | date | date | open |  | The session the latest NT 10-K or NT 10-Q late-filing notice became known (after the close of the session its filing was accepted in, else the next) | no late-filing notice became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `sessions_since_tender_offer` | window | int | sessions | open | >= 0 | Exchange sessions from the session the latest SC TO-I or SC TO-T tender offer became known up to the session (0: it became known today) | no tender offer became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+| `last_tender_offer_date` | window | date | date | open |  | The session the latest SC TO-I or SC TO-T tender offer became known (after the close of the session its filing was accepted in, else the next) | no tender offer became known in the last 60 sessions | `events/filing.ts`, `events/filing.form`, `events/filing.items` |
+
+## `earnings_date_shift@v1`
+
+The next earnings date, its shift from a year ago and the session the shift became known. Stored as `rollups/instrument/earnings_date_shift@v1`; reads `events/earnings`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `earnings_date_shift_days` | window | int | days | open |  | Calendar days the next report date lies after the year-ago report plus 364 days (negative: earlier than a year ago) | no report date on or after the session, or no report of a year ago to compare it with, known by the session | `events/earnings.ts` |
+| `earnings_shift_direction` | label | str | category | open | later, earlier | later or earlier when the next report date moved a week or more from last year's | no report date on or after the session, or no report of a year ago to compare it with, known by the session, or the date is within 7 days of last year's | `events/earnings.ts` |
+| `earnings_shift_known_date` | window | date | date | open |  | The session the next report date was first stored in a calendar known by the session | no report date on or after the session, or no report of a year ago to compare it with, known by the session, or the date is within 7 days of last year's | `events/earnings.ts` |
+| `sessions_since_earnings_shift` | window | int | sessions | open | >= 0 | Exchange sessions from the session the shifted date became known up to the session (0: it became known today) | no report date on or after the session, or no report of a year ago to compare it with, known by the session, or the date is within 7 days of last year's | `events/earnings.ts` |
 
 ## `ibkr_iv@v1`
 

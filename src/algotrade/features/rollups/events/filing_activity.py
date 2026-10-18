@@ -2,8 +2,9 @@
 the last 5 sessions, as known on the session (the no-news filter of the volume-shock edge,
 ADR 0050).
 
-Inputs: ``events/filing`` (every 8-K / 8-K/A row known on or before the session: the
-loader's ``known_from <= S`` rule, ``known_from`` being the acceptance's New York session),
+Inputs: ``events/filing`` (the SEC event filings of the last ``LOOKBACK`` sessions, each with
+``event_date``, the first session closing after its acceptance: EB H4's one read, never the
+stored ``known_from``),
 ``filings/walk`` (the filings task's clean daily-index walks of the sessions up to S, whose
 ``walked_to`` says how far the stored filings are complete), ``events/earnings`` read as
 ``earnings@v1`` reads it (``earnings.valid_events``; the 8-K results rows are filings, counted
@@ -21,26 +22,27 @@ Why the filing span ends at S-1: the nightly starts about 18:00 New York time an
 daily index of a day only once it is published. A filing accepted 17:30 to 22:00 is listed in
 the next day's index, so on the night of S the index of S is usually unread and S's own 8-Ks
 are not stored (and the filings step is not critical: a failed night stores none). Counting
-through S would read 0 where a later run reads 1. Through S-1's cut-off the stored filings are
-complete once the walk has read S-1's index, and a recompute after later nights gives the same
+through S would read 0 where a later run reads 1. A filing known on or before S-1 was accepted
+before S-1's close, so S-1's index lists it: the stored filings are complete once the walk has
+read S-1's index, and a recompute after later nights gives the same
 value (``feature.news_free_5d`` therefore means no 8-K through S-1 and no earnings window in the
 last 5 sessions).
 
 ``filing_count_5d`` is null (UNKNOWN), never zero, when the filings table cannot say "none"
 (fail closed): no clean walk of a session up to S reached S-1 (``walked_to < S-1``, or none),
-no filing is stored at all, the table's first ``known_from`` is after the span's first
-session (the backfill had not reached it), or the instrument has no filing stored by then
-(nothing for it: never fetched, or never filed). ``earnings_in_5d`` is null when the
+no filing is stored in the lookback, the first one is after the span's first session (the
+backfill had not reached it), or the instrument has no filing in the lookback (nothing for it:
+never fetched, or never filed). ``earnings_in_5d`` is null when the
 instrument has no earnings report known by the session at all. A report that was not yet known
 on the session never counts. The windows (5) are part of the definition: changing one is a new
 version. ``feature.news_free_5d`` combines the two columns.
 """
 
-from datetime import date, time
+from datetime import date
 
 import pandas as pd
 
-from algotrade.core.time.calendar import local_deadline, sessions_ending
+from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.corporate import earnings
@@ -51,7 +53,8 @@ VERSION = 1
 FILINGS = "events/filing"
 WALK = "filings/walk"
 KNOWN_FROM = earnings.KNOWN_FROM
-WINDOW = 5  # sessions of the window, the session included
+WINDOW = 5  # sessions of the window
+LOOKBACK = 250  # sessions of filings read: a name with none in them is unknown, not zero
 
 _NO_TABLE = (
     "no clean filings walk reached the previous session, no filing is stored, the filings "
@@ -83,20 +86,11 @@ def _known_days(rows: pd.DataFrame) -> pd.Series:
     return pd.to_datetime(rows[KNOWN_FROM]).dt.date
 
 
-INDEX_CUTOFF = time(17, 30)  # New York: later acceptances are listed in the next day's index
-EXCHANGE_ZONE = "America/New_York"
-
-
-def index_cutoff(day: date) -> pd.Timestamp:
-    """The instant after which an acceptance on ``day`` is listed in the next day's index."""
-    return pd.Timestamp(local_deadline(day, INDEX_CUTOFF, EXCHANGE_ZONE))
-
-
 def filing_counts(
     filings: pd.DataFrame | None, walks: pd.DataFrame | None, session: date
 ) -> pd.Series:
-    """Per instrument seen in ``filings``: its filings accepted from the span's first session
-    through ``S-1``'s index cut-off (the module doc's rule); empty when no clean walk reached
+    """Per instrument seen in ``filings``: its filings that became known from the span's first
+    session through ``S-1`` (the module doc's rule); empty when no clean walk reached
     ``S-1``, the table is absent, or it starts after the span, so that nobody gets a zero it
     cannot know."""
     empty = pd.Series(dtype="int64")
@@ -109,12 +103,11 @@ def filing_counts(
     ]
     if reached.empty or reached.max() < previous:
         return empty
-    known = _known_days(filings)
-    accepted = pd.to_datetime(filings["ts"], utc=True)
-    complete = filings[(known <= previous) & (accepted <= index_cutoff(previous))]
-    if complete.empty or _known_days(complete).min() > start:
+    known = pd.to_datetime(filings["event_date"]).dt.date
+    complete = filings[known <= previous]
+    if complete.empty or known[known <= previous].min() > start:
         return empty
-    in_span = (_known_days(complete) >= start).to_numpy()
+    in_span = (known[known <= previous] >= start).to_numpy()
     counts = complete.assign(_in=in_span).groupby(complete["instrument_id"].astype(str), sort=True)[
         "_in"
     ]
@@ -157,7 +150,7 @@ GROUP = FeatureGroup(
     "as known on the session",
     (
         Input(PRICE_STATS),
-        Input(FILINGS, required=False),
+        Input(FILINGS, lookback=LOOKBACK, required=False),
         Input(WALK, required=False),
         Input(earnings.EVENTS, required=False),
     ),

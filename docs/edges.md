@@ -225,7 +225,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 **Why rejected:** Under 1% since 2010 (Greenwood and Sammon, The Disappearing Index Effect), inside costs and the announcement-to-inclusion window; checked 2026-10-07.
 
 - **Outcome:** excess return, over 20 sessions, vs SPY, starting +1 sessions from the event
-- **Schedule:** on each `index_change` (an S&P 500 membership change (index_changes@v1); anchor: the session it is first stored)
+- **Schedule:** on each `index_change` (an S&P 500 membership change (index_changes@v1); anchor: the session it is first stored (never the announcement))
 - **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'`
 - **Top K:** all qualified names
 - **Screeners:** none yet
@@ -257,7 +257,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 **Why blocked:** Alive, but too few events: one a year to 2025 and two a year from 2026 give about 16 events from 2010 and 2 more a year, under the 40 independent events the bar asks until the mid-2030s, even with full membership history. We also hold no Russell membership (events/index_change is the S&P 500 only), and the universe (ADR 0013) lacks the small caps needed to rebuild the rank-day cut-off, so membership needs FTSE Russell's lists.
 
 - **Outcome:** excess return, over 20 sessions, vs SPY, starting +1 sessions from the event
-- **Schedule:** on each `index_change` (an S&P 500 membership change (index_changes@v1); anchor: the session it is first stored)
+- **Schedule:** on each `index_change` (an S&P 500 membership change (index_changes@v1); anchor: the session it is first stored (never the announcement))
 - **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'`
 - **Top K:** all qualified names
 - **Screeners:** none yet
