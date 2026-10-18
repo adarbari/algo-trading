@@ -253,6 +253,16 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "MAX: the best one-day return of the last 21 sessions"
 
 [[table]]
+name = "rollups/instrument/session_returns@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the last 20 sessions' return split into overnight (close to open) and intraday (open to close)"
+
+[[table]]
+name = "rollups/instrument/signed_volume@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the 20-session on-balance volume change as a share of the volume traded (obv_trend_20d)"
+
+[[table]]
 name = "rollups/instrument/earnings_neutral_reversal@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the 20-session return without the E-1..E+1 earnings reaction returns"

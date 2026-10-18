@@ -1,0 +1,49 @@
+# Earnings-anchored capital-gains overhang (ADR 0053, EB E1; edge anchored_vwap_reversion_retest):
+# every liquid common stock or ADR with a volume-weighted average price since its last earnings
+# report, ranked by how far the close sits above it, the most in profit first (Grinblatt and Han
+# 2005: stocks above holders' average cost earn more). A PROXY: their reference price is a
+# turnover-weighted average over years; this one starts at the last report. The one criterion only
+# asks that the value exists; the ranking is the screen. What it does not check: the anchor's age,
+# the reason for the post-report move, or a retest of the average from above.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "earnings_vwap_overhang"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Earnings-VWAP overhang (proxy)"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.overhang]
+field = "feature.capital_gains_overhang"
+op = "not_null"
+
+[columns]
+close = "rollup.price_stats@v2.close"
+avwap_earnings = "rollup.anchored_vwap@v2.avwap_earnings"
+avwap_anchor_date = "rollup.anchored_vwap@v2.avwap_anchor_date"
+capital_gains_overhang = "feature.capital_gains_overhang"
+
+[rank]
+tie_break = "feature.capital_gains_overhang"
+tie_break_order = "desc"

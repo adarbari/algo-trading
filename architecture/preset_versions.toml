@@ -37,3 +37,8 @@
 "pre_earnings_runup/v1.toml" = "0c2b78250cd91af6a2bf5ecb733cad3bee0ce58db371d1a713bdad4759e345aa"
 "earnings_gap_volume/v1.toml" = "64aa899a56a1bb3ec14482f38d21526652c702eaa81164ecd513f92ad784707c"
 "earnings_gap_only/v1.toml" = "254fa96881d2fcc7fa6b575b8837aef396a2baaddd21150185e5ab3215dd64c1"
+"short_term_momentum_turnover/v1.toml" = "440eaae7f7292a1eef60bcac18bbe4bec91c42e9b280d922400fecb613c47589"
+"momentum_own_trend/v1.toml" = "a12df409b0de9922c61be093089ccdcf9c6cf86395010f45b83b9b2ea70e51c7"
+"momentum_pullback_entry/v1.toml" = "28ce43097d7afa92238adba624b654706200379c7558e3be4cf112aa8c418910"
+"momentum_volume_confirmed/v1.toml" = "dad85a31fcd636e95f8c8cd8e2c10c0e796afda6253b37d218bcb49cda7ad42d"
+"earnings_vwap_overhang/v1.toml" = "59bdbbfda89e7e8a9d1446203e79bfcaf7a93b6388ddcf416c6e2f41acb127df"

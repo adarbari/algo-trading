@@ -795,6 +795,24 @@ Sources: Anchored VWAP from swing highs (Brian Shannon)
 
 Sources: Minervini (2013), Trade Like a Stock Market Wizard: the trend template; Weinstein (1988), Secrets for Profiting in Bull and Bear Markets: the 30-week moving average
 
+### `feature.capital_gains_overhang`
+
+**How to read it.** How far the close sits above the volume-weighted average price since the last earnings report, as a share of the close. 0.05 is 5% above, -0.05 is 5% below. Above 0, holders since the report are in profit. Grinblatt and Han link that to higher later returns.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| holders since the report are in profit | `gt 0` | hard | - | rank by it descending for the overhang long leg |
+
+**When the reading lies**
+
+- This is a proxy. Grinblatt and Han weight by turnover over years; this average starts at the last report, at most 126 sessions back. Read rollup.anchored_vwap@v2.avwap_anchor_date for its age.
+- A fresh anchor sits near the price, so the value is near 0 and says little. It means more after two to four weeks.
+- Null without a report in the last 126 sessions, fewer than 2 sessions since it, a gap, or no volume.
+
+Sources: Grinblatt and Han (2005), Prospect Theory, Mental Accounting, and Momentum, Journal of Financial Economics: https://doi.org/10.1016/j.jfineco.2004.06.007
+
 ### `rollup.trend_stats@v2.sessions_since_high_20d`
 
 **How to read it.** How many sessions ago the highest high of the last 20 sessions was set: 0 means today's high is the channel high (no pullback), 3 to 7 a one-week pullback, 15 to 19 a dip that has lasted nearly the whole window (the high is about to leave it). It is the pullback's duration; feature.pullback_atr_20d is its depth.

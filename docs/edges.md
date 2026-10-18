@@ -9,6 +9,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 
 | Edge | Family | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|---|
+| Short-term momentum in heavily traded stocks (`short_term_momentum_high_turnover`) | A | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `short_term_momentum_turnover` |
 | Earnings-date advances (`earnings_date_shift`) | B | candidate | on each `earnings_date_shift:earlier` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `earnings_date_early` |
 | Earnings gap on heavy volume (`earnings_gap_volume_drift`) | B | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `earnings_gap_volume`, `earnings_gap_only` |
 | Adverse 8-K item drift (`eight_k_item_drift`) | B | candidate | on each `filing_8k:4.02` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `eight_k_adverse_items` |
@@ -16,17 +17,48 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 | Pre-earnings run-up in past winners (`pre_earnings_runup_winners`) | B | candidate | on each `earnings_expected` | excess return, over 5 sessions, vs SPY, starting -6 sessions from the event, costs 10 bps | `pre_earnings_runup` |
 | S&P 500 deletions rebound (`sp500_deletions_long`) | B | candidate | on each `index_change:deletion` | excess return, over 20, 60, 250 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `sp500_deletion` |
 | Spin-off drift (`spinoff_drift`) | B | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
+| Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | G | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `earnings_vwap_overhang` |
 | Tender-offer drift after expiry (`tender_offer_drift`) | H | candidate | on each `tender_offer` | excess return, over 60, 250 sessions, vs SPY, starting +21 sessions from the event, costs 20 bps | `tender_offer_filed` |
 | Reverse-split distress filter (`reverse_split_distress_filter`) | H | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 | Thematic ETF launch fade (`thematic_etf_launch_fade`) | H | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 | Earnings announcement premium (`earnings_announcement_premium`) | - | candidate | on each `earnings_expected` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event, costs 10 bps | `eap_all`, `eap_volume` |
-| 12-1 momentum (`momentum_12_1`) | - | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1` |
+| 12-1 momentum (`momentum_12_1`) | - | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1`, `momentum_own_trend`, `momentum_pullback_entry`, `momentum_volume_confirmed` |
 | 12-1 momentum among names that just reported (`momentum_at_earnings`) | - | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 15 bps | `momentum_12_1` |
 | Small-cap post-earnings drift (`small_cap_earnings_drift`) | - | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 40 bps | `pead_small_cap` |
 | Volatility risk premium (`vrp_short_premium`) | - | candidate | every session | expires otm, over 15, 21, 31 sessions, entered 1 session after the decision session, short put struck at delta 0.3, not assigned at the horizon | `vrp_iv_hv` |
 | Leveraged ETF rebalancing (`leveraged_etf_rebalancing`) | - | rejected | every session | excess return, over 1 session, vs SPY, entered 1 session after the decision session | none yet |
 | S&P 500 index changes (`sp500_index_changes`) | - | rejected | on each `index_change` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event | none yet |
 | Russell reconstitution (`russell_reconstitution`) | - | blocked | on each `index_change` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event | none yet |
+
+## Short-term momentum in heavily traded stocks (`short_term_momentum_high_turnover`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Among the most heavily traded stocks, last month's winners keep outperforming the market over the next month.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 50000000` and `feature.turnover_20d gte 0.01` and `rollup.price_stats@v2.ret_20d gt -1`
+- **Top K:** 25
+- **Screeners:** `short_term_momentum_turnover`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The paper's rule is a double sort: among the top turnover decile, long the top past-month return decile and short the bottom, held one month. Here the universe is the liquid common stocks with 20-session turnover of at least 1% of shares a day, an absolute stand-in for the top turnover decile (the decile's own cut moves with the market and is not stored per session), and the picks are the 25 best past-month returns of them (a rank, not a decile). ADRs are left out: they have no filed share count, so turnover is unknown for them. Turnover is the 20-session average volume over the latest filed share count (not the float), as the paper's volume over shares outstanding. The main outcome is the long leg only; the variant losers_short holds the bottom 25 of the same names short (the paper's other leg), with the site's assumed borrow cost, so the two legs read apart. Both compare with every name in the heavy-turnover universe (the base), which isolates the past-month effect from the turnover effect. Month-end start sessions, spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** In heavily traded names the past month's return reflects information absorbed by many traders rather than a liquidity shock, so underreaction dominates and the winners continue; in thin names liquidity provision dominates and the month reverses (Medhat and Schmeling 2022).
+2. **Persistence:** Published in 2022 and found in 22 developed markets, so not a one-market artefact, but alpha in liquid names is the first that arbitrageurs take; no independent post-2018 evidence is on file and the 2021 high-turnover episodes reversed sharply, so persistence is a claim to test.
+3. **Outcome:** Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption, as for 12-1 momentum): a long hold of last month's winners among the heavily traded.
+4. **Trigger timing:** Turnover and the 20-session return are computed from the close of the decision session D (rollups, nightly) and the share count as filed by D, so the first fill is the next session's close: S = D + 1 (start_offset_sessions = 1); the screen is read at D, the outcome at S.
+5. **Faithful replication:** The source's rule first: double-sort turnover and past-month return deciles, long the winners of the top turnover decile and short the losers, hold one month (Medhat and Schmeling 2022). Here short_term_momentum_turnover takes the liquid common stocks with turnover of at least 1% a day and ranks them by the 20-session return, and the edge holds the best 25 (the long leg; the loser leg is the losers_short variant).
+6. **Expected size and sample:** About 1.4% a month for the winners-minus-losers spread in the top turnover decile, US 1963 to 2018, with a t statistic above 4 (the page marks the figure approximate and not verified, so no published figure is set, and it is a two-group spread, not the long leg). The long leg alone is smaller. There is no independent evidence after 2018: expect less, and the harness reports the t statistic and the independent sessions beside every number.
+7. **Capacity and costs:** Liquid names only (price over 5 dollars, 50M dollars of 20-day volume): the page says the effect is strongest in the most liquid names, so it is cheap to trade at a monthly turnover. The 10 bps round trip is the assumption; the short leg adds the assumed borrow cost.
+8. **Failure modes and retirement:** Meme and high-turnover episodes reverse sharply (2021); a turnover cut set too low admits names where the month reverses instead; one event can be the whole month's return. Retire if the frozen-period excess return of the picks is not above the base rate of every eligible name.
+9. **Decoys:** 12-1 momentum (a month's winners are often the year's), the size and volume tilts of heavily traded names, and the one-month reversal that dominates in all stocks: the momentum_12_1 and size_small baselines run on the same sessions, and the base is the heavy-turnover names themselves.
+
+**Sources**
+
+- Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022
+- Alpha Architect, Short-term Momentum (summary of Medhat and Schmeling 2022) <https://alphaarchitect.com/short-term-momentum/>
 
 ## Earnings-date advances (`earnings_date_shift`)
 
@@ -251,6 +283,37 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - S&P Global Market Intelligence, Capital Market Implications of Spinoffs, 2017 <https://www.spglobal.com/marketintelligence/en/documents/capital-market-implications-of-spinoffs.pdf>
 - McConnell, J., Sibley, S. and Xu, W., Journal of Portfolio Management, 2015 (spin-offs, 2001 to 2013)
 
+## Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`)
+
+**Status:** candidate. **Family:** G. **Thesis:** Stocks trading well above the average price paid since their last earnings report outperform the market over the next month.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type in ('COMMON_STOCK', 'ADR')` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 50000000` and `feature.capital_gains_overhang not_null`
+- **Top K:** 50
+- **Screeners:** `earnings_vwap_overhang`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** THE SIGNAL IS A PROXY. The source's overhang is (price - reference price) / price where the reference price is a turnover-weighted average of past prices over one to five years; the stored history cannot give that (no multi-year turnover history). The proxy is capital_gains_overhang: the close against the volume-weighted average price since the last earnings report (rollup.anchored_vwap@v2, at most 126 sessions back, so one to two quarters), the page's weaker 'Ready' version. It shares the sign of the idea (holders in profit or loss) but not its weighting or its horizon, and it is not the paper's measure. The retest in the edge's id (price falling back to the average from above) is not tested here: the screen ranks by distance above the average, which selects the most extended names, not the ones retesting it; a screener ranked by closeness to the average is a follow-up. A report a few sessions old gives an average near the price, so the value is near zero for those names. The universe is the liquid common stocks and ADRs with an earnings-anchored VWAP, so every name is scored. Month-end start sessions, spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Holders in a gain sell too early and holders in a loss hold on (the disposition effect), so the price underreacts to news until the pressure fades; the aggregate cost basis of a stock's holders is the reference point (Grinblatt and Han 2005). The anchored VWAP is the practitioner's expression of that cost basis (Shannon 2023).
+2. **Persistence:** The disposition effect is among the most persistent behavioural regularities, and the overhang predictor is replicated in the open asset-pricing data, but its strength after publication is reduced and not verified exactly; it also overlaps momentum, which it partly explains, so persistence beyond 12-1 momentum is a claim to test.
+3. **Outcome:** Excess return over SPY over 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption, as for 12-1 momentum): a long hold of the names furthest above their post-earnings average price.
+4. **Trigger timing:** The anchored VWAP is computed from the bars through the close of the decision session D and from earnings reports known by D (ADR 0050), so the first fill is the next session's close: S = D + 1 (start_offset_sessions = 1); the screen is read at D, the outcome at S.
+5. **Faithful replication:** The source's rule first: rank by the overhang and hold the top (Grinblatt and Han 2005, monthly, long the highest). Here earnings_vwap_overhang ranks the liquid names by the earnings-VWAP proxy and the edge holds the top 50. The proxy is not the paper's multi-year turnover-weighted reference price (no turnover history is stored), so this is not a faithful replication.
+6. **Expected size and sample:** About 1% a month for the highest minus the lowest overhang in 1963 to 1996, which the paper says explains momentum (recalled; the page marks it as not verified, and it is a two-group spread, so no published figure is set); the proxy's size is unknown and likely smaller. The stored history gives few independent month-end sessions: the harness reports the t statistic and the count.
+7. **Capacity and costs:** Liquid names only (price over 5 dollars, 50M dollars of 20-day volume), monthly turnover, long only: an individual can hold it. The 10 bps round trip is the assumption.
+8. **Failure modes and retirement:** The overhang is largely momentum, so its picks may only be 12-1 winners; a fresh anchor makes the value noise; a post-earnings gap up puts the whole universe's winners at the top, then the gap reverses. Retire if the frozen-period excess return of the picks is not above the base rate of every eligible name.
+9. **Decoys:** 12-1 momentum (the overhang is said to subsume part of it: the momentum_12_1 baseline runs on the same sessions), the 52-week-high effect, and size: the size_small baseline.
+
+**Sources**
+
+- Grinblatt, M. and Han, B., Prospect theory, mental accounting, and momentum, Journal of Financial Economics, 2005 <https://doi.org/10.1016/j.jfineco.2004.06.007>
+- An, L., Asset pricing when traders sell extreme winners and losers, Review of Financial Studies, 2016
+- Shannon, B., Maximum Trading Gains with Anchored VWAP, 2023
+
 ## Tender-offer drift after expiry (`tender_offer_drift`)
 
 **Status:** candidate. **Family:** H. **Thesis:** Stocks whose own tender offer for their shares has run its course outperform the market for a year or more afterwards.
@@ -384,11 +447,11 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Schedule:** month end
 - **Universe:** preset `liquid_common_stocks`
 - **Top K:** 50
-- **Screeners:** `momentum_12_1`
+- **Screeners:** `momentum_12_1`, `momentum_own_trend`, `momentum_pullback_entry`, `momentum_volume_confirmed`
 - **Baselines:** `size_small`
 - **Frozen period:** from 2026-04-01
 - **Published:** decile spread 1.31% over 20 sessions (Jegadeesh, N. and Titman, S., Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency, Journal of Finance, 1993, 25 years)
-- **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment).
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). EB E1 adds three variants as extra screeners, each the same ranking on a narrower set, so each is one more trial in the deflated Sharpe ratio and the harness reads them beside the main one: momentum_own_trend (the stock_time_series_momentum overlay: only names whose 252-session return is above 0 and whose close is above the 200-day average; the sign is the raw return, not an excess return over cash, and a risk-free series is a follow-up), momentum_pullback_entry (the oversold_in_uptrend_pullback entry: positive momentum in a stacked uptrend 1 to 2 ATRs under the 20-day average; the idea's every-session schedule is not available to a screener of a month-end edge, so only names at a pullback on the month-end session are seen and the list is short) and momentum_volume_confirmed (the volume_price_confirmation_obv_cmf variant: positive momentum with 20-session OBV trend and Chaikin money flow above 0; Lee and Swaminathan find low-volume winners persist, the opposite reading of volume). A narrower screener scores fewer names than the base, so the harness reports its picks and lift but no decile spread. The question for each is whether it adds to momentum_12_1 (a better entry, lower risk), not whether it beats cash.
 
 **Quality bar**
 
@@ -409,6 +472,10 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - Barberis, N., Shleifer, A. and Vishny, R., A Model of Investor Sentiment, Journal of Financial Economics, 1998 <https://doi.org/10.1016/S0304-405X(98)00027-0>
 - Asness, C., Frazzini, A., Israel, R. and Moskowitz, T., Fact, Fiction and Momentum Investing, AQR / Journal of Portfolio Management, 2014 <https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Momentum-Investing>
 - Quantpedia, Momentum Factor Effect in Stocks (strategy page) <https://quantpedia.com/strategies/momentum-factor-effect-in-stocks/>
+- Moskowitz, T., Ooi, Y. and Pedersen, L., Time Series Momentum, Journal of Financial Economics, 2012 <https://doi.org/10.1016/j.jfineco.2011.11.003>
+- Goyal, A. and Jegadeesh, N., Cross-Sectional and Time-Series Tests of Return Predictability: What Is the Difference?, Review of Financial Studies, 2018
+- Lee, C. and Swaminathan, B., Price Momentum and Trading Volume, Journal of Finance, 2000
+- Han, Y., Zhou, G. and Zhu, Y., A Trend Factor: Any Economic Gains from Using Information over Investment Horizons?, Journal of Financial Economics, 2016
 
 ## 12-1 momentum among names that just reported (`momentum_at_earnings`)
 
