@@ -1,0 +1,52 @@
+# Industry momentum (edge industry_momentum): every tradeable name ranked by its sector ETF's
+# 12-month return, strongest sector first (Moskowitz and Grinblatt 1999; the sector ETF is the
+# nearest stored industry, 11 sectors of the SEC SIC code). Every name of a sector shares the
+# value, so the order inside a sector is by instrument; read the decile spread of all names,
+# not a top-50 list. A missing value never passes (ADR 0030). What it does not check: the
+# stock's own momentum, 6-month formation.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "industry_momentum"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Industry momentum"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1, so the variants compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.sector_ret_252d]
+field = "rollup.momentum_variants@v1.sector_ret_252d"
+op = "gt"
+value = -1
+
+[columns]
+close = "rollup.price_stats@v2.close"
+sector_ret_252d = "rollup.momentum_variants@v1.sector_ret_252d"
+mom_12_1 = "rollup.trend_stats@v2.mom_12_1"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.momentum_variants@v1.sector_ret_252d"

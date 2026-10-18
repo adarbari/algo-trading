@@ -1,0 +1,52 @@
+# Residual reversal (edge short_term_residual_reversal): every tradeable name with a market-
+# residual 20-session return, ranked by it, the biggest losers first (Blitz, Huij, Lansdorp and
+# Verbeek 2013 strip the market, size and value; only the market is stored). A missing value
+# never passes (ADR 0030). What it does not check: earnings in the month (a news move does not
+# reverse), the large-cap cut of the paper (the ADV gate is the nearest).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "residual_reversal"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Residual reversal"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1, so the variants compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.resid_ret_20d]
+field = "rollup.momentum_variants@v1.resid_ret_20d"
+op = "gt"
+value = -5
+
+[columns]
+close = "rollup.price_stats@v2.close"
+resid_ret_20d = "rollup.momentum_variants@v1.resid_ret_20d"
+mom_12_1 = "rollup.trend_stats@v2.mom_12_1"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.momentum_variants@v1.resid_ret_20d"
+tie_break_order = "asc"
