@@ -8,11 +8,12 @@ from collections.abc import Callable
 from datetime import date
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from algotrade.config.user import UserContext
-from algotrade.core.time.calendar import next_session, sessions_between
+from algotrade.core.time.calendar import next_session, sessions_between, sessions_ending
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
 from algotrade.services.evaluation.cross_section.measures import SessionStat
 from tests.helpers.stored_frames import stamped
@@ -103,7 +104,7 @@ def test_the_share_of_negative_canaries_in_breadths_goes_to_cash() -> None:
 
 
 def test_a_defensive_ticker_is_the_one_with_the_highest_field_at_d() -> None:
-    canary = {**CANARY, "defensive": ["N03", "N02", "N04"]}
+    canary = {**CANARY, "defensive": ["N04", "N02", "N03"]}
     values = lambda day, i: {0: -0.01, 1: -0.01, 2: 0.02, 3: 0.05, 4: 0.05}.get(i, 0.01)  # noqa: E731
     stat = _first(_book(_world(values), canary=canary))
     weights = dict(stat.weights)  # N03 and N04 tie: the ticker order decides
@@ -156,3 +157,22 @@ def test_the_canary_is_part_of_the_trial() -> None:
     w = _world()
     assert _book(w).run_hash != _book(w, canary={**CANARY, "breadth": 1}).run_hash
     assert _book(w).run_hash == _book(w).run_hash
+
+
+def test_a_binding_vol_target_measures_the_book_the_canary_left() -> None:
+    """Half the book is in cash by the canary: the volatility is that of the half-invested book
+    (not of the book before the gate) and the names are scaled down from there."""
+    daily = lambda day: 0.01 + 0.01 * (day.toordinal() % 2)  # noqa: E731
+    values = lambda day, i: -0.01 if i == 0 else daily(day)  # noqa: E731
+    target = 0.01
+    stat = _first(_book(_world(values), vol_target=target, vol_window=20, vol_return_field=FIELD))
+    window = sessions_ending(stat.session, 20)
+    sigma = 0.5 * float(np.std([daily(d) for d in window], ddof=1) * np.sqrt(252))
+    assert stat.risk_off == 0.5 and stat.book_vol == pytest.approx(sigma)
+    k = target / sigma
+    assert 0 < k < 1
+    weights = dict(stat.weights)
+    assert weights["EQ:N15"] == pytest.approx(0.1 * k)
+    assert weights["CASH"] == pytest.approx(1 - 0.5 * k) and sum(weights.values()) == pytest.approx(
+        1
+    )
