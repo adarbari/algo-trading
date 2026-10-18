@@ -141,6 +141,7 @@ name = "events/fund_nav"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/fund_nav.py"
 note = "Edge build D5: the daily NAV per share of a closed-end fund from Tiingo's Nasdaq MFQS X<ticker>X series, keyed by the FUND's instrument_id + series, session_date = the NAV date, known_from = the next session after it, knowledge_ts = the fetch; a restated NAV replaces the row with known_from = the restating run's session; readers go through data/events with through=S, never a raw partition read"
 
+[[table]]
 name = "events/insider_transaction"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/insider.py"
 note = "EB D6: SEC Form 4 / 4/A insider transactions, a row per transaction line and reporting owner, ts = SEC's acceptance instant; known_from = the acceptance_session of SEC's acceptance time (first session whose close is after it), later for a line restated with different content; known_from is in the key, so a restated line sits beside the version it replaces; read through data.insiders"
