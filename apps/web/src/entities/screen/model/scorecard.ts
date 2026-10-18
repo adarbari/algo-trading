@@ -25,6 +25,21 @@ export interface ScorecardEntry {
   value?: unknown;
   /** How far from passing (near miss or miss), in the field's unit. */
   distance?: number | null | undefined;
+  /** The group it sits in (ADR 0071); null or absent: a gate. */
+  group?: string | null | undefined;
+}
+
+/** A group of the screen as one pick's run judged it (ADR 0071). */
+export interface ScorecardGroup {
+  id: string;
+  kind: string;
+  /** Member ids (criteria or groups) in funnel order. */
+  members: readonly string[];
+  parent?: string | null | undefined;
+  /** The group's PASS / NEAR / FAIL / MISSING for the pick; absent where no run judged it. */
+  outcome?: string | null | undefined;
+  /** The member that decided it. */
+  decidedBy?: string | null | undefined;
 }
 
 export interface ScorecardRow {

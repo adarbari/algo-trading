@@ -42,6 +42,10 @@ from algotrade.features.rollups.corporate import (
     earnings_schedule,
     financials,
     fundamentals,
+)
+from algotrade.features.rollups.events import (
+    earnings_date_shift,
+    filing_events,
     index_changes,
 )
 from algotrade.features.rollups.levels import gaps, pivot_strength, retest, swing_levels
@@ -84,7 +88,7 @@ from algotrade.features.rollups.price import (
     volume,
 )
 from algotrade.features.rollups.reference import fund_reference
-from algotrade.features.rollups.relative import relative_strength
+from algotrade.features.rollups.relative import momentum_variants, relative_strength
 from algotrade.features.rollups.statements import (
     balance_sheet,
     cash_flow,
@@ -112,6 +116,8 @@ GROUPS: dict[str, FeatureGroup] = {
             dividends.GROUP,
             dividend_schedule.GROUP,
             index_changes.GROUP,
+            filing_events.GROUP,
+            earnings_date_shift.GROUP,
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,
@@ -153,6 +159,7 @@ GROUPS: dict[str, FeatureGroup] = {
             regime.GROUP,
             fund_reference.GROUP,
             relative_strength.GROUP,
+            momentum_variants.GROUP,
         ),
         # iv30@v1, put_wing@v1 and call_wing@v1 read the materialised div_yield@v1 (FeatureSet
         # orders it)

@@ -39,8 +39,30 @@ export {
   type ScreenPreview,
 } from './model/preview';
 export {
+  CONNECTOR_LABEL,
+  DECIDED_BY_LABEL,
+  KIND_LABEL,
+  KIND_TERM,
+  type GroupKind,
+} from './lib/group-labels';
+export {
+  eitherWithPrevious,
+  excludeCriterion,
+  excludeGroup,
+  groupsOf,
+  groupText,
+  joinTarget,
+  layoutOf,
+  newGroupId,
+  ownGroupIds,
+  ungroup,
+  type CriterionGroup,
+  type LayoutNode,
+} from './lib/groups';
+export {
   blankDocument,
   criteriaOf,
+  groupsFor,
   criterionIds,
   criterionOfError,
   isComplete,
@@ -77,8 +99,17 @@ export {
   outcomeTone,
   type DecisionTone,
 } from './model/decisions';
-export { CriteriaScorecard, type CriteriaScorecardProps } from './ui/CriteriaScorecard';
-export { scorecardRows, type ScorecardEntry, type ScorecardRow } from './model/scorecard';
+export {
+  CriteriaScorecard,
+  type CriteriaScorecardProps,
+  type ScorecardGate,
+} from './ui/CriteriaScorecard';
+export {
+  scorecardRows,
+  type ScorecardEntry,
+  type ScorecardGroup,
+  type ScorecardRow,
+} from './model/scorecard';
 export { useCriterionLines } from './api/criteria-lines';
 export { criterionLines, type CriterionLine } from './model/criteria-lines';
 export { ScoreBreakdown } from './ui/ScoreBreakdown';
