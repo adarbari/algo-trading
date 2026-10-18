@@ -121,7 +121,7 @@ contracts = ["Layout: core model and time are the base of core (they never impor
 
 [[dir]]
 path = "src/algotrade/core/time"
-purpose = "the exchange session calendar and UTC clock helpers; never compute weekdays elsewhere"
+purpose = "the exchange session calendar, the calendar windows an edge schedule uses, and UTC clock helpers; never compute weekdays elsewhere"
 contracts = ["Layout: core model and time are the base of core (they never import views or validation)"]
 
 [[dir]]
@@ -276,7 +276,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/statements"
-purpose = "feature groups from the SEC financial statements (instruments/statements: income statement and cash flow lines as trailing twelve months, balance sheet lines at the latest date), one module per group (its documented FEATURES, a pure compute and its GROUP declaration), plus growth_history@v1 (the revenue and EPS TTMs 3 and 5 years back, from instruments/shares), ttm.py, the TTM arithmetic over one concept's periods that financials@v2 also uses, and instants.py, the latest-instant and debt rules of the balance sheet"
+purpose = "feature groups from the SEC financial statements (instruments/statements: income statement and cash flow lines as trailing twelve months, balance sheet lines at the latest date), one module per group (its documented FEATURES, a pure compute and its GROUP declaration), plus growth_history@v2 (the revenue and EPS TTMs 3 and 5 years back, from instruments/shares), ttm.py, the TTM arithmetic over one concept's periods that financials@v3 also uses, and instants.py, the latest-instant and debt rules of the balance sheet"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
