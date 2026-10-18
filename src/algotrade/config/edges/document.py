@@ -31,7 +31,10 @@ and the key.
                       ``long_short`` (the top ``top_k`` minus the bottom: a spread, diagnostic
                       only); a side other than long needs an ``excess_return`` outcome, no
                       ``max_drawdown``, an integer ``top_k``; optional ``borrow_bps_annual``
-                      (default from ``verdict.toml``) is the short leg's assumed borrow cost
+                      (default from ``verdict.toml``) is the short leg's assumed borrow cost;
+                      optional ``hold_rank`` (buy/hold band, ADR 0053 amendment 2026-10-18): held
+                      while rank <= this (>= ``top_k``, an integer); cost on entries and exits
+                      only; see ``_hold_rank`` for where it is allowed
     schedule          ``every_session`` | ``month_end`` | ``calendar:<window>`` (WINDOW_NAMES: a
                       stretch the calendar fixes, whose length is the one horizon) |
                       ``on_event:<class>[:<subtype>]`` (EVENT_CLASSES; EVENT_SUBTYPES)
@@ -103,7 +106,8 @@ from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
 from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
-from algotrade.config.edges.tenor import check_tenor
+from algotrade.config.edges.model_tenor import check_tenor
+from algotrade.config.edges.pair_rules import pair_field_of
 from algotrade.config.edges.verdict import LEGS
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Selection, parse_selection
@@ -127,7 +131,6 @@ STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short optio
 MODEL_STRUCTURES = (
     "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
 )  # fmt: skip
-# An option_model_pnl horizon must lie within half to double the IV field's tenor (``tenor.py``).
 MODEL_KIND = "option_model_pnl"
 PAIR_KIND = "pair_spread"  # the cheap name's return minus its sibling's (ADR 0053, EB H9)
 MODEL_BASIS = "model"  # what a price from a model, not a quote, is labelled (results and UI)
@@ -211,7 +214,7 @@ KEYS = (
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
-    "side", "borrow_bps_annual", "pair_field",
+    "side", "borrow_bps_annual", "hold_rank", "pair_field",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -246,6 +249,7 @@ class Outcome:
     side: str = LONG  # SIDES; a short leg pays ``borrow_bps_annual`` (None: the site's default)
     borrow_bps_annual: float | None = None
     pair_field: str | None = None  # a pair_spread's sibling-id feature, read at D
+    hold_rank: int | None = None  # buy/hold band: held while rank <= this (None: no band)
 
     @property
     def result_side(self) -> str:
@@ -460,6 +464,12 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
             raise ConfigurationError(
                 f"{where} top_k: a {held.side!r} outcome ranks the names, so it needs an "
                 f"integer top_k, not 'all'"
+            )
+        if held.hold_rank is not None and (top_k is None or held.hold_rank < top_k):
+            raise ConfigurationError(
+                f"{where} hold_rank: {held.hold_rank} must be an integer >= top_k "
+                f"({'all' if top_k is None else top_k}); a name is held down to that rank, "
+                f"entered at top_k"
             )
     edge = Edge(
         id=edge_id,
@@ -712,7 +722,8 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
     side = o.choice("side", LONG, SIDES)
     borrow = o.number("borrow_bps_annual", None, 0)
     _check_side(o, side, borrow, kind, drawdown)
-    pair_field = _pair_field(o, kind, benchmark, side, drawdown)
+    pair_field = pair_field_of(o, kind == PAIR_KIND, benchmark, side, drawdown)
+    hold_rank = _hold_rank(o, side, kind, schedule, horizons)
     return Outcome(
         kind=kind,
         horizon_sessions=horizons,
@@ -730,27 +741,8 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
         side=side,
         borrow_bps_annual=borrow,
         pair_field=pair_field,
+        hold_rank=hold_rank,
     )
-
-
-def _pair_field(
-    o: Table, kind: str, benchmark: str, side: str, drawdown: float | None
-) -> str | None:
-    """The ``pair_field`` of a ``pair_spread`` (required there, refused elsewhere): the picks are
-    the cheap legs (side ``long``), both legs are raw returns, a spread's dip is not stored."""
-    named = _prose(o, "pair_field") or None
-    if kind != PAIR_KIND:
-        if named is not None:
-            raise ConfigurationError(f"{o.where} pair_field: only a pair_spread outcome has one")
-        return None
-    if named is None:
-        _missing(o, "pair_field")
-    if benchmark != "none" or side != LONG or drawdown is not None:
-        raise ConfigurationError(
-            f"{o.where}: a pair_spread needs benchmark = 'none', side long (the picks are the "
-            f"cheap legs; the sibling is the short leg) and no max_drawdown"
-        )
-    return named
 
 
 def _check_side(
@@ -768,22 +760,28 @@ def _check_side(
         )
 
 
-def identity_dict(value: Any) -> Any:
-    """``value`` (an ``asdict`` of an edge or outcome) without the side keys of a long outcome:
-    a document that never named a side hashes as it did before sides, so no stored leg or
-    run is recomputed by their arrival (ADR 0053 amendment, outcome sides)."""
-    if isinstance(value, dict):
-        long = value.get("side") == LONG and value.get("borrow_bps_annual") is None
-        unpaired = "pair_field" in value and value["pair_field"] is None
-        return {
-            k: identity_dict(v)
-            for k, v in value.items()
-            if not (long and k in ("side", "borrow_bps_annual"))
-            and not (unpaired and k == "pair_field")
-        }
-    if isinstance(value, (list, tuple)):
-        return [identity_dict(v) for v in value]
-    return value
+def _hold_rank(
+    o: Table, side: str, kind: str, schedule: str, horizons: tuple[int, ...]
+) -> int | None:
+    """The outcome's buy/hold band rank (None: no band). Refused for a spread (``long_short`` has
+    no cost rows), a return that is not an excess return and an event or calendar schedule. The
+    schedule limit (``month_end``, or ``every_session`` at one session) is stricter than needed:
+    windows never overlap on a plain schedule (``sessions.py``), so loosening it is a later PR."""
+    if "hold_rank" not in o.names():
+        return None
+    rank = o.integer("hold_rank", 1, 1)
+    if side == LONG_SHORT or kind != "excess_return":
+        raise ConfigurationError(
+            f"{o.where} hold_rank: a band is for a long or short excess_return (a long_short "
+            f"spread has no cost rows to turn over)"
+        )
+    if schedule not in SCHEDULES or (schedule == "every_session" and horizons != (1,)):
+        raise ConfigurationError(
+            f"{o.where} hold_rank: for now the schedule is month_end, or every_session at "
+            f"horizon_sessions = [1] (kept stricter than needed), got {schedule!r} with "
+            f"{list(horizons)}"
+        )
+    return rank
 
 
 def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:

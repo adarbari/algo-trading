@@ -25,7 +25,6 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.instruments import pad_cik
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
@@ -83,14 +82,10 @@ def pairs(reference: pd.DataFrame) -> pd.DataFrame:
     ``sibling_id``, ``class_count`` and ``sibling_status`` (the module doc's rules)."""
     need = {"instrument_id", "cik", "share_class_figi", "security_type"}
     columns = ["instrument_id", "sibling_id", "class_count", "sibling_status"]
-    if not need <= set(
-        reference.columns
-    ):  # never an empty answer: every pick would read no_sibling
-        raise MissingDataError(
-            REFERENCE,
-            f"the snapshot has no {sorted(need - set(reference.columns))} column",
-            "rebuild the reference snapshot (algotrade-ingest reference)",
-        )
+    if not need <= set(reference.columns):
+        # A snapshot built without issuer or class ids (the vendor gave none) has no pairs: no
+        # rows, so every read is UNKNOWN. Raising would fail the nightly's critical rollups step.
+        return pd.DataFrame(columns=columns)
     held = reference[reference["security_type"].isin(OPERATING_TYPES)].copy()
     held["cik"] = held["cik"].map(pad_cik)  # one form of the issuer id
     held = held[held["cik"].notna()]

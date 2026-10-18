@@ -1,12 +1,16 @@
-"""The tenor of an implied-vol field, read from its name (ADR 0053 amendment 2026-10-17): the one
-tenor (``iv30``: 30 calendar days, about 21 sessions) that prices every horizon of an
-``option_model_pnl`` outcome, so a horizon far from it is refused by the document parser."""
+"""The tenor of an ``option_model_pnl`` outcome's implied-vol field (ADR 0053 amendment
+2026-10-17), read from the field's name, and the horizons it can price: split from
+``document.py`` (at its line cap), which checks an outcome's horizons with it."""
 
 import re
 
 from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
 
+# The implied vol is one tenor (``iv30``: 30 calendar days, about 21 sessions) and prices every
+# horizon of the outcome, so a horizon far from it prices the wrong option: an option_model_pnl
+# horizon must lie within ``[tenor / 2, tenor * 2]`` sessions of the field's tenor, read from its
+# name (a field with no ``iv<days>`` in its name has no known tenor and is refused).
 TRADING_DAYS_PER_YEAR, CALENDAR_DAYS_PER_YEAR = 252, 365
 _IV_TENOR = re.compile(r"(?<![a-z0-9])iv(\d+)(?![0-9])")
 
@@ -21,7 +25,7 @@ def tenor_sessions(iv_field: str) -> int | None:
 
 
 def check_tenor(o: Table, horizons: tuple[int, ...], iv_field: str | None) -> None:
-    """Refuse an ``option_model_pnl`` horizon the field's one tenor cannot price (module docs)."""
+    """Refuse an ``option_model_pnl`` horizon the field's one tenor cannot price (module top)."""
     if iv_field is None:
         return  # required, and reported, by ``_expires_otm``
     tenor = tenor_sessions(iv_field)

@@ -603,6 +603,22 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the nightly starts about 18:00 New York time and SEC lists 17:30-22:00 acceptances in the next day's index, so S's own 8-Ks are usually unstored when the nightly runs; counting through S read 0 live and 1 on a recompute. The span through S-1 gives the same value live and in a backtest. A history before the first nightly walk reads null. Known limits: the session after a market day EDGAR was closed reads null, and on a SEC-only holiday Friday an after-17:30 acceptance can be missing from the walked index until the next walk.
 
+## 2026-10-18 | EB H7 (buy/hold bands) | Where a band applies, long_short, and what the net series is
+- Question: which edges may carry `hold_rank`, what happens for `long_short`, how is a name's cost split between entry and exit, and which figures follow the banded series?
+- Options: allow a band on every schedule / only where decision sessions do not overlap; a band on both legs of a spread / refuse it; the whole round trip at entry / half in, half out; replace `pick_values` (and so every statistic) / keep gross figures and bind only the net series.
+- Decision: `long` and `short` `excess_return` with an integer `top_k`, on `month_end` or `every_session` at horizon 1; `long_short`, event and calendar schedules refused in the document; an entry and an exit each pay half a round trip, the last session exits (charged) and a coverage gap closes every position; hit rate, lift, decile spread, effect size and the floor stay the legs' own, the net series (Sharpe, deflated Sharpe, PBO, `mean_excess_picks`), the cost rows and the break-even follow the band; the break-even's turnover is read from the slope of the stored cost rows, no new column; hit counts at cost levels and the trade ledger stay per round-trip trade (follow-up).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the schedule limit is stricter than needed (plain-schedule windows never overlap; loosening is a later PR); a spread has no cost rows and no single book; half and half makes a name held through pay exactly one trip over its stay; gross figures must not move so the verdict's evidence is the same picks, and only what a trader pays changes.
+
+## 2026-10-18 | EB H7 (buy/hold bands) | One full re-run after LEG_VERSION 4
+- Question: who pays the re-run that LEG_VERSION 3 (H6) and 4 (H7) each force?
+- Options: a re-run after each / one after both.
+- Decision: one full re-run after both merge (`algotrade-backtest evaluate-edges --full`; the PR gives the command); H7 does not run it against the real store.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: every stored leg is recomputed by either bump, so two runs would spend the same hours twice.
+
 ## 2026-10-18 | PR #651 (D6, Form 4 insider transactions) | Storing the reporting owner's CIK and officer title
 - Question: may the insider transaction table store `owner_cik` and `officer_title` (public EDGAR fields that identify a natural person), or only a hashed owner key plus role flags?
 - Options: store `owner_cik` + `officer_title` as filed / store a salted hash of the owner CIK + role flags only / store role flags only (no per-person key).
@@ -626,3 +642,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the architect review found `REFERENCE_FACTS` dropped the ids so every pick read `no_sibling`; the loader now carries them. The folder split and the two counts touch other modules and need their own review.
+
+## 2026-10-18 | PR #661 CI (EB H9) | A reference snapshot without issuer or class ids
+- Question: does `share_classes@v1` raise MissingDataError when the reference snapshot has no `cik` / `share_class_figi` column?
+- Options: raise / return no rows.
+- Decision: no rows (every read is UNKNOWN; a pair pick reads `no_sibling`, counted), reversing the earlier review ask.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the ingestion nightly end-to-end tests build a reference without those columns and the critical rollups step failed, holding back the workflow; a snapshot built without issuer ids is a normal state, not a broken one.

@@ -5,9 +5,7 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
-import pytest
 
-from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.rollups.reference import share_classes
 from algotrade.features.rollups.reference.share_classes import (
@@ -87,9 +85,10 @@ def test_a_fund_a_preferred_or_a_row_missing_the_issuer_or_class_is_not_a_class(
     assert found.empty
 
 
-def test_a_reference_without_the_columns_is_missing_data_never_an_empty_answer() -> None:
-    with pytest.raises(MissingDataError, match="share_class_figi"):
-        pairs(pd.DataFrame({"instrument_id": ["EQ:A"], "cik": ["1"], "security_type": ["ADR"]}))
+def test_a_reference_without_the_columns_has_no_rows_so_every_read_is_unknown() -> None:
+    """The nightly must not fail on a snapshot built without issuer or class ids."""
+    bare = pd.DataFrame({"instrument_id": ["EQ:A"], "cik": ["1"], "security_type": ["ADR"]})
+    assert pairs(bare).empty
 
 
 def test_an_issuer_id_in_two_forms_is_one_issuer() -> None:

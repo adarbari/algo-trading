@@ -21,7 +21,8 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.config.edges.document import Edge, identity_dict
+from algotrade.config.edges.document import Edge
+from algotrade.config.edges.identity import identity_dict
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes

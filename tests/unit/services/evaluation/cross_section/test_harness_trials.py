@@ -212,6 +212,85 @@ def test_a_session_with_too_few_scores_has_no_short_leg_and_is_not_measured() ->
             assert all(s.excluded_coverage and not s.picks for s in r.stats), side
 
 
+def _held(hold_rank: int | None, **outcome: Any) -> EdgeEvaluation:
+    """The small world at a one-session horizon (name i earns (i - 9.5)% and ranks by its price,
+    so the top 5 are names 15..19 at every session and ranks 6 and 7 are names 14 and 13), the
+    document's cost 20 bp, with or without a buy/hold band."""
+    w = build_world(
+        rows_of=lambda day: [
+            outcome_row(iid, i, day, horizon_sessions=1) for i, iid in enumerate(IDS)
+        ]
+    )
+    for day in (*DAYS, DAYS[-1] + timedelta(days=4)):  # every name liquid (a short leg needs it)
+        rows = [{"instrument_id": i, "adv_usd_20d": 1e7} for i in IDS]
+        w.writer.write_table(
+            "rollups/instrument/price_stats@v2", day, f"p-{day}", stamped(rows, day, f"p-{day}")
+        )
+    doc = {
+        "kind": "excess_return", "horizon_sessions": [1], "benchmark": "SPY",
+        "start_offset_sessions": 1, "cost_bps": 20, "hold_rank": hold_rank, **outcome,
+    }  # fmt: skip
+    e = edge(outcome={k: v for k, v in doc.items() if v is not None}, top_k=5)
+    return evaluate_edge(
+        w.reader, w.results, w.configs, UserContext("site"), e, DAYS[0], DAYS[-1], AS_OF
+    )
+
+
+def test_a_buy_hold_band_charges_entries_and_exits_only_and_leaves_gross_alone() -> None:
+    flat, held = _held(None), _held(7)
+    (f,), (h,) = flat.results, held.results
+    sessions = h.measures[0].sessions
+    assert sessions > 2 and sessions == f.measures[0].sessions
+    # the legs hold the band: ranks 6 and 7 are names 14 and 13, with their net values
+    band = h.stats[0].band
+    assert [(p.instrument_id, p.rank) for p in band] == [("EQ:N14", 6), ("EQ:N13", 7)]
+    assert [p.value for p in band] == pytest.approx([0.045 - 0.002, 0.035 - 0.002])
+    assert all(not s.band for s in f.stats)  # an edge without a band stores none
+    # gross statistics are the legs' own, to the figure
+    for field in (
+        "picks",
+        "hits",
+        "hit_rate",
+        "base_rate",
+        "lift",
+        "decile_spread",
+        "top_decile_mean",
+    ):
+        assert getattr(h.measures[0], field) == getattr(f.measures[0], field)
+    # the same five names every session: bought once and sold once = one round trip each over
+    # ``sessions`` sessions, where without a band every session pays a whole one
+    assert f.measures[0].mean_excess_picks == pytest.approx(0.075 - 0.002)
+    assert h.measures[0].mean_excess_picks == pytest.approx(0.075 - 0.002 / sessions)
+    assert [round(s.round_trips or 0.0, 9) for s in h.stats] == [2.5] + [0.0] * (sessions - 2) + [
+        2.5
+    ]
+    # the cost rows keep the document's own level on the mean and scale the others by turnover
+    rows = {c.slice_value: c.mean_excess_picks for c in h.costs}
+    assert rows["all:20"] == pytest.approx(h.measures[0].mean_excess_picks)
+    assert rows["all:50"] == pytest.approx(0.075 - 0.005 / sessions)
+    # the legs of an edge with a band are another key (and the trial another trial)
+    assert h.config_hash != f.config_hash
+    assert held.run_hash != flat.run_hash
+
+
+def test_a_buy_hold_band_runs_are_deterministic() -> None:
+    first, again = _held(7), _held(7)
+    assert first.results[0].measures == again.results[0].measures
+    assert first.results[0].stats == again.results[0].stats
+
+
+def test_a_short_edge_holds_the_worst_names_through_its_band() -> None:
+    held = _held(7, side="short", borrow_bps_annual=0)
+    (r,) = held.results
+    assert all(p.side == "short" for p in r.stats[0].picks)
+    # the worst names are 0..4 (ranks 1..5), the band 5 and 6 (ranks 6 and 7), shorted as they are
+    assert [p.instrument_id for p in r.stats[0].picks] == [f"EQ:N{i:02d}" for i in range(5)]
+    assert [(p.instrument_id, p.rank) for p in r.stats[0].band] == [("EQ:N05", 6), ("EQ:N06", 7)]
+    assert r.stats[0].band[0].value == pytest.approx(
+        0.045 - 0.002
+    )  # a short earns minus the return
+
+
 STARTS = [DAYS[0], DAYS[2], DAYS[4], DAYS[6]]  # every 2nd session of Sept 1-10
 
 

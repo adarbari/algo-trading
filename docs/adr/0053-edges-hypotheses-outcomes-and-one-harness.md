@@ -603,7 +603,7 @@ them standard, measured on the same sessions, and reports how much each overlaps
    leave it out; the decoy report flags a decoy with no common session as not measured.
 6. **`LEG_VERSION` 3.** Every screener's out-of-sample leg now holds the stratified draws, so
    no stored leg is the one a run would compute: all legs recompute once. H7 (buy/hold bands)
-   bumps it again; run the one full re-run after both merge, not after each.
+   bumps it again (to 4); run the one full re-run after both merge, not after each.
 
 ## Amendment 2026-10-18: the event-class list and subtypes are a contract (edge build H4)
 
@@ -744,6 +744,49 @@ column, and reads the stored `forward_returns@v2` window and the implied vol at 
 6. **Not here.** The chain P&L grain (H13) and a short-put P&L (needs a strike key and a put
    price) are a follow-up PR. The short delta-hedged side is its own structure value
    (`delta_hedged_atm_short`), not a `side` key. The stored basis column is left to H13.
+
+## Amendment 2026-10-18: buy/hold bands for turnover-aware cost (edge build H7)
+
+`[outcome] hold_rank` (optional integer) turns an edge's flat cost into a turnover-aware one: a
+name enters at rank <= `top_k` and is held while its rank is <= `hold_rank`.
+
+1. **Document rule.** `hold_rank >= top_k` and `top_k` is an integer (config error otherwise, for
+   the edge and for each variant's outcome). Allowed only for a `long` or `short`
+   `excess_return`, on `month_end`, or `every_session` at `horizon_sessions = [1]`: a band carries
+   a name from one decision session to the next. The schedule limit is stricter than needed (windows
+   never overlap on a plain schedule); loosening it is a later PR. Refused for
+   `long_short` (a spread: no cost rows, and two legs with no single book to turn over), a
+   `hit_target`, an event or a calendar schedule. Unset, nothing changes: `identity_dict` drops
+   the key, so the run and trial hashes of every existing edge are as they were. Set, it is part
+   of the trial and the run, and of the leg key.
+2. **What a leg holds (leg v4, ADR 0063 amendment).** A leg stays one session's own: the counted
+   picks (ranks `1..top_k`) and, from a `hold_rank`, the band's names (`top_k + 1..hold_rank`)
+   with their oriented net values (`band_ids`, `band_ranks`, `band_values`; a name with no counted
+   value has a null value, never 0 and is never held). The `short` band is the next-worst liquid
+   names. `LEG_VERSION` 4; an edge without a band stores null columns.
+3. **The turnover pass** (`reporting/turnover.py`) runs over a variant's decision sessions in
+   order, after the legs are decoded, so legs and picks stay independent (ADR 0063): held at a
+   session = the counted picks plus the band names the previous session held. An entry pays half
+   a round trip and an exit half; a name held through pays none. A session the screen did not
+   measure (coverage) closes every position; the last session's names exit, charged. It sets
+   `banded_values` (each held name's value net of its own entries and exits) and `round_trips` on
+   the stat, never stored. The decile spread, hit rate, base rate, lift and every gross figure
+   are untouched; the net series (`pick_mean`, so Sharpe, deflated Sharpe, PBO), `mean_excess_picks`
+   and the cost rows use the banded values. The cost rows scale the mean's slope in the cost by
+   the turnover (`round_trips` per held name), so each is exact; the break-even is the gross mean
+   over that turnover (`break_even_cost(..., trips)`), read from the slope of the stored cost rows
+   (no stored column). Hit counts at the cost levels stay per round-trip trade, and the
+   trade ledger and `bh_mean` (the floor) stay as the legs have them: follow-ups.
+4. **Side interplay.** `long`: the band follows the qualified order. `short`: the worst-ranked
+   liquid names; a short's borrow still accrues for every held period (only the trading cost
+   changes). `long_short`: refused (item 1).
+5. **One full re-run.** `LEG_VERSION` 3 (H6) and 4 (this) both invalidate every stored leg once:
+   the owner pays one full re-run after both merge: `algotrade-backtest evaluate-edges --full` (every
+   open edge; `--edge ID` for one), from the main checkout's environment against the real store.
+6. **Accepted limits (architect review, non-blocking).** A month end the schedule skips counts a
+   name as held through it at no cost. A period with a single cost row has no slope, so the
+   break-even falls back to a full round trip per name: conservative. No exit reason is recorded
+   per name. `LEG_VERSION` 4 recomputes every leg (item 5).
 
 ## Amendment 2026-10-18: `pair_spread`, the cheap share class against its sibling (EB H9)
 
