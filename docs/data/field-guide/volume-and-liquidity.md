@@ -57,6 +57,24 @@ Sources: Gervais, Kaniel and Mingelgrin (2001), The high-volume return premium, 
 
 Sources: Amihud (2002), Illiquidity and Stock Returns: Cross-Section and Time-Series Effects, Journal of Financial Markets
 
+### `rollup.signed_volume@v1.obv_trend_20d`
+
+**How to read it.** On-balance volume's change over 20 sessions as a share of the volume traded, -1 to 1. Volume on a higher close counts for, on a lower close against. 0.3 is net buying on a third of the volume; below -0.3 is net selling.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| net buying over the month | `gt 0` | soft | 0.05 | pair with rollup.volume@v1.cmf_20d gt 0 as a confirmation of a price trend |
+
+**When the reading lies**
+
+- It reads only the direction of the close, not the size of the move or where the close sat in the range. Compare rollup.volume@v1.cmf_20d.
+- One heavy day dominates a quiet month. Check rollup.volume@v1.volume_z_20d before reading a high value as steady buying.
+- Null after a gap in the last 21 sessions or with no volume. Granville's OBV has no academic test of its own.
+
+Sources: Granville (1963), Granville's New Key to Stock Market Profits; Lee and Swaminathan (2000), Price Momentum and Trading Volume, Journal of Finance
+
 ### `rollup.volume@v1.session_volume`
 
 **How to read it.** The shares traded on the session, split-adjusted as of the session. 0 means no trades (known, not missing). Its size has no universal scale: a typical S&P 500 stock trades 1 to 10 million shares a day, a mega cap 20 to 100 million, a small Nasdaq name 100,000 to 1 million, and under about 100,000 shares a day a name is thin. Read it against the name's own normal: today over rollup.volume@v1.adv_shares_20d near 1 is an ordinary day, 1.5 a busy one, 3 or more an event (rollup.momentum@v1.rel_volume and rollup.volume@v1.volume_z_20d do that comparison for you). For dollars traded use rollup.volume@v1.dollar_volume.

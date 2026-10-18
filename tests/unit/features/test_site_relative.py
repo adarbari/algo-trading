@@ -1,5 +1,6 @@
-"""The relative-strength expression features (``config/site/features/technical/price.toml``):
-``rs_spy_positive``, ``rs_improving`` and ``sector_leader`` over ``relative_strength@v1`` rows."""
+"""The relative-strength and own-trend expression features (``config/site/features/technical/
+price.toml``): ``rs_spy_positive``, ``rs_improving`` and ``sector_leader`` over
+``relative_strength@v1`` rows, ``stock_tsmom_sign`` and ``capital_gains_overhang`` (EB E1)."""
 
 import numpy as np
 import pandas as pd
@@ -76,3 +77,43 @@ def test_mom_12_1_vol_scaled_divides_by_hv60_and_is_unknown_on_zero_or_null(
     assert value["EQ:A"] == pytest.approx(1.0, rel=1e-5)
     assert value["EQ:B"] == pytest.approx(-0.5, rel=1e-5)
     assert pd.isna(value["EQ:C"]) and pd.isna(value["EQ:D"])  # hv60 of 0, mom_12_1 null
+
+
+def test_stock_tsmom_sign_needs_the_return_and_the_average_to_agree(fs: FeatureSet) -> None:
+    ids = ["EQ:UP", "EQ:DOWN", "EQ:MIXED", "EQ:ZERO", "EQ:NONE"]
+    frames: dict[str, pd.DataFrame | None] = {
+        "rollups/instrument/trend_stats@v2": pd.DataFrame(
+            {"instrument_id": ids, "session_date": END, "ret_252d": [0.2, -0.2, 0.2, 0.0, np.nan]}
+        ).astype({"ret_252d": "float32"}),
+        "rollups/instrument/price_stats@v2": pd.DataFrame(
+            {
+                "instrument_id": ids,
+                "session_date": END,
+                "close": [110.0, 90.0, 90.0, 110.0, 100.0],
+                "sma_200": [100.0, 100.0, 100.0, 100.0, 100.0],
+            }
+        ).astype({"close": "float32", "sma_200": "float32"}),
+    }
+    out = fs.evaluate(frames, ["stock_tsmom_sign"]).set_index("instrument_id")
+    value = out["stock_tsmom_sign"]
+    assert value["EQ:UP"] == 1 and value["EQ:DOWN"] == -1
+    assert value["EQ:MIXED"] == 0  # a year up but under the 200-day average
+    assert value["EQ:ZERO"] == 0  # a flat year is neither sign
+    assert pd.isna(value["EQ:NONE"])  # no 252-session return: unknown, never 0
+
+
+def test_capital_gains_overhang_is_the_close_against_the_earnings_vwap(fs: FeatureSet) -> None:
+    ids = ["EQ:ABOVE", "EQ:BELOW", "EQ:NOVWAP"]
+    frames: dict[str, pd.DataFrame | None] = {
+        "rollups/instrument/price_stats@v2": pd.DataFrame(
+            {"instrument_id": ids, "session_date": END, "close": [105.0, 90.0, 100.0]}
+        ).astype({"close": "float32"}),
+        "rollups/instrument/anchored_vwap@v2": pd.DataFrame(
+            {"instrument_id": ids, "session_date": END, "avwap_earnings": [100.0, 100.0, np.nan]}
+        ).astype({"avwap_earnings": "float32"}),
+    }
+    out = fs.evaluate(frames, ["capital_gains_overhang"]).set_index("instrument_id")
+    value = out["capital_gains_overhang"]
+    assert value["EQ:ABOVE"] == pytest.approx(5 / 105, rel=1e-5)
+    assert value["EQ:BELOW"] == pytest.approx(-10 / 90, rel=1e-5)
+    assert pd.isna(value["EQ:NOVWAP"])  # no earnings anchor: unknown
