@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-568 stored features in 68 groups, in dependency order; 148 expression features.
+569 stored features in 69 groups, in dependency order; 149 expression features.
 
 ## `option_liquidity@v1`
 
@@ -242,6 +242,14 @@ The next earnings date, its shift from a year ago and the session the shift beca
 | `earnings_shift_direction` | label | str | category | open | later, earlier | later or earlier when the next report date moved a week or more from last year's | no report date on or after the session, or no report of a year ago to compare it with, known by the session, or the date is within 7 days of last year's | `events/earnings.ts` |
 | `earnings_shift_known_date` | window | date | date | open |  | The session the next report date was first stored in a calendar known by the session | no report date on or after the session, or no report of a year ago to compare it with, known by the session, or the date is within 7 days of last year's | `events/earnings.ts` |
 | `sessions_since_earnings_shift` | window | int | sessions | open | >= 0 | Exchange sessions from the session the shifted date became known up to the session (0: it became known today) | no report date on or after the session, or no report of a year ago to compare it with, known by the session, or the date is within 7 days of last year's | `events/earnings.ts` |
+
+## `earnings_gap_volume@v1`
+
+How much volume the last earnings report drew against the volume before it. Stored as `rollups/instrument/earnings_gap_volume@v1`; reads `events/earnings`, `bars/1d`, `instruments/symbol_ids` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `reaction_volume_ratio` | window | float32 | ratio | open | >= 0 | Mean dollar volume of the last report's window (the sessions before, of and after it) divided by the mean dollar volume of the 20 sessions before the window | no report known by the session has a closed reaction window, or a bar of the window or of the 20 sessions before it is missing, or the history is shorter | `bars/1d.close`, `bars/1d.volume`, `events/earnings.ts` |
 
 ## `ibkr_iv@v1`
 
@@ -1106,6 +1114,12 @@ Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on rea
 | `ex_div_before_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the target expiry (put_wing.target_expiry, the 30-60 day expiry the put and call wings use): a short call held to it risks early assignment, and a short put misses the dividend | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED: the source lists a date only about 30 days ahead, so null is 'none known yet', not 'none'), or no target expiry (put_wing NO_SPOT, NO_CHAIN or NO_EXPIRY) | `dividend_schedule.next_ex_date <= put_wing.target_expiry` | virtual |
 | `ex_div_before_nearest_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the nearest listed option expiry (nearest_expiry.expiry_date): a short option expiring then carries the dividend | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no stored chain with an expiry on or after the session | `dividend_schedule.next_ex_date <= nearest_expiry.expiry_date` | virtual |
 | `ex_div_before_call_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date falls on or before the covered-call wing's target expiry (call_wing.target_expiry): the early-assignment risk of the short call, and the dividend the shares collect if it is not assigned | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no call target expiry (call_wing NO_SPOT, NO_CHAIN or NO_EXPIRY) | `dividend_schedule.next_ex_date <= call_wing.target_expiry` | virtual |
+
+### `filings.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `eight_k_item_flag` | expression | bool | flag | open |  | An 8-K with Item 4.02 (non-reliance on prior financials), 4.01 (a change of auditor) or 5.02 (an officer or director departure) became known in the last 20 sessions (params.within_sessions); the filing counts from the first session whose close follows its SEC acceptance | the instrument has no row in filing_events (no tracked 8-K item, late-filing notice or tender offer became known in the last 60 sessions, or no filings backfill reaches the session): never read as no 8-K | `if(exists(filing_events), min(coalesce(filing_events.sessions_since_8k_4_02, 9999), coalesce(filing_events.sessions_since_8k_4_01, 9999), coalesce(filing_events.sessions_since_8k_5_02, 9999)) <= within_sessions, null)` (within_sessions = 20) | virtual |
 
 ### `forward.toml`
 

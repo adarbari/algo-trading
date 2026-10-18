@@ -1,0 +1,87 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: tender_offer_filed (EB E3). Idea page:
+# docs/edge-ideas/structural-niches.md (tender_offer_post_expiry_drift).
+id = "tender_offer_drift"
+name = "Tender-offer drift after expiry"
+thesis = "Stocks whose own tender offer for their shares has run its course outperform the market for a year or more afterwards."
+mechanism = """Management signals undervaluation with its own money; arbitrageurs who bought for the
+tender sell the pro-rated remainder at expiry, which makes the post-expiry dip the cheap entry;
+long-horizon investors are slow to re-rate (Lakonishok and Vermaelen 1990; Peyer and Vermaelen
+2009)."""
+persistence = """The events are small-cap and infrequent (about 20 to 40 US self-tenders a year), so
+funds ignore them; Peyer and Vermaelen (2009) show the anomaly survived its 1990 publication.
+Tender-specific evidence after 2010 is not on file, and the open-market buyback anomaly largely
+faded after 2003 (Fu and Huang 2016), so persistence is a claim to test."""
+family = "H"
+schedule = "on_event:tender_offer"
+top_k = 10
+base = "event"
+screeners = ["tender_offer_filed"]
+baselines = ["size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """The anchor is the session the SC TO-I or SC TO-T filing became known (the first session
+whose close follows its acceptance), not the expiry: the expiry is not stored. A tender offer must
+stay open at least 20 business days (SEC Rule 14e-1), so the entry is 21 sessions after the anchor
+(start_offset_sessions = 21; the decision session D is 20 sessions on), the earliest the offer can
+have expired; a longer or extended offer enters before expiry, and the harness cannot tell. That
+approximates the paper's "first close after expiry" and is the main limit of this edge. The class
+joins SC TO-I (the issuer's own offer) and SC TO-T (a third party's, a takeover): a third-party offer
+is a different event, and its target usually delists, so the issuer-only split is a follow-up (a new
+column of filing_events). The 250-session horizon outlasts the frozen period for any event filed
+since 2026-04-01, so only the 60-session read has a frozen slice for a long while. Filings coverage
+has a documented null history (decision log 2026-10-18); about 20 to 40 events a year make the
+independent count small."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [60, 250]
+benchmark = "SPY"
+start_offset_sessions = 21
+cost_bps = 20
+
+[quality_bar]
+outcome = """Excess return over SPY over 60 and 250 sessions after the entry close, 21 sessions
+after the tender offer became known (about when it can first have expired), net of 20 bps a round
+trip: a long hold after the offer."""
+trigger_timing = """The filing is known from the first session whose close follows its SEC acceptance
+(the anchor); the entry session S = anchor + 21 (start_offset_sessions = 21) and the decision
+session D = S - 1, 20 sessions after the anchor. The names are read at D from filing_events@v1
+(sessions_since_tender_offer = 20), a filing the session had not yet seen is never read. The
+expiry itself is not read: a tender offer open at least 20 business days has expired by S only if
+it was not extended."""
+replication = """The source's rule first: buy at the first close after expiry and hold two years
+(Lakonishok and Vermaelen 1990). Here tender_offer_filed v1 takes the liquid names with a tender
+offer 20 or more sessions old and the harness holds the 10 most liquid for 60 and 250 sessions
+(the 2-year hold exceeds the stored outcome history)."""
+expected_size = """Abnormal returns of about 9% for the full sample and about 23% for small firms
+after expiry (Lakonishok and Vermaelen 1990; the page marks the figure as not verified, so no
+published figure is set); post-2010 tender-specific evidence is not on file, and the page's own
+assumption is that the effect has halved. Roughly 20 to 40 events a year: independent events are the
+binding count, and 250-session outcomes need history the store reaches only from 2018."""
+capacity_costs = """Small and mid caps, long only, with a capacity of $20k to $100k a name on the
+page's estimate; the filter here (5M dollars a day) keeps only the liquid end, which is not where
+the largest drift sat. The outcome deducts 20 bps a round trip."""
+failure_modes = """A third-party tender offer (a takeover) delists the target and is not the issuer
+self-tender the thesis is about; an extended offer is entered early; the buyback anomaly faded after
+2003. Retire if the frozen-period excess return of the picks is not above the base rate of the
+other tender names after costs."""
+decoys = """Size and value (tender names are small and cheap) and the reversal of a price drop that
+prompted the offer: the size baseline. Overlaps any buyback idea (variant: tender only)."""
+
+[[sources]]
+title = "Lakonishok, J. and Vermaelen, T., Anomalous price behavior around repurchase tender offers, Journal of Finance, 1990"
+
+[[sources]]
+title = "Peyer, U. and Vermaelen, T., The nature and persistence of buyback anomalies, Review of Financial Studies, 2009"
+
+[[sources]]
+title = "Fu, F. and Huang, S., The persistence of long-run abnormal returns following stock repurchases and offerings, Management Science, 2016"

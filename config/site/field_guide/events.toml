@@ -763,3 +763,147 @@ value = 0
 mode = "soft"
 tolerance = 0
 note = "then rollup.price_stats@v2.ret_20d equals ret_ex_earnings_20d"
+
+[[field]]
+name = "rollup.earnings_date_shift@v1.earnings_shift_direction"
+theme = "events"
+reads = "Whether the next report date moved a week or more from last year's. earlier: the date is at least seven days before the year-ago report plus 364 days. later: at least seven days after. Null: no next date, no year-ago report to compare, or a move under a week. Johnson and So found early scheduling goes with good news and late scheduling with bad."
+caveats = [
+  "The calendar here is scheduled, never confirmed by the company. A date can move again, so read rollup.earnings_date_shift@v1.sessions_since_earnings_shift for how fresh the shift is.",
+  "The history starts at the first stored calendar snapshot. A date first stored at or before it says nothing about when it became known, so it is never a shift.",
+]
+sources = ["Johnson and So (2018), Time Will Tell: Information in the Timing of Scheduled Earnings News, Journal of Financial and Quantitative Analysis"]
+[[field.use]]
+for = "a report scheduled earlier than last year"
+op = "eq"
+value = "earlier"
+mode = "hard"
+note = "names with no shift or no year-ago report drop out"
+
+[[field]]
+name = "rollup.earnings_date_shift@v1.earnings_date_shift_days"
+theme = "events"
+reads = "Calendar days the next report date lies after the year-ago report plus 364 days. -10 is ten days earlier than a year ago. +10 is ten days later. Under a week either way is calendar noise, so rollup.earnings_date_shift@v1.earnings_shift_direction is null there."
+caveats = [
+  "Null when there is no next date or no report a year ago within 45 days of the same weekday. A new listing or a company that changed its fiscal calendar has none.",
+  "A fiscal-year change or a merger moves every date for a reason that is not news. Read rollup.earnings_expected@v1.expected_basis to see how the date is known.",
+]
+sources = ["Johnson and So (2018), Time Will Tell: Information in the Timing of Scheduled Earnings News"]
+[[field.use]]
+for = "the largest advance first"
+op = "lte"
+value = -7
+mode = "hard"
+note = "rank ascending to put the biggest advance first"
+
+[[field]]
+name = "feature.eight_k_item_flag"
+theme = "events"
+reads = "True when an 8-K with Item 4.02 (non-reliance on prior financials), 4.01 (a change of auditor) or 5.02 (an officer or director leaving or joining) became known in the last 20 sessions. Each counts from the first session whose close follows its SEC acceptance. False when the name has other tracked filings only. Null when the filings group has no row for it."
+caveats = [
+  "Item 5.02 also reports routine retirements and new hires, and 4.01 a planned auditor rotation. The flag cannot tell a forced exit from a routine one without reading the text.",
+  "Null is common: a name with no tracked 8-K item, late-filing notice or tender offer in 60 sessions has no row, and that is unknown, not clean. A hard 'eq true' keeps only the flagged.",
+]
+sources = ["Lerman and Livnat (2010), The New Form 8-K Disclosures, Review of Accounting Studies"]
+[[field.use]]
+for = "an adverse 8-K item this month (an avoid list)"
+op = "eq"
+value = true
+mode = "hard"
+note = "pair with rollup.price_stats@v2.adv_usd_20d to keep the names you could trade"
+
+[[field]]
+name = "rollup.filing_events@v1.sessions_since_late_filing"
+theme = "events"
+reads = "Exchange sessions since the latest NT 10-K or NT 10-Q (a Form 12b-25 late-filing notice) became known: 0 is today. It counts from the first session whose close follows the SEC acceptance. Null when none became known in the last 60 sessions. A company files one when it cannot file its annual or quarterly report on time."
+caveats = [
+  "The reason is in the text of the notice, which is not stored. A routine delay and an accounting problem look the same here.",
+  "Small and distressed companies file most of them. Gate on rollup.price_stats@v2.adv_usd_20d, or the screen holds names you cannot trade.",
+]
+sources = ["Dee, Hillison and Pacini (2010), Research in Accounting Regulation, on the reaction to late-filing notices by stated reason"]
+[[field.use]]
+for = "a late-filing notice in the last month"
+op = "lte"
+value = 20
+mode = "hard"
+note = "null (none known) names drop out"
+
+[[field]]
+name = "rollup.filing_events@v1.sessions_since_tender_offer"
+theme = "events"
+reads = "Exchange sessions since the latest SC TO-I (the issuer's own tender offer) or SC TO-T (a third party's) became known: 0 is today. Null when none became known in the last 60 sessions. A tender offer stays open at least 20 business days, so a name 20 or more sessions on is at or past the expiry."
+caveats = [
+  "The two forms are one column. A third-party offer for the company is a takeover, a different event from a self-tender: read the name's price against the offer before treating it as a buyback.",
+  "An extension keeps the offer open past 20 sessions, so a count above 20 does not prove it has expired. The expiry date is not stored.",
+]
+sources = ["Lakonishok and Vermaelen (1990), Anomalous price behavior around repurchase tender offers, Journal of Finance"]
+[[field.use]]
+for = "a tender offer past its minimum open period"
+op = "gte"
+value = 20
+mode = "hard"
+note = "null (none known) names drop out; the group looks back 60 sessions"
+
+[[field]]
+name = "rollup.index_changes@v1.last_index_change"
+theme = "events"
+reads = "The latest S&P 500 membership change of the name in the last 60 sessions: sp500_added (joined) or sp500_removed (left). Null when there was none. The date is the session the change was first stored, which is after the announcement, so this is a late read of the news."
+caveats = [
+  "A name leaves the index when it is bought, merged or shrinks. A removal after a takeover is not a demotion: rollup.price_stats@v2.close null or a delisted status exposes it.",
+  "The announcement is days before the date stored here. The announcement effect, which has faded, is already in the price.",
+]
+sources = ["Greenwood and Sammon (2022), The Disappearing Index Effect"]
+[[field.use]]
+for = "a name that left the S&P 500"
+op = "eq"
+value = "sp500_removed"
+mode = "hard"
+note = "pair with rollup.index_changes@v1.sessions_since_index_change for how recent"
+
+[[field]]
+name = "rollup.index_changes@v1.sessions_since_index_change"
+theme = "events"
+reads = "Exchange sessions from the session the latest S&P 500 membership change was first stored up to the session: 0 is the day it was stored. Null when the name had no change in the last 60 sessions."
+caveats = [
+  "The stored date lags the announcement and the effective date. A change stored 5 sessions ago was public before that.",
+  "Names that changed twice show only the latest change. Read rollup.index_changes@v1.last_index_change to see which way.",
+]
+sources = ["Greenwood and Sammon (2022), The Disappearing Index Effect"]
+[[field.use]]
+for = "a change in the last month"
+op = "lte"
+value = 20
+mode = "hard"
+note = "null (no change) names drop out"
+
+[[field]]
+name = "rollup.earnings_expected@v1.sessions_to_expected_report"
+theme = "events"
+reads = "Exchange sessions after the session up to the report date the session can expect: 0 reports today, 6 is a week away. The date is announced or the year-ago report plus 364 days, as rollup.earnings_expected@v1.expected_basis says."
+caveats = [
+  "A year-ago date can miss by days or weeks. For a window that must hold the report, read rollup.earnings_expected@v1.expected_basis eq SCHEDULED.",
+  "Null when no date is known. Options names report on a different calendar than the underlying in rare cases, so check rollup.earnings@v1.days_to_earnings if you hold options.",
+]
+sources = ["Aboody, Lehavy and Trueman (2010), Limited attention and the earnings announcement returns of past stock market winners, Review of Accounting Studies"]
+[[field.use]]
+for = "a report in the next week or so"
+op = "lte"
+value = 10
+mode = "hard"
+note = "null (no date) names drop out"
+
+[[field]]
+name = "rollup.earnings_gap_volume@v1.reaction_volume_ratio"
+theme = "events"
+reads = "How much the last report traded: the mean dollars a day over the three sessions around it (before, of and after) divided by the mean of the 20 sessions before that. 3 means the report drew three times the normal volume. 1 is an ordinary few days. It is the last report only, unlike rollup.earnings_reaction@v1.earnings_volume_ratio."
+caveats = [
+  "A heavy ratio can be an offering, a deal or an index change in the same window, not the report. Read rollup.earnings_reaction@v1.reaction_excess_return for what the price did.",
+  "Null when a bar of the window or of the 20 sessions before it is missing, or the history is short. A hard 'gte' drops those names.",
+]
+sources = ["Bernard and Thomas (1989), Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium?, Journal of Accounting Research"]
+[[field.use]]
+for = "a report that drew heavy volume"
+op = "gte"
+value = 3
+mode = "hard"
+note = "the episodic-pivot variant of the earnings drift screen asks 3"

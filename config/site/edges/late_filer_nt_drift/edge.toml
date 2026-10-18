@@ -1,0 +1,91 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: nt_late_filer (EB E3). Idea page:
+# docs/edge-ideas/events.md (late_filer_nt_drift).
+id = "late_filer_nt_drift"
+name = "Late filers (NT 10-K and NT 10-Q)"
+thesis = "Stocks that file a late-filing notice (Form 12b-25) keep drifting down over the following months."
+mechanism = """The notice is a weak-form admission of a problem: the company cannot file on time, and
+small firms with low attention are slow to be marked down until the delayed numbers arrive (Dee,
+Hillison and Pacini 2010; Impink et al. 2012)."""
+persistence = """It is a short-side idea in small caps where the borrow is hard, so arbitrage is
+costly; as a filter it asks nothing of the trader but the exclusion. The signs agree across
+studies and the magnitudes are modest and confounded by poor fundamentals, so persistence is a
+claim to test, not a given."""
+family = "B"
+schedule = "on_event:nt_late_filing"
+top_k = 20
+base = "event"
+screeners = ["nt_late_filer"]
+baselines = ["size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Short side, owner decision O2 (2026-10-17): a short result on liquid names may be a verdict
+basis; the outcome is minus the excess return over SPY, less cost and the assumed borrow (100 bps a
+year; no borrow data stored). The idea's own form is a filter (exclude late filers from a long
+screen); the harness tests it as the short side, which is the same claim stated so that a
+negative drift is a pass. The filers that clear the capacity floor (20-day dollar volume of
+$5M) are few, since late filers are mostly microcaps. Both NT 10-K and NT 10-Q are one event class
+(filing_events@v1, forms NT 10-K and NT 10-Q); the reason in the notice (boilerplate, accounting,
+an internal-control weakness) is in text that is not stored, so the reason-conditioned results of
+the papers (positive for specific legitimate reasons) are not tested. The event is the first
+session whose close follows the SEC acceptance. Filings coverage has a documented null history
+(decision log 2026-10-18)."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+side = "short"
+cost_bps = 20
+
+[quality_bar]
+outcome = """Minus the excess return over SPY over 20 and 60 sessions after the entry close (the
+session after the notice became known), net of 20 bps a round trip and the assumed borrow."""
+trigger_timing = """The notice is known from the first session whose close follows its SEC acceptance;
+that is the anchor and the decision session D, the entry session S = anchor + 1
+(start_offset_sessions = 1). The names are read at D from filing_events@v1
+(sessions_since_late_filing = 0), never from a notice accepted after D's close."""
+replication = """The source's rule first: the abnormal return after the notice and in the
+following months, by reason (Dee, Hillison and Pacini 2010; Cao, Chen and Higgs 2016). Here
+nt_late_filer v1 takes the liquid filers of the last 20 sessions, whatever the reason, and the
+harness shorts the 20 most liquid."""
+expected_size = """Modest and consistent in sign: a downward drift in the post-filing months for both
+forms (Cao, Chen and Higgs 2016 and the 2017 study summarised by CPA Practice Advisor), -1.35%
+when the reason is an internal-control weakness (Impink et al. 2012). The page gives no single
+number to compare, so no published figure is set. Late filers are few among liquid names: independent
+sessions are the binding count."""
+capacity_costs = """Late filers are mostly small and thin; the liquid ones are shorted at the
+borrow of a distressed name, which can be dear or recalled. The outcome deducts 20 bps and the
+site's assumed 100 bps a year; only names trading $5M a day or more are shorted. The usable form
+for an individual is the exclusion list."""
+failure_modes = """A boilerplate notice and a legitimate specific one look the same without the text;
+confounded by distress, low price and small size; the drift may already be in the price by the next
+close. Retire if the frozen-period short return of the picks is not above the base rate of the
+other late filers."""
+decoys = """Distress, low price and small size: the size baseline. Overlaps the 8-K Item 4.02 edge
+(a restatement often follows a late filing)."""
+
+[[sources]]
+title = "Dee, C., Hillison, W. and Pacini, C., Research in Accounting Regulation, 22(2), 2010 (the reaction to late-filing notices, by stated reason)"
+url = "https://ideas.repec.org/a/eee/reacre/v22y2010i2p121-127.html"
+
+[[sources]]
+title = "Impink, J., Lubberink, M., van Praag, B. and Veenman, D., Review of Accounting Studies, 17(2), 2012 (late-filing notices and internal-control weaknesses)"
+url = "https://ideas.repec.org/a/spr/reaccs/v17y2012i2d10.1007_s11142-011-9172-5.html"
+
+[[sources]]
+title = "S&P Global Market Intelligence, Late to File"
+url = "https://www.spglobal.com/marketintelligence/en/news-insights/research/late-to-file"
+
+[[sources]]
+title = "CPA Practice Advisor, Study Shows Investors Punish Companies for Late Financial Statements, 2017"
+url = "https://www.cpapracticeadvisor.com/2017/11/30/study-shows-investors-punish-companies-for-late-financial-statements/28096/"
