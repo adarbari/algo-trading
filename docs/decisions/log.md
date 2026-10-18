@@ -603,6 +603,22 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the nightly starts about 18:00 New York time and SEC lists 17:30-22:00 acceptances in the next day's index, so S's own 8-Ks are usually unstored when the nightly runs; counting through S read 0 live and 1 on a recompute. The span through S-1 gives the same value live and in a backtest. A history before the first nightly walk reads null. Known limits: the session after a market day EDGAR was closed reads null, and on a SEC-only holiday Friday an after-17:30 acceptance can be missing from the walked index until the next walk.
 
+## 2026-10-18 | EB H7 (buy/hold bands) | Where a band applies, long_short, and what the net series is
+- Question: which edges may carry `hold_rank`, what happens for `long_short`, how is a name's cost split between entry and exit, and which figures follow the banded series?
+- Options: allow a band on every schedule / only where decision sessions do not overlap; a band on both legs of a spread / refuse it; the whole round trip at entry / half in, half out; replace `pick_values` (and so every statistic) / keep gross figures and bind only the net series.
+- Decision: `long` and `short` `excess_return` with an integer `top_k`, on `month_end` or `every_session` at horizon 1; `long_short`, event and calendar schedules refused in the document; an entry and an exit each pay half a round trip, the last session exits (charged) and a coverage gap closes every position; hit rate, lift, decile spread, effect size and the floor stay the legs' own, the net series (Sharpe, deflated Sharpe, PBO, `mean_excess_picks`), the cost rows and the break-even follow the band; the break-even's turnover is read from the slope of the stored cost rows, no new column; hit counts at cost levels and the trade ledger stay per round-trip trade (follow-up).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the schedule limit is stricter than needed (plain-schedule windows never overlap; loosening is a later PR); a spread has no cost rows and no single book; half and half makes a name held through pay exactly one trip over its stay; gross figures must not move so the verdict's evidence is the same picks, and only what a trader pays changes.
+
+## 2026-10-18 | EB H7 (buy/hold bands) | One full re-run after LEG_VERSION 4
+- Question: who pays the re-run that LEG_VERSION 3 (H6) and 4 (H7) each force?
+- Options: a re-run after each / one after both.
+- Decision: one full re-run after both merge (`algotrade-backtest evaluate-edges --full`; the PR gives the command); H7 does not run it against the real store.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: every stored leg is recomputed by either bump, so two runs would spend the same hours twice.
+
 ## 2026-10-18 | PR #651 (D6, Form 4 insider transactions) | Storing the reporting owner's CIK and officer title
 - Question: may the insider transaction table store `owner_cik` and `officer_title` (public EDGAR fields that identify a natural person), or only a hashed owner key plus role flags?
 - Options: store `owner_cik` + `officer_title` as filed / store a salted hash of the owner CIK + role flags only / store role flags only (no per-person key).
@@ -610,3 +626,27 @@ follow-up PR).
 - decided by: Fable on the owner's behalf
 - status: pending owner confirmation
 - Reasoning: the owner CIK is an SEC public identifier the data set is keyed on; a hash buys nothing (the hash of a public id is trivially reversible against EDGAR) and loses the join to later filings, amendments (4/A) and the deep-dive dossier. Officer title is attribute data a cluster-buy edge weighs (CEO / CFO buys vs. director buys), stored as filed with no name. The cluster-insider-buy edge needs a distinct-insider count, so a stable per-person key is functionally required. Data never enters the public repo (store is local, git-ignored); the read model serves aggregates. Precedent: ADR 0040 keeps emails (private personal data) out of the repo, not public filing data out of the store. Erasure and shorter retention are owner-only decisions (log 2026-10-11), so the default event retention stands until the owner says otherwise.
+
+## 2026-10-18 | EB H5b (time-series base) | How a window edge is declared and judged
+- Question: how does a raw-return, named-instrument edge fit the edge document and the verdict without a new outcome kind or stored column?
+- Options: a new outcome kind `raw_return` and a new `edge_eval` column for the timing Sharpe / keep `excess_return` over benchmark `none` (legal only with `base = "out_of_window"`), named instruments as one `instrument.symbol in [...]` rule, the Welch t in the verdict's existing t slot and the timing Sharpe in the run record.
+- Decision: the second: no new outcome kind, no schema change; `decile_t` carries the Welch t (Promising t >= 2, Works t >= 3), `hit_rate` / `base_rate` the positive-window shares, `sharpe` / `picks_t` / the deflated Sharpe the in-window series, the random window sets are `role = random` rows; no variants and no per-session series, legs or ledger for such an edge.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the verdict, trial log and frozen split are reused unchanged, so a window edge cannot be judged more leniently than a cross-section one; a stored column and a series for a screen-less edge are a schema decision for when a page shows them. Known gap: the timing-versus-buy-and-hold Sharpe is in the run record only.
+
+## 2026-10-18 | EB H5b (time-series base) | The outcomes seam is a forbidden contract, not a widened one
+- Question: the plan says to widen "only cross_section/harness.py reads outcomes" to name `time_series/harness.py`.
+- Options: widen the named-modules list only / also add an import-linter contract confining the new package.
+- Decision: both: `time_series/harness.py` joins the named modules of `test_edge_outcomes_expressible.py`, and a forbidden contract keeps every other module of `services.evaluation.time_series` off `algotrade.data.outcomes`; the protected-module contract of 0053 (only `services.evaluation`) is unchanged.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the package-level contract already admits all of `services.evaluation`, so widening it would change nothing; the per-package contract is what makes "one reader" true for the new folder.
+
+## 2026-10-18 | EB H5b (PR 660 review) | The paired series carries the Sharpe, t and deflated Sharpe
+- Question: the in-window Sharpe, picks t and deflated Sharpe on raw window returns read drift, not timing.
+- Options: raw in-window series / each window minus the first stretch tiled right after it (unpaired windows counted, never filled).
+- Decision: the paired series; `decile_t` stays the Welch t, worded "In-window minus out-of-window t (Welch)" through `EdgeFacts.base`; several instruments deflate with the variance of their Sharpe ratios; `year_part` / `regime_part` slices added; Guide term `base_out_of_window`.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a rising instrument would otherwise pass Works on drift alone; the paired difference removes the instrument's drift without a model.

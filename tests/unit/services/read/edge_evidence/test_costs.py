@@ -99,6 +99,24 @@ def test_the_documents_own_cost_is_marked_and_break_even_is_exact_from_any_level
         assert break_even_cost(row_.mean_excess_picks, bp) == pytest.approx(GROSS * 1e4)
 
 
+def test_break_even_of_a_buy_hold_band_is_scaled_by_the_turnover_its_cost_rows_show() -> None:
+    """A band pays on entries and exits only: here 0.4 round trips per name, so the mean is
+    ``GROSS - 0.4 * bp / 1e4`` and the cost that wipes the gross out is ``GROSS / 0.4``, 312.5 bp
+    (a full round trip per name: 125 bp). The slope of the stored rows says the turnover."""
+    trips = 0.4
+    stored = cost_rows("all")
+    for r in stored:  # the mean falls by ``trips`` of the cost, not by all of it
+        r["mean_excess_picks"] = GROSS - trips * float(r["slice_value"].split(":")[1]) / 1e4
+    ctx, edge = site_world(stored)
+    basis = load_basis_rows(ctx, official_basis(ctx, edge))
+    by = {p.period: p for p in costs.costs_of(basis, OWN_BP, banded=True).periods}
+    assert by["all"].break_even_bp == pytest.approx(GROSS * 1e4 / trips)
+    plain = {p.period: p for p in costs.costs_of(basis, OWN_BP).periods}
+    assert plain["all"].break_even_bp != pytest.approx(GROSS * 1e4 / trips)  # not asked: unchanged
+    assert break_even_cost(GROSS - trips * 0.002, 20, 1.0, trips) == pytest.approx(312.5)
+    assert break_even_cost(0.01, 20, 1.0, 1.0) == break_even_cost(0.01, 20)  # no band: as it was
+
+
 def test_an_outcome_that_is_not_a_return_says_so_from_the_document_whatever_rows_exist() -> None:
     ctx, edge = site_world(cost_rows("all"))  # even a stray cost row does not make it a return
     assert edge.settings is not None and edge.settings.cost_applies  # excess_return: a return
