@@ -20,6 +20,7 @@ from algotrade_sources.vendors.sec.statement_concepts import (
     DURATION,
     INSTANT,
     STATEMENT_CONCEPTS,
+    STATEMENT_TAGS_VERSION_DATE,
 )
 from tests.conftest import REPO_ROOT
 
@@ -46,7 +47,7 @@ def test_the_concepts_and_their_tags_are_the_planned_ones() -> None:
     }  # fmt: skip
     assert STATEMENT_CONCEPTS["cost_of_revenue"][1][0] == "CostOfRevenue"  # best tag first
     assert "LiabilitiesAndStockholdersEquity" in STATEMENT_CONCEPTS["liabilities"][1]
-    assert len(ALL_TAGS) == len(set(ALL_TAGS)) == 35  # one concept per tag
+    assert len(ALL_TAGS) == len(set(ALL_TAGS)) == 39  # one concept per tag
 
 
 def test_the_recordings_read_the_alternative_tags_of_a_concept() -> None:
@@ -164,6 +165,23 @@ def test_instants_are_deduplicated_per_tag_and_date_with_restatements_kept() -> 
         "us-gaap:LiabilitiesAndStockholdersEquity"
     ]  # stored under liabilities, its own tag
     assert set(rows["period_type"]) == {INSTANT}
+
+
+def test_the_lease_inclusive_and_all_debt_tags_are_stored_as_debt() -> None:
+    """The parser keeps only listed tags: these four were the gap that left half the
+    operating companies without a debt total (ADR 0067)."""
+    tags = (
+        "LongTermDebtAndCapitalLeaseObligations",
+        "LongTermDebtAndCapitalLeaseObligationsCurrent",
+        "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+        "DebtLongtermAndShorttermCombinedAmount",
+    )
+    rows = parse_statements(_doc(**{t: [_row("2026-03-31", 5, "2026-05-01")] for t in tags}))
+    assert set(rows["concept"]) == {"debt"} and set(rows["tag"]) == {f"us-gaap:{t}" for t in tags}
+
+
+def test_the_source_carries_the_tag_list_date_the_shares_task_reads() -> None:
+    assert SecCompanyFacts.statements_tags_date == STATEMENT_TAGS_VERSION_DATE
 
 
 def test_durations_follow_the_flow_rule_and_a_loss_and_zero_are_kept() -> None:

@@ -1,4 +1,4 @@
-"""balance_sheet@v1: latest instant, look-ahead, tag rank, debt rules a/b/c in one filing,
+"""balance_sheet@v1: latest instant, look-ahead, tag rank, debt rules a to g in one filing,
 derived liabilities, the statuses and the financial flag."""
 
 from datetime import date, timedelta
@@ -115,6 +115,81 @@ def test_debt_rule_b_and_c() -> None:
     assert c["total_debt"] == 110.0 and c["debt_basis"] == "c"
     both = run(debt(*parts, ("DebtCurrent", 30.0)))
     assert both["debt_basis"] == "b"  # b before c
+
+
+N, C = instants.LEASE_NONCURRENT, instants.LEASE_CURRENT
+T, ALL = instants.LEASE_TOTAL, instants.ALL_DEBT
+
+
+def test_debt_rule_d_adds_the_noncurrent_and_current_parts_and_short_term_borrowings() -> None:
+    d = run(debt((N, 700.0), (C, 50.0), ("ShortTermBorrowings", 10.0), ("CommercialPaper", 5.0)))
+    assert d["total_debt"] == 760.0 and d["debt_basis"] == "d"  # never both short-term parts
+    assert run(debt((N, 700.0), (C, 50.0)))["total_debt"] == 750.0
+    paper = run(debt((N, 700.0), (C, 50.0), ("CommercialPaper", 5.0)))
+    assert paper["total_debt"] == 755.0
+    first = run(debt(("LongTermDebt", 1.0), (N, 700.0), (C, 50.0)))
+    assert first["debt_basis"] == "a"  # a, b and c come first: the older rules never move
+
+
+def test_debt_rule_e_f_and_g() -> None:
+    e = run(debt((N, 700.0), ("DebtCurrent", 60.0), ("ShortTermBorrowings", 9.0)))
+    assert e["total_debt"] == 760.0 and e["debt_basis"] == "e"  # DebtCurrent already has the 9
+    f = run(debt((T, 750.0), ("ShortTermBorrowings", 10.0)))
+    assert f["total_debt"] == 760.0 and f["debt_basis"] == "f"
+    g = run(debt((ALL, 900.0), ("ShortTermBorrowings", 10.0), (N, 700.0)))
+    assert g["total_debt"] == 900.0 and g["debt_basis"] == "g"  # a total is never added to parts
+    assert run(debt((N, 700.0), (C, 50.0), (T, 750.0)))["total_debt"] == 750.0  # d, not 1500
+    assert run(debt((N, 700.0), (C, 50.0), (ALL, 99.0)))["debt_basis"] == "d"
+
+
+def test_rules_b_and_c_keep_winning_when_all_four_new_tags_are_in_the_same_filing() -> None:
+    new = ((N, 700.0), (C, 50.0), (T, 750.0), (ALL, 900.0))
+    b = run(debt(("LongTermDebtNoncurrent", 80.0), ("LongTermDebtCurrent", 20.0), *new))
+    assert b["total_debt"] == 100.0 and b["debt_basis"] == "b"
+    c = run(debt(("LongTermDebtNoncurrent", 80.0), ("DebtCurrent", 30.0), *new))
+    assert c["total_debt"] == 110.0 and c["debt_basis"] == "c"
+    a = run(debt(("LongTermDebt", 95.0), ("ShortTermBorrowings", 5.0), *new))
+    assert a["total_debt"] == 100.0 and a["debt_basis"] == "a"
+    d = run(debt((N, 700.0), (C, 50.0), ("DebtCurrent", 60.0), (T, 750.0), (ALL, 900.0)))
+    assert d["total_debt"] == 750.0 and d["debt_basis"] == "d"  # d before e, f and g
+
+
+def test_an_incomplete_lease_inclusive_set_stays_not_tagged() -> None:
+    for parts in (
+        (N,), (C,), (N, "ShortTermBorrowings"), (N, "LongTermDebtCurrent"),
+        ("LongTermDebtNoncurrent", "ShortTermBorrowings"), ("DebtCurrent", "ShortTermBorrowings"),
+        ("LineOfCredit", "NotesPayable", "FinanceLeaseLiability"),
+    ):  # fmt: skip
+        row = run([*core(), *debt(*((t, 5.0) for t in parts))])
+        assert pd.isna(row["total_debt"]) and row["debt_basis"] == "NOT_TAGGED", parts
+
+
+def test_lease_inclusive_parts_of_two_filings_never_combine() -> None:
+    row = run(debt((N, 700.0), accn="A1") + debt((C, 50.0), accn="A2"))
+    assert pd.isna(row["total_debt"]) and row["debt_basis"] == "NOT_TAGGED"
+    row = run(debt((N, 700.0), accn="A1") + debt(("DebtCurrent", 60.0), accn="A2"))
+    assert pd.isna(row["total_debt"]) and row["debt_basis"] == "NOT_TAGGED"
+
+
+def test_a_newer_filing_with_a_new_rule_is_read_before_an_older_one() -> None:
+    both = debt(("LongTermDebt", 100.0), accn="A1") + [
+        fact("debt", t, v, filed=Q1 + timedelta(days=50), accn="A2")
+        for t, v in ((N, 7.0), (C, 3.0))
+    ]
+    row = run(both)
+    assert row["total_debt"] == 10.0 and row["debt_basis"] == "d"  # the newest filing, as before
+
+
+def test_a_debt_part_filed_after_the_session_is_never_read() -> None:
+    late = Q1 + timedelta(days=200)
+    assert late > SESSION
+    parts = [fact("debt", N, 700.0), fact("debt", C, 50.0, filed=late)]
+    row = run([*core(), *parts])
+    assert pd.isna(row["total_debt"]) and row["debt_basis"] == "NOT_TAGGED"  # d needs the part
+    assert run([*core(), *parts], session=late)["total_debt"] == 750.0  # read once it is public
+    total = [fact("debt", ALL, 1.0, filed=late)]
+    assert run([*core(), *total])["debt_basis"] == "NOT_TAGGED"
+    assert run([*core(), *total], session=late)["debt_basis"] == "g"
 
 
 def test_debt_parts_of_two_filings_never_combine() -> None:
