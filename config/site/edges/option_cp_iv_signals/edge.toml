@@ -13,7 +13,7 @@ Weinbaum 2010; Xing, Zhang and Zhao 2010; An, Ang, Bali and Cakici 2014)."""
 persistence = """The effect needs option data for hundreds of names and a weekly to monthly
 rebalance, and the parity deviation itself is blocked from arbitrage by borrow costs and early
 exercise. It declined over the original samples, which the authors read as arbitrage at work, so
-expect about half the published size (McLean and Pontiff 2016)."""
+find returns 26% lower out of sample and 58% lower after publication on average (McLean and Pontiff 2016)."""
 schedule = "every_session"
 universe = "liquid_common_stocks"
 top_k = 50
@@ -71,11 +71,11 @@ a rally), earnings-month IV ramps, the IV level (low idiosyncratic volatility) a
 
 [[sources]]
 title = "Cremers, M. and Weinbaum, D., Deviations from Put-Call Parity and Stock Return Predictability, Journal of Financial and Quantitative Analysis, 2010"
-url = "https://ideas.repec.org/a/cup/jfinqa/v45y2010i02p335-367.html"
+url = "https://ideas.repec.org/a/cup/jfinqa/v45y2010i02p335-367_00.html"
 
 [[sources]]
 title = "Xing, Y., Zhang, X. and Zhao, R., What Does the Individual Option Volatility Smirk Tell Us About Future Equity Returns?, Journal of Financial and Quantitative Analysis, 2010"
-url = "https://ideas.repec.org/a/cup/jfinqa/v45y2010i03p641-662.html"
+url = "https://ideas.repec.org/a/cup/jfinqa/v45y2010i03p641-662_00.html"
 
 [[sources]]
 title = "An, B.-J., Ang, A., Bali, T. and Cakici, N., The Joint Cross Section of Stocks and Options, Journal of Finance, 2014 (NBER working paper 19590)"

@@ -22,7 +22,7 @@ frozen_from = 2026-04-01
 notes = """volume_shock is today's volume at or above 2 standard deviations over the previous 20
 sessions (Gervais et al. use the top 10% of a 50-day reference: a looser, own-history version).
 volume_shock_no_news adds news_free_5d: no 8-K or 8-K/A through the previous session in the last 5
-and no earnings reaction window in them; it is a practitioner hypothesis with no published number.
+and no earnings reaction window in them; it is a practitioner hypothesis with no published number. The catalogue's variant also drops days with an absolute return of 1 standard deviation or more; the screener omits that condition.
 news_free_5d is null until the filings walk covers the session (filing_activity@v1 fails closed):
 the live store has no filing history until the filings backfill runs (EDGAR submissions from
 2018-01-01 is the planned span), so volume_shock_no_news has no sessions today. Once the backfill

@@ -36,6 +36,6 @@
 "volume_shock/v1.toml" = "1f2178cf97f63e165d56342fb5de84a1b3ea0dd45572f45d7021263c32bc9055"
 "volume_shock_no_news/v1.toml" = "f7997831b92fc3e34064529b76aad244a163e74afd117aa08f819409a773dd36"
 "dividend_month/v1.toml" = "1332475907ff590bf2715f0e74d7d0028ded35e383a49a3b130b445e390d39d9"
-"mispricing_composite/v1.toml" = "6f66590cbfde79c2ad02287643eae5ab377ffa4ac5d9f57f441d2fd51006a3be"
+"mispricing_composite/v1.toml" = "580f568249f6eec03d1cc6b14db315957c01b8ca48219dc716e8924ae0a301b2"
 "pre_earnings_reversal/v1.toml" = "cf4801042379da358d004a7073c6e6cb82efb87f87f46edcfe035e7da757a9e2"
 "earnings_neutral_reversal/v1.toml" = "3f172aeb7ccf979d66bad986717bc0c46b722f248598348a803d387bb3abcdbd"

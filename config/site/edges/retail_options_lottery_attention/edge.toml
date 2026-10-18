@@ -8,7 +8,7 @@ family = "H"
 thesis = "Lottery-like stocks with heavy option volume against their share volume, the names retail traders buy short-dated calls in, underperform over the next weeks."
 mechanism = """Retail traders buy short-dated out-of-the-money calls through wholesalers; market
 makers hedge by buying the stock, which lifts it transiently, and the pressure reverses; the
-calls are overpriced and retail pays wide spreads (Byun and Kim 2016; Bryzgalova, Pavlova and
+calls are overpriced (Byun and Kim 2016; Bryzgalova, Pavlova and
 Sikorskaya 2023)."""
 persistence = """Retail's preference for skewness is stable and zero-commission apps gamify it;
 the wholesalers internalise the flow, so institutions see it only indirectly, and shorting these
