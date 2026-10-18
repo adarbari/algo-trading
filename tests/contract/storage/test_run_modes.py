@@ -12,9 +12,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from algotrade.core.model.errors import DataValidationError
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.interfaces import Backend
+from algotrade.storage.tables.schemas import FILING_TEXT_EVENTS, spec_for
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import T0, stamped
 
@@ -22,6 +24,9 @@ DAY = date(2026, 10, 2)
 DIVIDENDS = "events/dividend"
 ROLLUP = "rollups/instrument/demo@v1"
 NIGHTLY = T0 + timedelta(hours=5)
+FILING_TEXT = FILING_TEXT_EVENTS.name  # edge build D10: a NULL item is one key (below)
+FILING_DAY = date(2026, 2, 11)
+FILING_LATER = T0 + timedelta(days=1)
 
 
 @pytest.fixture(params=["memory", "local"])
@@ -175,3 +180,94 @@ def test_runs_written_before_a_key_column_existed_merge_with_it_null(backend: Ba
         ("cheap", 0.4),
         ("main", 0.3),
     ]
+
+
+# --- events/filing_text (edge build D10): merge on (instrument, accession, item, parser_version)
+
+
+def filing_row(
+    item: str | None, text: str | None, version: int = 1, **kw: object
+) -> dict[str, object]:
+    return {
+        "instrument_id": "EQ:AAA",
+        "ts": pd.Timestamp("2026-02-10T21:30:00Z"),
+        "known_from": FILING_DAY,
+        "cik": "0000000001",
+        "form": "10-K",
+        "accession": "0000000001-26-000001",
+        "filing_date": date(2026, 2, 10),
+        "report_date": None,
+        "item": item,
+        "parser_version": version,
+        "text": text,
+        "char_count": len(text or ""),
+        "quality": "OK" if text else "NO_ITEMS",
+        "reason": None,
+        "method": "item_headers",
+        **kw,
+    }
+
+
+def write_filing_text(
+    backend: Backend, run: str, rows: list[dict[str, object]], at: object = T0
+) -> None:
+    frame = stamped(rows, FILING_DAY, run, at, "sec_edgar")  # type: ignore[arg-type]
+    StoreWriter(backend).write_table(FILING_TEXT, FILING_DAY, run, frame)
+
+
+def test_the_table_merges_on_the_item_and_version_key_with_the_stamps_required() -> None:
+    spec = spec_for(FILING_TEXT)
+    assert (spec.grain, spec.runs) == ("event", "merge")
+    assert spec.key == ("instrument_id", "accession", "item", "parser_version")
+    nullable = {c.name: c.nullable for c in spec.columns}
+    assert not nullable["known_from"] and not nullable["parser_version"] and not nullable["ts"]
+    assert nullable["item"] and nullable["text"] and nullable["reason"]
+
+
+def test_round_trip_keeps_types_and_the_null_item_and_text(backend: Backend) -> None:
+    write_filing_text(backend, "r1", [filing_row("1A", "Risk text"), filing_row(None, None)])
+    back = backend.tables.read(FILING_TEXT, FILING_DAY)
+    assert back is not None and len(back) == 2
+    by_item = back.set_index(back["item"].fillna("<null>"))
+    assert by_item.loc["1A", "text"] == "Risk text" and pd.isna(by_item.loc["<null>", "text"])
+    assert str(back["parser_version"].dtype) == "int64" and str(back["char_count"].dtype) == "int64"
+    assert pd.to_datetime(back["known_from"]).dt.date.eq(FILING_DAY).all()
+
+
+def test_a_rewritten_null_item_row_stays_one_row_and_a_later_run_wins(backend: Backend) -> None:
+    write_filing_text(backend, "r1", [filing_row(None, None), filing_row("1A", "old")])
+    write_filing_text(
+        backend,
+        "r2",
+        [filing_row(None, None, reason="again"), filing_row("1A", "new")],
+        FILING_LATER,
+    )
+    merged = backend.tables.read(FILING_TEXT, FILING_DAY)
+    assert merged is not None and len(merged) == 2  # the null item is one key, not a new row a run
+    assert sorted(merged["run_id"]) == ["r2", "r2"]
+    assert merged.loc[merged["item"] == "1A", "text"].iloc[0] == "new"
+
+
+def test_two_parser_versions_of_one_item_are_two_rows(backend: Backend) -> None:
+    write_filing_text(backend, "r1", [filing_row("1A", "v1 text")])
+    write_filing_text(
+        backend,
+        "r2",
+        [filing_row("1A", "v2 text", version=2, known_from=date(2026, 10, 5))],
+        FILING_LATER,
+    )
+    merged = backend.tables.read(FILING_TEXT, FILING_DAY)
+    assert merged is not None and sorted(merged["parser_version"]) == [1, 2]
+
+
+def test_as_of_pins_what_the_store_held(backend: Backend) -> None:
+    write_filing_text(backend, "r1", [filing_row("1A", "old")])
+    write_filing_text(backend, "r2", [filing_row("1A", "new")], FILING_LATER)
+    before = backend.tables.read(FILING_TEXT, FILING_DAY, as_of=FILING_LATER - timedelta(seconds=1))
+    assert before is not None and list(before["text"]) == ["old"]
+
+
+def test_a_row_without_its_acceptance_instant_or_known_from_is_rejected(backend: Backend) -> None:
+    for column in ("ts", "known_from", "accession", "parser_version"):
+        with pytest.raises(DataValidationError):
+            write_filing_text(backend, "bad", [filing_row("1A", "x", **{column: None})])

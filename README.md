@@ -229,6 +229,22 @@ nohup sh -c 'for i in 1 2 3 4 5 6 7 8; do .venv/bin/algotrade-ingest run filings
   > var/logs/filings-history.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/filings-history.status' >/dev/null 2>&1 &
 ```
 
+The 10-K / 10-Q item text (`filing-text`, edge build D10, `events/filing_text`; Items 1, 1A, 3, 7, 7A,
+9A of a 10-K and I-2, I-3, II-1, II-1A of a 10-Q) is one document request a filing (about 160k for the
+universe from 2010, at SEC's 5 a second plus parsing: 15-30 hours, 3-4 GB of Parquet; check `df` first).
+It runs in windows of filing dates, NEWEST FIRST so recent years are usable early, each window a loop
+of published runs of 100 CIKs (a CIK read for a covering window by an earlier run is skipped, so a
+killed loop restarts where it stopped; surplus runs read no CIK, `stats["pending"]` says how many are
+left):
+
+```bash
+nohup sh -c 'for w in "2021-01-01" "2016-01-01 --to 2020-12-31" "2010-01-01 --to 2015-12-31"; do
+  for i in $(seq 1 60); do .venv/bin/algotrade-ingest run filing-text --from $w --limit 100; done; done \
+  > var/logs/filing-text-history.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/filing-text-history.status' >/dev/null 2>&1 &
+```
+
+The nightly step (`filing-text`, optional, WARN-only) reads the last 14 days for the CIKs due a report.
+
 The `outcomes` backfill (ADR 0053: forward outcomes for the edge harness) takes about 1.3 s per
 window-end session over the whole universe, so the 500 stored sessions take about 11 minutes; one
 run per window end, so an interrupted backfill is resumed by starting it again from the last

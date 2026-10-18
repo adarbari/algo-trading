@@ -147,6 +147,10 @@ purpose = "reads of the feedback grain (feedback/, ADR 0066): the Describe-it ev
 contracts = ["Feedback reads are quarantined: only the read model's feedback loader imports them (ADR 0066)"]
 
 [[dir]]
+path = "src/algotrade/data/filing_text"
+purpose = "reads of events/filing_text (10-K / 10-Q Item sections, edge build D10): the rows known on a session (stamp floored by the acceptance session), the latest version per item; data/ is at its module cap, so the reads of this table are a folder"
+
+[[dir]]
 path = "src/algotrade/data/funds"
 purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035), the latest rows per fund and the CUSIP to ticker bridge; and a fund's shares outstanding from its issuer's file (holdings/etf_shares, EB D4)"
 

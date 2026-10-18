@@ -39,6 +39,20 @@ section = "docs/adr/0048-macro-series-with-vintages.md#decision"
 detect = [{ string = "series/observations" }, { string = "realtime_start" }]
 
 [[responsibility]]
+id = "filing-text-extraction"
+description = "Turn a 10-K / 10-Q document into its Item sections (edge build D10): the primary document fetched from the SEC archive (URL built from the accession and the submissions JSON's primaryDocument, a file name never a path, a block page, a stub or a textless document an error), read to visible text with the standard library parser and split by the Item header patterns written here (EDGAR-CRAWLER is GPL-3: never imported or vendored), the longest candidate per item winning over the table of contents, a quality flag per row, PARSER_VERSION bumped with any change that can change a text; the raw payload the run saves is the extraction, never the HTML"
+owner = [
+    "libs/sources/algotrade_sources/vendors/sec/filing_items.py",
+    "libs/sources/algotrade_sources/vendors/sec/filing_text.py",
+]
+allowed = [
+    "libs/sources/algotrade_sources/framework/registry.py",  # registers the adapter
+    "libs/sources/algotrade_sources/framework/series.py",  # the request and the frame names
+]
+section = "docs/data/vendors.md#10-k--10-q-item-sections-sec-edgar-edge-build-d10"
+detect = [{ call = "html_to_text" }, { call = "extract_text" }, { call = "extract_items" }]
+
+[[responsibility]]
 id = "rate-limiting"
 description = "Pace requests to a vendor: one limiter per key, shared across threads and processes (file lock under var/run/limits)"
 owner = ["libs/sources/algotrade_sources/framework/limiter.py"]

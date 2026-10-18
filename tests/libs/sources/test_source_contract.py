@@ -21,6 +21,7 @@ from algotrade_sources.framework.http import RetryPolicy
 from algotrade_sources.framework.series import (
     DailyIndexRequest,
     FilingsRequest,
+    FilingTextRequest,
     ReleaseRequest,
     SeriesRequest,
 )
@@ -44,6 +45,7 @@ from algotrade_sources.vendors.published.csv_series import PublishedSeries
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.daily_index import SecDailyIndex
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap
+from algotrade_sources.vendors.sec.filing_text import SecFilingText
 from algotrade_sources.vendors.sec.fund_objectives import (
     SecFundObjectives,
     SecFundSeries,
@@ -247,6 +249,17 @@ def sec_filings() -> Adapter:
     return SecFilings(http_for(lambda url: payload)), FilingsRequest("723125")
 
 
+def sec_filing_text() -> Adapter:
+    payload = (FIXTURES / "sec" / "10k_items_trimmed.htm").read_bytes()
+    request = FilingTextRequest(
+        key="0000320193-24-000123",
+        cik="320193",
+        form="10-K",
+        primary_document="aapl-20240928.htm",
+    )
+    return SecFilingText(http_for(lambda url: payload)), request
+
+
 def sec_daily_index() -> Adapter:
     payload = (FIXTURES / "sec" / "daily_index_form_20260930_trimmed.idx").read_bytes()
     request = DailyIndexRequest(key="2026-09-30", day=date(2026, 9, 30))
@@ -289,6 +302,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "fred_release_dates": fred_release_dates,
     "sec_filings": sec_filings,
     "sec_daily_index": sec_daily_index,
+    "sec_filing_text": sec_filing_text,
     "published": published,
     "treasury": treasury,
     "massive_tickers": massive_tickers,

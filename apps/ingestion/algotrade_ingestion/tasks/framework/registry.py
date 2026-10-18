@@ -17,7 +17,7 @@ from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.analyst import probe as analyst_probe
 from algotrade_ingestion.tasks.analyst import snapshot as analyst_snapshot
 from algotrade_ingestion.tasks.derived import history_copy, market_rollups, outcomes, rollups
-from algotrade_ingestion.tasks.events import filings
+from algotrade_ingestion.tasks.events import filing_text, filings
 from algotrade_ingestion.tasks.framework import (
     entries_market,
     entries_ops,
@@ -372,6 +372,36 @@ TASKS: dict[str, Task] = {
                 ),
                 Param("symbols", ("--symbols",), str, "only these tickers (default: the universe)"),
                 Param("limit", ("--limit",), int, "per-CIK reads: fetch at most N CIKs this run"),
+            ),
+        ),
+        Task(
+            "filing-text",
+            "item sections of the 10-K / 10-Q of every operating company (events/filing_text: "
+            "1, 1A, 3, 7, 7A, 9A of a 10-K; I-2, I-3, II-1, II-1A of a 10-Q); --from [--to] "
+            "backfills a filing-date window (--limit CIKs a run, resumable; history from "
+            "2010: newest windows first), the default is the nightly increment of the CIKs "
+            "due a report",
+            filing_text,
+            (filing_text.TABLE,),
+            entries_market.run_filing_text,
+            sources=("sec_filings", "sec_filing_text"),
+            settings="sources.toml [sec_edgar]",
+            params=(
+                SESSION,
+                Param(
+                    "start",
+                    ("--from",),
+                    date.fromisoformat,
+                    "backfill: filings filed on or after this date (default: the nightly "
+                    "increment of the CIKs due a report)",
+                ),
+                TO,
+                Param("symbols", ("--symbols",), str, "only these tickers (default: the universe)"),
+                Param(
+                    "limit", ("--limit",), int, "backfill: at most N CIKs this run (default 100)"
+                ),
+                Param("items", ("--items",), str, "item ids kept, comma list (1A,7 / I-2,II-1A)"),
+                Param("force", ("--force",), None, "fetch filings and CIKs already read again"),
             ),
         ),
         Task(

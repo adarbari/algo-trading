@@ -121,6 +121,9 @@ PURGE = "purge-raw"
 # catch-up skipped its screens and served a complete session without screener runs).
 SNAPSHOT = "the source serves only its current snapshot"
 NEW_SINCE_STORED = "it reads every filing since the latest stored one, so one run covers all"
+LOOKBACK_WINDOW = (
+    "it reads the last 14 days of reports, so the latest session's run covers this one"
+)
 FORWARD_RECORD = "paper picks are made only on the night they are for (a later one is no record)"
 WHOLE_YEAR = "it copies the whole year in one run, so the latest session's run covers this one"
 MARKET_DATA = ("bars", "rates", "corporate-actions", "earnings", "chains")
@@ -166,6 +169,10 @@ NIGHTLY: tuple[Step, ...] = (
     # filing, so a night reads the new ones; their Item 2.02 releases are earnings rows. Optional:
     # a failed night is read again the next (the default start is the latest stored filing).
     Step("filings", latest_only=NEW_SINCE_STORED, critical=False, accept_with=(check_filings,)),
+    # The Item sections of the 10-K / 10-Q the CIKs due a report filed in the last 14 days (edge
+    # build D10): optional and WARN-only (a PARTIAL run with nothing stored yet is a WARN, a failed
+    # night is read again); nothing reads it nightly yet (history accrues for track E).
+    Step("filing-text", needs=("filings",), latest_only=LOOKBACK_WINDOW, critical=False),
     Step("earnings", accept=(check_earnings,), task_complete=True),
     Step("bars", accept=(check_bars, check_bars_resolved)),
     Step("rates", task_complete=True),

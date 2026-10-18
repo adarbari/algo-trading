@@ -161,6 +161,29 @@ the same numbers but its terms forbid automation: never used. BDCs have no daily
 The Tiingo licence is personal (`[tiingo] licence`): features derived from `events/fund_nav` must
 carry it (ADR 0028), and readers go through `data.events` with `through` = the session.
 
+### 10-K / 10-Q item sections (SEC EDGAR, edge build D10)
+
+The text behind Lazy Prices, risk-factor change and MD&A tone. Per filing, one request for the
+`primaryDocument` of the submissions JSON (inline-XBRL HTML, 0.3-10 MB) at
+`https://www.sec.gov/Archives/edgar/data/<cik>/<accession>/<primaryDocument>`, on the shared `sec`
+limiter (10 requests a second at most, the contact `User-Agent`); the listing is the existing
+`sec_filings` source read with the periodic forms (10-K, 10-K/A, 10-Q, 10-Q/A: an amendment is its
+own filing with its own accession and acceptance time). `vendors/sec/filing_items.py` turns the
+HTML into plain text (standard library parser, no dependency) and splits the Item sections with
+header patterns written here (EDGAR-CRAWLER is GPL-3: never imported or vendored; EDGAR-CORPUS,
+Apache-2.0, is 10-K only to 2020 and 40 GB: not used). Only the sections are stored, never the
+HTML (raw saved by the run is the extraction, 7-day retention): `events/filing_text`, one row per
+instrument, filing, item and parser version, `text` plain, `quality` OK / SHORT / TRUNCATED /
+NOT_FOUND / NO_ITEMS, `known_from` the acceptance session (a later extraction that changes a text
+is known only from the fetch's session). Kept by default: 10-K items 1, 1A, 3, 7, 7A, 9A; 10-Q
+`I-2` (MD&A), `I-3`, `II-1`, `II-1A`; the notes to the statements are the Financial Statement and
+Notes data sets' (track E). Size: about 175 KB of text a 10-K and 60 KB a 10-Q, 4x smaller in
+zstd Parquet, so about 90 KB per filer-year: 2,000 filers over 2010-2025 is about 2.7 GB, 5,000
+names over their history about 3.6 GB. History: 4 CIK windows newest first, about 160k documents
+at 5 a second plus parse time, 15-30 hours detached (README "Long runs"); the nightly increment
+is optional and WARN-only. Readers go through `data.filing_text` (`known_from <= S`, the latest
+version per item).
+
 ### S&P 500 membership history (fja05680/sp500; edges ED6b-3)
 
 `sp500_ticker_start_end.csv` of https://github.com/fja05680/sp500 (MIT licence, free, no key):

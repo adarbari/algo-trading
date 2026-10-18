@@ -73,6 +73,7 @@ from algotrade_sources.vendors.published.csv_series import PublishedSeries
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.daily_index import SecDailyIndex, missing_index
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap, user_agent
+from algotrade_sources.vendors.sec.filing_text import SecFilingText
 from algotrade_sources.vendors.sec.fund_objectives import (
     SecFundObjectives,
     SecFundSeries,
@@ -263,6 +264,7 @@ SOURCES: dict[str, SourceSpec] = {
         _sec("sec_tickers", SecTickerMap),
         _sec("sec_submissions", SecSubmissions),
         _sec("sec_filings", SecFilings),
+        _sec("sec_filing_text", SecFilingText),
         _sec("sec_daily_index", SecDailyIndex, not_found=missing_index),
         _sec("sec_company_facts", SecCompanyFacts),
         _sec("sec_nport_holdings", NportHoldings),
