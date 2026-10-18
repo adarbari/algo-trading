@@ -2,16 +2,25 @@
 fails closed with the file and the key; rejected and blocked documents need their reason and
 may leave the quality bar unanswered."""
 
-from dataclasses import fields
+from dataclasses import asdict, fields
 from datetime import date
 from typing import Any
 
 import pytest
 
-from algotrade.config.edges.document import QUALITY_BAR, STATUSES, Edge, Published, parse_edge
+from algotrade.config.edges.document import (
+    QUALITY_BAR,
+    SIDES,
+    STATUSES,
+    Edge,
+    Published,
+    identity_dict,
+    parse_edge,
+)
 from algotrade.config.edges.follow import AUDIT_LABELS, BOOKMARK_LABELS, Follow
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.storage.tables.edge_schemas import EDGE_EVAL, EDGE_LEGS, EDGE_TRADES
 from tests.unit.services.evaluation.cross_section.conftest import edge
 
 WHERE = "config/site/edges/drift.toml"
@@ -169,6 +178,26 @@ def _outcome(**changes: Any) -> dict[str, Any]:
         ({"outcome": _outcome(measure="sharpe")}, "measure: expected one of"),
         ({"outcome": _outcome(max_drawdown=1.5)}, "max_drawdown: expected a fraction"),
         ({"outcome": _outcome(cost_bps=-1)}, "cost_bps: expected a number >= 0"),
+        ({"outcome": _outcome(side="flat")}, "side: expected one of"),
+        ({"outcome": _outcome(borrow_bps_annual=50)}, "only a short leg pays borrow"),
+        (
+            {"outcome": _outcome(side="short", max_drawdown=0.2), "top_k": 5},
+            "'short' needs an excess_return outcome with no max_drawdown",
+        ),
+        (
+            {
+                "outcome": _outcome(
+                    side="long_short",
+                    kind="hit_target",
+                    target=1,
+                    measure="excess_return",
+                    direction="above",
+                ),
+                "top_k": 5,
+            },
+            "'long_short' needs an excess_return outcome",
+        ),
+        ({"outcome": _outcome(side="short")}, "a 'short' outcome ranks the names"),  # top_k all
         (
             {"outcome": _outcome(start_offset_sessions=-5)},
             "an entry before the event needs it announced ahead",
@@ -467,3 +496,41 @@ def test_the_published_table_is_optional_typed_and_checked_against_the_document(
 def test_a_published_table_fails_closed(published: dict[str, Any], match: str) -> None:
     with pytest.raises(ConfigurationError, match=match):
         parse(published=published)
+
+
+def test_an_outcome_side_defaults_to_long_and_a_short_or_long_short_names_its_borrow() -> None:
+    assert parse().outcome.side == "long" and parse().outcome.borrow_bps_annual is None
+    for side in ("short", "long_short"):
+        got = parse(top_k=5, outcome=_outcome(side=side, borrow_bps_annual=75)).outcome
+        assert (got.side, got.borrow_bps_annual) == (side, 75.0)
+
+
+def test_a_variant_may_compare_sides_and_is_held_to_the_same_rules() -> None:
+    got = parse(
+        top_k=5,
+        variants=[{"id": "avoid", "outcome": {"side": "short"}}],
+    )
+    assert [v.outcome.side for v in got.variants] == ["short"]
+    with pytest.raises(ConfigurationError, match="a 'short' outcome ranks the names"):
+        parse(variants=[{"id": "avoid", "outcome": {"side": "short"}}])  # top_k = "all"
+
+
+def test_a_long_outcome_hashes_as_it_did_before_sides() -> None:
+    """No stored leg or run is recomputed by the arrival of sides: the identity of a long outcome
+    has no side key, a short one's has."""
+    assert "side" not in identity_dict(asdict(parse().outcome))
+    assert (
+        "borrow_bps_annual"
+        not in identity_dict({"outcomes": [asdict(parse().outcome)]})["outcomes"][0]
+    )
+    short = parse(top_k=5, outcome=_outcome(side="short")).outcome
+    assert identity_dict(asdict(short))["side"] == "short"
+
+
+def test_every_outcome_side_is_a_column_of_the_results_the_ledger_and_the_legs() -> None:
+    """Fitness: the side is stored with every result and ledger row, and a long-short leg's short
+    values with its leg (the Guide term of each value: ``tests/architecture/guide``)."""
+    assert SIDES == ("long", "short", "long_short")
+    for table in (EDGE_EVAL, EDGE_TRADES):
+        assert "side" in [c.name for c in table.columns]
+    assert "short_values" in [c.name for c in EDGE_LEGS.columns]

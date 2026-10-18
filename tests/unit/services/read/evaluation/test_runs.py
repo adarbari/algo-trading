@@ -9,6 +9,7 @@ import pytest
 from algotrade.core.time.calendar import is_session
 from algotrade.services.read.evaluation.edges import load_edge, load_edges
 from algotrade.services.read.evaluation.runs import (
+    _row,
     load_canonical_run,
     load_edge_runs,
     load_run_draws,
@@ -315,3 +316,10 @@ def test_the_touch_and_reference_rates_are_read_and_none_when_not_stored_never_z
     by = {r.slice_kind: r for r in load_run_rows(ctx, run) if r.variant == "momo"}
     assert (by["in_sample"].reference_rate, by["in_sample"].touch_rate) == (0.63, 0.54)
     assert by["frozen"].reference_rate is None and by["frozen"].touch_rate is None
+
+
+def test_a_row_serves_its_side_and_one_from_before_sides_is_long() -> None:
+    base = row("momo", "all", 0.6, None)
+    assert _row(base).side == "long"  # no column: a run from before sides
+    assert _row({**base, "side": float("nan")}).side == "long"  # a null in a frame is NaN
+    assert _row({**base, "side": "short"}).side == "short"

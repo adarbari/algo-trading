@@ -895,7 +895,7 @@ type EdgeVariants {
 }
 
 """
-An edge's verdict, judged on its official result (the canonical run): `verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` the first failing criterion in words; `headline` the page's sentence and `result` the list's one-liner; `basis` the screen and holding period it rests on (`basisWhy`: for a basis chosen among several, the in-sample lifts it was chosen on). The figures are the basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; `trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` the lift among random-pick backtests; `columns` the basis's figures in-sample, out-of-sample and over all (empty: no result yet); `evidence` the trades against what the verdict needs; `haircut` the basis's Sharpe ratio after the variants tried; `decay` the paper's figure against the in- and out-of-sample ones
+An edge's verdict, judged on its official result (the canonical run): `verdict` is works, promising, not_working, not_enough_data or waiting_on_data; `rationale` the first failing criterion in words; `headline` the page's sentence and `result` the list's one-liner; `basis` the screen and holding period it rests on (`basisWhy`: for a basis chosen among several, the in-sample lifts it was chosen on). The figures are the basis's out-of-sample ones (`trades`: the whole result's); `liftPts` is win rate minus base rate in points, `lift` the ratio. `criteria` and `years` feed the details panel; `trials` the variants tried on the edge, `deciles` the in-sample mean outcome of each tenth of the screen's ranking, best-ranked first (empty: not stored, never zeros), `robustness` the lift among random-pick backtests; `columns` the basis's figures in-sample, out-of-sample and over all (empty: no result yet); `evidence` the trades against what the verdict needs; `haircut` the basis's Sharpe ratio after the variants tried; `decay` the paper's figure against the in- and out-of-sample ones; `side` the basis's outcome side: long, short (the bottom of the ranking, after an assumed borrow cost) or long_short (a spread: diagnostic, never a verdict basis)
 """
 type EdgeVerdict {
   verdict: String!
@@ -904,6 +904,7 @@ type EdgeVerdict {
   result: String!
   basis: String
   basisWhy: String!
+  side: String!
   trades: Int
   oosTrades: Int
   winRate: Float

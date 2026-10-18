@@ -65,3 +65,13 @@ def test_a_document_overrides_and_an_unknown_key_fails() -> None:
 def test_the_committed_file_parses_to_the_defaults() -> None:
     doc = tomllib.loads(Path("config/site/verdict.toml").read_text())
     assert VerdictSettings.from_document(doc) == VerdictSettings()
+
+
+def test_the_assumed_borrow_cost_defaults_reads_and_rejects_a_bad_value() -> None:
+    assert VerdictSettings.from_document(None).borrow_bps_annual == 100.0
+    read = VerdictSettings.from_document({"edge_costs": {"borrow_bps_annual": 250}})
+    assert read.borrow_bps_annual == 250.0
+    assert read.cost_levels_bps == (0.0, 15.0, 30.0, 50.0)  # the grid keeps its default
+    for bad in (-1, "100", True):
+        with pytest.raises(ConfigurationError, match="borrow_bps_annual"):
+            VerdictSettings.from_document({"edge_costs": {"borrow_bps_annual": bad}})

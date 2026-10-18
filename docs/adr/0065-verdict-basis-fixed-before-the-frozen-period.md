@@ -74,3 +74,14 @@ changed or dropped (`test_the_basis_is_invariant_to_any_change_of_the_out_of_sam
 - `promoted` was chosen by ED7c on frozen-slice numbers; it is a reviewed declaration, used as
   written. No site edge is promoted today.
 - The Guide term `verdict_basis` states the rule and why.
+
+## Amendment 2026-10-17: the basis names a side (outcome sides, ADR 0053 amendment)
+
+The basis is chosen among candidates of the main edge variant, whose outcome has one side
+(`long`, `short` or `long_short`). A `short` candidate may be a basis: it is ranked and judged on
+its own in-sample and out-of-sample figures like a long one, over liquid names only (the short
+leg's dollar-volume floor and the assumed borrow cost are in its figures, `verdict.toml`).
+A `long_short` candidate is never a basis (owner decision 2026-10-17: a spread cannot be traded
+by buying alone and the broker access is read-only); an edge whose candidates are all
+`long_short` has no basis and waits, with that reason. Promising still needs t >= 2 and Works
+t >= 3 on both t series. The verdict and the edge page carry the basis's side.

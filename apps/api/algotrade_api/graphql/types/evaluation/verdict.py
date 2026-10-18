@@ -450,7 +450,9 @@ class EdgeDecay:
     "the lift among random-pick backtests; `columns` the basis's figures in-sample, "
     "out-of-sample and over all (empty: no result yet); `evidence` the trades against what the "
     "verdict needs; `haircut` the basis's Sharpe ratio after the variants tried; `decay` the "
-    "paper's figure against the in- and out-of-sample ones"
+    "paper's figure against the in- and out-of-sample ones; `side` the basis's outcome side: long, "
+    "short (the bottom of the ranking, after an assumed borrow cost) or long_short (a spread: "
+    "diagnostic, never a verdict basis)"
 )
 class EdgeVerdict:
     verdict: str
@@ -459,6 +461,7 @@ class EdgeVerdict:
     result: str
     basis: str | None
     basis_why: str
+    side: str
     trades: int | None
     oos_trades: int | None
     win_rate: float | None
@@ -489,6 +492,7 @@ class EdgeVerdict:
             result=d.result,
             basis=d.basis,
             basis_why=d.basis_why,
+            side=d.side,
             trades=d.trades,
             oos_trades=d.oos_trades,
             win_rate=d.win_rate,

@@ -24,6 +24,7 @@ from typing import Any
 import graphql
 import pytest
 
+from algotrade.config.edges.document import SIDES
 from algotrade.config.site.guide.glossary import load_guide_glossary
 from algotrade.config.site.guide.start import ENTRY_KINDS
 from algotrade.config.user import SITE_USER, UserContext
@@ -227,6 +228,14 @@ def entries() -> set[str]:
 @pytest.fixture(scope="module")
 def sources() -> dict[str, tuple[str, ...] | None]:
     return schema_sources((REPO_ROOT / "apps/api/schema.graphql").read_text())
+
+
+def test_every_outcome_side_has_a_guide_term(entries: set[str]) -> None:
+    """``EdgeVerdict.side`` is shown beside the basis (a chip for a side other than ``long``) and
+    is not named like a status, so ``STATUS_LIKE`` does not find it: each value of ``SIDES`` is
+    a term ``side_<value>`` here instead (ADR 0053 amendment, outcome sides)."""
+    missing = [f"side_{v}" for v in SIDES if f"term:side_{v}" not in entries]
+    assert not missing, f"no Guide term for the outcome side(s) {missing}; {FIX}"
 
 
 def assert_pinned(coverage: dict[str, Any], name: str, size: int) -> None:

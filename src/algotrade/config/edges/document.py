@@ -17,7 +17,14 @@ and the key.
                       option is not assigned at the horizon's close: put | call | strangle) names
                       its ``structure``, exactly one of ``strike_delta`` (a delta in (0, 1)) and
                       ``otm_pct`` (a fraction in (0, 1)) and the ``iv_field`` it reads at D;
-                      ``iv_field`` is allowed on a ratio measure too (default: the run's)
+                      ``iv_field`` is allowed on a ratio measure too (default: the run's);
+                      ``side`` (SIDES; ADR 0053 amendment, outcome sides): ``long`` (default),
+                      ``short`` (the picks are the bottom ``top_k`` of the ranked, liquid names;
+                      the value is minus the excess return, less cost and borrow) or
+                      ``long_short`` (the top ``top_k`` minus the bottom: a spread, diagnostic
+                      only); a side other than long needs an ``excess_return`` outcome, no
+                      ``max_drawdown``, an integer ``top_k``; optional ``borrow_bps_annual``
+                      (default from ``verdict.toml``) is the short leg's assumed borrow cost
     schedule          ``every_session`` | ``month_end`` | ``on_event:<class>`` (EVENT_CLASSES)
     base              what the picks are compared with: ``event`` (the names with the event at
                       D; default for an event schedule) | ``universe`` (every eligible name)
@@ -88,6 +95,8 @@ CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not
 OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm")
 STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
 BENCHMARKS = ("SPY", "none")
+LONG, SHORT, LONG_SHORT = "long", "short", "long_short"
+SIDES = (LONG, SHORT, LONG_SHORT)  # which names an outcome holds and in which direction
 SCHEDULES = ("every_session", "month_end")
 BASES = ("event", "universe")
 PICKS = ("event", "universe")  # where an event schedule's picks may come from
@@ -134,6 +143,7 @@ KEYS = (
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
+    "side", "borrow_bps_annual",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -165,6 +175,8 @@ class Outcome:
     strike_delta: float | None = None
     otm_pct: float | None = None
     iv_field: str | None = None
+    side: str = LONG  # SIDES; a short leg pays ``borrow_bps_annual`` (None: the site's default)
+    borrow_bps_annual: float | None = None
 
     @property
     def is_return(self) -> bool:
@@ -324,6 +336,14 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     base = _base(t, schedule)
     picks = _picks(t, schedule, base)
     sources = _sources(t)
+    top_k = _top_k(t)
+    variants = _variants(t, schedule, edge_id, universe, base, picks)
+    for held in (outcome, *(v.outcome for v in variants)):
+        if held.side != LONG and top_k is None:
+            raise ConfigurationError(
+                f"{where} top_k: a {held.side!r} outcome ranks the names, so it needs an "
+                f"integer top_k, not 'all'"
+            )
     edge = Edge(
         id=edge_id,
         name=_required(t, "name"),
@@ -333,7 +353,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         outcome=outcome,
         schedule=schedule,
         universe=universe,
-        top_k=_top_k(t),
+        top_k=top_k,
         screeners=_ids(t, "screeners"),
         baselines=_ids(t, "baselines"),
         status=status,
@@ -344,7 +364,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         frozen_from=_frozen_from(t),
         base=base,
         picks=picks,
-        variants=_variants(t, schedule, edge_id, universe, base, picks),
+        variants=variants,
         scorer_features=_scorer_features(t),
         evidence=_evidence(t),
         published=_published(t, outcome, len(sources)),
@@ -533,6 +553,9 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
     if drawdown is not None and not 0 < drawdown <= 1:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
     structure, strike_delta, otm_pct, iv_field = _expires_otm(o, kind)
+    side = o.choice("side", LONG, SIDES)
+    borrow = o.number("borrow_bps_annual", None, 0)
+    _check_side(o, side, borrow, kind, drawdown)
     return Outcome(
         kind=kind,
         horizon_sessions=horizons,
@@ -547,7 +570,40 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
         strike_delta=strike_delta,
         otm_pct=otm_pct,
         iv_field=iv_field,
+        side=side,
+        borrow_bps_annual=borrow,
     )
+
+
+def _check_side(
+    o: Table, side: str, borrow: float | None, kind: str, drawdown: float | None
+) -> None:
+    """A short or long-short outcome is an excess return with no drawdown limit (the dip of a
+    short is the rally, which the store keeps apart); the borrow cost belongs to a short leg."""
+    if side == LONG:
+        if borrow is not None:
+            raise ConfigurationError(f"{o.where} borrow_bps_annual: only a short leg pays borrow")
+        return
+    if kind != "excess_return" or drawdown is not None:
+        raise ConfigurationError(
+            f"{o.where} side: {side!r} needs an excess_return outcome with no max_drawdown"
+        )
+
+
+def identity_dict(value: Any) -> Any:
+    """``value`` (an ``asdict`` of an edge or outcome) without the side keys of a long outcome:
+    a document that never named a side hashes as it did before sides, so no stored leg or
+    run is recomputed by their arrival (ADR 0053 amendment, outcome sides)."""
+    if isinstance(value, dict):
+        long = value.get("side") == LONG and value.get("borrow_bps_annual") is None
+        return {
+            k: identity_dict(v)
+            for k, v in value.items()
+            if not (long and k in ("side", "borrow_bps_annual"))
+        }
+    if isinstance(value, (list, tuple)):
+        return [identity_dict(v) for v in value]
+    return value
 
 
 def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:

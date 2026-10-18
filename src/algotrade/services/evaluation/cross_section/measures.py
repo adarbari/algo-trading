@@ -46,7 +46,9 @@ class Pick:
     best first, from 1; ``score``: the screen's score at D (read with ``as_of = None``, ADR 0063);
     ``gross``: the stored excess return before cost (a return outcome, counted); ``drawdown``:
     the window's ``fwd_max_drawdown``; ``adv``: ``adv_usd_20d`` at D; ``reference`` / ``touch``:
-    an ``expires_otm`` pick's. A value not known is None, never 0."""
+    an ``expires_otm`` pick's; ``side``: ``short`` for a name the leg is short (its ``value`` and
+    ``hit`` are those of the short: ``hit.apply_outcome``'s ``short_value``). A value not known
+    is None, never 0."""
 
     instrument_id: str
     rank: int
@@ -60,6 +62,7 @@ class Pick:
     adv: float | None = None
     reference: float | None = None
     touch: bool | None = None
+    side: str = "long"
 
 
 @dataclass(frozen=True)
@@ -102,6 +105,17 @@ class SessionStat:
     # () when the outcome is not a return (cost does not apply) or the session is not measured.
     base_hits_at: tuple[int, ...] = ()
     pick_hits_at: tuple[int, ...] = ()
+    # ``long_short`` only (None for every other side): the net values of the counted short-leg
+    # names, ``-excess - cost - borrow`` each; ``pick_values`` are then the long leg's.
+    short_values: tuple[float, ...] | None = None
+
+    @property
+    def spread_value(self) -> float | None:
+        """A ``long_short`` session's value: the long leg's mean plus the short leg's mean (each
+        net of its costs), None unless both legs have a counted name (never half a spread)."""
+        if self.short_values is None or not self.pick_values or not self.short_values:
+            return None
+        return float(np.mean(self.pick_values) + np.mean(self.short_values))
 
     @property
     def eligible(self) -> int:
@@ -109,6 +123,9 @@ class SessionStat:
 
     @property
     def pick_mean(self) -> float | None:
+        """The picks' mean value; a ``long_short`` session's is its spread."""
+        if self.short_values is not None:
+            return self.spread_value
         return float(np.mean(self.pick_values)) if self.pick_values else None
 
     @property
@@ -123,7 +140,9 @@ def trial_value(stat: SessionStat, wins: bool) -> float | None:
     """The one value of a session the trial statistics read (ADR 0064 amendment 2026-10-11): the
     excess wins when ``wins`` (the outcome is not a return: a cushion is not P&L, and what such an
     edge claims is that its picks win more often than the names they were picked from), else the
-    picks' mean return."""
+    picks' mean return; a ``long_short`` session's value is its spread (``spread_value``)."""
+    if stat.short_values is not None:
+        return stat.spread_value
     return stat.excess_wins if wins else stat.pick_mean
 
 
@@ -167,7 +186,15 @@ def pool_stats(legs: Sequence[SessionStat]) -> SessionStat:
         picks=tuple(p for leg in legs for p in leg.picks),
         base_hits_at=_sum_levels([leg.base_hits_at for leg in legs]),
         pick_hits_at=_sum_levels([leg.pick_hits_at for leg in legs]),
+        short_values=_pooled_short(legs),
     )
+
+
+def _pooled_short(legs: Sequence[SessionStat]) -> tuple[float, ...] | None:
+    """The short legs of a block of days, None when none of them is a long-short day."""
+    if all(leg.short_values is None for leg in legs):
+        return None
+    return tuple(v for leg in legs for v in leg.short_values or ())
 
 
 def _sum_levels(counts: Sequence[tuple[int, ...]]) -> tuple[int, ...]:
@@ -289,6 +316,11 @@ def _measure(
     tops = [r.top_decile for r in rows if r.top_decile is not None]
     spread_mean, _, spread_t, spread_n = spread_summary(spreads)
     means = [m for m in (trial_value(r, wins) for r in rows) if m is not None]
+    if any(r.short_values is not None for r in rows):
+        capacity = (adv_median, adv_known, adv_low)
+        return _long_short(
+            sl, rows, in_sample, capacity, means, sum(r.excluded_coverage for r in kept)
+        )
     return SliceMeasure(
         slice_kind=sl.kind,
         slice_value=sl.value,
@@ -324,6 +356,58 @@ def _measure(
         pick_adv_median=adv_median,
         pick_adv_known=adv_known,
         pick_adv_low=adv_low,
+    )
+
+
+def _long_short(
+    sl: Slice,
+    rows: Sequence[SessionStat],
+    in_sample: bool,
+    capacity: tuple[float | None, int | None, int | None],
+    spreads: Sequence[float],
+    excluded_coverage: int,
+) -> SliceMeasure:
+    """The measure of a ``long_short`` outcome (ADR 0053 amendment, outcome sides): a spread has
+    no base rate, so the hit rate, base rate, lift, effect size and the equal-weight floor are None
+    (never 0; the read model says why), and ``mean_excess_picks`` is the mean session spread, the
+    long leg's mean plus the short leg's. ``picks`` are the long leg's. The decile figures are
+    the same as for any side: the ranking's own."""
+    tops = [r.top_decile for r in rows if r.top_decile is not None]
+    decile = [r.spread for r in rows if r.spread is not None]
+    spread_mean, _, spread_t, spread_n = spread_summary(decile)
+    return SliceMeasure(
+        slice_kind=sl.kind,
+        slice_value=sl.value,
+        in_sample=in_sample,
+        sessions=len(rows),
+        picks=sum(len(r.pick_values) for r in rows),
+        hits=0,
+        hit_rate=None,
+        eligible=sum(r.eligible for r in rows),
+        base_hits=0,
+        base_rate=None,
+        lift=None,
+        mean_excess_picks=float(np.mean(spreads)) if spreads else None,
+        bh_mean=None,
+        top_decile_mean=float(np.mean(tops)) if tops else None,
+        decile_spread=spread_mean,
+        decile_means=_mean_deciles([r.deciles for r in rows if r.deciles]),
+        decile_t=spread_t,
+        decile_sessions=spread_n,
+        effect_size=None,
+        sharpe=sharpe(list(spreads)),
+        unscored=sum(r.unscored for r in rows),
+        excluded_score_coverage=sum(r.excluded_score_coverage for r in rows),
+        excluded_unclosed=sum(r.excluded_unclosed for r in rows),
+        excluded_missing=sum(r.excluded_missing for r in rows),
+        excluded_unmeasured=sum(r.excluded_unmeasured for r in rows),
+        unmeasured_base=sum(r.unmeasured_base for r in rows),
+        excluded_coverage=excluded_coverage,
+        delisted=sum(r.delisted for r in rows),
+        pre_snapshot_sessions=sum(1 for r in rows if r.pre_snapshot),
+        pick_adv_median=capacity[0],
+        pick_adv_known=capacity[1],
+        pick_adv_low=capacity[2],
     )
 
 

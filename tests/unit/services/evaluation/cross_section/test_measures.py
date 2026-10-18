@@ -462,3 +462,40 @@ def test_a_lone_trial_is_deflated_by_the_trial_count_against_the_nulls_sharpe_va
 
 def replace_horizon(t: Trial, horizon: int) -> Trial:
     return Trial(t.name, t.role, t.unit, t.stats, t.measures, horizon)
+
+
+def _spread_day(day: date, longs: tuple[float, ...], shorts: tuple[float, ...]) -> SessionStat:
+    return stat(day, longs, (0.0, 0.01), 1, base_hits=3, short_values=shorts, spread=0.1)
+
+
+def test_a_long_short_session_is_worth_its_spread_and_never_half_of_one() -> None:
+    both = _spread_day(date(2026, 1, 5), (0.02, 0.04), (0.01, 0.03))
+    assert both.spread_value == pytest.approx(0.03 + 0.02) and both.pick_mean == both.spread_value
+    assert trial_value(both, wins=True) == pytest.approx(0.05)  # not the excess wins
+    assert _spread_day(date(2026, 1, 6), (0.02,), ()).spread_value is None  # no short leg counted
+    assert _spread_day(date(2026, 1, 6), (), (0.02,)).spread_value is None
+    plain = stat(date(2026, 1, 7), (0.02, 0.04), (0.0,), 1)
+    assert plain.short_values is None and plain.pick_mean == pytest.approx(0.03)
+
+
+def test_a_long_short_measure_has_no_hit_rate_base_rate_or_lift_never_zero() -> None:
+    days = [
+        _spread_day(date(2026, 1, 5 + i), (0.02, 0.04), (0.01 + i / 100, 0.03 + i / 100))
+        for i in range(3)
+    ]
+    (m,) = slice_measures(days, [ALL])
+    assert (m.hit_rate, m.base_rate, m.lift, m.effect_size, m.bh_mean) == (None,) * 5
+    assert m.mean_excess_picks == pytest.approx(0.06)  # 0.03 + (0.02, 0.03, 0.04)
+    assert m.sharpe == pytest.approx(sharpe([0.05, 0.06, 0.07]))  # of the spreads
+    assert (m.sessions, m.picks, m.decile_spread) == (3, 6, pytest.approx(0.1))
+    mixed = [*days, stat(date(2026, 1, 9), (0.02,), (0.0,), 1, short_values=(), spread=0.1)]
+    (n,) = slice_measures(mixed, [ALL])
+    assert n.mean_excess_picks == pytest.approx(0.06)  # a session with no short leg is no spread
+
+
+def test_a_pooled_event_block_keeps_its_days_short_legs_only_when_some_day_has_one() -> None:
+    one = _spread_day(date(2026, 1, 5), (0.02,), (0.01,))
+    two = _spread_day(date(2026, 1, 6), (0.04,), (0.03,))
+    assert pool_stats([one, two]).short_values == (0.01, 0.03)
+    plain = stat(date(2026, 1, 5), (0.02,), (0.0,), 1)
+    assert pool_stats([plain, plain]).short_values is None

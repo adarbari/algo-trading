@@ -32,6 +32,7 @@ KEYS = (
     "capacity_adv_floor_usd",
     "capacity_position_usd",
 )
+EDGE_COSTS_KEYS = ("levels_bps", "borrow_bps_annual")
 COST_LEVELS = (0.0, 15.0, 30.0, 50.0)  # bp, the site grid (ADR 0064 decision 5; owner 2026-10-10)
 
 
@@ -68,6 +69,12 @@ class VerdictSettings:
     # at, beside its document's own ``cost_bps`` (ADR 0064 decision 5). The harness counts hits
     # at each level in every leg, so the grid is in the leg key: a changed grid recomputes legs.
     cost_levels_bps: tuple[float, ...] = COST_LEVELS
+    # ``[edge_costs] borrow_bps_annual``: the assumed yearly cost (bp) of borrowing a name to short
+    # it, for an outcome that does not set its own (ADR 0053 amendment, outcome sides). No borrow
+    # data is stored: it is an assumption the reports say so. The short leg of a ``short`` or
+    # ``long_short`` outcome pays it scaled by the holding period (sessions / 252), and only names
+    # over ``capacity_adv_floor_usd`` can be that leg. It enters the leg key (it sets values).
+    borrow_bps_annual: float = 100.0
     # ``capacity_adv_floor_usd``: a pick whose 20-day average dollar volume at the decision session
     # is below this is "low liquidity" in the capacity columns of ``results/edge_eval`` (ADR 0064
     # decision 5). Applied when the statistics are computed, not in the leg key: a changed floor
@@ -103,7 +110,10 @@ class VerdictSettings:
             live_min_sessions=t.integer("live_min_sessions", d.live_min_sessions, 1),
             live_low=t.fraction("live_low", d.live_low),
             live_high=t.fraction("live_high", d.live_high),
-            cost_levels_bps=_cost_levels(t.table("edge_costs", ("levels_bps",)), d),
+            cost_levels_bps=_cost_levels(t.table("edge_costs", EDGE_COSTS_KEYS), d),
+            borrow_bps_annual=t.table("edge_costs", EDGE_COSTS_KEYS).number(
+                "borrow_bps_annual", d.borrow_bps_annual, 0
+            ),
             capacity_adv_floor_usd=t.number("capacity_adv_floor_usd", d.capacity_adv_floor_usd, 1),
             capacity_position_usd=t.number("capacity_position_usd", d.capacity_position_usd, 1),
         )

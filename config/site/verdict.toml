@@ -33,3 +33,6 @@ capacity_position_usd = 100000 # the position the capacity page sizes against a 
 
 [edge_costs]               # ADR 0064: the round-trip costs (bp) a return edge is also measured at,
 levels_bps = [0, 15, 30, 50] # beside its own cost_bps; in the leg key (a change recomputes every leg)
+borrow_bps_annual = 100       # the short leg's assumed borrow cost a year (bp; no borrow data
+                              # is stored): only for an edge with side short / long_short, in
+                              # the leg key of such edges only; names must clear the ADV floor
