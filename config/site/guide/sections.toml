@@ -78,4 +78,14 @@ presets = ["vrp_scanner", "vrp_iv_hv"]
 [[family]]
 id = "events"
 title = "Earnings events"
-presets = ["pead_small_cap", "eap_all", "eap_volume"]
+presets = ["pead_small_cap", "eap_all", "eap_volume", "pre_earnings_reversal", "earnings_neutral_reversal"]
+
+[[family]]
+id = "options_signals"
+title = "Option-implied signals"
+presets = ["cp_iv_spread", "cp_iv_spread_rise", "iv_smirk", "iv_change_call", "iv_change_ibkr", "option_stock_volume", "retail_option_attention", "lottery_max"]
+
+[[family]]
+id = "cross_section"
+title = "Cross-section ranks"
+presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite"]

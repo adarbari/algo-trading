@@ -1,0 +1,100 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea family C (docs/edge-ideas/options-volatility.md):
+# the option market predicting the stock. Screeners: cp_iv_spread (c01), iv_smirk (c02),
+# iv_change_call and iv_change_ibkr (c03).
+id = "option_cp_iv_signals"
+name = "Option-implied signals"
+family = "C"
+thesis = "Stocks whose options show informed buying (calls richer than puts, a flat put wing, rising call IV) outperform the market over the next weeks."
+mechanism = """Informed traders use options for leverage and to avoid short-sale constraints, and
+market makers widen the side being hit, so the implied-volatility surface leaks the direction of
+informed flow before the stock moves; stock investors do not read option surfaces (Cremers and
+Weinbaum 2010; Xing, Zhang and Zhao 2010; An, Ang, Bali and Cakici 2014)."""
+persistence = """The effect needs option data for hundreds of names and a weekly to monthly
+rebalance, and the parity deviation itself is blocked from arbitrage by borrow costs and early
+exercise. It declined over the original samples, which the authors read as arbitrage at work, so
+expect about half the published size (McLean and Pontiff 2016)."""
+schedule = "every_session"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["cp_iv_spread", "iv_smirk", "iv_change_call", "iv_change_ibkr"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Four screeners, one per source rule, read on every session. History differs by screener.
+cp_iv_spread, iv_smirk and iv_change_call read cp_iv@v1 and cp_iv_history@v1, which are derived
+from our own chains: chains are stored nightly from 2026-10-02 only, so these have a few sessions
+(about 11 by 2026-10-16, a 21-session change from 2026-11-02) and none before the frozen period
+starts, 2026-04-01; the harness reports the count beside every number and the verdict stays
+inconclusive until it is near 40 independent sessions. iv_change_ibkr reads ibkr_iv_history@v1,
+IBKR's blended IV30 change, with about 502 sessions of history (licence personal, ADR 0028, so
+fine for this private evaluation): it stands in for the call-only change of An et al. and is not
+the paper's rule, since a blended IV rises on bad news as well. Horizon 5 is the Cremers and
+Weinbaum week and needs the outcomes backfill once the document merges (horizons are stored from
+the documents); 20 is the month of the smirk and IV-change papers. Long side only: the short
+legs need borrow we do not have. Earnings windows are not excluded (a known decoy of IV changes)."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [5, 20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY for the 5 and 20 sessions after the entry close (the session
+after the decision session), net of 10 bps a round trip (an assumption for liquid names)."""
+trigger_timing = """Every spread, smirk and IV change is computed from the chain stored at the
+decision session D's close; the entry session is S = D + 1 (start_offset_sessions = 1), so the
+first fill is a close after the quotes the signal read. A name with no chain or no expiry 10 to 60
+days out has no value and never passes."""
+replication = """Cremers and Weinbaum: the open-interest-weighted mean of call minus put IV over
+same-strike pairs, quintile sorts, long the top (cp_iv_spread); Xing, Zhang and Zhao: the OTM put
+(moneyness 0.80 to 0.95) IV minus the ATM call IV, long the lowest (iv_smirk); An, Ang, Bali and
+Cakici: the one-month change of ATM call IV, long the largest rise (iv_change_call). Here the top
+50 of the liquid common stocks (liquid_common_stocks), not their decile of all names."""
+expected_size = """About 50 bp a week for the top-minus-bottom spread (Cremers and Weinbaum
+2010, 1996-2005, risk-adjusted), about 1% a month for call-IV changes (An et al. 2014), and about
+10.9% a year for the smirk (Xing et al. 2010); each declined within its sample. Few sessions of
+chain data cannot tell that from zero: the harness reports t and the sessions beside it."""
+capacity_costs = """Liquid optionable names only, stock-side costs only (10 bps a round trip is the
+assumption); the effect is concentrated in illiquid stocks with liquid options, so the long-only
+top 50 of large names is the harder, cheaper version. Option spreads are not paid: nothing is
+traded in options."""
+failure_modes = """Decay after publication, and the spread being borrow cost or jump risk rather
+than information (Bali and Hovakimian 2009 read it as jump risk). Retire if the frozen-period
+top-50 excess return is not above the buy-and-hold mean of the eligible names, or the decile
+spread is not above zero."""
+decoys = """Short interest and borrow cost (not stored), the past month's return (IV rises after
+a rally), earnings-month IV ramps, the IV level (low idiosyncratic volatility) and size: the
+12-1 momentum and size baselines on the same sessions."""
+
+[[sources]]
+title = "Cremers, M. and Weinbaum, D., Deviations from Put-Call Parity and Stock Return Predictability, Journal of Financial and Quantitative Analysis, 2010"
+url = "https://ideas.repec.org/a/cup/jfinqa/v45y2010i02p335-367.html"
+
+[[sources]]
+title = "Xing, Y., Zhang, X. and Zhao, R., What Does the Individual Option Volatility Smirk Tell Us About Future Equity Returns?, Journal of Financial and Quantitative Analysis, 2010"
+url = "https://ideas.repec.org/a/cup/jfinqa/v45y2010i03p641-662.html"
+
+[[sources]]
+title = "An, B.-J., Ang, A., Bali, T. and Cakici, N., The Joint Cross Section of Stocks and Options, Journal of Finance, 2014 (NBER working paper 19590)"
+url = "https://www.nber.org/papers/w19590"
+
+[[sources]]
+title = "Bali, T. and Hovakimian, A., Volatility Spreads and Expected Stock Returns, Management Science, 2009"
+url = "https://pubsonline.informs.org/doi/fpi/10.1287/mnsc.1090.1063"
+
+[[sources]]
+title = "McLean, R. D. and Pontiff, J., Does Academic Research Destroy Stock Return Predictability?, Journal of Finance, 2016"
+url = "https://ivey.uwo.ca/media/3775549/pontiff.pdf"
+
+# The literature's figure (ADR 0064): Cremers and Weinbaum's top-minus-bottom portfolio of the
+# call-put volatility spread, about 50 bp a week, risk-adjusted, 1996-2005, before costs. It is a
+# spread of the extreme groups, so read the harness's decile spread beside it.
+[published]
+measure = "decile_spread"
+value = 0.005
+horizon_sessions = 5
+sample = 10
+source = 0

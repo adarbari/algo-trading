@@ -1,0 +1,86 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea family C (docs/edge-ideas/options-volatility.md,
+# c04). A filter overlay in the plan (not a standalone trade): it is filed as the avoid list of the
+# long screens, the `avoid_high` variant, a short outcome on the high ratio names; the main
+# outcome is the source's own low-minus-high rule's long leg.
+id = "c04_option_stock_volume_ratio"
+name = "Option-to-stock volume ratio"
+family = "C"
+thesis = "Stocks with unusually heavy option volume against their share volume underperform over the next weeks, so the quiet-option names beat them."
+mechanism = """Bad news is traded in options because shorting is costly: the ratio spikes when
+informed traders lever bad news, and stock holders do not watch the option tape (Johnson and So
+2012; Ge, Lin and Pearson 2016 trace the power to the options' leverage)."""
+persistence = """The signal predicts negative returns mostly, and harvesting it means shorting
+hard-to-borrow names, which keeps arbitrageurs out; as a long-only filter (drop the top decile) it
+is a quality control, not a return source. It shrank after 2012 in public replications."""
+schedule = "every_session"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["option_stock_volume"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """The plan lists it as a filter overlay, tested as a variant of the edge it filters; it is
+filed here as its own document so its avoid list can be judged alone: the main outcome holds the
+50 lowest-ratio names (the source's low leg), the avoid_high variant is the short outcome on the
+50 highest ratio names, a result an avoid list can act on (owner decision O2). The ratio is
+chain flow over share volume (option_stock_volume_ratio), computed from chains stored nightly from
+2026-10-02 only: about 11 sessions by 2026-10-16, none before the frozen start 2026-04-01, so the
+verdict stays inconclusive for a long time; the harness reports the count beside every number.
+Opening against closing trades and signed volume are not in public data (Ge, Lin and Pearson's
+strongest sub-signal). The short outcome is net of the site's assumed borrow cost and is held only
+among names with at least the capacity floor of dollar volume (ADR 0053, outcome sides)."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [5, 20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[[variants]]
+id = "avoid_high"
+
+[variants.outcome]
+side = "short"
+
+[quality_bar]
+outcome = """Excess return over SPY for the 5 and 20 sessions after the entry close (the session after
+the decision session), net of 10 bps a round trip; the avoid_high variant is the short's value:
+minus the excess return, less cost and borrow."""
+trigger_timing = """The ratio is computed from the option volume and the share volume of the decision
+session D; the entry session is S = D + 1. A name with no chain, no option volume (a chain whose
+quotes carry none reads null, not zero) or no stock volume has no value."""
+replication = """Johnson and So: weekly decile sort on total option volume (contracts x 100) over
+the week's share volume, long low and short high; here the 50 lowest of the liquid common stocks
+(option_stock_volume ranks lowest first), and the avoid_high variant the 50 highest. The paper's week is the 5-session horizon (it needs the outcomes backfill once the
+document merges); 20 is the month."""
+expected_size = """About 0.34% a week for the low-minus-high spread (19.3% a year), 1996-2010,
+concentrated in the high-ratio (short) leg and in small caps (Johnson and So 2012); public
+replications report it shrinking after 2012. The long leg of liquid names should be much smaller."""
+capacity_costs = """Stock-side costs only for the long leg; the short leg is hard to borrow in the
+names where the ratio is high, so it is an avoid list. 10 bps a round trip and the site's borrow
+assumption are the costs modelled."""
+failure_modes = """Pre-earnings and expiration volume ramps carry no signal, and the effect has
+faded. Retire if the frozen-period avoid_high excess return is not below the buy-and-hold mean of
+the eligible names, or the decile spread is not above zero."""
+decoys = """Small size and illiquidity, short interest (not stored), pre-earnings volume ramps and
+the put-call ratio (the same channel): the 12-1 momentum and size baselines on the same
+sessions."""
+
+[[sources]]
+title = "Johnson, T. and So, E., The Option to Stock Volume Ratio and Future Returns, Journal of Financial Economics, 2012"
+url = "https://academicnewsletter.sufe.edu.cn/info/356813"
+
+[[sources]]
+title = "Ge, L., Lin, T.-C. and Pearson, N., Why Does the Option to Stock Volume Ratio Predict Stock Returns?, Journal of Financial Economics, 2016"
+url = "https://research.monash.edu/en/publications/why-does-the-option-to-stock-volume-ratio-predict-stock-returns/"
+
+# The literature's figure (ADR 0064): Johnson and So's low-minus-high O/S spread, 0.34% a week, 1996-2010, weekly decile sort, before costs
+# (a long-short spread: the harness's decile spread over 5 sessions is the comparable number).
+[published]
+measure = "decile_spread"
+value = 0.0034
+horizon_sessions = 5
+sample = 15
+source = 0

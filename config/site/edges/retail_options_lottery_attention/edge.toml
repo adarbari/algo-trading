@@ -1,0 +1,73 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea families H and I (docs/edge-ideas/structural-niches.md,
+# frontier.md). An avoid list: the outcome is short, so the result is the return of the names it
+# says to stay out of or sell.
+id = "retail_options_lottery_attention"
+name = "Retail lottery-option attention"
+family = "H"
+thesis = "Lottery-like stocks with heavy option volume against their share volume, the names retail traders buy short-dated calls in, underperform over the next weeks."
+mechanism = """Retail traders buy short-dated out-of-the-money calls through wholesalers; market
+makers hedge by buying the stock, which lifts it transiently, and the pressure reverses; the
+calls are overpriced and retail pays wide spreads (Byun and Kim 2016; Bryzgalova, Pavlova and
+Sikorskaya 2023)."""
+persistence = """Retail's preference for skewness is stable and zero-commission apps gamify it;
+the wholesalers internalise the flow, so institutions see it only indirectly, and shorting these
+names is costly and squeeze-prone, which keeps the overpricing from being traded away. Capacity per
+name is small."""
+schedule = "every_session"
+universe = "liquid_common_stocks"
+top_k = 30
+screeners = ["retail_option_attention"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """The papers' feature, the share of option volume in short-dated out-of-the-money calls
+(lottery_call_share), and a meme score are not stored: the screener is a proxy, names with a best
+day of 10% or more in the last 21 sessions (max_ret_21d, a pre-declared threshold, not tuned) ranked
+by the option-to-stock volume ratio, the highest first. Filed with that proxy rather than waiting;
+a trade-level or strike-level feature would replace it. The outcome is the short on the 30 worst
+names (the highest ratio) among those with enough dollar volume to short (the site's capacity
+floor), net of the site's borrow assumption; a long_short spread would be diagnostic only. Chain
+flow is stored from 2026-10-02 only: about 11 sessions by 2026-10-16, none before the frozen start
+2026-04-01, so no verdict is possible for a long time; the harness reports the count. The horizon
+6 is the nearest stored one to the 5 to 10 sessions of the literature. The put-based fade of the
+catalogue (buying puts on the same names) needs the option P&L outcome (H8) and is not here."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [6, 20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+side = "short"
+
+[quality_bar]
+outcome = """The short's value: minus the excess return over SPY for 6 and 20 sessions after the
+entry close, less 10 bps a round trip and the assumed borrow cost."""
+trigger_timing = """The best day of the last 21 sessions and the option-to-stock volume ratio are
+computed from the close and the chain of the decision session D; the entry session is S = D + 1.
+A name with no chain, no option volume or no 21-session history has no value and is not ranked."""
+replication = """Byun and Kim: calls with lottery features (high IV, out of the money, short
+maturity) earn significantly lower returns; Bryzgalova et al.: retail identified by wholesaler
+price improvement. Neither is stored: the proxy ranks lottery-like names (best day of 10% or more)
+by option volume over stock volume, the 30 highest."""
+expected_size = """No stock-return figure is verified for the proxy. The papers report retail
+losing money in options in aggregate (the exact figure is not verified) and negative subsequent
+returns after lottery demand; the harness reports t and the sessions, and with a short chain
+history it will say so."""
+capacity_costs = """An individual cannot short the microcaps where this effect lives: the short is
+held only among names above the capacity floor, with the assumed borrow cost, and shorting
+squeeze-prone names (GME, AMC) is the dangerous trade. Treat the list as an avoid list or a
+call-selling selector, not a short book."""
+failure_modes = """Squeezes, and a best day that was news (a bid or a report) rather than lottery
+demand. Retire if the frozen-period short value is not above zero after borrow, or the picks do
+not do worse than the buy-and-hold mean of the eligible names."""
+decoys = """Short-term reversal, MAX and idiosyncratic volatility (the same lottery cluster:
+lottery_max is its screen), momentum and size: the 12-1 momentum and size baselines on the same
+sessions."""
+
+[[sources]]
+title = "Bryzgalova, S., Pavlova, A. and Sikorskaya, T., Retail Trading in Options and the Rise of the Big Three Wholesalers, Journal of Finance, 2023"
+
+[[sources]]
+title = "Byun, S.-J. and Kim, D.-H., Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics, 2016"
