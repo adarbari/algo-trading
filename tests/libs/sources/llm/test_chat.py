@@ -11,7 +11,9 @@ from algotrade.core.model.errors import (
     ModelUnavailableError,
     QuotaExhaustedError,
 )
-from algotrade_sources.framework.http import HttpError, pause
+from algotrade.services.text_model.chain import FallbackTextModel
+from algotrade_sources.framework.http import HttpError, parse_retry_after, pause
+from algotrade_sources.framework.limiter import MAX_RETRY_AFTER_S
 from algotrade_sources.framework.registry import build_text_model
 from algotrade_sources.llm.chat import DETAIL_CHARS, ChatCompletions, content_of, error_detail
 from tests.helpers.payloads.llm import (
@@ -353,3 +355,75 @@ def test_the_quota_message_without_failure_details_cools_off_the_fixed_pause() -
     with pytest.raises(QuotaExhaustedError) as caught:
         client.complete("s", "u")
     assert len(calls) == 1 and caught.value.cool_off_s == 900.0
+
+
+def busy(status: int, retry_after: float | None, retries: int = 2):  # type: ignore[no-untyped-def]
+    calls: list[int] = []
+    slept: list[float] = []
+
+    def transport(url: str, payload: bytes) -> bytes:
+        calls.append(1)
+        raise HttpError(status, retry_after, b"slow down")
+
+    return ChatCompletions(BASE, "llama", transport, slept.append, retries=retries), calls, slept
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_a_retry_after_over_the_cap_is_unavailable_at_once_without_sleeping(status: int) -> None:
+    client, calls, slept = busy(status, 86400.0)
+    with pytest.raises(ModelUnavailableError, match=r"Retry-After 86400s, over the 300s cap") as e:
+        client.complete("s", "u")
+    assert not isinstance(e.value, QuotaExhaustedError)
+    assert len(calls) == 1 and slept == []  # the test that would have caught a day-long stall
+
+
+def test_a_retry_after_at_the_cap_is_still_waited_for() -> None:
+    client, calls, slept = busy(429, MAX_RETRY_AFTER_S, retries=1)
+    with pytest.raises(ModelUnavailableError, match=r"after 2 attempts"):
+        client.complete("s", "u")
+    assert len(calls) == 2 and slept == [MAX_RETRY_AFTER_S]
+
+
+@pytest.mark.parametrize("asked", [float("nan"), -5.0, 0.0])
+def test_an_unusable_retry_after_uses_the_back_off_instead(asked: float) -> None:
+    client, _, slept = busy(429, asked, retries=1)
+    with pytest.raises(ModelUnavailableError):
+        client.complete("s", "u")
+    assert slept == [20.0]  # the per-minute floor of a bare 429
+
+
+def test_the_header_forms_the_transport_parses_decide_between_wait_and_give_up() -> None:
+    # The transport turns the header into seconds (``parse_retry_after``); the adapter caps them.
+    now = 1_000_000.0
+    soon = parse_retry_after("Mon, 12 Jan 1970 13:46:50 GMT", now)  # 10 s ahead of ``now``
+    far = parse_retry_after("Tue, 13 Jan 1970 13:46:40 GMT", now)  # a day ahead of ``now``
+    assert soon == 10.0 and far == 86400.0
+    assert parse_retry_after("soon", now) is None  # garbage: no ask, the back-off applies
+    client, _, slept = busy(429, soon, retries=1)
+    with pytest.raises(ModelUnavailableError, match="after 2 attempts"):
+        client.complete("s", "u")
+    assert slept == [10.0]
+    client, calls, slept = busy(429, far)
+    with pytest.raises(ModelUnavailableError, match="over the 300s cap"):
+        client.complete("s", "u")
+    assert len(calls) == 1 and slept == []
+    client, _, slept = busy(429, parse_retry_after("soon", now), retries=1)
+    with pytest.raises(ModelUnavailableError):
+        client.complete("s", "u")
+    assert slept == [20.0]
+
+
+def test_the_chain_falls_through_to_the_next_provider_when_one_asks_for_a_day() -> None:
+    slept: list[float] = []
+
+    def banned(url: str, payload: bytes) -> bytes:
+        raise HttpError(429, 86400.0, b"slow down")
+
+    def fine(url: str, payload: bytes) -> bytes:
+        return answer('{"criteria": []}')
+
+    first = ChatCompletions(BASE, "llama", banned, slept.append, provider="first")
+    second = ChatCompletions(BASE, "gemma", fine, slept.append, provider="second")
+    done = FallbackTextModel([("first", first), ("second", second)]).complete("s", "u")
+    assert (done.provider, done.fell_back_from) == ("second", "first")
+    assert slept == []  # no sleep before the fallback answered

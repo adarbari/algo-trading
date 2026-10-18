@@ -5,7 +5,9 @@ for a JSON object (or, for a provider configured ``structured = "json_schema"``,
 fits the caller's schema), so the same prompt gets the same draft (as far as the provider
 allows). A
 provider that is busy (429, 500, 502, 503, 504) or unreachable is retried ``retries`` times
-with a doubling pause (``Retry-After`` wins); anything else, or the last failure, is a
+with a doubling pause (``Retry-After`` wins, parsed by ``framework.http.parse_retry_after``; one
+over ``MAX_RETRY_AFTER_S``, the shared cap, is not waited for: the provider is unavailable at once
+and the chain moves on); anything else, or the last failure, is a
 ``ModelUnavailableError`` (``core``) naming what went wrong, never the credential: the API
 answers 503 with it. A 429 whose body says the quota is used up (``QUOTA_MARKERS``: Google's
 per-day ``RESOURCE_EXHAUSTED``, OpenAI's ``insufficient_quota``) is never retried (ADR 0041,
@@ -21,6 +23,7 @@ from typing import Any, NamedTuple
 from algotrade.core.model.completion import CallTag, Completion
 from algotrade.core.model.errors import ModelUnavailableError, QuotaExhaustedError
 from algotrade_sources.framework.http import HttpError, JsonTransport
+from algotrade_sources.framework.limiter import MAX_RETRY_AFTER_S
 
 COMPLETIONS = "/chat/completions"
 JSON_SCHEMA = "json_schema"  # ``structured``: the provider takes a response schema
@@ -175,8 +178,14 @@ class ChatCompletions:
                     raise ModelUnavailableError(
                         f"{where}: HTTP {exc.status}{tried} {detail}"
                     ) from exc
+                asked = exc.retry_after if exc.retry_after and exc.retry_after > 0 else None
+                if asked is not None and asked > MAX_RETRY_AFTER_S:  # NaN, <= 0: none
+                    raise ModelUnavailableError(
+                        f"{where}: HTTP {exc.status} with Retry-After {asked:.0f}s, over the "
+                        f"{MAX_RETRY_AFTER_S:.0f}s cap {detail}"
+                    ) from exc
                 floor = self.throttle_s if exc.status == 429 else 0.0
-                delay = exc.retry_after or max(floor, self.backoff_s * 2**attempt)
+                delay = asked or max(floor, self.backoff_s * 2**attempt)
             except (OSError, TimeoutError) as exc:
                 if last:
                     raise ModelUnavailableError(f"{where}{tried}: {exc}") from exc
