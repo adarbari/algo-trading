@@ -40,7 +40,7 @@ def _row(iid: str, h: int = 5, pnl: float | None = 0.02, **changes: object) -> d
         "pnl_per_premium": pnl, "pnl_exec_per_premium": pnl, "pnl_per_underlying": pnl,
         "hedged_pnl_per_premium": pnl, "hedged_pnl_per_underlying": pnl,
         "outcome_status": "COMPLETE" if done else "UNMEASURED",
-        "outcome_reason": None if done else "STALE_CHAIN:2026-10-08",
+        "outcome_reason": None if done else "STALE_CHAIN:2026-10-08", "hedge_reason": None,
     }  # fmt: skip
     return {**row, **changes}
 
@@ -108,11 +108,22 @@ def test_nothing_stored_is_missing_data_and_no_sessions_is_empty() -> None:
         (_row("EQ:A", pnl_per_underlying=None), "is null on a COMPLETE outcome"),
         (_row("EQ:A", exit_kind="MID"), "exit_kind must be one of"),
         (_row("EQ:A", outcome_status="PARTIAL"), "outcome_status must be one of"),
+        (_row("EQ:A", hedged_pnl_per_premium=None), "is null on a COMPLETE outcome with no hedge"),
+        (_row("EQ:A", hedge_reason="NO_DELTA:2026-10-06"), "must be null when hedge_reason is set"),
     ],
 )
-def test_the_schema_rejects_a_row_that_breaks_the_status_rule(
+def test_the_schema_rejects_a_row_that_breaks_the_status_or_hedge_rule(
     row: dict[str, object], problem: str
 ) -> None:
     writer = StoreWriter(MemoryBackend())
     with pytest.raises(DataValidationError, match=problem):
         _write(writer, S1, "r1", EARLY, [row])
+
+
+def test_a_complete_row_with_a_hedge_reason_has_its_hedged_columns_null() -> None:
+    row = _row(
+        "EQ:A", hedged_pnl_per_premium=None, hedged_pnl_per_underlying=None,
+        hedge_reason="NO_DELTA:2026-10-06",
+    )  # fmt: skip
+    writer = StoreWriter(MemoryBackend())
+    _write(writer, S1, "r1", EARLY, [row])  # accepted: the unhedged P&L stands

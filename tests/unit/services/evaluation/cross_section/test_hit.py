@@ -373,6 +373,7 @@ def chain_rows(n: int = 3, **columns: object) -> pd.DataFrame:
         "entry_ask": [5.2] * n, "exit_mid": [7.0] * n, "exit_bid": [6.8] * n,
         "pnl_per_underlying": [0.02] * n, "hedged_pnl_per_underlying": [0.01] * n,
         "outcome_status": ["COMPLETE"] * n, "outcome_reason": [None] * n,
+        "hedge_reason": [None] * n,
     }  # fmt: skip
     return pd.DataFrame({**base, **columns})
 
@@ -435,3 +436,13 @@ def test_an_unmeasured_or_priceless_row_is_excluded_never_a_miss_or_a_zero() -> 
     out = apply_outcome(chain_edge(), frame)
     assert list(out["excluded"]) == ["", "unmeasured", "missing_value"]
     assert np.isnan(out["value"].iloc[1:]).all() and not out["hit"].iloc[1:].any()
+
+
+def test_a_hedged_row_with_a_hedge_reason_is_unmeasured_but_an_unhedged_one_still_counts() -> None:
+    frame = chain_rows(
+        2, hedged_pnl_per_underlying=[0.01, None], hedge_reason=[None, "STALE_CHAIN:2026-10-06"]
+    )
+    hedged = apply_outcome(chain_edge(structure="delta_hedged_atm"), frame)
+    assert list(hedged["excluded"]) == ["", "unmeasured"] and not hedged["hit"].iloc[1]
+    plain = apply_outcome(chain_edge(), frame)  # the unhedged P&L does not need the hedge
+    assert list(plain["excluded"]) == ["", ""] and plain["hit"].all()

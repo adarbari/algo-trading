@@ -40,11 +40,19 @@ def test_our_delta_from_the_mid_recovers_the_models_delta(is_call: bool) -> None
     )
 
 
-def test_no_delta_where_the_mid_implies_no_vol() -> None:
-    out = leg_delta(
-        [np.nan, 0.0, 200.0], 100.0, 100.0, 30 / 365, True
-    )  # missing, zero, above the spot
+def test_no_delta_where_the_mid_is_missing_or_prices_nothing() -> None:
+    # missing, a zero mid on an at-the-money strike, a call priced above the spot
+    out = leg_delta([np.nan, 0.0, 200.0], 100.0, 100.0, 30 / 365, True)
     assert np.isnan(out).all()
+
+
+def test_the_delta_limit_when_no_vol_solves_far_from_the_money() -> None:
+    t = 30 / 365
+    far_otm_put = float(leg_delta(1e-12, 120.0, 100.0, t, False))  # a bid-0 quote's mid
+    far_otm_call = float(leg_delta(1e-12, 80.0, 100.0, t, True))
+    deep_itm_call = float(leg_delta(20.0, 120.0, 100.0, t, True))  # at its intrinsic value
+    deep_itm_put = float(leg_delta(19.9, 80.0, 100.0, t, False))  # below its intrinsic value
+    assert (far_otm_put, far_otm_call, deep_itm_call, deep_itm_put) == (0.0, 0.0, 1.0, -1.0)
 
 
 def test_hedged_pnl_subtracts_the_gain_of_the_stock_hedge() -> None:

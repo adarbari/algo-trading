@@ -117,19 +117,39 @@ def test_a_window_is_written_to_its_start_partition_known_when_its_exit_chain_wa
     assert record.stats["atm_straddle:t30:h2"]["unmeasured"] == 0
 
 
-def test_a_stale_chain_in_the_window_is_an_unmeasured_row_with_its_session() -> None:
+def test_a_stale_hedge_session_costs_only_the_hedged_pnl_and_a_stale_exit_the_row() -> None:
     mid = sessions_ending(END, 2)[0]  # the session before the exit
-    writer, reader = _chains({(B, mid): "STALE_DATA: chain is for 2026-10-08"})
+    writer, reader = _chains(
+        {(B, mid): "STALE_DATA: chain is for 2026-10-08", (A, END): "STALE_DATA"}
+    )
     record = compute_option_outcomes(_ctx(writer, _configs()), END)
     rows = _rows(reader)
     rows = rows[rows["window_end"] == END]
     b = rows[rows["instrument_id"] == B].iloc[0]
-    assert b["outcome_status"] == "UNMEASURED" and b["outcome_reason"] == f"STALE_CHAIN:{mid}"
-    assert pd.isna(b["pnl_per_premium"]) and pd.isna(b["hedged_pnl_per_premium"])
-    a = rows[rows["instrument_id"] == A].iloc[0]
-    assert a["outcome_status"] == "COMPLETE"  # a stale chain for B costs only B its window
-    assert record.stats["atm_straddle:t30:h2"]["reasons"] == {"STALE_CHAIN": 1}
+    assert b["outcome_status"] == "COMPLETE" and b["hedge_reason"] == f"STALE_CHAIN:{mid}"
+    assert pd.notna(b["pnl_per_premium"]) and pd.isna(b["hedged_pnl_per_premium"])
+    a = rows[rows["instrument_id"] == A].iloc[0]  # the exit chain itself is stale
+    assert a["outcome_status"] == "UNMEASURED" and a["outcome_reason"] == f"STALE_CHAIN:{END}"
+    assert pd.isna(a["pnl_per_premium"])
+    stats = record.stats["atm_straddle:t30:h2"]
+    assert stats["reasons"] == {"STALE_CHAIN": 1} and stats["hedge_missing"] == 1
     assert {"STALE_CHAIN"} <= set(OPTION_PNL_REASONS)
+
+
+def test_two_structures_of_one_horizon_share_a_partition_and_both_are_stored() -> None:
+    doc = document(schedule="every_session", screeners=[], outcome=OUTCOME)
+    doc["variants"] = [{"id": "put", "outcome": {"structure": "put_short", "strike_delta": 0.25}}]
+    configs = edge_store(site__drift=doc)
+    writer, reader = _chains()
+    ctx = _ctx(writer, configs)
+    record = compute_option_outcomes(ctx, END)
+    start = sessions_ending(END, 3)[0]
+    part = reader.table(TABLE, start)
+    assert part is not None
+    mine = part[part["window_end"] == END]
+    assert set(mine["structure"]) == {"atm_straddle", "put_delta_25"}
+    assert len(mine) == 4  # both names under both structures: nothing replaced
+    assert check_option_outcomes(reader, END, ctx.settings)[0].status == "PASS", record.stats
 
 
 def test_a_window_before_the_first_stored_chain_is_not_computed() -> None:

@@ -125,8 +125,11 @@ history: chains are stored from 2026-10-02, after the frozen split 2026-04-01. S
 `option_pnl` edge no candidate can be ranked on an in-sample period, and none was chosen by
 looking at one: **the basis is declared at filing** (the document's one screen and one horizon,
 the main variant first; `choose_basis` already takes one declared candidate without ranking), and
-**every row is out of sample**; the in-sample slice is empty, not zero. An edge that files several
-candidates cannot be ranked, and its verdict is Waiting on data until one is declared. Candidates
-added after the first row was stored are trials in the site-wide count and cannot become the
-basis. How the Promising and Works rules read an empty in-sample t is not changed here: it is a
-question for the architect review of the first `option_pnl` edge (the rule's two t series).
+**every row is out of sample**; the in-sample slice is empty, not zero. An edge that files
+several candidates cannot be ranked, and its verdict is Waiting on data until one is declared.
+Candidates added after the first row was stored are trials in the site-wide count and cannot
+become the basis. Verdict rules for such an edge (architect decision 2026-10-18): the criterion
+"out-of-sample lift keeps its size" is not applicable (no in-sample lift exists to keep), so
+Promising is reachable on the other criteria; Works has one more criterion, "basis fixed on an
+in-sample period", which stays unmet, so **Works is unreachable** for a chain edge until a later
+amendment of this ADR says when a basis declared at filing may count. The verdict text names it.

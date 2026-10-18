@@ -208,6 +208,7 @@ class _Candidate:
     years: tuple[EdgeRow, ...]
     year_parts: tuple[EdgeRow, ...] = ()  # a year cut by the split, as ``<year>:<side>`` rows
     lone: bool = False  # the only screener of the run at its holding period: no PBO peers
+    chain: bool = False  # a chain P&L edge: no in-sample history exists (ADR 0065 amendment)
 
 
 def _by_year(row: EdgeRow) -> str:
@@ -306,6 +307,22 @@ def _measured(found: int, declared: int) -> str:
     return f" ({found} of {declared} measured)" if declared and found < declared else ""
 
 
+NO_INSAMPLE = "no in-sample history: chains are stored from 2026-10-02"
+
+
+def _basis_in_sample(chain: bool) -> tuple[VerdictCriterion, ...]:
+    """A chain P&L edge's Works criterion that stays unmet: its basis was declared at filing, not
+    fixed on an in-sample period (ADR 0065 amendment 2026-10-18); a later amendment decides when
+    such an edge may be Works."""
+    if not chain:
+        return ()
+    return (
+        _crit("basis_in_sample", "Basis fixed on an in-sample period",
+              "declared at filing: no in-sample period exists",
+              "an in-sample period before the frozen split", False, WORKS),
+    )  # fmt: skip
+
+
 def _criteria(
     c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool
 ) -> tuple[VerdictCriterion, ...]:
@@ -323,6 +340,15 @@ def _criteria(
     beats_all = _beats(oos.lift, lifts, len(c.baselines))
     beats_spread = _beats(oos.decile_spread, spreads, len(c.baselines))
     keeps = None if oos_pts is None or in_pts is None else oos_pts >= t.oos_lift_share * in_pts
+    lift_label = "Out-of-sample lift keeps its size"
+    lift_need = f"at least {t.oos_lift_share:g} of the in-sample lift"
+    lift_crit = (
+        _not_applicable("oos_lift", lift_label, NO_INSAMPLE, lift_need, PROMISING)
+        if c.chain  # no in-sample lift exists to keep: Promising stays reachable
+        else _crit("oos_lift", lift_label,
+                   f"{_num(oos_pts, 1)} pts vs {_num(in_pts, 1)} pts in-sample",
+                   lift_need, keeps, PROMISING)
+    )  # fmt: skip
     win_ok = None if oos_pts is None else oos_pts > 0
     enough = (
         None
@@ -378,9 +404,7 @@ def _criteria(
         _crit("dsr", "Deflated Sharpe", _num(dsr), f"at least {t.promising_dsr:g}",
               _at_least(dsr, t.promising_dsr), PROMISING),
         against_all,
-        _crit("oos_lift", "Out-of-sample lift keeps its size",
-              f"{_num(oos_pts, 1)} pts vs {_num(in_pts, 1)} pts in-sample",
-              f"at least {t.oos_lift_share:g} of the in-sample lift", keeps, PROMISING),
+        lift_crit,
         _crit("works_trades", "Trades, and out-of-sample trades", f"{trades} and {oos.sessions}",
               f"at least {t.works_trades} and {t.works_oos_trades}", enough, WORKS),
         _crit("works_t", "Top vs bottom decile t", _num(oos.decile_t),
@@ -393,6 +417,7 @@ def _criteria(
         spread_all,
         _crit("random", "Beats random picks", random_value,
               f"beats at least {_pct(t.random_beat_share)} of them", random_beaten, WORKS),
+        *_basis_in_sample(c.chain),
     )  # fmt: skip
 
 
@@ -481,6 +506,7 @@ class EdgeFacts:
     wins: bool = False  # the outcome is not a return: the Sharpe ratio is of the excess wins
     site_trials: Callable[[], int] | None = None  # the variants tried across every site
     # edge, read when the haircut is (None: not counted)
+    chain: bool = False  # an option_pnl edge: the basis cannot have been fixed in-sample
 
 
 def counts_wins(edge: Edge) -> bool:
@@ -489,6 +515,11 @@ def counts_wins(edge: Edge) -> bool:
     ADR 0064 amendment 2026-10-11). An edge with no resolved settings is read as a return."""
     s = edge.settings
     return s is not None and not s.cost_applies and s.kind != MODEL_KIND  # a model P&L is a return
+
+
+def is_chain(edge: Edge) -> bool:
+    """Whether the edge's outcome is a chain P&L (``option_pnl``): no in-sample history."""
+    return edge.settings is not None and edge.settings.kind == "option_pnl"
 
 
 def projection_of(whole: EdgeRow) -> Projection:
@@ -827,7 +858,8 @@ def judge(
         lost = f": {'; '.join(lost_inputs)}" if lost_inputs else ""
         reason = f"The official result has no out-of-sample figures for {on}{lost}"
         return replace(_waiting(edge_id, reason), basis=on)
-    judged = _judge_candidate(c, t, draws, decoys, lost_inputs, facts or EdgeFacts())
+    facts = facts or EdgeFacts()
+    judged = _judge_candidate(replace(c, chain=facts.chain), t, draws, decoys, lost_inputs, facts)
     return replace(judged, edge_id=edge_id, years=_years(c, split, range_to), basis_why=choice.why)
 
 
@@ -854,6 +886,7 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
             after=run.range_to,
             measured=lambda: runs.load_measured_sessions(ctx, run),
             wins=counts_wins(edge),
+            chain=is_chain(edge),
             site_trials=None if edge.mine else lambda: runs.load_site_trials(ctx),
         ),
         range_to=run.range_to,

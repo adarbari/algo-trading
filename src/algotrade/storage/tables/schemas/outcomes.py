@@ -76,8 +76,10 @@ def outcome_problems(frame: pd.DataFrame) -> list[str]:
 # position held long (``atm_straddle``; ``put_delta_NN``: the put whose own delta is -NN/100); the
 # edge document's side and hedging are applied by the harness. ``knowledge_ts`` is the latest
 # ``knowledge_ts`` among the chain partitions the row was computed from (the exit's), never the
-# write time. UNMEASURED: a reason and no P&L (a chain missing or STALE_DATA on any session of
-# the window, ADR 0054; never a zero, never an older chain in its place).
+# write time. UNMEASURED: a reason and no P&L (the entry or exit chain missing or STALE_DATA, ADR
+# 0054, or no exit quote; never a zero, never an older chain in its place). A chain missing or
+# stale on a session between them, or a delta that cannot be computed there, costs only the
+# hedged P&L: ``hedge_reason`` is set and the hedged columns are null, the row stays COMPLETE.
 OPTION_PNL = "outcomes/option/structure_pnl@v1"  # the grain is its own family, not instrument/
 OPTION_PNL_STATUSES = frozenset({"COMPLETE", "UNMEASURED"})
 # Why a window is UNMEASURED: the code before the colon of ``outcome_reason`` (a session follows
@@ -86,10 +88,9 @@ OPTION_PNL_REASONS = (
     "NO_CHAIN", "STALE_CHAIN", "NO_EXIT_QUOTE", "NO_DELTA", "NO_EXPIRY", "NO_ENTRY_QUOTE", "NO_PNL",
 )  # fmt: skip
 EXIT_KINDS = frozenset({"QUOTE", "INTRINSIC"})  # exit at the quoted bid, or intrinsic at expiry
-PNL_COLUMNS = (
-    "pnl_per_premium", "pnl_exec_per_premium", "pnl_per_underlying",
-    "hedged_pnl_per_premium", "hedged_pnl_per_underlying",
-)  # fmt: skip
+UNHEDGED_COLUMNS = ("pnl_per_premium", "pnl_exec_per_premium", "pnl_per_underlying")
+HEDGED_COLUMNS = ("hedged_pnl_per_premium", "hedged_pnl_per_underlying")
+PNL_COLUMNS = (*UNHEDGED_COLUMNS, *HEDGED_COLUMNS)
 
 _OPTION_PNL_TYPES = (
     "instrument_id string!",  # the underlying (EQ:<FIGI>)
@@ -105,6 +106,7 @@ _OPTION_PNL_TYPES = (
     *floats(*PNL_COLUMNS),
     "outcome_status string!",  # OPTION_PNL_STATUSES
     "outcome_reason string",  # UNMEASURED only
+    "hedge_reason string",  # COMPLETE only: why the hedged columns are null (a hedge session)
 )
 # pnl_per_premium: long, mid in and mid out, over the entry mid; pnl_exec_per_premium: bought at the
 # ask, sold at the bid (intrinsic at expiry), over the ask; pnl_per_underlying: the mid P&L over
@@ -119,8 +121,8 @@ OPTION_PNL_SPEC = fixed(
 
 
 def option_pnl_problems(frame: pd.DataFrame) -> list[str]:
-    """A COMPLETE chain outcome has every P&L and its exit kind; an UNMEASURED one has a reason
-    and no P&L (never a zero)."""
+    """A COMPLETE chain outcome has its unhedged P&L and exit kind, and its hedged P&L unless a
+    ``hedge_reason`` says why not; an UNMEASURED one has a reason and no P&L (never a zero)."""
     status = frame["outcome_status"].astype(str)
     problems = []
     bad = sorted(set(status) - OPTION_PNL_STATUSES)
@@ -130,12 +132,25 @@ def option_pnl_problems(frame: pd.DataFrame) -> list[str]:
     reason = frame["outcome_reason"] if "outcome_reason" in frame.columns else None
     if unmeasured.any() and (reason is None or reason[unmeasured].isna().any()):
         problems.append("an UNMEASURED outcome needs an outcome_reason")
-    for column in PNL_COLUMNS:
+    hedge = (
+        frame["hedge_reason"].notna()
+        if "hedge_reason" in frame.columns
+        else pd.Series(False, index=frame.index)
+    )
+    for column in UNHEDGED_COLUMNS:
         values = frame[column]
         if values[unmeasured].notna().any():
             problems.append(f"{column} must be null when UNMEASURED")
         if values[~unmeasured].isna().any():
             problems.append(f"{column} is null on a COMPLETE outcome")
+    for column in HEDGED_COLUMNS:
+        values = frame[column]
+        if values[unmeasured].notna().any():
+            problems.append(f"{column} must be null when UNMEASURED")
+        if values[~unmeasured & ~hedge.to_numpy()].isna().any():
+            problems.append(f"{column} is null on a COMPLETE outcome with no hedge_reason")
+        if values[hedge.to_numpy()].notna().any():
+            problems.append(f"{column} must be null when hedge_reason is set")
     kinds = frame["exit_kind"]
     if (~unmeasured).any() and not set(kinds[~unmeasured].astype(str)) <= EXIT_KINDS:
         problems.append(f"exit_kind must be one of {sorted(EXIT_KINDS)} on a COMPLETE outcome")

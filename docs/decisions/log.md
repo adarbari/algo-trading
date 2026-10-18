@@ -650,3 +650,19 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: one stored row serves the long, short and hedged edge; an expiry before T could not be held to the exit; the harness reads one outcome grain per run (reuse stamps and commit sequences are per grain), so mixing is refused at filing instead of silently reading the wrong table.
+
+## 2026-10-18 | EB H13 (architect review of #664) | Hedge-day gaps cost only the hedged P&L; bid-0 quotes and delta limits
+- Question: does a missing or stale chain on a session between entry and exit unmeasure the whole row, and how are far out-of-the-money and deep in-the-money legs read after a large move?
+- Options: the whole row UNMEASURED (first entry) / only the hedged P&L, with a `hedge_reason`; a bid-0 quote and an unsolved vol are missing / a bid-0 quote reads as mid ask / 2 and an unsolved vol takes the delta limit (0, +-1).
+- Decision: only the hedged P&L is lost (`hedge_reason` set, the row COMPLETE, a hedged structure's harness row excluded as unmeasured); bid-0 quotes and delta limits as above. This overrules the first H13 entry's "whole row UNMEASURED". r = q = 0 is accepted for v1.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the architect review showed the biggest moves would otherwise become NO_EXIT_QUOTE / NO_DELTA and flatter the short straddle, and a stale mid-window day would blank an unhedged window for no reason.
+
+## 2026-10-18 | EB H13 (architect review of #664) | A chain edge can be Promising, never Works, until the verdict-basis rule says more
+- Question: how do the verdict rules read an empty in-sample t for a chain basis declared at filing?
+- Options: leave it open / the in-sample-lift criterion not applicable and a Works criterion that stays unmet.
+- Decision: "out-of-sample lift keeps its size" is not applicable for a chain edge (Promising reachable); a Works criterion "basis fixed on an in-sample period" stays unmet (Works unreachable) until a later amendment of the verdict-basis rule; written into that amendment and the Guide.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: Promising can be read on the out-of-sample figures alone, but Works needs a basis not chosen after seeing the result, which the rule can only vouch for with an in-sample period.

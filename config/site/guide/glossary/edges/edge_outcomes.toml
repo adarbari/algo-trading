@@ -173,7 +173,8 @@ session and on the exit session. It pays the quoted spread and uses our own delt
 each session's chain, for any hedge. It leaves out the fill below the quote, margin, early
 exercise, the cost of trading the stock and financing, so a real result can be lower.
 Chains exist only from 2 October 2026. Every row is out of sample: no earlier period is
-stored to choose a setting from. Don't compare a chain result with a model result as if both
+stored to choose a setting from. The verdict can reach Promising but not Works until the rule
+for such a basis is amended. Don't compare a chain result with a model result as if both
 were the same kind of number.
 """
 next = "Treat the first results as a small sample and read how many windows were measured."
@@ -206,7 +207,9 @@ name. STALE_CHAIN means the feed served an older session's chain, so it is not u
 means a contract has no two-sided quote at the exit. NO_DELTA means a hedge delta could not be
 computed on a session. NO_EXPIRY means no listed expiry could be held to the window's end.
 NO_ENTRY_QUOTE means no two-sided strike or no underlying quote at the entry. NO_PNL means a
-price was missing in the arithmetic. Don't fill the gap from an older chain.
+price was missing in the arithmetic. NO_CHAIN, STALE_CHAIN and NO_DELTA on a session between the
+entry and the exit cost only the hedged value. The row keeps its unhedged value, and a hedged
+edge reads it as unmeasured. Don't fill the gap from an older chain.
 """
 next = "Read how many windows were measured; a high unmeasured share means the sample is thinner than it looks."
 see_also = ["outcome_option_pnl", "chain_outcome_complete", "chain_basis"]
@@ -216,8 +219,9 @@ id = "chain_outcome_complete"
 term = "Chain outcome: Complete"
 short = "A chain P&L window measured from stored quotes on every session it needs."
 body = """
-Every session from the entry to the exit has a current chain for the name. The contracts were
-quoted two-sided at the entry and the exit. The delta could be computed for each hedge day.
+The entry and the exit session have a current chain for the name. The contracts were quoted at
+the entry and the exit. The hedged value also needs a current chain and a delta on each session in
+between; without them only the hedged value is missing.
 The values are stored with the contracts held, so the result can be audited. A complete window is
 a measurement of one name over one holding period, not a forecast. It is known only after the exit
 session's chain was stored, which is in the evening. Don't read one complete window as a result.

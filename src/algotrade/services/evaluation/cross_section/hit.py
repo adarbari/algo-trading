@@ -32,7 +32,8 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   (``entry_ask - entry_mid``) and at exit (``exit_mid - exit_bid``) over ``entry_spot``, ``sign``
   -1 for a short structure, ``pnl_per_underlying`` the daily-hedged one
   (``hedged_pnl_per_underlying``, our own delta) for ``delta_hedged_atm[_short]``; ``cost_bps``
-  once on top. No hedge cost and no financing. A hit is ``value > 0``.
+  once on top. No hedge cost and no financing. A hedged structure's row with a ``hedge_reason``
+  (a hedge session lacked a chain or a delta) is UNMEASURED. A hit is ``value > 0``.
 - ``side`` ``short`` or ``long_short`` (an ``excess_return`` outcome only): ``short_value`` is the
   value of being short the name, ``-fwd_excess_return - cost_bps / 1e4 - borrow``, with the
   borrow ``borrow_bps_annual / 1e4 * horizon / 252`` (an assumption: no borrow data is stored);
@@ -95,6 +96,7 @@ CHAIN_PNL_FIELDS = (
     "exit_bid",
     "pnl_per_underlying",
     "hedged_pnl_per_underlying",
+    "hedge_reason",
 )  # the stored chain-grain fields an option_pnl outcome reads
 MISSING_VALUE = "missing_value"  # a row, but the measure is null (no benchmark bar, no vol)
 NO_IMPLIED_VOL = "no_implied_vol"  # the implied vol at S is missing or not positive
@@ -330,6 +332,8 @@ def apply_outcome(
     elif o.kind == CHAIN_KIND:
         value = _chain_pnl(edge, outcomes)
         excluded[~np.isfinite(value)] = MISSING_VALUE
+        if o.structure in HEDGED_STRUCTURES:  # a hedge session was missing: no hedged P&L
+            excluded[outcomes["hedge_reason"].notna().to_numpy()] = UNMEASURED
     elif is_return(edge):
         value = _numbers(outcomes, "fwd_excess_return") - (o.cost_bps or 0.0) / 1e4
         excluded[~np.isfinite(value)] = MISSING_VALUE

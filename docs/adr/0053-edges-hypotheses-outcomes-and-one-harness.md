@@ -775,20 +775,28 @@ It is a second outcomes grain and a second outcome kind; the first is unchanged.
    partitions it was computed from (the exit session's, S..T), not the write time: a window is
    known only when its exit chain was. A window whose T has not closed is refused. Past
    restatements of a chain partition would move the stamp, never the other way round.
-4. **Stale and missing chains.** A name is UNMEASURED, with a reason and no P&L, when any session
-   from S to T has no chain for it (`NO_CHAIN:<day>`) or a `STALE_DATA` chain
+4. **Stale and missing chains.** A name is UNMEASURED, with a reason and no P&L, when the entry
+   or the exit session has no chain for it (`NO_CHAIN:<day>`) or a `STALE_DATA` chain
    (`STALE_CHAIN:<day>`, ADR 0054's labelling, chronic staleness included), when a contract has
-   no two-sided quote at the exit (`NO_EXIT_QUOTE`), when a hedge delta cannot be computed on a
-   session (`NO_DELTA:<day>`), or when no expiry can be held (`NO_EXPIRY`) or no strike
-   entered (`NO_ENTRY_QUOTE`). A chain is never filled from an earlier session and a P&L is
-   never zero when it could not be computed. The whole row is UNMEASURED, also for the unhedged
-   P&L, so one status means one thing. A name whose chain at S is not `OK` has no row (no
-   position was knowable). The harness counts an UNMEASURED pick like any unmeasurable one.
+   no quote at the exit (`NO_EXIT_QUOTE`), or when no expiry can be held (`NO_EXPIRY`) or no
+   strike entered (`NO_ENTRY_QUOTE`). A chain is never filled from an earlier session and a P&L
+   is never zero when it could not be computed. A chain missing or stale on a session *between*
+   the entry and the exit, or a delta that cannot be computed on one (`NO_DELTA:<day>`), costs
+   only the hedged P&L: the row stays COMPLETE, `hedge_reason` is set and the hedged columns
+   are null (architect review 2026-10-18: a stale mid-window day must not blank an unhedged
+   window). The harness excludes a hedged structure's row as unmeasured when `hedge_reason`
+   is set. A name whose chain at S is not `OK` has no row (no position was knowable).
+   Quotes after a large move: at the exit and on hedge sessions a quote with a zero bid and an
+   ask is read as bid 0 and mid ask / 2 (a far out-of-the-money leg is quoted so), never as
+   missing; the entry needs a two-sided quote.
 5. **Hedge.** Daily, at each close from S to T - 1, with *our own* delta: the implied vol that
    each leg's mid gives (`quant/implied_vol`), then the Black-Scholes delta with r = q = 0 and
    t in calendar days over 365 (ADR 0021's time convention; the curve's rate and the dividend
-   yield move a one-month delta by under 1% and are left out, so the figure does not depend on
-   the rates and dividend tables). Never a vendor Greek. No hedge cost and no financing.
+   yield move a one-month delta by under 1% and are left out in v1, accepted at the architect
+   review, so the figure does not depend on the rates and dividend tables). Where no vol solves,
+   the limit: delta 0 for a strictly out-of-the-money leg priced inside its bound, +1 (call) or
+   -1 (put) for an in-the-money leg priced at or below intrinsic, else the day is missing
+   (`NO_DELTA`). Never a vendor Greek. No hedge cost and no financing.
 6. **Value.** The harness value of an `option_pnl` outcome is executable, net of the quoted
    spread: `sign * pnl_per_underlying` (or the hedged one for `delta_hedged_atm[_short]`) less
    the half-spread paid at entry (`entry_ask - entry_mid`) and at exit (`exit_mid - exit_bid`)

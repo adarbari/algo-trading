@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 
 from algotrade.quant.black_scholes import greeks, price
+from algotrade.storage.tables.schemas import OPTION_PNL_REASONS
 from algotrade_ingestion.tasks.derived.option_paths import (
     ATM_STRADDLE,
     DayChain,
@@ -38,7 +39,7 @@ def _quotes(
                 continue
             mid = float(price(spot, strike, t, 0.0, 0.0, VOL, right == "C"))
             rows.append({"instrument_id": f"OPT:{cid}", "underlying_id": A, "expiry": expiry,
-                         "right": right, "strike": strike, "bid": mid - HALF,
+                         "right": right, "strike": strike, "bid": max(mid - HALF, 0.0),
                          "ask": mid + HALF})  # fmt: skip
     return pd.DataFrame(rows)
 
@@ -141,20 +142,60 @@ def test_exit_at_expiry_is_intrinsic() -> None:
 @pytest.mark.parametrize(
     ("changes", "reason"),
     [
-        ({"d1": _chain(1, "STALE_DATA")}, "STALE_CHAIN:2026-10-06"),
-        ({"d1": _chain(1, None)}, "NO_CHAIN:2026-10-06"),
         ({"d2": _chain(2, "STALE_DATA")}, "STALE_CHAIN:2026-10-07"),
+        ({"d2": _chain(2, None)}, "NO_CHAIN:2026-10-07"),
         ({"d2": _chain(2, skip={"C100"})}, "NO_EXIT_QUOTE"),
-        ({"d1": _chain(1, skip={"P100"})}, "NO_DELTA:2026-10-06"),
     ],
 )
-def test_unmeasured_names_carry_a_reason_and_no_pnl(
+def test_an_entry_or_exit_gap_is_unmeasured_with_a_reason_and_no_pnl(
     changes: dict[str, DayChain], reason: str
 ) -> None:
     r = rows_of(_window(**changes), ATM_STRADDLE, 30)[0].iloc[0]
     assert r["outcome_status"] == "UNMEASURED" and r["outcome_reason"] == reason
     for column in ("pnl_per_premium", "pnl_exec_per_premium", "hedged_pnl_per_premium", "exit_mid"):
         assert pd.isna(r[column])  # never a zero, never a stale chain in its place
+    assert reason.split(":", maxsplit=1)[0] in OPTION_PNL_REASONS
+
+
+@pytest.mark.parametrize(
+    ("changes", "reason"),
+    [
+        ({"d1": _chain(1, "STALE_DATA")}, "STALE_CHAIN:2026-10-06"),
+        ({"d1": _chain(1, None)}, "NO_CHAIN:2026-10-06"),
+        ({"d1": _chain(1, skip={"P100"})}, "NO_DELTA:2026-10-06"),
+    ],
+)
+def test_a_hedge_session_gap_costs_only_the_hedged_pnl(
+    changes: dict[str, DayChain], reason: str
+) -> None:
+    whole = rows_of(_window(), ATM_STRADDLE, 30)[0].iloc[0]
+    r = rows_of(_window(**changes), ATM_STRADDLE, 30)[0].iloc[0]
+    assert r["outcome_status"] == "COMPLETE" and pd.isna(r["outcome_reason"])
+    assert r["hedge_reason"] == reason
+    assert r["pnl_per_premium"] == pytest.approx(whole["pnl_per_premium"])  # the unhedged P&L stays
+    assert pd.isna(r["hedged_pnl_per_premium"]) and pd.isna(r["hedged_pnl_per_underlying"])
+    assert pd.isna(whole["hedge_reason"])
+
+
+def test_a_straddle_after_a_large_move_is_complete_not_a_missing_quote() -> None:
+    """After +30% the far out-of-the-money put is quoted at bid 0, and the deep in-the-money call
+    can price below the vol the solver accepts: the biggest moves must stay measured."""
+    spots = (100.0, 115.0, 130.0)
+
+    def chain(i: int) -> DayChain:
+        day = DAYS[i]
+        return DayChain(day, _quotes(day, spots[i]), {A: spots[i]}, {A: "OK"}, _chain(i).known)
+
+    rows, _ = rows_of([chain(i) for i in range(3)], ATM_STRADDLE, 30)
+    r = rows.iloc[0]
+    exit_quotes = chain(2).options
+    put = exit_quotes[exit_quotes["instrument_id"] == "OPT:P100"].iloc[0]
+    assert put["bid"] == 0.0 and put["ask"] > 0  # the quote the old rule discarded
+    assert r["outcome_status"] == "COMPLETE" and pd.isna(r["hedge_reason"]), r["outcome_reason"]
+    call_mid = float(price(130.0, 100.0, (EXPIRY - DAYS[2]).days / 365, 0.0, 0.0, VOL, True))
+    assert r["exit_mid"] == pytest.approx(call_mid + put["ask"] / 2)  # a bid-0 quote: mid ask / 2
+    assert r["exit_bid"] == pytest.approx(call_mid - HALF + 0.0)
+    assert r["hedged_pnl_per_premium"] == r["hedged_pnl_per_premium"]  # a number, not NaN
 
 
 def test_a_zero_bid_entry_and_a_missing_expiry_are_reasons() -> None:

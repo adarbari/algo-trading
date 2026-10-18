@@ -22,7 +22,7 @@ from algotrade.storage.tables.schemas import OPTION_PNL
 
 CHAIN_FIELDS = (
     "structure", "tenor_days", "entry_spot", "entry_mid", "entry_ask", "exit_mid", "exit_bid",
-    "pnl_per_underlying", "hedged_pnl_per_underlying",
+    "pnl_per_underlying", "hedged_pnl_per_underlying", "hedge_reason",
 )  # fmt: skip
 CHAIN_COLUMNS = ("instrument_id", "horizon_sessions", *OUTCOME_FIELDS, *CHAIN_FIELDS)
 _KEY = ("instrument_id", "session_date", "horizon_sessions", "benchmark", "window_end")
@@ -106,8 +106,9 @@ def select_chain(
                    "fwd_realised_vol"):  # fmt: skip
         out[column] = np.nan
     out["benchmark"] = "none"
-    if "outcome_reason" not in out.columns:
-        out["outcome_reason"] = None
+    for nullable in ("outcome_reason", "hedge_reason"):  # a column no row of the partitions set
+        if nullable not in out.columns:
+            out[nullable] = None
     kept = out[[*_KEY, *OUTCOME_FIELDS, *CHAIN_FIELDS, "knowledge_ts"]]
     return kept.sort_values(["session_date", "instrument_id"], kind="stable").reset_index(drop=True)
 

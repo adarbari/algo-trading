@@ -78,27 +78,38 @@ class ChainLoader:
     def __init__(self, reader: StoreReader, sources: SourcesSettings) -> None:
         self.reader, self.sources = reader, sources
         self._entry: dict[date, DayChain] = {}
+        self._days: dict[date, tuple[dict[str, str], dict[str, float], list[pd.Timestamp]]] = {}
 
     def reset(self) -> None:
         self._entry.clear()
 
-    def __call__(self, day: date, ids: Collection[str] | None) -> DayChain:
-        if ids is None and day in self._entry:
-            return self._entry[day]
+    def _day(self, day: date) -> tuple[dict[str, str], dict[str, float], list[pd.Timestamp]]:
+        """A session's chain labels, closing quotes and partition stamps, read once a run (the
+        status and the quotes serve every window that touches the session)."""
+        if day in self._days:
+            return self._days[day]
         status = chain_status(self.reader, day)
         labels: dict[str, str] = {}
-        stamps = []
+        stamps: list[pd.Timestamp] = []
         if status is not None and not status.empty:
             labelled = chain_labels(status, day, self.sources.max_chain_stale_sessions)
             labels = dict(
                 zip(status["instrument_id"].astype(str), labelled.astype(str), strict=True)
             )
-            stamps.append(status["knowledge_ts"].max())
+            stamps.append(pd.Timestamp(status["knowledge_ts"].max()))
         quotes = underlying_quotes(self.reader, day)
         spots: dict[str, float] = {}
         if quotes is not None and not quotes.empty:
             spots = {str(i): float(v) for i, v in closing_spots(quotes).items()}  # the closes
-            stamps.append(quotes["knowledge_ts"].max())
+            stamps.append(pd.Timestamp(quotes["knowledge_ts"].max()))
+        self._days[day] = labels, spots, stamps
+        return self._days[day]
+
+    def __call__(self, day: date, ids: Collection[str] | None) -> DayChain:
+        if ids is None and day in self._entry:
+            return self._entry[day]
+        labels, spots, base = self._day(day)
+        stamps = list(base)
         held = None if ids is not None and not ids else ids  # no contract held: none to read
         options = (
             None
@@ -106,10 +117,10 @@ class ChainLoader:
             else option_quote_rows(self.reader, day, held, (*QUOTE_COLUMNS, "knowledge_ts"))
         )
         if options is not None and not options.empty:
-            stamps.append(options["knowledge_ts"].max())
+            stamps.append(pd.Timestamp(options["knowledge_ts"].max()))
             options = one_row_per_contract(options).drop(columns=["knowledge_ts", "ts"])
             options = options.assign(underlying_id=options["underlying_id"].astype(str))
-        known = pd.Timestamp(max(stamps)).to_pydatetime() if stamps else None
+        known = max(stamps).to_pydatetime() if stamps else None
         chain = DayChain(day, options, spots, labels, known)
         if ids is None:
             self._entry[day] = chain
@@ -147,6 +158,7 @@ def _one(
     loader: ChainLoader,
 ) -> RunRecord:
     current: date | None = None
+    parts: dict[date, list[pd.DataFrame]] = {}  # one partition per start session, written once
     with IngestRun(ctx, TASK, end) as run:
         for structure, tenor, h in sorted(wanted, key=lambda w: w[2]):
             key = f"{structure}:t{tenor}:h{h}"
@@ -159,18 +171,26 @@ def _one(
                 current = sessions[0]
             rows, known = structure_rows(sessions, loader, structure, tenor, h)
             if len(rows):
-                out = rows.assign(ts=close_time(sessions[0]))
-                run.write(TABLE, out, SOURCE, session=sessions[0], known=known)
+                stamp = known if known is not None else ctx.clock()
+                parts.setdefault(sessions[0], []).append(
+                    rows.assign(ts=close_time(sessions[0]), knowledge_ts=pd.Timestamp(stamp))
+                )
             reasons = rows.loc[rows["outcome_status"] == "UNMEASURED", "outcome_reason"]
             run.record_item(key, f"OK: {len(rows)} rows")
             run.stats[key] = {
                 "start": sessions[0].isoformat(),
                 "rows": len(rows),
                 "unmeasured": len(reasons),
+                "hedge_missing": int(rows["hedge_reason"].notna().sum()),
                 "reasons": {
                     str(r).split(":")[0]: int(n) for r, n in reasons.value_counts().items()
                 },
             }
+        for start, frames in parts.items():
+            # same-horizon windows share S: a second write would replace the first partition
+            both = pd.concat(frames, ignore_index=True)
+            stamps = both.pop("knowledge_ts")
+            run.write(TABLE, both, SOURCE, session=start, known=stamps)
         loader.reset()
     return run.record
 

@@ -7,8 +7,8 @@ a short position is its negative and is applied by the harness. Quotes, never a 
 - ``long_pnl``: per share, mid in and mid out, and executable (bought at the ask, sold at the bid;
   at expiry the intrinsic value is both);
 - ``leg_delta``: our own Black-Scholes delta (r = q = 0, ``t`` in years of calendar days) at the
-  vol the leg's mid implies (``implied_vol``), NaN where no vol solves: the hedge is never taken
-  from a delta we cannot compute;
+  vol the leg's mid implies (``implied_vol``); where no vol solves, the limit of a leg far out of
+  or in the money (0, +-1), else NaN: the hedge is never taken from a delta we cannot compute;
 - ``hedged_pnl``: the long position's mid P&L less the gain of a stock hedge rebalanced at each
   close, ``sum(delta_k * (S_{k+1} - S_k))`` over the sessions of the window (``delta_k`` the
   position's net delta at session ``k``'s close, the hedge held to the next close). No financing,
@@ -52,14 +52,23 @@ def long_pnl(
 def leg_delta(
     mid: ArrayLike, spot: ArrayLike, strike: ArrayLike, t_years: ArrayLike, is_call: ArrayLike
 ) -> Array:
-    """Our own delta of each leg from its mid (r = q = 0); NaN where its vol does not solve."""
+    """Our own delta of each leg from its mid (r = q = 0). Where no vol solves, the limit of the
+    delta when the price says the option is far from the money: 0 for a strictly out-of-the-money
+    leg priced inside its no-arbitrage bound, +1 (call) or -1 (put) for an in-the-money leg priced
+    at or below its intrinsic value. NaN otherwise (a missing mid, an ATM price with no vol, a
+    price above its bound)."""
     m, s, k, t = (np.asarray(a, dtype=np.float64) for a in (mid, spot, strike, t_years))
     call = np.asarray(is_call, dtype=bool)
     solved = implied_vol(m, s, k, t, 0.0, 0.0, call)
     ok = solved.status == IVStatus.OK
     sigma = np.where(ok, solved.iv, 1.0)  # a placeholder where unsolved: masked below
     delta = greeks(s, k, t, 0.0, 0.0, sigma, call).delta
-    return np.asarray(np.where(ok, delta, np.nan), dtype=np.float64)
+    with np.errstate(invalid="ignore"):
+        otm = np.where(call, k > s, k < s)
+        inside = (m >= 0) & (m <= np.where(call, s, k))
+        itm_flat = ~otm & (np.abs(s - k) > 0) & (m <= intrinsic(s, k, call) * (1 + 1e-6) + 1e-9)
+    limit = np.where(otm & inside, 0.0, np.where(itm_flat, np.where(call, 1.0, -1.0), np.nan))
+    return np.asarray(np.where(ok, delta, limit), dtype=np.float64)
 
 
 def hedged_pnl(entry_value: ArrayLike, exit_value: ArrayLike, spots: Array, deltas: Array) -> Array:

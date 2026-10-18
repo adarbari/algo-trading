@@ -37,6 +37,7 @@ ROW_COLUMNS = (
     "put_id", "expiry", "strike", "entry_spot", "entry_mid", "entry_ask", "exit_spot", "exit_mid",
     "exit_bid", "exit_kind", "pnl_per_premium", "pnl_exec_per_premium", "pnl_per_underlying",
     "hedged_pnl_per_premium", "hedged_pnl_per_underlying", "outcome_status", "outcome_reason",
+    "hedge_reason",
 )  # fmt: skip
 
 
@@ -168,8 +169,11 @@ def _pick_strike(
     }
 
 
-def _leg(chain: DayChain, ids: pd.Series) -> pd.DataFrame:
-    """The bid, ask and two-sided mid of contracts ``ids`` on one session (NaN where not quoted)."""
+def _leg(chain: DayChain, ids: pd.Series, lenient: bool = False) -> pd.DataFrame:
+    """The bid, ask and two-sided mid of contracts ``ids`` on one session (NaN where not quoted).
+    ``lenient`` (the exit and the hedge sessions): a quote with a zero bid and an ask is read as
+    bid 0 and mid ask / 2, as a far out-of-the-money leg is quoted after a large move; the entry
+    needs a bid above zero."""
     blank = pd.DataFrame(np.nan, index=range(len(ids)), columns=["bid", "ask", "mid"])
     if chain.options is None or chain.options.empty:
         return blank
@@ -177,6 +181,11 @@ def _leg(chain: DayChain, ids: pd.Series) -> pd.DataFrame:
     found = indexed.reindex(ids.to_numpy())[["bid", "ask"]].astype(float)
     found.index = blank.index
     found["mid"] = two_sided_mid(found["bid"], found["ask"])
+    if lenient:
+        bid, ask = found["bid"].to_numpy(), found["ask"].to_numpy()
+        with np.errstate(invalid="ignore"):
+            zero_bid = (bid == 0) & (ask > 0)
+        found["mid"] = np.where(zero_bid, ask / 2, found["mid"])
     return found
 
 
@@ -195,6 +204,12 @@ class _Held:
     strike: np.ndarray
     ok: np.ndarray
     reason: np.ndarray
+    hedge: np.ndarray  # why the hedged P&L alone is missing (a hedge session)
+
+    def fail_hedge(self, who: np.ndarray, why: str) -> None:
+        """Record ``why`` for the names in ``who`` whose hedge has no reason yet."""
+        for i in np.flatnonzero(self.ok & who & pd.isna(self.hedge)):
+            self.hedge[i] = why
 
     def fail(self, who: np.ndarray, why: str) -> None:
         """Record ``why`` for the names in ``who`` that have no reason yet."""
@@ -207,27 +222,33 @@ class _Held:
 
 def _hedge_path(days: Sequence[DayChain], held: _Held) -> tuple[list[np.ndarray], list[np.ndarray]]:
     """The underlying's close on each session and, on each but the last, the position's net
-    delta (NaN where a leg's delta cannot be computed); a session whose chain is missing or
-    stale is a reason of the names it fails."""
+    delta (NaN where a leg's delta cannot be computed). The exit session's missing or stale chain
+    is a reason of the name; one between the entry and the exit, or a delta that cannot be
+    computed, is only a reason its hedge is missing (``hedge``)."""
     spots = [np.array([days[0].spots.get(i, np.nan) for i in held.names], float)]
     deltas: list[np.ndarray] = []
     for k, day in enumerate(days):
         usable = _usable(day, held.names)
-        for i in map(int, np.flatnonzero(held.ok & ~usable & pd.isna(held.reason))):
-            held.reason[i] = _why_not(day, held.names.iloc[i : i + 1])[0]
+        last = k == len(days) - 1
+        for i in map(int, np.flatnonzero(held.ok & ~usable)):
+            why = _why_not(day, held.names.iloc[i : i + 1])[0]
+            if last:
+                held.fail(np.arange(len(held.ok)) == i, why)
+            else:
+                held.fail_hedge(np.arange(len(held.ok)) == i, why)
         if k:
             spots.append(np.array([day.spots.get(i, np.nan) for i in held.names], float))
-        if k == len(days) - 1:
+        if last:
             break
         years = _years(held.expiry.where(held.expiry.notna(), day.day), day.day)
         net, priced = np.zeros(len(held.names)), np.ones(len(held.names), bool)
         for r in held.legs():
-            leg = _leg(day, held.ids[r])
+            leg = _leg(day, held.ids[r], lenient=True)
             d = leg_delta(leg["mid"], spots[-1], held.strike, years, r == "C")
             net += held.weight[r] * np.nan_to_num(d)
             priced &= np.isfinite(d)
-        held.fail(usable & ~priced, f"NO_DELTA:{day.day}")
-        deltas.append(np.where(priced, net, np.nan))
+        held.fail_hedge(usable & ~priced, f"NO_DELTA:{day.day}")
+        deltas.append(np.where(priced & usable, net, np.nan))
     return spots, deltas
 
 
@@ -237,7 +258,7 @@ def _exit_values(
     """``(exit_mid, exit_bid, at_expiry)``: the quoted mid and bid of the position at the exit
     session, the intrinsic value for a contract that expires on it."""
     at_expiry = np.array([isinstance(e, date) and e == exit_.day for e in held.expiry])
-    quotes = {r: _leg(exit_, held.ids[r]) for r in held.legs()}
+    quotes = {r: _leg(exit_, held.ids[r], lenient=True) for r in held.legs()}
     mid = sum(held.weight[r] * quotes[r]["mid"].to_numpy() for r in quotes)
     bid = sum(held.weight[r] * quotes[r]["bid"].to_numpy() for r in quotes)
     value = sum(held.weight[r] * intrinsic(exit_spot, held.strike, r == "C") for r in quotes)
@@ -269,7 +290,7 @@ def structure_rows(
     reason = picks["reason"].astype(object).to_numpy().copy()
     ok = pd.isna(picks["reason"]).to_numpy()  # the names with contracts at the entry
     if not ok.any():
-        return _finish(out, reason), known
+        return _finish(out, reason, np.full(n, None, object)), known
     held = _Held(
         picks["instrument_id"],
         {r: picks[c].fillna("") for r, c in (("C", "call_id"), ("P", "put_id"))},
@@ -278,6 +299,7 @@ def structure_rows(
         picks["strike"].astype(float).to_numpy(),
         ok,
         reason,
+        np.full(n, None, dtype=object),
     )
     out["call_id"], out["put_id"] = picks["call_id"].to_numpy(), picks["put_id"].to_numpy()
     out["expiry"], out["strike"] = held.expiry.to_numpy(), held.strike
@@ -303,19 +325,25 @@ def structure_rows(
     ):  # fmt: skip
         out[column] = values
     complete = np.isfinite(mid) & np.isfinite(executable) & np.isfinite(per_underlying)
-    held.fail(~(complete & np.isfinite(h_premium) & np.isfinite(h_underlying)), "NO_PNL")
-    return _finish(out, held.reason), known
+    held.fail(~complete, "NO_PNL")
+    held.fail_hedge(~(np.isfinite(h_premium) & np.isfinite(h_underlying)), "NO_PNL")
+    return _finish(out, held.reason, held.hedge), known
 
 
 RESULT_NULLS = (
     "exit_spot", "exit_mid", "exit_bid", "exit_kind", "pnl_per_premium", "pnl_exec_per_premium",
     "pnl_per_underlying", "hedged_pnl_per_premium", "hedged_pnl_per_underlying",
 )  # fmt: skip
+HEDGE_NULLS = ("hedged_pnl_per_premium", "hedged_pnl_per_underlying")
 
 
-def _finish(out: pd.DataFrame, reason: np.ndarray) -> pd.DataFrame:
-    """Set the status and reasons; an UNMEASURED row has its exit and every P&L nulled."""
+def _finish(out: pd.DataFrame, reason: np.ndarray, hedge: np.ndarray) -> pd.DataFrame:
+    """Set the status and reasons. An UNMEASURED row has its exit and every P&L nulled; a
+    COMPLETE row with a ``hedge_reason`` has only its hedged P&L nulled."""
     bad = pd.notna(reason)
+    shown = pd.Series(hedge, index=out.index, dtype=object).mask(bad, None)
+    out["hedge_reason"] = shown
+    out.loc[shown.notna(), list(HEDGE_NULLS)] = None
     out["outcome_status"] = np.where(bad, "UNMEASURED", "COMPLETE")
     out["outcome_reason"] = pd.Series(reason, index=out.index).where(bad, None)
     out.loc[bad, list(RESULT_NULLS)] = None
