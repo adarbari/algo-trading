@@ -28,9 +28,9 @@ from algotrade_ingestion.tasks.events import filing_text as task
 from algotrade_ingestion.tasks.events.filings import Listed
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_sources.framework.http import HttpError, RetryPolicy
-from algotrade_sources.vendors.sec import filing_items
-from algotrade_sources.vendors.sec.filing_text import SecFilingText
 from algotrade_sources.vendors.sec.submissions import SecFilings
+from algotrade_sources.vendors.sec_text import filing_items
+from algotrade_sources.vendors.sec_text.filing_text import SecFilingText
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import FIXED, http_for, task_ctx
 from tests.helpers.stored_frames import stamped

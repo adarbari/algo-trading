@@ -36,7 +36,11 @@ from algotrade_sources.framework.series import (
     FilingTextRequest,
     items_for,
 )
-from algotrade_sources.vendors.sec.filing_items import PARSER_VERSION, extract_text, html_to_text
+from algotrade_sources.vendors.sec_text.filing_items import (
+    PARSER_VERSION,
+    extract_text,
+    html_to_text,
+)
 
 SOURCE = "sec_edgar"
 DATASET = "filing_text"

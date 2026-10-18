@@ -15,7 +15,7 @@ from algotrade_sources.framework.series import (
     FILING_TEXT_FRAME,
     FilingTextRequest,
 )
-from algotrade_sources.vendors.sec.filing_text import SecFilingText, document_url
+from algotrade_sources.vendors.sec_text.filing_text import SecFilingText, document_url
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for
 

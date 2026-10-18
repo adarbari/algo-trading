@@ -171,7 +171,7 @@ The text behind Lazy Prices, risk-factor change and MD&A tone. Per filing, one r
 `https://www.sec.gov/Archives/edgar/data/<cik>/<accession>/<primaryDocument>`, on the shared `sec`
 limiter (10 requests a second at most, the contact `User-Agent`); the listing is the existing
 `sec_filings` source read with the periodic forms (10-K, 10-K/A, 10-Q, 10-Q/A: an amendment is its
-own filing with its own accession and acceptance time). `vendors/sec/filing_items.py` turns the
+own filing with its own accession and acceptance time). `vendors/sec_text/filing_items.py` turns the
 HTML into plain text (standard library parser, no dependency) and splits the Item sections with
 header patterns written here (EDGAR-CRAWLER is GPL-3: never imported or vendored; EDGAR-CORPUS,
 Apache-2.0, is 10-K only to 2020 and 40 GB: not used). Only the sections are stored, never the

@@ -25,7 +25,7 @@ asks the SEC filings source for one company's 8-Ks (ADR 0050); its answer is
 8-K that day, ``parsed[DAILY_INDEX_FRAME]`` with ``DAILY_INDEX_COLUMNS``
 (``vendors/sec/daily_index.py``). ``FilingTextRequest`` asks for the item sections of one 10-K /
 10-Q (edge build D10): ``parsed[FILING_TEXT_FRAME]`` with ``FILING_TEXT_COLUMNS``
-(``vendors/sec/filing_text.py``). They live here so a task builds its requests without
+(``vendors/sec_text/filing_text.py``). They live here so a task builds its requests without
 importing a vendor module.
 """
 
@@ -161,8 +161,8 @@ class FilingsRequest(FetchRequest):
 class FilingTextRequest(FetchRequest):
     """The item sections of one periodic report. ``key`` is the accession; ``cik`` (digits),
     ``form`` and ``primary_document`` (the file name SEC's submissions JSON gives) say where the
-    document is; ``items`` the item ids kept (``vendors/sec/filing_items.py``: ``1A``, ``7`` for a
-    10-K, ``I-2``, ``II-1A`` for a 10-Q; empty: the form's default list)."""
+    document is; ``items`` the item ids kept (``1A``, ``7`` for a 10-K, ``I-2``, ``II-1A`` for a
+    10-Q; empty: the form's default list; ``vendors/sec_text/filing_items.py``)."""
 
     cik: str
     form: str

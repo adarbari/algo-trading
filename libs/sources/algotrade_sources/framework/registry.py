@@ -77,7 +77,6 @@ from algotrade_sources.vendors.published.csv_series import PublishedSeries
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.daily_index import SecDailyIndex, missing_index
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap, user_agent
-from algotrade_sources.vendors.sec.filing_text import SecFilingText
 from algotrade_sources.vendors.sec.form4_xml import SecForm4Xml
 from algotrade_sources.vendors.sec.form345_bulk import SecForm345Bulk
 from algotrade_sources.vendors.sec.fund_objectives import (
@@ -87,6 +86,7 @@ from algotrade_sources.vendors.sec.fund_objectives import (
 )
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.sec.submissions import SecFilings
+from algotrade_sources.vendors.sec_text.filing_text import SecFilingText
 from algotrade_sources.vendors.sp500_history.membership import Sp500Membership
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource

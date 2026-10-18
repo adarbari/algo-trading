@@ -7,7 +7,7 @@ nothing is guessed (NOT_FOUND, NO_ITEMS)."""
 import pytest
 
 from algotrade_sources.framework.series import DEFAULT_10K, DEFAULT_10Q, items_for
-from algotrade_sources.vendors.sec.filing_items import (
+from algotrade_sources.vendors.sec_text.filing_items import (
     MAX_CHARS,
     MIN_CHARS,
     NO_ITEMS,

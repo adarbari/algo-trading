@@ -5,8 +5,8 @@ change, MD&A tone; the similarity features are track E, this is the text).
 **Per CIK**: the filing list is the ``sec_filings`` source read with the periodic forms
 (``PERIODIC_FORMS``; one submissions request per CIK, the older pages when ``--from`` precedes the
 recent block), then one document request per filing to ``sec_filing_text`` (the primary document,
-parsed and dropped: only the items are stored, ``vendors/sec/filing_items.py``; kept items per form
-by default ``DEFAULT_10K`` / ``DEFAULT_10Q``, ``--items`` narrows or widens). Names are the
+parsed and dropped: only the items are stored, ``vendors/sec_text/filing_items.py``; kept items
+per form by default ``DEFAULT_10K`` / ``DEFAULT_10Q``, ``--items`` narrows or widens). Names are the
 session's universe snapshot minus the funds, each CIK from ``instruments/company`` as of the
 session (``events/filings.py``'s ``universe_names`` / ``ciks_of``: the same names as the 8-K
 history, share classes of one CIK get a row set each from one fetch). Rows carry the stable FIGI
