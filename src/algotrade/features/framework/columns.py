@@ -38,7 +38,7 @@ def conform(table: str, frame: pd.DataFrame, columns: Mapping[str, str]) -> pd.D
         raise DataValidationError(table, [f"undeclared columns {extra}: declare them"])
     if "instrument_id" not in frame.columns:
         raise DataValidationError(table, ["missing instrument_id"])
-    out = pd.DataFrame({"instrument_id": frame["instrument_id"].astype(str).to_numpy()})
+    typed = {"instrument_id": pd.Series(frame["instrument_id"].astype(str).to_numpy())}
     problems = []
     for name, kind in columns.items():
         values = (
@@ -47,9 +47,11 @@ def conform(table: str, frame: pd.DataFrame, columns: Mapping[str, str]) -> pd.D
             else pd.Series([None] * len(frame), dtype=object)
         )
         try:
-            out[name] = _cast(values, kind)
+            typed[name] = _cast(values, kind)
         except (ValueError, TypeError) as exc:
             problems.append(f"{name}: not a {kind} column ({exc})")
     if problems:
         raise DataValidationError(table, problems)
-    return out
+    # joined at once: inserting a hundred columns one by one fragments the frame (the
+    # expression catalogue passed a hundred with the forward features)
+    return pd.concat(typed, axis=1)
