@@ -60,7 +60,9 @@ SUBMISSION_COLUMNS = (
     "ISSUERTRADINGSYMBOL",
     "AFF10B5ONE",
 )
-OWNER_COLUMNS = ("ACCESSION_NUMBER", "RPTOWNERCIK", "RPTOWNER_RELATIONSHIP", "RPTOWNER_TITLE")
+OWNER_COLUMNS = (
+    "ACCESSION_NUMBER", "RPTOWNERCIK", "RPTOWNERNAME", "RPTOWNER_RELATIONSHIP", "RPTOWNER_TITLE",
+)  # fmt: skip
 TRANS_COLUMNS = ("ACCESSION_NUMBER", *LINE_COLUMNS.values())
 
 
@@ -137,6 +139,7 @@ def _owners(table: pd.DataFrame, accessions: set[str]) -> pd.DataFrame:
         {
             "accession": table["ACCESSION_NUMBER"],
             "owner_cik": table["RPTOWNERCIK"].map(pad_cik),
+            "owner_name": _text(table["RPTOWNERNAME"].str.strip()),
             "is_director": relation.str.contains("DIRECTOR"),
             "is_officer": relation.str.contains("OFFICER"),
             "is_ten_pct_owner": relation.str.contains("TENPERCENT"),

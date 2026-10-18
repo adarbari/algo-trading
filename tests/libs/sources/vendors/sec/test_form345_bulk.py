@@ -36,6 +36,7 @@ def test_a_quarter_gives_the_form_4_rows_of_each_line_and_owner() -> None:
     assert buy["issuer_cik"] == "0000999001" and buy["owner_cik"] == "0000888001"
     assert buy["is_director"] and buy["is_officer"] and not buy["is_ten_pct_owner"]
     assert buy["officer_title"] == "Chief Financial Officer"
+    assert buy["owner_name"] == "Doe Jane"  # as filed, whitespace trimmed
     assert first[first["transaction_code"] == "M"]["derivative"].tolist() == [True]
     assert first["plan_10b5_1"].isna().all()
 

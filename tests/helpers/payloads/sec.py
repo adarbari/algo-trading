@@ -83,7 +83,11 @@ def form345_zip(rows: dict[str, list[dict[str, str]]]) -> bytes:
 
 
 ISSUER = {"ISSUERCIK": "0000999001", "ISSUERNAME": "Example Corp", "ISSUERTRADINGSYMBOL": "EXMP"}
-OWNER = {"RPTOWNERCIK": "0000888001", "RPTOWNER_RELATIONSHIP": "Director,Officer"}
+OWNER = {
+    "RPTOWNERCIK": "0000888001",
+    "RPTOWNERNAME": " Doe Jane ",
+    "RPTOWNER_RELATIONSHIP": "Director,Officer",
+}
 
 
 def example_quarter(amend: bool = True, price: str = "12.5") -> bytes:

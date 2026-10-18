@@ -628,7 +628,8 @@ follow-up PR).
 - Options: store `owner_cik` + `officer_title` as filed / store a salted hash of the owner CIK + role flags only / store role flags only (no per-person key).
 - Decision: store `owner_cik` and `officer_title` as filed, no names, no other identifiers (no address, no owner name from the XML). The table carries the Form 4 public filing data only; the UI shows counts and roles (distinct insiders, officer / director / 10%-owner), never a per-person list. Retention: as the other event grains (indefinite, point-in-time), per D6's plan. `docs/architecture.md` section 10 ("PII: none stored") gets a one-line amendment in a follow-up: "public SEC filer identifiers (reporting-owner CIK, officer title) are stored as filed; no names."
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: overruled
+- confirmed: owner 2026-10-18
 - Reasoning: the owner CIK is an SEC public identifier the data set is keyed on; a hash buys nothing (the hash of a public id is trivially reversible against EDGAR) and loses the join to later filings, amendments (4/A) and the deep-dive dossier. Officer title is attribute data a cluster-buy edge weighs (CEO / CFO buys vs. director buys), stored as filed with no name. The cluster-insider-buy edge needs a distinct-insider count, so a stable per-person key is functionally required. Data never enters the public repo (store is local, git-ignored); the read model serves aggregates. Precedent: ADR 0040 keeps emails (private personal data) out of the repo, not public filing data out of the store. Erasure and shorter retention are owner-only decisions (log 2026-10-11), so the default event retention stands until the owner says otherwise.
 
 ## 2026-10-18 | EB H11 (residual returns) | Betas read before S, sector term, no nightly step yet
@@ -896,3 +897,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a signal read at S would trade on the window it is measured over; a missing scout read as positive would be a silent decision to stay invested. Architect design of 2026-10-18 (ADR 0074 item 17).
+
+## 2026-10-18 | EB D6b (Form 4 insider transactions) | The reporting owner's name is stored as filed
+- Question: may the insider transaction table store the Form 4 reporting owner's name (`owner_name`), reversing the "no names" part of the PR #651 entry above?
+- Options: keep no names (CIK and officer title only) / store the name as filed.
+- Decision: store `owner_name` as filed (SEC bulk `RPTOWNERNAME`, Form 4 XML `rptOwnerName`), whitespace trimmed, NULL when absent, never lowercased or altered; a changed spelling across filings is another value, the owner key stays `owner_cik`. Officer and director names are public SEC filing data. Everything else of the #651 entry stands (CIK and officer title as filed, no address, no other identifiers). The name is not part of the row key and never moves a `known_from`. UI rule unchanged: aggregates only, no per-person list unless a screen is explicitly built later.
+- decided by: owner
+- status: final
+- Reasoning: the name is on the public filing beside the CIK that is already stored, so storing it adds no exposure the CIK did not, and it makes the deep-dive dossier and a later per-insider view readable. Reverses only the "no names" clause; the #651 entry's status is `overruled` for that reason.
