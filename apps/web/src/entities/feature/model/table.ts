@@ -65,7 +65,23 @@ export interface TableRow {
   flags?: readonly string[] | undefined;
   /** Criterion id -> its value, outcome (PASS / NEAR / FAIL / MISSING) and distance from passing. */
   criteria?:
-    | Readonly<Record<string, { value: unknown; outcome: string; distance?: number | null }>>
+    | Readonly<
+        Record<
+          string,
+          { value: unknown; outcome: string; distance?: number | null; group?: string | null }
+        >
+      >
+    | undefined;
+  /** The groups of the screen as this row's run judged them (ADR 0071): the gate's outcome and its deciding member. */
+  groups?:
+    | readonly {
+        id: string;
+        kind: string;
+        members: readonly string[];
+        parent?: string | null;
+        outcome?: string | null;
+        decidedBy?: string | null;
+      }[]
     | undefined;
   /** New or dropped since the previous run (decided by the server). */
   change?: string | null | undefined;

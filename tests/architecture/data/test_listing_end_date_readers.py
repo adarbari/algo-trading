@@ -12,7 +12,7 @@ SCANNED = ("src/algotrade", "apps/api", "apps/backtest", "apps/ingestion", "libs
 ALLOWED = (
     "src/algotrade/data/listings/",  # universe_asof, delisted_by, read_listings, S&P 500
     "src/algotrade/data/resolver.py",  # is this listing alive on S
-    "src/algotrade/storage/tables/schemas.py",  # declares the columns
+    "src/algotrade/storage/tables/schemas/reference.py",  # declares the columns
     "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py",  # listing -> id
     "apps/ingestion/algotrade_ingestion/tasks/listings/",  # the winners sample and its coverage
     "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",  # listings_over: clip
