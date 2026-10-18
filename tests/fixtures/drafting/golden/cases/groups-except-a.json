@@ -37,29 +37,7 @@
     ],
     "contract": true,
     "explained": {
-      "parts": [
-        {
-          "words": "stocks",
-          "kind": "applied",
-          "origin": "words",
-          "join": null,
-          "join_words": ""
-        },
-        {
-          "words": "above $10",
-          "kind": "applied",
-          "origin": "words",
-          "join": null,
-          "join_words": ""
-        },
-        {
-          "words": "those with IV rank above 80%",
-          "kind": "applied",
-          "origin": "words",
-          "join": "and_not",
-          "join_words": "except"
-        }
-      ],
+      "parts": [],
       "model_share": 1.0,
       "not_understood": 0
     },
