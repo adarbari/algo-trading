@@ -1,20 +1,22 @@
-"""``fundamentals@v3``: point in time by filing date, cover count vs weighted fallback,
+"""``fundamentals@v4``: point in time by filing date, cover count vs weighted fallback,
 amendments, splits after the count, statuses (OK / NO_SHARES / STALE / NO_PRICE), the count a
 year earlier (``shares_outstanding_year_ago``: the 9 to 15 month window, the same concept, point
 in time by filing date, split-adjusted), ``shares_change_yoy``, that every v2 column is
 unchanged, and the selectable catalogue fields."""
 
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 import pandas as pd
 import pytest
 
 from algotrade.core.model.fields import field_source
+from algotrade.core.time.calendar import EXCHANGE_TZ
 from algotrade.features.framework.runner import compute_in_memory
 from algotrade.features.registry import catalogue_columns
 from algotrade.features.rollups.corporate.fundamentals import (
     GROUP,
+    SHARES,
     FundamentalsParams,
     choose,
     year_ago,
@@ -292,11 +294,31 @@ def test_shares_change_yoy_end_to_end_on_stored_counts() -> None:
 def test_params_validate_and_catalogue_fields() -> None:
     with pytest.raises(ValueError, match="stale_days"):
         replace(FundamentalsParams(), stale_days=0)
-    columns = catalogue_columns()["fundamentals@v3"]
+    columns = catalogue_columns()["fundamentals@v4"]
     assert columns["shares_outstanding"] == "float32" and columns["market_cap_status"] == "str"
     assert columns["shares_outstanding_year_ago"] == "float32"
     assert "market_cap" not in columns  # an expression feature since v2
-    assert field_source("rollup.fundamentals@v3.market_cap_status") == (
-        "rollups/instrument/fundamentals@v3",
+    assert field_source("rollup.fundamentals@v4.market_cap_status") == (
+        "rollups/instrument/fundamentals@v4",
         "market_cap_status",
     )
+
+
+def test_a_count_accepted_after_the_close_is_invisible_that_session_and_visible_the_next() -> None:
+    """The lookahead of v3 (``filed <= session``): a cover count accepted 16:30 New York time on D
+    is not public at D's close; v4 counts it from D+1."""
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": series(60, 0)})
+    filed = days[-5]
+    row = fact("EQ:A", "dei", 1000.0, filed - timedelta(days=10), filed)
+    row["accepted_ts"] = pd.Timestamp(datetime.combine(filed, time(16, 30), EXCHANGE_TZ))
+    write_facts(writer, [row])
+    rows = _rows(reader, [filed, days[-4]])
+    assert pd.isna(rows[filed].loc["EQ:A", "shares_outstanding"])
+    assert rows[days[-4]].loc["EQ:A", "shares_outstanding"] == 1000.0
+    row["accepted_ts"] = pd.Timestamp(datetime.combine(filed, time(9, 0), EXCHANGE_TZ))
+    writer2, reader2 = store()
+    write_bars(writer2, {"EQ:A": series(60, 0)})
+    write_facts(writer2, [row])
+    assert _rows(reader2, [filed])[filed].loc["EQ:A", "shares_outstanding"] == 1000.0
+    assert SHARES == "instruments/shares_accepted"

@@ -87,9 +87,9 @@ table: `out/feature-gap-survey.md` in the working tree). What it adds to the tra
 | `trend_r2_90d`, `reg_slope_90d_ann`, `clenow_momentum_90d` (Clenow's trend quality and pace) | `trend_stats@v2` | built (TA track 1b) |
 | `pocket_pivot` (Morales and Kacher) | `vol_stats@v1` | built |
 | `ps_ratio`, `net_margin`, `payout_ratio` | `fundamentals.toml` expressions over stored facts | built |
-| quarterly EPS and revenue growth yoy (CAN SLIM C / A) | `financials@v2` | built |
-| `shares_change_yoy` (buybacks / dilution) | `fundamentals@v3` | built |
-| balance-sheet and cash-flow facts (equity, assets, debt, OCF, capex, gross profit) and `roe`, `roa`, `pb_ratio`, `debt_to_equity`, `fcf_yield`, `gross_profitability` | `income_statement@v1`, `cash_flow@v1`, `balance_sheet@v1` (statements/) and the formulas in `config/site/features/company/statements.toml` (ADR 0067) | built except `gross_profitability` (`gross_margin` is built) |
+| quarterly EPS and revenue growth yoy (CAN SLIM C / A) | `financials@v3` | built |
+| `shares_change_yoy` (buybacks / dilution) | `fundamentals@v4` | built |
+| balance-sheet and cash-flow facts (equity, assets, debt, OCF, capex, gross profit) and `roe`, `roa`, `pb_ratio`, `debt_to_equity`, `fcf_yield`, `gross_profitability` | `income_statement@v2`, `cash_flow@v2`, `balance_sheet@v2` (statements/) and the formulas in `config/site/features/company/statements.toml` (ADR 0067) | built except `gross_profitability` (`gross_margin` is built) |
 | unusual options activity at chain level (`unusual_contracts`, `max_vol_oi_ratio`, `unusual_premium_usd`) | `chain_flow@v1` (positioning.md) | planned |
 | `iv30_chg_1d`, `iv30_chg_5d` | `iv_history@v3` | planned |
 | bar shape (body and wick shares, inside / outside bar) and the six named candles (hammer, shooting star, doji, bullish / bearish engulfing, inside-day breakout) | `candle@v1`, new folder `patterns/` | built |
@@ -147,8 +147,8 @@ folder per kind of thing; `architecture/layout*.toml`):
 | `chain_flow@v1`, `flow_history@v1`, `skew@v1`, `skew_history@v1`, `implied_move@v1`, `iv_term@v1` | `positioning/` | [positioning.md](positioning.md) | built |
 | `call_wing@v1` | `options/` | the covered-call mirror of `put_wing@v1` (shared search in `wing_search`): `wing_status`, `target_expiry`, `target_dte`, `n_unpriced`, `n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`, `delta_band_distance`, `best_call_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_yield` | built |
 | `dividend_schedule@v1` | `corporate/` | `dividend_status`, `next_ex_date`, `next_div_amount`, `days_to_ex_date`, `next_pay_date` | built |
-| `financials@v2` | `corporate/` | v1 + `eps_diluted_ttm_year_ago`, `revenue_qtr`, `revenue_qtr_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago`, `qtr_as_of` | built |
-| `fundamentals@v3` | `corporate/` | v2 + `shares_outstanding_year_ago` | built |
+| `financials@v3` | `corporate/` | v1 + `eps_diluted_ttm_year_ago`, `revenue_qtr`, `revenue_qtr_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago`, `qtr_as_of` | built |
+| `fundamentals@v4` | `corporate/` | v2 + `shares_outstanding_year_ago` | built |
 
 Formulas over stored columns are expression features (computed on read):
 `config/site/features/technical/bands.toml` (bands, channels, z-scores, stretches),
@@ -392,7 +392,7 @@ yield and the early-assignment risk are separate questions: `ex_div_before_expir
 ex-dividend date falls before the target expiry (the dividend can be taken early from a
 short call, an in-the-money one most of all).
 
-## `financials@v2` / `fundamentals@v3` (corporate/)
+## `financials@v3` / `fundamentals@v4` (corporate/)
 
 Built from the SEC facts already stored (`instruments/shares`, point in time by filing date;
 nothing new is fetched). Expressions over stored columns, no code: `ps_ratio` (market cap /
@@ -401,7 +401,7 @@ TTM), `payout_ratio` (`dividends.div_ttm` / EPS TTM: null when the EPS is 0, mis
 an ADR; a negative value is a payer with negative earnings, so a safe-dividend rule is
 `between 0 and 0.6`, never a bare `lt 0.6`).
 
-`financials@v2` keeps every v1 column and adds the EPS TTM a year earlier
+`financials@v3` keeps every v1 column and adds the EPS TTM a year earlier
 (`eps_diluted_ttm_year_ago`, the same assembly as `revenue_ttm_year_ago`: four quarters ending
 340 to 380 days before the EPS TTM, or the previous fiscal year) and the latest quarter. The
 quarter is the newest discrete quarter: a 10-Q's three-month figure as filed, or at a 10-K the
@@ -417,7 +417,7 @@ ending 340 to 380 days before it. Growth expressions: `eps_growth_yoy` (CAN SLIM
 EPS, quarterly or TTM) is 0 or negative: a growth rate from a loss is meaningless, so a
 turnaround is UNKNOWN, never infinite. `revenue_growth_yoy` is unchanged.
 
-`fundamentals@v3` keeps every v2 column and adds `shares_outstanding_year_ago`: among the facts
+`fundamentals@v4` keeps every v2 column and adds `shares_outstanding_year_ago`: among the facts
 filed by the session, the count of the same concept as the current one (a cover count against a
 cover count, a weighted average against a weighted average) whose period ended 9 to 15 months
 before `shares_as_of`, the one closest to a year, split-adjusted to the session's share terms
