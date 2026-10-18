@@ -68,6 +68,7 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/iv_history@v2",
     "rollups/instrument/iv_term@v1",
     "rollups/instrument/momentum@v1",   # 142 MB
+    "rollups/instrument/momentum_variants@v1",
     "rollups/instrument/nearest_expiry@v1",
     "rollups/instrument/oi_walls@v1",
     "rollups/instrument/option_liquidity@v1",

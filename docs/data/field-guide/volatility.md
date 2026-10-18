@@ -73,6 +73,117 @@ Sources: Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_chann
 
 Sources: Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel
 
+### `rollup.momentum_variants@v1.resid_mom_12_1`
+
+**How to read it.** The 12-1 momentum with the market taken out: the log return from 252 to 21 sessions back minus the name's beta times SPY's log return over the same window. 0.15 means the name gained 15 points beyond what its market exposure explains; near 0 means the year was the market's move. Blitz, Huij and Martens find the residual version earns about the same return with roughly half the volatility and fewer momentum crashes, because the market leg (a high-beta name in a rally) is removed.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| residual momentum long | `gte 0.1` | soft | 0.1 | a score over the universe; gate rollup.trend_stats@v2.mom_12_1 gt 0 as well so a name is a winner in both senses |
+
+**When the reading lies**
+
+- Only the market is removed, not the sector or style: a name that rode a hot sector still reads as a winner. Compare rollup.momentum_variants@v1.sector_ret_252d to see how much of the year was its sector.
+- The beta is estimated on the same window it is applied to, so it is noisy for a young listing or a name with thin bars; it needs 200 daily returns that overlap SPY's. Check rollup.price_history@v1.range_status.
+- It is a log return, not the simple 12-1 of rollup.trend_stats@v2.mom_12_1: a big winner reads lower than its simple return.
+- Null after any gap in the window (252 to 21 sessions back), a shorter history, or without SPY in the symbol map; a hard criterion then rejects the name.
+
+Sources: Blitz, Huij and Martens (2011), Residual Momentum, Journal of Empirical Finance; Jegadeesh and Titman (1993), Returns to Buying Winners and Selling Losers
+
+### `feature.mom_12_1_vol_scaled`
+
+**How to read it.** The 12-1 momentum divided by the 60-session realised volatility: the return per unit of risk. 1.0 means the 12-1 return equals one year of one-stdev moves; a calm name up 20% reads higher than a wild one up 20%. Barroso and Santa-Clara scale momentum by its own recent risk, which more than doubles the Sharpe of the long-short factor and removes most of the crash risk.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| risk-adjusted momentum | `gte 0.6` | soft | 0.3 | a score; gate rollup.trend_stats@v2.mom_12_1 gt 0 as well |
+
+**When the reading lies**
+
+- Low volatility inflates the ratio: a near-flat utility with a 5% return and 8% volatility outranks a real winner. Gate on rollup.trend_stats@v2.mom_12_1 above 0.15 as well.
+- hv60 is the last quarter's volatility, not the window's: a name that was wild during the year and is calm now scores high. Check rollup.vol_stats@v1.hv60 against rollup.price_stats@v2.hv20.
+- Null after a gap in the last 253 sessions, when hv60 is 0 (a name that barely trades), or on a shorter history.
+
+Sources: Barroso and Santa-Clara (2015), Momentum has its moments, Journal of Financial Economics; Moreira and Muir (2017), Volatility-Managed Portfolios
+
+### `rollup.momentum_variants@v1.fip_12_1`
+
+**How to read it.** Information discreteness of the 12-1 path: the sign of the 12-1 return times the share of down days minus the share of up days in that window. Below 0 the winner climbed on many small up days (continuous information, 'frog in the pan'); above 0 it got there on a few big jumps. -0.2 is 20 points more up days than down days in an up move. Da, Gurun and Warachka find continuous winners keep going, jumpy ones reverse, so the better winners have the lower value.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| continuous winners | `lte -0.05` | soft | 0.05 | with rollup.trend_stats@v2.mom_12_1 gt 0.2 as the gate; alone it also picks smooth losers |
+
+**When the reading lies**
+
+- It counts days, not size: five big up days and a hundred tiny down days read as discrete however the size shakes out. Read it with rollup.trend_stats@v2.mom_12_1 for the amount.
+- A flat day counts for neither side, so a name that barely trades shows a value near 0 whatever its path; gate on rollup.price_stats@v2.adv_usd_20d.
+- For a loser the sign flips, so a steady decline also reads negative: use it only for winners (rollup.trend_stats@v2.mom_12_1 above 0).
+- Null after any gap in the window (252 to 21 sessions back) or a shorter history.
+
+Sources: Da, Gurun and Warachka (2014), Frog in the Pan: Continuous Information and Momentum, Review of Financial Studies
+
+### `rollup.momentum_variants@v1.resid_ret_20d`
+
+**How to read it.** The last month's return with the market taken out: the log return over 20 sessions minus beta_252d times SPY's over the same sessions. 0.10 means the name beat its market exposure by 10 points this month. The one-month return reverses (Jegadeesh 1990), and Blitz, Huij, Lansdorp and Verbeek find the residual version reverses more cleanly because a market rally does not make every high-beta name a short; the high values are the reversal candidates, the low ones the buys.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| one-month residual reversal (long the losers) | `lte -0.08` | soft | 0.05 | with rollup.price_stats@v2.adv_usd_20d as a liquidity gate; the buys are the lowest values |
+
+**When the reading lies**
+
+- News moves the name as well as noise: an earnings gap or a takeover in the month does not reverse. Check rollup.price_moves@v1.one_day_move and the earnings dates before shorting a high value.
+- It reverses against low liquidity worst: small, thinly traded names have the largest values and the highest costs. Gate on rollup.price_stats@v2.adv_usd_20d.
+- Beta is a year's estimate, so a name whose exposure changed (a merger, a new business) is mis-adjusted; compare rollup.price_stats@v2.ret_20d.
+- Null after a gap in the last 21 sessions, without SPY in the symbol map or a beta (under 200 overlapping returns in the year).
+
+Sources: Jegadeesh (1990), Evidence of Predictable Behavior of Security Returns; Blitz, Huij, Lansdorp and Verbeek (2013), Short-term residual reversal, Journal of Financial Markets
+
+### `rollup.momentum_variants@v1.sector_ret_252d`
+
+**How to read it.** The 252-session return of the instrument's sector ETF: how the whole sector did over a year (0.20 up 20%). Moskowitz and Grinblatt find industry momentum explains much of single-stock momentum: sectors that did well keep doing well for months, so a name in a strong sector has a tailwind of its own.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a strong sector tailwind | `gte 0.15` | soft | 0.1 | a score beside the name's own momentum, never alone |
+
+**When the reading lies**
+
+- The sector is the SEC SIC code's eleven coarse groups, not an industry: a biotech and a hospital chain share Health Care. rollup.relative_strength@v1.sector_etf names the ETF used.
+- An ETF's year is dominated by its largest holdings (XLK by a few mega-caps), so it can differ from the median name's sector; compare rollup.relative_strength@v1.rs_sector_63d.
+- Null for an instrument without a sector (an ETF, no company snapshot yet) or when the ETF has a gap in its 253 closes.
+
+Sources: Moskowitz and Grinblatt (1999), Do Industries Explain Momentum?, Journal of Finance
+
+### `rollup.momentum_variants@v1.rs_sector_20d`
+
+**How to read it.** The last month's return against the sector ETF's: (1 + the name's 20-session return) / (1 + the ETF's) - 1. 0.05 beat its sector by 5 points; -0.05 lagged by 5. It is the one-month return with the industry move taken out (Hou and Moskowitz style), the sector standing in for the industry; the extremes reverse more than the raw return does.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a one-month sector-adjusted laggard | `lte -0.05` | soft | 0.03 | reversal candidate; gate rollup.price_stats@v2.adv_usd_20d for liquidity |
+
+**When the reading lies**
+
+- The sector is coarse (eleven ETFs), so a name in a small industry that moved on its own news reads as large; check rollup.price_moves@v1.one_day_move for a single big day.
+- A name that is a large part of its sector ETF (a mega-cap in XLK) is compared partly with itself, so its value is shrunk toward 0.
+- Null without a sector or sector ETF, with a gap in the last 21 closes of the name or the ETF.
+
+Sources: Moskowitz and Grinblatt (1999), Do Industries Explain Momentum?, Journal of Finance; Blitz, Huij, Lansdorp and Verbeek (2013), Short-term residual reversal
+
 ### `feature.atr_pct`
 
 **How to read it.** Wilder's 14-day average true range as a share of price: the typical daily range. Under 0.015 is a calm large cap or a fund; 0.015 to 0.025 is a normal stock; 0.025 to 0.035 is a lively swing-trading range; 0.035 to 0.05 is volatile; above 0.05 is very volatile (small caps, biotech, crypto-linked names). A stop or a target is usually set in multiples of it (2 ATR is the Turtle stop).
