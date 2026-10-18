@@ -767,7 +767,7 @@ note = "then rollup.price_stats@v2.ret_20d equals ret_ex_earnings_20d"
 [[field]]
 name = "rollup.earnings_date_shift@v1.earnings_shift_direction"
 theme = "events"
-reads = "Whether the next report date moved a week or more from last year's. earlier: the date is at least seven days before the year-ago report plus 364 days. later: at least seven days after. Null: no next date, no year-ago report, or a move under a week. Johnson and So found that early scheduling goes with good news. Late scheduling goes with bad."
+reads = "Whether the next report date moved a week or more from last year's. The value earlier means the date is at least seven days before the year-ago report plus 364 days. The value later means at least seven days after. Null: no next date, no year-ago report, or a move under a week. Johnson and So found that early scheduling goes with good news. Late scheduling goes with bad."
 caveats = [
   "The calendar here is scheduled, never confirmed by the company. A date can move again, so read rollup.earnings_date_shift@v1.sessions_since_earnings_shift for how fresh the shift is.",
   "The history starts at the first stored calendar snapshot. A date first stored at or before it says nothing about when it became known, so it is never a shift.",

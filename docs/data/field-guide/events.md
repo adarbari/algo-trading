@@ -742,7 +742,7 @@ Sources: Bernard and Thomas (1989), Post-earnings-announcement drift: the E-1 to
 
 ### `rollup.earnings_date_shift@v1.earnings_shift_direction`
 
-**How to read it.** Whether the next report date moved a week or more from last year's. earlier: the date is at least seven days before the year-ago report plus 364 days. later: at least seven days after. Null: no next date, no year-ago report, or a move under a week. Johnson and So found that early scheduling goes with good news. Late scheduling goes with bad.
+**How to read it.** Whether the next report date moved a week or more from last year's. The value earlier means the date is at least seven days before the year-ago report plus 364 days. The value later means at least seven days after. Null: no next date, no year-ago report, or a move under a week. Johnson and So found that early scheduling goes with good news. Late scheduling goes with bad.
 
 **The criterion per intent**
 
