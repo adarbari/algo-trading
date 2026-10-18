@@ -785,7 +785,7 @@ caveats = [
   "Part of a discount is fair: fees, leverage and a high payout all widen it. A fund that is always 10% down is not cheap against itself; read rollup.cef_nav@v1.cef_discount_zscore.",
   "The NAV is the issuer's own, struck once a day. A fund holding foreign or thinly traded assets is priced against a stale NAV, and its discount moves with the next day's gap.",
   "Null when the latest NAV is more than five sessions old, so a fund whose NAV stopped is not read as current. A hard 'lte' drops it.",
-  "The NAV is put in the closes' split terms using the stored splits. A split the store lacks still shows a false discount: check rollup.cef_nav@v1.nav_per_share against the price before trusting an extreme value.",
+  "The NAV is put in the closes' split terms from the stored splits, the same table the bars are adjusted with. A split the issuer made but the vendor never reported shifts both alike, so the discount holds.",
 ]
 sources = ["Lee, Shleifer and Thaler (1991), Investor Sentiment and the Closed-End Fund Puzzle, Journal of Finance"]
 [[field.use]]

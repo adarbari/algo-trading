@@ -33,8 +33,8 @@ Splits: ``bars/1d`` is split-adjusted as of the session and the NAV is as struck
 divided by the ratio of every split (``events/split``, by event date) of its fund dated after the
 NAV and on or before the session, the adjustment ``dividends@v2`` applies to dividends. A 1:10
 reverse split (ratio 0.1) after a NAV of 10 gives an adjusted NAV of 100, level with the
-adjusted close. ``nav_per_share`` stays the NAV as struck. A fund with no split row reads as
-unsplit, so a split the store lacks still skews its discount.
+adjusted close. ``nav_per_share`` stays the NAV as struck. Bars and splits come from the same
+split table, so a fund with no stored split is unadjusted on both sides and its discount stands.
 
 The NAV is the issuer's own, struck once a day, so a fund holding foreign or illiquid assets is
 priced against a NAV stale at the close.
@@ -48,6 +48,7 @@ import pandas as pd
 from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
+from algotrade.features.rollups.corporate.dividends import split_factors
 
 NAME = "cef_nav"
 VERSION = 1
@@ -111,23 +112,8 @@ def _latest_navs(frame: pd.DataFrame, first: date) -> pd.DataFrame:
     return rows[["instrument_id", "day", "nav"]].reset_index(drop=True)
 
 
-def _split_factor(navs: pd.DataFrame, splits: pd.DataFrame | None) -> np.ndarray:
-    """Per NAV row: the product of the ratios of its fund's splits dated after the NAV (strictly:
-    a NAV struck on the split date is post-split) and on or before the session (``splits`` holds
-    only those the session knows)."""
-    factor = np.ones(len(navs))
-    if splits is None or splits.empty:
-        return factor
-    ids, days = navs["instrument_id"].to_numpy(), navs["day"].to_numpy()
-    for fund, when, ratio in zip(
-        splits["instrument_id"], splits["event_date"], splits["ratio"].astype(float), strict=True
-    ):
-        factor[(ids == fund) & (days < when)] *= ratio
-    return factor
-
-
 def _discounts(
-    navs: pd.DataFrame, bars: pd.DataFrame, splits: pd.DataFrame | None = None
+    navs: pd.DataFrame, bars: pd.DataFrame, splits: pd.DataFrame | None, session: date
 ) -> pd.DataFrame:
     """Each NAV paired with the close of its own date: ``discount`` (NaN: no bar that day or the
     NAV is not positive), the NAV first put in the closes' split terms."""
@@ -135,7 +121,9 @@ def _discounts(
     closes["day"] = pd.to_datetime(closes["session_date"]).dt.date
     merged = navs.merge(closes[["instrument_id", "day", "close"]], how="left",
                         on=["instrument_id", "day"])  # fmt: skip
-    nav = merged["nav"].astype(float).where(merged["nav"] > 0) / _split_factor(merged, splits)
+    nav = merged["nav"].astype(float).where(merged["nav"] > 0) / split_factors(
+        merged.rename(columns={"day": "event_date"}), splits, session
+    )
     merged["discount"] = merged["close"].astype(float) / nav - 1.0
     return merged
 
@@ -153,7 +141,11 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
         return pd.DataFrame({c: [] for c in columns})
     bars = inputs.get(BARS)
     splits = inputs.get(SPLITS)
-    paired = _discounts(navs, bars, splits) if bars is not None else navs.assign(discount=np.nan)
+    paired = (
+        _discounts(navs, bars, splits, session)
+        if bars is not None
+        else navs.assign(discount=np.nan)
+    )
     paired = paired.sort_values(["instrument_id", "day"], kind="stable")
     rows = []
     for fund, group in paired.groupby("instrument_id", sort=True):
