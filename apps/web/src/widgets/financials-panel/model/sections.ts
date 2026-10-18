@@ -186,19 +186,18 @@ export const SECTIONS: readonly SectionSpec[] = [
   },
   {
     id: 'analysts',
-    title: 'Analysts: estimates and targets',
+    title: 'Analysts: targets, ratings and estimates',
     term: 'financials_analyst',
     collapseGaps: 'Analyst figures',
     statuses: [
       feature('rollup.analyst_estimates@v1.estimates_status'),
       feature('rollup.analyst_targets@v1.targets_status'),
+      feature('rollup.analyst_ratings@v1.ratings_status'),
+      feature('rollup.analyst_revisions@v1.revisions_status'),
     ],
-    // Not in the catalogue yet (PR #625): rollup.analyst_ratings@v1 rating_strong_buy ..
-    // rating_strong_sell, rating_count, rating_score, rating_month, rating_score_change_90d,
-    // ratings_status; rollup.analyst_revisions@v1 eps_fy1_revision_30d / 60d / 90d,
-    // revenue_fy1_revision_30d / 90d, eps_fy1_analysts_change_90d, revisions_status. Add the
-    // rows (and the two statuses) here when they exist; forward P/E and forward revenue growth
-    // are in the strip and not repeated.
+    // Forward P/E and forward revenue growth are in the strip and not repeated. Order: the
+    // targets, the ratings (the five counts, who rated, the score, its change, the month), the
+    // estimates, then the revisions of those estimates.
     rows: [
       f(
         'target',
@@ -208,6 +207,28 @@ export const SECTIONS: readonly SectionSpec[] = [
       f('upside', 'Upside to target', feature('feature.target_upside'), true),
       f('target-high', 'Price target (high)', feature('rollup.analyst_targets@v1.target_high')),
       f('target-low', 'Price target (low)', feature('rollup.analyst_targets@v1.target_low')),
+      f(
+        'r-strong-buy',
+        'Strong buy ratings',
+        feature('rollup.analyst_ratings@v1.rating_strong_buy'),
+      ),
+      f('r-buy', 'Buy ratings', feature('rollup.analyst_ratings@v1.rating_buy')),
+      f('r-hold', 'Hold ratings', feature('rollup.analyst_ratings@v1.rating_hold')),
+      f('r-sell', 'Sell ratings', feature('rollup.analyst_ratings@v1.rating_sell')),
+      f(
+        'r-strong-sell',
+        'Strong sell ratings',
+        feature('rollup.analyst_ratings@v1.rating_strong_sell'),
+      ),
+      f('r-count', 'Analysts rating', feature('rollup.analyst_ratings@v1.rating_count')),
+      f('r-score', 'Rating score (1 to 5)', feature('rollup.analyst_ratings@v1.rating_score')),
+      f(
+        'r-score-90',
+        'Rating score change (90d)',
+        feature('rollup.analyst_ratings@v1.rating_score_change_90d'),
+        true,
+      ),
+      f('r-month', 'Ratings month', feature('rollup.analyst_ratings@v1.rating_month')),
       f('eps-fy1', 'EPS estimate (FY1)', feature('rollup.analyst_estimates@v1.eps_fy1')),
       f('eps-fy2', 'EPS estimate (FY2)', feature('rollup.analyst_estimates@v1.eps_fy2')),
       f('fy1-end', 'FY1 ends', feature('rollup.analyst_estimates@v1.fy1_period_end')),
@@ -224,6 +245,42 @@ export const SECTIONS: readonly SectionSpec[] = [
         'rev-analysts',
         'Analysts behind revenue (FY1)',
         feature('rollup.analyst_estimates@v1.revenue_fy1_analysts'),
+      ),
+      f(
+        'eps-rev-30',
+        'EPS estimate revision, FY1 (30d)',
+        feature('rollup.analyst_revisions@v1.eps_fy1_revision_30d'),
+        true,
+      ),
+      f(
+        'eps-rev-60',
+        'EPS estimate revision, FY1 (60d)',
+        feature('rollup.analyst_revisions@v1.eps_fy1_revision_60d'),
+        true,
+      ),
+      f(
+        'eps-rev-90',
+        'EPS estimate revision, FY1 (90d)',
+        feature('rollup.analyst_revisions@v1.eps_fy1_revision_90d'),
+        true,
+      ),
+      f(
+        'revenue-rev-30',
+        'Revenue estimate revision, FY1 (30d)',
+        feature('rollup.analyst_revisions@v1.revenue_fy1_revision_30d'),
+        true,
+      ),
+      f(
+        'revenue-rev-90',
+        'Revenue estimate revision, FY1 (90d)',
+        feature('rollup.analyst_revisions@v1.revenue_fy1_revision_90d'),
+        true,
+      ),
+      f(
+        'eps-analysts-90',
+        'Analysts behind EPS, change (90d)',
+        feature('rollup.analyst_revisions@v1.eps_fy1_analysts_change_90d'),
+        true,
       ),
     ],
   },

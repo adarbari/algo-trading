@@ -18,6 +18,19 @@ describe('financialsTone', () => {
     expect(financialsTone(word)).toBe(tone);
   });
 
+  it('reads the rating and revision statuses: OK positive, STALE warning, the rest neutral', () => {
+    // ratings_status: OK / STALE / NOT_COVERED / NOT_FETCHED; revisions_status adds BUILDING / NO_PRIOR
+    const words = ['OK', 'STALE', 'NOT_COVERED', 'NOT_FETCHED', 'BUILDING', 'NO_PRIOR'];
+    expect(words.map(financialsTone)).toEqual([
+      'positive',
+      'warning',
+      'neutral',
+      'neutral',
+      'neutral',
+      'neutral',
+    ]);
+  });
+
   it('ignores case and padding', () => {
     expect(financialsTone(' ok ')).toBe('positive');
   });
