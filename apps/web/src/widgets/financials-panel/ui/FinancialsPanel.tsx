@@ -1,6 +1,6 @@
 /**
  * Financials: a company's reported results and the market's forecasts for the latest session,
- * from one GraphQL read (`useInstrumentFacts`, three requests under the API's name cap). A strip
+ * from one GraphQL read (`useInstrumentFacts`, three requests under the API's name cap, all for one session). A strip
  * of the key metrics leads, then six compact sections (growth, profitability, balance sheet and
  * cash flow, valuation, earnings, analysts) in columns that stack on a phone. Every row is
  * shown: a value the session does not have reads as the word for its kind with its Guide term
@@ -18,6 +18,7 @@ import { GuideHelp, termHelp } from '@/features/guide-help';
 
 import { commonGap, gapItem, rowItem, statItem, type RowHelp } from '../model/rows';
 import { FINANCIALS_PARTS, KEY_METRICS, SECTIONS, type SectionSpec } from '../model/sections';
+import { sessionsDiffer } from '../model/session';
 import { financialsTone } from '../model/tones';
 
 export interface FinancialsPanelProps {
@@ -91,8 +92,13 @@ export function FinancialsPanel({ symbol }: FinancialsPanelProps) {
       ),
     [instrument, balance, analysts],
   );
+  const mixed = sessionsDiffer([
+    first.data?.session?.date,
+    second.data?.session?.date,
+    third.data?.session?.date,
+  ]);
   const state =
-    first.isError || second.isError || third.isError
+    first.isError || second.isError || third.isError || mixed
       ? 'error'
       : first.isPending || second.isPending || third.isPending
         ? 'loading'
@@ -106,7 +112,16 @@ export function FinancialsPanel({ symbol }: FinancialsPanelProps) {
       actions={termHelp('financials_panel')}
       state={state}
       loadingLabel={`Loading ${symbol}…`}
-      errorMessage={`${symbol} failed to load.`}
+      errorMessage={
+        mixed ? (
+          <Stack direction="row" gap={1} align="center">
+            {`${symbol} loaded for two different sessions.`}
+            {termHelp('financials_panel')}
+          </Stack>
+        ) : (
+          `${symbol} failed to load.`
+        )
+      }
       emptyMessage={
         <Stack direction="row" gap={1} align="center">
           {instrument?.isEtf
