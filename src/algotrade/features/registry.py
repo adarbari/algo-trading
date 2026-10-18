@@ -27,6 +27,8 @@ from algotrade.features.framework.graph import dependency_order
 from algotrade.features.rollups.activity import (
     illiquidity,
     max_return,
+    session_returns,
+    signed_volume,
     vol_stats,
     volume_profile,
 )
@@ -164,6 +166,8 @@ GROUPS: dict[str, FeatureGroup] = {
             call_wing.GROUP,
             price_moves.GROUP,
             max_return.GROUP,
+            session_returns.GROUP,
+            signed_volume.GROUP,
             earnings_neutral_reversal.GROUP,
             momentum.GROUP,
             volume.GROUP,

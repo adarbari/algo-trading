@@ -13,7 +13,7 @@ from algotrade_ingestion.tasks.derived import (
     residual_returns,
     rollups,
 )
-from algotrade_ingestion.tasks.events import filings, insider
+from algotrade_ingestion.tasks.events import filings, insider, ipo_lockups
 from algotrade_ingestion.tasks.framework.params import Params, session_of, symbols
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.macro import calendar as macro_calendar
@@ -113,6 +113,19 @@ def run_insider(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("until"),
         p.get("limit"),
         bool(p.get("force")),
+    )
+
+
+def run_ipo_lockups(ctx: TaskContext, p: Params) -> RunRecord:
+    return ipo_lockups.ingest_ipo_lockups(
+        ctx,
+        session_of(p),
+        ctx.sources["sec_prospectus_search"],
+        ctx.sources["sec_filings"],
+        ctx.sources["sec_prospectus"],
+        p.get("since"),
+        p.get("until"),
+        p.get("limit"),
     )
 
 

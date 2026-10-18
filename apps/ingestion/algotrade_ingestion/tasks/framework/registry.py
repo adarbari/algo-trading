@@ -24,7 +24,7 @@ from algotrade_ingestion.tasks.derived import (
     residual_returns,
     rollups,
 )
-from algotrade_ingestion.tasks.events import filings, insider
+from algotrade_ingestion.tasks.events import filings, insider, ipo_lockups
 from algotrade_ingestion.tasks.framework import (
     entries_market,
     entries_ops,
@@ -405,6 +405,33 @@ TASKS: dict[str, Task] = {
                 Param("until", ("--until",), date.fromisoformat, "backfill: last quarter's date"),
                 Param("limit", ("--limit",), int, "backfill: read at most N quarters this run"),
                 Param("force", ("--force",), None, "backfill: also quarters already read"),
+            ),
+        ),
+        Task(
+            "ipo-lockups",
+            "IPO facts and lock-up expiry dates from EDGAR 424B4 final prospectuses "
+            "(events/ipo_lockup): the prospectuses EDGAR full-text search lists for a month at a "
+            "time, each read once (the submissions for the acceptance, the document for the "
+            "terms); no --since reads the last 30 days (the nightly), --since 2005-01-01 is the "
+            "backfill (resumable, --limit caps the prospectuses read)",
+            ipo_lockups,
+            (ipo_lockups.TABLE,),
+            entries_market.run_ipo_lockups,
+            sources=("sec_prospectus_search", "sec_filings", "sec_prospectus"),
+            settings="sources.toml [sec_edgar]",
+            params=(
+                SESSION,
+                Param(
+                    "since",
+                    ("--since",),
+                    date.fromisoformat,
+                    "first filing date (default: 30 days before the session; the backfill "
+                    "starts 2005-01-01)",
+                ),
+                Param(
+                    "until", ("--until",), date.fromisoformat, "last filing date (default --date)"
+                ),
+                Param("limit", ("--limit",), int, "read at most N prospectuses this run"),
             ),
         ),
         Task(

@@ -4,14 +4,16 @@ SEC has no filings for is not a failure), FAIL when no name has a CIK, PASS when
 needed no request, WARN when no name resolved, nothing without a run."""
 
 from datetime import date
+from typing import Any
 
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import start_run
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.events.filings import TASK
+from algotrade_ingestion.tasks.events.ipo_lockups import TASK as IPO_LOCKUPS_TASK
 from algotrade_ingestion.tasks.framework.run import TaskContext
-from algotrade_ingestion.tasks.maintenance.quality import check_filings
+from algotrade_ingestion.tasks.maintenance.quality import check_filings, check_ipo_lockups
 from tests.helpers.ingest_fakes import FIXED, task_ctx
 
 S = date(2026, 10, 5)
@@ -64,3 +66,30 @@ def test_only_a_finished_run_of_the_session_is_graded() -> None:
     assert check_filings(ctx_with(None), S) == []  # the step itself fails when its task failed
     other = {"names": 1, "with_cik": 1, "ciks": 1, "ciks_failed": 1}
     assert check_filings(ctx_with(other, session=date(2026, 10, 2)), S) == []
+
+
+def ipo_ctx(items: dict[str, str] | None, session: date = S, **stats: Any) -> TaskContext:
+    ctx = task_ctx(StoreWriter(MemoryBackend()))
+    if items is not None:
+        record = start_run(IPO_LOCKUPS_TASK, session, FIXED)
+        record.items = items
+        ctx.writer.save_run(record.finish(FIXED, stats=stats))
+    return ctx
+
+
+def test_ipo_lockups_a_clean_run_passes_with_its_counts() -> None:
+    items = {"win:2026-10": "OK: 4 hits", "acc:a": "OK: EXTRACTED"}
+    [check] = check_ipo_lockups(ipo_ctx(items, hits=4, read=1), S)
+    assert check.name == "ipo_lockups_fetched" and check.status == "PASS"
+    assert check.detail == "4 prospectuses listed, 1 read, 0 failed"
+
+
+def test_ipo_lockups_a_failed_month_or_prospectus_warns_and_never_fails() -> None:
+    items = {"win:2026-09": "FETCH_ERROR: HTTP 500", "acc:a": "FETCH_ERROR: boom", "acc:b": "OK: x"}
+    [check] = check_ipo_lockups(ipo_ctx(items, hits=3, read=2), S)
+    assert check.status == "WARN" and "win:2026-09" in check.detail and "acc:a" in check.detail
+
+
+def test_ipo_lockups_nothing_without_a_finished_run_of_the_session() -> None:
+    assert check_ipo_lockups(ipo_ctx(None), S) == []
+    assert check_ipo_lockups(ipo_ctx({"acc:a": "OK: x"}, session=date(2026, 10, 2)), S) == []

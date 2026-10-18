@@ -11,6 +11,7 @@ from algotrade.data.events import (
     acceptance_sessions,
     events_by_acceptance,
     filing_walks,
+    latest_versions,
     read_events,
 )
 from algotrade.storage.backends.memory import MemoryBackend
@@ -258,6 +259,39 @@ def test_two_filings_accepted_the_same_second_are_two_events() -> None:
     StoreWriter(backend).write_table("events/filing", d, "f", stamped(rows, d, "f"))
     got = events_by_acceptance(StoreReader(backend), "events/filing", d, d)
     assert sorted(got["form"]) == ["8-K", "SC TO-I"]
+
+
+def lockup(version: str, known: date, days: int | None) -> dict[str, object]:
+    """An ``events/ipo_lockup`` row of one prospectus (``cik`` + ``accession``): the table key
+    holds ``known_from``, so every version is kept."""
+    return {
+        "instrument_id": None, "ts": pd.Timestamp("2026-06-12T21:30:00Z"), "known_from": known,
+        "cik": "0001111111", "accession": "0001193125-26-100001", "filing_date": date(2026, 6, 15),
+        "is_ipo": True, "early_release": False, "extraction": "EXTRACTED", "rules_version": version,
+        "lockup_days": days,
+    }  # fmt: skip
+
+
+def test_latest_versions_reads_the_version_known_by_the_session() -> None:
+    """A re-extraction is a new version with a later ``known_from``: a session before it reads
+    the earlier version, a later one the new, and a session before both reads nothing."""
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    first, restated = date(2026, 6, 12), date(2026, 10, 5)
+    writer.write_table(
+        "events/ipo_lockup", BACKFILLED_ON, "r1", stamped([lockup("v1", first, 180)], first, "r1")
+    )
+    later = T0 + timedelta(days=1)
+    row = stamped([lockup("v2", restated, 90)], restated, "r2", later)
+    writer.write_table("events/ipo_lockup", restated, "r2", row)
+    reader, key = StoreReader(backend), ["cik", "accession"]
+    assert latest_versions(reader, "events/ipo_lockup", key, date(2026, 6, 11)).empty
+    old = latest_versions(reader, "events/ipo_lockup", key, date(2026, 10, 4))
+    assert list(old["rules_version"]) == ["v1"] and list(old["lockup_days"]) == [180]
+    new = latest_versions(reader, "events/ipo_lockup", key, date(2026, 10, 5))
+    assert list(new["rules_version"]) == ["v2"] and list(new["known_from"]) == [restated]
+    assert list(latest_versions(reader, "events/ipo_lockup", key)["lockup_days"]) == [90]
+    assert latest_versions(reader, "events/filing", ["accession"]).empty  # nothing stored
 
 
 def test_filing_walks_are_the_clean_published_walks_of_the_filings_task() -> None:

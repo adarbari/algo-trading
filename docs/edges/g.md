@@ -5,7 +5,39 @@ Back to the [index of every edge](../edges.md).
 
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
+| Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `earnings_vwap_overhang` |
 | Reversal into earnings (`earnings_neutral_reversal`) | candidate | on each `earnings_expected` | excess return, over 3 sessions, vs SPY, starting -2 sessions from the event, costs 10 bps | `pre_earnings_reversal`, `earnings_neutral_reversal` |
+
+## Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`)
+
+**Status:** candidate. **Family:** G. **Thesis:** Stocks trading well above the average price paid since their last earnings report outperform the market over the next month.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type in ('COMMON_STOCK', 'ADR')` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 50000000` and `feature.capital_gains_overhang not_null`
+- **Top K:** 50
+- **Screeners:** `earnings_vwap_overhang`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** THE SIGNAL IS A PROXY. The source's overhang is (price - reference price) / price where the reference price is a turnover-weighted average of past prices over one to five years; the stored history cannot give that (no multi-year turnover history). The proxy is capital_gains_overhang: the close against the volume-weighted average price since the last earnings report (rollup.anchored_vwap@v2, at most 126 sessions back, so one to two quarters), the page's weaker 'Ready' version. It shares the sign of the idea (holders in profit or loss) but not its weighting or its horizon, and it is not the paper's measure. The retest in the edge's id (price falling back to the average from above) is not tested here: the screen ranks by distance above the average, which selects the most extended names, not the ones retesting it; a screener ranked by closeness to the average is a follow-up. A report a few sessions old gives an average near the price, so the value is near zero for those names. The universe is the liquid common stocks and ADRs with an earnings-anchored VWAP, so every name is scored. Month-end start sessions, spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Holders in a gain sell too early and holders in a loss hold on (the disposition effect), so the price underreacts to news until the pressure fades; the aggregate cost basis of a stock's holders is the reference point (Grinblatt and Han 2005). The anchored VWAP is the practitioner's expression of that cost basis (Shannon 2023).
+2. **Persistence:** The disposition effect is among the most persistent behavioural regularities, and the overhang predictor is replicated in the open asset-pricing data, but its strength after publication is reduced and not verified exactly; it also overlaps momentum, which it partly explains, so persistence beyond 12-1 momentum is a claim to test.
+3. **Outcome:** Excess return over SPY over 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption, as for 12-1 momentum): a long hold of the names furthest above their post-earnings average price.
+4. **Trigger timing:** The anchored VWAP is computed from the bars through the close of the decision session D and from earnings reports known by D (ADR 0050), so the first fill is the next session's close: S = D + 1 (start_offset_sessions = 1); the screen is read at D, the outcome at S.
+5. **Faithful replication:** The source's rule first: rank by the overhang and hold the top (Grinblatt and Han 2005, monthly, long the highest). Here earnings_vwap_overhang ranks the liquid names by the earnings-VWAP proxy and the edge holds the top 50. The proxy is not the paper's multi-year turnover-weighted reference price (no turnover history is stored), so this is not a faithful replication.
+6. **Expected size and sample:** About 1% a month for the highest minus the lowest overhang in 1963 to 1996, which the paper says explains momentum (recalled; the page marks it as not verified, and it is a two-group spread, so no published figure is set); the proxy's size is unknown and likely smaller. The stored history gives few independent month-end sessions: the harness reports the t statistic and the count.
+7. **Capacity and costs:** Liquid names only (price over 5 dollars, 50M dollars of 20-day volume), monthly turnover, long only: an individual can hold it. The 10 bps round trip is the assumption.
+8. **Failure modes and retirement:** The overhang is largely momentum, so its picks may only be 12-1 winners; a fresh anchor makes the value noise; a post-earnings gap up puts the whole universe's winners at the top, then the gap reverses. Retire if the frozen-period excess return of the picks is not above the base rate of every eligible name.
+9. **Decoys:** 12-1 momentum (the overhang is said to subsume part of it: the momentum_12_1 baseline runs on the same sessions), the 52-week-high effect, and size: the size_small baseline.
+
+**Sources**
+
+- Grinblatt, M. and Han, B., Prospect theory, mental accounting, and momentum, Journal of Financial Economics, 2005 <https://doi.org/10.1016/j.jfineco.2004.06.007>
+- An, L., Asset pricing when traders sell extreme winners and losers, Review of Financial Studies, 2016
+- Shannon, B., Maximum Trading Gains with Anchored VWAP, 2023
 
 ## Reversal into earnings (`earnings_neutral_reversal`)
 
