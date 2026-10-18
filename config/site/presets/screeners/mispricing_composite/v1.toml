@@ -1,0 +1,52 @@
+# Composite mispricing, underpriced first: The composite mispricing rank (Stambaugh, Yu and Yuan 2015, simplified to the seven anomalies the stored
+# statements allow): the mean percentile rank of net issuance, accruals, net operating assets, asset
+# growth, the O-score, gross profitability and ROA, with a high rank overpriced. Ranked from the lowest
+# up, so the underpriced names rank first and the overpriced last. The criterion only asks that the
+# value exists (a missing value never passes, ADR 0030).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "mispricing_composite"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Composite mispricing, underpriced first"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1 for stocks, so the screens compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.composite_rank]
+field = "rollup.mispricing@v1.composite_rank"
+op = "gte"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+composite_rank = "rollup.mispricing@v1.composite_rank"
+composite_inputs = "rollup.mispricing@v1.composite_inputs"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.mispricing@v1.composite_rank"
+tie_break_order = "asc"

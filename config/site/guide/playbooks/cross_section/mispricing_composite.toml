@@ -1,0 +1,28 @@
+# L3 site setting: the Guide's playbook for the site preset mispricing_composite (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "mispricing_composite"
+version = 1  # the preset version this prose was written for
+summary = "Ranks every liquid stock by a composite of seven published mispricing anomalies, the underpriced names first and the overpriced last. It is a simplified version of the Stambaugh, Yu and Yuan composite, which averages eleven."
+hit = "The name is a listed stock closing above $5 that trades at least $50M a day with at least five of the seven inputs from its filings. Every such name qualifies; the lowest composite rank, the most underpriced, comes first."
+not_checked = "It leaves out four of the paper's eleven anomalies (equity issues, investment to assets, momentum, distress from returns), so it is not their composite. Financial firms and ETFs have no inputs."
+before_acting = [
+  "A rank on five inputs is less reliable than one on seven: read rollup.mispricing@v1.composite_inputs.",
+  "The paper finds most of the spread in the overpriced end, which is hard to short: the edge tests both ends separately.",
+]
+sources = [
+  "Stambaugh, Yu and Yuan, Arbitrage Asymmetry and the Idiosyncratic Volatility Puzzle (2015)",
+  "Jensen, Kelly and Pedersen, Is There a Replication Crisis in Finance? (2023)",
+]
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+composite_rank = "Has a composite mispricing rank"

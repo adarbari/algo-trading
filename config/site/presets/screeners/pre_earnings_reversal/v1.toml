@@ -1,0 +1,51 @@
+# Pre-earnings reversal, losers first: The reversal ahead of earnings (So and Wang 2014): among stocks about to report, rank by the return of the last
+# 3 sessions, the biggest losers first. Liquidity providers charge for holding inventory into a known
+# event. The edge restricts it to the names with a report expected; the criterion only asks that the
+# value exists (a missing value never passes, ADR 0030).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "pre_earnings_reversal"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Pre-earnings reversal, losers first"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1 for stocks, so the screens compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.ret_3d]
+field = "rollup.trend_stats@v2.ret_3d"
+op = "gt"
+value = -1
+
+[columns]
+close = "rollup.price_stats@v2.close"
+ret_3d = "rollup.trend_stats@v2.ret_3d"
+sessions_to_report = "rollup.earnings_expected@v1.sessions_to_expected_report"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.trend_stats@v2.ret_3d"
+tie_break_order = "asc"

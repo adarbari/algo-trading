@@ -81,9 +81,19 @@ presets = ["vrp_scanner", "vrp_iv_hv"]
 [[family]]
 id = "events"
 title = "Earnings events"
-presets = ["pead_small_cap", "eap_all", "eap_volume", "earnings_date_early", "pre_earnings_runup", "earnings_gap_volume", "earnings_gap_only"]
+presets = ["pead_small_cap", "eap_all", "eap_volume", "earnings_date_early", "pre_earnings_runup", "earnings_gap_volume", "earnings_gap_only", "pre_earnings_reversal", "earnings_neutral_reversal"]
 
 [[family]]
 id = "filings"
 title = "Filings and index changes"
 presets = ["eight_k_adverse_items", "nt_late_filer", "tender_offer_filed", "sp500_deletion"]
+
+[[family]]
+id = "options_signals"
+title = "Option-implied signals"
+presets = ["cp_iv_spread", "cp_iv_spread_rise", "iv_smirk", "iv_change_call", "iv_change_ibkr", "option_stock_volume", "retail_option_attention", "lottery_max"]
+
+[[family]]
+id = "cross_section"
+title = "Cross-section ranks"
+presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite"]
