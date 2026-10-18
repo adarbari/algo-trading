@@ -307,6 +307,8 @@ def encode_leg(record: LegRecord, user_id: str, edge_id: str) -> dict[str, Any]:
         portfolio_reason=s.portfolio_reason or None,
         weight_ids=[i for i, _ in s.weights] if s.weights else None,
         weight_values=[w for _, w in s.weights] if s.weights else None,
+        book_vol=s.book_vol,
+        risk_off=s.risk_off,
         **encode_picks(s.picks),
         **encode_band(s.band),
     )
@@ -378,6 +380,8 @@ def decode_leg(row: Mapping[str, Any]) -> LegRecord:
         short_values=shorts,
         weights=_weights(row),
         portfolio_reason=_opt_text(row.get("portfolio_reason")),
+        book_vol=_opt(row.get("book_vol")),
+        risk_off=_opt(row.get("risk_off")),
     )
     drawn = None
     if rand is not None:
