@@ -1,0 +1,97 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: pre_earnings_runup (EB E3). Variant of
+# earnings_announcement_premium: the same window and event class, conditioned on past winners. Idea
+# page: docs/edge-ideas/events.md (pre_earnings_runup_winners).
+id = "pre_earnings_runup_winners"
+name = "Pre-earnings run-up in past winners"
+thesis = "Stocks with extreme 12-month returns rise in the five sessions before their earnings report."
+mechanism = """Individual investors buy attention-grabbing winners ahead of the news, and the demand
+is uninformed (Aboody, Lehavy and Trueman 2010); the winners' bid is the run-up, and the same
+demand reverses after the report."""
+persistence = """Small and short, and it needs a position around the announcement on a few names, so
+capacity is limited; the earnings announcement premium itself is filed as not found by Heitz et
+al. 2020, so this is the conditional version and may be decayed."""
+family = "B"
+schedule = "on_event:earnings_expected"
+top_k = 20
+base = "event"
+screeners = ["pre_earnings_runup"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Long leg only: the run-up before the report. The give-back after the report (about
+-1.86% in the 5 days after) is the better half and needs a short or puts on the same winners; it
+needs a screener ranked the other way (the harness's short leg takes the lowest scores), so it is a
+follow-up, not a variant here. The window is the five sessions before the expected report date A:
+entry at the close of A-6, exit at the close of A-1 (start_offset_sessions = -6, horizon 5); the
+date must be known by the decision session D = A-7 (earnings_expected@v1: SCHEDULED, or the year-ago
+date plus 364 days: a PRIOR_YEAR date can miss the real report, so a window may not contain it).
+The paper's winners are the top decile by prior 12-month return; here the picks are the 20 highest
+12-1 momentum names of the liquid names reporting in 7 sessions (a rank, not a decile). Momentum at
+earnings (filed) is the opposite sign over the announcement and must be reconciled in one reading.
+Liquid base as the earnings announcement premium edge: common stock or ADR, close above $5, 20-day
+dollar volume of at least $50M."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [5]
+benchmark = "SPY"
+start_offset_sessions = -6
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY over the five sessions from the close of the session six
+before the expected report to the close of the one before it, net of 10 bps a round trip: a hold
+that ends before the report."""
+trigger_timing = """The expected report date A is read at the decision session D = A - 7 from
+earnings_expected@v1 (SCHEDULED, or PRIOR_YEAR: the year-ago report plus 364 days); an UNKNOWN date
+is excluded with a reason, and a date announced after D is not used. The entry session is
+S = A - 6 (start_offset_sessions = -6, allowed because the date is announced ahead) and the window
+closes at A - 1."""
+replication = """The source's rule first: top-decile prior-12-month winners, the market-adjusted
+return in the 5 days before the announcement (Aboody, Lehavy and Trueman 2010). Here
+pre_earnings_runup v1 ranks the liquid names reporting in about 7 sessions by 12-1 momentum and the
+harness holds the top 20."""
+expected_size = """+1.58% market-adjusted in the 5 days before for top-decile winners, about -1.86%
+in the 5 after (Aboody, Lehavy and Trueman 2010, sample to the mid-2000s). Chen, Cohen and Wang
+find the run-up only before post-close announcement clusters; So and Wang find reversal profits
+larger before announcements. Reports cluster in a few weeks a quarter: independent sessions are
+the binding count."""
+capacity_costs = """Liquid names only ($50M a day), a five-session hold, two legs of a round trip
+a quarter; an individual can trade a few names, the 10 bps round trip is the assumption."""
+failure_modes = """A date that is a year-ago guess (PRIOR_YEAR) and misses the real report; a decayed
+effect (the premium itself is not found by Heitz et al. 2020); the run-up shows only before
+post-close announcements. Retire if the frozen-period excess return of the picks is not above the
+base rate of the other reporters after costs."""
+decoys = """Plain momentum and the size effect: winners are momentum names, so the 12-1 momentum
+baseline is the same ranking at every session, not only before earnings; and the earnings
+announcement premium of every reporter (the base rate here)."""
+
+[[sources]]
+title = "Aboody, D., Lehavy, R. and Trueman, B., Limited attention and the earnings announcement returns of past stock market winners, Review of Accounting Studies, 2010"
+url = "https://ideas.repec.org/a/spr/reaccs/v15y2010i2d10.1007_s11142-009-9104-9.html"
+
+[[sources]]
+title = "Chen, J., Cohen, L. and Wang, C., Famous Firms, Earnings Clusters, and the Stock Market (working paper)"
+url = "https://papers.ssrn.com/abstract=3685452"
+
+[[sources]]
+title = "So, E. and Wang, S., News-driven return reversals: Liquidity provision ahead of earnings announcements, Journal of Financial Economics, 2014"
+
+# The literature's figure (ADR 0064): the market-adjusted return of top-decile prior-12-month
+# winners in the 5 days before the announcement, +1.58% (Aboody, Lehavy and Trueman 2010), before
+# costs.
+[published]
+measure = "mean_excess"
+value = 0.0158
+horizon_sessions = 5
+source = 0
+leg = "long"

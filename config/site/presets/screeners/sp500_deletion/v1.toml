@@ -1,0 +1,53 @@
+# S&P 500 deletions (ADR 0053, EB E3; edge sp500_deletions_long): a common stock trading at least $5M a
+# day that left the S&P 500 in the last 20 sessions, dated by the session the change was first
+# stored (after the announcement, never before it). Ranked by dollar volume, the most liquid first.
+# A missing value never passes (ADR 0030). What it does not check: why the name left (a demotion to
+# the S&P 400 or 600, or a takeover that delists it), or that it is still a member of a smaller index.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "sp500_deletion"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "S&P 500 deletions"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 5_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.index_change]
+field = "rollup.index_changes@v1.last_index_change"
+op = "eq"
+value = "sp500_removed"
+
+[criteria.recent_change]
+field = "rollup.index_changes@v1.sessions_since_index_change"
+op = "lte"
+value = 20
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+last_index_change_date = "rollup.index_changes@v1.last_index_change_date"
+sessions_since_index_change = "rollup.index_changes@v1.sessions_since_index_change"
+
+[rank]
+tie_break = "rollup.price_stats@v2.adv_usd_20d"
+tie_break_order = "desc"

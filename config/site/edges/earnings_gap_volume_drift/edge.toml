@@ -1,0 +1,94 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screeners: earnings_gap_volume and its control
+# earnings_gap_only (EB E3). Variant of small_cap_earnings_drift: the same event class, conditioned
+# on the volume the report drew. Idea page: docs/edge-ideas/altdata-text-ml.md
+# (canslim_episodic_pivot_vcp) and docs/edge-ideas/statarb-technical.md (episodic_pivot_gap_volume).
+id = "earnings_gap_volume_drift"
+name = "Earnings gap on heavy volume"
+thesis = "A stock that jumps at least 10% over the market on its earnings report on several times its normal volume keeps drifting up for weeks."
+mechanism = """Post-earnings drift plus the high-volume premium: a neglected name re-rates in steps
+as analysts, funds and momentum screens catch up, and the first day under-reacts because the news
+is bigger than the pre-event holders (Bernard and Thomas 1989; practitioner playbooks)."""
+persistence = """A discretionary playbook, not a fund strategy: capacity is small (mid and small
+caps) and it needs same-day action. The academic cousins persist through underreaction, but no
+peer-reviewed test of the exact template exists, and drift after earnings has faded in large caps
+(Martineau 2022)."""
+family = "B"
+schedule = "on_event:earnings_reaction"
+top_k = 20
+base = "event"
+screeners = ["earnings_gap_volume", "earnings_gap_only"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Variant of small_cap_earnings_drift (the same schedule, entry and horizons): the question
+this edge asks is the increment, whether volume-confirmed large reactions drift more than same-size
+reactions without the volume, so earnings_gap_only (the same reaction criterion, no volume) is
+listed beside earnings_gap_volume and read against it on the same sessions; the base rate is the
+other reporters. The gap is the two-session reaction (close before the report to close after it,
+the PEAD window) of at least 10% over SPY, standing in for the practitioner's opening gap: only
+closes are stored, and the entry is the next close, not the opening-range break. The volume
+confirmation is earnings_gap_volume@v1.reaction_volume_ratio of at least 3 (the window's mean dollar
+volume over the 20 sessions before it), the last report's own, not earnings_reaction's four-report
+mean. The "dormant base" filter (a name that went nowhere for months) and the non-earnings
+catalysts (an FDA decision, a contract) are not tested: the idea's novel part beyond PEAD is the
+volume increment only. Common stock, active, close above $5, 20-day dollar volume of at least $5M
+(no exchange or cap limit, unlike the small-cap edge)."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 20
+
+[quality_bar]
+outcome = """Excess return over SPY over 20 and 60 sessions after the entry close (the session after the
+reaction session), net of 20 bps a round trip (an assumption for names trading $5M a day or more):
+drift is held for weeks."""
+trigger_timing = """The reaction is two sessions, close(E-1) to close(E+1) (E: the report date); the
+anchor is E+1 and the decision session D = E+1, so the entry session is S = E+2
+(start_offset_sessions = 1). The event names are read at D from earnings_reaction@v1
+(sessions_since_reaction = 0) and the volume ratio from earnings_gap_volume@v1 for the same report,
+never from a report known after D."""
+replication = """No published rule with numbers exists: the practitioner description (Kullamagi's episodic
+pivot) is a gap of at least 10% on earnings or news, day-one volume far above average, after a
+dormant base. Here earnings_gap_volume v1: reaction of at least +10% over SPY and a window volume
+ratio of at least 3, the top 20 by reaction, entered at the close of the first session after the
+reaction."""
+expected_size = """Not published for the exact template; the academic cousins (PEAD, the high-volume
+premium, news continuation) are positive, and the filed small-cap PEAD carries the earnings subset.
+The increment of volume over same-size gaps is the unknown. Reports cluster in about eight seasons
+a year: independent sessions are the binding count."""
+capacity_costs = """Mid and small caps, long only, one to five events a week and large single-name
+variance; the entry is the next close, not the day-one open, so part of the move is gone. The
+outcome deducts 20 bps a round trip."""
+failure_modes = """The reaction can be an offering, a bid or guidance, not the report; a close-to-close
+reaction misses a gap that faded intraday; PEAD has faded in larger names. Retire if the
+frozen-period excess return of the volume-confirmed picks is not above both the base rate of the
+other reporters and the picks of earnings_gap_only."""
+decoys = """It may be PEAD with a volume filter: earnings_gap_only is that control, and the 12-1
+momentum and size baselines (winners and small names gap more) run on the same sessions; momentum at
+earnings (filed) overlaps."""
+
+[[sources]]
+title = "Bernard, V. and Thomas, J., Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium?, Journal of Accounting Research, 1989"
+url = "https://doi.org/10.2307/2491062"
+
+[[sources]]
+title = "Martineau, C., Rest in Peace Post-Earnings Announcement Drift, Critical Finance Review, 2022"
+url = "https://doi.org/10.1561/104.00000122"
+
+[[sources]]
+title = "Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001"
+
+[[sources]]
+title = "Pritamani, M. and Singal, V., Return predictability following large price changes and information releases, Journal of Banking and Finance, 2001"

@@ -53,6 +53,7 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/earnings@v1",
     "rollups/instrument/earnings_date_shift@v1",
     "rollups/instrument/earnings_expected@v1",
+    "rollups/instrument/earnings_gap_volume@v1",
     "rollups/instrument/earnings_neutral_reversal@v1",
     "rollups/instrument/earnings_reaction@v1",
     "rollups/instrument/earnings_revisions@v1",

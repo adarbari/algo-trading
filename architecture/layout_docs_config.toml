@@ -90,7 +90,11 @@ purpose = "the Guide's playbooks of the option income family (VRP scanner): one 
 
 [[config_dir]]
 path = "config/site/guide/playbooks/events"
-purpose = "the Guide's playbooks of the earnings events family (post-earnings drift, earnings announcement premium): one <id>.toml per preset the family lists in sections.toml"
+purpose = "the Guide's playbooks of the earnings events family (post-earnings drift, earnings announcement premium, earnings-date advances, pre-earnings run-up, earnings gaps on volume): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/filings"
+purpose = "the Guide's playbooks of the filings and index changes family (adverse 8-K items, late filers, tender offers, S&P 500 deletions): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/regime"
