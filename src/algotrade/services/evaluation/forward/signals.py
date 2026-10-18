@@ -133,6 +133,8 @@ def _not_possible(edge: Edge) -> str | None:
     """Why the paper record cannot trade ``edge`` (None: it can)."""
     if needs_implied_vol(edge) and iv_field_of(edge) in MIXED_SOURCE_IV:
         return "its implied vol field mixes sources: name one vendor's field"
+    if edge.outcome.side != "long":
+        return f"a {edge.outcome.side} outcome is not paper traded: the record buys the picks"
     if edge.promoted is None and not edge.screeners:
         return "the edge has no screener to take picks from"
     return None

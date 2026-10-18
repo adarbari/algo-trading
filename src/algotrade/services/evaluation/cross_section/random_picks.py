@@ -90,6 +90,21 @@ def random_stat(
     )
 
 
+def long_short_stat(long: RandomStat, short: RandomStat) -> RandomStat:
+    """A ``long_short`` session's draw (two seeded draws, one per leg): per draw the long leg's
+    sum plus the short leg's sum scaled to the long leg's count, so a pooled mean is the mean
+    spread. The base and hits are the long draw's (a spread has no base rate)."""
+    scale = long.picks / short.picks if short.picks else 0.0
+    return RandomStat(
+        session=long.session,
+        picks=long.picks,
+        value_sums=long.value_sums + short.value_sums * scale,
+        hit_sums=long.hit_sums,
+        eligible=long.eligible,
+        base_hits=long.base_hits,
+    )
+
+
 def pool_random(legs: Sequence[RandomStat]) -> RandomStat:
     """The block of event days as one session at its first day: the picks, sums and base added
     (the screener's own pooling, ``measures.pool_stats``)."""

@@ -15,6 +15,7 @@ from algotrade.services.evaluation.cross_section.random_picks import (
     DRAW,
     RandomStat,
     generator,
+    long_short_stat,
     pool_random,
     random_measures,
     random_stat,
@@ -128,3 +129,14 @@ def test_a_sessions_random_draws_do_not_change_with_the_range_or_the_as_of(
     evaluate_edge(w.reader, w.results, w.configs, USER, e, DAYS[2], DAYS[-1], later)
     assert drawn and set(drawn) <= set(full)
     assert all(draws[0] == full[day] for day, draws in drawn.items())
+
+
+def test_a_long_short_draw_adds_the_short_draw_scaled_to_the_long_legs_count() -> None:
+    day = date(2026, 9, 1)
+    long = RandomStat(day, 4, np.array([0.4, 0.8]), np.array([3.0, 4.0]), 20, 9)
+    short = RandomStat(day, 2, np.array([0.1, 0.3]), np.array([1.0, 2.0]), 12, 5)
+    both = long_short_stat(long, short)
+    assert both.picks == 4 and (both.eligible, both.base_hits) == (20, 9)
+    np.testing.assert_allclose(both.value_sums, [0.4 + 0.2, 0.8 + 0.6])
+    np.testing.assert_allclose(both.hit_sums, long.hit_sums)
+    assert long_short_stat(long, RandomStat(day, 0, np.zeros(2), np.zeros(2), 3, 1)).picks == 4

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -132,6 +132,15 @@ describe('EdgeHeader', () => {
     expect(
       screen.getByText('chosen on in-sample lift: 15 d +3.1 pts, 31 d +2.7 pts'),
     ).toBeInTheDocument();
+  });
+
+  it('names a short side, and says nothing for the usual long one', () => {
+    header({ ...momentum, verdict: { ...momentum.verdict, side: 'short' } });
+    expect(screen.getByText('Short')).toBeInTheDocument();
+    cleanup();
+    header(momentum);
+    expect(screen.queryByText('Short')).not.toBeInTheDocument();
+    expect(screen.queryByText('Long-short')).not.toBeInTheDocument();
   });
 
   it('gives the reason there is no date instead of a date', () => {

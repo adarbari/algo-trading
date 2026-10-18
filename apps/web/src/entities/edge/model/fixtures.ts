@@ -41,6 +41,7 @@ const verdict = (over: Record<string, unknown>) => ({
   result: 'No official result yet',
   basis: null,
   basisWhy: '',
+  side: 'long',
   trades: null,
   oosTrades: null,
   winRate: null,

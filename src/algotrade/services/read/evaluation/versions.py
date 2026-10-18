@@ -139,7 +139,7 @@ def load_verdict(ctx: Stores, edge: Edge) -> verdict.EdgeVerdict:
             wins=verdict.counts_wins(edge),
         ),
     )
-    if not hidden or found.verdict == verdict.WAITING:
+    if not hidden or found.verdict in (verdict.WAITING, verdict.DIAGNOSTIC):
         return found
     return replace(
         found,

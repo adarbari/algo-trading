@@ -64,12 +64,14 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/gaps@v1",   # 43 MB
     "rollups/instrument/growth_history@v2",
     "rollups/instrument/ibkr_iv@v1",
+    "rollups/instrument/ibkr_iv_history@v1",
     "rollups/instrument/implied_move@v1",
     "rollups/instrument/income_statement@v2",
     "rollups/instrument/index_changes@v1",
     "rollups/instrument/iv30@v1",
     "rollups/instrument/iv_history@v2",
     "rollups/instrument/iv_term@v1",
+    "rollups/instrument/mispricing@v1",
     "rollups/instrument/momentum@v1",   # 142 MB
     "rollups/instrument/momentum_variants@v1",
     "rollups/instrument/nearest_expiry@v1",
@@ -82,6 +84,8 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/put_wing@v1",
     "rollups/instrument/relative_strength@v1",   # 74 MB
     "rollups/instrument/retest@v1",
+    "rollups/instrument/cp_iv@v1",
+    "rollups/instrument/cp_iv_history@v1",
     "rollups/instrument/skew@v1",
     "rollups/instrument/skew_history@v1",
     "rollups/instrument/swing_levels@v1",

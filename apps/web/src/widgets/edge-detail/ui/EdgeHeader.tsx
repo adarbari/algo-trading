@@ -11,6 +11,7 @@ import { Button, Chip, formatValue, Heading, Stack, StatusBadge, Text } from '@a
 import {
   EdgeLiveBadge,
   labelText,
+  sideLabel,
   stateLabel,
   stateTone,
   statusLabel,
@@ -77,6 +78,12 @@ export function EdgeHeader({ edge, onBack, onEdit }: EdgeHeaderProps) {
                     {v.basis}
                   </Text>
                   {termHelp('verdict_basis')}
+                </>
+              )}
+              {sideLabel(v.side) && (
+                <>
+                  <Chip label={sideLabel(v.side) ?? ''} />
+                  {termHelp(v.side === 'short' ? 'side_short' : 'side_long_short')}
                 </>
               )}
             </Stack>

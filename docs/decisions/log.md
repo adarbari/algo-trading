@@ -507,6 +507,21 @@ follow-up PR).
 - status: final
 - Reasoning: the tag does not split finance from operating leases in the filer's figure; excluding it would leave about 70 of 259 untagged companies null.
 
+## 2026-10-17 | PR #646 (EB H3 outcome sides) | A long-short edge's verdict state
+- Question: what does an edge whose outcome is a long-short spread show as its verdict, given a spread is never a basis?
+- Options: Waiting on data with a reason / its own state, Diagnostic only.
+- Decision: its own state, `diagnostic_only`, with a Guide entry; the figures stay on the page.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: Waiting on data says a result is coming; a spread's never becomes a verdict, so the word would mislead.
+
+## 2026-10-17 | PR #646 (EB H3 outcome sides) | Assumed borrow cost of a short leg
+- Question: what borrow cost does a short leg pay, and are hard-to-borrow names excluded?
+- Options: flat 100 bp a year, no exclusion / flat rate plus a hard-to-borrow exclusion / no borrow cost.
+- Decision: 100 bp a year (`verdict.toml [edge_costs] borrow_bps_annual`, per outcome overridable), no hard-to-borrow exclusion; the $5M ADV floor stands in. The limitation is recorded in ADR 0053.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: no borrow data is stored, so any exclusion would be a guess; a flat assumption is stated and visible.
 ## 2026-10-17 | EB H2 (SEC acceptance time) | Scope of the acceptance-time fix
 - Question: which groups read facts by SEC acceptance session, and where does the session rule live?
 - Options: only `financials` and `fundamentals` / every group that reads the SEC facts; the rule only in `data.shares` / also in `core/time/calendar.py`.
@@ -523,6 +538,30 @@ follow-up PR).
 - status: pending owner confirmation
 - Architect review (PR 655): keep the six 8-K items (1.03 and 2.06 later), keep the 7-day threshold, approve the `features/rollups/events` folder.
 - Reasoning: the item list and the 7-day threshold are judgement calls the owner may widen; a stale `known_from` left in the store must not leak, so the reader does not trust it; a new folder is the layout rule's answer to a full one.
+
+## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Describe-it precedence of connectors
+- Question: how do "or", "and" and "except" combine in a drafted sentence?
+- Options: and binds tighter than or, a comma or "ideally" starts a new condition, an exclusion is its own gate / a flat left-to-right reading / the model decides per sentence.
+- Decision: and binds tighter than or (as the expression parser does); a comma or "ideally" starts a new condition, so an "or" never reaches across it; "except A or B" is neither; "except A and B" is neither only for a bare "and" (", and" ends the exclusion); "A or B except C" is (A or B) and not C. One golden case per phrasing pins it.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: one rule set gives the same reading every time and a wrong reading is one line and one golden case; the owner verifies the cases in the PR. Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it unchanged: "and" narrows a condition and "or" offers alternatives, the narrower screen costs a few missed names where a wider one buries the idea, and the Builder's plain-English line shows any wrong reading before a save. No golden case changes.
+
+## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Flat fallback when a part cannot sit in a group
+- Question: what does a draft do when an "or" or exclusion has a part that is a formula, a missing request, a dropped criterion or words nothing maps?
+- Options: keep the draft flat as before groups / group the available sides only.
+- Decision: keep it flat; only the formula case gets the verifier's doubt (draft one boolean formula), every other block leaves a visible note ("... is not available, so the 'or' or exclusion is not applied"); two kinds of instrument joined by "or" are doubted (one security_type criterion).
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: grouping the available sides would silently change the meaning (an "or" side dropped makes the other side mandatory). Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it and asked that the note say the other conditions apply on their own (done): blocking the draft would throw away the parts that worked.
+
+## 2026-10-17 | PR #644 (E1c option-implied features) | IBKR IV30 change as a personal-licence feature
+- Question: does the IV-change edge (c03) get a long-history IBKR variant beside the chain-derived one?
+- Options: chain-derived only (history from 2026-10-02) / also `ibkr_iv_chg_5d` and `ibkr_iv_chg_21d` from IBKR's IV30 history (about 502 sessions).
+- Decision: add `ibkr_iv_history@v1` with both, `licence = "personal"`, optional like `ibkr_iv@v1`; `cp_iv_history@v1` stays open. Its guide entries say IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: settled by the architect reviewer of #644 (the format accepts no `architect` decider); the edge can be scored now instead of from November; the read-only broker boundary is untouched (it reads a stored rollup).
 
 ## 2026-10-17 | EB H8 (option model P&L) | Short delta-hedged side, stored basis, short put
 - Question: how is the short side of the delta-hedged straddle expressed, where does `basis = "model"` live, and when does the short-put P&L land?

@@ -13,7 +13,12 @@ from algotrade.quant.black_scholes import (
     prob_otm,
     strike_from_delta,
 )
-from algotrade.services.evaluation.cross_section.hit import apply_outcome, needs_implied_vol
+from algotrade.services.evaluation.cross_section.hit import (
+    apply_outcome,
+    borrow_cost,
+    needs_implied_vol,
+    short_view,
+)
 from tests.unit.services.evaluation.cross_section.conftest import edge
 
 NAN = float("nan")
@@ -318,3 +323,34 @@ def test_a_row_with_no_horizon_has_no_time_to_expiry_so_no_value() -> None:
 def test_the_model_pnl_needs_the_implied_vol() -> None:
     with pytest.raises(ConfigurationError, match="needs the implied vol"):
         apply_outcome(model_edge(), otm_rows([0.1]))
+
+
+def _sided(side: str, **outcome: object) -> object:
+    base = {
+        "kind": "excess_return", "horizon_sessions": [20], "benchmark": "SPY",
+        "start_offset_sessions": 1, "cost_bps": 50, "side": side, "borrow_bps_annual": 252,
+    }  # fmt: skip
+    return edge(outcome={**base, **outcome}, top_k=5)
+
+
+def test_a_short_value_is_minus_the_excess_return_less_cost_and_borrow() -> None:
+    """252 bp a year over 20 of 252 sessions is 20 bp; cost is 50 bp: a short pays 70 bp."""
+    e = _sided("short")
+    frame = rows(fwd_excess_return=[-0.03, -0.005, 0.01, NAN], horizon_sessions=[20] * 4)
+    out = apply_outcome(e, frame)
+    assert np.allclose(out["short_value"][:3], [0.03 - 0.007, 0.005 - 0.007, -0.01 - 0.007])
+    assert list(out["short_hit"]) == [True, False, False, False]  # -0.2%: it fell less than costs
+    assert np.isnan(out["short_value"][3]) and out["excluded"][3] == "missing_value"
+    # the long columns are untouched: the base and the deciles are over them whatever the side
+    assert np.allclose(out["oriented"][:3], [-0.03 - 0.005, -0.005 - 0.005, 0.01 - 0.005])
+    assert list(out["hit"]) == [False, False, True, False]
+    view = short_view(out.set_index("instrument_id"))
+    assert np.allclose(view["oriented"].iloc[:3], out["short_value"][:3])
+    assert list(view["hit"]) == list(out["short_hit"])
+
+
+def test_a_long_outcome_has_no_short_value_and_borrow_scales_with_the_holding_period() -> None:
+    out = apply_outcome(edge(), rows(fwd_excess_return=[0.05, -0.05], horizon_sessions=[2, 2]))
+    assert np.isnan(out["short_value"]).all() and not out["short_hit"].any()
+    assert np.allclose(borrow_cost(252.0, np.array([252.0, 63.0])), [0.0252, 0.0063])
+    assert np.allclose(borrow_cost(None, np.array([20.0])), [0.0])

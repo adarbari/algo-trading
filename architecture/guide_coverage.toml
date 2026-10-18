@@ -123,7 +123,7 @@ exempt = "a catalogue field name; the field's own help explains it"
 [[enum]]
 source = "graphql:EdgeVerdict.verdict"
 values_from = "python:algotrade.services.read.evaluation.verdict:ORDER"
-values = { works = "term:verdict_works", promising = "term:verdict_promising", not_working = "term:verdict_not_working", not_enough_data = "term:verdict_not_enough_data", waiting_on_data = "term:verdict_waiting_on_data" }
+values = { works = "term:verdict_works", promising = "term:verdict_promising", not_working = "term:verdict_not_working", not_enough_data = "term:verdict_not_enough_data", waiting_on_data = "term:verdict_waiting_on_data", diagnostic_only = "term:verdict_diagnostic_only" }
 
 [[enum]]
 source = "graphql:VerdictCriterion.status"

@@ -141,6 +141,7 @@ class EdgeRow:
     # for any other outcome or a run from before the columns (never 0)
     reference_rate: float | None = None
     touch_rate: float | None = None
+    side: str = "long"  # the outcome's side (ADR 0053 amendment); a run before sides is long
 
 
 @dataclass(frozen=True)
@@ -367,6 +368,7 @@ def _row(row: Mapping[str, Any]) -> EdgeRow:
         pick_adv_low=_int(row.get("pick_adv_low")),
         reference_rate=_float(row.get("reference_rate")),
         touch_rate=_float(row.get("touch_rate")),
+        side=str(to_scalar(row.get("side")) or "long"),
     )
 
 
