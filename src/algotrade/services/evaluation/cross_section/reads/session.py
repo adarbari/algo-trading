@@ -4,7 +4,7 @@ label, the eligible names per universe, the implied vol, the ADV and the scored 
 chunk of sessions is released; ``implied_at`` reads the implied vol of names at one session, for
 the harness and the paper record alike."""
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import AbstractContextManager
 from datetime import date
 from typing import TYPE_CHECKING
@@ -199,6 +199,15 @@ class SessionReads:
         if key not in self._numbers:
             self._numbers[key] = numbers_at(self._reader, field_name, ids, day)
         return self._numbers[key]
+
+    def history(
+        self, field_name: str, ids: frozenset[str], days: Sequence[date]
+    ) -> dict[date, dict[str, float | None]]:
+        """``field_name`` of ``ids`` as each of ``days`` read it (the value known at that day, not
+        the latest: ``numbers`` per day), through the recording reader, so a restated partition of
+        any of the days invalidates the legs of the session that read it (a book's volatility,
+        ADR 0074 amendment)."""
+        return {day: self.numbers(field_name, ids, day) for day in days}
 
     def bill_yield(self, day: date) -> float | None:
         """The shortest-tenor Treasury bill yield (a decimal per year) of the curve ``day`` sees,

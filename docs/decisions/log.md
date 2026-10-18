@@ -796,3 +796,27 @@ follow-up PR).
 - Owner read the disclaimer: personal research use, monthly automated pull, no redistribution, no product built on the index.
 - Clause to respect: no reproduction, distribution or transmission without Barclays' consent, so CAPE values and every feature derived from them are never served to other users (`licence = "personal"`, held only by the owners listed in `config/site/users.toml`, ADR 0069).
 - Reasoning: the file is public and unauthenticated and has been served for years, a monthly pull is a light use, and the series is optional (the macro step is non-critical), so withdrawing it costs one registry block.
+
+## 2026-10-18 | EB E5 (vol_target) | A volatility-targeted book is scaled down from today's weights over past returns
+- Question: how is a book sized to a volatility target without look-ahead, leverage or a hidden re-weighting?
+- Options: scale by the stored realised vol of each name / by the book's own daily returns; scale up as well as down / down only; use the returns as stored today / as each day read them; a missing return counts as zero / leaves the session out.
+- Decision: sigma is the annualised sample std of `sum(w_i r_i,t)` over `vol_window` (60) sessions ending at D, today's weights on the returns each day `t <= D` read at `t` (through the recording reader, so a restated partition invalidates the legs); `k = min(1, target / sigma)`, names times `k`, the rest cash at the bill yield; a missing return is `no_book_vol`; an all-cash book is not scaled; the target and its window and field join an outcome's hash only when set. The scaled weights go through the turnover pass, so rescaling pays the cost.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the book's own series captures correlation, which per-name vols do not; down-only keeps the outcome a long, unlevered book; reading each day as it was known keeps a later restatement from moving an earlier session. Architect design of 2026-10-18 (ADR 0074 items 14 to 16 and 18).
+
+## 2026-10-18 | EB E5 (vol_target) | A de-risked book is still judged against the fully invested blend
+- Question: when a book holds cash by a volatility target or a canary, is its benchmark scaled the same way or left as the fully invested blend?
+- Options: leave the benchmark as written / scale it by the same cash share / add `CASH` as a benchmark constituent on request.
+- Decision: leave it: the book is judged against the fully invested blend, so the cost of de-risking shows up as a lower excess return in rising markets; a `CASH` constituent of the benchmark is added only if the owner asks.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: scaling the benchmark by the book's own choices would hide what de-risking cost; the proposed default is the stricter bar. Owner to confirm or overrule.
+
+## 2026-10-18 | EB E5 (macro bridge) | Revised CAPE history is accepted with a caveat
+- Question: country CAPE values are revised, so a backfill is not as it was known on each date; is the history used?
+- Options: use the history with a caveat in the edge's notes / start the series at the first stored vintage / drop the signal.
+- Decision: use it, flagged `revised` with the caveat in the notes of every edge that reads it; a signal built from it is never presented as an as-known test.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the series is monthly and slow-moving, a vintage-only start would leave years of history empty, and the caveat keeps the limit visible. Owner to confirm or overrule.

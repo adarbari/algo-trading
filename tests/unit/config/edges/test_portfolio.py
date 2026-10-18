@@ -211,3 +211,48 @@ def test_an_ensemble_is_for_a_portfolio_outcome_only() -> None:
 def test_an_ensemble_is_part_of_the_run_and_an_empty_one_is_not() -> None:
     assert "ensemble" not in identity_dict({"ensemble": (), "top_k": 3})
     assert identity_dict({"ensemble": ("a", "b")})["ensemble"] == ["a", "b"]
+
+
+def test_a_vol_target_parses_with_its_defaults_and_is_part_of_the_identity() -> None:
+    """ADR 0074 amendment: ``vol_target`` is a fraction a year, ``vol_window`` defaults to 60
+    sessions and ``vol_return_field`` to the stored daily return; no target, none of the three is
+    part of an outcome's identity (no existing hash moves), a target is."""
+    plain = book(outcome=outcome(weighting=None, vol_field=None)).outcome
+    assert (plain.vol_target, plain.vol_window) == (None, 60)
+    assert plain.vol_return_field == "rollup.trend_stats@v2.ret_1d"
+    bare = identity_dict(plain.__dict__)
+    assert not {"vol_target", "vol_window", "vol_return_field"} & set(bare)
+    sized = book(outcome=outcome(vol_target=0.1, vol_window=40, vol_return_field="a.b@v1.c"))
+    o = sized.outcome
+    assert (o.vol_target, o.vol_window, o.vol_return_field) == (0.1, 40, "a.b@v1.c")
+    kept = identity_dict(o.__dict__)
+    assert (kept["vol_target"], kept["vol_window"]) == (0.1, 40)
+    assert identity_dict(book(outcome=outcome(vol_target=0.1)).outcome.__dict__) != kept
+    assert identity_dict(book(outcome=outcome(vol_target=0.12)).outcome.__dict__) != identity_dict(
+        book(outcome=outcome(vol_target=0.1)).outcome.__dict__
+    )
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"vol_target": 0}, "vol_target"),
+        ({"vol_target": -0.1}, "vol_target"),
+        ({"vol_target": 1.5}, "vol_target: expected a fraction in \\(0, 1\\]"),
+        ({"vol_target": 0.1, "vol_window": 5}, "vol_window"),
+        ({"vol_target": 0.1, "vol_window": 20.5}, "vol_window"),
+        ({"vol_window": 60}, "vol_window: needs a vol_target"),
+        ({"vol_return_field": "a.b@v1.c"}, "vol_return_field: needs a vol_target"),
+    ],
+)
+def test_a_bad_vol_target_is_refused(changes: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        book(outcome=outcome(**changes))
+
+
+@pytest.mark.parametrize("key", ["vol_target", "vol_window", "vol_return_field"])
+def test_only_a_portfolio_outcome_names_a_vol_target(key: str) -> None:
+    doc = edge_document(schedule="month_end", top_k=3)
+    doc["outcome"] = {**doc["outcome"], key: 0.1 if key == "vol_target" else 60}
+    with pytest.raises(ConfigurationError, match=f"{key}: only a portfolio_return outcome"):
+        parse_edge(doc, "drift", "drift.toml")
