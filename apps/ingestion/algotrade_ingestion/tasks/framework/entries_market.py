@@ -7,7 +7,7 @@ from algotrade.config.site.settings import load_macro
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.derived import market_rollups, option_outcomes, outcomes, rollups
-from algotrade_ingestion.tasks.events import filings
+from algotrade_ingestion.tasks.events import filings, insider
 from algotrade_ingestion.tasks.framework.params import Params, session_of, symbols
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.macro import calendar as macro_calendar
@@ -89,6 +89,24 @@ def run_filings(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("since"),
         p.get("limit"),
         ctx.sources["sec_daily_index"],
+    )
+
+
+def run_insider(ctx: TaskContext, p: Params) -> RunRecord:
+    sources = insider.Sources(
+        ctx.sources["sec_filings"],
+        ctx.sources["sec_form345_bulk"],
+        ctx.sources["sec_form4_xml"],
+        ctx.sources["sec_daily_index"],
+    )
+    return insider.ingest_insider(
+        ctx,
+        sources,
+        session_of(p),
+        p.get("since"),
+        p.get("until"),
+        p.get("limit"),
+        bool(p.get("force")),
     )
 
 

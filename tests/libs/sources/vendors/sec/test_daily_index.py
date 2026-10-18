@@ -124,3 +124,24 @@ def test_forms_that_only_start_like_an_event_form_are_skipped() -> None:
     line = "{:<17}{:<62}{:<12}20260930    edgar/data/5/0000000005-26-000001.txt\n"
     for form in ("NT 10-K/A", "NT 11-K", "25-NSE/A", "424B40", "SC TO-I/A", "8-KT"):
         assert parse_index(line.format(form, "SOME CO", "5").encode()).empty, form
+
+
+def test_the_insider_forms_are_read_from_the_same_index_and_424b4_is_not_a_form_4() -> None:
+    lines = (
+        b"4                   ACME CORP                                         111       20260930"
+        b"    edgar/data/111/0000111-26-000001.txt\n"
+        b"4/A                 ACME CORP                                         111       20260930"
+        b"    edgar/data/111/0000111-26-000002.txt\n"
+        b"424B4               ACME CORP                                         111       20260930"
+        b"    edgar/data/111/0000111-26-000003.txt\n"
+        b"8-K                 ACME CORP                                         111       20260930"
+        b"    edgar/data/111/0000111-26-000004.txt\n"
+    )
+    frame = parse_index(lines, ("4", "4/A"))
+    assert frame["form"].tolist() == ["4", "4/A"]
+    assert frame["accession"].tolist() == ["0000111-26-000001", "0000111-26-000002"]
+    assert parse_index(lines)["form"].tolist() == ["424B4", "8-K"]  # the event forms, no Form 4
+    source = SecDailyIndex(http_for(lambda url: lines))
+    asked = DailyIndexRequest(key="2026-09-30", day=DAY, forms=("4", "4/A"))
+    normalized = source.normalize(asked, lines)
+    assert normalized is not None and len(normalized.parsed[DAILY_INDEX_FRAME]) == 2

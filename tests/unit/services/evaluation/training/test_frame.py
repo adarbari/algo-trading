@@ -8,7 +8,10 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.evaluation.cross_section.harness import edge_universe
+from algotrade.services.evaluation.discovery.frame import feature_reads
+from algotrade.services.evaluation.training import no_ml
 from algotrade.services.evaluation.training.frame import LABEL, purge_cutoff, training_frame
+from algotrade.services.features import site_features
 from tests.unit.services.evaluation.cross_section.conftest import (
     DAYS,
     IDS,
@@ -80,4 +83,25 @@ def test_an_edge_that_cannot_be_fitted_is_refused(changes, why: str) -> None:  #
     doc = {"scorer": {"features": [PRICE]}, "frozen_from": FROZEN, **changes}
     e, w = edge(**doc), build_world()
     with pytest.raises(ConfigurationError, match=why):
+        training_frame(w.reader, e, edge_universe(w.configs, USER, e), DAYS[0], DAYS[-1])
+
+
+def test_a_scorer_feature_on_a_no_ml_table_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The test that would have caught a learned scorer reading FINRA's rows: the catalogue's
+    price feature reads a table, and with that table no_ml the fit is refused before any read."""
+    features = site_features()
+    feature = features.feature(PRICE)
+    assert feature is not None
+    table = sorted(feature_reads(features, feature).tables)[0]
+    monkeypatch.setattr(no_ml, "NO_ML_TABLES", frozenset({table}))
+    w = build_world()
+    e = edge(scorer={"features": [PRICE]}, frozen_from=FROZEN)
+    with pytest.raises(ConfigurationError, match="machine learning"):
+        training_frame(w.reader, e, edge_universe(w.configs, USER, e), DAYS[0], DAYS[-1])
+
+
+def test_an_unresolvable_scorer_field_is_refused() -> None:
+    w = build_world()
+    e = edge(scorer={"features": ["rollup.nope@v1.x"]}, frozen_from=FROZEN)
+    with pytest.raises(ConfigurationError, match="unknown inputs"):
         training_frame(w.reader, e, edge_universe(w.configs, USER, e), DAYS[0], DAYS[-1])

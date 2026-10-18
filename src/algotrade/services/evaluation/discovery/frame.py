@@ -32,10 +32,12 @@ from algotrade.services.evaluation.discovery.controls import assign_cells, draw_
 from algotrade.services.evaluation.discovery.grid import GridSession, read_eligible
 from algotrade.services.evaluation.discovery.labels import Labels, read_labels
 from algotrade.services.features import entity_field_view
+from algotrade.storage.tables.schemas import NO_ML_TABLES
 
 EDGE_SCORE_PREFIX = "edge_score_"
 LIQUIDITY = "price_stats.adv_usd_20d"  # ``<group>.<column>`` of the liquidity matching variable
 EDGE_SCORE = "learned edge score"
+NO_ML = "reads a no_ml table (the source's terms bar machine learning)"
 MATCHING_VARIABLE = "matched on"
 
 
@@ -154,6 +156,8 @@ def _why_not(
         n.startswith(EDGE_SCORE_PREFIX) for n in reads.names
     ):
         return EDGE_SCORE
+    if reads.tables & NO_ML_TABLES:
+        return NO_ML  # the proposer fits a probit on every usable field
     if reads.columns & matching:
         return MATCHING_VARIABLE
     for table in sorted(reads.tables):
