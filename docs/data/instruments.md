@@ -152,6 +152,7 @@ Decision record: [ADR 0018](../adr/0018-figi-instrument-ids.md).
 | Equity / ETF with a composite FIGI | `EQ:<composite FIGI>` | `EQ:BBG000B9XRY4` (AAPL) |
 | Equity / ETF without one (no Massive key, unknown to Massive, golden data) | `EQ:<symbol>` | `EQ:BULL` |
 | Option contract | `OPT:<OCC symbol>`; `underlying_id` = the underlying's id | `OPT:SPY261231C00586000` |
+| Futures root / contract (`rates/futures_curve`; ids built only by `data/futures/curves.py`) | `FUT:<root>`; `FUT:<root>:<YYYY-MM delivery month>` with `parent_id` = the root | `FUT:CL`, `FUT:CL:2026-12` |
 
 - **Stable.** A FIGI id never changes automatically. A ticker change only updates `symbol` in
   the reference (and emits `ticker_changed`). When the previous active listing of a symbol

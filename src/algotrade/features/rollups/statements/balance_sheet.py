@@ -1,4 +1,4 @@
-"""``balance_sheet@v1``: the latest balance sheet lines from the SEC statements.
+"""``balance_sheet@v2``: the latest balance sheet lines from the SEC statements.
 
 Inputs: ``instruments/statements`` INSTANT rows of the concepts ``cash``, ``sti``, ``debt``,
 ``assets``, ``liabilities``, ``equity`` and ``current`` (every fact FILED on or before the
@@ -22,7 +22,7 @@ status is OK only when all three end on ``bs_as_of``, else PARTIAL shows one is 
     bs_status                 OK / PARTIAL / NO_FACTS / STALE
 
 Banks keep their balance sheet (``is_financial`` only flags them): only the EBIT family of
-``income_statement@v1`` is null for them.
+``income_statement@v2`` is null for them.
 """
 
 from datetime import date
@@ -52,7 +52,7 @@ from algotrade.features.rollups.statements.lines import (
 )
 
 NAME = "balance_sheet"
-VERSION = 1
+VERSION = 2
 STATUSES = ("OK", "PARTIAL", "NO_FACTS", "STALE")
 DEBT_BASES = ("a", "b", "c", "d", "e", "f", "g", "NOT_TAGGED")
 LIABILITIES_BASES = ("REPORTED", "DERIVED", "NONE")
@@ -148,17 +148,17 @@ FEATURES = (
         "bs_as_of", "date", "date",
         "The newest balance sheet date of the core lines (cash, total assets, equity): the "
         "quarter or fiscal year end every other line is read at",
-        _WHY, inputs=("instruments/statements.period_end",),
+        _WHY, inputs=(f"{STATEMENTS}.period_end",),
     ),
     Feature(
         "bs_filed", "date", "date",
         "The filing date of the newest balance sheet fact: the day the figures became public",
-        _WHY, inputs=("instruments/statements.filed",),
+        _WHY, inputs=(f"{STATEMENTS}.filed",),
     ),
     Feature(
         "is_financial", "bool", "flag",
         "The issuer is a bank, broker or insurer (SIC 6000 to 6411, instruments/company): its "
-        "balance sheet is kept, only the EBIT family of income_statement@v1 is null",
+        "balance sheet is kept, only the EBIT family of income_statement@v2 is null",
         "never (false without an instruments/company snapshot)",
         inputs=("instruments/company.sic",),
     ),
@@ -168,7 +168,7 @@ FEATURES = (
         "core line missing or ending on an older date); NO_FACTS (no fact filed); STALE (the "
         "newest balance sheet date is more than stale_days, 480, before the session; values "
         "still shown, checked first)",
-        "never", "label", categories=STATUSES, inputs=("instruments/statements.concept",),
+        "never", "label", categories=STATUSES, inputs=(f"{STATEMENTS}.concept",),
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)

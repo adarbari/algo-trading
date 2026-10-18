@@ -150,3 +150,21 @@ def test_quotes_key_fetches_an_expiry_at_strikes_and_normalises_a_frame() -> Non
     assert frame["listed"].tolist() == [True, False, False, False]
     assert frame.loc[0, "bid"] == 5.0 and pd.isna(frame.loc[1, "bid"])
     assert parse_key(request.key) == ("quotes", ["AAPL", "2026-11-20", "230.0+235.0"])
+
+
+def test_futures_request_returns_the_curve_frame() -> None:
+    ib = FakeIB(
+        futures={"CL": [("20261022", "CL"), ("20261120", "CL")]},
+        fut_quotes={("CL", "20261022"): (71.5, 71.0, 10.0, 50.0)},
+    )
+    src = source(ib)
+    request = FetchRequest("futures__CL__NYMEX__CL__2", None, SESSION)
+    with opened(src):
+        payload = src.fetch(request)
+    assert payload is not None
+    frame = src.normalize(request, payload).parsed["futures"]  # type: ignore[union-attr]
+    assert list(frame["contract_month"]) == ["202610", "202611"]
+    assert frame["last"].iloc[0] == 71.5 and pd.isna(frame["last"].iloc[1])
+    assert parse_key("futures__CL__NYMEX__CL__2") == ("futures", ["CL", "NYMEX", "CL", "2"])
+    with pytest.raises(ValueError):
+        parse_key("futures__CL")

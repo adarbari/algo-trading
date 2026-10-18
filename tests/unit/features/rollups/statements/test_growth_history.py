@@ -1,4 +1,4 @@
-"""growth_history@v1: the revenue and EPS TTMs three and five years back from hand-built facts
+"""growth_history@v2: the revenue and EPS TTMs three and five years back from hand-built facts
 (four quarters, or the fiscal year, ending near the target), a hole in that history giving
 null, a restatement filed after the session ignored, EPS split-adjusted, the statuses and the
 longer window."""
