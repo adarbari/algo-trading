@@ -19,10 +19,11 @@ from algotrade_sources.framework.http import (
     RetryPolicy,
     get_with_retry,
     json_post_transport,
+    parse_retry_after,
     urllib_transport,
     with_query_param,
 )
-from algotrade_sources.framework.limiter import Limiter, Pacing
+from algotrade_sources.framework.limiter import MAX_RETRY_AFTER_S, Limiter, Pacing
 from algotrade_sources.vendors.cboe.option_chains import (
     URL,
     CboeOptionsSource,
@@ -254,6 +255,76 @@ def test_429_holds_the_shared_limiter_for_retry_after_and_backs_off(tmp_path: Pa
     assert clock.slept == [47.0] and limiter.interval == 1.5
     assert (stats.requests, stats.throttled_429, stats.retry_after_wait_s) == (2, 1, 47.0)
     assert stats.errors == 1 and stats.limiter_wait_s == 47.0
+
+
+def test_retry_after_at_the_cap_is_still_honoured(tmp_path: Path) -> None:
+    clock = Clock()
+    limiter = Limiter("cboe", Pacing(1.0, max_interval_s=5.0), tmp_path, clock.sleep, clock)
+    body = get_with_retry(
+        scripted(HttpError(429, MAX_RETRY_AFTER_S), b"ok"), "u", FAST, str, limiter=limiter
+    )
+    assert body == b"ok" and clock.slept == [MAX_RETRY_AFTER_S]
+
+
+def test_retry_after_over_the_cap_gives_up_without_holding_or_sleeping(tmp_path: Path) -> None:
+    clock = Clock()
+    limiter = Limiter("cboe", Pacing(1.0, max_interval_s=5.0), tmp_path, clock.sleep, clock)
+    stats = limiter.track()
+    in_thread: list[float] = []
+    with pytest.raises(GaveUpError, match="Retry-After 86400s") as given_up:
+        get_with_retry(
+            scripted(HttpError(429, 86400.0), b"ok"), "u", FAST, in_thread.append, limiter=limiter
+        )
+    assert given_up.value.status == 429
+    assert in_thread == [] and clock.slept == []  # nothing slept
+    assert stats.retry_after_wait_s == 0.0 and stats.throttled_429 == 0  # nothing held
+    limiter.wait()  # the next request (another item) waits its pacing interval, not a day
+    assert clock.slept == [1.0]
+    with pytest.raises(GaveUpError):  # without a limiter: no sleep here either
+        get_with_retry(scripted(HttpError(429, 86400.0)), "u", FAST, in_thread.append)
+    assert in_thread == []
+
+
+def test_limiter_throttled_clamps_a_hold_to_the_cap(tmp_path: Path) -> None:
+    clock = Clock()
+    limiter = Limiter("cboe", Pacing(1.0, max_interval_s=5.0), tmp_path, clock.sleep, clock)
+    limiter.throttled(86400.0)
+    limiter.wait()
+    assert clock.slept == [MAX_RETRY_AFTER_S]
+
+
+@pytest.mark.parametrize("bad", [-5.0, 0.0, float("nan")])
+def test_a_garbage_retry_after_falls_back_to_the_default_backoff(bad: float) -> None:
+    limiter = CountingLimiter()
+    no_header = RetryPolicy(tries=2, max_delay=9.0)
+    get_with_retry(scripted(HttpError(429, bad), b"x"), "u", no_header, str, limiter=limiter)
+    assert limiter.held == 5.0  # the exponential default, as with no header
+
+
+def test_parse_retry_after_forms() -> None:
+    assert parse_retry_after("120") == 120.0
+    assert parse_retry_after(" 1.5 ") == 1.5
+    assert parse_retry_after("Wed, 21 Oct 2015 07:28:00 GMT", now=1445412480.0 - 90) == 90.0
+    assert parse_retry_after("Wed, 21 Oct 2015 07:28:00 GMT", now=1445412480.0 + 5) is None  # past
+    # An absurd date comes back as a huge number: get_with_retry gives up on it.
+    far = parse_retry_after("Fri, 31 Dec 9999 23:59:59 GMT", now=1445412480.0)
+    assert far is not None and far > MAX_RETRY_AFTER_S
+    for garbage in (None, "", "  ", "soon", "-5", "nan", "inf", "Wed, 99 Foo 2015 07:28:00 GMT"):
+        assert parse_retry_after(garbage) is None, garbage
+
+
+def test_urllib_transport_parses_an_http_date_retry_after() -> None:
+    headers = Message()
+    headers["Retry-After"] = "Fri, 31 Dec 9999 23:59:59 GMT"
+    err = urllib.error.HTTPError("u", 429, "slow down", headers, io.BytesIO())
+    with mock.patch("urllib.request.urlopen", side_effect=err), pytest.raises(HttpError) as exc:
+        urllib_transport()("https://example.com")
+    assert exc.value.retry_after is not None and exc.value.retry_after > MAX_RETRY_AFTER_S
+    headers.replace_header("Retry-After", "soon")
+    err = urllib.error.HTTPError("u", 429, "slow down", headers, io.BytesIO())
+    with mock.patch("urllib.request.urlopen", side_effect=err), pytest.raises(HttpError) as exc:
+        urllib_transport()("https://example.com")
+    assert exc.value.retry_after is None
 
 
 def test_outcomes_reported_to_the_limiter() -> None:

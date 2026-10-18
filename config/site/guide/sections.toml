@@ -38,12 +38,12 @@ purpose = "The app's own words and the rule grammar, to look up."
 [[theme_group]]
 id = "tradeable"
 title = "Who is tradeable"
-themes = ["instrument gates", "liquidity"]
+themes = ["instrument gates"]
 
 [[theme_group]]
 id = "chart"
 title = "The chart"
-themes = ["momentum and trend", "price levels", "volume", "volatility"]
+themes = ["momentum and trend", "price levels", "volume and liquidity", "volatility"]
 
 [[theme_group]]
 id = "options"
@@ -53,7 +53,7 @@ themes = ["implied volatility", "option chain and short strikes", "put wing, wal
 [[theme_group]]
 id = "company"
 title = "The company and its calendar"
-themes = ["events", "fundamentals", "episode behaviour"]
+themes = ["events", "fundamentals", "statements", "analyst"]
 
 [[family]]
 id = "trend"

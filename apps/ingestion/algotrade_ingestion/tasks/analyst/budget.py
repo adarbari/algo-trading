@@ -10,7 +10,7 @@ analyst tasks add their name to ``TASKS`` and key their FMP items the same way.
 
 from algotrade_ingestion.tasks.framework.run import IngestRun, status_label
 
-TASKS = ("analyst-probe",)
+TASKS = ("analyst-probe", "analyst-snapshot")
 PREFIX = "fmp:"
 NOT_MADE = "OVER_BUDGET"
 

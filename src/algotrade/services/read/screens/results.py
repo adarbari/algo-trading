@@ -26,7 +26,8 @@ import pandas as pd
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.features.framework.feature import NullReason
-from algotrade.services.licences import ALL_LICENCES, hidden_fields
+from algotrade.services.features import catalogue
+from algotrade.services.licences import ALL_LICENCES, hidden_stored
 from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import ReadContext, at_session, catalogue_key, partition
@@ -254,7 +255,8 @@ def _criterion(v: Mapping[str, Any], hidden: frozenset[str]) -> CriterionResult:
 
 
 def _run_fields(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
-    """The catalogue fields ``run``'s stored criteria and columns read (cached per run)."""
+    """The catalogue fields ``run``'s stored criteria and columns read (cached per run); empty
+    when its values are not readable."""
     key = ("screen_run_fields", run.run_id, ctx.session.date, ctx.reader.visible_seq())
 
     def read() -> frozenset[str]:
@@ -272,15 +274,56 @@ def _run_fields(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
     return found
 
 
+UNREADABLE = "*"  # in ``run_withheld``: the run has rows but no stored values to tell its fields
+
+
 def run_withheld(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
     """The fields ``run`` read that the viewer's data licences do not cover (none for a viewer
     who holds them all: nothing is read). A run with any is a screen the viewer sees by names
     and decisions only: its ``score``, ``tie_break`` and ``reasons`` embed the hidden values
     (``reasons`` says "0.83, needs >= 0.9") and its rank order follows them, so they and
-    the ``rank`` are withheld, and a sort by them is by symbol (ADR 0064 decision 10, ADR 0069)."""
+    the ``rank`` are withheld, and a sort by them is by symbol (ADR 0064 decision 10, ADR 0069).
+    A run evaluated under licences the viewer also holds read nothing else (``fields_view`` hid
+    the rest at run time): its fields count as open unless recorded otherwise. Each field (the
+    stored ones and every one the run recorded, ``audit["field_licences"]``: the tie-break and
+    flag fields too) is gated by ``hidden_stored``: the run's record and the site catalogue's
+    current licence, never the viewer's own names. A run with rows but no readable values and no
+    record is withheld whole."""
     if set(ctx.licences) >= ALL_LICENCES:
         return frozenset()
-    return hidden_fields(ctx.features, _run_fields(ctx, run), ctx.licences)
+    at_run = run.audit.get("licences")
+    within = isinstance(at_run, list | tuple) and set(at_run) <= set(ctx.licences)
+    recorded = run.audit.get("field_licences")
+    known: Mapping[str, str] = recorded if isinstance(recorded, Mapping) else {}
+    stored = _run_fields(ctx, run)
+    fields = stored | frozenset(known)
+    if within:
+        # evaluated under licences the viewer holds: what it read is open to them as recorded
+        # (``fields_view`` hid the rest), but a field the site has since made personal is not
+        known = {**dict.fromkeys(fields, "open"), **known}
+    site = ctx.cache.get_or_compute(("site_catalogue",), lambda: catalogue(ctx.configs))
+    hidden = hidden_stored(site, known, fields, ctx.licences)
+    if within:
+        return hidden
+    if not stored and not known and run.decisions:
+        return hidden | {UNREADABLE}
+    return hidden
+
+
+def run_audit(ctx: ReadContext, run: ScreenerRun) -> dict[str, Any]:
+    """The run record's audit as the viewer may see it: a narrow miss of a withheld field
+    quotes its value and threshold, so it is dropped (a role grants no licence)."""
+    audit = dict(run.audit)
+    summary = audit.get("summary")
+    if not isinstance(summary, Mapping) or not (hidden := run_withheld(ctx, run)):
+        return audit
+    misses = summary.get("narrow_misses") or []
+    kept = [
+        m for m in misses
+        if UNREADABLE not in hidden and str(m.get("field")) not in hidden
+    ]  # fmt: skip
+    audit["summary"] = {**summary, "narrow_misses": kept}
+    return audit
 
 
 def _result(

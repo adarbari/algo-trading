@@ -9,9 +9,10 @@ The order is a preference for concepts whose tags are alternatives of one figure
 figures it only fixes the output order:
 
 - ``debt``: the parts a rollup adds up from ONE filing (long-term debt, its noncurrent and
-  current portions, short-term borrowings, commercial paper); which parts, in which order, is
-  the rollup's rule (ADR 0067), and a filer with none of them has no debt tag, which is not
-  zero debt.
+  current portions, short-term borrowings, commercial paper, and the lease-inclusive
+  ``LongTermDebtAndCapitalLeaseObligations*`` forms and the all-debt total
+  ``DebtLongtermAndShorttermCombinedAmount``); which parts, in which order, is the rollup's
+  rule (ADR 0067), and a filer with none of them has no debt tag, which is not zero debt.
 - ``liabilities``: ``Liabilities``, plus ``LiabilitiesAndStockholdersEquity`` stored so a
   rollup can derive liabilities as that total less equity for filers that do not tag them.
 - ``current``: ``AssetsCurrent`` and ``LiabilitiesCurrent``.
@@ -20,6 +21,14 @@ A DURATION concept is a flow over a period (a quarter, half year, nine months or
 flow figures cumulative from the start of the fiscal year); an INSTANT concept is a balance at
 a date. Only USD facts are kept: a figure in another currency is not summed with dollars.
 """
+
+from datetime import date
+
+# The day the tag lists below last grew. A company whose statements were fetched before it was
+# parsed with an older list: the ``shares`` task counts its marker as backlog (refetched under the
+# nightly cap, no ``--force``). Set at release: the day of the first nightly with this code, so a
+# marker the old code wrote the night before is older than it (else it waits its 30-day slot).
+STATEMENT_TAGS_VERSION_DATE = date(2026, 10, 19)
 
 INSTANT = "INSTANT"
 DURATION = "DURATION"
@@ -82,6 +91,10 @@ STATEMENT_CONCEPTS: dict[str, tuple[str, tuple[str, ...]]] = {
             "DebtCurrent",
             "ShortTermBorrowings",
             "CommercialPaper",
+            "LongTermDebtAndCapitalLeaseObligations",
+            "LongTermDebtAndCapitalLeaseObligationsCurrent",
+            "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+            "DebtLongtermAndShorttermCombinedAmount",
         ),
     ),
     "assets": (INSTANT, ("Assets",)),

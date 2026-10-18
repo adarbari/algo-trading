@@ -10,10 +10,10 @@ scope = ["src/algotrade/features/"]
 
 [[responsibility]]
 id = "feature-applicability"
-description = "Whether a feature applies to an instrument (Feature.applies_to over the reference snapshot's optionable and security_type facts and the company snapshot's SIC): the one decision behind the read layer's NOT_APPLICABLE and the nightly coverage check (ADRs 0042, 0045); and the declared explanations of a null (null_status with illiquid_statuses / explained_statuses, the closed NullReason) behind ILLIQUID and EXPLAINED (ADR 0046)"
+description = "Whether a feature applies to an instrument (Feature.applies_to over the reference snapshot's optionable and security_type facts and the company snapshot's SIC): the one decision behind the read layer's NOT_APPLICABLE and the nightly coverage check (ADRs 0042, 0045); and the declared explanations of a null (null_status with illiquid_statuses / uncovered_statuses / explained_statuses, the closed NullReason) behind ILLIQUID, NOT_COVERED (ADR 0072) and EXPLAINED (ADR 0046)"
 owner = ["src/algotrade/features/framework/feature.py"]
 allowed = [
-    "src/algotrade/services/read/instruments/features.py",  # NOT_APPLICABLE / ILLIQUID / EXPLAINED on a read
+    "src/algotrade/services/read/instruments/features.py",  # NOT_APPLICABLE / ILLIQUID / NOT_COVERED / EXPLAINED on a read
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py",  # which names a feature is expected for
 ]
 section = "docs/adr/0042-not-applicable-and-illiquid-values.md#decision"
@@ -48,7 +48,7 @@ detect = [{ call = "Feature" }, { string = "docs/data/features.md" }]
 
 [[responsibility]]
 id = "rollup-computation"
-description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047; optional: its source may be absent for a session, ADR 0055), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity. The earnings report window (the E-1 to E+1 excess return, pre-event ADV and volume ratio) is computed once, in earnings_reaction@v1 (corporate/); EV2's event_reaction@v1 must read that group, never recompute the window. The earnings surprise (the reported EPS against the calendar's consensus forecast, computed from the two numbers, never the vendor's value, which is used only to detect a lost sign) is computed once, in earnings_surprise@v1, and the revision of the next report's forecast across the nightly snapshots (same fiscal quarter, carried-forward rows not observations) once, in earnings_revisions@v1 (both in consensus/)"
+description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047; optional: its source may be absent for a session, ADR 0055), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity. The earnings report window (the E-1 to E+1 excess return, pre-event ADV and volume ratio) is computed once, in earnings_reaction@v1 (corporate/); EV2's event_reaction@v1 must read that group, never recompute the window. The earnings surprise (the reported EPS against the calendar's consensus forecast, computed from the two numbers, never the vendor's value, which is used only to detect a lost sign) is computed once, in earnings_surprise@v1, and the revision of the next report's forecast across the nightly snapshots (same fiscal quarter, carried-forward rows not observations) once, in earnings_revisions@v1 (both in consensus/); the analyst estimates (FY1 / FY2 from the fiscal year end of the last annual report known) and price targets of our own FMP snapshots once each, in analyst_estimates@v1 and analyst_targets@v1 (consensus/), the analysts' strong buy to strong sell counts, mean rating and its 90-day change of our own Finnhub snapshots once in analyst_ratings@v1, and the revisions of the FY1 consensus (same fiscal year end, from the newest snapshot's day) once in analyst_revisions@v1 (both in consensus/); their population and status rules (OK, STALE, NOT_COVERED, NOT_FETCHED; per vendor) and the window of an earlier snapshot once in consensus/analyst_status.py"
 owner = [
     "src/algotrade/features/framework/*",
     "src/algotrade/features/registry.py",
@@ -62,12 +62,13 @@ detect = [{ call = "compute_sessions" }, { call = "compute_one" }, { call = "Fea
 
 [[responsibility]]
 id = "statement-ttm"
-description = "The trailing-twelve-month arithmetic over one concept's reported periods: the discrete quarter (a reported three-month fact, else the difference of two year-to-date facts of one fiscal year and one tag, never across tags), the TTM (four consecutive quarters, else the fiscal year), the latest quarter and its year-ago value. Written once in rollups/statements/ttm.py; financials@v2, income_statement@v1 and cash_flow@v1 import it (balance_sheet@v1 reads instants, which have no TTM: statements/instants.py), no group re-implements it"
+description = "The trailing-twelve-month arithmetic over one concept's reported periods: the discrete quarter (a reported three-month fact, else the difference of two year-to-date facts of one fiscal year and one tag, never across tags), the TTM (four consecutive quarters, else the fiscal year), the latest quarter and its year-ago value. Written once in rollups/statements/ttm.py; financials@v2, income_statement@v1, cash_flow@v1 and growth_history@v1 (its trailing_ago, the TTM three and five years back) import it (balance_sheet@v1 reads instants, which have no TTM: statements/instants.py), no group re-implements it"
 owner = [
     "src/algotrade/features/rollups/statements/ttm.py",
     "src/algotrade/features/rollups/corporate/financials.py",
     "src/algotrade/features/rollups/statements/income_statement.py",
     "src/algotrade/features/rollups/statements/cash_flow.py",
+    "src/algotrade/features/rollups/statements/growth_history.py",
 ]
 section = "docs/data/layers.md#rollups-as-built"
 detect = [{ call = "discrete_quarters" }, { call = "latest_quarter" }]

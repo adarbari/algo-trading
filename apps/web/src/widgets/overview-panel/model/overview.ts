@@ -10,13 +10,15 @@
  * always say what is known. The next / last earnings dates are catalogue features
  * (`rollup.earnings@v1`); the events only add the EPS figures of the date the server names.
  */
-import { formatValue, type KeyValueItem, type StatItem, type ValueFormat } from '@algotrade/ui';
+import { formatValue, type KeyValueItem, type StatItem } from '@algotrade/ui';
 
 import { unknownText, unknownWord } from '@/entities/availability';
-import { isUnknown, shownValue, valueFormat, type ServedValue } from '@/entities/feature';
+import { factItem, isUnknown, type Fact, type FactSpec, type Values } from '@/entities/feature';
 import { earningsOn, reportTime, type InstrumentEvent } from '@/entities/instrument';
 import { typeLabel } from '@/features/ticker-filter';
 import { feature, type gqlTypes, type SiteFeature } from '@/shared/api';
+
+export type { Fact, FactSpec, Values };
 
 export type FactsData = gqlTypes.InstrumentFactsQuery;
 export type FactsInstrument = NonNullable<FactsData['instrument']>;
@@ -40,14 +42,6 @@ export interface FactGroup {
   id: string;
   title: string;
   items: KeyValueItem[];
-}
-
-export interface FactSpec {
-  id: string;
-  label: string;
-  name: SiteFeature;
-  /** A change: shown signed, with an up / down tone. */
-  signed?: boolean;
 }
 
 const PROFILE = {
@@ -161,9 +155,6 @@ export const OVERVIEW_FEATURES: readonly SiteFeature[] = [
   ...GROUPS.flatMap((g) => g.facts.map((f) => f.name)),
 ];
 
-/** The served values by catalogue name. */
-export type Values = ReadonlyMap<string, ServedValue>;
-
 export function valuesOf(instrument: FactsInstrument): Values {
   return new Map(instrument.features.map((v) => [v.name, v]));
 }
@@ -208,38 +199,6 @@ export function profileOf(instrument: FactsInstrument, values: Values): Profile 
     exchange: exchangeLabel(text(instrument.exchange) ?? '') || null,
     website: text(known(values, PROFILE.website)),
     tags,
-  };
-}
-
-const UNKNOWN = 'Unknown';
-
-/** A row with its stable id (a headline stat uses the same id). */
-export type Fact = KeyValueItem & { id: string };
-
-function formatOf(spec: FactSpec, value: ServedValue): ValueFormat {
-  const format = valueFormat(value.info);
-  return spec.signed && format.kind === 'percent' ? { kind: 'delta', unit: 'percent' } : format;
-}
-
-/** A fact's row: its value, "Unknown" with the reason when the session has no partition for
- * it, nothing when it does not apply to the instrument. */
-export function factItem(values: Values, spec: FactSpec): Fact | null {
-  const value = values.get(spec.name);
-  if (!value) return null;
-  if (isUnknown(value)) {
-    if (value.unknown?.kind !== 'SYSTEM') return null;
-    return {
-      id: spec.id,
-      label: spec.label,
-      value: UNKNOWN,
-      hint: unknownText(value.unknown, value.info.nullMeaning),
-    };
-  }
-  return {
-    id: spec.id,
-    label: spec.label,
-    value: shownValue(value.value) as string | number,
-    format: formatOf(spec, value),
   };
 }
 

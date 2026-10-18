@@ -6,7 +6,9 @@
 #
 # A PR is merged only when all of these hold:
 #   - open, not a draft, not from a fork, not labelled "no-automerge" or "needs-owner"
-#   - the latest CI run for its head commit concluded "success"
+#   - the latest CI run for its head commit concluded "success"; when the pull_request run is
+#     held ("action_required", a commit pushed by github-actions[bot]) or missing, the latest
+#     workflow_dispatch CI run for the same sha started by github-actions[bot] counts instead
 #   - every other check run on that commit completed as success, skipped or neutral
 #     (checks of superseded CI runs for the same commit are ignored: a re-run or a renamed
 #     job would otherwise leave their cancelled checks blocking the PR forever)
@@ -32,10 +34,28 @@ try_merge() {
   fi
   sha=$(jq -r .headRefOid <<<"$pr")
   runs=$(gh api "repos/$REPO/actions/runs?head_sha=$sha&event=pull_request&per_page=50" \
-          --jq '[.workflow_runs[] | select(.name == "CI")] | sort_by(.created_at)')
+          | jq -c '[.workflow_runs[] | select(.name == "CI" and .path == ".github/workflows/ci.yml")] | sort_by(.created_at)')
   ci=$(jq -r 'last | if . == null then "missing" else (.conclusion // .status) end' <<<"$runs")
+  if [ "$ci" = "action_required" ] || [ "$ci" = "missing" ]; then
+    # GitHub holds pull_request runs of a commit pushed by github-actions[bot] (the screenshots
+    # workflow) until a maintainer approves them; that workflow dispatches CI on the same commit
+    # instead. Trust only a CI run of this repository, for this exact sha, started by the bot.
+    dispatched=$(gh api "repos/$REPO/actions/runs?head_sha=$sha&event=workflow_dispatch&per_page=50" \
+            | jq -c --arg sha "$sha" --arg repo "$REPO" '
+                [.workflow_runs[] | select(.name == "CI" and .path == ".github/workflows/ci.yml" and .head_sha == $sha
+                   and .head_repository.full_name == $repo
+                   and .triggering_actor.login == "github-actions[bot]")]
+                | sort_by(.created_at)')
+    ci=$(jq -r 'last | if . == null then "missing" else (.conclusion // .status) end' <<<"$dispatched")
+    runs=$(jq -c --argjson d "$dispatched" '. + $d' <<<"$runs")  # held runs stay, as superseded
+    decided=$(jq -r 'last.id' <<<"$dispatched")
+  else
+    decided=$(jq -r 'last.id' <<<"$runs")
+  fi
   if [ "$ci" != "success" ]; then echo "#$number: CI on ${sha:0:7} is '$ci', waiting"; return; fi
-  superseded=$(jq -c '[.[:-1][].check_suite_id]' <<<"$runs")
+  # every run but the one decided on is superseded, the held pull_request runs included
+  last_id=$decided
+  superseded=$(jq -c --argjson id "$last_id" '[.[] | select(.id != $id) | .check_suite_id]' <<<"$runs")
   bad=$(gh api "repos/$REPO/commits/$sha/check-runs?per_page=100" \
         | jq -r --argjson superseded "$superseded" '
             [.check_runs[] | select(.check_suite.id as $s | $superseded | index($s) | not)

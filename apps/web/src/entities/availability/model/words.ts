@@ -47,7 +47,7 @@ export function reasonText(reason: NullReasonName): string {
   }
 }
 
-/** What a cell with no value shows: the reason's word, "n/a", "Illiquid", else "Unknown". */
+/** What a cell with no value shows: the reason's word, "n/a", "Illiquid", "Not covered", else "Unknown". */
 export function cellWord(
   kind: UnavailableKindName | null | undefined,
   code: UnknownCodeName | null | undefined,
@@ -56,6 +56,7 @@ export function cellWord(
   if (code === 'EXPLAINED' && reason) return reasonLabel(reason);
   if (kind === 'NOT_APPLICABLE') return 'n/a';
   if (kind === 'ILLIQUID') return 'Illiquid';
+  if (kind === 'NOT_COVERED') return 'Not covered';
   return 'Unknown';
 }
 

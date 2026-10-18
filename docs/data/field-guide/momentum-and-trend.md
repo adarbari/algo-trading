@@ -54,6 +54,7 @@ Sources: Jegadeesh (1990), Evidence of predictable behavior of security returns:
 |---|---|---|---|---|
 | a longer run of momentum | `gt 0` | hard | - | use instead of ret_20d when the sentence says a longer trend; rank descending |
 | a strong quarter | `gte 0.2` | soft | 0.05 | - |
+| a weak quarter, down over the past few months | `lt 0` | soft | 0.05 | pair with rollup.price_stats@v2.ret_20d gt 0 to find a name that has begun to recover |
 
 **When the reading lies**
 

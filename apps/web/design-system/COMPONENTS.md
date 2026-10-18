@@ -876,7 +876,7 @@ Source: `design-system/components/KeyHints`
 
 ### KeyValue
 
-KeyValue: a definition list for detail panels: a label column and a value column (`<dl>`), values tabular. Values are text or formatted with a ValueFormat (`$13.99B`, `+1.24%` with its up / down tone); an optional hint (a feature id, a unit, a rule) sits under the label. Loading shows placeholder values, an empty list shows the empty message.
+KeyValue: a definition list for detail panels: a label column and a value column (`<dl>`), values tabular. Values are text or formatted with a ValueFormat (`$13.99B`, `+1.24%` with its up / down tone); an optional action (a help button) beside the label; an optional hint (a feature id, a unit, a rule) sits under the label. Loading shows placeholder values, an empty list shows the empty message.
 
 Source: `design-system/components/KeyValue`
 
@@ -1399,7 +1399,7 @@ Source: `design-system/components/StackedBar`
 
 ### StatStrip
 
-StatStrip: a summary row of a few headline numbers (completeness, checks, run time, open issues), separated by thin borders inside one bordered strip, never as separate cards. Each stat has a label, a value (text or a formatted number, optionally toned) and a sub-line. The strip wraps to two columns, then one, in narrow containers. Loading shows placeholders.
+StatStrip: a summary row of a few headline numbers (completeness, checks, run time, open issues), separated by thin borders inside one bordered strip, never as separate cards. Each stat has a label, a value (text or a formatted number, optionally toned) and a sub-line. The strip wraps to two columns, then one, in narrow containers; a strip of more than `MANY` stats (the Financials key metrics: nine) steps to three columns below 1200 px, then two, so each value keeps room. Loading shows placeholders.
 
 Source: `design-system/components/StatStrip`
 
