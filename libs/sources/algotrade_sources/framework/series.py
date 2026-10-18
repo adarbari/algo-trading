@@ -110,39 +110,6 @@ INSIDER_COLUMNS = (
     *INSIDER_LINE_COLUMNS,
     "plan_10b5_1",
 )
-# Form 4 (EB D6): insider transactions of an issuer, ``Form 4`` and its amendment. One frame shape
-# for the quarterly bulk sets and a filing's XML: a row per transaction line and reporting owner.
-INSIDER_FORMS = ("4", "4/A")
-INSIDER_FRAME = "insider"
-INSIDER_LINE_COLUMNS = (  # what one transaction line says, in the order lines are numbered by
-    "derivative",
-    "transaction_date",
-    "transaction_code",
-    "acquired_disposed",
-    "shares",
-    "price",
-    "shares_after",
-    "direct_indirect",
-)
-INSIDER_COLUMNS = (
-    "accession",
-    "form",
-    "issuer_cik",
-    "issuer_symbol",
-    "filing_date",
-    "period_of_report",
-    "amends_date",
-    "owner_cik",
-    "is_director",
-    "is_officer",
-    "is_ten_pct_owner",
-    "is_other",
-    "officer_title",
-    "owner_count",
-    "line",
-    *INSIDER_LINE_COLUMNS,
-    "plan_10b5_1",
-)
 FILING_COLUMNS = (
     "cik",
     "form",

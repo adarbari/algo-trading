@@ -242,7 +242,7 @@ nohup sh -c 'for y in $(seq 2010 2026); do .venv/bin/algotrade-ingest run inside
 The nightly `insider` step then keeps it current from the daily index and each filing's XML (at most
 4,000 filings a night; the walk resumes the next night).
 
-The 10-K / 10-Q item text (`filing-text`, edge build D10, `events/filing_text`; Items 1, 1A, 3, 7, 7A,
+**Do NOT run this recipe until the filer-first follow-up** (the schema key will change: `instrument_id` is required and in the key today; it also waits for free disk). The 10-K / 10-Q item text (`filing-text`, edge build D10, `events/filing_text`; Items 1, 1A, 3, 7, 7A,
 9A of a 10-K and I-2, I-3, II-1, II-1A of a 10-Q) is one document request a filing (about 160k for the
 universe from 2010, at SEC's 5 a second plus parsing: 15-30 hours, 3-4 GB of Parquet; check `df` first).
 It runs in windows of filing dates, NEWEST FIRST so recent years are usable early, each window a loop
@@ -256,7 +256,7 @@ nohup sh -c 'for w in "2021-01-01" "2016-01-01 --to 2020-12-31" "2010-01-01 --to
   > var/logs/filing-text-history.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/filing-text-history.status' >/dev/null 2>&1 &
 ```
 
-The nightly step (`filing-text`, optional, WARN-only) reads the last 14 days for the CIKs due a report.
+The nightly step (`filing-text`, optional, WARN-only) reads each due CIK from its latest stored filing.
 
 The `outcomes` backfill (ADR 0053: forward outcomes for the edge harness) takes about 1.3 s per
 window-end session over the whole universe, so the 500 stored sessions take about 11 minutes; one
