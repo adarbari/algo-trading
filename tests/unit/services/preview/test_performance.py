@@ -5,9 +5,13 @@ measured with coverage paused, since line tracing slows pure Python 2-3x.
 
 The strict budgets are the ``perf`` test, run on an idle machine (``make perf``); they fail
 whenever the machine is loaded, so the default run (``make test``, CI) excludes ``perf``. The
-default run keeps two machine-independent guards instead: a 5x ceiling (a catastrophic
-regression) and warm at most half of cold by median (the cache and the memo work). Shared CI
-runners are slower and noisy on this path (warm p95 306 ms, then 490 ms, vs ~80 ms locally)."""
+default run keeps two machine-independent guards instead, both by median: each preview at
+most 5x its usual cost in units of a reference workload (a catastrophic regression), and warm
+at most half of cold (the cache and the memo work). CPU time alone is not machine-independent:
+a loaded machine or a shared CI runner inflates it 3-14x on this path (warm p95 306 ms, 490 ms,
+1.04 s, 1.13 s on CI vs ~80 ms on an idle Mac), so an absolute ceiling there was flaky. The
+reference is pure Python shaped like the warm path, timed just before every sample, so both
+see the same machine; the median drops the odd descheduled sample that sets a p95 of 20."""
 
 import sys
 import time
@@ -31,7 +35,12 @@ from tests.helpers.stored_frames import reference_rows, stamped, universe_rows
 pytestmark = pytest.mark.slow
 
 COLD, WARM = 1.0, 0.2  # p95 budgets in CPU seconds (the perf test)
-LOOSE = 5.0  # the default run's ceiling multiple (see above)
+# The usual median cost in reference units, the top of what was measured on 2026-10-18 at load
+# 34 to 82 on a 10-core Mac, alone and as 6 parallel copies (cold 20-35, warm 7.5-9.0, while
+# the warm CPU median moved 258-339 ms and its p95 500-660 ms), and the default run's ceiling
+# multiple of it (see above).
+COLD_REFS, WARM_REFS = 35.0, 9.0
+LOOSE = 5.0
 
 DAY = date(2026, 10, 2)
 N = 5_000
@@ -122,17 +131,41 @@ def untraced() -> Iterator[None]:
         sys.settrace(tracer)
 
 
-def timings(run: Callable[[], object], times: int) -> list[float]:
-    taken = []
+_REFERENCE_ROWS = [
+    {f"f{j}": float(v) for j, v in enumerate(row)}
+    for row in np.random.default_rng(1).uniform(0, 100, (20_000, 20))
+]
+
+
+def reference() -> object:
+    """A fixed pure-Python workload shaped like the warm path (filter dict rows, rank, copy
+    the top): the machine's speed right now, the unit the default run's ceiling is in."""
+    rows = _REFERENCE_ROWS
+    kept = [(r["f3"], i) for i, r in enumerate(rows) if r["f0"] > 20 and 5 <= r["f2"] <= 90]
+    kept.sort(reverse=True)
+    return [dict(rows[i]) for _, i in kept[:100]], sum(r["f4"] * r["f5"] for r in rows)
+
+
+def cpu(run: Callable[[], object]) -> float:
+    started = time.process_time()
+    run()
+    return time.process_time() - started
+
+
+def timings(run: Callable[[], object], times: int) -> tuple[list[float], list[float]]:
+    """``times`` CPU timings of ``run``, each with the reference timed just before it."""
+    taken, refs = [], []
     with untraced():
         for _ in range(times):
-            started = time.process_time()
-            run()
-            taken.append(time.process_time() - started)
-    return taken
+            refs.append(cpu(reference))
+            taken.append(cpu(run))
+    return taken, refs
 
 
-def measure(sized: tuple[StoreReader, MemoryConfigStore]) -> tuple[list[float], list[float]]:
+Samples = tuple[list[float], list[float]]  # (seconds, reference seconds), sample by sample
+
+
+def measure(sized: tuple[StoreReader, MemoryConfigStore]) -> tuple[Samples, Samples]:
     reader, configs = sized
     user = UserContext("alice")
     fields = {SPEC["criteria"][c]["field"] for c in SPEC["criteria"]}
@@ -162,18 +195,22 @@ def measure(sized: tuple[StoreReader, MemoryConfigStore]) -> tuple[list[float], 
 def test_cold_and_warm_previews_stay_within_a_loose_ceiling(
     sized: tuple[StoreReader, MemoryConfigStore],
 ) -> None:
-    colds, warms = measure(sized)
-    cold_p95, warm_p95 = float(np.percentile(colds, 95)), float(np.percentile(warms, 95))
-    assert cold_p95 <= COLD * LOOSE, f"cold p95 {cold_p95:.3f}s (ceiling {COLD * LOOSE}s)"
-    assert warm_p95 <= WARM * LOOSE, f"warm p95 {warm_p95:.3f}s (ceiling {WARM * LOOSE}s)"
-    assert np.median(warms) <= 0.5 * np.median(colds), (colds, warms)
+    (colds, cold_refs), (warms, warm_refs) = measure(sized)
+    cold = float(np.median(np.divide(colds, cold_refs)))
+    warm = float(np.median(np.divide(warms, warm_refs)))
+    seen = "cpu ms cold {} warm {}, reference ms {} {}".format(
+        *([round(x * 1000) for x in xs] for xs in (colds, warms, cold_refs, warm_refs))
+    )
+    assert cold <= COLD_REFS * LOOSE, f"cold {cold:.1f} refs (ceiling {COLD_REFS * LOOSE}) {seen}"
+    assert warm <= WARM_REFS * LOOSE, f"warm {warm:.1f} refs (ceiling {WARM_REFS * LOOSE}) {seen}"
+    assert np.median(warms) <= 0.5 * np.median(colds), seen
 
 
 @pytest.mark.perf
 def test_cold_and_warm_previews_meet_the_budget(
     sized: tuple[StoreReader, MemoryConfigStore],
 ) -> None:
-    colds, warms = measure(sized)
+    (colds, _), (warms, _) = measure(sized)
     cold_p95, warm_p95 = float(np.percentile(colds, 95)), float(np.percentile(warms, 95))
     assert cold_p95 <= COLD, f"cold p95 {cold_p95:.3f}s (budget {COLD}s)"
     assert warm_p95 <= WARM, f"warm p95 {warm_p95:.3f}s (budget {WARM}s)"
