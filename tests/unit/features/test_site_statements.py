@@ -1,6 +1,7 @@
 """The site's statement expression features (``config/site/features/company/statements.toml``):
 EBITDA, the margins, interest cover, ROE / ROA / ROIC, net debt, debt to equity, P/B, free cash
-flow and its yield, enterprise value and EV / EBITDA, and the three and five year growth rates:
+flow and its yield, enterprise value, EV / EBITDA and EV / EBIT, the cash-based operating
+profitability, the composite value yield and the three and five year growth rates:
 each formula's value on hand-built group rows, each null guard (a negative equity or invested
 capital, no revenue, a status that is not usable, an untagged line), the bank rule (the EBIT
 family null, ROE / ROA / P/B kept) and that nothing divides into an infinity."""
@@ -26,7 +27,7 @@ TABLES = {
         "gross_profit_ttm", "ebit_ttm", "da_ttm", "interest_expense_ttm", "is_status",
         "is_ttm_as_of",
     ),
-    "rollups/instrument/cash_flow@v2": ("ocf_ttm", "capex_ttm", "cf_status"),
+    "rollups/instrument/cash_flow@v2": ("ocf_ttm", "capex_ttm", "cf_status", "cf_as_of"),
     "rollups/instrument/balance_sheet@v2": (
         "cash", "total_debt", "total_assets", "stockholders_equity", "bs_status",
     ),
@@ -40,6 +41,7 @@ BASE = {  # a healthy industrial: market cap 10 x 100 = 1000
     "revenue_ttm": 1000.0, "net_income_ttm": 100.0, "eps_diluted_ttm": 10.0,
     "financials_status": "OK", "eps_stale": False, "is_adr": False,
     "ttm_as_of": pd.Timestamp("2025-03-31"), "is_ttm_as_of": pd.Timestamp("2025-03-31"),
+    "cf_as_of": pd.Timestamp("2025-03-31"),
     "gross_profit_ttm": 400.0, "ebit_ttm": 150.0, "da_ttm": 50.0, "interest_expense_ttm": 30.0,
     "is_status": "OK", "ocf_ttm": 200.0, "capex_ttm": 80.0, "cf_status": "OK",
     "cash": 100.0, "total_debt": 300.0, "total_assets": 1000.0, "stockholders_equity": 500.0,
@@ -50,6 +52,7 @@ NAMES = [
     "ebitda", "gross_margin", "operating_margin", "interest_cover", "roe", "roa", "roic",
     "net_debt", "debt_to_equity", "pb_ratio", "fcf", "fcf_yield", "enterprise_value",
     "ev_ebitda", "revenue_cagr_3y", "revenue_cagr_5y", "eps_cagr_3y", "eps_cagr_5y",
+    "cash_op_profitability", "ev_ebit", "composite_value_yield",
 ]  # fmt: skip
 STALE_ALL = {"is_status": "STALE", "bs_status": "STALE", "cf_status": "STALE"}
 
@@ -72,7 +75,7 @@ def evaluate(fs: FeatureSet, rows: dict[str, dict]) -> pd.DataFrame:
     }
     for frame in frames.values():  # numbers as floats (None is NaN), the rest as given
         for c in frame.columns[2:]:
-            if c in ("ttm_as_of", "is_ttm_as_of"):
+            if c in ("ttm_as_of", "is_ttm_as_of", "cf_as_of"):
                 frame[c] = pd.to_datetime(frame[c])
             elif c not in ("market_cap_status", "financials_status", "is_status", "cf_status",
                          "bs_status", "gh_status", "eps_stale", "is_adr"):  # fmt: skip
@@ -262,3 +265,44 @@ def test_formulas_over_several_lines_need_complete_statuses(fs: FeatureSet) -> N
 def test_a_negative_enterprise_value_gives_no_multiple(fs: FeatureSet) -> None:
     out = evaluate(fs, {"EQ:CASH": {"cash": 5000.0, "total_debt": 0.0}}).loc["EQ:CASH"]
     assert out["enterprise_value"] == -4000.0 and pd.isna(out["ev_ebitda"])
+
+
+def test_cash_op_profitability_is_ebit_less_the_accruals_over_assets(fs: FeatureSet) -> None:
+    rows = {
+        "EQ:A": {},  # (150 - (100 - 200)) / 1000
+        "EQ:ACCRUAL": {"ocf_ttm": 40.0},  # earnings far above cash: (150 - (100 - 40)) / 1000
+    }
+    out = evaluate(fs, rows)["cash_op_profitability"]
+    assert out["EQ:A"] == pytest.approx(0.25) and out["EQ:ACCRUAL"] == pytest.approx(0.09)
+
+
+def test_cash_op_profitability_is_null_for_a_bank_a_stale_group_or_a_skewed_quarter(
+    fs: FeatureSet,
+) -> None:
+    other = pd.Timestamp("2024-12-31")
+    rows = {
+        "EQ:BANK": {"is_status": "FINANCIAL", "ebit_ttm": None},
+        "EQ:STALEBS": {"bs_status": "STALE"},
+        "EQ:STALECF": {"cf_status": "STALE"},
+        "EQ:CFSKEW": {"cf_as_of": other},
+        "EQ:ISSKEW": {"is_ttm_as_of": other},
+        "EQ:NOASSETS": {"total_assets": 0.0},
+        "EQ:NOOCF": {"ocf_ttm": None},
+    }
+    assert evaluate(fs, rows)["cash_op_profitability"].isna().all()
+    assert evaluate(fs, {"EQ:P": {"is_status": "PARTIAL"}})["cash_op_profitability"].notna().all()
+
+
+def test_ev_ebit_and_the_composite_value_yield(fs: FeatureSet) -> None:
+    rows = {
+        "EQ:A": {},
+        "EQ:LOSS": {"ebit_ttm": -10.0},  # no multiple, so no composite
+        "EQ:NOCAPEX": {"capex_ttm": None},  # no fcf yield, so no composite
+        "EQ:BANK": {"is_status": "FINANCIAL", "ebit_ttm": None},
+    }
+    out = evaluate(fs, rows)
+    assert out.loc["EQ:A", "ev_ebit"] == pytest.approx(8.0)  # 1200 / 150
+    assert out.loc["EQ:A", "composite_value_yield"] == pytest.approx((1 / 8 + 0.12) / 2)
+    assert out.loc[["EQ:LOSS", "EQ:BANK"], ["ev_ebit", "composite_value_yield"]].isna().all().all()
+    assert out.loc["EQ:NOCAPEX", "ev_ebit"] == pytest.approx(8.0)
+    assert pd.isna(out.loc["EQ:NOCAPEX", "composite_value_yield"])

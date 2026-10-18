@@ -1,0 +1,61 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Catalogue: docs/edge-ideas/ (edge build E2).
+id = "asset_growth"
+name = "Asset growth (an avoid list)"
+family = "A"
+thesis = "Companies whose total assets grew fastest over the last year underperform the market over the following months, and slow growers outperform."
+mechanism = """Managers over-invest and build empires, and investors extrapolate growth; on the rational side, low discount rates cause high investment (Cooper, Gulen and Schill 2008). The effect also captures financing: the asset growers are often issuers (Cooper, Gulen and Ion)."""
+persistence = """Known as the investment factor (the CMA factor of Fama and French 2015) yet still priced in large caps through the 2010s, because it is mostly a short-leg, glamour-avoidance effect: the fast growers are costly to short, and an avoid list asks nobody to."""
+schedule = "month_end"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["asset_growth"]
+baselines = ["size_small", "momentum_12_1"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). The main outcome is the avoid list: the bottom 50 of the ranking (the fastest asset growers) held short, minus the excess return, with the site's borrow cost (ADR 0053 amendment, outcome sides; a short result on liquid names may be a verdict basis, owner decision O2). The long side (slowest growers) and the spread are variants; the spread is diagnostic only. asset_growth is total assets over the assets a year back (within 40 days of a year) less one, from facts accepted by the session; an acquisition and an offering both lift it and nothing separates them."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+side = "short"
+
+[quality_bar]
+outcome = """Minus the excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision) of the 50 fastest asset growers among the liquid common stocks, less 10 bps a round trip and the assumed borrow cost: the value of avoiding them."""
+
+trigger_timing = """Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S."""
+
+replication = """Cooper, Gulen and Schill: asset growth = total assets(t-1) / total assets(t-2) - 1; deciles sorted in June, held 12 months, equal- and value-weighted. Here the stored year-over-year growth to the latest balance sheet at each month end, the fastest 50 as the avoid list, held 20 and 60 sessions: a monthly, not annual, sort."""
+
+expected_size = """The decile spread was about 1.7% a month equal-weighted and 1.0% value-weighted, 1968-2003 (approximate, not verified against the paper); the investment factor has been weak since 2017 (about 0.2% a month 2008-2024, approximate). On liquid names the short leg is a fraction of that. A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it."""
+
+capacity_costs = """An avoid list, not a short book: the cost of the main outcome is the borrow assumption (verdict.toml) plus 10 bps a round trip; fast growers are often hard to borrow, which is exactly why the premium persists, so the result is the value of not owning them, not a tradable short."""
+
+failure_modes = """Growth rallies (2020-2021 asset-heavy growth) punish the avoid list; acquisitive growers and fresh offerings are read as the same thing. Retire if the frozen-period short-side result is not above zero."""
+
+decoys = """Net share issuance and the value tilt (issuers are the fast growers; the net_share_issuance edge), size, and acquisitions (test excluding the largest jumps)."""
+
+[[sources]]
+title = "Cooper, M., Gulen, H. and Schill, M., Asset Growth and the Cross-Section of Stock Returns, Journal of Finance, 2008"
+url = "https://quantpedia.com/strategies/asset-growth-effect"
+
+[[sources]]
+title = "Cooper, M., Gulen, H. and Ion, M., The Use of Asset Growth in Empirical Asset Pricing Models, working paper, 2019"
+url = "https://finance.unibocconi.eu/sites/default/files/files/media/attachments/Cooper_Gulen_Ion_Manuscript20190507084119.pdf"
+
+[[sources]]
+title = "Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies, 2020"
+url = "https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html"
+
+[[variants]]
+id = "slow_growers_long"
+[variants.outcome]
+side = "long"
+
+[[variants]]
+id = "spread"
+[variants.outcome]
+side = "long_short"

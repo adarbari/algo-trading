@@ -5,11 +5,44 @@ Back to the [index of every edge](../edges.md).
 
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
+| BDC price to NAV reversion (`bdc_price_to_nav_reversion`) | candidate | month end | excess return, over 60 sessions, vs SPY, entered 1 session after the decision session, costs 30 bps | `bdc_price_to_nav` |
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | every session | excess return, over 6, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `retail_option_attention` |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | on each `tender_offer` | excess return, over 60, 250 sessions, vs SPY, starting +21 sessions from the event, costs 20 bps | `tender_offer_filed` |
 | Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
 | Reverse-split distress filter (`reverse_split_distress_filter`) | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 | Thematic ETF launch fade (`thematic_etf_launch_fade`) | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
+
+## BDC price to NAV reversion (`bdc_price_to_nav_reversion`)
+
+**Status:** candidate. **Family:** H. **Thesis:** Business development companies trading at a deep discount to their last reported net asset value outperform those at premiums over the next quarter.
+
+- **Outcome:** excess return, over 60 sessions, vs SPY, entered 1 session after the decision session, costs 30 bps
+- **Schedule:** month end
+- **Universe:** preset `bdc_listed`
+- **Top K:** 10
+- **Screeners:** `bdc_price_to_nav`
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** Month-end start sessions spaced at least 60 sessions apart (one quarter, the NAV cadence). The NAV is not a new source: the net asset value per share of a BDC is its stockholders' equity over its shares, so price to NAV is pb_ratio of the stored statements (a BDC's equity is its net assets), public from its 10-Q or 10-K acceptance (statements_accepted, H2). D5's events/fund_nav (Tiingo NAV series) does not carry BDCs, whose NAV is quarterly. The universe is a hand list of listed BDCs keyed by instrument id (resolved from the tickers through the SymbolResolver; the reference has no BDC type and the SEC company table no SIC for them), kept equal in the selection preset and the screener by a fitness test. History before the frozen period is survivor-only: BDCs merged away or delisted before the list was made are missing, and renamed ones (ORCC to OBDC 2023, AINV to MFIC 2022) are resolved by id. The book value is the balance sheet and the share count the newest cover page, which can be a quarter newer, so price to NAV mixes two dates; the screener also requires the balance sheet to be at most 135 days old (rollup.qmj@v1.balance_sheet_age_days), because pb_ratio refuses only a 480-day-old one. About 38 names: 10 picks is a quarter of the list, so the decile spread is over a handful of names a session and the harness's t is weak; the catalogue's rule (discount against the name's own three-year average and peers) needs a NAV history that is not stored, so v1 ranks the plain price to NAV, and says so. The discount must be read with the NAV trend (a falling NAV earns its discount): not conditioned in v1.
+
+**Quality bar**
+
+1. **Mechanism:** BDC holders are retail and buy on yield and sell on dividend cuts; there is no institutional arbitrage because BDCs are excluded from most indexes (the acquired-fund-fee rule drove them out of the S&P and Russell indexes in 2014) and are hard to borrow, and the net asset value is published only quarterly, so the price drifts away from it.
+2. **Persistence:** Index exclusion and the 2014 rule are structural, the quarterly NAV cadence is regulatory and the sector is small (about 50 listed BDCs, about 70 billion dollars), too small for large funds: the closed-end fund literature finds discounts predict returns (Pontiff 1995), and the one cited BDC datum is that the discount move dominated a year of price and NAV returns.
+3. **Outcome:** Excess return over SPY over the 60 sessions (one quarter) after the entry close (the session after a month-end decision), net of 30 bps a round trip (an assumption for small, wide-spread names).
+4. **Trigger timing:** Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S. The NAV used is the last quarterly report accepted by D, up to four months old; the price is D's close.
+5. **Faithful replication:** No canonical academic rule. The practitioner metric is Closed-End Fund Advisors' three-year relative discount (the current discount against the name's own trailing three-year average); this catalogue's formalisation ranks by price to NAV relative to the name and to peers and holds the bottom quintile, rebalanced quarterly after the 10-Q. v1 is the simpler plain price to NAV on the hand list, top 10 lowest, with the omitted history named in the notes: a partial replication of a rule that is itself a formalisation.
+6. **Expected size and sample:** Closed-end funds with a 20% discount earned about 6% a year more over the next 12 months (Pontiff 1995); a systematic CEF discount strategy earned 18.2% a year gross long-short, Sharpe 1.9, 582% turnover, 1984-2011 (Patro, Piccotti and Wu 2017, via CXO Advisory). No BDC-specific published figure exists, so there is no published bar. About 38 names and a handful of picks: the harness's t will be wide, and it reports the sessions beside it.
+7. **Capacity and costs:** Long-only, 20 thousand to 200 thousand dollars a name; BDC dividends are large (ordinary income and qualified-dividend mix); shorting premium BDCs is impractical (borrow, dividend owed). The 30 bps round trip is the assumption.
+8. **Failure modes and retirement:** Discounts cluster in credit-quality losers: a deep discount on a falling NAV is earned, not an opportunity (rising non-accruals, a dividend cut), and the NAV can be marked up or down only quarterly. Floating-rate assets give interest-rate beta and a small-cap and value exposure. Retire if the frozen-period decile spread is not above zero or the picks do not beat the buy-and-hold mean of the listed BDCs.
+9. **Decoys:** The sector's interest-rate and credit beta (the buy-and-hold mean of the listed BDCs is the base), small-cap and value exposure (the size baseline is not run on the hand list), and credit-quality losers (compare the picks' NAV change).
+
+**Sources**
+
+- Pontiff, J., Closed-end fund premia and returns: Implications for financial market equilibrium, Journal of Financial Economics, 1995
+- Patro, D., Piccotti, L. and Wu, Y., Exploiting closed-end fund discounts: a systematic examination of alphas, Journal of Financial Research, 2017 <https://ideas.repec.org/a/bla/jfnres/v40y2017i2p223-248.html>
+- CXO Advisory, Enhanced Exploitation of Closed-End Fund Discounts (summary of Patro, Piccotti and Wu) <https://www.cxoadvisory.com/mutual-hedge-funds/enhanced-exploitation-of-closed-end-fund-discounts/>
+- CEFdata, BDC portfolio summary and the 3-year relative discount metric <https://legacy.cefdata.com/portfolios/194/summary/>
 
 ## Retail lottery-option attention (`retail_options_lottery_attention`)
 

@@ -4,6 +4,8 @@ dividends groups (``config/site/features/company/fundamentals.toml``): ``ps_rati
 ``eps_growth_qtr_yoy``) and ``shares_change_yoy``: values, and null on a zero or negative base,
 an unknown input, a stale figure or an ADR. Split from ``test_site.py`` (at its line cap)."""
 
+import math
+
 import pandas as pd
 import pytest
 
@@ -115,3 +117,22 @@ def test_shares_change_yoy_is_negative_for_buybacks(fs: FeatureSet) -> None:
     out = _fundamental_expressions(fs, ids, ["shares_change_yoy"], fund=fund)["shares_change_yoy"]
     assert out["EQ:BUYBACK"] == pytest.approx(-0.05) and out["EQ:DILUTE"] == pytest.approx(0.12)
     assert out[["EQ:NEW", "EQ:OLD"]].isna().all()  # no count a year back, a stale count
+
+
+def test_net_issuance_is_the_log_share_change_and_buyback_flags_a_shrinking_count(
+    fs: FeatureSet,
+) -> None:
+    ids = ["EQ:BUYBACK", "EQ:DILUTE", "EQ:FLAT", "EQ:ROUND", "EQ:NEW", "EQ:OLD"]
+    fund = {
+        "shares_outstanding": [95.0, 112.0, 100.0, 99.5, 100.0, 100.0],
+        "shares_outstanding_year_ago": [100.0, 100.0, 100.0, 100.0, None, 90.0],
+        "market_cap_status": ["OK", "OK", "OK", "OK", "OK", "STALE"],
+    }
+    out = _fundamental_expressions(fs, ids, ["net_issuance_pct_12m", "buyback_flag"], fund=fund)
+    assert out["net_issuance_pct_12m"]["EQ:BUYBACK"] == pytest.approx(math.log(0.95))
+    assert out["net_issuance_pct_12m"]["EQ:DILUTE"] == pytest.approx(math.log(1.12))
+    assert out["net_issuance_pct_12m"]["EQ:FLAT"] == 0.0
+    assert out["buyback_flag"]["EQ:BUYBACK"] and not out["buyback_flag"]["EQ:DILUTE"]
+    assert not out["buyback_flag"]["EQ:FLAT"] and not out["buyback_flag"]["EQ:ROUND"]  # under 1%
+    for column in ("net_issuance_pct_12m", "buyback_flag"):  # no count a year back, a stale count
+        assert out[column][["EQ:NEW", "EQ:OLD"]].isna().all()
