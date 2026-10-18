@@ -39,7 +39,7 @@ owner = [
     "src/algotrade/storage/tables/feedback_writer.py",
 ]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/results.py",  # declares the table
     "src/algotrade/data/feedback/*",  # the read of the recorded events
     "src/algotrade/services/read/ops/feedback.py",  # the viewer-scoped loader
     "src/algotrade/services/read/ops/feature_requests.py",  # the viewer-scoped request loaders
@@ -169,7 +169,7 @@ owner = [
     "src/algotrade/storage/tables/live_writer.py",
 ]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/market.py",  # declares the table
     "src/algotrade/data/chains.py",  # the read of the recorded quotes (live_option_quotes)
 ]
 section = "docs/adr/0028-ibkr-enrichment-source.md#live-option-quotes-in-the-api"
@@ -184,7 +184,7 @@ owner = [
     "src/algotrade/storage/tables/usage_writer.py",
 ]
 allowed = [
-    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/storage/tables/schemas/results.py",  # declares the table
     "src/algotrade/data/usage/*",  # the read of the recorded usage (spent_by_day, read_llm_calls)
     "src/algotrade/config/site/llm.py",  # the [[price]] and [budget] settings and each provider's rate
     "apps/api/algotrade_api/text_model.py",  # wires the ledger into the chain

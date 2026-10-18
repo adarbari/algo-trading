@@ -151,6 +151,10 @@ path = "src/algotrade/data/funds"
 purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035), the latest rows per fund and the CUSIP to ticker bridge; and a fund's shares outstanding from its issuer's file (holdings/etf_shares, EB D4)"
 
 [[dir]]
+path = "src/algotrade/data/futures"
+purpose = "reads of rates/futures_curve (the nightly IBKR futures curve snapshots, personal licence): a range of stored sessions and one root's curve with its roll yield; data/ is at its module cap, so the reads of this table are a folder"
+
+[[dir]]
 path = "src/algotrade/data/listings"
 purpose = "reads of instruments/listing_history and instruments/index_membership (ADR 0018 amendment): the universe as it was on a session (universe_asof), from the latest listing and S&P 500 membership snapshots, which it names"
 
@@ -537,10 +541,17 @@ contracts = [
 
 [[dir]]
 path = "src/algotrade/storage/tables"
-purpose = "market and result tables: the schema vocabulary (spec.py), the schemas (schemas.py; the edge harness result tables in edge_schemas.py), store protocols, reader / writer facades"
+purpose = "market and result tables: the schema vocabulary (spec.py), the schemas (the schemas/ package; the edge harness result tables in edge_schemas.py), store protocols, reader / writer facades"
 contracts = [
     "Only the ingestion app writes market and feature data (ADR 0005)",
     "R1: only algotrade.data reads market data (consumers never import storage readers)",
+    "Layout: market tables never import config documents",
+]
+
+[[dir]]
+path = "src/algotrade/storage/tables/schemas"
+purpose = "table schemas by family (market, reference, events, results, outcomes), the registry that resolves a table name to its spec, and frame validation; the package re-exports every public name"
+contracts = [
     "Layout: market tables never import config documents",
 ]
 
