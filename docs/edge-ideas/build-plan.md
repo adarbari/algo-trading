@@ -327,6 +327,7 @@ Conventions used in `make changed`-style effort: S = a reader on an existing ada
 - Nasdaq: no free SO/flow endpoint found (the one on api.nasdaq.com is undocumented); commercial only (ETF Global, Intrinio, EODHD).
 - ToS: issuer sites: already accepted for holdings (`ishares`, `ssga`, `proshares` adapters). **OK.**
 - Quality: issuer SO is rounded to creation units; file gaps on issuer outages (carry forward with `carried_from`); a few funds report "as of" T-1.
+- **Built (EB D4, 2026-10-17)**: iShares only. SSGA workbooks and the ProShares file carry no shares outstanding and no file carries NAV or AUM (verified on the recorded fixtures): **blocked**, no paid or scraped workaround. Stored as `holdings/etf_shares` (shares only; flow = delta(SO) x the stored close, an approximation); `[etf_holdings] daily_funds` read nightly, other iShares funds weekly; history accrues from the first night. Fixtures show funds of one recording with different as-of dates (IVV / EFA / IWM Oct 1, AGG / IJH Oct 2), so the as-of date is the file's, and `known_from` is the session of the fetch's New York date.
 - Existing coverage: `ishares/etf_holdings.py`, `ssga/workbook.py`, `proshares/etf_holdings.py`: extend the parsers to emit the header fields (S).
 
 ### 7. Historical analyst estimates / revisions, point in time

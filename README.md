@@ -219,6 +219,16 @@ The nightly step continues the backfill on its own, `[ibkr] iv_backfill_per_nigh
 names a night (~17 min), so new names fill in without a command; the email's `ibkr-iv` line
 shows coverage, names still pending and the estimated hours left.
 
+The SEC `filings` history (8-K items back to 2004-08-23, plus NT 10-K / NT 10-Q, SC TO-I, Form 25,
+424B4 and Form 10; one request per CIK plus its older pages, about 1 h at SEC's pace) runs in chunks
+of CIKs, each chunk a published run, so a killed loop restarts where it stopped (a CIK an earlier
+run read from the same date is skipped; surplus chunks read no CIK):
+
+```bash
+nohup sh -c 'for i in 1 2 3 4 5 6 7 8; do .venv/bin/algotrade-ingest run filings --since 2004-08-23 --limit 1200; done \
+  > var/logs/filings-history.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/filings-history.status' >/dev/null 2>&1 &
+```
+
 The `outcomes` backfill (ADR 0053: forward outcomes for the edge harness) takes about 1.3 s per
 window-end session over the whole universe, so the 500 stored sessions take about 11 minutes; one
 run per window end, so an interrupted backfill is resumed by starting it again from the last

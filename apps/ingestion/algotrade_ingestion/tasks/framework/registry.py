@@ -232,7 +232,7 @@ TASKS: dict[str, Task] = {
             "etf-holdings",
             "what each ETF holds, from the issuers' daily files and SEC N-PORT (incremental)",
             etf_holdings,
-            ("holdings/etf",),
+            ("holdings/etf", "holdings/etf_shares"),
             entries_reference.run_etf_holdings,
             optional_sources=source_guards.HOLDINGS_ISSUERS,
             settings="sources.toml [etf_holdings]",
@@ -350,7 +350,8 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "filings",
-            "SEC 8-K filings of every operating company in the universe (events/filing) and "
+            "SEC event filings (8-K with items, NT 10-K/10-Q, SC TO-I, Form 25, 424B4, Form 10) of "
+            "every operating company in the universe (events/filing) and "
             "their Item 2.02 results releases as earnings rows (sec_8k); --since backfills per "
             "CIK (resumable, --limit), the default reads the days since the latest stored "
             "filing from EDGAR's daily form index",

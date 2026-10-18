@@ -158,6 +158,11 @@ export {
   type OutcomeDotsProps,
   type OutcomeTone,
 } from './OutcomeDots';
+export {
+  ConditionGroup,
+  type ConditionGroupKind,
+  type ConditionGroupProps,
+} from './ConditionGroup';
 export { Panel, type PanelProps, type PanelState } from './Panel';
 export { PendingRow, type PendingRowProps } from './PendingRow';
 export {
