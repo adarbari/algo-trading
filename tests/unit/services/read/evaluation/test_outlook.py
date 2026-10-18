@@ -170,8 +170,13 @@ def test_a_win_rate_outcomes_haircut_says_its_sharpe_is_of_the_win_rate_above_th
 def test_an_edge_counts_wins_when_its_outcome_is_not_a_return(
     applies: bool | None, wins: bool
 ) -> None:
-    settings = None if applies is None else SimpleNamespace(cost_applies=applies)
+    settings = None if applies is None else SimpleNamespace(cost_applies=applies, kind="hit_target")
     assert counts_wins(SimpleNamespace(settings=settings)) is wins  # type: ignore[arg-type]
+
+
+def test_a_model_pnl_edge_never_counts_wins_though_no_round_trip_cost_grid_applies() -> None:
+    settings = SimpleNamespace(cost_applies=False, kind="option_model_pnl")
+    assert counts_wins(SimpleNamespace(settings=settings)) is False  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("over", [{"sharpe": None}, {"trials": None}, {"sharpe": -0.1}])
