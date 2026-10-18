@@ -1,0 +1,32 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E3) until its event class exists.
+id = "reverse_split_distress_filter"
+name = "Reverse-split distress filter"
+thesis = "Stocks that reverse-split to cure a sub-$1 bid price underperform for one to three years, so they belong on an exclusion list."
+mechanism = """Compliance-driven splits signal distress, continued dilution (at-the-market offerings resume once the price is above $1) and index and retail abandonment; Nasdaq rule changes in 2024 and 2025 tightened cures for repeat offenders."""
+persistence = """Firms must split or delist and the dilution machine is the business model of many micro-cap issuers; shorting is costly, so prices stay too high (Kim, Klein and Rosenfeld 2008, exact figure not verified)."""
+family = "H"
+schedule = "month_end"
+top_k = "all"
+screeners = []
+status = "blocked"
+rejection_reason = """The data is stored (events/split holds the reverse splits with their ratios, ex-dates in ts, from Massive and Tiingo) but the harness has no event class to trigger on a split: the schedule above is a placeholder, and the class reverse_split is missing from EVENT_CLASSES (src/algotrade/config/edges/document.py) and EVENT_FIELDS (services/evaluation/cross_section/events.py). A screen on the universe cannot stand in: the avoid-list claim needs the short leg drawn from the flagged names (a short leg ranks the whole eligible set by score and fills with unflagged names when few are flagged), and the long side's negative lift would read as Not working for a claim that is confirmed. Unblock: a reverse_splits feature group (sessions_since_reverse_split, last_reverse_split_ratio, from events/split by ex-date) and the class; the group is not added here because no edge reads it yet."""
+notes = """Mostly microcaps: a liquid-name test (20-day dollar volume of $5M) will find few events, so the verdict will rest on a small count; the exclusion list is free for a long screen even where the short is not available (borrow often 20% to 100% a year). Idea page: docs/edge-ideas/structural-niches.md (reverse_split_distress_filter)."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [250, 500]
+benchmark = "SPY"
+start_offset_sessions = 1
+
+[[sources]]
+title = "Kim, S., Klein, A. and Rosenfeld, J., Return performance surrounding reverse stock splits: can investors profit?, Financial Management, 2008"
+
+[[sources]]
+title = "Han, K., The effects of reverse splits on the liquidity of the stock, Journal of Financial and Quantitative Analysis, 1995"

@@ -651,6 +651,14 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: a rising instrument would otherwise pass Works on drift alone; the paired difference removes the instrument's drift without a model.
 
+## 2026-10-18 | EB E3 (event edges and avoid lists) | Short-side edges, a delayed tender entry, and what is filed blocked
+- Question: how are the avoid-list edges tested, how is a tender offer's "after expiry" entry expressed, and what happens to ideas whose event class or data is missing?
+- Options: avoid lists as a long edge read for a negative lift / as `side = "short"` (O2); tender entry at the filing / 21 sessions after it / wait for an expiry field; missing classes skipped / filed `blocked` with the reason / classes added in this PR.
+- Decision: 8-K Item 4.02 and NT late filers are `side = "short"` edges over event names, ranked by dollar volume (the harness's short leg takes the lowest scores, so the screeners order ascending and the most liquid filer is shorted first); the tender edge enters 21 sessions after the filing (a tender offer stays open at least 20 business days; the expiry date is not stored, extensions enter early, and SC TO-T joins SC TO-I in one column); spinoff_drift, reverse_split_distress_filter and thematic_etf_launch_fade are filed `blocked` with what is missing (the classes spinoff, reverse_split and etf_launch in `EVENT_CLASSES` and `EVENT_FIELDS`, which this PR does not touch); `eight_k_item_flag` flags 4.02, 4.01 and 5.02 within 20 sessions for the avoid screen while the edge tests 4.02 only; `earnings_gap_volume@v1` adds the last report's volume ratio (the four-report mean in `earnings_reaction@v1` is a habit of the name, not the event).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a long edge reads an avoid list's confirmation as a negative lift (Not working), the short side states the same claim so that it passes; a dense-score short leg over a universe fills up with unflagged names when few are flagged, so a non-event schedule cannot test a small flagged set; entering at the filing would trade the offer's own period, not the post-expiry dip the thesis is about; a blocked document keeps the thesis, the bar and the missing pieces on file without a placeholder passing as a test.
+
 ## 2026-10-18 | EB E2 (PR 667 review) | How the BDC universe is defined
 - Question: how is the universe of the BDC price-to-NAV edge defined, when the reference has no BDC type and the SEC company table no SIC for them?
 - Options: a ticker list with a maintenance rule / key the list by instrument_id / drop the edge.

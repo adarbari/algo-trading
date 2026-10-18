@@ -278,6 +278,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the next earnings date's shift from the year-ago report plus 364 days and the session it was first stored; reads events/earnings as earnings@v1"
 
 [[table]]
+name = "rollups/instrument/earnings_gap_volume@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the last earnings report's window volume over the 20 sessions before it (E3); reads events/earnings and bars/1d through earnings_reaction's window rule"
+
+[[table]]
 name = "rollups/instrument/fundamentals@v4"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
