@@ -373,3 +373,34 @@ benchmark never holds cash, so a book in cash is judged on what it missed or avo
 """
 next = "Look at how often the book was in cash and what the benchmark did in those sessions."
 see_also = ["outcome_portfolio_return", "blended_benchmark"]
+
+[[term]]
+id = "edge_ensemble"
+term = "Ensemble"
+short = "A grid of screeners fixed in advance whose books are averaged each session into one result, tried once."
+body = """
+A trend rule has a lookback to choose: 3, 6, 9 or 12 months. Picking the best lookback after seeing the
+results would overfit. An ensemble lists the whole grid in the edge's document before the run. Each
+session the members' books are averaged name by name, and the average is valued as one book. The
+ensemble counts as one trial, however many members it has, because no member was chosen over another;
+the grid size is shown beside it. If one member cannot be read or weighted for a session, the session
+is left out, never averaged over the others. Example: four lookbacks each hold 25% in name A in one
+session, so the ensemble holds 25% in A. Don't read a member as a result of its own: it is shown, never
+the basis of a verdict.
+"""
+next = "Judge the ensemble's line; read each member only to see how much they differ."
+see_also = ["ensemble_member", "outcome_portfolio_return", "weighting_equal"]
+
+[[term]]
+id = "ensemble_member"
+term = "Ensemble member"
+short = "One screener of an ensemble's grid: its own book is reported, but it is neither a trial nor a basis."
+body = """
+Members are measured like any screener of a book, so the page can show how far the grid's choices
+disagree. They are not counted among the trials of the deflated Sharpe ratio, and a verdict never
+rests on one, since the ensemble was fixed to avoid choosing among them. A member that beats the
+ensemble is not a better edge. It is the best of the grid in hindsight, which is the choice an
+ensemble is there to avoid.
+"""
+next = "Compare a member with the ensemble only to see the spread, never to pick one."
+see_also = ["edge_ensemble", "outcome_portfolio_return", "deflated_sharpe", "sharpe_ratio"]

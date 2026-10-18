@@ -21,6 +21,12 @@ import re
 from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
 
+STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
+# An option_model_pnl outcome's position: one at-the-money straddle held to the horizon's close,
+# long or short, or delta-hedged, long or short (ADR 0053 amendment 2026-10-17).
+MODEL_STRUCTURES = (
+    "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
+)  # fmt: skip
 CHAIN_KIND = "option_pnl"
 CHAIN_BASIS = "chain"  # what a P&L of quoted prices is labelled (results and UI)
 CHAIN_STRUCTURES = (
@@ -131,3 +137,36 @@ def check_tenor(o: Table, horizons: tuple[int, ...], iv_field: str | None) -> No
             f"{o.where} horizon_sessions: {bad} are outside {low}..{high} sessions, what the "
             f"{tenor}-session tenor of {iv_field!r} prices; use a field of the horizon's tenor"
         )
+
+
+def option_fields(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:
+    """``(structure, strike_delta, otm_pct, iv_field)``: a structure only for the option kinds."""
+    delta, pct = o.number("strike_delta", None), o.number("otm_pct", None)
+    iv_field = " ".join(o.text("iv_field", "").split()) or None
+    structures = structures_of(kind, STRUCTURES, MODEL_STRUCTURES)
+    structure = o.choice("structure", "", structures) if "structure" in o.names() else None
+    if kind == CHAIN_KIND:
+        return check_chain(o, structure, delta, pct, iv_field)
+    if kind not in ("expires_otm", "option_model_pnl", CHAIN_KIND):
+        for key, value in (("structure", structure), ("strike_delta", delta), ("otm_pct", pct)):
+            if value is not None:
+                raise ConfigurationError(f"{o.where} {key}: only an expires_otm outcome has one")
+        return None, None, None, iv_field
+    if structure is None:
+        raise ConfigurationError(f"{o.where} structure: required")
+    if kind == "option_model_pnl":
+        for key, value in (("strike_delta", delta), ("otm_pct", pct)):
+            if value is not None:
+                raise ConfigurationError(
+                    f"{o.where} {key}: an option_model_pnl is at the money, it has no strike"
+                )
+    elif (delta is None) == (pct is None):
+        raise ConfigurationError(
+            f"{o.where}: an expires_otm outcome names exactly one of strike_delta and otm_pct"
+        )
+    for key, value in (("strike_delta", delta), ("otm_pct", pct)):
+        if value is not None and not 0 < value < 1:
+            raise ConfigurationError(f"{o.where} {key}: expected a fraction in (0, 1), got {value}")
+    if iv_field is None:
+        raise ConfigurationError(f"{o.where} iv_field: required for an {kind} outcome")
+    return structure, delta, pct, iv_field

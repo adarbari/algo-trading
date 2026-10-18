@@ -19,6 +19,8 @@ PORTFOLIO_KIND = "portfolio_return"
 BENCHMARK_BASE = "benchmark"  # ``base``: what the book is compared with is the blended benchmark
 MIX = "mix:"  # a benchmark of this form is a blend of the listed instruments
 CASH = "CASH"  # a pick that earns the T-bill yield (``rates/treasury``) instead of an instrument
+ENSEMBLE = "ensemble"  # the id of the combined variant of an ``[ensemble]`` (a screener may not be)
+OOS_CLASSES = ("trend",)  # ``oos_class``: what ``verdict.toml [oos_haircut]`` has a share for
 WEIGHTINGS = ("equal", "inverse_vol", "score")
 EQUAL, INVERSE_VOL, SCORE = WEIGHTINGS
 # A blend's weights add to one within this tolerance (``0.6, 0.4`` is exact, thirds are not).
@@ -160,3 +162,35 @@ def benchmark_words(benchmark: str) -> str:
     parts = [f"{weight:.0%} {ticker}" for ticker, weight in parse_mix(benchmark)]
     head = ", ".join(parts[:-1])
     return "a blend of " + (f"{head} and {parts[-1]}" if head else parts[0])
+
+
+def ensemble_of(t: Table, screeners: Sequence[str], kind: str) -> tuple[str, ...]:
+    """The members of the edge's ``[ensemble] variants = [...]``: the pre-registered grid of
+    screeners (ADR 0074 amendment) whose books are averaged per session into one variant, ``()``
+    when the document declares none. At least two distinct screeners the edge lists, for a
+    portfolio outcome only (an average of weights); ``ensemble`` is the combined variant's id, so
+    no screener may take it."""
+    if ENSEMBLE in screeners:
+        raise ConfigurationError(f"{t.where} screeners: {ENSEMBLE!r} is the id of an ensemble")
+    if t.raw(ENSEMBLE) is None:
+        return ()
+    members = t.table(ENSEMBLE, ("variants",)).strings("variants", ())
+    if kind != PORTFOLIO_KIND:
+        raise ConfigurationError(f"{t.where} ensemble: only a portfolio_return outcome has one")
+    if len(members) < 2 or len(set(members)) != len(members):
+        raise ConfigurationError(
+            f"{t.where} ensemble variants: expected two or more distinct screeners, got "
+            f"{list(members)}"
+        )
+    unknown = [m for m in members if m not in screeners]
+    if unknown:
+        raise ConfigurationError(
+            f"{t.where} ensemble variants: {unknown} are not among the edge's screeners "
+            f"{list(screeners)} (a grid is pre-registered, so its members are listed)"
+        )
+    return members
+
+
+def oos_class_of(t: Table) -> str | None:
+    """The edge's ``oos_class`` (None: no haircut expectation is shown for it)."""
+    return t.choice("oos_class", "", OOS_CLASSES) if "oos_class" in t.names() else None
