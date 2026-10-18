@@ -506,3 +506,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the tag does not split finance from operating leases in the filer's figure; excluding it would leave about 70 of 259 untagged companies null.
+
+## 2026-10-17 | PR #644 (E1c option-implied features) | IBKR IV30 change as a personal-licence feature
+- Question: does the IV-change edge (c03) get a long-history IBKR variant beside the chain-derived one?
+- Options: chain-derived only (history from 2026-10-02) / also `ibkr_iv_chg_5d` and `ibkr_iv_chg_21d` from IBKR's IV30 history (about 502 sessions).
+- Decision: add `ibkr_iv_history@v1` with both, `licence = "personal"`, optional like `ibkr_iv@v1`; `cp_iv_history@v1` stays open. Its guide entries say IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: settled by the architect reviewer of #644 (the format accepts no `architect` decider); the edge can be scored now instead of from November; the read-only broker boundary is untouched (it reads a stored rollup).

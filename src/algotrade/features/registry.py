@@ -56,6 +56,7 @@ from algotrade.features.rollups.market import (
 from algotrade.features.rollups.options import (
     call_wing,
     ibkr_iv,
+    ibkr_iv_history,
     iv30,
     iv_history,
     nearest_expiry,
@@ -117,6 +118,7 @@ GROUPS: dict[str, FeatureGroup] = {
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,
+            ibkr_iv_history.GROUP,
             fundamentals.GROUP,
             financials.GROUP,
             income_statement.GROUP,

@@ -353,7 +353,7 @@ Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options
 
 ### `rollup.cp_iv_history@v1.atm_call_iv_chg_21d`
 
-**How to read it.** The ATM call IV now minus 21 sessions ago (about a month), as a fraction (0.03 is three vol points). A rise has preceded higher returns the next month in the published sort; the put's change carries the opposite sign. Chains are stored from 2026-10-02 only, so this reads null until the end of October 2026.
+**How to read it.** The ATM call IV now minus 21 sessions ago (about a month), as a fraction (0.03 is three vol points). A rise has preceded higher returns the next month in the published sort; the put's change carries the opposite sign. Chains are stored from 2026-10-02 only, so this reads null until 2026-11-02.
 
 **When the reading lies**
 
@@ -365,7 +365,7 @@ Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options
 
 ### `rollup.cp_iv_history@v1.atm_put_iv_chg_21d`
 
-**How to read it.** The ATM put IV now minus 21 sessions ago, as a fraction. A rise has preceded lower returns the next month in the published sort. Chains are stored from 2026-10-02 only, so this reads null until the end of October 2026.
+**How to read it.** The ATM put IV now minus 21 sessions ago, as a fraction. A rise has preceded lower returns the next month in the published sort. Chains are stored from 2026-10-02 only, so this reads null until 2026-11-02.
 
 **When the reading lies**
 
@@ -741,3 +741,25 @@ Sources: ADR 0028
 - Null when neither feed has an IV30 for the session.
 
 Sources: docs/screeners/vrp-scanner.md (the lower-of-two rule)
+
+### `rollup.ibkr_iv_history@v1.ibkr_iv_chg_21d`
+
+**How to read it.** IBKR's 30-day implied vol now minus 21 sessions ago (about a month), as a fraction (0.03 is three vol points). IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split (rollup.cp_iv_history@v1.atm_call_iv_chg_21d and atm_put_iv_chg_21d). Unlike the chain-derived changes it has history: IBKR's IV reaches back about 502 sessions. Personal-use data: it carries the personal licence.
+
+**When the reading lies**
+
+- It moves with the market: when every name's IV rises in a sell-off the change says little; judge it as a rank across names on the session.
+- An earnings date inside the window lifts IV and drops it after; read the earnings fields before reading a change across one.
+- Null if IBKR had no IV today or 21 sessions ago (a gap is not filled), or IB Gateway was down for the session's pull.
+
+Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181
+
+### `rollup.ibkr_iv_history@v1.ibkr_iv_chg_5d`
+
+**How to read it.** IBKR's 30-day implied vol now minus 5 sessions ago, as a fraction: option buyers paying up (positive) or backing off (negative) over a week. IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split. Personal-use data: it carries the personal licence.
+
+**When the reading lies**
+
+- Same caveats and nulls as rollup.ibkr_iv_history@v1.ibkr_iv_chg_21d; a week is noisier than a month.
+
+Sources: Site convention (docs/edge-ideas/options-volatility.md c03)

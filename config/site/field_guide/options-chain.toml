@@ -844,7 +844,7 @@ note = "to exclude; read against the name's own usual level"
 # options-volatility.md): all read one expiry, the listed one nearest 30 days within 10..60, from
 # our own IV per contract. Chains are stored nightly from 2026-10-02 only, so each has history
 # from that date and no backfill: a 5-session change from 2026-10-09, a 21-session one from the
-# end of October 2026, a rank-like use not before 2027.
+# 2026-11-02, a rank-like use not before 2027.
 
 [[field]]
 name = "rollup.cp_iv@v1.cp_iv_spread"
@@ -908,7 +908,7 @@ sources = ["An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Opti
 [[field]]
 name = "rollup.cp_iv_history@v1.atm_call_iv_chg_21d"
 theme = "implied volatility"
-reads = "The ATM call IV now minus 21 sessions ago (about a month), as a fraction (0.03 is three vol points). A rise has preceded higher returns the next month in the published sort; the put's change carries the opposite sign. Chains are stored from 2026-10-02 only, so this reads null until the end of October 2026."
+reads = "The ATM call IV now minus 21 sessions ago (about a month), as a fraction (0.03 is three vol points). A rise has preceded higher returns the next month in the published sort; the put's change carries the opposite sign. Chains are stored from 2026-10-02 only, so this reads null until 2026-11-02."
 caveats = [
   "A level change confounds with the market: when every name's IV rises in a sell-off the change says little; judge it as a rank across names on the session.",
   "An earnings date inside the window moves call and put IV together; read feature.earnings_before_expiry and the earnings fields.",
@@ -919,7 +919,7 @@ sources = ["An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Opti
 [[field]]
 name = "rollup.cp_iv_history@v1.atm_put_iv_chg_21d"
 theme = "implied volatility"
-reads = "The ATM put IV now minus 21 sessions ago, as a fraction. A rise has preceded lower returns the next month in the published sort. Chains are stored from 2026-10-02 only, so this reads null until the end of October 2026."
+reads = "The ATM put IV now minus 21 sessions ago, as a fraction. A rise has preceded lower returns the next month in the published sort. Chains are stored from 2026-10-02 only, so this reads null until 2026-11-02."
 caveats = [
   "Same caveats and nulls as rollup.cp_iv_history@v1.atm_call_iv_chg_21d.",
 ]

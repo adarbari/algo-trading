@@ -113,6 +113,10 @@ max_spread_pct = 0.35    # a smile quote's (ask - bid) / mid must be within this
 window = 252             # sessions for FULL, today included
 min_provisional = 60     # sessions with a skew before the rank is shown (PROVISIONAL)
 
+["ibkr_iv_history@v1"]     # IBKR IV30 changes over 5 and 21 sessions (the column names carry both)
+short = 5
+long = 21
+
 ["cp_iv@v1"]              # call-put IV spread, smirk, ATM call and put IV (edge ideas c01-c03)
 target_days = 30         # the expiry nearest this many days out
 min_days = 10            # among the expiries min_days..max_days out

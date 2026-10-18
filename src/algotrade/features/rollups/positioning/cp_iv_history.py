@@ -12,7 +12,7 @@ session without a value, at either end, is a gap and the change is null, never f
     iv30_chg_5d                  change of our ``iv30`` (ATM, both sides)
 
 Chains are stored nightly from 2026-10-02 only and there is no earlier source, so a 5-session
-change exists from 2026-10-09 and a 21-session one from the end of October 2026.
+change exists from 2026-10-09 and a 21-session one from 2026-11-02.
 """
 
 from dataclasses import dataclass
@@ -33,7 +33,7 @@ IV30 = "rollups/instrument/iv30@v1"
 _SHORT, _LONG = 5, 21
 _FROM = (
     "chains are stored nightly from 2026-10-02 only, so a 5-session change exists from "
-    "2026-10-09 and a 21-session one from the end of October 2026"
+    "2026-10-09 and a 21-session one from 2026-11-02"
 )
 
 

@@ -332,6 +332,8 @@ export const SITE_FEATURES = [
   'rollup.iv_history@v2.iv_percentile_252d',
   'rollup.iv_history@v2.history_days',
   'rollup.iv_history@v2.rank_status',
+  'rollup.ibkr_iv_history@v1.ibkr_iv_chg_5d',
+  'rollup.ibkr_iv_history@v1.ibkr_iv_chg_21d',
   'rollup.fundamentals@v3.shares_outstanding',
   'rollup.fundamentals@v3.shares_outstanding_year_ago',
   'rollup.fundamentals@v3.shares_as_of',
