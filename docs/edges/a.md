@@ -40,6 +40,7 @@ Back to the [index of every edge](../edges.md).
 - Frazzini, A. and Pedersen, L., Betting Against Beta, Journal of Financial Economics, 2014
 - Novy-Marx, R. and Velikov, M., Betting Against Betting Against Beta, Journal of Financial Economics, 2022 <https://alphaarchitect.com/betting-against-beta-bab-construction/>
 - Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk without Lower Return, Journal of Portfolio Management, 2007
+- S&P Dow Jones Indices, Expectations and Anomalies, Indexology Blog, 2025 <https://www.indexologyblog.com/2025/04/09/expectations-and-anomalies/>
 
 ## Industry momentum (`industry_momentum`)
 
@@ -71,6 +72,7 @@ Back to the [index of every edge](../edges.md).
 - Moskowitz, T. and Grinblatt, M., Do Industries Explain Momentum?, Journal of Finance, 1999 <https://ideas.repec.org/a/bla/jfinan/v54y1999i4p1249-1290.html>
 - Arnott, R., Clements, M., Kalesnik, V. and Linnainmaa, J., Factor Momentum, Review of Financial Studies, 2023
 - Grobys, K., Ruotsalainen, J. and Aijo, J., Risk-managed industry momentum and momentum crashes, Quantitative Finance, 2018 <https://ideas.repec.org/a/taf/quantf/v18y2018i10p1715-1733.html>
+- Quantpedia, Sector Momentum Rotational System (strategy page) <https://quantpedia.com/strategies/sector-momentum-rotational-system>
 
 ## 12-1 momentum (`momentum_12_1`)
 
@@ -136,3 +138,4 @@ Back to the [index of every edge](../edges.md).
 - Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets, 2013 <https://repub.eur.nl/pub/40707>
 - Chen, A. and Velikov, M., Zeroing In on the Expected Returns of Anomalies, Journal of Financial and Quantitative Analysis, 2023
 - Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022 <https://alphaarchitect.com/short-term-momentum/>
+- Nagel, S., Evaporating Liquidity, Review of Financial Studies, 2012
