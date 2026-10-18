@@ -1,12 +1,14 @@
 """The ``filings`` task: the SEC event filings of every operating company in the universe ->
 ``events/filing``, and their Item 2.02 results releases -> ``events/earnings`` (ADR 0050).
 
-**Forms** (``submissions.FORMS``): 8-K and 8-K/A (items kept; the current item numbers start
+**Forms** (``series.FILING_FORMS``): 8-K and 8-K/A (items kept; the current item numbers start
 2004-08-23, the depth of the backfill, ``HISTORY_SINCE``), NT 10-K / NT 10-Q late-filing
 notices, SC TO-I issuer tender offers, Form 25 delisting notices (``25`` by the issuer,
 ``25-NSE`` by the exchange: also filed for a bond or preferred, so a row alone does not say the
 common stock left), 424B4 final prospectuses and Form 10 (``10-12B``) registrations. Each is
-public at its acceptance, so ``known_from`` is one rule for all (below). Only names in the
+public at its acceptance, so ``known_from`` is one rule for all (below). A filing accepted
+17:30-22:00 New York time carries ``known_from`` S but is listed in the daily index of S+1 only:
+the nightly of S misses it (the walk of S+1 reads it), a backfill includes it. Only names in the
 universe snapshot the run reads are fetched: a name already delisted is not.
 A run records ``stats["forms"] = FORMS_TAG``: a run that read a CIK before the form set grew
 does not count as having covered it (``asked_since``), so one backfill from ``HISTORY_SINCE``
@@ -90,6 +92,7 @@ from algotrade_ingestion.tasks.framework.run import (
 from algotrade_sources.framework.base import Source
 from algotrade_sources.framework.series import (
     DAILY_INDEX_FRAME,
+    FILING_FORMS,
     FILINGS_FRAME,
     DailyIndexRequest,
     FilingsRequest,
@@ -100,7 +103,7 @@ TABLE = "events/filing"  # the table this task owns (architecture/tables.toml)
 EARNINGS = "events/earnings"  # also written: the Item 2.02 rows (its writers: tables.toml)
 DEFAULT_SINCE = date(2018, 1, 1)
 HISTORY_SINCE = date(2004, 8, 23)  # the backfill's depth: SEC's current 8-K item numbers start here
-FORMS_TAG = "v2-event-forms"  # the form set a run read; bump when submissions.FORMS changes
+FORMS_TAG = ",".join(sorted(FILING_FORMS))  # the form set a run read: a changed set changes the tag
 FUND_TYPES = ("ETF", "ETN")  # security types that file no 8-K
 STALE_DAYS = 7  # business days after which a missing daily index is an error, not "not yet"
 RESULTS_ITEM = "2.02"

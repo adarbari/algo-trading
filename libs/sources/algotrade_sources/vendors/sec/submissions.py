@@ -41,29 +41,19 @@ from algotrade_sources.framework.base import (
 )
 from algotrade_sources.framework.http import Http
 from algotrade_sources.framework.pages import json_documents
-from algotrade_sources.framework.series import FILING_COLUMNS, FILINGS_FRAME, FilingsRequest
+from algotrade_sources.framework.series import (
+    FILING_COLUMNS,
+    FILING_FORMS,
+    FILINGS_FRAME,
+    FilingsRequest,
+)
 
 SOURCE = "sec_edgar"
 DATASET = "filings"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 PAGES_URL = "https://data.sec.gov/submissions/{name}"
 PAGE_NAME = re.compile(r"CIK\d{10}-submissions-\d+\.json")  # a page stays under submissions/
-EIGHT_K_FORMS = ("8-K", "8-K/A")  # the forms with items; Item 2.02 rows are results releases
-# Late-filing notices (12b-25), the issuer's own tender offer (its amendments SC TO-I/A are
-# left out), delisting notices (25 by the issuer, 25-NSE by the exchange: also filed for a bond
-# or a preferred, not only the common stock), final prospectuses (lock-up and offering dates)
-# and Form 10 registrations of a class (a spin-off's first public document). Amendments of
-# these are not kept: the original carries the event.
-FORMS = (
-    *EIGHT_K_FORMS,
-    "NT 10-K",
-    "NT 10-Q",
-    "SC TO-I",
-    "25",
-    "25-NSE",
-    "424B4",
-    "10-12B",
-)
+FORMS = FILING_FORMS  # defined in framework/series.py (the ingestion task names the set too)
 _ARRAYS = {  # our column -> the submissions array
     "form": "form",
     "accession": "accessionNumber",
