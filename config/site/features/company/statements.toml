@@ -1,5 +1,5 @@
 # L3 site setting: expression features (ADR 0023), the "statements" theme: formulas over the
-# SEC statement groups (rollup.income_statement@v1, rollup.cash_flow@v1, rollup.balance_sheet@v1;
+# SEC statement groups (rollup.income_statement@v2, rollup.cash_flow@v2, rollup.balance_sheet@v2;
 # instruments/statements, ADR 0067) go here, not in fundamentals.toml (at its line cap).
 
 # Usable source statuses: a statement group's own STALE (its newest period ended more than

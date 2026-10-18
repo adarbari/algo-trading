@@ -1,4 +1,4 @@
-"""Reading balance sheet instants for ``balance_sheet@v1`` (``instruments/statements``, ADR 0067).
+"""Reading balance sheet instants for ``balance_sheet@v2`` (``instruments/statements``, ADR 0067).
 
 An INSTANT fact is a balance at ``period_end`` (``period_start`` null), not a flow: there is no
 TTM and no subtraction. ``books`` turns the rows into one ``Book`` per instrument: for each

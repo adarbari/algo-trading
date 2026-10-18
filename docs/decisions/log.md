@@ -506,3 +506,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the tag does not split finance from operating leases in the filer's figure; excluding it would leave about 70 of 259 untagged companies null.
+
+## 2026-10-17 | EB H2 (SEC acceptance time) | Scope of the acceptance-time fix
+- Question: which groups read facts by SEC acceptance session, and where does the session rule live?
+- Options: only `financials` and `fundamentals` / every group that reads the SEC facts; the rule only in `data.shares` / also in `core/time/calendar.py`.
+- Decision: (3) `growth_history`, `income_statement`, `cash_flow` and `balance_sheet` also move to v2 reading the `_accepted` inputs, one backfill, rollup and retire window; (4) the `instruments/statements_accepted` input stays; (5) `calendar.acceptance_session` (strictly before the close counts that session) is the one scalar rule, for H4's 8-K fix. The 8-K `events/filing` `known_from` has the same bug (the New York acceptance day, not the session whose close it follows); it is fixed in H4, not in this PR.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a partial fix would leave the same one-session look-ahead in four groups that share the input and its backfill.

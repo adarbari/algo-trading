@@ -11,8 +11,8 @@ from datetime import date, datetime
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
+from algotrade.storage.tables.edge_schemas import FORWARD_RETURNS
 from algotrade.storage.tables.readers import StoreReader
-from algotrade.storage.tables.schemas import FORWARD_RETURNS
 
 OUTCOME_FIELDS = (
     "fwd_return", "fwd_excess_return", "fwd_max_return", "fwd_max_drawdown", "fwd_realised_vol",

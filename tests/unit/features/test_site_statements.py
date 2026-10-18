@@ -17,20 +17,20 @@ from tests.helpers.rollup_store import END
 
 TABLES = {
     "rollups/instrument/price_stats@v2": ("close",),
-    "rollups/instrument/fundamentals@v3": ("shares_outstanding", "market_cap_status"),
-    "rollups/instrument/financials@v2": (
+    "rollups/instrument/fundamentals@v4": ("shares_outstanding", "market_cap_status"),
+    "rollups/instrument/financials@v3": (
         "revenue_ttm", "net_income_ttm", "eps_diluted_ttm", "financials_status", "eps_stale",
         "is_adr", "ttm_as_of",
     ),
-    "rollups/instrument/income_statement@v1": (
+    "rollups/instrument/income_statement@v2": (
         "gross_profit_ttm", "ebit_ttm", "da_ttm", "interest_expense_ttm", "is_status",
         "is_ttm_as_of",
     ),
-    "rollups/instrument/cash_flow@v1": ("ocf_ttm", "capex_ttm", "cf_status"),
-    "rollups/instrument/balance_sheet@v1": (
+    "rollups/instrument/cash_flow@v2": ("ocf_ttm", "capex_ttm", "cf_status"),
+    "rollups/instrument/balance_sheet@v2": (
         "cash", "total_debt", "total_assets", "stockholders_equity", "bs_status",
     ),
-    "rollups/instrument/growth_history@v1": (
+    "rollups/instrument/growth_history@v2": (
         "revenue_ttm_3y_ago", "revenue_ttm_5y_ago", "eps_diluted_ttm_3y_ago",
         "eps_diluted_ttm_5y_ago", "gh_status",
     ),

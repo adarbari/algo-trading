@@ -43,7 +43,7 @@ RELEASE_FRAME = "release_dates"  # key of ``Normalized.parsed`` holding a releas
 # bond or a preferred), final prospectuses and Form 10 registrations of a class. Amendments of the
 # new forms are not kept: the original carries the event.
 FILING_FORMS = ("8-K", "8-K/A", "NT 10-K", "NT 10-Q", "SC TO-I", "25", "25-NSE", "424B4", "10-12B")
-FILINGS_FRAME = "filings"  # key of ``Normalized.parsed`` holding a company's 8-K rows (ADR 0050)
+FILINGS_FRAME = "filings"  # key of ``Normalized.parsed`` holding a company's filing rows (ADR 0050)
 DAILY_INDEX_FRAME = "daily_index"  # key of ``Normalized.parsed`` holding a day's 8-K filers
 DAILY_INDEX_COLUMNS = ("cik", "form", "accession", "filing_date")
 FILING_COLUMNS = (
@@ -88,9 +88,12 @@ class ReleaseRequest(FetchRequest):
 @dataclass(frozen=True, kw_only=True)
 class FilingsRequest(FetchRequest):
     """One company's filings. ``key`` is the CIK (digits); ``since``: the earliest filing date
-    wanted (``None``: the recent block only)."""
+    wanted (``None``: the recent block only); ``forms``: the form types kept (default
+    ``FILING_FORMS``; ``None``: every form, e.g. the periodic reports an accession is looked up in
+    for its acceptance time)."""
 
     since: date | None = None
+    forms: tuple[str, ...] | None = FILING_FORMS
 
 
 @dataclass(frozen=True, kw_only=True)

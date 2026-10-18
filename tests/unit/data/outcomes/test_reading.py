@@ -16,8 +16,8 @@ from algotrade.data.outcomes import (
     read_outcomes,
 )
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.tables.edge_schemas import FORWARD_RETURNS
 from algotrade.storage.tables.readers import StoreReader
-from algotrade.storage.tables.schemas import FORWARD_RETURNS
 from algotrade.storage.tables.writers import StoreWriter
 
 S1, S2, S3 = date(2026, 9, 1), date(2026, 9, 2), date(2026, 9, 3)

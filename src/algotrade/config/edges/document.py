@@ -18,7 +18,9 @@ and the key.
                       its ``structure``, exactly one of ``strike_delta`` (a delta in (0, 1)) and
                       ``otm_pct`` (a fraction in (0, 1)) and the ``iv_field`` it reads at D;
                       ``iv_field`` is allowed on a ratio measure too (default: the run's)
-    schedule          ``every_session`` | ``month_end`` | ``on_event:<class>`` (EVENT_CLASSES)
+    schedule          ``every_session`` | ``month_end`` | ``calendar:<window>`` (WINDOW_NAMES: a
+                      stretch the calendar fixes, whose length is the one horizon) |
+                      ``on_event:<class>`` (EVENT_CLASSES)
     base              what the picks are compared with: ``event`` (the names with the event at
                       D; default for an event schedule) | ``universe`` (every eligible name)
     picks             where an event schedule's picks come from: ``event`` (the qualified names
@@ -87,6 +89,12 @@ from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Selection, parse_selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
+from algotrade.core.time.windows import (
+    CALENDAR,
+    WINDOW_NAMES,
+    window_length,
+    window_name,
+)
 
 MIN_INDEPENDENT_SESSIONS = 40  # the quality bar's count: a fit and a promotion need this many
 FAMILIES = tuple("ABCDEFGHI")  # the idea catalogue's families (docs/edge-ideas/)
@@ -472,9 +480,17 @@ def _date(t: Table, key: str, raw: Any) -> date:
 
 def _schedule(t: Table) -> str:
     schedule = _required(t, "schedule")
-    if schedule in SCHEDULES or event_class(schedule) in EVENT_CLASSES:
+    if (
+        schedule in SCHEDULES
+        or event_class(schedule) in EVENT_CLASSES
+        or window_name(schedule) in WINDOW_NAMES
+    ):
         return schedule
-    options = [*SCHEDULES, *(f"{ON_EVENT}{c}" for c in EVENT_CLASSES)]
+    options = [
+        *SCHEDULES,
+        *(f"{CALENDAR}{w}" for w in WINDOW_NAMES),
+        *(f"{ON_EVENT}{c}" for c in EVENT_CLASSES),
+    ]
     raise ConfigurationError(f"{t.where} schedule: expected one of {options}, got {schedule!r}")
 
 
@@ -519,6 +535,19 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
     horizons = _horizons(o)
     offset = o.integer("start_offset_sessions", 0)
     event = event_class(schedule)
+    window = window_name(schedule)
+    if window is not None:
+        if offset != 1:
+            raise ConfigurationError(
+                f"{o.where} start_offset_sessions: a calendar window starts at the session after "
+                f"the decision session (D = S - 1), so 1, got {offset}"
+            )
+        if horizons != (window_length(window),):
+            raise ConfigurationError(
+                f"{o.where} horizon_sessions: calendar:{window} is {window_length(window)} "
+                f"sessions long, so its one horizon is [{window_length(window)}], "
+                f"got {list(horizons)}"
+            )
     if event is None and offset < 1:
         raise ConfigurationError(
             f"{o.where} start_offset_sessions: the screen runs after the decision session's "

@@ -11,7 +11,8 @@ from algotrade.storage.runs import (
     published,
     run_session,
 )
-from algotrade.storage.tables.schemas import FORWARD_RETURNS, spec_for, table_key, validate_frame
+from algotrade.storage.tables.edge_schemas import FORWARD_RETURNS
+from algotrade.storage.tables.schemas import spec_for, table_key, validate_frame
 from algotrade.storage.tables.spec import Column, TableSpec
 from tests.helpers.stored_frames import stamped
 

@@ -24,11 +24,15 @@ from algotrade.core.model.errors import DataValidationError
 from algotrade.core.validation.bars import ohlcv_problems
 from algotrade.core.views.series import FIELDS
 from algotrade.storage.tables.edge_schemas import (
+    _OUTCOME_TYPES,
     EDGE_EVAL,
     EDGE_LEGS,
     EDGE_PAPER,
     EDGE_SERIES,
     EDGE_TRADES,
+    OUTCOME_STATUSES,
+    OUTCOMES_PREFIX,
+    UNMEASURED,
     WINNERS_STUDY,
 )
 from algotrade.storage.tables.spec import (
@@ -214,6 +218,10 @@ INSTRUMENT_DESCRIPTION = fixed(
 # merge; a fact is identified by (instrument, concept, tag, period start, period end, filed
 # date): a year-to-date and a quarterly fact share an end date, and several us-gaap tags of one
 # concept report the same period (a null ``tag``, a ``checked`` marker's, equals a null).
+# ``accepted_ts`` is the instant SEC accepted the fact's filing (UTC, from the submissions
+# document, ADR 0067 amendment): when it became public. Null for a row stored before the column
+# existed or whose accession the submissions do not list: a reader then counts the fact from the
+# session after ``filed``.
 INSTRUMENT_SHARES = fixed(
     "instruments/shares",
     "reference",
@@ -225,6 +233,7 @@ INSTRUMENT_SHARES = fixed(
     "period_start date",
     "period_end date",
     "filed date",
+    "accepted_ts timestamp_utc",
     "fy int64",
     "shares float64",
     "class_values int64",
@@ -249,6 +258,7 @@ INSTRUMENT_STATEMENTS = fixed(
     "period_start date",
     "period_end date",
     "filed date",
+    "accepted_ts timestamp_utc",
     "fy int64",
     "value float64",
     "fetched_on date!",
@@ -294,6 +304,20 @@ VX_FUTURES = fixed(
     *floats("open", "high", "low", "close", "settle", "change"),
     *("volume int64", "efp int64", "open_interest int64"),
     runs="merge", key=("instrument_id", "session_date", "known_from"),
+)  # fmt: skip
+# L2: the futures curve, one partition per session (``futures-curves``, IB Gateway, read-only;
+# personal licence): a row per front-month contract, ``instrument_id`` ``FUT:<root>:<YYYY-MM
+# delivery month>``, ``parent_id`` ``FUT:<root>`` (ADR 0009). ``price`` is ONE ``price_kind`` per
+# root and session by the read clock against ``next_open`` (IB ``tradingHours``): ``last`` before
+# it, ``settle`` (IB close) from it to 12:00 New York next weekday, else nothing: see
+# ``tasks/market/futures/curves.py``. ``ts``: when the stream was read; a run is the partition.
+FUTURES_CURVE = fixed(
+    "rates/futures_curve", "curve", ("instrument_id", "ts", "root", "contract_month"),
+    "instrument_id string!", "ts timestamp_utc!", "parent_id string!", "root string!",
+    "contract_month string!", "expiry date", "next_open timestamp_utc", "conid int64",
+    "local_symbol string", "price_kind string",
+    *floats("price", "last", "close", "bid", "ask", "volume", "open_interest", "multiplier"),
+    key=("instrument_id",),
 )  # fmt: skip
 # Live option quotes the API read from IB Gateway (ADR 0028, the API's one write exception):
 # every answer it served, one partition per session, a row per contract and time taken. Runs
@@ -773,6 +797,7 @@ KNOWN: dict[str, TableSpec] = {
         IBKR_CONTRACTS,
         IBKR_IV30,
         VX_FUTURES,
+        FUTURES_CURVE,
         RULE_SCREEN,
         RULE_SCREEN_VALUES,
         EDGE_EVAL,
@@ -808,34 +833,6 @@ OPEN_PREFIXES = {
     "results/": "results",
     "catalog/": "catalog",
 }
-
-
-# Outcomes (ADR 0053): what happened after a start session S, read only by the harness
-# (``algotrade.data.outcomes``). One family of fixed tables ``outcomes/instrument/<name>@v<N>``;
-# the partition is S. Each night T writes the windows it closes (S = T - h sessions), so one
-# partition receives one run per horizon on different nights: runs merge, the latest run's row
-# winning per (instrument, horizon, benchmark). ``knowledge_ts`` is the write time, never before
-# the close of ``window_end`` (the writer refuses a window that has not closed).
-# v2 (ADR 0061): a window that needs a bar the ``bar-quality`` task flagged is UNMEASURED, a row
-# with a reason and no returns, instead of a return computed over a bad price.
-OUTCOMES_PREFIX = "outcomes/instrument/"
-FORWARD_RETURNS = f"{OUTCOMES_PREFIX}forward_returns@v2"  # the outcomes task's table
-OUTCOME_STATUSES = frozenset({"COMPLETE", "DELISTED", "UNMEASURED"})
-UNMEASURED = "UNMEASURED"
-_OUTCOME_TYPES = (
-    "instrument_id string!",
-    "ts timestamp_utc!",  # the close of S
-    "horizon_sessions int64!",
-    "window_end date!",  # T: the h-th exchange session after S
-    "benchmark string!",  # the benchmark ticker of fwd_excess_return
-    "fwd_return float64",  # close(T) / close(S) - 1, split-adjusted, price return; null: UNMEASURED
-    "fwd_excess_return float64",  # fwd_return - the benchmark's (null: no benchmark bar)
-    "fwd_max_return float64",  # max high over (S, T] / close(S) - 1 (favourable); null: UNMEASURED
-    "fwd_max_drawdown float64",  # 1 - min low over (S, T] / close(S), >= 0; null: UNMEASURED
-    "fwd_realised_vol float64",  # annualised stdev of daily log close returns over (S, T]
-    "outcome_status string!",  # OUTCOME_STATUSES; DELISTED: measured to the last bar
-    "outcome_reason string",  # UNMEASURED only: why (BAD_BAR: a flagged bar in S..T, ADR 0061)
-)
 
 
 def outcomes_spec(table: str) -> TableSpec:

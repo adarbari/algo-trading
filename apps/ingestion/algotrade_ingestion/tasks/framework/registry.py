@@ -56,6 +56,7 @@ from algotrade_ingestion.tasks.market import (
     rates,
     vx_futures,
 )
+from algotrade_ingestion.tasks.market.futures import curves as futures_curves
 from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     company_details,
@@ -220,7 +221,7 @@ TASKS: dict[str, Task] = {
             shares,
             ("instruments/shares", "instruments/statements"),
             entries_reference.run_shares,
-            sources=("sec_company_facts",),
+            sources=("sec_company_facts", "sec_filings"),
             settings="sources.toml [sec_edgar] facts_refresh_days, statements_backfill_per_night",
             params=(
                 SESSION,
@@ -515,6 +516,21 @@ TASKS: dict[str, Task] = {
                 TO,
                 Param("symbols", ("--symbols",), str, "comma-separated tickers"),
                 Param("limit", ("--limit",), int, "backfill at most N underlyings this run"),
+            ),
+            skip=source_guards.gateway_down,
+        ),
+        Task(
+            "futures-curves",
+            "nightly futures curve snapshot per root (IBKR, read-only): the front contracts' "
+            "last / prior settle / volume / open interest with expiry",
+            futures_curves,
+            (futures_curves.TABLE,),
+            entries_ops.run_futures_curves,
+            sources=("ibkr",),
+            settings="sources.toml [ibkr] futures_roots, futures_front",
+            params=(
+                SESSION,
+                Param("symbols", ("--symbols",), str, "comma-separated futures roots"),
             ),
             skip=source_guards.gateway_down,
         ),

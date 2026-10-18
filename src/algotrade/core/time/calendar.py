@@ -23,6 +23,9 @@ is closed), the last session of a month (``last_session_of_month``: a quarter's 
 annual Russell US index reconstitution (``russell_reconstitution``: after the close of the
 fourth Friday of June, or the session before it).
 
+``acceptance_session(ts)`` is the first session at whose close an instant is already public (a
+filing accepted before the close counts that session, at or after it the next one).
+
 ``last_closed_session(now)`` is the session a nightly run may ingest as end of day: the most
 recent one whose close (plus a settle margin) has passed in New York time. A run started
 during market hours therefore never treats today's intraday data as end of day.
@@ -252,6 +255,17 @@ def russell_reconstitution(year: int) -> date:
 def exchange_date(now: datetime) -> date:
     """The calendar date in New York at ``now`` (an aware datetime)."""
     return now.astimezone(EXCHANGE_TZ).date()
+
+
+def acceptance_session(ts: datetime) -> date:
+    """The first session whose close is strictly after ``ts`` (an aware datetime): the session
+    from which a fact made public at ``ts`` (a filing SEC accepted) is known at the close. A
+    filing accepted at or after a close, on a weekend or on a holiday counts from the next
+    session."""
+    day = exchange_date(ts)
+    if is_session(day) and ts < close_time(day):
+        return day
+    return next_session(day)
 
 
 def last_opened_session(now: datetime) -> date:

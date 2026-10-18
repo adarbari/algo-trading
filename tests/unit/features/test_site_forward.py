@@ -27,7 +27,7 @@ from tests.helpers.stored_frames import T0, stamped
 from tests.unit.services.screening.test_rule_screens import ACTIVE, DAY, seeded
 
 PRICE = "rollups/instrument/price_stats@v2"
-FINANCIALS = "rollups/instrument/financials@v2"
+FINANCIALS = "rollups/instrument/financials@v3"
 ESTIMATES = "rollups/instrument/analyst_estimates@v1"
 TARGETS = "rollups/instrument/analyst_targets@v1"
 TABLES = {

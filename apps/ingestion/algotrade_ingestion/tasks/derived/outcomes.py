@@ -56,7 +56,7 @@ from algotrade.data.prices import SessionBars, bars_with_flags, session_bars
 from algotrade.data.reference import instruments, load_universe
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
-from algotrade.storage.tables.schemas import FORWARD_RETURNS
+from algotrade.storage.tables.edge_schemas import FORWARD_RETURNS
 from algotrade_ingestion.tasks.derived.outcome_paths import Window, window_rows
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.maintenance.bar_quality import suspect_instruments

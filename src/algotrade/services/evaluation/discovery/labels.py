@@ -25,7 +25,7 @@ from algotrade.config.edges.winners import WinnersStudySettings
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import read_outcomes
-from algotrade.storage.tables.schemas import FORWARD_RETURNS
+from algotrade.storage.tables.edge_schemas import FORWARD_RETURNS
 
 COUNTED = ("COMPLETE", "DELISTED")
 HINT = "run `algotrade-ingest run outcomes --horizon 504 --from ... --to ...` (a backfill)"
