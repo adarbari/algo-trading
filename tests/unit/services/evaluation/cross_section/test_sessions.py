@@ -3,6 +3,7 @@ the range is not a month end; ``entry_session`` (S = D + the offset, always afte
 blocks an event schedule's days are pooled into."""
 
 from datetime import date
+from itertools import pairwise
 
 import pytest
 
@@ -78,3 +79,34 @@ def test_daily_events_over_a_long_range_make_one_block_per_horizon_never_one_blo
     days = DAYS[:60]
     blocks = event_blocks(days, days, 20)
     assert len(blocks) == 3 and all(len(b) == 20 for b in blocks)
+
+
+def test_a_calendar_window_gives_each_whole_windows_decision_session() -> None:
+    days = sessions_between(date(2026, 1, 2), date(2026, 4, 15))
+    # turn of month: S is the session before the month's last, D the one before S
+    assert decision_sessions("calendar:turn_of_month", days, 4) == [
+        date(2026, 1, 28), date(2026, 2, 25), date(2026, 3, 27),
+    ]  # fmt: skip
+    # the March window ends 2026-04-02 (inside the range); a range cut inside it drops it
+    cut = sessions_between(date(2026, 1, 2), date(2026, 4, 1))
+    assert decision_sessions("calendar:turn_of_month", cut, 4)[-1] == date(2026, 2, 25)
+    assert decision_sessions("calendar:pre_holiday", days, 1) == [
+        date(2026, 1, 14), date(2026, 2, 11), date(2026, 3, 31),
+    ]  # fmt: skip
+    assert decision_sessions("calendar:turn_of_month", [], 4) == []
+
+
+def test_calendar_decisions_do_not_overlap_and_enter_the_session_after_the_decision() -> None:
+    days = sessions_between(date(2020, 1, 2), date(2025, 12, 31))
+    for name, length in (("opex_week", 5), ("quarter_end", 5), ("turn_of_month", 4)):
+        picked = decision_sessions(f"calendar:{name}", days, length)
+        gaps = [days.index(b) - days.index(a) for a, b in pairwise(picked)]
+        assert min(gaps) >= length + 1, name  # D + 2 = window start; a window is `length` long
+        assert entry_session(picked[0], 1) == days[days.index(picked[0]) + 1]
+
+
+def test_a_calendar_horizon_must_equal_the_window_length_and_the_window_must_exist() -> None:
+    with pytest.raises(ConfigurationError, match="4 sessions long"):
+        decision_sessions("calendar:turn_of_month", DAYS, 5)
+    with pytest.raises(ConfigurationError, match="unknown calendar window"):
+        decision_sessions("calendar:fomc", DAYS, 1)
