@@ -36,6 +36,8 @@ OTHER_TERMS = {
     "member": "ensemble_member",
     "vol_target": "vol_target_sizing",
     "book_volatility": "book_volatility",
+    "canary": "canary_gate",
+    "defensive": "defensive_asset",
     **OOS_TERMS,
 }
 FIX = "write the term in config/site/guide/glossary/edges/edge_outcomes.toml and map it here"
