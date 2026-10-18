@@ -4,15 +4,17 @@ warm path (edits re-evaluate in memory; a publish invalidates), fail-closed vali
 writes."""
 
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pandas as pd
 import pytest
 
+from algotrade.config.strategy.screen_spec import parse_screen_spec
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import last_closed_session
+from algotrade.core.views.feature_view import FeatureView
 from algotrade.services.configs import resolve_config
 from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.preview import screens
@@ -21,6 +23,7 @@ from algotrade.services.read.context import open_context
 from algotrade.services.screening.run import run_screener
 from algotrade.services.views import to_value
 from algotrade.storage.tables.writers import StoreWriter
+from algotrade.strategies.screeners.rules import evaluate_screen
 from algotrade_api.deps import ReadStore
 from tests.helpers.api_store import NOW
 from tests.helpers.stored_frames import T0, stamped
@@ -270,3 +273,39 @@ def test_the_context_user_is_the_default() -> None:
 def test_the_store_has_its_own_preview_cache() -> None:
     store = preview_store()
     assert store.preview_cache is not store.cache
+
+
+def test_a_boolean_group_is_one_funnel_step() -> None:
+    """ADR 0071: a gate is one step, counted by the group's outcome; its members are not."""
+
+    def crit(field: str, **extra: Any) -> dict[str, Any]:
+        return {"field": field, "op": "gt", "value": 5, **extra}
+
+    spec = parse_screen_spec(
+        "s",
+        {
+            "criteria": {
+                "px": crit("px"),
+                "a": crit("a", mode="soft", tolerance=2),
+                "b": crit("b"),
+            },
+            "groups": {"either": {"any": ["a", "b"]}},
+        },
+        "s",
+    )
+    rows = {
+        "EQ:PASS": {"px": 9, "a": 9, "b": 0},
+        "EQ:NEAR": {"px": 9, "a": 4, "b": 0},
+        "EQ:FAIL": {"px": 9, "a": 0, "b": 0},
+        "EQ:MISSING": {"px": 9},
+        "EQ:CHEAP": {"px": 1, "a": 9},
+    }
+    result = evaluate_screen(spec, FeatureView(date(2026, 10, 2), rows))
+    px, either = screens.funnel(spec, list(result.rows))
+    assert (px.criterion_id, px.entering, px.failed, px.remaining) == ("px", 5, 1, 4)
+    assert (either.criterion_id, either.field, either.mode) == ("either", "any", "group")
+    assert (either.entering, either.passed, either.near, either.failed) == (4, 1, 1, 1)
+    assert (either.missing, either.remaining) == (
+        1,
+        3,
+    )  # no value on a soft member only costs points
