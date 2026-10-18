@@ -178,3 +178,13 @@ def test_create_plan_gives_each_worktree_its_own_port_block() -> None:
     one, same, other = base("feat/a"), base("feat/a"), base("feat/b")
     assert one == same and 10000 <= one < 15000 and one % 10 == 0
     assert one != other
+
+
+def test_here_makes_the_current_worktree_ready_without_a_branch_or_npm() -> None:
+    out = _run("--here")
+    if "refusing: this is the main checkout" in out.stderr:
+        pytest.skip("run from the main checkout")
+    assert out.returncode == 0, out.stderr
+    assert "PYTHONPATH=" in out.stdout and "worktree add" not in out.stdout
+    assert "[dry-run] npm" not in out.stdout
+    assert _run("--here", "x").returncode == 2

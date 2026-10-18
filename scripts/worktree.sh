@@ -4,6 +4,9 @@
 #   scripts/worktree.sh [--dry-run] <branch> [base]    new worktree off origin/<base|main>
 #   scripts/worktree.sh [--dry-run] --remove <branch>  remove it (refuses if dirty / unpushed)
 #   scripts/worktree.sh [--dry-run] --prune-merged     remove the worktrees of merged PRs
+#   scripts/worktree.sh [--dry-run] --here             make THIS worktree ready (an agent
+#       isolation worktree under .claude/worktrees/): link .venv, write worktree.env; no branch,
+#       no npm ci. The orchestrator runs it once per agent worktree, then briefs the agent.
 #
 # --prune-merged covers ../algo-trading-*, ../algo-wt-* and <main>/.claude/worktrees/*. It
 # removes a worktree only when it is clean, not locked, not the current one, its branch has no
@@ -27,17 +30,20 @@
 # Then: `source <wt>/worktree.env`.
 set -euo pipefail
 
-dry=0 remove=0 prune=0 args=()
+dry=0 remove=0 prune=0 here=0 args=()
 for a in "$@"; do
   case "$a" in
     --dry-run) dry=1 ;;
     --remove) remove=1 ;;
     --prune-merged) prune=1 ;;
-    -h | --help) sed -n '2,25p' "$0"; exit 0 ;;
+    --here) here=1 ;;
+    -h | --help) sed -n '2,28p' "$0"; exit 0 ;;
     *) args+=("$a") ;;
   esac
 done
-if [ "$prune" = 1 ]; then
+if [ "$here" = 1 ]; then
+  [ "${#args[@]}" = 0 ] && [ "$remove" = 0 ] && [ "$prune" = 0 ] || { echo "--here takes no branch" >&2; exit 2; }
+elif [ "$prune" = 1 ]; then
   [ "${#args[@]}" = 0 ] && [ "$remove" = 0 ] || { echo "--prune-merged takes no branch" >&2; exit 2; }
 elif [ "${#args[@]}" -lt 1 ] || [ "${#args[@]}" -gt 2 ]; then
   echo "usage: scripts/worktree.sh [--dry-run] [--remove] <branch> [base] | --prune-merged" >&2
@@ -119,6 +125,23 @@ prune_merged() {
 }
 
 if [ "$prune" = 1 ]; then prune_merged; exit 0; fi
+
+if [ "$here" = 1 ]; then
+  wt=$(git rev-parse --show-toplevel)
+  [ "$wt" != "$main" ] || { echo "refusing: this is the main checkout" >&2; exit 1; }
+  [ -e "$wt/.venv" ] || run ln -s "$main/.venv" "$wt/.venv"
+  run git -C "$wt" config rerere.enabled false
+  pp="$wt/src:$wt/libs/sources:$wt/apps/ingestion:$wt/apps/api:$wt/apps/backtest"
+  port_base=$((10000 + $(printf %s "$wt" | cksum | cut -d' ' -f1) % 500 * 10))
+  if [ "$dry" = 1 ]; then
+    echo "[dry-run] write $wt/worktree.env: export PYTHONPATH=$pp"
+    echo "[dry-run] write $wt/worktree.env: export ALGOTRADE_PORT_BASE=$port_base"
+  else
+    printf 'export PYTHONPATH=%s\nexport ALGOTRADE_PORT_BASE=%s\n' "$pp" "$port_base" >"$wt/worktree.env"
+  fi
+  echo "ready: source $wt/worktree.env (web: run npm ci --prefix apps/web when needed)"
+  exit 0
+fi
 
 if [ "$remove" = 1 ]; then
   [ -d "$wt" ] || { echo "no worktree at $wt" >&2; exit 1; }

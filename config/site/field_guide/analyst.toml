@@ -694,7 +694,7 @@ op = "gte"
 value = 0.3
 mode = "soft"
 tolerance = 0.1
-note = "a loading against IWM minus SPY, not a size rank"
+note = "illustrative screen, not a published cut-off: 0.3 is a clear lean on a one-year fit; a loading against IWM minus SPY, not a size rank"
 
 [[field]]
 name = "rollup.factor_betas@v1.beta_mom"
@@ -712,7 +712,7 @@ op = "gte"
 value = 0.3
 mode = "soft"
 tolerance = 0.1
-note = "a loading against MTUM minus SPY"
+note = "illustrative screen, not a published cut-off: 0.3 is a clear lean on a one-year fit; a loading against MTUM minus SPY"
 
 [[field]]
 name = "rollup.factor_betas@v1.beta_value"
@@ -730,7 +730,7 @@ op = "gte"
 value = 0.3
 mode = "soft"
 tolerance = 0.1
-note = "a loading against VLUE minus SPY, not a valuation"
+note = "illustrative screen, not a published cut-off: 0.3 is a clear lean on a one-year fit; a loading against VLUE minus SPY, not a valuation"
 
 [[field]]
 name = "rollup.factor_betas@v1.beta_sector"
@@ -748,7 +748,7 @@ op = "gte"
 value = 0.5
 mode = "soft"
 tolerance = 0.2
-note = "low values mean the name ignores its sector; check factor_status for NO_SECTOR"
+note = "illustrative screen, not a published cut-off: half the sector ETF move marks a name that follows its sector; check factor_status for NO_SECTOR"
 
 [[field]]
 name = "rollup.factor_betas@v1.factor_obs"
@@ -764,7 +764,7 @@ for = "a regression on a full year of sessions"
 op = "gte"
 value = 250
 mode = "hard"
-note = "under about 250 the betas are noisy"
+note = "illustrative screen: 250 is about a full year of sessions; below it the fit has fewer observations than the window and wider error"
 
 [[field]]
 name = "rollup.factor_betas@v1.factor_status"
@@ -798,7 +798,7 @@ op = "gte"
 value = 0.5
 mode = "soft"
 tolerance = 0.25
-note = "read with rollup.qmj@v1.safety_z; a score across the session, not a level"
+note = "illustrative screen, not a published cut-off: half a standard deviation above the session middle; the paper ranks, it sets no level. Read with rollup.qmj@v1.safety_z"
 
 [[field]]
 name = "rollup.qmj@v1.safety_z"
@@ -816,7 +816,7 @@ op = "gte"
 value = 0.5
 mode = "soft"
 tolerance = 0.25
-note = "a leverage and distress score; read with rollup.qmj@v1.profitability_z"
+note = "illustrative screen, not a published cut-off: half a standard deviation above the session middle; a leverage and distress score. Read with rollup.qmj@v1.profitability_z"
 
 [[field]]
 name = "rollup.mispricing@v1.composite_inputs"
@@ -832,7 +832,7 @@ for = "a composite rank built on at least six of seven anomalies"
 op = "gte"
 value = 6
 mode = "hard"
-note = "gate for when rollup.mispricing@v1.composite_rank is the decision"
+note = "illustrative screen: 6 of 7 drops only the least-covered names; the source composite requires all its anomalies, we require 5"
 
 [[field]]
 name = "rollup.cef_nav@v1.nav_per_share"
@@ -913,7 +913,7 @@ for = "issuers with more than one share class"
 op = "gte"
 value = 2
 mode = "hard"
-note = "then read sibling_status; three or more is AMBIGUOUS"
+note = "two or more classes is the definition of a pair candidate; then read sibling_status, as three or more is AMBIGUOUS"
 
 [[field]]
 name = "feature.buyback_flag"
@@ -948,4 +948,4 @@ op = "lt"
 value = 10
 mode = "soft"
 tolerance = 2
-note = "a loss-making company has no multiple, so a hard rule drops it"
+note = "illustrative screen, not a published cut-off: Loughran and Wellman sort names into groups by the multiple and set no level, and 10 is a round figure for the cheap end; a loss-making company has no multiple, so a hard rule drops it"

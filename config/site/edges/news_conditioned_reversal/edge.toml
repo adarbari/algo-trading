@@ -1,0 +1,130 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: news_free_residual_reversal (new, EB E3b), a
+# variant of short_term_residual_reversal's residual_reversal. Idea pages: docs/edge-ideas/statarb-technical.md
+# (large_move_news_vs_no_news) and calendar-flows.md (extreme_return_reversal).
+id = "news_conditioned_reversal"
+name = "Residual reversal on names with no news"
+family = "G"
+thesis = "Large stocks that fell most last month against what the market explains, with nothing filed to explain the fall, rise over the next month; a fall with news keeps going."
+mechanism = """A move with no disclosed cause is an order imbalance (a block, a forced seller, an index trade)
+that liquidity providers absorb and reverse; a move with news is under-reaction to hard information and
+drifts on (Chan 2003; Pritamani and Singal 2001; Tetlock 2010; Da, Liu and Schaumburg 2014)."""
+persistence = """The reversal is pay for liquidity provision and survives while that is scarce in a stress, but the
+plain reversal has shrunk since decimalisation and is near zero after costs (Chen and Velikov 2023;
+Cox and Peterson 1994: part was bid-ask bounce); the news filter is the claim that the part
+that is left is the no-news part. Persistence is a claim to test."""
+schedule = "month_end"
+top_k = 50
+base = "universe"
+screeners = ["news_free_residual_reversal"]
+baselines = ["momentum_12_1", "size_small", "residual_reversal"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """A variant of short_term_residual_reversal filed as its own edge (its own screener, one trial):
+the same market-residual 20-session return (rollup.momentum_variants@v1.resid_ret_20d, lowest first) among
+names with feature.news_free_5d true, that is, no 8-K or 8-K/A through the previous session and no
+earnings window in the last 5 sessions. The unconditioned residual_reversal is a baseline on the same
+sessions, so the question the harness answers is whether the news filter adds to the ranking; the
+base is every liquid optionable common stock with a residual return (the main universe has no news
+gate: the harness reads every screener and baseline over the same eligible set, so a gate there would make
+the baseline pick the same names), and the picks are the 50 most extreme of the news-free ones. Proxies, each stated: the source's no-news test is a headline or news-wire
+search over the move's day, here only 8-K filings and earnings windows (a press story, an analyst note or
+a rumour is not seen, so some news moves read as no-news; the bias is toward weaker measured reversal); the
+window is 5 sessions while the residual return runs 20, so news older than 5 sessions inside the
+window is not excluded; the residual is market-only (the paper also strips size and value). news_free_5d
+is null until the filings coverage reaches a session (the 8-K history of EB D1 from its backfill), so
+sessions before it screen nothing (an empty pick set is recorded as no_picks, not as a coverage exclusion), and the first measurable sessions are the
+backfill's. Short side, owner decision O2 (2026-10-17): the variant winners_short shorts the 50 highest
+residuals among the news-free names (its own universe adds the news gate, because a short leg ranks by
+score over every pickable name; liquid, net of cost and the assumed borrow); the long_short spread is
+diagnostic only. Month-end start sessions at least 20 sessions apart."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { field = "rollup.momentum_variants@v1.resid_ret_20d", op = "gt", value = -5 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[[variants]]
+id = "winners_short"
+[variants.outcome]
+side = "short"
+
+# The short legs rank by score over every pickable name, so their eligible set is the news-free names
+# (an unscored name is in neither leg): the gate lives here, not in the main universe.
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { field = "feature.news_free_5d", op = "eq", value = true },
+  { field = "rollup.momentum_variants@v1.resid_ret_20d", op = "gt", value = -5 },
+]
+
+[[variants]]
+id = "long_short"
+[variants.outcome]
+side = "long_short"
+
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { field = "feature.news_free_5d", op = "eq", value = true },
+  { field = "rollup.momentum_variants@v1.resid_ret_20d", op = "gt", value = -5 },
+]
+
+[quality_bar]
+outcome = """Excess return over SPY over the 20 sessions after the entry close (the session after a
+month-end decision), net of 10 bps a round trip: a long hold of the 50 lowest market-residual 20-session returns among the
+names with no 8-K and no earnings window in the last 5 sessions."""
+trigger_timing = """resid_ret_20d comes from the close of the decision session D (nightly rollup); news_free_5d counts
+filings known through D (an 8-K from the session after its SEC acceptance, never the filing's own date) and the
+earnings windows as known at D; the entry session is S = D + 1 (start_offset_sessions = 1); the screen is
+read at D, the outcome at S."""
+replication = """Chan (2003) and Pritamani and Singal (2001): sort the extreme movers by whether a headline accompanied the
+move, and the no-news ones reverse; Blitz, Huij, Lansdorp and Verbeek (2013): the residual version. Here the
+lowest 50 market-residual returns of the 20 sessions among liquid common stocks with no 8-K and no earnings
+window in the last 5 sessions; the headline test is replaced by the filing test."""
+expected_size = """The papers report sizable reversals in 1980s to 1990s samples (a two-day bounce of 1.8 percent after a
+10 percent drop in Bremer and Sweeney 1991, from memory) that shrank after decimalisation; the residual
+reversal's own figure on short_term_residual_reversal is the comparison. No post-2010 net figure for the
+news split is verified: expect a small number the harness reports with its t statistic and session count."""
+capacity_costs = """Liquid names ($50M a day), monthly turnover is high, and the 10 bps round trip is the whole question
+(the cost curve shows the break-even); the capacity of the residual reversal is the lowest of the anomalies
+(Frazzini, Israel and Moskowitz 2015). The winners_short variant pays the site's assumed borrow."""
+failure_modes = """A loser whose news was not an 8-K (a press story, a downgrade) reads as no-news and keeps falling; a market that
+keeps falling keeps its losers falling; the filter thins the set so the picks are fewer than 50 on some sessions.
+Retire if the frozen-period spread of the picks is not above the unconditioned residual_reversal's on
+the same sessions, or the picks do not beat the buy-and-hold mean of the eligible names net of costs."""
+decoys = """Plain one-month reversal and the residual without the news filter (the residual_reversal baseline),
+size and liquidity, the earnings reaction (the filter removes the earnings window), and low beta."""
+
+[[sources]]
+title = "Chan, W., Stock Price Reaction to News and No-News: Drift and Reversal after Headlines, Journal of Financial Economics, 2003"
+
+[[sources]]
+title = "Pritamani, M. and Singal, V., Return Predictability Following Large Price Changes and Information Releases, Journal of Banking and Finance, 2001"
+
+[[sources]]
+title = "Da, Z., Liu, Q. and Schaumburg, E., A Closer Look at the Short-Term Return Reversal, Management Science, 2014"
+
+[[sources]]
+title = "Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets, 2013"
+url = "https://repub.eur.nl/pub/40707"

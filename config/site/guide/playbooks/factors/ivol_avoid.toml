@@ -1,0 +1,30 @@
+# L3 site setting: the Guide's playbook for the site preset ivol_avoid (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Typed by src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "ivol_avoid"
+version = 1  # the preset version this prose was written for
+summary = "Ranks every tradeable stock by idiosyncratic volatility, the jumpiest last. Ang and co-authors find the most volatile names earn less than the calm ones. It is the avoid list of a candidate edge under test."
+hit = "The name is a common stock or ADR closing above $3 that trades at least $2M a day, with a four-factor idiosyncratic volatility. Every such name qualifies; the highest volatility ranks last."
+not_checked = "It does not check trend, quality, borrow cost or availability, or a squeeze under way. The volatility is the 252-session residual, slower than the paper's prior-month figure."
+before_acting = [
+  "The names ranked last are often costly or impossible to borrow, so the harness's short result is an upper bound: read rollup.factor_betas@v1.ivol_252d beside the borrow you could get.",
+  "A jumpy name with a pending bid or a squeeze can rise sharply; the average underperformance hides that tail.",
+  "The effect is strongest in small names and weak in large liquid ones, so the list is for dropping names from a long screen, not a short signal on its own.",
+]
+sources = [
+  "Ang, Hodrick, Xing and Zhang, The Cross-Section of Volatility and Expected Returns (2006)",
+  "Stambaugh, Yu and Yuan, Arbitrage Asymmetry and the Idiosyncratic Volatility Puzzle (2015)",
+]
+related = [
+  { id = "ivol_high", reason = "the same ranking, highest first, used as a comparison" },
+  { id = "lottery_max", reason = "the best one-day return of the month instead of the volatility" },
+]
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $3"
+adv = "Trades at least $2M a day"
+ivol = "Has a four-factor idiosyncratic volatility"
