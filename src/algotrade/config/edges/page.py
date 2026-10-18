@@ -108,7 +108,10 @@ def _outcome(o: Outcome, event: bool) -> str:
     elif not event:
         n = o.start_offset_sessions
         parts.append(f"entered {n} session{'' if n == 1 else 's'} after the decision session")
-    if o.structure is not None:
+    if o.kind == "option_model_pnl":
+        shape = (o.structure or "").replace("_", " ")
+        parts.append(f"modelled P&L of an {shape} (basis {o.basis}, not a quote)")
+    elif o.structure is not None:
         strike = (
             f"delta {o.strike_delta:g}" if o.strike_delta else f"{o.otm_pct:.0%} out of the money"
         )

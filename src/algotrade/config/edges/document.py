@@ -17,7 +17,10 @@ and the key.
                       option is not assigned at the horizon's close: put | call | strangle) names
                       its ``structure``, exactly one of ``strike_delta`` (a delta in (0, 1)) and
                       ``otm_pct`` (a fraction in (0, 1)) and the ``iv_field`` it reads at D;
-                      ``iv_field`` is allowed on a ratio measure too (default: the run's)
+                      ``iv_field`` is allowed on a ratio measure too (default: the run's); an
+                      ``option_model_pnl`` outcome (a model P&L, basis ``model``) names its
+                      ``structure`` (MODEL_STRUCTURES), the ``iv_field`` and ``benchmark =
+                      "none"``, and takes no strike
     schedule          ``every_session`` | ``month_end`` | ``on_event:<class>`` (EVENT_CLASSES)
     base              what the picks are compared with: ``event`` (the names with the event at
                       D; default for an event schedule) | ``universe`` (every eligible name)
@@ -92,8 +95,12 @@ MIN_INDEPENDENT_SESSIONS = 40  # the quality bar's count: a fit and a promotion 
 FAMILIES = tuple("ABCDEFGHI")  # the idea catalogue's families (docs/edge-ideas/)
 STATUSES = ("researching", "candidate", "evidenced", "live", "retired", "rejected", "blocked")
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
-OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm")
+OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm", "option_model_pnl")
 STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
+# An option_model_pnl outcome's position: one at-the-money straddle held to the horizon's close,
+# long or short, or the long one delta-hedged (ADR 0053 amendment 2026-10-17).
+MODEL_STRUCTURES = ("atm_straddle_long", "atm_straddle_short", "delta_hedged_atm")
+MODEL_BASIS = "model"  # what a price from a model, not a quote, is labelled (results and UI)
 BENCHMARKS = ("SPY", "none")
 SCHEDULES = ("every_session", "month_end")
 BASES = ("event", "universe")
@@ -175,6 +182,11 @@ class Outcome:
     def is_return(self) -> bool:
         """The value is the net excess return (a round-trip cost applies to it)."""
         return self.kind == "excess_return" or self.measure == "excess_return"
+
+    @property
+    def basis(self) -> str | None:
+        """``"model"`` when the value is priced by a model (``option_model_pnl``), else None."""
+        return MODEL_BASIS if self.kind == "option_model_pnl" else None
 
     @property
     def sign(self) -> float:
@@ -516,6 +528,11 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
     )
     if kind == "excess_return" and benchmark == "none":
         raise ConfigurationError(f"{o.where} benchmark: an excess return needs SPY, not 'none'")
+    if kind == "option_model_pnl" and benchmark != "none":
+        raise ConfigurationError(
+            f"{o.where} benchmark: an option_model_pnl is a P&L on the underlying, "
+            f"it has no benchmark: use 'none'"
+        )
     horizons = _horizons(o)
     offset = o.integer("start_offset_sessions", 0)
     event = event_class(schedule)
@@ -561,20 +578,29 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
 
 
 def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:
-    """``(structure, strike_delta, otm_pct, iv_field)`` of an outcome: the first three only for
-    ``expires_otm`` (exactly one of the two strikes; the implied vol field is required there)."""
+    """``(structure, strike_delta, otm_pct, iv_field)`` of an outcome: a structure only for
+    ``expires_otm`` (exactly one of two strikes) and ``option_model_pnl`` (no strike); the
+    implied vol field is required for both."""
     names = o.names()
-    structure = o.choice("structure", "", STRUCTURES) if "structure" in names else None
     delta, pct = o.number("strike_delta", None), o.number("otm_pct", None)
     iv_field = _prose(o, "iv_field") or None
-    if kind != "expires_otm":
+    options = ("expires_otm", "option_model_pnl")
+    structures = STRUCTURES if kind == "expires_otm" else MODEL_STRUCTURES
+    structure = o.choice("structure", "", structures) if "structure" in names else None
+    if kind not in options:
         for key, value in (("structure", structure), ("strike_delta", delta), ("otm_pct", pct)):
             if value is not None:
                 raise ConfigurationError(f"{o.where} {key}: only an expires_otm outcome has one")
         return None, None, None, iv_field
     if structure is None:
         _missing(o, "structure")
-    if (delta is None) == (pct is None):
+    if kind == "option_model_pnl":
+        for key, value in (("strike_delta", delta), ("otm_pct", pct)):
+            if value is not None:
+                raise ConfigurationError(
+                    f"{o.where} {key}: an option_model_pnl is at the money, it has no strike"
+                )
+    elif (delta is None) == (pct is None):
         raise ConfigurationError(
             f"{o.where}: an expires_otm outcome names exactly one of strike_delta and otm_pct"
         )
@@ -582,7 +608,7 @@ def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float |
         if value is not None and not 0 < value < 1:
             raise ConfigurationError(f"{o.where} {key}: expected a fraction in (0, 1), got {value}")
     if iv_field is None:
-        raise ConfigurationError(f"{o.where} iv_field: required for an expires_otm outcome")
+        raise ConfigurationError(f"{o.where} iv_field: required for an {kind} outcome")
     return structure, delta, pct, iv_field
 
 

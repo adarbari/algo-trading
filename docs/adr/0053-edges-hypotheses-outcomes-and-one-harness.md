@@ -522,3 +522,48 @@ for one thing is removed.
    (screener config hash, edge variant, outcome, universe), which does not read the document's
    status or follow fields. Excluding bookkeeping from `run_hash` is a follow-up if the draw
    stability matters.
+
+## Amendment 2026-10-17: `option_model_pnl`, a modelled option P&L (EB H8)
+
+A fourth outcome kind, harness-side like `expires_otm`: it adds no grain, no table and no
+column, and reads the stored `forward_returns@v2` window and the implied vol at D.
+
+1. **Document.** `[outcome] kind = "option_model_pnl"` names `structure` (`atm_straddle_long` |
+   `atm_straddle_short` | `delta_hedged_atm`, `MODEL_STRUCTURES`), the `iv_field` it reads at D
+   (required, as for `expires_otm`) and `benchmark = "none"` (a P&L on the underlying has no
+   benchmark); no strike key is allowed (at the money). `cost_bps` is optional. A variant may
+   switch to or from the kind like any other kind change.
+2. **Value** (`cross_section/hit.py`, `T = horizon_sessions / 252`, r = q = 0, per straddle as a
+   fraction of the entry close `P` that `fwd_return` is measured from):
+   - long straddle: `|fwd_return| - straddle_price(iv, T)`; short: its negative;
+   - delta-hedged long straddle: `straddle_vega(iv, T) * (fwd_realised_vol^2 - iv^2) / (2 iv)`,
+     the standard gamma-P&L approximation. The vega-unit P&L per unit of vega is
+     `(rv^2 - iv^2) / (2 iv)` (no `T`: the gamma P&L already carries it); multiplied by the
+     straddle's vega (`2 sqrt(T) n(iv sqrt(T) / 2)`) it is in the same unit as the unhedged
+     value. The design note's `... * T / (2 iv)` is the same quantity before that
+     multiplication and was not carried as a literal.
+   The closed forms (`atm_straddle_price`, `atm_straddle_vega`, `delta_hedged_vega_pnl`) are in
+   `quant/black_scholes.py`, tested against the call-plus-put price, a finite-difference vega
+   and a seeded delta-hedged simulation (a martingale underlying: the hedged long straddle earns
+   in expectation `price(rv) - price(iv)`, which the vega form overshoots by about 7% at
+   rv 34% against iv 30% and matches within 2% at 31%).
+3. **Costs.** `cost_bps` is charged once, in bps of `P`, after the sign (the excess return's
+   convention; a short position pays it too). No hedging cost, spread, fill or margin is
+   modelled. The cost grid (`CostGrid`, a sensitivity over a stored gross return) does not
+   apply: the outcome is not a return (`is_return` is false, so `cost_applies` is false and
+   `counts_wins` is true), exactly as for `expires_otm`.
+4. **Missing inputs.** A row with no usable IV (`no_implied_vol`, `invalid_implied_vol`), no
+   stored `fwd_return` / `fwd_realised_vol` or no horizon is excluded with its reason
+   (`missing_value`), an `UNMEASURED` window as `unmeasured`; never a zero and never a miss.
+5. **Unit, basis and licence.** The series unit is `pnl` (not a return: the evidence curve
+   counts wins above the base rate, the size is the mean of the oriented value in the run's
+   rows). The outcome is labelled `basis = "model"` (`Outcome.basis`, `MODEL_BASIS`): its text
+   on the edge and builder pages says "model, not a quote", and the Guide terms
+   `outcome_option_model_pnl`, the three structures and `model_basis` explain it. The licence
+   is inherited from the `iv_field` through the existing `needs_implied_vol` path (IBKR-derived
+   IV: `personal`). No stored column carries the basis; a second basis (a chain P&L, the
+   `outcomes/option/structure_pnl@v1` grain of the design note) will need one and its own
+   amendment.
+6. **Not here.** The chain P&L grain (H13) and a short-put P&L (needs a strike key and a put
+   price) are not part of this amendment; `delta_hedged_atm` is the long position (the short
+   side is its negative: a `side` key is an owner decision).

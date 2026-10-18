@@ -26,7 +26,7 @@ from algotrade.services.read.evaluation.runs import SeriesRow
 from algotrade.services.read.evaluation.verdict import ALL, IN_SAMPLE, OUT_OF_SAMPLE
 from algotrade.services.read.values import Unknown, UnknownCode
 
-EXCESS_RETURN, RETURN, CUSHION, RATIO = "excess_return", "return", "cushion", "ratio"
+EXCESS_RETURN, RETURN, CUSHION, RATIO, PNL = "excess_return", "return", "cushion", "ratio", "pnl"
 RETURN_UNITS: Final = (EXCESS_RETURN, RETURN)  # an outcome whose windows add up to a return
 MEASURED, NO_PICKS = "measured", "no_picks"
 

@@ -197,6 +197,11 @@ values = { measured = "term:drawdown", not_stored = "term:cost_state", not_a_ret
 names = { not_a_return = "not a return" }
 
 [[enum]]
+source = "graphql:EdgeSettings.kind"
+values_from = "python:algotrade.config.edges.document:OUTCOME_KINDS"
+values = { excess_return = "term:outcome_excess_return", hit_target = "term:outcome_hit_target", expires_otm = "term:outcome_expires_otm", option_model_pnl = "term:outcome_option_model_pnl" }
+
+[[enum]]
 source = "graphql:EdgeCosts.state"
 values_from = "python:algotrade.services.read.edge_evidence.costs:COST_STATES"
 values = { measured = "term:cost_state", not_stored = "term:cost_state", not_a_cost_outcome = "term:cost_state", oos_hidden = "term:cost_state" }
@@ -359,7 +364,7 @@ ids = ["edge_builder_idea", "edge_builder_screens", "edge_builder_picks", "edge_
 
 [baseline]
 # The pins: each baseline's size; a PR only lowers them (adding to a baseline fails).
-max_enums = 33
+max_enums = 32
 max_sections = 5
 max_panels = 66
 enums = [
@@ -370,7 +375,6 @@ enums = [
   "graphql:Config.kind",
   "graphql:EdgeRow.sliceKind",
   "graphql:EdgeRun.status",
-  "graphql:EdgeSettings.kind",
   "graphql:Episode.kind",
   "graphql:Event.kind",
   "graphql:FailureGroup.statuses",

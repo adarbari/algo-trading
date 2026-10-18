@@ -7,6 +7,7 @@ from datetime import date
 from algotrade.config.edges.verdict import VerdictSettings
 from algotrade.core.time.calendar import next_session, sessions_between
 from algotrade.services.evaluation.cross_section.detail.windows import (
+    counts_wins,
     exit_session,
     next_exits,
     plan_exits,
@@ -32,6 +33,11 @@ def test_the_unit_follows_the_outcome() -> None:
            "otm_pct": 0.1, "iv_field": "feature.x"}  # fmt: skip
     otm = {k: v for k, v in otm.items() if k not in ("direction", "target")}
     assert unit_of(edge(outcome=otm)) == "cushion"
+    model = {"kind": "option_model_pnl", "horizon_sessions": [2], "start_offset_sessions": 1,
+             "benchmark": "none", "structure": "atm_straddle_long",
+             "iv_field": "feature.x"}  # fmt: skip
+    assert unit_of(edge(outcome=model)) == "pnl"
+    assert counts_wins("pnl") and counts_wins("cushion") and not counts_wins("return")
 
 
 def test_n_is_the_largest_count_a_criterion_asks_of_a_quarter_fill() -> None:
