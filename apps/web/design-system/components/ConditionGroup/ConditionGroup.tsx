@@ -10,7 +10,6 @@ import { Children, useId, useState, type ReactNode } from 'react';
 
 import { Heading } from '../../primitives/Heading';
 import { Surface } from '../../primitives/Surface';
-import { Text, type TextTone } from '../../primitives/Text';
 import { ExpandableRow } from '../ExpandableRow';
 import { PartJoin, type PartJoinLogic } from '../PartJoin';
 import styles from './ConditionGroup.module.css';
@@ -22,12 +21,6 @@ const JOIN: Record<ConditionGroupKind, PartJoinLogic> = {
   all: 'and',
   any: 'or',
   none: 'and_not',
-};
-
-const TONE: Record<ConditionGroupKind, TextTone> = {
-  all: 'muted',
-  any: 'accent',
-  none: 'negative',
 };
 
 export interface ConditionGroupProps {
@@ -74,7 +67,10 @@ export function ConditionGroup({
   const headingId = useId();
   const [open, setOpen] = useState(defaultOpen);
   const members = (
-    <ol className={styles.members} aria-label={readOnly && typeof title === 'string' ? title : undefined}>
+    <ol
+      className={styles.members}
+      aria-label={readOnly && typeof title === 'string' ? title : undefined}
+    >
       {Children.toArray(children).map((child, index) => (
         <li className={styles.member} key={index}>
           {index > 0 ? (
@@ -118,9 +114,7 @@ export function ConditionGroup({
     <Surface as="section" aria-labelledby={headingId} tone="row" padding={3}>
       <div className={styles.header} data-kind={kind}>
         <div className={styles.titles}>
-          <Text size="sm" weight="semibold" tone={TONE[kind]}>
-            {kindLabel}
-          </Text>
+          <span className={styles.kind}>{kindLabel}</span>
           <Heading level={headingLevel} id={headingId}>
             {title}
           </Heading>

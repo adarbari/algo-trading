@@ -7,6 +7,21 @@
   justify-content: space-between;
 }
 
+.kind {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* accent-strong, not accent: the accent fails contrast on the row tone in dark. */
+.header[data-kind='any'] .kind {
+  color: var(--color-accent-strong);
+}
+
+.header[data-kind='none'] .kind {
+  color: var(--color-negative);
+}
+
 .titles {
   display: flex;
   flex-wrap: wrap;
