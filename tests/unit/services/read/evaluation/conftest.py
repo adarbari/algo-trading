@@ -11,7 +11,7 @@ import pytest
 from algotrade.config.edges.document import QUALITY_BAR
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
-from algotrade.services.read.context import ReadContext, StoreContext, open_stores
+from algotrade.services.read.context import ReadContext, ResultCache, StoreContext, open_stores
 from algotrade.services.read.session import Session
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
@@ -86,6 +86,8 @@ def write_run(
     series: list[dict[str, Any]] | None = None,
     trades: list[dict[str, Any]] | None = None,
     whole: dict[str, Any] | None = None,
+    edge: str = "drift",
+    trials_counted: int = 1,
 ) -> None:
     """A run of ``drift``: an ``all`` row and a frozen (or, for another split, a ``split``)
     row for ``momo``; ``minutes`` after T; ``trades``: its ledger (``results/edge_trades``, its
@@ -95,22 +97,24 @@ def write_run(
     done = T + timedelta(minutes=minutes if finished_minutes is None else finished_minutes)
     kind = "frozen" if split == FROZEN else "split"
     rows = [
-        row("momo", "all", 0.3, split, user_id=owner, **(whole or {})),
-        row("momo", kind, hit_rate, split, user_id=owner, exploratory=split != FROZEN),
+        row("momo", "all", 0.3, split, user_id=owner, edge_id=edge, **(whole or {})),
+        row(
+            "momo", kind, hit_rate, split, user_id=owner, exploratory=split != FROZEN, edge_id=edge
+        ),
         *(extra or []),
     ]
     frame = stamped(rows, END, run_id, at, "edge-eval")
     stats = {
-        "edge": "drift", "split_from": split.isoformat() if split else None,
+        "edge": edge, "split_from": split.isoformat() if split else None,
         "exploratory": split != FROZEN if exploratory is None else exploratory,
         "range": [START.isoformat(), END.isoformat()], "as_of": "2026-10-01T00:00:00+00:00",
-        "trials_counted": 1,
+        "trials_counted": trials_counted,
     }  # fmt: skip
     if trades is not None:
         stats["ledger_rows"] = len(trades)
     if trigger is not None:  # runs from before the trigger was recorded have none
         stats["trigger"] = trigger
-    record = RunRecord(run_id, f"edge-eval:drift:{owner}", END, at)
+    record = RunRecord(run_id, f"edge-eval:{edge}:{owner}", END, at)
     with writer.publishing(run_id, done):
         writer.write_result("edge_eval", END, run_id, frame, pending=True)
         if series:
@@ -138,5 +142,14 @@ def session_ctx(ctx: StoreContext, day: date) -> ReadContext:
     return ReadContext(ctx.reader, ctx.configs, ctx.user, session, ctx.features, ctx.cache)
 
 
-def stores(backend: MemoryBackend, user: str = "me") -> StoreContext:
-    return open_stores(StoreReader(backend), MemoryConfigStore(DOCS), UserContext(user))
+def stores(
+    backend: MemoryBackend,
+    user: str = "me",
+    docs: dict[tuple[str, str, str], dict[str, Any]] | None = None,
+    cache: ResultCache | None = None,
+) -> StoreContext:
+    """The stores of ``backend`` for ``user``; ``docs``: other config documents than ``DOCS``;
+    ``cache``: a result cache to share between two contexts (default: a fresh one)."""
+    return open_stores(
+        StoreReader(backend), MemoryConfigStore(docs or DOCS), UserContext(user), cache
+    )

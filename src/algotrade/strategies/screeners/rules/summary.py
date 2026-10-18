@@ -9,7 +9,6 @@ from typing import Any
 
 from algotrade.core.model.predicates import FieldValue
 from algotrade.strategies.screeners.base import Decision
-from algotrade.strategies.screeners.rules.criteria import Outcome
 from algotrade.strategies.screeners.rules.row import RuleRow
 
 
@@ -48,17 +47,18 @@ def summarise(rows: Sequence[RuleRow]) -> RunSummary:
     narrow = tuple(
         NarrowMiss(
             row.instrument_id,
-            result.criterion.id,
-            result.criterion.field,
-            result.value,
-            result.threshold(),
-            result.distance,
-            result.normalised,
+            leaf.criterion.id,
+            leaf.criterion.field,
+            leaf.value,
+            leaf.threshold(),
+            leaf.distance,
+            leaf.normalised,
         )
         for row in rows
         if row.only_near_misses()
-        for result in row.results
-        if result.gating and result.outcome is Outcome.NEAR
+        for gate in row.gate_results
+        if gate.verdict.near
+        for leaf in (gate.leaf,)
     )
     return RunSummary(
         rows=len(rows),
