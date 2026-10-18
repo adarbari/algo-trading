@@ -10,7 +10,8 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 | Edge | Family | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|---|
 | Asset growth (an avoid list) (`asset_growth`) | A | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `asset_growth` |
-| Cash-based operating profitability (`cash_based_operating_profitability`) | A | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cash_op_profitability`, `composite_value` |
+| Cash-based operating profitability (`cash_based_operating_profitability`) | A | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cash_op_profitability` |
+| Composite value among cash-profitable names (`composite_value`) | A | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `composite_value` |
 | Financial distress (an avoid list) (`distress_failure_probability`) | A | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `distress_ohlson` |
 | Net share issuance (`net_share_issuance`) | A | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `net_share_issuance` |
 | Quality minus junk (`quality_minus_junk`) | A | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `qmj` |
@@ -63,11 +64,11 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Schedule:** month end
 - **Universe:** preset `liquid_common_stocks`
 - **Top K:** 50
-- **Screeners:** `cash_op_profitability`, `composite_value`
+- **Screeners:** `cash_op_profitability`
 - **Baselines:** `size_small`, `momentum_12_1`
 - **Frozen period:** from 2026-04-01
 - **Published:** decile spread 0.47% over 20 sessions (Ball, G., Gerakos, J., Linnainmaa, J. and Nikolaev, V., Accruals, cash flows, and operating profitability in the cross section of stock returns, Journal of Financial Economics, 2016, 51 years)
-- **Notes:** Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). The second screener, composite_value, is the catalogue's variant: cheap on a two-part value yield among cash-profitable names ('only useful combined with profitability'); the harness scores it beside the main one on the same sessions. cash_op_profitability is built from stored lines (EBIT less the gap between net income and operating cash flow, over total assets): the paper's line by line accrual changes and its R&D add-back are not stored, so it is a proxy, not a replication; decile sorts are the harness's, not the paper's NYSE breakpoints. long_short, where run, is diagnostic only (ADR 0053 amendment, outcome sides).
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). cash_op_profitability is built from stored lines (EBIT less the gap between net income and operating cash flow, over total assets): the paper's line by line accrual changes and its R&D add-back are not stored, so it is a proxy, not a replication; decile sorts are the harness's, not the paper's NYSE breakpoints. long_short, where run, is diagnostic only (ADR 0053 amendment, outcome sides).
 
 **Quality bar**
 
@@ -86,6 +87,37 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - Ball, G., Gerakos, J., Linnainmaa, J. and Nikolaev, V., Accruals, cash flows, and operating profitability in the cross section of stock returns, Journal of Financial Economics, 2016 <https://doi.org/10.1016/j.jfineco.2016.03.002>
 - Novy-Marx, R., The Other Side of Value: The Gross Profitability Premium, Journal of Financial Economics, 2013 <https://www.nber.org/system/files/working_papers/w15940/w15940.pdf>
 - Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022 <https://papers.ssrn.com/abstract=3604626>
+
+## Composite value among cash-profitable names (`composite_value`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Cheap stocks that are also cash-profitable outperform the market over the following months.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_common_stocks`
+- **Top K:** 50
+- **Screeners:** `composite_value`
+- **Baselines:** `cash_op_profitability`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). A variant of cash_based_operating_profitability filed as its own edge so that edge's published figure is not read against this rule: the screener holds names with positive cash-based operating profitability and a positive composite_value_yield (the mean of EBIT / enterprise value and the free cash flow yield, a catalogue formalisation with no book to market or growth part), cheapest first; cash_op_profitability is the baseline, so the harness shows whether cheapness adds to profitability. No published figure is carried: the sources give approximate sizes only. long_short, where run, is diagnostic only.
+
+**Quality bar**
+
+1. **Mechanism:** Investors extrapolate past growth and overpay for glamour; cheap names are priced for decline, and pairing cheapness with profitability removes the value traps whose low price reflects a shrinking business (Lakonishok, Shleifer and Vishny 1994; Novy-Marx 2013).
+2. **Persistence:** Value alone has had a Sharpe near zero in the US since 2007 and is cheap itself (Israel, Laursen and Richardson 2021); the cheap-and-profitable combination is the robust trade in the research and is uncomfortable to hold in growth rallies, which keeps it from being arbitraged away.
+3. **Outcome:** Excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions).
+4. **Trigger timing:** Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** Lakonishok, Shleifer and Vishny: deciles on book to market, earnings to price, cash flow to price and sales growth, annual. Here the top 50 by a two-part yield (EBIT to enterprise value and free cash flow to market value) among names with positive cash-based operating profitability, monthly: a partial replication without the book to market and growth parts.
+6. **Expected size and sample:** Value-minus-glamour was about 10% a year, 1968-1990 (approximate, not verified), and the HML factor about 0.3% a month 1963-2024 and near zero since 2007 (approximate). Combined with profitability the catalogue expects a modest premium. A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it.
+7. **Capacity and costs:** Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume): low turnover, small spreads; the 10 bps round trip is the assumption. No short leg in the main outcome.
+8. **Failure modes and retirement:** Cheap names cluster in cyclical sectors at peak earnings (a high yield on peak profit) and lag in growth rallies. Retire if the frozen-period decile spread is not above zero or the top 50 does not beat the buy-and-hold mean of the eligible names.
+9. **Decoys:** The profitability tilt alone (the cash_op_profitability baseline), sector and interest-rate exposure, and size (the size baseline on the same sessions).
+
+**Sources**
+
+- Lakonishok, J., Shleifer, A. and Vishny, R., Contrarian Investment, Extrapolation, and Risk, Journal of Finance, 1994
+- Asness, C. and Frazzini, A., The Devil in HML's Details, Journal of Portfolio Management, 2013
+- Novy-Marx, R., The Other Side of Value: The Gross Profitability Premium, Journal of Financial Economics, 2013 <https://www.nber.org/system/files/working_papers/w15940/w15940.pdf>
 
 ## Financial distress (an avoid list) (`distress_failure_probability`)
 
@@ -193,7 +225,7 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - **Screeners:** `bdc_price_to_nav`
 - **Baselines:** none yet
 - **Frozen period:** from 2026-04-01
-- **Notes:** Month-end start sessions spaced at least 60 sessions apart (one quarter, the NAV cadence). The NAV is not a new source: the net asset value per share of a BDC is its stockholders' equity over its shares, so price to NAV is pb_ratio of the stored statements (a BDC's equity is its net assets), public from its 10-Q or 10-K acceptance (statements_accepted, H2). D5's events/fund_nav (Tiingo NAV series) does not carry BDCs, whose NAV is quarterly. The universe is a hand list of listed BDCs (the reference snapshot has no BDC type and the SEC company table no SIC for them), kept equal in the selection preset and the screener by a fitness test. About 38 names: 10 picks is a quarter of the list, so the decile spread is over a handful of names a session and the harness's t is weak; the catalogue's rule (discount against the name's own three-year average and peers) needs a NAV history that is not stored, so v1 ranks the plain price to NAV, and says so. The discount must be read with the NAV trend (a falling NAV earns its discount): not conditioned in v1.
+- **Notes:** Month-end start sessions spaced at least 60 sessions apart (one quarter, the NAV cadence). The NAV is not a new source: the net asset value per share of a BDC is its stockholders' equity over its shares, so price to NAV is pb_ratio of the stored statements (a BDC's equity is its net assets), public from its 10-Q or 10-K acceptance (statements_accepted, H2). D5's events/fund_nav (Tiingo NAV series) does not carry BDCs, whose NAV is quarterly. The universe is a hand list of listed BDCs keyed by instrument id (resolved from the tickers through the SymbolResolver; the reference has no BDC type and the SEC company table no SIC for them), kept equal in the selection preset and the screener by a fitness test. History before the frozen period is survivor-only: BDCs merged away or delisted before the list was made are missing, and renamed ones (ORCC to OBDC 2023, AINV to MFIC 2022) are resolved by id. The book value is the balance sheet and the share count the newest cover page, which can be a quarter newer, so price to NAV mixes two dates; the screener also requires the balance sheet to be at most 135 days old (rollup.qmj@v1.balance_sheet_age_days), because pb_ratio refuses only a 480-day-old one. About 38 names: 10 picks is a quarter of the list, so the decile spread is over a handful of names a session and the harness's t is weak; the catalogue's rule (discount against the name's own three-year average and peers) needs a NAV history that is not stored, so v1 ranks the plain price to NAV, and says so. The discount must be read with the NAV trend (a falling NAV earns its discount): not conditioned in v1.
 
 **Quality bar**
 

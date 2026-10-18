@@ -15,6 +15,7 @@ sum of profitability, growth and safety. Built from what is stored:
                       volatility: price based or unstored)
     qmj_score         z(profitability_z + safety_z); the growth part (five-year changes of the
                       profitability measures) is not built
+    balance_sheet_age_days  days from the latest balance sheet date to the session
 
 A part that cannot be formed is left out of its mean; too few parts, or a cross-section with fewer
 than ``min_members`` known values, is null (UNKNOWN), never zero.
@@ -26,16 +27,13 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
+from algotrade.features.framework.declaration import FeatureGroup, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.statements.lines import PRICE_STATS, STATEMENTS
 from algotrade.features.rollups.statements.mispricing import (
     BALANCE,
-    CASH_FLOW,
-    FINANCIALS,
-    FUNDAMENTALS,
-    INCOME,
+    GROUP_INPUTS,
     MispricingParams,
+    _table,
     measures,
 )
 
@@ -118,6 +116,17 @@ FEATURES = (
         "profitability_z or safety_z is null (see each)" + _RANKED,
         valid_range=(None, None), kind="cross_section", inputs=_INPUTS,
     ),
+    Feature(
+        "balance_sheet_age_days", "int", "days",
+        "Calendar days from the latest balance sheet's date (bs_as_of) to the session: how old "
+        "the book figures are. The statement groups call a balance sheet STALE only after "
+        "stale_days (480), far too late for a figure that is quarterly by nature; a screen on "
+        "book value asks for a day count it can bound (a quarter end plus the 45-day filing "
+        "deadline is about 135)",
+        "no balance sheet of the session (ETFs, funds, no CIK, issuers that report outside USD)",
+        valid_range=(0, None), kind="window",
+        inputs=("balance_sheet.bs_as_of@v2",),
+    ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
 
@@ -148,6 +157,9 @@ def compute(inputs: Inputs, session: date, p: QmjParams) -> pd.DataFrame:
     out["profitability_z"] = profitability
     out["safety_z"] = safety
     out["qmj_score"] = zscore(profitability + safety, p)
+    bs_date = pd.to_datetime(_table(inputs, BALANCE, session, ("bs_as_of",))["bs_as_of"])
+    age = (pd.Timestamp(session) - bs_date).dt.days
+    out["balance_sheet_age_days"] = age.reindex(out.index).astype("Int64")
     return out.reset_index()
 
 
@@ -158,15 +170,7 @@ GROUP = FeatureGroup(
     "leverage and distress safety z-score and their combined z-score across the cross-section, "
     "point in time by filing acceptance; parts that cannot be formed are left out and too few "
     "make the score null",
-    (
-        Input(PRICE_STATS),
-        Input(BALANCE, required=False),
-        Input(INCOME, required=False),
-        Input(CASH_FLOW, required=False),
-        Input(FINANCIALS, required=False),
-        Input(FUNDAMENTALS, required=False),
-        Input(STATEMENTS, required=False),
-    ),
+    GROUP_INPUTS,
     FEATURES,
     compute,
     QmjParams(),

@@ -30,7 +30,7 @@
 "eap_volume/v1.toml" = "762e7469aeb6396cb64eeeff01cea7cc8487ebab66174bcda3fcae76d90ea6ba"
 "vrp_iv_hv/v1.toml" = "2c78129bf0aa2179172ea0785c7d4a44dddd27d72d56b1d3c58cb73b163cdce3"
 "asset_growth/v1.toml" = "9a10763864e1d8ff594a092c2c8248e33ae5724128ae71e179e3012ed1eee3a7"
-"bdc_price_to_nav/v1.toml" = "8b5da5143a406e6d3a9bd669bdacfee2191d39312599fed71e53bb318a64b1d1"
+"bdc_price_to_nav/v1.toml" = "2d49621818c4af8b8a2581c744a4668dee09c238ba0cac3fcc65fc711a13f9c3"
 "cash_op_profitability/v1.toml" = "b39ef78172ccebd5d523f923a4964a188f4ecf3d87b31ed7bf272b5daa563dc0"
 "composite_value/v1.toml" = "74cb33d3d576b458d5b05584301cdb8860dca0079ba18355e2f2fb79dc8a96bd"
 "distress_ohlson/v1.toml" = "cabfbf9ee0fd9536674af3439c480354654a429b7fad3a12d0eb6fb7dc6dd898"

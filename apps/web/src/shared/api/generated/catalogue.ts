@@ -496,6 +496,7 @@ export const SITE_FEATURES = [
   'rollup.qmj@v1.profitability_z',
   'rollup.qmj@v1.safety_z',
   'rollup.qmj@v1.qmj_score',
+  'rollup.qmj@v1.balance_sheet_age_days',
   'rollup.analyst_revisions@v1.eps_fy1_revision_30d',
   'rollup.analyst_revisions@v1.eps_fy1_revision_60d',
   'rollup.analyst_revisions@v1.eps_fy1_revision_90d',

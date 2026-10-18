@@ -650,3 +650,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a rising instrument would otherwise pass Works on drift alone; the paired difference removes the instrument's drift without a model.
+
+## 2026-10-18 | EB E2 (PR 667 review) | How the BDC universe is defined
+- Question: how is the universe of the BDC price-to-NAV edge defined, when the reference has no BDC type and the SEC company table no SIC for them?
+- Options: a ticker list with a maintenance rule / key the list by instrument_id / drop the edge.
+- Decision: key by instrument_id: the tickers are resolved once through the SymbolResolver and the ids are committed in the selection preset and the screener (a fitness test keeps them equal); the edge notes say history before the frozen period is survivor-only (BDCs merged away are missing; renamed ones such as ORCC to OBDC 2023 and AINV to MFIC 2022 are the same id). The screener also requires the balance sheet to be at most 135 days old (`rollup.qmj@v1.balance_sheet_age_days`) and discloses that the cover-page share count and the balance-sheet equity can differ by a quarter.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a ticker is reused and renamed, an id is not (ADR 0018); a list with no maintenance rule is a silent survivor filter, so it is named as one; dropping the edge loses a clean, cheap test of a documented structural niche.

@@ -428,19 +428,19 @@ Sources: Sector rotation by relative strength: https://school.stockcharts.com/do
 
 Sources: Site convention (docs/data/instruments.md; Nasdaq Trader symbol directory)
 
-### `instrument.symbol`
+### `instrument.instrument_id`
 
-**How to read it.** The ticker. Identity, not a measure: used to gate a screen to a hand list of names (the listed business development companies of the bdc_price_to_nav screener), so hard, never soft or scored. A list is only as current as its last edit.
+**How to read it.** The instrument's own id. Identity, not a measure: used to gate a screen to a hand list of names (the listed business development companies of the bdc_price_to_nav screener), so hard, never soft or scored. The list is resolved from tickers once, through the symbol resolver, and keyed by id so a renamed company stays itself.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| one of these tickers | `in ["MAIN", "ARCC"]` | hard | - | - |
+| one of these instruments | `in ["EQ:EXAMPLE1", "EQ:EXAMPLE2"]` | hard | - | - |
 
 **When the reading lies**
 
-- A ticker can be reused after a delisting and changes when a company renames itself. A backtest reads the snapshot of its own session. A newly listed name is missing from a hand list until it is added.
-- A list by ticker says nothing about what the name is: check the company before trusting a name that only matches by spelling.
+- A list by id is survivor-only: a company merged away or delisted before the list was made is missing from any history built on it. A newly listed name is missing until it is added.
+- A list says nothing about what a name is; check the company before trusting an id copied from another list.
 
-Sources: Site convention (docs/data/instruments.md)
+Sources: Site convention (docs/data/instruments.md; ADR 0018, FIGI ids)

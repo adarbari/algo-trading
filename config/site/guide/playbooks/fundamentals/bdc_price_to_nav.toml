@@ -14,7 +14,7 @@ not_checked = "It does not check whether the net asset value is falling (a deep 
 before_acting = [
   "The discount is against the last reported net assets: feature.pb_ratio can look cheap because the value is stale, so check when the latest report was filed before acting.",
   "A discount that keeps widening usually follows rising non-accruals; a shrinking book (rollup.balance_sheet@v2.stockholders_equity compared with a quarter ago) says the discount is earned.",
-  "The hand list is checked by name, not by a type the data carries: a newly listed BDC is missing until the list is updated.",
+  "The list is keyed by instrument id and survivor-only: a BDC merged away before the list was made is missing, and a newly listed one is missing until it is added. The book value is the balance sheet (at most 135 days old here) while the share count is the newest cover page, so the ratio mixes two dates.",
 ]
 sources = [
   "Pontiff, Closed-End Fund Premia and Returns: Implications for Financial Market Equilibrium (1995)",
@@ -28,5 +28,6 @@ related = [
 security_type = "A common stock"
 status = "Still listed and trading"
 bdc = "On the list of listed BDCs"
+nav_fresh = "Its latest balance sheet is at most about 135 days old"
 adv = "Trades at least $1M a day"
 price_to_nav = "Trades below or near its book value per share"

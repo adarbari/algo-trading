@@ -19,8 +19,8 @@ EDGES = {e.id: e for e in load_edges(FileConfigStore(REPO_ROOT / "config", local
 RANKS = {
     "cash_based_operating_profitability": {
         "cash_op_profitability": "desc",
-        "composite_value": "desc",
     },
+    "composite_value": {"composite_value": "desc"},
     "quality_minus_junk": {"qmj": "desc"},
     "net_share_issuance": {"net_share_issuance": "asc"},  # most negative issuance (buybacks) first
     "asset_growth": {
@@ -74,16 +74,18 @@ def test_net_share_issuance_is_long_the_buybacks_with_the_issuers_as_a_short_var
 
 
 def test_the_bdc_hand_list_is_the_same_in_the_screener_and_the_universe() -> None:
-    screener = preset("bdc_price_to_nav")["criteria"]["bdc"]["value"]
+    criteria = preset("bdc_price_to_nav")["criteria"]
+    screener = criteria["bdc"]["value"]
+    assert criteria["nav_fresh"]["value"] == 135  # the book is at most a quarter and a filing old
     where = tomllib.loads((PRESETS / "selections" / "bdc_listed.toml").read_text())["where"]["all"]
-    universe = next(c["value"] for c in where if c["field"] == "instrument.symbol")
+    universe = next(c["value"] for c in where if c["field"] == "instrument.instrument_id")
     assert screener == universe and len(set(screener)) == len(screener) >= 30
     assert EDGES["bdc_price_to_nav_reversion"].universe == "bdc_listed"
 
 
 def test_only_the_edge_with_a_verified_figure_carries_a_published_one() -> None:
     published = {i: EDGES[i].published for i in RANKS if EDGES[i].published}
-    assert list(published) == ["cash_based_operating_profitability"]
+    assert list(published) == ["cash_based_operating_profitability"]  # composite_value has none
     figure = published["cash_based_operating_profitability"]
     assert figure.measure == "decile_spread" and figure.value == pytest.approx(0.0047)
     assert (

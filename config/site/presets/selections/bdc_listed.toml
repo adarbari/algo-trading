@@ -1,6 +1,8 @@
-# Listed business development companies (BDCs), a hand list: the reference snapshot carries no BDC
-# type and the SEC company table no SIC for them (the BDC's own N-54A election leaves it blank), so
-# the list is the names checked against the reference on 2026-10-18. Active common stocks that
+# Listed business development companies (BDCs), a hand list keyed by instrument id (resolved from
+# the tickers named on the list line through the SymbolResolver on 2026-10-18; the reference has no
+# BDC type and the SEC company table no SIC for them). It is survivor-only: a BDC merged away or
+# delisted before then is missing, and a renamed one (ORCC to OBDC 2023, AINV to MFIC 2022) is the
+# same id. Active common stocks that
 # trade at least $1M a day. The same list is the criterion of the bdc_price_to_nav screener
 # (a fitness test keeps them equal). The universe of the bdc_price_to_nav_reversion edge.
 name = "bdc_listed"
@@ -9,6 +11,6 @@ name = "bdc_listed"
 all = [
   { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
-  { field = "instrument.symbol", op = "in", value = ["NMFC", "CSWC", "OXSQ", "MAIN", "HTGC", "GAIN", "MFIC", "GLAD", "BBDC", "ARCC", "GBDC", "PSEC", "SAR", "HRZN", "PNNT", "OFS", "OCSL", "SLRC", "TSLX", "FDUS", "PFLT", "TCPC", "FSK", "WHF", "SCM", "GSBD", "TPVG", "ICMB", "CION", "CCAP", "OBDC", "CGBD", "BCSF", "BXSL", "TRIN", "KBDC", "LIEN", "RWAY"] },
+  { field = "instrument.instrument_id", op = "in", value = ["EQ:BBG000BG22J4", "EQ:BBG000BGJ661", "EQ:BBG000BS21R1", "EQ:BBG000BXT422", "EQ:BBG000C2R8K2", "EQ:BBG000C32KN7", "EQ:BBG000CBNX94", "EQ:BBG000DJYTQ4", "EQ:BBG000F54FK1", "EQ:BBG000PD6X77", "EQ:BBG000PXNF64", "EQ:BBG000Q3RGN4", "EQ:BBG000Q6S3Z2", "EQ:BBG000QJZTT6", "EQ:BBG000QVWX13", "EQ:BBG000R3NQ37", "EQ:BBG000TKZRB3", "EQ:BBG000V86JM5", "EQ:BBG001DFW799", "EQ:BBG001K9JH07", "EQ:BBG001LV74X3", "EQ:BBG001P0TNW2", "EQ:BBG001YCZP63", "EQ:BBG003CNYJ00", "EQ:BBG003LB3TH0", "EQ:BBG004DDDKH1", "EQ:BBG005GXFKJ7", "EQ:BBG005YZ5XC2", "EQ:BBG009KJ66B4", "EQ:BBG009NX1JT8", "EQ:BBG00DB0XYC4", "EQ:BBG00GQVWWP4", "EQ:BBG00JDV0M15", "EQ:BBG00MS80PM3", "EQ:BBG00T6WFZ96", "EQ:BBG00Z6ZX0D7", "EQ:BBG011K51BR7", "EQ:BBG012QFW3F4"] },  # NMFC CSWC OXSQ MAIN HTGC GAIN MFIC GLAD BBDC ARCC GBDC PSEC SAR HRZN PNNT OFS OCSL SLRC TSLX FDUS PFLT TCPC FSK WHF SCM GSBD TPVG ICMB CION CCAP OBDC CGBD BCSF BXSL TRIN KBDC LIEN RWAY
   { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 1_000_000 },
 ]
