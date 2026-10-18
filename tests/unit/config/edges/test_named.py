@@ -64,7 +64,7 @@ def test_a_time_series_document_parses_with_a_raw_return_outcome() -> None:
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
-        ({"schedule": "month_end"}, "needs a calendar schedule"),
+        ({"schedule": "month_end"}, "needs a calendar or on_market schedule"),
         ({"universe": "liquid_optionable"}, "names its instruments inline"),
         (
             {"universe": {"where": {"all": [rule(["SPY"], field="instrument.is_etf")]}}},

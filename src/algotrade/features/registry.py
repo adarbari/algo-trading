@@ -68,6 +68,7 @@ from algotrade.features.rollups.market import (
     macro,
     regime,
     trend,
+    triggers,
 )
 from algotrade.features.rollups.options import (
     call_wing,
@@ -198,6 +199,7 @@ GROUPS: dict[str, FeatureGroup] = {
             macro.GROUP,
             indicators.GROUP,
             regime.GROUP,
+            triggers.GROUP,
             fund_reference.GROUP,
             cef_nav.GROUP,
             etf_flows.GROUP,
