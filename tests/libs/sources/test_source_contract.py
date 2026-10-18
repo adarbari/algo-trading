@@ -62,9 +62,9 @@ from algotrade_sources.vendors.tiingo.prices import TiingoDailyPrices
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
 from tests.helpers.fake_ib import FakeIB
+from tests.helpers.finra import payloads as finra_payloads
 from tests.helpers.ingest_fakes import http_for
 from tests.helpers.payloads import cboe as fx
-from tests.helpers.payloads import finra as finra_payloads
 from tests.helpers.payloads import fred as fred_payloads
 from tests.helpers.payloads import massive as massive_payloads
 from tests.helpers.payloads import nasdaq_earnings as earnings_payloads

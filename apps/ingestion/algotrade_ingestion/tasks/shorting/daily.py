@@ -48,7 +48,7 @@ def one_day(run: IngestRun, source: Source, table: str, known: Known, day: date)
     return f"OK: {len(resolved)} rows"
 
 
-def ingest_days(
+def store_days(
     ctx: TaskContext,
     task: str,
     table: str,

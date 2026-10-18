@@ -541,10 +541,10 @@ FILING_EVENTS = fixed(
 # keeps only the latest revision of a date, so a stored date is never refetched: the first-seen
 # value is the point-in-time one. ``no_ml`` in tables.toml: FINRA's website terms bar machine
 # learning over the data, so no learned scorer reads it (``tests/architecture``).
-# The tables no learned scorer may read (``no_ml = true`` in architecture/tables.toml, the same set:
-# ``tests/architecture/test_no_ml_tables.py``): a source whose terms bar machine learning over its
-# data. Rule screens may read them; ``services.evaluation.training`` refuses a scorer feature
-# computed from one.
+# The tables no learned scorer may read (``no_ml = true`` in architecture/tables.toml, the same
+# set: ``tests/architecture/data/test_no_ml_tables.py``): a source whose terms bar machine learning
+# over its data. Rule screens may read them; ``services.evaluation.training`` refuses a scorer
+# feature computed from one.
 NO_ML_TABLES = frozenset({"events/short_interest", "events/short_volume"})
 SHORT_INTEREST_EVENTS = fixed(
     "events/short_interest",

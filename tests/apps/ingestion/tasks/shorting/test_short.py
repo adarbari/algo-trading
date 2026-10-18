@@ -17,8 +17,8 @@ from algotrade_ingestion.tasks.shorting import short_interest, short_volume
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.finra.short_interest import FinraShortInterest
 from algotrade_sources.vendors.finra.short_volume import FinraShortVolume
+from tests.helpers.finra import payloads
 from tests.helpers.ingest_fakes import http_for, task_ctx
-from tests.helpers.payloads import finra as payloads
 from tests.helpers.stored_frames import write_reference
 
 IDS = {"AAA": "EQ:AAA", "BBB": "EQ:BBB"}  # OTCX is not in the universe

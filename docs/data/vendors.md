@@ -252,7 +252,7 @@ intelligence" and building a database from the site. We read the API only (so th
 before the API's rolling year is not backfilled), and mark both tables `no_ml = true` in
 `architecture/tables.toml` as a precaution: rule screens may read them, but no learned scorer may
 (`services/evaluation/training/no_ml.py`, which `training_frame` runs; the rows are never passed
-to the text model either). `tests/architecture/test_no_ml_tables.py` keeps the flags and the code
+to the text model either). `tests/architecture/data/test_no_ml_tables.py` keeps the flags and the code
 one set. Quality: the volume covers off-exchange prints only (a venue-biased proxy of shorting, not
 short interest); days to cover uses FINRA's own average daily volume.
 

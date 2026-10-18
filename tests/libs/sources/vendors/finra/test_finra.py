@@ -13,8 +13,8 @@ from algotrade_sources.vendors.finra.short_interest import TABLE as INTEREST
 from algotrade_sources.vendors.finra.short_interest import FinraShortInterest
 from algotrade_sources.vendors.finra.short_volume import TABLE as VOLUME
 from algotrade_sources.vendors.finra.short_volume import FinraShortVolume
+from tests.helpers.finra import payloads
 from tests.helpers.ingest_fakes import http_for
-from tests.helpers.payloads import finra as payloads
 
 
 def test_the_url_filter_becomes_the_post_body(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -100,6 +100,8 @@ owner = ["apps/ingestion/algotrade_ingestion/tasks/shorting/*"]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the tasks' tables
     "src/algotrade/storage/tables/schemas.py",  # declares the tables
+    "libs/sources/algotrade_sources/vendors/finra/short_interest.py",  # the source's frame key
+    "libs/sources/algotrade_sources/vendors/finra/short_volume.py",  # the source's frame key
 ]
 section = "docs/edge-ideas/build-plan.md#3-finra-short-interest-bi-monthly-and-daily-short-sale-volume"
 detect = [{ string = "events/short_interest" }, { string = "events/short_volume" }]

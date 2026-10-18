@@ -18,7 +18,7 @@ from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.shorting import schedule
-from algotrade_ingestion.tasks.shorting.daily import ingest_days
+from algotrade_ingestion.tasks.shorting.daily import store_days
 
 TASK = "short-volume"
 TABLE = "events/short_volume"
@@ -39,7 +39,7 @@ def run(ctx: TaskContext, params: Mapping[str, Any]) -> RunRecord:
     end = params.get("end") or session
     days = ctx.settings.finra_short_volume_lookback_days
     start = params.get("start") or end - timedelta(days - 1)
-    return ingest_days(
+    return store_days(
         ctx,
         TASK,
         TABLE,

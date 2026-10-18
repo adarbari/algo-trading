@@ -7,7 +7,7 @@ of the last ``[finra] short_interest_lookback_days`` calendar days not stored ye
 published yet is ``NO_DATA`` and asked again the next night); a backfill is
 ``algotrade-ingest run short-interest --from 2017-12-29`` (the API's first partition), resumable
 because a stored date is skipped. The table is ``no_ml``: no learned scorer reads it
-(``architecture/tables.toml``, ``tests/architecture/test_no_ml_tables.py``).
+(``architecture/tables.toml``, ``tests/architecture/data/test_no_ml_tables.py``).
 """
 
 from collections.abc import Mapping
@@ -18,7 +18,7 @@ from algotrade.core.time.calendar import last_session_of_month, session_on_or_be
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.shorting import schedule
-from algotrade_ingestion.tasks.shorting.daily import ingest_days
+from algotrade_ingestion.tasks.shorting.daily import store_days
 
 TASK = "short-interest"
 TABLE = "events/short_interest"
@@ -52,7 +52,7 @@ def run(ctx: TaskContext, params: Mapping[str, Any]) -> RunRecord:
     end = params.get("end") or session
     days = ctx.settings.finra_short_interest_lookback_days
     start = params.get("start") or end - timedelta(days)
-    return ingest_days(
+    return store_days(
         ctx,
         TASK,
         TABLE,
