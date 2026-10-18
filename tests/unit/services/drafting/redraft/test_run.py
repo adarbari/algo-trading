@@ -462,7 +462,12 @@ def grouped_prior(ctx: ReadContext, groups: dict[str, Any] | None = None) -> Any
     the trader's own)."""
     held = held_draft(ctx)
     parts = tuple(
-        replace(p, join="or", join_words="or") if p.id == "p3" else p for p in held.parts or ()
+        replace(p, join="or", join_words="or")
+        if p.id == "p3"
+        else replace(p, join=None, join_words="")
+        if p.id == "p4"
+        else p
+        for p in held.parts or ()
     )
     ids = {c["field"]: cid for cid, c in held.document["criteria"].items()}
     derived = {"any_1": {"any": [ids[PRICE], ids[OI]]}}
@@ -482,6 +487,7 @@ def test_a_retyped_part_keeps_its_join_and_the_groups_of_the_sentence_are_read_a
     gone = check_request("my_screen", body_of(prior, "p3", "deep open interest"))
     flat = redraft_part(ctx, Canned(answer_for("deep open interest")), gone)
     assert "groups" not in flat.draft.document  # nothing left to group with the part's criterion
+    assert any("not applied" in n for n in flat.draft.notes)  # never silently flat
 
 
 def test_groups_the_trader_edited_stay_without_the_members_that_are_gone(

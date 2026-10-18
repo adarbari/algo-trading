@@ -430,9 +430,12 @@ def _draft(
         items = [replace(item, tag=WHOLE) for item in items]
     explained = build_parts(sentence, raw_parts, items, phrasebook)
     if explained:
-        derived = group_parts(explained[0], document["criteria"]).groups
         carried = prune_groups((current or {}).get("groups"), document["criteria"])
-        document = with_groups(ctx, screener_id, document, [{**carried, **derived}, carried])
+        grouping = group_parts(explained[0], document["criteria"], carried)
+        document, why = with_groups(
+            ctx, screener_id, document, [{**carried, **grouping.groups}, carried]
+        )
+        notes = (*notes, *grouping.notes, *why)
     return ScreenDraft(
         screener_id, document, dropped, notes,
         formulas=formulas.formulas, formulas_dropped=formulas.dropped,
@@ -448,12 +451,14 @@ def with_groups(
     screener_id: str,
     document: dict[str, Any],
     candidates: Sequence[Mapping[str, Any]],
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], tuple[str, ...]]:
     """``document`` with the first of the ``candidates`` (tables of boolean groups, ADR 0071) the
     validator accepts as the spec's ``groups`` (the groups the sentence's joins give, then the
-    ones the Builder's document already had); with none of them, or none valid, it has no
-    ``groups`` and the draft stays flat, as it was before groups."""
+    ones the Builder's document already had), and the notes to show; with none of them, or none
+    valid, it has no ``groups``, the draft stays flat as it was before groups, and a candidate the
+    validator refused is told in a note, never silently."""
     without = {k: v for k, v in document.items() if k != "groups"}
+    notes: tuple[str, ...] = ()
     for table in candidates:
         if not table:
             continue
@@ -462,9 +467,12 @@ def with_groups(
             resolve_rule_draft(ctx.configs, screener_id, ctx.user, grouped)
         except ConfigurationError as exc:
             log.info("groups refused (%s): the draft stays flat", exc)
+            notes = (
+                f"the 'or' or exclusion is not applied: the groups were refused ({exc})"[:300],
+            )
             continue
-        return grouped
-    return without
+        return grouped, ()
+    return without, notes
 
 
 def reading_of(criterion: Mapping[str, Any]) -> tuple[Any, Any, Any]:

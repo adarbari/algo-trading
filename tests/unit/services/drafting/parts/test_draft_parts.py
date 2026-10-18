@@ -316,5 +316,31 @@ def test_groups_the_validator_refuses_leave_the_draft_flat(ctx: ReadContext) -> 
     bad = {"g": {"any": ["price", "ghost"]}}
     good = {"g": {"any": ["price", "oi"]}}
     both = {**base, "criteria": {**base["criteria"], "oi": {"field": OI, "op": "gte", "value": 1}}}
-    assert "groups" not in with_groups(ctx, "my_screen", base, [bad])
-    assert with_groups(ctx, "my_screen", both, [bad, good])["groups"] == good  # the next one
+    flat, why = with_groups(ctx, "my_screen", base, [bad])
+    assert "groups" not in flat and "not applied" in why[0]  # told, never silent
+    grouped, none = with_groups(ctx, "my_screen", both, [bad, good])
+    assert grouped["groups"] == good and none == ()  # the next one
+
+
+def test_a_new_group_never_takes_the_id_of_one_the_builder_has(ctx: ReadContext) -> None:  # noqa: F811
+    current = {
+        "criteria": {"price": {"field": PRICE, "op": "gt", "value": 50},
+                     "oi": {"field": OI, "op": "gte", "value": 1000}},
+        "groups": {"any_1": {"any": ["price", "oi"]}},
+    }  # fmt: skip
+    only_price = proposal({**PRICE_GT, "part": "p1"}, {**OI_GTE, "part": "p2"}, parts=EITHER)
+    draft = draft_screen(
+        ctx, Canned(only_price), "my_screen", "over $50 or open interest of 1000", current
+    )
+    assert draft.document["groups"] == {"any_1": {"any": ["price", "oi"]}}  # carried, not replaced
+
+
+def test_an_or_next_to_a_missing_part_is_told_in_a_note(ctx: ReadContext) -> None:  # noqa: F811
+    parts = [
+        {"id": "p1", "words": "over $50", "reading": None},
+        {"id": "p2", "words": "for a year", "reading": None},
+    ]
+    answer = proposal({**PRICE_GT, "part": "p1"}, missing=[{**GAP, "part": "p2"}], parts=parts)
+    draft = draft_screen(ctx, Canned(answer), "my_screen", "over $50 or for a year")
+    assert "groups" not in draft.document
+    assert any("'for a year' is not available" in n for n in draft.notes)

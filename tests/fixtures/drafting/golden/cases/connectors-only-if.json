@@ -65,7 +65,7 @@
           "kind": "applied",
           "origin": "words",
           "join": "and",
-          "join_words": "only if"
+          "join_words": ", only if"
         }
       ],
       "model_share": 1.0,

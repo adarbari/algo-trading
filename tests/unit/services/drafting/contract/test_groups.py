@@ -85,6 +85,18 @@ def test_but_after_an_exclusion_ends_it() -> None:
     }  # (A and C) or D, and not B: the "but" is an and, not part of the exclusion
 
 
+def test_a_comma_before_and_ends_an_exclusion_a_bare_and_extends_it() -> None:
+    """ "except A and B" is neither; "except A, and B" excludes A only and B is a condition."""
+    bare = groups(
+        part("p1", "a"), part("p2", "b", join="and_not"), part("p3", "c", join="and", words="and")
+    )
+    comma = groups(
+        part("p1", "a"), part("p2", "b", join="and_not"), part("p3", "c", join="and", words=", and")
+    )
+    assert bare == {"none_1": {"none": ["b", "c"]}}
+    assert comma == {"none_1": {"none": ["b"]}}
+
+
 def test_a_or_b_except_c_is_a_group_and_a_gate() -> None:
     got = groups(part("p1", "a"), part("p2", "b", join="or"), part("p3", "c", join="and_not"))
     assert got == {"none_1": {"none": ["c"]}, "any_1": {"any": ["a", "b"]}}
@@ -151,3 +163,25 @@ def test_prune_drops_gone_members_and_groups_that_fall_under_their_size() -> Non
     nested = {"outer": {"any": ["inner", "a"]}, "inner": {"all": ["b", "gone"]}}
     assert prune_groups(nested, CRITERIA) == {}  # inner dissolves, outer falls to one member
     assert prune_groups(None, CRITERIA) == {} and prune_groups({"g": "no"}, CRITERIA) == {}
+
+
+def test_taken_group_ids_are_never_reused() -> None:
+    got = group_parts((part("p1", "a"), part("p2", "b", join="or")), CRITERIA, taken={"any_1"})
+    assert list(got.groups) == ["any_2"]
+
+
+def test_two_kinds_of_instrument_joined_by_or_are_blocked_not_anded() -> None:
+    etf = {**CRITERIA, "etfs": {"field": "instrument.security_type", "op": "in", "value": ["ETF"]}}
+    got = group_parts((part("p1", "active", "stocks"), part("p2", "etfs", join="or")), etf)
+    assert got.groups == {} and got.blocked == ("p2",)
+
+
+def test_a_part_that_is_not_available_leaves_a_note_not_a_silent_flat_draft() -> None:
+    missing = Part(
+        "p2", "B", 0, 0, None, "server", "not_available", "words", join="or", join_words="or"
+    )
+    got = group_parts((part("p1", "a"), missing), CRITERIA)
+    assert got.groups == {} and got.blocked == ()
+    assert got.notes and "'B' is not available" in got.notes[0] and "not applied" in got.notes[0]
+    formula = part("p2", join="or", kind="formula", formulas=("f",))
+    assert group_parts((part("p1", "a"), formula), CRITERIA).notes == ()  # the verifier doubts it

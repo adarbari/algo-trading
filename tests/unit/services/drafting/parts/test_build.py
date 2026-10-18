@@ -225,7 +225,7 @@ def test_connectors_the_model_leaves_out_are_joins_never_not_understood_chips() 
             ["optionable stocks over $10", "trade at least 1M shares a day"],
             [
                 ("optionable stocks over $10", None, ""),
-                ("trade at least 1M shares a day", "and", "only if"),
+                ("trade at least 1M shares a day", "and", ", only if"),
             ],
         ),
     ]
@@ -244,7 +244,7 @@ def test_a_gap_with_content_stays_not_understood_trimmed_with_its_own_join() -> 
     assert [(p.words, p.kind, p.join, p.join_words) for p in cheap] == [
         ("cheap", "not_understood", None, "")
     ]  # "show me" vanishes; "but" is the join of the part that follows the gap
-    assert (got[0][-1].id, got[0][-1].join, got[0][-1].join_words) == ("p1", "and", "but")
+    assert (got[0][-1].id, got[0][-1].join, got[0][-1].join_words) == ("p1", "and", ", but")
 
 
 def test_the_long_growth_sentence_has_no_glue_chips() -> None:
@@ -291,7 +291,7 @@ def test_a_negation_or_or_the_model_left_out_is_a_gap_never_silent() -> None:
         parts = _served(sentence, words)
         gaps = [p for p in parts if p.origin == "gap"]
         assert [(g.words, g.kind) for g in gaps] == [(gap, "not_understood")], sentence
-        assert gaps[0].join_words == gap and gaps[0].join in ("or", "and_not")
+        assert gaps[0].join_words.lstrip(", ") == gap and gaps[0].join in ("or", "and_not")
 
 
 def test_an_or_or_a_negation_between_two_parts_is_the_join_of_the_next_never_a_gap() -> None:
@@ -300,7 +300,7 @@ def test_an_or_or_a_negation_between_two_parts_is_the_join_of_the_next_never_a_g
         ("liquid but not overbought", ["liquid", "overbought"], "and_not", "but not"),
         ("RSI under 30 or near the low", ["RSI under 30", "near the low"], "or", "or"),
         ("cheap and also, except for ETFs", ["cheap", "ETFs"], "and_not", "and also, except for"),
-        ("cheap, or growing", ["cheap", "growing"], "or", "or"),
+        ("cheap, or growing", ["cheap", "growing"], "or", ", or"),
     ]
     for sentence, words, logic, join_words in cases:
         parts = _served(sentence, words)

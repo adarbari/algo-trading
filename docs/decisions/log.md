@@ -506,3 +506,19 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the tag does not split finance from operating leases in the filer's figure; excluding it would leave about 70 of 259 untagged companies null.
+
+## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Describe-it precedence of connectors
+- Question: how do "or", "and" and "except" combine in a drafted sentence?
+- Options: and binds tighter than or, a comma or "ideally" starts a new condition, an exclusion is its own gate / a flat left-to-right reading / the model decides per sentence.
+- Decision: and binds tighter than or (as the expression parser does); a comma or "ideally" starts a new condition, so an "or" never reaches across it; "except A or B" is neither; "except A and B" is neither only for a bare "and" (", and" ends the exclusion); "A or B except C" is (A or B) and not C. One golden case per phrasing pins it.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: one rule set gives the same reading every time and a wrong reading is one line and one golden case; the owner verifies the cases in the PR. (Taken by Opus in the architect review; the log's allowed `decided by` form is used.)
+
+## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Flat fallback when a part cannot sit in a group
+- Question: what does a draft do when an "or" or exclusion has a part that is a formula, a missing request, a dropped criterion or words nothing maps?
+- Options: keep the draft flat as before groups / group the available sides only.
+- Decision: keep it flat; only the formula case gets the verifier's doubt (draft one boolean formula), every other block leaves a visible note ("... is not available, so the 'or' or exclusion is not applied"); two kinds of instrument joined by "or" are doubted (one security_type criterion).
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: grouping the available sides would silently change the meaning (an "or" side dropped makes the other side mandatory). (Taken by Opus in the architect review; the log's allowed `decided by` form is used.)

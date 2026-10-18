@@ -70,7 +70,10 @@ def test_no_and_connector_or_glue_word_yields_a_not_understood_part(phrase: str)
     assert [p.id for p in got[0]] == ["p1", "p2"]  # no gap: it is a join or glue
 
 
-@pytest.mark.parametrize("phrase", KEPT_PHRASES)
+JOINING = [p for p in KEPT_PHRASES if JOINS[p] == "or" or p not in NEGATIONS]
+
+
+@pytest.mark.parametrize("phrase", JOINING)
 def test_an_or_or_a_negation_between_parts_is_the_join_of_the_next(phrase: str) -> None:
     """ADR 0071: left out between two parts it is read as the next part's join (never a chip),
     so the server can group them."""
@@ -106,3 +109,11 @@ def test_like_is_never_glue() -> None:
 def test_all_but_is_an_except_not_a_but(phrase: str) -> None:
     assert JOINS[phrase] == "and_not"
     assert {logic for _, logic in read(phrase.split())} == {"and_not"}
+
+
+@pytest.mark.parametrize("phrase", NEGATIONS)
+def test_a_bare_negation_between_parts_is_a_gap_the_verifier_doubts(phrase: str) -> None:
+    got = build_parts(f"liquid stocks {phrase} high yield", RAW, [], [])
+    assert got is not None
+    gaps = [p for p in got[0] if p.origin == "gap"]
+    assert [(g.words, g.kind) for g in gaps] == [(phrase, "not_understood")]

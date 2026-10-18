@@ -138,6 +138,13 @@ def _or_not_formula(part: Part) -> Doubt:
 
 
 def _grouped_formula(part: Part) -> Doubt:
+    if not part.formulas:  # a kind of instrument joined by "or"
+        return Doubt(
+            OR_NOT_FORMULA, part.id,
+            f"the words '{part.words}' name a kind of instrument joined by 'or', which a group "
+            "cannot hold: name both kinds in ONE part with ONE instrument.security_type "
+            "criterion (in [...]) instead of two parts",
+        )  # fmt: skip
     return Doubt(
         OR_NOT_FORMULA, part.id,
         f"the words '{part.words}' hold a formula and sit next to an 'or' or an exclusion "

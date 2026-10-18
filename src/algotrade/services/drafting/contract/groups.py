@@ -27,7 +27,7 @@ as it was and ``blocked`` names the formula parts, which the verifier doubts (``
 the whole "or" is then one boolean formula). Pure: reads parts and criteria, calls nothing."""
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -38,17 +38,20 @@ SCOPE_FIELDS = frozenset(
     {"instrument.status", "instrument.security_type", "instrument.is_etf"}
 )  # what names the kind of instrument: never an operand of an "or"
 PLAIN_KINDS = ("applied", "needs_choice")
-_AND_WORD = re.compile(r"^\W*and\W*$", re.IGNORECASE)  # the plain "and" that extends an exclusion
+_AND_WORD = re.compile(r"^\s*and\s*$", re.IGNORECASE)  # the plain "and" that extends an exclusion
 
 
 @dataclass(frozen=True)
 class Grouping:
     """``groups``: the spec's ``groups`` table (id -> ``{"any" | "all" | "none": [member ids]}``),
-    empty when nothing is grouped; ``blocked``: ids of the parts with a pending formula that sit
-    in an "or" or an exclusion, which kept the draft flat."""
+    empty when nothing is grouped; ``blocked``: ids of the parts that kept the draft flat and
+    that the verifier doubts (a pending formula that sits in an "or" or an exclusion; a kind of
+    instrument joined by "or"); ``notes``: what the trader is told when an "or" or an exclusion is
+    not applied for another reason (a part that is not available: never silent)."""
 
     groups: dict[str, dict[str, list[str]]] = field(default_factory=dict)
     blocked: tuple[str, ...] = ()
+    notes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -74,10 +77,20 @@ class _Names:
 
 
 def group_parts(
-    parts: Sequence[Part] | None, criteria: Mapping[str, Any] | None = None
+    parts: Sequence[Part] | None,
+    criteria: Mapping[str, Any] | None = None,
+    taken: Collection[str] = (),
 ) -> Grouping:
     """The groups of ``parts``' joins over the draft's ``criteria`` (id -> criterion; ``None``:
-    every criterion id a part names, no scope filtering)."""
+    every criterion id a part names, no scope filtering); ``taken``: group ids already in use (the
+    Builder's own groups), which a new group never takes."""
+    scope_or = [
+        p.id
+        for p in parts or ()
+        if p.origin in ("words", "gap") and p.join == OR and _scope_only(p, criteria)
+    ]  # "stocks or ETFs": one criterion on the security type, not two kinds ANDed
+    if scope_or:
+        return Grouping({}, tuple(scope_or))
     busy = [
         seg
         for seg in _segments(parts or (), criteria)
@@ -85,12 +98,29 @@ def group_parts(
     ]
     dirty = [r for seg in busy for r in seg if not _plain(r)]
     if dirty:  # a formula, a request, a dropped criterion: the draft stays flat
-        return Grouping({}, tuple(r.part.id for r in dirty if r.part.formulas))
-    names = _Names(set(criteria or ()))
+        return Grouping(
+            {}, tuple(r.part.id for r in dirty if r.part.formulas), _unapplied(busy, dirty)
+        )
+    names = _Names(set(criteria or ()) | set(taken))
     groups: dict[str, dict[str, list[str]]] = {}
     for seg in busy:
         _build(seg, names, groups)
     return Grouping(groups)
+
+
+def _unapplied(busy: list[list[_Row]], dirty: list[_Row]) -> tuple[str, ...]:
+    """A note for each segment whose "or" or exclusion was left out because a part is not
+    available (a formula is doubted instead)."""
+    notes = []
+    for seg in busy:
+        gone = [r for r in seg if r in dirty and not r.part.formulas]
+        if gone:
+            said = " ".join(f"{r.part.join_words} {r.part.words}".strip() for r in seg)
+            notes.append(
+                f"'{said[:80]}': '{gone[0].part.words}' is not available, so the 'or' or "
+                "exclusion is not applied"
+            )
+    return tuple(notes)
 
 
 def _plain(row: _Row) -> bool:

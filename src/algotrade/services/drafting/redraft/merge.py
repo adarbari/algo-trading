@@ -112,12 +112,12 @@ def merge_part(ctx: ReadContext, req: PartRequest, sub: ScreenDraft) -> ScreenDr
         fresh_id = _unique("s", {s.id for s in suggestions}, numbered=True)
         suggestions.append(replace(suggestion, id=fresh_id, part=None))
         mine.suggestions.append(fresh_id)
-    notes += [*mine.notes, *(n for n in sub.notes if n not in notes)]
+    notes += (n for n in sub.notes if n not in notes)
     parts = _parts(req, sub, document, mine, others)
     dropped, parts = _bounded(dropped, parts)
     return ScreenDraft(
-        req.screener_id, _regrouped(ctx, req, document, parts), tuple(dropped),
-        _newest(dict.fromkeys(_clip(n) for n in notes)),
+        req.screener_id, _regrouped(ctx, req, document, parts, mine), tuple(dropped),
+        _newest(dict.fromkeys(_clip(n) for n in [*notes, *mine.notes])),  # (after the groups)
         call_id=sub.call_id, formulas=tuple(formulas), formulas_dropped=_newest(formulas_dropped),
         missing=tuple(missing), unresolved=tuple(unresolved), suggestions=tuple(suggestions),
         suggestions_dropped=_newest([*prior.suggestions_dropped, *sub.suggestions_dropped]),
@@ -251,20 +251,23 @@ def _document(ctx: ReadContext, req: PartRequest, sub: ScreenDraft, mine: _Mine)
 
 
 def _regrouped(
-    ctx: ReadContext, req: PartRequest, document: dict[str, Any], parts: Sequence[Part]
+    ctx: ReadContext, req: PartRequest, document: dict[str, Any], parts: Sequence[Part], mine: _Mine
 ) -> dict[str, Any]:
     """``document`` with its boolean groups (ADR 0071) back: the sentence's reading of the merged
     parts' joins when the groups the draft held were that reading of its parts (the retyped part
     keeps its join), else the Builder's own groups (the trader edited them) without the members
-    that are gone; what the validator refuses leaves the draft flat."""
+    that are gone; what cannot be grouped, or the validator refuses, leaves the draft flat with a
+    note in ``mine``."""
     held = req.prior.document.get("groups") or {}
     unedited = held == group_parts(req.prior.parts, req.criteria).groups
-    table = (
-        group_parts(parts, document["criteria"]).groups
-        if unedited
-        else prune_groups(held, document["criteria"])
-    )
-    return with_groups(ctx, req.screener_id, document, [table])
+    if unedited:
+        grouping = group_parts(parts, document["criteria"])
+        table, mine.notes = grouping.groups, [*mine.notes, *grouping.notes]
+    else:
+        table = prune_groups(held, document["criteria"])
+    grouped, why = with_groups(ctx, req.screener_id, document, [table])
+    mine.notes += why
+    return grouped
 
 
 def _parts(

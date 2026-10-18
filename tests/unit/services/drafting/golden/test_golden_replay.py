@@ -108,6 +108,12 @@ def test_a_contract_answer_through_the_whole_draft_meets_the_case(
 GROUPED = [(c, slug, text) for c, slug, text in CONTRACT if c.groups is not None]
 
 
+DOUBTED = {  # grouping impossible: a left-out negation mixed with an or, two kinds joined by or
+    "groups-a-or-not-b": ["connector_left_out"],
+    "groups-stocks-or-etfs": ["or_not_formula"],
+}
+
+
 def test_the_group_cases_cover_every_phrasing_the_owner_verifies() -> None:
     """ADR 0071 (owner decision 2: precedence case by case): one case per phrasing, with its
     expected tree; the PR lists them under "Owner to verify (precedence)"."""
@@ -129,6 +135,10 @@ def test_the_group_cases_cover_every_phrasing_the_owner_verifies() -> None:
         ),
         "groups-a-ideally-b-or-c": ({"any": ["ideally with IV rank above 80%", "rising volume"]},),
         "groups-maths-stays-formula": (),
+        "groups-except-a-and-b": ({"none": ["RSI14 under 30", "rising volume"]},),
+        "groups-except-a-comma-and-b": ({"none": ["market cap under $2B"]},),
+        "groups-a-or-not-b": (),
+        "groups-stocks-or-etfs": (),
     }
 
 
@@ -142,7 +152,11 @@ def test_the_groups_of_a_recorded_answer_are_the_expected_tree_and_never_a_doubt
     grouped sentence has no doubt, and the document with its groups validates as finalise."""
     draft = draft_screen(ctx, Recorded(text), "golden", case.sentence)
     assert bool(draft.document.get("groups")) == bool(case.groups), case.id
-    assert doubts(draft.parts, True, draft.document["criteria"]) == (), case.id
+    found = doubts(draft.parts, True, draft.document["criteria"])
+    assert [d.kind for d in found] == DOUBTED.get(case.id, []), case.id
+    if case.id in DOUBTED or case.id == "groups-maths-stays-formula":
+        return
+    assert not any("not applied" in n for n in draft.notes), case.id
     assert '"part"' not in json.dumps(draft.document)
 
 

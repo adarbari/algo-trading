@@ -82,3 +82,15 @@ def test_the_snapshot_carries_groups_only_when_there_are_some() -> None:
     assert "groups" not in criteria_snapshot(RETURNED)
     held = {**RETURNED, "groups": {"either": {"any": ["price", "vol"]}}}
     assert criteria_snapshot(held)["groups"] == {"either": {"any": ["price", "vol"]}}
+
+
+def test_switching_a_group_off_is_a_change() -> None:
+    before = {"groups": {"g": {"any": ["a", "b"]}}}
+    after = {"groups": {"g": {"any": ["a", "b"], "enabled": False}}}
+    assert groups_diff(before, after)["changed"] == [
+        {
+            "id": "g",
+            "from": {"kind": "any", "members": ["a", "b"]},
+            "to": {"kind": "any", "members": ["a", "b"], "enabled": False},
+        }
+    ]

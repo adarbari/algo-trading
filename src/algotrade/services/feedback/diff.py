@@ -25,11 +25,15 @@ def _groups(document: Mapping[str, Any]) -> Mapping[str, Any]:
 
 
 def _group(body: Any) -> dict[str, Any]:
-    """A group table as ``{"kind": "any", "members": [...]}`` (members in the file's order)."""
+    """A group table as ``{"kind": "any", "members": [...]}`` (members in the file's order, and
+    ``enabled`` when the table says so: switching a group off is a change)."""
     item = body if isinstance(body, Mapping) else {}
     for kind in ("all", "any", "none"):
         if kind in item:
-            return {"kind": kind, "members": list(item[kind])}
+            out: dict[str, Any] = {"kind": kind, "members": list(item[kind])}
+            if "enabled" in item:
+                out["enabled"] = item["enabled"]
+            return out
     return {}
 
 

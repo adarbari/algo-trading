@@ -93,7 +93,7 @@ def test_text_of_connectors_and_punctuation_only_is_no_gap_but_a_join() -> None:
     sentence = "liquid, and stocks"
     found = stretches(sentence, [Span(0, 6), Span(12, 18)])
     assert [s.gap for s in found] == [None, None, None]
-    assert found[1].next_join == Join("and", "and")
+    assert found[1].next_join == Join("and", ", and")
     assert stretches("", [])[0] == Stretch(None, None, None)
 
 
@@ -107,6 +107,21 @@ def test_a_negation_between_parts_is_the_join_of_the_next_part_never_a_gap() -> 
     first, second = stretches(sentence, [c for c in covered if c])[1:3]
     assert (first.gap, first.next_join) == (None, Join("and_not", "but not"))
     assert (second.gap, second.next_join) == (None, Join("and_not", "and also, except for"))
+
+
+def test_a_bare_negation_or_an_or_with_one_between_parts_stays_a_gap_with_its_join() -> None:
+    """A bare "not" belongs to one condition and "or not" mixes the two: both are left-out
+    negations, visible as a gap (a doubt), never silently a join."""
+    for sentence, gap, logic in (
+        ("liquid not overbought", "not", "and_not"),
+        ("liquid or not overbought", "or not", "and_not"),
+        ("liquid without overbought", "without", "and_not"),
+    ):
+        covered = [locate(sentence, w) for w in ("liquid", "overbought")]
+        middle = stretches(sentence, [c for c in covered if c])[1]
+        assert middle.gap is not None, sentence
+        assert sentence[middle.gap.start : middle.gap.end] == gap
+        assert middle.gap_join is not None and middle.gap_join.logic == logic
 
 
 def test_a_trailing_negation_after_the_last_part_is_a_gap() -> None:
@@ -127,5 +142,5 @@ def test_content_beside_a_connector_keeps_the_leading_and_trailing_joins() -> No
     sentence = "liquid, but cheap and high yield"
     stretch = stretches(sentence, [Span(0, 6), locate(sentence, "high yield")])[1]
     assert (stretch.gap, stretch.gap_join, stretch.next_join) == (
-        Span(12, 17), Join("and", "but"), Join("and", "and"),
+        Span(12, 17), Join("and", ", but"), Join("and", "and"),
     )  # fmt: skip

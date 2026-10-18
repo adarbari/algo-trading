@@ -1,0 +1,86 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "part": "p1",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "stocks",
+      "part": "p1",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "price",
+      "part": "p2",
+      "field": "rollup.price_stats@v2.close",
+      "op": "gt",
+      "value": 10,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "above $10"
+    },
+    {
+      "id": "rsi",
+      "part": "p3",
+      "field": "rollup.momentum@v1.rsi_14",
+      "op": "lt",
+      "value": 30,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "RSI14 under 30"
+    },
+    {
+      "id": "volume",
+      "part": "p4",
+      "field": "feature.volume_trend_20_60",
+      "op": "gt",
+      "value": 1.0,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "rising volume"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": null,
+  "parts": [
+    {
+      "id": "p1",
+      "words": "stocks"
+    },
+    {
+      "id": "p2",
+      "words": "above $10"
+    },
+    {
+      "id": "p3",
+      "words": "RSI14 under 30"
+    },
+    {
+      "id": "p4",
+      "words": "rising volume"
+    }
+  ]
+}

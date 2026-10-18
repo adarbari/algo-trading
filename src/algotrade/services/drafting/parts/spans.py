@@ -10,8 +10,17 @@ are code points here; ``utf16`` converts them to what the browser counts."""
 import re
 from dataclasses import dataclass
 
-from algotrade.services.drafting.parts.connectors import AND, OR, merged, read
+from algotrade.services.drafting.parts.connectors import (
+    AND,
+    AND_NOT,
+    NEGATIONS,
+    OR,
+    exclusion_text,
+    merged,
+    read,
+)
 
+_BREAK = re.compile(r"[,;]\s*$")  # a comma or semicolon right before a connector
 MIN_FUZZY = 4  # a token shorter than this, or with a digit, must match exactly
 _TOKEN = re.compile("[\\w$%&'\u2019][\\w$%&'\u2019.\\-/]*")
 
@@ -149,7 +158,7 @@ def _stretch(sentence: str, start: int, end: int, where: str = "between") -> Str
         if k[0] == "content" or (k[0] == "join" and k[1] not in quiet)
     ]
     pure = all(kinds[i][0] == "join" for i in kept)  # only a negation or an or, no content
-    if not kept or (where == "between" and pure):
+    if not kept or (where == "between" and pure and _joinable(toks, kinds, kept)):
         return Stretch(None, None, _join(sentence, toks, kinds, range(len(toks))))
     first, last = kept[0], kept[-1]
     return Stretch(
@@ -157,6 +166,23 @@ def _stretch(sentence: str, start: int, end: int, where: str = "between") -> Str
         _join(sentence, toks, kinds, range(last + 1 if pure else first)),
         _join(sentence, toks, kinds, range(last + 1, len(toks))),
     )
+
+
+def _joinable(
+    toks: list[tuple[int, int, str]], kinds: list[tuple[str, str | None]], kept: list[int]
+) -> bool:
+    """Whether the kept connectors alone between two parts make the next part's join: all or-words,
+    or all exclusion phrases (the ``NEGATIONS`` that belong to one condition, and an or mixed
+    with a negation, stay a visible gap: ``A or not B`` is a left-out negation)."""
+    words = " ".join(toks[i][2] for i in kept)
+    logics = {kinds[i][1] for i in kept}
+    if logics == {OR}:
+        return True
+    return logics == {AND_NOT} and words not in NEGATIONS and words in _exclusion_phrases()
+
+
+def _exclusion_phrases() -> set[str]:
+    return set(exclusion_text().split(", "))
 
 
 def _join(
@@ -169,4 +195,7 @@ def _join(
     if not held:
         return None
     logics = [logic for i in held if (logic := kinds[i][1])]
-    return Join(merged(logics), sentence[toks[held[0]][0] : toks[held[-1]][1]])
+    start = toks[held[0]][0]
+    if comma := _BREAK.search(sentence[:start]):  # ", and" is not a bare "and" (ADR 0071)
+        start = comma.start()
+    return Join(merged(logics), sentence[start : toks[held[-1]][1]])

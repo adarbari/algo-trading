@@ -77,7 +77,7 @@
           "kind": "applied",
           "origin": "words",
           "join": "or",
-          "join_words": "or with"
+          "join_words": ", or with"
         }
       ],
       "model_share": 1.0,
