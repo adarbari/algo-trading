@@ -10,12 +10,14 @@ from algotrade.core.time.calendar import (
     holidays,
     is_session,
     last_closed_session,
+    last_opened_session,
     last_session_of_month,
     last_session_of_week,
     local_deadline,
     monthly_expiry,
     next_session,
     nth_weekday,
+    open_time,
     previous_session,
     russell_reconstitution,
     session_offset,
@@ -157,6 +159,27 @@ def test_close_times_in_utc() -> None:
 )
 def test_last_closed_session(now: datetime, expected: date) -> None:
     assert last_closed_session(now) == expected
+
+
+def test_open_times_in_utc() -> None:
+    assert open_time(date(2026, 10, 2)) == datetime(2026, 10, 2, 13, 30, tzinfo=UTC)  # EDT
+    assert open_time(date(2026, 12, 24)) == datetime(2026, 12, 24, 14, 30, tzinfo=UTC)  # EST
+    with pytest.raises(ValueError, match="not a session"):
+        open_time(date(2026, 10, 3))
+
+
+@pytest.mark.parametrize(
+    ("now", "expected"),
+    [
+        (datetime(2026, 10, 2, 13, 29, tzinfo=UTC), date(2026, 10, 1)),  # a minute before the open
+        (datetime(2026, 10, 2, 13, 30, tzinfo=UTC), date(2026, 10, 2)),  # at the open
+        (datetime(2026, 10, 2, 23, tzinfo=UTC), date(2026, 10, 2)),  # the night after the close
+        (datetime(2026, 10, 4, 15, tzinfo=UTC), date(2026, 10, 2)),  # Sunday
+        (datetime(2026, 12, 25, 15, tzinfo=UTC), date(2026, 12, 24)),  # Christmas
+    ],
+)
+def test_last_opened_session(now: datetime, expected: date) -> None:
+    assert last_opened_session(now) == expected
 
 
 def test_settle_margin_is_configurable() -> None:

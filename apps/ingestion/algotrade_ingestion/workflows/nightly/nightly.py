@@ -50,6 +50,7 @@ from algotrade.core.time.calendar import close_time, last_closed_session, local_
 from algotrade.data.reference import snapshot
 from algotrade.services.jobs import JobContext
 from algotrade.storage.runs import published
+from algotrade_ingestion.tasks.analyst.backlog import check_analyst_backlog, check_finnhub_backlog
 from algotrade_ingestion.tasks.derived.history_copy import check_history_copy
 from algotrade_ingestion.tasks.derived.outcomes import check_outcomes
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
@@ -63,6 +64,7 @@ from algotrade_ingestion.tasks.framework.run import (
 )
 from algotrade_ingestion.tasks.maintenance.coverage import check_coverage
 from algotrade_ingestion.tasks.maintenance.quality import (
+    check_analyst_snapshot,
     check_bars,
     check_bars_resolved,
     check_chains,
@@ -250,6 +252,20 @@ NIGHTLY: tuple[Step, ...] = (
     # the same features); a trade whose outcome is not stored yet stays open. Optional: a
     # failure warns, never holds the session.
     Step(EDGE_SIGNALS, needs=(SCREENS,), critical=False, latest_only=FORWARD_RECORD),
+    # Our own point-in-time history of FMP / Finnhub analyst data (ADR 0068): a rotating slice of
+    # names a night within [fmp] daily_budget, appended, never replaced. Optional: a vendor outage
+    # or no key only warns. The vendors serve only today's value, so a catch-up session is SKIPPED.
+    # After the screens and their jobs (it feeds no read of the session, and ~9 minutes of paced
+    # calls must not delay them); [fmp] run_budget_s bounds a stalling vendor, so it cannot hold
+    # the ingest lock. Publishes a table the history copies do not hold.
+    Step(
+        "analyst-snapshot",
+        needs=("universe-build",),
+        requires=universe_exists,
+        latest_only=SNAPSHOT,
+        critical=False,
+        accept_with=(check_analyst_snapshot, check_analyst_backlog, check_finnhub_backlog),
+    ),
     # `edge-eval`, `descriptions` and `verify` are the post-session workflow's (ADR 0070): they
     # do not feed the session's reads, so they no longer delay its COMPLETE record.
     # The derived history copies (ADR 0060), last: every step that publishes the copied tables

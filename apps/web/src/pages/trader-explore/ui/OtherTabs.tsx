@@ -1,5 +1,5 @@
 /**
- * The Explore tabs other than Overview and Chart (Compare, Options, Features, Events, Screener
+ * The Explore tabs other than Overview and Chart (Compare, Options, Features, Financials, Events, Screener
  * hits, Why it is an idea): one module the detail loads on demand, so Explore's first load
  * carries only the Overview and Chart widgets. A ticker named inside a panel opens in a tab of
  * its own.

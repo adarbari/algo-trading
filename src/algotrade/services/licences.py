@@ -9,7 +9,7 @@ Builder's preview and a screener run (``services.selection.fields_view``). A hid
 never read, so it is UNKNOWN (``UnknownCode.LICENCE`` in the read model; missing to a screen,
 which never passes a hard criterion on a missing value, ADR 0015)."""
 
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Mapping
 
 from algotrade.config.site.users import UsersSettings
 from algotrade.features.expressions.feature_set import FeatureSet
@@ -45,3 +45,33 @@ def hidden_fields(
 ) -> frozenset[str]:
     """The ``fields`` whose licence is not in ``held``."""
     return frozenset(f for f in fields if licence_of(features, f) not in held)
+
+
+def recorded_licences(features: FeatureSet, fields: Iterable[str]) -> dict[str, str]:
+    """``{field: licence}`` as the catalogue of the run's owner resolves them now: what a stored
+    run records (its audit, ``field_licences``) so that its values are gated by what they were
+    when it ran, never by a viewer's own catalogue (ADR 0069 decision 3)."""
+    return {f: licence_of(features, f) for f in sorted(set(fields))}
+
+
+def hidden_stored(
+    site: FeatureSet,
+    recorded: Mapping[str, str] | None,
+    fields: Iterable[str],
+    held: Collection[str],
+) -> frozenset[str]:
+    """The ``fields`` of a stored run the ``held`` licences do not cover. A field the SITE
+    catalogue resolves is gated by its current licence and, when the run recorded one, by that
+    too (the stricter wins: a field later made personal is hidden from a run that recorded it
+    open); the site's names cannot be taken by a user's expression. A name the site does not
+    resolve (a run owner's own expression) is gated by the record alone, and with none it is
+    hidden: fail closed, a name is never looked up in the viewer's own catalogue."""
+    known = recorded or {}
+    hidden: set[str] = set()
+    for f in fields:
+        licences = [known[f]] if f in known else []
+        if site.feature(f) is not None or f.partition(".")[0] == "instrument":
+            licences.append(licence_of(site, f))
+        if not licences or any(x not in held for x in licences):
+            hidden.add(f)
+    return frozenset(hidden)

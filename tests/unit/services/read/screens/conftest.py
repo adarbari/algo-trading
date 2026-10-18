@@ -130,7 +130,12 @@ def backend() -> MemoryBackend:
               [("BBB", "QUALIFIED", 90.0, None), ("CCC", "QUALIFIED", 80.0, None),
                ("AAA", "REJECT", 0.0, None)])  # fmt: skip
     _values(w)
-    w.save_run(RunRecord("r1", "screen-alpha-site", D1, T).finish(T))
+    # the licence of each stored field as the run recorded it (ADR 0069)
+    recorded = {"rollup.x@v1.iv_rank": "personal", "feature.vrp_iv30": "personal",
+                "feature.spread": "open"}  # fmt: skip
+    w.save_run(
+        RunRecord("r1", "screen-alpha-site", D1, T).finish(T, stats={"field_licences": recorded})
+    )
     return store
 
 

@@ -84,6 +84,7 @@ Sources: Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_chann
 | moves enough to trade (swing range) | `gte 0.02` | soft | 0.005 | - |
 | volatile | `gte 0.03` | soft | 0.005 | - |
 | calm (premium selling, income) | `lte 0.02` | soft | 0.005 | with feature.atr_pct gte 0.005 so pinned takeover targets do not pass as calm |
+| a daily range under a set share of price | `lt 0.03` | soft | 0.005 | the typical daily range (14-day average true range) as a share of price: 0.03 is 3% |
 
 **When the reading lies**
 

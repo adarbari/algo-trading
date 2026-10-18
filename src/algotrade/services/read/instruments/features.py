@@ -17,10 +17,12 @@ or in any input of the expression), ``NULL`` (stored or computed null; ``Feature
 says what null means), ``NOT_APPLICABLE`` (the feature is not defined for this kind of
 instrument: option features of a non-optionable one, earnings of an ETF, preferred or
 blank-check company; from the session's reference snapshot and its company snapshot's SIC) and
-``ILLIQUID`` (an option feature null because the chain is too thin: its status column says so)
-and ``EXPLAINED`` (the null is itself the fact, a ``NullReason`` its status column holds: no
-trade on the session, next earnings not announced, a new listing; ADR 0046).
-A present value wins over all three; they win over NO_ROW and NULL, in that order, so a
+``ILLIQUID`` (an option feature null because the chain is too thin: its status column says so),
+``NOT_COVERED`` (the analyst source does not cover the name, or was never asked: its status
+column says so, ADR 0072) and ``EXPLAINED`` (the null is itself the fact, a ``NullReason`` its
+status column holds: no trade on the session, next earnings not announced, a new listing; ADR
+0046).
+A present value wins over all four; they win over NO_ROW and NULL, in that order, so a
 non-optionable instrument with no option rows is n/a, not a gap (ADR 0042), and a stock with
 no bar on the session but a ``NO_TRADE`` status is "no trade", not a gap. ``LICENCE`` (ADR
 0028): a field under a data licence the caller does not hold (``ctx.licences``, from the users
@@ -103,13 +105,13 @@ def _tables(fs: FeatureSet, name: str) -> tuple[str, ...]:
 
 
 def _reason_fields(reasons: Reasons) -> list[str]:
-    """The extra fields a value's NOT_APPLICABLE / ILLIQUID / EXPLAINED decision reads."""
+    """The extra fields a value's NOT_APPLICABLE / ILLIQUID / NOT_COVERED / EXPLAINED call reads."""
     applies, statuses = reasons
     return [
         *([_OPTIONABLE] if "optionable" in applies else []),
         *([_SECURITY_TYPE, _SIC] if "operating_company" in applies else []),
         *([_LEVERAGED, _INVERSE] if "leveraged_fund" in applies else []),
-        *(field for field, _, _, _ in statuses),
+        *(field for field, *_ in statuses),
     ]
 
 
@@ -172,13 +174,24 @@ def _not_applicable(
 def _illiquid(statuses: Sequence[StatusRule], row: Mapping[str, Any], iid: str, day: date) -> str:
     """Why an option feature is null for want of a tradeable chain (the status column), or
     ``""``."""
-    for field, thin, _, _ in statuses:
+    for field, thin, *_ in statuses:
         status = to_scalar(row.get(field))
         if status in thin:
             return (
                 f"{field.rpartition('.')[2]} is {status} for {iid} on {day.isoformat()}: "
                 "no near-the-money quote within the spread limit"
             )
+    return ""
+
+
+def _uncovered(statuses: Sequence[StatusRule], row: Mapping[str, Any], iid: str, day: date) -> str:
+    """Why the data source gives nothing for the instrument (the status column says it does not
+    cover it, or was never asked), or ``""``. The public kind is one; the admin cause tells the
+    statuses apart (ADR 0072)."""
+    for field, *_, uncovered in statuses:
+        status = to_scalar(row.get(field))
+        if status in uncovered:
+            return f"{field.rpartition('.')[2]} is {status} for {iid} on {day.isoformat()}"
     return ""
 
 
@@ -196,7 +209,7 @@ def _explained(
     earnings status says)."""
     found = [
         (field, str(status), table)
-        for field, _, explained, table in statuses
+        for field, _, explained, table, _ in statuses
         if (status := to_scalar(row.get(field))) in explained
     ]
     if not found or not set(rowless) <= {table for _, _, table in found}:
@@ -246,7 +259,7 @@ def _absence(
     reasons: Reasons,
 ) -> Unknown:
     """Why a null value is null (ADR 0042 and 0046 precedence): not applicable, illiquid,
-    explained, no row in a table it reads, else a stored null."""
+    not covered, explained, no row in a table it reads, else a stored null."""
     day = ctx.session.date
     why = _not_applicable(reasons[0], row, ctx, iid)
     if why:
@@ -256,6 +269,9 @@ def _absence(
     why = _illiquid(reasons[1], row, iid, day)
     if why:
         return Unknown(UnknownCode.ILLIQUID, feature_cause(info.name, why, "ILLIQUID", day))
+    why = _uncovered(reasons[1], row, iid, day)
+    if why:
+        return Unknown(UnknownCode.NOT_COVERED, feature_cause(info.name, why, "NOT_COVERED", day))
     rowless = [
         t
         for t in tables
@@ -319,7 +335,9 @@ def _rows(
             raise ValueError(f"a {entity} read names its ids")
         frame, missing = entity_field_view(ctx.reader, day, fields, ids, features=ctx.features)
         return _by_id(frame), missing
-    view = field_view(ctx.reader, day, fields, ids, features=ctx.features)
+    view = field_view(
+        ctx.reader, day, fields, ids, features=ctx.features, memo=ctx.cache.get_or_compute
+    )
     rows, missing = _by_id(view.frame), view.missing
     # A company snapshot taken after the session is not known on it (no lookahead).
     if view.company_pre_snapshot:

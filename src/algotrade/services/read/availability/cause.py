@@ -56,6 +56,7 @@ class UnavailableKind(StrEnum):
     NOT_APPLICABLE = "NOT_APPLICABLE"  # not defined for this instrument (or the null is a fact)
     ILLIQUID = "ILLIQUID"  # an option value null because the chain is too thin
     LICENCE = "LICENCE"  # a personal-licence feature and the caller is not its owner
+    NOT_COVERED = "NOT_COVERED"  # the analyst source does not cover the name (ADR 0072)
     NOT_RUN = "NOT_RUN"  # a screener (or check) has no run for the session
 
 
@@ -66,6 +67,7 @@ GENERIC_REASONS: dict[UnavailableKind, str] = {
     UnavailableKind.NOT_APPLICABLE: "does not apply to this instrument",
     UnavailableKind.ILLIQUID: "not available: too thinly traded today",
     UnavailableKind.LICENCE: "not available under your data licence",
+    UnavailableKind.NOT_COVERED: "not covered by our analyst data",
     UnavailableKind.NOT_RUN: "not run for this session",
 }
 
@@ -77,6 +79,7 @@ GUIDE_TERMS: dict[UnavailableKind, str] = {
     UnavailableKind.NOT_APPLICABLE: "unavailable_not_applicable",
     UnavailableKind.ILLIQUID: "unavailable_illiquid",
     UnavailableKind.LICENCE: "unavailable_licence",
+    UnavailableKind.NOT_COVERED: "unavailable_not_covered",
     UnavailableKind.NOT_RUN: "not_run",
 }
 

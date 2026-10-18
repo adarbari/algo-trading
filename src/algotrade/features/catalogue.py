@@ -75,7 +75,8 @@ def _group(g: FeatureGroup, level: str = "##") -> list[str]:
     lines = [
         f"{level} `{g.key}`",
         "",
-        f"{g.description}. Stored as `{g.table}`; reads {inputs}.",
+        f"{g.description}. Stored as `{g.table}`; reads {inputs}."
+        + (f" Sole source: {g.sole_source}." if g.sole_source else ""),
         "",
         f"{_COLUMNS} Inputs |",
         "|---|---|---|---|---|---|---|---|---|",

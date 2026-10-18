@@ -105,6 +105,8 @@ def _rollup(**changes: Any) -> FeatureGroup:
         ({"entity": "market", "applies_to": "optionable"}, "applies to the whole market"),
         ({"inputs": (Input("universe", symbols=("SPY",)),)}, "symbols are only for"),
         ({"inputs": (Input("bars/1d", ids=("EQ:A",), symbols=("A",)),)}, "never with ids"),
+        ({"sole_source": "one vendor: ADR 0055"}, "sole_source is for an optional group"),
+        ({"optional": True, "sole_source": "one vendor"}, "must cite the ADR"),
         (
             {
                 "entity": "market",
@@ -117,6 +119,12 @@ def _rollup(**changes: Any) -> FeatureGroup:
 def test_declaration_is_validated(changes: dict[str, Any], problem: str) -> None:
     with pytest.raises(ValueError, match=problem):
         _rollup(**changes)
+
+
+def test_a_sole_source_group_is_an_optional_one_that_cites_its_adr() -> None:
+    group = _rollup(optional=True, sole_source="single free vendor, no fallback: ADR 0055")
+    assert group.optional and "ADR 0055" in group.sole_source
+    assert _rollup().sole_source == ""  # the default: a group has other sources
 
 
 def test_a_window_input_is_its_own_key_beside_the_trailing_one() -> None:

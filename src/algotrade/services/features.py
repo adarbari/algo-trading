@@ -12,11 +12,12 @@ or ./config); ``catalogue(store, user)`` is a user's
 the one a resolved config's selection is evaluated with (site + the user features it names).
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from functools import cache
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -109,6 +110,12 @@ def check_user_features(
     return out
 
 
+# ``memo(key, compute)``: the value under ``key``, computed once (``ResultCache.get_or_compute``);
+# a caller that serves many requests passes it so a read of facts that only move on a publish
+# is made once per published state.
+Memo = Callable[[Hashable, Callable[[], Any]], Any]
+
+
 @dataclass(frozen=True)
 class ExpressionRows:
     """``frame``: ``session_date``, ``instrument_id`` + one column per expression, one row
@@ -127,17 +134,19 @@ def field_view(
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
     historical: bool = False,
+    memo: Memo | None = None,
 ) -> InstrumentView:
     """``data.reference.instrument_view`` for any catalogue fields: stored ones as read,
     ``feature.<name>`` ones computed for the session, for ``ids`` only when given (tables they
     need that have no partition for the session are added to ``missing``). ``historical``: a
     session before the first reference snapshot reads the names of the listing history alive
-    then (``data.listings.identity``, ADR 0053 amendment 2026-10-09: the edge harness only)."""
+    then (``data.listings.identity``, ADR 0053 amendment 2026-10-09: the edge harness only).
+    ``memo``: see ``read_expressions``."""
     stored = [f for f in fields if not is_feature_field(f)]
     identity = _historical_identity(reader, session, as_of) if historical else None
     view = instrument_view(reader, session, stored, ids, as_of, identity)
     frame, missing = _with_expressions(
-        reader, session, fields, view.frame, view.missing, ids, as_of, features
+        reader, session, fields, view.frame, view.missing, ids, as_of, features, memo
     )
     return replace(view, frame=frame, missing=missing)
 
@@ -181,13 +190,14 @@ def _with_expressions(
     ids: Sequence[str] | None,
     as_of: datetime | None,
     features: FeatureSet | None,
+    memo: Memo | None = None,
 ) -> tuple[pd.DataFrame, tuple[str, ...]]:
     """``frame`` plus the ``feature.<name>`` fields of ``fields``, computed for ``session``."""
     expressions = [f.removeprefix(FEATURE_FIELD_PREFIX) for f in fields if is_feature_field(f)]
     if not expressions:
         return frame, missing
     computed = read_expressions(
-        reader, expressions, session, as_of=as_of, instruments=ids, features=features
+        reader, expressions, session, as_of=as_of, instruments=ids, features=features, memo=memo
     )
     extra = computed.frame.drop(columns="session_date").rename(
         columns={n: f"{FEATURE_FIELD_PREFIX}{n}" for n in expressions}
@@ -197,13 +207,28 @@ def _with_expressions(
 
 
 def _sessions(
-    reader: StoreReader, table: str, start: date, end: date, as_of: datetime | None
+    reader: StoreReader,
+    table: str,
+    start: date,
+    end: date,
+    as_of: datetime | None,
+    memo: Memo | None = None,
 ) -> frozenset[date]:
     """The sessions of ``start..end`` that ``table`` has rows for, known at ``as_of`` (None:
     now). An empty partition has none (ADR 0055 amendment: it holds no value, so it is
-    missing). Reads only the ``instrument_id`` column of every row."""
-    rows = feature_rows(reader, table, ["instrument_id"], start, end, as_of)
-    return frozenset() if rows is None else frozenset(rows["session_date"])
+    missing). Reads only the ``instrument_id`` column of every row, so ``memo`` keeps it (keyed
+    on the published state, read before the rows, ADR 0022) unless the read is ``as_of`` a time
+    or sees a run's pending writes: one population's sessions answer every instrument."""
+
+    def read() -> frozenset[date]:
+        rows = feature_rows(reader, table, ["instrument_id"], start, end, as_of)
+        return frozenset() if rows is None else frozenset(rows["session_date"])
+
+    if memo is None or as_of is not None or reader.own_run is not None:
+        return read()
+    key = ("expression-sessions", table, start, end, reader.visible_seq())
+    found: frozenset[date] = memo(key, read)
+    return found
 
 
 def read_expressions(
@@ -214,6 +239,7 @@ def read_expressions(
     as_of: datetime | None = None,
     instruments: Sequence[str] | None = None,
     features: FeatureSet | None = None,
+    memo: Memo | None = None,
 ) -> ExpressionRows:
     """Expression features ``names`` for ``start..end`` (``end``: ``start``), point in time,
     for ``instruments`` only when given: rows are read only for them. ``exists(group)`` must
@@ -221,7 +247,7 @@ def read_expressions(
     rows for are read from its whole population (one column), never every formula evaluated
     over every instrument (that took 14 s for one name's 90-day history). ``missing``: the
     tables read with no partition in the range (never one that merely has no rows for
-    ``instruments``)."""
+    ``instruments``). ``memo``: keeps those sessions across requests (``_sessions``)."""
     fs = features or site_features()
     _, todo = fs.plan(names)
     last = end or start
@@ -235,12 +261,12 @@ def read_expressions(
         # Narrowed, no rows may only mean none of theirs: a table is missing only when it has
         # no rows in the range at all. The exists tables' sessions come with that read.
         exists = {fs.table(g) for n in todo for g in fs.expressions[n].exists}
-        covered = {t: _sessions(reader, t, start, last, as_of) for t in exists}
+        covered = {t: _sessions(reader, t, start, last, as_of, memo) for t in exists}
 
         def has_rows(table: str) -> bool:
             if table in covered:
                 return bool(covered[table])
-            return _sessions(reader, table, start, last, as_of) != frozenset()
+            return _sessions(reader, table, start, last, as_of, memo) != frozenset()
 
         empty = [t for t, f in frames.items() if f is None and not has_rows(t)]
     missing = tuple(sorted(empty))

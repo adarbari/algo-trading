@@ -282,7 +282,7 @@ def split_adjusted(facts: pd.DataFrame, splits: pd.DataFrame | None, session: da
     return values / factor.reindex(facts.index).fillna(1.0)
 
 
-def _prepare(
+def prepare_facts(
     facts: pd.DataFrame | None, splits: pd.DataFrame | None, session: date, p: FinancialsParams
 ) -> pd.DataFrame:
     """The concepts' facts: epoch-day periods, EPS split-adjusted, only the newest value of
@@ -374,7 +374,7 @@ def compute(inputs: Inputs, session: date, p: FinancialsParams) -> pd.DataFrame:
     stats = inputs[PRICE_STATS]
     assert stats is not None  # required input
     today = stats[stats["session_date"] == session][["instrument_id"]]
-    rows = _prepare(inputs.get(FACTS), inputs.get(SPLITS), session, p)
+    rows = prepare_facts(inputs.get(FACTS), inputs.get(SPLITS), session, p)
     stale_before = (session - timedelta(days=p.stale_days) - date(1970, 1, 1)).days
     adrs = _adrs(inputs.get(REFERENCE))
     by_instrument: dict[str, dict[str, list[Fact]]] = {}

@@ -458,3 +458,51 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: they keep working; conversion adds risk for no gain.
+
+## 2026-10-17 | Edge build plan (EB) | Verdict bar (t-statistic)
+- Question: Verdict bar (t-statistic)?
+- Options: t >= 2 for Promising (keep) / t >= 3 for Promising.
+- Decision: Promising stays at t >= 2; Works needs t >= 3 on both series.
+- decided by: owner
+- status: final
+- Reasoning: Harvey-Liu-Zhu's t > 3 applies to claiming a new factor (Works); Promising remains a research state.
+
+## 2026-10-17 | Edge build plan (EB) | Short and long-short results as a verdict basis
+- Question: Short and long-short results as a verdict basis?
+- Options: long only / short ok and long-short diagnostic / both.
+- Decision: a short result on liquid names may be the basis; long-short is diagnostic only.
+- decided by: owner
+- status: final
+- Reasoning: an avoid list is actionable with a read-only broker; a long-short spread needs shorting the owner does not do.
+
+## 2026-10-17 | Edge build plan (EB) | Historical option chains
+- Question: Historical option chains?
+- Options: buy now / not now.
+- Decision: not now: H8 model P&L ships, H13 chain P&L accrues from 2026-10-02.
+- decided by: owner
+- status: final
+- Reasoning: no new spend.
+
+## 2026-10-17 | Edge build plan (EB) | Tiingo Power
+- Question: Tiingo Power?
+- Options: extend a month / pull within the bought month.
+- Decision: pull the 2010+ history and the outcomes backfill by 2026-11-09.
+- decided by: owner
+- status: final
+- Reasoning: no new spend.
+
+## 2026-10-17 | PR #599 (Explore features tab) | History copy covers every instrument rollup
+- Question: may the history copy (ADR 0060) grow to every instrument rollup, about +1.34 GB on the Mac (90% full, 20 GiB free), to cut the Features tab's history reads?
+- Options: accept the disk / keep the copy to market tables and bars only.
+- Decision: accept; release #599.
+- decided by: owner
+- status: final
+- Reasoning: the Features tab's history reads drop from 6.7-8.0 s to 1.3-1.9 s per ticker; the copy stays within its 2.6 GB budget.
+
+## 2026-10-17 | PR #619 (debt rules d to g) | Finance leases stay in total_debt
+- Question: may `balance_sheet@v1.total_debt` include finance lease obligations where the SEC tag does (rules d to f, and the current part of c and e through `DebtCurrent`)?
+- Options: keep them, labelled per rule in the field guide (as most data sites do) / exclude them and leave those filers NOT_TAGGED.
+- Decision: keep them; operating leases are never in debt.
+- decided by: owner
+- status: final
+- Reasoning: the tag does not split finance from operating leases in the filer's figure; excluding it would leave about 70 of 259 untagged companies null.

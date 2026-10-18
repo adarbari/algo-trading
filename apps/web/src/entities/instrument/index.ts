@@ -4,6 +4,8 @@
  */
 export {
   NAMES_PER_REQUEST,
+  prefetchFeatureHistory,
+  prefetchFeatureValues,
   useFeatureHistory,
   useFeatureValues,
   useInstrumentEvents,

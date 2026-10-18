@@ -47,6 +47,7 @@ class UnknownCode(StrEnum):
     PRE_SNAPSHOT = "PRE_SNAPSHOT"  # identity came from a later snapshot (survivorship)
     NOT_APPLICABLE = "NOT_APPLICABLE"  # the feature is not defined for this instrument (ADR 0042)
     ILLIQUID = "ILLIQUID"  # an option feature null because the chain is too thin (ADR 0042)
+    NOT_COVERED = "NOT_COVERED"  # the analyst source does not cover the name (ADR 0072)
     EXPLAINED = "EXPLAINED"  # the null is a fact: ``Unknown.reason`` says which (ADR 0046)
     PRUNED = "PRUNED"  # a run's rows the retention purge removed: re-run it (ADR 0064)
     NOT_STORED = "NOT_STORED"  # a run from before the table: never written for it (ADR 0064)
@@ -64,6 +65,7 @@ KIND_OF_CODE: dict[UnknownCode, UnavailableKind] = {
     UnknownCode.PRE_SNAPSHOT: UnavailableKind.NOT_STORED,
     UnknownCode.NOT_APPLICABLE: UnavailableKind.NOT_APPLICABLE,
     UnknownCode.ILLIQUID: UnavailableKind.ILLIQUID,
+    UnknownCode.NOT_COVERED: UnavailableKind.NOT_COVERED,
     UnknownCode.EXPLAINED: UnavailableKind.NOT_APPLICABLE,
     UnknownCode.PRUNED: UnavailableKind.NOT_STORED,
     UnknownCode.NOT_STORED: UnavailableKind.NOT_STORED,

@@ -5,6 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>algotrade</title>
+    <script id="chunk-reload">
+      // A redeploy removes the old hashed chunks: reload once (not again within 60 s).
+      (function () {
+        var re = /dynamically imported module|module script failed|preload CSS/;
+        function recover(error, event) {
+          try {
+            if (!re.test((error && error.message) || String(error))) return;
+            var now = Date.now();
+            var last = Number(sessionStorage.getItem('chunk-reload-at'));
+            if (now - last < 60000) return;
+            sessionStorage.setItem('chunk-reload-at', String(now));
+          } catch (e) {
+            return;
+          }
+          event.preventDefault();
+          location.reload();
+        }
+        addEventListener('vite:preloadError', function (e) {
+          recover(e.payload, e);
+        });
+        addEventListener('unhandledrejection', function (e) {
+          recover(e.reason, e);
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
