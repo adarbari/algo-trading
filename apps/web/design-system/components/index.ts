@@ -267,3 +267,6 @@ export {
 } from './TrackRecordChip';
 export { TopBar, type TopBarProps } from './TopBar';
 export { WorkspaceSwitch, type WorkspaceSwitchProps } from './WorkspaceSwitch';
+export { LinkCard, type LinkCardProps } from './LinkCard';
+export { ProseList, type ProseListItem, type ProseListProps } from './ProseList';
+export { SourceList, type SourceListItem, type SourceListProps } from './SourceList';
