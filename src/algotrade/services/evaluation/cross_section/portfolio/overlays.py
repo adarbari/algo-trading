@@ -80,7 +80,7 @@ def apply_overlays(
     if not ids:
         return weights, None, ""
     days = sessions_ending(day, o.vol_window)
-    sigma = book_volatility(weights, session.history(o.vol_return_field, ids, days), days)
+    sigma = book_volatility(weights, session.history(o.vol_return_field, ids, days, day), days)
     if sigma is None:
         return (), None, NO_BOOK_VOL
     return vol_scaled(weights, sigma, o.vol_target), sigma, ""

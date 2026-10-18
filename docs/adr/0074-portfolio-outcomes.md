@@ -131,7 +131,7 @@ belongs in it.
 15. **Realised volatility is read as it was known.** `sigma` is the book's volatility *at D*:
     today's weights on the daily returns of the `vol_window` sessions ending at D, each return read
     at its own session `t <= D` (`SessionReads.history`, `fields_view` historical, through the
-    recording reader) and never a value stored later. A restatement of any of those partitions
+    recording reader, cached per decision session so each leg logs its own reads) and never a value stored later. A restatement of any of those partitions
     invalidates the legs of the sessions that read it (ADR 0063), nothing after D is read, and a
     name with no finite return on a day of the window leaves the session out with the reason
     `no_book_vol`: sigma is never measured over the names that happen to have returns, and a
