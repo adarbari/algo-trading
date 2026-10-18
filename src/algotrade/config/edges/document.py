@@ -13,7 +13,8 @@ and the key.
                       least 1; for an event schedule the event's anchor session + this, D = S - 1;
                       <= 0 only for an event announced ahead), optional target, max_drawdown (a
                       fraction), cost_bps; a hit_target also names its measure (MEASURES) and
-                      direction (``below`` | ``above``); an ``expires_otm`` outcome (the short
+                      direction (``below`` | ``above``); an excess_return's measure may be
+                      ``residual_return`` (factor-neutral); an ``expires_otm`` outcome (the short
                       option is not assigned at the horizon's close: put | call | strangle) names
                       its ``structure``, exactly one of ``strike_delta`` (a delta in (0, 1)) and
                       ``otm_pct`` (a fraction in (0, 1)) and the ``iv_field`` it reads at D;
@@ -188,6 +189,7 @@ ANNOUNCED_AHEAD = ("earnings_expected",)  # an entry may precede these
 # Quality bar answers 3 to 9 (1 and 2 are the document's mechanism and persistence).
 # What a hit_target compares with its target over the window (ED2 stores each as a field).
 MEASURES = ("excess_return", "realised_to_implied_vol")
+EXCESS_MEASURES = ("residual_return",)  # what an excess_return outcome may name (factor-neutral)
 DIRECTIONS = ("below", "above")
 QUALITY_BAR = (
     "outcome",
@@ -653,6 +655,19 @@ def _outcome(t: Table, schedule: str, base: str = "universe") -> Outcome:
     return _outcome_of(t.table("outcome", OUTCOME_KEYS), schedule, base)
 
 
+def _hit_fields(o: Table, kind: str) -> tuple[float | None, str | None, str | None]:
+    allowed = EXCESS_MEASURES if kind == "excess_return" else MEASURES  # but its optional one
+    measure = o.choice("measure", "", allowed) if "measure" in o.names() else None
+    direction = o.choice("direction", "", DIRECTIONS) if "direction" in o.names() else None
+    target, own = o.number("target", None), None if kind == "excess_return" else measure
+    for key, value in {"target": target, "measure": own, "direction": direction}.items():
+        if kind == "hit_target" and value is None:
+            raise ConfigurationError(f"{o.where} {key}: required for a hit_target outcome")
+        if kind != "hit_target" and value is not None:
+            raise ConfigurationError(f"{o.where} {key}: only a hit_target outcome has one")
+    return target, measure, direction
+
+
 def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
     kind = o.choice("kind", "", OUTCOME_KINDS) if "kind" in o.names() else _missing(o, "kind")
     benchmark = (
@@ -693,15 +708,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
             f"ahead ({list(ANNOUNCED_AHEAD)}); {event!r} is known when it happens, so the "
             f"offset from its anchor is >= 1, got {offset}"
         )
-    target = o.number("target", None)
-    measure = o.choice("measure", "", MEASURES) if "measure" in o.names() else None
-    direction = o.choice("direction", "", DIRECTIONS) if "direction" in o.names() else None
-    hit = {"target": target, "measure": measure, "direction": direction}
-    for key, value in hit.items():
-        if kind == "hit_target" and value is None:
-            raise ConfigurationError(f"{o.where} {key}: required for a hit_target outcome")
-        if kind != "hit_target" and value is not None:
-            raise ConfigurationError(f"{o.where} {key}: only a hit_target outcome has one")
+    target, measure, direction = _hit_fields(o, kind)
     drawdown = o.number("max_drawdown", None, 0)
     if drawdown is not None and not 0 < drawdown <= 1:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
@@ -769,23 +776,6 @@ def _hold_rank(
             f"{list(horizons)}"
         )
     return rank
-
-
-def identity_dict(value: Any) -> Any:
-    """``value`` (an ``asdict`` of an edge or outcome) without the side keys of a long outcome
-    and an unset ``hold_rank``: a document that never named a side or a band hashes as it did
-    before them, so no stored leg or run is recomputed by their arrival (ADR 0053 amendments)."""
-    if isinstance(value, dict):
-        long = value.get("side") == LONG and value.get("borrow_bps_annual") is None
-        return {
-            k: identity_dict(v)
-            for k, v in value.items()
-            if not (long and k in ("side", "borrow_bps_annual"))
-            and not (k == "hold_rank" and v is None)
-        }
-    if isinstance(value, (list, tuple)):
-        return [identity_dict(v) for v in value]
-    return value
 
 
 def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:

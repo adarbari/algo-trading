@@ -1,0 +1,51 @@
+# Option smirk, lowest first: The individual option smirk (Xing, Zhang and Zhao 2010): the implied volatility of the out-of-the-money put
+# minus the at-the-money call, ranked from the lowest smirk up (a steep smirk is the bad-news signal,
+# so the flattest names rank first). The criterion only asks that the value exists (a missing value
+# never passes, ADR 0030). What it does not check: the quotes' liquidity or borrow cost.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "iv_smirk"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Option smirk, lowest first"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1 for stocks, so the screens compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.iv_smirk]
+field = "rollup.cp_iv@v1.iv_smirk"
+op = "gt"
+value = -5
+
+[columns]
+close = "rollup.price_stats@v2.close"
+iv_smirk = "rollup.cp_iv@v1.iv_smirk"
+atm_call_iv = "rollup.cp_iv@v1.atm_call_iv"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.cp_iv@v1.iv_smirk"
+tie_break_order = "asc"

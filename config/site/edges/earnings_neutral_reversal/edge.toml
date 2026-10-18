@@ -1,0 +1,86 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea family G (docs/edge-ideas/statarb-technical.md). The
+# work item is an edge of its own (an event edge on the report), not a variant of short-term
+# reversal. Screeners: pre_earnings_reversal (So and Wang's rule) and earnings_neutral_reversal
+# (the month's move without earnings days, earnings_neutral_reversal@v1).
+id = "earnings_neutral_reversal"
+name = "Reversal into earnings"
+family = "G"
+thesis = "Among stocks about to report, last days' losers beat last days' winners over the report window."
+mechanism = """Liquidity providers demand higher compensation for holding inventory into a known
+information event; the price pressure before the event is reversed as the event resolves the risk
+(So and Wang 2014). The compensation is for a real risk, the announcement, so nobody fixes it."""
+persistence = """It is a risk premium for inventory risk around scheduled news. It needs daily
+rebalancing across about a thousand announcers and short positions, so it is unattractive to large
+funds; but out-of-sample replications report the alpha deteriorating."""
+schedule = "on_event:earnings_expected"
+top_k = 20
+base = "event"
+screeners = ["pre_earnings_reversal", "earnings_neutral_reversal"]
+baselines = ["momentum_12_1", "size_small"]
+universe = "liquid_common_stocks"
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """The window is the 3 sessions of days -1, 0 and +1 around the expected report A, entered at
+the close of A - 2 (start_offset_sessions -2, the same window as the Savor-Wilson variant of the
+earnings announcement premium; horizon 3 is stored). The decision session is D = A - 3, so the
+return the screener reads is one session older than the paper's (the paper uses days -4 to -2 and
+enters at the close of -2): the harness cannot read a signal at the entry close itself. The date
+comes from earnings_expected@v1 (SCHEDULED, or last year's plus 364 days), known by D, so a name
+whose date moved is a miss, not a lookahead. The paper's size filter is the top quintile: the
+liquid_common_stocks floors ($50M a day) are the nearest rule, wider than the paper's quintile.
+pre_earnings_reversal ranks the 3-session return, losers first (long the losers: the paper also
+shorts the winners, which is diagnostic only); earnings_neutral_reversal ranks the 20-session
+return without earnings reaction days (earnings_neutral_reversal@v1), the plan's "earnings week
+reversal". Both rollups need the backfill once the document merges, and the earnings history of
+the store (EDGAR 8-K Item 2.02 and the vendors') sets the sessions; reports cluster in four
+seasons a year, so the independent sessions are fewer than the events."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [3]
+benchmark = "SPY"
+start_offset_sessions = -2
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY for the 3 sessions from the close two sessions before the
+expected report (days -1, 0 and +1), net of 10 bps a round trip."""
+trigger_timing = """The expected report date A is read at D = A - 3 (earnings_expected@v1,
+SCHEDULED or PRIOR_YEAR; UNKNOWN is excluded with a reason; a date confirmed after D is not used).
+The 3-session and the 20-session returns are read at D's close; the entry session is S = A - 2."""
+replication = """So and Wang: the largest size quintile, rank by the average return over days -4 to
+-2, long the bottom quintile and short the top, hold days -1, 0 and +1, equal-weighted. Here the 20
+lowest-return names (long only) of the liquid common stocks with a report expected, from the
+3-session return (pre_earnings_reversal) and from the earnings-neutral month
+(earnings_neutral_reversal)."""
+expected_size = """1.45% for the low-minus-high 3-day return against 0.22% in pseudo-announcement
+windows, 1996-2011, before costs, Sharpe 1.73 as annualised by Quantpedia; the long-only half and
+the 2012-on sample are smaller, and Quantpedia's out-of-sample test is slightly negative (So and
+Wang 2014; Jansen and Nikiforov report profit in 40 of 42 years)."""
+capacity_costs = """Three-day holds, 5 to 30 names a night in a season, small for a retail account;
+a report is a gap risk the 10 bps a round trip do not cover; the short leg is not tested."""
+failure_modes = """The alpha having decayed, and bid-ask bounce in the pre-earnings return.
+Retire if the frozen-period excess return of the picks is not above that of the other names
+reporting in the window."""
+decoys = """Pre-announcement drift from leaks (it predicts continuation: the opposite sign),
+momentum at earnings (a longer-horizon edge, opposite sign) and the small-cap PEAD (another size
+bucket): the 12-1 momentum and size baselines, and the other names reporting in the window."""
+
+[[sources]]
+title = "So, E. and Wang, S., News-Driven Return Reversals: Liquidity Provision Ahead of Earnings Announcements, Journal of Financial Markets, 2014"
+url = "https://papers.ssrn.com/abstract=2275982"
+
+[[sources]]
+title = "Quantpedia, Reversal During Earnings Announcements (strategy page)"
+url = "https://quantpedia.com/strategies/reversal-during-earnings-announcements/"
+
+# The literature's figure (ADR 0064): So and Wang's low-minus-high 3-day return of the largest size
+# quintile around the report, 1.45% against 0.22% in pseudo-announcement windows, 1996-2011,
+# before costs. A long-short spread of the extreme quintiles.
+[published]
+measure = "decile_spread"
+value = 0.0145
+horizon_sessions = 3
+sample = 16
+source = 0

@@ -137,6 +137,7 @@ def load_verdict(ctx: Stores, edge: Edge) -> verdict.EdgeVerdict:
             hidden,
             measured=lambda: runs.load_measured_sessions(ctx, run),
             wins=verdict.counts_wins(edge),
+            neutral=verdict.is_factor_neutral(edge),
             base=edge.base,
         ),
     )

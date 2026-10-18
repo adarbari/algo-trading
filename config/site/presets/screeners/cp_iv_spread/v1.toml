@@ -1,0 +1,53 @@
+# Call-put IV spread: Call-put implied volatility spread (Cremers and Weinbaum 2010): every liquid optionable stock with a
+# spread value, ranked by it, richest calls first. When calls are priced richer than same-strike puts,
+# informed buying is thought to sit in the calls. The criterion only asks that the value exists (a
+# missing value never passes, ADR 0030): the ranking is the screen, so the edge harness (ADR 0053)
+# takes its top K. What it does not check: the quotes' liquidity, earnings inside the expiry, borrow cost.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "cp_iv_spread"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Call-put IV spread"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1 for stocks, so the screens compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.cp_iv_spread]
+field = "rollup.cp_iv@v1.cp_iv_spread"
+op = "gt"
+value = -5
+
+[columns]
+close = "rollup.price_stats@v2.close"
+cp_iv_spread = "rollup.cp_iv@v1.cp_iv_spread"
+atm_call_iv = "rollup.cp_iv@v1.atm_call_iv"
+atm_put_iv = "rollup.cp_iv@v1.atm_put_iv"
+cp_iv_dte = "rollup.cp_iv@v1.cp_iv_dte"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.cp_iv@v1.cp_iv_spread"

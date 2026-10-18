@@ -89,8 +89,16 @@ path = "config/site/guide/playbooks/income"
 purpose = "the Guide's playbooks of the option income family (VRP scanner): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
+path = "config/site/guide/playbooks/options_signals"
+purpose = "the Guide's playbooks of the option-implied signals family (call-put IV spread, smirk, IV change, option-to-stock volume, lottery attention): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/cross_section"
+purpose = "the Guide's playbooks of the cross-section rank family (volume shock, dividend month, composite mispricing): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
 path = "config/site/guide/playbooks/events"
-purpose = "the Guide's playbooks of the earnings events family (post-earnings drift, earnings announcement premium, earnings-date advances, pre-earnings run-up, earnings gaps on volume): one <id>.toml per preset the family lists in sections.toml"
+purpose = "the Guide's playbooks of the earnings events family (post-earnings drift, earnings announcement premium, earnings-date advances, pre-earnings run-up, earnings gaps on volume, reversals into a report): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/guide/playbooks/filings"

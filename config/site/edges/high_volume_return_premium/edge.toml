@@ -1,0 +1,85 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea families D and G (docs/edge-ideas/calendar-flows.md,
+# statarb-technical.md). Screeners: volume_shock (the source's rule) and volume_shock_no_news (the
+# no-news variant); news_free_5d is the filter inside the second.
+id = "high_volume_return_premium"
+name = "High-volume return premium"
+family = "D"
+thesis = "A stock whose volume today is far above its own recent volume outperforms over the following weeks, most when nothing public explains the volume."
+mechanism = """A volume shock puts the stock on more screens, and with short-sale constraints the
+extra attention brings net buying (Merton 1987 visibility; Gervais, Kaniel and Mingelgrin 2001).
+The sellers who supplied the volume are not wrong, they just do not price the attention effect."""
+persistence = """The per-event gain is small and works best in smaller names where capacity is
+low; attention is a behavioural constant. It was found in 41 countries (Kaniel, Ozoguz and Starks
+2012), but no recent US out-of-sample figure was found."""
+schedule = "every_session"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["volume_shock", "volume_shock_no_news"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """volume_shock is today's volume at or above 2 standard deviations over the previous 20
+sessions (Gervais et al. use the top 10% of a 50-day reference: a looser, own-history version).
+volume_shock_no_news adds news_free_5d: no 8-K or 8-K/A through the previous session in the last 5
+and no earnings reaction window in them; it is a practitioner hypothesis with no published number. The catalogue's variant also drops days with an absolute return of 1 standard deviation or more; the screener omits that condition.
+news_free_5d is null until the filings walk covers the session (filing_activity@v1 fails closed):
+the live store has no filing history until the filings backfill runs (EDGAR submissions from
+2018-01-01 is the planned span), so volume_shock_no_news has no sessions today. Once the backfill
+is done, about 100 independent 20-session windows from 2018-01 are expected (about 2,000 sessions);
+volume_shock needs only bars and the volume rollup, so it has the bar history (2010 on, once the
+rollup is backfilled). The sign depends on the horizon and on an extreme return (the retail-herding
+literature finds the opposite at 5 days): the harness's 20 sessions is the paper's horizon.
+Earnings-day shocks are in volume_shock; the no-news variant removes them. Long side only."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY for the 20 sessions after the entry close (the session after
+the shock), net of 10 bps a round trip (an assumption for liquid names)."""
+trigger_timing = """The shock is read from the volume of the decision session D against the 20
+sessions before it; the entry session is S = D + 1. The news flag at D counts filings accepted
+before the previous session's close and earnings reactions known by D, never later ones."""
+replication = """Gervais, Kaniel and Mingelgrin: a day's volume in the top 10% of a 50-day
+reference period, long, held 20 (or 50) days, against the bottom 10%; here volume_shock (2 standard
+deviations over 20 sessions) and the top 50 by the size of the shock among the liquid common
+stocks; the no-news variant is not in the paper."""
+expected_size = """The high-minus-low portfolio earned 0.94% (small), 1.07% (medium) and 0.50%
+(large firms) per dollar long over 20 trading days, 1963-1996, t about 3 or higher (Gervais et al.
+2001, Table 2): read the 0.50% for the liquid names. It is a published spread of the extremes; the
+top 50 long-only will show less."""
+capacity_costs = """Many signals a day, so position limits and the liquidity floor matter; a 20-day
+hold keeps costs low (10 bps a round trip is the assumption). Capacity is limited in small names,
+which the $50M floor leaves out."""
+failure_modes = """Attention spikes that reverse (a shock with an extreme return), and a premium
+that has faded. Retire if the frozen-period top-50 excess return is not above the buy-and-hold
+mean of the eligible names, or the no-news variant does no better than all shocks."""
+decoys = """Earnings-day volume (the earnings announcement premium and PEAD edges), index
+additions, short-term reversal after an extreme return, and size: the 12-1 momentum and size
+baselines on the same sessions."""
+
+[[sources]]
+title = "Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001"
+url = "https://rodneywhitecenter.wharton.upenn.edu/wp-content/uploads/2014/04/9901.pdf"
+
+[[sources]]
+title = "Kaniel, R., Ozoguz, A. and Starks, L., The High Volume Return Premium: Cross-Country Evidence, Journal of Financial Economics, 2012"
+
+[[sources]]
+title = "Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (the signal catalogue; no volume-shock predictor of this paper)"
+url = "https://github.com/OpenSourceAP/CrossSection"
+
+# The literature's figure (ADR 0064): Gervais, Kaniel and Mingelgrin's high-minus-low volume
+# portfolio over 20 trading days, large firms, 0.50% per dollar long, 1963-1996, before costs
+# (Table 2). It is a spread of the extremes of the paper's own reference period.
+[published]
+measure = "decile_spread"
+value = 0.005
+horizon_sessions = 20
+sample = 34
+source = 0

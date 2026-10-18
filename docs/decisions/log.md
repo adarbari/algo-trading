@@ -627,6 +627,22 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the owner CIK is an SEC public identifier the data set is keyed on; a hash buys nothing (the hash of a public id is trivially reversible against EDGAR) and loses the join to later filings, amendments (4/A) and the deep-dive dossier. Officer title is attribute data a cluster-buy edge weighs (CEO / CFO buys vs. director buys), stored as filed with no name. The cluster-insider-buy edge needs a distinct-insider count, so a stable per-person key is functionally required. Data never enters the public repo (store is local, git-ignored); the read model serves aggregates. Precedent: ADR 0040 keeps emails (private personal data) out of the repo, not public filing data out of the store. Erasure and shorter retention are owner-only decisions (log 2026-10-11), so the default event retention stands until the owner says otherwise.
 
+## 2026-10-18 | EB H11 (residual returns) | Betas read before S, sector term, no nightly step yet
+- Question: which session's betas measure a window's residual, what to do with the sector loading, and does the task join the nightly workflow in this PR?
+- Options: betas at D / at the session before S / at S; the four-factor residual only / add the sector term where `beta_sector` is set (two fits' betas) / a single five-factor fit; a nightly step now / the task and its backfill command first.
+- Decision: the betas of `previous_session(S)` (exact partition, never an older one), the sector SPDR term only where `beta_sector` is set (the brief's rule, with the two-fit mix stated in the ADR), the task registered with its backfill command and no workflow step in this PR; the leg-reuse stamps do not cover the residual partitions (ADR 0053 amendment, limit a).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the session before S is D for the usual offset of 1 and never holds a window return for a larger one; the sector term is what the plan lists, and the mixed-fit inconsistency is small and visible; a nightly step needs the workflow-step tests and a real-store cost measurement the PR cannot run.
+
+## 2026-10-18 | EB H11 (residual returns) review | Four-factor betas only, stamps, nightly step, settlement
+- Question: how to resolve the architect's four findings on the residual-returns grain (sector counted twice, stale legs, no nightly step, settlement raising for a residual edge)?
+- Options: sector from `beta_sector` / drop it until a five-beta `factor_betas@v2`; leave the stamps / add the residual partitions to them; follow-up step / the step now; attach residuals in settlement / catch the error per edge.
+- Decision: residual on the four-factor betas only (market, size, momentum, value; a `factor_betas@v2` with all five betas of one fit is needed for sector; this supersedes the 2026-10-18 entry's sector choice); the stamps cover the residual partitions when a plan measures them (combined sequence and `knowledge_ts`); the optional nightly step `residual-returns` with an acceptance check; settlement attaches the residual rows, an unstored one waits and is skipped with a reason after the grace window.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the stored sector slope is from a different fit than the other four, so adding it counts sector exposure twice; a leg stored before the backfill must not stand for ever; an unscheduled grain goes stale; one residual edge must not stop every followed edge's settlement.
+
 ## 2026-10-18 | EB H5b (time-series base) | How a window edge is declared and judged
 - Question: how does a raw-return, named-instrument edge fit the edge document and the verdict without a new outcome kind or stored column?
 - Options: a new outcome kind `raw_return` and a new `edge_eval` column for the timing Sharpe / keep `excess_return` over benchmark `none` (legal only with `base = "out_of_window"`), named instruments as one `instrument.symbol in [...]` rule, the Welch t in the verdict's existing t slot and the timing Sharpe in the run record.
