@@ -1,0 +1,36 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E3) until its event class exists.
+id = "spinoff_drift"
+name = "Spin-off drift"
+thesis = "Spun-off subsidiaries outperform their industry peers over one to three years after the distribution, as forced sellers exit in the first months."
+mechanism = """Forced selling by holders with size or mandate constraints (index funds that cannot hold the small spin-off), no analyst coverage at birth, and management incentives reset at the spin (Cusatis, Miles and Woolridge 1993)."""
+persistence = """The mandate constraints are structural, but the effect has been known since Greenblatt; evidence for 2001 to 2013 is mixed and mostly not significant (McConnell, Sibley and Xu 2015, from memory), so persistence is a claim to test."""
+family = "B"
+schedule = "month_end"
+top_k = "all"
+screeners = []
+status = "blocked"
+rejection_reason = """No event class reads a spin-off: the schedule above is a placeholder. A spin-off needs the class spinoff in EVENT_CLASSES (src/algotrade/config/edges/document.py) and its field in services/evaluation/cross_section/events.py, a feature group that dates the distribution (sessions_since_spinoff), and the event itself, which the stored filings do not give: events/filing holds Form 10 registration statements (known from their acceptance), not the distribution date, and a spin-off with no price history cannot be measured before it trades. Spin-off events (a new instrument with parent_id, Form 10 plus the 8-K) are partly derivable but not stored."""
+notes = """The first regular-way session after the distribution is the anchor (known_from, announced ahead); the entry 20 to 60 sessions after it, after the forced selling (the page's own horizon is 250 to 750 sessions). About 20 to 40 US spin-offs a year, so 40 events need two years or more of history. Idea page: docs/edge-ideas/events.md (spinoff_parent_and_spinco). Filing it as a candidate needs the harness-side class, which this PR does not touch."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [250, 500]
+benchmark = "SPY"
+start_offset_sessions = 1
+
+[[sources]]
+title = "Cusatis, P., Miles, J. and Woolridge, J., Restructuring through spinoffs: The stock market evidence, Journal of Financial Economics, 1993"
+
+[[sources]]
+title = "S&P Global Market Intelligence, Capital Market Implications of Spinoffs, 2017"
+url = "https://www.spglobal.com/marketintelligence/en/documents/capital-market-implications-of-spinoffs.pdf"
+
+[[sources]]
+title = "McConnell, J., Sibley, S. and Xu, W., Journal of Portfolio Management, 2015 (spin-offs, 2001 to 2013)"

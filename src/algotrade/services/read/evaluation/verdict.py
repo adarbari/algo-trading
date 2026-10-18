@@ -511,6 +511,12 @@ class EdgeFacts:
     site_trials: Callable[[], int] | None = None  # the variants tried across every site
     # edge, read when the haircut is (None: not counted)
     chain: bool = False  # an option_pnl edge: the basis cannot have been fixed in-sample
+    neutral: bool = False  # the outcome is a residual return: market, size, momentum, value gone
+
+
+def is_factor_neutral(edge: Edge) -> bool:
+    """Whether the edge's outcome is a residual return (EB H11): the verdict says so."""
+    return edge.settings is not None and edge.settings.factor_neutral
 
 
 def counts_wins(edge: Edge) -> bool:
@@ -604,7 +610,10 @@ def _judge_one(
     oos, whole = c.oos, c.whole
     pts = runs.lift_points(oos.hit_rate, oos.base_rate)
     basis = _basis_words((c.variant, c.horizon))
-    held = " (short leg)" if oos.side == "short" else ""
+    tags = ["short leg"] if oos.side == "short" else []
+    if facts.neutral:  # the figure is the return left after the ETF factor loadings
+        tags.append("factor-neutral: market, size, momentum and value taken off")
+    held = f" ({', '.join(tags)})" if tags else ""
     body = (
         f"Out-of-sample, {basis}{held}: win rate {_pct(oos.hit_rate)} against a base rate of "
         f"{_pct(oos.base_rate)} ({_num(pts, 0)} pts)."
@@ -892,6 +901,7 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
             measured=lambda: runs.load_measured_sessions(ctx, run),
             wins=counts_wins(edge),
             chain=is_chain(edge),
+            neutral=is_factor_neutral(edge),
             base=edge.base,
             site_trials=None if edge.mine else lambda: runs.load_site_trials(ctx),
         ),

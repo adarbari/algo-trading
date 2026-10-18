@@ -26,11 +26,20 @@ from algotrade.data.outcomes.reading import (
     select_outcomes,
     stored_sessions,
 )
+from algotrade.data.outcomes.residuals import (
+    NO_RESIDUAL_ROW,
+    RESIDUAL_FIELDS,
+    attach_residuals,
+    read_residuals,
+)
 
 __all__ = [
     "CHAIN_COLUMNS",
     "CHAIN_FIELDS",
+    "NO_RESIDUAL_ROW",
     "OUTCOME_FIELDS",
+    "RESIDUAL_FIELDS",
+    "attach_residuals",
     "chain_seqs",
     "chain_sessions",
     "chain_stamps",
@@ -42,6 +51,7 @@ __all__ = [
     "read_chain",
     "read_chain_stored",
     "read_outcomes",
+    "read_residuals",
     "read_stored",
     "select_chain",
     "select_outcomes",

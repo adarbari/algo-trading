@@ -1,0 +1,84 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: sp500_deletion (EB E3). Variant of the rejected
+# sp500_index_changes (the announcement effect); this one trades what follows the deletion. Idea
+# page: docs/edge-ideas/events.md (sp500_deletions_long).
+id = "sp500_deletions_long"
+name = "S&P 500 deletions rebound"
+thesis = "Stocks dropped from the S&P 500 outperform the market over the following year."
+mechanism = """Index funds are forced to sell a deleted name at the effective date regardless of price,
+pushing it below value; deletions are often beaten-down value names demoted into the S&P 400 or 600,
+and nobody is paid to hold them (Arnott, Kalesnik and Wu 2018)."""
+persistence = """Index funds are mandated to trade at the effective close, and the demand for a demoted
+name stays thin; but the same forced selling was front-run by arbitrageurs once it was known, and the
+announcement effect has disappeared (Greenwood and Sammon 2022), so this edge trades the longer
+rebound, which is a different claim that needs its own test."""
+family = "B"
+schedule = "on_event:index_change:deletion"
+top_k = "all"
+base = "universe"
+screeners = ["sp500_deletion"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Long side. The anchor is the session the removal was first stored in events/index_change,
+which is when it became known to us and is later than the announcement and the effective date, so
+the entry misses the first days; the 12-month rebound is the claim, and it is long enough that a few
+sessions' lag matters little. The base rate is every eligible name on the event sessions (picks stay within the event names); the S&P 500 additions
+are the mirror (an event subtype index_change:addition) and the rejected announcement edge. A name
+removed because it was bought is delisted, and the harness measures a delisted pick only if the
+delisting return is known (otherwise it is excluded, counted). The 250-session horizon outlasts the
+frozen period for any change stored since 2026-04-01; the 20 and 60 sessions read it sooner. About
+20 to 25 deletions a year: the independent count reaches 40 only over a couple of years, even with
+the Tiingo history from 2018."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60, 250]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 20
+
+[quality_bar]
+outcome = """Excess return over SPY over 20, 60 and 250 sessions after the entry close (the session
+after the removal was first stored), net of 20 bps a round trip: a long hold of the deleted names."""
+trigger_timing = """The removal is read from events/index_change by the session it was first stored
+(known, by construction, on or before D) and is the anchor; D = anchor and the entry session
+S = anchor + 1. The announcement and the effective date are earlier and not read, so no day of the
+forced selling is traded and nothing leaks forward."""
+replication = """The source's rule first: equal-weight the deletions and hold 12 months from the
+effective date, against the additions (Arnott, Kalesnik and Wu 2018). Here sp500_deletion v1 takes
+every liquid deletion of the last 20 sessions, held from the first close after the removal was
+stored, with every eligible name on those sessions as the base rate."""
+expected_size = """Additions lagged discretionary deletions by more than 22 percentage points on
+average over the 12 months after the change, October 1989 to December 2017 (Research Affiliates;
+the figure is the corrected one, read in a 2018 summary because the paper is no longer hosted);
+the announcement premium fell to 0.8% for additions and -0.6% for deletions in 2010 to 2020
+(Greenwood and Sammon). The 22 points are a spread of the two groups, not the long leg alone."""
+capacity_costs = """Large and mid caps with liquid shares, long only, about 20 names a year: an
+individual can hold them all; the 20 bps round trip is the assumption."""
+failure_modes = """Deletions that are delistings (takeovers) have no rebound to trade; a deletion is
+often a name that kept falling (momentum), not a value bounce; the demotion to a smaller index
+brings its own buyers. Retire if the frozen-period excess return of the picks is not above the base
+rate of every eligible name after costs."""
+decoys = """Deletions are value plus long-term reversal and additions are momentum: the 12-1 momentum
+and size baselines on the same sessions (a matched value or reversal control is not stored)."""
+
+[[sources]]
+title = "Arnott, R., Kalesnik, V. and Wu, L., Buy High and Sell Low with Index Funds!, Research Affiliates, 2018 (summary: etf.com)"
+url = "https://www.etf.com/sections/news/research-affiliates-buy-high-sell-low-index-funds"
+
+[[sources]]
+title = "Greenwood, R. and Sammon, M., The Disappearing Index Effect, NBER Working Paper 30748, 2022"
+url = "https://www.nber.org/papers/w30748"
+
+[[sources]]
+title = "Alpha Architect, The Disappearing Index Effect (summary)"
+url = "https://alphaarchitect.com/disappearing-index-effect/"

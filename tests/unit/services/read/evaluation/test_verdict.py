@@ -654,3 +654,13 @@ def test_a_chain_edge_can_be_promising_but_never_works_without_an_in_sample_basi
     # an ordinary edge with the same rows still waits on its in-sample figures instead
     plain = verdict(rows, draws=draws(100))
     assert plain.verdict == NOT_ENOUGH and "basis_in_sample" not in {c.id for c in plain.criteria}
+
+
+def test_a_residual_return_verdict_says_the_figure_is_factor_neutral() -> None:
+    v = judge("e", result(), SPLIT, T, facts=EdgeFacts(neutral=True))
+    assert "factor-neutral" in v.headline
+    assert "factor-neutral" not in verdict(result()).headline
+    both = judge(
+        "e", [replace(r, side="short") for r in result()], SPLIT, T, facts=EdgeFacts(neutral=True)
+    )
+    assert "(short leg, factor-neutral" in both.headline

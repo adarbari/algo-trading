@@ -303,4 +303,8 @@ reason = "`check_outcomes` is the outcomes step's acceptance check (ADR 0053 ame
 module = "apps/ingestion/algotrade_ingestion/tasks/derived/option_outcomes.py"
 reason = "`check_option_outcomes` is the option-outcomes step's acceptance check (ADR 0053 amendment, EB H13, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
 
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/derived/residual_returns.py"
+reason = "`check_residual_returns` is the residual-returns step's acceptance check (ADR 0053 amendment, ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
+
 # The web app's folders (the [web] settings and every [[web_dir]], ADR 0025) are in architecture/web_layout.toml.

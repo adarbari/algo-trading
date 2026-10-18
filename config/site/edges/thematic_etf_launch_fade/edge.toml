@@ -1,0 +1,34 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E3) until its event class exists.
+id = "thematic_etf_launch_fade"
+name = "Thematic ETF launch fade"
+thesis = "Newly launched thematic and specialised ETFs underperform broad ETFs for years after launch, so a new theme ETF is one to avoid."
+mechanism = """Sponsors launch funds on themes at peak attention; the holdings are overvalued at launch (high past returns, media coverage) and the fund captures extrapolating retail flows (Ben-David, Franzoni, Kim and Moussawi 2023)."""
+persistence = """Sponsor economics (fees on hype) and retail extrapolation do not change; the paper is published, but shorting thin ETFs is costly, so the decay should be slow."""
+family = "H"
+schedule = "month_end"
+top_k = "all"
+screeners = []
+status = "blocked"
+rejection_reason = """Three things are not there. No event class reads an ETF launch (etf_launch is missing from EVENT_CLASSES in src/algotrade/config/edges/document.py and from EVENT_FIELDS in services/evaluation/cross_section/events.py), so the schedule above is a placeholder. Launch dates are known only from the first stored reference snapshot (2024-10) and the Tiingo history of ETFs that exist today, so a launch before them has no date. And no thematic classification is stored: the paper's specialised ETFs are judged by name and holdings concentration, holdings are stored only for iShares and SSGA funds, and any keyword list of themes is a judgement call for the owner, not an implementation detail. A dense-score short leg does not fix it (see reverse_split_distress_filter)."""
+notes = """Long-side use only is an avoid filter on the ETF itself (never buy a theme ETF younger than three years); the short side needs the fund borrowable, and the version that avoids what the new ETFs hold needs issuer holdings beyond iShares and SSGA, which are not stored. Idea pages: docs/edge-ideas/structural-niches.md (new_thematic_etf_fade) and docs/edge-ideas/frontier.md (thematic_etf_launch_underperformance)."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [250, 500]
+benchmark = "SPY"
+start_offset_sessions = 1
+
+[[sources]]
+title = "Ben-David, I., Franzoni, F., Kim, B. and Moussawi, R., Competition for Attention in the ETF Space, Review of Financial Studies, 2023"
+url = "https://www.nber.org/papers/w28369"
+
+[[sources]]
+title = "Alpha Architect, Competition for Attention in the ETF Space (summary)"
+url = "https://alphaarchitect.com/competition-for-attention-in-the-etf-space/"

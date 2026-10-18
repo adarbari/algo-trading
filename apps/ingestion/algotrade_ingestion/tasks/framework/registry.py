@@ -21,6 +21,7 @@ from algotrade_ingestion.tasks.derived import (
     market_rollups,
     option_outcomes,
     outcomes,
+    residual_returns,
     rollups,
 )
 from algotrade_ingestion.tasks.events import filings, insider
@@ -540,6 +541,16 @@ TASKS: dict[str, Task] = {
             option_outcomes.TABLES,
             entries_market.run_option_outcomes,
             settings="edges/*.toml (option_pnl structures, tenors, horizons)",
+            params=(SESSION, FROM, TO),
+        ),
+        Task(
+            "residual-returns",
+            "factor-neutral forward returns of the windows a session closes (ADR 0053); "
+            "--from/--to: window ends; needs factor_betas@v1 stored before each start session",
+            residual_returns,
+            residual_returns.TABLES,
+            entries_market.run_residual_returns,
+            settings="edges/*.toml (horizons of residual_return outcomes)",
             params=(SESSION, FROM, TO),
         ),
         Task(

@@ -48,6 +48,7 @@ def test_the_shipped_sections_follow_the_spec() -> None:
         "reversals",
         "income",
         "events",
+        "filings",
     ]
     assert shipped.families[1].presets == ("range_breakout", "breakout", "failed_breakout")
     assert shipped.theme_groups[0].themes == ("instrument gates",)
