@@ -60,7 +60,7 @@ def parse_epu_daily(payload: bytes) -> pd.DataFrame:
     return frame
 
 
-CAPE_NO_VALUE = {"0", "0.0", "0.00", "#VALUE!", "#N/A", "N/A", "NA"}
+BARCLAYS_NO_VALUE = {"0", "0.0", "0.00", "#VALUE!", "#N/A", "N/A", "NA"}
 
 
 def parse_cape_csv(payload: bytes) -> pd.DataFrame:
@@ -73,7 +73,7 @@ def parse_cape_csv(payload: bytes) -> pd.DataFrame:
     frame["Date"] = dates.dt.strftime("%Y-%m-%d").where(dates.notna(), None)
     for column in frame.columns.drop("Date"):
         cells = frame[column].str.strip()
-        frame[column] = cells.where(~cells.isin(CAPE_NO_VALUE), None)
+        frame[column] = cells.where(~cells.isin(BARCLAYS_NO_VALUE), None)
     return frame
 
 

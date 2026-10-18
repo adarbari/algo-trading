@@ -1,0 +1,71 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "part": "p1",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "stocks",
+      "part": "p1",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "rsi",
+      "part": "p2",
+      "field": "rollup.momentum@v1.rsi_14",
+      "op": "lt",
+      "value": 30,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "RSI14 under 30"
+    },
+    {
+      "id": "above_sma50",
+      "part": "p3",
+      "field": "feature.pct_vs_sma_50",
+      "op": "gt",
+      "value": 0,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "above SMA50"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": null,
+  "parts": [
+    {
+      "id": "p1",
+      "words": "stocks"
+    },
+    {
+      "id": "p2",
+      "words": "RSI14 under 30"
+    },
+    {
+      "id": "p3",
+      "words": "above SMA50"
+    }
+  ]
+}

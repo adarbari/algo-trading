@@ -1,0 +1,95 @@
+{
+  "id": "groups-except-a-or-b",
+  "sentence": "stocks above $10 except those with IV rank above 80% or market cap under $2B",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "above $10",
+        "bucket": "A",
+        "fields": [
+          "rollup.price_stats@v2.close"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 10,
+        "tolerance": 0
+      },
+      {
+        "span": "IV rank above 80%",
+        "bucket": "A",
+        "fields": [
+          "feature.iv_rank"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0.8,
+        "tolerance": 0
+      },
+      {
+        "span": "market cap under $2B",
+        "bucket": "A",
+        "fields": [
+          "feature.market_cap"
+        ],
+        "op": [
+          "lt",
+          "lte"
+        ],
+        "value": 2000000000,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "stocks",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "above $10",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "IV rank above 80%",
+          "kind": "applied",
+          "origin": "words",
+          "join": "and_not",
+          "join_words": "except those with"
+        },
+        {
+          "words": "market cap under $2B",
+          "kind": "applied",
+          "origin": "words",
+          "join": "or",
+          "join_words": "or"
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 0
+    },
+    "groups": [
+      {
+        "none": [
+          "IV rank above 80%",
+          "market cap under $2B"
+        ]
+      }
+    ]
+  }
+}

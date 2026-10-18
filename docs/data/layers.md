@@ -75,6 +75,7 @@ Two physical parts, always read together:
 | `live/option_quotes` | contract × time taken | on request | the live IBKR quotes the API served (`/chains/{id}/live`; ADR 0028): bid, ask, last, close, volume, IB's model `iv` and `delta`, `conid`, `market_data_type`. Merge runs (each a batch of snapshots; every snapshot kept, keyed by contract and `ts`); `session_date` is the session the quote was taken in. The API's one write, only through `LiveWriter`; never read by backtests. Personal-use licence. Read through `data.chains.live_option_quotes` |
 | `rates/treasury` | curve date × tenor (`RATE:UST-<tenor>`) | daily (bond-market days) | U.S. Treasury par yield curve: `tenor`, `tenor_days`, `rate_par`, `rate_cont` (decimals; ADR 0021). One partition per curve date; read through `data.rates.curve(reader, on)` (latest on or before, earliest flagged) |
 | `holdings/etf` | ETF × holding × issuer as-of date | weekly | what an ETF holds (ADR 0035): the largest `[etf_holdings] keep_top` (100) lines of the issuer's file ranked by the size of the weight (`weight` a fraction of the fund; `filed` hides an N-PORT row before its filing date), `holding_symbol` / `holding_name` / `asset_class` / `sector` / `shares` / `identifier` (CUSIP or ISIN), `holding_id` (the universe instrument the ticker resolves to, else null), `holdings_count` (every line of the file). Sources: State Street and iShares daily files, SEC N-PORT (quarterly) for the rest. Merge runs (a run reads a few funds); read through `data.funds.holdings.etf_holdings` |
+| `holdings/etf_shares` | ETF × issuer as-of date | nightly for `[etf_holdings] daily_funds`, weekly for the other iShares funds | an ETF's shares outstanding as its iShares file states them (EB D4; the header block of the file the holdings task already reads; State Street's and ProShares' files carry none, so those funds have no row): `as_of` (the file's date, which differs between funds of one night), `shares_outstanding` (rounded to creation units), `known_from` (the session of the New York date of the fetch, the next session on a weekend or holiday, never before `as_of`: readers apply `known_from <= S`, ADR 0050). No NAV, AUM or flow is stored: flow is approximated later as the change in shares times the stored close. History accrues from the first nightly that stores it; nothing is backfilled. Merge runs; read through `data.funds.shares.etf_shares` |
 | `rollups/daily/<name>@vN` | instrument × session | daily | rolls intraday bars up to a day: session OHLCV, VWAP, intraday range, opening gap |
 
 **`bars/<interval>` columns.** Key (`instrument_id`, `ts`) within an interval table.
@@ -195,7 +196,10 @@ Reads (`data.reference.descriptions`) union every partition and keep the latest 
 instrument; markers are left out of `descriptions` and kept in `stored_descriptions`.
 
 **`instruments/shares`** (SEC company facts, phase 2b.4; increments merged across runs, one row
-per instrument, concept, tag, period start, period end and filing date; `algotrade-ingest shares`)
+per instrument, concept, tag, period start, period end and filing date; `algotrade-ingest shares`;
+`accepted_ts`, UTC, is the instant SEC accepted the filing, from the company's submissions, null when
+unknown: readers count a fact from the first session whose close is after it, else from the session
+after `filed`: `data.shares.known_from`)
 
 | Columns | Notes |
 |---|---|
@@ -225,8 +229,8 @@ instrument, concept, tag, period start, period end and filing date)
 | `fetched_on` | when SEC was last asked; a CIK is fetched when the older of the two tables' latest `fetched_on` is past its slot |
 
 Reads (`data.statements.reading`): `stored_statements` (every row, the latest stored version per
-key) for the producer, `statement_facts(reader, session)` the facts FILED on or before the session.
-Read by `income_statement@v1`, `cash_flow@v1` and `balance_sheet@v1` (the `instruments/statements` feature input), and through them `growth_history@v1` and the formulas of `config/site/features/company/statements.toml`.
+key) for the producer, `statement_facts(reader, session)` the facts filed on or before the session (the by-acceptance read is `known_from`, `instruments/statements_accepted`).
+Read by `income_statement@v2`, `cash_flow@v2` and `balance_sheet@v2` (the `instruments/statements` feature input), and through them `growth_history@v2` and the formulas of `config/site/features/company/statements.toml`.
 
 **`macro/series`** (ADR 0048; increments merged across runs, one row per series, observation date
 and vintage) holds economic series (`MACRO:<KEY>`) and index levels (`IDX:<KEY>`: index levels
@@ -354,16 +358,17 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `div_yield@v1` | `div_yield` (the materialised expression feature) | `dividends@v2`, `price_stats@v2` | built |
 | `iv30@v1` | `iv30` (ours), `iv30_cboe`, `iv30_status`, `near_expiry`, `far_expiry`, `atm_strike_near`, `spot`, `rate`, `div_yield`, `n_quotes_used` | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `iv_history@v2` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days`, `rank_status` (UNKNOWN / PROVISIONAL / FULL) | `iv30@v1` over 252 sessions | built |
-| `fundamentals@v3` | `shares_outstanding`, `shares_outstanding_year_ago`, `shares_as_of`, `shares_filed`, `shares_source` (dei / weighted_basic), `market_cap_status` (OK / NO_SHARES / STALE / NO_PRICE) | `instruments/shares` (filed on or before the session), `price_stats@v2` close, `events/split`; `stale_days` in `config/site/rollups.toml` | built |
-| `financials@v2` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `eps_diluted_ttm`, `eps_diluted_ttm_year_ago`, `revenue_fy`, `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `ttm_basis` (QUARTERS / ANNUAL), `revenue_qtr`, `revenue_qtr_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago`, `qtr_as_of`, `eps_stale`, `is_adr`, `financials_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` financial concepts (filed on or before the session), `price_stats@v2` (which instruments get a row), `events/split`, `instruments/reference` (security type); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
-| `income_statement@v1` | `gross_profit_ttm`, `cost_of_revenue_ttm`, `ebit_ttm`, `da_ttm`, `interest_expense_ttm`, `pretax_income_ttm`, `income_tax_ttm`, `is_ttm_as_of`, `is_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE / FINANCIAL) | `instruments/statements` duration concepts (filed on or before the session), `price_stats@v2`, `instruments/company` (SIC); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
-| `growth_history@v1` | `revenue_ttm_3y_ago`, `revenue_ttm_5y_ago`, `eps_diluted_ttm_3y_ago`, `eps_diluted_ttm_5y_ago`, `gh_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` `revenue` and `eps_diluted` (filed on or before the session), `price_stats@v2`, `events/split`; `stale_days`, `history_days` (2700) | built |
-| `analyst_estimates@v1` | `fy1_period_end`, `fy2_period_end`, `eps_fy1`, `eps_fy2`, `revenue_fy1`, `revenue_fy2`, `eps_fy1_analysts`, `revenue_fy1_analysts`, `estimates_age_days`, `estimates_status` (OK / STALE / NOT_COVERED / NOT_FETCHED) | `analyst/estimate_snapshots` as the session sees it (annual estimates, FMP), `universe` (one row per equity), `financials@v2` (`revenue_fy_end`); `stale_days`, `fy_slack_days` in `config/site/rollups.toml`; personal licence, optional | built |
+| `fundamentals@v4` | `shares_outstanding`, `shares_outstanding_year_ago`, `shares_as_of`, `shares_filed`, `shares_source` (dei / weighted_basic), `market_cap_status` (OK / NO_SHARES / STALE / NO_PRICE) | `instruments/shares` (public by the session's close: SEC acceptance), `price_stats@v2` close, `events/split`; `stale_days` in `config/site/rollups.toml` | built |
+| `financials@v3` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `eps_diluted_ttm`, `eps_diluted_ttm_year_ago`, `revenue_fy`, `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `ttm_basis` (QUARTERS / ANNUAL), `revenue_qtr`, `revenue_qtr_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago`, `qtr_as_of`, `eps_stale`, `is_adr`, `financials_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` financial concepts (public by the session's close: SEC acceptance), `price_stats@v2` (which instruments get a row), `events/split`, `instruments/reference` (security type); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
+| `income_statement@v2` | `gross_profit_ttm`, `cost_of_revenue_ttm`, `ebit_ttm`, `da_ttm`, `interest_expense_ttm`, `pretax_income_ttm`, `income_tax_ttm`, `is_ttm_as_of`, `is_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE / FINANCIAL) | `instruments/statements` duration concepts (public by the session's close: SEC acceptance), `price_stats@v2`, `instruments/company` (SIC); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
+| `growth_history@v2` | `revenue_ttm_3y_ago`, `revenue_ttm_5y_ago`, `eps_diluted_ttm_3y_ago`, `eps_diluted_ttm_5y_ago`, `gh_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` `revenue` and `eps_diluted` (public by the session's close: SEC acceptance), `price_stats@v2`, `events/split`; `stale_days`, `history_days` (2700) | built |
+| `mispricing@v1` | `total_assets_1y_ago`, `asset_growth`, `accruals`, `gross_profit_to_assets`, `net_operating_assets`, `ohlson_o` (float), `quality_score`, `composite_rank` (float32), `composite_inputs` (int) | `balance_sheet@v2`, `income_statement@v2`, `cash_flow@v2`, `financials@v3`, `fundamentals@v4`, `instruments/statements_accepted` Assets instants, `price_stats@v2`; `stale_days`, `history_days`, `ago_tolerance_days`, `min_members`, `min_quality_inputs`, `min_anomalies` | built |
+| `analyst_estimates@v1` | `fy1_period_end`, `fy2_period_end`, `eps_fy1`, `eps_fy2`, `revenue_fy1`, `revenue_fy2`, `eps_fy1_analysts`, `revenue_fy1_analysts`, `estimates_age_days`, `estimates_status` (OK / STALE / NOT_COVERED / NOT_FETCHED) | `analyst/estimate_snapshots` as the session sees it (annual estimates, FMP), `universe` (one row per equity), `financials@v3` (`revenue_fy_end`); `stale_days`, `fy_slack_days` in `config/site/rollups.toml`; personal licence, optional | built |
 | `analyst_targets@v1` | `target_consensus`, `target_median`, `target_high`, `target_low`, `targets_age_days`, `targets_status` (OK / STALE / NOT_COVERED / NOT_FETCHED) | `analyst/estimate_snapshots` as the session sees it (price-target consensus, FMP), `universe`; `stale_days`; personal licence, optional | built |
 | `analyst_ratings@v1` | `rating_strong_buy`, `rating_buy`, `rating_hold`, `rating_sell`, `rating_strong_sell`, `rating_count`, `rating_score` (1..5, 5 = strong buy), `rating_month`, `rating_score_change_90d`, `ratings_status` (OK / STALE / NOT_COVERED / NOT_FETCHED) | `analyst/estimate_snapshots` as the session sees it (recommendation trend, Finnhub), `universe`; `stale_days` (45); personal licence, optional | built |
 | `analyst_revisions@v1` | `eps_fy1_revision_30d`, `_60d`, `_90d`, `revenue_fy1_revision_30d`, `_90d`, `eps_fy1_analysts_change_90d`, `revisions_status` (OK / BUILDING / NO_PRIOR / STALE / NOT_COVERED / NOT_FETCHED) | `analyst_estimates@v1` (FY1 and its year end), `analyst/estimate_snapshots` as the session sees it (annual estimates, FMP); personal licence, optional | built |
-| `cash_flow@v1` | `ocf_ttm`, `capex_ttm` (the cash paid, positive), `cf_as_of`, `cf_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/statements` `ocf` and `capex` (filed on or before the session), `price_stats@v2`; `stale_days`, `history_days` | built |
-| `balance_sheet@v1` | `cash`, `sti`, `total_debt`, `debt_basis` (a to g / NOT_TAGGED), `total_assets`, `total_liabilities`, `liabilities_basis` (REPORTED / DERIVED / NONE), `stockholders_equity`, `current_assets`, `current_liabilities`, `bs_as_of`, `bs_filed`, `is_financial`, `bs_status` (OK / PARTIAL / NO_FACTS / STALE) | `instruments/statements` instant concepts (filed on or before the session), `price_stats@v2`, `instruments/company` (SIC); `stale_days`, `history_days` | built |
+| `cash_flow@v2` | `ocf_ttm`, `capex_ttm` (the cash paid, positive), `cf_as_of`, `cf_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/statements` `ocf` and `capex` (public by the session's close: SEC acceptance), `price_stats@v2`; `stale_days`, `history_days` | built |
+| `balance_sheet@v2` | `cash`, `sti`, `total_debt`, `debt_basis` (a to g / NOT_TAGGED), `total_assets`, `total_liabilities`, `liabilities_basis` (REPORTED / DERIVED / NONE), `stockholders_equity`, `current_assets`, `current_liabilities`, `bs_as_of`, `bs_filed`, `is_financial`, `bs_status` (OK / PARTIAL / NO_FACTS / STALE) | `instruments/statements` instant concepts (public by the session's close: SEC acceptance), `price_stats@v2`, `instruments/company` (SIC); `stale_days`, `history_days` | built |
 | `put_wing@v1` | `wing_status` (OK / OUTSIDE_BAND / NO_SPOT / NO_CHAIN / NO_EXPIRY / NO_STRIKE), `target_expiry` + `target_dte` (nearest 45 days in 30..60, standard monthlies first), `n_unpriced`; band totals of the puts with OUR \|delta\| in 0.08..0.15 (`n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`); the best put among 0.05..0.35 delta, nearest the band then by cash-secured ROC (`delta_band_distance`, `best_put_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_roc`) | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `chain_flow@v1` | `flow_status` (OK / NO_CHAIN); `call_volume`, `put_volume` (every expiry, 0-DTE included), `call_oi`, `put_oi` (`dte >= 1`), `next_exp_call_volume`, `next_exp_put_volume` (first listed expiry 1+ days out); the unusual-activity columns `unusual_contracts` (volume above OI and at least `min_unusual_volume`), `max_vol_oi_ratio`, `unusual_premium_usd` ([positioning.md](positioning.md)) | the session's `chains/option_quotes` (+ `chains/underlying_quotes`: a quoted name without a chain reads NO_CHAIN); `min_unusual_volume` in `config/site/rollups.toml` | built |
 | `flow_history@v1` | `option_volume_rel_20d` (today's option volume over the mean of the earlier sessions), `pc_volume_ratio_20d`, `flow_history_days`; null until 10 of the last 20 sessions have a chain (stored from 2026-10-02 only) | `chain_flow@v1` over 20 sessions; `window`, `min_sessions` in `config/site/rollups.toml` | built |
@@ -384,11 +389,12 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `candle@v1` | `body_share`, `upper_wick_share`, `lower_wick_share`, `body_vs_avg_20d`, `bar_relation`, `prev_bar_relation`, `candle` ([technical.md](technical.md)) | `bars/1d` split-adjusted as of the session, 20 sessions back | built |
 | `vol_stats@v1` | `atr_5`, `atr_20`, `hv10`, `hv60`, `hv20_pctile_252d`, `adv_shares_60d`, `volume_pctile_252d`, `pocket_pivot` ([technical.md](technical.md)) | `bars/1d` split-adjusted as of the session, 272 sessions back | built |
 | `relative_strength@v1` | `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `rs_spy_trend_20d` (relative strength against SPY), `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d` (the return's rank among the universe's stocks), `sector_etf`, `sector_ret_63d`, `rs_sector_63d`, `sector_rank_63d` (the sector ETF and the name against it) ([technical.md](technical.md)) | `bars/1d` split-adjusted as of the session, 252 sessions back; `instruments/symbol_ids` (SPY and the sector ETFs), `universe` (the population of the percentiles), `instruments/company` (sector); `min_members`, `min_sector_etfs` in `config/site/rollups.toml` | built |
+| `momentum_variants@v1` | `resid_mom_12_1`, `resid_ret_20d` (the 12-1 and 1-month log returns net of beta x SPY), `fip_12_1` (information discreteness of the 12-1 path), `sector_ret_252d`, `rs_sector_20d` (the sector ETF's year and the 1-month return against it) | `bars/1d` split-adjusted as of the session, 252 sessions back; `instruments/symbol_ids` (SPY and the sector ETFs), `relative_strength@v1` (`sector_etf`) | built |
 | `anchored_vwap@v2` | `avwap_earnings`, `avwap_anchor_date` (v1), `avwap_swing_low`, `avwap_swing_high` (VWAP from the swing pivots `swing_levels@v1` found) | `events/earnings`, `bars/1d` split-adjusted as of the session, 251 sessions back, `swing_levels@v1` | built |
 | `oi_walls@v1` | `wall_status` (OK / PARTIAL / NO_OI / NO_SPOT / NO_CHAIN / NO_EXPIRY), `call_wall` + `call_wall_oi` (most call OI at or above spot), `put_wall` + `put_wall_oi` (most put OI at or below spot); OI summed across expiries 1..60 days out, ties nearer spot | the session's `chains/option_quotes`, `chains/underlying_quotes` | built |
 | `nearest_expiry@v1` | `expiry_date` (the nearest listed expiry on or after the session; 0-DTE counts), `dte` (calendar days to it), `sessions_to_expiry` (exchange sessions after the session up to it); a row per underlying with a chain, null when every listed expiry is past. `feature.earnings_before_expiry` (`config/site/features/options/earnings.toml`) compares it with `earnings@v1.next_earnings_date` | the session's `chains/option_quotes` | built |
 
-**`fundamentals@v3` rules.** Among facts FILED on or before the session: the latest cover
+**`fundamentals@v4` rules.** Among facts public by the session's close (SEC acceptance, as `financials@v3`): the latest cover
 count (`dei`; latest filed, then latest period end, so an amendment wins) while the company
 still tags it (its latest `dei` filing is no older than its latest weighted average), else the
 latest filing's weighted average basic. Splits after the count multiply it (after
@@ -406,9 +412,9 @@ by the same rule as the current count, so a split in between is not dilution; nu
 The expression `shares_change_yoy = shares_outstanding / shares_outstanding_year_ago - 1` is
 negative for buybacks and positive for dilution, null for a stale count.
 
-**`income_statement@v1` and `cash_flow@v1` rules (ADR 0067).** They read `instruments/statements`
-only (through the `instruments/statements` feature input: facts FILED on or before the session, so a
-restatement filed later never moves a session). The TTM arithmetic is the one `financials@v2` uses
+**`income_statement@v2` and `cash_flow@v2` rules (ADR 0067).** They read `instruments/statements`
+only (through the `instruments/statements` feature input: facts public by the session's close, so a
+restatement filed later never moves a session). The TTM arithmetic is the one `financials@v3` uses
 (`features/rollups/statements/ttm.py`): four consecutive discrete quarters (a reported three-month
 fact, else the difference of two year-to-date facts of one fiscal year and one tag filed within 150
 days of each other), else the latest fiscal year. A period takes the first tag of its concept's list
@@ -422,14 +428,16 @@ TTM present ended more than `stale_days` (480) before the session; FINANCIAL = S
 unknown SIC is not financial): `ebit_ttm`, `da_ttm` and `interest_expense_ttm` are null. `cf_status` is
 the same with OK = both lines ending on the same period.
 
-**`growth_history@v1` rules (ADR 0067).** The TTMs of `financials@v2` (`revenue_ttm`, `eps_diluted_ttm`) three and five years
-back, read from the same `instruments/shares` facts with a longer window (`history_days`, 2700; `financials@v2` keeps 1100). The newest TTM of
+**`growth_history@v2` rules (ADR 0067).** The TTMs of `financials@v3` (`revenue_ttm`, `eps_diluted_ttm`) three and five years
+back, read from the same `instruments/shares` facts (by acceptance) with a longer window (`history_days`, 2700; `financials@v3` keeps 1100). The newest TTM of
 the concept sets the end; the ago value is the four consecutive quarters (else the fiscal year) whose last period ends within 40 days of that
-end less 3 or 5 x 365.25 days (`ttm.trailing_ago`); a hole is null, never a shorter sum. Facts filed after the session are never read; EPS is
-split-adjusted to the session as in `financials@v2`. `gh_status`: STALE (first) = the newest TTM ended more than `stale_days` (480) before the
+end less 3 or 5 x 365.25 days (`ttm.trailing_ago`); a hole is null, never a shorter sum. Facts not public by the session's close (SEC acceptance) are never read; EPS is
+split-adjusted to the session as in `financials@v3`. `gh_status`: STALE (first) = the newest TTM ended more than `stale_days` (480) before the
 session; OK = revenue and EPS TTMs end on the same period and all four values are known; PARTIAL = otherwise; NO_TTM = facts but no TTM; NO_FACTS = no fact. The
 multi-year growth rates are expression features over it (`config/site/features/company/statements.toml`). The group is new: its table has
-no history until a backfill (`algotrade-ingest rollups --from D --to D --only growth_history@v1`, as for any new rollup).
+no history until a backfill (`algotrade-ingest rollups --from D --to D --only growth_history@v2`, as for any new rollup).
+
+**`mispricing@v1` rules (edge build E1d).** A rank needs the cross-section, so the anomaly inputs and their ranks are one group over the stored statement groups (each already point in time by the acceptance of its filing, ADR 0067 as amended by H2: a figure enters a session when its filing was public). `total_assets_1y_ago` is the `Assets` instant nearest to `bs_as_of` less 365 days within `ago_tolerance_days` (40), from facts accepted (public) by the session (a restatement accepted by then replaces the original). A value whose statement group is STALE, a balance-sheet measure of a PARTIAL balance sheet (a line at an older date), an accruals or O-score whose net income and operating cash flow end on different quarters, or a bank's balance-sheet anomaly, is null. `ohlson_o` is a simplified O-score: INTWO and CHIN (need last year's net income) and the GNP deflator (a per-session constant) are omitted. `quality_score` is the mean percentile rank of six measures (needs `min_quality_inputs`); `composite_rank` the mean of seven anomalies oriented high = overpriced (needs `min_anomalies`; a measure with fewer than `min_members` known values that session is not ranked); an input that is missing is left out, too few is null, never zero or median. `composite_inputs` counts the anomalies averaged. Four of Stambaugh-Yuan's eleven are not built (composite issuance, investment-to-assets, distress, momentum). A new table: it has no history until a backfill (`--only mispricing@v1`).
 
 **`analyst_estimates@v1` and `analyst_targets@v1` rules (ADR 0068, 0072).** Both read our own history of FMP's analyst data
 (`analyst/estimate_snapshots`) through `data/analyst/reading.py`: a snapshot row counts for session S only when its `session_date`
@@ -440,8 +448,8 @@ session's universe, from the vendor's newest snapshot of the name (never mixed w
 NOT_COVERED (the newest coverage marker that is not FAILED says the vendor refused the name or answered with nothing, or says OK while no row of the kind
 is as new), NOT_FETCHED (no row and no marker, or only FAILED markers: never asked, or every attempt failed); both read publicly as "not
 covered" (`Feature.uncovered_statuses`, ADR 0072), the admin cause tells them apart. FY1 is the first estimate year ending more than
-`fy_slack_days` (60, under 85) after the later of the last annual report's year end (`financials@v2.revenue_fy_end`) and the last quarter's end
-(`qtr_as_of`), else the first ending after S for a name with neither; without `financials@v2` for the session no year is served. FY2 is the next
+`fy_slack_days` (60, under 85) after the later of the last annual report's year end (`financials@v3.revenue_fy_end`) and the last quarter's end
+(`qtr_as_of`), else the first ending after S for a name with neither; without `financials@v3` for the session no year is served. FY2 is the next
 listed; at the fiscal-year roll FY1 moves on the session the 10-K becomes known, so a forward P/E jumps once. Forward P/E, forward EPS and revenue growth and target upside are formulas over it (`config/site/features/company/forward.toml`). The never-asked names are graded by `analyst_backlog` and
 `finnhub_backlog` (`tasks/analyst/backlog.py`, WARN only; the latter also when the run skipped Finnhub).
 
@@ -459,9 +467,9 @@ snapshot of the year, not every window), NO_PRIOR (none), or the estimates' own 
 (`uncovered_statuses`, so the same names read "not covered" on both groups; graded by `analyst_backlog`). History starts at our first snapshot (2026-10-19 at the earliest), so the 90-day
 fields are null until about 2027-01-17. Both groups are personal-licence and optional.
 
-**`balance_sheet@v1` rules (ADR 0067).** Balance sheet lines are instants (period type INSTANT, no start):
+**`balance_sheet@v2` rules (ADR 0067).** Balance sheet lines are instants (period type INSTANT, no start):
 no TTM, no subtraction. `bs_as_of` is the newest period end of the core lines (`cash`, `total_assets`,
-`stockholders_equity`), each core line reading its own latest instant filed on or before the session (the first
+`stockholders_equity`), each core line reading its own latest instant public by the session's close (SEC acceptance) (the first
 tag of its list that reports that end, never a mix of tags; a restatement filed after the session never moves
 it). Every other line, `total_liabilities` and `total_debt` are read ONLY at `bs_as_of`: not reported at that
 date is null (`NOT_TAGGED`, `NONE`), so no older figure sits beside the balance sheet. `total_debt` is added up
@@ -473,11 +481,13 @@ missing one counts as 0 (the one place a missing figure is added as 0). An incom
 less the equity of the same date, the one including the noncontrolling interest first (DERIVED), else NONE.
 `bs_status`: STALE (before the rest) = `bs_as_of` is more than `stale_days` (480) before the session; OK =
 the three core lines all end on it; PARTIAL = otherwise; NO_FACTS = no instant filed. A bank keeps its balance
-sheet (`is_financial`, SIC 6000 to 6411); only the EBIT family of `income_statement@v1` is null for it.
+sheet (`is_financial`, SIC 6000 to 6411); only the EBIT family of `income_statement@v2` is null for it.
 
-**`financials@v2` rules.** Among facts FILED on or before the session (a filing counts for
-the session of its filing date, even one made in the evening: the same few-hours look-ahead as
-`fundamentals@v3`), each (concept, tag, period) takes its latest known value (a restatement
+**`financials@v3` rules.** Among facts PUBLIC by the session's close (a filing counts from the first
+session whose close is after the instant SEC accepted it, `accepted_ts`: 16:00 New York time,
+13:00 on an early close; a 10-Q accepted at 16:30 on D counts from D+1; a fact with no acceptance time
+counts from the session after its filing date; v2 and `fundamentals@v3` counted `filed <= session`, a
+one-session look-ahead, ADR 0067 amendment 2026-10-17), each (concept, tag, period) takes its latest known value (a restatement
 counts from its filing date). Per concept a TTM is: (1) `QUARTERS`: the sum of the last four
 consecutive discrete quarters, when the newest quarter ends on or after the newest fiscal year;
 a discrete quarter is a reported three-month fact (the best revenue tag first), else the

@@ -5,10 +5,12 @@ import {
   criteriaOf,
   criterionIds,
   criterionOfError,
+  groupsFor,
   isComplete,
   isScreenId,
   newCriterionId,
   previewDocument,
+  tableFor,
   tieBreakOf,
   toDocument,
   withCriterion,
@@ -178,5 +180,63 @@ describe('documents and ids', () => {
     expect(isScreenId('My')).toBe(false);
     expect(isScreenId('')).toBe(false);
     expect(isScreenId('a'.repeat(65))).toBe(false);
+  });
+});
+
+describe('groups (ADR 0071)', () => {
+  const doc = (groups: Record<string, Record<string, unknown>>) =>
+    ({ id: 'my', groups }) as ReturnType<typeof blankDocument>;
+
+  it('says which group a criterion sits in', () => {
+    const document = doc({ either: { any: ['iv30', 'adv'] } });
+    expect(criteriaOf(BASE, document).map((c) => [c.id, c.group])).toEqual([
+      ['iv30', 'either'],
+      ['adv', 'either'],
+    ]);
+    expect(groupsFor(BASE, document)).toEqual([
+      { id: 'either', kind: 'any', members: ['iv30', 'adv'] },
+    ]);
+  });
+
+  it('keeps the group out of a criterion table', () => {
+    const [first] = criteriaOf(BASE, doc({ either: { any: ['iv30', 'adv'] } }));
+    expect(tableFor(first as Criterion)).not.toHaveProperty('group');
+    expect(tableFor(first as Criterion)).not.toHaveProperty('id');
+  });
+
+  it('takes the criteria of a disabled group out of the screen', () => {
+    const document = doc({ either: { any: ['iv30', 'adv'], enabled: false } });
+    expect(criteriaOf(BASE, document)).toEqual([]);
+  });
+
+  it('shares one key space: a group id is an id in use', () => {
+    expect(criterionIds(BASE, doc({ either: { any: ['iv30', 'adv'] } }))).toContain('either');
+  });
+
+  it('dissolves a draft group left too small when a member is removed', () => {
+    const own = {
+      id: 'my',
+      criteria: { a: { field: 'f.a' }, b: { field: 'f.b' } },
+      groups: { g: { any: ['a', 'b'] } },
+    };
+    expect(withoutCriterion(own as never, undefined, 'a')).toEqual({
+      id: 'my',
+      criteria: { b: { field: 'f.b' } },
+    });
+  });
+
+  it('leaves a criterion still being filled in, and its group, out of the preview', () => {
+    const own = {
+      id: 'my',
+      criteria: {
+        a: { field: 'f.a', op: 'gte', value: 1, mode: 'hard' },
+        b: { field: 'f.b', op: 'gte', mode: 'hard' },
+      },
+      groups: { g: { any: ['a', 'b'] } },
+    };
+    expect(previewDocument(own as never)).toEqual({
+      id: 'my',
+      criteria: { a: own.criteria.a },
+    });
   });
 });

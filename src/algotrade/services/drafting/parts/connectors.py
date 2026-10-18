@@ -1,6 +1,7 @@
 """The one vocabulary for the words between conditions (ADR 0041, amended 2026-10-17). ``JOINS``
-are the phrases that say how a condition relates to the one before it (and, or, and not; only the
-and-type ones are left out of a part's words, a negation or an or stays inside the condition);
+are the phrases that say how a condition relates to the one before it (and, or, and not; an or
+and an exclusion between two parts are left out of the words like an and, and become a group
+(``contract/groups``, ADR 0071); a negation inside one condition, ``NEGATIONS``, stays in it);
 ``GLUE`` are closed-class words that mean nothing alone (auxiliaries, pronouns, fillers like
 "show me"). The prompt renders the join phrases from here, so the model's "leave the connector
 out of the words" and the server's reading of what it left out cannot drift; ``spans`` turns
@@ -23,6 +24,11 @@ _JOIN_PHRASES: dict[str, tuple[str, ...]] = {
         "everything but",
     ),
 }  # fmt: skip
+NEGATIONS = (
+    "not",
+    "no",
+    "without",
+)  # a word of one condition ("not overbought"), kept in its words
 JOINS: dict[str, str] = {p: logic for logic, ps in _JOIN_PHRASES.items() for p in ps}
 
 GLUE = frozenset(
@@ -52,6 +58,12 @@ def join_text(*logics: str) -> str:
     """The join phrases of ``logics`` (default: the and-type ones, the only connectors the model
     leaves out of a part's words) as the prompt lists them, in the order declared here."""
     return ", ".join(p for p, logic in JOINS.items() if logic in (logics or (AND,)))
+
+
+def exclusion_text() -> str:
+    """The exclusion phrases that stand between two parts (every negation join but the
+    ``NEGATIONS`` that belong to one condition), as the prompt lists them."""
+    return ", ".join(p for p, logic in JOINS.items() if logic == AND_NOT and p not in NEGATIONS)
 
 
 def _phrase_words() -> dict[tuple[str, ...], str | None]:

@@ -1,0 +1,86 @@
+{
+  "criteria": [
+    {
+      "id": "active",
+      "part": "p1",
+      "field": "instrument.status",
+      "op": "eq",
+      "value": "ACTIVE",
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "stocks",
+      "part": "p1",
+      "field": "instrument.security_type",
+      "op": "in",
+      "value": [
+        "COMMON_STOCK",
+        "ADR"
+      ],
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "stocks"
+    },
+    {
+      "id": "near_high",
+      "part": "p2",
+      "field": "feature.pct_from_high_52w",
+      "op": "gte",
+      "value": -0.05,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "within 5% of their 52 week high"
+    },
+    {
+      "id": "small_cap",
+      "part": "p3",
+      "field": "feature.market_cap",
+      "op": "lt",
+      "value": 2000000000,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "market cap under $2B"
+    },
+    {
+      "id": "iv_rank",
+      "part": "p4",
+      "field": "feature.iv_rank",
+      "op": "gt",
+      "value": 0.8,
+      "mode": "hard",
+      "tolerance": null,
+      "on_miss": null,
+      "why": "IV rank above 80%"
+    }
+  ],
+  "tie_break": null,
+  "notes": [],
+  "formulas": null,
+  "missing": null,
+  "unresolved": null,
+  "suggestions": null,
+  "parts": [
+    {
+      "id": "p1",
+      "words": "stocks"
+    },
+    {
+      "id": "p2",
+      "words": "within 5% of their 52 week high"
+    },
+    {
+      "id": "p3",
+      "words": "market cap under $2B"
+    },
+    {
+      "id": "p4",
+      "words": "IV rank above 80%"
+    }
+  ]
+}

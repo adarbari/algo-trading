@@ -121,7 +121,7 @@ contracts = ["Layout: core model and time are the base of core (they never impor
 
 [[dir]]
 path = "src/algotrade/core/time"
-purpose = "the exchange session calendar and UTC clock helpers; never compute weekdays elsewhere"
+purpose = "the exchange session calendar, the calendar windows an edge schedule uses, and UTC clock helpers; never compute weekdays elsewhere"
 contracts = ["Layout: core model and time are the base of core (they never import views or validation)"]
 
 [[dir]]
@@ -148,7 +148,11 @@ contracts = ["Feedback reads are quarantined: only the read model's feedback loa
 
 [[dir]]
 path = "src/algotrade/data/funds"
-purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035), the latest rows per fund and the CUSIP to ticker bridge"
+purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035), the latest rows per fund and the CUSIP to ticker bridge; and a fund's shares outstanding from its issuer's file (holdings/etf_shares, EB D4)"
+
+[[dir]]
+path = "src/algotrade/data/futures"
+purpose = "reads of rates/futures_curve (the nightly IBKR futures curve snapshots, personal licence): a range of stored sessions and one root's curve with its roll yield; data/ is at its module cap, so the reads of this table are a folder"
 
 [[dir]]
 path = "src/algotrade/data/listings"
@@ -235,6 +239,11 @@ purpose = "feature groups from corporate events and filings (earnings, dividends
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/events"
+purpose = "feature groups of the event classes an edge schedule triggers on (on_event:<class>[:<subtype>], ADR 0050, ADR 0053 amendment 2026-10-18): one module per group, its documented FEATURES (a sessions-since count, the event's date, a subtype field), a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/levels"
 purpose = "feature groups of price-level structure from daily bars (swing pivots and their strength, breakouts and their retests, unfilled gaps): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
@@ -276,7 +285,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/statements"
-purpose = "feature groups from the SEC financial statements (instruments/statements: income statement and cash flow lines as trailing twelve months, balance sheet lines at the latest date), one module per group (its documented FEATURES, a pure compute and its GROUP declaration), plus growth_history@v1 (the revenue and EPS TTMs 3 and 5 years back, from instruments/shares), ttm.py, the TTM arithmetic over one concept's periods that financials@v2 also uses, and instants.py, the latest-instant and debt rules of the balance sheet"
+purpose = "feature groups from the SEC financial statements (instruments/statements: income statement and cash flow lines as trailing twelve months, balance sheet lines at the latest date), one module per group (its documented FEATURES, a pure compute and its GROUP declaration), plus growth_history@v2 (the revenue and EPS TTMs 3 and 5 years back, from instruments/shares), mispricing@v1 (the anomaly inputs, quality score and composite rank across the statement groups: a rank needs the whole cross-section), ttm.py, the TTM arithmetic over one concept's periods that financials@v3 also uses, and instants.py, the latest-instant and debt rules of the balance sheet"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
@@ -537,10 +546,17 @@ contracts = [
 
 [[dir]]
 path = "src/algotrade/storage/tables"
-purpose = "market and result tables: the schema vocabulary (spec.py), the schemas (schemas.py; the edge harness result tables in edge_schemas.py), store protocols, reader / writer facades"
+purpose = "market and result tables: the schema vocabulary (spec.py), the schemas (the schemas/ package; the edge harness result tables in edge_schemas.py), store protocols, reader / writer facades"
 contracts = [
     "Only the ingestion app writes market and feature data (ADR 0005)",
     "R1: only algotrade.data reads market data (consumers never import storage readers)",
+    "Layout: market tables never import config documents",
+]
+
+[[dir]]
+path = "src/algotrade/storage/tables/schemas"
+purpose = "table schemas by family (market, reference, events, results, outcomes), the registry that resolves a table name to its spec, and frame validation; the package re-exports every public name"
+contracts = [
     "Layout: market tables never import config documents",
 ]
 

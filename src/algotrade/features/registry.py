@@ -42,6 +42,10 @@ from algotrade.features.rollups.corporate import (
     earnings_schedule,
     financials,
     fundamentals,
+)
+from algotrade.features.rollups.events import (
+    earnings_date_shift,
+    filing_events,
     index_changes,
 )
 from algotrade.features.rollups.levels import gaps, pivot_strength, retest, swing_levels
@@ -84,12 +88,13 @@ from algotrade.features.rollups.price import (
     volume,
 )
 from algotrade.features.rollups.reference import fund_reference
-from algotrade.features.rollups.relative import relative_strength
+from algotrade.features.rollups.relative import momentum_variants, relative_strength
 from algotrade.features.rollups.statements import (
     balance_sheet,
     cash_flow,
     growth_history,
     income_statement,
+    mispricing,
 )
 
 GROUPS: dict[str, FeatureGroup] = {
@@ -112,6 +117,8 @@ GROUPS: dict[str, FeatureGroup] = {
             dividends.GROUP,
             dividend_schedule.GROUP,
             index_changes.GROUP,
+            filing_events.GROUP,
+            earnings_date_shift.GROUP,
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,
@@ -121,6 +128,7 @@ GROUPS: dict[str, FeatureGroup] = {
             cash_flow.GROUP,
             balance_sheet.GROUP,
             growth_history.GROUP,
+            mispricing.GROUP,
             put_wing.GROUP,
             call_wing.GROUP,
             price_moves.GROUP,
@@ -153,6 +161,7 @@ GROUPS: dict[str, FeatureGroup] = {
             regime.GROUP,
             fund_reference.GROUP,
             relative_strength.GROUP,
+            momentum_variants.GROUP,
         ),
         # iv30@v1, put_wing@v1 and call_wing@v1 read the materialised div_yield@v1 (FeatureSet
         # orders it)
@@ -166,12 +175,23 @@ _BY_FIELD: dict[str, Feature] = {f.field: f for f in FEATURES.values()}
 SUPERSEDED: dict[str, Superseded] = {
     "price_stats@v1": Superseded("price_stats@v2"),
     "dividends@v1": Superseded("dividends@v2"),
-    "fundamentals@v1": Superseded("fundamentals@v3"),
+    "fundamentals@v1": Superseded("fundamentals@v4"),
     # v3 adds shares_outstanding_year_ago; every v2 column is unchanged
-    "fundamentals@v2": Superseded("fundamentals@v3"),
+    "fundamentals@v2": Superseded("fundamentals@v4"),
+    # v4 reads the facts by SEC acceptance session, not filing date (a one-session lookahead
+    # fixed, ADR 0067 amendment); every v3 column is unchanged, the values are not
+    "fundamentals@v3": Superseded("fundamentals@v4"),
     # v2 adds the year-ago EPS TTM and the latest quarter's revenue and EPS (with the quarter a
     # year earlier); every v1 column is unchanged
-    "financials@v1": Superseded("financials@v2"),
+    "financials@v1": Superseded("financials@v3"),
+    # v3 reads the facts by SEC acceptance session (same fix); every v2 column is unchanged
+    "financials@v2": Superseded("financials@v3"),
+    # the statement groups and growth_history read the facts by SEC acceptance session as well
+    # (ADR 0067 amendment); every v1 column is unchanged, the values are not
+    "growth_history@v1": Superseded("growth_history@v2"),
+    "income_statement@v1": Superseded("income_statement@v2"),
+    "cash_flow@v1": Superseded("cash_flow@v2"),
+    "balance_sheet@v1": Superseded("balance_sheet@v2"),
     "iv_history@v1": Superseded("iv_history@v2"),
     "anchored_vwap@v1": Superseded("anchored_vwap@v2"),
     # v2 adds sma_150 and the regression trend quality (one nightly of v1 rows at most)

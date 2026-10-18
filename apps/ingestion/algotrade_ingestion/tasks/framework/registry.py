@@ -55,6 +55,7 @@ from algotrade_ingestion.tasks.market import (
     option_chains,
     rates,
 )
+from algotrade_ingestion.tasks.market.futures import curves as futures_curves
 from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     company_details,
@@ -219,7 +220,7 @@ TASKS: dict[str, Task] = {
             shares,
             ("instruments/shares", "instruments/statements"),
             entries_reference.run_shares,
-            sources=("sec_company_facts",),
+            sources=("sec_company_facts", "sec_filings"),
             settings="sources.toml [sec_edgar] facts_refresh_days, statements_backfill_per_night",
             params=(
                 SESSION,
@@ -231,7 +232,7 @@ TASKS: dict[str, Task] = {
             "etf-holdings",
             "what each ETF holds, from the issuers' daily files and SEC N-PORT (incremental)",
             etf_holdings,
-            ("holdings/etf",),
+            ("holdings/etf", "holdings/etf_shares"),
             entries_reference.run_etf_holdings,
             optional_sources=source_guards.HOLDINGS_ISSUERS,
             settings="sources.toml [etf_holdings]",
@@ -330,7 +331,8 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "filings",
-            "SEC 8-K filings of every operating company in the universe (events/filing) and "
+            "SEC event filings (8-K with items, NT 10-K/10-Q, SC TO-I, Form 25, 424B4, Form 10) of "
+            "every operating company in the universe (events/filing) and "
             "their Item 2.02 results releases as earnings rows (sec_8k); --since backfills per "
             "CIK (resumable, --limit), the default reads the days since the latest stored "
             "filing from EDGAR's daily form index",
@@ -502,6 +504,21 @@ TASKS: dict[str, Task] = {
                 TO,
                 Param("symbols", ("--symbols",), str, "comma-separated tickers"),
                 Param("limit", ("--limit",), int, "backfill at most N underlyings this run"),
+            ),
+            skip=source_guards.gateway_down,
+        ),
+        Task(
+            "futures-curves",
+            "nightly futures curve snapshot per root (IBKR, read-only): the front contracts' "
+            "last / prior settle / volume / open interest with expiry",
+            futures_curves,
+            (futures_curves.TABLE,),
+            entries_ops.run_futures_curves,
+            sources=("ibkr",),
+            settings="sources.toml [ibkr] futures_roots, futures_front",
+            params=(
+                SESSION,
+                Param("symbols", ("--symbols",), str, "comma-separated futures roots"),
             ),
             skip=source_guards.gateway_down,
         ),

@@ -107,3 +107,14 @@ unit = "flag"
 description = "The instrument's sector is one of the three strongest of the eleven sector ETFs over 63 sessions: sector_rank_63d at most 3 (params.leader_rank)"
 null_meaning = "sector_rank_63d is null (no sector or sector ETF, the ETF has no complete window, or fewer than min_sector_etfs ETFs do), or no relative_strength row"
 version = 1
+
+# Momentum variants (docs/edge-ideas/statarb-technical.md; the residual, discreteness and sector
+# columns are momentum_variants@v1)
+[mom_12_1_vol_scaled]
+expr = "trend_stats.mom_12_1 / vol_stats.hv60"
+dtype = "float"
+unit = "ratio"
+description = "The 12-1 momentum divided by the 60-session realised volatility (annualised): the return earned per unit of risk the name carries, so a calm 20% outranks a wild 20%; 1.0 is a 12-1 return equal to a year of one-stdev moves"
+null_meaning = "mom_12_1 is null (a gap among the last 253 sessions, or a shorter history), hv60 is null (a gap among the last 61 sessions) or 0, or no trend_stats or vol_stats row"
+valid_range = [-100, 100]
+version = 1

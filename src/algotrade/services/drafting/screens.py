@@ -23,7 +23,10 @@ doubt (a criterion dropped or refused, a field ``current`` has) falls through to
 A deterministic verifier (``parts/verify.py``, amended 2026-10-17) then reads the parts of a valid
 model draft: words nothing maps, an "or" left out of the words, an item tied to no words, "X or Y"
 drafted as ANDed criteria are doubts, refused like an invalid answer (repair on the same member,
-then the stronger ones); a draft every member leaves doubtful is served with its ``doubts``.
+then the stronger ones); a draft every member leaves doubtful is served with its ``doubts``. An
+"or" or an exclusion between parts is grouped, not doubted (ADR 0071): ``contract/groups`` reads
+the parts' joins into the document's ``groups``, which ``with_groups`` keeps only when the
+validator accepts them (the Builder's own groups are carried while their members survive).
 Reads the catalogue, the configs and, for the dry run of a formula, the request's session;
 writes nothing."""
 
@@ -66,6 +69,7 @@ from algotrade.services.drafting.contract.gaps import (
     missing_of,
     unresolved_of,
 )
+from algotrade.services.drafting.contract.groups import group_parts, prune_groups
 from algotrade.services.drafting.contract.suggestions import (
     DroppedSuggestion,
     Suggestion,
@@ -223,7 +227,7 @@ def ask_for_draft(
             c.get("field") == "instrument.security_type"
             for c in draft.document["criteria"].values()
         )
-        return doubts(draft.parts, typed)
+        return doubts(draft.parts, typed, draft.document["criteria"])
 
     def accept(text: str) -> None:
         """The chain's check of an answer: a draft we can use, else ``InvalidAnswerError``."""
@@ -425,6 +429,13 @@ def _draft(
         raw_parts = [{"id": WHOLE, "words": sentence, "reading": reading}]
         items = [replace(item, tag=WHOLE) for item in items]
     explained = build_parts(sentence, raw_parts, items, phrasebook)
+    if explained:
+        carried = prune_groups((current or {}).get("groups"), document["criteria"])
+        grouping = group_parts(explained[0], document["criteria"], carried)
+        document, why = with_groups(
+            ctx, screener_id, document, [{**carried, **grouping.groups}, carried]
+        )
+        notes = (*notes, *grouping.notes, *why)
     return ScreenDraft(
         screener_id, document, dropped, notes,
         formulas=formulas.formulas, formulas_dropped=formulas.dropped,
@@ -433,6 +444,35 @@ def _draft(
         sentence=sentence, parts=explained[0] if explained else None,
         parts_stats=explained[1] if explained else None,
     )  # fmt: skip
+
+
+def with_groups(
+    ctx: ReadContext,
+    screener_id: str,
+    document: dict[str, Any],
+    candidates: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    """``document`` with the first of the ``candidates`` (tables of boolean groups, ADR 0071) the
+    validator accepts as the spec's ``groups`` (the groups the sentence's joins give, then the
+    ones the Builder's document already had), and the notes to show; with none of them, or none
+    valid, it has no ``groups``, the draft stays flat as it was before groups, and a candidate the
+    validator refused is told in a note, never silently."""
+    without = {k: v for k, v in document.items() if k != "groups"}
+    notes: tuple[str, ...] = ()
+    for table in candidates:
+        if not table:
+            continue
+        grouped = {**without, "groups": {gid: dict(body) for gid, body in table.items()}}
+        try:
+            resolve_rule_draft(ctx.configs, screener_id, ctx.user, grouped)
+        except ConfigurationError as exc:
+            log.info("groups refused (%s): the draft stays flat", exc)
+            notes = (
+                f"the 'or' or exclusion is not applied: the groups were refused ({exc})"[:300],
+            )
+            continue
+        return grouped, notes  # a refused earlier candidate is still told
+    return without, notes
 
 
 def reading_of(criterion: Mapping[str, Any]) -> tuple[Any, Any, Any]:

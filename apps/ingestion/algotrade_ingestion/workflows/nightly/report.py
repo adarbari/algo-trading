@@ -53,6 +53,7 @@ KEY_COUNTS: Mapping[str, tuple[str, ...]] = {
         "backfill_pending",
         "backfill_eta_h",
     ),
+    "futures-curves": ("roots", "served", "rows"),
     "purge-raw": ("raw_files_removed", "staging_runs_removed"),
 }
 COUNT_MAPS = ("statuses", "sessions", "years")  # result dicts of status -> count

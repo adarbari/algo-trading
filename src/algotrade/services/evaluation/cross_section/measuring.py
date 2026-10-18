@@ -396,6 +396,7 @@ class _RandomSpec:
                 scope.edge.base,
                 scope.edge.picks,
                 self.costs,
+                scope.edge.event_subtype,
             )
         return found
 

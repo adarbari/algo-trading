@@ -20,7 +20,7 @@ from tests.helpers.analyst.snapshots import estimates, marker, night, put, store
 
 A, B, C = "EQ:A", "EQ:B", "EQ:C"
 S = date(2026, 10, 16)
-UNSET = object()  # run(): financials not given; None is a session without financials@v2
+UNSET = object()  # run(): financials not given; None is a session without financials@v3
 YEARS = {"2025-12-31": 4.0, "2026-12-31": 5.0, "2027-12-31": 6.0, "2028-12-31": 7.0}
 
 

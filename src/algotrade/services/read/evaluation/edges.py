@@ -13,6 +13,7 @@ from typing import Any
 from algotrade.config.edges import document, loading
 from algotrade.config.edges.follow import AUDIT
 from algotrade.config.edges.follow import KEY as FOLLOW
+from algotrade.core.time.windows import window_name
 from algotrade.services.read.context import Stores
 
 
@@ -92,7 +93,8 @@ class EdgeSettings:
 class Edge:
     """An edge document. ``frozen_from``: the first session of its frozen period (None: it has
     none, so no run is canonical); ``variants``: the ids of its ``[[variants]]``, ``main``
-    first; ``schedule``: ``every_session``, ``month_end`` or ``on_event:<class>``. The user's
+    first; ``schedule``: ``every_session``, ``month_end``, ``calendar:<window>`` or
+    ``on_event:<class>``. The user's
     own state about it (ADR 0053 amendment 2026-10-10): ``status`` is the one status (the user's
     on an own edge, with ``status_since`` and ``status_reason`` from its ``[audit]``); ``followed``
     and ``followed_since``: a site edge the user bookmarked; the permanent ``labels`` the server
@@ -154,9 +156,13 @@ class Edge:
 
 def _picks(e: document.Edge) -> str:
     event = document.event_class(e.schedule)
+    window = window_name(e.schedule)
     when = (
         f"after each {event.replace('_', ' ')}"
+        + (f" ({document.event_subtype(e.schedule)})" if document.event_subtype(e.schedule) else "")
         if event
+        else f"every {window.replace('_', ' ')}"
+        if window
         else {"every_session": "every session", "month_end": "every month end"}.get(
             e.schedule, e.schedule
         )

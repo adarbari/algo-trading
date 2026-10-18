@@ -16,12 +16,14 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.data.events import ALL_TIME, known_from, read_events
+from algotrade.data.events import ALL_TIME, acceptance_sessions, read_events
 from algotrade.services.read.availability.cause import table_cause
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.values import Unknown, UnknownCode
 
 FILING_TABLE = "events/filing"
+# The table also holds NT, SC TO-I, 25, 424B4 and 10-12B rows; this read shows the 8-Ks only.
+EIGHT_K_FORMS = ("8-K", "8-K/A")
 # The first item of an 8-K in words (SEC Form 8-K items); others read "Item <n>".
 ITEM_LABELS = {
     "1.01": "Material agreement",
@@ -91,13 +93,16 @@ def load_filings(
     ids = list(dict.fromkeys(instrument_ids))
     if not ids:
         return {}, {}
-    frame = read_events(ctx.reader, FILING_TABLE, *ALL_TIME, ids, through=day).frame
+    frame = read_events(ctx.reader, FILING_TABLE, *ALL_TIME, ids).frame
     start = months_before(day, months)
     filings: dict[str, list[Filing]] = {iid: [] for iid in ids}
-    seen = {str(i) for i in frame["instrument_id"]}
+    if not frame.empty:  # known from the acceptance session recomputed from ts, never the stamp
+        frame = frame[acceptance_sessions(frame["ts"]) <= day]
+    seen = {str(i) for i in frame["instrument_id"]}  # asked about, whatever forms it filed
     if not frame.empty:
+        frame = frame[frame["form"].isin(EIGHT_K_FORMS)]
         accepted = pd.to_datetime(frame["ts"], utc=True)
-        known = known_from(frame).dt.date
+        known = acceptance_sessions(frame["ts"])
         rows = zip(frame.to_dict("records"), accepted, known, strict=True)
         for row, ts, stamp in rows:
             if ts.date() >= start:

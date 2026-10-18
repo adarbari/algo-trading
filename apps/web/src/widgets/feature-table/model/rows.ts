@@ -39,9 +39,15 @@ export function resultRows(page: ResultsPage): TableRow[] {
       criteria: Object.fromEntries(
         result.criteria.map((c) => [
           c.id,
-          { value: c.value, outcome: c.outcome, distance: c.distance ?? null },
+          {
+            value: c.value,
+            outcome: c.outcome,
+            distance: c.distance ?? null,
+            group: c.group ?? null,
+          },
         ]),
       ),
+      groups: result.groups,
       change: result.change ?? null,
       previousDecision: result.previousDecision ?? null,
       columns: Object.fromEntries(result.columns.map((c) => [c.name, c.value])),

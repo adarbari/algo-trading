@@ -1,10 +1,10 @@
 """The ``filings`` task over the recorded SEC payloads and synthetic submissions (ADR 0050): the
 universe's operating companies (no funds), one ``events/filing`` row per 8-K and instrument with
-``known_from`` by the New York session of the acceptance time (around 16:00 ET and midnight
-UTC), the Item 2.02 releases as ``sec_8k`` ``events/earnings`` rows (the three ``time`` labels,
-``reported``, a key that never collides with the calendar's), the per-CIK ``--since`` (resumable,
-``--limit``), the nightly from the daily form index (only the CIKs that filed, an unpublished
-day read again, a failing day stopping the walk) and the item statuses."""
+``known_from`` the first session whose close is after the acceptance (around 16:00 ET, a
+weekend, midnight UTC), the Item 2.02 releases as ``sec_8k`` ``events/earnings`` rows (the three
+``time`` labels, ``reported``, a key that never collides with the calendar's), the per-CIK
+``--since`` (resumable, ``--limit``), the nightly from the daily form index (only the CIKs that
+filed, an unpublished day read again, a failing day stopping the walk) and the item statuses."""
 
 import json
 import re
@@ -17,6 +17,7 @@ import pytest
 
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import MissingDataError
+from algotrade.core.time.calendar import is_session
 from algotrade.data import StoreReader
 from algotrade.data.events import ALL_TIME, read_events
 from algotrade.storage.backends.memory import MemoryBackend
@@ -27,16 +28,20 @@ from algotrade_ingestion.tasks.events.filings import (
     DEFAULT_SINCE,
     EARNINGS,
     EARNINGS_COLUMNS,
+    FORMS_TAG,
+    KNOWN_FROM_RULE,
     TABLE,
     TASK,
     Listed,
     earnings_rows,
+    filing_rows,
     ingest_filings,
     since_by_cik,
     stored_filings,
 )
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_sources.framework.http import HttpError, RetryPolicy
+from algotrade_sources.framework.series import FILING_FORMS
 from algotrade_sources.vendors.sec.daily_index import SecDailyIndex, missing_index
 from algotrade_sources.vendors.sec.submissions import SecFilings
 from tests.conftest import REPO_ROOT
@@ -213,7 +218,7 @@ def test_micron_filings_and_results_from_the_recorded_payload() -> None:
     writer, feed = store(), Feed()
     record = run(writer, feed, ("MU",))
     assert record.status is RunStatus.COMPLETE and record.items["0000723125"].startswith(
-        "OK: 5 8-K"
+        "OK: 5 filings"
     )
     assert len(feed.urls) == 1  # since 2018 is inside the recent block: no older page
     filings = read(writer, TABLE, ["EQ:MU"])
@@ -232,7 +237,9 @@ def test_micron_filings_and_results_from_the_recorded_payload() -> None:
         "2.02,9.01",
         date(2026, 9, 30),
     )
-    assert last["report_date"] == date(2026, 9, 30) and last["known_from"] == date(2026, 9, 30)
+    assert last["report_date"] == date(2026, 9, 30) and last["known_from"] == date(
+        2026, 10, 1
+    )  # 16:02 ET
     assert last["primary_document"] == "mu-20260930.htm"
     results = read(writer, EARNINGS, ["EQ:MU"])
     assert list(results["earnings_date"]) == [date(2026, 6, 24), date(2026, 9, 30)]
@@ -255,12 +262,14 @@ def test_a_since_before_the_recent_block_reads_the_older_page() -> None:
 # ----------------------------------------------------------------------------- known_from and time
 
 
-def test_known_from_is_the_new_york_session_of_the_acceptance() -> None:
+def test_known_from_is_the_first_session_closing_after_the_acceptance() -> None:
     writer = store()
     run(writer, Feed(), ("GOOGL",))
     filings = read(writer, TABLE, ["EQ:GOOGL"]).set_index("accession")
-    assert filings.loc["A4", "known_from"] == date(2026, 10, 5)  # 16:00 ET: still that day
-    assert filings.loc["A5", "known_from"] == date(2026, 10, 5)  # 00:30 UTC on the 6th is 20:30 ET
+    assert filings.loc["A4", "known_from"] == date(
+        2026, 10, 6
+    )  # 16:00 ET: at the close, not before
+    assert filings.loc["A5", "known_from"] == date(2026, 10, 6)  # 00:30 UTC on the 6th is 20:30 ET
     assert filings.loc["A5", "filing_date"] == date(2026, 10, 6)  # SEC dates it the next day
     assert filings.loc["A1", "known_from"] == date(2026, 10, 5)
     assert filings.loc["A8", "known_from"] == date(2026, 1, 15)
@@ -289,7 +298,7 @@ def test_the_time_label_follows_the_new_york_clock_in_summer_and_winter() -> Non
     }
     by_ts = read(writer, EARNINGS, ["EQ:GOOGL"]).set_index("ts")
     late = by_ts.loc[pd.Timestamp("2026-10-06 00:30", tz="UTC")]
-    assert late["earnings_date"] == date(2026, 10, 5) and late["known_from"] == date(2026, 10, 5)
+    assert late["earnings_date"] == date(2026, 10, 5) and late["known_from"] == date(2026, 10, 6)
 
 
 def test_only_original_8ks_with_item_202_become_earnings_rows() -> None:
@@ -299,7 +308,8 @@ def test_only_original_8ks_with_item_202_become_earnings_rows() -> None:
     assert record.stats["results"] == len(results) == 7  # A1-A5, A8, A9: not the 8-K/A, not 7.01
     assert results["reported"].all() and set(results["source"]) == {"sec_8k"}
     assert set(results["symbol"]) == {"GOOGL"}
-    assert (results["known_from"] == results["earnings_date"]).all()
+    # a result accepted before the close is known that session, one after it the next: never before
+    assert (results["known_from"] >= results["earnings_date"]).all()
     assert results["fiscal_quarter"].isna().all()  # the calendar's label is a quarter end, not ours
 
 
@@ -517,7 +527,7 @@ def test_the_nightly_asks_only_the_ciks_the_index_shows_and_stops_at_the_last_da
     assert [u.rsplit("/", 1)[1] for u in feed.urls] == ["CIK0001652044.json"]  # not MU, not 55555
     items = record.items
     assert items["idx:2026-10-06"].startswith("NO_DATA") and "holiday" in items["idx:2026-10-06"]
-    assert items["idx:2026-10-07"] == "OK: 2 CIKs with an 8-K"  # the 10-K line is no filer
+    assert items["idx:2026-10-07"] == "OK: 2 CIKs with an event form"  # the 10-K line is no filer
     assert items["idx:2026-10-08"].startswith("NO_DATA: not published yet")
     assert items["0001652044"].startswith("OK")
     stored = read(writer, TABLE, ["EQ:GOOGL", "EQ:GOOG"]).set_index("accession")
@@ -658,3 +668,90 @@ def test_the_nightly_reads_in_full_the_ciks_it_never_read_up_to_the_cap() -> Non
         set(read(writer, TABLE, ["EQ:MU"])["accession"])
         and len(read(writer, TABLE, ["EQ:GOOG"])) == 9
     )
+
+
+# ----------------------------------------------------------------------------- the event forms
+
+EVENT_FILINGS = [
+    ("N1", "2026-10-05T21:30:00.000Z", "2026-10-06", "", "NT 10-Q", ""),  # 17:30 ET
+    ("T1", "2026-10-05T12:00:00.000Z", "2026-10-05", "", "SC TO-I", ""),
+    ("F1", "2026-10-05T18:03:54.000Z", "2026-10-05", "", "25-NSE", ""),
+    ("P1", "2026-10-05T03:20:22.000Z", "2026-10-05", "", "424B4", ""),  # 23:20 ET on the 4th
+    ("X1", "2026-10-05T14:00:00.000Z", "2026-10-05", "", "10-12B", ""),
+    ("E1", "2026-10-05T20:02:00.000Z", "2026-10-05", "2.02", "8-K", ""),
+]
+
+
+def test_event_forms_are_stored_with_the_same_known_from_rule_and_make_no_earnings_rows() -> None:
+    writer, feed = store(), Feed(alpha=EVENT_FILINGS)
+    record = run(writer, feed, ("GOOGL",))
+    assert record.items[ALPHA] == "OK: 6 filings, 1 results"
+    filings = read(writer, TABLE, ["EQ:GOOGL"]).set_index("accession")
+    assert filings["form"].to_dict() == {
+        "P1": "424B4", "T1": "SC TO-I", "X1": "10-12B", "F1": "25-NSE", "E1": "8-K", "N1": "NT 10-Q"
+    }  # fmt: skip
+    assert filings.loc["P1", "known_from"] == date(2026, 10, 5)  # Sunday 23:20 ET: the next session
+    assert filings.loc["N1", "known_from"] == date(2026, 10, 6)  # 17:30 ET Monday: after the close
+    assert filings.loc["F1", "filing_date"] == date(2026, 10, 5)
+    assert filings.loc["F1", "items"] == ""
+    results = read(writer, EARNINGS, ["EQ:GOOGL"])
+    assert len(results) == 1  # only the 8-K Item 2.02 is a results release
+
+
+def test_a_run_of_the_older_form_set_is_not_coverage_so_the_backfill_rereads_the_ciks() -> None:
+    writer = store()
+    run(writer, Feed(), (), since=date(2026, 1, 15))
+    again = Feed()
+    assert run(writer, again, (), since=date(2026, 1, 15)).stats["skipped_covered"] == 4
+    for record in writer.runs_for(TASK):  # what the runs before this form set recorded
+        record.stats.pop("forms", None)
+        writer.save_run(record)
+    reread = Feed()
+    record = run(writer, reread, (), since=date(2026, 1, 15))
+    assert record.stats["skipped_covered"] == 0 and record.stats["ciks"] == 4
+    assert record.stats["forms"] == FORMS_TAG
+
+
+def _accepted(*instants: str) -> pd.DataFrame:
+    """A source frame with one Item 2.02 8-K per acceptance instant (UTC)."""
+    size = len(instants)
+    return pd.DataFrame(
+        {
+            "cik": ["1"] * size,
+            "form": ["8-K"] * size,
+            "accession": [f"A{i}" for i in range(size)],
+            "filing_date": pd.to_datetime(["2026-10-01"] * size),
+            "acceptance_ts": pd.to_datetime(list(instants), utc=True),
+            "report_date": pd.NaT,
+            "items": ["2.02"] * size,
+            "primary_document": ["x.htm"] * size,
+        }
+    )
+
+
+def test_a_filing_accepted_after_the_close_is_known_from_the_next_session() -> None:
+    """The test that would have caught the New York DAY rule (EB H4): D = Thursday 2026-10-01.
+    16:30 ET on D has ``known_from`` D+1 (public after the close a feature read at D is made
+    at), a Saturday and a Sunday acceptance land on Monday, 15:59 stays on D, and the
+    ``sec_8k`` earnings row of each takes the same ``known_from`` and keeps its date."""
+    frame = _accepted(
+        "2026-10-01T19:59:00Z",  # 15:59 ET Thursday
+        "2026-10-01T20:30:00Z",  # 16:30 ET Thursday
+        "2026-10-03T15:00:00Z",  # Saturday
+        "2026-10-04T23:00:00Z",  # Sunday evening
+    )
+    rows = filing_rows(frame, "EQ:X")
+    assert list(rows["known_from"]) == [
+        date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 5), date(2026, 10, 5)
+    ]  # fmt: skip
+    assert all(is_session(d) for d in rows["known_from"])
+    results = earnings_rows(frame, Listed("EQ:X", "X"))
+    assert list(results["known_from"]) == list(rows["known_from"])
+    assert list(results["earnings_date"]) == [
+        date(2026, 10, 1), date(2026, 10, 1), date(2026, 10, 3), date(2026, 10, 4)
+    ]  # fmt: skip
+
+
+def test_a_backfill_after_the_known_from_rule_changed_is_not_skipped_as_covered() -> None:
+    old = {"forms": ",".join(sorted(FILING_FORMS))}  # a run before EB H4 recorded the form set only
+    assert old["forms"] != FORMS_TAG and KNOWN_FROM_RULE in FORMS_TAG
