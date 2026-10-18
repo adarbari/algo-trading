@@ -1,0 +1,68 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea family I (docs/edge-ideas/frontier.md): a variant of
+# option_cp_iv_signals, read only on the sessions before a report. Screeners: cp_iv_spread (the
+# level) and cp_iv_spread_rise (its 5-session climb).
+id = "pre_earnings_cp_iv_spread"
+name = "Call-put IV spread into earnings"
+family = "I"
+thesis = "Stocks whose call-put implied-volatility spread is high, or climbing, just before a report earn more over the report window."
+mechanism = """Informed traders take leverage in options ahead of the event and market makers
+move implied volatilities, while the stock lags because the information sits in the options market
+(Lei, Wang and Yan 2020; Jin, Livnat and Zhang 2012)."""
+persistence = """It needs option data and event alignment, and the signal is the change of the
+spread over a few days into the event, which is noisy and narrow; few retail platforms compute it.
+Capacity per event is small."""
+schedule = "on_event:earnings_expected"
+top_k = 20
+base = "event"
+screeners = ["cp_iv_spread", "cp_iv_spread_rise"]
+baselines = ["momentum_12_1", "size_small"]
+universe = "liquid_common_stocks"
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """The window is the report session and the two after it (3 sessions from S = A - 1 for the
+expected report A, start_offset_sessions -1: the decision session D = A - 2 reads the chain). The
+date comes from earnings_expected@v1 (SCHEDULED, or last year's plus 364 days), known by D. The
+base is the names with a report in the window (base = "event"), so the picks are compared with
+their reporting peers, not the whole market. Chains are stored nightly from 2026-10-02 only, so
+the screeners have about 11 sessions of data by 2026-10-16, all after the frozen start, and the
+harness will report few independent sessions for a long time; the October to November season
+gives many events on those sessions, and the 5-session change (cp_iv_spread_rise) exists from
+2026-10-09. Not in the paper: the abnormal spread is read as the level here, the change as the
+second screener. Long side only. The published paper reports no return spread (its result is a
+regression coefficient), so there is no [published] figure."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [3]
+benchmark = "SPY"
+start_offset_sessions = -1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY for the 3 sessions from the close before the expected report
+(the report session and the two after), net of 10 bps a round trip."""
+trigger_timing = """The expected report date A is read at the decision session D = A - 2
+(earnings_expected@v1, SCHEDULED or PRIOR_YEAR; UNKNOWN is excluded with a reason, a date confirmed
+after D is not used). The spread is read from D's chain; the entry session is S = A - 1."""
+replication = """Lei, Wang and Yan: a rise of the call-put IV spread into the announcement
+predicts the announcement return, most when option volume is high. cp_iv_spread ranks the level;
+cp_iv_spread_rise the 5-session change; the top 20 of the names reporting in the window."""
+expected_size = """The paper reports a regression, not a portfolio: the spread enters the
+announcement return at 0.02 and its interaction with the surprise at 0.42 (p < 0.01), so the
+spread amplifies the response to the surprise rather than adding a drift of its own. No size can be
+stated; the harness reports t and the sessions."""
+capacity_costs = """Liquid names, a 3-session hold, no options traded: the cost is the stock's
+spread, small for names over $50M a day; a report is a gap risk the 10 bps do not cover."""
+failure_modes = """The spread being the report's own implied move, and a gap against a long into
+the print. Retire if the frozen-period excess return of the picks is not above that of the other
+names reporting in the window."""
+decoys = """Pre-announcement drift and momentum (the 12-1 and size baselines), and the implied-move
+overpricing into earnings; the same names with a low spread."""
+
+[[sources]]
+title = "Lei, Q., Wang, X. W. and Yan, Z., Volatility Spread and Stock Market Response to Earnings Announcements, Journal of Banking and Finance, 2020"
+url = "https://doi.org/10.1016/j.jbankfin.2017.04.002"
+
+[[sources]]
+title = "Jin, W., Livnat, J. and Zhang, Y., Option Prices Leading Equity Prices: Do Options Traders Have an Information Advantage?, Journal of Accounting Research, 2012"
