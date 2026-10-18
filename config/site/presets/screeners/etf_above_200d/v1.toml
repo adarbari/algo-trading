@@ -1,0 +1,46 @@
+# ETFs above their 200-session average (ADR 0053, ADR 0074, EB E5; a screener of the allocation
+# edges that time ETFs with a moving average): an unleveraged ETF whose close is above its
+# 200-session mean, ranked by the distance above it, the largest first. Faber's rule uses a
+# 10-month average (about 210 sessions) of month-end closes; the 200-session mean of the daily
+# close is the stored stand-in. Price only, no dividend. A missing value never passes (ADR 0030).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "etf_above_200d"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "ETFs above their 200-day average"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "ETF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.not_leveraged]
+field = "instrument.is_leveraged"
+op = "eq"
+value = false
+
+[criteria.not_inverse]
+field = "instrument.is_inverse"
+op = "eq"
+value = false
+
+# ------------------------------------------------------------------------ the signal
+[criteria.above_average]
+field = "feature.pct_vs_sma_200"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+sma_200 = "rollup.price_stats@v2.sma_200"
+pct_vs_sma_200 = "feature.pct_vs_sma_200"
+
+[rank]
+tie_break = "feature.pct_vs_sma_200"

@@ -7,6 +7,7 @@ Back to the [index of every edge](../edges.md).
 |---|---|---|---|---|
 | Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `earnings_vwap_overhang` |
 | Reversal into earnings (`earnings_neutral_reversal`) | candidate | on each `earnings_expected` | excess return, over 3 sessions, vs SPY, starting -2 sessions from the event, costs 10 bps | `pre_earnings_reversal`, `earnings_neutral_reversal` |
+| Index ETF weak-close reversal (`ibs_etf_mean_reversion`) | candidate | every session | portfolio return, over 1 session, vs a blend of 50% SPY and 50% QQQ, entered 1 session after the decision session, costs 4 bps | `etf_low_ibs` |
 
 ## Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`)
 
@@ -69,3 +70,33 @@ Back to the [index of every edge](../edges.md).
 
 - So, E. and Wang, S., News-Driven Return Reversals: Liquidity Provision Ahead of Earnings Announcements, Journal of Financial Markets, 2014 <https://papers.ssrn.com/abstract=2275982>
 - Quantpedia, Reversal During Earnings Announcements (strategy page) <https://quantpedia.com/strategies/reversal-during-earnings-announcements/>
+
+## Index ETF weak-close reversal (`ibs_etf_mean_reversion`)
+
+**Status:** candidate. **Family:** G. **Thesis:** An index ETF that closes near the low of its day rises the day after next on average, so a book holding it only after such a close earns more on the days it is invested.
+
+- **Outcome:** portfolio return, over 1 session, vs a blend of 50% SPY and 50% QQQ, entered 1 session after the decision session, costs 4 bps
+- **Schedule:** every session
+- **Universe:** `instrument.symbol in ('SPY', 'QQQ')`
+- **Top K:** 2
+- **Screeners:** `etf_low_ibs`
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** DOCUMENTED-LIMIT VARIANT: the source day is not measurable (see trigger_timing). VERDICTS ARE UNMEASURED until the screen is run over the stored history and evaluated; the stored daily bars give internal bar strength as rollup.trend_stats@v2.close_range_pos, so no new feature is built. LIMITS: (1) the source's list is about twenty index ETFs; two (SPY, QQQ) are used so the equal-weight benchmark is exact (IWM and the sector funds are left out). (2) The benchmark is the two funds held always, so a book that holds them about a fifth of the sessions and cash otherwise trails by the drift of the market it skips: the value is a TIMING comparison, and a negative mean is expected from the cash days alone. The harness has no cash benchmark; the right test is the mean per invested session against the same days of the benchmark, which the weights recorded in the run allow and the verdict does not read: the read of the result needs that care (flagged for review). (3) One- session holds, a fund held at half when only one passes, the other half cash; cost_bps 4 a round trip assumed; the source's long-short version is not built. The idea is a timing overlay for other edges' entries, weak alone.
+
+**Quality bar**
+
+1. **Mechanism:** End-of-day order imbalance (market-on-close flow, hedging, futures-cash arbitrage) overshoots into the close and reverses overnight; it is index level, so there is no stock-specific information to lose (Pagonidis 2013).
+2. **Persistence:** The effect is a few basis points a trade held one day, which rules out capacity-seeking funds, and it is partly the overnight premium in disguise; it faded after about 2011, so persistence is a claim to test.
+3. **Outcome:** The book's return over the one session from the close after each decision session, less half SPY and half QQQ over the same session, net of the cost on the weight change; a session with no weak close is cash at the bill yield. Price only: the stored forward return is close to close and carries no dividend or distribution, so the book and the benchmark both miss their yield and cash earns the Treasury bill.
+4. **Trigger timing:** The internal bar strength is read at the close of D from that day's own high, low and close; the book is held from the next session's close S (start_offset_sessions = 1, the least the harness allows) for one session. It therefore tests the SECOND-day return after a weak close, from close(D+1) to close(D+2). The source's day, close(D) to close(D+1), is not measurable. Nothing after D enters a pick.
+5. **Faithful replication:** Pagonidis (2013): buy at the close when the internal bar strength is under 0.2 (or the lowest quintile) and exit at the next close (the day the harness cannot measure), over about twenty equity index ETFs since 1993; the low-IBS days dominated total returns (from memory, not re-verified). Here: SPY and QQQ, under 0.2.
+6. **Expected size and sample:** Strong before 2010; practitioner follow-ups report a diminished but positive SPY and QQQ effect through the 2010s and a weak one since 2020 (memory). A few basis points a trade.
+7. **Capacity and costs:** Unlimited capacity in two funds with near-zero spread cost; about 50 trades a year; cost_bps 4 a round trip assumed against a few basis points of edge.
+8. **Failure modes and retirement:** The edge is of the order of the cost and the overnight premium; it shares fate with RSI(2) and the short-term index reversal cluster. The always-held benchmark makes the cash days negative by construction, so a rule of retiring when the picks-series t is under 2 would fire whatever the timing does: read the invested-session figures in the run record, not the verdict.
+9. **Decoys:** The overnight (close to open) premium and the VIX regime; the benchmark mix and the invested-session comparison in the run record are the nulls.
+
+**Sources**
+
+- Pagonidis, A., The IBS Effect: Mean Reversion in Equity ETFs, SSRN, 2013
+- Connors, L. and Alvarez, C., Short Term Trading Strategies That Work, TradingMarkets, 2009
