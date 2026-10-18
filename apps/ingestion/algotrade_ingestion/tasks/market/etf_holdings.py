@@ -44,19 +44,31 @@ rest). Per run:
   stats (``fund_events``), not read back from item text. ``force`` accepts what it reads,
   checks off.
 
+- the iShares file's header also states the fund's **shares outstanding** (as of the file's date,
+  rounded to creation units; State Street's and ProShares' files have none): each accepted read
+  also stages one ``holdings/etf_shares`` row (``shares_frame``), so there is no second download.
+  ``known_from`` is the New York date of the fetch instant, never before the file's date (ADR
+  0050: the first session the count was knowable; the file's date is only when it is as of, and
+  issuers publish it the same evening or the next morning). The funds of ``[etf_holdings]
+  daily_funds`` (iShares ones the flow-pressure edges need) are read every night outside the
+  weekly slots and the ``per_night`` cap (``daily_due``), the rest weekly: a fund's count series
+  is daily only for the list. History accrues from the first night that stores it; flows are not
+  stored (shares change times the stored close approximates them).
+
 Per-fund rows are staged, then published as one partition; a crashed run resumes.
 """
 
 import math
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import partial
 from itertools import pairwise
 from typing import Any, Self
 
 import pandas as pd
 
+from algotrade.core.time.calendar import EXCHANGE_TZ
 from algotrade.data.funds.holdings import Bridge, cusip_of, holdings_status, known_cusips
 from algotrade.data.reference import instruments, snapshot
 from algotrade.data.resolver import SymbolResolver
@@ -78,6 +90,8 @@ from algotrade_sources.framework.holdings import is_position
 
 TASK = "etf_holdings"
 TABLE = "holdings/etf"
+SHARES_TABLE = "holdings/etf_shares"
+SHARES_SOURCE = "ishares_holdings"  # the one issuer whose file states shares outstanding
 DIRECTORY = "directory:"  # item key prefix of an issuer's fund list
 NO_FILE = "NO_FILE"
 EMPTY = "EMPTY"
@@ -106,6 +120,7 @@ class HoldingsSources:
     fallback_scope: str = "liquid"  # funds a scope-limited issuer (N-PORT) is read for
     check_weight_sum: bool = True  # reject weights far from 100% (off in tests: trimmed files)
     fallback_min_adv_usd: float = 5_000_000.0  # "liquid": also funds with at least this ADV
+    daily_funds: Collection[str] = ()  # iShares funds read every night (their shares outstanding)
 
 
 @dataclass(frozen=True)
@@ -305,6 +320,26 @@ def plan_due(
     return sorted(due, key=order)
 
 
+def daily_due(
+    daily: Collection[str],
+    covered: Mapping[str, HoldingsSource],
+    read: Mapping[str, date],
+    session: date,
+    hold: Mapping[str, date] | None = None,
+) -> list[str]:
+    """The ``daily_funds`` to read on ``session``: those an iShares file covers (the only issuer
+    with a share count), not yet read on or after ``session`` and not held back by a failure,
+    in ticker order. They are read outside the weekly slots and the nightly cap."""
+    return [
+        s
+        for s in sorted(daily)
+        if s in covered
+        and covered[s].name == SHARES_SOURCE
+        and read.get(s, date.min) < session
+        and (hold or {}).get(s, session) <= session
+    ]
+
+
 def nightly_cap(
     due: Sequence[str], covered: Mapping[str, HoldingsSource], limit: int | None
 ) -> list[str]:
@@ -472,6 +507,25 @@ def fund_frame(
     )
 
 
+def shares_frame(
+    iid: str, symbol: str, as_of: date, shares: float, fetched: datetime
+) -> pd.DataFrame:
+    """The ``holdings/etf_shares`` row of one fund read at ``fetched`` (a UTC instant): the
+    file's count and date, ``known_from`` the New York date of the fetch (a file read before the
+    date it says it is as of is not believable earlier than that date)."""
+    known = max(fetched.astimezone(EXCHANGE_TZ).date(), as_of)
+    return pd.DataFrame(
+        {
+            "instrument_id": [iid],
+            "symbol": [symbol],
+            "ts": [pd.Timestamp(as_of, tz="UTC")],
+            "as_of": [as_of],
+            "shares_outstanding": [shares],
+            "known_from": [known],
+        }
+    )
+
+
 @dataclass
 class FundContext:
     """What reading one fund needs besides the fund: the run's settings and shared state."""
@@ -538,6 +592,12 @@ def _fund(run: IngestRun, source: HoldingsSource, iid: str, symbol: str, c: Fund
             if cusip is not None and kind == "Equity":
                 c.cusips[cusip] = (str(ticker), str(holding_id))
     run.stage(TABLE, symbol, frame, source.name)
+    counted = normalized.parsed.get("shares")
+    if counted is not None and not counted.empty:
+        shares = float(counted["shares_outstanding"].iloc[0])
+        run.stage(
+            SHARES_TABLE, symbol, shares_frame(iid, symbol, as_of, shares, run.clock()), source.name
+        )
     return f"OK: {len(holdings)} lines as of {as_of}{note}"
 
 
@@ -586,7 +646,10 @@ def ingest_etf_holdings(
             covered, sources.issuers, history.read, session, sources.refresh_days, force, hold,
             failing,
         )  # fmt: skip
-        todo = nightly_cap(due, covered, limit)
+        daily = daily_due(sources.daily_funds, covered, history.read, session, hold)
+        rest = [s for s in due if s not in daily]
+        capped = nightly_cap(rest, covered, limit)
+        todo = daily + capped
         shared = FundContext(
             sources,
             run.resolver(),
@@ -604,6 +667,7 @@ def ingest_etf_holdings(
             if done % CHECKPOINT_EVERY == 0:
                 run.checkpoint()
         rows = run.publish(TABLE)
+        share_rows = run.publish(SHARES_TABLE)
         funds = {k: v for k, v in run.items.items() if not k.startswith(DIRECTORY)}
         run.stats.update(
             etfs=len(ids),
@@ -622,8 +686,10 @@ def ingest_etf_holdings(
             rejected=sum(1 for v in funds.values() if v.startswith(REJECTED)),
             failed=run.failures()[:20],
             failed_count=len(run.failures()),
-            deferred_by_limit=len(due) - len(todo),
+            deferred_by_limit=len(rest) - len(capped),
             rows=rows,
+            share_rows=share_rows,
+            daily=len(daily),
             statuses=run.counts(),
         )
         if down:
