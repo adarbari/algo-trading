@@ -214,6 +214,10 @@ INSTRUMENT_DESCRIPTION = fixed(
 # merge; a fact is identified by (instrument, concept, tag, period start, period end, filed
 # date): a year-to-date and a quarterly fact share an end date, and several us-gaap tags of one
 # concept report the same period (a null ``tag``, a ``checked`` marker's, equals a null).
+# ``accepted_ts`` is the instant SEC accepted the fact's filing (UTC, from the submissions
+# document, ADR 0067 amendment): when it became public. Null for a row stored before the column
+# existed or whose accession the submissions do not list: a reader then counts the fact from the
+# session after ``filed``.
 INSTRUMENT_SHARES = fixed(
     "instruments/shares",
     "reference",
@@ -225,6 +229,7 @@ INSTRUMENT_SHARES = fixed(
     "period_start date",
     "period_end date",
     "filed date",
+    "accepted_ts timestamp_utc",
     "fy int64",
     "shares float64",
     "class_values int64",
@@ -249,6 +254,7 @@ INSTRUMENT_STATEMENTS = fixed(
     "period_start date",
     "period_end date",
     "filed date",
+    "accepted_ts timestamp_utc",
     "fy int64",
     "value float64",
     "fetched_on date!",
@@ -284,6 +290,20 @@ IBKR_IV30 = fixed(
     "vol_reject string",
     runs="merge",
 )
+# L2: the futures curve, one partition per session (``futures-curves``, IB Gateway, read-only;
+# personal licence): a row per front-month contract, ``instrument_id`` ``FUT:<root>:<YYYY-MM
+# delivery month>``, ``parent_id`` ``FUT:<root>`` (ADR 0009). ``price`` is ONE ``price_kind`` per
+# root and session by the read clock against ``next_open`` (IB ``tradingHours``): ``last`` before
+# it, ``settle`` (IB close) from it to 12:00 New York next weekday, else nothing: see
+# ``tasks/market/futures/curves.py``. ``ts``: when the stream was read; a run is the partition.
+FUTURES_CURVE = fixed(
+    "rates/futures_curve", "curve", ("instrument_id", "ts", "root", "contract_month"),
+    "instrument_id string!", "ts timestamp_utc!", "parent_id string!", "root string!",
+    "contract_month string!", "expiry date", "next_open timestamp_utc", "conid int64",
+    "local_symbol string", "price_kind string",
+    *floats("price", "last", "close", "bid", "ask", "volume", "open_interest", "multiplier"),
+    key=("instrument_id",),
+)  # fmt: skip
 # Live option quotes the API read from IB Gateway (ADR 0028, the API's one write exception):
 # every answer it served, one partition per session, a row per contract and time taken. Runs
 # merge (each is a few snapshots; all are kept, keyed by contract and ``ts``). Written only
@@ -464,15 +484,11 @@ ETF_SHARES = fixed(
     "holdings/etf_shares",
     "holdings",
     ("instrument_id", "ts", "as_of", "shares_outstanding", "known_from"),
-    "instrument_id string!",
-    "symbol string",
-    "ts timestamp_utc!",
-    "as_of date!",
-    "shares_outstanding float64!",
-    "known_from date!",
+    "instrument_id string!", "symbol string", "ts timestamp_utc!", "as_of date!",
+    "shares_outstanding float64!", "known_from date!",
     runs="merge",
     key=("instrument_id", "as_of"),
-)
+)  # fmt: skip
 # L1: economic series and index levels (ADR 0048), one row per series x observation date x
 # vintage. ``instrument_id`` is ``MACRO:<KEY>`` or ``IDX:<KEY>`` (``core.model.instruments``);
 # ``series`` is the vendor's code (FRED ``NASDAQCOM``, Stooq ``^SPX``). ``vintage_date`` is the
@@ -525,16 +541,10 @@ MACRO_RELEASE_EVENTS = fixed(
     "events/macro_release",
     "event",
     ("instrument_id", "ts", KNOWN_FROM, "release_key", "release_date", "status"),
-    "instrument_id string!",
-    "ts timestamp_utc!",
-    f"{KNOWN_FROM} date!",
-    "release_key string!",
-    "release_name string!",
-    "release_date date!",
-    "time_et string!",
-    "status string!",
+    "instrument_id string!", "ts timestamp_utc!", f"{KNOWN_FROM} date!", "release_key string!",
+    "release_name string!", "release_date date!", "time_et string!", "status string!",
     runs="merge",
-)
+)  # fmt: skip
 # L1: the 8-K and 8-K/A filings of the scoped companies (ADR 0050), one row per instrument and
 # filing (a CIK's share classes each get the row). ``ts`` is SEC's acceptance instant in UTC;
 # ``filing_date`` is the date SEC files it under (an evening acceptance is dated the next
@@ -547,19 +557,12 @@ FILING_EVENTS = fixed(
     "events/filing",
     "event",
     ("instrument_id", "ts", KNOWN_FROM, "cik", "form", "accession", "filing_date", "items"),
-    "instrument_id string!",
-    "ts timestamp_utc!",
-    f"{KNOWN_FROM} date!",
-    "cik string!",
-    "form string!",
-    "accession string!",
-    "filing_date date!",
-    "items string!",
-    "report_date date",
-    "primary_document string",
+    "instrument_id string!", "ts timestamp_utc!", f"{KNOWN_FROM} date!", "cik string!",
+    "form string!", "accession string!", "filing_date date!", "items string!",
+    "report_date date", "primary_document string",
     runs="merge",
     key=("instrument_id", "accession"),
-)
+)  # fmt: skip
 # L1: Form 4 insider transactions (EB D6), a row per line and reporting owner. ``ts``: acceptance;
 # ``known_from`` is in the key so a restated line sits beside its predecessor (``data.insiders``).
 INSIDER_EVENTS = fixed(
@@ -578,15 +581,11 @@ MACRO_SERIES = fixed(
     "macro/series",
     "reference",
     ("instrument_id", "obs_date", "vintage_date", "vintage_kind"),
-    "instrument_id string!",
-    "series string",
-    "obs_date date!",
-    "vintage_date date!",
-    "value float64",
-    "vintage_kind string!",
+    "instrument_id string!", "series string", "obs_date date!", "vintage_date date!",
+    "value float64", "vintage_kind string!",
     runs="merge",
     key=("instrument_id", "obs_date", "vintage_date"),
-)
+)  # fmt: skip
 # L1: what each analyst-data vendor's key may call (ADR 0068), one row per (vendor, endpoint):
 # ``source`` is the vendor (``fmp``, ``finnhub``), ``endpoint`` the probe's name for the call
 # (``estimates_quarter``). ``status`` is ALLOWED / DENIED / LIMITED (``framework/access.py``);
@@ -599,15 +598,11 @@ ANALYST_VENDOR_ACCESS = fixed(
     "analyst/vendor_access",
     "reference",
     ("source", "endpoint"),
-    "endpoint string!",
-    "status string!",
-    "http_code int64",
-    "rows int64",
-    "note string",
+    "endpoint string!", "status string!", "http_code int64", "rows int64", "note string",
     "checked_ts timestamp_utc!",
     runs="merge",
     key=("source", "endpoint"),
-)
+)  # fmt: skip
 ACCESS_STATUSES = frozenset({"ALLOWED", "DENIED", "LIMITED"})
 # L1: our own point-in-time history of analyst data (ADR 0068; track D2 of the edge build). Both
 # vendors serve only today's value and restate their history, so each night's fetch is stored as
@@ -775,6 +770,7 @@ KNOWN: dict[str, TableSpec] = {
         VERIFICATION_IBKR,
         IBKR_CONTRACTS,
         IBKR_IV30,
+        FUTURES_CURVE,
         RULE_SCREEN,
         RULE_SCREEN_VALUES,
         EDGE_EVAL,

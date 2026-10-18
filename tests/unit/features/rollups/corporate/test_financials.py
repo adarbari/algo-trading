@@ -1,4 +1,4 @@
-"""``financials@v2``: discrete quarters from year-to-date facts (the fourth quarter as annual
+"""``financials@v3``: discrete quarters from year-to-date facts (the fourth quarter as annual
 minus nine months), four-quarter and annual TTMs, the year-ago TTMs, the latest quarter and
 the same quarter a year earlier, restatements and filing dates (point in time), split-adjusted
 EPS, the statuses (OK / PARTIAL / NO_TTM / NO_FACTS / STALE), the ``pe_ratio`` /
@@ -6,16 +6,18 @@ EPS, the statuses (OK / PARTIAL / NO_TTM / NO_FACTS / STALE), the ``pe_ratio`` /
 
 from calendar import monthrange
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from algotrade.core.model.fields import field_source
+from algotrade.core.time.calendar import EXCHANGE_TZ
 from algotrade.features.framework.runner import compute_in_memory
 from algotrade.features.registry import catalogue_columns
 from algotrade.features.rollups.corporate.financials import (
+    FACTS,
     GROUP,
     TAG_RANK,
     FinancialsParams,
@@ -421,11 +423,11 @@ def test_params_validate_and_catalogue_fields() -> None:
         replace(FinancialsParams(), stale_days=0)
     with pytest.raises(ValueError, match="history_days"):
         replace(FinancialsParams(), history_days=300)
-    columns = catalogue_columns()["financials@v2"]
+    columns = catalogue_columns()["financials@v3"]
     assert columns["revenue_ttm"] == "float" and columns["eps_diluted_ttm"] == "float32"
     assert columns["financials_status"] == "str" and columns["revenue_fy_end"] == "date"
-    assert field_source("rollup.financials@v2.net_income_ttm") == (
-        "rollups/instrument/financials@v2",
+    assert field_source("rollup.financials@v3.net_income_ttm") == (
+        "rollups/instrument/financials@v3",
         "net_income_ttm",
     )
 
@@ -613,3 +615,43 @@ def test_no_facts_table_at_all_gives_no_facts_rows() -> None:
     writer, reader = store()
     write_bars(writer, {"EQ:ETF": series(100, 0)})
     assert _rows(reader, [END])[END].loc["EQ:ETF", "financials_status"] == "NO_FACTS"
+
+
+def _accepted(day: date, hour: int, minute: int) -> pd.Timestamp:
+    return pd.Timestamp(datetime.combine(day, time(hour, minute), EXCHANGE_TZ))
+
+
+def _revenue_seen(accepted: pd.Timestamp | None, filed_offset: int = -5) -> dict[date, float]:
+    """The FY revenue TTM of EQ:A on the session it was filed and the next, for a 10-K filed on
+    ``days[filed_offset]`` and accepted at ``accepted`` (a callable of the filing day)."""
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": series(100, 0)})
+    filed = days[filed_offset]
+    row = fact("EQ:A", "revenue", date(2025, 1, 1), date(2025, 12, 31), 1200, filed, "10-K")
+    row["accepted_ts"] = None if accepted is None else _accepted(filed, *accepted)  # type: ignore[misc,arg-type]
+    writer.write_table("instruments/shares", STORED, "f", stamped([row], STORED, "f"))
+    out = _rows(reader, [filed, days[filed_offset + 1]])
+    return {d: out[d].loc["EQ:A", "revenue_ttm"] for d in out}
+
+
+def test_a_10k_accepted_after_the_close_is_invisible_that_session_and_visible_the_next() -> None:
+    """The lookahead of v2 (``filed <= session``): a 10-K accepted 16:30 New York time on D is
+    dated D by SEC but was not public at D's close; v3 counts it from D+1."""
+    seen = _revenue_seen((16, 30))  # type: ignore[arg-type]
+    (d0, hidden), (d1, shown) = sorted(seen.items())
+    assert pd.isna(hidden) and shown == 1200, (d0, d1)
+
+
+def test_a_10k_accepted_before_the_close_counts_that_session() -> None:
+    (d0, first), (_, second) = sorted(_revenue_seen((15, 30)).items())  # type: ignore[arg-type]
+    assert first == 1200 and second == 1200, d0
+
+
+def test_a_fact_without_an_acceptance_time_counts_from_the_session_after_filed() -> None:
+    (_, hidden), (_, shown) = sorted(_revenue_seen(None).items())
+    assert pd.isna(hidden) and shown == 1200
+
+
+def test_financials_reads_the_facts_by_acceptance_session() -> None:
+    assert FACTS == "instruments/shares_accepted"
+    assert "instruments/shares_accepted" in {i.table for i in GROUP.inputs}

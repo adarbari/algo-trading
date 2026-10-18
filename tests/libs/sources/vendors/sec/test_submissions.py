@@ -51,6 +51,17 @@ def test_only_8k_and_8ka_are_kept_with_their_form_and_the_columns_typed() -> Non
     assert frame["accession"].is_unique
 
 
+def test_forms_none_keeps_every_form_with_its_acceptance_for_an_accession_lookup() -> None:
+    every = parse_filings(MAIN, forms=None)
+    assert {"8-K", "10-Q"} <= set(every["form"]) and len(every) > len(parse_filings(MAIN))
+    assert every["accession"].is_unique and every["acceptance_ts"].notna().all()
+    only_10q = parse_filings(MAIN, forms=("10-Q",))
+    assert set(only_10q["form"]) == {"10-Q"}
+    request = FilingsRequest(key="723125", forms=None)
+    normalized = SecFilings(http_for(transport_for([]))).normalize(request, MAIN)
+    assert normalized is not None and len(normalized.parsed[FILINGS_FRAME]) == len(every)
+
+
 def test_the_earnings_filing_row_as_sec_gives_it() -> None:
     frame = parse_filings(MAIN).set_index("accession")
     row = frame.loc["0000723125-26-000018"]

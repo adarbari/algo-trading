@@ -40,7 +40,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | Company description (stocks, ADRs) | Massive ticker overview (`/v3/reference/tickers/{ticker}`; one request per ticker; free tier) | none free | Implemented (ADR 0034): capped per night |
 | Fund description (ETFs) | SEC prospectus investment objective (Risk/Return Summary data sets + `company_tickers_mf.json`; official, free) | issuer fund pages (per-site terms, not used) | Implemented (ADR 0034): the objective sentence, ~74% of ETFs |
 | Shares outstanding (market cap) | SEC EDGAR company facts (XBRL; free; same contact and pacing) | Massive ticker details (`share_class_shares_outstanding`) | Implemented, phase 2b.4 |
-| Revenue, net income, diluted EPS (TTM, P/E) | SEC EDGAR company facts (the same document and request as the share counts) | none planned | Implemented, `financials@v2` |
+| Revenue, net income, diluted EPS (TTM, P/E) | SEC EDGAR company facts (the same document and request as the share counts) | none planned | Implemented, `financials@v3` |
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
 | IV history / IV rank (enrichment) | **IBKR** (ADR 0028): IB's daily 30-day IV and HV per underlying, years of history; personal-use licence | our IV30 history (from the Cboe chains), the fallback | Implemented: `ibkr_iv@v1`, `iv_rank` with `iv_rank_source` |
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
@@ -499,7 +499,7 @@ cost an extra request.
 |---|---|---|
 | `dei:EntityCommonStockSharesOutstanding` (cover page, as of a date just before filing) | `dei` | each value; several values for one date are classes (companyfacts drops the class labels) and are summed, `class_values` counts them |
 | `us-gaap:WeightedAverageNumberOfSharesOutstandingBasic` | `weighted_basic` | the filing's current period: latest period end, then the shortest span (comparatives and year-to-date dropped) |
-| `us-gaap:Revenues`, else `RevenueFromContractWithCustomerExcludingAssessedTax`, else `SalesRevenueNet` (USD) | `revenue` | every quarter, half-year, nine-month and annual period (see below); all three tags are kept (`tag`), `financials@v2` prefers them in this order and never subtracts across tags |
+| `us-gaap:Revenues`, else `RevenueFromContractWithCustomerExcludingAssessedTax`, else `SalesRevenueNet` (USD) | `revenue` | every quarter, half-year, nine-month and annual period (see below); all three tags are kept (`tag`), `financials@v3` prefers them in this order and never subtracts across tags |
 | `us-gaap:NetIncomeLoss` (USD) | `net_income` | the same periods; losses are kept |
 | `us-gaap:EarningsPerShareDiluted` (USD per share) | `eps_diluted` | the same periods; negative values are kept |
 
@@ -507,7 +507,7 @@ cost an extra request.
 `period_start` and `period_end` (a year-to-date and a quarterly fact share an end date), and
 the amount is in `value` with `unit` (`usd`, `usd_per_share`). Only periodic filings count
 (10-K, 10-Q, 20-F, 40-F and their amendments; proxy statements and 8-Ks are dropped) and only
-spans of about 3, 6, 9 or 12 months: the year-to-date facts are how `financials@v2` derives the
+spans of about 3, 6, 9 or 12 months: the year-to-date facts are how `financials@v3` derives the
 fourth quarter (annual minus nine months). A period is repeated as a comparative in every
 later filing, so we keep the filing that first reported it plus any later filing whose value
 differs (a restatement), per tag. A point-in-time read then sees exactly what was public on each date,
@@ -563,7 +563,7 @@ one fetch of each company's document; a CIK is fetched when either table is due.
 class-specific counts, so every instrument of a CIK (GOOGL and GOOG) gets the company total.
 Most multi-class issuers no longer tag the cover count, so they fall back to the weighted
 average; Berkshire's last facts are from 2015 (class A equivalents), so BRK.A / BRK.B are
-`STALE` in `fundamentals@v3`, not wrong.
+`STALE` in `fundamentals@v4`, not wrong.
 
 Checked live 2026-10-05 (financials, sessions up to 2026-10-02, scratch copy of the store): AAPL
 TTM revenue $466.8B (four quarters to 2026-06-27, filed 2026-07-31), net income $128.9B, diluted
@@ -578,7 +578,7 @@ Checked live 2026-10-03 (closes of 2026-10-02): AAPL 14.594B shares (dei, as of 
 
 **Backfill:** `algotrade-ingest shares` once (~6k CIKs at the 0.2 s `sec` pacing plus
 download: about 30 to 40 minutes, ~1 GB of gzip raw kept 7 days, `[sec_edgar] raw_retention_days`), then
-`algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v3`.
+`algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v4`.
 A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks. The
 `instruments/statements` backlog (CIKs with share counts and no statements marker yet) is fetched
 `[sec_edgar] statements_backfill_per_night` (400) a night (5,260 CIKs), so it finishes in about 14 nights
@@ -587,8 +587,22 @@ by itself, the event scope and the S&P 500 first, then optionable liquid names (
 **Adding the financials to a store that already has share counts:** a CIK is refetched only
 on its 30-day slot, so run `algotrade-ingest shares --force` once (same cost; only facts not
 stored yet are written), then `algotrade-ingest rollups --from <first session> --to <last
-session> --only financials@v2` (compute alone measured at about 3 s for a synthetic frame of 6000 companies; not yet measured end to end). A CIK
+session> --only financials@v3` (compute alone measured at about 3 s for a synthetic frame of 6000 companies; not yet measured end to end). A CIK
 that has not been refetched yet shows `NO_FACTS` financials.
+**Acceptance time** (ADR 0067 amendment 2026-10-17). The facts carry a filing DATE; SEC dates a filing
+accepted until 17:30 New York time that day, after the 16:00 close. The `shares` task also reads each fetched
+CIK's submissions (`sec_filings`, `https://data.sec.gov/submissions/CIK##########.json` and its older pages,
+every form back to 2009: one to a few extra requests per CIK through the shared `sec` limiter) and stores each
+fact's `acceptanceDateTime` as `accepted_ts` (UTC) in `instruments/shares` and `instruments/statements`.
+`financials@v3`, `fundamentals@v4`, `growth_history@v2`, `income_statement@v2`, `cash_flow@v2` and `balance_sheet@v2` count a fact from the first session whose close is after it.
+Backfill (owner, from the main checkout, once): `ACCEPTANCE_VERSION_DATE` (`company_facts.py`) counts every
+CIK fetched before it as backlog, refetched under the nightly cap (`backfill_per_night`, 400), no command; to do
+it at once run `algotrade-ingest run shares --force` (refetches every CIK, outside the cap; only the facts
+without a time that now have one are written, under their old keys), then
+`algotrade-ingest rollups --from <first session> --to <last session> --only financials@v3,fundamentals@v4,growth_history@v2,income_statement@v2,cash_flow@v2,balance_sheet@v2`
+and, once those are complete, `algotrade-ingest retire-features --group financials@v2 --dry-run` (then without
+`--dry-run`), the same for `fundamentals@v3`, `growth_history@v1`, `income_statement@v1`, `cash_flow@v1`, `balance_sheet@v1`. Facts never refetched keep a null time and count from the
+session after `filed` (never the old rule).
 A change to the tag lists bumps `STATEMENT_TAGS_VERSION_DATE` (`statement_concepts.py`): the `shares` task counts a
 statements marker older than it as backlog and refetches it under the nightly cap, no `--force`.
 
@@ -626,7 +640,24 @@ maintained fork of `ib_insync`). **Read-only by construction**, three layers:
 | `div/<SYM>`: IB dividends (past / next 12 months) + close | `reqMktData` tick 456, streamed up to `stream_wait_s`, then `cancelMktData` | `ibkr` |
 | `option_params/<SYM>`: listed expirations and strikes | `reqSecDefOptParams` | `ibkr` |
 | `option/<SYM>/<expiry>/<C|P>/<strike>`: a snapshot quote | `qualifyContracts` + `reqTickers` | `ibkr` |
+| `futures/<ROOT>/<EXCHANGE>/<CLASS>/<N>`: the N nearest unexpired contracts of a futures root and their quotes (the nightly `futures-curves` task, table `rates/futures_curve`; `[ibkr] futures_roots`, `futures_front`) | `reqContractDetails` (a contract lookup) + `reqMktData` tick 588 streamed, then `cancelMktData` | `ibkr` |
 
+- **Futures curves** (EB D11): a row's `price` depends on the read clock against the contract's
+  OWN next session open (`next_open`, from `ContractDetails.tradingHours`; IB rolls its `close`
+  tick then, and it differs: CME 18:00 New York, CBOT grains ZC/ZS/ZW 20:00, ICE sugar SB the next
+  morning (no overnight session), a holiday Monday from the Sunday evening), one `price_kind` per
+  root and session. (a) Before `next_open`: `last`, the session's own last trade, `price_kind =
+  last` (IB's `close` is still the day before's settle). (b) From it until 12:00 New York on the
+  next weekday (`SETTLE_BOUND`, before the earliest next settlement: sugar about 12:55, gold
+  13:30, crude 14:30, the Treasury futures about 15:00): `close` is exactly the session's exchange
+  settle, `price_kind = settle`; `last` is the next trade date's trading and ignored. (c) Later:
+  nothing is stored, every root `NO_DATA` with the reason (a catch-up too late). A root whose
+  `tradingHours` are missing or unparsable (or whose contracts disagree) is `NO_DATA` too: fail
+  closed. `contract_month` is the delivery month (`ContractDetails.contractMonth`; CLZ6 stops
+  trading in November but is `2026-12`). Roots whose exchange the account has no market data for
+  come back with no price and are a `NO_DATA` item (WARN `futures_roots_served`), never a
+  failure. History accrues from the first night; IB's expired-contract history (`includeExpired`,
+  about 2 years, paced as historical requests) is not used, a backfill would be a separate task.
 - **Pacing** (`[ibkr]`): every message waits `min_interval_s = 0.02` (IB allows 50
   messages/s); every historical request also waits `historical_min_interval_s = 10` (60 per
   10 minutes, never two identical requests within 10 s). Two shared limiter keys, `ibkr` and

@@ -1,4 +1,6 @@
-"""The IBKR quality checks. ``verification``: graded rows of ``verification/ibkr`` for the
+"""The IBKR quality checks. ``futures_roots_served``: WARN (never FAIL) when a configured
+futures root stored no priced curve; nothing while ``[ibkr]`` is disabled or nothing was
+written. ``verification``: graded rows of ``verification/ibkr`` for the
 session; FAIL above ``max_verify_failures`` failing, WARN on any FAIL or on no rows while
 ``[ibkr]`` is enabled, nothing at all while it is disabled (the default). ``ibkr_vols_in_range``:
 FAIL above ``max_ibkr_vol_rejected`` of the session's ``volatility/ibkr_iv30`` rows with a
@@ -12,7 +14,11 @@ from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.maintenance.quality import check_ibkr_vols, check_verification
+from algotrade_ingestion.tasks.maintenance.quality import (
+    check_futures_curves,
+    check_ibkr_vols,
+    check_verification,
+)
 from tests.helpers.stored_frames import stamped
 
 D = date(2026, 10, 2)
@@ -91,3 +97,36 @@ def test_ibkr_vols_check(rejects: list[str | None], expected: str) -> None:
 def test_ibkr_vols_check_is_silent_when_disabled_or_nothing_written() -> None:
     assert check_ibkr_vols(reader_with_vols(["x"]), D, SourcesSettings()) == []
     assert check_ibkr_vols(reader_with_vols([]), D, ON) == []
+
+
+FUTURES = SourcesSettings.from_document(
+    {"ibkr": {"enabled": True, "futures_roots": ["CL:NYMEX", "NG:NYMEX"]}}
+)
+
+
+def reader_with_curves(roots: dict[str, float | None]) -> StoreReader:
+    backend = MemoryBackend()
+    rows = [
+        {"instrument_id": f"FUT:{r}:2026-11", "ts": D, "parent_id": f"FUT:{r}", "root": r,
+         "contract_month": "2026-11", "price": p}
+        for r, p in roots.items()
+    ]  # fmt: skip
+    if rows:
+        StoreWriter(backend).write_table("rates/futures_curve", D, "c", stamped(rows, D, "c"))
+    return StoreReader(backend)
+
+
+@pytest.mark.parametrize(
+    ("served", "expected"),
+    [({"CL": 70.0, "NG": 3.0}, "PASS"), ({"CL": 70.0, "NG": None}, "WARN")],
+)
+def test_futures_roots_served(served: dict[str, float | None], expected: str) -> None:
+    [check] = check_futures_curves(reader_with_curves(served), D, FUTURES)
+    assert check.status == expected and "of 2 futures roots" in check.detail
+    assert ("none for NG" in check.detail) == (expected == "WARN")
+
+
+def test_futures_check_is_silent_when_off_unconfigured_or_empty() -> None:
+    assert check_futures_curves(reader_with_curves({}), D, FUTURES) == []  # step skipped
+    assert check_futures_curves(reader_with_curves({"CL": 1.0}), D, SourcesSettings()) == []
+    assert check_futures_curves(reader_with_curves({"CL": 1.0}), D, ON) == []  # no roots
