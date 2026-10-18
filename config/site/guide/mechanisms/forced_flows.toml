@@ -1,0 +1,106 @@
+id = "forced_flows"
+title = "Forced buyers and sellers"
+question = "Who has to trade, whatever the price?"
+examples = "index changes, turn of the month, spin-off drift"
+short = "Index funds, balanced funds, dealers and leveraged ETFs must trade on a known date; you take the other side, before or after."
+how_it_works = [
+  "Some holders trade by rule, not by view. An index fund trades at the effective close of a change, a pension at quarter end, a leveraged ETF into every close, an income fund before an ex-date. The date and the direction are known in advance.",
+  "You trade against the rule: buy what they must sell, or buy before they must buy and sell into their flow. The other side pays with price impact; your return is the reversal after the flow, or the run-up before it.",
+  "The family covers index additions and deletions, the Russell reconstitution, quarter-end and turn-of-the-month flows, option expiration week, ETF flows, tender offers, spin-offs and dividend months.",
+]
+why_it_survives = [
+  "The flow is mandated, so it repeats; but the gain per event is small and the dates are public, so capital crowds in. Shleifer and Vishny: arbitrage runs on other people's money and steps back when prices move against it. Wurgler and Zhuravskaya: a stock has no perfect substitute, so trading against the flow carries a risk nobody hedges.",
+  "What keeps the capacity small: one sector concentrated in a reconstitution, one noisy day of returns, high small-cap costs and the borrow on the short leg.",
+]
+research = [
+  "The index effect has shrunk. Greenwood and Sammon: the abnormal return on an S&P 500 addition fell from 7.6% in the 1990s to 0.8% in the latest decade. A deletion averaged -0.6% over 2010 to 2020. Petajisto (1990-2005): additions rose 8.8% and deletions fell 15.1% from announcement to effective date, peaking in 2000.",
+  "Madhavan: long Russell additions, short deletions returned 14.94% in June over 1996-2002. Chang, Hong and Liskovich find price effects for both additions and deletions at the Russell 1000/2000 cutoff. Arnott, Kalesnik and Wu (1989-2017): in the year after the change, additions trailed the market by 1.28% and discretionary deletions beat it by 19.16%.",
+  "Calendar flows. McConnell and Xu (1926-2005): the four turn-of-the-month days average 0.15% a day value-weighted, the other 16 about zero, in 31 of 35 countries. Harvey, Mazzoleni and Melone: a rebalancing sale by institutions is followed by a 17 basis point lower equity return the next day.",
+  "Flows reverse. Coval and Stafford: trading against funds forced to sell by outflows earns highly significant returns. Brown, Davies and Ringgenberg: short high-flow ETFs, long low-flow ones, earns 1.1% to 2.0% a month. Our bar: a paper's long/short figure is expected to lose half by the time it trades, a long-only one a third, and Works needs t > 3.",
+]
+real_vs_decoy = [
+  "A real forced flow names the holder, the rule and the date, and its return concentrates in the window the rule forces. A decoy is a calendar pattern with no holder behind it, or an index effect measured before 2010 and assumed to hold.",
+  "The harness runs each edge on the same sessions as the standard decoys and keeps a frozen period. The out-of-sample lift must keep at least half of the whole-history lift. With a few events a year, Not enough data is the honest verdict for a long time.",
+]
+dont = "Don't trade a flow from one paper's sample years: the index effect of the 1990s is mostly gone, and the dates that remain are crowded."
+see_also = ["edge_how_sure", "edge_where_worked"]
+
+[[stats]]
+label = "Our bar"
+value = "t > 3"
+note = "Works needs t above 3 on the deciles and on the picks, on sessions the rule never saw."
+
+[[stats]]
+label = "Haircut on a paper's figure"
+value = "50% / one third"
+note = "Expect a long/short or short-leg figure to lose half by the time it trades, a long-only one a third."
+
+[[sources]]
+title = "Greenwood, R. and Sammon, M., The Disappearing Index Effect, NBER working paper 30748 (2022; Journal of Finance 2025)"
+url = "https://www.nber.org/papers/w30748"
+note = "S&P 500 addition return fell from 7.6% (1990s) to 0.8%; deletions -0.6% over 2010-2020."
+
+[[sources]]
+title = "Petajisto, A., The index premium and its hidden cost for index funds, Journal of Empirical Finance (2011)"
+url = "https://ideas.repec.org/a/eee/empfin/v18y2011i2p271-288.html"
+note = "1990-2005: S&P 500 additions +8.8%, deletions -15.1% announcement to effective; peaked in 2000."
+
+[[sources]]
+title = "Madhavan, A., The Russell Reconstitution Effect, Financial Analysts Journal (2003)"
+url = "https://ideas.repec.org/a/taf/ufajxx/v59y2003i4p51-64.html"
+note = "Long additions, short deletions returned 14.94% in June, 1996-2002; sector and cost risks explain persistence."
+
+[[sources]]
+title = "Chang, Y.-C., Hong, H. and Liskovich, I., Regression Discontinuity and the Price Effects of Stock Market Indexing, NBER working paper 19290 (2013; Review of Financial Studies 2015)"
+url = "https://www.nber.org/papers/w19290"
+note = "Clean identification at the Russell cutoff: price effects for both additions and deletions."
+
+[[sources]]
+title = "Arnott, R., Kalesnik, V. and Wu, L., Buy High and Sell Low with Index Funds!, Research Affiliates (2018; republished by Hedge Fund Alpha)"
+url = "https://hedgefundalpha.com/strategies/buy-high-and-sell-low-with-index-funds/"
+note = "1989-2017: after the change, additions -1.28% and discretionary deletions +19.16% versus the market over a year."
+
+[[sources]]
+title = "Harvey, C., Mazzoleni, M. and Melone, A., The Unintended Consequences of Rebalancing, NBER working paper 33554 (2025)"
+url = "https://www.nber.org/papers/w33554"
+note = "Institutional rebalancing sales precede a 17 bp lower equity return the next day; about $16 bn a year."
+
+[[sources]]
+title = "McConnell, J. and Xu, W., Equity Returns at the Turn of the Month, Financial Analysts Journal (2008)"
+url = "https://ideas.repec.org/a/taf/ufajxx/v64y2008i2p49-64.html"
+note = "1926-2005: 0.15% a day over the four turn-of-the-month days, about zero elsewhere; 31 of 35 countries."
+
+[[sources]]
+title = "Stivers, C. and Sun, L., Returns and option activity over the option-expiration week for S&P 100 stocks, Journal of Banking and Finance (2013)"
+url = "https://ideas.repec.org/a/eee/jbfina/v37y2013i11p4226-4240.html"
+note = "Option-active large caps earn high returns in expiration week; dealer delta-hedge unwinds are one driver."
+
+[[sources]]
+title = "Hartzmark, S. and Solomon, D., The dividend month premium, Journal of Financial Economics (2013)"
+url = "https://ideas.repec.org/a/eee/jfinec/v109y2013i3p640-660.html"
+note = "Abnormal returns in predicted dividend months, about the value premium's size; price pressure from dividend seekers."
+
+[[sources]]
+title = "Coval, J. and Stafford, E., Asset Fire Sales (and Purchases) in Equity Markets, NBER working paper 11357 (2005; Journal of Financial Economics 2007)"
+url = "https://www.nber.org/papers/w11357"
+note = "Funds with large outflows sell holdings under pressure; trading against them earns significant returns."
+
+[[sources]]
+title = "Brown, D., Davies, S. and Ringgenberg, M., ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance (2021)"
+url = "https://ideas.repec.org/a/oup/revfin/v25y2021i4p937-972..html"
+note = "ETF flows signal non-fundamental demand; short high-flow, long low-flow earns 1.1% to 2.0% a month."
+
+[[sources]]
+title = "Shum, P., Hejazi, W., Haryanto, E. and Rodier, A., Intraday Share Price Volatility and Leveraged ETF Rebalancing, Review of Finance (2016)"
+url = "https://academic.oup.com/rof/article/20/6/2379/2418138"
+note = "2006-2011: end-of-day volatility rises with leveraged ETF rebalancing demand, most on volatile days."
+
+[[sources]]
+title = "Wurgler, J. and Zhuravskaya, E., Does Arbitrage Flatten Demand Curves for Stocks?, Journal of Business (2002)"
+url = "https://ideas.repec.org/a/ucp/jnlbus/v75y2002i4p583-608.html"
+note = "Stocks without close substitutes jump more on S&P 500 inclusion: arbitrage against flows is risky."
+
+[[sources]]
+title = "Shleifer, A. and Vishny, R., The Limits of Arbitrage, NBER working paper 5167 (1995; Journal of Finance 1997)"
+url = "https://www.nber.org/papers/w5167"
+note = "Arbitrage is done by a few specialists with borrowed capital and fails when prices move against them."

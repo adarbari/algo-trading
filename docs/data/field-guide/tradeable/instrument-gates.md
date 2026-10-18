@@ -787,3 +787,99 @@ Sources: Site convention (ADR 0053 amendment, EB H9)
 - Sessions before the first stored reference snapshot use the earliest snapshot's sibling, so history carries today's pairs. The result shows the count of such sessions.
 
 Sources: Site convention (ADR 0018, ADR 0053 amendment, EB H9)
+
+### `rollup.ipo_lockups@v1.sessions_to_lockup_expiry`
+
+**How to read it.** Exchange sessions from the session to the lock-up expiry of a recent IPO. 5 means the lock-up ends in five sessions. 0 means today. -3 means it ended three sessions ago; the earliest read is -20.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a lock-up ending within the next ten sessions | `lte 10` | hard | - | illustrative screen for an avoid list; names with no lock-up date drop out, and a negative value is a lock-up already over |
+
+**When the reading lies**
+
+- The date comes from the prospectus text. A prospectus that states no term has no value, so the name is unknown, not free of a lock-up. An early-release lock-up can end for part of the shares sooner.
+
+Sources: Field and Hanke (2001), The Effect of Lockup Provisions on the Pricing of IPOs; Brav and Gompers (2003), The Role of Lockups in Initial Public Offerings, Review of Financial Studies
+
+### `rollup.ipo_lockups@v1.lockup_expiry_date`
+
+**How to read it.** The first session on which the lock-up of a recent IPO has ended: the first exchange session after the prospectus date plus the stated term. Insiders and early holders may sell from then.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names with a known lock-up date | `not_null` | hard | - | null means no stated lock-up, an expiry long past, or no company record |
+
+**When the reading lies**
+
+- Null when the prospectus states no term, when the expiry is more than 20 sessions past, or when the company has no record as of the session.
+
+Sources: Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)
+
+### `rollup.ipo_lockups@v1.lockup_release_terms`
+
+**How to read it.** How the prospectus ends the lock-up. The value standard means one expiry date. The value early_release means it lets part of the lock-up end early, for example after an earnings report or at a price level.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| lock-ups with a single expiry date | `eq "standard"` | hard | - | names with no lock-up in the window drop out |
+
+**When the reading lies**
+
+- The label comes from phrases in the prospectus. A release clause worded in an unusual way reads as standard. Null when the name has no lock-up in the window.
+
+Sources: Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)
+
+### `rollup.ipo_lockups@v1.lockup_days`
+
+**How to read it.** The lock-up term the prospectus states, in calendar days. 180 is the usual term. The term counts from the prospectus date, not from the first day of trading.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the usual 180-day term | `eq 180` | hard | - | illustrative: the most common term; names with another term or none drop out |
+
+**When the reading lies**
+
+- Null when the prospectus gives the term in a form the extraction does not read.
+
+Sources: Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)
+
+### `rollup.ipo_lockups@v1.ipo_offer_price`
+
+**How to read it.** The IPO offer price per share, in dollars, from the final prospectus. Compare it with the latest close to see how far the stock has moved since the offering.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names with a stated offer price | `not_null` | hard | - | null means no price could be read from the prospectus |
+
+**When the reading lies**
+
+- Null when the prospectus gives a range or no final price the extraction can read. The price is not adjusted for later splits.
+
+Sources: Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)
+
+### `feature.reverse_split_recent`
+
+**How to read it.** True when the name had a reverse split with an ex-date in the last 252 sessions, a year. Null when none is stored, which is not the same as no reverse split.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names that reverse-split within a year | `eq true` | hard | - | names with no stored split drop out |
+
+**When the reading lies**
+
+- Funds reverse-split too, so an edge on this flag names the operating-company universe. A hard 'eq true' keeps only names with a stored split.
+
+Sources: Desai and Jain (1997), Long-Run Common Stock Returns Following Stock Splits and Reverse Splits, Journal of Business

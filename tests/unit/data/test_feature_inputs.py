@@ -133,6 +133,7 @@ def test_company_input_is_the_sector_snapshot_the_session_sees() -> None:
     seen = company.at(days[3], 0)
     assert seen is not None and seen.to_dict("list") == {
         "instrument_id": ["EQ:A"],
+        "cik": ["1"],
         "sector": ["Technology"],
         "industry": ["Software"],
         "sic": ["3571"],
@@ -622,3 +623,33 @@ def test_short_interest_is_seen_from_its_publication_session_not_its_settlement_
     assert len(before.at(date(2026, 9, 24), 30)) == 0  # settled by then, not public yet
     empty = inputs.load_input(StoreReader(MemoryBackend()), "events/short_interest", [published], 5)
     assert len(empty.at(published, 5)) == 0
+
+
+def test_ipo_lockups_read_each_session_the_latest_version_known_by_it() -> None:
+    """ADR 0075: a re-extraction known on the 5th is invisible to the 4th (which reads the
+    earlier version) and wins from the 5th; before any version is known there is no input."""
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    first, restated = date(2026, 10, 2), date(2026, 10, 5)
+
+    def row(version: str, known: date, days: int) -> dict[str, object]:
+        return {
+            "instrument_id": None, "ts": pd.Timestamp("2026-10-01T21:30:00Z"), "known_from": known,
+            "cik": "0001111111", "accession": "0001193125-26-100001", "extraction": "EXTRACTED",
+            "rules_version": version, "filing_date": first, "is_ipo": True, "early_release": False,
+            "lockup_days": days,
+        }  # fmt: skip
+
+    writer.write_table(
+        "events/ipo_lockup", first, "r1", stamped([row("v1", first, 180)], first, "r1")
+    )
+    writer.write_table(
+        "events/ipo_lockup", restated, "r2", stamped([row("v2", restated, 90)], restated, "r2")
+    )
+    loaded = inputs.load_input(StoreReader(backend), "events/ipo_lockup", [restated], 0)
+    assert loaded.at(date(2026, 10, 1), 0) is None
+    old = loaded.at(date(2026, 10, 2), 0)
+    assert old is not None and list(old["lockup_days"]) == [180]
+    new = loaded.at(restated, 0)
+    assert new is not None and list(new["lockup_days"]) == [90]  # one row per prospectus
+    assert inputs.load_input(store()[1], "events/ipo_lockup", [restated], 0).at(restated, 0) is None

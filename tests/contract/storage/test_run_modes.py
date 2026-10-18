@@ -182,7 +182,7 @@ def test_runs_written_before_a_key_column_existed_merge_with_it_null(backend: Ba
     ]
 
 
-# --- events/filing_text (edge build D10): merge on (instrument, accession, item, parser_version)
+# --- events/filing_text (edge build D10b): merge on (cik, accession, item, parser_version, ...)
 
 
 def filing_row(
@@ -218,7 +218,7 @@ def write_filing_text(
 def test_the_table_merges_on_the_item_and_version_key_with_the_stamps_required() -> None:
     spec = spec_for(FILING_TEXT)
     assert (spec.grain, spec.runs) == ("event", "merge")
-    assert spec.key == ("instrument_id", "accession", "item", "parser_version", "known_from")
+    assert spec.key == ("cik", "accession", "item", "parser_version", "known_from")
     nullable = {c.name: c.nullable for c in spec.columns}
     assert not nullable["known_from"] and not nullable["parser_version"] and not nullable["ts"]
     assert nullable["item"] and nullable["text"] and nullable["reason"]

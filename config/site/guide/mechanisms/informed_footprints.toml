@@ -1,0 +1,106 @@
+id = "informed_footprints"
+title = "Informed money leaves footprints"
+question = "Who knows more, and shows it?"
+examples = "insider cluster buys, option-to-stock volume, call-put IV spread"
+short = "Someone with better information trades where it is cheap to act, in options or in their own stock; their footprint shows before the price moves."
+how_it_works = [
+  "A trader who knows something buys calls for the leverage, or puts to avoid a hard borrow; an insider buys their own stock when they think it is cheap. Market makers lean their quotes against the side being hit, and the footprint is public. It shows as calls priced above puts, a flat or steep put wing, a jump in call volatility, or a filed purchase.",
+  "The other side is the stock holder who never reads the option surface or the filing. The information sits in the options market or in a Form 4 for days before it reaches the price. You buy the footprint and hold while the stock catches up.",
+  "The family covers the call-put volatility spread, the smirk, the change in call volatility, the option-to-stock volume ratio, the spread climbing into a report, and clusters of opportunistic insider buying. Each is one place an informed trade leaves a mark.",
+]
+why_it_survives = [
+  "Reading the footprint needs option data on hundreds of names and daily work, which most stock holders never do. The parity deviation itself cannot be arbitraged away: borrow costs and early exercise block it, and the names where it pays most are illiquid stocks with liquid options.",
+  "It also fades as it is used. Cremers and Weinbaum find the predictability declines over their sample and read that as arbitrage at work; McLean and Pontiff find published predictors decay after publication without vanishing.",
+]
+research = [
+  "Cremers and Weinbaum: stocks with relatively expensive calls beat those with relatively expensive puts by 50 basis points a week, most when options are liquid and the stock is not. Xing, Zhang and Zhao: the steepest smirks lag the flattest by 10.9% a year risk-adjusted, for at least six months, and those firms report the worst earnings next quarter. An, Ang, Bali and Cakici: decile spreads on last month's rise in call volatility are about 1% a month.",
+  "Johnson and So: the lowest decile of option volume over stock volume beats the highest by 0.34% a week, about 19.3% a year, most where shorting is costly. Ge, Lin and Pearson trace it to opening call purchases: leverage, not short-sale avoidance. Pan and Poteshman: a low put-call ratio from opening buys beats a high one by over 40 basis points next day and over 1% over the week.",
+  "Insiders: Cohen, Malloy and Pomorski remove routine trades, over half of all insider trades, and the rest earns 82 basis points a month value-weighted; routine trades earn about zero. Jeng, Metrick and Zeckhauser find insider purchases earn about 40 basis points a month over 1975-1996 and sales nothing; Lakonishok and Lee find the same, mostly in smaller firms. Jin, Livnat and Zhang find the option signals strongest around unscheduled news.",
+  "The counter-evidence is real. Muravyev, Pearson and Broussard find no economically significant price discovery in the options of 39 liquid stocks: option quotes adjust to the stock, not the reverse. Bali and Hovakimian read the call-put spread as jump risk rather than information. Our bar: a paper's long/short figure is expected to lose half by the time it trades, a long-only one a third. Works needs t > 3 on the deciles and on the picks.",
+]
+real_vs_decoy = [
+  "A real footprint edge names who is informed and why they trade there, and is read from quotes and filings public at the decision. It beats the momentum and size yardsticks on the same sessions. A decoy is the report's own implied move, an expiration or pre-earnings volume ramp, borrow cost showing up as a parity gap, or a filing read before it was accepted.",
+  "The harness reads every chain at the decision session's close and every filing from the session after acceptance. It compares each edge with the standard decoys (size, momentum, idiosyncratic volatility, lottery, illiquidity, low beta) on the same sessions. It keeps a frozen period the rule never saw and asks for t > 3 before it says Works. Chain history here is short, so read the session count beside every number.",
+]
+dont = "Don't read a spread or volume spike into a report as information: the implied move, the hedging ramp and a hard borrow leave the same mark."
+see_also = ["edge_how_sure", "edge_evidence_section", "published_haircut"]
+
+[[stats]]
+label = "Our bar"
+value = "t > 3"
+note = "Works needs t above 3 on the deciles and on the picks, on sessions the rule never saw."
+
+[[stats]]
+label = "Haircut on a paper's figure"
+value = "50% / one third"
+note = "Expect a long/short or short-leg figure to lose half by the time it trades, a long-only one a third."
+
+[[sources]]
+title = "Cremers, M. and Weinbaum, D., Deviations from Put-Call Parity and Stock Return Predictability, Journal of Financial and Quantitative Analysis (2010)"
+url = "https://ideas.repec.org/a/cup/jfinqa/v45y2010i02p335-367_00.html"
+note = "Expensive calls beat expensive puts by 50 bp a week; stronger with liquid options and illiquid stock; declines in sample."
+
+[[sources]]
+title = "Xing, Y., Zhang, X. and Zhao, R., What Does the Individual Option Volatility Smirk Tell Us About Future Equity Returns?, Journal of Financial and Quantitative Analysis (2010)"
+url = "https://ideas.repec.org/a/cup/jfinqa/v45y2010i03p641-662_00.html"
+note = "Steepest smirks lag flattest by 10.9% a year risk-adjusted for at least six months; worst earnings shocks follow."
+
+[[sources]]
+title = "An, B.-J., Ang, A., Bali, T. and Cakici, N., The Joint Cross Section of Stocks and Options, Journal of Finance (2014)"
+url = "https://ideas.repec.org/a/bla/jfinan/v69y2014i5p2279-2337.html"
+note = "A rise in call implied volatility predicts higher returns, about 1% a month across deciles, for up to six months."
+
+[[sources]]
+title = "Johnson, T. and So, E., The Option to Stock Volume Ratio and Future Returns, Journal of Financial Economics (2012)"
+url = "https://ideas.repec.org/a/eee/jfinec/v106y2012i2p262-286.html"
+note = "Lowest O/S decile beats highest by 0.34% a week (19.3% a year); stronger where short-sale costs are high."
+
+[[sources]]
+title = "Ge, L., Lin, T.-C. and Pearson, N., Why Does the Option to Stock Volume Ratio Predict Stock Returns?, Journal of Financial Economics (2016)"
+url = "https://ideas.repec.org/a/eee/jfinec/v120y2016i3p601-622.html"
+note = "Signed volume: opening call purchases predict most; embedded leverage, not synthetic shorting, is the reason."
+
+[[sources]]
+title = "Pan, J. and Poteshman, A., The Information of Option Volume for Future Stock Prices, NBER working paper 10925 (2004; Review of Financial Studies 2006)"
+url = "https://www.nber.org/papers/w10925"
+note = "Low put-call ratios from opening buys beat high ones by over 40 bp next day, over 1% over the week."
+
+[[sources]]
+title = "Easley, D., O'Hara, M. and Srinivas, P. S., Option Volume and Stock Prices: Evidence on Where Informed Traders Trade, Journal of Finance (1998)"
+url = "https://academicnewsletter.sufe.edu.cn/info/361875"
+note = "The model of informed traders choosing options; positive and negative option volumes carry information about future prices."
+
+[[sources]]
+title = "Cohen, L., Malloy, C. and Pomorski, L., Decoding Inside Information, NBER working paper 16454 (2010; Journal of Finance 2012)"
+url = "https://www.nber.org/papers/w16454"
+note = "Routine insider trades carry nothing; opportunistic ones earn 82 bp a month value-weighted and predict news."
+
+[[sources]]
+title = "Jeng, L., Metrick, A. and Zeckhauser, R., The Profits to Insider Trading: A Performance-Evaluation Perspective, NBER working paper 6913 (1999; Review of Economics and Statistics 2003)"
+url = "https://www.nber.org/papers/w6913"
+note = "Insider purchases earn about 40 bp a month abnormal, 1975-1996; sales earn nothing."
+
+[[sources]]
+title = "Lakonishok, J. and Lee, I., Are Insider Trades Informative?, Review of Financial Studies (2001)"
+url = "https://ideas.repec.org/a/oup/rfinst/v14y2001i1p79-111.html"
+note = "1975-1995: purchases are informative, sales are not; the cross-sectional power comes mainly from smaller firms."
+
+[[sources]]
+title = "Jin, W., Livnat, J. and Zhang, Y., Option Prices Leading Equity Prices: Do Option Traders Have an Information Advantage?, Journal of Accounting Research (2012)"
+url = "https://ideas.repec.org/a/bla/joares/v50y2012i2p401-432.html"
+note = "Option skews and spreads predict most around information events, and after events only for unscheduled news."
+
+[[sources]]
+title = "Lei, Q., Wang, X. W. and Yan, Z., Volatility Spread and Stock Market Response to Earnings Announcements, Journal of Banking and Finance (2020)"
+url = "https://digitalcommons.njit.edu/fac_pubs/4962"
+note = "The call-put spread widens into a report and amplifies the announcement response, most when option volume is high."
+
+[[sources]]
+title = "Muravyev, D., Pearson, N. and Broussard, J. P., Is There Price Discovery in Equity Options?, Journal of Financial Economics (2013)"
+url = "https://ideas.repec.org/a/eee/jfinec/v107y2013i2p259-283.html"
+note = "Counter-evidence: in 39 liquid stocks, option quotes adjust to the stock; no economically significant price discovery."
+
+[[sources]]
+title = "Bali, T. and Hovakimian, A., Volatility Spreads and Expected Stock Returns, Management Science (2009)"
+url = "https://ideas.repec.org/a/inm/ormnsc/v55y2009i11p1797-1812.html"
+note = "The call-put spread predicts returns, read as jump risk; information flows from options to stocks."

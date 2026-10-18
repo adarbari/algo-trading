@@ -1,0 +1,106 @@
+id = "liquidity_provision"
+title = "Paid to provide liquidity"
+question = "Who needs to trade now, and pays for it?"
+examples = "short-term reversal, reversal into earnings, ETF weak-close reversal"
+short = "A seller in a hurry pays a discount; whoever takes the other side earns it back as the price recovers over days or weeks."
+how_it_works = [
+  "A fund redeems, an index trades, a block has to go by the close. The order is bigger than the book, so the price moves past what the news justifies. You take the other side after the move and hold until it comes back.",
+  "The other side is the market maker's job: hold inventory nobody wants for a day or a month and get paid by the rebound. You do that job in slower motion: a month-end rank of last month's losers, a weak close in an index ETF, the losers in the days before a report.",
+  "The family covers one-month reversal in large names net of market and sector, and the same with no filing behind the fall. It adds reversal into an earnings date and a weak close in SPY or QQQ. Each is one seller and one speed of rebound.",
+]
+why_it_survives = [
+  "Nobody fixes it because the pay is for a real risk: holding a falling name through more selling. The return is largest when volatility is high and liquidity scarce, exactly when the capital that could arbitrage it has gone (Nagel 2012).",
+  "The rest is cost. The trade turns over every week or month and buys the names nobody wants, so spreads take most of the gross return. Of all the anomaly families it has the least capacity (Frazzini, Israel and Moskowitz 2012).",
+]
+research = [
+  "The effect is old and large before costs. Jegadeesh (1990) finds a negative one-month serial correlation in stock returns; a forecast sort over 1934-87 gave 2.49% a month between the extreme deciles. Avramov, Chordia and Goyal (2006): the largest reversals are in high-turnover, illiquid names, and the profit is smaller than the likely cost.",
+  "It is pay for liquidity. Campbell, Grossman and Wang (1993): a fall on high volume reverses more than one on low volume. Hendershott and Menkveld (2014) measure NYSE price pressure at 0.49% with a half-life of 0.92 days. Nagel (2012): the return rises with the VIX and was highest in 2007-09.",
+  "Only the residual survives costs. Blitz, Huij, Lansdorp and Verbeek (2013): reversal of the return net of market, size and value earns twice the raw version's risk-adjusted return. It survives costs in large caps after 1990. Da, Liu and Schaumburg (2014): the residual part earns about three times the standard strategy over 1982-2009. De Groot, Huij and Zhou: 29 bps a week net in the 100 largest US stocks 1990-2009, negative in a 1,500-stock universe.",
+  "It has shrunk. Chen and Velikov (2023): the average of 204 anomalies nets about 4 bps a month after spreads in the modern era. Frazzini, Israel and Moskowitz find short-term reversal does not survive costs at size. So and Wang (2014): reversal is six times larger around earnings reports, 1.45% over three days in 1996-2011; Quantpedia's out-of-sample test is slightly negative. Our bar: a published long/short figure loses half, a long-only one a third, and Works needs t > 3 on the deciles and on the picks.",
+]
+real_vs_decoy = [
+  "A real liquidity edge names the forced seller and shows the rebound where no news explains the fall. It beats the plain one-month return, size and illiquidity yardsticks on the same sessions and clears its own cost. A decoy is bid-ask bounce (Cox and Peterson 1994), a loser on bad news that keeps falling (Chan 2003), or a sort that works only in names you cannot trade.",
+  "The harness compares each edge with plain reversal, size, momentum and illiquidity on the same sessions and prices it at several round-trip costs. It keeps a frozen period and asks for t > 3 before it says Works. Read the break-even cost before the hit rate.",
+]
+dont = "Don't read a reversal win rate as a steady income: the losses come in one piece, when a falling market keeps its losers falling, and the spread is the return."
+see_also = ["edge_how_sure", "edge_evidence_section", "cost_sensitivity", "break_even_cost"]
+
+[[stats]]
+label = "Our bar"
+value = "t > 3"
+note = "Works needs t above 3 on the deciles and on the picks, on sessions the rule never saw."
+
+[[stats]]
+label = "Haircut on a paper's figure"
+value = "50% / one third"
+note = "Expect a long/short or short-leg figure to lose half by the time it trades, a long-only one a third."
+
+[[sources]]
+title = "Nagel, S., Evaporating Liquidity, NBER working paper 17653 (2011; Review of Financial Studies 2012)"
+url = "https://www.nber.org/papers/w17653"
+note = "Short-term reversal returns are pay for liquidity provision; they rise with the VIX, most in 2007-09."
+
+[[sources]]
+title = "Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets (2013)"
+url = "https://repub.eur.nl/pub/40707"
+note = "Reversal on factor residuals earns twice the raw strategy's risk-adjusted return and survives costs in large caps post-1990."
+
+[[sources]]
+title = "Da, Z., Liu, Q. and Schaumburg, E., Decomposing Short-Term Return Reversal, Federal Reserve Bank of New York staff report 513 (2011; Management Science 2014)"
+url = "https://www.newyorkfed.org/research/staff_reports/sr513.html"
+note = "Only the non-fundamental residual reverses; a strategy on it earns about three times the standard one, 1982-2009."
+
+[[sources]]
+title = "Campbell, J., Grossman, S. and Wang, J., Trading Volume and Serial Correlation in Stock Returns, NBER working paper 4193 (1992; Quarterly Journal of Economics 1993)"
+url = "https://www.nber.org/papers/w4193"
+note = "Market makers absorb liquidity trades; a fall on high volume reverses more than one on low volume."
+
+[[sources]]
+title = "Jegadeesh, N., Evidence of Predictable Behavior of Security Returns, Journal of Finance (1990)"
+url = "https://ideas.repec.org/a/bla/jfinan/v45y1990i3p881-98.html"
+note = "Negative one-month serial correlation; 2.49% a month between extreme forecast deciles, 1934-87, before costs."
+
+[[sources]]
+title = "Hendershott, T. and Menkveld, A., Price Pressures, Journal of Financial Economics (2014)"
+url = "https://ideas.repec.org/a/eee/jfinec/v114y2014i3p405-423.html"
+note = "NYSE intermediary inventory moves price 0.49% on average, with a half-life of 0.92 days."
+
+[[sources]]
+title = "Avramov, D., Chordia, T. and Goyal, A., Liquidity and Autocorrelations in Individual Stock Returns, Journal of Finance (2006)"
+url = "https://ideas.repec.org/a/bla/jfinan/v61y2006i5p2365-2394.html"
+note = "Reversals are largest in high-turnover, illiquid stocks; contrarian profits are smaller than likely costs."
+
+[[sources]]
+title = "So, E. and Wang, S., News-Driven Return Reversals: Liquidity Provision Ahead of Earnings Announcements, Journal of Financial Economics (2014; MIT open access)"
+url = "https://dspace.mit.edu/handle/1721.1/119665"
+note = "Reversals are six times larger around earnings announcements; market makers charge more for inventory risk."
+
+[[sources]]
+title = "Quantpedia, Reversal During Earnings Announcements (strategy page on So and Wang)"
+url = "https://quantpedia.com/strategies/reversal-during-earnings-announcements/"
+note = "1.45% over three days versus 0.22% in pseudo windows, 1996-2011, gross; out-of-sample slightly negative."
+
+[[sources]]
+title = "Quantpedia, Short-Term Reversal Effect in Stocks (strategy page on de Groot, Huij and Zhou, Journal of Banking and Finance 2012)"
+url = "https://quantpedia.com/strategies/short-term-reversal-in-stocks/"
+note = "29 bps a week net in the 100 largest US stocks 1990-2009; negative net in a 1,500-stock universe."
+
+[[sources]]
+title = "Chen, A. and Velikov, M., Zeroing In on the Expected Returns of Anomalies, Journal of Financial and Quantitative Analysis (2023)"
+url = "https://www.cambridge.org/core/product/identifier/S0022109022000874/type/journal_article"
+note = "204 anomalies net about 4 bps a month after spreads in the modern era; the best about 10."
+
+[[sources]]
+title = "Frazzini, A., Israel, R. and Moskowitz, T., Trading Costs of Asset Pricing Anomalies, AQR working paper (2012)"
+url = "https://www.aqr.com/Insights/Research/Working-Paper/Trading-Costs-of-Asset-Pricing-Anomalies"
+note = "Live costs 1998-2011, 19 markets: short-term reversal does not survive trading costs at reasonable size."
+
+[[sources]]
+title = "Chan, W., Stock Price Reaction to News and No-News: Drift and Reversal after Headlines, Journal of Financial Economics (2003)"
+url = "https://academicnewsletter.sufe.edu.cn/info/357702"
+note = "Drift after headline news, strongest after bad news; reversal after extreme moves with no public news."
+
+[[sources]]
+title = "Cox, D. and Peterson, D., Stock Returns Following Large One-Day Declines, Journal of Finance (1994)"
+url = "https://ideas.repec.org/a/bla/jfinan/v49y1994i1p255-67.html"
+note = "Bid-ask bounce and liquidity explain the short-term rebound; no overreaction; long-run underperformance."

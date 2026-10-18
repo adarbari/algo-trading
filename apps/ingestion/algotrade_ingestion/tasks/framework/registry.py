@@ -437,15 +437,15 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "filing-text",
-            "item sections of the 10-K / 10-Q of every operating company (events/filing_text: "
+            "item sections of the 10-K / 10-Q of every filer, delisted too (events/filing_text: "
             "1, 1A, 3, 7, 7A, 9A of a 10-K; I-2, I-3, II-1, II-1A of a 10-Q); --from [--to] "
-            "backfills a filing-date window (--limit CIKs a run, resumable; history from "
-            "2010: newest windows first), the default is the nightly increment of the CIKs "
-            "due a report",
+            "backfills a filing-date window (the filers of the SEC daily index; --limit CIKs a "
+            "run, resumable; history from 2010: newest windows first), the default is the "
+            "nightly increment of the CIKs due a report",
             filing_text,
             (filing_text.TABLE,),
             entries_market.run_filing_text,
-            sources=("sec_filings", "sec_filing_text"),
+            sources=("sec_filings", "sec_filing_text", "sec_daily_index"),
             settings="sources.toml [sec_edgar]",
             params=(
                 SESSION,
@@ -457,12 +457,19 @@ TASKS: dict[str, Task] = {
                     "increment of the CIKs due a report)",
                 ),
                 TO,
-                Param("symbols", ("--symbols",), str, "only these tickers (default: the universe)"),
+                Param("symbols", ("--symbols",), str, "only these tickers (default: every filer)"),
                 Param(
                     "limit", ("--limit",), int, "backfill: at most N CIKs this run (default 100)"
                 ),
                 Param("items", ("--items",), str, "item ids kept, comma list (1A,7 / I-2,II-1A)"),
                 Param("force", ("--force",), None, "fetch filings and CIKs already read again"),
+                Param(
+                    "allow_gap",
+                    ("--allow-gap",),
+                    str,
+                    "backfill: weekdays (YYYY-MM-DD,...) with no daily index you verified SEC was "
+                    "closed on",
+                ),
             ),
         ),
         Task(

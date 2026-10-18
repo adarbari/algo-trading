@@ -459,6 +459,7 @@ def test_the_committed_feature_files_load() -> None:
     assert store.names("site", "features") == names
     assert names == [
         "bands",
+        "corporate_actions",
         "earnings",
         "filings",
         "forward",

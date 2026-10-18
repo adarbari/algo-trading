@@ -22,7 +22,7 @@ def line(accession: str = "A1", ts: str = "2026-09-30T20:30:00Z", **over: object
         "transaction_code": "P", "acquired_disposed": "A", "shares": 1000.0, "price": 12.5,
         "shares_after": 26000.0, "direct_indirect": "D", "is_director": True,
         "is_officer": True, "is_ten_pct_owner": False, "is_other": False,
-        "officer_title": "CFO", "plan_10b5_1": None, "owner_count": 1,
+        "officer_title": "CFO", "plan_10b5_1": None, "owner_count": 1, "owner_name": "Doe Jane",
     }  # fmt: skip
     return {**base, **over}
 
@@ -80,6 +80,13 @@ def test_the_same_line_with_the_same_content_keeps_its_stored_stamp() -> None:
     stored = stored_line(date(2026, 10, 15))  # stored as restated on the 15th
     out = rows.stamp_known_from(frame(line()), stored, FLOOR)
     assert out["known_from"].tolist() == [date(2026, 10, 15)]
+
+
+def test_a_name_only_difference_is_the_same_fact_and_keeps_the_stamp() -> None:
+    stored = stored_line(date(2026, 10, 15))
+    for name in (None, "DOE JANE Q"):  # added to a stored row, or spelled differently
+        out = rows.stamp_known_from(frame(line(owner_name=name)), stored, FLOOR)
+        assert out["known_from"].tolist() == [date(2026, 10, 15)]
 
 
 def test_a_line_that_changed_is_known_from_the_floor_not_its_acceptance() -> None:

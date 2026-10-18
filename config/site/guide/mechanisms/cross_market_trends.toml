@@ -1,0 +1,106 @@
+id = "cross_market_trends"
+title = "Trends across markets"
+question = "Who is slow across whole markets?"
+examples = "country ETF momentum, multi-asset trend, credit trend timing"
+short = "A market that rose over the past year tends to keep rising next month; the trade holds the rising markets and sits out falling ones."
+how_it_works = [
+  "A rate cycle, a commodity shortage, a credit wave: the news arrives over quarters and the price follows it in steps. You hold each market only while its own trailing return is positive, and cash or the alternative when it is not.",
+  "The other side is anyone whose rule works against the trend. A pension fund rebalances back to fixed weights and sells what rose; a hedger pays to lay off risk; a holder sells a winner early and keeps a loser. Their trades lean against the move and slow it.",
+  "The family covers a trend book over nine asset-class ETFs, the US versus world switch, a trend filter on five assets, and country, commodity, credit, currency and factor funds. It ends with an avoid rule for futures funds in contango. Each is one market and one way its holders are slow.",
+]
+why_it_survives = [
+  "The pay is for holding through droughts and sharp reversals. The SG Trend Index has had 16 drawdowns above 10% since 2000 and lost 20.4% from May 2024 to May 2025 (Cambridge Associates 2025). Allocators leave after such years, which keeps the premium for those who stay.",
+  "A long-only ETF version keeps only part of it. The short leg in futures earned the 2008 and 2022 gains, and a fund in cash earns the bill while the benchmark compounds. What is left is drawdown control more than return.",
+]
+research = [
+  "Moskowitz, Ooi and Pedersen (2012): over 58 futures and forwards and 25 years, each market's past 12-month excess return predicts its next month, in every contract. The effect persists about a year, then partly reverses. Hurst, Ooi and Pedersen (2017) extend it to 67 markets from 1880: positive net returns in every decade and a Sharpe ratio near 0.4 after fees. It gained in eight of the ten worst 60/40 drawdowns.",
+  "It shows up in every market the family trades. Jostova and co-authors (2013): bond momentum lives in non-investment-grade bonds, about 192 bps a month in 1991-2011. Menkhoff and co-authors (2012): up to 10% a year between winner and loser currencies, partly eaten by costs. Ehsani and Linnainmaa (2022): a factor earns about 1 bp a month after a losing year and 53 after a winning one. Gupta and Kelly (2019): a momentum book over 65 factors earns a Sharpe of 0.84. Gorton, Hayashi and Rouwenhorst (2013): commodity momentum pays mostly when inventories are low.",
+  "The timing versions are weaker than their backtests. Antonacci (2013) lifts a 60/40 Sharpe from 0.47 to 0.72 in 1973-2012 on index data; the 12-month lookback was chosen in sample. Faber's 10-month rule earned a Sharpe of 0.81 in 1972-2005 and 0.68 out of sample from 2006 to 2025 (Concretum). Zakamulin (2015): timing rules trail buy and hold on return, win on Sharpe, and are in cash a third of the time. Huang, Li, Wang and Zhou (2020): asset by asset, only 8 of 55 futures show predictability, and the sign of the historical mean does about as well.",
+  "The decay is small so far. Baltussen, Swinkels and van Vliet (2021) find 19 of 24 factor premiums with t above 3 in new samples from 1800 and limited out-of-sample decay. Our bar: a published long/short figure loses half, a long-only one a third. For a trend book we expect 45% of the in-sample Sharpe to go out of sample, and Works needs t > 3 on the picks.",
+]
+real_vs_decoy = [
+  "A real cross-market trend edge beats a passive mix of the same funds, not SPY, and its gain shows up as a smaller drawdown as much as a higher return. A decoy is equity beta in a bull decade. Watch for a book that is mostly SPY while markets rise, a lookback that was best in sample, or a 2010s sample without a bond bear.",
+  "The harness measures every allocation edge against its own blended benchmark over the same sessions and scores the ensemble of lookbacks as one trial. It prints the in-sample Sharpe beside the haircut expectation and the out-of-sample figure, and asks t > 3 on the picks before Works.",
+]
+dont = "Don't judge a trend rule on a rising decade: it trails buy and hold in most years by design, and its case is the few deep falls it sits out."
+see_also = ["edge_how_sure", "oos_haircut", "haircut_sharpe", "blended_benchmark", "edge_ensemble", "drawdown"]
+
+[[stats]]
+label = "Our bar"
+value = "t > 3"
+note = "Works needs t above 3 on the deciles and on the picks, on sessions the rule never saw."
+
+[[stats]]
+label = "Haircut on a paper's figure"
+value = "50% / one third"
+note = "Expect a long/short or short-leg figure to lose half by the time it trades, a long-only one a third."
+
+[[sources]]
+title = "Moskowitz, T., Ooi, Y. and Pedersen, L., Time Series Momentum, Journal of Financial Economics (2012; AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum"
+note = "58 futures and forwards, 25 years: the past 12-month return predicts the next month in every contract, then partly reverses."
+
+[[sources]]
+title = "Hurst, B., Ooi, Y. and Pedersen, L., A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management (2017; AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing"
+note = "Trend following back to 1880, consistently profitable over 110 years; gains in equity bear markets."
+
+[[sources]]
+title = "CXO Advisory, Trend Following with Intrinsic Momentum over the Very Long Run (summary of Hurst, Ooi and Pedersen 2017)"
+url = "https://www.cxoadvisory.com/momentum-investing/trend-following-with-intrinsic-momentum-over-the-very-long-run"
+note = "67 markets 1880-2016: positive net returns every decade, Sharpe about 0.4 after fees, eight of ten worst 60/40 drawdowns."
+
+[[sources]]
+title = "Cambridge Associates (Ooi, Y. Y.), Does Trend-Following's Recent Struggle Signal That the Strategy Is Structurally Broken? (2025)"
+url = "https://www.cambridgeassociates.com/insight/does-trend-followings-recent-struggle-signal-that-the-strategy-is-structurally-broken/"
+note = "SG Trend Index: 16 drawdowns above 10% since 2000, -20.4% May 2024 to May 2025; +20.9% 2008, +27.4% 2022."
+
+[[sources]]
+title = "Ehsani, S. and Linnainmaa, J., Factor Momentum and the Momentum Factor, NBER working paper 25551 (2019; Journal of Finance 2022)"
+url = "https://www.nber.org/papers/w25551"
+note = "About 1 bp a month after a factor's losing year, 53 after a winning one; stock momentum is factor momentum."
+
+[[sources]]
+title = "Gupta, T. and Kelly, B., Factor Momentum Everywhere, Journal of Portfolio Management (2019; AQR page)"
+url = "https://www.aqr.com/Insights/Research/Working-Paper/Factor-Momentum-Everywhere"
+note = "65 factors, global: timing each by its own past return gives a combined Sharpe of 0.84."
+
+[[sources]]
+title = "Jostova, G., Nikolova, S., Philipov, A. and Stahel, C., Momentum in Corporate Bond Returns, Review of Financial Studies (2013)"
+url = "https://ideas.repec.org/a/oup/rfinst/v26y2013i7p1649-1693.html"
+note = "81,491 bonds 1973-2011: momentum is in non-investment-grade bonds, about 192 bps a month 1991-2011."
+
+[[sources]]
+title = "Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A., Currency Momentum Strategies, BIS working paper 366 (2011; Journal of Financial Economics 2012)"
+url = "https://www.bis.org/publ/work366.pdf"
+note = "Up to 10% a year between past winner and loser currencies; partly costs, limits to arbitrage keep the rest."
+
+[[sources]]
+title = "Gorton, G., Hayashi, F. and Rouwenhorst, K., The Fundamentals of Commodity Futures Returns, NBER working paper 13249 (2007; Review of Finance 2013)"
+url = "https://www.nber.org/papers/w13249"
+note = "31 commodities 1969-2006: momentum and backwardation returns come from holding when inventories are low."
+
+[[sources]]
+title = "CXO Advisory, Intrinsic Momentum across Asset Classes (summary of Antonacci, Absolute Momentum, 2013)"
+url = "https://www.cxoadvisory.com/momentum-investing/intrinsic-momentum-across-asset-classes/"
+note = "12-month rule, 8 asset classes 1973-2012: 60/40 Sharpe 0.47 to 0.72, drawdown -29% to -13%; in-sample lookback."
+
+[[sources]]
+title = "Huang, D., Li, J., Wang, L. and Zhou, G., Time Series Momentum: Is It There?, Journal of Financial Economics (2020)"
+url = "https://profiles.wustl.edu/en/publications/time-series-momentum-is-it-there/"
+note = "Asset by asset, little evidence of time-series momentum; the sample-mean sign does about as well."
+
+[[sources]]
+title = "Concretum Research, Global Tactical Asset Allocation, Automated With Python and IBKR (2026; Faber's 10-month rule out of sample)"
+url = "https://concretumgroup.substack.com/p/global-tactical-asset-allocation"
+note = "Faber GTAA: Sharpe 0.81 in 1972-2005; 0.68 and CAGR 6.05% out of sample 2006 to March 2025."
+
+[[sources]]
+title = "CXO Advisory, Market Timing with Moving Averages over the Very Long Run (summary of Zakamulin, 2015)"
+url = "https://www.cxoadvisory.com/technical-trading/market-timing-with-moving-averages-over-the-very-long-run"
+note = "S&P Composite 1860-2009: timing rules trail on return, win on Sharpe, sit in cash a third of the time."
+
+[[sources]]
+title = "Quantpedia, Two Centuries of Global Factor Premiums (summary of Baltussen, Swinkels and van Vliet, Journal of Financial Economics 2021)"
+url = "https://quantpedia.com/two-centuries-of-global-factor-premiums/"
+note = "24 premiums 1800-2016: 19 t-values above 3 in new samples, average Sharpe 0.41, limited out-of-sample decay."

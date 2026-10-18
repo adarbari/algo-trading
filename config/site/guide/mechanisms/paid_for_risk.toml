@@ -1,0 +1,106 @@
+id = "paid_for_risk"
+title = "Paid to carry a risk"
+question = "Who pays you to take a risk they avoid?"
+examples = "the volatility premium, earnings premium, low beta"
+short = "Someone pays above the odds to shed a risk they cannot hold; you collect the premium and carry the loss when it hits."
+how_it_works = [
+  "An option buyer pays implied volatility; the stock then moves by less, on average. A fund that cannot use leverage buys high-beta stocks for the kick. A holder sells before a report rather than sit through it. Each pays a premium to be rid of a risk.",
+  "You take the risk: sell the straddle, hold the low-beta names, hold through the announcement. The premium arrives as small, steady gains. The loss arrives rarely and large, clustered in crashes, so your curve is a staircase with a cliff.",
+  "The family covers selling option premium (by implied level, implied minus realised, term structure, name characteristics, and into or out of earnings), the earnings announcement premium and betting against beta.",
+]
+why_it_survives = [
+  "It is a risk premium, not a mistake, so it does not vanish when found; what limits it is who can carry the losses. Santa-Clara and Saretto: margin requirements cap how much premium a seller can write and force positions closed after a loss. Cao and Han: dealers charge more for options on names where their own hedging costs are higher.",
+  "Baker, Bradley and Wurgler: a manager judged against a cap-weighted benchmark cannot hold the low-beta side, so the low-volatility premium persists as long as benchmarks do.",
+]
+research = [
+  "Coval and Shumway: zero-beta at-the-money index straddles lose about 3% a week. Bakshi and Kapadia: delta-hedged index option positions underperform zero, more so when volatility is high, which is a negative volatility risk premium. Carr and Wu measure it across five indexes and 35 stocks.",
+  "Across names, Goyal and Saretto: long options where realised volatility exceeds implied, short the opposite, earns a significant monthly return across industries and liquidity. Vasquez: straddles on steep term structures beat flat ones. Zhan and co-authors: delta-hedged call writing sorted on characteristics reaches a Sharpe ratio above 2 after costs. Bali and co-authors: nonlinear models on 12 million observations, 1996-2020, stay profitable after costs.",
+  "Around earnings, Gao, Xing and Zhang: a straddle bought three days before and sold on the announcement earns 3.34%, most in small, noisy, costly names. Savor and Wilson: the announcement premium persists across stocks over horizons up to 20 years, and early announcers earn more.",
+  "Low beta: Frazzini and Pedersen's factor earns risk-adjusted returns in US and 20 global equity markets, bonds and futures. Novy-Marx and Velikov: its net return survives costs but comes from a profitability and investment tilt and a hidden equal weighting. Our bar: expect a paper's short or long/short figure to lose half, a long-only one a third, and Works needs t > 3.",
+]
+real_vs_decoy = [
+  "A real premium pays in calm periods and loses in the storm, the same way in every market. A decoy is a short-volatility curve that looks smooth only because its sample held no crash. Ask what the worst month was and whether the sample contains one.",
+  "The harness measures each edge at several cost levels, keeps a frozen period and reports the drawdown of the evidence curve by regime. A premium edge that never shows a losing regime has not been tested, not proven.",
+]
+dont = "Don't size a premium trade from its average month: the losses come at once, in the months when everything else is also falling."
+see_also = ["edge_where_worked", "edge_how_sure", "regime"]
+
+[[stats]]
+label = "Our bar"
+value = "t > 3"
+note = "Works needs t above 3 on the deciles and on the picks, on sessions the rule never saw."
+
+[[stats]]
+label = "Haircut on a paper's figure"
+value = "50% / one third"
+note = "Expect a long/short or short-leg figure to lose half by the time it trades, a long-only one a third."
+
+[[sources]]
+title = "Coval, J. and Shumway, T., Expected Option Returns, Journal of Finance (2001)"
+url = "https://ideas.repec.org/a/bla/jfinan/v56y2001i3p983-1009.html"
+note = "Zero-beta at-the-money index straddles lose about 3% a week: a priced volatility factor."
+
+[[sources]]
+title = "Bakshi, G. and Kapadia, N., Delta-Hedged Gains and the Negative Market Volatility Risk Premium, Review of Financial Studies (2003)"
+url = "https://ideas.repec.org/a/oup/rfinst/v16y2003i2p527-566.html"
+note = "Delta-hedged S&P 500 option positions underperform zero, more when volatility is high."
+
+[[sources]]
+title = "Carr, P. and Wu, L., Variance Risk Premiums, Review of Financial Studies (2009)"
+url = "https://ideas.repec.org/a/oup/rfinst/v22y2009i3p1311-1341.html"
+note = "Synthetic variance swap rates for five indexes and 35 stocks; the premium measured as realised minus swap rate."
+
+[[sources]]
+title = "Goyal, A. and Saretto, A., Cross-section of option returns and volatility, Journal of Financial Economics (2009)"
+url = "https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html"
+note = "Sort on realised minus implied volatility; a long/short option portfolio earns a significant monthly return."
+
+[[sources]]
+title = "Vasquez, A., Equity Volatility Term Structures and the Cross Section of Option Returns, Journal of Financial and Quantitative Analysis (2017)"
+url = "https://www.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/equity-volatility-term-structures-and-the-cross-section-of-option-returns/F0A40E99FD2458367DD9A56A89783D38"
+note = "Straddles on high-slope term structures beat low-slope ones; not explained by factors or jump risk."
+
+[[sources]]
+title = "Cao, J. and Han, B., Cross section of option returns and idiosyncratic stock volatility, Journal of Financial Economics (2013)"
+url = "https://ideas.repec.org/a/eee/jfinec/v108y2013i1p231-249.html"
+note = "Delta-hedged option returns fall with idiosyncratic volatility; limits-to-arbitrage proxies explain about 40%."
+
+[[sources]]
+title = "Zhan, X., Han, B., Cao, J. and Tong, Q., Option Return Predictability, Review of Financial Studies (2022)"
+url = "https://research.polyu.edu.hk/en/publications/option-return-predictability/"
+note = "Delta-hedged call writing sorted on stock characteristics: Sharpe above 2, profitable after costs."
+
+[[sources]]
+title = "Bali, T., Beckmeyer, H., Moerke, M. and Weigert, F., Option Return Predictability with Machine Learning and Big Data, CFR working paper 21-08 (2021; Review of Financial Studies 2023)"
+url = "https://www.cfr-cologne.de/download/workingpaper/cfr-21-08.pdf"
+note = "12 million observations 1996-2020; nonlinear models profitable after costs; frictions, costly arbitrage, mispricing."
+
+[[sources]]
+title = "Gao, C., Xing, Y. and Zhang, X., Anticipating Uncertainty: Straddles around Earnings Announcements, Journal of Financial and Quantitative Analysis (2018)"
+url = "https://www.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/anticipating-uncertainty-straddles-around-earnings-announcements/7B34877AD5E06304BA3C55FBA3219FDD"
+note = "Straddle bought 3 days before, sold at the report, earns 3.34%; largest in small, noisy, costly names."
+
+[[sources]]
+title = "Savor, P. and Wilson, M., Earnings Announcements and Systematic Risk, Journal of Finance (2016; December 2011 draft, Wharton)"
+url = "https://faculty.wharton.upenn.edu/wp-content/uploads/2012/04/Draft20111215p_edited.pdf"
+note = "The announcement premium persists across stocks up to 20 years; a risk story, announcement betas priced."
+
+[[sources]]
+title = "Frazzini, A. and Pedersen, L., Betting Against Beta, NBER working paper 16601 (2010; Journal of Financial Economics 2014)"
+url = "https://www.nber.org/papers/w16601"
+note = "Leverage-constrained investors bid up high beta; BAB earns risk-adjusted returns in equities, bonds, futures."
+
+[[sources]]
+title = "Novy-Marx, R. and Velikov, M., Betting against betting against beta, Journal of Financial Economics (2022)"
+url = "https://ideas.repec.org/a/eee/jfinec/v143y2022i1p80-106.html"
+note = "BAB's return comes from hidden equal weighting and a profitability tilt; still positive after costs."
+
+[[sources]]
+title = "Baker, M., Bradley, B. and Wurgler, J., Benchmarks as Limits to Arbitrage: Understanding the Low-Volatility Anomaly, Financial Analysts Journal (2011)"
+url = "https://ideas.repec.org/a/taf/ufajxx/v67y2011i1p40-54.html"
+note = "1968-2008: $1 in low volatility grew to $59.55, in high volatility to $0.58; benchmarks block the arbitrage."
+
+[[sources]]
+title = "Santa-Clara, P. and Saretto, A., Option strategies: Good deals and margin calls, Journal of Financial Markets (2009)"
+url = "https://ideas.repec.org/a/eee/finmar/v12y2009i3p391-417.html"
+note = "Margin requirements cap put writing and force sellers out after losses: the seller's limit to arbitrage."

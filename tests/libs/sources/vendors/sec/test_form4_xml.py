@@ -44,6 +44,7 @@ def test_a_filing_is_a_row_per_transaction_line_with_the_owner_and_no_holdings()
     assert frame["is_director"].all() and frame["is_officer"].all()  # "1" and "true"
     assert not frame["is_ten_pct_owner"].any() and not frame["is_other"].any()
     assert set(frame["officer_title"]) == {"Chief Financial Officer"}
+    assert set(frame["owner_name"]) == {"Doe Jane"}  # as filed, never reordered or recased
     assert set(frame["issuer_cik"]) == {"0000999001"} and set(frame["issuer_symbol"]) == {"EXMP"}
     assert set(frame["form"]) == {"4"} and frame["filing_date"].isna().all()
     assert set(frame["period_of_report"]) == {pd.Timestamp("2026-09-28")}

@@ -462,3 +462,62 @@ for = "has a 50-session breakdown level"
 op = "not_null"
 mode = "hard"
 note = "compare with rollup.price_stats@v2.close in a rule"
+
+[[field]]
+name = "rollup.reverse_splits@v1.sessions_since_reverse_split"
+theme = "instrument gates"
+reads = "Exchange sessions from the ex-date of the latest reverse split up to the session. 0 means it took effect today. 5 is a week ago. The read goes back one year."
+caveats = [
+  "Null means no reverse split was stored in the last 252 sessions, not that none happened. Funds reverse-split often, so screen operating companies only.",
+]
+sources = ["Desai and Jain (1997), Long-Run Common Stock Returns Following Stock Splits and Reverse Splits, Journal of Business"]
+[[field.use]]
+for = "a reverse split in the last 20 sessions"
+op = "lte"
+value = 20
+mode = "hard"
+note = "illustrative: about a month, while the move is still news; no published cut-off"
+
+[[field]]
+name = "rollup.reverse_splits@v1.last_reverse_split_date"
+theme = "instrument gates"
+reads = "The ex-date of the latest reverse split: the first session at the new share price. Only splits with an ex-date on or before the session count, so a declared one is never read early."
+caveats = [
+  "Null when no reverse split was stored in the last 252 sessions. A vendor can give a date a day off the real ex-date.",
+]
+sources = ["Site convention over the stored splits (ADR 0075)"]
+[[field.use]]
+for = "names that reverse-split within a year"
+op = "not_null"
+mode = "hard"
+note = "null means none stored in the window, not that none happened"
+
+[[field]]
+name = "rollup.reverse_splits@v1.reverse_split_ratio"
+theme = "instrument gates"
+reads = "New shares per old share of the latest reverse split. 0.1 means one new share for ten old, a 1-for-10. It is always below 1. A forward split has a ratio above 1 and is not read here."
+caveats = [
+  "The ratio is the stored one. A vendor row that records a reverse split as a forward ratio is not read as one. Null when no reverse split was stored in the window.",
+]
+sources = ["Desai and Jain (1997), Long-Run Common Stock Returns Following Stock Splits and Reverse Splits, Journal of Business"]
+[[field.use]]
+for = "a split of one for ten or deeper"
+op = "lte"
+value = 0.1
+mode = "hard"
+note = "illustrative: deep ratios are the weakest names; no published cut-off"
+
+[[field]]
+name = "rollup.reverse_splits@v1.reverse_splits_1y"
+theme = "instrument gates"
+reads = "How many reverse splits the name had in the last 252 sessions. 1 is a single split. 2 or more marks a company that had to do it again after a long decline."
+caveats = [
+  "Counts the splits stored. A vendor with a shallow history can miss an early one. Null when the name had none in the window.",
+]
+sources = ["Site convention over the stored splits (ADR 0075)"]
+[[field.use]]
+for = "names that reverse-split more than once in a year"
+op = "gte"
+value = 2
+mode = "hard"
+note = "illustrative screen for repeat splitters; names with none drop out"

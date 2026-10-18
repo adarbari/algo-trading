@@ -628,7 +628,8 @@ follow-up PR).
 - Options: store `owner_cik` + `officer_title` as filed / store a salted hash of the owner CIK + role flags only / store role flags only (no per-person key).
 - Decision: store `owner_cik` and `officer_title` as filed, no names, no other identifiers (no address, no owner name from the XML). The table carries the Form 4 public filing data only; the UI shows counts and roles (distinct insiders, officer / director / 10%-owner), never a per-person list. Retention: as the other event grains (indefinite, point-in-time), per D6's plan. `docs/architecture.md` section 10 ("PII: none stored") gets a one-line amendment in a follow-up: "public SEC filer identifiers (reporting-owner CIK, officer title) are stored as filed; no names."
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: overruled
+- confirmed: owner 2026-10-18
 - Reasoning: the owner CIK is an SEC public identifier the data set is keyed on; a hash buys nothing (the hash of a public id is trivially reversible against EDGAR) and loses the join to later filings, amendments (4/A) and the deep-dive dossier. Officer title is attribute data a cluster-buy edge weighs (CEO / CFO buys vs. director buys), stored as filed with no name. The cluster-insider-buy edge needs a distinct-insider count, so a stable per-person key is functionally required. Data never enters the public repo (store is local, git-ignored); the read model serves aggregates. Precedent: ADR 0040 keeps emails (private personal data) out of the repo, not public filing data out of the store. Erasure and shorter retention are owner-only decisions (log 2026-10-11), so the default event retention stands until the owner says otherwise.
 
 ## 2026-10-18 | EB H11 (residual returns) | Betas read before S, sector term, no nightly step yet
@@ -897,6 +898,26 @@ follow-up PR).
 - status: pending owner confirmation
 - Note: planned by the architect agent on the owner's behalf; CLAUDE.md's settled line names `field_guide/*.toml`; the owner may reword it to `field_guide/**/*.toml` (this PR does not edit CLAUDE.md).
 - Reasoning: the cap is a settled rule, the move costs no behaviour, and the groups are the ones the Guide already shows.
+## 2026-10-18 | EB H4 follow-up (ipo_lockup, reverse_split) | Where the lock-up versions and the CIK map are read
+- Question: ADR 0075 says read the lock-up table with `latest_versions(through=D)` and map the CIK through `instruments/company` as of D, but a rollup is pure (no storage, no data) and reads its inputs per session.
+- Options: a loader that returns the latest version known by each session (`feature_inputs._Versions`, sharing `events.latest_of` with `latest_versions`) / a version filter inside `compute`; the CIK from `instruments/reference` / from `instruments/company` with its `cik` column added to `company_sectors`.
+- Decision: the loader dedupes per session by the one shared rule, and `compute` joins the CIK to `instruments/company` of the session (`company_sectors` now returns `cik` too, one more column for its other readers); a CIK with several share classes gives each the event; the nearest lock-up is the earliest expiry from 20 sessions back on.
+- decided by: proposed by orchestrator; awaiting owner
+- status: pending owner confirmation
+- Reasoning: keeps the one version rule in `data/`, keeps the rollup pure, and honours the ADR's company snapshot; the stored reverse-split ratio is new shares per old (a forward 4-for-1 is 4), pinned by a test, a ratio below 1 is a reverse split.
+
+## 2026-10-18 | EB H4 follow-up (ipo_lockup, reverse_split) | Field-guide entries of the new groups sit under the instrument-gates theme
+- Question: `events.toml` (977 lines) and the events theme page `docs/data/field-guide/events.md` cannot take 11 more entries (cap 1000 each), the field_guide folder and the docs page folder are both at 12 files, and a new theme would be a 13th page.
+- Options: entries under the events theme (fails `make filelen`); a new theme or file (breaks the 12-file cap); the entries under `instrument gates`, whose page has room (the names are avoid-list gates), filed in the files that have room (trend, momentum, options-wing).
+- Decision: the third; a structural fix (raise the page cap, or split the events theme) is for the architect.
+- decided by: proposed by orchestrator; awaiting owner
+- status: pending owner confirmation
+- Reasoning: the entries must ship with the columns (coverage test); a mislabelled group is cheaper to move later than a failing gate.
+
+## 2026-10-18 | EB H4 follow-up (PR 700 review) | Dual-class CIKs and the events field-guide split
+- Decision: a CIK with two share classes counts the same lock-up expiry twice, which overstates the independent events of an `ipo_lockup` edge: the edge's run record notes it. The events field-guide theme (`events.toml` and its docs page at the cap) needs a sub-folder split; Now / Next is full, so the follow-up is here only.
+- decided by: proposed by orchestrator; awaiting owner
+- status: pending owner confirmation
 ## 2026-10-18 | EB E5 (etf_macro bridge) | Field guide entries ship with the first edge that screens on the columns
 - Question: does the etf_macro@v1 PR carry field guide entries for its 32 columns?
 - Options: entries now (needs a split of the field guide folders, both at their caps) / entries with the folder split or the first edge PR that screens on them.
@@ -919,3 +940,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a signal read at S would trade on the window it is measured over; a missing scout read as positive would be a silent decision to stay invested. Architect design of 2026-10-18 (ADR 0074 item 17).
+
+## 2026-10-18 | EB D6b (Form 4 insider transactions) | The reporting owner's name is stored as filed
+- Question: may the insider transaction table store the Form 4 reporting owner's name (`owner_name`), reversing the "no names" part of the PR #651 entry above?
+- Options: keep no names (CIK and officer title only) / store the name as filed.
+- Decision: store `owner_name` as filed (SEC bulk `RPTOWNERNAME`, Form 4 XML `rptOwnerName`), whitespace trimmed, NULL when absent, never lowercased or altered; a changed spelling across filings is another value, the owner key stays `owner_cik`. Officer and director names are public SEC filing data. Everything else of the #651 entry stands (CIK and officer title as filed, no address, no other identifiers). The name is not part of the row key and never moves a `known_from`. UI rule unchanged: aggregates only, no per-person list unless a screen is explicitly built later.
+- decided by: owner
+- status: final
+- Reasoning: the name is on the public filing beside the CIK that is already stored, so storing it adds no exposure the CIK did not, and it makes the deep-dive dossier and a later per-insider view readable. Reverses only the "no names" clause; the #651 entry's status is `overruled` for that reason.
