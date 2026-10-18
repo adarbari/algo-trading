@@ -38,6 +38,7 @@ from algotrade.quant.edges.statistics import (
 
 BUCKETS = 10
 PBO_SPLITS = 16
+UNCOUNTED_BAND = "uncounted"  # the reason of a band name with no counted value (never held)
 
 
 @dataclass(frozen=True)
@@ -111,6 +112,22 @@ class SessionStat:
     # ``long_short`` only (None for every other side): the net values of the counted short-leg
     # names, ``-excess - cost - borrow`` each; ``pick_values`` are then the long leg's.
     short_values: tuple[float, ...] | None = None
+    # Buy/hold bands (ADR 0053 amendment 2026-10-18; ``[outcome] hold_rank``). ``band``: the picks
+    # ranked just below the counted ones, ``top_k + 1`` to ``hold_rank`` (a name there is held
+    # when the previous session held it); stored with the leg (leg v4). ``banded_values`` and
+    # ``round_trips`` are set by the turnover pass (``reporting/turnover.py``), never stored:
+    # the oriented net values of the names the band held at this session (each net of its own
+    # entry and exit cost) and the round trips of cost they paid in all (an entry or an exit is
+    # half). None: no band, every pick pays one round trip.
+    band: tuple[Pick, ...] = ()
+    banded_values: tuple[float, ...] | None = None
+    round_trips: float | None = None
+
+    @property
+    def net_values(self) -> tuple[float, ...]:
+        """The values the net series and the break-even are over: the band's held names when a
+        band ran, else the counted picks (each net of one round trip)."""
+        return self.pick_values if self.banded_values is None else self.banded_values
 
     @property
     def spread_value(self) -> float | None:
@@ -129,7 +146,7 @@ class SessionStat:
         """The picks' mean value; a ``long_short`` session's is its spread."""
         if self.short_values is not None:
             return self.spread_value
-        return float(np.mean(self.pick_values)) if self.pick_values else None
+        return float(np.mean(self.net_values)) if self.net_values else None
 
     @property
     def excess_wins(self) -> float | None:
@@ -314,6 +331,7 @@ def _measure(
     eligible = sum(r.eligible for r in rows)
     base_hits = sum(r.base_hits for r in rows)
     pick_values = _pooled([r.pick_values for r in rows])
+    net = _pooled([r.net_values for r in rows])  # the banded names' when a band ran
     rest = merge_moments([r.rest for r in rows])
     n_ref = sum(len(r.pick_reference) for r in rows)  # picks with an expires_otm reference
     hit_rate, base_rate = _mean(hits, picks), _mean(base_hits, eligible)
@@ -339,7 +357,7 @@ def _measure(
         base_hits=base_hits,
         base_rate=base_rate,
         lift=lift(hit_rate, base_rate),
-        mean_excess_picks=_mean(float(pick_values.sum()), picks),
+        mean_excess_picks=_mean(float(net.sum()), len(net)),
         bh_mean=_mean(float(pick_values.sum() + rest[0] * rest[1]), eligible),
         top_decile_mean=float(np.mean(tops)) if tops else None,
         decile_spread=spread_mean,
@@ -423,6 +441,7 @@ def _cost_rows(m: SliceMeasure, rows: Sequence[SessionStat], costs: CostGrid) ->
     cost), so a cost row leaves it unset and the reader serves the period's own. Capacity is not
     a cost figure: unset here."""
     measured = [r for r in rows if not r.excluded_coverage]
+    share = _trip_share(measured)
     found: dict[float, tuple[int, int]] = {costs.own: (m.hits, m.base_hits)}
     for index, bp in enumerate(costs.levels):
         counted = _level_hits(measured, index)
@@ -458,16 +477,28 @@ def _cost_rows(m: SliceMeasure, rows: Sequence[SessionStat], costs: CostGrid) ->
                 hit_rate=hit_rate,
                 base_rate=base_rate,
                 lift=lift(hit_rate, base_rate),
-                mean_excess_picks=_net(m.mean_excess_picks, costs.own, bp, costs.sign),
+                mean_excess_picks=_net(m.mean_excess_picks, costs.own, bp, costs.sign, share),
                 bh_mean=_net(m.bh_mean, costs.own, bp, costs.sign),
             )
         )
     return out
 
 
-def _net(mean: float | None, own_bp: float, bp: float, sign: float) -> float | None:
-    """``mean`` (oriented, net of ``own_bp``) as it would be net of ``bp``."""
-    return None if mean is None else mean + sign * (own_bp - bp) / 1e4
+def _net(
+    mean: float | None, own_bp: float, bp: float, sign: float, share: float = 1.0
+) -> float | None:
+    """``mean`` (oriented, net of ``own_bp``) as it would be net of ``bp``: ``share`` is the
+    round trips of cost each name pays (1 without a band)."""
+    return None if mean is None else mean + sign * share * (own_bp - bp) / 1e4
+
+
+def _trip_share(rows: Sequence[SessionStat]) -> float:
+    """The round trips of cost the net values of ``rows`` pay per name: a band's turnover (an
+    entry or an exit is half a trip, so a name held through pays none), 1.0 for every pick of a
+    run without one. The net mean is linear in the cost with this slope."""
+    names = sum(len(r.net_values) for r in rows)
+    trips = sum(len(r.pick_values) if r.round_trips is None else r.round_trips for r in rows)
+    return trips / names if names else 1.0
 
 
 def slice_measures(

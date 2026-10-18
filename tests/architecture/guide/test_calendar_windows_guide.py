@@ -15,6 +15,7 @@ def test_every_window_name_has_its_own_guide_term() -> None:
     terms = {t.id for t in load_guide_glossary(FileConfigStore(REPO_ROOT / "config")).terms}
     missing = [f"calendar_{w}" for w in WINDOW_NAMES if f"calendar_{w}" not in terms]
     assert not missing, f"write a glossary term in config/site/guide/glossary/edges/: {missing}"
+    assert "base_out_of_window" in terms  # the base of a time-series edge (ADR 0073)
     stray = sorted(t for t in terms if t.startswith("calendar_") and t[9:] not in WINDOW_NAMES)
     assert not stray, f"a calendar_ term for no window: {stray}"
 

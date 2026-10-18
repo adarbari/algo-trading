@@ -172,3 +172,16 @@ one; the alternative is cheaper to build.
     label `<edge variant>|<screener>|sector`; the strata draw in sector-name order, the names in
     id order, so the draws do not depend on the order the names arrive in, the chunking or the
     run's range. The uniform draws are bit-for-bit those of leg v2.
+
+## Amendment 2026-10-18: leg v4 holds a buy/hold band (edge build H7)
+
+14. **What a leg holds.** From `LEG_VERSION` 4 the leg of an edge with `[outcome] hold_rank` also
+    holds the names ranked just below its counted picks, `top_k + 1` to `hold_rank`: `band_ids`,
+    `band_ranks`, `band_values` (oriented net values, null for a name with no counted value) in
+    `results/edge_legs`, null for an edge without a band. A row from before decodes with none; its
+    key differs (`LEG_VERSION`), so it is never reused. `hold_rank` joins the leg key only when
+    set, so no other key moves but by the version.
+15. **Legs and picks stay independent.** Which names a book holds across sessions is not in the
+    leg: the turnover pass over the ordered legs decides it (ADR 0053 amendment 2026-10-18), in
+    reporting, from stored values. A leg of one session never reads another, an incremental run
+    and a full one give the same series, and the pass is deterministic over the decoded legs.
