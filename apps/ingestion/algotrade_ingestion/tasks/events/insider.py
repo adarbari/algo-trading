@@ -11,9 +11,10 @@ date, ``known_from`` the NY session of SEC's acceptance time, restatements later
   of each issuer (``sec_filings`` with the insider forms: one request per issuer CIK, its older
   pages when ``--since`` precedes the recent block), joined by accession; a line whose filing
   the issuer's submissions do not list is counted (``no_acceptance``), never stored with a
-  guessed time. Only issuers whose ticker resolves as of the filing date are read. A quarter an
-  earlier run read ``OK`` is skipped (``--force`` reads it again; ``--limit`` caps the quarters),
-  so a backfill is run in chunks (a year per run keeps a run's rows in memory) and repeated.
+  guessed time; no submissions at all for an issuer fails the quarter (read again later). Only
+  issuers whose ticker resolves as of the filing date are read. A quarter an earlier run read
+  ``OK`` is skipped (``--force`` reads it again; ``--limit`` caps the quarters), so a backfill is
+  run in chunks (a year per run keeps a run's rows in memory) and repeated.
 - **Daily index** (the nightly, with rows stored and no ``--since``): for each weekday since the
   last clean walk's ``walked_to`` (else the latest stored filing date, else a week back), the
   ``sec_daily_index`` lists the day's Form 4 filers; the universe's CIKs among them are asked for
@@ -23,7 +24,8 @@ date, ``known_from`` the NY session of SEC's acceptance time, restatements later
   that fills it and the next run goes on. A day or filing that fails keeps ``walked_to`` unset, so
   the next run walks the same days again (stored accessions are not read twice).
 
-``stats``: ``rows`` written, ``unresolved`` / ``no_acceptance`` / ``bad_rows`` lines dropped,
+``stats``: ``rows`` written, ``unresolved`` / ``no_acceptance`` / ``bad_rows`` / ``other_source``
+lines dropped (the last: an accession the other source stored; one source per accession),
 ``restated`` rows stamped later than their acceptance (module ``insider_rows``).
 """
 
@@ -139,21 +141,17 @@ def acceptance_of(
     run: IngestRun, source: Source, cik: str, since: date, cache: dict[str, pd.DataFrame]
 ) -> pd.DataFrame:
     """The Form 4 / 4/A filings of one issuer CIK filed on or after ``since``: ``accession``,
-    ``acceptance_ts``, ``filing_date``, ``primary_document`` (cached for the run)."""
+    ``acceptance_ts``, ``filing_date``, ``primary_document`` (cached for the run). SEC having no
+    submissions for the CIK raises ``NoResponseError``: the item fails, it is never an empty
+    answer (every line would be dropped as having no acceptance, and the item would read OK)."""
     if cik not in cache:
         request = FilingsRequest(
             key=cik, session_date=run.session, since=since, forms=INSIDER_FORMS
         )
-        try:
-            found = run.fetch(source, request)
-        except NoResponseError:
-            cache[cik] = pd.DataFrame(
-                columns=["accession", "acceptance_ts", "filing_date", "primary_document"]
-            )
-        else:
-            assert found is not None
-            columns = ["accession", "acceptance_ts", "filing_date", "primary_document"]
-            cache[cik] = found.parsed[FILINGS_FRAME][columns]
+        found = run.fetch(source, request)  # no submissions for an issuer we ask about: an error
+        assert found is not None
+        columns = ["accession", "acceptance_ts", "filing_date", "primary_document"]
+        cache[cik] = found.parsed[FILINGS_FRAME][columns]
     return cache[cik]
 
 
@@ -164,16 +162,24 @@ def build_rows(
     stored: pd.DataFrame,
     floor: date,
     tally: Tally,
+    source: str,
 ) -> pd.DataFrame:
     """The table rows of a parsed ``frame`` (``INSIDER_COLUMNS``): SEC's acceptance time and
     filing date from ``accepted``, the id as of that filing date, the dates as dates, then
     ``known_from`` against the ``stored`` rows (``insider_rows``). Lines without an acceptance,
-    an id, an owner or a transaction date are dropped and counted."""
+    an id, an owner or a transaction date are dropped and counted, and so are the lines of an
+    accession already stored by the other source than ``source`` (``insider_rows``)."""
     joined = frame.drop(columns="filing_date").merge(
         accepted[["accession", "acceptance_ts", "filing_date"]], on="accession", how="inner"
     )
     tally["no_acceptance"] += len(frame) - len(joined)
     joined = joined.assign(ts=pd.to_datetime(joined["acceptance_ts"], utc=True))
+    timed = joined["ts"].notna()
+    tally["bad_rows"] += int((~timed).sum())
+    joined = joined[timed]
+    elsewhere = set(stored.loc[stored["source"] != source, "accession"]) if len(stored) else set()
+    tally["other_source"] += int(joined["accession"].isin(elsewhere).sum())
+    joined = joined[~joined["accession"].isin(elsewhere)]
     resolved, unresolved = rows_of.resolve_ids(joined, resolver_on)
     tally["unresolved"] += unresolved
     usable = resolved[resolved["transaction_date"].notna() & resolved["owner_cik"].notna()]
@@ -216,9 +222,10 @@ def _quarter(
         else pd.DataFrame(columns=["accession", "acceptance_ts", "filing_date"])
     )
     frame = frame[frame["issuer_cik"].isin(issuers)]
-    rows = build_rows(frame, accepted, resolver_on, stored.frame, floor_of(run), tally)
+    source = sources.bulk.dataset
+    rows = build_rows(frame, accepted, resolver_on, stored.frame, floor_of(run), tally, source)
     if len(rows):
-        run.stage(TABLE, label, rows, sources.bulk.name)
+        run.stage(TABLE, label, rows, source)
     tally["rows"] += len(rows)
     return f"OK: {len(rows)} lines"
 
@@ -350,10 +357,10 @@ def walk(
             accepted = chosen[chosen["day"] == day]
             rows = build_rows(
                 pd.concat(frames, ignore_index=True), accepted, resolver_on, stored.frame,
-                floor_of(run), tally,
+                floor_of(run), tally, sources.xml.dataset,
             )  # fmt: skip
             if len(rows):
-                run.stage(TABLE, f"d:{day}", rows, sources.xml.name)
+                run.stage(TABLE, f"d:{day}", rows, sources.xml.dataset)
             tally["rows"] += len(rows)
     clean = not any(status_label(s) in FAILURES for s in run.items.values())
     return taken[-1] if clean else None
@@ -375,9 +382,11 @@ def ingest_insider(
     """Store Form 4 / 4/A transactions (module doc): the bulk quarters from ``since`` through
     ``until`` when ``since`` is given, else the daily walk since the last clean one."""
     with IngestRun(ctx, TASK, session) as run:
-        tally = dict.fromkeys(("rows", "unresolved", "no_acceptance", "bad_rows", "restated"), 0)
+        tally = dict.fromkeys(
+            ("rows", "unresolved", "no_acceptance", "bad_rows", "restated", "other_source"), 0
+        )
         resolver_on = listing_resolver(run.reader)
-        stored = Stored(run, rows_of.COLUMNS if since is not None else rows_of.AMENDMENT_COLUMNS)
+        stored = Stored(run, rows_of.COLUMNS if since is not None else rows_of.KEY_COLUMNS)
         walked: date | None = None
         labels: list[str] = []
         if since is not None:

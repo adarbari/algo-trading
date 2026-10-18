@@ -1,5 +1,6 @@
-import { Stack, Text } from '@algotrade/ui';
+import { IconButton, Stack, Text } from '@algotrade/ui';
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -14,13 +15,30 @@ vi.mock('@/entities/screen', async (importOriginal) => ({
   CriteriaScorecard: (props: {
     screenerId: string;
     entries: readonly { id: string; outcome: string }[];
+    groups?: readonly { id: string; kind: string; outcome?: string | null }[];
+    renderGroup?: (gate: unknown) => ReactNode;
   }) => (
     <Stack aria-label={`Criteria of ${props.screenerId}`}>
       {props.entries.map((e) => (
         <Text key={e.id}>{`${e.id} ${e.outcome}`}</Text>
       ))}
+      {props.groups?.map((group) => (
+        <Stack key={group.id}>
+          {props.renderGroup?.({
+            group,
+            names: ['IV30', 'IV/HV'],
+            decidedBy: 'IV/HV',
+            members: [<Text key="m">members</Text>],
+          })}
+        </Stack>
+      ))}
     </Stack>
   ),
+}));
+
+// The help button reads the Guide; its own test covers that.
+vi.mock('@/features/guide-help', () => ({
+  termHelp: (id: string) => <IconButton icon="info" label={`Help: ${id}`} />,
 }));
 
 const CRITERIA: CriterionInfo[] = [
@@ -74,6 +92,21 @@ describe('PickDetail', () => {
     const criteria = screen.getByLabelText('Criteria of vrp');
     expect(criteria).toHaveTextContent('iv30 PASS');
     expect(criteria).toHaveTextContent('ratio NEAR');
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows a gate that is a group as one row with its outcome and deciding member (ADR 0071)', async () => {
+    const { container } = setup({
+      row: {
+        ...ROW,
+        groups: [{ id: 'either', kind: 'any', members: ['iv30', 'ratio'], outcome: 'NEAR' }],
+      },
+    });
+    const gate = await screen.findByRole('button', { name: /Any of/ });
+    expect(gate).toHaveTextContent('IV30 or IV/HV');
+    expect(gate).toHaveTextContent('Near miss');
+    expect(gate).toHaveTextContent('Decided by IV/HV');
+    expect(screen.getByRole('button', { name: 'Help: group_any' })).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

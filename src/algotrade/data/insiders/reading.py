@@ -2,11 +2,12 @@
 
 A row is a Form 4 line of one reporting owner (``instrument_id``, ``accession``, ``line``,
 ``owner_cik``) with ``known_from``, the trading session its filing was public on (the
-acceptance's New York session; for a row that restates a stored one, no earlier than the fetch's
-next session: ``tasks/events/insider_rows.py``). The one read rule of ADR 0050 decision 3 applies
-first: keep the rows with ``known_from <= S`` (``through``). Then, per line, the version with the
-latest ``known_from`` (ties: the latest ``knowledge_ts``): a restated line shows its old version
-until its own ``known_from`` and its new one after, never the new one early.
+``calendar.acceptance_session`` of SEC's acceptance time; for a line restated with different
+content, no earlier than the fetch's next session: ``tasks/events/insider_rows.py``). The one
+read rule of ADR 0050 decision 3 applies first: keep the rows with ``known_from <= S``
+(``through``). Then, per line, the version with the latest ``known_from`` (ties: the latest
+``knowledge_ts``): a restated line shows its old version until its own ``known_from`` and its
+new one after, never the new one early.
 
 **Amendments.** A 4/A replaces the originals it names, once the 4/A itself is known: the rows of
 form ``4`` with the same issuer, owner and report period and a ``filing_date`` equal to the 4/A's

@@ -15,6 +15,7 @@ import pytest
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
 from algotrade.data.insiders.reading import read_insider_transactions
+from algotrade.data.listings.resolvers import listing_resolver
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
@@ -24,7 +25,7 @@ from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.sec.daily_index import SecDailyIndex, missing_index
 from algotrade_sources.vendors.sec.form4_xml import SecForm4Xml
-from algotrade_sources.vendors.sec.form345_bulk import SecForm345Bulk
+from algotrade_sources.vendors.sec.form345_bulk import SecForm345Bulk, parse_bulk
 from algotrade_sources.vendors.sec.submissions import SecFilings
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for
@@ -40,7 +41,7 @@ FIRST, AMENDED, NEW, NEWER = (f"0000999001-26-{n:06d}" for n in (1, 2, 10, 11))
 S1, S2, S3 = date(2026, 10, 5), date(2026, 10, 12), date(2026, 10, 14)
 # (accession, form, acceptance UTC, filing date): the submissions of the issuer
 FILINGS = [
-    (FIRST, "4", "2026-09-30T20:30:00.000Z", "2026-09-30"),  # 16:30 ET: public that evening
+    (FIRST, "4", "2026-09-30T20:30:00.000Z", "2026-09-30"),  # 16:30 ET: after the close, S+1
     (AMENDED, "4/A", "2026-10-02T14:00:00.000Z", "2026-10-02"),
 ]
 
@@ -165,7 +166,8 @@ def run(
 
 def stored(writer: StoreWriter) -> pd.DataFrame:
     """Every stored row, whatever a session may see."""
-    return StoreReader(writer._backend).table_range(TABLE, date(1900, 1, 1), date(9999, 12, 31))
+    found = StoreReader(writer._backend).table_range(TABLE, date(1900, 1, 1), date(9999, 12, 31))
+    return found if found is not None else pd.DataFrame(columns=["accession"])
 
 
 def seen(writer: StoreWriter, through: date | None = None) -> pd.DataFrame:
@@ -188,7 +190,7 @@ def test_a_backfill_stores_the_lines_with_ids_and_the_real_acceptance_sessions()
     rows = stored(writer).set_index(["accession", "line"])
     assert set(rows["instrument_id"]) == {"EQ:EXMP"} and len(rows) == 4
     # the run's fetch was on 2026-10-05, the acceptances in September and early October
-    assert rows.loc[(FIRST, 1), "known_from"] == date(2026, 9, 30)
+    assert rows.loc[(FIRST, 1), "known_from"] == date(2026, 10, 1)  # accepted after the 30th close
     assert rows.loc[(AMENDED, 1), "known_from"] == date(2026, 10, 2)
     assert rows.loc[(FIRST, 1), "ts"] == pd.Timestamp("2026-09-30T20:30:00Z")
     assert rows.loc[(FIRST, 1), "filing_date"] == date(2026, 9, 30)  # SEC's (submissions) date
@@ -203,8 +205,9 @@ def test_a_session_sees_the_original_until_its_amendment_is_known() -> None:
     writer = store()
     run(writer, Feeds(), since=date(2026, 7, 1))
     assert seen(writer, date(2026, 9, 29)).empty
-    on_the_30th = seen(writer, date(2026, 9, 30))
-    assert on_the_30th["accession"].tolist() == [FIRST] * 3
+    assert seen(writer, date(2026, 9, 30)).empty  # accepted 16:30 on the 30th: not in that close
+    on_the_1st = seen(writer, date(2026, 10, 1))
+    assert on_the_1st["accession"].tolist() == [FIRST] * 3
     on_the_2nd = seen(writer, date(2026, 10, 2))  # the 4/A is known: it replaces its original
     assert on_the_2nd["accession"].tolist() == [AMENDED]
 
@@ -230,7 +233,7 @@ def test_a_quarter_read_once_is_skipped_and_force_rereads_it_without_changing_a_
     rows = stored(writer)  # the rerun is a second copy of the same keys in its own partition
     keys = ["accession", "line", "owner_cik", "known_from"]
     assert len(rows) == 8 and len(rows.drop_duplicates(keys)) == 4
-    assert set(rows[rows["accession"] == FIRST]["known_from"]) == {date(2026, 9, 30)}
+    assert set(rows[rows["accession"] == FIRST]["known_from"]) == {date(2026, 10, 1)}
 
 
 def test_limit_caps_the_quarters_a_run_reads() -> None:
@@ -255,10 +258,10 @@ def test_a_line_that_changed_is_known_from_the_fetchs_next_session() -> None:
     new = seen(writer, floor)
     assert old[old["transaction_code"] == "P"]["price"].tolist() == [12.5]
     assert new[new["transaction_code"] == "P"]["price"].tolist() == [12.0]
-    assert seen(writer, date(2026, 9, 30))["price"].tolist() == [12.5, 13.0, 0.0]  # as first known
+    assert seen(writer, date(2026, 10, 1))["price"].tolist() == [12.5, 13.0, 0.0]  # as first known
 
 
-def test_a_4a_over_a_stored_original_is_known_from_the_fetchs_next_session() -> None:
+def test_a_4a_is_known_from_its_own_acceptance_even_when_its_original_is_stored() -> None:
     writer, feeds = store(), Feeds()
     feeds.quarters["2026q3"] = payloads.example_quarter(amend=False)
     run(writer, feeds, since=date(2026, 7, 1))
@@ -266,11 +269,75 @@ def test_a_4a_over_a_stored_original_is_known_from_the_fetchs_next_session() -> 
     feeds.quarters["2026q3"] = payloads.example_quarter()
     second = run(writer, feeds, session=S2, since=date(2026, 7, 1), force=True,
                  at=datetime(2026, 10, 12, 22, tzinfo=UTC))  # fmt: skip
-    assert second.stats["restated"] == 1
+    assert second.stats["restated"] == 0  # its own filing, its own keys: no floor
     rows = stored(writer).set_index("accession")
-    assert rows.loc[AMENDED, "known_from"] == date(2026, 10, 13)  # not its own Oct 2
-    assert set(seen(writer, date(2026, 10, 12))["accession"]) == {FIRST}
-    assert set(seen(writer, date(2026, 10, 13))["accession"]) == {AMENDED}
+    assert rows.loc[AMENDED, "known_from"] == date(2026, 10, 2)  # its acceptance, not the fetch
+    assert set(seen(writer, date(2026, 10, 1))["accession"]) == {FIRST}
+    assert set(seen(writer, date(2026, 10, 2))["accession"]) == {AMENDED}
+
+
+def test_no_submissions_for_an_issuer_fails_the_quarter_and_it_is_read_again() -> None:
+    writer, feeds = store(), Feeds()
+    working = feeds.submissions
+
+    def gone(url: str) -> bytes:
+        raise HttpError(404)
+
+    feeds.submissions = gone  # type: ignore[method-assign]
+    bad = run(writer, feeds, since=date(2026, 7, 1))
+    assert bad.items["q:2026q3"].startswith("FETCH_ERROR") and stored(writer).empty
+    feeds.submissions = working  # type: ignore[method-assign]
+    good = run(writer, feeds, session=S2, since=date(2026, 7, 1),
+               at=datetime(2026, 10, 12, 22, tzinfo=UTC))  # fmt: skip
+    assert good.items["q:2026q3"] == "OK: 4 lines"  # a failed quarter is not a read one
+
+
+def test_an_accession_the_other_source_stored_is_skipped_not_keyed_twice() -> None:
+    writer = store()
+    run(writer, Feeds(), since=date(2026, 7, 1))  # the bulk stores FIRST and AMENDED
+    parsed = parse_bulk(payloads.example_quarter())
+    parsed = parsed[parsed["issuer_symbol"] == "EXMP"]
+    accepted = pd.DataFrame(
+        {
+            "accession": [FIRST, AMENDED],
+            "acceptance_ts": pd.to_datetime(
+                ["2026-09-30T20:30:00Z", "2026-10-02T14:00:00Z"], utc=True
+            ),
+            "filing_date": pd.to_datetime(["2026-09-30", "2026-10-02"]),
+        }
+    )
+    ctx_reader = StoreReader(writer._backend)
+    resolver_on = listing_resolver(ctx_reader)
+    tally = dict.fromkeys(
+        ("no_acceptance", "unresolved", "bad_rows", "restated", "other_source"), 0
+    )
+    held = stored(writer)
+    args = (parsed, accepted, resolver_on, held, date(2026, 10, 13), tally)
+    assert len(insider.build_rows(*args, "form4_xml")) == 0  # the bulk rows are the bulk's
+    assert tally["other_source"] == 4
+    assert len(insider.build_rows(*args, "form345_bulk")) == 4  # its own: a rerun
+
+
+def test_a_row_without_an_acceptance_instant_is_dropped_and_counted() -> None:
+    writer = store()
+    run(writer, Feeds(), since=date(2026, 7, 1))
+    parsed = parse_bulk(payloads.example_quarter())
+    parsed = parsed[parsed["accession"] == FIRST]
+    accepted = pd.DataFrame(
+        {
+            "accession": [FIRST],
+            "acceptance_ts": [pd.NaT],
+            "filing_date": pd.to_datetime(["2026-09-30"]),
+        }
+    )
+    tally = dict.fromkeys(
+        ("no_acceptance", "unresolved", "bad_rows", "restated", "other_source"), 0
+    )
+    rows = insider.build_rows(
+        parsed, accepted, listing_resolver(StoreReader(writer._backend)),
+        stored(writer).iloc[0:0], date(2026, 10, 13), tally, "form345_bulk",
+    )  # fmt: skip
+    assert rows.empty and tally["bad_rows"] == 3
 
 
 # ----------------------------------------------------------------------------- the nightly walk

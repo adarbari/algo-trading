@@ -1,7 +1,7 @@
 """SEC EDGAR submissions as a filing history: the event filings a company made (8-K and 8-K/A
-with their items, NT 10-K / NT 10-Q late-filing notices, SC TO-I issuer tender offers, Form 25
-delisting notices, 424B4 final prospectuses, Form 10 registrations), with the second each was
-accepted (ADR 0050; free, no key).
+with their items, NT 10-K / NT 10-Q late-filing notices, SC TO-I issuer and SC TO-T third-party
+tender offers, Form 25 delisting notices, 424B4 final prospectuses, Form 10 registrations), with
+the second each was accepted (ADR 0050; free, no key).
 
 ``https://data.sec.gov/submissions/CIK##########.json`` holds a company's most recent filings
 (about 1,000, ``filings.recent``) as parallel arrays (``form``, ``filingDate``,

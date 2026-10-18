@@ -31,23 +31,26 @@ def frame(*lines: dict) -> pd.DataFrame:
     return pd.DataFrame(list(lines))
 
 
-def test_known_from_is_the_new_york_session_of_the_acceptance() -> None:
+def test_known_from_is_the_first_session_whose_close_is_after_the_acceptance() -> None:
     ts = pd.Series(
         pd.to_datetime(
             [
-                "2026-09-30T13:29:59Z",  # 09:29 ET, before the open
-                "2026-09-30T20:30:00Z",  # 16:30 ET, after the close: public that evening
-                "2026-10-01T02:00:00Z",  # 22:00 ET on the 30th
+                "2026-09-30T13:29:59Z",  # 09:29 ET, before the open: that session
+                "2026-09-30T19:59:59Z",  # 15:59:59 ET, before the close: that session
+                "2026-09-30T20:00:00Z",  # 16:00 ET, at the close: the next session
+                "2026-09-30T20:30:00Z",  # 16:30 ET, after the close: the next session
+                "2026-09-30T21:00:00Z",  # 17:00 ET: the next session
+                "2026-10-01T02:00:00Z",  # 22:00 ET on the 30th: the next session
                 "2026-01-15T14:35:00Z",  # winter: 09:35 ET
             ],
             utc=True,
         )
     )
     known = rows.known_session(ts)
-    assert list(known) == [date(2026, 9, 30)] * 3 + [date(2026, 1, 15)]
+    assert list(known) == [date(2026, 9, 30)] * 2 + [date(2026, 10, 1)] * 4 + [date(2026, 1, 15)]
 
 
-def test_an_acceptance_on_a_closed_day_rolls_to_the_next_session() -> None:
+def test_an_acceptance_on_a_closed_day_is_known_from_the_next_session() -> None:
     ts = pd.Series(
         pd.to_datetime(
             ["2026-04-03T15:00:00Z", "2026-10-10T15:00:00Z", "2026-09-07T15:00:00Z"], utc=True
@@ -57,9 +60,9 @@ def test_an_acceptance_on_a_closed_day_rolls_to_the_next_session() -> None:
 
 
 def test_a_backfilled_row_is_known_from_its_real_acceptance_not_the_fetch() -> None:
-    fresh = frame(line(ts="2012-03-08T21:10:00Z"))
+    fresh = frame(line(ts="2012-03-08T21:10:00Z"))  # 16:10 ET: after that day's close
     out = rows.stamp_known_from(fresh, pd.DataFrame(columns=rows.COLUMNS), FLOOR)
-    assert out["known_from"].tolist() == [date(2012, 3, 8)]  # 2026's fetch changes nothing
+    assert out["known_from"].tolist() == [date(2012, 3, 9)]  # 2026's fetch changes nothing
 
 
 def test_the_restatement_floor_is_the_session_after_the_fetch_day() -> None:
@@ -80,35 +83,27 @@ def test_the_same_line_with_the_same_content_keeps_its_stored_stamp() -> None:
 
 
 def test_a_line_that_changed_is_known_from_the_floor_not_its_acceptance() -> None:
-    stored = stored_line(date(2026, 9, 30))
+    stored = stored_line(date(2026, 10, 1))
     out = rows.stamp_known_from(frame(line(price=12.0)), stored, FLOOR)
     assert out["known_from"].tolist() == [FLOOR]
     late = frame(line(price=12.0, ts="2026-11-02T15:00:00Z"))  # accepted after the floor: its own
     assert rows.stamp_known_from(late, stored, FLOOR)["known_from"].tolist() == [date(2026, 11, 2)]
 
 
-def test_an_amendment_whose_original_is_stored_is_a_restatement() -> None:
-    stored = stored_line(date(2026, 9, 30))
-    amendment = line("A2", ts="2026-10-02T14:00:00Z", form="4/A", amends_date=date(2026, 9, 30))
+def test_an_amendment_is_its_own_filing_known_from_its_own_acceptance() -> None:
+    stored = stored_line(date(2026, 10, 1))  # the original
+    amendment = line("A2", ts="2012-10-02T14:00:00Z", form="4/A", amends_date=date(2026, 9, 30))
     out = rows.stamp_known_from(frame(amendment), stored, FLOOR)
-    assert out["known_from"].tolist() == [FLOOR]  # its own session (Oct 2) is before the floor
-    other_owner = {**amendment, "owner_cik": "0000888002"}  # another owner's report: no original
-    assert rows.stamp_known_from(frame(other_owner), stored, FLOOR)["known_from"].tolist() == [
-        date(2026, 10, 2)
-    ]
-    other_day = {**amendment, "amends_date": date(2026, 9, 29)}  # names another filing day
-    assert rows.stamp_known_from(frame(other_day), stored, FLOOR)["known_from"].tolist() == [
-        date(2026, 10, 2)
-    ]
+    assert out["known_from"].tolist() == [date(2012, 10, 2)]  # a historical 4/A: no floor
 
 
-def test_rows_read_with_their_original_in_one_run_keep_their_own_sessions() -> None:
+def test_the_original_and_its_amendment_read_together_keep_their_own_sessions() -> None:
     original = line(ts="2026-09-30T20:30:00Z")
     amendment = line("A2", ts="2026-10-02T14:00:00Z", form="4/A", amends_date=date(2026, 9, 30))
     out = rows.stamp_known_from(
         frame(original, amendment), pd.DataFrame(columns=rows.COLUMNS), FLOOR
     )
-    assert out["known_from"].tolist() == [date(2026, 9, 30), date(2026, 10, 2)]
+    assert out["known_from"].tolist() == [date(2026, 10, 1), date(2026, 10, 2)]
 
 
 def test_symbols_resolve_as_of_the_filing_date_and_a_recycled_ticker_is_two_ids() -> None:

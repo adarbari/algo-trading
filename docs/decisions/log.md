@@ -514,3 +514,36 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a partial fix would leave the same one-session look-ahead in four groups that share the input and its backfill.
+
+## 2026-10-18 | EB H4 (event-class framework) | Subtypes, the filing group, and what is left out
+- Question: how are subtypes read, which classes ship on stored data, and does the folder cap force a new feature-group folder?
+- Options: one subtype label field per class (the plan) / per-subtype count and date fields; keep every group in `rollups/corporate` / a folder `rollups/events` for the event-class groups; add `ex_dividend`, `macro_release` and `lockup_expiry` / leave them until their fields exist.
+- Decision: a subtype is its own count and date fields (an 8-K item: the latest filing only would miss an item filed before another 8-K) or a label field that must read a value (index changes, date-shift direction), one mechanism in `EventField.subtypes`; `filing_events@v1` holds the 8-K items 1.02, 2.05, 3.01, 4.01, 4.02, 5.02, NT and tender offers (SC TO-T joins the kept forms); `earnings_date_shift@v1` with a 7-day threshold; `rollups/corporate` is at its 10-module cap, so the event-class groups (and `index_changes`, moved) live in a new `rollups/events` folder; `ex_dividend`, `macro_release`, `lockup_expiry` are left out (ADR 0053 amendment, point 4); filings are read by the acceptance session recomputed from `ts`, never the stored `known_from`.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Architect review (PR 655): keep the six 8-K items (1.03 and 2.06 later), keep the 7-day threshold, approve the `features/rollups/events` folder.
+- Reasoning: the item list and the 7-day threshold are judgement calls the owner may widen; a stale `known_from` left in the store must not leak, so the reader does not trust it; a new folder is the layout rule's answer to a full one.
+
+## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Describe-it precedence of connectors
+- Question: how do "or", "and" and "except" combine in a drafted sentence?
+- Options: and binds tighter than or, a comma or "ideally" starts a new condition, an exclusion is its own gate / a flat left-to-right reading / the model decides per sentence.
+- Decision: and binds tighter than or (as the expression parser does); a comma or "ideally" starts a new condition, so an "or" never reaches across it; "except A or B" is neither; "except A and B" is neither only for a bare "and" (", and" ends the exclusion); "A or B except C" is (A or B) and not C. One golden case per phrasing pins it.
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: one rule set gives the same reading every time and a wrong reading is one line and one golden case; the owner verifies the cases in the PR. Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it unchanged: "and" narrows a condition and "or" offers alternatives, the narrower screen costs a few missed names where a wider one buries the idea, and the Builder's plain-English line shows any wrong reading before a save. No golden case changes.
+
+## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Flat fallback when a part cannot sit in a group
+- Question: what does a draft do when an "or" or exclusion has a part that is a formula, a missing request, a dropped criterion or words nothing maps?
+- Options: keep the draft flat as before groups / group the available sides only.
+- Decision: keep it flat; only the formula case gets the verifier's doubt (draft one boolean formula), every other block leaves a visible note ("... is not available, so the 'or' or exclusion is not applied"); two kinds of instrument joined by "or" are doubted (one security_type criterion).
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: grouping the available sides would silently change the meaning (an "or" side dropped makes the other side mandatory). Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it and asked that the note say the other conditions apply on their own (done): blocking the draft would throw away the parts that worked.
+
+## 2026-10-18 | PR #651 (D6, Form 4 insider transactions) | Storing the reporting owner's CIK and officer title
+- Question: may the insider transaction table store `owner_cik` and `officer_title` (public EDGAR fields that identify a natural person), or only a hashed owner key plus role flags?
+- Options: store `owner_cik` + `officer_title` as filed / store a salted hash of the owner CIK + role flags only / store role flags only (no per-person key).
+- Decision: store `owner_cik` and `officer_title` as filed, no names, no other identifiers (no address, no owner name from the XML). The table carries the Form 4 public filing data only; the UI shows counts and roles (distinct insiders, officer / director / 10%-owner), never a per-person list. Retention: as the other event grains (indefinite, point-in-time), per D6's plan. `docs/architecture.md` section 10 ("PII: none stored") gets a one-line amendment in a follow-up: "public SEC filer identifiers (reporting-owner CIK, officer title) are stored as filed; no names."
+- decided by: Fable on the owner's behalf
+- status: pending owner confirmation
+- Reasoning: the owner CIK is an SEC public identifier the data set is keyed on; a hash buys nothing (the hash of a public id is trivially reversible against EDGAR) and loses the join to later filings, amendments (4/A) and the deep-dive dossier. Officer title is attribute data a cluster-buy edge weighs (CEO / CFO buys vs. director buys), stored as filed with no name. The cluster-insider-buy edge needs a distinct-insider count, so a stable per-person key is functionally required. Data never enters the public repo (store is local, git-ignored); the read model serves aggregates. Precedent: ADR 0040 keeps emails (private personal data) out of the repo, not public filing data out of the store. Erasure and shorter retention are owner-only decisions (log 2026-10-11), so the default event retention stands until the owner says otherwise.

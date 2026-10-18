@@ -42,6 +42,12 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        ``lookback`` sessions before the session up to the session (never a
                        later one, e.g. a declared future ex-date), with ``event_date``; an
                        empty frame when there are none
+- ``events/filing``    ``events.events_by_acceptance``: the SEC event filings that became known
+                       (the first session closing after SEC's acceptance, recomputed from the
+                       stored instant, not the stored ``known_from``) from ``lookback``
+                       sessions before the session up to it, with ``event_date`` that session
+                       (``filing_events@v1``; ADR 0050 amendment, EB H4); an empty frame when
+                       there are none
 - ``instruments/shares``
                        ``shares.share_facts``: every stored share-count and financial (revenue,
                        net income, diluted EPS) fact FILED on or before the session (point in
@@ -123,7 +129,7 @@ from algotrade.data.analyst.reading import KINDS as ANALYST_KINDS
 from algotrade.data.analyst.reading import TABLE as ANALYST
 from algotrade.data.analyst.reading import snapshot_window
 from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
-from algotrade.data.events import events_by_event_date, stored_events
+from algotrade.data.events import events_by_acceptance, events_by_event_date, stored_events
 from algotrade.data.funds.holdings import TABLE as HOLDINGS
 from algotrade.data.funds.holdings import funds_holdings
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
@@ -391,6 +397,12 @@ def _events_by_date(table: str) -> Loader:
     return load
 
 
+def _filings(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    first = sessions_before(sessions[0], lookback)
+    frame = events_by_acceptance(reader, "events/filing", first, sessions[-1])
+    return _Window(frame, _days(frame["event_date"]), need_session=False)
+
+
 SHARES_ACCEPTED = f"{SHARES}_accepted"  # instruments/shares counted from its acceptance session
 STATEMENTS_ACCEPTED = f"{STATEMENTS}_accepted"
 STATEMENT_COLUMNS = ["concept", "tag", "period_start", "period_end", "filed", "value", "accn"]
@@ -461,6 +473,7 @@ INPUTS: Mapping[str, Loader] = {
     "events/dividend_declared": _event_snapshots("events/dividend", from_first_session=True),
     "events/split": _events_by_date("events/split"),
     "events/index_change": _events_by_date("events/index_change"),
+    "events/filing": _filings,
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,
     SHARES_ACCEPTED: _share_facts_accepted,

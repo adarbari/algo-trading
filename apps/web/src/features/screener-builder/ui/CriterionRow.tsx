@@ -62,6 +62,8 @@ export interface CriterionRowProps {
    * each other); `onUse` sets this row to one of the field's guided intents.
    */
   renderFieldHelp?: (field: string, onUse: (use: GuideUse) => void) => ReactNode;
+  /** Buttons for the row's end, before Remove (the grouping actions, ADR 0071). */
+  actions?: ReactNode;
 }
 
 export function CriterionRow({
@@ -73,6 +75,7 @@ export function CriterionRow({
   error = null,
   disabled = false,
   renderFieldHelp,
+  actions,
 }: CriterionRowProps) {
   const feature = catalogue.find((f) => f.name === criterion.field);
   const kind = fieldKind(feature);
@@ -160,6 +163,7 @@ export function CriterionRow({
           invalid={error !== null}
           disabled={disabled}
         />
+        {actions}
         <IconButton
           icon="close"
           label={`Remove criterion ${criterion.id}`}

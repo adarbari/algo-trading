@@ -87,7 +87,9 @@ def _check_own(ctx: ReadContext, req: PartRequest, others: Mapping[str, Any]) ->
     finalise sees them, or ``ConfigurationError`` (a 400) naming the first that is not: the merge
     never drops what the trader has, and the model is not asked about a screen that cannot be
     saved."""
-    document = {k: v for k, v in req.prior.document.items() if k not in ("criteria", "rank")}
+    document = {
+        k: v for k, v in req.prior.document.items() if k not in ("criteria", "rank", "groups")
+    }  # (the groups name the part's criteria too: ``merge`` puts them back)
     document["criteria"] = dict(others)
     rank = req.prior.document.get("rank")
     if rank is not None and not req.part.rank:

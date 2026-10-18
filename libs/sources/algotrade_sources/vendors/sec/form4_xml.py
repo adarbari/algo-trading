@@ -33,7 +33,12 @@ import pandas as pd
 from algotrade.core.model.instruments import pad_cik
 from algotrade_sources.framework.base import FetchRequest, Normalized
 from algotrade_sources.framework.http import Http
-from algotrade_sources.framework.series import INSIDER_COLUMNS, INSIDER_FRAME, InsiderRequest
+from algotrade_sources.framework.series import (
+    INSIDER_COLUMNS,
+    INSIDER_FRAME,
+    INSIDER_LINE_COLUMNS,
+    InsiderRequest,
+)
 
 SOURCE = "sec_edgar"
 DATASET = "form4_xml"
@@ -42,16 +47,7 @@ _TABLES = (  # (table, transaction element, derivative)
     ("nonDerivativeTable", "nonDerivativeTransaction", False),
     ("derivativeTable", "derivativeTransaction", True),
 )
-LINE_ORDER = [
-    "derivative",
-    "transaction_date",
-    "transaction_code",
-    "acquired_disposed",
-    "shares",
-    "price",
-    "shares_after",
-    "direct_indirect",
-]
+LINE_ORDER = list(INSIDER_LINE_COLUMNS)
 _TRUE = {"1", "true", "y", "yes"}
 _FALSE = {"0", "false", "n", "no"}
 

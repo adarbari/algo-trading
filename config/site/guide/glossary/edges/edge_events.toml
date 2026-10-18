@@ -1,0 +1,176 @@
+# L3 site setting: the Guide glossary, edges: the event classes an edge schedule may trigger on and their subtypes (ADR 0051, ADR 0053,
+# ADR 0050). One [[term]] each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; one term per class (id = event_class_<class>) and per subtype (id =
+# event_class_<class>_<subtype>, a dot written as an underscore) of src/algotrade/config/edges/document.py, kept complete by
+# tests/architecture/guide/test_event_classes_guide.py. A class is read at the decision session D, the session before the entry.
+# The anchor is the session the event became KNOWN, never the day it happened.
+
+[[term]]
+id = "event_class_earnings_reaction"
+term = "After an earnings reaction"
+short = "The edge starts after a company's two-session move around a reported result."
+body = """
+The trigger is a reported result whose two sessions of price reaction have closed. The window runs from the close before the report to the close after it, so it holds the move whether the company reports before the open or after the close. The anchor is the last of the two sessions. The edge enters from that session on, as its start offset says. Only reports known by the decision session count, and one name counts once in about two months. Example: a report on a Tuesday after the close has its reaction on Tuesday and Wednesday, so an edge with start offset 1 enters on Thursday. The report date is the company's own, so a date from a vendor calendar that moved is not enough. Compare the picks with other names that reported in the same weeks, not with the whole market.
+"""
+next = "Open the edge's result and compare its picks with the names that reported in the same weeks."
+see_also = ["base_rate", "out_of_sample", "event_class_earnings_expected"]
+
+[[term]]
+id = "event_class_earnings_expected"
+term = "Before an expected earnings report"
+short = "The edge starts before a report that is scheduled or expected from last year's date."
+body = """
+The trigger is a report date a name can expect. A scheduled date is one a calendar listed by the decision session. A date taken from last year is the year-ago report plus 364 days, the same weekday, and is a guess. The anchor is the expected date's session, so an entry can come before the report. This is the only class announced ahead: the date is after the decision session by design. Check which basis a name used. A guessed date that is a week wrong means the trade held through a quiet week or missed the report. The report count shows how many names had each basis. Don't read a result built mostly on guessed dates as a statement about earnings.
+"""
+next = "Open the edge's report and check how many names used a scheduled date and how many a guessed one."
+see_also = ["base_rate", "out_of_sample", "event_class_earnings_reaction"]
+
+[[term]]
+id = "event_class_index_change"
+term = "S&P 500 membership change"
+short = "The edge starts after a company joins or leaves the S&P 500."
+body = """
+The trigger is a change in the index's members. The anchor is the first session the change is stored, which is on or after its effective date, never the earlier announcement. So the edge trades the days after the change, not the run-up to it. Funds that track the index buy new members and sell leavers around the effective date, and prices can overshoot and then partly reverse. Few names change in a year, about 20 to 30 of each kind, so spread sessions are thin. Pick a subtype to trade only additions or only deletions. Without one, both kinds count together. A result from fewer than 30 events is noise.
+"""
+next = "Open the edge's result and read how many events lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_index_change_addition", "event_class_index_change_deletion"]
+
+[[term]]
+id = "event_class_index_change_addition"
+term = "Joined the S&P 500"
+short = "The edge starts after a company is added to the S&P 500."
+body = """
+The trigger is a company joining the index. The anchor is the first session the addition is stored, after its effective date. The compared names are other additions when the base is the event, or every eligible name when the base is the universe. Index funds have already bought by then, so the usual claim is a reversal, not a rise. Example: a company added on a Friday has its first session on the Monday. Additions are few, about 20 a year, so a result from fewer than 30 is noise. Compare with other additions before comparing with the market.
+"""
+next = "Open the edge's result and compare its picks with other additions."
+see_also = ["base_rate", "out_of_sample", "event_class_index_change_deletion"]
+
+[[term]]
+id = "event_class_index_change_deletion"
+term = "Left the S&P 500"
+short = "The edge starts after a company is removed from the S&P 500."
+body = """
+The trigger is a company leaving the index. The anchor is the first session the deletion is stored, after its effective date. Funds that track the index have already sold, so the usual claim is a rebound after the selling. A removal often follows a poor run, so the picks start from a low point and the rebound may be ordinary mean reversion. Example: a name removed on a Friday has its first session on the Monday. Deletions are few, about 20 a year, so a result from fewer than 30 is noise. A deletion for a takeover is not a rebound candidate: check the reason in the name's filings.
+"""
+next = "Open the edge's result and read how many deletions lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_index_change_addition"]
+
+[[term]]
+id = "event_class_filing_8k"
+term = "After an 8-K item"
+short = "The edge starts after a company files an 8-K that reports one named item."
+body = """
+An 8-K is the form a US company files to report a material event. Each report carries items, and one filing can carry several. The edge names one item, so it is always a subtype. The anchor is the session the filing became public: the first session whose close is after SEC accepted it. A filing accepted at 16:30 counts from the next session, and a Saturday filing from Monday. So a trade never uses news the market had not yet seen at the close. An amendment is not a new event. A name counts once in about two months. Example: an item filed Thursday at 16:30 gives an anchor of Friday. Read how many filings lie behind the result: rare items give thin samples.
+"""
+next = "Open the edge's result and read how many filings lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_filing_8k_4_02"]
+
+[[term]]
+id = "event_class_filing_8k_1_02"
+term = "8-K Item 1.02: agreement ended"
+short = "The edge starts after a company reports the termination of a material agreement."
+body = """
+Item 1.02 reports that a company ended a major contract, such as a supply deal, a loan or a merger agreement. The anchor is the session the filing became public. A terminated merger can drop the target's price at once and a terminated loan can warn of stress. The kind of agreement is in the filing text, which the stored fields do not read. So the group mixes good and bad news. Example: a filing accepted on Monday at 17:00 has an anchor of Tuesday. Read the lift against other names with the same item before reading it against the market.
+"""
+next = "Open the edge's result and compare it with other 1.02 filers."
+see_also = ["base_rate", "out_of_sample", "event_class_filing_8k"]
+
+[[term]]
+id = "event_class_filing_8k_2_05"
+term = "8-K Item 2.05: exit costs"
+short = "The edge starts after a company reports exit or disposal costs, usually a restructuring."
+body = """
+Item 2.05 reports that a company committed to a plan to close operations or cut staff, with its expected costs. The anchor is the session the filing became public. Markets sometimes cheer a restructuring and sometimes read it as a warning. The filing carries a cost estimate that these fields do not read. Example: a filing accepted on a Wednesday morning has that Wednesday as its anchor. Few companies file one in a month, so counts are thin. Read the result with the trades behind it.
+"""
+next = "Open the edge's result and read how many filings lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_filing_8k"]
+
+[[term]]
+id = "event_class_filing_8k_3_01"
+term = "8-K Item 3.01: listing notice"
+short = "The edge starts after a company reports a notice of delisting or a failure of a listing rule."
+body = """
+Item 3.01 reports that an exchange told a company it fails a listing rule, such as a minimum price or a late report, or that the company plans to leave. The anchor is the session the filing became public. Prices of such names are low and wide, so the quoted move may not be one a trader could capture. Costs matter more here than on other items. Example: a notice accepted on a Friday evening has an anchor of Monday. Read the cost estimate before the lift.
+"""
+next = "Open the edge's cost estimate and compare it with the lift."
+see_also = ["base_rate", "out_of_sample", "event_class_filing_8k"]
+
+[[term]]
+id = "event_class_filing_8k_4_01"
+term = "8-K Item 4.01: new auditor"
+short = "The edge starts after a company reports a change of its auditor."
+body = """
+Item 4.01 reports that a company dismissed its auditor or that the auditor resigned. The anchor is the session the filing became public. An auditor who resigns can signal a dispute, while a routine switch means little. The filing says which, but these fields do not read it. So the group mixes both. Example: a filing accepted on a Tuesday at 09:00 has that Tuesday as its anchor. Few companies file one in a month, so counts are thin. Read the result with the trades behind it.
+"""
+next = "Open the edge's result and read how many filings lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_filing_8k"]
+
+[[term]]
+id = "event_class_filing_8k_4_02"
+term = "8-K Item 4.02: financials not reliable"
+short = "The edge starts after a company says its past financial statements should not be relied on."
+body = """
+Item 4.02 reports that a company concluded earlier statements contain an error, so a restatement is coming. The anchor is the session the filing became public. Prices often fall on the news, and the trade asks whether the fall continues. These filings are rare, only a few dozen a year among listed names. A result from fewer than 30 filings is noise. Example: a filing accepted on Thursday at 16:30 has an anchor of Friday. The decline may already be in the price by then, so the entry is after it, not before.
+"""
+next = "Open the edge's result and read how many filings lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_filing_8k"]
+
+[[term]]
+id = "event_class_filing_8k_5_02"
+term = "8-K Item 5.02: officer or director change"
+short = "The edge starts after a company reports that a director or senior officer left or was appointed."
+body = """
+Item 5.02 reports a change among a company's directors or its named senior officers, such as the chief executive or chief financial officer. The anchor is the session the filing became public. A sudden departure can warn of trouble while a planned hand-over means little. The filing says which, but these fields do not read it. So the group mixes both. The item is common, so counts are large and a small lift can be real. Example: a filing accepted on Monday at 08:30 has that Monday as its anchor. Compare the picks with other names with the same item.
+"""
+next = "Open the edge's result and compare it with other 5.02 filers."
+see_also = ["base_rate", "out_of_sample", "event_class_filing_8k"]
+
+[[term]]
+id = "event_class_nt_late_filing"
+term = "Late filing notice"
+short = "The edge starts after a company says it will be late with its annual or quarterly report."
+body = """
+The trigger is an NT 10-K or NT 10-Q, the notice a company files when it cannot finish a yearly or quarterly report on time. The anchor is the session the notice became public: the first session whose close is after SEC accepted it. A late report can mean an accounting problem, but many are a few days' delay. Notices come in bunches around each filing deadline, so many names share a session. Example: a notice accepted on a Friday at 17:30 has an anchor of Monday. Small and troubled companies file most of them, so costs can be high. Read the cost estimate before the lift.
+"""
+next = "Open the edge's cost estimate and compare it with the lift."
+see_also = ["base_rate", "out_of_sample", "event_class_filing_8k_4_02"]
+
+[[term]]
+id = "event_class_tender_offer"
+term = "Tender offer"
+short = "The edge starts after a tender offer is filed for a company's shares."
+body = """
+The trigger is an SC TO-I, the company buying back its own shares, or an SC TO-T, someone else offering to buy them. The anchor is the session the filing became public: the first session whose close is after SEC accepted it. Both are filed for the target company. A third-party offer usually lifts the price toward the offer, so little may remain after the filing. An issuer offer is a buyback and can mean the company sees its shares as cheap. The two are not separated here, so the group mixes them. Example: a filing accepted on Monday at 16:20 has an anchor of Tuesday. Few offers are filed in a year, so counts are thin.
+"""
+next = "Open the edge's result and read how many offers lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_filing_8k"]
+
+[[term]]
+id = "event_class_earnings_date_shift"
+term = "Earnings date moved"
+short = "The edge starts when a company's next report date is a week or more from last year's."
+body = """
+The trigger is a next report date that differs by at least 7 days from the year-ago report plus 364 days, the same weekday. A later date can mean the company needs more time to close its books, and an earlier one that it is eager to report. The anchor is the session the shifted date was first stored in a calendar known by then. Vendor calendars carry no time for their first load, so a date stored in the first snapshot is never an event, and the history starts the next session. The date is a scheduled one: the calendar does not confirm it. Example: a date first stored on Monday that lies 10 days after last year's has an anchor of Monday. Use a subtype to trade only later or only earlier dates. Our first stored calendar is from 2 October 2026, so results are insufficient for about a year.
+"""
+next = "Open the edge's result and read how many shifted dates lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_earnings_expected", "event_class_earnings_date_shift_later"]
+
+[[term]]
+id = "event_class_earnings_date_shift_later"
+term = "Earnings date moved later"
+short = "The edge starts when a company's next report date is a week or more later than last year's."
+body = """
+The trigger is a next report date at least 7 days after the year-ago report plus 364 days. A later date can mean the company needs more time to close its books, and that is sometimes a sign of trouble. The anchor is the session the later date was first stored in a calendar known by then. The date is a scheduled one: the calendar does not confirm it. Example: a date first stored on Monday that lies 10 days after last year's has an anchor of Monday. The history starts with our first stored calendar, so counts are small until a few quarters pass. Compare the picks with other names whose dates moved the same way.
+"""
+next = "Open the edge's result and read how many shifted dates lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_earnings_date_shift_earlier"]
+
+[[term]]
+id = "event_class_earnings_date_shift_earlier"
+term = "Earnings date moved earlier"
+short = "The edge starts when a company's next report date is a week or more earlier than last year's."
+body = """
+The trigger is a next report date at least 7 days before the year-ago report plus 364 days. An earlier date can mean a company that closes its books fast and is keen to report, which is often good news. The anchor is the session the earlier date was first stored in a calendar known by then. The date is a scheduled one: the calendar does not confirm it. Example: a date first stored on Monday that lies 8 days before last year's has an anchor of Monday. The history starts with our first stored calendar, so counts are small until a few quarters pass. Compare the picks with other names whose dates moved the same way.
+"""
+next = "Open the edge's result and read how many shifted dates lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_earnings_date_shift_later"]

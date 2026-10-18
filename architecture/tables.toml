@@ -134,12 +134,12 @@ note = "ADR 0050: the macro release calendar (FRED release dates, ISM by rule), 
 [[table]]
 name = "events/filing"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/filings.py"
-note = "ADR 0050: SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I, 25 / 25-NSE, 424B4, 10-12B) of every operating company in the universe by acceptance time; known_from = the acceptance's session (New York)"
+note = "ADR 0050: SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I / SC TO-T, 25 / 25-NSE, 424B4, 10-12B) of every operating company in the universe by acceptance time; known_from = the first session whose close is after the acceptance (an acceptance after the close, on a weekend or a holiday counts from the next session; ADR 0050 amendment, EB H4)"
 
 [[table]]
 name = "events/insider_transaction"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/insider.py"
-note = "EB D6: SEC Form 4 / 4/A insider transactions, a row per transaction line and reporting owner, ts = SEC's acceptance instant; known_from = the acceptance's New York session (a trading session), later for a restated line; known_from is in the key, so a restated line sits beside the version it replaces; read through data.insiders"
+note = "EB D6: SEC Form 4 / 4/A insider transactions, a row per transaction line and reporting owner, ts = SEC's acceptance instant; known_from = the acceptance_session of SEC's acceptance time (first session whose close is after it), later for a line restated with different content; known_from is in the key, so a restated line sits beside the version it replaces; read through data.insiders"
 
 [[table]]
 name = "events/reference_change"
@@ -231,6 +231,16 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the latest S&P 500 membership change and the sessions since it; reads events/index_change by event date"
 
 [[table]]
+name = "rollups/instrument/filing_events@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "sessions since each kind of SEC event filing (8-K items, NT late-filing notices, tender offers) became known; reads events/filing by the acceptance session recomputed from ts (never the stored known_from)"
+
+[[table]]
+name = "rollups/instrument/earnings_date_shift@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the next earnings date's shift from the year-ago report plus 364 days and the session it was first stored; reads events/earnings as earnings@v1"
+
+[[table]]
 name = "rollups/instrument/fundamentals@v4"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
@@ -252,6 +262,11 @@ note = "TTM operating cash flow and capex from instruments/statements (ADR 0067)
 name = "rollups/instrument/growth_history@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "revenue and diluted EPS TTMs about 3 and 5 years back from instruments/shares (the bases of the multi-year growth rates)"
+
+[[table]]
+name = "rollups/instrument/mispricing@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the Stambaugh-Yuan anomaly inputs, a QMJ-like quality score and the cross-sectional composite mispricing rank from the statement groups"
 
 [[table]]
 name = "rollups/instrument/balance_sheet@v2"
