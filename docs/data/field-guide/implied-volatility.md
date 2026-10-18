@@ -290,6 +290,112 @@ Sources: Term structure of implied volatility and calendar spreads: Natenberg, O
 
 Sources: Event vol in the front expiry: https://www.tastylive.com/concepts-strategies/implied-volatility-earnings
 
+### `rollup.cp_iv@v1.cp_iv_spread`
+
+**How to read it.** The call-put IV spread: call IV minus put IV on the same strike, averaged over the pairs within 10% of the spot and weighted by open interest, at the expiry nearest 30 days (as a fraction: 0.02 is two vol points). Positive: calls richer than puts, the pattern Cremers and Weinbaum found ahead of stock gains over a week to a month; negative: puts richer. Near zero is the normal state, and the published edge is a rank across many names, not a level. History starts 2026-10-02, when the chains were first stored.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| call-rich option pricing | `gte 0.02` | soft | 0.005 | a rank across names is the published rule; this is a coarse level cut |
+
+**When the reading lies**
+
+- A cross-sectional signal: judge a name against the others on the same session, not against zero. One name's level over a few weeks says little.
+- Put-call parity pins call and put IV together, so a large spread is usually a hard-to-borrow name (puts bid up) or a dividend or event the quotes price in; read rollup.cp_iv@v1.cp_iv_dte and the earnings fields before trusting it.
+- Thin chains lie: the weight is open interest, but a few contracts can set the average. Read rollup.option_liquidity@v1.chain_oi for how deep the chain is.
+- Stored quotes are the close, not a live market, and the published effect has decayed since 2005; expect about half the published spread, if any.
+- Null while cp_iv_status is not OK: no expiry 10..60 days out, no pair of the same strike with quotes on both sides, or no open interest on the pairs.
+
+Sources: Cremers and Weinbaum, Deviations from Put-Call Parity and Stock Return Predictability, JFQA 2010: https://ideas.repec.org/a/cup/jfinqa/v45y2010i02p335-367_00.html
+
+### `rollup.cp_iv@v1.iv_smirk`
+
+**How to read it.** The individual-option smirk (Xing, Zhang and Zhao): the IV of the put 5% to 20% out of the money (the one nearest 5%) minus the IV of the call at the money, at the expiry nearest 30 days, as a fraction. A high value means the put wing is paid up; steep smirks have preceded lower returns and negative earnings surprises over the following weeks to months. History starts 2026-10-02, when the chains were first stored.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a steep put smirk | `gte 0.06` | soft | 0.01 | avoid or fade; the published rule is a quintile rank, this is a coarse level |
+
+**When the reading lies**
+
+- It is not rollup.skew@v1.skew: that one is the 25-delta put minus call over ATM vol at a constant 30 days; this is a moneyness pick from one listed expiry, so the two agree in sign but not in size.
+- A high-vol or event-heavy name has a large smirk at an ordinary shape; compare names on one session as a rank, and read feature.skew_rr25 or rollup.skew@v1.skew for the delta-based view.
+- The smirk's low side is a mild quality tilt; the short side needs borrow, and steep-smirk names are often hard to borrow.
+- Null with no OTM put in the band, no ATM call within 5% of the spot, or cp_iv_status of NO_SPOT, NO_CHAIN or NO_EXPIRY.
+
+Sources: Xing, Zhang and Zhao, What Does the Individual Option Volatility Smirk Tell Us About Future Equity Returns?, JFQA 2010: https://ideas.repec.org/a/cup/jfinqa/v45y2010i03p641-662_00.html
+
+### `rollup.cp_iv@v1.atm_call_iv`
+
+**How to read it.** The call IV at the strike nearest the spot (within 5%) at the expiry nearest 30 days, as a fraction: our own inversion of the mid, which is the call-side input An, Ang, Bali and Cakici sort on. Close to rollup.iv30@v1.iv30 on a liquid name. History starts 2026-10-02, when the chains were first stored.
+
+**When the reading lies**
+
+- A level is not the signal: the published rule uses the change over a month (rollup.cp_iv_history@v1.atm_call_iv_chg_21d), which needs 21 sessions of stored chains.
+- One strike at one expiry: a wide quote or a thin strike moves it; rollup.iv30@v1.iv30 is the interpolated 30-day figure for a plain ATM vol.
+- Null with no call within 5% of the spot that has a two-sided quote under the spread cap.
+
+Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181
+
+### `rollup.cp_iv@v1.atm_put_iv`
+
+**How to read it.** The put IV at the strike nearest the spot (within 5%) at the expiry nearest 30 days, as a fraction: the put-side input of the An, Ang, Bali and Cakici signal. Within a vol point or two of rollup.cp_iv@v1.atm_call_iv on a liquid name.
+
+**When the reading lies**
+
+- Same construction, same 2026-10-02 start and nulls as rollup.cp_iv@v1.atm_call_iv; the published rule reads the change (rollup.cp_iv_history@v1.atm_put_iv_chg_21d), with the opposite sign to the call's.
+
+Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181
+
+### `rollup.cp_iv_history@v1.atm_call_iv_chg_21d`
+
+**How to read it.** The ATM call IV now minus 21 sessions ago (about a month), as a fraction (0.03 is three vol points). A rise has preceded higher returns the next month in the published sort; the put's change carries the opposite sign. Chains are stored from 2026-10-02 only, so this reads null until the end of October 2026.
+
+**When the reading lies**
+
+- A level change confounds with the market: when every name's IV rises in a sell-off the change says little; judge it as a rank across names on the session.
+- An earnings date inside the window moves call and put IV together; read feature.earnings_before_expiry and the earnings fields.
+- Null if the ATM call IV is missing today or 21 sessions ago (a gap is not filled).
+
+Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181
+
+### `rollup.cp_iv_history@v1.atm_put_iv_chg_21d`
+
+**How to read it.** The ATM put IV now minus 21 sessions ago, as a fraction. A rise has preceded lower returns the next month in the published sort. Chains are stored from 2026-10-02 only, so this reads null until the end of October 2026.
+
+**When the reading lies**
+
+- Same caveats and nulls as rollup.cp_iv_history@v1.atm_call_iv_chg_21d.
+
+Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181
+
+### `rollup.cp_iv_history@v1.cp_iv_spread_chg_5d`
+
+**How to read it.** The call-put IV spread now minus 5 sessions ago, as a fraction: how fast calls are getting richer against puts over a week (positive) or poorer (negative). Lei, Wang and Yan found a monotonic rise of the spread into an earnings date predicts the announcement return. Chains are stored from 2026-10-02 only, so this reads null until 2026-10-09.
+
+**When the reading lies**
+
+- A change of a noisy level doubles the noise: read rollup.cp_iv@v1.cp_iv_spread and the chain depth (rollup.option_liquidity@v1.chain_oi) with it.
+- Null if either end has no spread (a gap is not filled).
+
+Sources: Lei, Wang and Yan, Option-implied information ahead of earnings announcements (2020)
+
+### `rollup.cp_iv_history@v1.iv30_chg_5d`
+
+**How to read it.** Our 30-day ATM IV now minus 5 sessions ago, as a fraction (0.03 is three vol points): a rising value is option buyers paying up over the week, as ahead of an event or in a sell-off. Chains are stored from 2026-10-02 only, so this reads null until 2026-10-09; IBKR's own IV history reaches back further but is not used here.
+
+**When the reading lies**
+
+- It moves with the market: compare a name to the others on the session, not to zero.
+- A rise ahead of earnings is the term structure doing its job; read feature.term_ratio_next_30.
+- Null if iv30 is missing today or 5 sessions ago (a gap is not filled).
+
+Sources: Site convention (docs/edge-ideas/options-volatility.md c03)
+
 ### `rollup.iv30@v1.iv30`
 
 **How to read it.** Our 30-calendar-day at-the-money implied volatility as a fraction (ADR 0021): the forward ATM vols of the two expiries around 30 days, each from the two strikes around the forward with calls and puts averaged, interpolated in total variance. The number rollup.iv_history@v2.iv30 stores and feature.iv_rank ranks. 0.20 is a calm large cap, 0.30 to 0.50 an ordinary single stock, above 0.80 a biotech, a meme or an event.
