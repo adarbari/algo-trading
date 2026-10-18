@@ -31,18 +31,27 @@ Each edge's full section is on its family page (docs/edges/).
 | S&P 500 deletions rebound (`sp500_deletions_long`) | candidate | [family B](edges/b.md) |
 | Spin-off drift (`spinoff_drift`) | blocked | [family B](edges/b.md) |
 | Option-to-stock volume ratio (`c04_option_stock_volume_ratio`) | candidate | [family C](edges/c.md) |
+| Per-name volatility premium, ranked (`c12_vrp_cross_section_iv_hv`) | candidate | [family C](edges/c.md) |
+| Delta-hedged selling on speculative names (`c14_delta_hedged_characteristics`) | candidate | [family C](edges/c.md) |
+| Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | candidate | [family C](edges/c.md) |
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | [family C](edges/c.md) |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | [family C](edges/c.md) |
+| Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | blocked | [family C](edges/c.md) |
+| Pre-earnings straddle purchase (`c16_pre_earnings_straddle_buy`) | blocked | [family C](edges/c.md) |
+| Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`) | blocked | [family C](edges/c.md) |
+| ETF flow pressure (`etf_flow_pressure`) | candidate | [family D](edges/d.md) |
 | High-volume return premium (`high_volume_return_premium`) | candidate | [family D](edges/d.md) |
 | Option-expiration week (`option_expiration_week`) | candidate | [family D](edges/d.md) |
 | Quarter-end rebalancing (`quarter_end_rebalancing`) | candidate | [family D](edges/d.md) |
 | Crowded shorts by days to cover (`short_squeeze_days_to_cover`) | candidate | [family D](edges/d.md) |
 | Turn of the month (`turn_of_the_month`) | candidate | [family D](edges/d.md) |
+| Closed-end fund discount reversion (`closed_end_fund_discounts`) | blocked | [family D](edges/d.md) |
 | Composite mispricing score (`composite_mispricing_score`) | candidate | [family F](edges/f.md) |
 | Reversal into earnings (`earnings_neutral_reversal`) | candidate | [family G](edges/g.md) |
 | BDC price to NAV reversion (`bdc_price_to_nav_reversion`) | candidate | [family H](edges/h.md) |
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | [family H](edges/h.md) |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | [family H](edges/h.md) |
+| Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | [family H](edges/h.md) |
 | Reverse-split distress filter (`reverse_split_distress_filter`) | blocked | [family H](edges/h.md) |
 | Thematic ETF launch fade (`thematic_etf_launch_fade`) | blocked | [family H](edges/h.md) |
 | Call-put IV spread into earnings (`pre_earnings_cp_iv_spread`) | candidate | [family I](edges/i.md) |

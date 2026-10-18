@@ -1,0 +1,75 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E4) until the long end of the
+# implied-volatility term structure has history. Idea page: docs/edge-ideas/options-volatility.md
+# (c13_iv_term_structure_straddles).
+id = "c13_iv_term_structure_straddles"
+name = "Implied-volatility term structure and straddles"
+thesis = "Names whose long-dated implied volatility sits far above their short-dated one earn more from a bought straddle than names with an inverted term structure."
+mechanism = """Short-dated implied volatility over-reacts to recent news and mean-reverts toward the
+long end, so the slope forecasts the direction of the next month's change in implied
+volatility and with it the straddle's return (Vasquez 2017)."""
+persistence = """The same limits as the per-name premium sort (c12): the trade needs option books across
+hundreds of names, spreads are wide and capacity is small. The slope remained a predictor in
+the machine-learning study of option returns (Bali, Beckmeyer, Moerke and Weigert 2023)."""
+family = "C"
+schedule = "month_end"
+universe = "liquid_optionable_floored"
+top_k = 20
+screeners = []
+baselines = ["vrp_iv_hv"]
+status = "blocked"
+frozen_from = 2026-04-01
+rejection_reason = """The slope has no history. The long end (term_ratio_30_90, the iv_90d of iv_term@v1)
+is computed from option chains, which are stored from 2026-10-02 only, about two weeks of sessions;
+IBKR's stored history (502 sessions) is the 30-day volatility alone, with no 6-month or 1-year
+point. The bar asks 40 independent sessions: month-end windows need about three years of chains. Unblock
+by chain accrual (a screener over term_ratio_30_90, outcome as below) or by a stored long-tenor
+implied-volatility history. The outcome horizon is final, the screener is not written."""
+notes = """The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8): at-the-money
+straddle priced by Black-Scholes (r = q = 0) from the IBKR IV30 at D, one volatility for the window,
+no skew, no spread or hedge cost beyond cost_bps; no historical chains are stored (owner decision O3)
+and the real-chain P&L (H13) accrues from 2026-10-02. The source buys the high-slope decile and sells
+the low-slope one; the harness here holds the long straddle on the highest slope only. The source
+slope uses a 6-month to 1-year point, the catalogue would have the 90-day one: a proxy to state when
+the screener is written."""
+
+[outcome]
+kind = "option_model_pnl"
+structure = "atm_straddle_long"
+iv_field = "rollup.ibkr_iv@v1.iv30_ibkr"
+horizon_sessions = [21]
+benchmark = "none"
+start_offset_sessions = 1
+cost_bps = 35
+
+[quality_bar]
+outcome = """The model P&L of one long at-the-money straddle held 21 sessions from the entry close,
+as a fraction of the entry price, net of 35 bps: the move that followed less the premium paid. The
+mean P&L of the picks is read against the mean of every liquid optionable name."""
+trigger_timing = """The chain-based slope is stored after the close of the decision session D (the last session
+of the month); the first fill is the next session's close, S = D + 1 (start_offset_sessions = 1). The
+slope is read at D and the straddle is priced with the implied volatility read at D."""
+replication = """The source's rule: slope = the long-dated at-the-money implied volatility (6 months to 1
+year) minus the one-month one, a monthly decile sort, long the high-slope straddles and short the low-slope
+ones, held to expiry (Vasquez 2017). Here, once unblocked, the top 20 by the 30-to-90-day slope are held
+long."""
+expected_size = """The decile spread is economically large and not explained by jump risk or the standard
+factors, 1996-2007 (Vasquez 2017; the abstract gives no number we verified, so none is filed). With
+chains stored from 2026-10-02 no independent window exists yet: the edge waits."""
+capacity_costs = """Single-name option spreads of 5 to 10% of premium are the whole game for a bought
+straddle, which the 35 bps cost approximates; the model has no hedge cost. A buyer has defined risk and
+needs no margin."""
+failure_modes = """An inverted term structure around earnings is event pricing, not mean reversion; a steep
+one in a calm market is cheap to be wrong about. Retire if the frozen-period mean P&L of the picks
+is not above the mean of every liquid optionable name."""
+decoys = """The earnings inversion (a report inside the front month inverts the slope for a known
+reason), the per-name premium sort (c12) and the filed VRP edge; test the slope after taking out names
+with a report inside the window."""
+
+[[sources]]
+title = "Vasquez, A., Equity Volatility Term Structures and the Cross-Section of Option Returns, Journal of Financial and Quantitative Analysis, 2017"
+url = "https://www.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/equity-volatility-term-structures-and-the-cross-section-of-option-returns/F0A40E99FD2458367DD9A56A89783D38"
+
+[[sources]]
+title = "Alpha Architect, Equity Term Structure and Option Returns (summary)"
+url = "https://alphaarchitect.com/2014/01/equity-term-structure-and-option-returns/"
