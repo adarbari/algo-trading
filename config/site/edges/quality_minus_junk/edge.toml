@@ -12,6 +12,7 @@ top_k = 50
 screeners = ["qmj"]
 baselines = ["size_small", "momentum_12_1"]
 status = "candidate"
+mechanism_kind = "mispriced_fundamentals"
 frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). qmj_score is built from what the stored statements support: profitability in full (gross profit over assets, ROE, ROA, cash flow over assets, gross margin, low accruals) and safety only as low leverage and low Ohlson O-score; the paper's growth part (five-year changes), low beta, Altman Z and earnings volatility are not built (no stored five-year history of the measures, beta and volatility are price based and another group). Not size-neutral and not within industry, as the paper is. long_short, where run, is diagnostic only."""
 

@@ -17,6 +17,7 @@ screeners = [
 base = "benchmark"
 oos_class = "trend"
 status = "candidate"
+mechanism_kind = "cross_market_trends"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. LIMITS: this is the MOMENTUM leg
 only. The carry leg of the source (sort on the forward discount) needs foreign short-rate series

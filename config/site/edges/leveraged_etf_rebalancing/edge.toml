@@ -11,6 +11,7 @@ schedule = "every_session"
 top_k = "all"
 screeners = []
 status = "rejected"
+mechanism_kind = "forced_flows"
 rejection_reason = """Intraday: the flow moves prices in the last minutes and reverses, which daily
 bars cannot see or trade, and what is left is weak after costs (Ivanov and Lenkey 2014; Shum et
 al. 2016); checked 2026-10-07."""

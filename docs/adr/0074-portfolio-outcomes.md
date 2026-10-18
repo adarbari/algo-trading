@@ -141,6 +141,19 @@ belongs in it.
     `edge_schemas.py`); null in every other leg and in a leg written before them, so
     `LEG_VERSION` stays 4. The vol target, its window and its return field join an outcome's
     identity only when a target is set (`identity_dict`), so no existing edge's hash moves.
+17. **The canary and the defensive asset.** `[outcome.canary] tickers = ["VWO", "BND"], field =
+    "<numeric feature>", breadth = 2, defensive = ["CASH"]` (or `["SHY", "IEF", "LQD"]`) gates
+    the book. The canaries are resolved to ids at D (the resolver, ADR 0018) and the field is read
+    at D (`SessionReads.numbers`), never at S: a signal that turns negative only after D does not
+    move the book. `bad` counts the canaries with a value below zero, `f = min(1, bad / breadth)`
+    is the risk-off share (VAA is a breadth of 1, DAA of 2) and the book becomes `(1 - f) * book +
+    f * defensive`. The defensive asset is `CASH` (the bill yield, item 4) or the defensive ticker
+    with the highest field at D, ties by ticker; it is chosen only when `f > 0`. A canary that is
+    not a known instrument at D or has no finite value is `no_canary:<ticker>`, a defensive
+    candidate likewise `no_defensive:<ticker>`, and a defensive asset with no return at S is
+    `no_pick_return`: the session is left out, never read as positive. `risk_off` stores `f` in the
+    leg; the canary table joins the outcome's identity only when present. A switch of defensive
+    asset pays the weight change; `CASH` is free; the benchmark is not scaled.
 18. **Composition order.** The overlays apply once per session, in `measuring._valued`, in this
     order: the weighting (with the cash of unfilled slots), the ensemble average, then the canary
     (item 17), then `vol_target`. A volatility target is measured on the book that will be held,

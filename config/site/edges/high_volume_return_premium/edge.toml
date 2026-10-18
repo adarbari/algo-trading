@@ -18,6 +18,7 @@ top_k = 50
 screeners = ["volume_shock", "volume_shock_no_news"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "lottery_demand"
 frozen_from = 2026-04-01
 notes = """volume_shock is today's volume at or above 2 standard deviations over the previous 20
 sessions (Gervais et al. use the top 10% of a 50-day reference: a looser, own-history version).

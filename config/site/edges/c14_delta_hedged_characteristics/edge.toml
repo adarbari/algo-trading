@@ -20,6 +20,7 @@ top_k = 20
 screeners = ["ivol_high"]
 baselines = ["vrp_cross_section", "vrp_iv_hv"]
 status = "candidate"
+mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 notes = """A selection overlay on c12, filed as its own edge so the harness can say whether the
 characteristic adds anything to the premium ranking (the baselines are the c12 ranking and the filed

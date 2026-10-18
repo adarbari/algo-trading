@@ -16,6 +16,7 @@ top_k = 50
 screeners = ["low_beta", "low_volatility"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "paid_for_risk"
 family = "A"
 frozen_from = 2026-04-01
 notes = """The claim is about return per unit of risk, and the harness scores excess return over

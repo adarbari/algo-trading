@@ -19,6 +19,7 @@ top_k = 50
 screeners = ["option_stock_volume"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "informed_footprints"
 frozen_from = 2026-04-01
 notes = """The plan lists it as a filter overlay, tested as a variant of the edge it filters; it is
 filed here as its own document so its avoid list can be judged alone: the main outcome holds the

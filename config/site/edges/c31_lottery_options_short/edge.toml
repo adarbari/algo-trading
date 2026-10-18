@@ -18,6 +18,7 @@ top_k = 30
 screeners = ["lottery_max"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "lottery_demand"
 frozen_from = 2026-04-01
 notes = """The source is Boyer and Vorkink's sort on ex-ante option skewness, and its short-call P&L
 needs the option model outcome (H8) and chains from 2026-10-02 only. What is filed here is the

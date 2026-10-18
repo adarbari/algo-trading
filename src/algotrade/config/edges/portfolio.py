@@ -11,6 +11,7 @@ line cap)."""
 import math
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
@@ -136,6 +137,46 @@ def vol_target_of(o: Table, kind: str) -> tuple[float | None, int, str]:
         )
     window = o.integer("vol_window", VOL_WINDOW, MIN_VOL_WINDOW)
     return target, window, o.text("vol_return_field", VOL_RETURN_FIELD)
+
+
+@dataclass(frozen=True)
+class Canary:
+    """``[outcome.canary]`` (ADR 0074 amendment): the book moves to a defensive asset by the share
+    of ``tickers`` whose ``field`` is negative at D, in units of ``breadth`` (a breadth of 1 is
+    VAA's, 2 is DAA's). ``defensive``: ``("CASH",)``, or tickers of which the one with the highest
+    ``field`` at D is held."""
+
+    tickers: tuple[str, ...]
+    field: str
+    breadth: int
+    defensive: tuple[str, ...]
+
+
+def canary_of(o: Table, kind: str) -> Canary | None:
+    """The outcome's ``[outcome.canary]`` (None: none). A portfolio outcome only; tickers are
+    distinct plain symbols (turned into ids at D through the resolver, never here), ``breadth`` is
+    between one and the number of canaries, and ``defensive`` is ``["CASH"]`` or tickers."""
+    if "canary" not in o.names():
+        return None
+    if kind != PORTFOLIO_KIND:
+        raise ConfigurationError(f"{o.where} canary: only a portfolio_return outcome has one")
+    c = o.table("canary", ("tickers", "field", "breadth", "defensive"))
+    tickers, defensive = c.strings("tickers", ()), c.strings("defensive", ())
+    for key, found in (("tickers", tickers), ("defensive", defensive)):
+        plain = [t for t in found if t != CASH]
+        if not found or len(set(found)) != len(found):
+            raise ConfigurationError(f"{c.where} {key}: expected one or more distinct symbols")
+        if not all(_TICKER.fullmatch(t) for t in plain):
+            raise ConfigurationError(f"{c.where} {key}: {list(found)} are not plain symbols")
+    if CASH in tickers or (CASH in defensive and len(defensive) > 1):
+        raise ConfigurationError(f"{c.where}: CASH is only the whole defensive choice ['CASH']")
+    breadth = c.integer("breadth", 1, 1)
+    if breadth > len(tickers):
+        raise ConfigurationError(
+            f"{c.where} breadth: {breadth} is more than the {len(tickers)} canaries"
+        )
+    # sorted: the order written decides nothing (the tie-break is by ticker), so it is no trial
+    return Canary(tuple(sorted(tickers)), c.line("field"), breadth, tuple(sorted(defensive)))
 
 
 def check_portfolio(

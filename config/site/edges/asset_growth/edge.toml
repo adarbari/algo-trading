@@ -12,6 +12,7 @@ top_k = 50
 screeners = ["asset_growth"]
 baselines = ["size_small", "momentum_12_1"]
 status = "candidate"
+mechanism_kind = "mispriced_fundamentals"
 frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). The main outcome is the avoid list: the bottom 50 of the ranking (the fastest asset growers) held short, minus the excess return, with the site's borrow cost (ADR 0053 amendment, outcome sides; a short result on liquid names may be a verdict basis, owner decision O2). The long side (slowest growers) and the spread are variants; the spread is diagnostic only. asset_growth is total assets over the assets a year back (within 40 days of a year) less one, from facts accepted by the session; an acquisition and an offering both lift it and nothing separates them."""
 

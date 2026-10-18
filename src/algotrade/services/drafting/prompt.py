@@ -52,7 +52,8 @@ from algotrade.services.read.instruments.catalogue import FeatureInfo
 # 12: an "or" and an exclusion are left out of the words between two parts and the server groups
 # the parts (ADR 0071); only maths over fields stays one boolean formula.
 # 13: a side of an "or" that needs maths makes the whole "or" ONE part with ONE boolean formula.
-PROMPT_VERSION = "13"
+# 14: missing data never passes, an exclusion included.
+PROMPT_VERSION = "14"
 PROMPT_BUDGET_TOKENS = 13_000  # chars / 4; the hard cap is 15k, the rest is margin for new text
 SECTION_TOKENS = 120  # headers between the sections, counted before the slice is planned
 
@@ -102,6 +103,8 @@ Rules:
   A phrasebook entry's last column, "exact default" (`field op value`), is the meaning to use as
   given unless the sentence gives its own value;
   for a word with several readings it lists them and the first is the default.
+- Missing data never passes: a name with no value for a field fails a hard criterion, an
+  exclusion ("except ...") included, so it is left out. Write no note about names with no value.
 - "criteria" holds ONLY what the sentence asks for; a caveat's check goes in "suggestions" (soft
   or score). A vague word ("heavy") with no phrasebook or guide threshold stays out of "criteria":
   offer "unresolved" readings when fields fit, else a note.
