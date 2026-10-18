@@ -42,7 +42,11 @@ purpose = "expression features of the market entity: regime.toml (the context si
 
 [[config_dir]]
 path = "config/site/edges"
-purpose = "edge documents, one <id>.toml per edge: thesis, mechanism, persistence, outcome, schedule, universe, the screeners that implement it, status and the quality-bar answers (typed by src/algotrade/config/edges; ADR 0053); rendered to docs/edges.md by make features-doc"
+purpose = "edge documents (ADR 0053): one folder per edge id, no files of its own (the folder keeps the 8-file cap from the flat list of ids)"
+
+[[config_dir]]
+path = "config/site/edges/*"
+purpose = "one edge's edge.toml: thesis, mechanism, persistence, outcome, schedule, universe, the screeners that implement it, status, family and the quality-bar answers (typed by src/algotrade/config/edges; ADR 0053); rendered to docs/edges.md by make features-doc"
 
 [[config_dir]]
 path = "config/site/studies"
@@ -163,7 +167,7 @@ kind = "log"
 
 [[docs_dir]]
 path = "docs/edge-ideas"
-purpose = "the edge idea catalogue: researched hypotheses not yet filed as edge documents, one page per family with evidence, data needs and a verdict, and the index ranking them (docs/edges-plan.md quality bar; an idea becomes config/site/edges/<id>.toml when it is picked up)"
+purpose = "the edge idea catalogue: researched hypotheses not yet filed as edge documents, one page per family with evidence, data needs and a verdict, and the index ranking them (docs/edges-plan.md quality bar; an idea becomes config/site/edges/<id>/edge.toml when it is picked up)"
 
 [[docs_dir]]
 path = "docs/drafting"
