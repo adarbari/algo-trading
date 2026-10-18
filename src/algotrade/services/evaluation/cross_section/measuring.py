@@ -458,6 +458,7 @@ class _RandomSpec:
                 scope.edge.picks,
                 self.costs,
                 None if scope.edge.outcome.side == LONG else self.adv_floor,
+                scope.edge.event_subtype,
             )
         return found
 

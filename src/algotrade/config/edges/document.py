@@ -27,9 +27,10 @@ and the key.
                       (default from ``verdict.toml``) is the short leg's assumed borrow cost
     schedule          ``every_session`` | ``month_end`` | ``calendar:<window>`` (WINDOW_NAMES: a
                       stretch the calendar fixes, whose length is the one horizon) |
-                      ``on_event:<class>`` (EVENT_CLASSES)
+                      ``on_event:<class>[:<subtype>]`` (EVENT_CLASSES; EVENT_SUBTYPES)
     base              what the picks are compared with: ``event`` (the names with the event at
-                      D; default for an event schedule) | ``universe`` (every eligible name)
+                      D, of the schedule's own class and subtype; default for an event
+                      schedule) | ``universe`` (every eligible name)
     picks             where an event schedule's picks come from: ``event`` (the qualified names
                       within the event names; default) | ``universe`` (the qualified names of
                       every eligible name on the event sessions; a decoy). Plain schedules
@@ -130,9 +131,41 @@ EVENT_CLASSES: Mapping[str, str] = {
     "earnings_expected": "a next report expected, scheduled or from the year-ago report "
     "(earnings_expected@v1); anchor: the expected report date's session",
     "index_change": "an S&P 500 membership change (index_changes@v1); anchor: the session it is "
-    "first stored",
+    "first stored (never the announcement)",
+    "filing_8k": "an 8-K carrying one Item (filing_events@v1); needs the item as its subtype; "
+    "anchor: the session the filing became known, the first whose close is after SEC accepted it",
+    "nt_late_filing": "an NT 10-K or NT 10-Q late-filing notice (filing_events@v1); anchor: the "
+    "session it became known",
+    "tender_offer": "an SC TO-I issuer or SC TO-T third-party tender offer (filing_events@v1); "
+    "anchor: the session it became known",
+    "earnings_date_shift": "a next report date a week or more away from last year's "
+    "(earnings_date_shift@v1); anchor: the session the shifted date was first stored",
 }
-# ex_dividend and macro_release were declared without a field to read; EB H4 re-adds them with it.
+# A class may be split by a subtype: ``on_event:<class>:<subtype>``. The subtype is one of the
+# class's own values (fail closed on any other, and on a subtype for a class that has none); the
+# base of an edge on it is the same class and subtype (``base = "event"``) or the universe. A
+# class in ``SUBTYPE_REQUIRED`` has no field of its own to read without one. The stored field of
+# each is declared in ``cross_section/events.py`` (kept equal by a fitness test).
+EVENT_SUBTYPES: Mapping[str, Mapping[str, str]] = {
+    "index_change": {
+        "addition": "joined the S&P 500 (sp500_added)",
+        "deletion": "left the S&P 500 (sp500_removed)",
+    },
+    "filing_8k": {
+        "1.02": "Item 1.02, termination of a material agreement",
+        "2.05": "Item 2.05, exit or disposal costs (a restructuring)",
+        "3.01": "Item 3.01, a delisting or listing-standard notice",
+        "4.01": "Item 4.01, a change of the auditor",
+        "4.02": "Item 4.02, non-reliance on previously issued financial statements",
+        "5.02": "Item 5.02, the departure or appointment of a director or an officer",
+    },
+    "earnings_date_shift": {
+        "later": "the next report date is a week or more later than last year's",
+        "earlier": "the next report date is a week or more earlier than last year's",
+    },
+}
+SUBTYPE_REQUIRED = ("filing_8k",)
+# ex_dividend, macro_release and lockup_expiry have no field to read yet (EB H4 follow-ups).
 ANNOUNCED_AHEAD = ("earnings_expected",)  # an entry may precede these
 # Quality bar answers 3 to 9 (1 and 2 are the document's mechanism and persistence).
 # What a hit_target compares with its target over the window (ED2 stores each as a field).
@@ -308,6 +341,11 @@ class Edge:
         return event_class(self.schedule)
 
     @property
+    def event_subtype(self) -> str | None:
+        """The subtype of an ``on_event:<class>:<subtype>`` schedule, else None."""
+        return event_subtype(self.schedule)
+
+    @property
     def answers(self) -> tuple[tuple[str, str], ...]:
         """The nine quality-bar answers in the plan's order."""
         return (
@@ -333,8 +371,38 @@ def job_name(edge_id: str, user_id: str) -> str:
 
 
 def event_class(schedule: str) -> str | None:
-    """The event class of an ``on_event:<class>`` schedule, else None."""
-    return schedule.removeprefix(ON_EVENT) if schedule.startswith(ON_EVENT) else None
+    """The event class of an ``on_event:<class>[:<subtype>]`` schedule, else None."""
+    if not schedule.startswith(ON_EVENT):
+        return None
+    return schedule.removeprefix(ON_EVENT).partition(":")[0]
+
+
+def event_subtype(schedule: str) -> str | None:
+    """The subtype of an ``on_event:<class>:<subtype>`` schedule, else None."""
+    if not schedule.startswith(ON_EVENT):
+        return None
+    return schedule.removeprefix(ON_EVENT).partition(":")[2] or None
+
+
+def _event_schedule_ok(t: Table, schedule: str) -> bool:
+    """Whether an ``on_event:`` schedule names a known class and, fail closed, one of its
+    subtypes (required for ``SUBTYPE_REQUIRED``, refused for a class that has none)."""
+    cls, sub = event_class(schedule), event_subtype(schedule)
+    if cls is None or cls not in EVENT_CLASSES:
+        return False
+    allowed = EVENT_SUBTYPES.get(cls, {})
+    if sub is None:
+        if cls in SUBTYPE_REQUIRED:
+            raise ConfigurationError(
+                f"{t.where} schedule: {schedule!r} needs a subtype, one of {sorted(allowed)}"
+            )
+        return True
+    if sub not in allowed:
+        raise ConfigurationError(
+            f"{t.where} schedule: {sub!r} is not a subtype of {cls!r} "
+            f"(known: {sorted(allowed) or 'none'})"
+        )
+    return True
 
 
 def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
@@ -512,7 +580,7 @@ def _schedule(t: Table) -> str:
     schedule = _required(t, "schedule")
     if (
         schedule in SCHEDULES
-        or event_class(schedule) in EVENT_CLASSES
+        or _event_schedule_ok(t, schedule)
         or window_name(schedule) in WINDOW_NAMES
     ):
         return schedule

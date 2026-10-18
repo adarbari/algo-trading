@@ -56,17 +56,20 @@ def leg_key(
     picks: str,
     cost_levels: tuple[float, ...],
     short_adv_floor: float | None = None,
+    event_subtype: str | None = None,
 ) -> str:
     """The key of a leg (``top_k``, ``base`` and ``picks`` of the scope's edge cut its picks and
     names and are not in the trial hash for ``main``): ``universe`` is ``universe_hash``,
     ``expr_defs_hash`` is ``expression_hash``, ``cost_levels`` the site's cost grid in bp;
-    ``short_adv_floor`` the dollar volume a name must have to be in a short leg (only for an
-    outcome with one: it is left out of the payload otherwise, so a long edge's key is what it was
-    before sides)."""
+    ``short_adv_floor`` the dollar volume a name must have to be in a short leg. It and
+    ``event_subtype`` join the digest only when set, so the keys of every long edge and of every
+    schedule without a subtype (and the legs stored under them) are unchanged."""
     extra = {} if short_adv_floor is None else {"short_adv_floor": float(short_adv_floor)}
+    subtype = {"event_subtype": event_subtype} if event_subtype else {}
     return _digest(
         {
             **extra,
+            **subtype,
             "trial": trial_hash,
             "universe": universe,
             "iv_field": iv_field,
