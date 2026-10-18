@@ -9,10 +9,11 @@
  */
 import type { KeyValueItem } from '@algotrade/ui';
 
+import { factItem } from '@/entities/feature';
 import { episodeName, type RegimeEpisode } from '@/entities/regime';
 import { feature, type SiteFeature } from '@/shared/api';
 
-import { factItem, type FactGroup, type Values } from './overview';
+import type { FactGroup, Values } from './overview';
 
 const BETA = feature('rollup.episode_behaviour@v1.beta_252d');
 

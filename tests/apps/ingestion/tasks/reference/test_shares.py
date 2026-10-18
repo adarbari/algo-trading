@@ -2,6 +2,7 @@
 CIKs without facts, only new facts stored, carry to a new class, limit, force, resume."""
 
 import json
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
@@ -13,7 +14,14 @@ from algotrade.data.statements.reading import statement_facts, stored_statements
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.reference.shares import SharesSources, _rows, ingest_shares
+from algotrade_ingestion.tasks.reference.shares import (
+    SharesSources,
+    Standing,
+    _due,
+    _rows,
+    ingest_shares,
+    priority_order,
+)
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.sec import company_facts
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts, parse_statements
@@ -23,6 +31,7 @@ from tests.libs.sources.vendors.sec.test_company_facts import PAYLOAD
 from tests.libs.sources.vendors.sec.test_statement_concepts import AAPL as AAPL_STATEMENTS
 
 DAY = date(2026, 10, 2)
+PRICE_STATS = "rollups/instrument/price_stats@v2"
 CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731
 GOOGL_CIK = "0001652044"
 GOOGL_FACTS = (
@@ -52,7 +61,9 @@ class FakeFacts:
 
 
 def sources(feed: FakeFacts, refresh_days: int = 30) -> SharesSources:
-    return SharesSources(SecCompanyFacts(http_for(feed, RetryPolicy(tries=1))), refresh_days)
+    return SharesSources(
+        SecCompanyFacts(http_for(feed, RetryPolicy(tries=1))), refresh_days, tags_date=DAY
+    )  # tags_date DAY: the markers these tests store are current
 
 
 def store(extra: tuple[tuple[str, str | None], ...] = ()) -> tuple[StoreWriter, StoreReader]:
@@ -297,7 +308,9 @@ def test_the_statements_backlog_is_fetched_a_few_ciks_a_night() -> None:
     seen: list[str] = []
     for night, deferred in ((1, 2), (2, 1), (3, 0), (4, 0)):
         feed = FakeFacts(aapl=AAPL_STATEMENTS)
-        capped = SharesSources(sources(feed, 100000).facts, 100000, backfill_per_night=1)
+        capped = SharesSources(
+            sources(feed, 100000).facts, 100000, backfill_per_night=1, tags_date=DAY
+        )
         record = ingest_shares(task_ctx(writer, reader, CLOCK), capped, DAY + timedelta(days=night))
         seen += [u.rsplit("CIK", 1)[1][:10] for u in feed.urls]
         assert record.stats["deferred_by_limit"] == deferred
@@ -308,9 +321,58 @@ def test_the_statements_backlog_is_fetched_a_few_ciks_a_night() -> None:
     }  # fmt: skip
 
 
+def test_statements_fetched_before_the_tag_list_date_are_backlog_under_the_cap() -> None:
+    """A marker older than ``tags_date`` (parsed with an older tag list) is due before its
+    refresh slot, counted in the backlog and capped; a newer one is not due; force bypasses."""
+    writer, reader = store()
+    day = DAY - timedelta(days=1)
+    for table, run in ((TABLE, "s"), (STATEMENTS, "t")):
+        markers = [
+            {"instrument_id": f"EQ:{sym}", "symbol": sym, "cik": cik, "concept": "checked",
+             "tag": None, "period_start": None, "period_end": None, "filed": None,
+             "fetched_on": day}
+            for sym, cik in (("AAPL", "0000320193"), ("GOOGL", GOOGL_CIK), ("GOOG", GOOGL_CIK),
+                             ("SPY", "0000884394"))
+        ]  # fmt: skip
+        writer.write_table(table, day, run, stamped(markers, day, run))
+    kinds = lambda feed: sorted(u.rsplit("CIK", 1)[1][:10] for u in feed.urls)  # noqa: E731
+    session = DAY + timedelta(days=1)  # inside every 100000-day slot: nothing else is due
+    base = SharesSources(
+        sources(FakeFacts(), 100000).facts, 100000, backfill_per_night=2, tags_date=DAY
+    )
+
+    current = FakeFacts()  # the marker (day) is not before tags_date: nothing due
+    ingest_shares(
+        task_ctx(writer, reader, CLOCK),
+        replace(base, facts=sources(current, 100000).facts, tags_date=day),
+        session,
+    )
+    assert current.urls == []
+
+    feed = FakeFacts(aapl=AAPL_STATEMENTS)
+    old = replace(base, facts=sources(feed, 100000).facts, tags_date=DAY)
+    record = ingest_shares(task_ctx(writer, reader, CLOCK), old, session)
+    assert len(kinds(feed)) == 2 and record.stats["deferred_by_limit"] == 1  # capped at 2 of 3
+
+    first = set(kinds(feed))
+    for night, expected in ((2, 1), (3, 0)):  # a plain rerun: the deferred CIK only, then nothing
+        again = FakeFacts(aapl=AAPL_STATEMENTS)
+        ingest_shares(
+            task_ctx(writer, reader, CLOCK),
+            replace(old, facts=sources(again, 100000).facts),
+            DAY + timedelta(days=night),
+        )
+        assert len(kinds(again)) == expected and not set(kinds(again)) & first
+
+    forced = FakeFacts(aapl=AAPL_STATEMENTS)
+    uncapped = replace(old, facts=sources(forced, 100000).facts)
+    ingest_shares(task_ctx(writer, reader, CLOCK), uncapped, session, force=True)
+    assert len(kinds(forced)) == 3  # force still refetches every company, cap or not
+
+
 def test_a_new_cik_is_never_capped_by_the_backlog_limit() -> None:
     writer, reader = store()
-    capped = SharesSources(sources(FakeFacts()).facts, 30, backfill_per_night=1)
+    capped = SharesSources(sources(FakeFacts()).facts, 30, backfill_per_night=1, tags_date=DAY)
     record = ingest_shares(task_ctx(writer, reader, CLOCK), capped, DAY)
     assert record.stats["requested"] == 3 and record.stats["deferred_by_limit"] == 0
 
@@ -355,3 +417,119 @@ def test_a_restatement_filed_after_a_session_does_not_change_what_that_session_r
     after = statement_facts(reader, date(2026, 12, 1))
     assert len(after) == len(before) + 1
     assert after.iloc[-1]["value"] == latest["val"] * 2
+
+
+def _order(scope=(), sp500=(), standing=None):  # type: ignore[no-untyped-def]
+    ids = {"A": "1", "B": "2", "C": "3", "D": "4", "E": "5"}
+    return priority_order(sorted(ids.values()), set(scope), set(sp500), standing or {}, ids)
+
+
+def test_priority_scope_then_sp500_then_the_rest_by_market_cap() -> None:
+    standing = {"C": Standing(market_cap=5.0), "D": Standing(market_cap=9.0)}
+    assert _order(scope={"E"}, sp500={"B"}, standing=standing) == ["5", "2", "4", "3", "1"]
+
+
+def test_priority_inside_the_sp500_optionable_liquid_names_come_first() -> None:
+    standing = {
+        "A": Standing(optionable=False, adv_usd=9e9),
+        "B": Standing(optionable=True, adv_usd=1e6),
+        "C": Standing(optionable=True, adv_usd=5e7),
+    }
+    assert _order(sp500={"A", "B", "C"}, standing=standing)[:3] == ["3", "2", "1"]
+
+
+def test_priority_scope_names_stay_first_whatever_their_liquidity() -> None:
+    standing = {"A": Standing(optionable=False), "B": Standing(optionable=True, adv_usd=9e9)}
+    assert _order(scope={"A"}, sp500={"B"}, standing=standing)[:2] == ["1", "2"]
+
+
+def test_priority_missing_inputs_degrade_to_cik_order_and_a_cik_takes_its_best_instrument() -> None:
+    assert _order() == ["1", "2", "3", "4", "5"] == _order()  # deterministic
+    ids = {"A1": "9", "A2": "9", "B": "1"}
+    got = priority_order(["1", "9"], set(), {"A2"}, {}, ids)
+    assert got == ["9", "1"]  # CIK 9 holds an S&P 500 class
+
+
+def test_the_cap_defers_the_lowest_priority_backlog_ciks() -> None:
+    day = date(2026, 1, 5)
+    fetched = [dict.fromkeys("123", day), {}]
+    src = SharesSources(None, 30, backfill_per_night=1)  # type: ignore[arg-type]
+    due, deferred = _due(list("123"), fetched, day, src, False, ["3", "1", "2"])
+    assert due == ["3"] and deferred == 2
+    assert _due(list("123"), fetched, day, src, False)[0] == ["1"]  # default: CIK order
+    # a CIK new to both is never deferred, and --limit style slicing takes the highest first
+    fresh = _due(list("123"), [{"1": day}, {}], day, src, False, ["3", "2", "1"])
+    assert fresh == (["3", "2", "1"], 0)  # new to both are never deferred; priority order
+
+
+def test_priority_never_changes_what_is_due_or_exempt() -> None:
+    """Fails if the order changed the due set or which CIKs the cap exempts (new to both,
+    shares-due, stale): only the order of the new part may differ."""
+    day = date(2026, 3, 1)
+    old, recent = date(2026, 1, 1), date(2026, 2, 28)
+    fetched = [
+        {"1": old, "2": recent, "3": recent, "4": old, "5": recent},  # shares
+        {"1": old, "4": old, "5": recent},  # statements: 2, 3 are backlog; 6 new to both
+    ]
+    ciks = ["1", "2", "3", "4", "5", "6"]
+    for cap, force in ((0, False), (1, False), (3, False), (1, True)):
+        src = SharesSources(None, 30, backfill_per_night=cap)  # type: ignore[arg-type]
+        plain = _due(ciks, fetched, day, src, force)
+        ranked = _due(ciks, fetched, day, src, force, ["6", "3", "2", "5", "4", "1"])
+        backlog = {"2", "3"}
+        assert set(plain[0]) - backlog == set(ranked[0]) - backlog  # exempt CIKs: the same
+        assert len(plain[0]) == len(ranked[0]) and plain[1] == ranked[1]
+        if cap == 0 or force or cap >= 2:
+            assert sorted(plain[0]) == sorted(ranked[0])  # nothing deferred: the same due set
+        else:
+            assert "3" in ranked[0] and "2" not in ranked[0]  # the cap defers the lowest
+
+
+def _priced_store() -> tuple[StoreWriter, StoreReader]:
+    """The shares store with a flagged S&P 500 name: GOOGL in the S&P 500, AAPL optionable."""
+    writer = StoreWriter(MemoryBackend())
+    rows = [("AAPL", "0000320193", False, True), ("GOOGL", GOOGL_CIK, True, False),
+            ("SPY", "0000884394", False, False)]  # fmt: skip
+    reference = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "asset_class": "equity", "multiplier": 1.0,
+         "security_type": "COMMON_STOCK", "status": "ACTIVE", "cik": cik, "in_sp500": sp,
+         "optionable": opt}
+        for s, cik, sp, opt in rows
+    ]  # fmt: skip
+    writer.write_table("instruments/reference", DAY, "u", stamped(reference, DAY, "u"))
+    return writer, StoreReader(writer._backend)
+
+
+def _stats(writer: StoreWriter, day: date, adv: dict[str, float], run: str) -> None:
+    frame = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "close": 100.0, "adv_usd_20d": v}
+        for s, v in adv.items()
+    ]
+    writer.write_table(PRICE_STATS, day, run, stamped(frame, day, run))
+
+
+def test_limit_takes_the_sp500_first_then_the_liquid_optionable() -> None:
+    writer, reader = _priced_store()
+    _stats(writer, DAY - timedelta(days=1), {"AAPL": 5e7}, "p")
+    feed = FakeFacts()
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(feed), DAY, limit=2)
+    fetched = [u.rsplit("CIK", 1)[1][:10] for u in feed.urls]
+    assert fetched == [GOOGL_CIK, "0000320193"]  # S&P 500 first; then optionable and liquid
+
+
+def test_a_rerun_after_tonights_rollups_keeps_the_same_order() -> None:
+    """Two optionable names outside the S&P 500: the prior day's roll-up puts GOOGL (liquid)
+    ahead of AAPL; tonight's, written between the two runs, would lift AAPL above it. Fails if
+    an input is read on the session itself: the rerun would fetch AAPL first."""
+    writer, reader = _priced_store()
+    reference = reader.table("instruments/reference", DAY)
+    fixed = reference.assign(in_sp500=False, optionable=reference["symbol"] != "SPY")
+    writer.write_table("instruments/reference", DAY, "v", fixed)
+    _stats(writer, DAY - timedelta(days=1), {"AAPL": 1e6, "GOOGL": 5e7}, "prior")
+    first, second = FakeFacts(), FakeFacts()
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(first), DAY, force=True, limit=1)
+    _stats(writer, DAY, {"AAPL": 9e8, "GOOGL": 5e7}, "same-day")  # tonight's, written after
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(second), DAY, force=True, limit=1)
+    order = [u.rsplit("CIK", 1)[1][:10] for u in first.urls]
+    assert order == [GOOGL_CIK]
+    assert order == [u.rsplit("CIK", 1)[1][:10] for u in second.urls]

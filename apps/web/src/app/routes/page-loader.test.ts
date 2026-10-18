@@ -47,7 +47,7 @@ describe('pageRoute', () => {
     const page = { load: () => Promise.resolve({ x: 1 }), preload: () => Promise.resolve() };
     const options = pageRoute(page, prefetch);
     await options.loader({ context: { queryClient: new QueryClient() } });
-    expect(prefetch).toHaveBeenCalledWith({ x: 1 }, expect.any(QueryClient));
+    expect(prefetch).toHaveBeenCalledWith({ x: 1 }, expect.any(QueryClient), undefined);
     expect(options.staticData.preload).toBe(page.preload);
   });
 

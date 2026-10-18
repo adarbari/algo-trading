@@ -32,6 +32,13 @@ describe('KeyValue', () => {
     expect(screen.getByText('Nothing selected')).toBeInTheDocument();
   });
 
+  it('draws an action beside the label, inside the term', () => {
+    render(
+      <KeyValue items={[{ label: 'Revenue', value: 1, action: <button>About Revenue</button> }]} />,
+    );
+    expect(screen.getByRole('button', { name: 'About Revenue' }).closest('dt')).not.toBeNull();
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <KeyValue

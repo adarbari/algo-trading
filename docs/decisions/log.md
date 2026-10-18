@@ -426,3 +426,83 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a token between every pair of cards is noise; "but" or "only if" changes how the second part reads and is where a misread hides.
+
+## 2026-10-17 | PR #590 (ADR 0071) | Boolean groups: a tree in the engine, one level in the Builder
+- Question: one level of groups, or a full boolean tree?
+- Options: keep formulas / one level `any` / `none` / inline tree / tree by reference in the engine with a one-level Builder.
+- Decision: a tree by reference (`all` / `any` / `none`, depth <= 4) in the spec and engine; the Builder edits one level for now.
+- decided by: owner
+- status: final
+- Reasoning: the engine should express any condition the trader means; the UI stays simple on phones until a tree editor is wanted.
+
+## 2026-10-17 | PR #590 (ADR 0071) | Describe-it precedence case by case
+- Question: one global precedence rule for mixed and / or / except in a sentence?
+- Options: OR binds tighter than AND globally / decided per phrasing.
+- Decision: per phrasing, each a golden case with its expected tree that the owner verifies in the Describe-it PR.
+- decided by: owner
+- status: final
+- Reasoning: natural language is ambiguous; the owner wants to see and check each reading.
+
+## 2026-10-17 | PR #590 (ADR 0071) | Soft and score criteria inside groups
+- Question: may a `soft` or `score` criterion sit inside a group?
+- Options: hard only in v1 / every mode everywhere.
+- Decision: every criterion keeps `hard` / `soft` / `score`; `all` sums penalties, `any` takes its best member, `none` negates operators and keeps tolerances.
+- decided by: owner
+- status: final
+- Reasoning: soft and score are how traders express preference; groups must not take them away.
+
+## 2026-10-17 | PR #590 (ADR 0071) | Existing boolean formulas are not converted
+- Question: offer to convert saved boolean formula features into groups?
+- Options: convert / leave.
+- Decision: leave them; new drafts use groups.
+- decided by: owner
+- status: final
+- Reasoning: they keep working; conversion adds risk for no gain.
+
+## 2026-10-17 | Edge build plan (EB) | Verdict bar (t-statistic)
+- Question: Verdict bar (t-statistic)?
+- Options: t >= 2 for Promising (keep) / t >= 3 for Promising.
+- Decision: Promising stays at t >= 2; Works needs t >= 3 on both series.
+- decided by: owner
+- status: final
+- Reasoning: Harvey-Liu-Zhu's t > 3 applies to claiming a new factor (Works); Promising remains a research state.
+
+## 2026-10-17 | Edge build plan (EB) | Short and long-short results as a verdict basis
+- Question: Short and long-short results as a verdict basis?
+- Options: long only / short ok and long-short diagnostic / both.
+- Decision: a short result on liquid names may be the basis; long-short is diagnostic only.
+- decided by: owner
+- status: final
+- Reasoning: an avoid list is actionable with a read-only broker; a long-short spread needs shorting the owner does not do.
+
+## 2026-10-17 | Edge build plan (EB) | Historical option chains
+- Question: Historical option chains?
+- Options: buy now / not now.
+- Decision: not now: H8 model P&L ships, H13 chain P&L accrues from 2026-10-02.
+- decided by: owner
+- status: final
+- Reasoning: no new spend.
+
+## 2026-10-17 | Edge build plan (EB) | Tiingo Power
+- Question: Tiingo Power?
+- Options: extend a month / pull within the bought month.
+- Decision: pull the 2010+ history and the outcomes backfill by 2026-11-09.
+- decided by: owner
+- status: final
+- Reasoning: no new spend.
+
+## 2026-10-17 | PR #599 (Explore features tab) | History copy covers every instrument rollup
+- Question: may the history copy (ADR 0060) grow to every instrument rollup, about +1.34 GB on the Mac (90% full, 20 GiB free), to cut the Features tab's history reads?
+- Options: accept the disk / keep the copy to market tables and bars only.
+- Decision: accept; release #599.
+- decided by: owner
+- status: final
+- Reasoning: the Features tab's history reads drop from 6.7-8.0 s to 1.3-1.9 s per ticker; the copy stays within its 2.6 GB budget.
+
+## 2026-10-17 | PR #619 (debt rules d to g) | Finance leases stay in total_debt
+- Question: may `balance_sheet@v1.total_debt` include finance lease obligations where the SEC tag does (rules d to f, and the current part of c and e through `DebtCurrent`)?
+- Options: keep them, labelled per rule in the field guide (as most data sites do) / exclude them and leave those filers NOT_TAGGED.
+- Decision: keep them; operating leases are never in debt.
+- decided by: owner
+- status: final
+- Reasoning: the tag does not split finance from operating leases in the filer's figure; excluding it would leave about 70 of 259 untagged companies null.

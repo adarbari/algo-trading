@@ -45,6 +45,7 @@ def test_the_committed_site_files_load() -> None:
     assert sources.cboe_workers == 2 and sources.cboe_priority_symbols[:2] == ("SPY", "QQQ")
     assert (sources.descriptions_per_night, sources.descriptions_refresh_days) == (100, 365)
     assert sources.sec_fund_quarters == 6
+    assert sources.sec_statements_priority_min_adv_usd == 10_000_000.0
     assert (sources.http_backoff_factor, sources.http_speedup_factor) == (1.5, 1.05)
     assert (sources.http_speedup_after, sources.http_error_window) == (100, 50)
     assert sources.http_max_error_rate == 0.10
@@ -77,6 +78,10 @@ def test_missing_files_fall_back_to_defaults() -> None:
             r"descriptions_per_night: expected an integer",
         ),
         ({"massive": {"descriptions_refresh_days": 1.5}}, r"descriptions_refresh_days: expected"),
+        (
+            {"sec_edgar": {"statements_priority_min_adv_usd": -1}},
+            r"statements_priority_min_adv_usd",
+        ),
         ({"sec_edgar": {"fund_quarters": -2}}, r"fund_quarters: expected an integer >= 0"),
         ({"sec_edgar": {"raw_retention_days": 0}}, r"\[sec_edgar\] raw_retention_days: expected"),
         ({"sec_edgar": {"raw_retention_days": 1.5}}, r"raw_retention_days: expected an integer"),
@@ -448,11 +453,13 @@ def test_the_committed_feature_files_load() -> None:
     assert names == [
         "bands",
         "earnings",
+        "forward",
         "fundamentals",
         "liquidity",
         "positioning",
         "price",
         "regime",
+        "statements",
         "swing",
         "volatility",
         "volume",
@@ -512,3 +519,20 @@ def test_every_vendor_section_sets_each_of_its_keys_explicitly() -> None:
         if section in doc
     }
     assert {s: keys for s, keys in missing.items() if keys} == {}
+
+
+def test_analyst_snapshot_settings_default_and_validate() -> None:
+    settings = SourcesSettings.from_document(site("sources"))
+    assert (settings.fmp_refresh_days, settings.finnhub_per_night) == (7, 300)
+    assert settings.max_analyst_failed == 0.20 and settings.finnhub_refresh_days == 7
+    assert settings.max_analyst_backlog == 0.25
+    assert settings.fmp_run_budget_s == 1500
+    document = {
+        "fmp": {"refresh_days": 3, "run_budget_s": 60},
+        "finnhub": {"refresh_days": 5},
+        "quality": {"max_analyst_failed": 0.5, "max_analyst_backlog": 0.1},
+    }
+    changed = SourcesSettings.from_document(document)
+    assert changed.fmp_refresh_days == 3 and changed.max_analyst_failed == 0.5
+    assert changed.finnhub_refresh_days == 5 and changed.fmp_run_budget_s == 60
+    assert changed.max_analyst_backlog == 0.1

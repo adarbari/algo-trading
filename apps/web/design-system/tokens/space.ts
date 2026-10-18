@@ -32,7 +32,7 @@ export function spaceName(step: Space): string {
  * cannot read custom properties, so Grid.module.css repeats these numbers; Grid.test.tsx fails
  * if the two disagree.
  */
-export const breakpoint = { sm: 480, md: 720, lg: 960 } as const;
+export const breakpoint = { sm: 480, md: 720, lg: 960, xl: 1200 } as const;
 
 export type Breakpoint = keyof typeof breakpoint;
 

@@ -64,6 +64,9 @@ describe('unknown words', () => {
       'n/a',
     );
     expect(unknownWord({ ...base, code: 'NULL', kind: 'ILLIQUID', kindText: '' })).toBe('Illiquid');
+    expect(unknownWord({ ...base, code: 'NULL', kind: 'NOT_COVERED', kindText: '' })).toBe(
+      'Not covered',
+    );
     expect(unknownWord({ ...base, code: 'NO_ROW', kind: 'SYSTEM', kindText: '' })).toBe('Unknown');
   });
 });
@@ -100,6 +103,7 @@ describe('cell words', () => {
     expect(cellText(null, null, null)).toBe('not known');
     expect(cellWord('NOT_APPLICABLE', 'NO_ROW')).toBe('n/a');
     expect(cellWord('ILLIQUID', 'NULL')).toBe('Illiquid');
+    expect(cellWord('NOT_COVERED', 'NOT_COVERED')).toBe('Not covered');
     expect([
       cellWord('SYSTEM', 'NO_ROW'),
       cellWord('NOT_STORED', 'NULL'),

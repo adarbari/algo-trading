@@ -48,6 +48,19 @@ describe('StatStrip', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Failed to load');
   });
 
+  it('marks a strip of more than six stats as dense, so its columns can step down', () => {
+    const items = Array.from({ length: 9 }, (_, i) => ({ label: `Stat ${String(i)}`, value: i }));
+    const { rerender } = render(<StatStrip label="Nine" items={items} />);
+    expect(screen.getByRole('region', { name: 'Nine' }).firstElementChild).toHaveAttribute(
+      'data-many',
+      'true',
+    );
+    rerender(<StatStrip label="Nine" items={items.slice(0, 6)} />);
+    expect(screen.getByRole('region', { name: 'Nine' }).firstElementChild).not.toHaveAttribute(
+      'data-many',
+    );
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <StatStrip

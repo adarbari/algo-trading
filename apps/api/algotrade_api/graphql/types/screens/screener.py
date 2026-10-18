@@ -103,7 +103,7 @@ class ScreenerRun:
         extensions=[AdminCause(public=lambda _, audit: JSON(public_audit(audit)))],
     )
     def audit(self) -> JSON:
-        return JSON(dict(self.run.audit))
+        return JSON(results.run_audit(self.ctx, self.run))
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The session of the previous run it is compared with; null: none (nothing "

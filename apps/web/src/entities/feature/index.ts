@@ -6,6 +6,7 @@
  * table is built from (ADR 0038).
  */
 export {
+  fetchCatalogue,
   prefetchFeatureCatalogue,
   refreshCatalogue,
   useFeatureCatalogue,
@@ -109,3 +110,4 @@ export {
   distributionMarkers,
   type FeatureDistribution,
 } from './model/distribution';
+export { factItem, type Fact, type FactSpec, type Values } from './model/fact';

@@ -49,18 +49,25 @@
     "explained": {
       "parts": [
         {
-          "words": "optionable stocks with a market cap over $10B",
+          "words": "optionable stocks",
           "kind": "applied",
           "origin": "words",
           "join": null,
           "join_words": ""
         },
         {
-          "words": "IV rank is under 30%",
+          "words": "with a market cap over $10B",
           "kind": "applied",
           "origin": "words",
-          "join": "and",
-          "join_words": "although"
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "although IV rank is under 30%",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
         }
       ],
       "model_share": 1.0,
