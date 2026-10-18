@@ -1,0 +1,145 @@
+# L3 site setting: the Guide glossary, edges: what counts as an edge working (the outcome kinds and the option structures of an outcome; ADR 0053, ADR 0051). One [[term]]
+# each: id, term, short (one sentence), body, next, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "outcome_excess_return"
+term = "Outcome: Excess return"
+short = "A pick works when it beats the benchmark over the holding period, after the round-trip cost."
+body = """
+The edge's value for a pick is its return from the entry close to the close at the horizon. The
+benchmark's return over the same days is taken off. So is the cost, in basis points of the entry
+price, charged once. A pick hits when that number is above zero. It is a return, so its windows add up
+to a curve. Example: a pick that gains 3% while SPY gains 1%, with a 25 bp cost, scores 1.75%.
+A hit rate alone hides size: a pick can hit often and still lose money when the misses are large.
+Don't read one window as a result; the verdict needs enough out-of-sample trades.
+"""
+next = "Read the mean excess return and the hit rate against the base rate on the edge page."
+see_also = ["edge", "base_rate", "win_rate", "verdict"]
+
+[[term]]
+id = "outcome_hit_target"
+term = "Outcome: Hit target"
+short = "A pick works when a measure over the holding period lands on the right side of a target."
+body = """
+The edge names a measure (the excess return, or realised over implied volatility), a direction
+(below or above) and a target. A pick hits when the measure is on the named side; equal is a
+miss. The value shown is the measure itself, oriented so higher is better. It is not a return,
+so the edge's curve counts wins above what the base rate predicts. Example: realised over implied
+volatility below 1.0 hits when the stock moved less than options priced. Don't read a ratio near
+the target as a result: a few points either side flips the hit.
+"""
+next = "Read the hit rate against the base rate; the size shown is the measure's mean, not money."
+see_also = ["edge", "base_rate", "win_rate", "verdict", "not_a_return"]
+
+[[term]]
+id = "outcome_expires_otm"
+term = "Outcome: Expires out of the money"
+short = "A pick works when the short option it describes would not be assigned at the horizon's close."
+body = """
+The strike is set at the entry close from the implied volatility known the session before, by
+delta or by a fixed distance. A pick hits when the price at the horizon stays on the safe side of
+it (both sides for a strangle). The value is the cushion to the nearest strike. No premium and no
+profit and loss is counted. A high hit rate therefore overstates what selling the option earns,
+because a few large misses can cost more than many small wins. The risk-neutral chance of the hit and how
+often the strike was touched on the way are shown beside the hit rate, never inside it.
+"""
+next = "Compare the hit rate with its risk-neutral reference; for money, use a modelled P&L outcome."
+see_also = ["edge", "base_rate", "win_rate", "outcome_option_model_pnl"]
+
+[[term]]
+id = "outcome_option_model_pnl"
+term = "Outcome: Option model P&L"
+short = "A pick works when a modelled straddle position would have made money over the holding period."
+body = """
+The value is the profit and loss of one at-the-money straddle opened at the entry close. It is a
+fraction of the entry price, from the implied volatility known the session before and the stored
+price window. The option price is a model price (basis model), not a quote. The stored data holds
+no historical option prices, so the real spread and fill are not in it. The structure says which
+position is modelled (long, short or delta-hedged). The cost in basis points of the entry price
+is charged once; no hedging cost is modelled. A volatility or window that is missing makes the
+pick unmeasured, with the reason, never a zero. The implied volatility keeps its source's licence. Example: at 30% implied volatility over 21 sessions a straddle costs 6.9% of the
+price, so a stock that moves 10% earns a long straddle 3.1%.
+The implied volatility is a 30-day figure. The edge's horizons must therefore lie between 10 and
+42 sessions. A shorter or longer window would price the wrong option, so the document is refused.
+Don't read it as money earned: it is a model of the structure on the stored data.
+"""
+next = "Check the structure and the basis label before comparing it with an excess-return edge."
+see_also = ["model_basis", "straddle_long", "straddle_short", "delta_hedged_straddle", "edge", "base_rate"]
+
+[[term]]
+id = "straddle_long"
+term = "Structure: Long at-the-money straddle"
+short = "A call and a put bought at the entry price and held to the horizon: it pays when the move is large."
+body = """
+The modelled position loses the straddle's price if the stock ends where it started and gains
+the move beyond that price in either direction. Its value is the absolute return less the
+model price at the implied volatility. Example: at 30% implied volatility over 21 sessions the
+price is 6.9% of the stock; a 2% move loses 4.9%, a 12% move gains 5.1%. It is the position of a
+trader who expects a larger move than options price. Most windows lose a little and a few win a
+lot, so the hit rate alone says little. The edge's horizon must be near the implied volatility's
+30 days, so a window of a few sessions around a report cannot be modelled this way.
+"""
+next = "Read the mean value and how often it is above zero; a model, so no fill or spread is in it."
+see_also = ["outcome_option_model_pnl", "model_basis", "straddle_short"]
+
+[[term]]
+id = "straddle_short"
+term = "Structure: Short at-the-money straddle"
+short = "The straddle sold and held to the horizon: it pays when the move is small and loses when it is large."
+body = """
+The modelled value is exactly the long straddle's value with the sign reversed. It wins the
+price of the straddle if the stock ends where it started and loses the move beyond that price.
+The hit rate is usually high and the losses are large and rare, so judge the mean value, not
+the win rate. Example: at 30% implied volatility over 21 sessions a 2% move earns 4.9% and a
+12% move loses 5.1%. The model has no margin, no assignment and no early exit.
+Don't size a real position from a modelled average.
+"""
+next = "Read the mean value and the worst windows before the hit rate."
+see_also = ["outcome_option_model_pnl", "model_basis", "straddle_long", "win_rate"]
+
+[[term]]
+id = "delta_hedged_straddle"
+term = "Structure: Delta-hedged at-the-money straddle"
+short = "A long straddle whose stock exposure is hedged every day, so it earns the gap between realised and implied volatility."
+body = """
+Hedging removes the direction of the move and leaves the size of the daily moves. The modelled
+value is the straddle's sensitivity to volatility times (realised volatility squared minus
+implied volatility squared) over twice the implied volatility, the standard approximation
+for small gaps. It is positive when the stock moved more than options priced and negative when it moved less.
+Example: realised 34% against implied 30% over 21 sessions is worth about 1% of the price.
+It overstates the gain a little for large gaps and ignores hedging costs and jumps between hedges.
+"""
+next = "Read it as the variance risk premium's size; the short side is its own structure."
+see_also = ["outcome_option_model_pnl", "model_basis", "straddle_long", "delta_hedged_straddle_short"]
+
+[[term]]
+id = "delta_hedged_straddle_short"
+term = "Structure: Short delta-hedged at-the-money straddle"
+short = "The hedged straddle sold: it earns the gap when options price more movement than the stock delivers."
+body = """
+The modelled value is exactly the delta-hedged long straddle's value with the sign reversed. It
+is positive when the stock moved less than options priced, the variance risk premium that a seller
+collects, and negative when it moved more. The hedge removes the direction, so one large move
+does not dominate, but the hedged seller still loses when volatility jumps. Example: realised 26%
+against implied 30% over 21 sessions earns about 1% of the price; realised 34% loses about 1%.
+The model ignores hedging costs and jumps between hedges, so a real seller earns less.
+Don't size a real position from a modelled average.
+"""
+next = "Read the mean value and the worst windows before the hit rate."
+see_also = ["outcome_option_model_pnl", "model_basis", "delta_hedged_straddle", "win_rate"]
+
+[[term]]
+id = "model_basis"
+term = "Model basis"
+short = "A value priced by a formula on stored inputs, not read from a market quote."
+body = """
+A result with the basis model was computed with an option pricing formula from the implied
+volatility and the stock's price window, because no historical option prices are stored. It
+answers what the structure would have earned in the formula's world. It leaves out the quoted
+spread, the fill, margin and early exercise, so a real result can be lower. When option chains
+have been stored long enough, a result priced from real quotes will carry a different basis.
+Don't compare a model result with a result from quotes as if they were the same kind of number.
+"""
+next = "Treat a model result as a size estimate; the edge's evidence needs the same sample rules as any other."
+see_also = ["outcome_option_model_pnl", "edge", "out_of_sample"]
