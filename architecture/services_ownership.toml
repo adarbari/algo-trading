@@ -204,6 +204,18 @@ section = "docs/adr/0058-llm-usage-log-prices-and-budget.md#budget"
 detect = [{ string = "usage/llm_calls" }, { call = "UsageWriter" }, { call = "UsageLedger" }]
 
 [[responsibility]]
+id = "no-ml-tables"
+description = "Keep rows of a source whose terms bar machine learning (the no_ml tables of architecture/tables.toml = schemas.NO_ML_TABLES, FINRA short interest and short volume) out of every learned fit: training_frame refuses a scorer field computed from one (or one the catalogue cannot resolve), and the winners study leaves such a feature out of its usable fields (the probit proposer fits them all); rule screens and the edge harness may read them; the text model never gets their rows (ADR 0028 amendment 2026-10-17)"
+owner = ["src/algotrade/services/evaluation/training/no_ml.py"]
+allowed = [
+    "src/algotrade/storage/tables/schemas/events.py",  # declares the set
+    "src/algotrade/storage/tables/schemas/__init__.py",  # re-exports it
+    "src/algotrade/services/evaluation/discovery/frame.py",  # leaves such a feature out of the usable fields
+]
+section = "docs/adr/0028-ibkr-enrichment-source.md#amendment-2026-10-17-no-ml-tables"
+detect = [{ string = "NO_ML_TABLES" }]
+
+[[responsibility]]
 id = "on-request-edge-evaluations"
 description = "The API's on-request edge evaluations (ADR 0059): the CLI's `edge-eval` job for the edge's owner only (a user their own edges, an admin a site edge as the site; anyone else is refused), recorded with trigger `ui`, on its own single-worker runner (one queued or running evaluation per owner across processes, the check and submit under `Backend.lock` `edge-eval:<owner>`; a stale RUNNING record is recovered first); writes only results/edge_eval rows and run records under the run's own run id, never market or feature data"
 owner = ["src/algotrade/services/ondemand/*"]

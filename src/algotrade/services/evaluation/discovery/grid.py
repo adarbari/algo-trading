@@ -27,7 +27,7 @@ from algotrade.data import StoreReader
 from algotrade.data.feature_inputs import first_stored_session
 from algotrade.data.listings.universe import universe_asof
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.services.evaluation.training.frame import purge_cutoff
+from algotrade.services.evaluation.training.purge import purge_cutoff
 from algotrade.services.features import entity_field_view
 
 BARS = "bars/1d"

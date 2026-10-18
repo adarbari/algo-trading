@@ -136,7 +136,7 @@ the skill with the fix.
    library's), then `uv lock`; commit `uv.lock`.
 9. **Check locally only what changed, then push; CI is the gate** (owner decision
    2026-10-08: CI has the hardware, the machine does not). Before the push run `make changed`
-   (the mirrored tests of the changed files, the mapped web checks, the fast gates) and the
+   (the mirrored tests of the changed files, `tests/architecture` + `tests/unit/config`, the mapped web checks, the fast gates) and the
    one gate for what you touched when `changed` cannot map it; never the full `make check`
    on the machine (396 runs in one week, 30-40 min each, were the bottleneck). After a CI
    failure rerun only the failed gate locally (`make <gate>` / `npm run <script>`), fix, push
