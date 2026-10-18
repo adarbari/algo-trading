@@ -1,12 +1,13 @@
-"""SEC EDGAR daily form index: the CIKs that filed an 8-K on a day (ADR 0050; free, no key).
+"""SEC EDGAR daily form index: the CIKs that filed an event form (``submissions.FORMS``) on a day
+(ADR 0050; free, no key).
 
 ``https://www.sec.gov/Archives/edgar/daily-index/<YYYY>/QTR<n>/form.<YYYYMMDD>.idx`` lists every
 filing SEC disseminated under that filing date, one fixed-width text line each: form type,
 company name, CIK, date filed (``YYYYMMDD``) and the file name
 (``edgar/data/<cik>/<accession>.txt``).
 It has no items and no acceptance time (the submissions JSON of ``submissions.py`` has both), so
-the nightly uses it only to learn WHICH CIKs to ask. ``normalize`` keeps the ``8-K`` and
-``8-K/A`` lines as ``parsed["daily_index"]`` (``DAILY_INDEX_COLUMNS``): ``cik`` (10 digits),
+the nightly uses it only to learn WHICH CIKs to ask. ``normalize`` keeps the lines of
+``FORMS`` as ``parsed["daily_index"]`` (``DAILY_INDEX_COLUMNS``): ``cik`` (10 digits),
 ``form``, ``accession`` and ``filing_date`` (a calendar day), sorted by accession.
 
 A day without a published index (a weekend, a federal holiday, or a day SEC has not published
@@ -34,9 +35,13 @@ from algotrade_sources.vendors.sec.submissions import FORMS
 SOURCE = "sec_edgar"
 DATASET = "daily_index"
 INDEX_URL = "https://www.sec.gov/Archives/edgar/daily-index/{year}/QTR{quarter}/form.{day}.idx"
+# A form type can hold a space ("NT 10-K"), so the line starts with a known form, longest first
+# (``25`` is not ``25-NSE``, ``SC TO-I`` is not its amendment): the type then ends at whitespace.
+_FORM = "|".join(re.escape(f) for f in sorted(FORMS, key=len, reverse=True))
+_START = re.compile(rf"^(?:{_FORM})(?=\s)")
 _LINE = re.compile(
-    r"^(?P<form>\S+)\s+(?P<name>.+?)\s+(?P<cik>\d+)\s+(?P<filed>\d{8})\s+"
-    r"edgar/data/\d+/(?P<accession>[\w-]+)\.txt\s*$"
+    rf"^(?P<form>{_FORM})\s+(?P<name>.+?)\s+(?P<cik>\d+)\s+"
+    r"(?P<filed>\d{8})\s+edgar/data/\d+/(?P<accession>[\w-]+)\.txt\s*$"
 )
 
 
@@ -60,14 +65,13 @@ def daily_index_request(request: FetchRequest) -> DailyIndexRequest:
 
 
 def parse_index(payload: bytes) -> pd.DataFrame:
-    """The 8-K and 8-K/A lines of one form index (``DAILY_INDEX_COLUMNS``), sorted by accession.
+    """The ``FORMS`` lines of one form index (``DAILY_INDEX_COLUMNS``), sorted by accession.
 
     A line of those forms that does not match the layout is an error: a silently skipped line
     would be a filer the nightly never asks about."""
     rows = []
     for line in payload.decode("latin-1").splitlines():
-        form = line.split(None, 1)[0] if line.strip() else ""
-        if form not in FORMS:
+        if _START.match(line) is None:
             continue
         match = _LINE.match(line)
         if match is None:
@@ -75,7 +79,7 @@ def parse_index(payload: bytes) -> pd.DataFrame:
         rows.append(
             {
                 "cik": pad_cik(match["cik"]),
-                "form": form,
+                "form": match["form"],
                 "accession": match["accession"],
                 "filing_date": pd.to_datetime(match["filed"], format="%Y%m%d"),
             }
