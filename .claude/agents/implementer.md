@@ -23,7 +23,10 @@ checkout after merge. A worktree not made by `scripts/worktree.sh` (an agent wor
 `.claude/worktrees/`) has neither `.venv` nor `worktree.env`, and the auto-mode classifier
 refuses an agent's own `ln -s <main>/.venv .venv` (2026-10-09). Owner decision 2026-10-09: an
 agent that needs the hooks gets a worktree made by `scripts/worktree.sh` from the orchestrator;
-stop and report instead of linking it yourself. Where the shell refuses `export` / `source`, prefix each command that runs
+stop and report instead of linking it yourself. First command of the run: `test -f worktree.env && test -e .venv` (stop and report if either is
+missing: 99 blocked calls in 11 agent sessions, 2026-10-18 review). One simple command per `Bash` call:
+no `cd X && ...` chains, no `$(...)` / `&&` strings that name git; use absolute paths and `git -C <worktree>`
+(the agent-worktree sandbox refuses a compound command it cannot verify). Where the shell refuses `export` / `source`, prefix each command that runs
 Python with it instead: `env PYTHONPATH=... make check ...`, `env PYTHONPATH=... git commit`
 (the hooks run Python). Check with `python -c "import algotrade; print(algotrade.__file__)"`
 that it imports this worktree's code, not main's. On the shared machine run

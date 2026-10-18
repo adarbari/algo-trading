@@ -7,6 +7,8 @@ repos:
       # The GraphQL codegen output is kept byte-for-byte as generated (npm run generated:check).
       - id: end-of-file-fixer
         exclude: ^(datasets/|apps/web/src/shared/api/generated/graphql/)
+      - id: check-merge-conflict
+      # a committed <<<<<<< / >>>>>>> marker slipped through a merge of main (2026-10-18 session review)
       - id: check-yaml
       - id: check-added-large-files
         args: ["--maxkb=1024"]
