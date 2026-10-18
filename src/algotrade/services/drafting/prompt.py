@@ -485,10 +485,21 @@ _WORD = re.compile(r"[a-z0-9]{3,}")
 OPEN_HEADER = "Open requests (key | what it is); reuse one as a missing item's key when it fits:"
 
 
+# Feature groups kept out of the drafting prompt: their columns are not for natural-language drafts
+# yet (etf_macro@v1: macro signals on about 30 carrier funds), and 32 more index lines crowd the
+# budget. Remove a group here when the first edge screens on it (decision log 2026-10-18).
+UNDRAFTED_GROUPS = frozenset({"etf_macro@v1"})
+
+
+def draftable(catalogue: Iterable[FeatureInfo]) -> list[FeatureInfo]:
+    """``catalogue`` without the fields of ``UNDRAFTED_GROUPS``."""
+    return [i for i in catalogue if i.group not in UNDRAFTED_GROUPS]
+
+
 def prefix_text(catalogue: Iterable[FeatureInfo]) -> str:
     """The part of the sliced prompt that no sentence changes: the task, the examples and the
     index of every SITE field (sorted by name)."""
-    site = sorted((i for i in catalogue if i.scope == "site"), key=lambda i: i.name)
+    site = sorted((i for i in draftable(catalogue) if i.scope == "site"), key=lambda i: i.name)
     return f"{TASK}\n{examples_text()}\n{INDEX_HEADER}\n{index_text(site)}\n"
 
 
@@ -542,7 +553,7 @@ def slice_for(
     when given (the small slice of one part's re-draft). The plan is checked against
     the rendered prompt and tightened until the whole fits ``PROMPT_BUDGET_TOKENS`` (or only the
     phrasebook and core fields remain)."""
-    infos, book, keys = list(catalogue), tuple(phrasebook), tuple(open_keys)
+    infos, book, keys = draftable(catalogue), tuple(phrasebook), tuple(open_keys)
     weigh = _weigher(infos, guide)
     matched = select_slice(sentence, infos, book, guide, 0, weigh).phrases
     bare = Slice((), frozenset(), matched)
@@ -583,7 +594,7 @@ def sliced_system_prompt(
     slice), then the caller's own features in full (``scope != "site"``, sorted; most users have
     none). The sentence itself is in the user prompt. ``slice_tokens`` caps the slice (a part's
     re-draft sends the same prefix and a small one, ``services/drafting/redraft``)."""
-    infos, keys = list(catalogue), tuple(open_keys)
+    infos, keys = draftable(catalogue), tuple(open_keys)
     chosen = slice_for(infos, sentence, phrasebook, guide, keys, slice_tokens)
     return _render(infos, sentence, chosen, guide, keys)
 

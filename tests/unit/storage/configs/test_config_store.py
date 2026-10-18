@@ -131,6 +131,17 @@ def test_the_field_guide_is_filed_in_group_folders_and_read_in_stem_order(root: 
     assert store.load("alice", "field_guide", "momentum") is None  # never a user's
 
 
+def test_the_guide_ideas_are_site_only_one_file_per_family(root: Path) -> None:
+    (root / "site" / "guide" / "ideas").mkdir(parents=True)
+    (root / "site" / "guide" / "ideas" / "events.toml").write_text('family = "B"\n')
+    (root / "site" / "guide" / "sections.toml").write_text("")
+    store = FileConfigStore(root)
+    assert store.names("site", "guide_ideas") == ["events"]
+    assert store.names("site", "guide") == ["sections"]  # the subfolder is not a guide file
+    assert store.load("site", "guide_ideas", "events") == {"family": "B"}
+    assert store.load("alice", "guide_ideas", "events") is None  # never a user's
+
+
 def test_the_guide_glossary_is_site_only_one_file_per_theme(root: Path) -> None:
     (root / "site" / "guide" / "glossary").mkdir(parents=True)
     (root / "site" / "guide" / "glossary" / "day.toml").write_text('[[term]]\nid = "run"\n')
