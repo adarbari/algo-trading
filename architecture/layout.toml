@@ -242,6 +242,11 @@ purpose = "feature groups of volatility and trading activity from daily bars (AT
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/bridges"
+purpose = "bridging feature groups: a series that is not a bar (a macro series, the VIX family, CAPE, a rate differential) made a per-fund column (etf_macro@v1), and etf_map.py, the pinned map of which fund carries which signal"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/consensus"
 purpose = "feature groups from analysts' consensus: as the earnings calendar stores it (the surprise of the last reports against their forecast, the revision of the next report's forecast across the nightly snapshots) and from our own analyst snapshots (FY1 / FY2 estimates, price targets: ADR 0068): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus analyst_status.py, the population and status rules the two analyst groups share"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
@@ -259,11 +264,6 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 [[dir]]
 path = "src/algotrade/features/rollups/levels"
 purpose = "feature groups of price-level structure from daily bars (swing pivots and their strength, breakouts and their retests, unfilled gaps): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
-contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
-
-[[dir]]
-path = "src/algotrade/features/rollups/bridges"
-purpose = "bridging feature groups: a series that is not a bar (a macro series, the VIX family, CAPE, a rate differential) made a per-fund column (etf_macro@v1), and etf_map.py, the pinned map of which fund carries which signal"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
