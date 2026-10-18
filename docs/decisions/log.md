@@ -416,7 +416,8 @@ follow-up PR).
 - Options: the logic's own names (AND, OR, AND NOT) / the trader's register.
 - Decision: and -> "and", or -> "or", and_not -> "but not" (one negation beside a card that already states the exclusion, never two); read as "joined by {words}, read as {label}" (just "joined by {words}" when the words equal the label); the Guide entry `describe_part_join` explains it.
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-10-18
 - Reasoning: the traders' own words (but, except, unless) stay visible and the reading beside them is what they would say; a second negation would read as a double negative.
 
 ## 2026-10-17 | PR #589 (Describe it connector) | When the connector token shows
@@ -424,7 +425,8 @@ follow-up PR).
 - Options: every join / only those that change the reading.
 - Decision: join "or" and "and_not" always; join "and" only when the words are not a plain conjunction: hidden when every word (commas ignored) is a plain conjunction: and, with, plus, also, then, or there are no words; shown for but, yet, while, although, though, whereas, as long as, so long as, only if, provided (that).
 - decided by: orchestrator (design call)
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-10-18
 - Reasoning: a token between every pair of cards is noise; "but" or "only if" changes how the second part reads and is where a misread hides.
 
 ## 2026-10-17 | PR #590 (ADR 0071) | Boolean groups: a tree in the engine, one level in the Builder
@@ -561,7 +563,8 @@ follow-up PR).
 - Options: and binds tighter than or, a comma or "ideally" starts a new condition, an exclusion is its own gate / a flat left-to-right reading / the model decides per sentence.
 - Decision: and binds tighter than or (as the expression parser does); a comma or "ideally" starts a new condition, so an "or" never reaches across it; "except A or B" is neither; "except A and B" is neither only for a bare "and" (", and" ends the exclusion); "A or B except C" is (A or B) and not C. One golden case per phrasing pins it.
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-10-18
 - Reasoning: one rule set gives the same reading every time and a wrong reading is one line and one golden case; the owner verifies the cases in the PR. Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it unchanged: "and" narrows a condition and "or" offers alternatives, the narrower screen costs a few missed names where a wider one buries the idea, and the Builder's plain-English line shows any wrong reading before a save. No golden case changes.
 
 ## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Flat fallback when a part cannot sit in a group
@@ -569,7 +572,8 @@ follow-up PR).
 - Options: keep the draft flat as before groups / group the available sides only.
 - Decision: keep it flat; only the formula case gets the verifier's doubt (draft one boolean formula), every other block leaves a visible note ("... is not available, so the 'or' or exclusion is not applied"); two kinds of instrument joined by "or" are doubted (one security_type criterion).
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-10-18
 - Reasoning: grouping the available sides would silently change the meaning (an "or" side dropped makes the other side mandatory). Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it and asked that the note say the other conditions apply on their own (done): blocking the draft would throw away the parts that worked.
 
 ## 2026-10-17 | PR #644 (E1c option-implied features) | IBKR IV30 change as a personal-licence feature
@@ -796,3 +800,28 @@ follow-up PR).
 - Owner read the disclaimer: personal research use, monthly automated pull, no redistribution, no product built on the index.
 - Clause to respect: no reproduction, distribution or transmission without Barclays' consent, so CAPE values and every feature derived from them are never served to other users (`licence = "personal"`, held only by the owners listed in `config/site/users.toml`, ADR 0069).
 - Reasoning: the file is public and unauthenticated and has been served for years, a monthly pull is a light use, and the series is optional (the macro step is non-critical), so withdrawing it costs one registry block.
+
+## 2026-10-18 | EB track E | Owner approvals: shares --force and the stale edge-eval record
+- Question: may the owner-approved ops actions run: a forced refetch of every SEC company-facts CIK (`algotrade-ingest shares --force`), and clearing the stale `edge-eval` job record for edge `momentum_12_1` (status running since 2026-10-18T10:00:35Z, no process)?
+- Options: wait for the nightly backlog (400 CIKs a night) / run `shares --force` once locally; hand-edit or delete the stale record / clear it only through the jobs service.
+- Decision: owner, in the session chat: "run shares --force"; for the stale record: "Approved" (to "clear the stale momentum_12_1 job record through the jobs service"). Bounds: local ingestion through the normal writer, detached, one at a time under the claim lock; no deletes, no `--waive`, no `--force` on anything else, no new vendor calls beyond SEC EDGAR (free, the `shares` task's own pace); the stale record is cleared only through the jobs service (`LocalJobRunner.recover`), never by deleting files by hand.
+- decided by: owner
+- status: final
+- Note: the parent (orchestrating) session ran `shares --force`, not the implementer that recorded this entry; the stale record was cleared by this task through `LocalJobRunner.recover` (kind `edge-eval`, the only running record).
+- Reasoning: the statements groups v2/v3/v4 need every CIK refetched: 5,260 CIKs are in the backlog at 400 a night, about 14 nights; `--force` does it in about 40 minutes. The stale record would otherwise block its owner's edge evaluations until the 2 h staleness window, and it is marked failed ("abandoned: the process running it stopped") with a `finished_at`.
+
+## 2026-10-18 | EB track E | Owner approval: CEF coverage while Tiingo Power is active
+- Question: may closed-end funds be pulled into coverage (and their history) while the Tiingo Power account is active?
+- Options: keep CEFs out of the universe (ADR 0013) / amend coverage to pull CEFs and their history before Tiingo Power ends.
+- Decision: owner, in the session chat: "pull cef also until tingo power is there. If the edges is strong we can reconsider our decision to continue tingo power account"
+- decided by: owner
+- status: final
+- Reasoning: `closed_end_fund_discounts` (Strong), `cef_distribution_trap` and `muni_cef_december` are blocked because CEFs are not in universe coverage (ADR 0013). Bars already exist for 330 CEFs (the nightly Massive grouped-daily and Tiingo bars-history from 2010), so the Tiingo cost is 0 symbols; the change is the universe coverage amendment, with no deadline pressure. Continuing the Tiingo Power account is to be reconsidered if the CEF (or other) edges prove strong.
+
+## 2026-10-18 | EB E5 (PR 680 review) | Allocation edges the harness measures only in part
+- Question: how are the IBS edge (the source day is close(D) to close(D+1), but S = D + 1 at the earliest), the natgas avoid list and the 9-month lookback filed?
+- Options: IBS dropped / filed as a documented-limit variant; natgas against SPY / against the mix of its own funds; a 189-session return column (changes stored group trend_stats@v2) / the 3, 6 and 12 month grid.
+- Decision: IBS filed as a documented-limit variant that tests the second-day return, its failure_modes saying the always-held benchmark makes cash days negative by construction; natgas benchmark is the near-equal mix of UNG, USO and DBO, so a positive excess means cash in falling years beat holding them; keep the 3, 6 and 12 month ensemble, no ret_189d (a full-history recompute, catalogue and golden regeneration, every @v2 preset moves; the 9-month return correlates about 0.9 with 6 and 12; a later 4-member grid is a new trial by hash; revisit only if the 3-member ensemble reaches Promising).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a document that states what it cannot measure is better than none, and a stored-group change for a highly correlated member is cost without information.
