@@ -13,9 +13,26 @@ SYMBOL_FIELD = "instrument.symbol"
 MAX_NAMED = 10
 
 
-def named_symbols(universe: Selection, where: str = "universe") -> tuple[str, ...]:
+def check_raw_returns(where: str, kind: str, benchmark: str, timed: bool) -> None:
+    """An excess return needs SPY; a time-series edge's (``timed``) is the raw return, only."""
+    if kind == "excess_return" and benchmark == "none" and not timed:
+        raise ConfigurationError(f"{where} benchmark: an excess return needs SPY, not 'none'")
+    if timed and (kind != "excess_return" or benchmark != "none"):
+        raise ConfigurationError(
+            f"{where} kind: base 'out_of_window' compares raw returns: kind "
+            f"'excess_return' with benchmark 'none', got {kind!r} over {benchmark!r}"
+        )
+
+
+def named_symbols(universe: str | Selection, where: str = "universe") -> tuple[str, ...]:
     """The symbols ``universe`` names, in order, each once; ``ConfigurationError`` when it is
-    anything but one ``instrument.symbol`` ``in`` / ``eq`` rule over 1 to ``MAX_NAMED`` symbols."""
+    a preset name (the instruments are named inline) or anything but one ``instrument.symbol``
+    ``in`` / ``eq`` rule over 1 to ``MAX_NAMED`` symbols."""
+    if isinstance(universe, str):
+        raise ConfigurationError(
+            f"{where}: base 'out_of_window' names its instruments inline "
+            f"([universe] where = ...), not a preset"
+        )
     rules = universe.where.rules()
     only = universe.where.kind == "all" and len(rules) == 1 == len(universe.where.children)
     rule: Rule = rules[0] if rules else Rule("", "eq")
