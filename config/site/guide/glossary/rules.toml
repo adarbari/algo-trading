@@ -15,7 +15,7 @@ score), a soft or score criterion may have a tolerance, and a soft one an on_mis
 funnel shows the criteria in the order written. A criterion can be switched off without
 deleting it.
 """
-see_also = ["op", "mode", "tolerance", "on_miss"]
+see_also = ["op", "mode", "tolerance", "on_miss", "criterion_group"]
 
 [[term]]
 id = "op"
@@ -92,3 +92,46 @@ criteria have an on_miss: a hard miss is always a REJECT and a score miss change
 score.
 """
 see_also = ["watch", "liquidity_risk", "event_risk", "near_miss", "reject"]
+
+# ---------------------------------------------------------------------------- groups (ADR 0071)
+
+[[term]]
+id = "criterion_group"
+term = "Criterion group"
+short = "Criteria combined into one step of a screen: all of them, any of them, or none of them."
+body = """
+A group holds two or more criteria, or other groups, and decides as one. A screen without groups needs every gating criterion to pass; a group changes that for the criteria inside it. Each criterion in a group keeps its own mode, tolerance and on_miss. A group has no mode of its own. At the top level a group is a step of the funnel, placed where its first criterion is written, and the screen still needs every step.
+
+On a result a group shows its outcome (pass, near miss, fail or missing) and the member that decided it. Example: the group oversold, any of rsi_low and near_low, with RSI at 41 and the price 12% above its low, fails because neither member passes. Don't read a group's outcome as a measurement: open its members to see the values.
+"""
+see_also = ["group_all", "group_any", "group_none", "criterion", "mode", "near_miss", "hard", "gating_criterion", "on_miss"]
+
+[[term]]
+id = "group_all"
+term = "all (group)"
+short = "A group that passes only when every member passes."
+body = """
+An all group is the screen's own rule applied to a few criteria. One miss rejects it and the penalties add up. A near miss keeps the most severe on_miss among its members. It is useful inside an any group, as in (RSI below 30 and volume up) or price near its low.
+"""
+next = "Open the failing member to see which value missed, and by how much."
+see_also = ["criterion_group", "group_any", "near_miss", "on_miss"]
+
+[[term]]
+id = "group_any"
+term = "any (group)"
+short = "A group that passes when at least one member passes, taking the verdict of its best member."
+body = """
+An any group is an or. It takes the verdict of its best member: one that passes before one that does not, then the lowest penalty, then the order written. With RSI a near miss and volume a hard fail, the group is the RSI near miss. A hard any with no passing member rejects the row, and it also rejects when the members have no value, so missing data never passes. An any with a score member never rejects.
+"""
+next = "Read the deciding member on the row: it is the one that carried the group."
+see_also = ["criterion_group", "group_all", "near_miss", "score_mode", "hard"]
+
+[[term]]
+id = "group_none"
+term = "none (group)"
+short = "A group that passes when no member holds: the screen excludes every condition listed."
+body = """
+A none group is an except. Each member is turned into its opposite, so none of RSI below 30 means RSI at or above 30, and the group needs all of those opposites to hold. A member keeps its mode and tolerance: with a tolerance of 2, RSI at 29 is a near miss. A row that matches an excluded condition fails, with the reason naming it.
+"""
+next = "To find why a row failed, look for the excluded condition it matched."
+see_also = ["criterion_group", "group_all", "near_miss", "reject"]

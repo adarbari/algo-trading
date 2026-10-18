@@ -24,7 +24,7 @@ from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.availability import Unavailable
 from algotrade_api.graphql.types.evaluation.track_record import TrackRecord
 from algotrade_api.graphql.types.instruments.feature import Unknown
-from algotrade_api.graphql.types.screens.result import ChangeCount, ScreenResultPage
+from algotrade_api.graphql.types.screens.result import ChangeCount, ScreenGroup, ScreenResultPage
 
 
 @strawberry.type(description="How many rows of a run got one decision")
@@ -162,7 +162,7 @@ class ScreenerRun:
     description="A criterion of a screen, in funnel order: the field it judges, its `mode` and "
     "its rule as the config states it: the operator `op` and the threshold `value` in the "
     "field's stored unit (a number, a string or boolean, a list for `in` / `between`; null: "
-    "the operator takes none)"
+    "the operator takes none); `group` is the id of the group it sits in (null: a gate, ADR 0071)"
 )
 class ScreenCriterion:
     id: str
@@ -170,11 +170,12 @@ class ScreenCriterion:
     mode: str
     op: str
     value: JSON | None
+    group: str | None
 
     @classmethod
     def of(cls, d: screeners.ScreenCriterion) -> Self:
         value = list(d.value) if isinstance(d.value, tuple) else d.value
-        return cls(id=d.id, field=d.field, mode=d.mode, op=d.op, value=JSON(value))
+        return cls(id=d.id, field=d.field, mode=d.mode, op=d.op, value=JSON(value), group=d.group)
 
 
 @strawberry.type(description="A display column of a screen: its name and catalogue field")
@@ -210,7 +211,8 @@ class PickCount:
 
 @strawberry.type(
     description="A rule screen as the user sees it (their own config, else the site preset): "
-    "`owner` is whose runs are its; `criteria` and `displayColumns` the current config's; "
+    "`owner` is whose runs are its; `criteria`, `groups` and `displayColumns` the current "
+    "config's; "
     "`latestRun` its run for the session, else `notRun` says why (NOT_RUN); `pickHistory` its "
     "picked count per session over a window ending at the session"
 )
@@ -223,6 +225,7 @@ class Screener:
     hash: str
     criteria: list[ScreenCriterion]
     display_columns: list[ScreenColumn]
+    groups: list[ScreenGroup]
     ctx: strawberry.Private[ReadContext]
 
     @classmethod
@@ -236,6 +239,7 @@ class Screener:
             hash=d.hash,
             criteria=[ScreenCriterion.of(c) for c in d.criteria],
             display_columns=[ScreenColumn.of(c) for c in d.display_columns],
+            groups=[ScreenGroup.of(g) for g in d.groups],
             ctx=ctx,
         )
 

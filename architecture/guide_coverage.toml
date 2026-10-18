@@ -67,6 +67,11 @@ source = "graphql:FeatureFormat"
 exempt = "a display hint for the column (percent, date, ...), never shown as a word"
 
 [[enum]]
+source = "graphql:ScreenGroup.kind"
+values_from = "python:algotrade.core.model.screen_spec:GROUP_KINDS"
+values = { all = "term:group_all", any = "term:group_any", none = "term:group_none" }
+
+[[enum]]
 source = "graphql:Edge.status"
 values_from = "python:algotrade.config.edges.document:STATUSES"
 values = { researching = "term:edge_status", candidate = "term:edge_status", evidenced = "term:edge_status", live = "term:edge_status", retired = "term:edge_status", rejected = "term:edge_status", blocked = "term:edge_status" }

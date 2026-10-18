@@ -416,7 +416,7 @@ note = "every rule screen's rows (ADR 0029), framed by services/screening/rule_r
 [[table]]
 name = "results/rule_screen_values"
 owner = "src/algotrade/storage/tables/result_writer.py"
-note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen"
+note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen; group rows (mode = group, field = the kind, value_str = the deciding member) and a nullable group_id (the parent) on member rows (ADR 0071); readers skip group rows beside display columns (is_criterion_row)"
 
 [[table]]
 name = "results/edge_eval"
