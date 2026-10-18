@@ -46,6 +46,7 @@ KEYS = (
     "licence",
     "terms",
     "revised",
+    "refetch_days",
     *FILE_KEYS,
 )
 _KEY = re.compile(r"^[A-Z0-9][A-Z0-9_]*$")
@@ -76,6 +77,7 @@ class MacroSeries:
     value_column: str = ""
     parser: str = ""
     revised: bool = False
+    refetch_days: int = 0  # a published file: read again after this many days (0: by cadence)
 
     @property
     def is_revised(self) -> bool:
@@ -169,6 +171,7 @@ def _series(doc: Mapping[str, Any], index: int) -> MacroSeries:
         value_column=t.text("value_column", ""),
         parser=t.text("parser", "csv" if source == "published" else ""),
         revised=t.boolean("revised", False),
+        refetch_days=t.integer("refetch_days", 0, 0),
     )
     _check_source(s, where)
     return s

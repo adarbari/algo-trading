@@ -26,7 +26,7 @@ EBP = SeriesRequest(
 )
 REPO = Path(__file__).resolve().parents[5]
 RECORDED = REPO / "tests" / "fixtures" / "sources" / "published"
-RECORDED_FILES = {"ebp_csv.csv", "fsi.csv", "All_Daily_Policy_Data.csv"}  # named as served
+RECORDED_FILES = {"ebp_csv.csv", "fsi.csv", "All_Daily_Policy_Data.csv", "cape.csv"}  # as served
 OFR = SeriesRequest(
     "OFR_FSI", url="https://example.org/fsi.csv", date_column="Date", value_column="OFR FSI"
 )
@@ -139,6 +139,7 @@ def test_epu_daily_builds_the_date_from_its_three_columns() -> None:
         ("EBP_RECESSION_PROB", 9, date(1973, 1, 1), 0.18496912088474687),
         ("OFR_FSI", 6, date(2000, 1, 3), 2.14),
         ("EPU_DAILY", 6, date(1985, 1, 1), 103.83),
+        ("CAPE_USA", 5, date(1981, 12, 31), 9.8),  # cape.csv is hand-built in the file's format
     ],
 )
 def test_each_registry_file_loads_from_its_recorded_response(
@@ -159,3 +160,46 @@ def test_each_registry_file_loads_from_its_recorded_response(
     assert frame["obs_date"].dt.date.iloc[0] == first
     assert frame["value"].iloc[0] == pytest.approx(value)
     assert frame["obs_date"].is_monotonic_increasing
+
+
+CAPE_JAPAN = SeriesRequest(
+    "CAPE_JAPAN", url="https://example.org/cape.csv", date_column="Date", value_column="Japan",
+    parser="cape_csv",
+)  # fmt: skip
+
+
+def test_cape_reads_dates_day_first_and_placeholders_as_no_value() -> None:
+    payload = (RECORDED / "cape.csv").read_bytes()
+    japan = parse_series(CAPE_JAPAN, payload)
+    assert japan["obs_date"].dt.date.tolist()[:3] == [
+        date(1981, 12, 31), date(1982, 1, 31), date(1982, 2, 28),
+    ]  # fmt: skip
+    assert japan["value"].isna().tolist() == [True, False, False, False, False]  # 0: not started
+    russia = parse_series(SeriesRequest(**{**vars(CAPE_JAPAN), "value_column": "Russia"}), payload)
+    assert russia["value"].tolist()[2] == 4.1 and russia["value"].isna().tolist()[3:] == [True] * 2
+    day_first = b"Date,USA\n05/10/1982,20.5\n"
+    usa = parse_series(SeriesRequest(**{**vars(CAPE_JAPAN), "value_column": "USA"}), day_first)
+    assert usa["obs_date"].dt.date.tolist() == [date(1982, 10, 5)]  # not 10 May
+
+
+def test_the_cape_registry_is_one_personal_file_pulled_monthly() -> None:
+    cape = [
+        s for s in load_macro(FileConfigStore(REPO / "config")).series if s.key.startswith("CAPE_")
+    ]
+    assert len(cape) == 26 and {s.url for s in cape} == {cape[0].url}
+    assert {s.licence for s in cape} == {"personal"} and {s.refetch_days for s in cape} == {31}
+    assert all(s.pit == "lag" and s.revised and s.release_lag_days == 45 for s in cape)
+    assert {s.parser for s in cape} == {"cape_csv"}
+
+
+def test_one_file_serving_many_series_is_requested_once() -> None:
+    urls: list[str] = []
+
+    def transport(url: str) -> bytes:
+        urls.append(url)
+        return files.STOOQ
+
+    source = PublishedSeries(http_for(transport))
+    for _ in range(3):
+        source.fetch(STOOQ)
+    assert urls == [STOOQ.url]

@@ -257,6 +257,10 @@ def test_a_published_file_is_refetched_by_cadence_but_at_most_weekly() -> None:
     )
     assert [refetch_days(s) for s in monthly.series] == [7, 7]
     assert refetch_days(REGISTRY.by_key("SPX")) == 1
+    pulled = MacroSettings.from_document(
+        {"series": [{**SPX, "cadence": "monthly", "refetch_days": 31}]}
+    )
+    assert refetch_days(pulled.series[0]) == 31  # a use-limited file: one pull a month
     ctx = context(Feeds())
     ingest_macro(ctx, REGISTRY, D1, only=["SPX"])
     assert ingest_macro(ctx, REGISTRY, D1).items["SPX"] == "NOT_DUE"

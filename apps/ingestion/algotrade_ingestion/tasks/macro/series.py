@@ -57,7 +57,9 @@ MAX_REFETCH_DAYS = 7
 
 
 def refetch_days(spec: MacroSeries) -> int:
-    return min(spec.cadence_days, MAX_REFETCH_DAYS)
+    """The registry's ``refetch_days`` (a file with a use-limited licence: one pull a month),
+    else the cadence capped at a week."""
+    return spec.refetch_days or min(spec.cadence_days, MAX_REFETCH_DAYS)
 
 
 def _last_fetched(ctx: TaskContext) -> dict[str, date]:
