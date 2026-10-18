@@ -815,3 +815,37 @@ name = "a null is not a value"
 signs = "The field is often null by construction: feature.pe_ratio (loss makers, ADRs), feature.iv_rank (under 60 sessions of IV), the 52-week fields (under 240 bars), rollup.earnings@v1.days_to_earnings (no announced date, every ETF), feature.option_tier (a failed chain run)."
 affects = ["feature.pe_ratio", "feature.revenue_growth_yoy", "feature.iv_rank", "feature.iv_percentile", "feature.pct_from_high_52w", "feature.pct_from_low_52w", "rollup.earnings@v1.days_to_earnings", "feature.earnings_before_expiry", "feature.option_tier", "feature.market_cap"]
 do = "A null never passes a hard criterion and a soft one lists it as a near miss; so a hard 'pe_ratio lt 15' drops every unprofitable company and 'days_to_earnings gt 10' drops every ETF. Choose hard only when excluding the unknown is the intent; otherwise soft (listed with the reason) or score (ranked lower). 'not_null' is the explicit way to require the fact."
+
+[[field]]
+name = "rollup.ibkr_iv_history@v1.ibkr_iv_chg_21d"
+theme = "implied volatility"
+reads = "IBKR's 30-day implied vol now minus 21 sessions ago (about a month), as a fraction (0.03 is three vol points). IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split (rollup.cp_iv_history@v1.atm_call_iv_chg_21d and atm_put_iv_chg_21d). Unlike the chain-derived changes it has history: IBKR's IV reaches back about 502 sessions. Personal-use data: it carries the personal licence."
+caveats = [
+  "It moves with the market: when every name's IV rises in a sell-off the change says little; judge it as a rank across names on the session.",
+  "An earnings date inside the window lifts IV and drops it after; read the earnings fields before reading a change across one.",
+  "Null if IBKR had no IV today or 21 sessions ago (a gap is not filled), or IB Gateway was down for the session's pull.",
+]
+sources = ["An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181"]
+[[field.use]]
+for = "IBKR IV up three vol points in a month"
+op = "gte"
+value = 0.03
+mode = "soft"
+tolerance = 0.01
+note = "overall IV change, calls and puts blended; compare across names"
+
+[[field]]
+name = "rollup.ibkr_iv_history@v1.ibkr_iv_chg_5d"
+theme = "implied volatility"
+reads = "IBKR's 30-day implied vol now minus 5 sessions ago, as a fraction: option buyers paying up (positive) or backing off (negative) over a week. IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split. Personal-use data: it carries the personal licence."
+caveats = [
+  "Same caveats and nulls as rollup.ibkr_iv_history@v1.ibkr_iv_chg_21d; a week is noisier than a month.",
+]
+sources = ["Site convention (docs/edge-ideas/options-volatility.md c03)"]
+[[field.use]]
+for = "IBKR IV up three vol points in a week"
+op = "gte"
+value = 0.03
+mode = "soft"
+tolerance = 0.01
+note = "overall IV change, calls and puts blended; compare across names"

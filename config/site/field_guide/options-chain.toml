@@ -827,7 +827,7 @@ theme = "option chain and short strikes"
 reads = "The option-to-stock volume ratio (Johnson and So): the shares the session's option volume controls (call plus put contracts times 100, every expiry) over the stock's share volume that session. 0.05 is option volume worth 5% of the shares traded; far above a name's usual level is informed option trading. High readings have preceded lower returns over a week to a month, so it is a filter to avoid, not a long signal. Chains are stored from 2026-10-02 only, so this has no history before that date."
 caveats = [
   "Only the ratio's rank across names or against the name's own usual level means anything; rollup.flow_history@v1.option_volume_rel_20d is the name against its own volume once it has 10 sessions.",
-  "It counts hedging and market-making trades as well as informed ones, and cannot tell opening from closing trades or calls from puts (the published strongest part, opening call buys, is not in our data); read feature.put_call_volume_ratio for the side.",
+  "It counts hedging and market-making trades as well as informed ones. It cannot tell opening from closing trades, and the published strongest part, opening call buys, is not in our data. Read feature.put_call_volume_ratio for the side.",
   "Index-like and meme names run a high ratio all year; a name above its own history is the signal, not a high level.",
   "Null with no option chain or no chain volume for the session, or with no stock volume (zero is null, never infinity).",
 ]
@@ -849,10 +849,10 @@ note = "to exclude; read against the name's own usual level"
 [[field]]
 name = "rollup.cp_iv@v1.cp_iv_spread"
 theme = "implied volatility"
-reads = "The call-put IV spread: call IV minus put IV on the same strike, averaged over the pairs within 10% of the spot and weighted by open interest, at the expiry nearest 30 days (as a fraction: 0.02 is two vol points). Positive: calls richer than puts, the pattern Cremers and Weinbaum found ahead of stock gains over a week to a month; negative: puts richer. Near zero is the normal state, and the published edge is a rank across many names, not a level. History starts 2026-10-02, when the chains were first stored."
+reads = "The call-put IV spread, as a fraction (0.02 is two vol points): call IV minus put IV on the same strike, averaged over the pairs within 10% of the spot. Pairs are weighted by open interest, at the expiry nearest 30 days. Positive: calls richer than puts, the pattern Cremers and Weinbaum found ahead of stock gains over a week to a month; negative: puts richer. Near zero is the normal state, and the published edge is a rank across many names, not a level. History starts 2026-10-02, when the chains were first stored."
 caveats = [
   "A cross-sectional signal: judge a name against the others on the same session, not against zero. One name's level over a few weeks says little.",
-  "Put-call parity pins call and put IV together, so a large spread is usually a hard-to-borrow name (puts bid up) or a dividend or event the quotes price in; read rollup.cp_iv@v1.cp_iv_dte and the earnings fields before trusting it.",
+  "Put-call parity pins call and put IV together, so a large spread is usually a hard-to-borrow name (puts bid up). It can also be a dividend or event the quotes price in. Read rollup.cp_iv@v1.cp_iv_dte and the earnings fields before trusting it.",
   "Thin chains lie: the weight is open interest, but a few contracts can set the average. Read rollup.option_liquidity@v1.chain_oi for how deep the chain is.",
   "Stored quotes are the close, not a live market, and the published effect has decayed since 2005; expect about half the published spread, if any.",
   "Null while cp_iv_status is not OK: no expiry 10..60 days out, no pair of the same strike with quotes on both sides, or no open interest on the pairs.",
@@ -869,9 +869,9 @@ note = "a rank across names is the published rule; this is a coarse level cut"
 [[field]]
 name = "rollup.cp_iv@v1.iv_smirk"
 theme = "implied volatility"
-reads = "The individual-option smirk (Xing, Zhang and Zhao): the IV of the put 5% to 20% out of the money (the one nearest 5%) minus the IV of the call at the money, at the expiry nearest 30 days, as a fraction. A high value means the put wing is paid up; steep smirks have preceded lower returns and negative earnings surprises over the following weeks to months. History starts 2026-10-02, when the chains were first stored."
+reads = "The individual-option smirk (Xing, Zhang and Zhao), as a fraction. It is the IV of the put 5% to 20% out of the money (nearest 5%) minus the ATM call IV. It reads the expiry nearest 30 days. A high value means the put wing is paid up; steep smirks have preceded lower returns and negative earnings surprises over the following weeks to months. History starts 2026-10-02, when the chains were first stored."
 caveats = [
-  "It is not rollup.skew@v1.skew: that one is the 25-delta put minus call over ATM vol at a constant 30 days; this is a moneyness pick from one listed expiry, so the two agree in sign but not in size.",
+  "It is not rollup.skew@v1.skew, the 25-delta put minus call over ATM vol at a constant 30 days. This one is a moneyness pick from one listed expiry, so the two agree in sign but not in size.",
   "A high-vol or event-heavy name has a large smirk at an ordinary shape; compare names on one session as a rank, and read feature.skew_rr25 or rollup.skew@v1.skew for the delta-based view.",
   "The smirk's low side is a mild quality tilt; the short side needs borrow, and steep-smirk names are often hard to borrow.",
   "Null with no OTM put in the band, no ATM call within 5% of the spot, or cp_iv_status of NO_SPOT, NO_CHAIN or NO_EXPIRY.",
@@ -888,22 +888,36 @@ note = "avoid or fade; the published rule is a quintile rank, this is a coarse l
 [[field]]
 name = "rollup.cp_iv@v1.atm_call_iv"
 theme = "implied volatility"
-reads = "The call IV at the strike nearest the spot (within 5%) at the expiry nearest 30 days, as a fraction: our own inversion of the mid, which is the call-side input An, Ang, Bali and Cakici sort on. Close to rollup.iv30@v1.iv30 on a liquid name. History starts 2026-10-02, when the chains were first stored."
+reads = "The call IV at the strike nearest the spot (within 5%), as a fraction, at the expiry nearest 30 days. It is our own inversion of the mid and the call-side input An, Ang, Bali and Cakici sort on. Close to rollup.iv30@v1.iv30 on a liquid name. History starts 2026-10-02, when the chains were first stored."
 caveats = [
   "A level is not the signal: the published rule uses the change over a month (rollup.cp_iv_history@v1.atm_call_iv_chg_21d), which needs 21 sessions of stored chains.",
   "One strike at one expiry: a wide quote or a thin strike moves it; rollup.iv30@v1.iv30 is the interpolated 30-day figure for a plain ATM vol.",
   "Null with no call within 5% of the spot that has a two-sided quote under the spread cap.",
 ]
 sources = ["An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181"]
+[[field.use]]
+for = "an ATM call vol of at least 40%"
+op = "gte"
+value = 0.4
+mode = "soft"
+tolerance = 0.05
+note = "a level only; the published signal is the month's change"
 
 [[field]]
 name = "rollup.cp_iv@v1.atm_put_iv"
 theme = "implied volatility"
-reads = "The put IV at the strike nearest the spot (within 5%) at the expiry nearest 30 days, as a fraction: the put-side input of the An, Ang, Bali and Cakici signal. Within a vol point or two of rollup.cp_iv@v1.atm_call_iv on a liquid name."
+reads = "The put IV at the strike nearest the spot (within 5%), as a fraction, at the expiry nearest 30 days. It is the put-side input of the An, Ang, Bali and Cakici signal. Within a vol point or two of rollup.cp_iv@v1.atm_call_iv on a liquid name."
 caveats = [
   "Same construction, same 2026-10-02 start and nulls as rollup.cp_iv@v1.atm_call_iv; the published rule reads the change (rollup.cp_iv_history@v1.atm_put_iv_chg_21d), with the opposite sign to the call's.",
 ]
 sources = ["An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181"]
+[[field.use]]
+for = "an ATM put vol of at least 40%"
+op = "gte"
+value = 0.4
+mode = "soft"
+tolerance = 0.05
+note = "a level only; the published signal is the month's change"
 
 [[field]]
 name = "rollup.cp_iv_history@v1.atm_call_iv_chg_21d"
@@ -915,6 +929,13 @@ caveats = [
   "Null if the ATM call IV is missing today or 21 sessions ago (a gap is not filled).",
 ]
 sources = ["An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181"]
+[[field.use]]
+for = "call IV up three vol points in a month"
+op = "gte"
+value = 0.03
+mode = "soft"
+tolerance = 0.01
+note = "as a rank across names; read with the put's change"
 
 [[field]]
 name = "rollup.cp_iv_history@v1.atm_put_iv_chg_21d"
@@ -924,6 +945,13 @@ caveats = [
   "Same caveats and nulls as rollup.cp_iv_history@v1.atm_call_iv_chg_21d.",
 ]
 sources = ["An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181"]
+[[field.use]]
+for = "put IV up three vol points in a month"
+op = "gte"
+value = 0.03
+mode = "soft"
+tolerance = 0.01
+note = "the published sign is negative for the stock; read with the call's change"
 
 [[field]]
 name = "rollup.cp_iv_history@v1.cp_iv_spread_chg_5d"
@@ -934,14 +962,28 @@ caveats = [
   "Null if either end has no spread (a gap is not filled).",
 ]
 sources = ["Lei, Wang and Yan, Option-implied information ahead of earnings announcements (2020)"]
+[[field.use]]
+for = "the call-put spread up two vol points in a week"
+op = "gte"
+value = 0.02
+mode = "soft"
+tolerance = 0.005
+note = "as a rank across names; best ahead of earnings"
 
 [[field]]
 name = "rollup.cp_iv_history@v1.iv30_chg_5d"
 theme = "implied volatility"
-reads = "Our 30-day ATM IV now minus 5 sessions ago, as a fraction (0.03 is three vol points): a rising value is option buyers paying up over the week, as ahead of an event or in a sell-off. Chains are stored from 2026-10-02 only, so this reads null until 2026-10-09; IBKR's own IV history reaches back further but is not used here."
+reads = "Our 30-day ATM IV now minus 5 sessions ago, as a fraction (0.03 is three vol points). A rising value is option buyers paying up over the week, as ahead of an event or in a sell-off. Chains are stored from 2026-10-02 only, so this reads null until 2026-10-09; IBKR's own IV history reaches back further but is not used here."
 caveats = [
   "It moves with the market: compare a name to the others on the session, not to zero.",
   "A rise ahead of earnings is the term structure doing its job; read feature.term_ratio_next_30.",
   "Null if iv30 is missing today or 5 sessions ago (a gap is not filled).",
 ]
 sources = ["Site convention (docs/edge-ideas/options-volatility.md c03)"]
+[[field.use]]
+for = "IV30 up three vol points in a week"
+op = "gte"
+value = 0.03
+mode = "soft"
+tolerance = 0.01
+note = "a market-wide move lifts every name; compare across names"

@@ -969,23 +969,3 @@ value = 0.7
 mode = "soft"
 tolerance = 0.1
 note = "with rollup.vol_stats@v1.hv20_pctile_252d lte 0.2 for a contraction against the year as well"
-
-[[field]]
-name = "rollup.ibkr_iv_history@v1.ibkr_iv_chg_21d"
-theme = "implied volatility"
-reads = "IBKR's 30-day implied vol now minus 21 sessions ago (about a month), as a fraction (0.03 is three vol points). IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split (rollup.cp_iv_history@v1.atm_call_iv_chg_21d and atm_put_iv_chg_21d). Unlike the chain-derived changes it has history: IBKR's IV reaches back about 502 sessions. Personal-use data: it carries the personal licence."
-caveats = [
-  "It moves with the market: when every name's IV rises in a sell-off the change says little; judge it as a rank across names on the session.",
-  "An earnings date inside the window lifts IV and drops it after; read the earnings fields before reading a change across one.",
-  "Null if IBKR had no IV today or 21 sessions ago (a gap is not filled), or IB Gateway was down for the session's pull.",
-]
-sources = ["An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181"]
-
-[[field]]
-name = "rollup.ibkr_iv_history@v1.ibkr_iv_chg_5d"
-theme = "implied volatility"
-reads = "IBKR's 30-day implied vol now minus 5 sessions ago, as a fraction: option buyers paying up (positive) or backing off (negative) over a week. IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split. Personal-use data: it carries the personal licence."
-caveats = [
-  "Same caveats and nulls as rollup.ibkr_iv_history@v1.ibkr_iv_chg_21d; a week is noisier than a month.",
-]
-sources = ["Site convention (docs/edge-ideas/options-volatility.md c03)"]

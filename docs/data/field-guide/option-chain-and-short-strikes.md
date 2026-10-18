@@ -839,7 +839,7 @@ Sources: Site convention
 **When the reading lies**
 
 - Only the ratio's rank across names or against the name's own usual level means anything; rollup.flow_history@v1.option_volume_rel_20d is the name against its own volume once it has 10 sessions.
-- It counts hedging and market-making trades as well as informed ones, and cannot tell opening from closing trades or calls from puts (the published strongest part, opening call buys, is not in our data); read feature.put_call_volume_ratio for the side.
+- It counts hedging and market-making trades as well as informed ones. It cannot tell opening from closing trades, and the published strongest part, opening call buys, is not in our data. Read feature.put_call_volume_ratio for the side.
 - Index-like and meme names run a high ratio all year; a name above its own history is the signal, not a high level.
 - Null with no option chain or no chain volume for the session, or with no stock volume (zero is null, never infinity).
 

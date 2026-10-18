@@ -290,9 +290,43 @@ Sources: Term structure of implied volatility and calendar spreads: Natenberg, O
 
 Sources: Event vol in the front expiry: https://www.tastylive.com/concepts-strategies/implied-volatility-earnings
 
+### `rollup.ibkr_iv_history@v1.ibkr_iv_chg_21d`
+
+**How to read it.** IBKR's 30-day implied vol now minus 21 sessions ago (about a month), as a fraction (0.03 is three vol points). IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split (rollup.cp_iv_history@v1.atm_call_iv_chg_21d and atm_put_iv_chg_21d). Unlike the chain-derived changes it has history: IBKR's IV reaches back about 502 sessions. Personal-use data: it carries the personal licence.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| IBKR IV up three vol points in a month | `gte 0.03` | soft | 0.01 | overall IV change, calls and puts blended; compare across names |
+
+**When the reading lies**
+
+- It moves with the market: when every name's IV rises in a sell-off the change says little; judge it as a rank across names on the session.
+- An earnings date inside the window lifts IV and drops it after; read the earnings fields before reading a change across one.
+- Null if IBKR had no IV today or 21 sessions ago (a gap is not filled), or IB Gateway was down for the session's pull.
+
+Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181
+
+### `rollup.ibkr_iv_history@v1.ibkr_iv_chg_5d`
+
+**How to read it.** IBKR's 30-day implied vol now minus 5 sessions ago, as a fraction: option buyers paying up (positive) or backing off (negative) over a week. IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split. Personal-use data: it carries the personal licence.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| IBKR IV up three vol points in a week | `gte 0.03` | soft | 0.01 | overall IV change, calls and puts blended; compare across names |
+
+**When the reading lies**
+
+- Same caveats and nulls as rollup.ibkr_iv_history@v1.ibkr_iv_chg_21d; a week is noisier than a month.
+
+Sources: Site convention (docs/edge-ideas/options-volatility.md c03)
+
 ### `rollup.cp_iv@v1.cp_iv_spread`
 
-**How to read it.** The call-put IV spread: call IV minus put IV on the same strike, averaged over the pairs within 10% of the spot and weighted by open interest, at the expiry nearest 30 days (as a fraction: 0.02 is two vol points). Positive: calls richer than puts, the pattern Cremers and Weinbaum found ahead of stock gains over a week to a month; negative: puts richer. Near zero is the normal state, and the published edge is a rank across many names, not a level. History starts 2026-10-02, when the chains were first stored.
+**How to read it.** The call-put IV spread, as a fraction (0.02 is two vol points): call IV minus put IV on the same strike, averaged over the pairs within 10% of the spot. Pairs are weighted by open interest, at the expiry nearest 30 days. Positive: calls richer than puts, the pattern Cremers and Weinbaum found ahead of stock gains over a week to a month; negative: puts richer. Near zero is the normal state, and the published edge is a rank across many names, not a level. History starts 2026-10-02, when the chains were first stored.
 
 **The criterion per intent**
 
@@ -303,7 +337,7 @@ Sources: Event vol in the front expiry: https://www.tastylive.com/concepts-strat
 **When the reading lies**
 
 - A cross-sectional signal: judge a name against the others on the same session, not against zero. One name's level over a few weeks says little.
-- Put-call parity pins call and put IV together, so a large spread is usually a hard-to-borrow name (puts bid up) or a dividend or event the quotes price in; read rollup.cp_iv@v1.cp_iv_dte and the earnings fields before trusting it.
+- Put-call parity pins call and put IV together, so a large spread is usually a hard-to-borrow name (puts bid up). It can also be a dividend or event the quotes price in. Read rollup.cp_iv@v1.cp_iv_dte and the earnings fields before trusting it.
 - Thin chains lie: the weight is open interest, but a few contracts can set the average. Read rollup.option_liquidity@v1.chain_oi for how deep the chain is.
 - Stored quotes are the close, not a live market, and the published effect has decayed since 2005; expect about half the published spread, if any.
 - Null while cp_iv_status is not OK: no expiry 10..60 days out, no pair of the same strike with quotes on both sides, or no open interest on the pairs.
@@ -312,7 +346,7 @@ Sources: Cremers and Weinbaum, Deviations from Put-Call Parity and Stock Return 
 
 ### `rollup.cp_iv@v1.iv_smirk`
 
-**How to read it.** The individual-option smirk (Xing, Zhang and Zhao): the IV of the put 5% to 20% out of the money (the one nearest 5%) minus the IV of the call at the money, at the expiry nearest 30 days, as a fraction. A high value means the put wing is paid up; steep smirks have preceded lower returns and negative earnings surprises over the following weeks to months. History starts 2026-10-02, when the chains were first stored.
+**How to read it.** The individual-option smirk (Xing, Zhang and Zhao), as a fraction. It is the IV of the put 5% to 20% out of the money (nearest 5%) minus the ATM call IV. It reads the expiry nearest 30 days. A high value means the put wing is paid up; steep smirks have preceded lower returns and negative earnings surprises over the following weeks to months. History starts 2026-10-02, when the chains were first stored.
 
 **The criterion per intent**
 
@@ -322,7 +356,7 @@ Sources: Cremers and Weinbaum, Deviations from Put-Call Parity and Stock Return 
 
 **When the reading lies**
 
-- It is not rollup.skew@v1.skew: that one is the 25-delta put minus call over ATM vol at a constant 30 days; this is a moneyness pick from one listed expiry, so the two agree in sign but not in size.
+- It is not rollup.skew@v1.skew, the 25-delta put minus call over ATM vol at a constant 30 days. This one is a moneyness pick from one listed expiry, so the two agree in sign but not in size.
 - A high-vol or event-heavy name has a large smirk at an ordinary shape; compare names on one session as a rank, and read feature.skew_rr25 or rollup.skew@v1.skew for the delta-based view.
 - The smirk's low side is a mild quality tilt; the short side needs borrow, and steep-smirk names are often hard to borrow.
 - Null with no OTM put in the band, no ATM call within 5% of the spot, or cp_iv_status of NO_SPOT, NO_CHAIN or NO_EXPIRY.
@@ -331,7 +365,13 @@ Sources: Xing, Zhang and Zhao, What Does the Individual Option Volatility Smirk 
 
 ### `rollup.cp_iv@v1.atm_call_iv`
 
-**How to read it.** The call IV at the strike nearest the spot (within 5%) at the expiry nearest 30 days, as a fraction: our own inversion of the mid, which is the call-side input An, Ang, Bali and Cakici sort on. Close to rollup.iv30@v1.iv30 on a liquid name. History starts 2026-10-02, when the chains were first stored.
+**How to read it.** The call IV at the strike nearest the spot (within 5%), as a fraction, at the expiry nearest 30 days. It is our own inversion of the mid and the call-side input An, Ang, Bali and Cakici sort on. Close to rollup.iv30@v1.iv30 on a liquid name. History starts 2026-10-02, when the chains were first stored.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| an ATM call vol of at least 40% | `gte 0.4` | soft | 0.05 | a level only; the published signal is the month's change |
 
 **When the reading lies**
 
@@ -343,7 +383,13 @@ Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options
 
 ### `rollup.cp_iv@v1.atm_put_iv`
 
-**How to read it.** The put IV at the strike nearest the spot (within 5%) at the expiry nearest 30 days, as a fraction: the put-side input of the An, Ang, Bali and Cakici signal. Within a vol point or two of rollup.cp_iv@v1.atm_call_iv on a liquid name.
+**How to read it.** The put IV at the strike nearest the spot (within 5%), as a fraction, at the expiry nearest 30 days. It is the put-side input of the An, Ang, Bali and Cakici signal. Within a vol point or two of rollup.cp_iv@v1.atm_call_iv on a liquid name.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| an ATM put vol of at least 40% | `gte 0.4` | soft | 0.05 | a level only; the published signal is the month's change |
 
 **When the reading lies**
 
@@ -354,6 +400,12 @@ Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options
 ### `rollup.cp_iv_history@v1.atm_call_iv_chg_21d`
 
 **How to read it.** The ATM call IV now minus 21 sessions ago (about a month), as a fraction (0.03 is three vol points). A rise has preceded higher returns the next month in the published sort; the put's change carries the opposite sign. Chains are stored from 2026-10-02 only, so this reads null until 2026-11-02.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| call IV up three vol points in a month | `gte 0.03` | soft | 0.01 | as a rank across names; read with the put's change |
 
 **When the reading lies**
 
@@ -367,6 +419,12 @@ Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options
 
 **How to read it.** The ATM put IV now minus 21 sessions ago, as a fraction. A rise has preceded lower returns the next month in the published sort. Chains are stored from 2026-10-02 only, so this reads null until 2026-11-02.
 
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| put IV up three vol points in a month | `gte 0.03` | soft | 0.01 | the published sign is negative for the stock; read with the call's change |
+
 **When the reading lies**
 
 - Same caveats and nulls as rollup.cp_iv_history@v1.atm_call_iv_chg_21d.
@@ -377,6 +435,12 @@ Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options
 
 **How to read it.** The call-put IV spread now minus 5 sessions ago, as a fraction: how fast calls are getting richer against puts over a week (positive) or poorer (negative). Lei, Wang and Yan found a monotonic rise of the spread into an earnings date predicts the announcement return. Chains are stored from 2026-10-02 only, so this reads null until 2026-10-09.
 
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the call-put spread up two vol points in a week | `gte 0.02` | soft | 0.005 | as a rank across names; best ahead of earnings |
+
 **When the reading lies**
 
 - A change of a noisy level doubles the noise: read rollup.cp_iv@v1.cp_iv_spread and the chain depth (rollup.option_liquidity@v1.chain_oi) with it.
@@ -386,7 +450,13 @@ Sources: Lei, Wang and Yan, Option-implied information ahead of earnings announc
 
 ### `rollup.cp_iv_history@v1.iv30_chg_5d`
 
-**How to read it.** Our 30-day ATM IV now minus 5 sessions ago, as a fraction (0.03 is three vol points): a rising value is option buyers paying up over the week, as ahead of an event or in a sell-off. Chains are stored from 2026-10-02 only, so this reads null until 2026-10-09; IBKR's own IV history reaches back further but is not used here.
+**How to read it.** Our 30-day ATM IV now minus 5 sessions ago, as a fraction (0.03 is three vol points). A rising value is option buyers paying up over the week, as ahead of an event or in a sell-off. Chains are stored from 2026-10-02 only, so this reads null until 2026-10-09; IBKR's own IV history reaches back further but is not used here.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| IV30 up three vol points in a week | `gte 0.03` | soft | 0.01 | a market-wide move lifts every name; compare across names |
 
 **When the reading lies**
 
@@ -741,25 +811,3 @@ Sources: ADR 0028
 - Null when neither feed has an IV30 for the session.
 
 Sources: docs/screeners/vrp-scanner.md (the lower-of-two rule)
-
-### `rollup.ibkr_iv_history@v1.ibkr_iv_chg_21d`
-
-**How to read it.** IBKR's 30-day implied vol now minus 21 sessions ago (about a month), as a fraction (0.03 is three vol points). IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split (rollup.cp_iv_history@v1.atm_call_iv_chg_21d and atm_put_iv_chg_21d). Unlike the chain-derived changes it has history: IBKR's IV reaches back about 502 sessions. Personal-use data: it carries the personal licence.
-
-**When the reading lies**
-
-- It moves with the market: when every name's IV rises in a sell-off the change says little; judge it as a rank across names on the session.
-- An earnings date inside the window lifts IV and drops it after; read the earnings fields before reading a change across one.
-- Null if IBKR had no IV today or 21 sessions ago (a gap is not filled), or IB Gateway was down for the session's pull.
-
-Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181
-
-### `rollup.ibkr_iv_history@v1.ibkr_iv_chg_5d`
-
-**How to read it.** IBKR's 30-day implied vol now minus 5 sessions ago, as a fraction: option buyers paying up (positive) or backing off (negative) over a week. IBKR's IV30 blends calls and puts, so it tests the overall IV-change effect, not the call-minus-put split. Personal-use data: it carries the personal licence.
-
-**When the reading lies**
-
-- Same caveats and nulls as rollup.ibkr_iv_history@v1.ibkr_iv_chg_21d; a week is noisier than a month.
-
-Sources: Site convention (docs/edge-ideas/options-volatility.md c03)
