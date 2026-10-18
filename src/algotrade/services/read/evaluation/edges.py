@@ -159,6 +159,7 @@ def _picks(e: document.Edge) -> str:
     window = window_name(e.schedule)
     when = (
         f"after each {event.replace('_', ' ')}"
+        + (f" ({document.event_subtype(e.schedule)})" if document.event_subtype(e.schedule) else "")
         if event
         else f"every {window.replace('_', ' ')}"
         if window
