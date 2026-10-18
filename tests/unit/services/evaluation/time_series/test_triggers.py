@@ -198,3 +198,12 @@ def test_an_on_market_edge_is_evaluated_and_reports_the_stale_stretches_as_lost(
     assert (ran.window, ran.horizon, ran.scheduled) == ("vix_spike", H, 2)
     (spy,) = ran.results
     assert spy.lost[triggers.STALE] >= 1
+
+
+def test_a_trigger_on_the_session_before_a_weekend_first_is_scanned() -> None:
+    saturday, friday = date(2024, 1, 6), date(2024, 1, 5)
+    r = world([friday])
+    got = triggers.trigger_periods(r, "vix_spike", saturday, LAST, H, AS_OF)
+    taken = set(triggers._window(friday, H))
+    base = [p for p in got.periods if not p.inside]
+    assert base and all(not set(sessions_of(p)) & taken for p in base)

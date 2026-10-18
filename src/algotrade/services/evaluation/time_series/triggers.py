@@ -96,7 +96,9 @@ def trigger_periods(
     counted: list[list[date]] = []
     occupied: list[list[date]] = []
     stale: set[date] = set()
-    early = sessions_ending(first, horizon + 2)[:-1]  # earlier triggers' windows run into the range
+    early = [
+        d for d in sessions_ending(first, horizon + 2) if d < first
+    ]  # earlier triggers' windows run into the range
     for day in [*early, *sessions_between(first, last)]:
         got = reading(reader, trigger, day, as_of)
         if got is None:
