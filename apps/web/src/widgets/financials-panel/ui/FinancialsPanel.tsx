@@ -1,10 +1,12 @@
 /**
  * Financials: a company's reported results and the market's forecasts for the latest session,
- * from one GraphQL read (`useInstrumentFacts`). A strip of the key metrics leads, then five
- * compact sections (growth, profitability, balance sheet and cash flow, valuation, earnings) in
- * columns that stack on a phone. Every row is shown: a value the session does not have reads as
- * the word for its kind with its Guide term button. Status and basis fields are badges in the
- * section header. A fund has no financials and says so with the panel's empty state.
+ * from one GraphQL read (`useInstrumentFacts`, three requests under the API's name cap). A strip
+ * of the key metrics leads, then six compact sections (growth, profitability, balance sheet and
+ * cash flow, valuation, earnings, analysts) in columns that stack on a phone. Every row is
+ * shown: a value the session does not have reads as the word for its kind with its Guide term
+ * button; a section whose every row is the same gap (an uncovered name's analysts) says it once.
+ * Status and basis fields are badges in the section header. A fund has no financials and says
+ * so with the panel's empty state.
  */
 import { Grid, Heading, KeyValue, Panel, StatStrip, StatusBadge, Stack } from '@algotrade/ui';
 import { useMemo } from 'react';
@@ -14,8 +16,8 @@ import { isUnknown, type Values } from '@/entities/feature';
 import { useInstrumentFacts } from '@/entities/instrument';
 import { GuideHelp, termHelp } from '@/features/guide-help';
 
-import { rowItem, statItem, type RowHelp } from '../model/rows';
-import { FINANCIALS_PARTS, KEY_METRICS, SECTIONS } from '../model/sections';
+import { commonGap, gapItem, rowItem, statItem, type RowHelp } from '../model/rows';
+import { FINANCIALS_PARTS, KEY_METRICS, SECTIONS, type SectionSpec } from '../model/sections';
 import { financialsTone } from '../model/tones';
 
 export interface FinancialsPanelProps {
@@ -40,20 +42,59 @@ function Badge({ values, name }: { values: Values; name: string }) {
   );
 }
 
+/**
+ * One section: heading, help and badges, then its rows (or the one row of a shared gap). Beside
+ * a shared gap the status badges that hold a value stay (NOT_COVERED and NOT_FETCHED share a
+ * public kind and the badge tells them apart); a badge that is itself a gap is dropped.
+ */
+function Section({ section, values }: { section: SectionSpec; values: Values }) {
+  const gap = section.collapseGaps ? commonGap(values, section.rows) : null;
+  return (
+    <Stack gap={2}>
+      <Stack direction="row" gap={2} align="center" wrap>
+        <Heading level={3}>{section.title}</Heading>
+        {termHelp(section.term)}
+        {section.statuses
+          .filter((name) => !gap || !isUnknown(values.get(name)))
+          .map((name) => (
+            <Badge key={name} values={values} name={name} />
+          ))}
+      </Stack>
+      <KeyValue
+        label={section.title}
+        items={
+          gap && section.collapseGaps
+            ? [gapItem(section.id, section.collapseGaps, gap, HELP)]
+            : section.rows.map((spec) => rowItem(values, spec, HELP))
+        }
+        alignValues="end"
+      />
+    </Stack>
+  );
+}
+
 export function FinancialsPanel({ symbol }: FinancialsPanelProps) {
   const first = useInstrumentFacts(symbol, FINANCIALS_PARTS[0] ?? []);
   const second = useInstrumentFacts(symbol, FINANCIALS_PARTS[1] ?? []);
+  const third = useInstrumentFacts(symbol, FINANCIALS_PARTS[2] ?? []);
   const instrument = first.data?.instrument;
-  const rest = second.data?.instrument;
+  const balance = second.data?.instrument;
+  const analysts = third.data?.instrument;
   const values = useMemo<Values>(
     () =>
-      new Map([...(instrument?.features ?? []), ...(rest?.features ?? [])].map((v) => [v.name, v])),
-    [instrument, rest],
+      new Map(
+        [
+          ...(instrument?.features ?? []),
+          ...(balance?.features ?? []),
+          ...(analysts?.features ?? []),
+        ].map((v) => [v.name, v]),
+      ),
+    [instrument, balance, analysts],
   );
   const state =
-    first.isError || second.isError
+    first.isError || second.isError || third.isError
       ? 'error'
-      : first.isPending || second.isPending
+      : first.isPending || second.isPending || third.isPending
         ? 'loading'
         : !instrument || instrument.isEtf
           ? 'empty'
@@ -77,6 +118,7 @@ export function FinancialsPanel({ symbol }: FinancialsPanelProps) {
       onRetry={() => {
         void first.refetch();
         void second.refetch();
+        void third.refetch();
       }}
     >
       <Stack gap={4}>
@@ -86,20 +128,7 @@ export function FinancialsPanel({ symbol }: FinancialsPanelProps) {
         />
         <Grid columns={2} gap={4} collapse="md">
           {SECTIONS.map((section) => (
-            <Stack key={section.id} gap={2}>
-              <Stack direction="row" gap={2} align="center" wrap>
-                <Heading level={3}>{section.title}</Heading>
-                {termHelp(section.term)}
-                {section.statuses.map((name) => (
-                  <Badge key={name} values={values} name={name} />
-                ))}
-              </Stack>
-              <KeyValue
-                label={section.title}
-                items={section.rows.map((spec) => rowItem(values, spec, HELP))}
-                alignValues="end"
-              />
-            </Stack>
+            <Section key={section.id} section={section} values={values} />
           ))}
         </Grid>
       </Stack>

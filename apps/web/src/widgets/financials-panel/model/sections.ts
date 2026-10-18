@@ -1,6 +1,6 @@
 /**
- * The Financials panel as a spec: the key-metrics strip and the five sections (Growth,
- * Profitability, Balance sheet and cash flow, Valuation, Earnings), each a list of catalogue
+ * The Financials panel as a spec: the key-metrics strip and the six sections (Growth,
+ * Profitability, Balance sheet and cash flow, Valuation, Earnings, Analysts), each a list of catalogue
  * features by name with its status fields. Adding a row is one line in `SECTIONS`. The browser
  * derives nothing (ADR 0038): every figure, margin and surprise is a stored value the server
  * serves already formatted by its `info.format`.
@@ -14,6 +14,12 @@ export type RowSpec = FactSpec;
 export interface SectionSpec {
   id: string;
   title: string;
+  /**
+   * The label of the one row that replaces the section's rows when every one of them is a gap
+   * of the same kind (an uncovered name has no analyst figure at all). The kind is the
+   * server's; the browser only chooses to say it once.
+   */
+  collapseGaps?: string;
   /** The glossary term the section's help button opens. */
   term: string;
   /** Status and basis fields drawn as badges in the header. */
@@ -28,10 +34,18 @@ const f = (id: string, label: string, name: SiteFeature, signed?: boolean): RowS
   ...(signed ? { signed } : {}),
 });
 
-/** The headline strip: the few figures that say most, in order. */
+/**
+ * The headline strip, in the owner's order: P/E, forward P/E, revenue growth, forward revenue,
+ * EPS growth, operating margin, debt to equity, free cash flow, last EPS surprise. Forward
+ * revenue reads as its growth over the last twelve months (a rate scans at a glance and sits
+ * beside the reported growth; a bare amount has no base to read against); the amounts are in
+ * the Analysts section.
+ */
 export const KEY_METRICS: readonly RowSpec[] = [
   f('pe', 'P/E ratio', feature('feature.pe_ratio')),
+  f('forward-pe', 'Forward P/E', feature('feature.forward_pe')),
   f('revenue-growth', 'Revenue growth (YoY)', feature('feature.revenue_growth_yoy'), true),
+  f('forward-revenue', 'Forward revenue growth', feature('feature.forward_revenue_growth'), true),
   f('eps-growth', 'EPS growth (YoY)', feature('feature.eps_growth_yoy'), true),
   f('op-margin', 'Operating margin', feature('feature.operating_margin')),
   f('d-e', 'Debt to equity', feature('feature.debt_to_equity')),
@@ -42,8 +56,6 @@ export const KEY_METRICS: readonly RowSpec[] = [
     feature('rollup.earnings_surprise@v1.last_surprise_pct'),
     true,
   ),
-  // Not buildable yet (no analyst data in the app): forward revenue and forward P/E; append one
-  // line each here when their features exist.
 ];
 
 export const SECTIONS: readonly SectionSpec[] = [
@@ -172,6 +184,49 @@ export const SECTIONS: readonly SectionSpec[] = [
       ),
     ],
   },
+  {
+    id: 'analysts',
+    title: 'Analysts: estimates and targets',
+    term: 'financials_analyst',
+    collapseGaps: 'Analyst figures',
+    statuses: [
+      feature('rollup.analyst_estimates@v1.estimates_status'),
+      feature('rollup.analyst_targets@v1.targets_status'),
+    ],
+    // Not in the catalogue yet (PR #625): rollup.analyst_ratings@v1 rating_strong_buy ..
+    // rating_strong_sell, rating_count, rating_score, rating_month, rating_score_change_90d,
+    // ratings_status; rollup.analyst_revisions@v1 eps_fy1_revision_30d / 60d / 90d,
+    // revenue_fy1_revision_30d / 90d, eps_fy1_analysts_change_90d, revisions_status. Add the
+    // rows (and the two statuses) here when they exist; forward P/E and forward revenue growth
+    // are in the strip and not repeated.
+    rows: [
+      f(
+        'target',
+        'Price target (consensus)',
+        feature('rollup.analyst_targets@v1.target_consensus'),
+      ),
+      f('upside', 'Upside to target', feature('feature.target_upside'), true),
+      f('target-high', 'Price target (high)', feature('rollup.analyst_targets@v1.target_high')),
+      f('target-low', 'Price target (low)', feature('rollup.analyst_targets@v1.target_low')),
+      f('eps-fy1', 'EPS estimate (FY1)', feature('rollup.analyst_estimates@v1.eps_fy1')),
+      f('eps-fy2', 'EPS estimate (FY2)', feature('rollup.analyst_estimates@v1.eps_fy2')),
+      f('fy1-end', 'FY1 ends', feature('rollup.analyst_estimates@v1.fy1_period_end')),
+      f('fwd-eps-growth', 'Forward EPS growth (FY1)', feature('feature.forward_eps_growth'), true),
+      f('fwd-pe-fy2', 'Forward P/E (FY2)', feature('feature.forward_pe_fy2')),
+      f('rev-fy1', 'Revenue estimate (FY1)', feature('rollup.analyst_estimates@v1.revenue_fy1')),
+      f('rev-fy2', 'Revenue estimate (FY2)', feature('rollup.analyst_estimates@v1.revenue_fy2')),
+      f(
+        'eps-analysts',
+        'Analysts behind EPS (FY1)',
+        feature('rollup.analyst_estimates@v1.eps_fy1_analysts'),
+      ),
+      f(
+        'rev-analysts',
+        'Analysts behind revenue (FY1)',
+        feature('rollup.analyst_estimates@v1.revenue_fy1_analysts'),
+      ),
+    ],
+  },
 ];
 
 const namesOf = (sections: readonly SectionSpec[], extra: readonly RowSpec[] = []) => [
@@ -182,16 +237,19 @@ const namesOf = (sections: readonly SectionSpec[], extra: readonly RowSpec[] = [
 ];
 
 const BALANCE = SECTIONS.filter((s) => s.id === 'balance');
+const ANALYSTS = SECTIONS.filter((s) => s.id === 'analysts');
 
 /**
- * The catalogue features the panel asks for, in two requests (the API caps `features(names)` at
- * `NAMES_PER_REQUEST`): the strip and every section but the balance sheet, then the balance
- * sheet and cash flow. A test keeps each part under the cap.
+ * The catalogue features the panel asks for, in three requests (the API caps `features(names)`
+ * at `NAMES_PER_REQUEST`): the strip and the sections that are neither the balance sheet nor
+ * the analysts, then the balance sheet and cash flow, then the analysts. A test keeps each part
+ * under the cap.
  */
 export const FINANCIALS_PARTS: readonly (readonly SiteFeature[])[] = [
   namesOf(
-    SECTIONS.filter((s) => s.id !== 'balance'),
+    SECTIONS.filter((s) => s.id !== 'balance' && s.id !== 'analysts'),
     KEY_METRICS,
   ),
   namesOf(BALANCE),
+  namesOf(ANALYSTS),
 ];

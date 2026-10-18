@@ -1,7 +1,10 @@
 /*
  * StatStrip: one bordered strip, stats divided by soft borders (not cards). Columns from the
  * item count (--stat-count, set by StatStrip.tsx); two, then one column in narrow containers.
- * The px values in the container queries are the breakpoint tokens md 720 / sm 480 (tokens/space.ts).
+ * The px values in the container queries are the breakpoint tokens xl 1200 / md 720 / sm 480
+ * (tokens/space.ts). A dense strip (data-many, more than six stats) needs about 130px a column
+ * for a seven-character value at the 2xl size: nine fit one row from xl, three to a row between
+ * md and xl, two to a row below md and below sm (a 375px phone gives ~187px a column).
  */
 .strip {
   container-type: inline-size;
@@ -30,6 +33,20 @@
   border-inline-start: 0;
 }
 
+@container (720px <= width < 1200px) {
+  .list[data-many] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .list[data-many] .stat:nth-child(3n + 1) {
+    border-inline-start: 0;
+  }
+
+  .list[data-many] .stat:nth-child(n + 4) {
+    border-top: var(--border-width-thin) solid var(--color-border-soft);
+  }
+}
+
 @container (width < 720px) {
   .list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -55,6 +72,22 @@
 
   .stat:nth-child(n + 2) {
     border-top: var(--border-width-thin) solid var(--color-border-soft);
+  }
+
+  .list[data-many] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .list[data-many] .stat:nth-child(odd) {
+    border-inline-start: 0;
+  }
+
+  .list[data-many] .stat:nth-child(even) {
+    border-inline-start: var(--border-width-thin) solid var(--color-border-soft);
+  }
+
+  .list[data-many] .stat:nth-child(2) {
+    border-top: 0;
   }
 }
 

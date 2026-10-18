@@ -185,3 +185,9 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+@container (width < 1200px) {
+  .grid[data-collapse='xl'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
