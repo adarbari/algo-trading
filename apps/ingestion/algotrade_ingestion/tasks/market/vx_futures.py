@@ -7,11 +7,16 @@ published at the end as one partition per trade date (``stage_sessions`` / ``pub
 so a window of years is one commit and an interrupted run resumes from its staging
 (``resume=True``): the items already done stay done.
 
-**Known from.** A row's ``knowledge_ts`` is the instant the run published it (the fetch), never
-the trade date: Cboe regenerates an expiry's file about 01:05 New York time the morning after
-the trade date (measured 2026-10-17), so a nightly run after the close does not yet hold that
-night's settle and the next night's run stores it; a backfill's rows are known from the backfill.
-ADR 0007 / 0050: readers pin ``as_of`` and see a row only from then on.
+**Known from.** Cboe regenerates an expiry's file about 01:05 New York time the morning after
+the trade date (measured 2026-10-17), so a row is knowable from the NEXT SESSION after its trade
+date: ``known_from`` = ``next_session(trade date)`` for a backfill and the nightly alike (the
+ADR 0050 pattern; ``knowledge_ts`` stays the write instant). ``data.volatility.vx_futures`` reads
+a session S as the rows with ``known_from <= S``. A ``--force`` refetch writes only rows that are
+new or differ from the stored ones; a restated row is known from the later of that and the
+session after the fetch's own day, and the table keeps both versions (key includes
+``known_from``). The incremental ``> through`` filter never sees a revision of an older row
+(Cboe rewrites old files): only ``--force`` does. Contract days use the NYSE calendar, so a
+CFE-only contract on an NYSE holiday would show as NO_DATA.
 
 **Incremental and resumable.** Only the rows after the latest trade date an earlier run stored
 for the expiry are written (item ``OK: <n> rows through <date>``): a stored row is never
@@ -30,9 +35,14 @@ import re
 from collections.abc import Mapping
 from datetime import date, timedelta
 from functools import partial
+from typing import cast
+
+import pandas as pd
 
 from algotrade.core.time.calendar import (
+    exchange_date,
     is_session,
+    next_session,
     previous_session,
     session_on_or_before,
     third_friday,
@@ -121,6 +131,46 @@ def _history(runs: list[RunRecord]) -> tuple[dict[date, date], set[date]]:
     return through, done
 
 
+VALUES = ("open", "high", "low", "close", "settle", "change", "volume", "efp", "open_interest")
+
+
+def _restated(run: IngestRun, rows: pd.DataFrame) -> pd.DataFrame:
+    """``--force``: only the rows that are new or differ from the stored ones. A restated row is
+    known from the session AFTER the fetch's own day (``next_session(exchange_date(clock))``) when
+    that is later than its trade date's next session, so a past session never sees a value Cboe
+    changed afterwards; the reader keeps, per contract and trade date, the latest version known."""
+    learned = next_session(exchange_date(run.clock()))
+    stored = run.reader.table_range(
+        TABLE,
+        rows["session_date"].min(),
+        rows["session_date"].max(),
+        None,
+        [rows["instrument_id"].iloc[0]],
+    )
+    if stored is None or stored.empty:
+        return rows
+    stored = stored.assign(session_date=pd.to_datetime(stored["session_date"]).dt.date)
+    stored = stored.sort_values("known_from", kind="stable").drop_duplicates(
+        "session_date", keep="last"
+    )
+    old = stored.set_index("session_date")
+    keep, known = [], []
+    for row in rows.itertuples(index=False):
+        before = old.loc[row.session_date] if row.session_date in old.index else None
+        if before is None:
+            keep.append(True)
+            known.append(row.known_from)
+            continue
+        same = all(
+            (pd.isna(getattr(row, c)) and pd.isna(before[c])) or getattr(row, c) == before[c]
+            for c in VALUES
+        )
+        keep.append(not same)
+        known.append(max(cast(date, row.known_from), learned))
+    out = rows.assign(known_from=known)
+    return out[keep].reset_index(drop=True)
+
+
 def _fetch_expiry(
     run: IngestRun, source: Source, expiry: date, through: Mapping[date, date], force: bool
 ) -> str:
@@ -133,6 +183,9 @@ def _fetch_expiry(
         return "NO_DATA"
     seen = through.get(expiry)
     new = frame if force or seen is None else frame[frame["session_date"] > seen]
+    new = new.assign(known_from=[next_session(d) for d in new["session_date"]])
+    if force:
+        new = _restated(run, new)
     if not new.empty:
         run.stage_sessions(TABLE, expiry.isoformat(), new.reset_index(drop=True), source.name)
     last = max(frame["session_date"])

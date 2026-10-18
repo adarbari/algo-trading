@@ -81,26 +81,59 @@ def test_backfill_writes_a_partition_per_trade_date_known_from_the_fetch() -> No
         "FUT:VX-20130529",
     ]
     assert set(day["source"]) == {"cboe_vx"}
-    assert set(day["knowledge_ts"]) == {FETCHED}  # the fetch instant, never the trade date
+    assert set(day["knowledge_ts"]) == {FETCHED}  # the write instant
+    assert set(day["known_from"]) == {date(2013, 5, 23)}  # known from the NEXT session
     assert record.stats["rows"] == 8 and record.stats["latest"] == "2013-05-22"
     assert record.stats["listed"] == 2 and record.stats["sessions_written"] == 4
 
 
-def test_the_curve_of_a_session_is_its_rows_by_expiry_and_a_read_pins_as_of() -> None:
+def test_a_session_reads_only_rows_known_by_it_even_for_a_backfill() -> None:
     backend = MemoryBackend()
     served = {
         "2013-05-22": files.vx_file("F (Jan 2014)"),
         "2013-05-29": files.vx_file("G (Feb 2014)"),
     }
-    ingest_vx_futures(_ctx(backend), _source(served, []), SESSION, *WINDOW)
+    # a backfill run years later: the rows are still known from the session after their trade date
+    late = datetime(2026, 10, 17, 12, tzinfo=UTC)
+    ingest_vx_futures(_ctx(backend, late), _source(served, []), date(2026, 10, 16), *WINDOW)
     reader = StoreReader(backend)
     curve = vx_futures(reader, date(2013, 5, 22), date(2013, 5, 22))
     assert curve["expiry"].tolist() == [date(2013, 5, 22), date(2013, 5, 29)]
     assert curve["settle"].tolist() == [15.75, 15.75]
-    before = FETCHED - timedelta(hours=1)  # a backtest as of before the fetch sees nothing
-    assert vx_futures(reader, date(2013, 5, 15), date(2013, 5, 22), as_of=before).empty
-    assert len(vx_futures(reader, date(2013, 5, 15), date(2013, 5, 22), as_of=FETCHED)) == 8
+    # on the trade date itself the settle is not known yet; the next session has it
+    on_day = vx_futures(reader, date(2013, 5, 22), date(2013, 5, 22), session=date(2013, 5, 22))
+    assert on_day.empty
+    nxt = vx_futures(reader, date(2013, 5, 22), date(2013, 5, 22), session=date(2013, 5, 23))
+    assert len(nxt) == 2
+    # a backtest as_of before the write sees nothing; the table is not hidden from a 2013 session
+    assert vx_futures(reader, date(2013, 5, 15), date(2013, 5, 22), as_of=late - timedelta(1)).empty
     assert vx_futures(StoreReader(MemoryBackend()), date(2013, 5, 1), date(2013, 5, 31)).empty
+
+
+def test_a_forced_restatement_is_known_from_the_session_after_the_fetch() -> None:
+    backend = MemoryBackend()
+    served = {"2013-05-22": files.vx_file("F (Jan 2014)")}
+    ingest_vx_futures(_ctx(backend), _source(served, []), SESSION, WINDOW[0], WINDOW[0])
+    revised = tuple(
+        (d, o, h, lo, c, 16.0 if d == "2013-05-22" else st, ch, v, e, oi)
+        for d, o, h, lo, c, st, ch, v, e, oi in files.ROWS
+    )
+    fetch = datetime(2013, 6, 10, 23, tzinfo=UTC)  # a Monday evening
+    record = ingest_vx_futures(
+        _ctx(backend, fetch),
+        _source({"2013-05-22": files.vx_file("F (Jan 2014)", revised)}, []),
+        date(2013, 6, 10),
+        WINDOW[0],
+        WINDOW[0],
+        force=True,
+    )
+    assert record.items["2013-05-22"] == "OK: 1 rows through 2013-05-22"  # only the changed row
+    reader = StoreReader(backend)
+    one = (date(2013, 5, 22), date(2013, 5, 22))
+    assert vx_futures(reader, *one, session=date(2013, 5, 23))["settle"].tolist() == [15.75]
+    assert vx_futures(reader, *one, session=date(2013, 6, 10))["settle"].tolist() == [15.75]
+    assert vx_futures(reader, *one, session=date(2013, 6, 11))["settle"].tolist() == [16.0]
+    assert vx_futures(reader, *one)["settle"].tolist() == [16.0]
 
 
 def test_a_never_listed_expiry_is_no_data_and_not_asked_again_once_past() -> None:
@@ -118,7 +151,9 @@ def test_a_never_listed_expiry_is_no_data_and_not_asked_again_once_past() -> Non
     again = ingest_vx_futures(_ctx(backend), _source(served, asked), later, *WINDOW)
     assert asked == [] and set(again.items.values()) == {"NOT_DUE"}
     redo = ingest_vx_futures(_ctx(backend), _source(served, asked), later, *WINDOW, force=True)
-    assert len(asked) == 2 and redo.items["2013-05-22"].startswith("OK: 4 rows")
+    assert (
+        len(asked) == 2 and redo.items["2013-05-22"] == "OK: 0 rows through 2013-05-22"
+    )  # unchanged: not rewritten
 
 
 def test_an_expiry_not_yet_past_is_asked_again_and_only_new_rows_are_written() -> None:

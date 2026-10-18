@@ -112,11 +112,15 @@ Verified 2026-10-17.
   `Total Volume` are as published. A file's `Last-Modified` is about 01:05 New York time the day
   AFTER the last trade date it holds (a rewritten 2025 file was modified in December 2025), so a
   night's run after the close does not yet have that night's settle.
-- **known_from (ADR 0007 / 0050).** `knowledge_ts` is the fetch instant (the run's publish time),
-  never the trade date: the next night's run stores the session, and a backfill's rows are known
-  from the backfill. A stored row is not restated by a later fetch (only rows after the latest stored
-  trade date are written; `--force` rewrites). The macro index series use the lag rule above.
-- **Pacing** `[cboe_vx] min_interval_s = 0.5` (static S3 objects, no published limit; a 2013-
+- **known_from (ADR 0007 / 0050).** A row has a `known_from` date: the NEXT SESSION after its trade
+  date (the file is regenerated ~01:05 ET the morning after), for a backfill and the nightly alike;
+  `knowledge_ts` is only the write instant. `data.volatility.vx_futures(session=S)` keeps rows with
+  `known_from <= S`. The incremental run writes only rows after the latest stored trade date, so it
+  never sees a revised older row; `--force` refetches and writes rows that are new or differ, a
+  restated one known from the later of that and the session after the fetch's day (both versions
+  kept). Contract days use the NYSE calendar: a CFE-only contract on an NYSE holiday shows as NO_DATA.
+  The macro index series use the lag rule above.
+- **Pacing** `[cboe_vx] min_interval_s` in `sources.toml`, 0.5 (static S3 objects, no published limit; a 2013-
   backfill is ~730 requests, about 6 minutes). Backfill: `algotrade-ingest vx-futures --from
   2013-01-01 --to 2026-12-31` (`--from` / `--to` bound the expiries; resumable: an interrupted run
   continues from its staging, a finished one never asks for a settled expiry again). The nightly

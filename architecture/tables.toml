@@ -465,7 +465,7 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py"
 [[table]]
 name = "volatility/vx_futures"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/vx_futures.py"
-note = "EB D3: Cboe VIX futures by expiry and trade date (settle, volume, open interest); known_from = the fetch instant, the file of a session is not published before the next morning; personal-use licence"
+note = "EB D3: Cboe VIX futures by expiry and trade date (settle, volume, open interest); known_from = the next session after the trade date (the file is published the morning after), later for a restated value; personal-use licence"
 
 [[table]]
 name = "holdings/etf"

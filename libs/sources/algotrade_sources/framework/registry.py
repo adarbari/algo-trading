@@ -241,7 +241,7 @@ SOURCES: dict[str, SourceSpec] = {
     s.name: s
     for s in (
         SourceSpec("cboe", "cboe", "cboe", CboeOptionsSource, not_found=missing_chain),
-        SourceSpec("cboe_vx", "cboe_vx", "cboe_vx", CboeVxFutures, 0.5, not_found=missing_chain),
+        SourceSpec("cboe_vx", "cboe_vx", "cboe_vx", CboeVxFutures, not_found=missing_chain),
         SourceSpec("nasdaq_trader", "nasdaq_trader", "nasdaqtrader", NasdaqTraderSource),
         SourceSpec("spy_holdings", "ssga", "ssga", SpyHoldingsSource, 1.0),
         SourceSpec("ssga_holdings", "ssga", "ssga", SsgaHoldings, 1.0, switch="etf_files"),
