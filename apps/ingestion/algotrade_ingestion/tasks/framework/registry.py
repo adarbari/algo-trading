@@ -17,7 +17,7 @@ from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.analyst import probe as analyst_probe
 from algotrade_ingestion.tasks.analyst import snapshot as analyst_snapshot
 from algotrade_ingestion.tasks.derived import history_copy, market_rollups, outcomes, rollups
-from algotrade_ingestion.tasks.events import filings
+from algotrade_ingestion.tasks.events import filings, insider
 from algotrade_ingestion.tasks.framework import (
     entries_market,
     entries_ops,
@@ -351,6 +351,31 @@ TASKS: dict[str, Task] = {
                 ),
                 Param("symbols", ("--symbols",), str, "only these tickers (default: the universe)"),
                 Param("limit", ("--limit",), int, "per-CIK reads: fetch at most N CIKs this run"),
+            ),
+        ),
+        Task(
+            "insider",
+            "SEC Form 4 / 4/A insider transactions (events/insider_transaction): --since backfills "
+            "the quarterly bulk sets from that quarter (acceptance times from the issuers' "
+            "submissions; resumable, --limit quarters, --force rereads), the default reads the "
+            "days since the last clean walk from EDGAR's daily form index and each filing's XML",
+            insider,
+            (insider.TABLE,),
+            entries_market.run_insider,
+            sources=("sec_filings", "sec_form345_bulk", "sec_form4_xml", "sec_daily_index"),
+            settings="sources.toml [sec_edgar]",
+            params=(
+                SESSION,
+                Param(
+                    "since",
+                    ("--since",),
+                    date.fromisoformat,
+                    "backfill: the bulk quarters from the one holding this date (a quarter an "
+                    "earlier run read is skipped); default: the daily walk",
+                ),
+                Param("until", ("--until",), date.fromisoformat, "backfill: last quarter's date"),
+                Param("limit", ("--limit",), int, "backfill: read at most N quarters this run"),
+                Param("force", ("--force",), None, "backfill: also quarters already read"),
             ),
         ),
         Task(

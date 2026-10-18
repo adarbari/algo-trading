@@ -46,6 +46,36 @@ FILING_FORMS = ("8-K", "8-K/A", "NT 10-K", "NT 10-Q", "SC TO-I", "25", "25-NSE",
 FILINGS_FRAME = "filings"  # key of ``Normalized.parsed`` holding a company's 8-K rows (ADR 0050)
 DAILY_INDEX_FRAME = "daily_index"  # key of ``Normalized.parsed`` holding a day's 8-K filers
 DAILY_INDEX_COLUMNS = ("cik", "form", "accession", "filing_date")
+# Form 4 (EB D6): insider transactions of an issuer, ``Form 4`` and its amendment. One frame shape
+# for the quarterly bulk sets and a filing's XML: a row per transaction line and reporting owner.
+INSIDER_FORMS = ("4", "4/A")
+INSIDER_FRAME = "insider"
+INSIDER_COLUMNS = (
+    "accession",
+    "form",
+    "issuer_cik",
+    "issuer_symbol",
+    "filing_date",
+    "period_of_report",
+    "amends_date",
+    "owner_cik",
+    "is_director",
+    "is_officer",
+    "is_ten_pct_owner",
+    "is_other",
+    "officer_title",
+    "owner_count",
+    "line",
+    "derivative",
+    "transaction_date",
+    "transaction_code",
+    "acquired_disposed",
+    "shares",
+    "price",
+    "shares_after",
+    "direct_indirect",
+    "plan_10b5_1",
+)
 FILING_COLUMNS = (
     "cik",
     "form",
@@ -91,6 +121,7 @@ class FilingsRequest(FetchRequest):
     wanted (``None``: the recent block only)."""
 
     since: date | None = None
+    forms: tuple[str, ...] = FILING_FORMS  # the form types kept (insiders: ``INSIDER_FORMS``)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -100,6 +131,16 @@ class DailyIndexRequest(FetchRequest):
     day)."""
 
     day: date
+    forms: tuple[str, ...] = FILING_FORMS
+
+
+@dataclass(frozen=True, kw_only=True)
+class InsiderRequest(FetchRequest):
+    """Form 4 transactions to read: a quarterly bulk set (``key`` = ``2019q2``) or one filing's
+    XML (``key`` = the accession; ``cik`` the issuer's, ``document`` the file under it)."""
+
+    cik: str = ""
+    document: str = ""
 
 
 def series_request(request: FetchRequest) -> SeriesRequest:

@@ -290,9 +290,10 @@ def since_by_cik(
     }
 
 
-def previous_runs(run: IngestRun) -> list[RunRecord]:
-    """The finished (published) runs of this task before ``run``."""
-    return [r for r in run.reader.runs(TASK) if r.status in PUBLISHED and r.run_id != run.run_id]
+def previous_runs(run: IngestRun, task: str = TASK) -> list[RunRecord]:
+    """The finished (published) runs of ``task`` before ``run`` (the insider task walks the
+    same index with its own runs)."""
+    return [r for r in run.reader.runs(task) if r.status in PUBLISHED and r.run_id != run.run_id]
 
 
 def asked_since(run: IngestRun) -> dict[str, date]:
@@ -315,13 +316,13 @@ def asked_since(run: IngestRun) -> dict[str, date]:
     return out
 
 
-def last_walked(run: IngestRun) -> date | None:
+def last_walked(run: IngestRun, task: str = TASK) -> date | None:
     """The last index day an earlier nightly read cleanly (no failed day or index-asked CIK):
     where the next walk starts. Stored filing dates do not say: a per-CIK run (``--symbols``,
     ``--limit``) or a failed CIK moves them past days never read."""
     walked = [
         date.fromisoformat(r.stats["walked_to"])
-        for r in previous_runs(run)
+        for r in previous_runs(run, task)
         if r.stats.get("walked_to")
     ]
     return max(walked, default=None)
@@ -376,10 +377,11 @@ def filing_days(first: date, last: date) -> list[date]:
 
 
 def read_index_days(
-    run: IngestRun, index: Source, days: list[date]
+    run: IngestRun, index: Source, days: list[date], forms: tuple[str, ...] = FILING_FORMS
 ) -> tuple[dict[date, set[str]], int]:
-    """Each day's event-form filer CIKs by day for the days with a published index (module doc), and
-    the days asked. Records one ``idx:<date>`` item per day; a failing day stops the walk."""
+    """Each day's filer CIKs of ``forms`` by day for the days with a published index (module
+    doc), and the days asked. Records one ``idx:<date>`` item per day; a failing day stops the
+    walk."""
     filers: dict[date, set[str]] = {}
     unpublished: list[date] = []
     asked = 0
@@ -387,7 +389,10 @@ def read_index_days(
         asked += 1
         try:
             normalized = run.fetch(
-                index, DailyIndexRequest(key=day.isoformat(), session_date=run.session, day=day)
+                index,
+                DailyIndexRequest(
+                    key=day.isoformat(), session_date=run.session, day=day, forms=forms
+                ),
             )
         except NoResponseError:
             unpublished.append(day)

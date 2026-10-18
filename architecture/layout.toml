@@ -151,6 +151,10 @@ path = "src/algotrade/data/funds"
 purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035), the latest rows per fund and the CUSIP to ticker bridge; and a fund's shares outstanding from its issuer's file (holdings/etf_shares, EB D4)"
 
 [[dir]]
+path = "src/algotrade/data/insiders"
+purpose = "reads of events/insider_transaction (Form 4, EB D6): the lines a session may see (known_from on or before it), each line's latest version, the originals a known 4/A replaced; data/ is at its module cap, so the reads of this table are a folder"
+
+[[dir]]
 path = "src/algotrade/data/listings"
 purpose = "reads of instruments/listing_history and instruments/index_membership (ADR 0018 amendment): the universe as it was on a session (universe_asof), from the latest listing and S&P 500 membership snapshots, which it names"
 

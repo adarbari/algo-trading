@@ -560,6 +560,20 @@ FILING_EVENTS = fixed(
     runs="merge",
     key=("instrument_id", "accession"),
 )
+# L1: Form 4 insider transactions (EB D6), a row per line and reporting owner. ``ts``: acceptance;
+# ``known_from`` is in the key so a restated line sits beside its predecessor (``data.insiders``).
+INSIDER_EVENTS = fixed(
+    "events/insider_transaction", "event",
+    ("instrument_id", "ts", KNOWN_FROM, "accession", "line", "owner_cik"),
+    "instrument_id string!", "ts timestamp_utc!", f"{KNOWN_FROM} date!", "accession string!",
+    "line int64!", "owner_cik string!", "form string!", "issuer_cik string!", "filing_date date!",
+    "period_of_report date", "amends_date date", "transaction_date date!", "derivative bool!",
+    "transaction_code string", "acquired_disposed string", "shares float64", "price float64",
+    "shares_after float64", "direct_indirect string", "is_director bool!", "is_officer bool!",
+    "is_ten_pct_owner bool!", "is_other bool!", "officer_title string", "plan_10b5_1 bool",
+    "owner_count int64!", runs="merge",
+    key=("instrument_id", "accession", "line", "owner_cik", KNOWN_FROM),
+)  # fmt: skip
 MACRO_SERIES = fixed(
     "macro/series",
     "reference",
@@ -781,6 +795,7 @@ KNOWN: dict[str, TableSpec] = {
         EARNINGS_EVENTS,
         MACRO_RELEASE_EVENTS,
         FILING_EVENTS,
+        INSIDER_EVENTS,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the

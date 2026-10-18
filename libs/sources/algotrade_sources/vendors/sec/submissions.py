@@ -16,9 +16,10 @@ block; only when ``since`` is before its oldest filing does it also read the old
 reach ``since`` (``filingTo >= since``), one request each. A single document is saved as
 received; with pages they are saved one document after another (one per line), which
 ``normalize`` reads the same way. Every form stays in the raw payload; ``normalize`` keeps the
-rows of ``FORMS`` filed on or after ``since``. Same pacing, ``User-Agent`` (contact from
-``ALGOTRADE_SEC_CONTACT``) and 404 rule as the other SEC sources (the ``sec`` limiter,
-``[sec_edgar]``; 404: no filings for this CIK, ``None``).
+rows of the request's ``forms`` (default ``FORMS``; the insider task asks for Form 4 and 4/A,
+whose ``primary_document`` names an ``xsl`` rendering) filed on or after ``since``. Same pacing,
+``User-Agent`` (contact from ``ALGOTRADE_SEC_CONTACT``) and 404 rule as the other SEC sources
+(the ``sec`` limiter, ``[sec_edgar]``; 404: no filings for this CIK, ``None``).
 
 ``normalize`` returns ``parsed["filings"]`` (``FILING_COLUMNS``) sorted by acceptance: ``cik``
 (10 digits), ``form``, ``accession``, ``filing_date`` and ``report_date`` (calendar days;
@@ -110,8 +111,10 @@ def older_pages(document: dict[str, Any], since: date | None) -> list[str]:
     return names
 
 
-def parse_filings(payload: bytes, since: date | None = None) -> pd.DataFrame:
-    """The 8-K and 8-K/A rows (``FILING_COLUMNS``) of every document in ``payload`` filed on
+def parse_filings(
+    payload: bytes, since: date | None = None, forms: tuple[str, ...] = FORMS
+) -> pd.DataFrame:
+    """The rows of ``forms`` (``FILING_COLUMNS``) of every document in ``payload`` filed on
     or after ``since``, sorted by acceptance."""
     parts = []
     cik: str | None = None
@@ -127,7 +130,7 @@ def parse_filings(payload: bytes, since: date | None = None) -> pd.DataFrame:
     if cik is None:
         raise ValueError("submissions document has no CIK")
     frame = pd.concat(parts, ignore_index=True)
-    frame = frame[frame["form"].isin(FORMS)]
+    frame = frame[frame["form"].isin(forms)]
     out = pd.DataFrame(
         {
             "cik": cik,
@@ -179,7 +182,8 @@ class SecFilings:
         return page
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
-        frame = parse_filings(payload, filings_request(request).since)
+        asked = filings_request(request)
+        frame = parse_filings(payload, asked.since, asked.forms)
         return Normalized(session_date=None, tables={}, parsed={FILINGS_FRAME: frame})
 
 

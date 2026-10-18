@@ -137,6 +137,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/events/filings.py"
 note = "ADR 0050: SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I, 25 / 25-NSE, 424B4, 10-12B) of every operating company in the universe by acceptance time; known_from = the acceptance's session (New York)"
 
 [[table]]
+name = "events/insider_transaction"
+owner = "apps/ingestion/algotrade_ingestion/tasks/events/insider.py"
+note = "EB D6: SEC Form 4 / 4/A insider transactions, a row per transaction line and reporting owner, ts = SEC's acceptance instant; known_from = the acceptance's New York session (a trading session), later for a restated line; known_from is in the key, so a restated line sits beside the version it replaces; read through data.insiders"
+
+[[table]]
 name = "events/reference_change"
 owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
