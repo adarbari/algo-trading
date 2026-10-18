@@ -45,6 +45,7 @@ import pandas as pd
 
 from algotrade.config.edges.document import CLOSED
 from algotrade.config.edges.loading import Documents, load_edges
+from algotrade.config.edges.portfolio import MIX
 from algotrade.config.edges.winners import load_winners
 from algotrade.config.env import config_dir
 from algotrade.config.site.settings import SourcesSettings
@@ -87,7 +88,8 @@ def horizons_and_benchmarks(configs: Documents | None = None) -> tuple[list[int]
     study = load_winners(configs or SITE)
     horizons = {DEFAULT_HORIZON, study.horizon_sessions}
     horizons |= {h for o in outcomes for h in o.horizon_sessions}
-    benchmarks = {DEFAULT_BENCHMARK, study.benchmark, *(o.benchmark for o in outcomes)} - {"none"}
+    stored = (o.benchmark for o in outcomes if not o.benchmark.startswith(MIX))  # mixes: harness
+    benchmarks = {DEFAULT_BENCHMARK, study.benchmark, *stored} - {"none"}
     return sorted(horizons), sorted(benchmarks)
 
 

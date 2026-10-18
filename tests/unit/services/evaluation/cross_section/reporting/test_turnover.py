@@ -220,3 +220,10 @@ def test_the_net_slice_follows_the_book_and_the_gross_hit_rate_does_not() -> Non
     assert measure.mean_excess_picks == pytest.approx((0.0025 * 3 - COST / 1e4) / 3)
     assert measure.base_rate is None and measure.lift is None  # the benchmark is the base
     assert (measure.sessions, measure.picks) == (3, 3)
+
+
+def test_the_hit_follows_the_net_value_of_a_book_that_holds_still() -> None:
+    legs = [book(d, 0.0015, A=1.0) for d in (D1, D2, D3)]  # 15 bp gross: lost to a full trip (20)
+    assert [s.pick_hits for s in legs] == [0, 0, 0]
+    one, two, three = apply_rebalances(legs, COST)
+    assert (one.pick_hits, two.pick_hits, three.pick_hits) == (1, 1, 1)  # 15 bp beats 10 / 0 / 10

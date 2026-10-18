@@ -666,3 +666,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: no existing leg's content or key changes (a bump recomputes every leg for nothing); a portfolio edge's legs are new keys anyway. H6 and H7's bumps already force the one full re-run.
+
+## 2026-10-18 | EB H10 (portfolio outcomes) | Unfilled slots are cash; Works for a book without deciles
+- Question: when fewer names qualify than `top_k`, is the book re-normalised over them or is the rest cash? What does Works rest on for a book with no deciles?
+- Options: re-normalise / unfilled slots in cash; picks-series t alone / both t series always.
+- Decision: each unfilled slot is `1 / top_k` in cash (re-normalising puts the whole book in one name); a day before the first stored Treasury curve has no yield (no look-ahead); Works for a book rests on the picks-series t of 3 when there are no deciles, with deciles both t series.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: architect review of PR 666; the cash rule is set before any edge stores legs, so no leg is invalidated.

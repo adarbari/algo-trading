@@ -112,8 +112,8 @@ def apply_rebalances(
     one. The first session buys its whole book (half a trip per unit of weight), the last
     session's book is sold at the end of the data (charged, as in a band), a session the screen
     could not value breaks the chain (everything held before it is sold, the next session buys
-    afresh). The net value is ``stored + cost * (1 - trips)``. Gross figures and the hit stay the
-    legs' own. Deterministic and in the order given."""
+    afresh). The net value is ``stored + cost * (1 - trips)``. The hit follows the
+    net value (not a full round trip each session). Deterministic and in the order given."""
     order = sorted(range(len(stats)), key=lambda i: stats[i].session)
     ordered = [stats[i] for i in order]
     cost = (cost_bp or 0.0) / 1e4
@@ -131,7 +131,7 @@ def apply_rebalances(
         if at + 1 == len(books) or books[at + 1] is None:  # the last book, or one before a gap
             trips += sum(book.values()) * EXIT  # is sold
         net = stat.pick_values[0] + cost * (1.0 - trips)
-        done.append(replace(stat, banded_values=(net,), round_trips=trips))
+        done.append(replace(stat, banded_values=(net,), round_trips=trips, pick_hits=int(net > 0)))
     out = list(stats)
     for slot, stat in zip(order, done, strict=True):
         out[slot] = stat

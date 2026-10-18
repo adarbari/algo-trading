@@ -226,7 +226,7 @@ term = "Cash position"
 short = "Money a book does not invest, which earns the Treasury bill yield known at the decision session."
 body = """
 A trend filter can send a book to cash. A pick named CASH earns the bill yield read at the decision
-session, scaled to the holding period as the yield times the sessions held over 252. A session with
+session, scaled to the holding period as the yield times the sessions held over 252. Each place the screen leaves unfilled (fewer qualify than the edge's top K) is cash too. A session with
 no picks at all is a cash session: the whole book is in cash and is measured, not left out. Cash
 costs nothing to enter or leave. If no yield is stored for the session, the session is left out with
 the reason, never given a zero return. Example: a 4% yield over 21 sessions earns 0.33%. The

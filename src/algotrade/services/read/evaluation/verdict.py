@@ -797,7 +797,12 @@ def _why(ranked: Sequence[tuple[tuple[str, int], tuple[int, float]]]) -> str:
 
 
 def _in_sample_rank(
-    key: tuple[str, int], ins: EdgeRow, main: Sequence[EdgeRow], t: VerdictSettings, decoys: bool
+    key: tuple[str, int],
+    ins: EdgeRow,
+    main: Sequence[EdgeRow],
+    t: VerdictSettings,
+    decoys: bool,
+    portfolio: bool = False,
 ) -> tuple[int, float]:
     """The verdict's ranking (level, then lift points) over the in-sample figures alone: the
     in-sample row stands for every period and the baselines are their in-sample rows; no
@@ -808,7 +813,7 @@ def _in_sample_rank(
         if r.role == "baseline" and r.horizon_sessions == key[1] and r.slice_kind == runs.IN_SAMPLE
     )
     c = _Candidate(key[0], key[1], ins, ins, ins, base, ())
-    level, _ = _level(c, _criteria(c, t, (), decoys), t)
+    level, _ = _level(c, _criteria(c, t, (), decoys, portfolio), t)
     return ORDER.index(level), _rank(_strength(ins))
 
 
@@ -817,6 +822,7 @@ def choose_basis(
     t: VerdictSettings,
     declared: Declared = UNDECLARED,
     decoys: bool = True,
+    portfolio: bool = False,
 ) -> BasisChoice:
     """The basis of a result's ``rows`` (ADR 0065), read from the in-sample rows only (the
     candidates are named by their ``in_sample`` and ``all`` rows, whose figures are not read):
@@ -850,7 +856,9 @@ def choose_basis(
     # a model screener's in-sample row is its training fit (``in_sample``): never ranked, so a
     # model is the basis only when it is the one candidate left (``promoted``)
     fair = {k: r for k, r in ins.items() if not r.in_sample}
-    ranked = [(k, _in_sample_rank(k, fair[k], main, t, decoys)) for k in keys if k in fair]
+    ranked = [
+        (k, _in_sample_rank(k, fair[k], main, t, decoys, portfolio)) for k in keys if k in fair
+    ]
     if not ranked:
         if any(k in ins for k in keys):
             return BasisChoice(
@@ -907,7 +915,11 @@ def judge(
     found = _candidates(rows)
     if found and all(c.oos.side == "long_short" for c in found):
         return _diagnostic(edge_id)  # never a verdict basis
-    choice = basis if basis is not None else choose_basis(rows, t, declared, decoys)
+    choice = (
+        basis
+        if basis is not None
+        else choose_basis(rows, t, declared, decoys, facts.portfolio if facts else False)
+    )
     if choice.key is None:
         lost = f": {'; '.join(lost_inputs)}" if lost_inputs and not found else ""
         return _waiting(edge_id, f"{choice.reason}{lost}")

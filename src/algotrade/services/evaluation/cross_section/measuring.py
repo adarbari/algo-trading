@@ -298,7 +298,7 @@ def _portfolio_stat(
     chosen = [i for i in run.qualified if i in names.pickable]
     picks = chosen if scope.edge.top_k is None else chosen[: scope.edge.top_k]
     vols = session.numbers(o.vol_field, frozenset(picks), day) if o.vol_field and picks else {}
-    weights, why = book_weights(picks, o.weighting, run.scores, vols)
+    weights, why = book_weights(picks, o.weighting, run.scores, vols, scope.edge.top_k)
     regime = session.label(day)
     if why:
         return portfolio_stat(day, regime, None, why, (), o.cost_bps)

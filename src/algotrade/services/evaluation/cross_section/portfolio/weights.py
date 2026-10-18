@@ -9,8 +9,9 @@ an input (a missing volatility given zero weight would be a bet nobody declared)
 - ``inverse_vol``: proportional to ``1 / vol``; every pick needs a finite positive volatility.
 - ``score``: proportional to the screen's score; every pick needs a finite positive score (a
   score is a rank key, not a size: a non-positive one has no size to give).
-- ``CASH`` among the picks is a position like any other with an equal share ``1 / n``; the
-  names beside it share the rest by the weighting (cash has no score or volatility).
+- A book has ``slots`` places (``top_k``): each one the picks leave unfilled, and each ``CASH``
+  pick, is a share of ``1 / slots`` in cash (re-normalising over fewer names would put the whole
+  book in one); the names share the rest by the weighting (cash has no score or volatility).
 - No picks: all cash, a cash session (not an excluded one)."""
 
 import math
@@ -32,14 +33,17 @@ def book_weights(
     weighting: str,
     scores: Mapping[str, float],
     vols: Mapping[str, float | None],
+    slots: int | None = None,
 ) -> tuple[Weights, str]:
     """``(weights, reason)``: the book of ``picks`` (in rank order) and ``""``, or ``()`` and why
-    it cannot be formed. Weights add to one; the picks are distinct (a repeated one counts once)."""
+    it cannot be formed. ``slots``: the places of the book (None: one per pick). Weights add to
+    one; the picks are distinct (a repeated one counts once)."""
     ids = list(dict.fromkeys(picks))
     if not ids:
         return ((CASH, 1.0),), ""
     names = [i for i in ids if i != CASH]
-    cash = (1.0 / len(ids)) if CASH in ids else 0.0
+    size = max(slots or len(ids), len(ids))  # the book's slots; one a pick does not fill is cash
+    cash = (size - len(names)) / size if size > len(names) else 0.0
     if weighting == EQUAL:
         raw = dict.fromkeys(names, 1.0)
     elif weighting == INVERSE_VOL:

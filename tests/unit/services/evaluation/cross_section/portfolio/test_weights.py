@@ -60,3 +60,15 @@ def test_a_pick_listed_twice_counts_once_and_weights_add_to_one() -> None:
 def test_an_unknown_weighting_is_a_programming_error() -> None:
     with pytest.raises(ValueError, match="no weighting"):
         book_weights(["A"], "kelly", {}, {})
+
+
+def test_slots_a_book_does_not_fill_are_cash_not_renormalised() -> None:
+    weights, _ = book_weights(["A"], "equal", {}, {}, slots=4)
+    assert dict(weights) == pytest.approx({"A": 0.25, "CASH": 0.75})  # not all in A
+    weights, _ = book_weights(["A", "B"], "inverse_vol", {}, {"A": 0.1, "B": 0.2}, slots=4)
+    assert dict(weights) == pytest.approx({"A": 1 / 3, "B": 1 / 6, "CASH": 0.5})
+    assert book_weights([], "equal", {}, {}, slots=3) == ((("CASH", 1.0),), "")
+    full, _ = book_weights(["A", "B"], "equal", {}, {}, slots=2)
+    assert dict(full) == {"A": 0.5, "B": 0.5}  # a full book has no cash
+    explicit, _ = book_weights(["A", "CASH"], "equal", {}, {}, slots=4)
+    assert dict(explicit) == pytest.approx({"A": 0.25, "CASH": 0.75})  # CASH is a slot too

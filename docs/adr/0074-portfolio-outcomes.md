@@ -43,7 +43,7 @@ belongs in it.
    session*, measured, not excluded (for this kind only). Cash earns the shortest-tenor par yield
    of the curve D sees (`rates/treasury`, the latest on or before D) times `h / 252`. No stored
    curve leaves a cash-holding session out (`no_cash_yield`). Cash costs nothing to hold or leave.
-   Slots a `top_k` leaves unfilled do not go to cash by themselves (an owner decision, below).
+   Each slot a `top_k` leaves unfilled is a `1 / top_k` share in cash too (architect decision: re-normalising over fewer names would put the whole book in one). A day before the first stored curve has no yield (`no_cash_yield`): the read would fall back to a later curve.
 5. **Cost is the weight change.** A leg's stored value is net of one full round trip, as every
    leg's is. The turnover pass (`reporting/turnover.py::apply_rebalances`) replaces it by the
    cost of `sum |w_t - w_(t-1)| / 2` round trips over the names, cash excluded: the first

@@ -192,14 +192,15 @@ class SessionReads:
     def bill_yield(self, day: date) -> float | None:
         """The shortest-tenor Treasury bill yield (a decimal per year) of the curve ``day`` sees,
         the latest stored on or before it (``data.rates``: known at D); None when no curve is
-        stored. What cash earns in a portfolio book (ADR 0074)."""
+        stored or the day is before the first one. What cash earns in a portfolio book (0074)."""
         if day not in self._bills:
             try:
-                frame = curve(self._reader, day).frame
+                found = curve(self._reader, day)
             except MissingDataError:
                 self._bills[day] = None
-            else:
-                self._bills[day] = float(frame["rate_par"].iloc[0]) if len(frame) else None
+            else:  # before the first curve the read falls back to a LATER one: not known at D
+                ok = len(found.frame) and not found.pre_snapshot
+                self._bills[day] = float(found.frame["rate_par"].iloc[0]) if ok else None
         return self._bills[day]
 
     def instruments(self, tickers: tuple[str, ...], on: date) -> dict[str, str | None]:

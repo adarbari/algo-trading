@@ -174,3 +174,34 @@ def test_a_book_run_is_deterministic_and_its_trial_is_its_own() -> None:
     assert first.run_hash == again.run_hash
     assert _book(weighting="equal").run_hash == first.run_hash  # the default is spelled or not
     assert _book(benchmark="mix:N00=0.5,N01=0.5").run_hash != first.run_hash
+
+
+def test_a_book_with_fewer_qualified_names_than_top_k_holds_cash_for_the_rest() -> None:
+    w = _world()
+    only = {**screen(), "criteria": {"price": {"field": PRICE, "op": "gt", "value": 285.0}}}
+    w.configs = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "momo"): only}
+    )  # prices 100 + 10 i: only names 19 qualifies (290); top_k 5 leaves four slots in cash
+    (r,) = _book(w).results
+    weights = dict(r.stats[0].weights)
+    assert weights == pytest.approx({"EQ:N19": 0.2, "CASH": 0.8})
+
+
+def test_cash_before_the_first_stored_curve_is_never_a_later_yield() -> None:
+    w = build_world(
+        rows_of=lambda day: [
+            outcome_row(iid, i, day, horizon_sessions=1) for i, iid in enumerate(IDS)
+        ]
+    )
+    ts = pd.Timestamp(DAYS[-1], tz="UTC")  # the only curve is stored AFTER every decision session
+    rows = [{"instrument_id": "RATE:UST-1M", "ts": ts, "tenor": "1M", "tenor_days": 30,
+             "rate_par": BILL, "rate_cont": BILL}]  # fmt: skip
+    w.writer.write_table(
+        "rates/treasury", DAYS[-1] + timedelta(days=1), "r", stamped(rows, DAYS[-1], "r")
+    )
+    never = {**screen(), "criteria": {"price": {"field": PRICE, "op": "gt", "value": 1e9}}}
+    w.configs = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "momo"): never}
+    )
+    (r,) = _book(w).results
+    assert {s.portfolio_reason for s in r.stats} == {"no_cash_yield"}
