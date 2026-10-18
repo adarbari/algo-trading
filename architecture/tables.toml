@@ -216,6 +216,26 @@ name = "rollups/instrument/dividends@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/dividend_months@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the coming calendar month's ex-dividend hits in the last 3 years, from events/dividend by event date"
+
+[[table]]
+name = "rollups/instrument/filing_activity@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0050: 8-K filings (events/filing, known_from <= session) and earnings reaction windows in the last 5 sessions: the no-news filter"
+
+[[table]]
+name = "rollups/instrument/max_return@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "MAX: the best one-day return of the last 21 sessions"
+
+[[table]]
+name = "rollups/instrument/earnings_neutral_reversal@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the 20-session return without the E-1..E+1 earnings reaction returns"
+
+[[table]]
 name = "rollups/instrument/dividend_schedule@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the next known ex-dividend date; reads events/dividend by knowledge date (events/dividend_declared)"

@@ -24,7 +24,7 @@ from collections.abc import Mapping
 from algotrade.features.framework.declaration import FeatureGroup, Superseded
 from algotrade.features.framework.feature import Feature
 from algotrade.features.framework.graph import dependency_order
-from algotrade.features.rollups.activity import vol_stats, volume_profile
+from algotrade.features.rollups.activity import max_return, vol_stats, volume_profile
 from algotrade.features.rollups.consensus import (
     analyst_estimates,
     analyst_ratings,
@@ -34,12 +34,14 @@ from algotrade.features.rollups.consensus import (
     earnings_surprise,
 )
 from algotrade.features.rollups.corporate import (
+    dividend_months,
     dividend_schedule,
     dividends,
     earnings,
     earnings_expected,
     earnings_reaction,
     earnings_schedule,
+    filing_activity,
     financials,
     fundamentals,
 )
@@ -74,6 +76,7 @@ from algotrade.features.rollups.positioning import (
 from algotrade.features.rollups.price import (
     anchored_vwap,
     bands,
+    earnings_neutral_reversal,
     episodes,
     momentum,
     price_history,
@@ -110,6 +113,8 @@ GROUPS: dict[str, FeatureGroup] = {
             analyst_revisions.GROUP,
             dividends.GROUP,
             dividend_schedule.GROUP,
+            dividend_months.GROUP,
+            filing_activity.GROUP,
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,
@@ -122,6 +127,8 @@ GROUPS: dict[str, FeatureGroup] = {
             put_wing.GROUP,
             call_wing.GROUP,
             price_moves.GROUP,
+            max_return.GROUP,
+            earnings_neutral_reversal.GROUP,
             momentum.GROUP,
             volume.GROUP,
             bands.GROUP,

@@ -52,3 +52,28 @@ description = "Daily turnover: the 20-session average share volume / shares outs
 null_meaning = "adv_shares_20d is null (a gap among the last 20 sessions), or shares_outstanding is null (no share count filed, or STALE: fundamentals market_cap_status)"
 valid_range = [0, inf]
 version = 1
+
+[volume_shock]
+expr = "volume.volume_z_20d >= min_z"
+params = { min_z = 2.0 }  # standard deviations above the 20 sessions before the session
+dtype = "bool"
+unit = "flag"
+description = "The session's volume is 2 (params.min_z) or more standard deviations above the 20 sessions before it: the unusually high volume of the volume-shock premium (Gervais, Kaniel and Mingelgrin 2001); a lower bar than volume_climax, which is event-sized"
+null_meaning = "volume_z_20d is null (a gap among the last 21 sessions, a shorter history, or the 20 sessions before all had the same volume)"
+version = 1
+
+[news_free_5d]
+expr = "filing_activity.filing_count_5d == 0 and not filing_activity.earnings_in_5d"
+dtype = "bool"
+unit = "flag"
+description = "No 8-K or 8-K/A was filed and no earnings reaction window touched the last 5 sessions, as known on the session: nothing identifiable explains a move in them"
+null_meaning = "filing_count_5d is null (no filing stored for the instrument by the session, or the filings backfill starts after the window) or earnings_in_5d is null (no earnings report known for it), and the other term does not already make it false"
+version = 1
+
+[volume_shock_no_news]
+expr = "volume_shock and news_free_5d"
+dtype = "bool"
+unit = "flag"
+description = "A volume shock (volume_shock) with nothing to explain it (news_free_5d): the setup the volume-shock return premium trades"
+null_meaning = "volume_shock or news_free_5d is null and the other term is not false"
+version = 1

@@ -29,6 +29,9 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
 - ``events/earnings``  ``events.stored_events``: every calendar row known on or before the
                        session (``known_from``, else the session that stored it: ADR 0050),
                        as stored (what was known then); ``None`` when there is none
+- ``events/filing``    ``events.stored_events``: every 8-K / 8-K/A row known on or before the
+                       session (``known_from``, the acceptance's session: ADR 0050), as stored;
+                       ``None`` when there is none. The same read as ``events/earnings``
 - ``chains/*``         ``chains``: the session's own partition, read per session (chains are
                        large; a lookback is not supported)
 - ``events/dividend_declared``
@@ -425,6 +428,7 @@ def _group_rows(
 INPUTS: Mapping[str, Loader] = {
     BARS: _bars,
     "events/earnings": _event_snapshots("events/earnings"),
+    "events/filing": _event_snapshots("events/filing"),
     "chains/status": _partition(chain_status),
     "chains/option_quotes": _partition(option_quotes),
     "chains/underlying_quotes": _partition(underlying_quotes),
