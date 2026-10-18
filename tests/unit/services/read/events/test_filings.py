@@ -8,7 +8,14 @@ import pytest
 from algotrade.services.read.events import filings
 from algotrade.services.read.events.filings import item_label, load_filings, months_before
 from algotrade.services.read.values import UnknownCode
-from tests.unit.services.read.events.conftest import D1, context, store_with
+from tests.helpers.stored_frames import stamped
+from tests.unit.services.read.events.conftest import (
+    D1,
+    FILING,
+    context,
+    filing_row,
+    store_with,
+)
 
 
 def test_the_window_known_by_the_session_newest_first() -> None:
@@ -53,3 +60,20 @@ def test_labels_and_months() -> None:
     assert months_before(D1, 24) == date(2024, 10, 1)
     assert months_before(date(2026, 3, 31), 1) == date(2026, 2, 28)
     assert months_before(date(2026, 1, 15), 13) == date(2024, 12, 15)
+
+
+def test_only_8ks_are_shown_the_other_event_forms_of_the_table_are_not() -> None:
+    def other_forms(writer):  # type: ignore[no-untyped-def]
+        rows = [
+            {
+                **filing_row("2026-09-20 13:00", "", date(2026, 9, 20)),
+                "form": form,
+                "accession": form,
+            }
+            for form in ("NT 10-Q", "424B4", "25-NSE", "SC TO-I", "10-12B")
+        ]
+        writer.write_table(FILING, D1, "other", stamped(rows, D1, "other", source="sec"))
+
+    found, gaps = load_filings(context(store_with(other_forms)), ["EQ:AAA", "EQ:BBB"], 24)
+    assert {f.form for f in found["EQ:AAA"]} == {"8-K"} and len(found["EQ:AAA"]) == 2
+    assert "EQ:BBB" in gaps  # asked about nowhere: still UNKNOWN

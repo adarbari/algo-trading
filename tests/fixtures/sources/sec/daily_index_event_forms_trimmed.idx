@@ -1,0 +1,24 @@
+Description:           Daily Index of EDGAR Dissemination Feed by Form Type
+Last Data Received:    Sep 30, 2026
+Comments:              webmaster@sec.gov
+Anonymous FTP:         ftp://ftp.sec.gov/edgar/
+
+
+
+
+Form Type   Company Name                                                  CIK
+      Date Filed  File Name
+---------------------------------------------------------------------------------------------------------------------------------------------
+10-12B           Trinzic, Inc.                                                 2101664     20260930    edgar/data/2101664/0001140361-26-038098.txt
+424B4            NewGenIvf Group Ltd                                           1981662     20260930    edgar/data/1981662/0001213900-26-104917.txt
+SC TO-I          USVC Venture Capital Access Fund                              1858660     20260930    edgar/data/1858660/0001999371-26-021570.txt
+SC TO-I/A        Align Alternative Access Fund                                 2026675     20260930    edgar/data/2026675/0001580642-26-006585.txt
+25-NSE           Abpro Holdings, Inc.                                          1893219     20260930    edgar/data/1893219/0001354457-26-000926.txt
+25-NSE           NEW YORK STOCK EXCHANGE LLC                                   876661      20260930    edgar/data/876661/0000876661-26-000800.txt
+NT 10-K          ADVENT TECHNOLOGIES HOLDINGS, INC.                            1744494     20260331    edgar/data/1744494/0001829126-26-002882.txt
+NT 10-K          AIBOTICS, INC.                                                1763329     20260331    edgar/data/1763329/0001096906-26-000443.txt
+NT 10-Q          ADM TRONICS UNLIMITED, INC.                                   849401      20260814    edgar/data/849401/0001437749-26-027992.txt
+NT 10-Q          AETERNUM HEALTH, INC.                                         764630      20260814    edgar/data/764630/0001493152-26-038480.txt
+8-K              374Water Inc.                                                 933972      20260930    edgar/data/933972/0001654954-26-008681.txt
+25               NEIGHBORHOOD INTELLIGENCE, INC.                               1130713     20260814    edgar/data/1130713/0001140361-26-033184.txt
+10-K             Bowen Acquisition Corp                                        1973056     20260930    edgar/data/1973056/0001493152-26-044953.txt

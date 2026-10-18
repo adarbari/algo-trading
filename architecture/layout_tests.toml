@@ -40,7 +40,7 @@ purpose = "fitness tests: layout, ownership, structure, docs, registries"
 
 [[test_dir]]
 path = "tests/architecture/api"
-purpose = "fitness tests for the API surface and the read model"
+purpose = "fitness tests for the API surface and the read model (and that a reader of the rule-screen values skips group rows, ADR 0071)"
 
 [[test_dir]]
 path = "tests/architecture/data"
