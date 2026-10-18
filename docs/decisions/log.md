@@ -512,5 +512,6 @@ follow-up PR).
 - Options: (a) block learned fits only (edge-scorer training frame, winners-study discovery probit in `services/evaluation/discovery` / `quant.probit`), harness may score screeners using them / (b) also stop the harness from scoring such screeners.
 - Decision: (a), applied to every FINRA-derived feature whatever its source (API or cdn backfill files), as one licence tag on the feature groups with a fitness test that no training frame or probit input reads a tagged feature; the FINRA rows never reach the TextModel seam. The edge harness may score rule screeners that use them.
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-10-18
 - Reasoning: the clause targets a program that learns or predicts from the data, and it sits only in the website terms (the cdn files), not the API terms. The harness evaluates a fixed, human-written rule after the fact (hit rate vs base rate, lift, deciles); nothing is fitted and no estimate becomes a model, so it is an audit, not predictive analytics. Use is personal and non-commercial with no redistribution, so the residual risk is remote, while knowing whether a short-interest screen has an edge is the reason to ingest it. Reversible: (b) is one PR (extend the tag check to the harness) if the owner disagrees. Matches the owner's plan "rule screens only, never a learned scorer".
