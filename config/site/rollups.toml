@@ -121,6 +121,24 @@ max_spread_pct = 0.35    # a smile quote's (ask - bid) / mid must be within this
 window = 252             # sessions for FULL, today included
 min_provisional = 60     # sessions with a skew before the rank is shown (PROVISIONAL)
 
+["ibkr_iv_history@v1"]     # IBKR IV30 changes over 5 and 21 sessions (the column names carry both)
+short = 5
+long = 21
+
+["cp_iv@v1"]              # call-put IV spread, smirk, ATM call and put IV (edge ideas c01-c03)
+target_days = 30         # the expiry nearest this many days out
+min_days = 10            # among the expiries min_days..max_days out
+max_days = 60
+max_spread_pct = 0.35    # a smile quote's (ask - bid) / mid must be within this
+pair_band = 0.10         # spread pairs: |strike / spot - 1| within this
+atm_band = 0.05          # the ATM vols: |strike / spot - 1| within this
+otm_lo = 0.80            # the smirk's put: strike / spot in otm_lo..otm_hi
+otm_hi = 0.95
+
+["cp_iv_history@v1"]      # changes over 5 and 21 sessions (the column names carry both)
+short = 5
+long = 21
+
 ["iv_term@v1"]            # the ATM vol at the next expiry and at a constant 90 days
 target_days = 90         # the constant maturity of iv_90d
 min_days = 30            # its expiries are min_days..max_days out
