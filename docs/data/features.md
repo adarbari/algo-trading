@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-519 stored features in 61 groups, in dependency order; 146 expression features.
+524 stored features in 62 groups, in dependency order; 147 expression features.
 
 ## `option_liquidity@v1`
 
@@ -671,6 +671,18 @@ The move priced by the at-the-money straddle at the expiry covering the next ear
 | `move_dte` | chain | int | days | open | >= 1 | Calendar days from the session to the move expiry | no expiry was selected (NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.expiry`, `earnings.next_earnings_date@v1`, `earnings.earnings_time@v1` |
 | `move_basis` | label | str | category | open | EARNINGS, TERM | EARNINGS when the move expiry is the first covering the next report, TERM when it is the expiry nearest 30 days (no report ahead, or none covered within 60 days) | no expiry was selected (NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.expiry`, `earnings.next_earnings_date@v1`, `earnings.earnings_time@v1` |
 
+## `momentum_variants@v1`
+
+The momentum factor's variants: the 12-1 and 1-month returns net of SPY (residual), the information discreteness of the 12-1 path, the sector ETF's 12-month return and the 1-month return against it. Stored as `rollups/instrument/momentum_variants@v1`; reads `bars/1d`, `instruments/symbol_ids` (optional), `rollups/instrument/relative_strength@v1` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `resid_mom_12_1` | window | float32 | decimal | open | -5 .. 5 | The 12-1 momentum net of the market: ln(close 21 sessions back / close 252 sessions back) minus beta times SPY's same log return, beta the OLS slope of the instrument's daily log returns on SPY's over that same window (no intercept is removed). 0.15 is 15 points of log return beyond what the market's own move explains. A market-only, unscaled approximation of Blitz, Huij and Martens' residual momentum (they use 36-month Fama-French residuals scaled by their stdev) | a session from 252 to 21 sessions back has no bar for the instrument (a session in the window has no bar (a gap), or the history is shorter), SPY is not in the symbol map or has no bars, or its own window has a gap, or the instrument has fewer than 200 of the window's returns (or SPY does) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `fip_12_1` | window | float32 | ratio | open | -1 .. 1 | Information discreteness of the 12-1 path: sign(12-1 return) x (share of down days - share of up days) over the 12-1 window's daily returns. Below 0 the winners rose on many small up days (continuous, 'frog in the pan'); above 0 they rose on a few big jumps (discrete); -0.2 is 20 points more up days than down days in an up move | a session from 252 to 21 sessions back has no bar (a session in the window has no bar (a gap), or the history is shorter) | `bars/1d.close` |
+| `resid_ret_20d` | window | float32 | decimal | open | -5 .. 5 | The 20-session return net of the market (residual 1-month return): the log return over 20 sessions minus beta_252d times SPY's over the same sessions (beta from the trailing 252 sessions, the rollup beta_252d). Positive: the name beat what its market exposure explains; a high value tends to reverse next month | a session among the last 21 has no bar (a session in the window has no bar (a gap), or the history is shorter), SPY is not in the symbol map or has no bars, or its own window has a gap, or the instrument has fewer than 200 of the window's returns (or SPY does) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `sector_ret_252d` | window | float32 | decimal | open | >= -1 | The 252-session return of the instrument's sector ETF (close / close 252 sessions earlier - 1): how the sector as a whole has done over a year | relative_strength@v1's sector_etf is null for the session, or the ETF is not in the symbol map or has a gap in its 253 closes | `relative_strength.sector_etf@v1`, `bars/1d.close` |
+| `rs_sector_20d` | window | float32 | decimal | open | >= -1 | The 20-session return against the sector ETF's: (1 + the instrument's return) / (1 + the ETF's) - 1. A sector-adjusted 1-month return (the sector is the SEC SIC code's coarse market sector, the nearest industry proxy stored); 0.05 beat its sector by 5 points | sector_etf is null, the ETF has a gap in its last 21 closes, or the instrument has (a session in the window has no bar (a gap), or the history is shorter) | `relative_strength.sector_etf@v1`, `bars/1d.close` |
+
 ## `analyst_estimates@v1`
 
 Analysts' consensus EPS and revenue for the current and next fiscal year (FMP annual estimates, our own point-in-time snapshots; personal-use licence). Stored as `rollups/instrument/analyst_estimates@v1`; reads `universe`, `analyst/estimate_snapshots` (optional), `rollups/instrument/financials@v3` (optional). Sole source: single free vendor (FMP), no fallback: ADR 0055 amendment, ADR 0068.
@@ -1078,6 +1090,7 @@ Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on rea
 | `rs_spy_positive` | expression | bool | flag | open |  | The instrument beat SPY over the last 63 sessions: rs_spy_63d above 0 (outperforming the market over a quarter) | rs_spy_63d is null (a gap in the 64 closes, or SPY not in the symbol map), or no relative_strength row | `relative_strength.rs_spy_63d > 0` | virtual |
 | `rs_improving` | expression | bool | flag | open |  | Relative strength against SPY is improving: rs_spy_trend_20d above 0 (the 63-session relative strength is higher than it was 20 sessions ago) | rs_spy_trend_20d is null (a gap in either 63-session window, or SPY not in the symbol map), or no relative_strength row | `relative_strength.rs_spy_trend_20d > 0` | virtual |
 | `sector_leader` | expression | bool | flag | open |  | The instrument's sector is one of the three strongest of the eleven sector ETFs over 63 sessions: sector_rank_63d at most 3 (params.leader_rank) | sector_rank_63d is null (no sector or sector ETF, the ETF has no complete window, or fewer than min_sector_etfs ETFs do), or no relative_strength row | `relative_strength.sector_rank_63d <= leader_rank` (leader_rank = 3) | virtual |
+| `mom_12_1_vol_scaled` | expression | float | ratio | open | -100 .. 100 | The 12-1 momentum divided by the 60-session realised volatility (annualised): the return earned per unit of risk the name carries, so a calm 20% outranks a wild 20%; 1.0 is a 12-1 return equal to a year of one-stdev moves | mom_12_1 is null (a gap among the last 253 sessions, or a shorter history), hv60 is null (a gap among the last 61 sessions) or 0, or no trend_stats or vol_stats row | `trend_stats.mom_12_1 / vol_stats.hv60` | virtual |
 
 ### `regime.toml`
 
