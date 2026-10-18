@@ -396,6 +396,7 @@ def test_screened_and_phrased_fields_have_a_guide_entry() -> None:
 
 # ----------------------------------------------------------------------------- optional sources
 OPTIONAL = {g.name for g in GROUPS.values() if g.optional}  # ADR 0055
+SOLE_SOURCE = {g.name for g in GROUPS.values() if g.sole_source}  # ADR 0055 amendment
 _SAMPLE = {"float": 0.5, "float32": 0.5, "int": 1, "bool": True, "date": pd.Timestamp("2026-10-02")}
 
 
@@ -403,30 +404,46 @@ def _sample(f: Feature) -> object:
     return f.categories[0] if f.categories else _SAMPLE.get(f.dtype, "x")
 
 
+def _reads(name: str) -> set[str]:
+    """The groups an expression feature reads, through the expressions it uses."""
+    return set(SITE.plan([name])[0])
+
+
 @pytest.mark.parametrize(
-    "name",
-    sorted(
-        n for n, e in SITE.expressions.items() if {r.partition(".")[0] for r in e.refs} & OPTIONAL
-    ),
+    "name", sorted(n for n in SITE.expressions if _reads(n) & (OPTIONAL - SOLE_SOURCE))
 )
 def test_an_expression_over_an_optional_source_still_has_a_value_without_it(name: str) -> None:
     """ADR 0055: a screen goes without an optional group's table (IB Gateway down) and is not
     PARTIAL, so every expression feature reading it falls back to a required table (``coalesce``
     or an ``is_null`` branch): with the optional table absent and the rest stored, it has a
-    value."""
+    value. A sole-source group (no other source exists: the analyst consensus, ADR 0055
+    amendment) is stored here, never absent: its expressions are null without it by design."""
     frames: dict[str, pd.DataFrame | None] = {}
     for table, columns in SITE.stored_columns([name]).items():
         group = GROUPS[table.rpartition("/")[2]]
-        if group.optional:
+        if group.optional and not group.sole_source:
             frames[table] = None
             continue
         row = {"instrument_id": "EQ:X", "session_date": pd.Timestamp("2026-10-02").date()}
         frames[table] = pd.DataFrame([{**row, **{c: _sample(group.feature(c)) for c in columns}}])
     out = SITE.evaluate(frames, [name])
     assert out[name].notna().all(), (
-        f"{name} reads an optional group ({sorted(OPTIONAL)}) with no fallback: coalesce it "
-        "with a required table, or the screens reading it go without a value (ADR 0055)"
+        f"{name} reads an optional group ({sorted(OPTIONAL - SOLE_SOURCE)}) with no fallback: "
+        "coalesce it with a required table, or the screens reading it go without a value "
+        "(ADR 0055)"
     )
+
+
+def test_sole_source_groups_are_optional_and_name_their_adr() -> None:
+    assert {"analyst_estimates", "analyst_targets"} == SOLE_SOURCE  # a new one is a decision
+    assert SOLE_SOURCE <= OPTIONAL
+    assert all("ADR " in GROUPS[f"{n}@v1"].sole_source for n in SOLE_SOURCE)
+    # the checks see through expressions: the forward features read the sole sources, the
+    # IBKR formulas an optional group that still needs its fallback
+    assert {"analyst_estimates", "analyst_targets"} <= {
+        g for n in ("forward_pe", "target_upside") for g in _reads(n)
+    }
+    assert "ibkr_iv" in _reads("vrp_iv30") and "ibkr_iv" not in SOLE_SOURCE
 
 
 def test_no_site_hard_criterion_reads_an_optional_source_directly() -> None:
@@ -442,4 +459,7 @@ def test_no_site_hard_criterion_reads_an_optional_source_directly() -> None:
             head, _, rest = str(c.get("field", "")).partition(".")
             if head == "rollup" and rest.partition("@")[0] in OPTIONAL:
                 bad.append(f"{path.parent.name}/{path.name} criteria.{cid}")
+            elif head == "feature" and rest in SITE.expressions and _reads(rest) & SOLE_SOURCE:
+                # no fallback exists for a sole-source group: its expressions are optional fields
+                bad.append(f"{path.parent.name}/{path.name} criteria.{cid} (sole source)")
     assert not bad, f"HARD criteria on an optional source's field: {bad}"
