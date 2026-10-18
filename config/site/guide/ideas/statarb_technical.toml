@@ -1,0 +1,255 @@
+# Researched, not built: family G (statarb technical) of the edge-idea catalogue, one [[idea]] each (ADR 0051; keys in config/site/guide/ideas.py).
+
+family = "G"
+
+[[idea]]
+id = "rsi2_connors_etf_pullback"
+title = "Two-day RSI pullback in an uptrend"
+mechanism_kind = "liquidity_provision"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The edge has faded and survives only as an entry-timing overlay; a short-window RSI feature would be needed."
+
+[[idea]]
+id = "trend_factor_ma_cross_section"
+title = "Trend factor from many moving averages"
+mechanism_kind = "slow_to_update"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but it needs a long price history and a new cross-sectional feature kind."
+
+[[idea]]
+id = "breakout_52w_high_trend_following"
+title = "Buying new highs with a trailing stop"
+mechanism_kind = "slow_to_update"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned as a momentum variant, but a fair test needs long history including delisted names."
+
+[[idea]]
+id = "nearness_52w_high_cross_section"
+title = "Monthly 52-week-high ratio ranking"
+mechanism_kind = "slow_to_update"
+filed_as = "momentum_12_1"
+
+[[idea]]
+id = "etf_flow_reversal_constituents"
+title = "ETF demand pressure reverses in its holdings"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but it needs ETF ownership per stock; the filed ETF flow edge covers only the fund level."
+
+[[idea]]
+id = "etf_constituent_residual_statarb"
+title = "ETF-residual mean reversion across stocks"
+mechanism_kind = "liquidity_provision"
+verdict = "decayed"
+feasibility = "out_of_scope"
+why_not_built = "Faded for an individual and out of scope by its cost structure; only its residual feature is kept."
+
+[[idea]]
+id = "pairs_distance_ggr"
+title = "Distance-method pairs trading"
+mechanism_kind = "value_gaps"
+verdict = "decayed"
+feasibility = "needs_data"
+why_not_built = "Decayed, and it needs a pair table and long history; worth at most a bear-market study."
+
+[[idea]]
+id = "pairs_cointegration_copula"
+title = "Cointegration and copula pairs"
+mechanism_kind = "value_gaps"
+verdict = "decayed"
+feasibility = "out_of_scope"
+why_not_built = "Decayed, and the catalogue puts it out of scope for the first year."
+
+[[idea]]
+id = "share_class_pairs"
+title = "Dual-class and dual-listed share pairs"
+mechanism_kind = "value_gaps"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak and likely to fail the cost test; the dual-class spread edge is already filed."
+
+[[idea]]
+id = "lead_lag_large_to_small"
+title = "Large caps lead small caps"
+mechanism_kind = "slow_to_update"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "Decayed; it would be filed only if the economic-links variant is researched elsewhere."
+
+[[idea]]
+id = "etf_to_holdings_lead_lag"
+title = "ETF price leads its holdings"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; a cheap test once holdings-weighted returns exist, so it is low priority."
+
+[[idea]]
+id = "donchian_turtle_breakout_stocks"
+title = "Channel breakouts with ATR stops"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; shorter lookbacks lose to the 52-week-high version, so it is tested only as a parameter of that."
+
+[[idea]]
+id = "gap_fill_vs_gap_and_go"
+title = "Overnight gaps: fill or continue"
+mechanism_kind = "liquidity_provision"
+verdict = "weak"
+feasibility = "out_of_scope"
+why_not_built = "Weak; the fill leg needs intraday data and the continuation leg is covered elsewhere."
+
+[[idea]]
+id = "opening_range_breakout"
+title = "Opening range breakout"
+mechanism_kind = "slow_to_update"
+verdict = "not_graded"
+feasibility = "out_of_scope"
+why_not_built = "Intraday, so it is out of scope; its end-of-day relative is the volume and gap filter of the episodic pivot."
+
+[[idea]]
+id = "candlestick_patterns"
+title = "Candlestick patterns"
+mechanism_kind = "slow_to_update"
+verdict = "dead"
+feasibility = "data_ready"
+why_not_built = "Dead as an edge; the candle feature stays a description for the Guide, not a signal."
+
+[[idea]]
+id = "chart_patterns_hs_cup_handle"
+title = "Head and shoulders, cup and handle patterns"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "needs_code"
+why_not_built = "Weak and low priority; it needs a pattern detector, and existing breakout features already approximate it."
+
+[[idea]]
+id = "support_resistance_round_numbers"
+title = "Support, resistance and round-number levels"
+mechanism_kind = "liquidity_provision"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak as an edge; it is kept as a risk-placement convention."
+
+[[idea]]
+id = "ma_crossover_single_stocks"
+title = "Golden and death crosses"
+mechanism_kind = "slow_to_update"
+verdict = "dead"
+feasibility = "data_ready"
+why_not_built = "Dead as alpha; it is already built as a regime filter."
+
+[[idea]]
+id = "adx_trend_filter"
+title = "ADX trend-strength filter"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak with no mechanism of its own; stored regression trend statistics substitute for it."
+
+[[idea]]
+id = "ibd_relative_strength_ranking"
+title = "Relative strength rank, recent quarter weighted"
+mechanism_kind = "slow_to_update"
+verdict = "not_graded"
+feasibility = "data_ready"
+why_not_built = "The catalogue treats it as a variant of the filed momentum edge, so it is not built as its own edge."
+
+[[idea]]
+id = "minervini_trend_template"
+title = "Stage-2 trend template screen"
+mechanism_kind = "slow_to_update"
+verdict = "not_graded"
+feasibility = "data_ready"
+why_not_built = "The catalogue treats it as a variant of the filed momentum edge; only its filter increment would be tested."
+
+[[idea]]
+id = "overbought_shorts"
+title = "Shorting stretched, overbought names"
+mechanism_kind = "liquidity_provision"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; useful only as the short leg of the residual reversal idea or a volatility overlay."
+
+[[idea]]
+id = "bollinger_keltner_reversion"
+title = "Band reversion"
+mechanism_kind = "liquidity_provision"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak and redundant with other short-term reversal ideas, so it is not filed separately."
+
+[[idea]]
+id = "industry_relative_mean_reversion_monthly"
+title = "Intra-industry reversal beside industry momentum"
+mechanism_kind = "slow_to_update"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan; the filed industry momentum edge does not yet include this reversal leg."
+
+[[idea]]
+id = "low_volume_pullback_pocket_pivot"
+title = "Pocket pivots and volume dry-ups"
+mechanism_kind = "informed_footprints"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; it would be tested only as an entry filter inside the momentum edge."
+
+[[idea]]
+id = "short_term_reversal_classic"
+title = "Raw one-week and one-month reversal"
+mechanism_kind = "liquidity_provision"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "Decayed; listed only as the control for the residual reversal edge."
+
+[[idea]]
+id = "long_term_reversal_debondt_thaler"
+title = "Three to five year losers"
+mechanism_kind = "liquidity_provision"
+verdict = "weak"
+feasibility = "out_of_scope"
+why_not_built = "Weak and it belongs to the value family, so it is out of scope here."
+
+[[idea]]
+id = "correlation_breakdown_cross_asset_pairs"
+title = "Sector funds against commodity and rate pairs"
+mechanism_kind = "cross_market_trends"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and it needs futures or commodity fund history; handed to the macro family."
+
+[[idea]]
+id = "residual_reversal_sector_neutral"
+title = "Residual reversal, industry-neutral"
+mechanism_kind = "liquidity_provision"
+filed_as = "short_term_residual_reversal"
+
+[[idea]]
+id = "large_move_news_vs_no_news"
+title = "Large moves with and without news"
+mechanism_kind = "liquidity_provision"
+filed_as = "news_conditioned_reversal"
+
+[[idea]]
+id = "episodic_pivot_gap_volume"
+title = "Episodic pivot: big gap on volume"
+mechanism_kind = "slow_to_update"
+filed_as = "earnings_gap_volume_drift"
+
+[[idea]]
+id = "oversold_in_uptrend_pullback"
+title = "Pullback to the moving average in an uptrend"
+mechanism_kind = "slow_to_update"
+filed_as = "momentum_12_1"
+
+[[idea]]
+id = "volume_price_confirmation_obv_cmf"
+title = "Volume confirmation of price trends"
+mechanism_kind = "slow_to_update"
+filed_as = "momentum_12_1"

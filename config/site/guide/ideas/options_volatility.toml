@@ -1,0 +1,181 @@
+# Researched, not built: family C (options volatility) of the edge-idea catalogue, one [[idea]] each (ADR 0051; keys in config/site/guide/ideas.py).
+
+family = "C"
+
+[[idea]]
+id = "c05_put_call_ratio_volume"
+title = "Put-to-call volume ratio"
+mechanism_kind = "informed_footprints"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The public-data version of the effect has faded; it is useful only as a filter, so it is not built as an edge."
+
+[[idea]]
+id = "c06_risk_neutral_skewness"
+title = "Skewness implied by option prices"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "needs_code"
+why_not_built = "Weak with an unstable sign, and it needs a new pricing function in the maths package before it can be tested."
+
+[[idea]]
+id = "c07_iv_minus_realized_stock"
+title = "Implied minus realised volatility for stock returns"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; it is cheap to test beside the filed volatility premium, but it is not built on its own."
+
+[[idea]]
+id = "c08_iv_term_structure_slope_stock"
+title = "Option term-structure slope as a stock signal"
+mechanism_kind = "informed_footprints"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak for stock returns; the catalogue points to the option-return version as the better test."
+
+[[idea]]
+id = "c09_unusual_options_activity"
+title = "Unusual options activity"
+mechanism_kind = "informed_footprints"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "No replicable published rule exists, and separating sweeps from spreads needs trade-level data we do not store."
+
+[[idea]]
+id = "c10_dealer_gamma_pinning"
+title = "Dealer hedging and price pinning at expiry"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Pinning is real but no tradable rule is published, and trading it needs intraday data, so at most it is measured."
+
+[[idea]]
+id = "c11_option_implied_expected_return"
+title = "Expected return implied by option prices"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "needs_code"
+why_not_built = "Weak and theory-driven, and it needs a new pricing function in the maths package before it can be tested."
+
+[[idea]]
+id = "c15_option_momentum"
+title = "Momentum in option returns"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak after costs, and our option history is too short for the lookbacks the idea needs."
+
+[[idea]]
+id = "c19_index_put_write"
+title = "Selling index puts for the premium"
+mechanism_kind = "paid_for_risk"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan; it runs on stored index chains and waits its turn behind the ideas already filed."
+
+[[idea]]
+id = "c20_short_vix_roll_yield"
+title = "Roll yield from short VIX futures"
+mechanism_kind = "paid_for_risk"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but it needs VIX futures history by expiry, which the catalogue lists as not yet stored."
+
+[[idea]]
+id = "c21_vix_futures_basis_signal"
+title = "VIX futures basis as a market timing signal"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Too few independent events, and VIX term-structure data is not stored."
+
+[[idea]]
+id = "c22_dispersion_trade"
+title = "Dispersion between index and single-name volatility"
+mechanism_kind = "paid_for_risk"
+verdict = "promising"
+feasibility = "out_of_scope"
+why_not_built = "Promising only as a measured premium; trading it is heavy, so it stays an idea to measure."
+
+[[idea]]
+id = "c23_skew_risk_reversal_trade"
+title = "Selling index skew"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "It restates the index variance premium with more market exposure, so it adds little beyond put-writing."
+
+[[idea]]
+id = "c24_tail_hedge_cost_benefit"
+title = "Cost and benefit of tail hedges"
+mechanism_kind = "paid_for_risk"
+verdict = "dead"
+feasibility = "data_ready"
+why_not_built = "Dead as a return source; it is risk design, not an edge."
+
+[[idea]]
+id = "c25_iron_condor_etf"
+title = "Iron condors on index funds"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "A structure rather than an edge; it repeats index put-writing with the tails bought back."
+
+[[idea]]
+id = "c26_weekend_nontrading_option_mispricing"
+title = "Options over-priced across weekends"
+mechanism_kind = "slow_to_update"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as an execution-timing overlay, not as a stand-alone trade."
+
+[[idea]]
+id = "c27_opex_week_effect"
+title = "Equity returns in option-expiration week"
+mechanism_kind = "forced_flows"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The effect is weakening and small, and the filed option-expiration week edge already tests the calendar window."
+
+[[idea]]
+id = "c28_zero_dte_premium"
+title = "Selling same-day-expiry index options"
+mechanism_kind = "paid_for_risk"
+verdict = "promising"
+feasibility = "out_of_scope"
+why_not_built = "It needs intraday option quotes, which are not stored, so it is out of scope."
+
+[[idea]]
+id = "c29_wheel_strategy"
+title = "The wheel: cash-secured puts then covered calls"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "It is put-writing plus covered calls on single names; kept only as a benchmark for stock selection."
+
+[[idea]]
+id = "c30_calendar_spread_term_kinks"
+title = "Calendar spreads on term-structure kinks"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; the catalogue folds it into the filed term-structure straddle idea."
+
+[[idea]]
+id = "c01_call_put_iv_spread"
+title = "Call-put implied volatility spread"
+mechanism_kind = "informed_footprints"
+filed_as = "option_cp_iv_signals"
+
+[[idea]]
+id = "c02_iv_smirk_skew"
+title = "Implied volatility smirk of a stock"
+mechanism_kind = "informed_footprints"
+filed_as = "option_cp_iv_signals"
+
+[[idea]]
+id = "c03_iv_change_call_put"
+title = "Changes in call and put implied volatility"
+mechanism_kind = "informed_footprints"
+filed_as = "option_cp_iv_signals"
