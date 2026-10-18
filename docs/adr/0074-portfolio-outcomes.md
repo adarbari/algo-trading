@@ -104,3 +104,19 @@ belongs in it.
     Sharpe ratio, what it becomes after the haircut and the out-of-sample one, per decision session
     and not annualised: display, never a verdict input. The read model and the edge page do not
     show it yet.
+
+## Amendment (2026-10-18, EB E5 extensions): the macro bridge
+13. **`etf_macro@v1`, a stored instrument group that makes a macro series a per-fund column**
+    (`features/rollups/bridges/`): the credit spreads, the curve, real yield, oil, the broad
+    dollar, the VIX family, VX basis and roll, country CAPE and the FX carry, each on the row of
+    the fund an allocation edge trades on it (`etf_map.py`, pinned by a hash against `VERSION`;
+    tickers become ids only through the symbol lookup). A signal that is a difference of two is a
+    TOML expression feature in the edge's own PR, never a column here. Point in time: macro values
+    are the latest observation whose vintage is on or before the session (`known_window`), VX rows
+    are read `known_from <= session` (the latest version known by then), `vx_basis` only when the
+    VX trade date is the VIX observation date, a level older than its class's maximum age
+    (`rollups.toml`) is null and a mean needs 80 percent of its window. The licence of a column is
+    the strictest of its series (a fitness test reads `macro.toml`). The group is not optional and
+    its inputs are not required: a missing series is a null column. CAPE history is revised in
+    place, so a backfilled CAPE column is not as-known (a caveat in the edge notes, an owner
+    decision logged 2026-10-18).

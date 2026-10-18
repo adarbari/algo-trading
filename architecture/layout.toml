@@ -257,6 +257,11 @@ purpose = "feature groups of price-level structure from daily bars (swing pivots
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/bridges"
+purpose = "bridging feature groups: a series that is not a bar (a macro series, the VIX family, CAPE, a rate differential) made a per-fund column (etf_macro@v1), and etf_map.py, the pinned map of which fund carries which signal"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/market"
 purpose = "market-entity feature groups (one MKT:US row per session, ADR 0047): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus tickers.py, the ticker -> id lookup and close panel they share (the relative-strength groups use it too)"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]

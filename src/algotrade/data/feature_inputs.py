@@ -127,6 +127,10 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
 - ``volatility/ibkr_iv30``
                        ``volatility.ibkr_iv30``: IBKR's vols for the session plus ``lookback``
                        earlier sessions; ``None`` when the session has no rows (no IBKR run)
+- ``volatility/vx_futures``
+                       ``volatility.vx_futures``: the VIX futures curves the session knew
+                       (``known_from <= session``, the latest version per contract and trade
+                       date) of the ``lookback`` sessions before it; ``None`` when none
 - ``macro/series``     ``macro.series.known_window`` over the group's series (``Input.ids``;
                        all when empty): each observation as the session knew it (the latest
                        vintage with ``vintage_date`` on or before the session: point in time
@@ -186,7 +190,7 @@ from algotrade.data.shares import TABLE as SHARES
 from algotrade.data.shares import known_from, share_facts
 from algotrade.data.statements.reading import TABLE as STATEMENTS
 from algotrade.data.statements.reading import statement_facts
-from algotrade.data.volatility import IBKR_IV30, ibkr_iv30
+from algotrade.data.volatility import IBKR_IV30, VX_FUTURES, ibkr_iv30, known_vx, vx_futures
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import KNOWN_FROM
 
@@ -403,6 +407,32 @@ def _macro_series(
 
 
 @dataclass(frozen=True)
+class _VxCurves:
+    """Every stored version of the VIX futures, read once; ``at`` is the curves the session
+    knew (``known_from <= session``, the latest version per contract and trade date) over its
+    ``lookback`` sessions of trade dates; ``None`` when none."""
+
+    frame: pd.DataFrame
+
+    def at(self, session: date, lookback: int) -> pd.DataFrame | None:
+        first = sessions_before(session, lookback)
+        window = self.frame[
+            (self.frame["session_date"] >= first) & (self.frame["session_date"] <= session)
+        ]
+        rows = known_vx(window, session)
+        return (
+            None
+            if rows.empty
+            else rows.sort_values(["session_date", "expiry"]).reset_index(drop=True)
+        )
+
+
+def _vx_curves(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    first = sessions_before(sessions[0], lookback)
+    return _VxCurves(vx_futures(reader, first, sessions[-1], versions=True))
+
+
+@dataclass(frozen=True)
 class _Partition:
     read: Callable[[date], pd.DataFrame | None]
 
@@ -563,6 +593,7 @@ INPUTS: Mapping[str, Loader] = {
     UNIVERSE_TABLE: _partition(_universe),
     COMPANY_TABLE: _partition(company_sectors),
     IBKR_IV30: _ibkr_vols,
+    VX_FUTURES: _vx_curves,
 }
 
 

@@ -949,3 +949,47 @@ value = 10
 mode = "soft"
 tolerance = 2
 note = "a loss-making company has no multiple, so a hard rule drops it"
+
+# The macro signals (etf_macro@v1): a macro series as a column of the fund that trades it.
+
+[[field]]
+name = "rollup.etf_macro@v1.vx_basis"
+theme = "instrument gates"
+reads = "How far the first monthly VIX future sits above the VIX: 0.05 means it settles 5 percent over spot (contango, the usual state); below 0 is backwardation, stress. Carried by SPY."
+caveats = ["Null unless the futures' trade date is the VIX observation date, so a gap day is unknown, not zero. The futures are monthly expiries after the session only, so the basis jumps when the front contract rolls."]
+sources = ["Cboe VIX futures settlements and the VIX close, both personal use (decision log 2026-10-18)"]
+
+[[field]]
+name = "rollup.etf_macro@v1.vx_roll"
+theme = "instrument gates"
+reads = "The second monthly VIX future over the first, minus 1: the one-month roll of the curve. Above 0 a long VIX position pays the roll; it is the cost the VIX funds bleed. Carried by SPY."
+caveats = ["Null with fewer than two monthly futures after the session or no settle (settles before May 2013 are null). It is a curve slope at one close, not a forecast of the VIX."]
+sources = ["Cboe VIX futures settlements, personal use"]
+
+[[field]]
+name = "rollup.etf_macro@v1.cape"
+theme = "instrument gates"
+reads = "The country's cyclically adjusted price over ten-year real earnings, on its fund's row: 12 is cheap, 30 is dear against that country's own history. Rank across countries or against its own past, not against a global number."
+caveats = ["The history is revised in place, so a backfill reads today's estimate, not what was known then: a historical test is optimistic. Null when the latest month is over 100 days old (rollup.etf_macro@v1.cape stops updating) or the fund is not a country fund."]
+sources = ["Barclays Shiller CAPE file (personal research use, never served to other users); Shiller (2000), Irrational Exuberance"]
+
+[[field]]
+name = "rollup.etf_macro@v1.fx_carry"
+theme = "instrument gates"
+reads = "The currency's 3-month interbank rate minus the US one: 0.02 means holding it earns 2 points a year more than dollars. Positive is the carry side, negative the funding side. Carried by the six currency funds."
+caveats = ["Null for the euro and the pound until fresher series are stored, and when either rate is over 100 days old. The fund's own price excludes the interest it earns, so carry is not its return."]
+sources = ["OECD 3-month interbank rates via FRED; Lustig, Roussanov and Verdelhan (2011), Common risk factors in currency markets, RFS 24"]
+
+[[field]]
+name = "rollup.etf_macro@v1.hy_oas"
+theme = "instrument gates"
+reads = "The high-yield bond spread over Treasuries, on HYG's row: 0.04 is 4 percent, calm; above 0.08 is a credit scare. Its 50- and 200-observation means (hy_oas_ma50, hy_oas_ma200) give the trend."
+caveats = ["A spread above its 200-day mean is stress rising; the level alone says nothing about direction. Null when the series is over 7 days old. Personal-use data: never served to other users."]
+sources = ["ICE BofA US High Yield Index OAS via FRED (personal use)"]
+
+[[field]]
+name = "rollup.etf_macro@v1.vix"
+theme = "instrument gates"
+reads = "The VIX close on SPY's row: 12 is calm, 30 stressed, 40 panic. Its 50- and 200-observation means are the trend references; vix9d, vix3m, vix6m and vvix give the term structure."
+caveats = ["A spike resolves within days, so a level above its mean is a regime read, not a signal by itself. Null when the VIX is over 7 days old."]
+sources = ["Cboe VIX close via FRED (personal use)"]
