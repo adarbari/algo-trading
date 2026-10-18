@@ -34,6 +34,8 @@ OTHER_TERMS = {
     "CASH": "cash_position",
     "ensemble": "edge_ensemble",
     "member": "ensemble_member",
+    "vol_target": "vol_target_sizing",
+    "book_volatility": "book_volatility",
     **OOS_TERMS,
 }
 FIX = "write the term in config/site/guide/glossary/edges/edge_outcomes.toml and map it here"
