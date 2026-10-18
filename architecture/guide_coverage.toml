@@ -34,7 +34,7 @@
 non_sections = []
 
 [panels]
-tags = ["Banner", "Panel", "PartCard", "StatusStrip"]
+tags = ["Banner", "ConditionGroup", "Panel", "PartCard", "StatusStrip"]
 
 # ------------------------------------------------------------------ enums and status fields
 
