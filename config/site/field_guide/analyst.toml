@@ -2,3 +2,124 @@
 # consensus fields (ratings, price targets, estimate revisions, the forward formulas over them).
 # Entries arrive with the analyst feature groups; the keys and the rules each entry follows are in
 # the header of momentum.toml. A theme file with no [[field]] yet renders no page.
+
+# --- forward formulas ---
+# Formulas over the analyst consensus groups (config/site/features/company/forward.toml). Each
+# inherits the personal licence of its source (ADR 0069), so a viewer without it sees UNKNOWN.
+
+[[field]]
+name = "feature.forward_pe"
+theme = "analyst"
+reads = "Close divided by the analysts' average EPS estimate for the current fiscal year (FY1): 15 means the price is fifteen times this year's expected earnings. Lower is cheaper on expected profit."
+caveats = [
+  "At the fiscal year roll FY1 moves when the annual report becomes public, so the ratio jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, so a hard criterion keeps only a covered subset.",
+  "A consensus of one or two analysts is an opinion, not a consensus: check rollup.analyst_estimates@v1.eps_fy1_analysts.",
+  "Analysts' EPS usually leaves out one-off items that the reported EPS keeps, so this ratio and feature.pe_ratio are measured differently. Compare them as a rough guide only.",
+  "Null for a forecast loss and for an ADR, whose EPS is per ordinary share. A hard criterion drops both.",
+]
+sources = [
+  "Damodaran, Investment Valuation: the price earnings ratio, trailing and forward",
+  "Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "cheap on expected earnings"
+op = "lte"
+value = 15
+mode = "soft"
+tolerance = 3
+note = "with feature.forward_eps_growth gte 0 so a low multiple is not a profit expected to shrink"
+[[field.use]]
+for = "a forward multiple exists"
+op = "gt"
+value = 0
+mode = "hard"
+note = "drops names with no estimates, a forecast loss or an ADR"
+
+[[field]]
+name = "feature.forward_pe_fy2"
+theme = "analyst"
+reads = "Close divided by the analysts' average EPS estimate for the fiscal year after FY1. Beside feature.forward_pe, a lower multiple here means analysts expect earnings to grow."
+caveats = [
+  "At the fiscal year roll FY2 moves with FY1 when the annual report becomes public, so the ratio jumps once. Check rollup.analyst_estimates@v1.fy2_period_end.",
+  "Null when the vendor lists only one forward year, which is common for thinly covered names. A hard criterion drops them.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, so a hard criterion keeps only a covered subset.",
+  "Null for a forecast loss and for an ADR, whose EPS is per ordinary share. A hard criterion drops both.",
+]
+sources = [
+  "Damodaran, Investment Valuation: the price earnings ratio, trailing and forward",
+  "Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "cheap on the later estimate"
+op = "lte"
+value = 12
+mode = "soft"
+tolerance = 3
+note = "with feature.forward_pe lte 15 so the cheapness does not rest on one far-off estimate"
+
+[[field]]
+name = "feature.forward_eps_growth"
+theme = "analyst"
+reads = "The analysts' FY1 EPS estimate divided by the diluted EPS of the last twelve months, minus 1: 0.20 is 20% more earnings per share. Below 0 is a profit expected to shrink, below -1 a forecast loss."
+caveats = [
+  "At the fiscal year roll FY1 moves when the annual report becomes public, so the figure jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.",
+  "Analysts' EPS usually leaves out one-off items that the reported EPS keeps, so a one-off can make the figure look high or low. Check feature.eps_cagr_3y for the reported trend.",
+  "Null when the last twelve months were a loss: a growth rate off a loss is not shown, so a hard criterion drops turnarounds. Null for an ADR and for a stale reported EPS.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, so a hard criterion keeps only a covered subset.",
+]
+sources = [
+  "Damodaran, Investment Valuation: expected growth in earnings and analyst estimates",
+  "Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "earnings expected to rise"
+op = "gte"
+value = 0.1
+mode = "soft"
+tolerance = 0.05
+note = "with feature.forward_pe lte 30 so the rise is not already in the price"
+
+[[field]]
+name = "feature.forward_revenue_growth"
+theme = "analyst"
+reads = "The analysts' FY1 revenue estimate divided by the revenue of the last twelve months, minus 1: 0.10 is 10% more sales. Below 0 is revenue expected to shrink."
+caveats = [
+  "At the fiscal year roll FY1 moves when the annual report becomes public, so the figure jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.",
+  "Null for an ADR, because a foreign filer's revenue is in its own currency. Null when the reported revenue is stale or not positive.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, so a hard criterion keeps only a covered subset.",
+  "A consensus of one or two analysts is an opinion, not a consensus: check rollup.analyst_estimates@v1.revenue_fy1_analysts.",
+]
+sources = [
+  "Damodaran, Investment Valuation: expected growth in revenues and analyst estimates",
+  "Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "sales expected to rise"
+op = "gte"
+value = 0.08
+mode = "soft"
+tolerance = 0.04
+note = "with feature.forward_eps_growth gte 0 so the sales rise reaches profit"
+
+[[field]]
+name = "feature.target_upside"
+theme = "analyst"
+reads = "The average analyst price target divided by the close, minus 1: 0.15 means the average analyst puts the price 15% above today's close. Negative means the close is above the target."
+caveats = [
+  "Targets are the vendor's current ones on the day it was asked and carry no date of their own: check rollup.analyst_targets@v1.targets_age_days.",
+  "Targets usually look twelve months ahead and move after the price does, so a large upside is often a recent fall. It is not a forecast of the price.",
+  "Null with targets_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, so a hard criterion keeps only a covered subset.",
+  "A wide gap between the highest and the lowest target means analysts disagree: check rollup.analyst_targets@v1.target_high and rollup.analyst_targets@v1.target_low.",
+]
+sources = [
+  "Brav and Lehavy (2003), An empirical analysis of analysts' target prices, Journal of Finance",
+  "Financial Modeling Prep price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "room to the analysts' target"
+op = "gte"
+value = 0.15
+mode = "soft"
+tolerance = 0.05
+note = "with feature.forward_eps_growth gte 0 so the room is not on a shrinking profit"
