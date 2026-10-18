@@ -23,6 +23,9 @@ fy_slack_days = 60       # FY1 is the first year ending this many days after the
 ["analyst_targets@v1"]
 stale_days = 21          # as analyst_estimates@v1
 
+["analyst_ratings@v1"]
+stale_days = 45          # Finnhub's trend is monthly: a snapshot older than this is STALE (values not served)
+
 ["pivot_strength@v1"]    # swing-level tests and structure (docs/data/swing.md); the 0.5 ATR is part of v1
 touch_atr = 0.5          # a bar touches a level when its high / low is within touch_atr x atr_14
 

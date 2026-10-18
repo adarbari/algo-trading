@@ -360,6 +360,8 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `growth_history@v1` | `revenue_ttm_3y_ago`, `revenue_ttm_5y_ago`, `eps_diluted_ttm_3y_ago`, `eps_diluted_ttm_5y_ago`, `gh_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` `revenue` and `eps_diluted` (filed on or before the session), `price_stats@v2`, `events/split`; `stale_days`, `history_days` (2700) | built |
 | `analyst_estimates@v1` | `fy1_period_end`, `fy2_period_end`, `eps_fy1`, `eps_fy2`, `revenue_fy1`, `revenue_fy2`, `eps_fy1_analysts`, `revenue_fy1_analysts`, `estimates_age_days`, `estimates_status` (OK / STALE / NOT_COVERED / NOT_FETCHED) | `analyst/estimate_snapshots` as the session sees it (annual estimates, FMP), `universe` (one row per equity), `financials@v2` (`revenue_fy_end`); `stale_days`, `fy_slack_days` in `config/site/rollups.toml`; personal licence, optional | built |
 | `analyst_targets@v1` | `target_consensus`, `target_median`, `target_high`, `target_low`, `targets_age_days`, `targets_status` (OK / STALE / NOT_COVERED / NOT_FETCHED) | `analyst/estimate_snapshots` as the session sees it (price-target consensus, FMP), `universe`; `stale_days`; personal licence, optional | built |
+| `analyst_ratings@v1` | `rating_strong_buy`, `rating_buy`, `rating_hold`, `rating_sell`, `rating_strong_sell`, `rating_count`, `rating_score` (1..5, 5 = strong buy), `rating_month`, `rating_score_change_90d`, `ratings_status` (OK / STALE / NOT_COVERED / NOT_FETCHED) | `analyst/estimate_snapshots` as the session sees it (recommendation trend, Finnhub), `universe`; `stale_days` (45); personal licence, optional | built |
+| `analyst_revisions@v1` | `eps_fy1_revision_30d`, `_60d`, `_90d`, `revenue_fy1_revision_30d`, `_90d`, `eps_fy1_analysts_change_90d`, `revisions_status` (OK / BUILDING / NO_PRIOR / STALE / NOT_COVERED / NOT_FETCHED) | `analyst_estimates@v1` (FY1 and its year end), `analyst/estimate_snapshots` as the session sees it (annual estimates, FMP); personal licence, optional | built |
 | `cash_flow@v1` | `ocf_ttm`, `capex_ttm` (the cash paid, positive), `cf_as_of`, `cf_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/statements` `ocf` and `capex` (filed on or before the session), `price_stats@v2`; `stale_days`, `history_days` | built |
 | `balance_sheet@v1` | `cash`, `sti`, `total_debt`, `debt_basis` (a to g / NOT_TAGGED), `total_assets`, `total_liabilities`, `liabilities_basis` (REPORTED / DERIVED / NONE), `stockholders_equity`, `current_assets`, `current_liabilities`, `bs_as_of`, `bs_filed`, `is_financial`, `bs_status` (OK / PARTIAL / NO_FACTS / STALE) | `instruments/statements` instant concepts (filed on or before the session), `price_stats@v2`, `instruments/company` (SIC); `stale_days`, `history_days` | built |
 | `put_wing@v1` | `wing_status` (OK / OUTSIDE_BAND / NO_SPOT / NO_CHAIN / NO_EXPIRY / NO_STRIKE), `target_expiry` + `target_dte` (nearest 45 days in 30..60, standard monthlies first), `n_unpriced`; band totals of the puts with OUR \|delta\| in 0.08..0.15 (`n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`); the best put among 0.05..0.35 delta, nearest the band then by cash-secured ROC (`delta_band_distance`, `best_put_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_roc`) | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
@@ -440,8 +442,22 @@ is as new), NOT_FETCHED (no row and no marker, or only FAILED markers: never ask
 covered" (`Feature.uncovered_statuses`, ADR 0072), the admin cause tells them apart. FY1 is the first estimate year ending more than
 `fy_slack_days` (60, under 85) after the later of the last annual report's year end (`financials@v2.revenue_fy_end`) and the last quarter's end
 (`qtr_as_of`), else the first ending after S for a name with neither; without `financials@v2` for the session no year is served. FY2 is the next
-listed; at the fiscal-year roll FY1 moves on the session the 10-K becomes known, so a forward P/E jumps once. Forward P/E, ratings and
-revisions are later formulas. The never-asked names are graded by `analyst_backlog` (`tasks/analyst/backlog.py`, WARN only).
+listed; at the fiscal-year roll FY1 moves on the session the 10-K becomes known, so a forward P/E jumps once. Forward P/E is a later formula. The never-asked names are graded by `analyst_backlog` and
+`finnhub_backlog` (`tasks/analyst/backlog.py`, WARN only; the latter also when the run skipped Finnhub).
+
+**`analyst_ratings@v1` and `analyst_revisions@v1` rules (ADR 0068, 0072).** Ratings read Finnhub's recommendation trend through the same
+reader and status rules, with Finnhub's own coverage markers (`analyst_status` takes the vendor): the newest month of the name's newest
+snapshot, `rating_score` the mean of strong buy 5 to strong sell 1 (null at count 0), STALE after 45 days (the trend is monthly).
+`rating_score_change_90d` is the newest snapshot's score less that of our latest snapshot for a session 90 to 97 days before the
+NEWEST snapshot's session, not the session (`SNAPSHOT_SLACK`, a refresh window, at least `[fmp]` / `[finnhub] refresh_days`: a test): our own history only, never the months the vendor lists, null until it exists. Revisions
+read `analyst_estimates@v1` for FY1 (so its year, STALE and coverage rules) and our earlier FMP snapshots: a past value is the estimate row
+whose year end is within 10 days of FY1's, in the latest snapshot `N` to `N + 7` days before the newest one (N = 30, 60, 90; no 7-day window, names refresh
+weekly), compared in percent of the old value with the `earnings_revisions@v1` `MIN_BASE` floor. Matching on the year end, never the FY1
+label, means a fiscal-year roll compares the new FY1 with its own earlier estimate where the old snapshots listed it as FY2, and gives null
+where they did not. One row per `analyst_estimates@v1` row (a required input): `revisions_status` is OK (every window found), BUILDING (an earlier
+snapshot of the year, not every window), NO_PRIOR (none), or the estimates' own STALE / NOT_COVERED / NOT_FETCHED passed through with null values
+(`uncovered_statuses`, so the same names read "not covered" on both groups; graded by `analyst_backlog`). History starts at our first snapshot (2026-10-19 at the earliest), so the 90-day
+fields are null until about 2027-01-17. Both groups are personal-licence and optional.
 
 **`balance_sheet@v1` rules (ADR 0067).** Balance sheet lines are instants (period type INSTANT, no start):
 no TTM, no subtraction. `bs_as_of` is the newest period end of the core lines (`cash`, `total_assets`,
