@@ -1,4 +1,4 @@
-# ADR 0073: Portfolio outcomes: a weighted book against a blended benchmark
+# ADR 0074: Portfolio outcomes: a weighted book against a blended benchmark
 
 **Status:** accepted (2026-10-18; orchestrator design call, pending owner confirmation, see
 `docs/decisions/log.md`). Amends [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) (the

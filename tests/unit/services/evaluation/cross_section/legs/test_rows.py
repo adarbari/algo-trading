@@ -327,7 +327,7 @@ def test_a_buy_hold_band_round_trips_and_a_leg_without_one_stores_nothing_new() 
 
 
 def test_a_portfolio_book_round_trips_and_every_other_leg_stores_nothing_new() -> None:
-    """Leg v5 (ADR 0073): the book's weights as ``weight_ids`` / ``weight_values`` and a session
+    """Leg v5 (ADR 0074): the book's weights as ``weight_ids`` / ``weight_values`` and a session
     with no value as ``portfolio_reason``; null columns in every other leg, which read back with
     no book and no reason (a leg from before v5 has no such columns at all)."""
     book = (("EQ:A", 0.25), ("EQ:B", 0.5), ("CASH", 0.25))

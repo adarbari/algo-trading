@@ -183,7 +183,7 @@ class SessionReads:
     def numbers(self, field_name: str, ids: frozenset[str], day: date) -> dict[str, float | None]:
         """The declared numeric feature ``field_name`` of ``ids`` at D (None: not stored, never
         0), read once per set and session through the recording reader (a portfolio book's
-        volatility, ADR 0073)."""
+        volatility, ADR 0074)."""
         key = (field_name, ids, day)
         if key not in self._numbers:
             self._numbers[key] = numbers_at(self._reader, field_name, ids, day)
@@ -192,7 +192,7 @@ class SessionReads:
     def bill_yield(self, day: date) -> float | None:
         """The shortest-tenor Treasury bill yield (a decimal per year) of the curve ``day`` sees,
         the latest stored on or before it (``data.rates``: known at D); None when no curve is
-        stored. What cash earns in a portfolio book (ADR 0073)."""
+        stored. What cash earns in a portfolio book (ADR 0074)."""
         if day not in self._bills:
             try:
                 frame = curve(self._reader, day).frame

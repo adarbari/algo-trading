@@ -1,4 +1,4 @@
-"""The portfolio_return outcome of an edge document (ADR 0073): the blend of a ``mix:`` benchmark
+"""The portfolio_return outcome of an edge document (ADR 0074): the blend of a ``mix:`` benchmark
 parses closed, the weighting and its volatility feature agree, a book is long, banded by nothing and
 rebalanced on a schedule whose windows never overlap, and ``base = "benchmark"`` is its alone."""
 

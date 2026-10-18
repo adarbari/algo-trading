@@ -1,5 +1,5 @@
 """Every value a portfolio_return outcome adds to an edge document has a Guide entry (ADR 0051,
-ADR 0073): each weighting, the blended benchmark (the ``benchmark`` base and a ``mix:`` benchmark),
+ADR 0074): each weighting, the blended benchmark (the ``benchmark`` base and a ``mix:`` benchmark),
 the ``CASH`` pick and the kind itself. A value added to ``WEIGHTINGS`` or ``BASES`` fails here until
 its term is written and mapped."""
 
@@ -16,7 +16,12 @@ WEIGHTING_TERMS = {
     "inverse_vol": "weighting_inverse_vol",
     "score": "weighting_score",
 }
-BASE_TERMS = {"event": None, "universe": None, BENCHMARK_BASE: "blended_benchmark"}
+BASE_TERMS = {  # the other bases have terms of their own (event schedules, time-series edges)
+    "event": None,
+    "universe": None,
+    "out_of_window": None,
+    BENCHMARK_BASE: "blended_benchmark",
+}
 OTHER_TERMS = {PORTFOLIO_KIND: "outcome_portfolio_return", "CASH": "cash_position"}
 FIX = "write the term in config/site/guide/glossary/edges/edge_outcomes.toml and map it here"
 

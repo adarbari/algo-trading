@@ -1,4 +1,4 @@
-"""One session of a portfolio_return outcome (ADR 0073): the value against a blended benchmark
+"""One session of a portfolio_return outcome (ADR 0074): the value against a blended benchmark
 from the constituents' own rows, cash at the bill yield, the session left out (with its reason)
 when anything it needs is missing, and the decile figures that are N/A under about 20 names."""
 

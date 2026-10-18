@@ -1,4 +1,4 @@
-"""The ``portfolio_return`` outcome of an edge document (ADR 0053 amendment, ADR 0073): the value of
+"""The ``portfolio_return`` outcome of an edge document (ADR 0053 amendment, ADR 0074): the value of
 one session is the return of a weighted book of the picks minus the return of a blended benchmark
 over the same window, so an allocation edge (ETF rotation, tactical asset allocation) is judged
 against what a passive mix of its own constituents would have paid.

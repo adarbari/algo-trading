@@ -26,6 +26,7 @@ from datetime import date, timedelta
 from typing import Final
 
 from algotrade.config.edges.document import MODEL_KIND
+from algotrade.config.edges.named import OUT_OF_WINDOW
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.config.edges.portfolio import benchmark_words as benchword
 from algotrade.config.edges.verdict import VerdictSettings
@@ -215,6 +216,7 @@ class _Candidate:
     years: tuple[EdgeRow, ...]
     year_parts: tuple[EdgeRow, ...] = ()  # a year cut by the split, as ``<year>:<side>`` rows
     lone: bool = False  # the only screener of the run at its holding period: no PBO peers
+    timed: bool = False  # a time-series edge (ADR 0073): its t is the Welch t, in against out
 
 
 def _by_year(row: EdgeRow) -> str:
@@ -320,7 +322,7 @@ NO_NAMES = "needs about 20 ranked names"  # the value of a decile criterion with
 def _portfolio_criteria(
     crit: Sequence[VerdictCriterion], c: _Candidate, t: VerdictSettings
 ) -> tuple[VerdictCriterion, ...]:
-    """The criteria of a ``portfolio_return`` edge (ADR 0073): the value is the book's excess return
+    """The criteria of a ``portfolio_return`` edge (ADR 0074): the value is the book's excess return
     over a blended benchmark, so the win rate, the lift and the random picks (a base rate over
     names, a name drawn at random) do not apply, the decoys are compared on the mean excess return
     of their own books, and the picks-series t is Promising's test as well as Works's. The decile
@@ -392,6 +394,7 @@ def _all_criteria(
         if trades is None or oos.sessions is None
         else trades >= t.works_trades and oos.sessions >= t.works_oos_trades
     )
+    t_label = "In-window minus out-of-window t (Welch)" if c.timed else "Top vs bottom decile t"
     versus = f"{_pct(oos.hit_rate)} against {_pct(oos.base_rate)}"
     random_value, random_beaten = _random(c, t, draws)
     best = f"{_num(oos.lift)} vs best {_num(max(lifts))}" if lifts else "not stored"
@@ -435,7 +438,7 @@ def _all_criteria(
               None if oos.sessions is None else oos.sessions >= t.min_oos_trades, PROMISING),
         _crit("win_rate", "Out-of-sample win rate above the base rate", versus,
               "above the base rate", win_ok, PROMISING),
-        _crit("decile_t", "Top vs bottom decile t", _num(oos.decile_t),
+        _crit("decile_t", t_label, _num(oos.decile_t),
               f"at least {t.promising_t:g}", _at_least(oos.decile_t, t.promising_t), PROMISING),
         _overfit("pbo", pbo, t.max_pbo, PROMISING, alone),
         _crit("dsr", "Deflated Sharpe", _num(dsr), f"at least {t.promising_dsr:g}",
@@ -446,7 +449,7 @@ def _all_criteria(
               f"at least {t.oos_lift_share:g} of the in-sample lift", keeps, PROMISING),
         _crit("works_trades", "Trades, and out-of-sample trades", f"{trades} and {oos.sessions}",
               f"at least {t.works_trades} and {t.works_oos_trades}", enough, WORKS),
-        _crit("works_t", "Top vs bottom decile t", _num(oos.decile_t),
+        _crit("works_t", t_label, _num(oos.decile_t),
               f"at least {t.works_t:g}", _at_least(oos.decile_t, t.works_t), WORKS),
         _crit("works_picks_t", "Picks-series t (Sharpe ratio's t-ratio)", _num(oos.picks_t),
               f"at least {t.works_picks_t:g}", _at_least(oos.picks_t, t.works_picks_t), WORKS),
@@ -546,8 +549,9 @@ class EdgeFacts:
     after: date | None = None
     measured: Callable[[], Mapping[tuple[str, int], int] | None] | None = None
     wins: bool = False  # the outcome is not a return: the Sharpe ratio is of the excess wins
-    portfolio: bool = False  # a portfolio_return book (ADR 0073): read against its benchmark
+    portfolio: bool = False  # a portfolio_return book (ADR 0074): read against its benchmark
     benchmark: str = ""  # ... the words of that benchmark ("SPY", "60% SPY and 40% AGG")
+    base: str = ""  # the edge's base: ``out_of_window`` words the decile t as a Welch t
     site_trials: Callable[[], int] | None = None  # the variants tried across every site
     # edge, read when the haircut is (None: not counted)
 
@@ -619,6 +623,7 @@ def _at_target(
 def _judge_one(
     c: _Candidate, t: VerdictSettings, draws: Sequence[EdgeRow], decoys: bool, facts: EdgeFacts
 ) -> EdgeVerdict:
+    c = replace(c, timed=facts.base == OUT_OF_WINDOW)
     crit = _criteria(c, t, draws, decoys, facts.portfolio)
     level, reason = _level(c, crit, t)
     gap = _next_gap(crit)
@@ -941,6 +946,7 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
             wins=counts_wins(edge),
             portfolio=edge.settings is not None and edge.settings.kind == PORTFOLIO_KIND,
             benchmark=benchword(edge.settings.benchmark) if edge.settings is not None else "",
+            base=edge.base,
             site_trials=None if edge.mine else lambda: runs.load_site_trials(ctx),
         ),
         range_to=run.range_to,

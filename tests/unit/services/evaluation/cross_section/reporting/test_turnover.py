@@ -152,7 +152,7 @@ def test_gross_figures_are_unchanged_and_the_net_series_and_break_even_follow_th
     assert slope == pytest.approx(50 / 1e4)
 
 
-# portfolio_return books (ADR 0073): the weight change is the only cost
+# portfolio_return books (ADR 0074): the weight change is the only cost
 def book(day: date, gross: float, **weights: float) -> SessionStat:
     """A session whose leg value is net of one full round trip, as every leg stores it."""
     net = gross - COST / 1e4

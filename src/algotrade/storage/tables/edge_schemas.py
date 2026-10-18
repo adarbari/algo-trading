@@ -175,7 +175,7 @@ EDGE_PAPER = fixed(
 # Leg v3 (ADR 0053 amendment 2026-10-18): a screener's second set of draws, matched to the picks'
 # sector mix, as ``strat_picks`` / ``strat_value_sums`` / ``strat_hit_sums`` beside ``rand_*``.
 # Leg v4 (ADR 0053 amendment 2026-10-18): the names of a buy/hold band as ``band_*`` lists.
-# Leg v5 (ADR 0073): a portfolio_return leg's book as ``weight_ids`` / ``weight_values`` and, for a
+# Leg v5 (ADR 0074): a portfolio_return leg's book as ``weight_ids`` / ``weight_values`` and, for a
 # session with no value, ``portfolio_reason``; null in every other leg, which no key change moves.
 EDGE_LEGS = fixed(
     "results/edge_legs",

@@ -1,4 +1,4 @@
-"""The weights of a portfolio_return book (ADR 0073): each rule, the cash position and the
+"""The weights of a portfolio_return book (ADR 0074): each rule, the cash position and the
 refusals (no volatility or score for a pick: no book, never a book of the names that have one)."""
 
 import pytest

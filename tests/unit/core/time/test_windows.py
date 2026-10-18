@@ -11,6 +11,7 @@ from algotrade.core.time.windows import (
     WINDOW_NAMES,
     decision_session,
     entry_session,
+    out_of_window_stretches,
     window_length,
     window_name,
     windows,
@@ -123,3 +124,29 @@ def test_an_unknown_window_is_refused() -> None:
         windows("fomc", FIRST, LAST)
     with pytest.raises(KeyError):
         window_length("fomc")
+
+
+def test_stretches_tile_from_the_session_after_each_window_and_never_touch_one() -> None:
+    placed = windows("turn_of_month", FIRST, LAST)
+    stretches = out_of_window_stretches(placed, 4, LAST)
+    inside = {d for w in placed for d in w}
+    assert stretches and all(len(s) == 4 for s in stretches)
+    assert not any(d in inside for s in stretches for d in s)
+    assert stretches[0][0] == next_session(placed[0][-1])  # the first tile starts after a window
+    flat = [d for s in stretches for d in s]
+    assert len(flat) == len(set(flat))  # non-overlapping
+    assert all(s[-1] <= LAST for s in stretches)
+
+
+def test_stretches_are_deterministic_and_do_not_depend_on_what_follows_the_range() -> None:
+    placed = windows("opex_week", FIRST, date(2022, 12, 31))
+    a = out_of_window_stretches(placed, 5, date(2022, 12, 31))
+    assert a == out_of_window_stretches(list(reversed(placed)), 5, date(2022, 12, 31))
+    longer = out_of_window_stretches(windows("opex_week", FIRST, LAST), 5, LAST)
+    assert longer[: len(a) - 1] == a[:-1]  # the later range only adds (the last tile may extend)
+
+
+def test_a_stretch_that_does_not_fit_whole_is_dropped() -> None:
+    first_window = windows("pre_holiday", date(2025, 1, 1), date(2025, 12, 31))[0]
+    short = out_of_window_stretches([first_window], 3, next_session(next_session(first_window[0])))
+    assert short == []

@@ -290,7 +290,7 @@ def _portfolio_stat(
     horizon: int,
     rows: pd.DataFrame,
 ) -> SessionStat:
-    """One ``portfolio_return`` session (ADR 0073): the qualified names among the pickable ones,
+    """One ``portfolio_return`` session (ADR 0074): the qualified names among the pickable ones,
     best first, ``top_k`` of them, weighted at D (``portfolio/weights.py``) and valued at S against
     the blended benchmark with the cash at the bill yield read at D (``portfolio/session.py``).
     No picks is a cash session, not an excluded one."""

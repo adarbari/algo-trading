@@ -30,7 +30,7 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   borrow ``borrow_bps_annual / 1e4 * horizon / 252`` (an assumption: no borrow data is stored);
   ``short_hit`` is ``short_value > 0`` (the name underperformed by more than the costs). The
   long columns are unchanged: the deciles and the base are over them whatever the side.
-- ``portfolio_return`` (ADR 0073) is not valued here: a book is one value per session, from its
+- ``portfolio_return`` (ADR 0074) is not valued here: a book is one value per session, from its
   weights and a blended benchmark (``cross_section/portfolio``); ``apply_outcome`` refuses it.
 - ``max_drawdown`` set: a hit also needs ``fwd_max_drawdown <= max_drawdown``.
 

@@ -103,7 +103,7 @@ def apply_rebalances(
     stats: Sequence[SessionStat], cost_bp: float | None
 ) -> tuple[SessionStat, ...]:
     """``stats`` (one portfolio_return variant at one horizon, one per decision session) with the
-    net series of a book that trades only the weight change (ADR 0073): ``banded_values`` (the
+    net series of a book that trades only the weight change (ADR 0074): ``banded_values`` (the
     session's one value) and ``round_trips`` per session.
 
     The legs' value is net of one full round trip (the convention of every leg: the whole book

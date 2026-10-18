@@ -1,4 +1,4 @@
-"""One session of a portfolio_return outcome (ADR 0073): the value is the book's return over the
+"""One session of a portfolio_return outcome (ADR 0074): the value is the book's return over the
 window minus the blended benchmark's over the same window, and a hit is a positive value after
 the document's cost.
 

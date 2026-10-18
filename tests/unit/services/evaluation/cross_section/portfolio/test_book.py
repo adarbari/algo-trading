@@ -1,4 +1,4 @@
-"""The portfolio_return outcome (ADR 0073) measured end to end on the small world: name i earns
+"""The portfolio_return outcome (ADR 0074) measured end to end on the small world: name i earns
 (i - 9.5)% over the one-session window and ranks by its price, so the top 5 are names 15..19
 (mean 7.5%). The book is compared with a blend of two of the world's own names as the benchmark,
 cash earns the bill yield, a session that lacks a constituent is left out with its reason, and the

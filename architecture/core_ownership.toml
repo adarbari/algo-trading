@@ -67,7 +67,7 @@ detect = [{ attr = "os.environ" }, { call = "getenv" }, { call = "putenv" }]
 
 [[responsibility]]
 id = "session-calendar"
-description = "Which day is a trading session, in exchange time (weekends, holidays, early closes); the last closed session; the market-structure days by rule (the monthly option expiry, a month's last session, the Russell reconstitution), moved to the session before a closed day; the calendar windows an edge schedule may use (turn of month, expiry week, quarter end, before a holiday), placed from the calendar alone"
+description = "Which day is a trading session, in exchange time (weekends, holidays, early closes); the last closed session; the market-structure days by rule (the monthly option expiry, a month's last session, the Russell reconstitution), moved to the session before a closed day; the calendar windows an edge schedule may use (turn of month, expiry week, quarter end, before a holiday), placed from the calendar alone, and the same-length stretches outside every window of a range that a time-series edge compares them with (ADR 0073)"
 owner = ["src/algotrade/core/time/calendar.py", "src/algotrade/core/time/windows.py"]
 allowed = ["src/algotrade/core/time/clock.py"]  # business_days: a plain weekday grid for synthetic golden data (no holidays by design)
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"

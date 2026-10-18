@@ -638,7 +638,7 @@ def test_a_decoy_with_no_figure_is_not_measured_never_left_out_of_beats_every_ba
     assert whole["baselines"].status == "pass" and "measured" not in whole["baselines"].value
 
 
-# portfolio_return (ADR 0073): a book beats a blended benchmark, with no base rate over names
+# portfolio_return (ADR 0074): a book beats a blended benchmark, with no base rate over names
 BOOK = EdgeFacts(portfolio=True, benchmark="a blend of 60% SPY and 40% AGG")
 NO_BASE = {
     "base_rate": None, "lift": None, "decile_spread": None, "decile_t": None,

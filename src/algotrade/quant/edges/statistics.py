@@ -13,6 +13,9 @@ result (too few observations, a zero denominator) is ``None``, never NaN.
     random_pick_sums     per draw, the sum of values and of hits over ``k`` names drawn
                          uniformly without replacement (the random-pick backtests)
     percentile_of        the share of a sample a value beats (ties half)
+    welch_t              mean of one sample minus another's and its Welch t-ratio (unequal
+                         variances), the in-window against out-of-window comparison of a
+                         time-series edge (ADR 0073)
     sharpe               per-period mean over sample sd
     sharpe_t             its t-ratio, ``sharpe sqrt(n)`` (the picks-series t), over the
                          independent sessions when windows overlap
@@ -190,6 +193,20 @@ def spread_summary(x: ArrayLike) -> tuple[float | None, float | None, float | No
     if sd <= 0.0:
         return mean, sd, None, n
     return mean, sd, mean / (sd / math.sqrt(n)), n
+
+
+def welch_t(a: ArrayLike, b: ArrayLike) -> tuple[float | None, float | None]:
+    """``(mean(a) - mean(b), t)`` of the finite values, ``t = difference / sqrt(var_a / n_a +
+    var_b / n_b)`` with sample variances (Welch); the difference is None without a value on
+    either side and the t where a side has fewer than two values or both have no spread."""
+    x, y = _finite(a), _finite(b)
+    if x.size == 0 or y.size == 0:
+        return None, None
+    diff = float(x.mean() - y.mean())
+    if x.size < 2 or y.size < 2:
+        return diff, None
+    se = math.sqrt(float(x.var(ddof=1)) / x.size + float(y.var(ddof=1)) / y.size)
+    return diff, (diff / se if se > 0.0 else None)
 
 
 def sharpe(x: ArrayLike) -> float | None:

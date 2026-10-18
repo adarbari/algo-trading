@@ -1,4 +1,4 @@
-"""The weights of a portfolio_return book at one decision session (ADR 0073): from the picks, the
+"""The weights of a portfolio_return book at one decision session (ADR 0074): from the picks, the
 edge's weighting and what was read at D (the screen's scores, a declared volatility feature).
 
 Fail closed: a book whose weights cannot be formed from what was known at D is *no book* (a
