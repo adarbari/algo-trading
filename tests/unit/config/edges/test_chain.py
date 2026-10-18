@@ -9,7 +9,8 @@ from typing import Any
 import pytest
 
 from algotrade.config.edges.chain import CHAIN_STRUCTURES, grain_structure
-from algotrade.config.edges.document import identity_dict, parse_edge
+from algotrade.config.edges.document import parse_edge
+from algotrade.config.edges.identity import identity_dict
 from algotrade.core.model.errors import ConfigurationError
 from tests.unit.config.edges.test_document import WHERE, document
 
