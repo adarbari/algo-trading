@@ -439,9 +439,9 @@ def test_the_published_table_is_optional_typed_and_checked_against_the_document(
             "sample": 25,
         },
     ).published
-    assert found == Published("decile_spread", 0.0131, 60, 1, 25)
+    assert found == Published("decile_spread", 0.0131, 60, 1, 25, "long_short")
     no_sample = {"measure": "lift_pts", "value": 4, "horizon_sessions": 20, "source": 0}
-    assert parse(published=no_sample).published == Published("lift_pts", 4.0, 20, 0, None)
+    assert parse(published=no_sample).published == Published("lift_pts", 4.0, 20, 0, None, "long")
 
 
 @pytest.mark.parametrize(
@@ -467,3 +467,19 @@ def test_the_published_table_is_optional_typed_and_checked_against_the_document(
 def test_a_published_table_fails_closed(published: dict[str, Any], match: str) -> None:
     with pytest.raises(ConfigurationError, match=match):
         parse(published=published)
+
+
+def test_a_published_leg_defaults_from_the_measure_and_fails_closed() -> None:
+    base = {"measure": "lift_pts", "value": 4, "horizon_sessions": 20, "source": 0}
+    for measure, leg in (
+        ("lift_pts", "long"),
+        ("mean_excess", "long"),
+        ("decile_spread", "long_short"),
+    ):
+        assert parse(published={**base, "measure": measure}).published.leg == leg  # type: ignore[union-attr]
+    assert parse(published={**base, "leg": "long_short"}).published.leg == "long_short"  # type: ignore[union-attr]
+    assert parse(published={**base, "leg": "long"}).published == Published(
+        "lift_pts", 4.0, 20, 0, None, "long"
+    )
+    with pytest.raises(ConfigurationError, match="leg"):
+        parse(published={**base, "leg": "short"})
