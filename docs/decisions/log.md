@@ -801,6 +801,38 @@ follow-up PR).
 - Clause to respect: no reproduction, distribution or transmission without Barclays' consent, so CAPE values and every feature derived from them are never served to other users (`licence = "personal"`, held only by the owners listed in `config/site/users.toml`, ADR 0069).
 - Reasoning: the file is public and unauthenticated and has been served for years, a monthly pull is a light use, and the series is optional (the macro step is non-critical), so withdrawing it costs one registry block.
 
+## 2026-10-18 | EB H4 follow-ups | Market-level triggers are a schedule family, not event classes
+- Question: should a VIX spike or FOMC date be an event class?
+- Options: an event class (base = the universe, N counts per trigger) / a schedule family `on_market:<trigger>` on the 0073 time-series harness.
+- Decision: `on_market:<trigger>` (named universe, `base = out_of_window`, benchmark none, one horizon); `market_triggers@v1` in rollups/market, licence personal; FOMC joins as `on_market:fomc`; `tdf_contrarian_flows` stays blocked on `on_market:large_market_month`; amends the time-series schedule rule.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: an event base would equal the universe and each trigger would count once per name.
+
+## 2026-10-18 | EB H4 follow-ups | VIX spike definition and its placement
+- Question: how is a VIX spike defined and placed?
+- Options: a level only / level plus term-structure inversion; thresholds in config / fixed in the feature.
+- Decision: first session with the latest fresh VIX >= 30 and VIX/VIX3M > 1 after >= 21 sessions without one; thresholds fixed in the feature (a change is a version bump); D = the session the reading was first known, both legs FRED `VIXCLS` / `VXVCLS` (`pit = "lag"`, one-day release lag, personal licence), known by D when observation date plus lag is at or before D; a trigger within h sessions of the last counted window is skipped; the base depends on later triggers inside the range (known by range end, never a decision input) and a stretch near range end can change when the range is extended.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: fixed thresholds leave no tuning knob (multiple testing), and the skip rule keeps windows from overlapping.
+
+## 2026-10-18 | EB H4 follow-ups | ipo_lockup and reverse_split classes
+- Question: how are lockup expiries and reverse splits read without lookahead?
+- Options: the row's instrument_id / CIK mapped through instruments/company as of D; latest version / `latest_versions(through=D)`.
+- Decision: CIK mapped through `instruments/company` as of D, `latest_versions(through=D)`, `is_ipo` rows only; `reverse_split` anchored on the ex-date with `ts <= D`, ratio < 1 pinned by a test, funds excluded; `ipo_lockup` sign -1, `announced_ahead`, short avoid-list side.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a later version or a later instrument mapping would leak survivorship into the entry.
+
+## 2026-10-18 | EB H4 follow-ups | pre_month_end and year_turn windows; weekend and etf_launch skipped
+- Question: which calendar windows are added?
+- Options: last 3 sessions of the month / turn of the year / weekend / etf_launch.
+- Decision: `pre_month_end` (last 3 sessions, names disjoint from `SCHEDULES`) and `year_turn` (last 5 of December + first 5 of January, length 10, belongs to December's year; about 8 windows since 2018 so it cannot reach evidenced); non-overlap property test 2000-2040; weekend skipped (decayed evidence, adds a trial); `etf_launch` deferred until the owner supplies a keyword list.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: each window is one more trial; only those with a documented, undecayed mechanism are worth it.
+
 ## 2026-10-18 | EB track E | Owner approvals: shares --force and the stale edge-eval record
 - Question: may the owner-approved ops actions run: a forced refetch of every SEC company-facts CIK (`algotrade-ingest shares --force`), and clearing the stale `edge-eval` job record for edge `momentum_12_1` (status running since 2026-10-18T10:00:35Z, no process)?
 - Options: wait for the nightly backlog (400 CIKs a night) / run `shares --force` once locally; hand-edit or delete the stale record / clear it only through the jobs service.
