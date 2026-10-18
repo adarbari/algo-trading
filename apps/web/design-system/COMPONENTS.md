@@ -378,6 +378,27 @@ Source: `design-system/components/Combobox`
 | `search` | `boolean` | no | A search box that adds: no selection is kept, the list shows only once something is typed, and the input clears after a choice. |
 | `focusKey` | `string` | no | With `search`: the key that focuses the box from anywhere outside a text field ("/"); shown as a hint at the end while the box is idle. |
 
+### ConditionGroup
+
+ConditionGroup: a titled surface for a group of rule conditions (ADR 0071): the group's kind label (all / any / none of), a title, an actions slot and an optional Guide InfoButton, then the members as a vertical list with the PartJoin connector between them (and for all, or for any, and not for none). One level only, so phones need no variant. `readOnly` shows a group the Builder cannot edit (a deeper tree from Describe it or TOML) as one ExpandableRow: its plain-English expression, members shown on expanding. Every label arrives as a prop.
+
+Source: `design-system/components/ConditionGroup`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `kind` | `ConditionGroupKind` | yes | How the members combine. |
+| `kindLabel` | `string` | yes | The kind in words ("All of", "Any of", "None of"). |
+| `title` | `ReactNode` | yes | The group's name; shown as a heading (a row title when read only). |
+| `connectorLabel` | `string` | yes | The connector between members ("and", "or", "and not"). |
+| `joinedByLabel` | `string` | yes | The spoken lead-in to the connector ("joined by"), hidden visually. |
+| `actions` | `ReactNode` | no | Controls on the header's end (buttons, a Guide InfoButton). Edit mode only. |
+| `info` | `ReactNode` | no | A Guide InfoButton for the kind, shown beside the title. |
+| `expression` | `ReactNode` | no | The group as one plain-English sentence; shown on the read-only row. |
+| `readOnly` | `boolean` | no | Show one expandable row with no editing controls. |
+| `defaultOpen` | `boolean` | no | Read only: start expanded. |
+| `headingLevel` | `2 \| 3 \| 4` | no | Heading level in the page outline; 3 by default. |
+| `children` | `ReactNode` | yes | The members, in order. |
+
 ### DataTable
 
 DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort` (sorted here, or by the caller when `sortMode` is `server`: a header only reports the sort it asks for); numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths, with the checkbox column and the first column pinned at the start (the row's key stays in view; `pinFirst`). Under the `sm` breakpoint (its own width: a phone, not a desktop's aside column) only the `essential` columns show by default (else the first three) and the column picker appears so the user adds the rest back. `groupBy` puts the rows under group headings in a declared order (the sort still orders the rows inside each group). Built on TanStack Table + Virtual, which stay internal.
