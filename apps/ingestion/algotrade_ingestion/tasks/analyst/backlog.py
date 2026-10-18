@@ -18,8 +18,9 @@ is asked, not backlog; only a name no attempt reached in the window is.
 The same measure for Finnhub (``check_finnhub_backlog``, the recommendation trend that
 ``analyst_ratings@v1`` reads): the share with no Finnhub row and no Finnhub coverage marker other
 than FAILED in the last four ``[finnhub] refresh_days`` windows, against the same
-``max_analyst_backlog``. Nothing when the run skipped Finnhub (no key, or the probe says DENIED:
-the run record names why), since every name would then read NOT_FETCHED by design.
+``max_analyst_backlog``. When the run skipped Finnhub (no key, or the probe says DENIED) it WARNs
+with the run's reason: every name then reads NOT_FETCHED, and the ratings group would otherwise
+read "not covered" for the whole universe without a word (FMP without a key warns the same way).
 """
 
 from datetime import date, timedelta
@@ -44,8 +45,8 @@ def check_analyst_backlog(ctx: TaskContext, session: date) -> list[Check]:
 
 
 def check_finnhub_backlog(ctx: TaskContext, session: date) -> list[Check]:
-    """The same for Finnhub's recommendation trend and its own refresh cadence; nothing when the
-    finished run skipped Finnhub."""
+    """The same for Finnhub's recommendation trend and its own refresh cadence; a WARN naming the
+    reason when the finished run skipped Finnhub."""
     return _backlog(ctx, session, FINNHUB, FINNHUB_CHECK, ctx.settings.finnhub_refresh_days)
 
 
@@ -53,8 +54,11 @@ def _backlog(
     ctx: TaskContext, session: date, vendor: str, check: str, refresh_days: int
 ) -> list[Check]:
     done = [r for r in ctx.reader.runs(TASK) if r.status in PUBLISHED and r.session_date == session]
-    if vendor == FINNHUB and any("skipped" in r.stats.get(FINNHUB, {}) for r in done):
-        return []
+    skipped = [
+        str(r.stats[vendor]["skipped"]) for r in done if "skipped" in r.stats.get(vendor, {})
+    ]
+    if vendor == FINNHUB and skipped:  # no call was made: every name is unasked
+        return [Check(check, "WARN", f"Finnhub was not asked tonight: {skipped[0]}")]
     names = scope_names(ctx.reader, ctx, session) if done else []
     if not names:
         return []

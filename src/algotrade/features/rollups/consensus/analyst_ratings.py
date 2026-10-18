@@ -22,8 +22,9 @@ name). A STALE snapshot (older than ``stale_days``, 45: the trend is monthly, so
 half without a refresh) serves no values: they read as not stored, the status stays.
 
 The change is the history we hold, never a vendor history (the vendor restates its months): the
-newest snapshot's score less that of the latest snapshot of ``SNAPSHOT_SLACK`` (7) days at most
-before ``session - 90`` days. It is null until a snapshot that old exists: our history starts at
+newest snapshot's score less that of the latest snapshot 90 to 90 + ``SNAPSHOT_SLACK`` (7) days
+before the NEWEST snapshot (not before the session: the window is 90 days whatever the newest
+snapshot's age). It is null until a snapshot that old exists: our history starts at
 the first nightly snapshot (2026-10-19 at the earliest), so the first value is 90 days later.
 Only snapshots for a session on or before this one are read.
 """
@@ -136,7 +137,7 @@ def _snapshots(rows: pd.DataFrame) -> pd.DataFrame:
     rows = rows.assign(month=pd.to_datetime(rows["period"], errors="coerce")).dropna(
         subset=["month"]
     )
-    rows = rows.assign(day=pd.to_datetime(rows["session_date"]).dt.date)
+    rows = rows.assign(day=pd.to_datetime(rows["session_date"]).dt.normalize())
     rows = rows.sort_values(["instrument_id", "day", "month"], kind="stable")
     rows = rows.drop_duplicates(["instrument_id", "day"], keep="last")
     counts = rows[list(POINTS)].apply(pd.to_numeric, errors="coerce").astype("float64")
@@ -149,14 +150,16 @@ def _snapshots(rows: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _change(snaps: pd.DataFrame, newest: pd.DataFrame, session: date) -> pd.Series:
+def _change(snaps: pd.DataFrame, newest: pd.DataFrame) -> pd.Series:
     """Per name the newest snapshot's score less the score of the latest snapshot in the window
-    ``CHANGE_DAYS`` back; a name without both has none."""
-    since, until = days_back(session, CHANGE_DAYS)
-    old = snaps[(snaps["day"] >= since) & (snaps["day"] <= until)]
+    ``CHANGE_DAYS`` before the NEWEST snapshot's day; a name without both has none."""
+    now = newest.set_index("instrument_id")
+    since, until = days_back(now["day"], CHANGE_DAYS)
+    window = pd.DataFrame({"since": since, "until": until}).reset_index()
+    old = snaps.merge(window, on="instrument_id")
+    old = old[(old["day"] >= old["since"]) & (old["day"] <= old["until"])]
     old = old.sort_values("day", kind="stable").drop_duplicates("instrument_id", keep="last")
-    now = newest.set_index("instrument_id")["score"]
-    return now - old.set_index("instrument_id")["score"].reindex(now.index)
+    return now["score"] - old.set_index("instrument_id")["score"].reindex(now.index)
 
 
 def compute(inputs: Inputs, session: date, p: RatingsParams) -> pd.DataFrame:
@@ -176,7 +179,7 @@ def compute(inputs: Inputs, session: date, p: RatingsParams) -> pd.DataFrame:
     out["rating_count"] = out["instrument_id"].map(now["count"])
     out["rating_score"] = out["instrument_id"].map(now["score"])
     out["rating_month"] = out["instrument_id"].map(now["month"].dt.date)
-    out["rating_score_change_90d"] = out["instrument_id"].map(_change(snaps, newest, session))
+    out["rating_score_change_90d"] = out["instrument_id"].map(_change(snaps, newest))
     for column in ("rating_count", *(f"rating_{name}" for name in POINTS)):
         out[column] = out[column].astype("Int64")
     return out[["instrument_id", *COLUMNS]]

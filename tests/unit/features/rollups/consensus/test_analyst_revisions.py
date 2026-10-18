@@ -2,7 +2,7 @@
 the SAME fiscal year (matched on the year end, never the FY1 label), the MIN_BASE floor, OK /
 BUILDING / NO_PRIOR, and no snapshot the session could not know."""
 
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 import pytest
@@ -10,6 +10,7 @@ import pytest
 from algotrade.features.framework.columns import conform
 from algotrade.features.rollups.consensus import analyst_estimates as ae
 from algotrade.features.rollups.consensus import analyst_revisions as rv
+from algotrade.features.rollups.consensus.analyst_status import UNCOVERED
 from algotrade.features.rollups.consensus.earnings_surprise import MIN_BASE
 from tests.helpers.analyst.snapshots import estimates, marker, night, put, store, universe, visible
 
@@ -165,40 +166,71 @@ def test_a_snapshot_published_after_the_next_open_is_not_the_history_of_the_sess
     assert run(writer, tue).loc[A, "eps_fy1_revision_90d"] == pytest.approx(25.0)
 
 
-def test_a_snapshot_for_a_later_session_is_never_the_past() -> None:
+def test_the_windows_count_from_the_day_of_the_newest_snapshot_not_from_the_session() -> None:
+    """The newest snapshot is 14 days old (still OK): its 30-day window is 30 to 37 days before
+    ITS day. Counted from the session it would be only 16 to 23 days of history."""
+    newest = S - timedelta(days=14)
     writer = store()
+    put(writer, newest - timedelta(days=32), years(4.0))
+    put(writer, newest, years(5.0))
+    row = run(writer).loc[A]
+    assert row["eps_fy1_revision_30d"] == pytest.approx(25.0)
+    other = store()
+    put(other, S - timedelta(days=30), years(4.0))  # 16 days before the newest: not a 30-day past
+    put(other, newest, years(5.0))
+    assert pd.isna(run(other).loc[A, "eps_fy1_revision_30d"])
+
+
+def test_a_later_snapshot_is_never_the_past() -> None:
+    """Computed for the Friday, a snapshot of the next Monday is not read, whatever the frame
+    holds: the 30-day past of the Monday's own estimate would be this very Friday."""
+    mon = date(2027, 1, 18)
+    writer = store()
+    put(writer, S - timedelta(days=30), years(4.0))
     put(writer, S, years(5.0))
-    put(writer, date(2027, 1, 18), years(50.0))
-    inputs = {
-        rv.ESTIMATES_TABLE: rollup(writer, S),
-        rv.SNAPSHOTS: visible(writer, date(2027, 1, 18)),
-    }
+    put(writer, mon, years(50.0))
+    inputs = {rv.ESTIMATES_TABLE: rollup(writer, S), rv.SNAPSHOTS: visible(writer, mon)}
     got = rv.compute(inputs, S, None).set_index("instrument_id")
-    assert got.loc[A, "revisions_status"] == rv.NO_PRIOR
+    assert got.loc[A, "eps_fy1_revision_30d"] == pytest.approx(25.0)  # 4.0 -> 5.0, not 50.0
 
 
-def test_only_names_with_served_estimates_have_a_row() -> None:
+def test_names_without_served_estimates_pass_their_status_through_with_null_values() -> None:
+    """One row per estimates row (ADR 0072): the uncovered statuses read as not covered, like
+    the estimates; STALE stays out of the uncovered list."""
     writer = store()
     put(writer, S, [*years(5.0), marker(B, "NOT_COVERED")])
     put(writer, date(2026, 12, 1), estimates(C, {YEAR: 3.0}), run_id="old")  # 45 days: STALE
     got = run(writer, ids=(A, B, C, "EQ:D"))
-    assert list(got.index) == [A]
+    assert got["revisions_status"].to_dict() == {
+        A: rv.NO_PRIOR,
+        B: "NOT_COVERED",
+        C: "STALE",
+        "EQ:D": "NOT_FETCHED",
+    }
+    assert got.loc[[B, C, "EQ:D"], REVISIONS].isna().all().all()
+    assert got.loc[[B, C, "EQ:D"], "eps_fy1_analysts_change_90d"].isna().all()
+    values = [f for f in rv.GROUP.features if f.name != "revisions_status"]
+    assert all(f.null_status == "revisions_status" for f in values)
+    assert all(f.uncovered_statuses == UNCOVERED for f in values)
 
 
-def test_without_the_estimates_rollup_or_snapshots_there_is_nothing_to_compare() -> None:
-    assert rv.compute({rv.ESTIMATES_TABLE: None, rv.SNAPSHOTS: None}, S, None).empty
+def test_without_snapshots_the_names_with_served_estimates_have_no_prior() -> None:
     writer = store()
     put(writer, S, years(5.0))
-    est = rollup(writer)
-    got = rv.compute({rv.ESTIMATES_TABLE: est, rv.SNAPSHOTS: None}, S, None)
+    got = rv.compute({rv.ESTIMATES_TABLE: rollup(writer), rv.SNAPSHOTS: None}, S, None)
     assert got["revisions_status"].tolist() == [rv.NO_PRIOR]
+
+
+def test_the_estimates_rollup_is_a_required_input() -> None:
+    spec = {i.table: i for i in rv.GROUP.inputs}
+    assert spec[rv.ESTIMATES_TABLE].required and not spec[rv.SNAPSHOTS].required
 
 
 def test_the_output_conforms_and_every_feature_is_personal_and_optional() -> None:
     writer = store()
     history(writer)
-    conform("t", run(writer).reset_index(), rv.COLUMNS)
-    conform("t", rv.compute({rv.ESTIMATES_TABLE: None, rv.SNAPSHOTS: None}, S, None), rv.COLUMNS)
+    put(writer, S, [marker(B, "NOT_COVERED")], run_id="m")
+    conform("t", run(writer, ids=(A, B)).reset_index(), rv.COLUMNS)
     assert all(f.licence == "personal" for f in rv.GROUP.features) and rv.GROUP.optional
     assert rv.WINDOWS == (30, 60, 90) and not any("7d" in f.name for f in rv.GROUP.features)
     assert rv.GROUP.params is None

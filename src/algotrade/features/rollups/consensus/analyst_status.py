@@ -27,7 +27,7 @@ Finnhub for the recommendation trend (``analyst_ratings@v1``), each with its own
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 
 import pandas as pd
 
@@ -62,7 +62,10 @@ NEEDED = (  # the snapshot columns the groups read: a store without one reads it
     "strong_sell",
 )
 LOOKBACK = 70  # sessions of snapshots read: about 100 calendar days, well past the 21 of STALE
-HISTORY_LOOKBACK = 75  # the groups that compare with 90 days back: 90 + slack, holidays included
+# Sessions of snapshots the groups that compare with 90 days back read: the newest snapshot may be
+# ``stale_days`` (45, the longest) old, and the one before it 90 + SNAPSHOT_SLACK days earlier:
+# 142 calendar days, about 98 sessions (a test checks it against the calendar).
+HISTORY_LOOKBACK = 105
 SNAPSHOT_SLACK = 7  # days: a refresh window; the snapshot "N days back" is at most this much older
 
 
@@ -117,12 +120,14 @@ def history_rows(
     return rows.reindex(columns=[*dict.fromkeys([*rows.columns, *NEEDED])])
 
 
-def days_back(session: date, days: int) -> tuple[date, date]:
-    """The sessions of the snapshot that stands for ``days`` ago, as ``(first, last)``: from
-    ``days + SNAPSHOT_SLACK`` before ``session`` to ``days`` before it (a night the fetch
-    missed must not reach back to a stale value)."""
-    latest = session - timedelta(days=days)
-    return latest - timedelta(days=SNAPSHOT_SLACK), latest
+def days_back(anchor: pd.Series, days: int) -> tuple[pd.Series, pd.Series]:
+    """The window of the snapshot that stands for ``days`` before ``anchor`` (a Series of the
+    day of each name's NEWEST snapshot, not of the session: the window then spans ``days``
+    whatever the age of the newest snapshot), as ``(first, last)``: from ``days +
+    SNAPSHOT_SLACK`` before it to ``days`` before it (a night the fetch missed must not reach
+    back to a stale value)."""
+    last = anchor - pd.Timedelta(days=days)
+    return last - pd.Timedelta(days=SNAPSHOT_SLACK), last
 
 
 def _markers(snapshots: pd.DataFrame | None, vendor: str) -> dict[str, tuple[date, str]]:

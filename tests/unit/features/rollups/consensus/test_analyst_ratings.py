@@ -2,7 +2,7 @@
 change of the score from our own snapshots only, STALE after 45 days, NOT_COVERED and NOT_FETCHED
 told apart, the personal licence."""
 
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 import pytest
@@ -98,6 +98,18 @@ def test_the_latest_snapshot_in_the_window_is_the_one_compared() -> None:
     finnhub(writer, date(2026, 10, 12), recommendation(A, {"2026-10-01": (0, 0, 0, 0, 9)}))
     finnhub(writer, OLD, recommendation(A, {"2026-10-01": (2, 4, 10, 2, 2)}))
     finnhub(writer, S, recommendation(A, TREND))
+    assert run(writer).loc[A, "rating_score_change_90d"] == pytest.approx(3.4 - 3.1)
+
+
+def test_the_90_days_count_from_the_newest_snapshot_not_from_the_session() -> None:
+    """The newest snapshot is 30 days old (still OK at 45): the change reads the snapshot 90 days
+    before IT. Counted from the session that snapshot would be 120 days back, out of reach."""
+    newest = S - timedelta(days=30)
+    writer = store()
+    finnhub(
+        writer, newest - timedelta(days=92), recommendation(A, {"2026-09-01": (2, 4, 10, 2, 2)})
+    )
+    finnhub(writer, newest, recommendation(A, TREND))
     assert run(writer).loc[A, "rating_score_change_90d"] == pytest.approx(3.4 - 3.1)
 
 

@@ -107,16 +107,16 @@ def test_finnhub_names_that_only_failed_stay_in_the_backlog() -> None:
     assert check.data["examples"] == ["NVDA"]
 
 
-def test_finnhub_has_no_backlog_check_when_the_run_skipped_it_and_none_without_a_run() -> None:
+def test_finnhub_warns_with_the_reason_when_the_run_skipped_it() -> None:
     writer = StoreWriter(MemoryBackend())
     seed(writer)
     ctx = context(writer, D1, [])
-    assert check_finnhub_backlog(ctx, D1) == []
+    assert check_finnhub_backlog(ctx, D1) == []  # no finished run of the session
     no_key = replace(ctx, sources={k: v for k, v in ctx.sources.items() if "finnhub" not in k})
     run(no_key, {"session": D1})
-    assert (
-        check_finnhub_backlog(no_key, D1) == []
-    )  # skipped: every name reads NOT_FETCHED by design
+    (check,) = check_finnhub_backlog(no_key, D1)  # every name reads NOT_FETCHED: say why
+    assert (check.name, check.status) == (FINNHUB_CHECK, "WARN")
+    assert check.detail.startswith("Finnhub was not asked tonight: ")
     assert len(check_analyst_backlog(no_key, D1)) == 1
 
 
@@ -126,6 +126,7 @@ DECLARING = {
     "analyst_estimates@v1": ("analyst-snapshot", check_analyst_backlog),
     "analyst_targets@v1": ("analyst-snapshot", check_analyst_backlog),
     "analyst_ratings@v1": ("analyst-snapshot", check_finnhub_backlog),
+    "analyst_revisions@v1": ("analyst-snapshot", check_analyst_backlog),
 }
 
 

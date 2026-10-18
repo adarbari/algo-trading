@@ -214,7 +214,8 @@ Sources: Finnhub analyst recommendation trends, stored nightly in analyst/estima
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - A small old estimate makes a big percentage: the field is null when the old EPS is under five cents in size. Read it beside rollup.analyst_estimates@v1.eps_fy1.
 - One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v1.eps_fy1_analysts, and prefer 5 or more.
-- A name with no row has no current estimates: not covered, never asked, or the newest snapshot is STALE. A hard criterion rejects it.
+- Null with revisions_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.
+- Null with revisions_status STALE: the newest snapshot is over 21 days old, so no estimate and no revision is served.
 
 Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003); Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect; Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
@@ -234,7 +235,8 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - A small old estimate makes a big percentage: the field is null when the old EPS is under five cents in size. Read it beside rollup.analyst_estimates@v1.eps_fy1.
 - One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v1.eps_fy1_analysts, and prefer 5 or more.
-- A name with no row has no current estimates: not covered, never asked, or the newest snapshot is STALE. A hard criterion rejects it.
+- Null with revisions_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.
+- Null with revisions_status STALE: the newest snapshot is over 21 days old, so no estimate and no revision is served.
 
 Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003); Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect; Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
@@ -254,7 +256,8 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - A small old estimate makes a big percentage: the field is null when the old EPS is under five cents in size. Read it beside rollup.analyst_estimates@v1.eps_fy1.
 - One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v1.eps_fy1_analysts, and prefer 5 or more.
-- A name with no row has no current estimates: not covered, never asked, or the newest snapshot is STALE. A hard criterion rejects it.
+- Null with revisions_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.
+- Null with revisions_status STALE: the newest snapshot is over 21 days old, so no estimate and no revision is served.
 
 Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003); Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect; Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
@@ -274,7 +277,8 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - Revenue is in the vendor's reporting currency, so an ADR's figure moves with the exchange rate as well as the forecast.
 - One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v1.eps_fy1_analysts, and prefer 5 or more.
-- A name with no row has no current estimates: not covered, never asked, or the newest snapshot is STALE. A hard criterion rejects it.
+- Null with revisions_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.
+- Null with revisions_status STALE: the newest snapshot is over 21 days old, so no estimate and no revision is served.
 
 Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003); Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect; Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
@@ -294,7 +298,8 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - Revenue is in the vendor's reporting currency, so an ADR's figure moves with the exchange rate as well as the forecast.
 - One analyst moving a thin estimate shifts it a lot. Read rollup.analyst_estimates@v1.eps_fy1_analysts, and prefer 5 or more.
-- A name with no row has no current estimates: not covered, never asked, or the newest snapshot is STALE. A hard criterion rejects it.
+- Null with revisions_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.
+- Null with revisions_status STALE: the newest snapshot is over 21 days old, so no estimate and no revision is served.
 
 Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003); Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996): the revision-in-earnings-forecasts effect; Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
@@ -313,25 +318,29 @@ Sources: Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery 
 - Our history starts on 2026-10-19, so this is null until about 2027-01-17. Read rollup.analyst_revisions@v1.revisions_status for whether the windows exist yet.
 - The comparison is for the same fiscal year, matched on its year end. At the year roll a year the old snapshots never listed has no past value, so the field reads null, not a jump.
 - Coverage grows as a report nears, so a rise is the normal course. Compare names with the same year end.
-- Null when either snapshot gave no count, and for a name with no row.
+- Null when either snapshot gave no count.
+- Null with revisions_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.
+- Null with revisions_status STALE: the newest snapshot is over 21 days old, so no estimate and no revision is served.
 
 Sources: Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
 
 ### `rollup.analyst_revisions@v1.revisions_status`
 
-**How to read it.** Whether the estimate revisions of the name can be measured. OK: a snapshot of the same fiscal year exists for 30, 60 and 90 days back. BUILDING: an earlier one exists, but not for every window. NO_PRIOR: none holds this year.
+**How to read it.** Whether the estimate revisions of the name can be measured. OK: a snapshot of the same fiscal year exists for 30, 60 and 90 days back. BUILDING: an earlier one exists, but not for every window. NO_PRIOR: none holds this year. STALE, NOT_COVERED and NOT_FETCHED are the estimates' own status.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
 | only names whose revisions over every window can be measured | `eq "OK"` | hard | - | - |
+| leave out stale snapshots | `ne "STALE"` | hard | - | - |
 
 **When the reading lies**
 
 - OK says the comparisons exist, not that the estimate moved: most names read a revision near 0. Read the revision fields for the size.
 - BUILDING lasts until 2027-01-17 for every name, since our history starts on 2026-10-19. A night the rotation missed can also hold a covered name there.
 - NO_PRIOR also covers a year that the older snapshots never listed, as at the fiscal year roll, and a name whose first estimate year is unknown.
-- A name with no row has no current estimates: not covered, never asked, or the newest snapshot is STALE. A hard criterion rejects it.
+- Null with revisions_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The vendor does not answer for every name, and the nightly rotation has not asked every name yet.
+- Null with revisions_status STALE: the newest snapshot is over 21 days old, so no estimate and no revision is served.
 
 Sources: Financial Modeling Prep analyst estimates, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
