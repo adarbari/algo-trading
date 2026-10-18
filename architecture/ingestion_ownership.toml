@@ -127,11 +127,13 @@ detect = [{ call = "map_funds" }, { call = "nav_symbol" }, { call = "parse_nav_t
 
 [[responsibility]]
 id = "ibkr-enrichment"
-description = "IBKR as an enrichment source, read-only (ADR 0028): conids of the optionable universe (instruments/ibkr_contracts) and IB's implied / historical vol per underlying (volatility/ibkr_iv30: history backfill + nightly snapshot), each read through algotrade.data; features derived from them carry licence = personal"
+description = "IBKR as an enrichment source, read-only (ADR 0028): conids of the optionable universe (instruments/ibkr_contracts) IB's implied / historical vol per underlying (volatility/ibkr_iv30: history backfill + nightly snapshot) and the nightly futures curve snapshots (rates/futures_curve), each read through algotrade.data; features derived from them carry licence = personal"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/reference/ibkr_contracts.py",
     "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py",
+    "apps/ingestion/algotrade_ingestion/tasks/market/futures/curves.py",
     "src/algotrade/data/volatility.py",
+    "src/algotrade/data/futures/curves.py",
 ]
 allowed = [
     "src/algotrade/storage/tables/schemas.py",  # declares the tables
@@ -139,7 +141,7 @@ allowed = [
     "src/algotrade/features/rollups/options/ibkr_iv.py",  # names its input; read through data.feature_inputs
 ]
 section = "docs/adr/0028-ibkr-enrichment-source.md#decision"
-detect = [{ string = "instruments/ibkr_contracts" }, { string = "volatility/ibkr_iv30" }]
+detect = [{ string = "instruments/ibkr_contracts" }, { string = "volatility/ibkr_iv30" }, { string = "rates/futures_curve" }]
 
 [[responsibility]]
 id = "ingestion-report"

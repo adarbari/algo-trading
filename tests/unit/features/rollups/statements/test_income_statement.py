@@ -1,4 +1,4 @@
-"""income_statement@v1: TTM of each line, the financial-company rule, tags and look-ahead."""
+"""income_statement@v2: TTM of each line, the financial-company rule, tags and look-ahead."""
 
 from datetime import date, timedelta
 

@@ -214,6 +214,10 @@ INSTRUMENT_DESCRIPTION = fixed(
 # merge; a fact is identified by (instrument, concept, tag, period start, period end, filed
 # date): a year-to-date and a quarterly fact share an end date, and several us-gaap tags of one
 # concept report the same period (a null ``tag``, a ``checked`` marker's, equals a null).
+# ``accepted_ts`` is the instant SEC accepted the fact's filing (UTC, from the submissions
+# document, ADR 0067 amendment): when it became public. Null for a row stored before the column
+# existed or whose accession the submissions do not list: a reader then counts the fact from the
+# session after ``filed``.
 INSTRUMENT_SHARES = fixed(
     "instruments/shares",
     "reference",
@@ -225,6 +229,7 @@ INSTRUMENT_SHARES = fixed(
     "period_start date",
     "period_end date",
     "filed date",
+    "accepted_ts timestamp_utc",
     "fy int64",
     "shares float64",
     "class_values int64",
@@ -249,6 +254,7 @@ INSTRUMENT_STATEMENTS = fixed(
     "period_start date",
     "period_end date",
     "filed date",
+    "accepted_ts timestamp_utc",
     "fy int64",
     "value float64",
     "fetched_on date!",
@@ -284,6 +290,20 @@ IBKR_IV30 = fixed(
     "vol_reject string",
     runs="merge",
 )
+# L2: the futures curve, one partition per session (``futures-curves``, IB Gateway, read-only;
+# personal licence): a row per front-month contract, ``instrument_id`` ``FUT:<root>:<YYYY-MM
+# delivery month>``, ``parent_id`` ``FUT:<root>`` (ADR 0009). ``price`` is ONE ``price_kind`` per
+# root and session by the read clock against ``next_open`` (IB ``tradingHours``): ``last`` before
+# it, ``settle`` (IB close) from it to 12:00 New York next weekday, else nothing: see
+# ``tasks/market/futures/curves.py``. ``ts``: when the stream was read; a run is the partition.
+FUTURES_CURVE = fixed(
+    "rates/futures_curve", "curve", ("instrument_id", "ts", "root", "contract_month"),
+    "instrument_id string!", "ts timestamp_utc!", "parent_id string!", "root string!",
+    "contract_month string!", "expiry date", "next_open timestamp_utc", "conid int64",
+    "local_symbol string", "price_kind string",
+    *floats("price", "last", "close", "bid", "ask", "volume", "open_interest", "multiplier"),
+    key=("instrument_id",),
+)  # fmt: skip
 # Live option quotes the API read from IB Gateway (ADR 0028, the API's one write exception):
 # every answer it served, one partition per session, a row per contract and time taken. Runs
 # merge (each is a few snapshots; all are kept, keyed by contract and ``ts``). Written only
@@ -776,6 +796,7 @@ KNOWN: dict[str, TableSpec] = {
         VERIFICATION_IBKR,
         IBKR_CONTRACTS,
         IBKR_IV30,
+        FUTURES_CURVE,
         RULE_SCREEN,
         RULE_SCREEN_VALUES,
         EDGE_EVAL,
