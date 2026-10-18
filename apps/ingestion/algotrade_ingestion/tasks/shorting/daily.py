@@ -17,6 +17,7 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import date
 from functools import partial
 
+from algotrade.core.time.calendar import exchange_date, next_session
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
 from algotrade_sources.framework.base import FetchRequest, Source
@@ -29,7 +30,14 @@ type Known = Callable[[date], Mapping[str, date]]  # a date -> its ``known_from`
 
 def one_day(run: IngestRun, source: Source, table: str, known: Known, day: date) -> str:
     """Fetch, resolve and write one date's partition; the item status. ``known`` gives the
-    columns the point-in-time rule adds (``schedule.py``: the task decides ``known_from``)."""
+    columns the point-in-time rule adds (``schedule.py``: the task decides ``known_from``).
+
+    ``known_from`` is never earlier than the session after THIS fetch (the New York date of the
+    run's clock): the schedule says when FINRA published, but a backfill, a ``--force`` refetch,
+    a restated row (``revision_flag``) or a re-posted file holds values we did not have before
+    the fetch, so no session before it may read them. A nightly fetch of the day's own data
+    gets the schedule's date; a backfill's rows are known from the session after the backfill,
+    never from a later ``--to``."""
     try:
         normalized = run.fetch(source, FetchRequest(day.isoformat(), session_date=run.session))
     except NoResponseError:
@@ -37,13 +45,16 @@ def one_day(run: IngestRun, source: Source, table: str, known: Known, day: date)
     frame = normalized.tables[table] if normalized else None
     if frame is None or frame.empty:
         return NO_DATA
-    resolver = run.resolver()
+    resolver = run.resolver(day)
     known_names = frame["symbol"].map(resolver.knows)
     run.unresolved += int((~known_names).sum())  # a ticker the reference does not know is dropped
-    resolved = run.resolve(frame[known_names], keep_symbol=False)
+    resolved = run.resolve(frame[known_names], as_of=day, keep_symbol=False)
     if resolved.empty:
         return f"{NO_DATA}: no ticker resolved"
-    rows = resolved.reset_index(drop=True).assign(**known(day))
+    fetched = next_session(exchange_date(run.clock()))
+    stamps = dict(known(day))
+    stamps["known_from"] = max(stamps["known_from"], fetched)  # never before this fetch's session
+    rows = resolved.reset_index(drop=True).assign(**stamps)
     run.write(table, rows, source.name, session=day)
     return f"OK: {len(resolved)} rows"
 

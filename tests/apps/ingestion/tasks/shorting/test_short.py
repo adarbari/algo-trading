@@ -3,7 +3,7 @@ partition per date, ids resolved (unknown tickers dropped), ``known_from`` by th
 resumable (a stored date is skipped, ``force`` refetches), an unpublished date ``NO_DATA``, a
 failed date PARTIAL, and the nightly window defaults."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -152,3 +152,43 @@ def test_short_volume_window_defaults_to_the_lookback() -> None:
 def test_a_session_is_required(module) -> None:
     with pytest.raises(ValueError, match="session"):
         module.run(task_ctx(_writer()), {})
+
+
+def test_known_from_is_never_before_the_session_after_the_fetch() -> None:
+    """A backfill, a ``--force`` refetch or a restated row holds values we did not have before the
+    fetch: known_from = max(schedule, next session after the fetch), never the schedule alone."""
+
+    def clock() -> datetime:
+        return datetime(2026, 11, 20, 22, tzinfo=UTC)  # a Friday evening in New York
+
+    writer = _writer()
+    ctx = task_ctx(writer, clock=clock, sources={short_interest.SOURCE: _interest([])})
+    short_interest.run(
+        ctx, {"session": date(2026, 11, 20), "start": date(2026, 9, 30), "end": date(2026, 9, 30)}
+    )
+    ctx = task_ctx(writer, clock=clock, sources={short_volume.SOURCE: _volume([])})
+    short_volume.run(
+        ctx, {"session": date(2026, 11, 20), "start": date(2026, 10, 16), "end": date(2026, 10, 16)}
+    )
+    reader = StoreReader(writer._backend)
+    interest = reader.table("events/short_interest", date(2026, 9, 30))
+    volume = reader.table("events/short_volume", date(2026, 10, 16))
+    assert interest is not None and volume is not None
+    assert set(interest["known_from"]) == {date(2026, 11, 23)}  # schedule said 2026-10-12
+    assert set(volume["known_from"]) == {date(2026, 11, 23)}  # schedule said 2026-10-19
+
+
+def test_backfilled_dates_resolve_against_their_own_reference() -> None:
+    """The reference snapshot of the date, not today's: a name listed only later is not resolved
+    for an earlier date."""
+    writer = StoreWriter(MemoryBackend())
+    write_reference(writer, date(2026, 10, 2), {"AAA": "EQ:AAA"})
+    write_reference(writer, date(2026, 10, 14), IDS, "ref2")
+    ctx = task_ctx(writer, sources={short_volume.SOURCE: _volume([])})
+    short_volume.run(ctx, {"session": SESSION, "start": date(2026, 10, 9), "end": SESSION})
+    reader = StoreReader(writer._backend)
+    early = reader.table("events/short_volume", date(2026, 10, 9))
+    late = reader.table("events/short_volume", date(2026, 10, 15))
+    assert early is not None and late is not None
+    assert sorted(early["instrument_id"]) == ["EQ:AAA"]
+    assert sorted(late["instrument_id"]) == ["EQ:AAA", "EQ:BBB"]

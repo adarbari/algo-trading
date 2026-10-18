@@ -57,3 +57,42 @@ def test_nothing_else_in_training_reads_a_stored_table() -> None:
         text = path.read_text()
         if path.name not in allowed:
             assert "read_outcomes" not in text and "fields_view" not in text, path.name
+
+
+SRC = REPO_ROOT / "src" / "algotrade"
+# Every module that fits a probit (``quant.probit``) and why its input cannot be a no_ml feature.
+PROBIT_USERS = {
+    "services/evaluation/training/fit.py": "fits the training frame, which runs refuse_no_ml",
+    "services/evaluation/discovery/proposer.py": "fits the usable fields, leaving out no_ml reads",
+    "services/evaluation/regime_scorecard.py": "fits market indicator histories, no catalogue",
+}
+GUARDED = {
+    "services/evaluation/training/fit.py": ("training/frame.py", "refuse_no_ml"),
+    "services/evaluation/discovery/proposer.py": ("discovery/frame.py", "NO_ML_TABLES"),
+}
+
+
+def test_every_probit_fit_is_listed_and_guarded() -> None:
+    """The one list of learned fits: a new caller of ``quant.probit`` must be added here with its
+    reason, and the guarded ones must still run their guard (the training frame is not the only
+    door: the winners study's proposer fits every usable field too)."""
+    found = {
+        str(p.relative_to(SRC))
+        for p in SRC.rglob("*.py")
+        if p.parts[-3:-1] != ("algotrade", "quant")
+        and ("quant import probit" in p.read_text() or "quant.probit import" in p.read_text())
+    }
+    assert found == set(PROBIT_USERS)
+    for user, (feeder, marker) in GUARDED.items():
+        text = (SRC / "services" / "evaluation" / feeder).read_text()
+        assert marker in text, f"{user} is fed by {feeder}, which must run {marker}"
+
+
+def test_the_text_model_path_never_reads_the_no_ml_tables() -> None:
+    """FINRA rows never reach the TextModel seam: nothing under the text-model, explaining or
+    drafting services names a no_ml table or reads event tables."""
+    for folder in ("text_model", "explaining", "drafting"):
+        for path in (SRC / "services" / folder).rglob("*.py"):
+            text = path.read_text()
+            assert not any(t in text for t in NO_ML_TABLES), path
+            assert "algotrade.data.events" not in text, path
