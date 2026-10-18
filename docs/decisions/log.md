@@ -796,3 +796,11 @@ follow-up PR).
 - Owner read the disclaimer: personal research use, monthly automated pull, no redistribution, no product built on the index.
 - Clause to respect: no reproduction, distribution or transmission without Barclays' consent, so CAPE values and every feature derived from them are never served to other users (`licence = "personal"`, held only by the owners listed in `config/site/users.toml`, ADR 0069).
 - Reasoning: the file is public and unauthenticated and has been served for years, a monthly pull is a light use, and the series is optional (the macro step is non-critical), so withdrawing it costs one registry block.
+
+## 2026-10-18 | EB E5 (PR 680 review) | Allocation edges the harness measures only in part
+- Question: how are the IBS edge (the source day is close(D) to close(D+1), but S = D + 1 at the earliest), the natgas avoid list and the 9-month lookback filed?
+- Options: IBS dropped / filed as a documented-limit variant; natgas against SPY / against the mix of its own funds; a 189-session return column (changes stored group trend_stats@v2) / the 3, 6 and 12 month grid.
+- Decision: IBS filed as a documented-limit variant that tests the second-day return, its failure_modes saying the always-held benchmark makes cash days negative by construction; natgas benchmark is the near-equal mix of UNG, USO and DBO, so a positive excess means cash in falling years beat holding them; keep the 3, 6 and 12 month ensemble, no ret_189d (a full-history recompute, catalogue and golden regeneration, every @v2 preset moves; the 9-month return correlates about 0.9 with 6 and 12; a later 4-member grid is a new trial by hash; revisit only if the 3-member ensemble reaches Promising).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a document that states what it cannot measure is better than none, and a stored-group change for a highly correlated member is cost without information.

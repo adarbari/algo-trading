@@ -22,7 +22,8 @@ oos_class = "trend"
 status = "candidate"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history (the outcome rows of all
-nine funds exist from 2015 and most from 2010; DBC, VNQ, EEM and the bond funds from 2010) and the
+nine funds start with the store on 2010-01-04, so that is the common start; the grid needs every fund
+each session, ADR 0074, so the latest-starting fund sets the sample) and the
 parent's evaluation runs. LIMITS, so nothing implies the full source rule: (1) long only: the source
 goes short a falling asset and scales each leg to 40 percent volatility with futures; this book
 holds a rising fund or its slot is cash at the Treasury bill yield, never short and never levered.

@@ -7,7 +7,7 @@ Back to the [index of every edge](../edges.md).
 |---|---|---|---|---|
 | BDC price to NAV reversion (`bdc_price_to_nav_reversion`) | candidate | month end | excess return, over 60 sessions, vs SPY, entered 1 session after the decision session, costs 30 bps | `bdc_price_to_nav` |
 | Currency ETF momentum (`fx_etf_carry_momentum`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 20% FXE, 20% FXY, 20% FXB, 20% FXA and 20% FXC, entered 1 session after the decision session, costs 10 bps | `trend_positive_6m`, `trend_positive_12m` |
-| Natural gas and oil ETF avoid list (`natgas_etf_contango_drag`) | candidate | month end | portfolio return, over 21 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps | `trend_positive_12m` |
+| Natural gas and oil ETF avoid list (`natgas_etf_contango_drag`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 34% UNG, 33% USO and 33% DBO, entered 1 session after the decision session, costs 20 bps | `trend_positive_12m` |
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | every session | excess return, over 6, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `retail_option_attention` |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | on each `tender_offer` | excess return, over 60, 250 sessions, vs SPY, starting +21 sessions from the event, costs 20 bps | `tender_offer_filed` |
 | Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
@@ -78,28 +78,28 @@ Back to the [index of every edge](../edges.md).
 
 ## Natural gas and oil ETF avoid list (`natgas_etf_contango_drag`)
 
-**Status:** candidate. **Family:** H. **Thesis:** Funds that roll futures in a market in contango lose value by structure, so a book that holds them only while their own price trend is up loses less than the market.
+**Status:** candidate. **Family:** H. **Thesis:** Funds that roll futures in a market in contango lose value by structure, so holding them only while their own price trend is up, and cash otherwise, beats holding them always.
 
-- **Outcome:** portfolio return, over 21 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps
+- **Outcome:** portfolio return, over 21 sessions, vs a blend of 34% UNG, 33% USO and 33% DBO, entered 1 session after the decision session, costs 20 bps
 - **Schedule:** month end
 - **Universe:** `instrument.symbol in ('UNG', 'USO', 'DBO')`
 - **Top K:** 3
 - **Screeners:** `trend_positive_12m`
 - **Baselines:** none yet
 - **Frozen period:** from 2026-04-01
-- **Notes:** DOCUMENTED-LIMIT VARIANT. VERDICTS ARE UNMEASURED until the screen is run and evaluated. An allocation edge is long (ADR 0074), so the source's AVOID or SHORT rule cannot be filed as such: this document expresses the avoid list as a long book that holds each fund only while its own 12-month raw return is above 0 and holds cash at the Treasury bill yield for the rest, measured against SPY. A fund the structure drags down is mostly out of the book, so the book earns the bill where the fund's drift is negative. NOT BUILT: the source's trigger (short when the front and second futures are in contango beyond the cost of carry) needs the Henry Hub futures curve, which is not stored (the D11 history); the price-drift version (the fund against the spot price) needs the spot series. The value against SPY mixes the avoid decision with the energy market's own direction and with SPY's, so a pass is not evidence of a contango drag. The short side with a borrow cost (Quantpedia's UNG and BOIL) is not expressible here: an excess-return short over three names has no decile figures. Three funds, price only, cost_bps 20 a round trip assumed. Leveraged BOIL and KOLD are excluded by the screen.
+- **Notes:** DOCUMENTED-LIMIT VARIANT. VERDICTS ARE UNMEASURED until the screen is run and evaluated. An allocation edge is long (ADR 0074), so the source's AVOID or SHORT rule cannot be filed as such: this document expresses the avoid list as a long book that holds each fund only while its own 12-month raw return is above 0 and holds cash at the Treasury bill yield for the rest, measured against an near-equal mix of the three funds held always (34, 33 and 33 percent: weights must add to one). A fund the structure drags down is mostly out of the book, so the book earns the bill where the fund's drift is negative. NOT BUILT: the source's trigger (short when the front and second futures are in contango beyond the cost of carry) needs the Henry Hub futures curve, which is not stored (the D11 history); the price-drift version (the fund against the spot price) needs the spot series. A positive excess means cash in the funds' falling years beat holding them; it is the effect of the trend rule, so a pass is still not evidence of a contango drag. The short side with a borrow cost (Quantpedia's UNG and BOIL) is not expressible here: an excess-return short over three names has no decile figures. Three funds, price only, cost_bps 20 a round trip assumed. Leveraged BOIL and KOLD are excluded by the screen.
 
 **Quality bar**
 
 1. **Mechanism:** A commodity ETF must roll its futures monthly; natural gas has steep seasonal contango, so each roll sells low and buys high, and its holders are retail speculators on weather (Erb and Harvey 2006; Guedj, Li and McCann 2011).
 2. **Persistence:** The structure has not changed (UNG has lost most of its value since 2007, not verified), but a cold snap can lift the fund by 50 percent, which is the risk that keeps shorts small.
-3. **Outcome:** The book's return over the 21 sessions from the close after each month end, less SPY's, net of the cost on the weight change; a fund with a falling trend is held as cash. Price only: the stored forward return is close to close and carries no dividend or distribution, so the book and the benchmark both miss their yield and cash earns the Treasury bill.
+3. **Outcome:** The book's return over the 21 sessions from the close after each month end, less the near-equal mix of the three funds held always, net of the cost on the weight change; a fund with a falling trend is held as cash. Price only: the stored forward return is close to close and carries no dividend or distribution, so the book and the benchmark both miss their yield and cash earns the Treasury bill.
 4. **Trigger timing:** The 12-month raw return is read at the month-end close D; the book is held from the next session's close S for 21 sessions. No fact after D enters a pick.
 5. **Faithful replication:** The source's rule is a futures-curve trigger on the single ETP (Erb and Harvey 2006; Gorton, Hayashi and Rouwenhorst 2013). Here only the trend filter and a cash position exist, so the replication is partial: it tests whether staying out of a drag fund after a falling year helps.
 6. **Expected size and sample:** Guedj, Li and McCann (2011) document the roll losses in UNG and USO; no recent split is on file. The size of a trend-filtered avoidance is not published.
 7. **Capacity and costs:** Capacity is small to moderate in three funds; a few switches a year; cost_bps 20 assumed. The source's short side needs borrow (1 to 5 percent on UNG, not verified): not charged.
-8. **Failure modes and retirement:** A cold-snap rally while the book is in cash costs a month against SPY; the result rests on three funds and a few years of falling prices. Retire if the frozen-period picks-series t is under 2.
-9. **Decoys:** SPY's own direction (the benchmark) and the energy market's: the funds' falling years make cash look good by construction. Read it beside commodity_roll_momentum's energy funds.
+8. **Failure modes and retirement:** A cold-snap rally while the book is in cash costs a month against the held mix; the result rests on three funds and a few years of falling prices. Retire if the frozen-period picks-series t is under 2.
+9. **Decoys:** The energy market's own direction: in the funds' falling years cash looks good by construction. Read it beside commodity_roll_momentum's energy funds.
 
 **Sources**
 

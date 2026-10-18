@@ -66,8 +66,9 @@ replication = """Antonacci (2013): monthly, hold the asset if its 12-month exces
 else bills; eight asset classes, 1973 to 2012, 0.2 percent a switch. Faber (2007): month-end close
 above the 10-month average, 20 percent per asset, bills otherwise. Here: five ETFs, raw returns and
 a 200-day stand-in, the three averaged."""
-expected_size = """Antonacci: Sharpe 0.47 to 0.72 and drawdown 29 to 13 percent for a 60/40, five-asset equal weight
-0.62 to 1.06 (index data, in-sample). Faber in sample 1972 to 2005: Sharpe 0.81; out of sample 2006
+expected_size = """Antonacci (index data, in sample): for a 60/40 mix the Sharpe ratio rises from 0.47 to 0.72 and the
+drawdown falls from 29 to 13 percent; for an equal-weight five-asset mix the Sharpe ratio rises from
+0.62 to 1.06. Faber in sample 1972 to 2005: Sharpe 0.81; out of sample 2006
 to 2025 (a 200-day variant): 0.68 (Concretum). Expect the timing to lose to a passive mix on return
 in most years."""
 capacity_costs = """Unlimited capacity in five liquid funds; about 5 to 8 trades a year in all; a few basis points a

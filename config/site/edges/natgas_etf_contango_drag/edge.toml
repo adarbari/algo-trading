@@ -4,7 +4,7 @@
 id = "natgas_etf_contango_drag"
 name = "Natural gas and oil ETF avoid list"
 family = "H"
-thesis = "Funds that roll futures in a market in contango lose value by structure, so a book that holds them only while their own price trend is up loses less than the market."
+thesis = "Funds that roll futures in a market in contango lose value by structure, so holding them only while their own price trend is up, and cash otherwise, beats holding them always."
 mechanism = """A commodity ETF must roll its futures monthly; natural gas has steep seasonal contango, so each roll
 sells low and buys high, and its holders are retail speculators on weather (Erb and Harvey 2006;
 Guedj, Li and McCann 2011)."""
@@ -20,12 +20,12 @@ notes = """DOCUMENTED-LIMIT VARIANT. VERDICTS ARE UNMEASURED until the screen is
 allocation edge is long (ADR 0074), so the source's AVOID or SHORT rule cannot be filed as such:
 this document expresses the avoid list as a long book that holds each fund only while its own
 12-month raw return is above 0 and holds cash at the Treasury bill yield for the rest, measured
-against SPY. A fund the structure drags down is mostly out of the book, so the book earns the bill
+against an near-equal mix of the three funds held always (34, 33 and 33 percent: weights must add to one). A fund the structure drags down is mostly out of the book, so the book earns the bill
 where the fund's drift is negative. NOT BUILT: the source's trigger (short when the front and second
 futures are in contango beyond the cost of carry) needs the Henry Hub futures curve, which is not
 stored (the D11 history); the price-drift version (the fund against the spot price) needs the spot
-series. The value against SPY mixes the avoid decision with the energy market's own direction and
-with SPY's, so a pass is not evidence of a contango drag. The short side with a borrow cost
+series. A positive excess means cash in the funds' falling years beat holding them; it is the effect of
+the trend rule, so a pass is still not evidence of a contango drag. The short side with a borrow cost
 (Quantpedia's UNG and BOIL) is not expressible here: an excess-return short over three names has no
 decile figures. Three funds, price only, cost_bps 20 a round trip assumed. Leveraged BOIL and KOLD
 are excluded by the screen."""
@@ -38,13 +38,13 @@ all = [
 [outcome]
 kind = "portfolio_return"
 horizon_sessions = [21]
-benchmark = "SPY"
+benchmark = "mix:UNG=0.34,USO=0.33,DBO=0.33"
 start_offset_sessions = 1
 cost_bps = 20
 weighting = "equal"
 
 [quality_bar]
-outcome = """The book's return over the 21 sessions from the close after each month end, less SPY's, net of the
+outcome = """The book's return over the 21 sessions from the close after each month end, less the near-equal mix of the three funds held always, net of the
 cost on the weight change; a fund with a falling trend is held as cash. Price only: the stored
 forward return is close to close and carries no dividend or distribution, so the book and the
 benchmark both miss their yield and cash earns the Treasury bill."""
@@ -57,10 +57,9 @@ expected_size = """Guedj, Li and McCann (2011) document the roll losses in UNG a
 size of a trend-filtered avoidance is not published."""
 capacity_costs = """Capacity is small to moderate in three funds; a few switches a year; cost_bps 20 assumed. The
 source's short side needs borrow (1 to 5 percent on UNG, not verified): not charged."""
-failure_modes = """A cold-snap rally while the book is in cash costs a month against SPY; the result rests on three
+failure_modes = """A cold-snap rally while the book is in cash costs a month against the held mix; the result rests on three
 funds and a few years of falling prices. Retire if the frozen-period picks-series t is under 2."""
-decoys = """SPY's own direction (the benchmark) and the energy market's: the funds' falling years make cash look
-good by construction. Read it beside commodity_roll_momentum's energy funds."""
+decoys = """The energy market's own direction: in the funds' falling years cash looks good by construction. Read it beside commodity_roll_momentum's energy funds."""
 
 [[sources]]
 title = "Erb, C. and Harvey, C., The Strategic and Tactical Value of Commodity Futures, Financial Analysts Journal, 2006"
