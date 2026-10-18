@@ -253,6 +253,14 @@ const ResultDecay = graphql(`
           n
           state
         }
+        expected {
+          leg
+          haircut
+          value
+          realised
+          share
+          summary
+        }
       }
     }
   }

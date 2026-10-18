@@ -24,7 +24,7 @@ from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
-from algotrade.core.model.screen_spec import Mode, ScreenSpec
+from algotrade.core.model.screen_spec import ScreenSpec
 from algotrade.core.time.calendar import last_closed_session
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.services.configs import resolve_config, resolve_rule_draft
@@ -41,7 +41,7 @@ from algotrade.services.read.screens.screeners import (
 from algotrade.services.screening.run import rule_run, settle_coverage
 from algotrade.services.views import to_value
 from algotrade.strategies.screeners.base import Decision
-from algotrade.strategies.screeners.rules import Outcome, RuleRow, RuleScreener
+from algotrade.strategies.screeners.rules import Outcome, RuleRow, RuleScreener, gate_slots
 
 MAX_ROWS = 1000  # the most rows one preview returns
 DRAFT_ID = "preview"  # the screen id of a draft that names none
@@ -169,26 +169,25 @@ def draft_spec(document: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
 
 
 def funnel(spec: ScreenSpec, rows: Sequence[RuleRow]) -> list[FunnelStep]:
-    """Each gating criterion in spec order over the rows still in after the ones before."""
+    """Each gate in spec order over the rows still in after the ones before: a gating
+    criterion, or a boolean group as one step (ADR 0071)."""
     remaining = list(rows)
     steps = []
-    for index, criterion in enumerate(spec.criteria):
-        if not criterion.mode.gating:
+    for index, slot in enumerate(gate_slots(spec)):
+        if not slot.gating:
             continue
-        outcomes = [row.results[index].outcome for row in remaining]
-        passed, near = outcomes.count(Outcome.PASS), outcomes.count(Outcome.NEAR)
-        keep = {Outcome.PASS, Outcome.NEAR}
-        if criterion.mode is Mode.SOFT:  # no value only costs points: the row stays in
-            keep.add(Outcome.MISSING)
-        kept = [r for r in remaining if r.results[index].outcome in keep]
+        gates = [row.gate_results[index] for row in remaining]
+        outcomes = [g.outcome for g in gates]
+        # a hard miss rejects; no value on a soft criterion only costs points: the row stays in
+        kept = [r for r, g in zip(remaining, gates, strict=True) if not g.verdict.rejects]
         steps.append(
             FunnelStep(
-                criterion.id,
-                criterion.field,
-                criterion.mode.value,
+                slot.id,
+                slot.field,
+                slot.mode,
                 entering=len(remaining),
-                passed=passed,
-                near=near,
+                passed=outcomes.count(Outcome.PASS),
+                near=outcomes.count(Outcome.NEAR),
                 failed=outcomes.count(Outcome.FAIL),
                 missing=outcomes.count(Outcome.MISSING),
                 remaining=len(kept),
