@@ -1,0 +1,62 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Catalogue: docs/edge-ideas/ (edge build E2).
+id = "net_share_issuance"
+name = "Net share issuance"
+family = "A"
+thesis = "Companies that shrink their share count outperform the market over the following months, and companies that issue shares underperform."
+mechanism = """Managers time the market: they issue when they believe shares are overvalued and repurchase when undervalued, and investors do not discount the signal fully. Issuers are also often glamour, high-asset-growth names (Pontiff and Woodgate 2008)."""
+persistence = """One of the few anomalies Fama and French (2008) found in every size group. It is partly mechanical dilution and partly informed managers, and it persists because the short leg (serial issuers) is costly to short and the long leg (steady repurchasers) is a boring trade; it moves slowly, so it is cheap to trade."""
+schedule = "month_end"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["net_share_issuance"]
+baselines = ["size_small", "momentum_12_1"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). The score is the log change of the split-adjusted share count over a year (net_issuance_pct_12m, Pontiff and Woodgate's definition) from the cover-page or weighted-average count of fundamentals@v4 (a cover count against a cover count, never mixed); the screener ranks lowest first, so the main outcome holds the top 50 net repurchasers. The issuers are the variant issuers_short (the bottom 50 held short, an avoid list: ADR 0053 amendment, outcome sides, with the site's borrow cost); the spread is diagnostic only. The 3-year composite issuance of Daniel and Titman is not built (it needs a five-year return history joined to market value)."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions); the short variant is minus that excess return, less cost and borrow."""
+
+trigger_timing = """Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S."""
+
+replication = """Pontiff and Woodgate: net issuance is the log change of the split-adjusted shares outstanding over the prior 12 months; decile sorts, one-month hold, monthly rebalance. Here the top 50 (the most negative) of the liquid common stocks, held 20 and 60 sessions: a long-only slice of their decile, since a net buyback is the actionable side for an individual."""
+
+expected_size = """Issuance predicts returns more significantly than size, book to market or momentum after 1970 (Pontiff and Woodgate 2008; the abstract states no decile spread and none is cited here). The effect is concentrated in issuers (the short leg) and in small caps, so on liquid names expect less. A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it."""
+
+capacity_costs = """Large and liquid names only; the count changes slowly, turnover is low. The short variant needs borrow (an assumed cost from verdict.toml) and heavy issuers can be hard to borrow: it is an avoid list, not a trade. 10 bps round trip is the assumption."""
+
+failure_modes = """Buyback names are not a uniform tilt: they cluster in mature cash-rich companies and lag growth rallies (the S&P 500 Buyback Index lagged the index in the decade to 2024); a cover-page count artefact or an acquisition paid in shares is read as an issue. Retire if the frozen-period decile spread is not above zero or the top 50 does not beat the buy-and-hold mean of the eligible names."""
+
+decoys = """Asset growth and the value tilt (issuers are high asset growers; the asset_growth edge and the 12-1 momentum and size baselines on the same sessions), and an acquisition-driven count change (test excluding the largest rises)."""
+
+[[sources]]
+title = "Pontiff, J. and Woodgate, A., Share Issuance and Cross-Sectional Returns, Journal of Finance, 2008"
+url = "https://doi.org/10.1111/j.1540-6261.2008.01335.x"
+
+[[sources]]
+title = "Fama, E. and French, K., Dissecting Anomalies, Journal of Finance, 2008"
+
+[[sources]]
+title = "Daniel, K. and Titman, S., Market Reactions to Tangible and Intangible Information, Journal of Finance, 2006"
+
+[[sources]]
+title = "Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022"
+url = "https://papers.ssrn.com/abstract=3604626"
+
+[[variants]]
+id = "issuers_short"
+[variants.outcome]
+side = "short"
+
+[[variants]]
+id = "spread"
+[variants.outcome]
+side = "long_short"

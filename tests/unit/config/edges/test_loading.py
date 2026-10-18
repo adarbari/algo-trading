@@ -9,6 +9,7 @@ import pytest
 
 from algotrade.config.edges.document import CLOSED
 from algotrade.config.edges.loading import edge_problems, load_all_edges, load_edges
+from algotrade.config.edges.verdict import DECOYS_STANDARD
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.configs import field_catalog
@@ -369,3 +370,33 @@ def test_momentum_12_1_declares_a_decoy_so_its_baseline_criteria_apply() -> None
     12-1 momentum edge is itself the others' decoy, so it carries the size tilt of its winners."""
     found = {e.id: e for e in load_all_edges(FileConfigStore(REPO_ROOT / "config", local=False))}
     assert found["momentum_12_1"].baselines == ("size_small",)
+
+
+def test_the_standard_token_expands_to_the_sites_decoys_when_the_edge_loads() -> None:
+    verdict = {("site", "settings", "verdict"): {"decoys": {"standard": ["mine_a", "mine_b"]}}}
+    presets = {
+        **PRESETS,
+        ("site", "screeners", "mine_a@1"): {"id": "mine_a", "impl": "rules"},
+        ("site", "screeners", "mine_b@1"): {"id": "mine_b", "impl": "rules"},
+        **verdict,
+    }
+    doc = document(screeners=["mine_b"], baselines=["vrp_scanner", "@standard"])
+    docs = {("site", "edges", "drift"): doc}
+    (edge,) = load_edges(MemoryConfigStore({**presets, **docs}))
+    # the edge's own screener is not its decoy; a listed baseline keeps its place
+    assert (edge.screeners, edge.baselines) == (("mine_b",), ("vrp_scanner", "mine_a"))
+
+
+def test_a_standard_decoy_without_a_preset_fails_the_load_like_any_baseline() -> None:
+    presets = {**PRESETS, ("site", "settings", "verdict"): {"decoys": {"standard": ["nope"]}}}
+    docs = {("site", "edges", "drift"): document(baselines=["@standard"])}
+    with pytest.raises(ConfigurationError, match="baselines: no screener preset named"):
+        load_edges(MemoryConfigStore({**presets, **docs}))
+
+
+def test_without_a_verdict_file_the_default_decoys_expand() -> None:
+    names = {n: {"id": n, "impl": "rules"} for n in DECOYS_STANDARD}
+    presets = {**PRESETS, **{("site", "screeners", f"{n}@1"): d for n, d in names.items()}}
+    docs = {("site", "edges", "drift"): document(baselines=["@standard"])}
+    (edge,) = load_edges(MemoryConfigStore({**presets, **docs}))
+    assert edge.baselines == DECOYS_STANDARD

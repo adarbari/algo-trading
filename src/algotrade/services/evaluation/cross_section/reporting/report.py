@@ -31,6 +31,10 @@ def _cell(row: Mapping[str, Any], key: str, fmt: str) -> str:
     return "-" if value is None else fmt.format(value)
 
 
+def _gap(value: float | None) -> str:
+    return "-" if value is None else f"{value:+.4f}"
+
+
 def render_edge_report(result: Mapping[str, Any]) -> str:
     """The report of one ``edge-eval`` job result."""
     lines = [f"# Edge {result['edge']} (run {result['run_id']}, {result['trials']} trials)", ""]
@@ -66,12 +70,26 @@ def render_edge_report(result: Mapping[str, Any]) -> str:
             f"at {iv['stored']} of {iv['sessions']} measured sessions; {iv['picks']} picks "
             "excluded for no implied vol (not misses)"
         )
+    for sib in result.get("sibling_coverage", []):
+        lines.append(
+            f"NO SIBLING DATA: {sib['variant']} h={sib['horizon']} has no pair field stored at "
+            f"{sib['no_sibling_data']} of {sib['sessions']} measured sessions (picks excluded "
+            "as no_sibling, not misses)"
+        )
     for c in result.get("report_containment", []):
         share = c["contained"] / c["windows"] if c["windows"] else None
         lines.append(
             f"CONTAINED: {c['variant']} h={c['horizon']} contained the report: "
             f"{'-' if share is None else f'{share:.0%}'} of {c['windows']} windows "
             f"({c['no_report']} with no later report stored; a diagnostic, never a filter)"
+        )
+    for d in result.get("decoys", []):
+        shown = "-" if d["overlap"] is None else f"{d['overlap']:.2f}"
+        flag = "" if d.get("measured", True) else " NOT MEASURED (no sessions or spread to compare)"
+        lines.append(
+            f"DECOY: {d['edge_variant']}/{d['screener']} vs {d['decoy']} h={d['horizon']}: pick "
+            f"overlap {shown} (Jaccard at D, {d['sessions']} sessions); spread less the decoy's "
+            f"{_gap(d['spread_gap'])} all, {_gap(d['spread_gap_oos'])} out of sample{flag}"
         )
     rows: Sequence[Mapping[str, Any]] = result["rows"]
     header = "| " + " | ".join(label for _, label, _ in COLUMNS) + " |"

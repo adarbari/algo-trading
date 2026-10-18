@@ -740,147 +740,155 @@ Sources: Jegadeesh (1990), Evidence of predictable behavior of security returns;
 
 Sources: Bernard and Thomas (1989), Post-earnings-announcement drift: the E-1 to E+1 window
 
-### `rollup.episode_behaviour@v1.beta_252d`
+### `rollup.earnings_date_shift@v1.earnings_shift_direction`
 
-**How to read it.** The slope of the name's daily returns on SPY's over the trailing 252 sessions: 1 moves with the market, 1.5 moves half again as much (a 5% market fall is a 7.5% fall here), 0.5 half as much, below 0 against it. Under 0.8 is defensive (utilities, staples, health care), 0.8 to 1.2 average, above 1.2 high beta (technology, discretionary, financials, small caps). A position's market risk is its weight times its beta.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| defensive (low beta) | `lte 0.8` | soft | 0.1 | with rollup.episode_behaviour@v1.corr_252d gte 0.3 so the low beta is a steady name, not noise |
-| high beta (a market play with leverage) | `gte 1.3` | soft | 0.1 | - |
-| market-like | `between [0.8, 1.2]` | soft | 0.1 | - |
-
-**When the reading lies**
-
-- Beta is average co-movement, not downside behaviour: a low-beta name can fall as much as the market in a panic when correlations go to one. The episode drawdowns (dd_covid_2020 and the others) are the direct measure of that.
-- Trailing a year: a name that changed character (a merger, a new business) carries the old beta for months.
-- Null for young listings (under 200 overlapping returns) and when SPY's bars are missing.
-
-Sources: Sharpe (1964) and the CAPM; beta bands as practitioners use them: https://www.tastylive.com/concepts-strategies/beta
-
-### `rollup.episode_behaviour@v1.corr_252d`
-
-**How to read it.** The correlation of the name's daily returns with SPY's over the trailing 252 sessions, -1 to 1: above 0.7 the name is mostly a market bet, 0.3 to 0.7 ordinary, under 0.3 it has a life of its own (gold miners, biotech, special situations), negative is rare and usually an inverse fund. Beta says how much, correlation says how reliably.
+**How to read it.** Whether the next report date moved a week or more from last year's. The value earlier means the date is at least seven days before the year-ago report plus 364 days. The value later means at least seven days after. Null: no next date, no year-ago report, or a move under a week. Johnson and So found that early scheduling goes with good news. Late scheduling goes with bad.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| moves with the market | `gte 0.7` | soft | 0.1 | - |
-| its own story (low correlation) | `lte 0.3` | soft | 0.1 | exclude inverse funds with instrument.is_inverse eq false |
+| a report scheduled earlier than last year | `eq "earlier"` | hard | - | names with no shift or no year-ago report drop out |
 
 **When the reading lies**
 
-- A low beta with a low correlation is noise, not defence: the regression explains little. Defensive names have a low beta with a decent correlation.
-- Correlations rise toward 1 in a crash, whatever the trailing year said; diversification by low correlation is weakest when it is needed.
-- Null for young listings and when SPY's bars are missing.
+- The calendar here is scheduled, never confirmed by the company. A date can move again, so read rollup.earnings_date_shift@v1.sessions_since_earnings_shift for how fresh the shift is.
+- The history starts at the first stored calendar snapshot. A date first stored at or before it says nothing about when it became known, so it is never a shift.
 
-Sources: Standard portfolio theory (Markowitz); the correlation-in-crashes observation (Longin and Solnik 2001)
+Sources: Johnson and So (2018), Time Will Tell: Information in the Timing of Scheduled Earnings News, Journal of Financial and Quantitative Analysis
 
-### `rollup.episode_behaviour@v1.dd_covid_2020`
+### `rollup.earnings_date_shift@v1.earnings_date_shift_days`
 
-**How to read it.** The worst fall of the name's close from its own running high during the Covid crash (2020-02-19 to 2020-03-23), as a negative fraction: -0.35 means it lost 35% peak to trough. SPY lost about a third; a reading better than -0.25 held up well, worse than -0.50 was hit hard (travel, energy, small caps). The name's realised behaviour in a fast, liquidity-driven crash.
+**How to read it.** Calendar days the next report date lies after the year-ago report plus 364 days. -10 is ten days earlier than a year ago. +10 is ten days later. Under a week either way is calendar noise, so rollup.earnings_date_shift@v1.earnings_shift_direction is null there.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| held up in a fast crash | `gte -0.3` | soft | 0.05 | - |
-| was hit hard (a high-beta or cyclical name) | `lte -0.45` | soft | 0.05 | - |
+| the largest advance first | `lte -7` | hard | - | rank ascending to put the biggest advance first |
 
 **When the reading lies**
 
-- Five years old: the company and its shareholders may have changed; it is evidence of the kind of name it was, not a forecast.
-- Null for names listed after the episode or with under 80% of its sessions on file, which a hard criterion rejects: most IPOs since 2020 and every young fund.
+- Null when there is no next date or no report a year ago within 45 days of the same weekday. A new listing or a company that changed its fiscal calendar has none.
+- A fiscal-year change or a merger moves every date for a reason that is not news. Read rollup.earnings_expected@v1.expected_basis to see how the date is known.
 
-Sources: docs/market-regime-plan.md (the episode scorecard, ADR 0047)
+Sources: Johnson and So (2018), Time Will Tell: Information in the Timing of Scheduled Earnings News
 
-### `rollup.episode_behaviour@v1.dd_hikes_2022`
+### `feature.eight_k_item_flag`
 
-**How to read it.** The worst fall of the name's close from its own running high during the 2022 rate-hike bear market (2022-01-03 to 2022-10-12), as a negative fraction. SPY lost about a quarter; long-duration growth and unprofitable technology lost 50% to 80%, energy and value held or rose. A slow, valuation-driven decline, the opposite kind of episode to Covid.
+**How to read it.** True when an 8-K with Item 4.02, 4.01 or 5.02 became known in the last 20 sessions. Item 4.02 is non-reliance on prior financials. Item 4.01 is a change of auditor. Item 5.02 is an officer or director leaving or joining. Each counts from the first session whose close follows its SEC acceptance. False when the name has other tracked filings only. Null when the filings group has no row for it.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| held up in a slow bear market | `gte -0.25` | soft | 0.05 | - |
-| was hit hard by rates (long duration) | `lte -0.5` | soft | 0.05 | - |
+| an adverse 8-K item this month (an avoid list) | `eq true` | hard | - | pair with rollup.price_stats@v2.adv_usd_20d to keep the names you could trade |
 
 **When the reading lies**
 
-- A name that did well in 2022 and badly in 2020 (or the reverse) is telling you which kind of drawdown it is exposed to; read the three episodes together.
-- Null for names listed after 2022 or thinly traded through it.
+- Item 5.02 also reports routine retirements and new hires, and 4.01 a planned auditor rotation. The flag cannot tell a forced exit from a routine one without reading the text.
+- Null is common: a name with no tracked 8-K item, late-filing notice or tender offer in 60 sessions has no row, and that is unknown, not clean. A hard 'eq true' keeps only the flagged.
 
-Sources: docs/market-regime-plan.md (the episode scorecard)
+Sources: Lerman and Livnat (2010), The New Form 8-K Disclosures, Review of Accounting Studies
 
-### `rollup.episode_behaviour@v1.dd_tariffs_2025`
+### `rollup.filing_events@v1.sessions_since_late_filing`
 
-**How to read it.** The worst fall of the name's close from its own running high during the 2025 tariff shock (2025-02-19 to 2025-04-08), as a negative fraction. SPY lost about a fifth in seven weeks; importers, semiconductors and small caps lost more, domestic defensives less. The most recent episode, so the most representative of today's holders.
+**How to read it.** Exchange sessions since the latest NT 10-K or NT 10-Q (a Form 12b-25 late-filing notice) became known: 0 is today. It counts from the first session whose close follows the SEC acceptance. Null when none became known in the last 60 sessions. A company files one when it cannot file its annual or quarterly report on time.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| held up in the tariff shock | `gte -0.2` | soft | 0.05 | - |
-| was hit hard by the tariff shock | `lte -0.35` | soft | 0.05 | - |
+| a late-filing notice in the last month | `lte 20` | hard | - | null (none known) names drop out |
 
 **When the reading lies**
 
-- Short and sharp, and recovered fast: a deep drawdown here with a quick recovery (rollup.episode_behaviour@v1.recovery_sessions_tariffs_2025) is a liquid high-beta name, not a broken one.
-- Null for names listed after early 2025 or thinly traded through it.
+- The reason is in the text of the notice, which is not stored. A routine delay and an accounting problem look the same here.
+- Small and distressed companies file most of them. Gate on rollup.price_stats@v2.adv_usd_20d, or the screen holds names you cannot trade.
 
-Sources: docs/market-regime-plan.md (the episode scorecard)
+Sources: Dee, Hillison and Pacini (2010), Research in Accounting Regulation, on the reaction to late-filing notices by stated reason
 
-### `rollup.episode_behaviour@v1.recovery_sessions_covid_2020`
+### `rollup.filing_events@v1.sessions_since_tender_offer`
 
-**How to read it.** Sessions from the Covid trough (2020-03-23) until the close first regained the pre-episode high: 0 means the trough itself was at or above it, about 100 is the index's own recovery (SPY regained its high in August 2020), 250 is a year. Resilience in one number: how long holders waited to be whole.
+**How to read it.** Exchange sessions since the latest SC TO-I (the issuer's own tender offer) or SC TO-T (a third party's) became known: 0 is today. Null when none became known in the last 60 sessions. A tender offer stays open at least 20 business days, so a name 20 or more sessions on is at or past the expiry.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| recovered as fast as the index or faster | `lte 120` | soft | 30 | - |
-| recovered at all within the horizon | `not_null` | soft | 0 | - |
+| a tender offer past its minimum open period | `gte 20` | hard | - | null (none known) names drop out; the group looks back 60 sessions |
 
 **When the reading lies**
 
-- Null means not recovered within 400 sessions of the trough, or the session is before the trough: 'never came back' and 'too early to say' look the same, and a hard criterion rejects both.
-- A fast recovery of a shallow drawdown is unremarkable; read with rollup.episode_behaviour@v1.dd_covid_2020.
+- The two forms are one column. A third-party offer for the company is a takeover, a different event from a self-tender: read the name's price against the offer before treating it as a buyback.
+- An extension keeps the offer open past 20 sessions, so a count above 20 does not prove it has expired. The expiry date is not stored.
 
-Sources: docs/market-regime-plan.md; S&P 500 recovery times after bear markets (StockCharts, Bear markets and drawdowns)
+Sources: Lakonishok and Vermaelen (1990), Anomalous price behavior around repurchase tender offers, Journal of Finance
 
-### `rollup.episode_behaviour@v1.recovery_sessions_hikes_2022`
+### `rollup.index_changes@v1.last_index_change`
 
-**How to read it.** Sessions from the 2022 trough (2022-10-12) until the close first regained the pre-episode high (the early-2022 peak). SPY took about 300 sessions (January 2024); many growth names took longer or have not, which is what a null here means.
+**How to read it.** The latest S&P 500 membership change of the name in the last 60 sessions: sp500_added (joined) or sp500_removed (left). Null when there was none. The date is the session the change was first stored, which is after the announcement, so this is a late read of the news.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| recovered faster than the index | `lte 250` | soft | 50 | - |
-| recovered within the horizon | `not_null` | soft | 0 | - |
+| a name that left the S&P 500 | `eq "sp500_removed"` | hard | - | pair with rollup.index_changes@v1.sessions_since_index_change for how recent |
 
 **When the reading lies**
 
-- Null is 'not within 400 sessions' as much as 'not yet': for this episode the horizon has passed, so null reads as 'did not recover within about 19 months'.
+- A name leaves the index when it is bought, merged or shrinks. A removal after a takeover is not a demotion: rollup.price_stats@v2.close null or a delisted status exposes it.
+- The announcement is days before the date stored here. The announcement effect, which has faded, is already in the price.
 
-Sources: docs/market-regime-plan.md
+Sources: Greenwood and Sammon (2022), The Disappearing Index Effect
 
-### `rollup.episode_behaviour@v1.recovery_sessions_tariffs_2025`
+### `rollup.index_changes@v1.sessions_since_index_change`
 
-**How to read it.** Sessions from the tariff-shock trough (2025-04-08) until the close first regained the pre-episode high. SPY needed about 30 sessions; a liquid high-beta name often recovered in a similar time, a name that had something else wrong took much longer.
+**How to read it.** Exchange sessions from the session the latest S&P 500 membership change was first stored up to the session: 0 is the day it was stored. Null when the name had no change in the last 60 sessions.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| recovered with the index | `lte 45` | soft | 15 | - |
-| recovered within the horizon so far | `not_null` | soft | 0 | - |
+| a change in the last month | `lte 20` | hard | - | null (no change) names drop out |
 
 **When the reading lies**
 
-- The horizon (400 sessions after the trough) runs into late 2026: a null can still be 'not yet'.
+- The stored date lags the announcement and the effective date. A change stored 5 sessions ago was public before that.
+- Names that changed twice show only the latest change. Read rollup.index_changes@v1.last_index_change to see which way.
 
-Sources: docs/market-regime-plan.md
+Sources: Greenwood and Sammon (2022), The Disappearing Index Effect
+
+### `rollup.earnings_expected@v1.sessions_to_expected_report`
+
+**How to read it.** Exchange sessions after the session up to the report date the session can expect: 0 reports today, 6 is a week away. The date is announced or the year-ago report plus 364 days, as rollup.earnings_expected@v1.expected_basis says.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a report in the next week or so | `lte 10` | hard | - | null (no date) names drop out |
+
+**When the reading lies**
+
+- A year-ago date can miss by days or weeks. For a window that must hold the report, read rollup.earnings_expected@v1.expected_basis eq SCHEDULED.
+- Null when no date is known. Options names report on a different calendar than the underlying in rare cases, so check rollup.earnings@v1.days_to_earnings if you hold options.
+
+Sources: Aboody, Lehavy and Trueman (2010), Limited attention and the earnings announcement returns of past stock market winners, Review of Accounting Studies
+
+### `rollup.earnings_gap_volume@v1.reaction_volume_ratio`
+
+**How to read it.** How much the last report traded. It is the mean dollars a day over the three sessions around it (before, of and after) divided by the mean of the 20 sessions before that. 3 means the report drew three times the normal volume. 1 is an ordinary few days. It is the last report only, unlike rollup.earnings_reaction@v1.earnings_volume_ratio.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a report that drew heavy volume | `gte 3` | hard | - | the episodic-pivot variant of the earnings drift screen asks 3 |
+
+**When the reading lies**
+
+- A heavy ratio can be an offering, a deal or an index change in the same window, not the report. Read rollup.earnings_reaction@v1.reaction_excess_return for what the price did.
+- Null when a bar of the window or of the 20 sessions before it is missing, or the history is short. A hard 'gte' drops those names.
+
+Sources: Bernard and Thomas (1989), Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium?, Journal of Accounting Research

@@ -132,4 +132,4 @@ def test_the_catalogue_carries_the_field_guide(graph: Graph) -> None:
     assert (first["op"], first["value"], first["mode"], first["tolerance"]) == ("lt", 30, "soft", 5)
     liquid = catalogue["rollup.price_stats@v2.adv_usd_20d"]["guide"]["uses"][0]
     assert liquid["tolerance"] == {"relative": 0.2} and liquid["onMiss"] == "LIQUIDITY_RISK"
-    assert catalogue["instrument.symbol"]["guide"] is None
+    assert catalogue["instrument.name"]["guide"] is None

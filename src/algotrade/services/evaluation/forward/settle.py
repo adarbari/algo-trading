@@ -21,10 +21,19 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.config.edges.document import Edge, identity_dict
+from algotrade.config.edges.chain import CHAIN_KIND
+from algotrade.config.edges.document import Edge
+from algotrade.config.edges.identity import identity_dict
+from algotrade.config.edges.portfolio import PORTFOLIO_KIND
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
-from algotrade.data.outcomes import read_outcomes
+from algotrade.data.outcomes import (
+    NO_RESIDUAL_ROW,
+    attach_residuals,
+    read_chain,
+    read_outcomes,
+    read_residuals,
+)
 from algotrade.services.evaluation.cross_section.harness import iv_field_of
 from algotrade.services.evaluation.cross_section.hit import (
     INVALID_IMPLIED_VOL,
@@ -34,6 +43,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     apply_outcome,
     is_return,
     needs_implied_vol,
+    needs_residual,
 )
 from algotrade.services.evaluation.cross_section.measuring import BENCHMARK
 from algotrade.services.evaluation.cross_section.reads.session import implied_at
@@ -92,8 +102,13 @@ def settle_group(
     names = [i for i in names if i not in {s.instrument_id for s in out}]
     if not names:
         return out
+    if edge.outcome.kind == PORTFOLIO_KIND:  # a book is valued whole, never name by name
+        return out + [_skipped(i, "a portfolio book is not settled name by name") for i in names]
     try:
-        stored = read_outcomes(reader, horizon, [buy], BENCHMARK, as_of=now)
+        if edge.outcome.kind == CHAIN_KIND:  # an option P&L reads the chain grain (EB H13)
+            stored = read_chain(reader, horizon, [buy], as_of=now)
+        else:
+            stored = read_outcomes(reader, horizon, [buy], BENCHMARK, as_of=now)
     except MissingDataError:
         stored = pd.DataFrame()
     if stored.empty:
@@ -102,6 +117,15 @@ def settle_group(
             [_skipped(i, "no outcome stored for its window") for i in names] if late else []
         )
     mine = stored[stored["instrument_id"].isin(names)]
+    if needs_residual(edge):  # a factor-neutral edge settles on the residual rows (EB H11)
+        mine = attach_residuals(mine, read_residuals(reader, [buy], now), horizon)
+        waiting = set(mine.loc[mine["residual_reason"] == NO_RESIDUAL_ROW, "instrument_id"])
+        late = session >= advance(first["sell_session"], GRACE_SESSIONS)
+        out += [_skipped(i, "no residual return stored for its window") for i in waiting if late]
+        names = [i for i in names if i not in waiting]  # not yet stored: stays open until late
+        mine = mine[~mine["instrument_id"].isin(waiting)]
+        if not names:
+            return out
     try:
         implied = (
             implied_at(reader, iv_field_of(edge), names, first["signal_session"])

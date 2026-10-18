@@ -18,8 +18,10 @@ A user's own document still holding the old ``[follow]`` state is read as its st
 Each layered document is typed by ``document.parse_edge``, then checked against the store: every
 screener and baseline must name a screener preset that exists (a site preset, or the user's own
 screen), a universe given by name a selection preset that exists, and, given the caller's field
-catalogue, an inline universe only catalogue fields. ``Edge.site_frozen_from`` is the
-``frozen_from`` of the root of the copy chain, so a copy whose split differs is exploratory.
+catalogue, an inline universe only catalogue fields. A baseline ``"@standard"`` is expanded to
+``verdict.toml [decoys] standard`` first (so a decoy that does not exist fails here, as any
+baseline). ``Edge.site_frozen_from`` is the ``frozen_from`` of the root of the copy chain, so a
+copy whose split differs is exploratory.
 
 The ``site`` user reads the site documents only. ``Edge.owner`` is where the document lives:
 ``site`` for a site document (a user's follow-only file over it included), the user for a copy or
@@ -30,9 +32,11 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any, Protocol
 
-from algotrade.config.edges.document import Edge, parse_edge
+from algotrade.config.edges.document import Edge, expand_baselines, parse_edge
 from algotrade.config.edges.follow import AUDIT, is_legacy, legacy_own, parse_audit, parse_follow
 from algotrade.config.edges.follow import KEY as FOLLOW
+from algotrade.config.edges.verdict import VerdictSettings
+from algotrade.config.site.settings import site_document
 from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.resolve import deep_merge
 from algotrade.config.user import SITE_USER
@@ -107,10 +111,15 @@ def _load(
     layered, problems = _layered(configs, user)
     screeners = _screeners(configs, scopes)
     selections = {n for scope in scopes for n in configs.names(scope, SELECTIONS)}
+    verdict = VerdictSettings.from_document(site_document(configs.load, "verdict"))
+    standard = verdict.decoys_standard
     parsed: dict[str, Edge] = {}
     for name, (doc, where, _root) in sorted(layered.items()):
         try:
             edge = parse_edge(doc, name, where)
+            edge = replace(
+                edge, baselines=expand_baselines(edge.baselines, standard, edge.screeners)
+            )
             _check_presets(edge, where, screeners, selections)
             if catalog is not None and not isinstance(edge.universe, str):
                 catalog.check(edge.universe.where, f"{where} universe")

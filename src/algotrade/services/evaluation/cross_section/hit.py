@@ -3,6 +3,12 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
 
 - ``excess_return``: ``value = fwd_excess_return - cost_bps / 1e4`` (a round trip, charged
   once); a hit is ``value > 0``.
+- ``excess_return`` with ``measure = "residual_return"`` (EB H11): ``fwd_residual_return`` (the
+  return left after the ETF factor loadings known before S, factor-neutral) replaces
+  ``fwd_excess_return`` everywhere, the short side's included. It comes from
+  ``outcomes/instrument/residual_returns@v1`` (``attach_residuals``); a name the factors or betas
+  cannot cover, or with no stored residual row, is UNMEASURED with its reason: excluded as
+  ``UNMEASURED``, never a miss and never the excess return in its place.
 - ``hit_target``: ``value`` is the ``measure`` (the net excess return, or ``fwd_realised_vol``
   over the implied vol at S, ``IMPLIED_VOL_FIELD``); a hit is ``value < target`` for
   ``below`` and ``value > target`` for ``above`` (equal is a miss).
@@ -25,11 +31,31 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   (``quant/black_scholes``), ``delta_hedged_atm_short`` its negative. ``cost_bps`` is charged
   once, in bps of ``P`` (the excess return's convention); no hedging cost, spread or fill is
   modelled and the cost grid does not apply (it scales a stored return). A hit is ``value > 0``.
+- ``option_pnl`` (basis ``chain``, quoted prices; ADR 0053 amendment, EB H13): the P&L of the
+  structure the stored chains priced (``outcomes/option/structure_pnl@v1``, rows of the edge's
+  structure and tenor only), as a fraction of the entry underlying price, net of the quoted
+  spread: ``sign * (pnl_per_underlying)`` less the half-spread paid at entry
+  (``entry_ask - entry_mid``) and at exit (``exit_mid - exit_bid``) over ``entry_spot``, ``sign``
+  -1 for a short structure, ``pnl_per_underlying`` the daily-hedged one
+  (``hedged_pnl_per_underlying``, our own delta) for ``delta_hedged_atm[_short]``; ``cost_bps``
+  once on top. No hedge cost and no financing. A hedged structure's row with a ``hedge_reason``
+  (a hedge session lacked a chain or a delta) is UNMEASURED. A hit is ``value > 0``.
 - ``side`` ``short`` or ``long_short`` (an ``excess_return`` outcome only): ``short_value`` is the
   value of being short the name, ``-fwd_excess_return - cost_bps / 1e4 - borrow``, with the
   borrow ``borrow_bps_annual / 1e4 * horizon / 252`` (an assumption: no borrow data is stored);
   ``short_hit`` is ``short_value > 0`` (the name underperformed by more than the costs). The
   long columns are unchanged: the deciles and the base are over them whatever the side.
+- ``pair_spread`` (ADR 0053 amendment, EB H9): a row is one share class, read as the cheap leg of
+  its pair; ``value = fwd_return(name) - fwd_return(sibling) - 2 * cost_bps / 1e4 - borrow``
+  (two round trips; the borrow on the rich leg, the sibling, as for a short: ``borrow_cost``),
+  the sibling's id read at D from the ``pair_field`` (never the sibling of today's reference),
+  its return from the same outcome partition at S. A name with no sibling, a sibling outside
+  the universe, a sibling that does not name it back, a sibling with no row at S or one that is
+  UNMEASURED is excluded with that reason, never a zero. A hit is ``value > 0``. The base is
+  the same value of every eligible name (each class against its sibling), so it is the spread
+  of a random side of the pair.
+- ``portfolio_return`` (ADR 0074) is not valued here: a book is one value per session, from its
+  weights and a blended benchmark (``cross_section/portfolio``); ``apply_outcome`` refuses it.
 - ``max_drawdown`` set: a hit also needs ``fwd_max_drawdown <= max_drawdown``.
 
 A row whose value cannot be computed is *excluded with a reason*, never a miss and never a
@@ -42,11 +68,18 @@ as an ``above`` one's.
 """
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
-from algotrade.config.edges.document import Edge
+from algotrade.config.edges.chain import (
+    CHAIN_KIND,
+    HEDGED_STRUCTURES,
+    SHORT_STRUCTURES,
+    grain_structure,
+)
+from algotrade.config.edges.document import EXCESS_MEASURES, Edge
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.quant.black_scholes import (
     atm_straddle_price,
@@ -71,6 +104,24 @@ MODEL_PNL_FIELDS: Mapping[str, tuple[str, ...]] = {
     "delta_hedged_atm": ("fwd_realised_vol",),
     "delta_hedged_atm_short": ("fwd_realised_vol",),
 }  # the stored fields each option_model_pnl structure reads, beside the implied vol
+PAIR_FIELDS = ("fwd_return",)  # the stored field a pair_spread reads, for each leg
+NO_SIBLING = "no_sibling"  # the pair field names no sibling for the name at D
+SIBLING_NOT_ELIGIBLE = "sibling_not_eligible"  # the sibling is not in the universe at D
+SIBLING_MISMATCH = "sibling_mismatch"  # the sibling's own sibling at D is not the name
+NO_SIBLING_ROW = "no_sibling_row"  # the sibling has no outcome row at S (not listed, no bar)
+SIBLING_UNMEASURED = "sibling_unmeasured"  # the sibling's window is UNMEASURED
+CHAIN_PNL_FIELDS = (
+    "structure",
+    "tenor_days",
+    "entry_spot",
+    "entry_mid",
+    "entry_ask",
+    "exit_mid",
+    "exit_bid",
+    "pnl_per_underlying",
+    "hedged_pnl_per_underlying",
+    "hedge_reason",
+)  # the stored chain-grain fields an option_pnl outcome reads
 MISSING_VALUE = "missing_value"  # a row, but the measure is null (no benchmark bar, no vol)
 NO_IMPLIED_VOL = "no_implied_vol"  # the implied vol at S is missing or not positive
 INVALID_IMPLIED_VOL = "invalid_implied_vol"  # ... or non-finite or above MAX_IMPLIED_VOL: garbage
@@ -87,6 +138,32 @@ RESULT_COLUMNS = (
 def is_return(edge: Edge) -> bool:
     """Whether the outcome's value is the net excess return (``apply_outcome``'s own test)."""
     return edge.outcome.is_return
+
+
+@dataclass(frozen=True)
+class Pairs:
+    """What a ``pair_spread`` reads besides the outcome rows: each eligible name's sibling id read
+    at D (``pair_field``; None: none stored) and the names eligible at D, and ``stored``, every
+    outcome row of the horizon at S (the sibling's return is read from the same partition,
+    whatever the base names are)."""
+
+    siblings: Mapping[str, str | None]
+    eligible: frozenset[str]
+    stored: pd.DataFrame
+
+
+def needs_pairs(edge: Edge) -> bool:
+    return edge.outcome.kind == "pair_spread"
+
+
+def needs_residual(edge: Edge) -> bool:
+    """Whether the outcome reads the residual-returns grain (a factor-neutral return)."""
+    return edge.outcome.measure in EXCESS_MEASURES
+
+
+def _gross_field(edge: Edge) -> str:
+    """The stored return field a return outcome measures (and its short side is minus)."""
+    return "fwd_residual_return" if needs_residual(edge) else "fwd_excess_return"
 
 
 def needs_implied_vol(edge: Edge) -> bool:
@@ -153,6 +230,24 @@ def _expires_otm(
     return cushion, hit, np.asarray(reference), np.asarray(touch), usable
 
 
+def _otm_outcome(
+    edge: Edge,
+    outcomes: pd.DataFrame,
+    implied: Mapping[str, float | None] | None,
+    excluded: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """``(cushion, hit, reference, touch)`` of an expires_otm outcome; ``excluded`` gets the
+    reason of each row that has no value."""
+    if implied is None:
+        raise ConfigurationError(f"{edge.id}: expires_otm needs the implied vol")
+    value, hit, reference, touched, _ = _expires_otm(edge, outcomes, implied)
+    excluded[~np.isfinite(_numbers(outcomes, "fwd_return"))] = MISSING_VALUE
+    reasons = _implied_reasons(_implied_array(outcomes, implied))
+    excluded[(excluded == "") & (reasons != "")] = reasons[(excluded == "") & (reasons != "")]
+    excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE  # no horizon: no strike
+    return value, hit, reference, touched.astype(np.float64)
+
+
 def _model_pnl(edge: Edge, outcomes: pd.DataFrame, iv: np.ndarray) -> np.ndarray:
     """The ``option_model_pnl`` value per row (NaN where the stored window or the vol is not
     usable; ``iv`` is NaN where it is not), net of ``cost_bps``."""
@@ -185,6 +280,76 @@ def _model_outcome(
     excluded[:] = reasons
     excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE
     return value
+
+
+def _sibling_reason(name: str, sibling: str | None, pairs: Pairs, stored: pd.DataFrame) -> str:
+    """Why ``name`` has no pair (``""``: it has one), checked in the order the data is read."""
+    if sibling is None or sibling == name:
+        return NO_SIBLING
+    if sibling not in pairs.eligible:
+        return SIBLING_NOT_ELIGIBLE
+    if pairs.siblings.get(sibling) != name:
+        return SIBLING_MISMATCH
+    if sibling not in stored.index:
+        return NO_SIBLING_ROW
+    if stored.at[sibling, "outcome_status"] == "UNMEASURED":
+        return SIBLING_UNMEASURED
+    return ""
+
+
+def _pair_outcome(
+    edge: Edge, outcomes: pd.DataFrame, pairs: Pairs | None, excluded: np.ndarray
+) -> np.ndarray:
+    """The ``pair_spread`` value per row (see the module doc); ``excluded`` gets the reason of
+    each row that has none."""
+    if pairs is None:
+        raise ConfigurationError(f"{edge.id}: pair_spread needs the siblings")
+    o = edge.outcome
+    stored = pairs.stored.drop_duplicates("instrument_id").set_index("instrument_id")
+    own = _numbers(outcomes, "fwd_return")
+    other = np.full(len(outcomes), np.nan)
+    for at, name in enumerate(outcomes["instrument_id"]):
+        sibling = pairs.siblings.get(name)
+        reason = _sibling_reason(name, sibling, pairs, stored)
+        if reason:
+            excluded[at] = reason
+        else:
+            assert sibling is not None
+            other[at] = pd.to_numeric(stored.at[sibling, "fwd_return"], errors="coerce")
+    horizon = _numbers(outcomes, "horizon_sessions")
+    value = own - other - 2 * (o.cost_bps or 0.0) / 1e4 - borrow_cost(o.borrow_bps_annual, horizon)
+    excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE
+    return np.asarray(value, dtype=np.float64)
+
+
+def chain_rows(edge: Edge, outcomes: pd.DataFrame) -> pd.DataFrame:
+    """The rows of ``outcomes`` (the chain grain's, every structure and tenor) the edge's
+    ``option_pnl`` outcome names: one per instrument; any other outcome's rows unchanged."""
+    o = edge.outcome
+    if o.kind != CHAIN_KIND:
+        return outcomes
+    held = grain_structure(o.structure or "", o.strike_delta)
+    keep = (outcomes["structure"] == held) & (outcomes["tenor_days"] == o.tenor_days)
+    return outcomes[keep]
+
+
+def _chain_pnl(edge: Edge, outcomes: pd.DataFrame) -> np.ndarray:
+    """The ``option_pnl`` value per row of ``chain_rows`` (NaN where a price is missing), net of
+    the quoted half-spreads and ``cost_bps``."""
+    o = edge.outcome
+    hedged = o.structure in HEDGED_STRUCTURES
+    gross = _numbers(outcomes, "hedged_pnl_per_underlying" if hedged else "pnl_per_underlying")
+    spot = _numbers(outcomes, "entry_spot")
+    spread = (
+        _numbers(outcomes, "entry_ask")
+        - _numbers(outcomes, "entry_mid")
+        + _numbers(outcomes, "exit_mid")
+        - _numbers(outcomes, "exit_bid")
+    )
+    sign = -1.0 if o.structure in SHORT_STRUCTURES else 1.0
+    with np.errstate(divide="ignore", invalid="ignore"):
+        value = sign * gross - spread / spot - (o.cost_bps or 0.0) / 1e4
+    return np.where(spot > 0, value, np.nan)
 
 
 def _numbers(frame: pd.DataFrame, column: str) -> np.ndarray:
@@ -224,7 +389,7 @@ def _short_value(edge: Edge, outcomes: pd.DataFrame, counted: np.ndarray) -> np.
     if o.side == "long":
         return np.full(len(outcomes), np.nan)
     horizon = _numbers(outcomes, "horizon_sessions")
-    gross = _numbers(outcomes, "fwd_excess_return")
+    gross = _numbers(outcomes, _gross_field(edge))
     value = -gross - (o.cost_bps or 0.0) / 1e4 - borrow_cost(o.borrow_bps_annual, horizon)
     return np.where(counted, value, np.nan)
 
@@ -238,39 +403,74 @@ def short_view(res: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _unmeasured(edge: Edge, outcomes: pd.DataFrame) -> np.ndarray:
+    """The rows with no measurement: an UNMEASURED forward row, or, for a residual outcome, an
+    UNMEASURED residual row too (the residual grain's own status: no factor-neutral return)."""
+    mask = (outcomes["outcome_status"] == "UNMEASURED").to_numpy()
+    if needs_residual(edge):
+        mask = mask | (outcomes["residual_status"] == "UNMEASURED").to_numpy()
+    return mask
+
+
+def _refuse_book(edge: Edge) -> None:
+    """A ``portfolio_return`` is valued as a book (``cross_section/portfolio``), never by name."""
+    if edge.outcome.kind == "portfolio_return":
+        raise ConfigurationError(
+            f"{edge.id}: a portfolio_return is valued as a book (cross_section/portfolio), "
+            f"never name by name"
+        )
+
+
+def _chain_outcome(edge: Edge, outcomes: pd.DataFrame, excluded: np.ndarray) -> np.ndarray:
+    """``_chain_pnl`` per row; ``excluded`` gets the reason of each row that has no value."""
+    value = _chain_pnl(edge, outcomes)
+    excluded[~np.isfinite(value)] = MISSING_VALUE
+    if edge.outcome.structure in HEDGED_STRUCTURES:  # a hedge session was missing: no hedged P&L
+        excluded[outcomes["hedge_reason"].notna().to_numpy()] = UNMEASURED
+    return value
+
+
 def apply_outcome(
-    edge: Edge, outcomes: pd.DataFrame, implied: Mapping[str, float | None] | None = None
+    edge: Edge,
+    outcomes: pd.DataFrame,
+    implied: Mapping[str, float | None] | None = None,
+    pairs: Pairs | None = None,
 ) -> pd.DataFrame:
     """``outcomes`` (the rows of one horizon at one session) as ``RESULT_COLUMNS``: the value,
     its higher-is-better orientation, whether it hit, why it was excluded (``""`` when counted)
     and whether the name was delisted. ``implied``: the IV at S by instrument id (needed when
-    ``needs_implied_vol``)."""
+    ``needs_implied_vol``); ``pairs``: the siblings (needed when ``needs_pairs``)."""
     o = edge.outcome
+    outcomes = chain_rows(edge, outcomes)
+    _refuse_book(edge)
     n = len(outcomes)
     excluded = np.full(n, "", dtype=object)
     reference = np.full(n, np.nan)
     touch = np.full(n, np.nan)
     otm_hit: np.ndarray | None = None
     if o.kind == "expires_otm":
-        if implied is None:
-            raise ConfigurationError(f"{edge.id}: expires_otm needs the implied vol")
-        value, otm_hit, reference, touched, _ = _expires_otm(edge, outcomes, implied)
-        touch = touched.astype(np.float64)
-        excluded[~np.isfinite(_numbers(outcomes, "fwd_return"))] = MISSING_VALUE
-        reasons = _implied_reasons(_implied_array(outcomes, implied))
-        excluded[(excluded == "") & (reasons != "")] = reasons[(excluded == "") & (reasons != "")]
-        excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE  # no horizon: no strike
+        value, otm_hit, reference, touch = _otm_outcome(edge, outcomes, implied, excluded)
     elif o.kind == "option_model_pnl":
         value = _model_outcome(edge, outcomes, implied, excluded)
+    elif o.kind == CHAIN_KIND:
+        value = _chain_outcome(edge, outcomes, excluded)
+    elif o.kind == "pair_spread":
+        value = _pair_outcome(edge, outcomes, pairs, excluded)
     elif is_return(edge):
-        value = _numbers(outcomes, "fwd_excess_return") - (o.cost_bps or 0.0) / 1e4
+        if needs_residual(edge) and "residual_status" not in outcomes.columns:
+            raise ConfigurationError(
+                f"{edge.id}: a residual_return outcome needs the residual-returns rows "
+                f"(attach_residuals), which this read did not attach"
+            )
+        value = _numbers(outcomes, _gross_field(edge)) - (o.cost_bps or 0.0) / 1e4
         excluded[~np.isfinite(value)] = MISSING_VALUE
     elif o.measure == "realised_to_implied_vol":
         value = _vol_ratio(edge, outcomes, implied, excluded)
     else:
         raise ConfigurationError(f"{edge.id}: no measure {o.measure!r}")
-    unmeasured = (outcomes["outcome_status"] == "UNMEASURED").to_numpy()
-    excluded[unmeasured] = UNMEASURED  # before any other reason: there is no row to read
+    excluded[_unmeasured(edge, outcomes)] = (
+        UNMEASURED  # before any other reason: there is no row to read
+    )
     counted = excluded == ""
     if otm_hit is not None:
         hit = otm_hit

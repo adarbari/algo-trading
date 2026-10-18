@@ -19,10 +19,13 @@ from algotrade.storage.tables.schemas.events import (
     EARNINGS_EVENTS,
     FILING_EVENTS,
     FUND_NAV_EVENTS,
+    INSIDER_EVENTS,
     IPO_LOCKUP_EVENTS,
     KNOWN_FROM,
     MACRO_RELEASE_EVENTS,
     MACRO_SERIES,
+    SHORT_INTEREST_EVENTS,
+    SHORT_VOLUME_EVENTS,
 )
 from algotrade.storage.tables.schemas.market import (
     _BAR_TYPES,
@@ -39,7 +42,11 @@ from algotrade.storage.tables.schemas.market import (
     UNIVERSE,
     VERIFICATION_IBKR,
 )
-from algotrade.storage.tables.schemas.outcomes import OUTCOMES_PREFIX, outcomes_spec
+from algotrade.storage.tables.schemas.outcomes import (
+    OPTION_PNL_SPEC,
+    OUTCOMES_PREFIX,
+    outcomes_spec,
+)
 from algotrade.storage.tables.schemas.reference import (
     ETF_HOLDINGS,
     ETF_SHARES,
@@ -108,7 +115,11 @@ KNOWN: dict[str, TableSpec] = {
         MACRO_RELEASE_EVENTS,
         FILING_EVENTS,
         IPO_LOCKUP_EVENTS,
+        SHORT_INTEREST_EVENTS,
+        SHORT_VOLUME_EVENTS,
         FUND_NAV_EVENTS,
+        INSIDER_EVENTS,
+        OPTION_PNL_SPEC,
     )
 }
 

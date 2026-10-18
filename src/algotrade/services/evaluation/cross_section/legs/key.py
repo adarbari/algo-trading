@@ -17,9 +17,13 @@ from algotrade.config.strategy.schema import Selection
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.evaluation.cross_section.random_picks import SEED_VERSION
 
-LEG_VERSION = 2  # bump when a change to code (not config) changes what a leg holds
+LEG_VERSION = 4  # bump when a change to code (not config) changes what a leg holds
 # 2 (ADR 0064 decision 4): every pick with its rank, score, reason, gross value, dip, ADV at D;
 # hits at each cost level
+# 3 (ADR 0053 amendment 2026-10-18): a screener out of sample also holds its sector-stratified
+# random draws (``random_picks.SectorDraws``)
+# 4 (ADR 0053 amendment 2026-10-18, buy/hold bands): a leg of an edge with ``hold_rank`` also holds
+# the band names ranked ``top_k + 1 .. hold_rank``; every leg is recomputed once (one full re-run)
 HARNESS_VERSION = 2  # 2: the run hash is an allowlist of ``RUN_INPUTS``, not the whole Edge
 
 
@@ -57,19 +61,23 @@ def leg_key(
     cost_levels: tuple[float, ...],
     short_adv_floor: float | None = None,
     event_subtype: str | None = None,
+    hold_rank: int | None = None,
 ) -> str:
     """The key of a leg (``top_k``, ``base`` and ``picks`` of the scope's edge cut its picks and
     names and are not in the trial hash for ``main``): ``universe`` is ``universe_hash``,
     ``expr_defs_hash`` is ``expression_hash``, ``cost_levels`` the site's cost grid in bp;
-    ``short_adv_floor`` the dollar volume a name must have to be in a short leg. It and
-    ``event_subtype`` join the digest only when set, so the keys of every long edge and of every
-    schedule without a subtype (and the legs stored under them) are unchanged."""
+    ``short_adv_floor`` the dollar volume a name must have to be in a short leg; ``hold_rank`` the
+    buy/hold band's depth (the leg holds the names down to it). It, the floor and ``event_subtype``
+    join the digest only when set, so the keys of every long edge, of every schedule without a
+    subtype and of every edge without a band are unchanged but for ``LEG_VERSION``."""
     extra = {} if short_adv_floor is None else {"short_adv_floor": float(short_adv_floor)}
     subtype = {"event_subtype": event_subtype} if event_subtype else {}
+    band = {} if hold_rank is None else {"hold_rank": hold_rank}
     return _digest(
         {
             **extra,
             **subtype,
+            **band,
             "trial": trial_hash,
             "universe": universe,
             "iv_field": iv_field,

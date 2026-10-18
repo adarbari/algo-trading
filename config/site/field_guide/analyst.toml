@@ -498,3 +498,98 @@ value = 0.15
 mode = "soft"
 tolerance = 0.05
 note = "with feature.forward_eps_growth gte 0 so the room is not on a shrinking profit"
+
+[[field]]
+name = "instrument.instrument_id"
+theme = "instrument gates"
+reads = "The instrument's own id. Identity, not a measure: used to gate a screen to a hand list of names (the listed business development companies of the bdc_price_to_nav screener), so hard, never soft or scored. The list is resolved from tickers once, through the symbol resolver, and keyed by id so a renamed company stays itself."
+caveats = [
+  "A list by id is survivor-only: a company merged away or delisted before the list was made is missing from any history built on it. A newly listed name is missing until it is added.",
+  "A list says nothing about what a name is; check the company before trusting an id copied from another list.",
+]
+sources = ["Site convention (docs/data/instruments.md; ADR 0018, FIGI ids)"]
+[[field.use]]
+for = "one of these instruments"
+op = "in"
+value = ["EQ:EXAMPLE1", "EQ:EXAMPLE2"]
+mode = "hard"
+
+[[field]]
+name = "rollup.qmj@v1.balance_sheet_age_days"
+theme = "statements"
+reads = "Calendar days from the latest balance sheet's date to the session: how old the book figures are. A quarter-end balance sheet is public about 45 days after the quarter. So 0 to 135 days is the normal range, and above 135 is a missed or late quarter."
+caveats = [
+  "The statement groups only call a balance sheet STALE after 480 days. A ratio built on book value (feature.pb_ratio) can therefore rest on a balance sheet several quarters old. This field is how a screen bounds it.",
+  "It dates the balance sheet, not the share count: shares_outstanding is the newest cover page and can be a quarter newer than the equity it is compared with.",
+  "Null for funds and for names with no balance sheet filed; a missing value is a gap, not a pass.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "a balance sheet from the latest quarter"
+op = "lte"
+value = 135
+mode = "hard"
+
+# Edge build E2: the fundamentals entries (cash-based operating profitability sits in statements.toml),
+# filed here under their own themes because the fundamentals, statements and instrument guide files
+# reached their line cap.
+
+[[field]]
+name = "feature.composite_value_yield"
+theme = "fundamentals"
+reads = "What the company earns for each dollar of its value, on two yields averaged: operating profit over enterprise value and free cash flow over market value. 0.08 is 8 cents a year; above 0.10 is cheap by either measure, below 0.04 is dear. Value is high-is-cheap here, the opposite of ev_ebit, so a screen for cheap names asks for a high number."
+caveats = [
+  "A formalisation, not the paper's composite. The research composites use book to market, earnings, cash flow and sales growth. This has two yields only and averages the yields themselves, so a very high yield in one part dominates the mean.",
+  "A very high yield is often a peak-earnings cyclical or a company the market expects to shrink: check feature.revenue_cagr_3y and feature.cash_op_profitability.",
+  "Null for a company with an operating loss, a negative enterprise value, no capex line, a stale statement or no market value, and for banks. A missing value is a gap, not a pass.",
+  "Enterprise value ignores minority interest and preferred stock, and both yields use the latest filings, up to four months old.",
+]
+sources = ["Lakonishok, Shleifer and Vishny (1994), Journal of Finance 49(5), Contrarian Investment, Extrapolation, and Risk", "Asness and Frazzini (2013), Journal of Portfolio Management 39(4), The Devil in HML's Details"]
+[[field.use]]
+for = "cheap on earnings and cash flow"
+op = "gte"
+value = 0.08
+mode = "soft"
+tolerance = { relative = 0.25 }
+
+[[field]]
+name = "rollup.qmj@v1.qmj_score"
+theme = "fundamentals"
+reads = "Quality minus junk as a z-score across the day's cross-section: 0 is the middle, 1 is one standard deviation above, -1 below. High is quality (profitable, cash-generating, little debt and distress risk), low is junk. 1 and above is the top sixth of the cross-section; the idea (Asness, Frazzini and Pedersen) is to prefer quality and avoid junk at any price."
+caveats = [
+  "Built from what is stored. Profitability is complete (gross profit over assets, ROE, ROA, cash flow over assets, gross margin, low accruals). Safety is only leverage and distress. The paper's growth, beta and earnings-volatility parts are not built, so rollup.qmj@v1.safety_z does not know how steady the earnings are.",
+  "Relative to the session: the score falls when others improve; it has no level and cannot be compared across dates. It ranks across all names, so an asset-light software company outranks a utility on margins.",
+  "Needs enough profitability parts (four of six) and a cross-section of at least 100 names; a name without them has no score (a gap, not a pass). Banks are scored on the parts they have.",
+  "Quality is not cheapness: compare feature.pb_ratio and feature.ev_ebit. Statement figures enter from the session after SEC acceptance of the filing and can be four months old.",
+]
+sources = ["Asness, Frazzini and Pedersen (2019), Review of Accounting Studies 24(1), Quality Minus Junk", "Novy-Marx (2014), Journal of Financial Economics 112(1), The Quality Dimension of Value Investing"]
+[[field.use]]
+for = "a high-quality name"
+op = "gte"
+value = 0.5
+mode = "soft"
+tolerance = 0.3
+
+[[field]]
+name = "feature.net_issuance_pct_12m"
+theme = "fundamentals"
+reads = "The log change of the share count over a year, the form Pontiff and Woodgate use. A value of -0.03 is about 3% of the shares bought back and +0.10 about 10% more shares issued. Negative is a net buyer of its own stock and around 0 is stable. Above +0.05 is a steady issuer. Above +0.20 is a heavy one: an offering, an acquisition in stock or heavy compensation. In the research the issuers underperform and the repurchasers outperform. It ranks like feature.shares_change_yoy. It is the form the issuance edge sorts on."
+caveats = [
+  "The counts are the company total from the filings. A cover-page count is compared with a cover-page count and a weighted average with a weighted average, so a company that began tagging the cover page recently is null.",
+  "An acquisition paid in shares, a spin-off or a reverse merger changes the count without being a financing decision; a split is adjusted away.",
+  "A shrinking count can hide issuance: companies buy back what compensation issues, so a flat count is not a company that does nothing. A buyback funded by debt is not strength (see feature.debt_to_equity).",
+  "Null for funds, companies without two counts a year apart (recent IPOs and filers) and a stale count.",
+]
+sources = ["Pontiff and Woodgate (2008), Journal of Finance 63(2), Share Issuance and Cross-Sectional Returns"]
+[[field.use]]
+for = "buying back shares"
+op = "lte"
+value = -0.01
+mode = "soft"
+tolerance = 0.01
+[[field.use]]
+for = "no heavy issuance"
+op = "lte"
+value = 0.1
+mode = "soft"
+tolerance = 0.03

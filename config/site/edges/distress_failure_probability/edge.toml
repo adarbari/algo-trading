@@ -1,0 +1,63 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Catalogue: docs/edge-ideas/ (edge build E2).
+id = "distress_failure_probability"
+name = "Financial distress (an avoid list)"
+family = "A"
+thesis = "Stocks with the highest predicted bankruptcy risk underperform the market over the following months, and the safest outperform."
+mechanism = """Investors overpay for the option-like upside of distressed equity (lottery demand), and limits to arbitrage (hard to short, low institutional ownership) keep the price from falling to value (Campbell, Hilscher and Szilagyi 2008; Dichev 1998)."""
+persistence = """Short-side and small-cap concentrated, and weaker after 2008: Hou, Xue and Zhang find distress anomalies largely insignificant value-weighted, and 2020-2021 showed the crash risk of the short leg. What persists is the avoid list: it asks nobody to short, and distressed names stay costly to short."""
+schedule = "month_end"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["distress_ohlson"]
+baselines = ["size_small", "momentum_12_1"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). Only what the stored statements support is built: ohlson_o is a simplified Ohlson O-score (the INTWO and CHIN terms need last year's net income and the price-index deflator is a per-session constant, all omitted), a rank input, not a probability. Campbell, Hilscher and Szilagyi's failure probability needs market terms (excess return, volatility, relative size, market to book, price) from another group and is not built; this edge is therefore the accounting-only distress screen (Ohlson 1980 and Dichev 1998 style), and the harness's verdict on it says nothing about the market-based model. The main outcome is the avoid list: the 50 most distressed held short (ADR 0053 amendment, outcome sides; owner decision O2), with the long side and the spread as variants (diagnostic only)."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+side = "short"
+
+[quality_bar]
+outcome = """Minus the excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision) of the 50 highest O-score names among the liquid common stocks, less 10 bps a round trip and the assumed borrow cost: the value of avoiding them."""
+
+trigger_timing = """Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S."""
+
+replication = """Campbell, Hilscher and Szilagyi: a dynamic logit of 12-month failure on accounting and market terms, deciles, monthly rebalance, long low-distress and short high-distress. Here the Ohlson O-score alone from stored statements, the 50 highest as the avoid list: a partial replication, with the omitted terms named above and in the field's description."""
+
+expected_size = """The top 5% distressed stocks earned about 0.7% a month below the bottom (Campbell, Hilscher and Szilagyi 2008, 1981-2003; approximate, not verified), concentrated in small caps and weaker value-weighted (Hou, Xue and Zhang 2020). On liquid names expect little. A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it."""
+
+capacity_costs = """An avoid list, not a short book: distressed names are hard and expensive to borrow, which is why the premium persists; the cost of the main outcome is the borrow assumption plus 10 bps a round trip, so the result is the value of not owning them."""
+
+failure_modes = """Distressed rallies (2020-2021) and rescue financings reverse the short leg violently; an accounting-only score misses market-implied distress. Retire if the frozen-period short-side result is not above zero."""
+
+decoys = """Low-price, idiosyncratic-volatility and lottery names (the same cluster), size and leverage; the size and 12-1 momentum baselines on the same sessions."""
+
+[[sources]]
+title = "Campbell, J., Hilscher, J. and Szilagyi, J., In Search of Distress Risk, Journal of Finance, 2008"
+
+[[sources]]
+title = "Campbell, J., Hilscher, J. and Szilagyi, J., Predicting Financial Distress and the Performance of Distressed Stocks, Journal of Investment Management, 2011"
+url = "https://joim.com/article/predicting-financial-distress-and-the-performance-of-distressed-stocks/"
+
+[[sources]]
+title = "Dichev, I., Is the Risk of Bankruptcy a Systematic Risk?, Journal of Finance, 1998"
+
+[[sources]]
+title = "Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies, 2020"
+url = "https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html"
+
+[[variants]]
+id = "safest_long"
+[variants.outcome]
+side = "long"
+
+[[variants]]
+id = "spread"
+[variants.outcome]
+side = "long_short"

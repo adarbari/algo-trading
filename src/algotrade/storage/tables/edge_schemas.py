@@ -172,6 +172,11 @@ EDGE_PAPER = fixed(
 # merge: a leg recomputed by a later run replaces the earlier one under the same key. Leg v2
 # (ADR 0064): every pick as ``pick_*`` lists aligned to ``pick_ids`` (``legs/rows.py``) and the
 # hits at each level of the site's cost grid (``base_hits_at``, ``pick_hits_at``); null in v1 rows.
+# Leg v3 (ADR 0053 amendment 2026-10-18): a screener's second set of draws, matched to the picks'
+# sector mix, as ``strat_picks`` / ``strat_value_sums`` / ``strat_hit_sums`` beside ``rand_*``.
+# Leg v4 (ADR 0053 amendment 2026-10-18): the names of a buy/hold band as ``band_*`` lists.
+# Leg v5 (ADR 0074): a portfolio_return leg's book as ``weight_ids`` / ``weight_values`` and, for a
+# session with no value, ``portfolio_reason``; null in every other leg, which no key change moves.
 EDGE_LEGS = fixed(
     "results/edge_legs",
     "results",
@@ -180,12 +185,17 @@ EDGE_LEGS = fixed(
         "horizon_sessions",
     ),
     *strings("user_id", "edge_id", "row_kind", "leg_key", "edge_variant", "variant"),
-    *strings("trial_hash", "regime", "lost_table"),
+    *strings("trial_hash", "regime", "lost_table", "portfolio_reason"),
     "horizon_sessions int64!",
     "entry_session date",
     "screen_snapshot date",
     "outcomes_as_of timestamp_utc",
     "pick_values float64[]",
+    "band_values float64[]",  # leg v4: a buy/hold band's net values (null: no band, or no value)
+    "band_ranks int64[]",
+    "band_ids string[]",
+    "weight_values float64[]",  # leg v5: a portfolio_return book's weights (null for every other)
+    "weight_ids string[]",  # ... by instrument id, CASH for the T-bill share
     "short_values float64[]",  # a long-short leg's short names' values; null for every other side
     "deciles float64[]",
     "pick_reference float64[]",
@@ -197,16 +207,19 @@ EDGE_LEGS = fixed(
         "pick_hits", "rest_n", "base_hits", "ranked", "unscored", "excluded_score_coverage",
         "excluded_unclosed", "excluded_missing", "excluded_coverage", "excluded_unmeasured",
         "unmeasured_base", "delisted", "outside_universe", "no_entry_bar", "pick_touches",
-        "no_implied_vol", "rand_picks", "rand_eligible", "rand_base_hits", "inputs_seq",
-        "outcome_seq", "id_eligible_flag", "id_eligible_proxy", "id_screened_flag",
+        "no_implied_vol", "rand_picks", "rand_eligible", "rand_base_hits", "strat_picks",
+        "inputs_seq", "outcome_seq", "id_eligible_flag", "id_eligible_proxy", "id_screened_flag",
         "id_screened_proxy",
     )),
     *floats("rest_mean", "rest_m2", "top_decile", "spread"),
     "pre_snapshot bool",
     "implied_stored bool",
+    "siblings_stored bool",  # pair_spread: the pair field had a value for some name; null: n/a
     "tombstone bool",  # a leg row that says its key has no leg any more (ADR 0063 amendment 7)
     "value_sums float32[]",
     "hit_sums float32[]",
+    "strat_value_sums float32[]",  # leg v3: the sector-stratified draws (ADR 0053 amendment)
+    "strat_hit_sums float32[]",
     "read_table string[]",
     "read_kind string[]",
     "read_digest string[]",

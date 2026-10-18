@@ -1,0 +1,50 @@
+# Option-to-stock volume, lowest first: The option-to-stock volume ratio (Johnson and So 2012): the shares the day's option volume controls over the
+# stock's own volume, ranked from the lowest ratio up (a high ratio is the bad-news signal, so the
+# quietest option tape ranks first). The criterion only asks that the value exists (a missing value
+# never passes, ADR 0030). What it does not check: whether the volume opens or closes positions.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "option_stock_volume"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Option-to-stock volume, lowest first"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as momentum_12_1 for stocks, so the screens compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.option_stock_volume_ratio]
+field = "feature.option_stock_volume_ratio"
+op = "gte"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+option_stock_volume_ratio = "feature.option_stock_volume_ratio"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "feature.option_stock_volume_ratio"
+tie_break_order = "asc"

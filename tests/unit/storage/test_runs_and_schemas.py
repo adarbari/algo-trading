@@ -152,6 +152,34 @@ def test_filing_rows_key_on_the_accession_and_require_known_from() -> None:
         )
 
 
+def test_insider_rows_key_on_the_line_the_owner_and_known_from() -> None:
+    spec = spec_for("events/insider_transaction")
+    assert spec.grain == "event" and spec.runs == "merge" and not spec.open_ended
+    assert spec.key == ("instrument_id", "accession", "line", "owner_cik", "known_from")
+    column = spec.column("known_from")
+    assert "known_from" in spec.required and column is not None and not column.nullable
+    ts = datetime(2026, 9, 30, 20, 30, tzinfo=UTC)
+    row = {
+        "instrument_id": "EQ:EXMP", "ts": ts, "known_from": date(2026, 9, 30),
+        "accession": "0000999001-26-000001", "line": 1, "owner_cik": "0000888001", "form": "4",
+        "issuer_cik": "0000999001", "filing_date": date(2026, 9, 30),
+        "period_of_report": date(2026, 9, 28), "amends_date": None,
+        "transaction_date": date(2026, 9, 28), "derivative": False, "transaction_code": "P",
+        "acquired_disposed": "A", "shares": 1000.0, "price": 12.5, "shares_after": 26000.0,
+        "direct_indirect": "D", "is_director": True, "is_officer": True,
+        "is_ten_pct_owner": False, "is_other": False, "officer_title": "CFO",
+        "plan_10b5_1": None, "owner_count": 1,
+    }  # fmt: skip
+    day = date(2026, 10, 5)
+    validate_frame("events/insider_transaction", stamped([row], day, "r"))
+    with pytest.raises(DataValidationError, match="duplicate rows"):
+        validate_frame("events/insider_transaction", stamped([row, row], day, "r"))
+    restated = {**row, "known_from": date(2026, 10, 13), "price": 12.0}  # beside its predecessor
+    validate_frame("events/insider_transaction", stamped([row, restated], day, "r"))
+    other_owner = {**row, "owner_cik": "0000888002"}
+    validate_frame("events/insider_transaction", stamped([row, other_owner], day, "r"))
+
+
 def test_ipo_lockup_rows_key_on_the_issuer_cik_and_keep_every_version() -> None:
     spec = spec_for("events/ipo_lockup")
     assert spec.grain == "event" and spec.runs == "merge" and not spec.open_ended

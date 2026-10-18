@@ -52,7 +52,9 @@ from algotrade.services.jobs import JobContext
 from algotrade.storage.runs import published
 from algotrade_ingestion.tasks.analyst.backlog import check_analyst_backlog, check_finnhub_backlog
 from algotrade_ingestion.tasks.derived.history_copy import check_history_copy
+from algotrade_ingestion.tasks.derived.option_outcomes import check_option_outcomes
 from algotrade_ingestion.tasks.derived.outcomes import check_outcomes
+from algotrade_ingestion.tasks.derived.residual_returns import check_residual_returns
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
 from algotrade_ingestion.tasks.framework.run import (
     RETRYABLE,
@@ -121,8 +123,8 @@ PURGE = "purge-raw"
 # data for the session (the rollups, the screens) runs for every session (2026-10-16: a
 # catch-up skipped its screens and served a complete session without screener runs).
 SNAPSHOT = "the source serves only its current snapshot"
-NEW_SINCE_STORED = "it reads every filing since the latest stored one, so one run covers all"
 LAST_MONTH = "it reads the last 30 filing days whatever the session, so one run covers all"
+NEW_SINCE_STORED = "it reads every filing since the latest stored one, so one run covers all"
 FORWARD_RECORD = "paper picks are made only on the night they are for (a later one is no record)"
 WHOLE_YEAR = "it copies the whole year in one run, so the latest session's run covers this one"
 MARKET_DATA = ("bars", "rates", "corporate-actions", "earnings", "chains")
@@ -168,6 +170,10 @@ NIGHTLY: tuple[Step, ...] = (
     # filing, so a night reads the new ones; their Item 2.02 releases are earnings rows. Optional:
     # a failed night is read again the next (the default start is the latest stored filing).
     Step("filings", latest_only=NEW_SINCE_STORED, critical=False, accept_with=(check_filings,)),
+    # SEC Form 4 insider transactions (EB D6): the days since the last clean walk from EDGAR's daily
+    # index, each filing's XML; a night reads at most a few days, the next goes on. Optional: no
+    # edge reads it until the history is backfilled (`algotrade-ingest insider --since`).
+    Step("insider", latest_only=NEW_SINCE_STORED, critical=False),
     # IPO facts and lock-up expiry dates from EDGAR 424B4 prospectuses (ADR 0050, edge build D8):
     # the last 30 days' prospectuses, each read once. Optional and WARN-only: one edge reads it.
     Step("ipo-lockups", latest_only=LAST_MONTH, critical=False, accept_with=(check_ipo_lockups,)),
@@ -261,6 +267,23 @@ NIGHTLY: tuple[Step, ...] = (
         critical=False,
         accept=(check_outcomes,),
     ),
+    # Chain P&L of the option windows the session closes (ADR 0053 amendment, EB H13): the stored
+    # chains of the window's sessions, read only by the edge harness. Optional, forward-only.
+    Step(
+        "option-outcomes",
+        needs=("chains",),
+        critical=False,
+        accept=(check_option_outcomes,),
+    ),
+    # The factor-neutral sibling of the outcomes (ADR 0053 amendment, EB H11): the same windows
+    # less the loadings of factor_betas@v1 (the rollups step) times the ETF factor returns.
+    # Optional: a gap is UNMEASURED rows, a failure never holds back the screens.
+    Step(
+        "residual-returns",
+        needs=("outcomes", "rollups"),
+        critical=False,
+        accept=(check_residual_returns,),
+    ),
     # Every session, catch-up too: the screeners read only stored features, and a complete
     # session without screener runs would be served as one (ADR 0062). In a catch-up session the
     # chains were fetched by its own earlier attempt or not at all; without them the options
@@ -285,6 +308,11 @@ NIGHTLY: tuple[Step, ...] = (
         critical=False,
         accept_with=(check_analyst_snapshot, check_analyst_backlog, check_finnhub_backlog),
     ),
+    # FINRA short interest and daily short-sale volume (EB D9), both tables no_ml. Optional: an
+    # outage only warns; each reads a window of dates not stored yet, so a catch-up session
+    # repeats nothing, and a date FINRA has not published is NO_DATA and asked again.
+    Step("short-interest", needs=("universe-build",), requires=universe_exists, critical=False),
+    Step("short-volume", needs=("universe-build",), requires=universe_exists, critical=False),
     # `edge-eval`, `descriptions` and `verify` are the post-session workflow's (ADR 0070): they
     # do not feed the session's reads, so they no longer delay its COMPLETE record.
     # The derived history copies (ADR 0060), last: every step that publishes the copied tables

@@ -1,0 +1,52 @@
+# Quality minus junk, v1 (Asness, Frazzini and Pedersen 2019): every stock with a quality score,
+# ranked by it, highest first. The score is rollup.qmj@v1.qmj_score, the z-score of profitability
+# plus safety across the cross-section: the stored data builds profitability in full and safety
+# only as leverage and distress, without the growth part (see the field). A missing score never
+# passes (ADR 0030). What it does not check: value, momentum, size, industry (the score ranks
+# across all names, not within an industry).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "qmj"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Quality minus junk"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.qmj]
+field = "rollup.qmj@v1.qmj_score"
+op = "not_null"
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+qmj_score = "rollup.qmj@v1.qmj_score"
+profitability_z = "rollup.qmj@v1.profitability_z"
+safety_z = "rollup.qmj@v1.safety_z"
+
+[rank]
+tie_break = "rollup.qmj@v1.qmj_score"
+tie_break_order = "desc"

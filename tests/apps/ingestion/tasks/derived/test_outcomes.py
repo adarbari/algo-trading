@@ -10,11 +10,13 @@ from datetime import UTC, date, datetime
 import pandas as pd
 import pytest
 
+from algotrade.config.edges.document import parse_edge
 from algotrade.core.time.calendar import close_time, next_session, sessions_ending
 from algotrade.data.prices import FLAGS_TABLE, raw_bars
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
+from algotrade_ingestion.tasks.derived import outcomes as outcomes_task
 from algotrade_ingestion.tasks.derived.outcome_paths import NO_END_BAR
 from algotrade_ingestion.tasks.derived.outcomes import (
     DEFAULT_HORIZON,
@@ -35,6 +37,7 @@ from tests.helpers.rollup_store import (
     write_split,
 )
 from tests.helpers.stored_frames import stamped, universe_rows
+from tests.unit.services.evaluation.cross_section.conftest import edge_document
 
 N = 70  # sessions of bars: room for the 60-session horizon
 IDS = {"A": "EQ:A", "B": "EQ:B", "D": "EQ:D", "SPY": SPY}
@@ -253,3 +256,17 @@ def test_a_real_squeeze_warns_and_never_fails_the_acceptance() -> None:
     assert check.status == "WARN" and "EQ:A" in check.detail and "no suspect bar" in check.detail
     part = _partition(reader, sessions_ending(END, 7)[0], END).set_index("instrument_id")
     assert part.loc["EQ:A", "outcome_status"] == "COMPLETE"
+
+
+def test_a_blended_benchmark_is_never_a_stored_benchmark(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A ``mix:`` benchmark is computed by the harness from its constituents' rows (ADR 0074): the
+    grain keeps only real index benchmarks, never a row set named ``mix:...``."""
+    outcome = {
+        "kind": "portfolio_return", "horizon_sessions": [21], "benchmark": "mix:SPY=0.6,AGG=0.4",
+        "start_offset_sessions": 1,
+    }  # fmt: skip
+    doc = edge_document(schedule="month_end", top_k=3, outcome=outcome)
+    book = parse_edge(doc, "drift", "drift.toml")
+    monkeypatch.setattr(outcomes_task, "load_edges", lambda configs: (book,))
+    horizons, benchmarks = horizons_and_benchmarks()
+    assert 21 in horizons and benchmarks == ["SPY"]  # the default only, no ``mix:``
