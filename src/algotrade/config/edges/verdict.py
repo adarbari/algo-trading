@@ -34,7 +34,8 @@ KEYS = (
     "capacity_adv_floor_usd",
     "capacity_position_usd",
 )
-LEGS = ("long", "long_short")  # ``[published] leg`` (ADR 0065; H3 adds ``short``)
+EDGE_COSTS_KEYS = ("levels_bps", "borrow_bps_annual")
+LEGS = ("long", "short", "long_short")  # ``[published] leg`` (ADR 0065; outcome sides)
 HAIRCUT_KEYS = LEGS  # ``[published_haircut]``: the share of a published figure lost, by leg
 COST_LEVELS = (0.0, 15.0, 30.0, 50.0)  # bp, the site grid (ADR 0064 decision 5; owner 2026-10-10)
 
@@ -73,6 +74,12 @@ class VerdictSettings:
     # at, beside its document's own ``cost_bps`` (ADR 0064 decision 5). The harness counts hits
     # at each level in every leg, so the grid is in the leg key: a changed grid recomputes legs.
     cost_levels_bps: tuple[float, ...] = COST_LEVELS
+    # ``[edge_costs] borrow_bps_annual``: the assumed yearly cost (bp) of borrowing a name to short
+    # it, for an outcome that does not set its own (ADR 0053 amendment, outcome sides). No borrow
+    # data is stored: it is an assumption the reports say so. The short leg of a ``short`` or
+    # ``long_short`` outcome pays it scaled by the holding period (sessions / 252), and only names
+    # over ``capacity_adv_floor_usd`` can be that leg. It enters the leg key (it sets values).
+    borrow_bps_annual: float = 100.0
     # ``capacity_adv_floor_usd``: a pick whose 20-day average dollar volume at the decision session
     # is below this is "low liquidity" in the capacity columns of ``results/edge_eval`` (ADR 0064
     # decision 5). Applied when the statistics are computed, not in the leg key: a changed floor
@@ -88,10 +95,14 @@ class VerdictSettings:
     # input (ADR 0065 amendment 2026-10-17).
     haircut_long_short: float = 0.5
     haircut_long: float = 0.333
+    haircut_short: float = 0.5  # as the spread: a short leg is harder to hold (ADR 0065)
 
     def published_haircut(self, leg: str) -> float:
         """The share of a published figure on ``leg`` (``LEGS``) expected to be lost."""
-        return self.haircut_long_short if leg == "long_short" else self.haircut_long
+        return {
+            "long_short": self.haircut_long_short,
+            "short": self.haircut_short,
+        }.get(leg, self.haircut_long)
 
     @classmethod
     def from_document(
@@ -120,10 +131,14 @@ class VerdictSettings:
             live_min_sessions=t.integer("live_min_sessions", d.live_min_sessions, 1),
             live_low=t.fraction("live_low", d.live_low),
             live_high=t.fraction("live_high", d.live_high),
-            cost_levels_bps=_cost_levels(t.table("edge_costs", ("levels_bps",)), d),
+            cost_levels_bps=_cost_levels(t.table("edge_costs", EDGE_COSTS_KEYS), d),
+            borrow_bps_annual=t.table("edge_costs", EDGE_COSTS_KEYS).number(
+                "borrow_bps_annual", d.borrow_bps_annual, 0
+            ),
             capacity_adv_floor_usd=t.number("capacity_adv_floor_usd", d.capacity_adv_floor_usd, 1),
             capacity_position_usd=t.number("capacity_position_usd", d.capacity_position_usd, 1),
             haircut_long_short=cut.fraction("long_short", d.haircut_long_short),
+            haircut_short=cut.fraction("short", d.haircut_short),
             haircut_long=cut.fraction("long", d.haircut_long),
         )
 

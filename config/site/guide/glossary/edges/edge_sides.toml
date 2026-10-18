@@ -1,0 +1,51 @@
+# L3 site setting: the Guide glossary, edges: the side of an outcome (ADR 0051, ADR 0053 amendment "outcome sides", ADR 0065 amendment). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "side_long"
+term = "Long side"
+short = "The edge buys the screen's best-ranked names; this is the default and what most edges are."
+body = """
+A long edge is judged on the names its screen ranks best: they should beat the market after cost.
+A win is a pick that beat its benchmark by more than the round-trip cost. The base rate is the
+share of all eligible names that did the same. Example: 56% of picks won against a base rate of
+52% is a lift of 4 points. Don't read a long result as one about the worst-ranked names: those
+were not traded.
+"""
+see_also = ["side_short", "side_long_short", "win_rate", "base_rate"]
+
+[[term]]
+id = "side_short"
+term = "Short side"
+short = "The edge sells short the screen's worst-ranked liquid names, an avoid list traded the other way, after an assumed borrow cost."
+body = """
+A short edge is judged on the bottom of the ranking: the names the screen likes least should fall
+behind the market. A win is a pick that underperformed its benchmark by more than the round-trip
+cost plus the borrow. The value of a pick is minus its excess return less those costs. The base rate is the
+share of all eligible names that did the same, so the lift is still against doing it blindly.
+Only names above the site's dollar-volume floor can be in the short leg. A thinly traded name
+cannot be sold short in size by an individual, and a name with no known volume is not one. The
+borrow cost is an assumption from the site settings, or the edge's own, scaled to the holding
+period: no borrow data is stored. A short can lose more than it risked. Example: a pick that
+returns 3% less than the market over the window wins 3% minus cost and borrow. Don't compare a
+short edge's lift with a long edge's without the borrow in mind, and remember that a name hard to
+borrow costs more than the assumption.
+"""
+see_also = ["side_long", "side_long_short", "capacity", "cost_sensitivity", "win_rate", "base_rate"]
+
+[[term]]
+id = "side_long_short"
+term = "Long-short side"
+short = "The edge's value is the spread between the best-ranked names bought and the worst-ranked sold short; a diagnostic, never a verdict basis."
+body = """
+A long-short outcome measures the ranking itself. Each session it is the mean of the best names
+minus the mean of the worst. Each leg is net of its costs, and the short leg of the assumed
+borrow. A spread has no base rate, so its win rate and lift are not applicable and are shown as
+such, never as zero. The decile figures and the Sharpe ratio are of the spread. A long-short edge
+gets no verdict: the broker access here is read-only and a spread cannot be traded by buying
+alone. Read it to learn whether the ranking works, then judge the long or the short leg on its own.
+Example: a long leg of +0.4% and a short leg of +0.3% in a session is a spread of 0.7%. Don't read a
+positive spread as the return of a buy-only strategy.
+"""
+see_also = ["side_long", "side_short", "top_vs_bottom_decile", "verdict_basis", "win_rate", "base_rate", "sharpe_ratio"]

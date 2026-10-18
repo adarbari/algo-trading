@@ -49,6 +49,7 @@ const EdgesPage = graphql(`
         result
         basis
         basisWhy
+        side
         trades
         oosTrades
         winRate

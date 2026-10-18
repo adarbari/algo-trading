@@ -46,7 +46,7 @@ EXCLUDED_KINDS = {
     INVALID_IMPLIED_VOL: "NO_IMPLIED_VOL",
     MISSING_DRAWDOWN: "MISSING_DRAWDOWN",
 }
-ORDER = ["variant", "horizon_sessions", "decision_session", "rank"]
+ORDER = ["variant", "horizon_sessions", "decision_session", "side", "rank"]
 
 
 def _status(pick: Pick) -> tuple[str, str | None]:
@@ -66,6 +66,7 @@ def _row(ev: EdgeEvaluation, r: VariantResult, leg: LegDetail, pick: Pick) -> di
         "user_id": ev.user_id,
         "edge_variant": None,  # the main edge variant, stored as on edge_eval
         "variant": r.variant,
+        "side": pick.side,
         "role": r.role,
         "config_hash": r.config_hash,
         "run_config_hash": ev.run_hash,
