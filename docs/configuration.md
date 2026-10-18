@@ -440,8 +440,9 @@ feature.drawdown_pct  expression float  (config/users/alice/features/momentum.to
 ## Field guide
 
 How to read each catalogue field, which criterion means what, and when the reading lies:
-`config/site/field_guide/<theme>.toml` (`momentum`, `liquidity`, `volatility`, `events`,
-`fundamentals`) plus `situations.toml` (ADR 0041, amended). Each `[[field]]` names a catalogue
+`config/site/field_guide/<group>/<file>.toml` (a folder per theme group of `guide/sections.toml`:
+`tradeable`, `chart`, `options`, `company`; each file with its `-2` part, under 900 lines; the situations in
+`tradeable/instrument-2.toml`; ADR 0041, amended). Each `[[field]]` names a catalogue
 field, its `theme`, `reads` (what the number means), `caveats` (each ending with the field to
 check), `sources`, and `[[field.use]]` entries: an intent (`for`) with the criterion as a rule
 screen takes it (`op`, `value`, `mode`, `tolerance`, `on_miss`, `note`). A `[[situation]]`

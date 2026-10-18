@@ -1,0 +1,488 @@
+# Continues volatility.toml: the same keys, the same theme; see its header.
+
+[[field]]
+name = "rollup.iv30@v1.div_yield"
+theme = "implied volatility"
+reads = "The dividend yield used as the continuous q in the forward, read from the materialised div_yield feature: 0.03 is 3%. A name priced with q = 0 (null here) has its forward slightly too high, and its IV30 off by a fraction of a point. The screening version of the yield is feature.div_yield."
+caveats = [
+  "Null means 'priced with no dividend', which is right for a non-payer and slightly wrong for a payer with too little history to be known as one.",
+]
+sources = ["ADR 0021"]
+[[field.use]]
+for = "priced with a known yield"
+op = "not_null"
+mode = "soft"
+tolerance = 0
+
+[[field]]
+name = "rollup.iv30@v1.n_quotes_used"
+theme = "implied volatility"
+reads = "How many option quotes' implied vols were averaged into our IV30, across both expiries: 8 is the full set (two strikes, call and put, two expiries), 4 is one expiry (SINGLE_EXPIRY) or one side, 1 or 2 is a number resting on a quote or two. The confidence of rollup.iv30@v1.iv30 in one count."
+caveats = [
+  "Few quotes means a wide or thin chain: the IV30 is then a noisy number and the IV-over-HV premium built on it noisier still. Require 4 or more for a premium-selling screen.",
+]
+sources = ["ADR 0021"]
+[[field.use]]
+for = "an IV30 built on enough quotes"
+op = "gte"
+value = 4
+mode = "soft"
+tolerance = 2
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.ibkr_iv@v1.iv30_ibkr"
+theme = "implied volatility"
+reads = "IBKR's 30-day implied volatility of the underlying's options for the session, as a fraction (IB's daily implied-volatility bar, or the streamed value after the close). A third method next to ours and Cboe's; on liquid names the three agree within a few points. feature.vrp_iv30 takes the lower of IBKR's and Cboe's so a premium screen is conservative. Personal licence (ADR 0028)."
+caveats = [
+  "The earnings and event caveats of every IV apply (rollup.earnings@v1.days_to_earnings).",
+  "Null for names IBKR has no IV for (no listed options, no quotes) and for sessions outside the nightly snapshot's coverage; the history backfill covers IV, not HV.",
+]
+sources = ["ADR 0028 (IBKR-derived features); IB's option implied-volatility bars"]
+[[field.use]]
+for = "high implied volatility (IBKR's)"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+note = "prefer feature.vrp_iv30 (the lower of the two feeds) for a premium gate"
+
+[[field]]
+name = "rollup.ibkr_iv@v1.hv30_ibkr"
+theme = "implied volatility"
+reads = "IBKR's 30-day historical (realised) volatility for the session, as a fraction: IB's own estimate of what the stock did, next to our close-to-close rollup.price_stats@v2.hv30. The two agree closely on ordinary names; a gap between them is usually a split or a bad print on one side."
+caveats = [
+  "Only from the nightly snapshot: null on sessions the backfill filled (it fetches IV only). Our hv30 is the one every stored IV/HV feature uses.",
+]
+sources = ["ADR 0028"]
+[[field.use]]
+for = "a realised-volatility cross-check exists"
+op = "not_null"
+mode = "soft"
+tolerance = 0
+
+[[field]]
+name = "rollup.ibkr_iv@v1.iv_percentile_252d_ibkr"
+theme = "implied volatility"
+reads = "The share of the last 252 sessions whose IBKR IV was below today's, 0 to 1: 0.9 means IV was lower on 90% of days this year. The steadier companion of rollup.ibkr_iv@v1.iv_rank_252d_ibkr (counts days instead of measuring the span, so one spike cannot squash it); feature.iv_percentile prefers this one where IBKR has it."
+caveats = [
+  "Null under 60 sessions of IBKR IV (rollup.ibkr_iv@v1.rank_status_ibkr UNKNOWN); PROVISIONAL below 252 sessions compares against a shorter year.",
+  "A report in the next ten sessions lifts it like every IV measure.",
+]
+sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters; ADR 0028"]
+[[field.use]]
+for = "IV high for the name (robust, IBKR's history)"
+op = "gte"
+value = 0.7
+mode = "soft"
+tolerance = 0.1
+
+[[field]]
+name = "rollup.ibkr_iv@v1.history_days_ibkr"
+theme = "implied volatility"
+reads = "Sessions of the 252-session window with an IBKR IV, today included: 252 is a full year, 60 is the floor for a rank, under 60 means no rank yet. Says how much of the year the IBKR-based rank and percentile are computed over."
+caveats = [
+  "Gaps are not filled: a name IBKR dropped and re-added has a low count with a long listing history.",
+]
+sources = ["ADR 0028"]
+[[field.use]]
+for = "a full year of IBKR IV"
+op = "gte"
+value = 252
+mode = "soft"
+tolerance = 30
+[[field.use]]
+for = "enough history for a rank"
+op = "gte"
+value = 60
+mode = "hard"
+
+[[field]]
+name = "rollup.ibkr_iv@v1.rank_status_ibkr"
+theme = "implied volatility"
+reads = "How complete IBKR's IV history is for the rank: UNKNOWN below 60 sessions (no rank), PROVISIONAL below 252 (a rank over a partial year), FULL from 252. A PROVISIONAL rank over three months compares today against a short, possibly calm, window."
+caveats = [
+  "A PROVISIONAL rank of 1.0 after a quiet quarter is a modest IV; read the level (rollup.ibkr_iv@v1.iv30_ibkr) with it.",
+]
+sources = ["ADR 0028"]
+[[field.use]]
+for = "a rank over a full year"
+op = "eq"
+value = "FULL"
+mode = "soft"
+tolerance = 0
+note = "the near miss is PROVISIONAL"
+
+[[field]]
+name = "rollup.iv_history@v2.iv_rank_252d"
+theme = "implied volatility"
+reads = "IV rank on our own IV30 history, 0 to 1: where today's IV30 sits between the year's low and high. feature.iv_rank prefers IBKR's rank and falls back to this one (feature.iv_rank_source says which); use this field only when the screen must say 'our history'."
+caveats = [
+  "Every caveat of feature.iv_rank: one spike squashes the year, a report ahead lifts it, a takeover collapses it; rollup.iv_history@v2.iv_percentile_252d is the steadier cross-check (one extreme day moves it less).",
+  "Null under 60 sessions of our IV (rollup.iv_history@v2.rank_status UNKNOWN), when there is no IV today, or when every IV in the window is equal.",
+]
+sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters"]
+[[field.use]]
+for = "IV high for the name (our history)"
+op = "gte"
+value = 0.5
+mode = "soft"
+tolerance = 0.1
+note = "prefer feature.iv_rank, which takes IBKR's where it exists"
+
+[[field]]
+name = "rollup.iv_history@v2.iv_percentile_252d"
+theme = "implied volatility"
+reads = "The share of the last 252 sessions whose IV30 (ours) was below today's, 0 to 1. The steadier companion of rollup.iv_history@v2.iv_rank_252d; feature.iv_percentile prefers IBKR's and falls back to this."
+caveats = [
+  "A percentile near 1 after a long calm stretch can be a modest IV; read the level too.",
+  "Null under 60 sessions of IV or without an earlier IV.",
+]
+sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters"]
+[[field.use]]
+for = "IV high for the name (robust, our history)"
+op = "gte"
+value = 0.7
+mode = "soft"
+tolerance = 0.1
+
+[[field]]
+name = "rollup.iv_history@v2.history_days"
+theme = "implied volatility"
+reads = "Sessions of the 252-session window with our IV30, today included: 252 is a full year, 60 the floor for a rank. Our history starts when the chain store starts (2026-10-02), so counts are short for every name until a year has passed; IBKR's history (rollup.ibkr_iv@v1.history_days_ibkr) is the longer one."
+caveats = [
+  "Gaps are not filled: a session whose chain failed is a missing day in the window.",
+]
+sources = ["Site convention (docs/roadmap.md: the IBKR IV history backfill)"]
+[[field.use]]
+for = "enough history for a rank"
+op = "gte"
+value = 60
+mode = "hard"
+
+[[field]]
+name = "rollup.iv_history@v2.rank_status"
+theme = "implied volatility"
+reads = "How complete our IV history is for the rank: UNKNOWN below 60 sessions (no rank), PROVISIONAL below 252, FULL from 252."
+caveats = [
+  "PROVISIONAL over a short, calm window makes an ordinary IV rank near 1; read rollup.iv_history@v2.iv30 with it.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "a rank over a full year"
+op = "eq"
+value = "FULL"
+mode = "soft"
+tolerance = 0
+note = "the near miss is PROVISIONAL"
+
+[[field]]
+name = "feature.iv_rank_source"
+theme = "implied volatility"
+reads = "Where feature.iv_rank and feature.iv_percentile came from: ibkr (IBKR's IV history, the longer one, personal licence) or ours (iv_history, from Cboe chains, from 2026-10-02). A label to show next to the rank; a screen restricted to one source pins it here."
+caveats = [
+  "Null when neither source has a rank; the two sources' ranks are not interchangeable on the same name (different methods, different windows), so a screen that mixes them compares slightly different things.",
+]
+sources = ["ADR 0028"]
+[[field.use]]
+for = "IBKR's rank only"
+op = "eq"
+value = "ibkr"
+mode = "hard"
+
+[[field]]
+name = "feature.vrp_iv30_source"
+theme = "implied volatility"
+reads = "Where feature.vrp_iv30 came from: ibkr or cboe, the lower of the two when both exist (ibkr on a tie). A label to show with the VRP gate's IV30; when it says cboe, IBKR's number was the higher (or missing), and the premium screen used the conservative one."
+caveats = [
+  "Null when neither feed has an IV30 for the session.",
+]
+sources = ["docs/screeners/vrp-scanner.md (the lower-of-two rule)"]
+[[field.use]]
+for = "both feeds agreed closely enough to use IBKR's"
+op = "eq"
+value = "ibkr"
+mode = "soft"
+tolerance = 0
+
+# Realised-volatility bands and the squeeze (bands@v2, trend_stats@v2 and
+# config/site/features/technical/bands.toml): how dispersed the last month's closes are, where that
+# sits against the year, and the compressions that precede a move.
+
+[[field]]
+name = "rollup.bands@v2.close_std_20"
+theme = "volatility"
+reads = "The sample standard deviation of the last 20 closes, in dollars per share: half the distance from the 20-session mean to a one-sigma Bollinger band. It scales with the price, so read it as a share of the price (feature.bb_width is four of these over the mean) or in the z-score it normalises (feature.price_z_20d): a $2 deviation is wide on a $30 stock and tight on a $300 one."
+caveats = [
+  "It measures dispersion of closes, which a steady trend inflates as much as choppiness does: a stock that rose 10% in a straight line over 20 sessions has a large deviation and no noise. For the noise alone use rollup.price_stats@v2.hv20 (the deviation of returns).",
+  "Null after a gap in the last 20 sessions or a shorter history.",
+]
+sources = [
+  "Bollinger Bands, Wikipedia: https://en.wikipedia.org/wiki/Bollinger_Bands",
+]
+[[field.use]]
+for = "has a 20-close deviation"
+op = "not_null"
+mode = "hard"
+note = "threshold the normalised forms instead: feature.bb_width or feature.price_z_20d"
+
+[[field]]
+name = "feature.bb_width"
+theme = "volatility"
+reads = "The Bollinger bandwidth: the distance between the bands as a share of the 20-session mean, 0.10 meaning the bands are 10% of the price apart (four standard deviations of the last 20 closes). Low to high: under about 0.05 is tight for a large cap, 0.08 to 0.15 ordinary, above 0.25 a volatile month. The level depends on the name, so screen on its rank against the year, rollup.bands@v2.bb_width_pctile_252d, and use this to compare two names on the same day."
+caveats = [
+  "A shock day widens the bands for exactly 20 sessions and then they snap shut as it leaves the window; a 'narrowest in a year' reading right then is arithmetic, not a base. Check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date.",
+  "Bandwidth rises in a clean trend as well as in a chop (a one-direction move spreads the closes), so a high value is not 'risky' on its own; pair with feature.trend_state.",
+  "Null after a gap in the last 20 sessions or a shorter history.",
+]
+sources = [
+  "Bollinger (2001), Bollinger on Bollinger Bands: BandWidth and the Squeeze",
+  "Bollinger BandWidth, StockCharts: https://school.stockcharts.com/doku.php?id=technical_indicators:bollinger_band_width",
+]
+[[field.use]]
+for = "comparing two names' volatility today"
+op = "lte"
+value = 0.10
+mode = "score"
+tolerance = 0.05
+note = "a score between names; for 'tight for this name' use rollup.bands@v2.bb_width_pctile_252d lte 0.10"
+
+[[field]]
+name = "rollup.bands@v2.bb_width_pctile_252d"
+theme = "volatility"
+reads = "Where today's Bollinger bandwidth sits against the name's own last year, 0 to 1: the share of the 252 sessions before today whose bandwidth was narrower. 0.05 means the bands are tighter than on 95% of days in the year (Bollinger's Squeeze: the lowest bandwidth in six months), 0.50 an ordinary month, 0.95 one of the widest. A squeeze says a large move is likelier, not which way: it is a setup to pair with a direction (feature.trend_state, rollup.volume@v1.up_volume_share_20d), and feature.bb_squeeze is the same idea measured against the Keltner channel."
+caveats = [
+  "Twenty sessions after a shock day the bands snap shut as the shock leaves the window, and the percentile can print 0.05 on a name that recently had its biggest day of the year; a genuine squeeze has a flat chart behind it. Check rollup.price_moves@v1.one_day_move and rollup.trend_stats@v2.tight_range_sessions.",
+  "A squeeze can last weeks and the release can go either way; do not read a low percentile as a buy. Confirm the direction with feature.breakout_20d or rollup.volume@v1.up_volume_share_20d once it moves.",
+  "A pending takeover pins the price, so the bands stay the tightest in the year until the deal closes. See the 'pending takeover' situation.",
+  "Null when fewer than 240 of the 252 sessions before today have a bandwidth (a young listing or a name with gaps), or today's is unknown.",
+]
+sources = [
+  "Bollinger (2001), Bollinger on Bollinger Bands: 'The Squeeze' (BandWidth at a six-month low)",
+  "Minervini (2013), Trade Like a Stock Market Wizard: volatility contraction before breakouts",
+]
+[[field.use]]
+for = "a squeeze (volatility contraction)"
+op = "lte"
+value = 0.10
+mode = "soft"
+tolerance = 0.05
+note = "pair with feature.trend_state eq UPTREND for a bullish setup; the squeeze itself has no direction"
+[[field.use]]
+for = "a volatile month (avoid for mean reversion)"
+op = "gte"
+value = 0.90
+mode = "soft"
+tolerance = 0.05
+note = "a filter for strategies that need a calm name; for 'wide bands today' use feature.bb_width"
+
+[[field]]
+name = "feature.bb_squeeze"
+theme = "volatility"
+reads = "True when both Bollinger bands sit inside the Keltner channel: the dispersion of closes has fallen below the name's own daily range, the compression Carter's TTM squeeze is built on. It is a state, not a signal: the release (the first session the bands move back outside the channel) is the event, and its direction comes from the price. It usually coincides with rollup.bands@v2.bb_width_pctile_252d under about 0.15 but needs no history, so it works on young listings."
+caveats = [
+  "With a Keltner multiplier of 2 ATR the squeeze fires less often than Carter's 1.5; a name that is 'almost' squeezed shows in rollup.bands@v2.bb_width_pctile_252d.",
+  "A squeeze lasts from a few sessions to months; screening on it alone finds names going nowhere. Pair with feature.trend_state or feature.volume_dry_up to find the ones building a base.",
+  "A pending takeover squeezes forever (no range, no dispersion); see the 'pending takeover' situation.",
+  "Null when the bands or the channel are unknown (fewer than 20 consecutive bars) and the known side does not already say false.",
+]
+sources = [
+  "Carter (2005), Mastering the Trade: the TTM squeeze",
+  "TTM Squeeze, StockCharts: https://school.stockcharts.com/doku.php?id=technical_indicators:ttm_squeeze",
+]
+[[field.use]]
+for = "a squeeze setup"
+op = "eq"
+value = true
+mode = "hard"
+note = "with feature.trend_state eq UPTREND (bullish) or rollup.volume@v1.up_volume_share_20d gte 0.55 for the direction"
+
+[[field]]
+name = "rollup.trend_stats@v2.ret_z_20d"
+theme = "volatility"
+reads = "Today's close-to-close return in units of the name's normal daily move: the return divided by the standard deviation of the 20 daily returns before it. Low to high: within -1 to +1 is an ordinary day, beyond 2 a notable one (about one day in twenty by chance), beyond 3 an event (earnings, news, an index change, a capitulation), beyond 5 almost always a gap on news. The sign is the direction; rollup.volume@v1.volume_z_20d is the same measure for volume."
+caveats = [
+  "The base is the 20 sessions before today, so the day after a shock the base is wide and a second large move reads small; the day after that the shock is in the base for 19 more sessions. Check rollup.price_moves@v1.one_day_move for the largest recent day.",
+  "An earnings day is an outsized day by nature; check rollup.earnings@v1.last_earnings_date before reading a 3-sigma move as news.",
+  "A thin name with a half-cent daily move has a tiny base, so an ordinary tick prints as sigmas; gate on rollup.price_stats@v2.adv_usd_20d.",
+  "Null after a gap in the last 22 sessions, a shorter history, or when the 20 base returns were all equal (zero deviation).",
+]
+sources = [
+  "Standard score, Wikipedia: https://en.wikipedia.org/wiki/Standard_score",
+  "Event-day detection by standardised returns (de Bondt and Thaler style event studies): https://en.wikipedia.org/wiki/Event_study",
+]
+[[field.use]]
+for = "an outsized up day"
+op = "gte"
+value = 3.0
+mode = "soft"
+tolerance = 0.5
+note = "confirm with rollup.volume@v1.volume_z_20d gte 2; for a down shock use lte -3"
+[[field.use]]
+for = "an ordinary day (no event today)"
+op = "between"
+value = [-2.0, 2.0]
+mode = "hard"
+note = "a filter for setups that need a quiet entry day"
+
+[[field]]
+name = "rollup.trend_stats@v2.tight_range_sessions"
+theme = "volatility"
+reads = "How many consecutive sessions, ending today, the 20-session high-low range has been at most 15% of the close: the age of the current base. 0 means the range is not tight today; 5 to 10 is a young base (one or two weeks); 20 and above a month-old consolidation, the kind O'Neil's flat base and Minervini's contraction patterns describe; 60 and above a long, often dull, range. It counts sessions, so the base's start is today minus the count."
+caveats = [
+  "15% of the close is tight for a large cap and wide for a biotech or a leveraged fund: a high-volatility name never qualifies and a utility always does. For 'tight for this name' use rollup.bands@v2.bb_width_pctile_252d, which ranks against the name's own year.",
+  "A base in a downtrend is a shelf before the next leg down as often as a bottom; pair with feature.trend_state or feature.pct_vs_sma_200 for the direction it should resolve in.",
+  "A pending takeover makes the tightest base there is; see the 'pending takeover' situation.",
+  "Null when today's 20-session range is unknown (a gap among the last 20 sessions, or a shorter history).",
+]
+sources = [
+  "O'Neil (2009), How to Make Money in Stocks: flat bases (at least five weeks, under 15% deep)",
+  "Minervini (2013), Trade Like a Stock Market Wizard: the volatility contraction pattern",
+]
+[[field.use]]
+for = "an established base"
+op = "gte"
+value = 20
+mode = "soft"
+tolerance = 5
+note = "with feature.trend_state eq UPTREND for a base in a trend; feature.breakout_20d then marks the exit from it"
+[[field.use]]
+for = "not in a base (already moving)"
+op = "eq"
+value = 0
+mode = "hard"
+note = "a filter for momentum entries that want the move under way"
+
+# ATR and realised-vol windows beside the 14 / 20 / 30 (vol_stats@v1, volatility.toml
+# expressions): the expansion and contraction of the daily range, and where realised vol sits
+# against the name's own year.
+
+[[field]]
+name = "rollup.vol_stats@v1.atr_5"
+theme = "volatility"
+reads = "Wilder's average true range over 5 sessions, in dollars per share: this week's typical daily range, reacting to a change in volatility within days where atr_14 takes two weeks. Read it against atr_20 (feature.atr_ratio_5_20): above the longer average the range is expanding, below it contracting. On its own it scales with the price; feature.atr_pct is the 14-session range as a share of the close."
+caveats = [
+  "Five true ranges is a small sample: one gap day lifts it by a fifth of the gap for a week. Check rollup.price_moves@v1.one_day_move.",
+  "Null with fewer than 6 consecutive bars ending on the session.",
+]
+sources = ["Wilder (1978), New Concepts in Technical Trading Systems: ATR"]
+[[field.use]]
+for = "has a short ATR"
+op = "not_null"
+mode = "hard"
+note = "threshold the ratio instead: feature.atr_ratio_5_20"
+
+[[field]]
+name = "rollup.vol_stats@v1.atr_20"
+theme = "volatility"
+reads = "Wilder's average true range over 20 sessions, in dollars per share: the month's typical daily range, the slow reference the 5-session ATR is compared with (feature.atr_ratio_5_20). Position sizing by ATR usually uses 14 or 20; the two differ by a few percent on most names."
+caveats = [
+  "Null with fewer than 21 consecutive bars ending on the session.",
+]
+sources = ["Wilder (1978), New Concepts in Technical Trading Systems: ATR"]
+[[field.use]]
+for = "has a monthly ATR"
+op = "not_null"
+mode = "hard"
+note = "threshold feature.atr_pct for the range as a share of the price"
+
+[[field]]
+name = "rollup.vol_stats@v1.hv10"
+theme = "volatility"
+reads = "Close-to-close realised volatility over the last 10 sessions, annualised: 0.30 means the last two weeks' daily moves, scaled to a year, were 30%. It is the fastest realised-vol window in the catalogue and the noisiest; compare it with hv60 (feature.hv_ratio_10_60) to see whether the last two weeks were calmer or wilder than the quarter, and with rollup.iv30@v1.iv30 for what options price for the month ahead."
+caveats = [
+  "Ten returns: one 5% day alone gives an hv10 near 0.25. Check rollup.trend_stats@v2.ret_z_20d for the day behind the number.",
+  "Null after a gap in the last 11 sessions or a shorter history.",
+]
+sources = ["Realised volatility estimators: ADR 0021; Sinclair (2013), Volatility Trading"]
+[[field.use]]
+for = "a calm fortnight (realised vol low)"
+op = "lte"
+value = 0.20
+mode = "soft"
+tolerance = 0.05
+note = "the level depends on the name: use feature.hv_ratio_10_60 or rollup.vol_stats@v1.hv20_pctile_252d for 'calm for this name'"
+
+[[field]]
+name = "rollup.vol_stats@v1.hv60"
+theme = "volatility"
+reads = "Close-to-close realised volatility over the last 60 sessions (a quarter), annualised: the name's recent normal, slower and steadier than hv20 and hv30. A large cap sits around 0.15 to 0.30, a growth name 0.40 to 0.60, a biotech or a leveraged fund above 0.70. It is the base feature.hv_ratio_10_60 compares the last two weeks with, and a fair comparison for a 60-day option's implied vol."
+caveats = [
+  "An earnings day inside the quarter lifts it for 60 sessions; check rollup.earnings@v1.last_earnings_date.",
+  "Null after a gap in the last 61 sessions or a shorter history.",
+]
+sources = ["Realised volatility estimators: ADR 0021"]
+[[field.use]]
+for = "a volatile name (quarterly realised vol)"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+note = "for premium selling, pair with feature.iv_hv_spread or the vrp features so the implied side pays for it"
+
+[[field]]
+name = "rollup.vol_stats@v1.hv20_pctile_252d"
+theme = "volatility"
+reads = "Where today's 20-session realised volatility sits against the name's own last year, 0 to 1: the share of the 252 sessions before today whose hv20 was lower. 0.10 means the last month was among the calmest tenth of the year (the realised side of a volatility contraction, the setup the squeeze screens look for); 0.90 among the wildest. It is the realised twin of feature.iv_percentile: both high means a known storm, implied high and realised low means the market expects one."
+caveats = [
+  "After a shock day hv20 stays high for 20 sessions and then drops in one step; a percentile that collapses with no news is the shock leaving the window. Check rollup.price_moves@v1.one_day_move.",
+  "One missing bar voids every hv20 window containing it (21 of them), so a name with two or three gaps in the year has no percentile. Check rollup.price_stats@v2.history_days.",
+  "Null when today's hv20 is unknown or fewer than 240 of the 252 sessions before have one.",
+]
+sources = ["Bollinger (2001), Bollinger on Bollinger Bands: volatility cycles; Sinclair (2013), Volatility Trading"]
+[[field.use]]
+for = "realised volatility contraction"
+op = "lte"
+value = 0.15
+mode = "soft"
+tolerance = 0.05
+note = "with feature.bb_squeeze eq true or rollup.bands@v2.bb_width_pctile_252d lte 0.10; a pre-move state, no direction"
+[[field.use]]
+for = "realised volatility already elevated"
+op = "gte"
+value = 0.85
+mode = "soft"
+tolerance = 0.05
+note = "a filter for strategies that want a calm entry; for premium selling check feature.iv_percentile is higher still"
+
+[[field]]
+name = "feature.atr_ratio_5_20"
+theme = "volatility"
+reads = "ATR(5) / ATR(20): the daily range this week against the month. 1 is unchanged; above about 1.3 the range is expanding (a breakout under way, or a shock), below about 0.7 it is contracting (the quiet before a move, or a dull name). The breakout screens want it above 1 on the breakout day; the range-breakout screen wants it below 1 before the move."
+caveats = [
+  "One gap day lifts ATR(5) by a fifth of the gap and the ratio with it for a week; an 'expansion' that is one day old is a gap, not a trend. Check rollup.trend_stats@v2.ret_z_20d.",
+  "A pending takeover collapses both ATRs; the ratio then swings on cents. See the 'pending takeover' situation.",
+  "Null with fewer than 21 consecutive bars, or ATR(20) of 0.",
+]
+sources = ["Volatility breakout systems (Kaufman, Trading Systems and Methods: range expansion)"]
+[[field.use]]
+for = "range expanding (breakout confirmation)"
+op = "gte"
+value = 1.2
+mode = "soft"
+tolerance = 0.1
+note = "with feature.breakout_20d or feature.breakout_magnitude_20d gt 0"
+[[field.use]]
+for = "range contracting (before the move)"
+op = "lte"
+value = 0.8
+mode = "soft"
+tolerance = 0.1
+note = "with rollup.bands@v2.bb_width_pctile_252d lte 0.15 for the squeeze"
+
+[[field]]
+name = "feature.hv_ratio_10_60"
+theme = "volatility"
+reads = "Realised vol over the last 10 sessions / over the last 60: above 1 the last two weeks were more volatile than the quarter, below 1 calmer. 0.5 is a markedly quiet fortnight (a base), 2 a fortnight that held an event. The same reading as feature.atr_ratio_5_20 from close-to-close returns instead of ranges, so a gap-heavy name reads higher here."
+caveats = [
+  "An earnings day in the last 10 sessions is the whole numerator; check rollup.earnings@v1.last_earnings_date.",
+  "Null after a gap in the last 61 sessions, a shorter history, or hv60 of 0.",
+]
+sources = ["Sinclair (2013), Volatility Trading: volatility cones and term comparison"]
+[[field.use]]
+for = "a quiet fortnight against the quarter"
+op = "lte"
+value = 0.7
+mode = "soft"
+tolerance = 0.1
+note = "with rollup.vol_stats@v1.hv20_pctile_252d lte 0.2 for a contraction against the year as well"

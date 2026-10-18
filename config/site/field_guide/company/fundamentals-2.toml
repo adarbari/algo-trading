@@ -1,0 +1,496 @@
+# Continues fundamentals.toml: the same keys, the same theme; see its header.
+
+[[field]]
+name = "rollup.financials@v3.qtr_as_of"
+theme = "fundamentals"
+reads = "The end date of the latest reported quarter that rollup.financials@v3.revenue_qtr and rollup.financials@v3.eps_diluted_qtr describe. Up to about four months before the session; the same date for every non-null quarter column of the row."
+caveats = [
+  "Not the date it became public: that is later. A session reads only what SEC had accepted by its close. A filing accepted at or after 16:00 New York time counts from the next session.",
+  "Null when no quarter can be formed or the quarter is older than 480 days.",
+]
+sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
+[[field.use]]
+for = "a latest quarter is known"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.fundamentals@v4.shares_outstanding_year_ago"
+theme = "fundamentals"
+reads = "The company's share count a year earlier: the count of the same kind (cover page or weighted average) whose period ended 9 to 15 months before rollup.fundamentals@v4.shares_as_of, the one closest to a year, split-adjusted to the session. The base of feature.shares_change_yoy."
+caveats = [
+  "Null for a recent filer, and for a company that began tagging the cover page less than a year ago (no cover count a year back): the weighted average is not substituted, as the two differ by definition.",
+  "A weighted average lags: it is the average over its period, not the count at its end.",
+]
+sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
+[[field.use]]
+for = "a year-over-year share change is defined"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.financials@v3.financials_status"
+theme = "fundamentals"
+reads = "Whether the company's revenue, net income and earnings per share each have a trailing twelve month figure. OK: all three do. PARTIAL: some do, so a ratio built on a missing one is blank. NO_TTM: facts are filed but no figure can be formed, a recent filer without four quarters or a year. NO_FACTS: nothing is filed, as for funds and foreign filers that do not report in dollars. STALE: the first figure ended more than 480 days before the session; the values are shown but old."
+caveats = [
+  "OK says the figures exist, not that they are recent. A name stays OK for months after its period ended, and a company between two reports is not stale.",
+  "STALE is checked before PARTIAL and OK, so a late filer with all three figures reads STALE. The price to sales ratio, feature.ps_ratio, is blank for it. The price to earnings ratio, feature.pe_ratio, is blank when only the earnings figure is old.",
+  "OK does not make feature.pe_ratio defined. It is also blank for a loss and for an ADR, which rollup.financials@v3.is_adr marks.",
+]
+sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
+[[field.use]]
+for = "complete, current financials"
+op = "eq"
+value = "OK"
+mode = "hard"
+[[field.use]]
+for = "leave out stale or missing financials"
+op = "in"
+value = ["OK", "PARTIAL"]
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_estimates@v1.fy1_period_end"
+theme = "fundamentals"
+reads = "The fiscal year end of the first estimate year: the first year the vendor lists after the last annual report we know. It is the current year, not yet reported, so a December filer reads 2026-12-31 until its 10-K is public."
+caveats = [
+  "At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.",
+  "A 52 or 53 week year can differ from the vendor's date by a few days; years ending within 60 days of the last report count as that report.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "estimates for the current year exist"
+op = "not_null"
+mode = "hard"
+note = "a building block: check the year before using an estimate"
+
+[[field]]
+name = "rollup.analyst_estimates@v1.fy2_period_end"
+theme = "fundamentals"
+reads = "The fiscal year end of the second estimate year, the next year the vendor lists after the first. It is one year after fy1_period_end for most names."
+caveats = [
+  "Null when the vendor lists only one forward year, which is common for thinly covered names. A hard criterion then drops them.",
+  "At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "estimates for the next year exist"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_estimates@v1.eps_fy1"
+theme = "fundamentals"
+reads = "The analysts' average estimate of earnings per share for the first estimate year, in dollars. Divided into the price it is the forward P/E; against the last reported EPS it is the growth analysts expect this year."
+caveats = [
+  "At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.",
+  "The vendor reports in its own currency, which for a foreign filer is not the listing's: check the filing currency before comparing it with a USD price.",
+  "A consensus of one or two analysts is an opinion, not a consensus: read the analyst count beside it. Check rollup.analyst_estimates@v1.eps_fy1_analysts.",
+  "A negative estimate is a forecast loss; a forward P/E on it has no meaning. Check the sign before dividing.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "a profit is expected this year"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_estimates@v1.eps_fy2"
+theme = "fundamentals"
+reads = "The analysts' average estimate of earnings per share for the second estimate year, in dollars. Against eps_fy1 it shows the growth analysts expect from one year to the next."
+caveats = [
+  "Fewer analysts cover the second year than the first, so it moves more between snapshots. Read it with rollup.analyst_estimates@v1.eps_fy1_analysts as the minimum count.",
+  "At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.",
+  "The vendor reports in its own currency, which for a foreign filer is not the listing's: check the filing currency before comparing it with a USD price.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "a profit is expected next year"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_estimates@v1.revenue_fy1"
+theme = "fundamentals"
+reads = "The analysts' average estimate of revenue for the first estimate year, in dollars. Against rollup.financials@v3.revenue_ttm it is the growth analysts expect in sales."
+caveats = [
+  "At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.",
+  "The vendor reports in its own currency, which for a foreign filer is not the listing's: check the filing currency before comparing it with a USD price.",
+  "A consensus of one or two analysts is an opinion, not a consensus: read the analyst count beside it. Check rollup.analyst_estimates@v1.revenue_fy1_analysts.",
+  "Revenue is defined by each analyst: banks and insurers report it differently, and the average mixes the definitions.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "a revenue estimate exists"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_estimates@v1.revenue_fy2"
+theme = "fundamentals"
+reads = "The analysts' average estimate of revenue for the second estimate year, in dollars."
+caveats = [
+  "Fewer analysts cover the second year than the first, so it moves more between snapshots.",
+  "At the fiscal year roll FY1 moves when the annual report becomes public, so a ratio over FY1 jumps once. That is a change of year, not of the estimate: check rollup.analyst_estimates@v1.fy1_period_end.",
+  "The vendor reports in its own currency, which for a foreign filer is not the listing's: check the filing currency before comparing it with a USD price.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "a revenue estimate for next year exists"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_estimates@v1.eps_fy1_analysts"
+theme = "fundamentals"
+reads = "How many analysts' EPS estimates the first year's average holds. Three or more is a consensus; one or two is a single view that can be stale."
+caveats = [
+  "The count is the vendor's at the snapshot, and an analyst who stopped covering the name may still be counted for weeks.",
+  "Large companies have 20 or more; below 5 one revision moves the average.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "at least three analysts"
+op = "gte"
+value = 3
+mode = "soft"
+tolerance = 1
+note = "pair it with eps_fy1 so a thin average does not pass as a consensus"
+
+[[field]]
+name = "rollup.analyst_estimates@v1.revenue_fy1_analysts"
+theme = "fundamentals"
+reads = "How many analysts' revenue estimates the first year's average holds. It can differ from the EPS count, as some analysts publish one and not the other."
+caveats = [
+  "The count is the vendor's at the snapshot, and an analyst who stopped covering the name may still be counted for weeks.",
+  "Null with estimates_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with estimates_status STALE: the newest snapshot is over 21 days old, so no estimate is served. rollup.analyst_estimates@v1.estimates_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "at least three analysts"
+op = "gte"
+value = 3
+mode = "soft"
+tolerance = 1
+
+[[field]]
+name = "rollup.analyst_estimates@v1.estimates_age_days"
+theme = "fundamentals"
+reads = "Days from the session the snapshot was fetched for to this session: how old the estimates are. The nightly rotation refreshes each covered name about every few days, so 0 to 10 is normal."
+caveats = [
+  "Shown for OK and STALE only. Null for a name the vendor does not cover and for one never asked.",
+  "An estimate can be old when the snapshot is new: the vendor revises on its own schedule, and a quiet name has no revisions.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "fresh estimates"
+op = "lte"
+value = 14
+mode = "soft"
+tolerance = 7
+
+[[field]]
+name = "rollup.analyst_estimates@v1.estimates_status"
+theme = "fundamentals"
+reads = "Whether the analyst estimates of the name can be used. OK: a snapshot at most 21 days old. STALE: older, so no value is served. NOT_COVERED: the vendor has no estimates for the name. NOT_FETCHED: we have not asked yet."
+caveats = [
+  "NOT_COVERED and NOT_FETCHED read the same to a trader, as not covered. The admin cause tells them apart, and NOT_FETCHED ends as the nightly rotation reaches the name.",
+  "STALE is not the old value: a snapshot past 21 days serves nothing, so a vendor outage shows as STALE rather than as old numbers.",
+  "OK does not say the estimates exist for both years: check fy2_period_end, or the single column you need, instead of requiring OK alone.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "estimates are current"
+op = "eq"
+value = "OK"
+mode = "hard"
+[[field.use]]
+for = "leave out stale snapshots"
+op = "ne"
+value = "STALE"
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_targets@v1.target_consensus"
+theme = "fundamentals"
+reads = "The average analyst price target, in dollars: where the analysts who cover the name expect the price in about twelve months. Against the close it is the upside they see, 20% above is a strong view."
+caveats = [
+  "Analysts raise targets after a rise and cut them after a fall, so a target above the price is often the lag of a rally.",
+  "The target is the vendor's current one on the day it was asked, with no date of its own. A stale or revised target is not visible in the number.",
+  "The average mixes analysts who updated last week with ones who updated a year ago: the vendor does not date each target.",
+  "Null with targets_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v1.targets_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "a target exists"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_targets@v1.target_median"
+theme = "fundamentals"
+reads = "The median analyst price target, in dollars. It is less moved by one extreme target than the consensus, so a gap between the two means a skewed range."
+caveats = [
+  "Analysts raise targets after a rise and cut them after a fall, so a target above the price is often the lag of a rally.",
+  "The target is the vendor's current one on the day it was asked, with no date of its own. A stale or revised target is not visible in the number.",
+  "Null with targets_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v1.targets_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "a target exists"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_targets@v1.target_high"
+theme = "fundamentals"
+reads = "The highest analyst price target, in dollars: the most optimistic single view."
+caveats = [
+  "One analyst sets it, and it can be old or built on a case the others reject. Never read it as the likely price.",
+  "The target is the vendor's current one on the day it was asked, with no date of its own. A stale or revised target is not visible in the number.",
+  "Null with targets_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v1.targets_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "a target exists"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_targets@v1.target_low"
+theme = "fundamentals"
+reads = "The lowest analyst price target, in dollars: the most cautious single view. A low target above the price means every analyst expects a gain."
+caveats = [
+  "One analyst sets it, and it can be old or built on a case the others reject. Never read it as the likely price.",
+  "The target is the vendor's current one on the day it was asked, with no date of its own. A stale or revised target is not visible in the number.",
+  "Null with targets_status NOT_COVERED or NOT_FETCHED reads as not covered by our analyst data. The free vendor plan covers few names, and the nightly rotation has not asked every name yet.",
+  "Null with targets_status STALE: the newest snapshot is over 21 days old, so no target is served. rollup.analyst_targets@v1.targets_age_days says how old it is.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "a target exists"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.analyst_targets@v1.targets_age_days"
+theme = "fundamentals"
+reads = "Days from the session the snapshot was fetched for to this session: how old the targets are. The nightly rotation refreshes each covered name about every few days, so 0 to 10 is normal."
+caveats = [
+  "Shown for OK and STALE only. Null for a name the vendor does not cover and for one never asked.",
+  "A target can be old when the snapshot is new: the vendor changes it only when an analyst does.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "fresh targets"
+op = "lte"
+value = 14
+mode = "soft"
+tolerance = 7
+
+[[field]]
+name = "rollup.analyst_targets@v1.targets_status"
+theme = "fundamentals"
+reads = "Whether the price targets of the name can be used. OK: a snapshot at most 21 days old. STALE: older, so no value is served. NOT_COVERED: the vendor has no target for the name. NOT_FETCHED: we have not asked yet."
+caveats = [
+  "NOT_COVERED and NOT_FETCHED read the same to a trader, as not covered. The admin cause tells them apart, and NOT_FETCHED ends as the nightly rotation reaches the name.",
+  "STALE is not the old value: a snapshot past 21 days serves nothing, so a vendor outage shows as STALE rather than as old numbers.",
+]
+sources = [
+  "Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)",
+]
+[[field.use]]
+for = "targets are current"
+op = "eq"
+value = "OK"
+mode = "hard"
+[[field.use]]
+for = "leave out stale snapshots"
+op = "ne"
+value = "STALE"
+mode = "hard"
+
+# mispricing@v1: the anomaly inputs, the quality score and the composite rank (edge build E1d).
+
+[[field]]
+name = "rollup.mispricing@v1.composite_rank"
+theme = "fundamentals"
+reads = "The composite mispricing rank, 0 to 1. It is the mean percentile rank of seven anomalies: net share issuance, accruals, net operating assets, asset growth, a simplified Ohlson O-score, and inverted gross profitability and return on assets. Each is oriented so that high means overpriced. 1 is the most overpriced name of the session, 0 the most underpriced; 0.5 is the middle. Combining many noisy anomalies predicts returns better than any one, and most of the spread in the literature sits on the overpriced end."
+caveats = [
+  "It is not Stambaugh, Yu and Yuan's composite: four of their eleven anomalies are missing. Composite equity issuance and investment-to-assets need cash-flow detail we do not store. Financial distress needs returns and volatility. Momentum lives in the price fields. rollup.mispricing@v1.composite_inputs says how many of the seven an instrument's rank averages; a rank on five is less reliable than one on seven.",
+  "Missing is left out, never filled. An anomaly a company cannot report (an untagged debt line, no gross profit) drops out of its own mean. Fewer than five of seven gives null. A hard criterion therefore drops those names rather than passing them.",
+  "A rank is relative to the session's cross-section, so it moves when other names move and carries no level. It uses all instruments with statements, across industries and sizes; banks, brokers and insurers have most inputs null and are usually unranked.",
+  "Statement figures enter from the session after SEC acceptance of the filing. A rank can be up to four months stale for a company that has not filed lately. rollup.balance_sheet@v2.bs_as_of shows how old the balance sheet is. Individual anomalies have decayed since publication (accruals especially); the composite holds up better, and it is also the benchmark any other cross-sectional edge has to beat.",
+]
+sources = ["Stambaugh, Yu and Yuan (2015), Journal of Finance 70(5); docs/edge-ideas/altdata-text-ml.md (composite_mispricing_score)"]
+[[field.use]]
+for = "the most underpriced fifth (the long leg)"
+op = "lte"
+value = 0.2
+mode = "hard"
+note = "null (too few anomalies known) never passes"
+[[field.use]]
+for = "the most overpriced fifth (the short leg, or an avoid list)"
+op = "gte"
+value = 0.8
+mode = "hard"
+
+[[field]]
+name = "rollup.mispricing@v1.quality_score"
+theme = "fundamentals"
+reads = "A quality score from 0 to 1. It is the mean percentile rank of six measures among instruments with a value that session. The measures are return on equity, return on assets, gross margin, net margin, operating cash flow over total assets and low debt to equity. 0.8 is better than about 80% of the cross-section on the average measure. Quality names are profitable, cash-generating and conservatively financed; the idea is to hold momentum within them so the junk that drives momentum crashes is excluded."
+caveats = [
+  "QMJ-like, not QMJ. It omits Asness, Frazzini and Pedersen's growth (five-year changes), payout (buybacks, dividends, accruals) and low-beta parts. It uses one year of data with no stability measure. It ranks across industries, so an asset-light software firm outranks a utility on margins. It weights the six measures equally.",
+  "Needs at least four of the six measures. Gross margin is missing for the many filers that do not tag GrossProfit. Debt to equity is missing for those with negative equity or untagged debt. A score therefore rests on different measures for different names. Missing is dropped, never counted as zero; a hard criterion drops names with too few.",
+  "Banks and insurers are scored on the measures they report (return on equity and assets, net margin) and their debt to equity is not comparable; read them separately.",
+  "Statement figures enter from the session after SEC acceptance of the filing and can be four months old; the score is relative to the session's cross-section and has no level.",
+]
+sources = ["Asness, Frazzini and Pedersen (2019), Review of Accounting Studies 24(1), Quality Minus Junk; docs/edge-ideas/cross-sectional.md (momentum_x_quality_interaction)"]
+[[field.use]]
+for = "a high-quality name"
+op = "gte"
+value = 0.7
+mode = "soft"
+tolerance = { relative = 0.1 }
+
+[[field]]
+name = "rollup.mispricing@v1.asset_growth"
+theme = "fundamentals"
+reads = "Growth of total assets over the year to the latest balance sheet: total assets over the same line a year earlier, less one (0.10 is +10%). Firms that expand their balance sheet fast, by acquisition, capex or hoarding, tend to earn lower returns afterwards (Cooper, Gulen and Schill), so high growth counts as overpriced in rollup.mispricing@v1.composite_rank."
+caveats = [
+  "An acquisition or a financing round can double assets overnight without any organic growth; nothing here separates them. Check rollup.balance_sheet@v2.total_assets and the filings.",
+  "The year-ago figure is the balance sheet ending within 40 days of the latest one's date minus 365 days, as restated by any filing accepted by the session. A company with less than a year of filings, or a gap, is null.",
+  "Rate of change of a size measure: a small company swings more than a large one. Banks and insurers grow assets by lending and are not comparable.",
+]
+sources = ["Cooper, Gulen and Schill (2008), Journal of Finance 63(4), Asset Growth and the Cross-Section of Stock Returns"]
+[[field.use]]
+for = "assets not growing fast"
+op = "lte"
+value = 0.2
+mode = "soft"
+tolerance = { relative = 0.5 }
+
+[[field]]
+name = "rollup.mispricing@v1.accruals"
+theme = "fundamentals"
+reads = "Accruals as a share of total assets: net income minus operating cash flow, both over the trailing twelve months, over total assets at the latest balance sheet. Positive means reported earnings exceed the cash behind them (accounting profit not yet realised), negative means cash exceeds earnings. Sloan found high accruals followed by low returns."
+caveats = [
+  "A weak signal on its own: the accruals anomaly has largely vanished in US large caps since about 2002 and is subsumed by cash-based profitability. It is here as one input of rollup.mispricing@v1.composite_rank, not a screen to trade alone.",
+  "Uses the latest total assets, not the average of two years as Sloan did, and the whole income-less-cash gap, not only working-capital accruals; depreciation and large non-cash items move it.",
+  "Net income and operating cash flow come from different groups: check rollup.cash_flow@v2.cf_as_of and rollup.financials@v3.ttm_as_of that they end on the same quarter. Null for banks, brokers and insurers, whose cash flows are not comparable.",
+]
+sources = ["Sloan (1996), The Accounting Review 71(3), Do Stock Prices Fully Reflect Information in Accruals and Cash Flows about Future Earnings"]
+[[field.use]]
+for = "earnings backed by cash"
+op = "lte"
+value = 0
+mode = "soft"
+tolerance = { relative = 0.5 }
+
+[[field]]
+name = "rollup.mispricing@v1.gross_profit_to_assets"
+theme = "fundamentals"
+reads = "Gross profitability: gross profit over the trailing twelve months over total assets at the latest balance sheet (0.30 is 30 cents of gross profit a year per dollar of assets). Novy-Marx found it predicts returns about as well as value, and it hedges value; high is underpriced, so it enters rollup.mispricing@v1.composite_rank inverted."
+caveats = [
+  "Null for the many filers that do not tag GrossProfit, and null is not zero: a hard criterion drops them. Filers draw the line between cost of revenue and operating costs differently, so compare within an industry.",
+  "Asset-heavy businesses score low and asset-light ones high regardless of quality; intangible assets that are not on the balance sheet (brands, software) understate the base.",
+  "Null for banks, brokers and insurers.",
+]
+sources = ["Novy-Marx (2013), Journal of Financial Economics 108(1), The Other Side of Value: The Gross Profitability Premium"]
+[[field.use]]
+for = "a high gross profit on assets"
+op = "gte"
+value = 0.3
+mode = "soft"
+tolerance = { relative = 0.2 }
+
+[[field]]
+name = "rollup.mispricing@v1.net_operating_assets"
+theme = "fundamentals"
+reads = "Net operating assets as a share of total assets. Operating assets are assets less cash; operating liabilities are assets less debt and equity. The difference is debt plus equity less cash, divided by total assets. A high value means the business has tied up much capital in operations beyond what operating liabilities fund. Hirshleifer, Hou, Teoh and Zhang link that to accumulated accruals and low future returns."
+caveats = [
+  "Short-term investments, minority interest and preferred stock are not separated: investments count as operating, so a company holding treasuries looks asset-heavy. The base is the latest total assets, not the year-ago assets of the paper.",
+  "Null when total_debt is null (an untagged debt line is not zero) and for banks, brokers and insurers, whose balance sheets are not operating ones.",
+  "Moves slowly and with every acquisition; a negative value (net cash larger than the capital employed) is possible and valid.",
+]
+sources = ["Hirshleifer, Hou, Teoh and Zhang (2004), Journal of Accounting and Economics 38, Do Investors Overvalue Firms with Bloated Balance Sheets?"]
+[[field.use]]
+for = "a lean balance sheet"
+op = "lte"
+value = 1
+mode = "soft"
+tolerance = { relative = 0.2 }
+
+[[field]]
+name = "rollup.mispricing@v1.ohlson_o"
+theme = "fundamentals"
+reads = "A simplified Ohlson O-score, a bankruptcy-risk index from size, leverage, working capital, current ratio, a negative-equity flag, profitability and cash flow. Higher is riskier; it is a rank input to rollup.mispricing@v1.composite_rank, not a probability and not comparable with the paper's levels."
+caveats = [
+  "Two of Ohlson's terms are omitted because they need last year's net income, which no group stores. They are a loss in both of the last two years and the change in net income. The GNP price-index deflator on the size term is omitted too. The deflator is a constant within a session, so ranks are unaffected, but the level shifts across sessions: compare only within one session.",
+  "Operating cash flow stands in for funds from operations, and total assets are in dollars, not thousands of 1968 dollars; both only shift or rescale the score.",
+  "Null for banks, brokers and insurers, for a filer missing current assets, current liabilities, total liabilities or operating cash flow, and when a statement is stale.",
+]
+sources = ["Ohlson (1980), Journal of Accounting Research 18(1), Financial Ratios and the Probabilistic Prediction of Bankruptcy"]
+[[field.use]]
+for = "a low bankruptcy-risk rank input (compare within one session)"
+op = "lte"
+value = -3
+mode = "soft"
+tolerance = { relative = 0.3 }

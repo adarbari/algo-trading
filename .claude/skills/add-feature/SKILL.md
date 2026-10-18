@@ -34,7 +34,7 @@ high_52w - 1`, a HIGH / LOW label from thresholds, `shares x close`.) Then it is
 3. `make features-doc`; tests: a case in `tests/unit/features/test_site.py` (values, nulls,
    categories). A bad formula fails at load naming the file, the feature and the position.
 4. **Its field guide entry, same PR** (ADR 0041 amended): a `[[field]]` in
-   `config/site/field_guide/<theme>.toml` naming `feature.<name>`: how to read it (low to
+   `config/site/field_guide/<group>/<file>.toml` naming `feature.<name>`: how to read it (low to
    high, in its unit), the criterion per intent as the rule grammar takes it (`[[field.use]]`:
    `for`, `op`, `value`, `mode`, `tolerance`, `on_miss`, `note`), the caveats (when the number
    is right and the conclusion wrong, each naming the field that exposes it) and the sources.
@@ -124,7 +124,7 @@ loader under `features/`, and never write a new task for a group. `make ownershi
 8. **Docs:** the generated catalogue (`make features-doc`), the groups table in
    `docs/data/layers.md` and the selectable fields in `docs/configuration.md`; and the
    field guide entry of every column a person would set a threshold on (`[[field]]` in
-   `config/site/field_guide/<theme>.toml`, as in the expression-feature step 4 above:
+   `config/site/field_guide/<group>/<file>.toml`, as in the expression-feature step 4 above:
    reading, criterion per intent, caveats, sources). `make features-doc` lists what is
    still unguided; screened or phrased fields must be guided.
 9. **Baseline:** if strategies or screeners use it, run `make baseline` and explain the diff.

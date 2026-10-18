@@ -603,3 +603,5 @@ rest).
 - Thresholds are bounded by the field guide: a field without an entry gets the model's own
   number. A bad threshold in a draft is fixed in `config/site/field_guide/`, with its source, once
   for the page, the Builder and the prompt; `make features-doc` regenerates the page.
+
+- Amended 2026-10-18: the files are `config/site/field_guide/<group>/<file>.toml`, one folder per theme group of `config/site/guide/sections.toml`, each file with a `-2` part so none passes 900 lines; the generated pages are `docs/data/field-guide/<group>/<theme>.md` (a long theme in parts). Load order, entries and prompt are unchanged.

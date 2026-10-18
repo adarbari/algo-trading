@@ -12,10 +12,11 @@
 - a null explained by a status column (ADRs 0042, 0046) names statuses that are ``NullReason``
   values and that the status column declares as categories;
 - the generated catalogue (``docs/data/features.md``) is up to date;
-- the site field guide (``config/site/field_guide/*.toml``, ADR 0041) names only catalogue fields,
+- the site field guide (``config/site/field_guide/<group>/*.toml``, ADR 0041) names only
+  catalogue fields,
   in its entries, its situations and its prose, with values that fit each field's type,
-  categories and range, and its generated pages (``docs/data/field-guide.md`` and one per theme
-  under ``docs/data/field-guide/``) are up to date;
+  categories and range, and its generated pages (``docs/data/field-guide.md`` and the theme pages
+  under ``docs/data/field-guide/<group>/``) are up to date;
 - inputs come only through ``algotrade.data.feature_inputs``: no module under ``features/``
   imports storage or a domain reader, and the framework has no loaders of its own;
 - an expression over an optional group (ADR 0055) has a value without it, and no site preset's
@@ -31,6 +32,7 @@ import pandas as pd
 import pytest
 
 from algotrade.config.site.field_guide import GuideUse
+from algotrade.config.site.guide.sections import load_guide_sections
 from algotrade.config.site.settings import (
     MacroSettings,
     load_field_guide,
@@ -52,6 +54,7 @@ from algotrade.features.framework.feature import (
 from algotrade.features.framework.graph import dependencies
 from algotrade.features.framework.runner import compute_in_memory
 from algotrade.features.guide import DIR as GUIDE_DIR
+from algotrade.features.guide import PAGE_LINES
 from algotrade.features.guide import pages as guide_pages
 from algotrade.features.registry import GROUPS, feature
 from algotrade.features.site import site_features
@@ -315,16 +318,44 @@ def test_field_guide_values_fit_their_fields() -> None:
 
 
 def test_field_guide_page_is_up_to_date() -> None:
-    pages = guide_pages(GUIDE)
+    pages = guide_pages(GUIDE, load_guide_sections(FileConfigStore(REPO_ROOT / "config")))
     for rel, text in pages.items():
         path = REPO_ROOT / rel
         assert path.exists() and path.read_text() == text, (
             f"{rel} is out of date: run `make features-doc`"
         )
-    extra = {str(p.relative_to(REPO_ROOT)) for p in (REPO_ROOT / GUIDE_DIR).glob("*.md")} - set(
+    extra = {str(p.relative_to(REPO_ROOT)) for p in (REPO_ROOT / GUIDE_DIR).glob("**/*.md")} - set(
         pages
     )
     assert not extra, f"theme pages no longer rendered: {sorted(extra)} (run `make features-doc`)"
+
+
+def test_field_guide_files_are_filed_by_theme_group_and_stay_under_the_caps() -> None:
+    """``field_guide/<group>/<file>.toml``: one folder per theme group of ``sections.toml``, no
+    file beside them, file stems unique (the loader names a file by its stem and reads them
+    in stem order), every config file and generated page under ``PAGE_LINES``, a folder at most
+    12 files (ADR 0020)."""
+    base = REPO_ROOT / "config" / "site" / "field_guide"
+    groups = {g.id for g in load_guide_sections(FileConfigStore(REPO_ROOT / "config")).theme_groups}
+    assert not list(base.glob("*.toml")), "a field guide file belongs in a theme group folder"
+    folders = {p.name for p in base.iterdir() if p.is_dir()}
+    assert folders == groups, (
+        f"field_guide/ folders {sorted(folders)} != theme groups {sorted(groups)}"
+    )
+    files = sorted(base.glob("*/*.toml"))
+    stems = [p.stem for p in files]
+    assert len(stems) == len(set(stems)), "a file stem is used in two folders"
+    assert all(re.fullmatch(r"[a-z]+(-[a-z]+)*(-\d)?", s) for s in stems), stems
+    for folder in (base / g for g in folders):
+        assert len(list(folder.iterdir())) <= 12, f"{folder}: more than 12 files"
+    pages = list((REPO_ROOT / GUIDE_DIR).glob("**/*.md"))
+    long = {
+        str(p): n for p in [*files, *pages] if (n := len(p.read_text().splitlines())) > PAGE_LINES
+    }
+    assert not long, f"over {PAGE_LINES} lines (split at an entry boundary): {long}"
+    generated = {p.parent for p in pages}
+    for folder in generated:
+        assert len(list(folder.glob("*.md"))) <= 12, f"{folder}: more than 12 pages"
 
 
 def test_series_inputs_are_checked_against_the_macro_registry() -> None:
@@ -415,7 +446,7 @@ def test_screened_and_phrased_fields_have_a_guide_entry() -> None:
     missing = {f: w for f, w in {**_screened_fields(), **phrased}.items() if f not in guided}
     assert not missing, (
         "fields screened or phrased without a field guide entry (add a [[field]] to "
-        f"config/site/field_guide/<theme>.toml, then `make features-doc`): {missing}"
+        f"config/site/field_guide/<group>/<file>.toml, then `make features-doc`): {missing}"
     )
 
 

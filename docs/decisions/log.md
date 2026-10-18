@@ -808,3 +808,12 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a document that states what it cannot measure is better than none, and a stored-group change for a highly correlated member is cost without information.
+
+## 2026-10-18 | Field guide files: folders by theme group, files split in two
+- Question: the twelve `config/site/field_guide/*.toml` files sit at 934-991 lines (the 1000-line cap), so every new entry fails `make filelen`; how is the guide filed?
+- Options: raise the cap for these files / split each file in two in place / subfolders named after the four Guide theme groups (tradeable, chart, options, company) with each file split `<stem>.toml` + `<stem>-2.toml` / re-home entries by theme.
+- Decision: subfolders by theme group, each file split at an entry boundary near its midpoint (a pure move: no entry changes, no re-homing, since themes interleave across files); the loader reads the folders one level deep and the stem order keeps `x-2` right after `x`, so the order of fields and situations, the drafting prompt bytes and the Builder's help are identical (proved by a before/after snapshot); generated pages move to `docs/data/field-guide/<group>/`, a long theme split into parts under 900 lines; a contract test keeps the layout.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Note: planned by the architect agent on the owner's behalf; CLAUDE.md's settled line names `field_guide/*.toml`; the owner may reword it to `field_guide/**/*.toml` (this PR does not edit CLAUDE.md).
+- Reasoning: the cap is a settled rule, the move costs no behaviour, and the groups are the ones the Guide already shows.
