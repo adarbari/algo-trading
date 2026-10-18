@@ -74,7 +74,9 @@ def test_no_filing_table_is_all_unknown() -> None:
 
 def test_a_filing_known_after_the_session_never_counts() -> None:
     later = SESSION + timedelta(days=3)
-    out = _compute(_filings([("EQ:A", GRID[0]), ("EQ:A", later), ("EQ:B", GRID[0])]))
+    out = _compute(
+        _filings([("EQ:A", GRID[0]), ("EQ:A", later), ("EQ:B", GRID[0]), ("EQ:C", SESSION)])
+    )
     assert out["filing_count_5d"].tolist()[:2] == [0, 0]  # the later one is invisible
 
 
@@ -158,3 +160,20 @@ def test_volume_shock_and_news_free_flags() -> None:
         "EQ:UNK": None,
         "EQ:NOVOL": None,
     }
+
+
+def test_a_session_the_filings_step_did_not_store_is_unknown_not_zero() -> None:
+    previous = GRID[-2]  # the filings stop the session before: the step failed or was skipped
+    out = _compute(_filings([("EQ:A", GRID[0]), ("EQ:B", previous), ("EQ:C", GRID[0])]))
+    assert out["filing_count_5d"].isna().all()  # never zeros, which would read as "no news"
+
+
+def test_a_filing_on_the_session_before_the_window_counts_like_the_earnings_span() -> None:
+    first = sessions_ending(SESSION, 6)[0]  # the span earnings_in_5d uses
+    before = sessions_ending(SESSION, 7)[0]
+    out = _compute(
+        _filings([("EQ:A", first), ("EQ:B", before), ("EQ:B", SESSION), ("EQ:C", SESSION)])
+    )
+    assert out["filing_count_5d"].tolist() == [1, 1, 1]  # EQ:A: only the one before the window
+    out = _compute(_filings([("EQ:A", before), ("EQ:B", SESSION)]))
+    assert out["filing_count_5d"].tolist()[:2] == [0, 1]  # a filing older than the span is out

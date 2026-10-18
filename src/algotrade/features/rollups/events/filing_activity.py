@@ -7,16 +7,22 @@ loader's ``known_from <= S`` rule, ``known_from`` being the acceptance's New Yor
 results rows are filings, counted by the first column) and ``price_stats@v2`` for the names
 traded on the session. One row per operating company with a ``price_stats@v2`` row.
 
-    filing_count_5d  8-K and 8-K/A filings of the instrument with ``known_from`` in the last 5
-                     exchange sessions, the session included (0: none)
+    filing_count_5d  8-K and 8-K/A filings of the instrument with ``known_from`` from the
+                     session before the last 5 exchange sessions through the session (the same
+                     span as ``earnings_in_5d``: a filing accepted after that session's close
+                     or over the weekend is known from the first session of the window or
+                     the one before it); 0: none
     earnings_in_5d   whether an earnings report's reaction window (E-1 to E+1,
                      ``earnings_reaction``) touches the last 5 sessions: a report dated on or
                      after the session before the window and on or before the session
 
-``filing_count_5d`` is null (UNKNOWN), never zero, when the filings table cannot say "none":
-no filing is stored at all, the table's first ``known_from`` is after the window's first
-session (the backfill had not reached it), or the instrument has no filing known by the
-session (filings are fetched for the event-study scope only, so no row may mean not asked).
+``filing_count_5d`` is null (UNKNOWN), never zero, when the filings table cannot say "none"
+(fail closed): no filing is stored at all; the table's first ``known_from`` is after the
+span's first session (the backfill had not reached it); no filing at all is known FROM the
+session itself (the filings step is not critical and tolerates failures: on a night it failed
+or was skipped the session's 8-Ks are not stored yet, and a zero would read "no news"; a later
+run that stores them turns the null into a value, never a zero into a one); or the instrument
+has no filing known by the session (nothing stored for it: never fetched, or never filed).
 ``earnings_in_5d`` is null when the instrument has no earnings report known by the session at
 all. A report that was not yet known on the session never counts, so a session recomputed
 after later nights changes nothing it knew. The window (5) is part of the definition:
@@ -40,15 +46,16 @@ KNOWN_FROM = earnings.KNOWN_FROM
 WINDOW = 5  # sessions of the window, the session included
 
 _NO_TABLE = (
-    "no filing is stored, the filings backfill starts after the window, or the instrument has "
-    "no filing known by the session (filings are fetched for the event-study scope only)"
+    "no filing is stored, the filings backfill starts after the window, no filing is known "
+    "from the session itself (the filings step did not store it yet), or the instrument has no "
+    "filing known by the session (nothing stored for it)"
 )
 
 FEATURES = (
     Feature(
         "filing_count_5d", "int", "count",
-        f"8-K and 8-K/A filings of the company accepted in the last {WINDOW} sessions, the "
-        "session included, as known on the session (0: it filed nothing)",
+        f"8-K and 8-K/A filings of the company accepted from the session before the last "
+        f"{WINDOW} sessions through the session, as known on the session (0: it filed nothing)",
         _NO_TABLE, valid_range=(0, None), inputs=(f"{FILINGS}.accession",),
     ),
     Feature(
@@ -69,14 +76,14 @@ def _known_days(rows: pd.DataFrame) -> pd.Series:
 
 def filing_counts(filings: pd.DataFrame | None, session: date) -> pd.Series:
     """Per instrument seen in ``filings``: its filings known in the window (the module doc's
-    rule); empty when the table is absent, or starts after the window, so that nobody
-    gets a zero it cannot know."""
+    rule); empty when the table is absent, starts after the span, or holds nothing known from
+    the session itself, so that nobody gets a zero it cannot know."""
     if filings is None or filings.empty:
         return pd.Series(dtype="int64")
     known = _known_days(filings)
     known = known[known <= session]  # the loader's rule, kept here for the invariant
-    start = sessions_ending(session, WINDOW)[0]
-    if known.empty or known.min() > start:
+    start = sessions_ending(session, WINDOW + 1)[0]  # the span earnings_flags uses
+    if known.empty or known.min() > start or not (known == session).any():
         return pd.Series(dtype="int64")
     seen = filings.loc[known.index]
     in_window = known >= start

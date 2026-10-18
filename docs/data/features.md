@@ -496,7 +496,7 @@ Whether the coming calendar month is one the name pays an ex-dividend date in, f
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
-| `filing_count_5d` | window | int | count | open | >= 0 | 8-K and 8-K/A filings of the company accepted in the last 5 sessions, the session included, as known on the session (0: it filed nothing) | no filing is stored, the filings backfill starts after the window, or the instrument has no filing known by the session (filings are fetched for the event-study scope only) | `events/filing.accession` |
+| `filing_count_5d` | window | int | count | open | >= 0 | 8-K and 8-K/A filings of the company accepted from the session before the last 5 sessions through the session, as known on the session (0: it filed nothing) | no filing is stored, the filings backfill starts after the window, no filing is known from the session itself (the filings step did not store it yet), or the instrument has no filing known by the session (nothing stored for it) | `events/filing.accession` |
 | `earnings_in_5d` | window | bool | flag | open |  | An earnings report's reaction window (the session before it to the session after it) touches the last 5 sessions: the company reported in them, or the day before the first of them | no earnings report is known for the instrument by the session | `events/earnings.ts` |
 
 ## `fundamentals@v3`

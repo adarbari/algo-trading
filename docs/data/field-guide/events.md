@@ -594,7 +594,7 @@ Sources: Site convention (docs/data/features.md, earnings_revisions@v1)
 
 ### `rollup.filing_activity@v1.filing_count_5d`
 
-**How to read it.** How many 8-K and 8-K/A filings (the SEC's current-report form: results, deals, management changes, material agreements) the company had accepted in the last 5 sessions, counting the session, as known on it. 0 means it filed nothing in the week; 1 is routine for most companies; 3 or more is a busy corporate week.
+**How to read it.** How many 8-K and 8-K/A filings (the SEC's current-report form: results, deals, management changes, material agreements) the company had accepted from the session before the last 5 sessions through the session, as known on it (an 8-K filed after the close or over a weekend is counted from the first session it was known). 0 means it filed nothing in the week; 1 is routine for most companies; 3 or more is a busy corporate week.
 
 **The criterion per intent**
 
@@ -604,7 +604,7 @@ Sources: Site convention (docs/data/features.md, earnings_revisions@v1)
 
 **When the reading lies**
 
-- Null means the table cannot say none: no filing is stored for the company by the session (filings are fetched for the event-study scope only, so no row may mean not asked), or the stored history starts after the 5-session window. A hard 'eq 0' therefore drops those names, which is the point.
+- Null means the table cannot say none: no filing is stored for the company by the session (never fetched, or never filed), the stored history starts after the window, or no filing is stored from the session itself yet (the nightly filings step failed or was skipped: a zero then would wrongly read as no news). A hard 'eq 0' therefore drops those names, which is the point.
 - A filing is counted from the session its acceptance made it public (after 16:00 New York time on a session it still counts that session); a filing accepted after the session never appears on it, so a past session reads the same as it did then.
 - News with no 8-K (an analyst note, a press story, a rumour, a competitor's results) is not counted: a zero is 'no company filing', not 'no news'. rollup.filing_activity@v1.earnings_in_5d adds the report windows, and feature.news_free_5d combines both.
 - An Item 2.02 results release is an 8-K, so an earnings week shows at least one filing.
@@ -679,7 +679,7 @@ Sources: Hartzmark and Solomon (2013), The dividend month premium, Journal of Fi
 **When the reading lies**
 
 - It is the absence of company filings and report dates, not of news: a press story, an analyst call, a rumour, a peer's results or a macro release still moves a name in a 'news free' week.
-- Null is common before the filings backfill and for names outside the event-study scope; a hard 'eq true' keeps only names where the absence is known.
+- Null is common before the filings backfill, on a night the filings step did not store the session, and for names with no stored filing; a hard 'eq true' keeps only names where the absence is known.
 - A past session is read as it was: a filing accepted after it, or a report date published later, never changes it.
 
 Sources: Gervais, Kaniel and Mingelgrin (2001), The high-volume return premium, Journal of Finance
