@@ -198,6 +198,7 @@ description = "Keep rows of a source whose terms bar machine learning (the no_ml
 owner = ["src/algotrade/services/evaluation/training/no_ml.py"]
 allowed = [
     "src/algotrade/storage/tables/schemas/events.py",  # declares the set
+    "src/algotrade/storage/tables/schemas/__init__.py",  # re-exports it
     "src/algotrade/services/evaluation/discovery/frame.py",  # leaves such a feature out of the usable fields
 ]
 section = "docs/adr/0028-ibkr-enrichment-source.md#amendment-2026-10-17-no-ml-tables"
