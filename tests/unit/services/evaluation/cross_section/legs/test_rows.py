@@ -264,3 +264,38 @@ def test_rows_survive_a_store_and_come_back_decoded(backend: Backend) -> None:
 def test_nothing_stored_reads_as_nothing(backend: Backend) -> None:
     assert read_legs(StoreReader(backend), "site", "drift", D, S).legs == {}
     assert decode_frame(pd.DataFrame()) == decode_frame(None)
+
+
+def test_a_long_short_leg_keeps_its_short_names_values_apart_and_an_absent_field_is_long() -> None:
+    """Outcome sides: the long leg's counted values are ``pick_values``, the short leg's
+    ``short_values``; the flag says which side a pick is. A leg of any other side has no
+    ``short_values`` (null, not empty) and reads back as it was written."""
+    picks = (
+        Pick("EQ:A", 1, "", 0.1, True, False, 3.5, 0.11, 0.02, 2.5e7),
+        Pick("EQ:B", 2, "no_entry_bar", score=3.1),
+        Pick("EQ:C", 1, "", 0.2, True, False, -3.0, -0.2, 0.0, 9e6, side="short"),
+        Pick("EQ:D", 2, "", -0.05, False, False, -3.1, 0.05, 0.0, 8e6, side="short"),
+    )
+    spread = leg(stat=stat(pick_values=(0.1,), short_values=(0.2, -0.05), picks=picks))
+    row = encode_leg(spread, "site", "drift")
+    assert row["short_values"] == [0.2, -0.05]
+    back = decode_leg(row).stat
+    assert back == spread.stat
+    assert [(p.instrument_id, p.side, p.value) for p in back.picks] == [
+        ("EQ:A", "long", 0.1), ("EQ:B", "long", None), ("EQ:C", "short", 0.2),
+        ("EQ:D", "short", -0.05),
+    ]  # fmt: skip
+    plain = encode_leg(leg(), "site", "drift")
+    assert plain["short_values"] is None and decode_leg(plain).stat.short_values is None
+    legacy = {k: v for k, v in plain.items() if k != "short_values"}  # a row from before sides
+    assert decode_leg(legacy).stat == leg().stat
+    empty = leg(stat=stat(pick_values=(), short_values=(), picks=()))
+    assert decode_leg(encode_leg(empty, "site", "drift")).stat.short_values == ()  # not None
+
+
+def test_a_short_leg_is_all_short_picks_with_their_values_in_pick_values() -> None:
+    picks = (Pick("EQ:C", 1, "", 0.2, True, side="short"), Pick("EQ:D", 2, "", -0.05, side="short"))
+    short = leg(stat=stat(pick_values=(0.2, -0.05), picks=picks, pick_hits=1))
+    back = decode_leg(encode_leg(short, "site", "drift")).stat
+    assert back == short.stat and all(p.side == "short" for p in back.picks)
+    assert back.short_values is None

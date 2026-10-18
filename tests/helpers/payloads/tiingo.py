@@ -118,3 +118,41 @@ def meta_payload() -> bytes:
         row("US000000020003", "aac", "Aac Holdings Now", True),
     ]
     return json.dumps(rows).encode()
+
+
+NAV_TICKERS_SLICE = (
+    REPO_ROOT / "tests" / "fixtures" / "sources" / "tiingo" / "nav_tickers_slice.csv"
+)
+
+
+def nav_tickers_zip() -> bytes:
+    """RECORDED: 25 rows of the 2026-10-08 supported-tickers file as received (same file as the
+    slice above): the NMFQS NAV series of seven closed-end funds (XPHKX, XGDLX, XEVVX, XBSTX,
+    XNADX, XBITX, XJPSX ended 2024), two real mutual funds whose symbol collides with a stock
+    (XCATX, XALCX), ten other mutual funds, two NMFQS ETF rows, and the NYSE / NASDAQ rows of
+    PHK, AAPL and SPY (AZNH is listed twice: NMFQS and NYSE ARCA)."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("supported_tickers.csv", NAV_TICKERS_SLICE.read_bytes())
+    return buffer.getvalue()
+
+
+def nav_prices(rows: Iterable[tuple[str, float | None]]) -> bytes:
+    """``/tiingo/daily/XPHKX/prices`` BUILT FROM THE DOCUMENTATION, NOT RECORDED (no NAV payload
+    was captured): a mutual-fund series, ``open = high = low = close`` = the NAV, zero volume, an
+    ``adjClose`` that differs (proves it is never read); a ``None`` NAV is a null close."""
+    out = [
+        {
+            "date": f"{d}T00:00:00.000Z",
+            "open": nav,
+            "high": nav,
+            "low": nav,
+            "close": nav,
+            "volume": 0,
+            "adjClose": None if nav is None else nav / 2,
+            "divCash": 0.0,
+            "splitFactor": 1.0,
+        }
+        for d, nav in rows
+    ]
+    return json.dumps(out).encode()

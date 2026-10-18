@@ -1,6 +1,7 @@
 """The skew and term-structure expression features of
 ``config/site/features/options/positioning.toml``
-(``skew_rr25``, ``term_ratio_30_90``, ``term_ratio_next_30``): values, the sign conventions
+(``skew_rr25``, ``term_ratio_30_90``, ``term_ratio_next_30``,
+``option_stock_volume_ratio``): values, the sign conventions
 (backwardation above 1, contango below), and nulls (UNKNOWN, never zero or infinity)."""
 
 import numpy as np
@@ -61,3 +62,30 @@ def test_term_ratios_read_backwardation_above_one_and_the_front_premium(fs: Feat
     assert pd.isna(out.loc["EQ:NONEXT", "term_ratio_next_30"])
     assert out.loc["EQ:NOIV30", names].isna().all()  # no iv30: both ratios UNKNOWN
     assert {fs.expressions[n].feature.licence for n in names} == {"open"}
+
+
+def test_option_stock_volume_ratio_is_contracts_times_100_over_shares(fs: FeatureSet) -> None:
+    flow = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:ZERO", "EQ:DARK", "EQ:NOVOL"],
+            "session_date": END,
+            "flow_status": ["OK", "OK", "NO_CHAIN", "OK"],
+            "call_volume": [3000.0, 10.0, np.nan, 0.0],
+            "put_volume": [2000.0, 10.0, np.nan, 0.0],
+        }
+    )
+    volume = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:ZERO", "EQ:DARK", "EQ:NOVOL"],
+            "session_date": END,
+            "session_volume": [10_000_000.0, 0.0, 1e6, 1e6],
+        }
+    )
+    out = fs.evaluate(
+        {"rollups/instrument/chain_flow@v1": flow, "rollups/instrument/volume@v1": volume},
+        ["option_stock_volume_ratio"],
+    ).set_index("instrument_id")["option_stock_volume_ratio"]
+    assert out["EQ:A"] == pytest.approx(0.05)  # 5,000 contracts x 100 over 10m shares
+    assert pd.isna(out["EQ:ZERO"]) and pd.isna(out["EQ:DARK"])  # never infinity; no chain
+    assert pd.isna(out["EQ:NOVOL"])  # a chain without volume is unknown, not 0
+    assert fs.expressions["option_stock_volume_ratio"].feature.licence == "open"

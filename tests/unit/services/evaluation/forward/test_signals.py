@@ -7,8 +7,13 @@ from datetime import date
 from algotrade.config.edges.loading import load_edges
 from algotrade.core.time.calendar import next_session
 from algotrade.services.evaluation.cross_section.sessions import leg_blocks
-from algotrade.services.evaluation.forward.signals import edge_signals, legs_between, paper_traded
-from tests.unit.services.evaluation.cross_section.conftest import DAYS, build_world
+from algotrade.services.evaluation.forward.signals import (
+    _not_possible,
+    edge_signals,
+    legs_between,
+    paper_traded,
+)
+from tests.unit.services.evaluation.cross_section.conftest import DAYS, build_world, edge
 from tests.unit.services.evaluation.cross_section.test_harness import (
     EVENTS,
     OTM_OUTCOME,
@@ -122,3 +127,14 @@ def test_a_screen_with_no_features_for_the_session_is_skipped_not_empty() -> Non
     d = desk(build_world(no_features=[DAYS[0]]))
     found = signals(d, DAYS[0])
     assert found.signals == () and found.skipped is not None
+
+
+def test_a_short_or_long_short_edge_is_never_paper_traded_as_longs() -> None:
+    """Outcome sides: the record buys the picks, so an edge whose outcome is the short or the
+    spread says why instead of signalling the screen's best names."""
+    base = {"kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
+            "start_offset_sessions": 1}  # fmt: skip
+    assert _not_possible(edge()) is None
+    for side in ("short", "long_short"):
+        why = _not_possible(edge(outcome={**base, "side": side}, top_k=5))
+        assert why is not None and side in why

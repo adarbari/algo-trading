@@ -28,6 +28,7 @@ export {
   EDGE_VIEWS,
   inView,
   labelText,
+  sideLabel,
   stateLabel,
   stateOrStatus,
   stateTone,

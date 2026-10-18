@@ -55,7 +55,8 @@ PROMISING: Final = "promising"
 NOT_WORKING: Final = "not_working"
 NOT_ENOUGH: Final = "not_enough_data"
 WAITING: Final = "waiting_on_data"
-ORDER: Final = (WAITING, NOT_ENOUGH, NOT_WORKING, PROMISING, WORKS)  # worst to best
+DIAGNOSTIC: Final = "diagnostic_only"  # a long-short result: a spread is never a verdict basis
+ORDER: Final = (DIAGNOSTIC, WAITING, NOT_ENOUGH, NOT_WORKING, PROMISING, WORKS)  # worst to best
 PASS, FAIL, NOT_MEASURED, NOT_APPLICABLE = "pass", "fail", "not_measured", "not_applicable"
 CRITERION_STATUSES: Final = (
     PASS,
@@ -65,6 +66,9 @@ CRITERION_STATUSES: Final = (
 )  # a criterion's status, each explained in the Guide
 IN_SAMPLE, OUT_OF_SAMPLE, BOTH, ALL = "in_sample", "out_of_sample", "both", "all"
 NO_DECOYS = "no decoys declared"  # the value of a decoy criterion that does not apply
+DIAGNOSTIC_SIDE = (
+    "A long-short spread is a diagnostic: no verdict rests on it (a short leg alone can)"
+)
 EN_DASH = "\u2013"  # between the months of a partial year's label
 
 
@@ -160,6 +164,7 @@ class EdgeVerdict:
     haircut: EdgeHaircut | None = None  # the basis's Sharpe ratio after the variants tried
     decay: EdgeDecay | None = None  # the paper's figure against the in- and out-of-sample ones
     basis_why: str = ""  # a basis chosen among several: the in-sample lifts it was chosen on
+    side: str = "long"  # the basis's outcome side: long | short | long_short (ADR 0053 amendment)
 
 
 def _pct(x: float | None) -> str:
@@ -543,8 +548,9 @@ def _judge_one(
     oos, whole = c.oos, c.whole
     pts = runs.lift_points(oos.hit_rate, oos.base_rate)
     basis = _basis_words((c.variant, c.horizon))
+    held = " (short leg)" if oos.side == "short" else ""
     body = (
-        f"Out-of-sample, {basis}: win rate {_pct(oos.hit_rate)} against a base rate of "
+        f"Out-of-sample, {basis}{held}: win rate {_pct(oos.hit_rate)} against a base rate of "
         f"{_pct(oos.base_rate)} ({_num(pts, 0)} pts)."
     )
     shown = level in (WORKS, PROMISING, NOT_WORKING)
@@ -560,6 +566,7 @@ def _judge_one(
         else reason,
         criteria=crit,
         basis=basis,
+        side=oos.side,
         trades=whole.sessions,
         oos_trades=oos.sessions,
         win_rate=oos.hit_rate,
@@ -631,8 +638,13 @@ def _years(c: _Candidate, split: date | None, range_to: date | None = None) -> t
     return tuple(out)
 
 
-def _waiting(edge_id: str, reason: str) -> EdgeVerdict:
-    return EdgeVerdict(edge_id, WAITING, reason, reason, reason)
+def _waiting(edge_id: str, reason: str, side: str = "long") -> EdgeVerdict:
+    return EdgeVerdict(edge_id, WAITING, reason, reason, reason, side=side)
+
+
+def _diagnostic(edge_id: str) -> EdgeVerdict:
+    reason = DIAGNOSTIC_SIDE
+    return EdgeVerdict(edge_id, DIAGNOSTIC, reason, reason, reason, side="long_short")
 
 
 def _rank(lift_pts: float | None) -> float:
@@ -783,6 +795,8 @@ def judge(
     if rows is None:
         return _waiting(edge_id, "No official result yet")
     found = _candidates(rows)
+    if found and all(c.oos.side == "long_short" for c in found):
+        return _diagnostic(edge_id)  # never a verdict basis
     choice = basis if basis is not None else choose_basis(rows, t, declared, decoys)
     if choice.key is None:
         lost = f": {'; '.join(lost_inputs)}" if lost_inputs and not found else ""

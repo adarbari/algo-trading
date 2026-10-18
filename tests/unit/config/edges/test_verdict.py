@@ -87,7 +87,25 @@ def test_every_key_of_the_verdict_file_is_read_and_every_read_key_is_in_the_file
     doc = tomllib.loads(Path("config/site/verdict.toml").read_text())
     assert set(doc) == set(KEYS)
     assert set(doc["published_haircut"]) == set(LEGS)
-    assert set(doc["edge_costs"]) == {"levels_bps"}
+    assert set(doc["edge_costs"]) == {"levels_bps", "borrow_bps_annual"}
+
+
+def test_the_assumed_borrow_cost_defaults_reads_and_rejects_a_bad_value() -> None:
+    assert VerdictSettings.from_document(None).borrow_bps_annual == 100.0
+    read = VerdictSettings.from_document({"edge_costs": {"borrow_bps_annual": 250}})
+    assert read.borrow_bps_annual == 250.0
+    assert read.cost_levels_bps == (0.0, 15.0, 30.0, 50.0)  # the grid keeps its default
+    for bad in (-1, "100", True):
+        with pytest.raises(ConfigurationError, match="borrow_bps_annual"):
+            VerdictSettings.from_document({"edge_costs": {"borrow_bps_annual": bad}})
+
+
+def test_a_short_leg_has_its_own_published_haircut_beside_the_others() -> None:
+    d = VerdictSettings.from_document(None)
+    assert (d.published_haircut("short"), d.published_haircut("long_short")) == (0.5, 0.5)
+    assert d.published_haircut("long") == 0.333
+    read = VerdictSettings.from_document({"published_haircut": {"short": 0.4}})
+    assert read.published_haircut("short") == 0.4 and read.published_haircut("long_short") == 0.5
 
 
 def test_the_standard_decoys_default_read_and_reject_a_bad_list() -> None:
