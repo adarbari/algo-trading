@@ -215,6 +215,7 @@ The trigger is a reverse split, where each holder gets one new share for several
 next = "Open the edge's result and read how many reverse splits lie behind it."
 see_also = ["base_rate", "out_of_sample"]
 
+[[term]]
 id = "schedule_on_market"
 term = "After a market-wide trigger"
 short = "The edge starts after something that happens to the whole market, not to one company."
