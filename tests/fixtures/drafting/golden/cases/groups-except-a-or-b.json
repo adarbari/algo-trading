@@ -50,36 +50,7 @@
     ],
     "contract": true,
     "explained": {
-      "parts": [
-        {
-          "words": "stocks",
-          "kind": "applied",
-          "origin": "words",
-          "join": null,
-          "join_words": ""
-        },
-        {
-          "words": "above $10",
-          "kind": "applied",
-          "origin": "words",
-          "join": null,
-          "join_words": ""
-        },
-        {
-          "words": "IV rank above 80%",
-          "kind": "applied",
-          "origin": "words",
-          "join": "and_not",
-          "join_words": "except those with"
-        },
-        {
-          "words": "market cap under $2B",
-          "kind": "applied",
-          "origin": "words",
-          "join": "or",
-          "join_words": "or"
-        }
-      ],
+      "parts": [],
       "model_share": 1.0,
       "not_understood": 0
     },

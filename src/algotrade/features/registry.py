@@ -32,6 +32,7 @@ from algotrade.features.rollups.activity import (
     vol_stats,
     volume_profile,
 )
+from algotrade.features.rollups.bridges import etf_macro
 from algotrade.features.rollups.consensus import (
     analyst_estimates,
     analyst_ratings,
@@ -207,6 +208,7 @@ GROUPS: dict[str, FeatureGroup] = {
             relative_strength.GROUP,
             momentum_variants.GROUP,
             factor_betas.GROUP,
+            etf_macro.GROUP,
             illiquidity.GROUP,
         ),
         # iv30@v1, put_wing@v1 and call_wing@v1 read the materialised div_yield@v1 (FeatureSet

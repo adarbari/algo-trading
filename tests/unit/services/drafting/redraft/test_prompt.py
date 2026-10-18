@@ -118,6 +118,7 @@ def test_the_user_prompt_says_what_is_asked(site) -> None:  # noqa: F811
 
 
 PINNED = {
+    "14": ("a124244834229593", "cb03fbc5eba3b5b0"),
     "13": ("e5ba4f3935a531e8", "cb03fbc5eba3b5b0"),
     "12": ("ac0ca060dd6963f7", "cb03fbc5eba3b5b0"),
     "11": ("c9d0abccce7c9bc1", "cb03fbc5eba3b5b0"),

@@ -69,12 +69,22 @@ def ibkr_stored_hv(
     }
 
 
+def known_vx(frame: pd.DataFrame, session: date) -> pd.DataFrame:
+    """The rows of ``frame`` (every stored version, ``known_from`` as dates) known by
+    ``session`` (``known_from <= session``), the latest version per contract and trade date."""
+    kept = frame[frame["known_from"] <= session]
+    return kept.sort_values("known_from", kind="stable").drop_duplicates(
+        ["instrument_id", "session_date"], keep="last"
+    )
+
+
 def vx_futures(
     reader: StoreReader,
     start: date,
     end: date,
     session: date | None = None,
     as_of: datetime | None = None,
+    versions: bool = False,
 ) -> pd.DataFrame:
     """VIX futures rows with ``start <= session_date <= end`` (``VX_COLUMNS``), sorted by
     trade date then expiry, dates as dates; an empty frame when none.
@@ -82,17 +92,19 @@ def vx_futures(
     ``session`` is the session the read serves (ADR 0050): only rows with ``known_from <=
     session`` are kept (a trade date's settle is known from the next session), and per contract
     and trade date the latest version known by then. ``None`` keeps every row, the latest
-    version. ``as_of`` pins the stored run (ADR 0007). ``settle`` is null where Cboe published
-    none (before 2013-05-20)."""
+    version. ``versions`` keeps every stored version of a contract and trade date instead
+    (the caller applies ``known_vx`` per session). ``as_of`` pins the stored run (ADR 0007).
+    ``settle`` is null where Cboe published none (before 2013-05-20)."""
     frame = reader.table_range(VX_FUTURES, start, end, as_of)
     if frame is None or frame.empty:
         return pd.DataFrame({c: [] for c in VX_COLUMNS})
     frame = frame.assign(known_from=pd.to_datetime(frame["known_from"]).dt.date)
     if session is not None:
         frame = frame[frame["known_from"] <= session]
-    frame = frame.sort_values("known_from", kind="stable").drop_duplicates(
-        ["instrument_id", "session_date"], keep="last"
-    )
+    if not versions:
+        frame = frame.sort_values("known_from", kind="stable").drop_duplicates(
+            ["instrument_id", "session_date"], keep="last"
+        )
     out = frame.reindex(columns=list(VX_COLUMNS))
     out["session_date"] = pd.to_datetime(out["session_date"]).dt.date
     out["expiry"] = pd.to_datetime(out["expiry"]).dt.date

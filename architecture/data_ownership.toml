@@ -123,6 +123,7 @@ owner = ["src/algotrade/data/macro/*"]
 allowed = [
     "src/algotrade/storage/tables/schemas/events.py",  # declares the table
     "src/algotrade/features/rollups/market/macro.py",  # names its input; read through data.feature_inputs (ADR 0048)
+    "src/algotrade/features/rollups/bridges/etf_macro.py",  # names its input; read through data.feature_inputs (EB E5)
 ]
 section = "docs/adr/0048-macro-series-with-vintages.md#decision"
 detect = [{ string = "macro/series" }]
