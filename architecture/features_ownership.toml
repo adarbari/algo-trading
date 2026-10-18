@@ -9,6 +9,19 @@
 scope = ["src/algotrade/features/"]
 
 [[responsibility]]
+id = "edge-market-triggers"
+description = "The market-level triggers an on_market:<trigger> edge times by (ADR 0075): the VIX spike (market_triggers@v1: the first session with the latest fresh VIX at least 30 and VIX / VIX3M above 1 after 21 quiet sessions, known from the session after its close, null when the reading is stale, never 'no spike') and its placement for the time-series harness (the trigger sessions read one at a time from the stored market row, windows that never overlap, the out-of-window base around them); the outcomes are read by time_series/harness.py alone"
+owner = [
+    "src/algotrade/features/rollups/market/triggers.py",
+    "src/algotrade/services/evaluation/time_series/triggers.py",
+]
+allowed = [
+    "src/algotrade/services/evaluation/time_series/evaluate.py",  # the caller: places the periods of an on_market edge
+]
+section = "docs/adr/0075-market-triggers-lockup-reverse-split-and-two-windows.md#decision"
+detect = [{ call = "trigger_periods" }, { call = "trigger_row" }, { call = "vix_stale" }]
+
+[[responsibility]]
 id = "feature-applicability"
 description = "Whether a feature applies to an instrument (Feature.applies_to over the reference snapshot's optionable and security_type facts and the company snapshot's SIC): the one decision behind the read layer's NOT_APPLICABLE and the nightly coverage check (ADRs 0042, 0045); and the declared explanations of a null (null_status with illiquid_statuses / uncovered_statuses / explained_statuses, the closed NullReason) behind ILLIQUID, NOT_COVERED (ADR 0072) and EXPLAINED (ADR 0046)"
 owner = ["src/algotrade/features/framework/feature.py"]
