@@ -6,7 +6,7 @@ fact FILED on or before the session: a restatement filed later never moves a ses
 the session's ``price_stats@v2`` (it sets which instruments get a row) and
 ``instruments/company`` (the SIC code).
 
-Each line's TTM is formed as ``financials@v2``'s are (``ttm.trailing``): the last four
+Each line's TTM is formed as ``financials@v3``'s are (``ttm.trailing``): the last four
 consecutive discrete quarters (a reported three-month fact, else the difference of two
 year-to-date facts of one fiscal year and one tag filed close together), else the latest fiscal
 year. A period takes the first tag of its concept's list that reports it (``statement_concepts``,

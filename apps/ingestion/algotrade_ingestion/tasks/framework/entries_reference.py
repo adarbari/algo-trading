@@ -99,6 +99,7 @@ def run_shares(ctx: TaskContext, p: Params) -> RunRecord:
         ctx.settings.sec_statements_backfill_per_night,
         ctx.settings.sec_statements_priority_min_adv_usd,
         getattr(facts, "statements_tags_date", date.min),
+        filings=ctx.sources["sec_filings"],
     )
     return shares.ingest_shares(ctx, sources, session_of(p), bool(p.get("force")), p.get("limit"))
 

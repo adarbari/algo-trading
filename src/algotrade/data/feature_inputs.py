@@ -46,12 +46,19 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        ``shares.share_facts``: every stored share-count and financial (revenue,
                        net income, diluted EPS) fact FILED on or before the session (point in
                        time by filing date), sorted by ``filed``; ``None`` when there is none
+- ``instruments/shares_accepted``
+                       the same facts counted from the session each became public (``shares.
+                       known_from``: the first session whose close is at or after SEC's
+                       acceptance of the filing, else the session after ``filed``), sorted by it
+                       (``financials@v3``, ``fundamentals@v4``; ADR 0067 amendment)
 - ``instruments/statements``
                        ``statements.reading.statement_facts``: every stored statement line (cost
                        of revenue, operating income, cash flow, balance sheet..., one row per
                        tag, period and filing) FILED on or before the session (point in time by
                        filing date, ADR 0067), sorted by ``filed``, without the stamp columns;
                        ``None`` when there is none
+- ``instruments/statements_accepted``
+                       the statement lines counted from ``known_from`` as above
 - ``analyst/estimate_snapshots``
                        ``analyst.reading.snapshot_window``: our own history of analyst data
                        (ADR 0068), every kind with its coverage markers, for the session plus
@@ -134,7 +141,7 @@ from algotrade.data.reference import (
 )
 from algotrade.data.rollups import rollup_rows
 from algotrade.data.shares import TABLE as SHARES
-from algotrade.data.shares import share_facts
+from algotrade.data.shares import known_from, share_facts
 from algotrade.data.statements.reading import TABLE as STATEMENTS
 from algotrade.data.statements.reading import statement_facts
 from algotrade.data.volatility import IBKR_IV30, ibkr_iv30
@@ -290,6 +297,26 @@ def _share_facts(reader: StoreReader, sessions: Sequence[date], lookback: int) -
     return _Snapshots(frame, _days(frame["filed"]) if len(frame) else np.array([], "datetime64[D]"))
 
 
+def _by_known_from(frame: pd.DataFrame) -> _Snapshots:
+    """``frame`` ordered by the session each fact became public (``shares.known_from``)."""
+    if frame.empty:
+        return _Snapshots(frame, np.array([], "datetime64[D]"))
+    days = _days(known_from(frame))
+    order = np.argsort(days, kind="stable")
+    return _Snapshots(frame.iloc[order].reset_index(drop=True), days[order])
+
+
+def _share_facts_accepted(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    return _by_known_from(share_facts(reader))
+
+
+def _statement_facts_accepted(
+    reader: StoreReader, sessions: Sequence[date], lookback: int
+) -> Loaded:
+    frame = statement_facts(reader, sessions[-1], columns=[*STATEMENT_COLUMNS, "accepted_ts"])
+    return _by_known_from(frame)
+
+
 def _statement_facts(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
     frame = statement_facts(reader, sessions[-1], columns=STATEMENT_COLUMNS)
     return _Snapshots(frame, _days(frame["filed"]) if len(frame) else np.array([], "datetime64[D]"))
@@ -364,6 +391,8 @@ def _events_by_date(table: str) -> Loader:
     return load
 
 
+SHARES_ACCEPTED = f"{SHARES}_accepted"  # instruments/shares counted from its acceptance session
+STATEMENTS_ACCEPTED = f"{STATEMENTS}_accepted"
 STATEMENT_COLUMNS = ["concept", "tag", "period_start", "period_end", "filed", "value", "accn"]
 REFERENCE_FACTS = ("instrument_id", "security_type", "symbol", "name", "is_leveraged", "is_inverse")
 
@@ -433,7 +462,9 @@ INPUTS: Mapping[str, Loader] = {
     "events/split": _events_by_date("events/split"),
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,
+    SHARES_ACCEPTED: _share_facts_accepted,
     STATEMENTS: _statement_facts,
+    STATEMENTS_ACCEPTED: _statement_facts_accepted,
     ANALYST: _analyst_snapshots,
     "instruments/reference": _partition(_reference_facts),
     HOLDINGS: _partition(_leveraged_holdings),

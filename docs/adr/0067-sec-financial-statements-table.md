@@ -79,6 +79,31 @@ carry no start. A figure in another currency is dropped: those issuers have no s
   from debt) is null: a bank's debt and operating income are not those of an operating company. ROE,
   ROA and price to book are kept.
 
+### Amendment 2026-10-17: acceptance time is the point-in-time instant of a fact
+`filed` is a date. SEC gives a filing that is accepted until 17:30 New York time that day's date, so a
+10-Q accepted at 16:30 on D has `filed = D` but was not public at D's close, and `filed <= session`
+counted it at that close: a one-session look-ahead in every feature read from `instruments/shares`
+(`financials@v2`, `fundamentals@v3`), found by the edge-build review. Extends [0007](0007-point-in-time-data.md)
+(a fact is known from the moment it was public) and uses [0050](0050-event-sensitivity.md)'s `known_from`
+idea for facts.
+- `instruments/shares` and `instruments/statements` gain `accepted_ts` (UTC timestamp, nullable; an
+  additive column, partitions before it read as null; the key is unchanged, so a refetched fact replaces
+  its old row). The `shares` task reads each fetched CIK's submissions (`sec_filings`, every form, back to
+  2009) and joins each fact's accession to its `acceptanceDateTime`.
+- A reader counts a fact from `data.shares.known_from`: the first session whose close (16:00 New York,
+  13:00 on an early close, `core/time/calendar.py`) is at or after `accepted_ts`; a fact whose time is
+  unknown counts from the session after `filed`, never from `filed`.
+- The input is `instruments/shares_accepted` (and `instruments/statements_accepted`), beside the by-filing-date
+  `instruments/shares`: `financials@v3` and `fundamentals@v4` read it, new versions with the same columns
+  (the old tables are superseded in `features/registry.py`, retired after the backfill). Other groups still
+  read by filing date: `growth_history@v1` (shares) and `income_statement@v1`, `cash_flow@v1`,
+  `balance_sheet@v1` (statements) keep the one-session look-ahead until their own version bump; the
+  statements table already carries the time.
+- A transport error of the submissions fails the CIK (nothing staged, due again); a CIK with no submissions
+  stores null times. `ACCEPTANCE_VERSION_DATE` makes older fetches backlog under the nightly cap; a stored
+  fact without a time is stored again when a fetch now has one.
+- Cost: one to a few extra requests per CIK per refresh (30 days), through the shared `sec` limiter.
+
 ### Amendment 2026-10-17: rules d to g for the lease-inclusive debt tags
 Measured on the first fetched companies (non-financial, `bs_status` OK, 504): `debt_basis` was
 `NOT_TAGGED` for 259 (51%). 70 of them tag `LongTermDebtAndCapitalLeaseObligations` at `bs_as_of`, the

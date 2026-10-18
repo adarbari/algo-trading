@@ -1,6 +1,6 @@
 """Share counts, basic financials and financial statement lines from SEC company facts as
 two L1 tables (``instruments/shares``, phase 2b.4, with revenue, net income and diluted EPS for
-``financials@v2``; ``instruments/statements``, ADR 0067), written from ONE fetch of each
+``financials@v3``; ``instruments/statements``, ADR 0067), written from ONE fetch of each
 company's document.
 
 - CIK per instrument: the latest ``instruments/company`` snapshot on or before the session
@@ -28,6 +28,15 @@ company's document.
   ties by CIK; a CIK takes its best instrument's key. It only reorders:
   what is due, the cap's exemptions and ``force`` do not change, and a missing input (no list,
   no membership snapshot, no roll-up) leaves that tier empty, the order falling back to CIK.
+- Acceptance time (ADR 0067 amendment): company facts give a filing DATE only, and SEC dates a
+  filing accepted until 17:30 New York time that day, after the 16:00 close. Each fetched CIK's
+  submissions (``sec_filings``, every form, back to ``XBRL_SINCE``) are read once and every fact's
+  ``accn`` is joined to its ``acceptanceDateTime`` as ``accepted_ts`` (UTC); readers count a fact
+  from the first session whose close is at or after it (``data.shares.known_from``). An accession
+  the submissions do not list, or a run without the source, stores a null: counted from the
+  session after ``filed``. A stored fact whose ``accepted_ts`` is null is stored again (same key,
+  the merge keeps the newer version) when a fetch now has its acceptance time: that is the
+  backfill, the nightly backlog (``tags_date``) or ``--force`` below.
 - Per-CIK rows are staged and published as one partition per table; a crashed run resumes
   (CIKs it already fetched are skipped).
 """
@@ -52,13 +61,15 @@ from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
 from algotrade_sources.framework.base import FetchRequest, Source
+from algotrade_sources.framework.series import FILINGS_FRAME, FilingsRequest
 
 TASK = "shares"
 COMPANY = "instruments/company"
 CHECKPOINT_EVERY = 100
-FUNDAMENTALS = "rollups/instrument/fundamentals@v3"
+FUNDAMENTALS = "rollups/instrument/fundamentals@v4"
 PRICE_STATS = "rollups/instrument/price_stats@v2"
 CARRY = "carry"  # staging key for facts copied to instruments new to a CIK
+XBRL_SINCE = date(2009, 1, 1)  # company facts start with the 2009 XBRL phase-in: no older filing
 
 
 @dataclass(frozen=True)
@@ -70,6 +81,7 @@ class SharesSources:
         10_000_000.0  # 20-day dollar volume from which an optionable name is liquid
     )
     tags_date: date = date.min  # statements fetched before it are backlog (the source's date)
+    filings: Source | None = None  # SecFilings: accession -> acceptance time (None: all null)
 
 
 @dataclass(frozen=True)
@@ -82,7 +94,8 @@ class Target:
     # instrument_id, cik, concept, fetched_on of every stored row, nothing else (not deduplicated:
     # what is due needs only a maximum per CIK)
     light: Callable[[StoreReader], pd.DataFrame]
-    keys: Callable[[StoreReader, list[str]], pd.DataFrame]  # the key rows of instruments
+    # the key rows (and ``accepted_ts``) of instruments
+    keys: Callable[[StoreReader, list[str]], pd.DataFrame]
     donors: Callable[[StoreReader, list[str]], pd.DataFrame]  # full stored rows of instruments
 
 
@@ -105,7 +118,9 @@ TARGETS = (
         "statements",
         STATEMENT_KEY,
         light_statements,
-        lambda reader, ids: stored_statements(reader, instruments=ids, columns=["fetched_on"]),
+        lambda reader, ids: stored_statements(
+            reader, instruments=ids, columns=["fetched_on", "accepted_ts"]
+        ),
         lambda reader, ids: stored_statements(reader, instruments=ids),
     ),
 )
@@ -157,15 +172,47 @@ def _rows(
     return out
 
 
+def _keys(
+    stored: pd.DataFrame | None, key: list[str], lacking: bool = False
+) -> set[tuple[object, ...]]:
+    """The key tuples of the ``stored`` rows; with ``lacking`` only those without an
+    ``accepted_ts`` (every row when the stored partitions predate the column)."""
+    if stored is None or stored.empty:
+        return set()
+    if lacking and "accepted_ts" in stored.columns:
+        stored = stored[stored["accepted_ts"].isna()]
+    return {tuple(r) for r in stored[key].astype(object).itertuples(index=False)}
+
+
+def _acceptance(run: IngestRun, source: Source | None, cik: str) -> dict[str, pd.Timestamp] | None:
+    """Accession -> acceptance instant (UTC) of every filing the CIK's submissions list; ``None``
+    without a source or when SEC has no submissions for the CIK. A transport error raises: the
+    CIK stays due, nothing of it is staged."""
+    if source is None:
+        return None
+    request = FilingsRequest(key=cik, session_date=run.session, since=XBRL_SINCE, forms=None)
+    try:
+        normalized = run.fetch(source, request)
+    except NoResponseError:
+        return None
+    if normalized is None or normalized.parsed.get(FILINGS_FRAME) is None:
+        return None
+    filings = normalized.parsed[FILINGS_FRAME]
+    return dict(zip(filings["accession"], filings["acceptance_ts"], strict=True))
+
+
 def _fetch(
     run: IngestRun,
     source: Source,
+    filings: Source | None,
     cik: str,
     members: pd.DataFrame,
     known: Mapping[str, set[tuple[object, ...]]],
+    lacking: Mapping[str, set[tuple[object, ...]]],
 ) -> str:
     """One document, both tables: each table's new rows are staged in turn, so a failure to
-    stage the statements leaves the shares staged (and the statements due again)."""
+    stage the statements leaves the shares staged (and the statements due again). A stored fact
+    without ``accepted_ts`` is staged again once its acceptance time is known (module doc)."""
     normalized = None
     try:
         normalized = run.fetch(source, FetchRequest(cik, session_date=run.session))
@@ -178,6 +225,7 @@ def _fetch(
         status = f"OK: {sizes['shares']} facts, {sizes['statements']} statements"
         if not any(sizes.values()):
             status = "NO_SHARE_FACTS"
+    accepted = _acceptance(run, filings, cik) if any(len(f) for f in parsed.values()) else None
     for target in TARGETS:
         facts = parsed.get(target.parsed)
         if facts is None and normalized is not None:
@@ -185,9 +233,22 @@ def _fetch(
             # for it), raised after the earlier tables staged.
             raise ValueError(f"{target.parsed} could not be parsed from the document")
         facts = pd.DataFrame(columns=["concept"]) if facts is None else facts
+        if accepted and "accn" in facts.columns:
+            stamps = facts["accn"].map(accepted)
+            facts = facts.assign(accepted_ts=pd.to_datetime(stamps, utc=True))
         rows = _rows(facts, members, run.session, target.key)
         new = [tuple(r) for r in rows[target.key].astype(object).itertuples(index=False)]
-        fresh = [k not in known[target.table] or k[1] == CHECKED for k in new]
+        timed = (
+            rows["accepted_ts"].notna()
+            if "accepted_ts" in rows.columns
+            else pd.Series(False, index=rows.index)
+        )
+        fresh = [
+            k not in known[target.table]
+            or k[1] == CHECKED
+            or (k in lacking[target.table] and has_time)
+            for k, has_time in zip(new, timed, strict=True)
+        ]
         run.stage(target.table, cik, _typed(rows[fresh]), source.name)
     return status
 
@@ -373,19 +434,20 @@ def ingest_shares(
         todo = due if limit is None else due[: max(limit, 0)]
         members = dict(tuple(ids.groupby("cik")))
         todo_ids = list(ids["instrument_id"][ids["cik"].isin(todo)])
-        known = {  # the stored keys of the instruments fetched now, not of the whole table
-            t.table: {
-                tuple(r)
-                for r in t.keys(ctx.reader, todo_ids)[t.key].astype(object).itertuples(index=False)
-            }
-            if todo_ids
-            else set()
-            for t in TARGETS
-        }
+        # the stored keys of the instruments fetched now, not of the whole table, and those of
+        # them that have no acceptance time yet
+        stored = {t.table: t.keys(ctx.reader, todo_ids) if todo_ids else None for t in TARGETS}
+        known = {t.table: _keys(stored[t.table], t.key) for t in TARGETS}
+        lacking = {t.table: _keys(stored[t.table], t.key, lacking=True) for t in TARGETS}
         for i, cik in enumerate(todo, start=1):
             if cik in run.items:
                 continue  # fetched before a resume
-            run.attempt(cik, partial(_fetch, run, sources.facts, cik, members[cik], known))
+            run.attempt(
+                cik,
+                partial(
+                    _fetch, run, sources.facts, sources.filings, cik, members[cik], known, lacking
+                ),
+            )
             if i % CHECKPOINT_EVERY == 0:
                 run.checkpoint()
         carried = {}

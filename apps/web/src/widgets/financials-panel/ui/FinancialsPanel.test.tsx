@@ -51,8 +51,8 @@ const stock = {
     known('feature.revenue_growth_yoy', 0.06, 'PERCENT', 'decimal'),
     known('feature.net_margin', 0.22, 'PERCENT', 'decimal'),
     known('feature.pe_ratio', 24.3, 'NUMBER', 'ratio'),
-    known('rollup.financials@v2.revenue_ttm', 4.7e10, 'COMPACT', 'usd'),
-    known('rollup.financials@v2.financials_status', 'OK', 'TEXT'),
+    known('rollup.financials@v3.revenue_ttm', 4.7e10, 'COMPACT', 'usd'),
+    known('rollup.financials@v3.financials_status', 'OK', 'TEXT'),
     known('rollup.balance_sheet@v1.debt_basis', 'LT_PLUS_ST', 'TEXT'),
     gap(
       'rollup.balance_sheet@v1.total_debt',

@@ -9,7 +9,7 @@ nine months) and the 10-K the whole year, so a discrete quarter is the differenc
 year-to-date facts of one fiscal year and one tag (``ttm.discrete_quarters``; the first quarter
 is the three-month figure itself), never across tags, and the two facts must have been filed
 close together (one restatement generation). The TTM is the last four consecutive quarters,
-else the latest fiscal year, as in ``financials@v2``. A period takes the first tag of its
+else the latest fiscal year, as in ``financials@v3``. A period takes the first tag of its
 concept's list that reports it (``statement_concepts``, best first).
 
 ``capex_ttm`` is the cash PAID for property, plant and equipment as the filer tags it

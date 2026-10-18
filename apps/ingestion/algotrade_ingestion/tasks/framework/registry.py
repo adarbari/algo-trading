@@ -219,7 +219,7 @@ TASKS: dict[str, Task] = {
             shares,
             ("instruments/shares", "instruments/statements"),
             entries_reference.run_shares,
-            sources=("sec_company_facts",),
+            sources=("sec_company_facts", "sec_filings"),
             settings="sources.toml [sec_edgar] facts_refresh_days, statements_backfill_per_night",
             params=(
                 SESSION,

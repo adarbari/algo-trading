@@ -1,11 +1,15 @@
-"""``financials@v2``: trailing-twelve-month revenue, net income and diluted EPS, last fiscal-year
+"""``financials@v3``: trailing-twelve-month revenue, net income and diluted EPS, last fiscal-year
 revenue, the year-ago revenue and EPS TTMs, and the latest quarter's revenue and EPS with the
 same quarter a year earlier, from SEC company facts.
 
 Inputs: ``instruments/shares`` rows of the concepts ``revenue``, ``net_income`` and
-``eps_diluted`` (every fact FILED on or before the session, point in time by filing date; the
-filing date is a date, so a filing made late in the evening counts for that day's session, the
-same convention as ``fundamentals@v3``), the session's ``price_stats@v2`` (it sets which
+``eps_diluted``, read as ``instruments/shares_accepted``: every fact public at the session's
+CLOSE, point in time by the instant SEC ACCEPTED the filing (``accepted_ts``; 16:00 New York
+time, 13:00 on an early close). A 10-Q accepted at 16:30 on D is not in D's row and is in
+D+1's; a fact without an acceptance time counts from the session after its filing date (v2
+counted every fact ``filed <= session``: a date, so a filing accepted after the close counted
+at that close, a one-session lookahead in every feature of this group; ADR 0067 amendment,
+``fundamentals@v4`` has the same fix). The session's ``price_stats@v2`` (it sets which
 instruments get a row), ``events/split`` and ``instruments/reference`` (the security type).
 
 Each (concept, tag, period) takes its latest known value (a restatement replaces it from its
@@ -100,8 +104,8 @@ __all__ = [
 ]
 
 NAME = "financials"
-VERSION = 2
-FACTS = "instruments/shares"
+VERSION = 3
+FACTS = "instruments/shares_accepted"  # by acceptance session, not by filing date
 PRICE_STATS = "rollups/instrument/price_stats@v2"
 SPLITS = "events/split"
 REVENUE, NET_INCOME, EPS = "revenue", "net_income", "eps_diluted"
@@ -117,8 +121,8 @@ TAG_RANK = {
 REFERENCE = "instruments/reference"
 
 _NO_FACTS = (
-    "no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers "
-    "that report outside USD): NO_FACTS"
+    "no revenue / net income / EPS fact public by the session's close (ETFs, funds, no CIK, "
+    "issuers that report outside USD): NO_FACTS"
 )
 _COLS = tuple(f"{FACTS}.{c}" for c in ("concept", "value", "period_start", "period_end", "filed"))
 _WHY_TTM = "; or neither four consecutive quarters nor a fiscal year of this concept are known"
@@ -183,7 +187,8 @@ FEATURES = (
     ),
     Feature(
         "ttm_filed", "date", "date",
-        "The filing date that made that TTM public (the newest filing behind it)",
+        "The filing date of the newest filing behind that TTM (it counts from the session whose "
+        "close is at or after SEC's acceptance of it, not from this date)",
         _NO_FACTS, inputs=(f"{FACTS}.filed",),
     ),
     Feature(
@@ -405,7 +410,7 @@ GROUP = FeatureGroup(
     VERSION,
     "Trailing-twelve-month revenue, net income and diluted EPS (and the TTMs a year earlier), "
     "the last fiscal year's revenue and the latest quarter's revenue and diluted EPS with the "
-    "same quarter a year earlier (SEC company facts, point in time by filing date)",
+    "same quarter a year earlier (SEC company facts, point in time by SEC acceptance)",
     (
         Input(PRICE_STATS),
         Input(FACTS, required=False),

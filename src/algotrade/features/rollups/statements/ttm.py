@@ -1,5 +1,5 @@
 """Trailing-twelve-month arithmetic over one concept's reported periods, shared by the
-statement rollups (``financials@v2``, ``income_statement@v1``, ``cash_flow@v1``).
+statement rollups (``financials@v3``, ``income_statement@v1``, ``cash_flow@v1``).
 
 A fact is ``(start, end, value, filed, tag rank)`` with dates as epoch days. A discrete quarter
 is a reported three-month fact, else the difference of two year-to-date facts of one fiscal
@@ -22,7 +22,7 @@ AGO_TOLERANCE = 40  # days a TTM end may be off its target of N years before the
 @dataclass(frozen=True)
 class TtmParams:
     """How far back statement facts are read and when a trailing figure is stale; shared by
-    ``financials@v2`` and the statement groups so the two never drift apart."""
+    ``financials@v3`` and the statement groups so the two never drift apart."""
 
     stale_days: int = 480  # a TTM whose period ended longer ago is STALE (still shown)
     history_days: int = 1100  # facts whose period ended earlier than this are not read

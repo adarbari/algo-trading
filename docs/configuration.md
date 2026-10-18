@@ -100,7 +100,7 @@ Fields come from a catalogue built from the code, so a typo or a type mismatch f
 | Field | Source table | Example |
 |---|---|---|
 | `instrument.<column>` | L1 `instruments/reference`; company columns from `instruments/company` | `instrument.security_type`, `instrument.is_leveraged`, `instrument.sector` |
-| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (each column a declared feature of the group, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v2.hv30`, `rollup.price_stats@v2.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings`, `rollup.fundamentals@v3.market_cap_status` |
+| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (each column a declared feature of the group, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v2.hv30`, `rollup.price_stats@v2.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings`, `rollup.fundamentals@v4.market_cap_status` |
 | `feature.<name>` | an expression feature (`config/site/features/*/*.toml`, [below](#expression-features)), computed on read from the stored features it names | `feature.liquidity_class`, `feature.near_52w`, `feature.market_cap`, `feature.iv_hv_spread` |
 
 Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built) has the rules;
@@ -115,8 +115,8 @@ Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built
 | `dividend_schedule@v1` | `dividend_status` (str: SCHEDULED / NOT_ANNOUNCED); `next_ex_date`, `next_pay_date` (date); `next_div_amount` (float32); `days_to_ex_date` (int) |
 | `iv30@v1` | `iv30`, `iv30_cboe`, `atm_strike_near`, `spot`, `rate`, `div_yield` (float); `iv30_status` (str); `near_expiry`, `far_expiry` (date); `n_quotes_used` (int) |
 | `iv_history@v2` | `iv30`, `iv_rank_252d`, `iv_percentile_252d` (float32); `history_days` (int); `rank_status` (str: UNKNOWN / PROVISIONAL / FULL) |
-| `fundamentals@v3` | `shares_outstanding`, `shares_outstanding_year_ago` (float32); `shares_as_of`, `shares_filed` (date); `shares_source`, `market_cap_status` (str) |
-| `financials@v2` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `revenue_fy`, `revenue_qtr`, `revenue_qtr_year_ago` (float); `eps_diluted_ttm`, `eps_diluted_ttm_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago` (float32); `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `qtr_as_of` (date); `eps_stale`, `is_adr` (bool); `ttm_basis`, `financials_status` (str) |
+| `fundamentals@v4` | `shares_outstanding`, `shares_outstanding_year_ago` (float32); `shares_as_of`, `shares_filed` (date); `shares_source`, `market_cap_status` (str) |
+| `financials@v3` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `revenue_fy`, `revenue_qtr`, `revenue_qtr_year_ago` (float); `eps_diluted_ttm`, `eps_diluted_ttm_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago` (float32); `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `qtr_as_of` (date); `eps_stale`, `is_adr` (bool); `ttm_basis`, `financials_status` (str) |
 | `income_statement@v1` | `gross_profit_ttm`, `cost_of_revenue_ttm`, `ebit_ttm`, `da_ttm`, `interest_expense_ttm`, `pretax_income_ttm`, `income_tax_ttm` (float); `is_ttm_as_of` (date); `is_status` (str) |
 | `growth_history@v1` | `revenue_ttm_3y_ago`, `revenue_ttm_5y_ago` (float); `eps_diluted_ttm_3y_ago`, `eps_diluted_ttm_5y_ago` (float32); `gh_status` (str) |
 | `analyst_estimates@v1` | `fy1_period_end`, `fy2_period_end` (date); `eps_fy1`, `eps_fy2` (float32); `revenue_fy1`, `revenue_fy2` (float); `eps_fy1_analysts`, `revenue_fy1_analysts`, `estimates_age_days` (int); `estimates_status` (str); personal licence, optional |

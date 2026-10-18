@@ -64,11 +64,11 @@ export const SECTIONS: readonly SectionSpec[] = [
     title: 'Growth',
     term: 'financials_growth',
     statuses: [
-      feature('rollup.financials@v2.financials_status'),
+      feature('rollup.financials@v3.financials_status'),
       feature('rollup.growth_history@v1.gh_status'),
     ],
     rows: [
-      f('rev-ttm', 'Revenue (TTM)', feature('rollup.financials@v2.revenue_ttm')),
+      f('rev-ttm', 'Revenue (TTM)', feature('rollup.financials@v3.revenue_ttm')),
       f(
         'rev-qtr',
         'Revenue growth, quarter (YoY)',
@@ -88,7 +88,7 @@ export const SECTIONS: readonly SectionSpec[] = [
     term: 'financials_profitability',
     statuses: [feature('rollup.income_statement@v1.is_status')],
     rows: [
-      f('income', 'Net income (TTM)', feature('rollup.financials@v2.net_income_ttm')),
+      f('income', 'Net income (TTM)', feature('rollup.financials@v3.net_income_ttm')),
       f('margin', 'Net margin', feature('feature.net_margin')),
       f('gross-margin', 'Gross margin', feature('feature.gross_margin')),
       f('ebitda', 'EBITDA', feature('feature.ebitda')),
@@ -139,7 +139,7 @@ export const SECTIONS: readonly SectionSpec[] = [
     statuses: [],
     rows: [
       f('ps', 'P/S ratio', feature('feature.ps_ratio')),
-      f('eps', 'Diluted EPS (TTM)', feature('rollup.financials@v2.eps_diluted_ttm')),
+      f('eps', 'Diluted EPS (TTM)', feature('rollup.financials@v3.eps_diluted_ttm')),
       f('pb', 'P/B ratio', feature('feature.pb_ratio')),
       f('ev', 'Enterprise value', feature('feature.enterprise_value')),
       f('ev-ebitda', 'EV / EBITDA', feature('feature.ev_ebitda')),

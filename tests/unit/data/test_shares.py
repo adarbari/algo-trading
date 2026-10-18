@@ -4,8 +4,10 @@ facts, facts ordered by filing date."""
 
 from datetime import UTC, date, datetime
 
+import pandas as pd
+
 from algotrade.data import StoreReader
-from algotrade.data.shares import TABLE, share_facts, stored_shares
+from algotrade.data.shares import NEVER, TABLE, known_from, share_facts, stored_shares
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import stamped
@@ -106,3 +108,50 @@ def test_a_restated_tag_replaces_only_its_own_row_and_null_tags_are_one_key() ->
     stored = stored_shares(StoreReader(writer._backend))
     assert len(stored[stored["concept"] == "checked"]) == 1  # NaN is not NaN-unequal
     assert sorted(stored[stored["concept"] == "revenue"]["value"]) == [101.0, 105.0]
+
+
+def _known(filed: date, accepted: str | None) -> date:
+    facts = pd.DataFrame({"filed": [filed], "accepted_ts": [accepted]})
+    return known_from(facts).iloc[0]
+
+
+def test_a_filing_accepted_after_the_close_counts_from_the_next_session() -> None:
+    """The test that would have caught the lookahead: a 10-Q accepted 16:30 New York time on
+    Tuesday 2026-08-04 (SEC dates it that day) is not public at Tuesday's close."""
+    tue, wed = date(2026, 8, 4), date(2026, 8, 5)
+    assert _known(tue, "2026-08-04T20:30:00Z") == wed  # 16:30 EDT
+    assert _known(tue, "2026-08-04T19:59:59Z") == tue  # 15:59:59 EDT: public at the close
+    assert _known(tue, "2026-08-04T20:00:00Z") == tue  # exactly 16:00: at the close
+    assert _known(tue, "2026-08-04T20:00:01Z") == wed
+    assert _known(tue, "2026-08-04T23:30:00Z") == wed  # 19:30 EDT, still Tuesday in New York
+
+
+def test_acceptance_uses_the_new_york_day_winter_clock_weekends_and_early_closes() -> None:
+    assert _known(date(2026, 1, 13), "2026-01-13T21:30:00Z") == date(2026, 1, 14)  # 16:30 EST
+    assert _known(date(2026, 1, 13), "2026-01-13T20:59:00Z") == date(2026, 1, 13)  # 15:59 EST
+    friday_evening = "2026-08-07T21:00:00Z"
+    assert _known(date(2026, 8, 7), friday_evening) == date(2026, 8, 10)  # the Monday
+    assert _known(date(2026, 8, 10), "2026-08-08T15:00:00Z") == date(2026, 8, 10)  # Saturday
+    day_after_thanksgiving = date(2025, 11, 28)  # closes 13:00
+    assert _known(day_after_thanksgiving, "2025-11-28T18:30:00Z") == date(2025, 12, 1)  # 13:30
+    assert _known(day_after_thanksgiving, "2025-11-28T17:30:00Z") == day_after_thanksgiving
+
+
+def test_a_fact_without_an_acceptance_time_counts_from_the_session_after_filed() -> None:
+    """Conservative, never the old rule (``filed <= session``): the hour is unknown."""
+    assert _known(date(2026, 8, 4), None) == date(2026, 8, 5)
+    assert _known(date(2026, 8, 7), None) == date(2026, 8, 10)  # a Friday filing: Monday
+    assert _known(date(2026, 8, 8), None) == date(2026, 8, 10)  # filed on a Saturday
+    no_column = pd.DataFrame({"filed": [date(2026, 8, 4)]})
+    assert known_from(no_column).iloc[0] == date(2026, 8, 5)  # a partition older than the column
+    assert known_from(pd.DataFrame({"filed": [None], "accepted_ts": [None]})).iloc[0] == NEVER
+
+
+def test_known_from_is_per_row_over_a_mixed_frame() -> None:
+    facts = pd.DataFrame(
+        {
+            "filed": [date(2026, 8, 4)] * 3,
+            "accepted_ts": ["2026-08-04T20:30:00Z", "2026-08-04T14:00:00Z", None],
+        }
+    )
+    assert list(known_from(facts)) == [date(2026, 8, 5), date(2026, 8, 4), date(2026, 8, 5)]

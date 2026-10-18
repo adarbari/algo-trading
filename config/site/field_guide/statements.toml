@@ -6,7 +6,7 @@
 [[field]]
 name = "rollup.income_statement@v1.ebit_ttm"
 theme = "statements"
-reads = "Operating income over the trailing twelve months, in dollars: revenue less the costs of running the business, before interest and tax (us-gaap OperatingIncomeLoss, as the filer reports it). Negative for an operating loss. The profit behind interest cover and EV to EBIT; against rollup.financials@v2.revenue_ttm it gives the operating margin (10% is healthy for most industries, 25% and above is software or a franchise)."
+reads = "Operating income over the trailing twelve months, in dollars: revenue less the costs of running the business, before interest and tax (us-gaap OperatingIncomeLoss, as the filer reports it). Negative for an operating loss. The profit behind interest cover and EV to EBIT; against rollup.financials@v3.revenue_ttm it gives the operating margin (10% is healthy for most industries, 25% and above is software or a franchise)."
 caveats = [
   "Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v1.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company. A hard criterion drops them: use pretax income for them instead.",
   "Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date. Check rollup.income_statement@v1.is_ttm_as_of for the quarter it ends at.",
@@ -29,7 +29,7 @@ tolerance = { relative = 0.3 }
 [[field]]
 name = "rollup.income_statement@v1.gross_profit_ttm"
 theme = "statements"
-reads = "Gross profit over the trailing twelve months, in dollars: sales less the direct cost of what was sold, as the filer reports it (us-gaap GrossProfit). Against rollup.financials@v2.revenue_ttm it is the gross margin: 20% is a distributor or retailer, 40% a branded manufacturer, 70% and above software."
+reads = "Gross profit over the trailing twelve months, in dollars: sales less the direct cost of what was sold, as the filer reports it (us-gaap GrossProfit). Against rollup.financials@v3.revenue_ttm it is the gross margin: 20% is a distributor or retailer, 40% a branded manufacturer, 70% and above software."
 caveats = [
   "A filer that does not tag the line has none, and null is not zero. A service company with no gross profit line still has costs: read rollup.income_statement@v1.ebit_ttm instead.",
   "Filers draw the line between cost of revenue and operating costs differently. A software company that puts support in cost of revenue shows a lower margin than one that does not. Compare within an industry only.",
@@ -60,7 +60,7 @@ for = "a cost of revenue is reported"
 op = "gt"
 value = 0
 mode = "hard"
-note = "mostly a building block: divide by rollup.financials@v2.revenue_ttm for the cost ratio"
+note = "mostly a building block: divide by rollup.financials@v3.revenue_ttm for the cost ratio"
 
 [[field]]
 name = "rollup.income_statement@v1.da_ttm"
@@ -177,7 +177,7 @@ mode = "hard"
 [[field]]
 name = "rollup.cash_flow@v1.ocf_ttm"
 theme = "statements"
-reads = "Net cash provided by operating activities over the trailing twelve months, in dollars; negative when operations used cash. Cash the business generated before investing and financing: the cleanest check on whether profit is real. Against rollup.financials@v2.net_income_ttm it is the earnings quality (above 1 is cash-backed, well under 1 is accrual-heavy)."
+reads = "Net cash provided by operating activities over the trailing twelve months, in dollars; negative when operations used cash. Cash the business generated before investing and financing: the cleanest check on whether profit is real. Against rollup.financials@v3.net_income_ttm it is the earnings quality (above 1 is cash-backed, well under 1 is accrual-heavy)."
 caveats = [
   "10-Qs report cash flow cumulatively from the fiscal year start. Each quarter is derived as the difference of two year-to-date figures of one fiscal year and one tag. When a quarter is missing or the figures come from different tags, the TTM is null rather than wrong.",
   "Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.",
@@ -509,7 +509,7 @@ name = "rollup.growth_history@v1.eps_diluted_ttm_3y_ago"
 theme = "statements"
 reads = "Diluted EPS over the trailing twelve months that ended about three years before the newest one, in dollars per share, split-adjusted to the session. The base of feature.eps_cagr_3y; negative when the company then lost money."
 caveats = [
-  "Split-adjusted by filing date like rollup.financials@v2.eps_diluted_ttm, so a split in between is not read as a fall. Quarterly EPS is not additive across share count changes, so the sum is the usual approximation.",
+  "Split-adjusted by filing date like rollup.financials@v3.eps_diluted_ttm, so a split in between is not read as a fall. Quarterly EPS is not additive across share count changes, so the sum is the usual approximation.",
   "A loss or a zero then gives no growth rate: feature.eps_cagr_3y is null, not negative. Check the revenue rate instead.",
   "Null for a company with less than three years of filed history and for a gap in it. Companies of one CIK share the company figure.",
   "Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.",
@@ -528,7 +528,7 @@ name = "rollup.growth_history@v1.eps_diluted_ttm_5y_ago"
 theme = "statements"
 reads = "Diluted EPS over the trailing twelve months that ended about five years before the newest one, in dollars per share, split-adjusted to the session. The base of feature.eps_cagr_5y; negative when the company then lost money."
 caveats = [
-  "Split-adjusted by filing date like rollup.financials@v2.eps_diluted_ttm, so a split in between is not read as a fall. Quarterly EPS is not additive across share count changes, so the sum is the usual approximation.",
+  "Split-adjusted by filing date like rollup.financials@v3.eps_diluted_ttm, so a split in between is not read as a fall. Quarterly EPS is not additive across share count changes, so the sum is the usual approximation.",
   "A loss or a zero then gives no growth rate: feature.eps_cagr_5y is null, not negative. Check the revenue rate instead.",
   "Null for a company with less than five years of filed history and for a gap in it. Companies of one CIK share the company figure.",
   "Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.",
@@ -595,7 +595,7 @@ name = "feature.gross_margin"
 theme = "statements"
 reads = "Gross profit over revenue for the trailing twelve months: 0.20 is a distributor or retailer, 0.40 a branded manufacturer, 0.70 and above software. The share of each sales dollar left after the direct cost of what was sold."
 caveats = [
-  "Null when the income statement and the revenue end on different quarters: is_ttm_as_of must equal rollup.financials@v2.ttm_as_of. The end of the gross profit line itself is not checked.",
+  "Null when the income statement and the revenue end on different quarters: is_ttm_as_of must equal rollup.financials@v3.ttm_as_of. The end of the gross profit line itself is not checked.",
   "Many filers do not tag GrossProfit, so a hard criterion drops them. Null is not a bad margin; check rollup.income_statement@v1.ebit_ttm for those names.",
   "Filers draw the line between cost of revenue and operating costs differently. Compare within an industry only.",
   "Gross profit and revenue are separate TTMs and can end on different quarters when the filer's tags differ in timing. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.",
@@ -617,7 +617,7 @@ name = "feature.operating_margin"
 theme = "statements"
 reads = "Operating income (EBIT) over revenue for the trailing twelve months: 0.10 is healthy for most industries, 0.25 and above is software or a franchise, negative is an operating loss. The profit left on each sales dollar before interest and tax."
 caveats = [
-  "Null when the income statement and the revenue end on different quarters: rollup.income_statement@v1.is_ttm_as_of must equal rollup.financials@v2.ttm_as_of.",
+  "Null when the income statement and the revenue end on different quarters: rollup.income_statement@v1.is_ttm_as_of must equal rollup.financials@v3.ttm_as_of.",
   "Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v1.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company.",
   "Operating income includes one-offs the filer leaves in it (impairments, restructuring, legal charges). One bad quarter can turn a sound business negative.",
   "EBIT and revenue are separate TTMs and can end on different quarters when the tags differ in timing. Null when the statement it reads is STALE: its newest period ended over 480 days before the session. Old figures are shown in the rollup but never used in a ratio.",
