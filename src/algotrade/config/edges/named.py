@@ -30,12 +30,23 @@ def check_variants(where: str, *bases: str | None) -> None:
         raise ConfigurationError(f"{where}: a time-series edge has no variants")
 
 
-def check_time_series(base: str, calendar: bool, universe: str | Selection, where: str) -> None:
-    """``base = "out_of_window"`` needs a ``calendar`` schedule and a named universe."""
+def check_time_series(
+    base: str, calendar: bool, universe: str | Selection, where: str, market: bool = False
+) -> None:
+    """``base = "out_of_window"`` needs a ``calendar`` or ``on_market`` (``market``) schedule and
+    a named universe; an ``on_market`` schedule needs that base (ADR 0075: a market trigger's
+    base is not the cross-section)."""
+    if market and base != OUT_OF_WINDOW:
+        raise ConfigurationError(
+            f"{where} base: an on_market schedule is measured against the out-of-window "
+            f"stretches, so base = 'out_of_window', got {base!r}"
+        )
     if base != OUT_OF_WINDOW:
         return
-    if not calendar:
-        raise ConfigurationError(f"{where} base: 'out_of_window' needs a calendar schedule")
+    if not calendar and not market:
+        raise ConfigurationError(
+            f"{where} base: 'out_of_window' needs a calendar or on_market schedule"
+        )
     named_symbols(universe, f"{where} universe")
 
 

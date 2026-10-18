@@ -31,6 +31,7 @@ from algotrade.services.evaluation.time_series.measures import (
 )
 from algotrade.services.evaluation.time_series.periods import Period, periods
 from algotrade.services.evaluation.time_series.random_windows import random_windows
+from algotrade.services.evaluation.time_series.triggers import trigger_periods
 
 
 @dataclass(frozen=True)
@@ -69,12 +70,17 @@ def evaluate_time_series(
 ) -> TimeSeriesRun:
     """``edge`` (``base = "out_of_window"``) over the periods of ``start..end``. ``label``: the
     site's regime label at a session (the regime slices); ``split``: the run's split date."""
-    name = window_name(edge.schedule)
+    trigger = edge.market_trigger
+    name = trigger or window_name(edge.schedule)
     if name is None or not isinstance(edge.universe, Selection):
         raise ConfigurationError(f"edge {edge.id}: not a time-series edge")
-    horizon = window_length(name)
+    horizon = edge.outcome.horizon_sessions[0] if trigger else window_length(name)
     symbols = named_symbols(edge.universe)
-    ps = periods(name, start, end)
+    ps = (
+        trigger_periods(reader, trigger, start, end, horizon, as_of)
+        if trigger
+        else periods(name, start, end)
+    )
     ids, unknown = harness.resolve_symbols(reader, symbols, end, as_of)
     read = harness.read_returns(reader, list(ids.values()), [p.entry for p in ps], horizon, as_of)
     bills = harness.bill_returns(reader, [p.decision for p in ps], horizon, as_of)
@@ -114,7 +120,7 @@ def _instrument(
         else:
             lost[read.reasons.get((instrument, p.entry), harness.NO_OUTCOME)] += 1
     obs = with_pairs(obs, horizon)
-    window = window_name(edge.schedule)
+    window = edge.market_trigger or window_name(edge.schedule)
     oos = [o for o in obs if split is not None and o.period.decision >= split]
     return InstrumentResult(
         symbol=symbol,
