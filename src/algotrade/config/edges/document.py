@@ -60,6 +60,10 @@ and the key.
                       exist (the Guide's Edges section groups by it); unknown values fail; a
                       site edge must have one (fitness test), a user draft or copy may omit it
                       (a copy inherits it through ``extends``)
+    asset_class       optional, one of ASSET_CLASSES (stocks | etfs | options): what the edge
+                      trades, for the Guide's filter; bookkeeping, never a run input. Needed
+                      where the universe cannot say (a hand-listed symbol universe with no
+                      security_type rule: a fitness test); else the Guide derives it
     frozen_from       optional date: the harness reports sessions from it on their own as the
                       frozen period (fixed once chosen, never rolling; none: no frozen slice)
     [evidence]        run_id and split_from of the run an evidenced or live edge rests on; its
@@ -164,6 +168,7 @@ MECHANISM_KINDS = (
     "slow_to_update", "forced_flows", "paid_for_risk", "lottery_demand", "mispriced_fundamentals",
     "informed_footprints", "liquidity_provision", "cross_market_trends", "value_gaps",
 )  # fmt: skip
+ASSET_CLASSES = ("stocks", "etfs", "options")
 STATUSES = ("researching", "candidate", "evidenced", "live", "retired", "rejected", "blocked")
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
 OUTCOME_KINDS = (
@@ -203,6 +208,7 @@ KEYS = (
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
     "extends", "follow", "audit", "published", "family", "ensemble", "oos_class", "mechanism_kind",
+    "asset_class",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
@@ -350,6 +356,7 @@ class Edge:
     rejection_reason: str = ""
     notes: str = ""
     family: str = ""  # the catalogue family "A".."I" the idea came from ("" none)
+    asset_class: str | None = None  # one of ASSET_CLASSES (None: derived by the Guide)
     mechanism_kind: str | None = None  # one of MECHANISM_KINDS (None: a draft that omits it)
     frozen_from: date | None = None
     base: str = "universe"  # what the picks are compared with: the event's names | the universe
@@ -477,6 +484,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         mechanism_kind=t.choice("mechanism_kind", "", MECHANISM_KINDS)
         if "mechanism_kind" in doc
         else None,
+        asset_class=t.choice("asset_class", "", ASSET_CLASSES) if "asset_class" in doc else None,
         frozen_from=_frozen_from(t),
         base=base,
         picks=picks,

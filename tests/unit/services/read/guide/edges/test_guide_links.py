@@ -55,6 +55,13 @@ def test_the_search_finds_a_mechanism_and_an_edge(site: StoreContext) -> None:
     assert entry_titles(site)[("mechanism", "forced_flows")] == "Forced buyers and sellers"
 
 
+def test_a_users_draft_never_shows_in_search_or_the_batched_read(with_draft: StoreContext) -> None:
+    found = load_guide_search(with_draft, "draft", 50)
+    assert "guide_draft_edge" not in [h.id for g in found.groups for h in g.hits]
+    refs = [GuideRef(GuideEntryKind.EDGE, "guide_draft_edge")]
+    assert load_guide_entries(with_draft, refs).edges == ()
+
+
 def test_the_search_keeps_its_budget_with_every_edge_in_it(site: StoreContext) -> None:
     load_guide_search(site, "earnings", 5)  # warm: the edges are read once per cache
     start = time.perf_counter()

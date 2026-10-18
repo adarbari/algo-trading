@@ -5,12 +5,13 @@ kinds. Session-free: the rules are read as written, never run against a snapshot
 
 The asset-class rule (``asset_of``), first match wins:
 
+0. the document's own ``asset_class`` (required where a hand-listed symbol universe names no
+   security type, a fitness test);
 1. ``options``: the edge's outcome, or any variant's, is an option outcome
    (``option_model_pnl``, ``expires_otm``, ``option_pnl``);
 2. ``etfs`` (shown as "ETFs and funds"): the universe's ``instrument.security_type`` rules name
-   fund types only (``FUND_TYPES``), or it names no type and lists symbols by hand (a hand list
-   is a fund list in every shipped case but one that mixes an index fund with large stocks:
-   read the rule as a limit, not a classification of each name);
+   fund types only (``FUND_TYPES``), or it names no type and lists symbols by hand (a fallback
+   for drafts: a site edge with a hand list declares ``asset_class``);
 3. ``stocks``: everything else (common stocks and ADRs, a preset's listed companies)."""
 
 from collections.abc import Iterable
@@ -69,6 +70,8 @@ def outcomes_of(edge: Edge) -> Iterable[Outcome]:
 
 def asset_of(edge: Edge, universe: Universe) -> str:
     """The asset-class tag of ``edge`` (module docstring): one of ``ASSETS``."""
+    if edge.asset_class is not None:
+        return edge.asset_class
     if any(o.kind in OPTION_KINDS for o in outcomes_of(edge)):
         return "options"
     types = _types(universe.rules)

@@ -53,4 +53,4 @@ def site() -> StoreContext:
 @pytest.fixture
 def with_draft() -> StoreContext:
     store = WithDraft(FileConfigStore(REPO_ROOT / "config"))
-    return open_stores(StoreReader(MemoryBackend()), store, UserContext(SITE_USER))  # type: ignore[arg-type]
+    return open_stores(StoreReader(MemoryBackend()), store, UserContext(DRAFT_USER))  # type: ignore[arg-type]

@@ -21,6 +21,7 @@ base = "benchmark"
 oos_class = "trend"
 status = "candidate"
 mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history (the outcome rows of all
 nine funds start with the store on 2010-01-04, so that is the common start; the grid needs every fund

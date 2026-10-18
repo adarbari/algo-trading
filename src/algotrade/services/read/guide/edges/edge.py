@@ -249,7 +249,7 @@ def _research(ctx: Stores, edge: Edge, terms: set[str]) -> GuideEdgeResearch | N
         horizon_text=f"over {p.horizon_sessions} session"
         + ("" if p.horizon_sessions == 1 else "s"),
         leg=LEG_WORDS.get(p.leg, p.leg.replace("_", "-")),
-        sample=f"{p.sample} years" if p.sample else None,
+        sample=(f"{p.sample} year" + ("" if p.sample == 1 else "s")) if p.sample else None,
         source=edge.sources[p.source].title,
         terms=tuple(t for t in ("published_number", "published_haircut") if t in terms),
     )
