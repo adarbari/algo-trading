@@ -812,7 +812,7 @@ follow-up PR).
 ## 2026-10-18 | EB H4 follow-ups | VIX spike definition and its placement
 - Question: how is a VIX spike defined and placed?
 - Options: a level only / level plus term-structure inversion; thresholds in config / fixed in the feature.
-- Decision: first session with the latest fresh VIX >= 30 and VIX/VIX3M > 1 after >= 21 sessions without one; thresholds fixed in the feature (a change is a version bump); D = the session the reading was first known, history from ALFRED vintages known by D; a trigger within h sessions of the last counted window is skipped; the base depends on later triggers inside the range (known by range end, never a decision input) and a stretch near range end can change when the range is extended.
+- Decision: first session with the latest fresh VIX >= 30 and VIX/VIX3M > 1 after >= 21 sessions without one; thresholds fixed in the feature (a change is a version bump); D = the session the reading was first known, both legs FRED `VIXCLS` / `VXVCLS` (`pit = "lag"`, one-day release lag, personal licence), known by D when observation date plus lag is at or before D; a trigger within h sessions of the last counted window is skipped; the base depends on later triggers inside the range (known by range end, never a decision input) and a stretch near range end can change when the range is extended.
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: fixed thresholds leave no tuning knob (multiple testing), and the skip rule keeps windows from overlapping.

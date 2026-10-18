@@ -2,7 +2,7 @@
 
 **Status:** accepted (2026-10-18; orchestrator design call, architect-reviewed, pending owner
 confirmation, see `docs/decisions/log.md`). Amends [0053](0053-edges-hypotheses-outcomes-and-one-harness.md)
-point 4 (the schedule vocabulary) and [0073](0073-calendar-schedules-and-the-time-series-base.md)
+(amendment 2026-10-08: ED4, item 7 "Event schedules", the schedule vocabulary) and [0073](0073-calendar-schedules-and-the-time-series-base.md)
 decision 8 (where a schedule known only at D lives). Part of the EB H4 follow-ups; PR A records
 the design and splits `config/edges/schedules/`, the classes, trigger and windows follow in
 their own PRs.
@@ -31,12 +31,18 @@ calendar windows (the last sessions of a month, the turn of the year) fit 0073 a
 3. **A market-level trigger is not an event class.** A new schedule family
    `on_market:<trigger>` is measured by the 0073 time-series harness: a named universe, `base =
    "out_of_window"`, benchmark none, one horizon. Group `market_triggers@v1` in
-   `features/rollups/market/` (`licence = "personal"`, the VIX3M leg) with fields
-   `vix_spike_date`, `sessions_since_vix_spike`, `vix_spike_level`.
+   `features/rollups/market/` with fields
+   `vix_spike_date`, `sessions_since_vix_spike`, `vix_spike_level`. Both legs are `macro/series`
+   rows (`config/site/macro.toml`): VIX is FRED `VIXCLS` and VIX3M is FRED `VXVCLS` (Cboe closes
+   via FRED, as `docs/data/vendors.md` says), each `pit = "lag"`,
+   `release_lag_days = 1`, `licence = "personal"` (FRED terms: personal use only), so the group
+   is personal. Neither is an ALFRED series: the unrevised close has one value, and its vintage
+   is the observation date plus the one-day release lag.
 4. **The VIX spike** is the first session where the latest fresh VIX is at least 30 and
    VIX / VIX3M is above 1 after at least 21 sessions without one. The thresholds are fixed in
    the feature; a change is a version bump. D is the session the reading was first known;
-   historical values come from ALFRED vintages known by D. Placement
+   a reading is known by D when its observation date plus the release lag is at or before D, the
+   same rule for history and live (no ALFRED vintages involved). Placement
    (`time_series/triggers.py`) skips a trigger within `h` sessions of the last counted window,
    so windows never overlap. The base depends on later triggers inside the range (known by the
    range end, never a decision input), so a stretch near the range end can change when the
@@ -54,7 +60,8 @@ calendar windows (the last sessions of a month, the turn of the year) fit 0073 a
 7. **`etf_launch` is deferred**: it needs the owner's keyword list.
 8. **Config layout**: the event-class vocabulary and schedule parsing move from `document.py`
    (963 lines; `config/edges/` at its module cap) to `config/edges/schedules/events.py`, which
-   `document.py` re-exports unchanged; the trigger and window names land beside it.
+   `document.py` re-exports unchanged; the market-trigger names land beside it. The calendar windows stay in
+   `core/time/windows.py` (`WINDOW_NAMES`, ADR 0073).
 
 ## Consequences
 The Guide and `guide_coverage` gain an entry per new class, trigger and window in the PRs that

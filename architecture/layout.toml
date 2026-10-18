@@ -72,7 +72,7 @@ contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
 path = "src/algotrade/config/edges/schedules"
-purpose = "schedule vocabularies of an edge document, split from config/edges/document.py (at its line cap, config/edges at its module cap): the event classes and subtypes an on_event: schedule may name, their anchor sessions and the fail-closed parsing (events.py; ADR 0053 decision 4, ADR 0075); the market-trigger and calendar-window names follow here"
+purpose = "schedule vocabularies of an edge document, split from config/edges/document.py (at its line cap, config/edges at its module cap): the event classes and subtypes an on_event: schedule may name, their anchor sessions and the fail-closed parsing (events.py; ADR 0053 amendment 2026-10-08: ED4 item 7, ADR 0075); the market-trigger names land beside it (calendar windows stay in core/time/windows.py, ADR 0073)"
 contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]

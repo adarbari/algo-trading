@@ -1,4 +1,5 @@
-"""Event schedules of an edge document (ADR 0053 decision 4, ADR 0050): the event classes an
+"""Event schedules of an edge document (ADR 0053 amendment 2026-10-08: ED4 item 7, ADR 0050):
+the event classes an
 ``on_event:<class>[:<subtype>]`` schedule may trigger on with their anchor sessions, the subtypes
 a class may be split by, and the parsing and fail-closed validity check of such a schedule.
 Split from ``document.py`` (at its line cap); ``document`` re-exports every name."""
