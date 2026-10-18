@@ -873,3 +873,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the field guide folders are at their file caps and a guide entry without a user of the field is untestable prose.
+
+## 2026-10-18 | EB E5 (etf_macro bridge) | The bridge fields stay out of the Describe-it prompt
+- Question: do the 32 etf_macro@v1 columns enter the natural-language drafting index?
+- Options: raise the 13k-token budget / keep the group out of the drafting prompt until an edge screens on it.
+- Decision: keep the group out (`services/drafting/prompt.py UNDRAFTED_GROUPS`, a fitness test checks the list and that the prompt honours it); the columns stay in the catalogue, Explore and the Builder. They return to the index, by removing the group from the list, when the first edge screens on them. The budget is not raised.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the columns apply to about 30 carrier funds and are not for drafts yet; their index lines pushed two golden cases' fields (atr_pct, days_to_earnings) out of the slice.
