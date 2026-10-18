@@ -31,6 +31,10 @@ def doc(*members: tuple[str, str], groups: dict | None = None) -> dict:
         ("Names with no value for market cap are included.", False),
         ("Names with no IV rank are kept out of the result.", True),
         ("Names with no IV rank still appear in the funnel as rejected.", True),
+        ("Names with no IV rank do not pass the exclusion.", True),
+        ("Names with no IV rank cannot pass.", True),
+        ("Names with no IV rank don't pass.", True),
+        ("Names with no IV rank fail to pass the exclusion.", True),
         ("Thresholds follow the phrasebook.", True),
     ],
 )
@@ -87,3 +91,15 @@ def test_a_field_is_named_by_its_catalogue_words() -> None:
         f"Names with no close vs its 50-day SMA are also left out {TAIL}",
         f"Names with no IV rank are also left out {TAIL}",
     )
+
+
+def test_a_one_letter_capital_is_no_acronym_but_a_real_one_is_kept() -> None:
+    infos = {
+        "feature.a": SimpleNamespace(description="A ratio of close to its 50-day SMA."),
+        "feature.b": SimpleNamespace(description="IV rank over the past year."),
+    }
+    document = {"criteria": {"a": {"field": "feature.a"}, "b": {"field": "feature.b"}}}
+    assert field_labels(infos, document) == {
+        "feature.a": "a ratio of close to its 50-day SMA",
+        "feature.b": "IV rank over the past year",
+    }

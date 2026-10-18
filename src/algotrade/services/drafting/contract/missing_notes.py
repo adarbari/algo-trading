@@ -11,7 +11,8 @@ from typing import Any
 
 CLAIMS_MISSING_PASSES = re.compile(
     r"(null|no value|missing|no \w+ rank)[^.]*"
-    r"\b(not excluded|are kept(?! out)|are included|(?<!never )pass(es)?\b|still pass"
+    r"\b(not excluded|are kept(?! out)|are included|still pass"
+    r"|(?<!never )(?<!not )(?<!n't )(?<!cannot )(?<!to )pass(es)?\b"
     r"|still appear(?!.*reject))",
     re.IGNORECASE,
 )  # one pattern: the server drops such a note, the golden replay test asserts none is served
@@ -62,7 +63,9 @@ def field_labels(infos: Mapping[str, Any], document: Mapping[str, Any]) -> dict[
         text = getattr(infos.get(name), "description", "") if isinstance(name, str) else ""
         clause = re.split(r"[.;:,(]", text.strip(), maxsplit=1)[0].strip()
         if clause:
-            labels[name] = clause if clause[:2].isupper() else clause[0].lower() + clause[1:]
+            first = clause.split()[0]
+            acronym = len(first) > 1 and first.isupper()
+            labels[name] = clause if acronym else clause[0].lower() + clause[1:]
     return labels
 
 
