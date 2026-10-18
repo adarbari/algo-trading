@@ -2,8 +2,10 @@
 fails closed with the file and the key; rejected and blocked documents need their reason and
 may leave the quality bar unanswered."""
 
+import tomllib
 from dataclasses import asdict, fields
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -18,9 +20,9 @@ from algotrade.config.edges.document import (
     expand_baselines,
     identity_dict,
     parse_edge,
-    tenor_sessions,
 )
 from algotrade.config.edges.follow import AUDIT_LABELS, BOOKMARK_LABELS, Follow
+from algotrade.config.edges.model_tenor import tenor_sessions
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.tables.edge_schemas import EDGE_EVAL, EDGE_LEGS, EDGE_TRADES
@@ -737,3 +739,94 @@ def test_a_published_figure_of_a_short_edge_defaults_to_the_short_leg() -> None:
     assert leg("mean_excess", "short") == "short"
     assert leg("decile_spread", "short") == "long_short"  # a spread stays a spread
     assert leg("mean_excess", "long") == "long"
+
+
+def _band(**changes: Any) -> dict[str, Any]:
+    """A monthly top-5 edge with a band of 8: the changes override its keys (None drops one)."""
+    base = {"schedule": "month_end", "top_k": 5, "outcome": _outcome(hold_rank=8)}
+    return {**base, **changes}
+
+
+def test_a_hold_rank_types_into_the_outcome_of_a_long_or_short_edge() -> None:
+    assert parse(**_band()).outcome.hold_rank == 8
+    assert parse(**_band(top_k=8)).outcome.hold_rank == 8  # a band of no depth is allowed
+    assert parse(**_band(outcome=_outcome(hold_rank=8, side="short"))).outcome.side == "short"
+    assert parse(
+        **_band(schedule="every_session", outcome=_outcome(hold_rank=6, horizon_sessions=[1]))
+    )
+    assert parse(**_band(outcome=_outcome())).outcome.hold_rank is None
+    variant = {"id": "deep", "outcome": {"hold_rank": 12}}
+    assert parse(**_band(variants=[variant])).variants[0].outcome.hold_rank == 12
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"top_k": 9}, "hold_rank: 8 must be an integer >= top_k"),  # hold_rank >= top_k
+        ({"top_k": "all"}, "hold_rank: 8 must be an integer >= top_k"),
+        ({"outcome": _outcome(hold_rank=0)}, "hold_rank: expected an integer >= 1"),
+        ({"outcome": _outcome(hold_rank=2.5)}, "hold_rank: expected an integer >= 1"),
+        ({"outcome": _outcome(hold_rank="deep")}, "hold_rank: expected an integer >= 1"),
+        ({"outcome": _outcome(hold_rank=8, side="long_short")}, "a long_short spread has no cost"),
+        (
+            {
+                "outcome": {
+                    "kind": "hit_target",
+                    "horizon_sessions": [20],
+                    "benchmark": "SPY",
+                    "start_offset_sessions": 1,
+                    "target": 0.1,
+                    "measure": "excess_return",
+                    "direction": "above",
+                    "hold_rank": 8,
+                }
+            },
+            "a band is for a long or short excess_return",
+        ),
+        (
+            {"schedule": "every_session"},
+            "month_end, or every_session at horizon_sessions = \\[1\\]",
+        ),
+        ({"schedule": "on_event:earnings_reaction"}, "month_end, or every_session at"),
+        (
+            {
+                "schedule": "calendar:turn_of_month",
+                "outcome": _outcome(hold_rank=8, horizon_sessions=[4]),
+            },
+            "month_end, or every_session at",
+        ),
+    ],
+)
+def test_a_hold_rank_is_refused_where_a_position_cannot_carry_over(
+    changes: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        parse(**_band(**changes))
+
+
+def test_a_variant_hold_rank_below_top_k_is_refused() -> None:
+    with pytest.raises(ConfigurationError, match="hold_rank: 3 must be an integer >= top_k"):
+        parse(**_band(variants=[{"id": "thin", "outcome": {"hold_rank": 3}}]))
+
+
+def test_an_edge_without_a_hold_rank_hashes_as_it_did_before_bands() -> None:
+    """No stored leg, run or trial is recomputed by the arrival of bands: the identity of an
+    outcome without one has no key for it, one with one has."""
+    assert "hold_rank" not in identity_dict(asdict(parse().outcome))
+    assert (
+        "hold_rank"
+        not in identity_dict({"o": [asdict(parse(**_band(outcome=_outcome())).outcome)]})["o"][0]
+    )
+    assert identity_dict(asdict(parse(**_band()).outcome))["hold_rank"] == 8
+
+
+def test_every_shipped_edge_with_a_band_keeps_it_at_or_below_top_k() -> None:
+    """Fitness: a site edge document that names a ``hold_rank`` parses (so it holds down from its
+    ``top_k``, on a schedule whose positions carry over)."""
+    root = Path(__file__).resolve().parents[4] / "config" / "site" / "edges"
+    for path in sorted(root.glob("*/edge.toml")):
+        if "hold_rank" in path.read_text():
+            doc = tomllib.loads(path.read_text())
+            got = parse_edge(doc, path.parent.name, str(path))
+            assert got.outcome.hold_rank is None or got.top_k is not None
+            assert got.outcome.hold_rank is None or got.outcome.hold_rank >= (got.top_k or 0)

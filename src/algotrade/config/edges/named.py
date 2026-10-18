@@ -24,6 +24,21 @@ def check_raw_returns(where: str, kind: str, benchmark: str, timed: bool) -> Non
         )
 
 
+def check_variants(where: str, *bases: str | None) -> None:
+    """A time-series edge (any of the ``bases`` of an edge and its variant) has no variants."""
+    if OUT_OF_WINDOW in bases:
+        raise ConfigurationError(f"{where}: a time-series edge has no variants")
+
+
+def check_time_series(base: str, calendar: bool, universe: str | Selection, where: str) -> None:
+    """``base = "out_of_window"`` needs a ``calendar`` schedule and a named universe."""
+    if base != OUT_OF_WINDOW:
+        return
+    if not calendar:
+        raise ConfigurationError(f"{where} base: 'out_of_window' needs a calendar schedule")
+    named_symbols(universe, f"{where} universe")
+
+
 def named_symbols(universe: str | Selection, where: str = "universe") -> tuple[str, ...]:
     """The symbols ``universe`` names, in order, each once; ``ConfigurationError`` when it is
     a preset name (the instruments are named inline) or anything but one ``instrument.symbol``

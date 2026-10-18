@@ -27,14 +27,17 @@ and the key.
                       ``long_short`` (the top ``top_k`` minus the bottom: a spread, diagnostic
                       only); a side other than long needs an ``excess_return`` outcome, no
                       ``max_drawdown``, an integer ``top_k``; optional ``borrow_bps_annual``
-                      (default from ``verdict.toml``) is the short leg's assumed borrow cost
+                      (default from ``verdict.toml``) is the short leg's assumed borrow cost;
+                      optional ``hold_rank`` (buy/hold band, ADR 0053 amendment 2026-10-18): held
+                      while rank <= this (>= ``top_k``, an integer); cost on entries and exits
+                      only; see ``_hold_rank`` for where it is allowed
     schedule          ``every_session`` | ``month_end`` | ``calendar:<window>`` (WINDOW_NAMES: a
                       stretch the calendar fixes, whose length is the one horizon) |
                       ``on_event:<class>[:<subtype>]`` (EVENT_CLASSES; EVENT_SUBTYPES)
     base              what the picks are compared with: ``event`` (the names with the event at
                       D, of the schedule's own class and subtype; default for an event
                       schedule) | ``universe`` (every eligible name) | ``out_of_window`` (a
-                      time-series edge: ADR 0073, ``named.py``, a calendar schedule)
+                      time-series edge: ADR 0073)
     picks             where an event schedule's picks come from: ``event`` (the qualified names
                       within the event names; default) | ``universe`` (the qualified names of
                       every eligible name on the event sessions; a decoy). Plain schedules
@@ -99,8 +102,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
+from algotrade.config.edges import named
 from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
-from algotrade.config.edges.named import OUT_OF_WINDOW, check_raw_returns, named_symbols
+from algotrade.config.edges.model_tenor import check_tenor
 from algotrade.config.edges.verdict import LEGS
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Selection, parse_selection
@@ -124,19 +128,13 @@ STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short optio
 MODEL_STRUCTURES = (
     "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
 )  # fmt: skip
-# The implied vol is one tenor (``iv30``: 30 calendar days, about 21 sessions) and prices every
-# horizon of the outcome, so a horizon far from it prices the wrong option: an option_model_pnl
-# horizon must lie within ``[tenor / 2, tenor * 2]`` sessions of the field's tenor, read from its
-# name (a field with no ``iv<days>`` in its name has no known tenor and is refused).
-TRADING_DAYS_PER_YEAR, CALENDAR_DAYS_PER_YEAR = 252, 365
-_IV_TENOR = re.compile(r"(?<![a-z0-9])iv(\d+)(?![0-9])")
 MODEL_KIND = "option_model_pnl"
 MODEL_BASIS = "model"  # what a price from a model, not a quote, is labelled (results and UI)
 BENCHMARKS = ("SPY", "none")
 LONG, SHORT, LONG_SHORT = "long", "short", "long_short"
 SIDES = (LONG, SHORT, LONG_SHORT)  # which names an outcome holds and in which direction
 SCHEDULES = ("every_session", "month_end")
-BASES = ("event", "universe", OUT_OF_WINDOW)
+BASES = ("event", "universe", named.OUT_OF_WINDOW)
 PICKS = ("event", "universe")  # where an event schedule's picks may come from
 MAIN = "main"  # the edge itself, as the key of a results row (a variant has its own id)
 ON_EVENT = "on_event:"
@@ -212,7 +210,7 @@ KEYS = (
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
-    "side", "borrow_bps_annual",
+    "side", "borrow_bps_annual", "hold_rank",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -246,6 +244,7 @@ class Outcome:
     iv_field: str | None = None
     side: str = LONG  # SIDES; a short leg pays ``borrow_bps_annual`` (None: the site's default)
     borrow_bps_annual: float | None = None
+    hold_rank: int | None = None  # buy/hold band: held while rank <= this (None: no band)
 
     @property
     def is_return(self) -> bool:
@@ -445,8 +444,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     base = _base(t, schedule)
     outcome = _outcome(t, schedule, base)
     universe = _universe(t, edge_id)
-    if base == OUT_OF_WINDOW:
-        named_symbols(universe, f"{where} universe")
+    named.check_time_series(base, window_name(schedule) in WINDOW_NAMES, universe, where)
     picks = _picks(t, schedule, base)
     sources = _sources(t)
     top_k = _top_k(t)
@@ -456,6 +454,12 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
             raise ConfigurationError(
                 f"{where} top_k: a {held.side!r} outcome ranks the names, so it needs an "
                 f"integer top_k, not 'all'"
+            )
+        if held.hold_rank is not None and (top_k is None or held.hold_rank < top_k):
+            raise ConfigurationError(
+                f"{where} hold_rank: {held.hold_rank} must be an integer >= top_k "
+                f"({'all' if top_k is None else top_k}); a name is held down to that rank, "
+                f"entered at top_k"
             )
     edge = Edge(
         id=edge_id,
@@ -629,8 +633,6 @@ def _base(t: Table, schedule: str, default: str | None = None) -> str:
     )
     if base == "event" and not event:
         raise ConfigurationError(f"{t.where} base: 'event' needs an on_event schedule")
-    if base == OUT_OF_WINDOW and window_name(schedule) not in WINDOW_NAMES:
-        raise ConfigurationError(f"{t.where} base: 'out_of_window' needs a calendar schedule")
     return base
 
 
@@ -658,7 +660,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         if "benchmark" in o.names()
         else _missing(o, "benchmark")
     )
-    check_raw_returns(o.where, kind, benchmark, base == OUT_OF_WINDOW)
+    named.check_raw_returns(o.where, kind, benchmark, base == named.OUT_OF_WINDOW)
     if kind == "option_model_pnl" and benchmark != "none":
         raise ConfigurationError(
             f"{o.where} benchmark: an option_model_pnl is a P&L on the underlying, "
@@ -705,10 +707,11 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
     structure, strike_delta, otm_pct, iv_field = _expires_otm(o, kind)
     if kind == MODEL_KIND:
-        _check_tenor(o, horizons, iv_field)
+        check_tenor(o, horizons, iv_field)
     side = o.choice("side", LONG, SIDES)
     borrow = o.number("borrow_bps_annual", None, 0)
     _check_side(o, side, borrow, kind, drawdown)
+    hold_rank = _hold_rank(o, side, kind, schedule, horizons)
     return Outcome(
         kind=kind,
         horizon_sessions=horizons,
@@ -725,35 +728,8 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         iv_field=iv_field,
         side=side,
         borrow_bps_annual=borrow,
+        hold_rank=hold_rank,
     )
-
-
-def tenor_sessions(iv_field: str) -> int | None:
-    """The tenor of an implied-vol field in sessions (``iv30`` is 30 calendar days: 21), from its
-    name; None when the name carries none."""
-    found = _IV_TENOR.search(iv_field.lower())
-    if found is None:
-        return None
-    return round(int(found.group(1)) * TRADING_DAYS_PER_YEAR / CALENDAR_DAYS_PER_YEAR)
-
-
-def _check_tenor(o: Table, horizons: tuple[int, ...], iv_field: str | None) -> None:
-    """Refuse an ``option_model_pnl`` horizon the field's one tenor cannot price (module docs)."""
-    if iv_field is None:
-        return  # required, and reported, by ``_expires_otm``
-    tenor = tenor_sessions(iv_field)
-    if tenor is None:
-        raise ConfigurationError(
-            f"{o.where} iv_field: {iv_field!r} names no tenor (iv<days>), so an option_model_pnl "
-            f"cannot tell which horizons its vol prices"
-        )
-    low, high = tenor // 2, tenor * 2
-    bad = [h for h in horizons if not low <= h <= high]
-    if bad:
-        raise ConfigurationError(
-            f"{o.where} horizon_sessions: {bad} are outside {low}..{high} sessions, what the "
-            f"{tenor}-session tenor of {iv_field!r} prices; use a field of the horizon's tenor"
-        )
 
 
 def _check_side(
@@ -771,16 +747,41 @@ def _check_side(
         )
 
 
+def _hold_rank(
+    o: Table, side: str, kind: str, schedule: str, horizons: tuple[int, ...]
+) -> int | None:
+    """The outcome's buy/hold band rank (None: no band). Refused for a spread (``long_short`` has
+    no cost rows), a return that is not an excess return and an event or calendar schedule. The
+    schedule limit (``month_end``, or ``every_session`` at one session) is stricter than needed:
+    windows never overlap on a plain schedule (``sessions.py``), so loosening it is a later PR."""
+    if "hold_rank" not in o.names():
+        return None
+    rank = o.integer("hold_rank", 1, 1)
+    if side == LONG_SHORT or kind != "excess_return":
+        raise ConfigurationError(
+            f"{o.where} hold_rank: a band is for a long or short excess_return (a long_short "
+            f"spread has no cost rows to turn over)"
+        )
+    if schedule not in SCHEDULES or (schedule == "every_session" and horizons != (1,)):
+        raise ConfigurationError(
+            f"{o.where} hold_rank: for now the schedule is month_end, or every_session at "
+            f"horizon_sessions = [1] (kept stricter than needed), got {schedule!r} with "
+            f"{list(horizons)}"
+        )
+    return rank
+
+
 def identity_dict(value: Any) -> Any:
-    """``value`` (an ``asdict`` of an edge or outcome) without the side keys of a long outcome:
-    a document that never named a side hashes as it did before sides, so no stored leg or
-    run is recomputed by their arrival (ADR 0053 amendment, outcome sides)."""
+    """``value`` (an ``asdict`` of an edge or outcome) without the side keys of a long outcome
+    and an unset ``hold_rank``: a document that never named a side or a band hashes as it did
+    before them, so no stored leg or run is recomputed by their arrival (ADR 0053 amendments)."""
     if isinstance(value, dict):
         long = value.get("side") == LONG and value.get("borrow_bps_annual") is None
         return {
             k: identity_dict(v)
             for k, v in value.items()
             if not (long and k in ("side", "borrow_bps_annual"))
+            and not (k == "hold_rank" and v is None)
         }
     if isinstance(value, (list, tuple)):
         return [identity_dict(v) for v in value]
@@ -874,8 +875,7 @@ def _variants(
         )  # a variant of another kind drops the base's kind-specific keys
         merged = Table({**kept, **{k: over.raw(k) for k in over.names()}}, f"{v.where} outcome")
         v_base = _base(v, schedule) if "base" in v.names() else None
-        if OUT_OF_WINDOW in (v_base, edge_base):
-            raise ConfigurationError(f"{v.where}: a time-series edge has no variants")
+        named.check_variants(v.where, v_base, edge_base)
         _picks(v, schedule, v_base or edge_base, edge_picks)  # the effective pair is checked
         found.append(
             EdgeVariant(
