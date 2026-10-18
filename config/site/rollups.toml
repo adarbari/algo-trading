@@ -186,6 +186,12 @@ min_coverage = 0.9         # share of member stocks with a bar on the session, e
 min_months_12 = 10          # a 12-month mean or low needs this many of its months (Oct 2025: shutdown)
 min_months_3 = 2            # a 3-month mean needs this many of its months
 
+["etf_macro@v1"]            # macro signals as per-fund columns (EB E5 extension, ADR 0074)
+max_age_daily_days = 7      # a daily series (lag one day) older than this is null
+max_age_delayed_days = 21   # a daily series published about ten days late (WTI, the broad dollar)
+max_age_monthly_days = 100  # a monthly series (CAPE: 45 days late; the OECD rates: 60)
+min_window_share = 0.8      # a 50- or 200-observation mean needs this share of its window
+
 ["regime_indicators@v1"]     # the regime cards' verdicts (ADR 0047; docs/market-regime-plan.md 3-4)
 changed_sessions = 5         # <card>_changed compares the verdict with this many sessions earlier
 curve_below = 0.0            # curve: 10y - 3m below this (inverted) ...
