@@ -104,3 +104,21 @@ def test_a_horizon_with_nothing_stored_in_its_span_fails_while_another_is_read()
     assert set(failed) == {5} and closed[2] and not closed[5]
     with pytest.raises(Exception, match="no outcomes"):
         raise failed[5]
+
+
+def test_a_books_history_is_logged_against_every_decision_session_that_read_it() -> None:
+    """A history read for decision session D+1 that shares a day with D's window is logged against
+    D+1 too (a cache hit logs nothing, so the cache is per decision session): a restated partition
+    of that day must invalidate both legs (ADR 0074 amendment item 15)."""
+    w = build_world()
+    field = "rollup.option_liquidity@v1.underlying_price"
+    ids = frozenset({"EQ:N00", "EQ:N01"})
+    session = SessionReads(w.reader, "label")
+    shared = DAYS[0]
+    for decision in (DAYS[1], DAYS[2]):
+        with session.attribute(decision):
+            got = session.history(field, ids, [shared, decision], decision)
+        assert set(got) == {shared, decision}
+    seen = {d: {(r.table, r.start, r.end) for r in session.day_reads(d).reads} for d in DAYS[1:3]}
+    on_shared = {r for r in seen[DAYS[1]] if r[0].startswith("rollups/") and r[1] <= shared <= r[2]}
+    assert on_shared and on_shared <= seen[DAYS[2]]  # the shared day's partition, in both
