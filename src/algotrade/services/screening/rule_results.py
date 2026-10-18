@@ -7,6 +7,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import FieldValue
 from algotrade.services.views import to_value
 from algotrade.storage.tables.schemas import DISPLAY_COLUMN_MODE
@@ -55,7 +56,17 @@ def _ids(row: RuleRow, outcome: str) -> str:
     return ",".join(r.criterion.id for r in row.results if r.gating and r.outcome == outcome)
 
 
+def _refuse_groups(result: RuleScreenResult) -> None:
+    """Group rows land with ADR 0071 PR 3; until then members would be stored as gates."""
+    if result.spec.groups:
+        raise ConfigurationError(
+            f"{result.spec.id}: a screen with groups cannot be stored yet (group rows land "
+            "with ADR 0071 PR 3)"
+        )
+
+
 def screen_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
+    _refuse_groups(result)
     records = [
         {
             "instrument_id": row.instrument_id,
@@ -81,6 +92,7 @@ def screen_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
 
 
 def values_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
+    _refuse_groups(result)
     records: list[dict[str, object]] = []
     for row in result.rows:
         for r in row.results:
