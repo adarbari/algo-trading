@@ -48,9 +48,13 @@ def test_the_shipped_registry() -> None:
         "IDX:COMP": "NASDAQCOM",
         "IDX:VIX": "VIXCLS",
         "IDX:VIX3M": "VXVCLS",
+        "IDX:VIX9D": "VIX9D",  # Cboe's own files (EB D3): the code is the key
+        "IDX:VIX6M": "VIX6M",
+        "IDX:VVIX": "VVIX",
     }
     personal = {s.key for s in macro.series if s.licence == "personal"}
     third_party = {"BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "COMP", "VIX", "VIX3M", "SPX"}
+    third_party |= {"VIX9D", "VIX6M", "VVIX"}  # Cboe's files: personal use, no redistribution
     cape = {k for k in macro.keys if k.startswith("CAPE_")}  # Barclays' file: personal use
     assert len(cape) == 26 and personal == third_party | cape
     unrevised = {  # FRED's daily market series: never revised, so one plain request each

@@ -27,6 +27,7 @@ from algotrade_ingestion.tasks.market import (
     option_chains,
     rates,
 )
+from algotrade_ingestion.tasks.market.volatility import vx_futures
 
 
 def run_earnings(ctx: TaskContext, p: Params) -> RunRecord:
@@ -133,6 +134,18 @@ def run_rates(ctx: TaskContext, p: Params) -> RunRecord:
     end = p.get("end") or session_of(p)
     start = p.get("start") or end - timedelta(ctx.settings.treasury_lookback_days - 1)
     return rates.ingest_rates(ctx, ctx.sources["treasury"], start, end, bool(p.get("force")))
+
+
+def run_vx_futures(ctx: TaskContext, p: Params) -> RunRecord:
+    # --from / --to bound the EXPIRIES asked for; with neither it is the nightly window.
+    return vx_futures.ingest_vx_futures(
+        ctx,
+        ctx.sources["cboe_vx"],
+        session_of(p),
+        p.get("start"),
+        p.get("end"),
+        bool(p.get("force")),
+    )
 
 
 def run_corporate_actions(ctx: TaskContext, p: Params) -> RunRecord:

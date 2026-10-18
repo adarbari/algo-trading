@@ -226,6 +226,11 @@ purpose = "futures tasks: the nightly futures curve snapshots from IB Gateway (r
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/market/volatility"
+purpose = "volatility tasks: Cboe VIX futures by expiry (the VIX-family indices are macro series); tasks/market is at its module cap, so these are a folder"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/profile"
 purpose = "profile tasks: descriptive text about what an instrument is (stock descriptions from Massive, ETF investment objectives from SEC prospectuses)"
 kind = "task-domain"

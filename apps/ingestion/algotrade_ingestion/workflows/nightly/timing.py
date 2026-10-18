@@ -35,6 +35,7 @@ UNITS: Mapping[str, str] = {
     "earnings": "dates",
     "bars": "sessions",
     "rates": "years",
+    "vx-futures": "expiries",
     "corporate-actions": "windows",
     "chains": "underlyings",
     "rollups": "rows",

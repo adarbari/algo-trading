@@ -18,6 +18,7 @@ from algotrade.config.site.events.releases import MacroRelease, load_macro_relea
 from algotrade.config.site.macro import MacroSeries, MacroSettings
 from algotrade.config.site.settings import SourcesSettings, load_macro
 from algotrade.core.model.instruments import market_id
+from algotrade.core.time.calendar import previous_session
 from algotrade.data import StoreReader
 from algotrade.data.chains import (
     CHRONIC,
@@ -35,6 +36,7 @@ from algotrade.services.features import site_features
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
     FAILURES,
+    FETCH_ERROR,
     PUBLISHED,
     IngestRun,
     TaskContext,
@@ -380,6 +382,35 @@ def macro_checks(
         _macro_fresh(stored, session, s.max_macro_stale_share, fetchable, skipped),
         _macro_vintages(stored, runs, enabled),
     ]
+
+
+VX_TASK = "vx_futures"  # the vx-futures task's job name (tasks/market/volatility/)
+
+
+def check_vx_futures(ctx: TaskContext, session: date) -> list[Check]:
+    """The ``vx-futures`` step's acceptance, WARN-only (EB D3: the step is optional and Cboe's
+    free files never fail a night): WARN when the session's finished run stored no row at or
+    after the session before (Cboe publishes a session's settle the morning after, so the
+    session itself is not expected), found no listed contract, or had fetch errors. Nothing
+    without a finished run of the session (a task that failed fails its step itself)."""
+    done = [
+        r for r in ctx.reader.runs(VX_TASK) if r.status in PUBLISHED and r.session_date == session
+    ]
+    if not done:
+        return []
+    record = max(done, key=lambda r: (r.started_at, r.run_id))
+    name = "vx_futures_fresh"
+    errors = int(record.stats.get("items", {}).get(FETCH_ERROR) or 0)
+    if errors:
+        return [Check(name, "WARN", f"{errors} expiry files failed to fetch")]
+    if not record.stats.get("listed"):
+        return [Check(name, "WARN", "no VX contract file was found")]
+    latest, expected = record.stats.get("latest"), previous_session(session)
+    if latest is None or date.fromisoformat(str(latest)) < expected:
+        return [
+            Check(name, "WARN", f"latest stored trade date {latest}, expected {expected} or later")
+        ]
+    return [Check(name, "PASS", f"latest stored trade date {latest}")]
 
 
 def check_macro_calendar(ctx: TaskContext, session: date) -> list[Check]:

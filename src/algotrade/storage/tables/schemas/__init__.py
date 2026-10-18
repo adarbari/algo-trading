@@ -58,6 +58,7 @@ from algotrade.storage.tables.schemas.market import (
     UNDERLYING_QUOTES,
     UNIVERSE,
     VERIFICATION_IBKR,
+    VX_FUTURES,
 )
 from algotrade.storage.tables.schemas.outcomes import (
     _OUTCOME_TYPES,
@@ -188,6 +189,7 @@ __all__ = [
     "VALUE_CHECKS",
     "VERIFICATION_IBKR",
     "VINTAGE_KINDS",
+    "VX_FUTURES",
     "_BAR_TYPES",
     "_OUTCOME_TYPES",
     "access_status_problems",

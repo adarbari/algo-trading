@@ -98,6 +98,10 @@ daily_funds = [
     "HYG", "AGG", "EMB",
 ]
 
+[cboe_vx]                        # VIX futures by expiry (EB D3): one static CSV per contract on Cboe's CDN
+enabled = true
+min_interval_s = 0.5             # static S3 objects, no published limit; ~730 expiries in a 2013- backfill
+
 [nasdaq_earnings]                # earnings calendar
 enabled = true
 days = 60                        # forward window stored each night

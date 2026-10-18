@@ -126,3 +126,44 @@ def payload(
 
 
 CLOCK_TS = datetime(2026, 10, 2, 22, 0, tzinfo=UTC)
+
+
+# --- Cboe VIX futures and index history files (EB D3): the real CSV formats, made-up numbers
+
+VX_HEADER = "Trade Date,Futures,Open,High,Low,Close,Settle,Change,Total Volume,EFP,Open Interest"
+# (trade date, open, high, low, close, settle, change, volume, efp, open interest)
+type Row = tuple[str, float, float, float, float, float, float, int, int, int]
+
+ROWS: tuple[Row, ...] = (
+    ("2013-05-15", 15.0, 15.2, 14.9, 15.1, 0, 0, 40, 0, 40),  # before 2013-05-20: no settle
+    ("2013-05-20", 15.1, 15.4, 15.0, 15.3, 15.25, 0.15, 55, 2, 90),
+    ("2013-05-21", 0, 0, 0, 0, 15.40, 0.15, 0, 0, 90),  # a day without a trade: settle only
+    ("2013-05-22", 15.4, 15.9, 15.3, 15.8, 15.75, 0.35, 120, 5, 130),
+)
+
+
+def vx_file(label: str, rows: tuple[Row, ...] = ROWS) -> bytes:
+    """One contract's file: ``label`` is Cboe's month label (``F (Jan 2014)``)."""
+    lines = [VX_HEADER]
+    for day, *values in rows:
+        prices = ",".join(f"{v:.4f}" for v in values[:4])
+        settle, change = values[4], values[5]
+        lines.append(
+            f"{day},{label},{prices},{settle},{change},{values[6]},{values[7]},{values[8]}"
+        )
+    return ("\n".join(lines) + "\n").encode()
+
+
+def index_file(rows: tuple[tuple[str, float], ...], close_only: str = "") -> bytes:
+    """``DATE,OPEN,HIGH,LOW,CLOSE`` (MM/DD/YYYY), or ``DATE,<close_only>`` when given (VVIX)."""
+    if close_only:
+        lines = [f"DATE,{close_only}"] + [f"{d},{v:.6f}" for d, v in rows]
+    else:
+        lines = ["DATE,OPEN,HIGH,LOW,CLOSE"] + [
+            f"{d},{v:.6f},{v + 1:.6f},{v - 1:.6f},{v:.6f}" for d, v in rows
+        ]
+    return ("\n".join(lines) + "\n").encode()
+
+
+VIX9D = index_file((("01/04/2011", 16.06), ("01/05/2011", 15.57), ("10/16/2026", 20.12)))
+VVIX = index_file((("03/06/2006", 71.73), ("10/15/2026", 100.5)), close_only="VVIX")

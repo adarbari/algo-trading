@@ -24,6 +24,7 @@ from algotrade.core.time.calendar import (
     session_on_or_before,
     sessions_between,
     third_friday,
+    weekdays_between,
 )
 
 # NYSE published full-day holidays (nyse.com hours & calendars).
@@ -312,3 +313,10 @@ def test_last_session_of_week_follows_holidays() -> None:
     assert last_session_of_week(date(2026, 10, 10)) == date(2026, 10, 9)  # a Saturday: its week
     assert last_session_of_week(date(2026, 4, 1)) == date(2026, 4, 2)  # Good Friday 04-03 is shut
     assert last_session_of_week(date(2026, 11, 26)) == date(2026, 11, 27)  # Thanksgiving: Friday
+
+
+def test_weekdays_between_lists_every_such_weekday_inclusive() -> None:
+    wednesdays = weekdays_between(date(2013, 1, 1), date(2013, 1, 23), 2)
+    assert wednesdays == [date(2013, 1, 2), date(2013, 1, 9), date(2013, 1, 16), date(2013, 1, 23)]
+    assert weekdays_between(date(2013, 1, 2), date(2013, 1, 8), 2) == [date(2013, 1, 2)]
+    assert weekdays_between(date(2013, 1, 3), date(2013, 1, 8), 2) == []

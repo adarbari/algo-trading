@@ -64,6 +64,7 @@ from algotrade_ingestion.tasks.market import (
     rates,
 )
 from algotrade_ingestion.tasks.market.futures import curves as futures_curves
+from algotrade_ingestion.tasks.market.volatility import vx_futures
 from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     company_details,
@@ -442,6 +443,17 @@ TASKS: dict[str, Task] = {
             entries_market.run_rates,
             sources=("treasury",),
             settings="sources.toml [treasury] lookback_days",
+            params=(SESSION, FROM, TO, Param("force", ("--force",), None, "rewrite stored")),
+        ),
+        Task(
+            "vx-futures",
+            "Cboe VIX futures by expiry (settle, volume, open interest): the nightly window, or a "
+            "resumable history backfill of the expiries in --from/--to (2013 on)",
+            vx_futures,
+            (vx_futures.TABLE,),
+            entries_market.run_vx_futures,
+            sources=("cboe_vx",),
+            settings="sources.toml [cboe_vx]",
             params=(SESSION, FROM, TO, Param("force", ("--force",), None, "rewrite stored")),
         ),
         Task(

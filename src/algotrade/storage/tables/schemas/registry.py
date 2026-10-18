@@ -41,6 +41,7 @@ from algotrade.storage.tables.schemas.market import (
     UNDERLYING_QUOTES,
     UNIVERSE,
     VERIFICATION_IBKR,
+    VX_FUTURES,
 )
 from algotrade.storage.tables.schemas.outcomes import (
     OPTION_PNL_SPEC,
@@ -93,6 +94,7 @@ KNOWN: dict[str, TableSpec] = {
         VERIFICATION_IBKR,
         IBKR_CONTRACTS,
         IBKR_IV30,
+        VX_FUTURES,
         FUTURES_CURVE,
         RULE_SCREEN,
         RULE_SCREEN_VALUES,

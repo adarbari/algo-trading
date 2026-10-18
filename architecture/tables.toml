@@ -589,6 +589,11 @@ name = "volatility/ibkr_iv30"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py"
 
 [[table]]
+name = "volatility/vx_futures"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/volatility/vx_futures.py"
+note = "EB D3: Cboe VIX futures by expiry and trade date (settle, volume, open interest); known_from = the next session after the trade date (the file is published the morning after), later for a restated value; personal-use licence"
+
+[[table]]
 name = "rates/futures_curve"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/futures/curves.py"
 note = "the nightly futures curve snapshot per root (IBKR, read-only, personal licence): the front contracts' last / prior settle / volume / open interest with expiry, so basis and roll yield are rebuilt from our own history; read through data/futures"

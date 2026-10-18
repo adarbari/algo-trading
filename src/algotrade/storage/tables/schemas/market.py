@@ -110,6 +110,17 @@ FUTURES_CURVE = fixed(
     key=("instrument_id",),
 )  # fmt: skip
 
+# L2: Cboe VIX futures (EB D3): a partition per trade date, a row per contract (``FUT:VX-<expiry>``,
+# monthly and weekly), so a session's rows by ``expiry`` are its curve. A file price of 0 is null.
+# ``known_from``: the session the row was knowable on (next session after the trade date; later for
+# a restated value, ADR 0050), in the key so a restatement is a second version.
+VX_FUTURES = fixed(
+    "volatility/vx_futures", "volatility", ("instrument_id", "expiry"),
+    "instrument_id string!", "root string!", "expiry date!", "known_from date!", "contract string",
+    *floats("open", "high", "low", "close", "settle", "change"),
+    *("volume int64", "efp int64", "open_interest int64"),
+    runs="merge", key=("instrument_id", "session_date", "known_from"),
+)  # fmt: skip
 # Live option quotes the API read from IB Gateway (ADR 0028, the API's one write exception):
 # every answer it served, one partition per session, a row per contract and time taken. Runs
 # merge (each is a few snapshots; all are kept, keyed by contract and ``ts``). Written only
