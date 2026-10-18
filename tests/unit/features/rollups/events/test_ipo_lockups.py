@@ -113,3 +113,15 @@ def test_the_earliest_expiry_in_the_window_is_the_nearest() -> None:
 def test_no_prospectuses_or_no_company_snapshot_has_no_rows() -> None:
     assert il.compute(_inputs(None, [("EQ:A", "1")]), SESSION, None).empty
     assert il.compute(_inputs([_row("1", date(2026, 10, 14))], None), SESSION, None).empty
+
+
+def test_an_unpadded_cik_in_the_snapshot_still_joins_the_prospectus() -> None:
+    out = il.compute(
+        _inputs(
+            [_row("0000320193", date(2026, 10, 14))],
+            [("EQ:A", "320193"), ("EQ:B", "320193.0")],  # the forms reference rows carry
+        ),
+        SESSION,
+        None,
+    )
+    assert sorted(out["instrument_id"]) == ["EQ:A", "EQ:B"]

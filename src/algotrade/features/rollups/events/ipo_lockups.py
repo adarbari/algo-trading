@@ -22,10 +22,11 @@ The nearest lock-up is the earliest expiry on or after ``AFTER`` sessions before
 instrument with none has no row (UNKNOWN, never "no lock-up").
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
+from algotrade.core.model.instruments import pad_cik
 from algotrade.core.time.calendar import session_offset
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
@@ -41,7 +42,13 @@ _NONE = (
     "on, or its CIK is in no company snapshot of the session (the prospectus states no "
     "lock-up date, or the issuer is not an instrument yet)"
 )
-_INPUTS = (f"{EVENTS}.lockup_expiry", f"{EVENTS}.early_release", f"{EVENTS}.lockup_days")
+_INPUTS = (
+    f"{EVENTS}.lockup_expiry",
+    f"{EVENTS}.early_release",
+    f"{EVENTS}.lockup_days",
+    f"{COMPANY}.cik",
+)
+STALE = timedelta(days=40)  # calendar days past the expiry beyond which AFTER sessions have passed
 
 FEATURES = (
     Feature(
@@ -76,8 +83,8 @@ def _ciks(company: pd.DataFrame | None) -> pd.DataFrame:
     """``instrument_id`` and ``cik`` of the company snapshot, rows with a CIK only."""
     if company is None or company.empty or "cik" not in company.columns:
         return pd.DataFrame({"instrument_id": [], "cik": []})
-    ciks = company[["instrument_id", "cik"]].dropna()
-    return ciks.assign(instrument_id=ciks["instrument_id"].astype(str), cik=ciks["cik"].astype(str))
+    ciks = company[["instrument_id", "cik"]].assign(cik=company["cik"].map(pad_cik)).dropna()
+    return ciks.assign(instrument_id=ciks["instrument_id"].astype(str))
 
 
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
@@ -87,8 +94,9 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
         return pd.DataFrame(columns=columns)
     rows = stored[stored["is_ipo"].fillna(False).astype(bool) & stored["lockup_expiry"].notna()]
     rows = rows.assign(
-        lockup_expiry=pd.to_datetime(rows["lockup_expiry"]).dt.date, cik=rows["cik"].astype(str)
+        lockup_expiry=pd.to_datetime(rows["lockup_expiry"]).dt.date, cik=rows["cik"].map(pad_cik)
     )
+    rows = rows[rows["lockup_expiry"] >= session - STALE]  # long past: no calendar walk for it
     rows = rows.assign(offset=[session_offset(session, day) for day in rows["lockup_expiry"]]).pipe(
         lambda f: f[f["offset"] >= -AFTER]
     )

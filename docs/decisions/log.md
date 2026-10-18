@@ -904,3 +904,8 @@ follow-up PR).
 - decided by: implementer (forced by the caps; user-visible grouping)
 - status: pending owner confirmation
 - Reasoning: the entries must ship with the columns (coverage test); a mislabelled group is cheaper to move later than a failing gate.
+
+## 2026-10-18 | EB H4 follow-up (PR 700 review) | Dual-class CIKs and the events field-guide split
+- Decision: a CIK with two share classes counts the same lock-up expiry twice, which overstates the independent events of an `ipo_lockup` edge: the edge's run record notes it. The events field-guide theme (`events.toml` and its docs page at the cap) needs a sub-folder split; Now / Next is full, so the follow-up is here only.
+- decided by: architect review
+- status: pending owner confirmation

@@ -8,6 +8,7 @@ from datetime import date
 import pandas as pd
 
 from algotrade.features.rollups.events import reverse_splits as rs
+from algotrade_sources.vendors.massive.corporate_actions import parse_splits
 
 SESSION = date(2026, 10, 9)  # a Friday
 
@@ -68,3 +69,14 @@ def test_a_split_with_an_ex_date_after_the_session_is_never_read() -> None:
 def test_no_splits_stored_has_no_rows() -> None:
     assert rs.compute(_inputs(None), SESSION, None).empty
     assert rs.compute(_inputs([]), SESSION, None).empty
+
+
+def test_the_massive_normaliser_stores_a_one_for_ten_reverse_split_as_point_one() -> None:
+    rows = parse_splits(
+        [
+            {"execution_date": "2026-10-08", "ticker": "AAA", "split_from": 10, "split_to": 1},
+            {"execution_date": "2026-10-08", "ticker": "BBB", "split_from": 1, "split_to": 4},
+        ]
+    ).set_index("symbol")
+    assert rows.at["AAA", "ratio"] == 0.1  # reverse: below 1, the rollup reads it
+    assert rows.at["BBB", "ratio"] == 4.0  # forward 4-for-1: stored as 4
