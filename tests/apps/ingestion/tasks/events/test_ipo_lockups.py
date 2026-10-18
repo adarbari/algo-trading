@@ -29,9 +29,9 @@ from algotrade_ingestion.tasks.events.ipo_lockups import (
 )
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_sources.framework.http import HttpError, RetryPolicy
-from algotrade_sources.vendors.sec.prospectus import SecProspectus
-from algotrade_sources.vendors.sec.prospectus_search import SecProspectusSearch
 from algotrade_sources.vendors.sec.submissions import SecFilings
+from algotrade_sources.vendors.sec_prospectus.prospectus import SecProspectus
+from algotrade_sources.vendors.sec_prospectus.prospectus_search import SecProspectusSearch
 from tests.helpers.ingest_fakes import FIXED, http_for, task_ctx
 from tests.helpers.payloads import sec as payloads
 from tests.helpers.stored_frames import stamped

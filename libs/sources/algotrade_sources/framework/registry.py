@@ -85,9 +85,9 @@ from algotrade_sources.vendors.sec.fund_objectives import (
     SecFundTickerMap,
 )
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
-from algotrade_sources.vendors.sec.prospectus import SecProspectus
-from algotrade_sources.vendors.sec.prospectus_search import SecProspectusSearch
 from algotrade_sources.vendors.sec.submissions import SecFilings
+from algotrade_sources.vendors.sec_prospectus.prospectus import SecProspectus
+from algotrade_sources.vendors.sec_prospectus.prospectus_search import SecProspectusSearch
 from algotrade_sources.vendors.sp500_history.membership import Sp500Membership
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource

@@ -25,9 +25,9 @@ asks the SEC filings source for one company's 8-Ks (ADR 0050); its answer is
 8-K that day, ``parsed[DAILY_INDEX_FRAME]`` with ``DAILY_INDEX_COLUMNS``
 (``vendors/sec/daily_index.py``). ``ProspectusSearchRequest`` asks EDGAR full-text search for
 the 424B4 final prospectuses mentioning a lock-up filed in a window, ``parsed[HITS_FRAME]`` with
-``HIT_COLUMNS`` (``vendors/sec/prospectus_search.py``); ``ProspectusRequest`` asks for one
+``HIT_COLUMNS`` (``sec_prospectus/prospectus_search.py``); ``ProspectusRequest`` asks for one
 prospectus's main document, ``parsed[IPO_FRAME]`` with the IPO facts read from its text
-(``vendors/sec/prospectus.py``). They live here so a task builds its requests without importing a
+(``sec_prospectus/prospectus.py``). They live here so a task builds its requests without importing a
 vendor module.
 """
 

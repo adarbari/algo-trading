@@ -11,7 +11,7 @@ is an item (``win:YYYY-MM``) and the others still run.
 **What is read**: per prospectus, the issuer's submissions (``sec_filings``, one request per CIK
 and run: the acceptance instant and the main document's name; ``events/filing`` is not read) and
 the document itself (``sec_prospectus``, fetched once: fair access, 10 requests/second), whose
-facts the source extracts (``vendors/sec/prospectus.py`` holds the rules and their failure modes:
+facts the source extracts (``sec_prospectus/prospectus.py`` holds the rules and their failure modes:
 a fact the text does not state is null with ``extraction`` and ``reason``, never guessed). A 424B4
 that is not an IPO (a follow-on, a note offering) is stored too, ``NOT_IPO``: it is not read twice.
 

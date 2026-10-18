@@ -8,7 +8,7 @@ import pytest
 
 from algotrade_sources.framework.base import FetchRequest
 from algotrade_sources.framework.series import HIT_COLUMNS, HITS_FRAME, ProspectusSearchRequest
-from algotrade_sources.vendors.sec.prospectus_search import (
+from algotrade_sources.vendors.sec_prospectus.prospectus_search import (
     MAX_HITS,
     SecProspectusSearch,
     parse_hits,

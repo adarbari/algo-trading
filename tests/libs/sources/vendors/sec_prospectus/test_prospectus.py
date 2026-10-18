@@ -1,14 +1,14 @@
 """The IPO facts read from a 424B4 text (edge build D8): each rule of
-``vendors/sec/prospectus.py`` and each failure mode (not an IPO, a SPAC, no term, an anchor that is
-not the prospectus date, several terms, a term in months or years, an early-release clause), plus
-the document URL and the fetch."""
+``sec_prospectus/prospectus.py`` and each failure mode (not an IPO, a SPAC, no term, an anchor
+that is not the prospectus date, several terms, a term in months or years, an early-release
+clause), plus the document URL and the fetch."""
 
 from datetime import date
 
 import pytest
 
 from algotrade_sources.framework.series import IPO_COLUMNS, IPO_FRAME, ProspectusRequest
-from algotrade_sources.vendors.sec.prospectus import (
+from algotrade_sources.vendors.sec_prospectus.prospectus import (
     AMBIGUOUS,
     EXTRACTED,
     NO_LOCKUP,
