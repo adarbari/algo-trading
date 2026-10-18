@@ -318,8 +318,11 @@ def test_groups_the_validator_refuses_leave_the_draft_flat(ctx: ReadContext) -> 
     both = {**base, "criteria": {**base["criteria"], "oi": {"field": OI, "op": "gte", "value": 1}}}
     flat, why = with_groups(ctx, "my_screen", base, [bad])
     assert "groups" not in flat and "not applied" in why[0]  # told, never silent
-    grouped, none = with_groups(ctx, "my_screen", both, [bad, good])
-    assert grouped["groups"] == good and none == ()  # the next one
+    grouped, told = with_groups(ctx, "my_screen", both, [bad, good])
+    assert grouped["groups"] == good  # the next one
+    assert "not applied" in told[0]  # the refused first candidate is still told
+    clean, none = with_groups(ctx, "my_screen", both, [good])
+    assert clean["groups"] == good and none == ()
 
 
 def test_a_new_group_never_takes_the_id_of_one_the_builder_has(ctx: ReadContext) -> None:  # noqa: F811

@@ -471,7 +471,7 @@ def with_groups(
                 f"the 'or' or exclusion is not applied: the groups were refused ({exc})"[:300],
             )
             continue
-        return grouped, ()
+        return grouped, notes  # a refused earlier candidate is still told
     return without, notes
 
 
