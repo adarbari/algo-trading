@@ -42,7 +42,11 @@ function Badge({ values, name }: { values: Values; name: string }) {
   );
 }
 
-/** One section: heading, help and badges, then its rows (or the one row of a shared gap). */
+/**
+ * One section: heading, help and badges, then its rows (or the one row of a shared gap). Beside
+ * a shared gap the status badges that hold a value stay (NOT_COVERED and NOT_FETCHED share a
+ * public kind and the badge tells them apart); a badge that is itself a gap is dropped.
+ */
 function Section({ section, values }: { section: SectionSpec; values: Values }) {
   const gap = section.collapseGaps ? commonGap(values, section.rows) : null;
   return (
@@ -50,9 +54,11 @@ function Section({ section, values }: { section: SectionSpec; values: Values }) 
       <Stack direction="row" gap={2} align="center" wrap>
         <Heading level={3}>{section.title}</Heading>
         {termHelp(section.term)}
-        {gap
-          ? null
-          : section.statuses.map((name) => <Badge key={name} values={values} name={name} />)}
+        {section.statuses
+          .filter((name) => !gap || !isUnknown(values.get(name)))
+          .map((name) => (
+            <Badge key={name} values={values} name={name} />
+          ))}
       </Stack>
       <KeyValue
         label={section.title}

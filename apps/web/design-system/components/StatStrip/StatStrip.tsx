@@ -3,8 +3,8 @@
  * issues), separated by thin borders inside one bordered strip, never as separate cards. Each
  * stat has a label, a value (text or a formatted number, optionally toned) and a sub-line. The
  * strip wraps to two columns, then one, in narrow containers; a strip of more than `MANY`
- * stats (the Financials key metrics: nine) steps to three columns below 1200 px first, so each
- * value keeps room. Loading shows placeholders.
+ * stats (the Financials key metrics: nine) steps to three columns below 1200 px, then two, so
+ * each value keeps room. Loading shows placeholders.
  */
 import type { CSSProperties, ReactNode } from 'react';
 

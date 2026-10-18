@@ -93,5 +93,8 @@ export const Many: Story = {
   },
 };
 
+/** Nine stats in a phone-width container (375 px): two to a row, not nine stacked. */
+export const NarrowMany: Story = { ...Many, decorators: [narrow] };
+
 /** A phone-width container (375 px): the stats stack in one column. */
 export const Narrow: Story = { decorators: [narrow] };

@@ -186,9 +186,25 @@ describe('the analysts section', () => {
     expect(section).toHaveTextContent('Not covered');
     expect(section).toHaveTextContent('term unavailable_not_covered');
     expect(section).not.toHaveTextContent('Price target (consensus)');
-    expect(section).not.toHaveTextContent('NOT_COVERED');
+    expect(section).not.toHaveTextContent('Price target (consensus)');
     expect(screen.getByRole('heading', { name: 'Analysts: estimates and targets' })).toBeVisible();
     await expectNoA11yViolations(container);
+  });
+
+  it('keeps a status badge that holds a value beside the collapsed row', () => {
+    hooks.useInstrumentFacts.mockReturnValue(
+      withAnalysts([
+        ...analystNames.map(notCovered),
+        known(STATUSES[0] ?? '', 'NOT_FETCHED', 'TEXT'),
+        notCovered(STATUSES[1] ?? ''),
+      ]),
+    );
+    render(<FinancialsPanel symbol="KO" />);
+    const section = screen.getByLabelText('Analysts: estimates and targets');
+    expect(section).toHaveTextContent('Analyst figures');
+    expect(screen.getByText('NOT_FETCHED')).toBeInTheDocument();
+    // the targets status is itself a gap: no badge, no second Not covered word
+    expect(screen.getAllByText('Not covered')).toHaveLength(1);
   });
 
   it('says a licence gap once too, by its own kind', () => {
