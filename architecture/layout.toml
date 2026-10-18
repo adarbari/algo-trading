@@ -148,7 +148,7 @@ contracts = ["Feedback reads are quarantined: only the read model's feedback loa
 
 [[dir]]
 path = "src/algotrade/data/funds"
-purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035), the latest rows per fund and the CUSIP to ticker bridge"
+purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035), the latest rows per fund and the CUSIP to ticker bridge; and a fund's shares outstanding from its issuer's file (holdings/etf_shares, EB D4)"
 
 [[dir]]
 path = "src/algotrade/data/futures"

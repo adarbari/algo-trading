@@ -13,6 +13,7 @@ from algotrade.services.read import values
 from algotrade.services.read.availability.cause import UnavailableKind, kind_texts
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens import results as stored
+from algotrade.services.read.screens import screeners as stored_screeners
 from algotrade_api.graphql.types.availability import KindText, Unavailable
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
@@ -29,6 +30,7 @@ class CriterionResult:
     outcome: str
     value: JSON | None
     distance: float | None
+    group: str | None
 
     @classmethod
     def of(cls, d: stored.CriterionResult) -> Self:
@@ -39,6 +41,34 @@ class CriterionResult:
             outcome=d.outcome,
             value=JSON(d.value),
             distance=d.distance,
+            group=d.group,
+        )
+
+
+@strawberry.type(
+    description="A group of criteria (ADR 0071): its `kind` (`all`, `any` or `none`), its "
+    "`members` (criterion and group ids, in funnel order) and its `parent` group (null: a "
+    "gate). In a result, `outcome` is the group's PASS / NEAR / FAIL / MISSING for the "
+    "instrument and `decidedBy` the member that decided it; both are null in a screen's "
+    "definition"
+)
+class ScreenGroup:
+    id: str
+    kind: str
+    members: list[str]
+    parent: str | None
+    outcome: str | None
+    decided_by: str | None
+
+    @classmethod
+    def of(cls, d: stored_screeners.ScreenGroup) -> Self:
+        return cls(
+            id=d.id,
+            kind=d.kind,
+            members=list(d.members),
+            parent=d.parent,
+            outcome=d.outcome,
+            decided_by=d.decided_by,
         )
 
 
@@ -77,6 +107,7 @@ class ScreenResult:
     previous_decision: str | None
     regime: str | None
     size_multiplier: float | None
+    groups: list[ScreenGroup]
 
     @classmethod
     def of(cls, d: stored.ScreenResult, ctx: ReadContext) -> Self:
@@ -97,6 +128,7 @@ class ScreenResult:
             previous_decision=d.previous_decision,
             regime=d.regime,
             size_multiplier=d.size_multiplier,
+            groups=[ScreenGroup.of(g) for g in d.groups],
         )
 
 

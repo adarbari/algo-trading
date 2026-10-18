@@ -74,6 +74,13 @@ class GroupResult:
     decided_by: str | None
     members: tuple[Gate, ...]
     effective: str = "all"
+    written: "GroupResult | None" = None  # under a negation: this group as written (storage)
+
+    @property
+    def as_written(self) -> "GroupResult":
+        """The group as the config states it, whatever negation its parents push down: what
+        a stored group row and a trace show (the gating tree keeps the negated one)."""
+        return self if self.written is None else self.written
 
     @property
     def id(self) -> str:
@@ -226,7 +233,9 @@ def _node(p: Plan, gid: str, negated: bool, lookup: Lookup) -> Gate:
     members = tuple(_node(p, m, below, lookup) for m in p.members[gid])
     effective = "any" if (group.kind == "any") != negated else "all"
     verdict, decided_by = (_any if effective == "any" else _all)(members)
-    return GroupResult(group, verdict, decided_by, members, effective)
+    written = _node(p, gid, False, lookup) if negated else None
+    assert written is None or isinstance(written, GroupResult)
+    return GroupResult(group, verdict, decided_by, members, effective, written)
 
 
 def evaluate_gates(p: Plan, lookup: Lookup) -> tuple[Gate, ...]:
