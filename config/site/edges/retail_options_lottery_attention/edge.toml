@@ -20,6 +20,7 @@ top_k = 30
 screeners = ["retail_option_attention"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "lottery_demand"
 frozen_from = 2026-04-01
 notes = """The papers' feature, the share of option volume in short-dated out-of-the-money calls
 (lottery_call_share), and a meme score are not stored: the screener is a proxy, names with a best

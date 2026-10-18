@@ -18,6 +18,7 @@ base = "universe"
 screeners = ["eight_k_adverse_items"]
 baselines = ["size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """Short side, owner decision O2 (2026-10-17): a short result on liquid names may be a verdict
 basis; the outcome is minus the excess return over SPY, less cost and the borrow the site assumes

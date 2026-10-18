@@ -18,6 +18,7 @@ top_k = 50
 screeners = ["mispricing_composite"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "mispriced_fundamentals"
 frozen_from = 2026-04-01
 notes = """mispricing@v1.composite_rank is a simplified composite: the mean percentile rank of seven
 anomalies (net issuance, accruals, net operating assets, asset growth, the O-score, and, inverted,

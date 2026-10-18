@@ -18,6 +18,7 @@ base = "event"
 screeners = ["pre_earnings_runup"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "lottery_demand"
 frozen_from = 2026-04-01
 notes = """Long leg only: the run-up before the report. The give-back after the report (about
 -1.86% in the 5 days after) is the better half and needs a short or puts on the same winners; it

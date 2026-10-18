@@ -18,6 +18,7 @@ top_k = 50
 screeners = ["momentum_squeeze_entry"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """A per-name entry filter on momentum_12_1, filed as its own edge (one trial): positive 12-1 momentum, trend_state
 UPTREND and rollup.bands@v2.bb_width_pctile_252d at or below 0.2 (the Bollinger bandwidth narrower than 80 percent

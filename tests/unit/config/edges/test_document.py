@@ -12,6 +12,7 @@ import pytest
 
 from algotrade.config.edges.chain import MODEL_STRUCTURES, tenor_sessions
 from algotrade.config.edges.document import (
+    MECHANISM_KINDS,
     QUALITY_BAR,
     STATUSES,
     Edge,
@@ -865,6 +866,27 @@ def test_every_shipped_edge_with_a_band_keeps_it_at_or_below_top_k() -> None:
             got = parse_edge(doc, path.parent.name, str(path))
             assert got.outcome.hold_rank is None or got.top_k is not None
             assert got.outcome.hold_rank is None or got.outcome.hold_rank >= (got.top_k or 0)
+
+
+def test_mechanism_kind_is_an_optional_closed_set_key() -> None:
+    assert parse_edge(document(), "drift", WHERE).mechanism_kind is None
+    for kind in MECHANISM_KINDS:
+        assert parse_edge(document(mechanism_kind=kind), "drift", WHERE).mechanism_kind == kind
+    with pytest.raises(ConfigurationError, match="mechanism_kind") as caught:
+        parse_edge(document(mechanism_kind="vibes"), "drift", WHERE)
+    assert WHERE in str(caught.value)
+
+
+def test_every_site_edge_names_a_mechanism_kind_of_the_closed_set() -> None:
+    """Fitness: the Guide's Edges section groups by ``mechanism_kind``; a site edge without one
+    (or with an unknown one) fails here, naming its id."""
+    root = Path(__file__).resolve().parents[4] / "config" / "site" / "edges"
+    bad = [
+        path.parent.name
+        for path in sorted(root.glob("*/edge.toml"))
+        if tomllib.loads(path.read_text()).get("mechanism_kind") not in MECHANISM_KINDS
+    ]
+    assert not bad, f"site edges without a mechanism_kind of {MECHANISM_KINDS}: {bad}"
 
 
 def _pair(**changes: Any) -> dict[str, Any]:

@@ -19,6 +19,7 @@ base = "universe"
 screeners = ["tender_offer_filed"]
 baselines = ["size_small"]
 status = "candidate"
+mechanism_kind = "forced_flows"
 frozen_from = 2026-04-01
 notes = """The anchor is the session the SC TO-I or SC TO-T filing became known (the first session
 whose close follows its acceptance), not the expiry: the expiry is not stored. A tender offer must
