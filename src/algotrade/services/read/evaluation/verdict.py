@@ -216,6 +216,7 @@ class _Candidate:
     years: tuple[EdgeRow, ...]
     year_parts: tuple[EdgeRow, ...] = ()  # a year cut by the split, as ``<year>:<side>`` rows
     lone: bool = False  # the only screener of the run at its holding period: no PBO peers
+    chain: bool = False  # a chain P&L edge: no in-sample history exists (ADR 0065 amendment)
     timed: bool = False  # a time-series edge (ADR 0073): its t is the Welch t, in against out
 
 
@@ -315,6 +316,9 @@ def _measured(found: int, declared: int) -> str:
     return f" ({found} of {declared} measured)" if declared and found < declared else ""
 
 
+NO_INSAMPLE = "no in-sample history: chains are stored from 2026-10-02"
+
+
 PORTFOLIO_BASE = "a book is read against its benchmark, not a base rate"  # a criterion's value
 NO_NAMES = "needs about 20 ranked names"  # the value of a decile criterion with no deciles
 
@@ -388,6 +392,15 @@ def _all_criteria(
     beats_all = _beats(oos.lift, lifts, len(c.baselines))
     beats_spread = _beats(oos.decile_spread, spreads, len(c.baselines))
     keeps = None if oos_pts is None or in_pts is None else oos_pts >= t.oos_lift_share * in_pts
+    lift_label = "Out-of-sample lift keeps its size"
+    lift_need = f"at least {t.oos_lift_share:g} of the in-sample lift"
+    lift_crit = (
+        _not_applicable("oos_lift", lift_label, NO_INSAMPLE, lift_need, PROMISING)
+        if c.chain  # no in-sample lift exists to keep: Promising stays reachable
+        else _crit("oos_lift", lift_label,
+                   f"{_num(oos_pts, 1)} pts vs {_num(in_pts, 1)} pts in-sample",
+                   lift_need, keeps, PROMISING)
+    )  # fmt: skip
     win_ok = None if oos_pts is None else oos_pts > 0
     enough = (
         None
@@ -444,9 +457,7 @@ def _all_criteria(
         _crit("dsr", "Deflated Sharpe", _num(dsr), f"at least {t.promising_dsr:g}",
               _at_least(dsr, t.promising_dsr), PROMISING),
         against_all,
-        _crit("oos_lift", "Out-of-sample lift keeps its size",
-              f"{_num(oos_pts, 1)} pts vs {_num(in_pts, 1)} pts in-sample",
-              f"at least {t.oos_lift_share:g} of the in-sample lift", keeps, PROMISING),
+        lift_crit,
         _crit("works_trades", "Trades, and out-of-sample trades", f"{trades} and {oos.sessions}",
               f"at least {t.works_trades} and {t.works_oos_trades}", enough, WORKS),
         _crit("works_t", t_label, _num(oos.decile_t),
@@ -459,6 +470,10 @@ def _all_criteria(
         spread_all,
         _crit("random", "Beats random picks", random_value,
               f"beats at least {_pct(t.random_beat_share)} of them", random_beaten, WORKS),
+        # a chain edge's basis was declared at filing: this Works criterion stays unmet (ADR 0065)
+        *([_crit("basis_in_sample", "Basis fixed on an in-sample period",
+                 "declared at filing: no in-sample period exists",
+                 "an in-sample period before the frozen split", False, WORKS)] * c.chain),
     )  # fmt: skip
 
 
@@ -554,6 +569,7 @@ class EdgeFacts:
     base: str = ""  # the edge's base: ``out_of_window`` words the decile t as a Welch t
     site_trials: Callable[[], int] | None = None  # the variants tried across every site
     # edge, read when the haircut is (None: not counted)
+    chain: bool = False  # an option_pnl edge: the basis cannot have been fixed in-sample
     neutral: bool = False  # the outcome is a residual return: market, size, momentum, value gone
 
 
@@ -569,6 +585,11 @@ def counts_wins(edge: Edge) -> bool:
     s = edge.settings
     # a model P&L and a pair spread are returns
     return s is not None and not s.cost_applies and s.kind not in (MODEL_KIND, PAIR_KIND)
+
+
+def is_chain(edge: Edge) -> bool:
+    """Whether the edge's outcome is a chain P&L (``option_pnl``): no in-sample history."""
+    return edge.settings is not None and edge.settings.kind == "option_pnl"
 
 
 def projection_of(whole: EdgeRow) -> Projection:
@@ -939,7 +960,8 @@ def judge(
         lost = f": {'; '.join(lost_inputs)}" if lost_inputs else ""
         reason = f"The official result has no out-of-sample figures for {on}{lost}"
         return replace(_waiting(edge_id, reason), basis=on)
-    judged = _judge_candidate(c, t, draws, decoys, lost_inputs, facts or EdgeFacts())
+    facts = facts or EdgeFacts()
+    judged = _judge_candidate(replace(c, chain=facts.chain), t, draws, decoys, lost_inputs, facts)
     return replace(judged, edge_id=edge_id, years=_years(c, split, range_to), basis_why=choice.why)
 
 
@@ -966,6 +988,7 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
             after=run.range_to,
             measured=lambda: runs.load_measured_sessions(ctx, run),
             wins=counts_wins(edge),
+            chain=is_chain(edge),
             portfolio=edge.settings is not None and edge.settings.kind == PORTFOLIO_KIND,
             benchmark=benchword(edge.settings.benchmark) if edge.settings is not None else "",
             neutral=is_factor_neutral(edge),

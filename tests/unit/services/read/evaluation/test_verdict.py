@@ -638,6 +638,24 @@ def test_a_decoy_with_no_figure_is_not_measured_never_left_out_of_beats_every_ba
     assert whole["baselines"].status == "pass" and "measured" not in whole["baselines"].value
 
 
+def test_a_chain_edge_can_be_promising_but_never_works_without_an_in_sample_basis() -> None:
+    """No in-sample history exists for the chain grain (ADR 0065 amendment 2026-10-18): the lift
+    that keeps its size does not apply, and a Works criterion stays unmet."""
+    strong = result(
+        oos={"decile_t": 3.0, "decile_spread": 0.9},
+        whole={"sessions": 100, "deflated_sharpe": 0.95, "pbo": 0.2},
+    )
+    rows = [r for r in strong if r.slice_kind != "in_sample"]  # nothing in-sample exists
+    chain = EdgeFacts(chain=True)
+    v = verdict(rows, draws=draws(100), facts=chain)
+    assert v.verdict == PROMISING and "Basis fixed on an in-sample period" in v.rationale
+    by = {c.id: c for c in v.criteria}
+    assert by["oos_lift"].status == "not_applicable" and by["basis_in_sample"].status == "fail"
+    # an ordinary edge with the same rows still waits on its in-sample figures instead
+    plain = verdict(rows, draws=draws(100))
+    assert plain.verdict == NOT_ENOUGH and "basis_in_sample" not in {c.id for c in plain.criteria}
+
+
 # portfolio_return (ADR 0074): a book beats a blended benchmark, with no base rate over names
 BOOK = EdgeFacts(portfolio=True, benchmark="a blend of 60% SPY and 40% AGG")
 NO_BASE = {

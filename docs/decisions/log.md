@@ -699,6 +699,46 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: architect review of PR 666; the cash rule is set before any edge stores legs, so no leg is invalidated.
 
+## 2026-10-18 | EB H13 (chain P&L grain) | One UNMEASURED status per row, executable value, hedge with r = q = 0
+- Question: when a hedge-day chain is missing or stale, is only the hedged P&L unmeasured or the whole row; is the harness value mid or executable; which rate and yield does our own hedge delta use?
+- Options: hedged columns null, unhedged kept / the whole row UNMEASURED; mid-to-mid / ask in, bid out (half-spreads on the hedged value); the Treasury curve and dividend yield / r = q = 0.
+- Decision: the whole row is UNMEASURED with the first reason (`STALE_CHAIN:<day>`, `NO_CHAIN:<day>`, `NO_DELTA:<day>`, `NO_EXIT_QUOTE`), every P&L null; the harness value is executable (a long pays the ask in and bid out, a short the reverse, the hedged value less the same half-spreads) while the mid P&L columns stay stored; the delta uses r = q = 0 and calendar days over 365.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: one status then means one thing and the spec's "never a zero, never a silently filled stale chain" holds for every column; option spreads are the main cost of this trade, so a mid value would overstate it; a one-month delta moves under 1% with the curve and the yield, and r = q = 0 keeps the grain independent of the rates and dividend tables (ADR 0053 amendment 2026-10-18, item 5). The cost of the first choice is that a stale mid-window day also unmeasures an unhedged window.
+
+## 2026-10-18 | EB H13 (chain P&L grain) | The basis is declared at filing; no stored basis column
+- Question: with no pre-frozen chain history, how is the verdict's basis fixed, and does `results/edge_eval` get a stored `basis` column (H8 left it for H13)?
+- Options: rank candidates on an in-sample slice that does not exist / the basis declared at filing, every row out of sample; a stored column / the basis from the document's kind, which is in the outcome hash.
+- Decision: the basis is the declared screen and horizon (several undeclared candidates: Waiting on data); every chain row is out of sample; `Outcome.basis` is `"chain"` and no `edge_eval` column is added; how the Promising and Works rules read an empty in-sample t is left open for the architect review.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: ranking needs the in-sample history the grain cannot have, and `choose_basis` already takes one declared candidate; a column on a stored results table is a schema change for a label the outcome hash already fixes, so a run cannot be mistaken for the other basis.
+
+## 2026-10-18 | EB H13 (chain P&L grain) | Structures, tenor rule and where the grain is read
+- Question: which structures and which tenor rule does the first chain grain offer, and does a mixed edge (price and chain variants) run?
+- Options: only the straddles / also the short put by delta; the expiry nearest the tenor / the first at least the tenor out and not before the window's end; mixed edges allowed / refused.
+- Decision: five structures (`atm_straddle_long|short`, `delta_hedged_atm[_short]`, `put_short` by delta), the grain stores the long position (`atm_straddle`, `put_delta_NN`); the first listed expiry at least `tenor_days` out and not before T; an edge and its `[[variants]]` are all `option_pnl` or none is.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: one stored row serves the long, short and hedged edge; an expiry before T could not be held to the exit; the harness reads one outcome grain per run (reuse stamps and commit sequences are per grain), so mixing is refused at filing instead of silently reading the wrong table.
+
+## 2026-10-18 | EB H13 (architect review of #664) | Hedge-day gaps cost only the hedged P&L; bid-0 quotes and delta limits
+- Question: does a missing or stale chain on a session between entry and exit unmeasure the whole row, and how are far out-of-the-money and deep in-the-money legs read after a large move?
+- Options: the whole row UNMEASURED (first entry) / only the hedged P&L, with a `hedge_reason`; a bid-0 quote and an unsolved vol are missing / a bid-0 quote reads as mid ask / 2 and an unsolved vol takes the delta limit (0, +-1).
+- Decision: only the hedged P&L is lost (`hedge_reason` set, the row COMPLETE, a hedged structure's harness row excluded as unmeasured); bid-0 quotes and delta limits as above. This overrules the first H13 entry's "whole row UNMEASURED". r = q = 0 is accepted for v1.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the architect review showed the biggest moves would otherwise become NO_EXIT_QUOTE / NO_DELTA and flatter the short straddle, and a stale mid-window day would blank an unhedged window for no reason.
+
+## 2026-10-18 | EB H13 (architect review of #664) | A chain edge can be Promising, never Works, until the verdict-basis rule says more
+- Question: how do the verdict rules read an empty in-sample t for a chain basis declared at filing?
+- Options: leave it open / the in-sample-lift criterion not applicable and a Works criterion that stays unmet.
+- Decision: "out-of-sample lift keeps its size" is not applicable for a chain edge (Promising reachable); a Works criterion "basis fixed on an in-sample period" stays unmet (Works unreachable) until a later amendment of the verdict-basis rule; written into that amendment and the Guide.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: Promising can be read on the out-of-sample figures alone, but Works needs a basis not chosen after seeing the result, which the rule can only vouch for with an in-sample period.
+
 ## 2026-10-18 | EB H9 (pair spread) | Result side, costs, base and eligibility of a pair
 - Question: how is a pair spread judged, what does it charge, what is its base and which pairs count?
 - Options: verdict-eligible as a long outcome / diagnostic only like `long_short`; one round trip / two; the base as one value per pair / per name against its sibling; a sibling outside the universe counts / is excluded.

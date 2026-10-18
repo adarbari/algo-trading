@@ -175,13 +175,17 @@ def _picks(e: document.Edge) -> str:
     return f"{when.capitalize()} · {top}"
 
 
+_WINS = {
+    "expires_otm": "the option expires worthless",
+    "option_model_pnl": "the modelled straddle P&L is positive (a model, not a quote)",
+    "pair_spread": "the cheap class returns more than its sibling, after costs and borrow",
+    "option_pnl": "the chain P&L is positive (quoted prices, net of the spread)",
+}
+
+
 def _win(o: document.Outcome) -> str:
-    if o.kind == "expires_otm":
-        return "the option expires worthless"
-    if o.kind == "option_model_pnl":
-        return "the modelled straddle P&L is positive (a model, not a quote)"
-    if o.kind == "pair_spread":
-        return "the cheap class returns more than its sibling, after costs and borrow"
+    if o.kind in _WINS:
+        return _WINS[o.kind]
     if o.kind == "hit_target":
         return f"{(o.measure or 'the measure').replace('_', ' ')} {o.direction} {o.target:g}"
     if o.benchmark != "none":
