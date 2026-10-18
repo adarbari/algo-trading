@@ -60,7 +60,7 @@ id = "trend"
 title = "Trend"
 presets = [
   "trend_continuation", "pullback", "momentum_12_1", "size_small", "ivol_high", "max_ret_high",
-  "amihud_illiquid", "beta_low", "etf_flow_pressure", "short_term_momentum_turnover",
+  "amihud_illiquid", "beta_low", "etf_flow_pressure",
   "momentum_own_trend", "momentum_pullback_entry", "momentum_volume_confirmed",
 ]
 
@@ -97,7 +97,7 @@ presets = ["cp_iv_spread", "cp_iv_spread_rise", "iv_smirk", "iv_change_call", "i
 [[family]]
 id = "cross_section"
 title = "Cross-section ranks"
-presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite"]
+presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite", "short_term_momentum_turnover"]
 
 [[family]]
 id = "factors"
