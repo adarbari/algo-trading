@@ -1,0 +1,43 @@
+/* LinkCard: a bordered tile; the title link stretches over the whole tile (no nested links). */
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  box-sizing: border-box;
+  min-width: 0;
+  height: 100%;
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.card:hover,
+.card:focus-within {
+  border-color: var(--color-accent);
+  background: var(--color-row);
+}
+
+.link {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.link:hover {
+  color: var(--color-accent-strong);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+  margin-block-start: auto;
+  padding-block-start: var(--space-1-5);
+}

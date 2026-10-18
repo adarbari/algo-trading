@@ -58,7 +58,7 @@ purpose = "event-sensitivity track settings: the scope list of names the event s
 
 [[config_dir]]
 path = "config/site/guide"
-purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups and playbook families in order), start.toml (the numbered Start here pages, [[page]]); the glossary in glossary/, the edge mechanism pages in mechanisms/ and the playbook prose in playbooks/"
+purpose = "the Guide's own sources (ADR 0051): sections.toml (the sections, field theme groups and playbook families in order), start.toml (the numbered Start here pages, [[page]]); the glossary in glossary/, the edge mechanism pages in mechanisms/, the researched-not-built ideas in ideas/ and the playbook prose in playbooks/"
 
 [[config_dir]]
 path = "config/site/guide/glossary"
@@ -67,6 +67,10 @@ purpose = "the Guide's glossary (ADR 0051), one <theme>.toml per theme (the 400-
 [[config_dir]]
 path = "config/site/guide/glossary/edges"
 purpose = "the Guide's glossary of the edges (ADR 0051, ADR 0064), one <theme>.toml per theme: the edge page, its evidence and curve, the live record, the outlook and haircut, the ledger and variants, cost and capacity, where the result worked (loaded after the glossary folder; kind guide_glossary_edges)"
+
+[[config_dir]]
+path = "config/site/guide/ideas"
+purpose = "the Guide's \"Researched, not built\" ideas (ADR 0051), one <family>.toml per family page of docs/edge-ideas/ (nine files: A cross_sectional to I frontier): every catalogue idea that is not a site edge, [[idea]] each with its id (the catalogue heading's), plain title, mechanism_kind, and either filed_as (the site edge it became under another name) or the catalogue's verdict, feasibility and one sentence on why it is not built (loaded by config/site/guide/ideas.py, kind guide_ideas; fitness tests: the headings and the ids agree, an unfiled id is not a site edge, so building one moves it to filed_as)"
 
 [[config_dir]]
 path = "config/site/guide/mechanisms"
