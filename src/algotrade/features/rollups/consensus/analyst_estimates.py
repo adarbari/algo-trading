@@ -232,4 +232,5 @@ GROUP = FeatureGroup(
     # The vendor's free plan covers few names and its key may be absent: a screen reading it
     # without the table warns, never PARTIAL (ADR 0055, ADR 0068).
     optional=True,
+    sole_source="single free vendor (FMP), no fallback: ADR 0055 amendment, ADR 0068",
 )

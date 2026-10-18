@@ -219,4 +219,5 @@ GROUP = FeatureGroup(
     FEATURES,
     compute,
     optional=True,  # a screen without the table warns, never PARTIAL (ADR 0055, ADR 0068)
+    sole_source="single free vendor (FMP), no fallback: ADR 0055 amendment, ADR 0068",
 )

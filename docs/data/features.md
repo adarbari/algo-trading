@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-509 stored features in 56 groups, in dependency order; 138 expression features.
+509 stored features in 56 groups, in dependency order; 143 expression features.
 
 ## `option_liquidity@v1`
 
@@ -171,7 +171,7 @@ How the consensus forecast of the next earnings report has been revised (7 and 3
 
 ## `analyst_targets@v1`
 
-Analysts' price targets: consensus, median, high and low (FMP price-target consensus, our own point-in-time snapshots; personal-use licence). Stored as `rollups/instrument/analyst_targets@v1`; reads `universe`, `analyst/estimate_snapshots` (optional).
+Analysts' price targets: consensus, median, high and low (FMP price-target consensus, our own point-in-time snapshots; personal-use licence). Stored as `rollups/instrument/analyst_targets@v1`; reads `universe`, `analyst/estimate_snapshots` (optional). Sole source: single free vendor (FMP), no fallback: ADR 0055 amendment, ADR 0068.
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
@@ -184,7 +184,7 @@ Analysts' price targets: consensus, median, high and low (FMP price-target conse
 
 ## `analyst_ratings@v1`
 
-How many analysts rate each stock strong buy to strong sell, the mean rating and its change over 90 days (Finnhub recommendation trend, our own point-in-time snapshots; personal-use licence). Stored as `rollups/instrument/analyst_ratings@v1`; reads `universe`, `analyst/estimate_snapshots` (optional).
+How many analysts rate each stock strong buy to strong sell, the mean rating and its change over 90 days (Finnhub recommendation trend, our own point-in-time snapshots; personal-use licence). Stored as `rollups/instrument/analyst_ratings@v1`; reads `universe`, `analyst/estimate_snapshots` (optional). Sole source: single free vendor (Finnhub), no fallback: ADR 0055 amendment, ADR 0068.
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
@@ -628,7 +628,7 @@ The move priced by the at-the-money straddle at the expiry covering the next ear
 
 ## `analyst_estimates@v1`
 
-Analysts' consensus EPS and revenue for the current and next fiscal year (FMP annual estimates, our own point-in-time snapshots; personal-use licence). Stored as `rollups/instrument/analyst_estimates@v1`; reads `universe`, `analyst/estimate_snapshots` (optional), `rollups/instrument/financials@v2` (optional).
+Analysts' consensus EPS and revenue for the current and next fiscal year (FMP annual estimates, our own point-in-time snapshots; personal-use licence). Stored as `rollups/instrument/analyst_estimates@v1`; reads `universe`, `analyst/estimate_snapshots` (optional), `rollups/instrument/financials@v2` (optional). Sole source: single free vendor (FMP), no fallback: ADR 0055 amendment, ADR 0068.
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
@@ -734,7 +734,7 @@ The at-the-money vol at the next expiry and at a constant 90 days (iv30's method
 
 ## `analyst_revisions@v1`
 
-How the consensus EPS and revenue of the current fiscal year have been revised over 30, 60 and 90 days (FMP annual estimates, our own point-in-time snapshots; personal-use licence). Stored as `rollups/instrument/analyst_revisions@v1`; reads `rollups/instrument/analyst_estimates@v1`, `analyst/estimate_snapshots` (optional).
+How the consensus EPS and revenue of the current fiscal year have been revised over 30, 60 and 90 days (FMP annual estimates, our own point-in-time snapshots; personal-use licence). Stored as `rollups/instrument/analyst_revisions@v1`; reads `rollups/instrument/analyst_estimates@v1`, `analyst/estimate_snapshots` (optional). Sole source: single free vendor (FMP), no fallback: ADR 0055 amendment, ADR 0068.
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
@@ -963,6 +963,16 @@ Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on rea
 | `ex_div_before_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the target expiry (put_wing.target_expiry, the 30-60 day expiry the put and call wings use): a short call held to it risks early assignment, and a short put misses the dividend | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED: the source lists a date only about 30 days ahead, so null is 'none known yet', not 'none'), or no target expiry (put_wing NO_SPOT, NO_CHAIN or NO_EXPIRY) | `dividend_schedule.next_ex_date <= put_wing.target_expiry` | virtual |
 | `ex_div_before_nearest_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the nearest listed option expiry (nearest_expiry.expiry_date): a short option expiring then carries the dividend | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no stored chain with an expiry on or after the session | `dividend_schedule.next_ex_date <= nearest_expiry.expiry_date` | virtual |
 | `ex_div_before_call_expiry` | expression | bool | flag | open |  | Whether the next known ex-dividend date falls on or before the covered-call wing's target expiry (call_wing.target_expiry): the early-assignment risk of the short call, and the dividend the shares collect if it is not assigned | no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no call target expiry (call_wing NO_SPOT, NO_CHAIN or NO_EXPIRY) | `dividend_schedule.next_ex_date <= call_wing.target_expiry` | virtual |
+
+### `forward.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `forward_pe` | expression | float | ratio | personal | >= 0 | Forward P/E: close / the analysts' average EPS estimate for FY1 (the first fiscal year not yet reported); 15 means fifteen times expected earnings. Annual estimates only. Jumps once at the fiscal-year roll, when FY1 moves on. Null for a loss and for an ADR | estimates_status is not OK (NOT_COVERED: the free vendor key covers few names; NOT_FETCHED: never asked; STALE: the snapshot is over 21 days old), eps_fy1 is null or not positive (a forecast loss), the close is not positive, or the instrument is an ADR (its EPS is per ordinary share and the ADR ratio is not stored) | `if(analyst_estimates.eps_fy1 > 0 and price_stats.close > 0 and analyst_estimates.estimates_status == "OK" and not financials.is_adr, price_stats.close / analyst_estimates.eps_fy1, null)` | virtual |
+| `forward_pe_fy2` | expression | float | ratio | personal | >= 0 | Forward P/E on FY2 (the fiscal year after FY1): close / the analysts' average EPS estimate for it. Annual estimates only. Jumps once at the fiscal-year roll, when FY2 moves on. Null for a loss and for an ADR | estimates_status is not OK (NOT_COVERED: the free vendor key covers few names; NOT_FETCHED: never asked; STALE), eps_fy2 is null (the vendor lists only one forward year, common for thinly covered names) or not positive, the close is not positive, or the instrument is an ADR | `if(analyst_estimates.eps_fy2 > 0 and price_stats.close > 0 and analyst_estimates.estimates_status == "OK" and not financials.is_adr, price_stats.close / analyst_estimates.eps_fy2, null)` | virtual |
+| `forward_eps_growth` | expression | float | decimal | personal |  | Expected EPS growth: the analysts' FY1 EPS estimate / diluted EPS over the trailing twelve months - 1; 0.20 is 20% more. Annual estimates only. Jumps once at the fiscal-year roll, when FY1 moves on. Below -1 means a forecast loss | estimates_status is not OK (NOT_COVERED: the free vendor key covers few names; NOT_FETCHED; STALE), eps_fy1 is null, eps_diluted_ttm is null or not positive (a growth rate off a loss is not shown), eps_stale (the reported EPS ended more than stale_days before the session), or the instrument is an ADR | `if(financials.eps_diluted_ttm > 0 and not financials.eps_stale and analyst_estimates.estimates_status == "OK" and not financials.is_adr, analyst_estimates.eps_fy1 / financials.eps_diluted_ttm - 1, null)` | virtual |
+| `forward_revenue_growth` | expression | float | decimal | personal | >= -1 | Expected revenue growth: the analysts' FY1 revenue estimate / revenue over the trailing twelve months - 1; 0.10 is 10% more. Annual estimates only. Jumps once at the fiscal-year roll, when FY1 moves on | estimates_status is not OK (NOT_COVERED: the free vendor key covers few names; NOT_FETCHED; STALE), revenue_fy1 is null, revenue_ttm is null or not positive, the reported revenue is STALE, or the instrument is an ADR (a foreign filer's revenue is in its own currency, the ratio would mix currencies) | `if(financials.revenue_ttm > 0 and financials.financials_status != "STALE" and analyst_estimates.estimates_status == "OK" and not financials.is_adr, analyst_estimates.revenue_fy1 / financials.revenue_ttm - 1, null)` | virtual |
+| `target_upside` | expression | float | decimal | personal | >= -1 | Upside to the analysts' price target: the average target / close - 1; 0.15 means the target is 15% above the close, negative when the close is above it. The target has no date of its own | targets_status is not OK (NOT_COVERED: the free vendor key covers few names; NOT_FETCHED: never asked; STALE: the snapshot is over 21 days old), target_consensus is null or not positive, or the close is not positive | `if(analyst_targets.targets_status == "OK" and analyst_targets.target_consensus > 0 and price_stats.close > 0, analyst_targets.target_consensus / price_stats.close - 1, null)` | virtual |
 
 ### `fundamentals.toml`
 

@@ -60,9 +60,14 @@ def test_the_snapshot_slack_covers_a_refresh_window_of_each_vendor() -> None:
 
 
 def test_the_history_lookback_reaches_the_longest_window_from_the_longest_stale_age() -> None:
-    """A snapshot stale_days old is still served; the one 90 days before it, plus the slack,
-    must be read in the holiday-heaviest stretch of the year as well."""
-    reach = max(AnalystParams().stale_days, RatingsParams().stale_days)
+    """A snapshot stale_days old (the code's and the configured values) is still served; the one
+    90 days before it, plus the slack, must be read in the holiday-heaviest stretch as well."""
+    configured = tomllib.loads((REPO_ROOT / "config/site/rollups.toml").read_text())
+    reach = max(
+        AnalystParams().stale_days,
+        RatingsParams().stale_days,
+        *(v["stale_days"] for k, v in configured.items() if k.startswith("analyst_")),
+    )
     days = reach + max(CHANGE_DAYS, *WINDOWS) + st.SNAPSHOT_SLACK
     for session in (date(2027, 1, 15), date(2027, 2, 26), date(2026, 12, 31), date(2027, 7, 9)):
         oldest = sessions_ending(session, st.HISTORY_LOOKBACK + 1)[0]

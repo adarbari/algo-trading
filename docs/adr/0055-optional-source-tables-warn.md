@@ -70,3 +70,23 @@ reports them in `missing_optional_tables` (which now means "ran without") and th
 them as a WARN. A missing table no field explains stays blocking. Implemented by
 `FeatureSet.coverage` and used by `services/screening/run.py` (`split_missing` is gone). The backtest's rebalance
 evaluation (`services/backtests/rebalance.py`) applies the same rule to the selection's fields.
+
+## Amendment: a sole-source optional group has no fallback (2026-10-17)
+**Context.** The analyst consensus (`analyst_estimates@v1`, `analyst_targets@v1`, ADR 0068) has one
+vendor, FMP's free plan, which covers few names and whose key may be absent. Unlike IBKR's IV
+there is no second source to coalesce with, so a formula over it (forward P/E, target upside)
+is null for every row when the table is absent, and decision 5's fallback test cannot hold. The
+rule's aim is that no field is null for every row while the run reads COMPLETE and that no
+screen is rejected wholesale by a HARD criterion on it. Null is the honest value here.
+
+**Rule.** `FeatureGroup.sole_source` (a sentence citing the ADR that says why no other source
+exists) marks an optional group with no fallback. It is declared on the group, never per
+expression, and a declaration without `optional=True` or without an `ADR ` reference is
+refused. A sole-source group is exempt from the fallback test of decision 5: the expressions
+reading it, directly or through other expressions, are null with their reason (ADR 0036) when its
+table is absent. They count as optional fields: no site preset's HARD criterion may read one
+(`rollup.<group>.<field>` or a `feature.<name>` over it); SCORE or soft criteria only. Coverage
+is unchanged (a stored field of an optional group is covered, so a screen without the table
+warns and is not PARTIAL). The fallback test still applies to every other optional group.
+
+**Who decides.** `architect` review of the diff, for each new sole-source group.

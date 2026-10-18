@@ -342,8 +342,9 @@ class FeatureSet:
         )
         dtypes = {n: self.expressions[n].feature.dtype for n in names}
         out = conform("expressions", typed, dtypes)
-        out.insert(0, "session_date", keys["session_date"].to_numpy())
-        return out
+        # joined, not inserted: an insert into a catalogue of a hundred columns warns
+        sessions_col = pd.DataFrame({"session_date": keys["session_date"].to_numpy()})
+        return pd.concat([sessions_col, out], axis=1)
 
     # ------------------------------------------------------------------ materialised
     def _materialised(self, e: Expression) -> FeatureGroup:

@@ -115,6 +115,13 @@ op = "gte"
 value = 0.20
 mode = "soft"
 tolerance = 0.05
+[[field.use]]
+for = "a weak quarter, down over the past few months"
+op = "lt"
+value = 0
+mode = "soft"
+tolerance = 0.05
+note = "pair with rollup.price_stats@v2.ret_20d gt 0 to find a name that has begun to recover"
 
 [[field]]
 name = "rollup.momentum@v1.ret_5d"
