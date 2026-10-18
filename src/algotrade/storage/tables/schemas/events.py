@@ -158,12 +158,11 @@ IPO_LOCKUP_EVENTS = fixed(
 # was found in (``quality`` ``NO_ITEMS``); ``text`` is the section's plain text (null when
 # ``quality`` is ``NOT_FOUND``), ``char_count`` its length, ``reason`` why a row is not ``OK``.
 # ``ts`` is SEC's acceptance instant of the filing; the partition (``session_date``) is its
-# acceptance session. ``instrument_id`` is NULLABLE: the first version of a filing carries none (the
-# run's universe is today's, the row is known from an old session: an id there would exist only for
-# the survivors); a run stages the id as a version of its own (same cik, accession, item and
-# parser version) known from max(acceptance session, the session after the fetch), the D8 pattern
-# (``ipo_lockup``). Readers map a cik to an instrument through ``instruments/company`` as of their
-# own session. ``known_from``: the acceptance session for the first extraction of a filing; a LATER
+# acceptance session. ``instrument_id`` is stored NULL: the run's universe is today's, a stored id
+# would exist only for the survivors; readers map a cik to its instruments through
+# ``instruments/company`` as of their own session on every read (``data.filing_text``).
+# ``text_sha`` (sha256 of ``text``) lets a re-extraction compare with the stored text without
+# reading it. ``known_from``: the acceptance session for the first extraction of a filing; a LATER
 # extraction of the same filing (a new ``parser_version``, an item added to the kept list) that
 # differs from the stored one carries max(its acceptance session, the next session after the
 # fetch), so a parser change never rewrites history as known earlier; one that is identical keeps
@@ -187,6 +186,7 @@ FILING_TEXT_EVENTS = fixed(
     "item string",
     "parser_version int64!",
     "text string",
+    "text_sha string",
     "char_count int64!",
     "quality string!",
     "reason string",

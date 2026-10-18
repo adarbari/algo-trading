@@ -1,11 +1,11 @@
 """The ``filing-text`` task (edge builds D10, D10b) over synthetic submissions, daily form indexes
 and the two trimmed filing fixtures: filer-first coverage (a delisted filer in no universe is read,
-its rows keyed by CIK with a NULL id), the id as a version of its own (NULL from the acceptance
-session, the id from the fetch's session), ``known_from`` the acceptance SESSION (after the close,
-a weekend), a rerun that asks for nothing, a parser bump that changes one item (revised from the
-FETCH's session, the identical items keeping their stamp, the id never earlier than its version),
-the reader's as-of view across the bump, a failing document (the other filings stored, the item
-failed), a headerless document (a null-item row), the 10-K/A as its own filing, and the nightly."""
+its rows keyed by CIK, no id stored: readers map the CIK), ``known_from`` the acceptance SESSION
+(after the close, a weekend), a rerun that asks for nothing, a parser bump that changes one item
+(revised from the FETCH's session, the identical items keeping their stamp), the reader's as-of
+view across the bump (and the ids it maps at the session), a failing document (the other filings
+stored, the item failed), a headerless document (a null-item row), the 10-K/A as its own filing,
+SEC holidays in the index walk, and the nightly."""
 
 import json
 import re
@@ -28,7 +28,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.events import filing_text as task
-from algotrade_ingestion.tasks.events.filing_text_filers import IndexGapError
+from algotrade_ingestion.tasks.events.filing_text_filers import IndexGapError, sec_holidays
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_sources.framework.http import GaveUpError, HttpError, RetryPolicy
 from algotrade_sources.vendors.sec.daily_index import SecDailyIndex, missing_index
@@ -81,6 +81,7 @@ KA = (
 NOISE = ("0001652044-26-000050", "2026-06-01T15:00:00.000Z", "2026-06-01", "8-K", "n.htm")
 MU_Q = ("0000723125-26-000007", "2026-08-06T13:00:00.000Z", "2026-08-06", "10-Q", "mu.htm")
 GONE_K = ("0000999999-26-000001", "2026-03-10T14:00:00.000Z", "2026-03-10", "10-K", "gone.htm")
+FULL_ITEMS = ("1", "1A", "3", "7", "7A", "9A", "I-2", "I-3", "II-1", "II-1A")
 DENIED = b"<Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>"
 
 
@@ -215,26 +216,34 @@ def run(writer: StoreWriter, sec: Feed, session: date = SESSION, **kw: Any) -> A
     index = SecDailyIndex(http_for(sec, RetryPolicy(tries=1, not_found=missing_index)))
     ctx: TaskContext = task_ctx(writer, clock=clock, settings=SourcesSettings())
     kw.setdefault("since", date(2026, 1, 1))
+    kw.setdefault("items", FULL_ITEMS)  # the six + four sections the fixtures hold
     return task.ingest_filing_text(ctx, listing, text, index, session, **kw)
 
 
 def rows(writer: StoreWriter, ciks: list[str] | None = None) -> pd.DataFrame:
     """Every stored version (the null-id first versions and the id versions)."""
-    frame = stored_filing_text(StoreReader(writer._backend), None, COLUMNS, ciks=ciks)
+    frame = stored_filing_text(
+        StoreReader(writer._backend), None, (*COLUMNS, "text_sha"), ciks=ciks
+    )
     return frame.sort_values(
         ["cik", "accession", "item", "known_from"], na_position="first"
     ).reset_index(drop=True)
 
 
 def first_versions(writer: StoreWriter, cik: str = ALPHA) -> pd.DataFrame:
-    """The versions with no id: each item's first extraction."""
-    frame = rows(writer, [cik])
-    return frame[frame["instrument_id"].isna()].reset_index(drop=True)
+    """Every stored row of one filer (no id is ever stored)."""
+    return rows(writer, [cik])
+
+
+def once(reader: StoreReader, on: date, **kw: Any) -> pd.DataFrame:
+    """The scan on ``on``, a row per (filer, filing, item): the share classes of a filer folded."""
+    found = filing_text(reader, None, on, **kw)
+    return found.drop_duplicates(["cik", "accession", "item"], ignore_index=True)
 
 
 def scan(writer: StoreWriter, on: date = date(2027, 1, 1), **kw: Any) -> pd.DataFrame:
     """What the reader shows on ``on``: the latest version of each item of every filer."""
-    return filing_text(StoreReader(writer._backend), None, on, **kw)
+    return once(StoreReader(writer._backend), on, **kw)
 
 
 def bumped(monkeypatch: pytest.MonkeyPatch, version: int = 2) -> None:
@@ -246,28 +255,21 @@ def bumped(monkeypatch: pytest.MonkeyPatch, version: int = 2) -> None:
 # ------------------------------------------------------------------------------ rows and stamps
 
 
-def test_a_backfill_stores_the_items_of_each_periodic_filing_once_per_filer_with_one_id() -> None:
+def test_a_backfill_stores_the_items_of_each_periodic_filing_once_per_filer_with_no_id() -> None:
     writer, sec = store(), feed()
     record = run(writer, sec, requested_symbols=("GOOGL", "GOOG"))
     assert record.status is RunStatus.COMPLETE, record.stats
     assert record.items["0001652044"].startswith("OK: 2026-01-01..2026-10-02 (4 filings)")
-    first = first_versions(writer)
-    assert set(first["accession"]) == {K1[0], Q1[0], Q2[0], KA[0]}  # the 8-K is not a report
-    assert first["cik"].eq(ALPHA).all()  # a row set per filer, share classes are not repeated
-    assert sorted(first.loc[first["accession"] == K1[0], "item"]) == [
-        "1",
-        "1A",
-        "3",
-        "7",
-        "7A",
-        "9A",
-    ]
-    assert sorted(first.loc[first["accession"] == Q1[0], "item"]) == ["I-2", "I-3", "II-1", "II-1A"]
-    assert len(sec.document_urls) == 4  # one request a filing
-    filled = rows(writer)
-    filled = filled[filled["instrument_id"].notna()]
-    assert set(filled["instrument_id"]) == {"EQ:GOOG"} and len(filled) == len(first) == 20
-    assert record.stats["rows"] == 40 and record.stats["ids_filled"] == 20
+    frame = first_versions(writer)
+    assert set(frame["accession"]) == {K1[0], Q1[0], Q2[0], KA[0]}  # the 8-K is not a report
+    assert frame["cik"].eq(ALPHA).all() and frame["instrument_id"].isna().all()
+    k1 = sorted(frame.loc[frame["accession"] == K1[0], "item"])
+    assert k1 == ["1", "1A", "3", "7", "7A", "9A"]
+    q1 = sorted(frame.loc[frame["accession"] == Q1[0], "item"])
+    assert q1 == ["I-2", "I-3", "II-1", "II-1A"]
+    assert len(sec.document_urls) == 4  # one request a filing, whatever the share classes
+    assert len(frame) == 20 and record.stats["rows"] == 20
+    assert frame["text_sha"].notna().equals(frame["text"].notna())  # a hash of every text
 
 
 def test_known_from_is_the_acceptance_session_not_the_filing_date_or_the_fetch_day() -> None:
@@ -287,31 +289,19 @@ def test_known_from_is_the_acceptance_session_not_the_filing_date_or_the_fetch_d
     assert not (pd.to_datetime(first["known_from"]).dt.date == SESSION).any()  # never the fetch day
 
 
-def test_the_id_is_a_version_of_its_own_known_from_the_fetch_session_never_the_acceptance() -> None:
+def test_the_reader_maps_the_cik_to_instruments_at_the_session_the_row_stores_none() -> None:
     writer = store()
     run(writer, feed([K1]), requested_symbols=("GOOGL",))
-    stored = rows(writer, [ALPHA])
-    assert len(stored) == 12  # six items, the null-id version and the id version of each
-    bare, named = stored[stored["instrument_id"].isna()], stored[stored["instrument_id"].notna()]
-    assert set(named["instrument_id"]) == {"EQ:GOOGL"}
-    assert pd.to_datetime(bare["known_from"]).dt.date.eq(date(2026, 2, 11)).all()
-    assert pd.to_datetime(named["known_from"]).dt.date.eq(LEARNED).all()  # the fetch's session
-    assert named["text"].tolist() == bare["text"].tolist()  # the same text, the same filing
     reader = StoreReader(writer._backend)
-    for on in (date(2026, 2, 11), LEARNED - timedelta(days=1)):  # before the id is known: NULL
-        seen = filing_text(reader, None, on)
-        assert seen["instrument_id"].isna().all() and len(seen) == 6, on
-    after = filing_text(reader, None, LEARNED)
-    assert len(after) == 6 and after["instrument_id"].eq("EQ:GOOGL").all()  # one filing, one id
-
-
-def test_an_id_on_the_acceptance_session_itself_sits_on_the_one_row() -> None:
-    late = ("0001652044-26-000060", "2026-10-02T21:30:00.000Z", "2026-10-02", "10-K", "k1.htm")
-    writer = store()  # accepted after the close of the run's own day: known from LEARNED
-    run(writer, feed([late]), requested_symbols=("GOOGL",))
-    stored = rows(writer, [ALPHA])
-    assert len(stored) == 6 and stored["instrument_id"].eq("EQ:GOOGL").all()
-    assert pd.to_datetime(stored["known_from"]).dt.date.eq(LEARNED).all()
+    seen = filing_text(reader, ["EQ:GOOGL"], LEARNED)
+    assert len(seen) == 6 and seen["instrument_id"].eq("EQ:GOOGL").all()
+    both = filing_text(reader, ["EQ:GOOGL", "EQ:GOOG"], LEARNED)  # one filer, two share classes
+    assert sorted(set(both["instrument_id"])) == ["EQ:GOOG", "EQ:GOOGL"] and len(both) == 12
+    scan_ = filing_text(reader, None, LEARNED)
+    assert sorted(set(scan_["instrument_id"])) == ["EQ:GOOG", "EQ:GOOGL"]
+    assert scan_.attrs["pre_snapshot"] is False
+    early = filing_text(reader, ["EQ:GOOGL"], date(2026, 3, 1))  # before the first snapshot
+    assert len(early) == 6 and early.attrs["pre_snapshot"] is True  # the earliest stands in
 
 
 def test_a_filer_in_no_universe_is_read_filer_first_with_a_null_id() -> None:
@@ -322,12 +312,13 @@ def test_a_filer_in_no_universe_is_read_filer_first_with_a_null_id() -> None:
     assert record.stats["index_days"] == len(sec.index_urls) > 190
     assert set(record.items) == {ALPHA, BETA, GONE}  # GONE is in no universe snapshot
     gone = rows(writer, [GONE])
-    assert gone["accession"].eq(GONE_K[0]).all() and gone["instrument_id"].isna().all()
-    assert len(gone) == 6  # no id version: nothing to fill
-    assert set(rows(writer, [ALPHA])["instrument_id"].dropna()) == {"EQ:GOOG"}  # min of its classes
-    assert set(rows(writer, [BETA])["instrument_id"].dropna()) == {"EQ:MU"}
+    assert gone["accession"].eq(GONE_K[0]).all() and len(gone) == 6
+    assert rows(writer)["instrument_id"].isna().all()  # no id is stored for any filer
+    mapped = filing_text(StoreReader(writer._backend), None, date(2027, 1, 1))
+    assert set(mapped.loc[mapped["cik"] == BETA, "instrument_id"]) == {"EQ:MU"}
+    assert set(mapped.loc[mapped["cik"] == ALPHA, "instrument_id"]) == {"EQ:GOOGL", "EQ:GOOG"}
     seen = scan(writer, forms=["10-K"], ciks=[GONE])
-    assert seen["cik"].eq(GONE).all() and seen["instrument_id"].isna().all() and len(seen) == 6
+    assert seen["cik"].eq(GONE).all() and len(seen) == 6
 
 
 def test_the_filers_of_a_past_window_are_read_from_the_run_that_found_them() -> None:
@@ -350,19 +341,37 @@ def test_a_window_reaching_the_session_is_walked_again() -> None:
     assert len(sec.index_urls) > 190
 
 
-def test_a_missing_index_day_is_skipped_but_a_long_gap_or_a_failing_day_fails_the_run() -> None:
+def test_sec_holidays_are_the_federal_closures_with_weekend_observance() -> None:
+    year = sec_holidays(2026)
+    assert {date(2026, 1, 1), date(2026, 1, 19), date(2026, 2, 16), date(2026, 5, 25)} <= year
+    assert {date(2026, 6, 19), date(2026, 7, 3), date(2026, 9, 7), date(2026, 10, 12)} <= year
+    assert {date(2026, 11, 11), date(2026, 11, 26), date(2026, 12, 25)} <= year  # July 4 is a Sat
+    assert date(2026, 7, 4) not in year and date(2026, 4, 3) not in year  # Good Friday is open
+    assert date(2021, 12, 31) in sec_holidays(2022)  # New Year 2022 fell on a Saturday
+    assert date(2020, 6, 19) not in sec_holidays(2020) and date(2025, 1, 9) in sec_holidays(2025)
+
+
+def test_a_holiday_without_an_index_is_skipped_but_any_other_missing_day_fails_the_run() -> None:
     sec = feed()
-    sec.unpublished = {date(2026, 1, 19)}  # a holiday
+    sec.unpublished = {date(2026, 1, 19)}  # Martin Luther King Jr. Day
     record = run(store(), sec)
-    assert record.status is RunStatus.COMPLETE and record.stats["index_days_unpublished"] == 1
-    gap = feed()
-    gap.unpublished = {date(2026, 2, d) for d in range(2, 11)}  # nine weekdays in a row
+    assert record.status is RunStatus.COMPLETE and record.stats["index_holidays"] == 1
+    normal = feed()
+    normal.unpublished = {date(2026, 2, 3)}  # a business day: S3 has not got it
     with pytest.raises(IndexGapError):
-        run(store(), gap)
+        run(store(), normal, until=date(2026, 9, 1))
     down = feed()
     down.down = {date(2026, 2, 3)}
     with pytest.raises(GaveUpError):
         run(store(), down)
+
+
+def test_the_default_items_are_the_risk_factors_and_the_mda() -> None:
+    writer = store()
+    run(writer, feed([K1, Q1]), requested_symbols=("GOOGL",), items=())
+    frame = rows(writer)
+    assert sorted(frame.loc[frame["form"] == "10-K", "item"]) == ["1A", "7"]
+    assert sorted(frame.loc[frame["form"] == "10-Q", "item"]) == ["I-2", "II-1A"]
 
 
 def test_the_stored_row_carries_no_html_and_the_columns_the_reader_names() -> None:
@@ -432,14 +441,10 @@ def test_a_document_without_item_headers_is_one_null_item_row() -> None:
     sec = Feed([KA], {**DOCUMENTS, "ka.htm": page})
     run(writer, sec, requested_symbols=("GOOGL",))
     frame = rows(writer)
-    assert len(frame) == 2 and frame["item"].isna().all() and frame["text"].isna().all()
-    assert frame["quality"].eq("NO_ITEMS").all() and frame["reason"].notna().all()  # null id, id
+    assert len(frame) == 1 and frame["item"].isna().all() and frame["text"].isna().all()
+    assert frame["quality"].eq("NO_ITEMS").all() and frame["reason"].notna().all()
     seen = scan(writer, date(2026, 3, 2))
-    assert (
-        len(seen) == 1
-        and seen["quality"].iloc[0] == "NO_ITEMS"
-        and seen["instrument_id"].isna().all()
-    )
+    assert len(seen) == 1 and seen["quality"].iloc[0] == "NO_ITEMS"
     again = run(writer, feed([KA]), requested_symbols=("GOOGL",), since=date(2026, 1, 1))
     assert again.stats["rows"] == 0
 
@@ -453,7 +458,7 @@ def test_items_narrow_the_kept_sections_and_a_new_item_list_is_a_new_read() -> N
     assert len(wider.document_urls) == 1
     frame = scan(writer)
     assert sorted(frame["item"]) == ["1", "1A", "3", "7", "7A", "9A"]
-    assert second.stats["revised"] == 4 and frame["instrument_id"].eq("EQ:GOOGL").all()
+    assert second.stats["revised"] == 4
 
 
 # ---------------------------------------------------------------------- a parser bump is a revision
@@ -474,17 +479,12 @@ def test_a_parser_bump_that_changes_one_item_is_known_from_the_fetch_not_the_acc
     assert record.stats["learned_on"] == LEARNED.isoformat() and record.stats["revised"] == 1
     frame = rows(writer)
     risk = frame[frame["item"] == "1A"].sort_values(["parser_version", "known_from"])
-    assert risk["parser_version"].tolist() == [1, 1, 2]  # both versions stay (v1: null id, id)
+    assert risk["parser_version"].tolist() == [1, 2]  # both versions stay
     known = [pd.Timestamp(k).date() for k in risk["known_from"]]
-    assert known == [date(2026, 2, 11), LEARNED, LEARNED]  # v2: never the acceptance
-    assert risk["instrument_id"].tolist()[2] == "EQ:GOOGL"  # the id is on the revised row itself
-    business = frame[(frame["item"] == "1") & (frame["parser_version"] == 2)]
+    assert known == [date(2026, 2, 11), LEARNED]  # v2: never the acceptance
+    business = frame[frame["item"] == "1"].sort_values("parser_version")
     assert business["text"].nunique() == 1  # identical text: the stored stamp stands
-    stamps = {
-        (i, pd.Timestamp(k).date())
-        for i, k in zip(business["instrument_id"].fillna("-"), business["known_from"], strict=True)
-    }
-    assert stamps == {("-", date(2026, 2, 11)), ("EQ:GOOGL", LEARNED)}  # the id never earlier
+    assert business["known_from"].nunique() == 1
 
 
 def test_the_reader_sees_the_old_text_until_the_revision_is_known(
@@ -497,15 +497,15 @@ def test_the_reader_sees_the_old_text_until_the_revision_is_known(
     reader = StoreReader(writer._backend)
 
     def risk(on: date) -> str:
-        found = filing_text(reader, None, on, items=["1A"])
+        found = once(reader, on, items=["1A"])
         assert len(found) == 1
         return str(found["text"].iloc[0])
 
-    assert filing_text(reader, None, date(2026, 2, 10)).empty  # not accepted yet
+    assert once(reader, date(2026, 2, 10)).empty  # not accepted yet
     assert "faces competition" in risk(date(2026, 2, 11))
     assert "faces competition" in risk(date(2026, 10, 2))  # the day before the revision is known
     assert "faces intense competition" in risk(LEARNED)
-    assert filing_text(reader, None, LEARNED, items=["1A"], forms=["10-Q"]).empty
+    assert once(reader, LEARNED, items=["1A"], forms=["10-Q"]).empty
 
 
 def test_a_later_parser_that_finds_a_header_an_earlier_one_missed_is_a_revision(
@@ -518,13 +518,13 @@ def test_a_later_parser_that_finds_a_header_an_earlier_one_missed_is_a_revision(
     )
     writer = store()
     run(writer, Feed([K1], {**DOCUMENTS, "k1.htm": headless}), requested_symbols=("GOOGL",))
-    assert rows(writer)["quality"].tolist() == ["NO_ITEMS", "NO_ITEMS"]  # null id, then the id
+    assert rows(writer)["quality"].tolist() == ["NO_ITEMS"]
     bumped(monkeypatch)
     run(writer, feed([K1]), requested_symbols=("GOOGL",))
     reader = StoreReader(writer._backend)
-    before = filing_text(reader, None, date(2026, 10, 2))
+    before = once(reader, date(2026, 10, 2))
     assert before["quality"].tolist() == ["NO_ITEMS"]  # known then: nothing found
-    after = filing_text(reader, None, LEARNED)
+    after = once(reader, LEARNED)
     assert sorted(after["item"]) == ["1", "1A", "3", "7", "7A", "9A"]  # the null row is dropped
     first = rows(writer)
     assert (pd.to_datetime(first[first["item"].notna()]["known_from"]).dt.date == LEARNED).all()
@@ -602,11 +602,15 @@ def test_a_cik_checked_within_the_recheck_days_is_not_asked_again() -> None:
 
 
 def test_due_ciks_reads_from_the_latest_stored_day_and_the_longest_unchecked_goes_first() -> None:
-    ts = {"OLD": "2026-06-01", "OLDER": "2026-03-01", "FRESH": "2026-09-20", "ASKED": "2026-01-05"}
+    ts = {"OLD": "2026-06-01", "OLDER": "2026-03-01", "FRESH": "2026-09-20", "ASKED": "2026-01-05",
+          "DEAD": "2024-11-01"}  # fmt: skip
     stored = pd.DataFrame({"cik": list(ts), "ts": [pd.Timestamp(d, tz=UTC) for d in ts.values()]})
     checked = {"OLD": date(2026, 9, 1), "ASKED": SESSION}
     due = task.due_ciks(stored, checked, SESSION)  # NEVER has nothing stored: the backfill's
-    assert list(due) == ["OLDER", "OLD"]  # never checked first; ASKED today; FRESH not due
+    assert list(due) == [
+        "OLDER",
+        "OLD",
+    ]  # never checked first; ASKED today; FRESH not due; DEAD silent over 400 days
     assert due["OLDER"] == date(2026, 2, 28) and due["OLD"] == date(2026, 5, 31)  # New York
     assert task.due_ciks(pd.DataFrame(), {}, SESSION) == {}
 

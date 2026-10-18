@@ -16,13 +16,14 @@ the older row's ``known_from``. The null-item row of a filing is dropped when th
 item row (an earlier parser found nothing, a later one did), never the other way round: a later
 parser that finds nothing does not erase items an earlier one found.
 
-**Instruments**: ``instrument_id`` is NULL on a filing's first version (the producer's universe is
-today's, the row is known from an old session) and is filled by a later version of the same
-(cik, accession, item), known from the session the producer filled it. A read at S before that
-shows NULL; from it the id. ``filing_text(..., ids)`` instead maps the ids to their CIKs through
-``instruments/company`` as of S (plus the ids a known version carries), so a listed name reads its
-filings whatever the stored id; ``ids=None`` is the scan of every filer (``ciks`` narrows it), with
-the stored id, NULL or not.
+**Instruments**: the table stores no instrument id (``instrument_id`` is NULL in every row: the
+run's universe is today's, and a stored id would exist only for the survivors). A read maps each
+CIK to its instruments through the ``instruments/company`` snapshot of its session on every call
+(``snapshot``'s rule, ADR 0007: the latest on or before S, else the earliest, disclosed in
+``frame.attrs["company_snapshot"]`` and ``["pre_snapshot"]``; ``MissingDataError`` for a read by
+``ids`` when no snapshot exists). ``filing_text(..., ids)`` returns those instruments' filings (a
+CIK of two share classes gives a row set each); ``ids=None`` is the scan of every filer
+(``ciks`` narrows it) with ``instrument_id`` NULL where no instrument has the CIK at S.
 
 Rows carry ``quality`` (``OK``, ``SHORT``, ``TRUNCATED``, ``NOT_FOUND``, ``NO_ITEMS``); a text
 read for a signal is an ``OK`` row, the others are UNKNOWN or a disclosed "short section".
@@ -33,9 +34,11 @@ from datetime import date, datetime
 
 import pandas as pd
 
+from algotrade.core.model.errors import MissingDataError
+from algotrade.core.model.fields import COMPANY_TABLE
 from algotrade.core.model.instruments import pad_cik
 from algotrade.data.events import ALL_TIME, acceptance_sessions
-from algotrade.data.reference import companies
+from algotrade.data.reference import REFERENCE_HINT, read_snapshot
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import KNOWN_FROM
 
@@ -121,19 +124,28 @@ def stored_filing_text(
     return frame.reset_index(drop=True)
 
 
-def _instruments_of(
-    reader: StoreReader, ids: Sequence[str], on: date, as_of: datetime | None
-) -> dict[str, list[str]]:
-    """CIK -> the requested ids that have it in the ``instruments/company`` snapshot on or before
-    ``on`` (a later snapshot never stands in); empty before the first snapshot."""
-    found = companies(reader, on, list(ids), as_of)
-    if found is None or found.empty or "cik" not in found.columns:
-        return {}
-    out: dict[str, list[str]] = {}
-    for iid, cik in zip(found["instrument_id"], found["cik"], strict=True):
-        if (padded := pad_cik(cik)) is not None:
-            out.setdefault(padded, []).append(str(iid))
-    return out
+def _instruments_by_cik(
+    reader: StoreReader, on: date, as_of: datetime | None, ids: Sequence[str] | None
+) -> tuple[pd.DataFrame, date | None, bool]:
+    """``cik`` / ``instrument_id`` pairs of the company snapshot of ``on`` (``ids``' rows only when
+    given), its date and whether it is later than ``on`` (``pre_snapshot``). A scan with no
+    snapshot known has no pairs; a read by ``ids`` raises ``MissingDataError``."""
+    empty = pd.DataFrame({"cik": [], "instrument_id": []})
+    try:
+        found, snap = read_snapshot(reader, COMPANY_TABLE, on, REFERENCE_HINT, as_of, ids)
+    except MissingDataError:
+        if ids is not None:
+            raise
+        return empty, None, False  # a scan reads the filings, its ids all NULL
+    if found.empty or "cik" not in found.columns:
+        return empty, snap.snapshot_date, snap.pre_snapshot
+    pairs = pd.DataFrame(
+        {
+            "cik": [pad_cik(c) for c in found["cik"]],
+            "instrument_id": found["instrument_id"].astype(str).to_numpy(),
+        }
+    ).dropna(subset=["cik"])
+    return pairs.drop_duplicates().reset_index(drop=True), snap.snapshot_date, snap.pre_snapshot
 
 
 def _with_text(reader: StoreReader, frame: pd.DataFrame, as_of: datetime | None) -> pd.DataFrame:
@@ -177,30 +189,31 @@ def filing_text(
     """The item rows (``COLUMNS``) known on or before session ``on`` (module doc), the latest
     version of each (cik, accession, item), for filings accepted on or after ``since`` and the
     ``items`` / ``forms`` asked (``None``: all); sorted by instrument, acceptance, cik, accession
-    and item. ``instrument_ids``: those instruments' filings, mapped through the company snapshot
-    as of ``on`` (a CIK of two share classes gives a row set each), ``instrument_id`` the
-    requested one; ``None``: every filer, ``instrument_id`` as stored (NULL before the producer's
-    id version is known), ``ciks`` narrowing the scan. ``with_text=False`` leaves ``text`` out of
-    the read (a scan of what is there). Empty (with the columns) when nothing is known."""
+    and item. ``instrument_ids``: those instruments' filings, ``instrument_id`` the requested one;
+    ``None``: every filer, ``instrument_id`` NULL where the company snapshot of ``on`` maps the
+    CIK to none, ``ciks`` narrowing the scan. ``with_text=False`` leaves ``text`` out of the read
+    (a scan of what is there; no text column is read). Empty (with the columns) when nothing is
+    known."""
     wanted = [c for c in COLUMNS if with_text or c != "text"]
+    pairs, snap_date, pre = _instruments_by_cik(reader, on, as_of, instrument_ids)
+    meta = {"company_snapshot": snap_date, "pre_snapshot": pre}
+
+    def nothing() -> pd.DataFrame:
+        out = pd.DataFrame({c: [] for c in wanted})
+        out.attrs.update(meta)
+        return out
+
     light = [c for c in COLUMNS if c != "text"]
     frame = reader.table_range(TABLE, since or ALL_TIME[0], on, as_of, None, light)
     if frame is None or frame.empty:
-        return pd.DataFrame({c: [] for c in wanted})
+        return nothing()
     frame = frame[effective_known_from(frame) <= pd.Timestamp(on)]  # known first, then the latest
-    mapping: dict[str, list[str]] = {}
     if instrument_ids is not None:
-        mapping = _instruments_of(reader, instrument_ids, on, as_of)
-        carried = frame[frame["instrument_id"].isin(list(instrument_ids))]
-        for cik, iid in zip(carried["cik"], carried["instrument_id"], strict=True):
-            mapping.setdefault(str(cik), [])
-            if iid not in mapping[str(cik)]:
-                mapping[str(cik)].append(str(iid))
-        frame = frame[frame["cik"].isin(list(mapping))]
+        frame = frame[frame["cik"].isin(pairs["cik"])]
     if ciks is not None:
         frame = frame[frame["cik"].isin([pad_cik(c) for c in ciks])]
     if frame.empty:
-        return pd.DataFrame({c: [] for c in wanted})
+        return nothing()
     frame = latest_filing_versions(frame.assign(_kf=frame["known_from"]))
     frame = _without_empty_filing_rows(frame)
     if items is not None:
@@ -208,19 +221,17 @@ def filing_text(
     if forms is not None:
         frame = frame[frame["form"].isin(list(forms))]
     if frame.empty:
-        return pd.DataFrame({c: [] for c in wanted})
+        return nothing()
     if with_text:
         frame = _with_text(reader, frame.assign(_item=frame["item"].fillna(_NO_ITEM)), as_of)
-    if instrument_ids is not None:
-        frame = pd.concat(
-            [
-                frame[frame["cik"] == c].assign(instrument_id=i)
-                for c, ids in mapping.items()
-                for i in ids
-            ],
-            ignore_index=True,
-        )
-    order = ["instrument_id", "ts", "cik", "accession", "item"]
-    return (
-        frame[wanted].sort_values(order, kind="stable", na_position="first").reset_index(drop=True)
+    frame = frame.drop(columns="instrument_id").merge(
+        pairs, how="inner" if instrument_ids is not None else "left", on="cik"
     )
+    frame["instrument_id"] = (
+        frame["instrument_id"].astype(object).where(frame["instrument_id"].notna(), None)
+    )
+    order = ["instrument_id", "ts", "cik", "accession", "item"]
+    out = frame[wanted].sort_values(order, kind="stable", na_position="first")
+    out = out.reset_index(drop=True)
+    out.attrs.update(meta)
+    return out
