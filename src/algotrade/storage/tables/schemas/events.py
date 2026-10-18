@@ -122,6 +122,35 @@ INSIDER_EVENTS = fixed(
     key=("instrument_id", "accession", "line", "owner_cik", KNOWN_FROM),
 )  # fmt: skip
 
+# L1: the IPO facts and lock-up expiry of each 424B4 prospectus (ADR 0050, edge build D8; rules in
+# ``tasks/events/ipo_lockups.py``): one row per (``cik``, ``accession``), keyed by the ISSUER's CIK
+# (a new issuer is in no universe yet: ``instrument_id`` is null until a run finds it). ``ts`` is
+# the acceptance instant, ``known_from`` its session; a re-extraction that changed a value is a
+# new version with a later ``known_from``, part of the merge key so it never replaces the version
+# an earlier session read (readers: ``data.events.latest_versions``).
+IPO_LOCKUP_EVENTS = fixed(
+    "events/ipo_lockup",
+    "event",
+    ("ts", KNOWN_FROM, "cik", "accession", "extraction"),
+    "ts timestamp_utc!",
+    f"{KNOWN_FROM} date!",
+    "cik string!",
+    "accession string!",
+    "extraction string!",
+    "rules_version string!",
+    "filing_date date!",
+    "is_ipo bool!",
+    "early_release bool!",
+    "prospectus_date date",
+    "lockup_expiry date",
+    "offer_price float64",
+    "lockup_days int64",
+    *strings("instrument_id", "issuer_name", "primary_document", "ticker"),
+    *strings("exchange", "lockup_terms", "early_release_text", "reason"),
+    runs="merge",
+    key=("cik", "accession", KNOWN_FROM),
+)
+
 # L1: a closed-end fund's daily NAV (edge build D5), keyed by the FUND's id; ``ts`` = the NAV date
 # (also the partition); known_from: next session after it, after the fetch if restated.
 FUND_NAV_EVENTS = fixed(

@@ -855,3 +855,88 @@ value = 0.05
 mode = "soft"
 tolerance = 0.02
 note = "a score over the universe; the decoy battery's amihud_illiquid ranks the other end"
+
+[[field]]
+name = "feature.stock_tsmom_sign"
+theme = "volatility"
+reads = "The name's own trend as a sign. 1 means the 252-session return is above 0 and the close is above the 200-day average. -1 means both are below. 0 means they disagree. Moskowitz, Ooi and Pedersen hold names with a positive past year, whatever their rank among peers."
+caveats = [
+  "The return is raw, not in excess of cash, so in a high-rate year a sign of 1 is a weaker claim. Compare trend_stats ret_252d with rollup.trend_stats@v2.ret_252d.",
+  "Part of its payoff is market timing: most names read 1 after a rising market. Read it beside feature.trend_state and the market's own trend.",
+  "Null after a gap in the last 253 sessions or a shorter history. It is never 0 for a missing value.",
+]
+sources = ["Moskowitz, Ooi and Pedersen (2012), Time Series Momentum, Journal of Financial Economics", "Goyal and Jegadeesh (2018), Cross-Sectional and Time-Series Tests of Return Predictability, Review of Financial Studies"]
+[[field.use]]
+for = "a name whose own trend is up"
+op = "eq"
+value = 1
+mode = "hard"
+note = "as a filter on a momentum rank; names with no value drop out"
+
+[[field]]
+name = "rollup.session_returns@v1.overnight_ret_20d"
+theme = "volatility"
+reads = "The month's return earned overnight, from each close to the next open, compounded over 20 sessions. 0.04 is up 4% overnight in total. Lou, Polk and Skouras found momentum profits arrive overnight and reversal profits arrive during the day."
+caveats = [
+  "A dividend or an earnings gap sits in the overnight part. Check rollup.earnings@v1.last_earnings_date before reading a high value as a trend.",
+  "Opening prices of thin names are noisy. Gate on rollup.price_stats@v2.adv_usd_20d before ranking by it.",
+  "Null after a gap, a non-positive price, or a missing open among the last 21 sessions.",
+]
+sources = ["Lou, Polk and Skouras (2019), A Tug of War: Overnight Versus Intraday Expected Returns, Journal of Financial Economics: https://personal.lse.ac.uk/polk/research/TugOfWar.pdf"]
+[[field.use]]
+for = "a month that gained overnight"
+op = "gt"
+value = 0
+mode = "hard"
+note = "a decomposition: read with rollup.session_returns@v1.intraday_ret_20d, not as a signal alone"
+
+[[field]]
+name = "rollup.session_returns@v1.intraday_ret_20d"
+theme = "volatility"
+reads = "The month's return earned while the market was open, from each open to the same day's close, compounded over 20 sessions. With rollup.session_returns@v1.overnight_ret_20d it makes the 20-session return: one plus each, multiplied, minus one."
+caveats = [
+  "A name that gained overnight and lost in the day nets close to the old 20-session return. Read both parts before judging the move.",
+  "Null after a gap, a non-positive price, or a missing open among the last 21 sessions.",
+]
+sources = ["Lou, Polk and Skouras (2019), A Tug of War: Overnight Versus Intraday Expected Returns, Journal of Financial Economics"]
+[[field.use]]
+for = "a month that gained during the day"
+op = "gt"
+value = 0
+mode = "hard"
+note = "a decomposition: the part of the move a market-on-close entry would have missed"
+
+[[field]]
+name = "rollup.signed_volume@v1.obv_trend_20d"
+theme = "volume and liquidity"
+reads = "On-balance volume's change over 20 sessions as a share of the volume traded, -1 to 1. Volume on a higher close counts for, on a lower close against. 0.3 is net buying on a third of the volume; below -0.3 is net selling."
+caveats = [
+  "It reads only the direction of the close, not the size of the move or where the close sat in the range. Compare rollup.volume@v1.cmf_20d.",
+  "One heavy day dominates a quiet month. Check rollup.volume@v1.volume_z_20d before reading a high value as steady buying.",
+  "Null after a gap in the last 21 sessions or with no volume. Granville's OBV has no academic test of its own.",
+]
+sources = ["Granville (1963), Granville's New Key to Stock Market Profits", "Lee and Swaminathan (2000), Price Momentum and Trading Volume, Journal of Finance"]
+[[field.use]]
+for = "net buying over the month"
+op = "gt"
+value = 0
+mode = "soft"
+tolerance = 0.05
+note = "pair with rollup.volume@v1.cmf_20d gt 0 as a confirmation of a price trend"
+
+[[field]]
+name = "feature.capital_gains_overhang"
+theme = "price levels"
+reads = "How far the close sits above the volume-weighted average price since the last earnings report, as a share of the close. 0.05 is 5% above, -0.05 is 5% below. Above 0, holders since the report are in profit. Grinblatt and Han link that to higher later returns."
+caveats = [
+  "This is a proxy. Grinblatt and Han weight by turnover over years; this average starts at the last report, at most 126 sessions back. Read rollup.anchored_vwap@v2.avwap_anchor_date for its age.",
+  "A fresh anchor sits near the price, so the value is near 0 and says little. It means more after two to four weeks.",
+  "Null without a report in the last 126 sessions, fewer than 2 sessions since it, a gap, or no volume.",
+]
+sources = ["Grinblatt and Han (2005), Prospect Theory, Mental Accounting, and Momentum, Journal of Financial Economics: https://doi.org/10.1016/j.jfineco.2004.06.007"]
+[[field.use]]
+for = "holders since the report are in profit"
+op = "gt"
+value = 0
+mode = "hard"
+note = "rank by it descending for the overhang long leg"

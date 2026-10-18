@@ -1,0 +1,33 @@
+# L3 site setting: the Guide's playbook for the site preset short_term_momentum_turnover (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "short_term_momentum_turnover"
+version = 1  # the preset version this prose was written for
+summary = "Finds heavily traded common stocks and ranks them by last month's return, the winners first: the finding that in the most-traded names a month's winners keep winning. It is a candidate edge under test, not a proven trade."
+hit = "The name is a common stock closing above $5 that trades at least $50M a day, with 1% or more of its shares changing hands on an average day over 20 sessions. The best 20-session return ranks first."
+not_checked = "It does not check why the month moved (news, an index change), the float behind the share count, or a market-wide rebound that reverses the winners. The 1% cut is a fixed stand-in for the study's top turnover decile."
+before_acting = [
+  "A month that is mostly one event is not short-term momentum: check rollup.price_moves@v1.one_day_move against rollup.price_stats@v2.ret_20d.",
+  "Turnover uses the latest filed share count, which can be stale; check feature.turnover_20d against rollup.volume@v1.volume_ratio_5d_20d to see if the last week drove it.",
+  "The study found the effect in 1963 to 2018 data; the 2021 meme episodes reversed sharply, so size positions for a reversal.",
+]
+sources = [
+  "Medhat and Schmeling, Short-term Momentum (2022)",
+]
+related = [
+  { id = "momentum_12_1", reason = "the year-long momentum this one-month version contrasts with" },
+  { id = "max_ret_high", reason = "the lottery-attention name that often tops a month's return" },
+]
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+turnover = "At least 1% of its shares trade a day"
+ret_20d = "Has a 20-session return"

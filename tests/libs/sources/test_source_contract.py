@@ -22,6 +22,8 @@ from algotrade_sources.framework.series import (
     DailyIndexRequest,
     FilingsRequest,
     InsiderRequest,
+    ProspectusRequest,
+    ProspectusSearchRequest,
     ReleaseRequest,
     SeriesRequest,
 )
@@ -56,6 +58,8 @@ from algotrade_sources.vendors.sec.fund_objectives import (
 )
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.sec.submissions import SecFilings
+from algotrade_sources.vendors.sec_prospectus.prospectus import SecProspectus
+from algotrade_sources.vendors.sec_prospectus.prospectus_search import SecProspectusSearch
 from algotrade_sources.vendors.sp500_history.membership import Sp500Membership
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
@@ -280,6 +284,22 @@ def sec_form345_bulk() -> Adapter:
     return SecForm345Bulk(http_for(lambda url: payload)), InsiderRequest(key="2026q3")
 
 
+def sec_prospectus_search() -> Adapter:
+    payload = sec_payloads.search_page(
+        [("0001193125-26-100001", "1111111", "2026-06-15", "Abc Inc")]
+    )
+    request = ProspectusSearchRequest(
+        key="2026-06-01..2026-06-30", start=date(2026, 6, 1), end=date(2026, 6, 30)
+    )
+    return SecProspectusSearch(http_for(lambda url: payload)), request
+
+
+def sec_prospectus() -> Adapter:
+    payload = sec_payloads.prospectus()
+    request = ProspectusRequest(key="0001193125-26-100001", cik="1111111", document="a.htm")
+    return SecProspectus(http_for(lambda url: payload)), request
+
+
 def published() -> Adapter:
     request = SeriesRequest(
         "SPX", url="https://stooq.com/q/d/l/?s=^spx&i=d", date_column="Date", value_column="Close"
@@ -316,6 +336,8 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "fred_release_dates": fred_release_dates,
     "sec_filings": sec_filings,
     "sec_daily_index": sec_daily_index,
+    "sec_prospectus_search": sec_prospectus_search,
+    "sec_prospectus": sec_prospectus,
     "sec_form4_xml": sec_form4_xml,
     "sec_form345_bulk": sec_form345_bulk,
     "published": published,

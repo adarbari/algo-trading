@@ -1,0 +1,34 @@
+# L3 site setting: the Guide's playbook for the site preset momentum_own_trend (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "momentum_own_trend"
+version = 1  # the preset version this prose was written for
+summary = "Ranks names by 12-1 momentum, keeping only those whose own trend is up: a positive year and a close above the 200-day average. It drops winners whose last month broke their trend. It is a filter on the momentum ranking, tested as a variant."
+hit = "The name is a listed common stock, ADR or ETF closing above $5 that trades at least $50M a day, has a 12-1 momentum value, and reads 1 on the own-trend sign. Best momentum first."
+not_checked = "It does not check market timing, crash risk or earnings dates. Part of any own-trend payoff is a long position after a rising market, not stock selection."
+before_acting = [
+  "Most top-ranked names already read 1 in a rising market, so the filter changes the list most after a fall: compare it with momentum_12_1 on the same day.",
+  "The return behind feature.stock_tsmom_sign is raw, not in excess of cash, and a flat year reads 0, which drops the name.",
+  "Momentum crashes in sharp rebounds after a market fall; the own-trend filter does not remove that risk.",
+]
+sources = [
+  "Moskowitz, Ooi and Pedersen, Time Series Momentum (2012)",
+  "Goyal and Jegadeesh, Cross-Sectional and Time-Series Tests of Return Predictability (2018)",
+]
+related = [
+  { id = "momentum_12_1", reason = "the ranking this filters" },
+  { id = "momentum_pullback_entry", reason = "the same winners, entered on a dip" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+mom_12_1 = "Has a 12-1 momentum value"
+own_trend = "Own trend up: a positive year, above the 200-day average"

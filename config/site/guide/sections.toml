@@ -61,6 +61,7 @@ title = "Trend"
 presets = [
   "trend_continuation", "pullback", "momentum_12_1", "size_small", "ivol_high", "max_ret_high",
   "amihud_illiquid", "beta_low", "etf_flow_pressure",
+  "momentum_own_trend", "momentum_pullback_entry", "momentum_volume_confirmed",
 ]
 
 [[family]]
@@ -81,7 +82,7 @@ presets = ["vrp_scanner", "vrp_iv_hv", "vrp_cross_section", "iv_rank_high"]
 [[family]]
 id = "events"
 title = "Earnings events"
-presets = ["pead_small_cap", "eap_all", "eap_volume", "earnings_date_early", "pre_earnings_runup", "earnings_gap_volume", "earnings_gap_only", "pre_earnings_reversal", "earnings_neutral_reversal"]
+presets = ["pead_small_cap", "eap_all", "eap_volume", "earnings_date_early", "pre_earnings_runup", "earnings_gap_volume", "earnings_gap_only", "pre_earnings_reversal", "earnings_neutral_reversal", "earnings_vwap_overhang"]
 
 [[family]]
 id = "filings"
@@ -96,7 +97,7 @@ presets = ["cp_iv_spread", "cp_iv_spread_rise", "iv_smirk", "iv_change_call", "i
 [[family]]
 id = "cross_section"
 title = "Cross-section ranks"
-presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite"]
+presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite", "short_term_momentum_turnover"]
 
 [[family]]
 id = "factors"

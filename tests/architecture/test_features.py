@@ -357,10 +357,33 @@ def test_series_inputs_are_checked_against_the_macro_registry() -> None:
         series_input_problems(group((), feature("hy", "series:BAMLH0A0HYM2", "personal")), MACRO)
         == []
     )
+    cape = group(("MACRO:CAPE_USA",), feature("cape", "series:CAPE_USA"))
+    assert series_input_problems(cape, MACRO) == [  # Barclays' terms: never served to others
+        "toy.cape@v1: series:CAPE_USA is for personal use; so is the feature"
+    ]
+    assert not series_input_problems(
+        group(("MACRO:CAPE_USA",), feature("cape", "series:CAPE_USA", "personal")), MACRO
+    )
     typo = group(("MACRO:T10Y3N",), feature("slope", "series:T10Y3M"))
     assert series_input_problems(typo, MACRO)[0] == (
         "toy@v1: macro/series ids ['MACRO:T10Y3N'] are not in macro.toml"
     )
+
+
+def test_personal_series_are_read_only_through_licensed_features() -> None:
+    """A personal-use series (Barclays CAPE: no distribution to other users) reaches a viewer
+    only as a feature, which carries the licence the data-licence gate hides (ADR 0069): no
+    module outside the registry and the feature groups names one of its keys."""
+    keys = [s.key for s in MACRO.series if s.licence == "personal" and s.key.startswith("CAPE_")]
+    assert len(keys) == 26
+    allowed = ("src/algotrade/features/rollups/", "src/algotrade/config/")
+    named = {
+        str(p.relative_to(REPO_ROOT))
+        for root in ("src", "apps", "libs")
+        for p in (REPO_ROOT / root).rglob("*.py")
+        if "CAPE_" in p.read_text() and not str(p.relative_to(REPO_ROOT)).startswith(allowed)
+    }
+    assert not named, f"read CAPE series outside a licensed feature group: {sorted(named)}"
 
 
 def _screened_fields() -> dict[str, str]:

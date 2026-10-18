@@ -20,6 +20,7 @@ Each edge's full section is on its family page (docs/edges/).
 | 12-1 momentum (`momentum_12_1`) | candidate | [family A](edges/a.md) |
 | Net share issuance (`net_share_issuance`) | candidate | [family A](edges/a.md) |
 | Quality minus junk (`quality_minus_junk`) | candidate | [family A](edges/a.md) |
+| Short-term momentum in heavily traded stocks (`short_term_momentum_high_turnover`) | candidate | [family A](edges/a.md) |
 | Short-term residual reversal (`short_term_residual_reversal`) | candidate | [family A](edges/a.md) |
 | Dividend-month premium (`dividend_month_premium`) | candidate | [family B](edges/b.md) |
 | Earnings-date advances (`earnings_date_shift`) | candidate | [family B](edges/b.md) |
@@ -42,6 +43,7 @@ Each edge's full section is on its family page (docs/edges/).
 | High-volume return premium (`high_volume_return_premium`) | candidate | [family D](edges/d.md) |
 | Closed-end fund discount reversion (`closed_end_fund_discounts`) | blocked | [family D](edges/d.md) |
 | Composite mispricing score (`composite_mispricing_score`) | candidate | [family F](edges/f.md) |
+| Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | candidate | [family G](edges/g.md) |
 | Reversal into earnings (`earnings_neutral_reversal`) | candidate | [family G](edges/g.md) |
 | BDC price to NAV reversion (`bdc_price_to_nav_reversion`) | candidate | [family H](edges/h.md) |
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | [family H](edges/h.md) |
