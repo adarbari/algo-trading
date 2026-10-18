@@ -37,7 +37,9 @@ def test_config_list(graph: Graph) -> None:
           "cash_op_profitability", "composite_value", "qmj", "net_share_issuance", "asset_growth",
           "distress_ohlson", "bdc_price_to_nav",
           "vrp_cross_section", "iv_rank_high", "etf_flow_pressure",
-          "insider_cluster_buys", "short_squeeze_dtc"}  # fmt: skip
+          "insider_cluster_buys", "short_squeeze_dtc",
+          "trend_positive_3m", "trend_positive_6m", "trend_positive_12m", "etf_above_200d",
+          "etf_low_ibs"}  # fmt: skip
     assert set(configs) == {"short_premium_liquidity", "sma_trend", "vrp_scanner", "vrp_iv_hv"} | ta
     assert (configs["sma_trend"]["kind"], configs["sma_trend"]["scope"]) == ("strategy", "site")
     assert configs["sma_trend"]["selection"] == "liquid_optionable"
