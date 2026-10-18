@@ -50,3 +50,7 @@ to declare `uncovered_statuses` (`NOT_COVERED`, `NOT_FETCHED`). The never-asked 
 `analyst_backlog` acceptance check on the `analyst-snapshot` step (`tasks/analyst/backlog.py`, WARN only, `[quality]
 max_analyst_backlog`); a fitness test (`tests/apps/ingestion/tasks/analyst/test_backlog.py`) fails when a
 feature declares `NOT_FETCHED` and the step does not run it.
+
+**Update (the ratings and revisions PR):** `analyst_ratings@v1` also declares `NOT_FETCHED`; it reads Finnhub, so the
+`finnhub_backlog` check (same module, same `max_analyst_backlog`, Finnhub's own refresh windows, nothing when the run skipped Finnhub)
+is on the step too, and the fitness test's list maps each declaring group to the check of its vendor.

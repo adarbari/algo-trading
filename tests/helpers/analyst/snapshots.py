@@ -48,6 +48,20 @@ def target(iid: str, consensus: float) -> dict:
     }
 
 
+def recommendation(iid: str, months: dict[str, tuple[int, int, int, int, int]]) -> list[dict]:
+    """Finnhub trend rows: one per month (its first day), the counts strong buy, buy, hold, sell,
+    strong sell; store them with ``put(..., source="finnhub")``."""
+    return [
+        {
+            "instrument_id": iid,
+            "kind": "recommendation",
+            "period": month,
+            **dict(zip(("strong_buy", "buy", "hold", "sell", "strong_sell"), counts, strict=True)),
+        }
+        for month, counts in months.items()
+    ]
+
+
 def marker(iid: str, status: str) -> dict:
     return {"instrument_id": iid, "kind": "coverage", "period": "current", "status": status}
 

@@ -10,7 +10,12 @@ from algotrade.features.rollups.consensus.analyst_status import (
 from algotrade.services.features import site_features
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.analyst.backlog import CHECK, check_analyst_backlog
+from algotrade_ingestion.tasks.analyst.backlog import (
+    CHECK,
+    FINNHUB_CHECK,
+    check_analyst_backlog,
+    check_finnhub_backlog,
+)
 from algotrade_ingestion.tasks.analyst.snapshot import run
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.workflows.nightly.nightly import NIGHTLY
@@ -71,10 +76,56 @@ def test_a_name_that_only_ever_failed_stays_in_the_backlog() -> None:
     assert check.data["not_asked"] == 1 and check.data["examples"] == ["NVDA"]
 
 
-# The groups that declare NOT_FETCHED, and the step and check that grade the names they hide.
+def test_finnhub_names_the_rotation_has_not_reached_are_a_warning_above_the_limit() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer)
+    ctx = context(writer, D1, [], per_night=1)  # Finnhub reaches one of the three names
+    run(ctx, {"session": D1})
+    (check,) = check_finnhub_backlog(ctx, D1)
+    assert (check.name, check.status) == (FINNHUB_CHECK, "WARN")
+    assert check.data["in_scope"] == 3 and check.data["not_asked"] == 2
+    assert "2 of 3 in-scope names not asked of FINNHUB" in check.detail
+    (fmp,) = check_analyst_backlog(ctx, D1)  # FMP asked all three: its own measure is separate
+    assert fmp.status == "PASS"
+
+
+def test_finnhub_passes_when_every_name_was_asked_and_an_empty_answer_counts() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer)
+    ctx = context(writer, D1, [], empty=frozenset({"NVDA"}))
+    run(ctx, {"session": D1})
+    (check,) = check_finnhub_backlog(ctx, D1)
+    assert check.status == "PASS" and check.data["not_asked"] == 0
+
+
+def test_finnhub_names_that_only_failed_stay_in_the_backlog() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer)
+    ctx = context(writer, D1, [], broken=frozenset({"NVDA"}))
+    run(ctx, {"session": D1})
+    (check,) = check_finnhub_backlog(ctx, D1)
+    assert check.data["examples"] == ["NVDA"]
+
+
+def test_finnhub_has_no_backlog_check_when_the_run_skipped_it_and_none_without_a_run() -> None:
+    writer = StoreWriter(MemoryBackend())
+    seed(writer)
+    ctx = context(writer, D1, [])
+    assert check_finnhub_backlog(ctx, D1) == []
+    no_key = replace(ctx, sources={k: v for k, v in ctx.sources.items() if "finnhub" not in k})
+    run(no_key, {"session": D1})
+    assert (
+        check_finnhub_backlog(no_key, D1) == []
+    )  # skipped: every name reads NOT_FETCHED by design
+    assert len(check_analyst_backlog(no_key, D1)) == 1
+
+
+# The groups that declare NOT_FETCHED, and the step and check that grade the names they hide (the
+# vendor the group reads: FMP for the estimates and targets, Finnhub for the ratings).
 DECLARING = {
     "analyst_estimates@v1": ("analyst-snapshot", check_analyst_backlog),
     "analyst_targets@v1": ("analyst-snapshot", check_analyst_backlog),
+    "analyst_ratings@v1": ("analyst-snapshot", check_finnhub_backlog),
 }
 
 

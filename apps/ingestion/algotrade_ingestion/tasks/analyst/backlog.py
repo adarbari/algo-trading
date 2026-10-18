@@ -14,6 +14,12 @@ WARN only, above ``[quality] max_analyst_backlog``: the step is optional, and a 
 the ``[fmp] daily_budget`` is smaller than the names due, not that data is wrong. Nothing without
 a finished run of the session. Every attempt writes a coverage marker, so a refused or empty name
 is asked, not backlog; only a name no attempt reached in the window is.
+
+The same measure for Finnhub (``check_finnhub_backlog``, the recommendation trend that
+``analyst_ratings@v1`` reads): the share with no Finnhub row and no Finnhub coverage marker other
+than FAILED in the last four ``[finnhub] refresh_days`` windows, against the same
+``max_analyst_backlog``. Nothing when the run skipped Finnhub (no key, or the probe says DENIED:
+the run record names why), since every name would then read NOT_FETCHED by design.
 """
 
 from datetime import date, timedelta
@@ -24,7 +30,9 @@ from algotrade_ingestion.tasks.framework.run import PUBLISHED, TaskContext
 from algotrade_ingestion.tasks.maintenance.quality import Check
 
 CHECK = "analyst_backlog"
+FINNHUB_CHECK = "finnhub_backlog"
 VENDOR = "fmp"
+FINNHUB = "finnhub"
 FAILED = "FAILED"  # a marker of an error: the vendor was not reached, so the name is not asked
 EXAMPLES = 10  # names listed in the check's data
 
@@ -32,27 +40,41 @@ EXAMPLES = 10  # names listed in the check's data
 def check_analyst_backlog(ctx: TaskContext, session: date) -> list[Check]:
     """WARN when over ``max_analyst_backlog`` of the in-scope names were not asked of FMP in the
     last ``retry_days`` (four refresh windows); PASS otherwise; nothing without a finished run."""
+    return _backlog(ctx, session, VENDOR, CHECK, ctx.settings.fmp_refresh_days)
+
+
+def check_finnhub_backlog(ctx: TaskContext, session: date) -> list[Check]:
+    """The same for Finnhub's recommendation trend and its own refresh cadence; nothing when the
+    finished run skipped Finnhub."""
+    return _backlog(ctx, session, FINNHUB, FINNHUB_CHECK, ctx.settings.finnhub_refresh_days)
+
+
+def _backlog(
+    ctx: TaskContext, session: date, vendor: str, check: str, refresh_days: int
+) -> list[Check]:
     done = [r for r in ctx.reader.runs(TASK) if r.status in PUBLISHED and r.session_date == session]
+    if vendor == FINNHUB and any("skipped" in r.stats.get(FINNHUB, {}) for r in done):
+        return []
     names = scope_names(ctx.reader, ctx, session) if done else []
     if not names:
         return []
-    days = retry_days(ctx.settings.fmp_refresh_days)
+    days = retry_days(refresh_days)
     since = session - timedelta(days=days)
     ids = sorted({n.instrument_id for n in names})
     rows = stored_snapshots(ctx.reader, None, KINDS, ids, since=since, through=session)
-    reached = (rows["source"] == VENDOR) & ~(
+    reached = (rows["source"] == vendor) & ~(
         (rows["kind"] == COVERAGE) & (rows["status"] == FAILED)
     )
     asked = set(rows.loc[reached, "instrument_id"].astype(str))
     missing = [n for n in names if n.instrument_id not in asked]
     share, limit = len(missing) / len(names), ctx.settings.max_analyst_backlog
     detail = (
-        f"{len(missing)} of {len(names)} in-scope names not asked of FMP in the last "
-        f"{days} days ({share:.0%}; max {limit:.0%})"
+        f"{len(missing)} of {len(names)} in-scope names not asked of {vendor.upper()} in the "
+        f"last {days} days ({share:.0%}; max {limit:.0%})"
     )
     data = {
         "in_scope": len(names),
         "not_asked": len(missing),
         "examples": sorted(n.symbol for n in missing)[:EXAMPLES],
     }
-    return [Check(CHECK, "WARN" if share > limit else "PASS", detail, data=data)]
+    return [Check(check, "WARN" if share > limit else "PASS", detail, data=data)]

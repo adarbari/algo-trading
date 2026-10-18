@@ -185,6 +185,16 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "ADR 0068: price-target consensus, median, high and low from our own analyst snapshots; personal licence, optional"
 
 [[table]]
+name = "rollups/instrument/analyst_ratings@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0068: analysts' strong buy to strong sell counts, mean rating and its 90-day change from our own Finnhub snapshots; personal licence, optional"
+
+[[table]]
+name = "rollups/instrument/analyst_revisions@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0068: revisions of the FY1 consensus EPS and revenue over 30, 60 and 90 days, matched on the fiscal year end, from our own FMP snapshots; personal licence, optional"
+
+[[table]]
 name = "rollups/instrument/earnings_revisions@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
