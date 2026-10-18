@@ -427,3 +427,60 @@ Sources: Sector rotation by relative strength: https://school.stockcharts.com/do
 - A company that moves its listing changes value on the snapshot after the move; a backtest reads the snapshot of its own session.
 
 Sources: Site convention (docs/data/instruments.md; Nasdaq Trader symbol directory)
+
+### `rollup.cef_nav@v1.cef_discount_to_nav`
+
+**How to read it.** How far a closed-end fund's price sits from the value of the assets behind it. It is the close on the NAV's own date over that NAV, minus 1. -0.10 is a 10% discount, 0 is level, 0.10 a 10% premium.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a wide discount | `lte -0.1` | hard | - | the closed-end fund discount edge reads the widest first |
+| a premium | `gte 0.1` | hard | - | the distribution trap filter asks a premium of at least 10% |
+
+**When the reading lies**
+
+- Part of a discount is fair: fees, leverage and a high payout all widen it. A fund that is always 10% down is not cheap against itself; read rollup.cef_nav@v1.cef_discount_zscore.
+- The NAV is the issuer's own, struck once a day. A fund holding foreign or thinly traded assets is priced against a stale NAV, and its discount moves with the next day's gap.
+- Null when the latest NAV is more than five sessions old, so a fund whose NAV stopped is not read as current. A hard 'lte' drops it.
+- A split or reverse split inside the last year shows a false discount, because the NAV is not split-adjusted. Check rollup.cef_nav@v1.nav_per_share against the price before trusting an extreme value.
+
+Sources: Lee, Shleifer and Thaler (1991), Investor Sentiment and the Closed-End Fund Puzzle, Journal of Finance
+
+### `rollup.cef_nav@v1.cef_discount_zscore`
+
+**How to read it.** How unusual a closed-end fund's discount is against its own year. It is today's discount minus its mean over the last 252 sessions, over their standard deviation. -2 is a discount two standard deviations wider than the fund's norm.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a discount wider than the fund's own year | `lte -1.5` | hard | - | - |
+
+**When the reading lies**
+
+- A wide z-score on a fund that cut its payout or changed manager is a new level, not a stretch that will close. Read the fund's distribution history before acting.
+- Null with fewer than 120 discounts in the year, so a young fund drops out. A hard 'lte' drops it.
+- It shares the NAV caveats of rollup.cef_nav@v1.cef_discount_to_nav: stale NAVs and splits both move it.
+
+Sources: Patro, Piccotti and Wu, Closed-end fund discounts (Quantpedia summary of the strategy)
+
+### `rollup.etf_flows@v1.etf_shares_chg_21d`
+
+**How to read it.** How many more or fewer shares an iShares fund has than 21 sessions ago. It is the latest count over the earlier one, minus 1. 0.10 means 10% net creation, money coming in. -0.10 means 10% net redemption.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| heavy net creation | `gte 0.05` | hard | - | the edge shorts the heaviest creations, ranked by this field |
+| heavy net redemption | `lte -0.05` | hard | - | - |
+
+**When the reading lies**
+
+- It holds for iShares funds only. SPDR, Vanguard and other issuers' funds have no count, so a screen on it silently leaves them out.
+- Null until the fund has a count from a month earlier, and when the latest count is more than seven days old. The history starts on 2026-10-17.
+- A share change is not a price effect: a fund can create shares because its price rose. Read it beside the fund's own return.
+
+Sources: Brown, Davies and Ringgenberg (2021), ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance

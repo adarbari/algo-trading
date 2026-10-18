@@ -16,7 +16,16 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 | Pre-earnings run-up in past winners (`pre_earnings_runup_winners`) | B | candidate | on each `earnings_expected` | excess return, over 5 sessions, vs SPY, starting -6 sessions from the event, costs 10 bps | `pre_earnings_runup` |
 | S&P 500 deletions rebound (`sp500_deletions_long`) | B | candidate | on each `index_change:deletion` | excess return, over 20, 60, 250 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `sp500_deletion` |
 | Spin-off drift (`spinoff_drift`) | B | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
+| Per-name volatility premium, ranked (`c12_vrp_cross_section_iv_hv`) | C | candidate | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps | `vrp_cross_section` |
+| Delta-hedged selling on speculative names (`c14_delta_hedged_characteristics`) | C | candidate | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an delta hedged atm short (basis model, not a quote), costs 35 bps | `ivol_high` |
+| Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | C | candidate | every session | option model pnl, over 15, 21, 31 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps | `iv_rank_high` |
+| Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | C | blocked | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle long (basis model, not a quote), costs 35 bps | none yet |
+| Pre-earnings straddle purchase (`c16_pre_earnings_straddle_buy`) | C | blocked | on each `earnings_expected` | option model pnl, over 10 sessions, starting -3 sessions from the event, modelled P&L of an atm straddle long (basis model, not a quote), costs 50 bps | none yet |
+| Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`) | C | blocked | on each `earnings_expected` | option model pnl, over 10 sessions, starting -1 sessions from the event, modelled P&L of an atm straddle short (basis model, not a quote), costs 50 bps | none yet |
+| ETF flow pressure (`etf_flow_pressure`) | D | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `etf_flow_pressure` |
+| Closed-end fund discount reversion (`closed_end_fund_discounts`) | D | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
 | Tender-offer drift after expiry (`tender_offer_drift`) | H | candidate | on each `tender_offer` | excess return, over 60, 250 sessions, vs SPY, starting +21 sessions from the event, costs 20 bps | `tender_offer_filed` |
+| Premium closed-end funds that over-distribute (`cef_distribution_trap`) | H | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
 | Reverse-split distress filter (`reverse_split_distress_filter`) | H | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 | Thematic ETF launch fade (`thematic_etf_launch_fade`) | H | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 | Earnings announcement premium (`earnings_announcement_premium`) | - | candidate | on each `earnings_expected` | excess return, over 6 sessions, vs SPY, starting -5 sessions from the event, costs 10 bps | `eap_all`, `eap_volume` |
@@ -251,6 +260,256 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - S&P Global Market Intelligence, Capital Market Implications of Spinoffs, 2017 <https://www.spglobal.com/marketintelligence/en/documents/capital-market-implications-of-spinoffs.pdf>
 - McConnell, J., Sibley, S. and Xu, W., Journal of Portfolio Management, 2015 (spin-offs, 2001 to 2013)
 
+## Per-name volatility premium, ranked (`c12_vrp_cross_section_iv_hv`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Selling at-the-money straddles on the names whose implied volatility sits furthest above the volatility they delivered earns more than selling on every liquid name.
+
+- **Outcome:** option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_optionable_floored`
+- **Top K:** 20
+- **Screeners:** `vrp_cross_section`
+- **Baselines:** `vrp_iv_hv`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8). No historical option chains are stored (owner decision O3: no paid history), so the position is one at-the-money straddle priced by Black-Scholes (r = q = 0) from the IBKR IV30 read at D, held to the horizon's close, as a fraction of the entry close; the short straddle's value is minus the long's, |window return| minus the straddle price. It assumes one constant volatility for the whole window, no skew, no early exercise, no dividends, and no spread, hedge cost or margin beyond cost_bps (35 bps, about 5% of an at-the-money straddle's premium at 30% volatility: the 5 to 10% the page cites for single names). IV30 prices the 21-session horizon only; the parser refuses horizons outside 10 to 42 sessions. The real-chain P&L (H13) accrues from 2026-10-02 and replaces the model when it has history; IBKR's IV30 history (licence personal) goes back 502 sessions, about 23 month-end windows spaced a horizon apart. Proxies, each stated: the screener ranks on 30-session realised volatility, where the source ranks on 12-month realised volatility (no 252-session realised volatility is stored); the source buys straddles in the decile where realised exceeds implied and sells the opposite one, this edge keeps the short leg only (an individual's variant; the buy-low leg is a follow-up with a reversed screener); the harness takes the top 20 names, not a decile. The base is every liquid optionable name, so the lift reads whether ranking beats selling on all of them. The delta-hedged variant is the source's own position. No figure is filed under [published]: the source's 22.5% a month is a decile 10 minus decile 1 straddle spread, two groups, and the harness would be measuring one.
+
+**Quality bar**
+
+1. **Mechanism:** Option traders weight recent events heavily and prices under-react to a name's own long-run realised volatility, which mean-reverts; the cross-sectional gap between implied and realised volatility is a mispricing, not a risk the standard factors explain (Goyal and Saretto 2009).
+2. **Persistence:** Harvesting it takes delta-hedged option books across hundreds of names, with spreads of 5 to 10% of premium, so capacity is small and the cost is high; professionals run it and the authors' sort still ranks among the top predictors in later studies (Bali, Beckmeyer, Moerke and Weigert 2023).
+3. **Outcome:** The model P&L of one short at-the-money straddle held 21 sessions from the entry close, as a fraction of the entry price, net of 35 bps: the premium the straddle's seller keeps less the move that followed. The harness reads the mean P&L of the picks against the mean of every liquid optionable name, never the win rate: a short straddle can win most windows and lose on average.
+4. **Trigger timing:** IV30 (ibkr_iv@v1) and HV30 (price_stats@v2) are stored after the close of the decision session D (the last session of the month), so the first fill is the next session's close: the entry session is S = D + 1 (start_offset_sessions = 1). The rank is read at D, the straddle is priced with the implied volatility read at D, the outcome is read at S.
+5. **Faithful replication:** The source's rule is a monthly decile sort on log(HV/IV), hold the next month, long the decile where realised exceeds implied and short the opposite one (Goyal and Saretto 2009). Here vrp_cross_section v1 takes the liquid names whose implied volatility is at least their 30-session realised volatility (floor 10% a year), ranked by implied over realised, and the harness holds the top 20 short. The proxies are in the notes.
+6. **Expected size and sample:** The paper's straddle decile spread is 22.5% a month gross (1996-2005; a two-group figure, not filed), and the delta-hedged call decile spread is 2.7% a month; about half the gross return vanishes after costs in later work (Bali et al. 2023). IBKR IV30 history is 502 sessions, about 23 independent month-ends, under the 40 the bar asks: the harness reports the count beside every number and the edge waits for a verdict.
+7. **Capacity and costs:** Single-name option spreads are 5 to 10% of premium, which the 35 bps cost reflects; the model has no hedge cost, margin or assignment risk. An individual sells a handful of straddles or strangles, far below the open interest of names with $50M of daily stock volume; undefined risk needs margin and the stomach for gaps.
+8. **Failure modes and retirement:** Losses arrive together in volatility spikes: a short straddle is short the left and the right tail, so the mean P&L, not the hit rate, decides. A report inside the month raises implied volatility for a known reason (the no_earnings variant tests it). Retire if the picks' mean P&L in the frozen period is not above the mean of every liquid optionable name, or the ranking does not beat vrp_iv_hv on the same sessions.
+9. **Decoys:** Implied volatility above realised before every report and after every shock (an event, not a mispricing); high-IV names are small and speculative: compare with the vrp_iv_hv screen (the unranked premium) and the size baseline on the same sessions, and with the no_earnings variant.
+
+**Sources**
+
+- Goyal, A. and Saretto, A., Cross-section of option returns and volatility, Journal of Financial Economics, 2009
+- Bali, T., Beckmeyer, H., Moerke, M. and Weigert, F., Option Return Predictability with Machine Learning and Big Data, Review of Financial Studies, 2023 <https://www.wiwi.uni-muenster.de/fcm/en/publication/98329575>
+- EDHEC, Empirical properties of straddle returns <https://risk.edhec.edu/publications/empirical-properties-straddle-returns>
+
+## Delta-hedged selling on speculative names (`c14_delta_hedged_characteristics`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Selling delta-hedged options earns more on speculative names, the ones with the highest idiosyncratic volatility, because their options are overpriced.
+
+- **Outcome:** option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an delta hedged atm short (basis model, not a quote), costs 35 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_optionable_floored`
+- **Top K:** 20
+- **Screeners:** `ivol_high`
+- **Baselines:** `vrp_cross_section`, `vrp_iv_hv`
+- **Frozen period:** from 2026-04-01
+- **Notes:** A selection overlay on c12, filed as its own edge so the harness can say whether the characteristic adds anything to the premium ranking (the baselines are the c12 ranking and the filed VRP screen). The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8): a short at-the-money straddle delta-hedged continuously, priced from the IBKR IV30 at D with the gamma P&L approximation vega x (realised^2 - implied^2) / (2 implied), the realised volatility the window's own, demeaned; no historical chains are stored (owner decision O3), and the real-chain P&L with the daily hedge from our own Greeks (H13) accrues from 2026-10-02. It assumes constant volatility, no skew, a hedge with no cost or slippage beyond cost_bps (35 bps) and one implied volatility pricing the 21-session window; IV30 history (personal licence) is 502 sessions. Proxies, each stated: the source sells one at-the-money call and hedges it (the straddle here is a call and a put, a wider position on the same volatility); the source sorts on many characteristics, this edge takes idiosyncratic volatility alone (rollup.factor_betas@v1.ivol_252d, a four-factor residual: the Cao and Han characteristic; profitability, issuance and distress are follow-ups from mispricing@v1); the harness takes the top 20 names, not a decile; the screener is the stock-only ivol_high ranking, so the ETFs of the universe never qualify. Unlike the source the edge's own universe floors price at $5, so the low-price names the paper finds richest are out.
+
+**Quality bar**
+
+1. **Mechanism:** Retail demand for lottery-like options and dealers' limits to arbitrage: the traits that make a stock speculative (low price, high idiosyncratic volatility, distress, heavy issuance) make its options expensive, and delta-hedged returns fall as idiosyncratic volatility rises (Cao and Han 2013; Zhan, Han, Cao and Tong 2022).
+2. **Persistence:** The authors report Sharpe ratios above 2 after costs, explained by two option factors and not equity ones, and stock characteristics still add power in the machine-learning study through 2020 (Bali, Beckmeyer, Moerke and Weigert 2023). Costs are the binding constraint, not competition.
+3. **Outcome:** The model P&L of one short at-the-money straddle, delta-hedged, held 21 sessions from the entry close, as a fraction of the entry price, net of 35 bps: the gamma P&L the seller keeps when the implied volatility paid exceeds the realised one. The mean P&L of the picks is read against the mean of every liquid optionable name.
+4. **Trigger timing:** The idiosyncratic volatility (factor_betas@v1) and the IV30 (ibkr_iv@v1) are stored after the close of the decision session D (the last session of the month), so the first fill is the next session's close: S = D + 1 (start_offset_sessions = 1). The rank is read at D and the outcome at S.
+5. **Faithful replication:** The source's rule: each month, for every name, sell one at-the-money call about 1.5 months from expiry, delta-hedge daily, hold a month, sort on each characteristic into deciles and read the long-short spread (Zhan, Han, Cao and Tong 2022; Cao and Han 2013 for idiosyncratic volatility). Here ivol_high v1 ranks the optionable names by four-factor idiosyncratic volatility and the harness holds the top 20 as short delta-hedged straddles; the proxies are in the notes.
+6. **Expected size and sample:** The papers report Sharpe ratios above 2 after costs for the characteristic sorts (not verified against the tables, so no figure is filed); idiosyncratic volatility explains much of the spread (Cao and Han 2013). IV30 history is 502 sessions, about 23 independent month-ends, under the 40 the bar asks: the edge waits for a verdict.
+7. **Capacity and costs:** Daily hedging across 50 names is heavy for one person; the practical use is to pick which names to sell covered calls or strangles on (an overlay on c12). Spreads on single-name options and the hedge are the binding cost; the model charges 35 bps and no hedge cost.
+8. **Failure modes and retirement:** The speculative names are the ones that gap: one takeover bid or a 40% move wipes the premium of many windows, so the mean P&L decides, not the hit rate. Retire if the frozen-period mean P&L of the picks is not above the mean of every liquid optionable name, or it does not beat the c12 ranking on the same sessions.
+9. **Decoys:** Idiosyncratic volatility explains most of the characteristic spread (Cao and Han 2013): a name with high idiosyncratic volatility usually has high implied volatility too, which is c12 and the filed VRP. Compare with vrp_cross_section and vrp_iv_hv on the same sessions.
+
+**Sources**
+
+- Zhan, X., Han, B., Cao, J. and Tong, Q., Option Return Predictability, Review of Financial Studies, 2022 <https://research.polyu.edu.hk/en/publications/option-return-predictability/>
+- Cao, J. and Han, B., Cross section of option returns and idiosyncratic stock volatility, Journal of Financial Economics, 2013
+- CXO Advisory, Option Strategies Based on Factor Sorts (summary) <https://www.cxoadvisory.com/equity-options/option-strategies-based-on-factor-sorts>
+
+## Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Selling at-the-money straddles only on names whose implied volatility rank is at least 0.5 earns more than selling on every liquid name.
+
+- **Outcome:** option model pnl, over 15, 21, 31 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps
+- **Schedule:** every session
+- **Universe:** preset `liquid_optionable_floored`
+- **Top K:** all qualified names
+- **Screeners:** `iv_rank_high`
+- **Baselines:** `vrp_iv_hv`, `vrp_cross_section`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8). No historical option chains are stored (owner decision O3), so the position is one at-the-money straddle priced by Black-Scholes (r = q = 0) from the IBKR IV30 read at D, held to the horizon's close, as a fraction of the entry close, short; it assumes constant volatility, no skew, and no spread, hedge or margin beyond cost_bps (35 bps). The practitioner position is a 45-day 16-delta strangle managed at 50% of the credit or 21 days; a straddle held to the horizon is a proxy for it, and the delta-hedged variant is a second reading of the same volatility. IV30 prices 15, 21 and 31 sessions (the parser's range is 10 to 42). The real-chain P&L (H13) accrues from 2026-10-02 and will replace the model; IBKR's IV30 history (personal licence) is 502 sessions. Every picked name qualifies, so the base is every liquid optionable name (the default for a plain schedule): the lift reads whether the rank gate beats selling on all of them, which is the edge's whole claim. feature.iv_rank is IBKR's 252-session rank where IBKR has one and ours otherwise (iv_rank_source says which); a new rank needs 60 sessions.
+
+**Quality bar**
+
+1. **Mechanism:** Implied volatility mean-reverts, so a high rank for the name's own year means it is more likely to fall than a low one; practitioners treat "sell when IV rank is above 50" as doctrine (tastylive).
+2. **Persistence:** The conditional edge over unconditional selling is probably small: high rank clusters in crashes and before earnings, when realised volatility is highest too, and no peer-reviewed study shows that IV rank adds anything beyond implied minus realised volatility (not verified). It is free and widely taught, which is the case against it.
+3. **Outcome:** The model P&L of one short at-the-money straddle held 15, 21 or 31 sessions from the entry close, as a fraction of the entry price, net of 35 bps. The mean P&L of the names with a rank of at least 0.5 is read against the mean of every liquid optionable name: the same position without the gate.
+4. **Trigger timing:** IV30 and its 252-session rank are stored after the close of the decision session D, so the first fill is the next session's close: S = D + 1 (start_offset_sessions = 1). The rank and the straddle's implied volatility are read at D, the outcome at S.
+5. **Faithful replication:** The practitioner rule: IV rank = (IV - 1-year low) / (1-year high - 1-year low); sell a 45-day 16-delta strangle when it exceeds 50 and manage at 50% of the credit or 21 days (tastylive, practitioner, no published return). Here iv_rank_high v1 passes the liquid optionable names with a rank of at least 0.5 and the harness holds all of them short as straddles.
+6. **Expected size and sample:** No peer-reviewed figure. Practitioner backtests (tastylive, ORATS, Spintwig) report a modest Sharpe improvement and larger drawdowns in high-rank periods, not verified here. 502 IV30 sessions give about 24 independent 21-session windows, under the 40 the bar asks: the edge waits for a verdict.
+7. **Capacity and costs:** Single-name option spreads of 5 to 10% of premium, which the 35 bps cost approximates; undefined risk needs margin. An individual sells a few positions, far below the open interest of names trading $50M a day.
+8. **Failure modes and retirement:** High rank clusters in crashes: the sale is short volatility into a spike, so the mean P&L and the drawdown decide, not the hit rate. Retire if the frozen-period mean P&L of the gated names is not above the mean of every liquid optionable name, or the gate does not beat vrp_iv_hv on the same sessions.
+9. **Decoys:** High rank before earnings (a known event) and after a shock (the year's range reset by one spike): compare with vrp_iv_hv and vrp_cross_section, the premium over realised volatility, which has the academic evidence; the practitioner expects the premium measure to dominate the rank.
+
+**Sources**
+
+- tastylive research on IV rank for premium selling (practitioner, not peer reviewed)
+- Goyal, A. and Saretto, A., Cross-section of option returns and volatility, Journal of Financial Economics, 2009
+
+## Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`)
+
+**Status:** blocked. **Family:** C. **Thesis:** Names whose long-dated implied volatility sits far above their short-dated one earn more from a bought straddle than names with an inverted term structure.
+
+**Why blocked:** The slope has no history. The long end (term_ratio_30_90, the iv_90d of iv_term@v1) is computed from option chains, which are stored from 2026-10-02 only, about two weeks of sessions; IBKR's stored history (502 sessions) is the 30-day volatility alone, with no 6-month or 1-year point. The bar asks 40 independent sessions: month-end windows need about three years of chains. Unblock by chain accrual (a screener over term_ratio_30_90, outcome as below) or by a stored long-tenor implied-volatility history. The outcome horizon is final, the screener is not written.
+
+- **Outcome:** option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle long (basis model, not a quote), costs 35 bps
+- **Schedule:** month end
+- **Universe:** preset `liquid_optionable_floored`
+- **Top K:** 20
+- **Screeners:** none yet
+- **Baselines:** `vrp_iv_hv`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8): at-the-money straddle priced by Black-Scholes (r = q = 0) from the IBKR IV30 at D, one volatility for the window, no skew, no spread or hedge cost beyond cost_bps; no historical chains are stored (owner decision O3) and the real-chain P&L (H13) accrues from 2026-10-02. The source buys the high-slope decile and sells the low-slope one; the harness here holds the long straddle on the highest slope only. The source slope uses a 6-month to 1-year point, the catalogue would have the 90-day one: a proxy to state when the screener is written.
+
+**Quality bar**
+
+1. **Mechanism:** Short-dated implied volatility over-reacts to recent news and mean-reverts toward the long end, so the slope forecasts the direction of the next month's change in implied volatility and with it the straddle's return (Vasquez 2017).
+2. **Persistence:** The same limits as the per-name premium sort (c12): the trade needs option books across hundreds of names, spreads are wide and capacity is small. The slope remained a predictor in the machine-learning study of option returns (Bali, Beckmeyer, Moerke and Weigert 2023).
+3. **Outcome:** The model P&L of one long at-the-money straddle held 21 sessions from the entry close, as a fraction of the entry price, net of 35 bps: the move that followed less the premium paid. The mean P&L of the picks is read against the mean of every liquid optionable name.
+4. **Trigger timing:** The chain-based slope is stored after the close of the decision session D (the last session of the month); the first fill is the next session's close, S = D + 1 (start_offset_sessions = 1). The slope is read at D and the straddle is priced with the implied volatility read at D.
+5. **Faithful replication:** The source's rule: slope = the long-dated at-the-money implied volatility (6 months to 1 year) minus the one-month one, a monthly decile sort, long the high-slope straddles and short the low-slope ones, held to expiry (Vasquez 2017). Here, once unblocked, the top 20 by the 30-to-90-day slope are held long.
+6. **Expected size and sample:** The decile spread is economically large and not explained by jump risk or the standard factors, 1996-2007 (Vasquez 2017; the abstract gives no number we verified, so none is filed). With chains stored from 2026-10-02 no independent window exists yet: the edge waits.
+7. **Capacity and costs:** Single-name option spreads of 5 to 10% of premium are the whole game for a bought straddle, which the 35 bps cost approximates; the model has no hedge cost. A buyer has defined risk and needs no margin.
+8. **Failure modes and retirement:** An inverted term structure around earnings is event pricing, not mean reversion; a steep one in a calm market is cheap to be wrong about. Retire if the frozen-period mean P&L of the picks is not above the mean of every liquid optionable name.
+9. **Decoys:** The earnings inversion (a report inside the front month inverts the slope for a known reason), the per-name premium sort (c12) and the filed VRP edge; test the slope after taking out names with a report inside the window.
+
+**Sources**
+
+- Vasquez, A., Equity Volatility Term Structures and the Cross-Section of Option Returns, Journal of Financial and Quantitative Analysis, 2017 <https://www.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/equity-volatility-term-structures-and-the-cross-section-of-option-returns/F0A40E99FD2458367DD9A56A89783D38>
+- Alpha Architect, Equity Term Structure and Option Returns (summary) <https://alphaarchitect.com/2014/01/equity-term-structure-and-option-returns/>
+
+## Pre-earnings straddle purchase (`c16_pre_earnings_straddle_buy`)
+
+**Status:** blocked. **Family:** C. **Thesis:** Buying an at-the-money straddle three sessions before a report and selling it at the announcement earns a positive return on small, noisy names because implied volatility under-estimates the event.
+
+**Why blocked:** The position's horizon cannot be priced. The model P&L prices every horizon with one 30-day implied volatility (IV30, the only history stored), and the document parser refuses a horizon outside 10 to 42 sessions for it (ADR 0053 amendment 2026-10-17, tenor_sessions); the trade is held 3 sessions, from three sessions before the report to the announcement. The 10-session horizon below is a placeholder that keeps the document valid and is not the thesis. Unblock with a short-tenor implied volatility field (an iv7-style name the parser can read a tenor from) with history: the nearest-expiry vol of iv_term@v1 (iv_next) is stored from 2026-10-02 only and carries no tenor in its name. Then the entry is the expected report date's session minus 3 (start_offset_sessions = -3, an event announced ahead) and the screener keeps names whose report date is SCHEDULED, not taken from last year.
+
+- **Outcome:** option model pnl, over 10 sessions, starting -3 sessions from the event, modelled P&L of an atm straddle long (basis model, not a quote), costs 50 bps
+- **Schedule:** on each `earnings_expected` (a next report expected, scheduled or from the year-ago report (earnings_expected@v1); anchor: the expected report date's session)
+- **Universe:** preset `liquid_optionable_floored`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** `vrp_iv_hv`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8): the long at-the-money straddle priced by Black-Scholes (r = q = 0) from an implied volatility at D, one volatility, no skew, no spread beyond cost_bps; no historical chains are stored (owner decision O3) and the real-chain P&L (H13) accrues from 2026-10-02. Names are those with an expected report date (scheduled or taken from the year-ago report: earnings_expected@v1.expected_basis tells which); about 1,500 reports a quarter in the universe. The source finds the return in small names; the universe floors ($5, $50M a day) remove many of them, so the filed figure would be the large-cap one, which practitioners find thinner.
+
+**Quality bar**
+
+1. **Mechanism:** Investors under-estimate event uncertainty where signals are noisy and information is thin; the pre-announcement rise in implied volatility plus the move itself more than covers the straddle's time decay (Gao, Xing and Zhang 2018).
+2. **Persistence:** The effect sits in small, illiquid, high-cost names, exactly where option spreads are widest, so costs, not competition, keep it in place; the authors say it pays only if costs are low enough. Practitioner tests report the pre-earnings ramp thinner in large caps (BSIC, not peer reviewed).
+3. **Outcome:** The model P&L of one long at-the-money straddle from three sessions before the expected report to the announcement, as a fraction of the entry price, net of 50 bps: the move and the implied volatility's rise less the premium paid. The placeholder horizon is 10 sessions until a short-tenor volatility exists.
+4. **Trigger timing:** The expected report date is known weeks ahead (earnings_expected@v1, known_from <= D); the entry session is S = the report session - 3 (start_offset_sessions = -3), the decision session D = S - 1, and the straddle is priced with the implied volatility read at D. A date taken from last year is a guess: the screener should read only SCHEDULED dates.
+5. **Faithful replication:** The source's rule: an at-the-money straddle in the nearest expiry after the announcement, bought at the close three sessions before and sold at the close of the announcement day (the next day for an after-close report); average return 3.34% over 1996-2013, stronger in small, high-kurtosis, low-volume names (Gao, Xing and Zhang 2018). No screener is written until the horizon can be priced.
+6. **Expected size and sample:** 3.34% per straddle gross over 1996-2013 (Gao, Xing and Zhang 2018, a one-leg average, not a measure the harness reports: its P&L is a fraction of the underlying's price, not of the premium, so nothing is filed under [published]). About 1,500 reports a quarter in the universe give plenty of events, but the IV30 history is 502 sessions.
+7. **Capacity and costs:** Long options with defined risk and no margin; costs are the whole game: restrict to names whose straddle spread is under 5% of its price, which removes much of the published edge. The model charges 50 bps and no spread beyond it.
+8. **Failure modes and retirement:** Implied volatility that has already risen leaves nothing to earn; a report that arrives earlier than the guessed date. Retire if the frozen-period mean P&L is not above the mean of every liquid optionable name reporting on the same sessions.
+9. **Decoys:** The stock-return earnings announcement premium (separate: found no premium here), the IV crush sale (c17, the mirror image by size), and the pre-announcement ramp alone (close the straddle the session before the move): test both legs.
+
+**Sources**
+
+- Gao, C., Xing, Y. and Zhang, X., Anticipating Uncertainty: Straddles around Earnings Announcements, Journal of Financial and Quantitative Analysis, 2018 <https://resolve.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/anticipating-uncertainty-straddles-around-earnings-announcements/7B34877AD5E06304BA3C55FBA3219FDD>
+- BSIC, Straddling outside and into earnings (practitioner) <https://bsic.it/straddling-outside-and-into-earnings/>
+
+## Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`)
+
+**Status:** blocked. **Family:** C. **Thesis:** In large liquid names the implied move before a report exceeds the realised one on average, so selling the straddle before the announcement and covering after earns the difference.
+
+**Why blocked:** The position's horizon cannot be priced. The model P&L prices every horizon with one 30-day implied volatility (IV30, the only history stored), and the document parser refuses a horizon outside 10 to 42 sessions for it (ADR 0053 amendment 2026-10-17, tenor_sessions); the trade is held 1 to 2 sessions, from the close before the report to the close after. The 10-session horizon below is a placeholder that keeps the document valid and is not the thesis. Unblock with a short-tenor implied volatility field (an iv7-style name with history); iv_next of iv_term@v1 is stored from 2026-10-02 only and carries no tenor in its name. A second gap: the page's own first step, the implied move (implied_move@v1, chain-based, from 2026-10-02) against the realised reaction by size bucket, has no history either; earnings_reaction@v1 has the realised half.
+
+- **Outcome:** option model pnl, over 10 sessions, starting -1 sessions from the event, modelled P&L of an atm straddle short (basis model, not a quote), costs 50 bps
+- **Schedule:** on each `earnings_expected` (a next report expected, scheduled or from the year-ago report (earnings_expected@v1); anchor: the expected report date's session)
+- **Universe:** `instrument.security_type in ('COMMON_STOCK', 'ADR')` and `instrument.status eq 'ACTIVE'` and `instrument.optionable eq True` and `rollup.price_stats@v2.close gt 20` and `rollup.price_stats@v2.adv_usd_20d gte 200000000`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** `vrp_iv_hv`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8): the short at-the-money straddle priced by Black-Scholes (r = q = 0) from an implied volatility at D; no skew, no spread beyond cost_bps, no margin; no historical chains are stored (owner decision O3) and the real-chain P&L (H13) accrues from 2026-10-02. The page expects 65 to 70% winning trades with a negative skew: the harness reads the mean P&L, which a short straddle's win rate overstates. Large caps only (the universe: $200M a day, price above $20); the source evidence favours buying into earnings in small names, so the selling edge is an inference about the large-cap half. A defined-risk iron-fly version would cut the tail and most of the edge and needs a different structure.
+
+**Quality bar**
+
+1. **Mechanism:** Retail demand for event protection and lottery calls, and the jump risk dealers cannot hedge, push the pre-report straddle above the move that follows; the premium is the insurer's (practitioner evidence only; no peer-reviewed rule publishes a return).
+2. **Persistence:** Well known and crowded: practitioner sites publish the trade. The average edge is small (an implied-to-realised move ratio near 1.1 to 1.3 in large caps, not verified) and the payoff is a short jump tail: one 30% gap erases the premium of many trades.
+3. **Outcome:** The model P&L of one short at-the-money straddle from the close before the report to the close after, as a fraction of the entry price, net of 50 bps: the premium kept less the move. The placeholder horizon is 10 sessions until a short-tenor volatility exists. The distribution, not the win rate, is the result.
+4. **Trigger timing:** The expected report date is known weeks ahead (earnings_expected@v1, known_from <= D); the entry session is S = the report session - 1 (start_offset_sessions = -1), D = S - 1, and the straddle is priced with the implied volatility read at D. An after-close report is covered the next session; a date taken from last year is a guess and the screener should read only SCHEDULED dates.
+5. **Faithful replication:** The practitioner rule: at the close before the report sell the at-the-money straddle (or a 16-delta strangle) expiring after it and cover at the open or close after. No peer-reviewed rule with a published return exists, so no figure is filed. No screener is written until the horizon can be priced.
+6. **Expected size and sample:** No published return. The page's own test is the implied move against the realised reaction by size bucket, which can settle the sign quickly once chain history exists; today the reaction half is stored (earnings_reaction@v1) and the implied half is not.
+7. **Capacity and costs:** Undefined-risk short straddles need margin; a defined-risk fly cuts the tail and most of the edge. Large caps with $200M a day have tight option spreads, which the 50 bps cost approximates, and an individual's size is far below the open interest.
+8. **Failure modes and retirement:** The tail: one large gap wipes ten to twenty winning trades. Crowding thins the premium. Retire if the frozen-period mean P&L is not above the mean of every large liquid name reporting on the same sessions, or the worst window breaches the drawdown the owner accepts.
+9. **Decoys:** The filed VRP edge (this is the premium at an event) and the pre-earnings straddle purchase (c16, the mirror image by size); the post-event drift is a separate edge.
+
+**Sources**
+
+- Gao, C., Xing, Y. and Zhang, X., Anticipating Uncertainty: Straddles around Earnings Announcements, Journal of Financial and Quantitative Analysis, 2018 <https://resolve.cambridge.org/core/journals/journal-of-financial-and-quantitative-analysis/article/anticipating-uncertainty-straddles-around-earnings-announcements/7B34877AD5E06304BA3C55FBA3219FDD>
+
+## ETF flow pressure (`etf_flow_pressure`)
+
+**Status:** candidate. **Family:** D. **Thesis:** ETFs that took in the most money over the last month, measured by the change in their shares outstanding, underperform the market over the next one to three months.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'ETF'` and `instrument.status eq 'ACTIVE'` and `instrument.is_leveraged eq False` and `instrument.is_inverse eq False` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 20000000`
+- **Top K:** 10
+- **Screeners:** `etf_flow_pressure`
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** iShares funds only: the share count comes from iShares' own daily files (EB D4); SPDR, Vanguard, Invesco and every other issuer's funds are absent, not neutral. The stored history starts with the first nightly run on about 2026-10-17, and the change is 21 sessions, so the first value is about 2026-11-17 and no independent month exists yet: the edge waits for months of counts to accrue (the harness reports the count). This is the fund-level version, the Brown, Davies and Ringgenberg result for ETFs themselves; the constituent version (aggregate each stock's ETF flow pressure from holdings, then long low and short high) needs ETF ownership per stock and is a follow-up. Short side, owner decision O2 (2026-10-17): the ETFs shorted are liquid ($20M a day), outcome minus the excess return over SPY, less cost and the assumed borrow; the long variant (the heaviest redemptions) and the long-short spread (diagnostic only) are variants. The rank is the screener's: the harness's short leg is the lowest scores, and etf_flow_pressure ranks ascending on the change, so the heaviest creation is shorted first. A flow is a share change here, not dollars: the page's flow is the share change times NAV, and a price rise alone draws money in, so a fund can show creation because it rose (momentum overlaps).
+
+**Quality bar**
+
+1. **Mechanism:** ETF creations and redemptions carry demand that is partly non-fundamental (retail and allocator flows), pushed into the basket by authorised participants who hedge by trading it; the pressure is temporary and reverses (Ben-David, Franzoni and Moussawi 2018; Brown, Davies and Ringgenberg 2021).
+2. **Persistence:** ETF flows are growing, not shrinking, and the reversal is spread across many funds and horizons, which is costly to harvest in full; the evidence is 2000s to 2010s samples, with no public decay study yet, so persistence is a claim to test.
+3. **Outcome:** Minus the excess return over SPY over 20 and 60 sessions after the entry close, net of 10 bps a round trip and the assumed borrow: a short position in the iShares funds with the heaviest net creation of the last 21 sessions.
+4. **Trigger timing:** The issuer's count is known from the session of the fetch that stored it (holdings/etf_shares known_from, a restated count from the session that fetched it), never from the issuer's own date. The change is read at D (the last session of the month) and the entry session is S = D + 1 (start_offset_sessions = 1).
+5. **Faithful replication:** The source's rule: ETF-level flows (the change in shares outstanding) predict negative subsequent ETF returns; sorted monthly, long the low-flow and short the high-flow funds, 1 to 3 months (Brown, Davies and Ringgenberg 2021; the spread is not verified, so nothing is filed under [published]). Here etf_flow_pressure v1 ranks the unleveraged ETFs with a 21-session share change and the harness shorts the top 10 creations.
+6. **Expected size and sample:** The papers report a reversal of several percent a year for the long-short flow sort (recalled, not verified). Only the iShares subset has counts, a few hundred funds, so a decile is a few dozen; with history from 2026-10-17 the bar's 40 independent months is about three and a half years away.
+7. **Capacity and costs:** ETFs with $20M a day trade at a few basis points; the 10 bps round trip is the assumption, and the short side adds the site's assumed borrow (verdict.toml). An individual's size is far below the volume; the crowded thematic funds are the hardest to borrow.
+8. **Failure modes and retirement:** Flow chases performance: inflows go to recent winners, so the sort is a momentum bet with the sign reversed; a fund with a one-off creation (a seed, a conversion) shows a flow that is not demand; a restated count. Retire if the frozen-period short return of the picks is not above the mean of every eligible ETF.
+9. **Decoys:** Short-term reversal and sector momentum (inflows follow winners): the 12-1 momentum and size screens are stock rankings, so the decoy here is the ETF's own past return; compare the long variant (buy the redemptions) with the short.
+
+**Sources**
+
+- Ben-David, I., Franzoni, F. and Moussawi, R., Do ETFs Increase Volatility?, Journal of Finance, 2018
+- Brown, D., Davies, S. and Ringgenberg, M., ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance, 2021
+
+## Closed-end fund discount reversion (`closed_end_fund_discounts`)
+
+**Status:** blocked. **Family:** D. **Thesis:** Closed-end funds trading at an unusually wide discount to their own net asset value, against their own history, outperform the market as the discount narrows.
+
+**Why blocked:** Closed-end funds are not in the covered universe, so they have no bars, no outcomes and no screener rows. Universe coverage is the stock, ADR and ETF types of ADR 0013 (security_types in config/site/universe.toml); a fund the vendor types as FUND is stored in the reference as CEF and "drops out of the default coverage" (docs/data/instruments.md). The NAV side exists (events/fund_nav, EB D5: 273 of 332 CEFs mapped, history to 2004, licence personal) and so does cef_nav@v1, which pairs a NAV with a close, but a discount needs the fund's close from bars/1d. Unblock by an owner decision: add the CEF type to security_types (or the funds to include_symbols) with an ADR 0013 amendment, accept about 330 more symbols in the nightly bars and the Tiingo monthly symbol budget (docs/data/vendors.md), and run bars-history for them. The screener is then written over rollup.cef_nav@v1.cef_discount_zscore.
+
+- **Outcome:** excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'CEF'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 3` and `rollup.price_stats@v2.adv_usd_20d gte 500000`
+- **Top K:** 10
+- **Screeners:** none yet
+- **Baselines:** `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Long only, as the source's short leg is unnecessary for an individual (the page). Tested against SPY, which is a mismatch for a bond or municipal fund (a benchmark by fund category is a follow-up); a leveraged fund's discount also carries rate and credit beta. Proxies, each stated: the source's relative discount is a sort on the discount against its history, here the 252-session z-score (cef_nav@v1); the NAV is the issuer's own, struck after the close and known from the next session (known_from), so the discount pairs the NAV with the close of the NAV's own date, one session old at the decision; the BDC half is out (their NAV is quarterly, from 10-Q filings). Fund edges are keyed by instrument_id (ADR 0018), never by hand-listed tickers. The activism half (13D filings by fund) is cef_activist_target_prediction, not filed here.
+
+**Quality bar**
+
+1. **Mechanism:** Retail-held and without creation or redemption, closed-end funds trade on sentiment, not on the value of their assets (Lee, Shleifer and Thaler 1991); activists such as Saba and Bulldog force tender offers and open-endings that roughly halve the discount (Bradley, Brav, Goldstein and Jiang 2010).
+2. **Persistence:** A small, retail, illiquid market that institutions avoid, with capacity of about $1M to $10M for the strategy; part of the discount is a fair cash-flow drag (fees, leverage, payout policy), so the discount does not close fully and is not arbitraged away. No systematic 2015 to 2024 study was found; 2024 press reports funds buying wide discounts.
+3. **Outcome:** Excess return over SPY over 60, 125 and 250 sessions after the entry close, net of 50 bps a round trip: a long hold in the funds with the widest discount against their own year.
+4. **Trigger timing:** The NAV is struck after the close of its date and known from the next session (events/fund_nav known_from); the discount pairs it with the close of its own date. The rank is read at D (the last session of the month) from the latest NAV known by D, at most five sessions old, and the entry session is S = D + 1 (start_offset_sessions = 1).
+5. **Faithful replication:** The source's rule: sort funds on the discount relative to its history, long the widest quintile and short the narrowest, 18.2% a year and Sharpe 1.9 over 1998-2011 (Patro, Piccotti and Wu; a two-group long-short figure, not filed under [published]). Here the long side only: the 10 funds with the lowest discount z-score over 252 sessions.
+6. **Expected size and sample:** 18.2% a year for the long-short quintile spread in-sample (Patro et al., via Quantpedia, not verified in the paper); activism cuts discounts to about half (Bradley et al. 2010). Funds with a mapped NAV number about 273, so a decile is under 30 names; 40 independent month-ends need over three years of history, which the NAV series (to 2004) supplies once bars exist.
+7. **Capacity and costs:** Spreads of 0.3 to 1% on small funds; capacity $20k to $100k a fund, hundreds of funds. The filter keeps funds trading $500k a day and the cost is 50 bps a round trip.
+8. **Failure modes and retirement:** A discount that is fair (a fund that cut its payout or lost its manager) never closes; a rate rise hits levered bond funds across the board; a stale NAV makes a discount that is not there. Retire if the frozen-period excess return of the picks is not above the mean of every eligible fund.
+9. **Decoys:** Leverage (most funds are about 30% levered: rate and credit beta), the payout-rate trap (the next edge, cef_distribution_trap), duration of the bond and municipal funds, and small-size tilt: the size baseline; compare funds of one category in a follow-up.
+
+**Sources**
+
+- Lee, C., Shleifer, A. and Thaler, R., Investor Sentiment and the Closed-End Fund Puzzle, Journal of Finance, 1991
+- Bradley, M., Brav, A., Goldstein, I. and Jiang, W., Activist Arbitrage: A Study of Open-Ending Attempts of Closed-End Funds, Journal of Financial Economics, 2010
+- Patro, D., Piccotti, L. and Wu, Y., closed-end fund discounts (Quantpedia strategy summary) <https://hedgefundalpha.com/strategies/closed-end-fund-discounts/>
+
 ## Tender-offer drift after expiry (`tender_offer_drift`)
 
 **Status:** candidate. **Family:** H. **Thesis:** Stocks whose own tender offer for their shares has run its course outperform the market for a year or more afterwards.
@@ -281,6 +540,38 @@ candidates stay on file with the reason, so the same idea is not filed twice.
 - Lakonishok, J. and Vermaelen, T., Anomalous price behavior around repurchase tender offers, Journal of Finance, 1990
 - Peyer, U. and Vermaelen, T., The nature and persistence of buyback anomalies, Review of Financial Studies, 2009
 - Fu, F. and Huang, S., The persistence of long-run abnormal returns following stock repurchases and offerings, Management Science, 2016
+
+## Premium closed-end funds that over-distribute (`cef_distribution_trap`)
+
+**Status:** blocked. **Family:** H. **Thesis:** Closed-end funds at a large premium to NAV whose distributions exceed what they earn fall in price when the payout is cut, so they are ones to avoid.
+
+**Why blocked:** Two things are missing. Closed-end funds are not in the covered universe (ADR 0013: security_types of config/site/universe.toml; a fund typed FUND is the reference's CEF and is not in the nightly bars), so there are no closes, outcomes or screener rows; the owner decision and the bars-history run are the same as for closed_end_fund_discounts. And the rule's second half, distribution coverage (the payout against earned income), needs the fund's distribution history and its Section 19(a) notices: no CEF dividend rows are stored (dividends follow the covered universe) and 19(a) notices are not ingested. The premium half is available through cef_nav@v1 (cef_discount_to_nav above 0.10) once bars exist; that alone is a weaker rule than the practitioner's, and a premium-only screener should be filed as that proxy, named.
+
+- **Outcome:** excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'CEF'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 3` and `rollup.price_stats@v2.adv_usd_20d gte 1000000`
+- **Top K:** 10
+- **Screeners:** none yet
+- **Baselines:** `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Short side, owner decision O2 (2026-10-17): a short result on liquid names may be a verdict basis. Small funds are expensive to short (borrow plus the distribution owed) and rarely have an ADV over the capacity floor; the useful form for an individual is an avoid filter on closed_end_fund_discounts, never to buy a premium fund with a payout above its coverage. Fund edges are keyed by instrument_id (ADR 0018), never by hand-listed tickers. Practitioner rule only (premium above 10% and coverage below 90%): no published return, so nothing is filed under [published].
+
+**Quality bar**
+
+1. **Mechanism:** Retail buys the headline yield; return of capital masks the erosion of the asset value, and the cut becomes unavoidable once the NAV has fallen far enough (PIMCO's PGP and PHK are the practitioner cases, with premiums of 40 to 70% and price falls of 20 to 40% on the day).
+2. **Persistence:** Yield-chasing is behavioural and encouraged by sponsors; shorting a premium fund costs borrow plus the distribution owed, so arbitrageurs do not lean on it. Evidence is a case series, not a panel, and no independent 2018 to 2025 panel was found.
+3. **Outcome:** Minus the excess return over SPY over 60, 125 and 250 sessions after the entry close, net of 50 bps a round trip and the assumed borrow: a short position in the premium funds with the weakest payout coverage.
+4. **Trigger timing:** The NAV is known from the session after its date (events/fund_nav known_from) and the premium pairs it with the close of its own date; a distribution notice is public when issued. The rank is read at D (the last session of the month), the entry session is S = D + 1 (start_offset_sessions = 1).
+5. **Faithful replication:** The practitioner rule (Morningstar and CEFA, not verified): premium above 10% and distribution coverage below 90% means a negative expected price return, exit on any announced cut. The premium quintile in Patro, Piccotti and Wu supplies the short leg of their long-short spread (a two-group figure, not filed). No screener is written until closes and payout data exist.
+6. **Expected size and sample:** No published panel number. The case series show price falls of 20 to 40% on a cut day, at funds that held large premiums for years; the premium itself predicts negative price returns in the quintile sort. Few funds ever hold a 10% premium, so the independent count is the binding limit.
+7. **Capacity and costs:** Shorting a small fund costs borrow plus the distribution owed and may not be possible; the 50 bps cost and the site's assumed borrow stand in for it. As an avoid filter capacity is irrelevant.
+8. **Failure modes and retirement:** A premium that persists for years (a fund can stay at a premium while it distributes); a short squeeze in a small fund; a rights offering or merger that resets the premium. Retire if the frozen-period short return of the picks is not above the mean of every eligible fund.
+9. **Decoys:** The mirror of the discount edge (a premium is a narrow discount: compare with closed_end_fund_discounts' ranking on the same sessions), leverage and rate beta, and size.
+
+**Sources**
+
+- Patro, D., Piccotti, L. and Wu, Y., closed-end fund discounts (Quantpedia strategy summary) <https://hedgefundalpha.com/strategies/closed-end-fund-discounts/>
+- SEC, Section 19(a) notices of distribution sources (return of capital disclosure)
 
 ## Reverse-split distress filter (`reverse_split_distress_filter`)
 

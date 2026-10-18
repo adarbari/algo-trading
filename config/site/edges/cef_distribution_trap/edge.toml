@@ -1,0 +1,78 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E4): closed-end funds are not covered
+# and the payout side is not stored. An avoid list and a filter on closed_end_fund_discounts. Idea page:
+# docs/edge-ideas/structural-niches.md (cef_distribution_trap_premium_collapse).
+id = "cef_distribution_trap"
+name = "Premium closed-end funds that over-distribute"
+thesis = "Closed-end funds at a large premium to NAV whose distributions exceed what they earn fall in price when the payout is cut, so they are ones to avoid."
+mechanism = """Retail buys the headline yield; return of capital masks the erosion of the asset value, and
+the cut becomes unavoidable once the NAV has fallen far enough (PIMCO's PGP and PHK are the practitioner
+cases, with premiums of 40 to 70% and price falls of 20 to 40% on the day)."""
+persistence = """Yield-chasing is behavioural and encouraged by sponsors; shorting a premium fund costs borrow
+plus the distribution owed, so arbitrageurs do not lean on it. Evidence is a case series, not a panel,
+and no independent 2018 to 2025 panel was found."""
+family = "H"
+schedule = "month_end"
+top_k = 10
+screeners = []
+baselines = ["size_small"]
+status = "blocked"
+frozen_from = 2026-04-01
+rejection_reason = """Two things are missing. Closed-end funds are not in the covered universe (ADR 0013:
+security_types of config/site/universe.toml; a fund typed FUND is the reference's CEF and is not in the nightly
+bars), so there are no closes, outcomes or screener rows; the owner decision and the bars-history run are
+the same as for closed_end_fund_discounts. And the rule's second half, distribution coverage (the payout
+against earned income), needs the fund's distribution history and its Section 19(a) notices: no CEF dividend
+rows are stored (dividends follow the covered universe) and 19(a) notices are not ingested. The premium half is
+available through cef_nav@v1 (cef_discount_to_nav above 0.10) once bars exist; that alone is a weaker
+rule than the practitioner's, and a premium-only screener should be filed as that proxy, named."""
+notes = """Short side, owner decision O2 (2026-10-17): a short result on liquid names may be a verdict
+basis. Small funds are expensive to short (borrow plus the distribution owed) and rarely have an ADV
+over the capacity floor; the useful form for an individual is an avoid filter on closed_end_fund_discounts, never to
+buy a premium fund with a payout above its coverage. Fund edges are keyed by instrument_id (ADR 0018),
+never by hand-listed tickers. Practitioner rule only (premium above 10% and coverage below 90%): no
+published return, so nothing is filed under [published]."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "CEF" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 3 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 1_000_000 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [60, 125, 250]
+benchmark = "SPY"
+start_offset_sessions = 1
+side = "short"
+cost_bps = 50
+
+[quality_bar]
+outcome = """Minus the excess return over SPY over 60, 125 and 250 sessions after the entry close, net of 50 bps a
+round trip and the assumed borrow: a short position in the premium funds with the weakest payout coverage."""
+trigger_timing = """The NAV is known from the session after its date (events/fund_nav known_from) and the premium pairs
+it with the close of its own date; a distribution notice is public when issued. The rank is read at D (the
+last session of the month), the entry session is S = D + 1 (start_offset_sessions = 1)."""
+replication = """The practitioner rule (Morningstar and CEFA, not verified): premium above 10% and distribution
+coverage below 90% means a negative expected price return, exit on any announced cut. The premium
+quintile in Patro, Piccotti and Wu supplies the short leg of their long-short spread (a two-group figure,
+not filed). No screener is written until closes and payout data exist."""
+expected_size = """No published panel number. The case series show price falls of 20 to 40% on a cut day,
+at funds that held large premiums for years; the premium itself predicts negative price returns in
+the quintile sort. Few funds ever hold a 10% premium, so the independent count is the binding limit."""
+capacity_costs = """Shorting a small fund costs borrow plus the distribution owed and may not be possible; the 50 bps
+cost and the site's assumed borrow stand in for it. As an avoid filter capacity is irrelevant."""
+failure_modes = """A premium that persists for years (a fund can stay at a premium while it distributes); a short
+squeeze in a small fund; a rights offering or merger that resets the premium. Retire if the frozen-period short
+return of the picks is not above the mean of every eligible fund."""
+decoys = """The mirror of the discount edge (a premium is a narrow discount: compare with
+closed_end_fund_discounts' ranking on the same sessions), leverage and rate beta, and size."""
+
+[[sources]]
+title = "Patro, D., Piccotti, L. and Wu, Y., closed-end fund discounts (Quantpedia strategy summary)"
+url = "https://hedgefundalpha.com/strategies/closed-end-fund-discounts/"
+
+[[sources]]
+title = "SEC, Section 19(a) notices of distribution sources (return of capital disclosure)"

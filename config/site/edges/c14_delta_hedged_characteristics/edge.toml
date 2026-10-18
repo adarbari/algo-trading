@@ -1,0 +1,92 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: ivol_high (an existing preset, the
+# idiosyncratic-volatility ranking), read on the liquid optionable universe (EB E4). A selection
+# overlay for c12. Idea page: docs/edge-ideas/options-volatility.md (c14_delta_hedged_characteristics).
+id = "c14_delta_hedged_characteristics"
+name = "Delta-hedged selling on speculative names"
+thesis = "Selling delta-hedged options earns more on speculative names, the ones with the highest idiosyncratic volatility, because their options are overpriced."
+mechanism = """Retail demand for lottery-like options and dealers' limits to arbitrage: the traits that make
+a stock speculative (low price, high idiosyncratic volatility, distress, heavy issuance) make its
+options expensive, and delta-hedged returns fall as idiosyncratic volatility rises (Cao and Han 2013;
+Zhan, Han, Cao and Tong 2022)."""
+persistence = """The authors report Sharpe ratios above 2 after costs, explained by two option factors
+and not equity ones, and stock characteristics still add power in the machine-learning study through
+2020 (Bali, Beckmeyer, Moerke and Weigert 2023). Costs are the binding constraint, not
+competition."""
+family = "C"
+schedule = "month_end"
+universe = "liquid_optionable_floored"
+top_k = 20
+screeners = ["ivol_high"]
+baselines = ["vrp_cross_section", "vrp_iv_hv"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """A selection overlay on c12, filed as its own edge so the harness can say whether the
+characteristic adds anything to the premium ranking (the baselines are the c12 ranking and the filed
+VRP screen). The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8): a
+short at-the-money straddle delta-hedged continuously, priced from the IBKR IV30 at D with the
+gamma P&L approximation vega x (realised^2 - implied^2) / (2 implied), the realised volatility the
+window's own, demeaned; no historical chains are stored (owner decision O3), and the real-chain
+P&L with the daily hedge from our own Greeks (H13) accrues from 2026-10-02. It assumes
+constant volatility, no skew, a hedge with no cost or slippage beyond cost_bps (35 bps) and one
+implied volatility pricing the 21-session window; IV30 history (personal licence) is 502
+sessions. Proxies, each stated: the source sells one at-the-money call and hedges it (the straddle
+here is a call and a put, a wider position on the same volatility); the source sorts on many
+characteristics, this edge takes idiosyncratic volatility alone (rollup.factor_betas@v1.ivol_252d, a
+four-factor residual: the Cao and Han characteristic; profitability, issuance and distress are
+follow-ups from mispricing@v1); the harness takes the top 20 names, not a decile; the screener is
+the stock-only ivol_high ranking, so the ETFs of the universe never qualify. Unlike the source
+the edge's own universe floors price at $5, so the low-price names the paper finds richest are out."""
+
+[outcome]
+kind = "option_model_pnl"
+structure = "delta_hedged_atm_short"
+iv_field = "rollup.ibkr_iv@v1.iv30_ibkr"
+horizon_sessions = [21]
+benchmark = "none"
+start_offset_sessions = 1
+cost_bps = 35
+
+[[variants]]
+id = "straddle"
+[variants.outcome]
+structure = "atm_straddle_short"
+
+[quality_bar]
+outcome = """The model P&L of one short at-the-money straddle, delta-hedged, held 21 sessions from
+the entry close, as a fraction of the entry price, net of 35 bps: the gamma P&L the seller keeps when
+the implied volatility paid exceeds the realised one. The mean P&L of the picks is read against the mean
+of every liquid optionable name."""
+trigger_timing = """The idiosyncratic volatility (factor_betas@v1) and the IV30 (ibkr_iv@v1) are stored after
+the close of the decision session D (the last session of the month), so the first fill is the next
+session's close: S = D + 1 (start_offset_sessions = 1). The rank is read at D and the outcome at S."""
+replication = """The source's rule: each month, for every name, sell one at-the-money call about 1.5
+months from expiry, delta-hedge daily, hold a month, sort on each characteristic into deciles and read
+the long-short spread (Zhan, Han, Cao and Tong 2022; Cao and Han 2013 for idiosyncratic
+volatility). Here ivol_high v1 ranks the optionable names by four-factor idiosyncratic volatility and
+the harness holds the top 20 as short delta-hedged straddles; the proxies are in the notes."""
+expected_size = """The papers report Sharpe ratios above 2 after costs for the characteristic sorts (not
+verified against the tables, so no figure is filed); idiosyncratic volatility explains much of the
+spread (Cao and Han 2013). IV30 history is 502 sessions, about 23 independent month-ends, under the 40
+the bar asks: the edge waits for a verdict."""
+capacity_costs = """Daily hedging across 50 names is heavy for one person; the practical use is to pick which
+names to sell covered calls or strangles on (an overlay on c12). Spreads on single-name options and the
+hedge are the binding cost; the model charges 35 bps and no hedge cost."""
+failure_modes = """The speculative names are the ones that gap: one takeover bid or a 40% move wipes the
+premium of many windows, so the mean P&L decides, not the hit rate. Retire if the frozen-period mean
+P&L of the picks is not above the mean of every liquid optionable name, or it does not beat the c12 ranking on
+the same sessions."""
+decoys = """Idiosyncratic volatility explains most of the characteristic spread (Cao and Han 2013): a name
+with high idiosyncratic volatility usually has high implied volatility too, which is c12 and the
+filed VRP. Compare with vrp_cross_section and vrp_iv_hv on the same sessions."""
+
+[[sources]]
+title = "Zhan, X., Han, B., Cao, J. and Tong, Q., Option Return Predictability, Review of Financial Studies, 2022"
+url = "https://research.polyu.edu.hk/en/publications/option-return-predictability/"
+
+[[sources]]
+title = "Cao, J. and Han, B., Cross section of option returns and idiosyncratic stock volatility, Journal of Financial Economics, 2013"
+
+[[sources]]
+title = "CXO Advisory, Option Strategies Based on Factor Sorts (summary)"
+url = "https://www.cxoadvisory.com/equity-options/option-strategies-based-on-factor-sorts"

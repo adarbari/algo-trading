@@ -248,6 +248,34 @@ def test_statement_facts_are_seen_from_their_filing_date_without_markers() -> No
     assert loaded.at(early - timedelta(days=1), 0) is None
 
 
+def test_fund_nav_and_etf_share_rows_are_seen_from_their_known_from() -> None:
+    """EB E4: a NAV (known the session after its date) and a share count (known from its fetch)
+    reach a session only from their known_from; a restated count is a second version."""
+    writer, reader = store()
+    nav_day, seen_on = date(2026, 10, 1), date(2026, 10, 2)
+    navs = [{"instrument_id": "EQ:F", "ts": pd.Timestamp(nav_day, tz="UTC"), "known_from": seen_on,
+             "series": "nav", "nav": 10.0, "nav_symbol": "XFX"}]  # fmt: skip
+    writer.write_table("events/fund_nav", seen_on, "n", stamped(navs, seen_on, "n"))
+    nav = inputs.load_input(reader, "events/fund_nav", [nav_day, seen_on], 252)
+    assert nav.at(nav_day, 252) is None
+    seen = nav.at(seen_on, 252)
+    assert seen is not None and list(seen["nav"]) == [10.0]
+    shares = "holdings/etf_shares"
+    counts = [{"instrument_id": "EQ:F", "as_of": nav_day, "shares_outstanding": 100.0,
+               "ts": pd.Timestamp(nav_day, tz="UTC"), "symbol": "F", "known_from": seen_on,
+               "source": "ishares"}]  # fmt: skip
+    writer.write_table(shares, seen_on, "s", stamped(counts, seen_on, "s"))
+    later = date(2026, 10, 5)
+    again = [{**counts[0], "shares_outstanding": 104.0, "known_from": later}]
+    writer.write_table(shares, later, "t", stamped(again, later, "t"))
+    loaded = inputs.load_input(reader, shares, [seen_on, later], 0)
+    assert loaded.at(nav_day, 0) is None
+    first = loaded.at(seen_on, 0)
+    assert first is not None and list(first["shares_outstanding"]) == [100.0]
+    both = loaded.at(later, 0)
+    assert both is not None and list(both["shares_outstanding"]) == [100.0, 104.0]
+
+
 def test_ibkr_vols_are_the_session_and_earlier_rows_merged_per_instrument() -> None:
     """``volatility/ibkr_iv30`` (``data.volatility.ibkr_iv30``): runs merge per instrument
     (a later history run replaces a snapshot); ``None`` without a row on the session."""

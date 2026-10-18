@@ -1,0 +1,121 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: vrp_cross_section (EB E4). A variant of
+# vrp_short_premium that ranks instead of thresholding. Idea page: docs/edge-ideas/options-volatility.md
+# (c12_vrp_cross_section_iv_hv).
+id = "c12_vrp_cross_section_iv_hv"
+name = "Per-name volatility premium, ranked"
+thesis = "Selling at-the-money straddles on the names whose implied volatility sits furthest above the volatility they delivered earns more than selling on every liquid name."
+mechanism = """Option traders weight recent events heavily and prices under-react to a name's own
+long-run realised volatility, which mean-reverts; the cross-sectional gap between implied and
+realised volatility is a mispricing, not a risk the standard factors explain (Goyal and Saretto
+2009)."""
+persistence = """Harvesting it takes delta-hedged option books across hundreds of names, with spreads of
+5 to 10% of premium, so capacity is small and the cost is high; professionals run it and the
+authors' sort still ranks among the top predictors in later studies (Bali, Beckmeyer, Moerke and
+Weigert 2023)."""
+family = "C"
+schedule = "month_end"
+universe = "liquid_optionable_floored"
+top_k = 20
+screeners = ["vrp_cross_section"]
+baselines = ["vrp_iv_hv", "size_small"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8). No
+historical option chains are stored (owner decision O3: no paid history), so the position is one
+at-the-money straddle priced by Black-Scholes (r = q = 0) from the IBKR IV30 read at D, held to the
+horizon's close, as a fraction of the entry close; the short straddle's value is minus the long's,
+|window return| minus the straddle price. It assumes one constant volatility for the whole window, no
+skew, no early exercise, no dividends, and no spread, hedge cost or margin beyond cost_bps (35 bps, about
+5% of an at-the-money straddle's premium at 30% volatility: the 5 to 10% the page cites for single
+names). IV30 prices the 21-session horizon only; the parser refuses horizons outside 10 to 42
+sessions. The real-chain P&L (H13) accrues from 2026-10-02 and replaces the model when it has
+history; IBKR's IV30 history (licence personal) goes back 502 sessions, about 23 month-end
+windows spaced a horizon apart. Proxies, each stated: the screener ranks on 30-session realised
+volatility, where the source ranks on 12-month realised volatility (no 252-session realised
+volatility is stored); the source buys straddles in the decile where realised exceeds implied and
+sells the opposite one, this edge keeps the short leg only (an individual's variant; the
+buy-low leg is a follow-up with a reversed screener); the harness takes the top 20 names, not a
+decile. The base is every liquid optionable name, so the lift reads whether ranking beats selling on
+all of them. The delta-hedged variant is the source's own position. No figure is filed under
+[published]: the source's 22.5% a month is a decile 10 minus decile 1 straddle spread, two groups, and
+the harness would be measuring one."""
+
+[outcome]
+kind = "option_model_pnl"
+structure = "atm_straddle_short"
+iv_field = "rollup.ibkr_iv@v1.iv30_ibkr"
+horizon_sessions = [21]
+benchmark = "none"
+start_offset_sessions = 1
+cost_bps = 35
+
+[[variants]]
+id = "delta_hedged"
+[variants.outcome]
+structure = "delta_hedged_atm_short"
+
+# Windows with no report expected inside the horizon (read at D, the window ends at D + 1 + 21,
+# so more than 23 sessions to the expected report): the implied volatility carries no earnings
+# move. A stock whose date is UNKNOWN never passes; an ETF has no earnings, so it stays.
+[[variants]]
+id = "no_earnings"
+[variants.universe]
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR", "ETF"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { any = [
+    { field = "instrument.security_type", op = "eq", value = "ETF" },
+    { all = [
+      { field = "rollup.earnings_expected@v1.expected_basis", op = "ne", value = "UNKNOWN" },
+      { field = "rollup.earnings_expected@v1.sessions_to_expected_report", op = "gt", value = 23 },
+    ] },
+  ] },
+]
+
+[quality_bar]
+outcome = """The model P&L of one short at-the-money straddle held 21 sessions from the entry close,
+as a fraction of the entry price, net of 35 bps: the premium the straddle's seller keeps less
+the move that followed. The harness reads the mean P&L of the picks against the mean of every
+liquid optionable name, never the win rate: a short straddle can win most windows and lose on average."""
+trigger_timing = """IV30 (ibkr_iv@v1) and HV30 (price_stats@v2) are stored after the close of the decision
+session D (the last session of the month), so the first fill is the next session's close: the entry session
+is S = D + 1 (start_offset_sessions = 1). The rank is read at D, the straddle is priced with the
+implied volatility read at D, the outcome is read at S."""
+replication = """The source's rule is a monthly decile sort on log(HV/IV), hold the next month, long
+the decile where realised exceeds implied and short the opposite one (Goyal and Saretto 2009). Here
+vrp_cross_section v1 takes the liquid names whose implied volatility is at least their 30-session
+realised volatility (floor 10% a year), ranked by implied over realised, and the harness holds the
+top 20 short. The proxies are in the notes."""
+expected_size = """The paper's straddle decile spread is 22.5% a month gross (1996-2005; a two-group
+figure, not filed), and the delta-hedged call decile spread is 2.7% a month; about half the gross
+return vanishes after costs in later work (Bali et al. 2023). IBKR IV30 history is 502 sessions,
+about 23 independent month-ends, under the 40 the bar asks: the harness reports the count beside every
+number and the edge waits for a verdict."""
+capacity_costs = """Single-name option spreads are 5 to 10% of premium, which the 35 bps cost reflects; the
+model has no hedge cost, margin or assignment risk. An individual sells a handful of straddles or
+strangles, far below the open interest of names with $50M of daily stock volume; undefined risk
+needs margin and the stomach for gaps."""
+failure_modes = """Losses arrive together in volatility spikes: a short straddle is short the left and the
+right tail, so the mean P&L, not the hit rate, decides. A report inside the month raises implied
+volatility for a known reason (the no_earnings variant tests it). Retire if the picks' mean P&L in
+the frozen period is not above the mean of every liquid optionable name, or the ranking does not beat
+vrp_iv_hv on the same sessions."""
+decoys = """Implied volatility above realised before every report and after every shock (an event, not a
+mispricing); high-IV names are small and speculative: compare with the vrp_iv_hv screen (the
+unranked premium) and the size baseline on the same sessions, and with the no_earnings variant."""
+
+[[sources]]
+title = "Goyal, A. and Saretto, A., Cross-section of option returns and volatility, Journal of Financial Economics, 2009"
+
+[[sources]]
+title = "Bali, T., Beckmeyer, H., Moerke, M. and Weigert, F., Option Return Predictability with Machine Learning and Big Data, Review of Financial Studies, 2023"
+url = "https://www.wiwi.uni-muenster.de/fcm/en/publication/98329575"
+
+[[sources]]
+title = "EDHEC, Empirical properties of straddle returns"
+url = "https://risk.edhec.edu/publications/empirical-properties-straddle-returns"

@@ -37,3 +37,6 @@
 "pre_earnings_runup/v1.toml" = "0c2b78250cd91af6a2bf5ecb733cad3bee0ce58db371d1a713bdad4759e345aa"
 "earnings_gap_volume/v1.toml" = "64aa899a56a1bb3ec14482f38d21526652c702eaa81164ecd513f92ad784707c"
 "earnings_gap_only/v1.toml" = "254fa96881d2fcc7fa6b575b8837aef396a2baaddd21150185e5ab3215dd64c1"
+"vrp_cross_section/v1.toml" = "7baed46259b2b51a8cb98b6ace612b78ee8503a30dcadd7cb5d5f439881a32d2"
+"iv_rank_high/v1.toml" = "ecc0515678c328639855aae9e3dcfa0dda22541f529dd8627bbf183539024641"
+"etf_flow_pressure/v1.toml" = "f85e4347c8592e877ff93b294068847cf570297b9753aa82cb9cc9dcc9e8c3c1"
