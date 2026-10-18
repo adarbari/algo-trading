@@ -16,6 +16,11 @@ ON_MARKET = "on_market:"
 MARKET_TRIGGERS: Mapping[str, str] = {
     "vix_spike": "market.market_triggers@v1.vix_spike_date",
 }
+# The stored field that is null when the reading behind the trigger is stale (UNKNOWN): the
+# placement counts such a session as not known, never as "no trigger".
+MARKET_TRIGGER_AGE: Mapping[str, str] = {
+    "vix_spike": "market.market_triggers@v1.sessions_since_vix_spike",
+}
 
 
 def market_trigger(schedule: str) -> str | None:

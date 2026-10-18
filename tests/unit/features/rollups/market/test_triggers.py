@@ -45,7 +45,8 @@ def test_the_spike_is_known_from_the_session_after_its_close() -> None:
 
 def test_a_high_vix_in_contango_is_no_spike() -> None:
     got = row(series({40: (35.0, 40.0)}))
-    assert got["vix_spike_date"] is None and pd.isna(got["sessions_since_vix_spike"])
+    assert got["vix_spike_date"] is None and pd.isna(got["vix_spike_level"])
+    assert got["sessions_since_vix_spike"] == triggers.NONE_SEEN  # fresh, none seen: not null
 
 
 def test_a_stale_reading_is_null_not_no_spike_and_not_the_old_spike() -> None:

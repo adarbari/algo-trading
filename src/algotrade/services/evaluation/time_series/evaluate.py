@@ -11,7 +11,7 @@ frozen one, so the verdict says there is nothing to judge)."""
 
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 
 from algotrade.config.edges.document import Edge
@@ -31,7 +31,7 @@ from algotrade.services.evaluation.time_series.measures import (
 )
 from algotrade.services.evaluation.time_series.periods import Period, periods
 from algotrade.services.evaluation.time_series.random_windows import random_windows
-from algotrade.services.evaluation.time_series.triggers import trigger_periods
+from algotrade.services.evaluation.time_series.triggers import STALE, trigger_periods
 
 
 @dataclass(frozen=True)
@@ -76,11 +76,8 @@ def evaluate_time_series(
         raise ConfigurationError(f"edge {edge.id}: not a time-series edge")
     horizon = edge.outcome.horizon_sessions[0] if trigger else window_length(name)
     symbols = named_symbols(edge.universe)
-    ps = (
-        trigger_periods(reader, trigger, start, end, horizon, as_of)
-        if trigger
-        else periods(name, start, end)
-    )
+    placed = trigger_periods(reader, trigger, start, end, horizon, as_of) if trigger else None
+    ps = placed.periods if placed else periods(name, start, end)
     ids, unknown = harness.resolve_symbols(reader, symbols, end, as_of)
     read = harness.read_returns(reader, list(ids.values()), [p.entry for p in ps], horizon, as_of)
     bills = harness.bill_returns(reader, [p.decision for p in ps], horizon, as_of)
@@ -89,6 +86,8 @@ def evaluate_time_series(
                     horizon, unknown.get(s))
         for s in symbols
     ]  # fmt: skip
+    if placed and placed.dropped:  # base stretches left out for a stale trigger reading
+        results = [replace(r, lost={**r.lost, STALE: placed.dropped}) for r in results]
     windows = [p for p in ps if p.inside]
     measured = {e for r in results for e, _ in r.in_window}
     return TimeSeriesRun(

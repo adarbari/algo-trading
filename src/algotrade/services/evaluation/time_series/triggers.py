@@ -13,14 +13,19 @@ stretch near the range end can change when the range is extended (the run record
 session whose row is not stored, or holds no trigger date, is no trigger, never a window. Reads
 only the market entity's feature row; the outcomes are read by ``harness.py`` alone."""
 
+from dataclasses import dataclass
 from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.config.edges.schedules.markets import MARKET_TRIGGERS
+from algotrade.config.edges.schedules.markets import MARKET_TRIGGER_AGE, MARKET_TRIGGERS
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.instruments import market_id
-from algotrade.core.time.calendar import next_session, sessions_between
+from algotrade.core.time.calendar import (
+    next_session,
+    sessions_between,
+    sessions_ending,
+)
 from algotrade.core.time.windows import out_of_window_stretches
 from algotrade.data import StoreReader
 from algotrade.services.evaluation.time_series.periods import Period, period
@@ -29,15 +34,31 @@ from algotrade.services.features import entity_field_view
 US = market_id("US")
 
 
-def triggered(reader: StoreReader, trigger: str, day: date, as_of: datetime) -> bool:
-    """Whether ``trigger`` first fired at session ``day``: the stored row of ``day`` says its
-    date is ``day`` (UNKNOWN, or an older trigger, is not)."""
-    field = MARKET_TRIGGERS[trigger]
-    frame, _ = entity_field_view(reader, day, [field], [US], as_of)
-    if frame.empty or field not in frame.columns:
-        return False
-    value = frame.iloc[0][field]
-    return bool(pd.notna(value)) and pd.Timestamp(value).date() == day
+STALE = "STALE_TRIGGER"  # the lost reason of a stretch left out: its trigger reading was not known
+
+
+@dataclass(frozen=True)
+class Placed:
+    """The periods of a trigger edge and the base stretches left out for a stale reading."""
+
+    periods: list[Period]
+    dropped: int = 0
+
+
+def reading(
+    reader: StoreReader, trigger: str, day: date, as_of: datetime
+) -> tuple[bool, bool] | None:
+    """``(triggered, known)`` of ``trigger`` at session ``day`` from the stored market row:
+    triggered when its date is ``day``, known unless the age field is null (a stale reading).
+    ``None``: the partition is not stored."""
+    fields = [MARKET_TRIGGERS[trigger], MARKET_TRIGGER_AGE[trigger]]
+    frame, missing = entity_field_view(reader, day, fields, [US], as_of)
+    if missing or frame.empty:
+        return None
+    row = frame.iloc[0]
+    known = bool(pd.notna(row[fields[1]]))
+    value = row[fields[0]]
+    return bool(pd.notna(value)) and pd.Timestamp(value).date() == day, known
 
 
 def _window(decision: date, horizon: int) -> list[date]:
@@ -51,12 +72,21 @@ def _window(decision: date, horizon: int) -> list[date]:
     return out
 
 
+def sessions_after(p: Period, horizon: int) -> list[date]:
+    """The ``horizon`` sessions a period holds (from its first session)."""
+    out, day = [p.first], p.first
+    while len(out) < horizon:
+        day = next_session(day)
+        out.append(day)
+    return out
+
+
 def trigger_periods(
     reader: StoreReader, trigger: str, first: date, last: date, horizon: int, as_of: datetime
-) -> list[Period]:
+) -> Placed:
     """The windows of ``trigger`` with D in ``[first, last]`` that end by ``last`` and the
-    out-of-window stretches of ``horizon`` sessions that end by ``last``, in order of their first
-    session."""
+    out-of-window stretches of ``horizon`` sessions that end by ``last`` (tiled from ``first``,
+    none holding a session whose reading was stale), in order of their first session."""
     if trigger not in MARKET_TRIGGERS:
         raise ConfigurationError(
             f"unknown market trigger {trigger!r}: one of {sorted(MARKET_TRIGGERS)}"
@@ -65,13 +95,28 @@ def trigger_periods(
         raise ConfigurationError(f"horizon must be >= 1 session, got {horizon}")
     counted: list[list[date]] = []
     occupied: list[list[date]] = []
-    for day in sessions_between(first, last):
-        if not triggered(reader, trigger, day, as_of):
+    stale: set[date] = set()
+    early = sessions_ending(first, horizon + 2)[:-1]  # earlier triggers' windows run into the range
+    for day in [*early, *sessions_between(first, last)]:
+        got = reading(reader, trigger, day, as_of)
+        if got is None:
+            if day >= first:
+                raise ConfigurationError(
+                    f"market trigger {trigger}: no stored market row for {day}: run the "
+                    f"market rollups before the evaluation"
+                )
+            continue  # before the range: nothing to place
+        fired, known = got
+        if not known:
+            stale.add(day)
+        if not fired:
             continue
         window = _window(day, horizon)
         occupied.append(window)
-        if (not counted or window[0] > counted[-1][-1]) and window[-1] <= last:
+        if day >= first and (not counted or window[0] > counted[-1][-1]) and window[-1] <= last:
             counted.append(window)
-    stretches = out_of_window_stretches(occupied, horizon, last)
-    found = [*(period(w, True) for w in counted), *(period(s, False) for s in stretches)]
-    return sorted(found, key=lambda p: p.first)
+    stretches = out_of_window_stretches(occupied, horizon, last, first)
+    base = [period(s, False) for s in stretches]
+    kept = [p for p in base if not stale & {p.decision, p.entry, *sessions_after(p, horizon)}]
+    found = [*(period(w, True) for w in counted), *kept]
+    return Placed(sorted(found, key=lambda p: p.first), len(base) - len(kept))

@@ -11,6 +11,7 @@ from algotrade.config.edges.document import QUALITY_BAR, parse_edge
 from algotrade.config.edges.schedules import markets
 from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.features.rollups.market import triggers
 
 NAMED = {"where": {"all": [{"field": "instrument.symbol", "op": "in", "value": ["SPY", "QQQ"]}]}}
 
@@ -86,3 +87,11 @@ def test_a_market_edge_is_refused_unless_it_is_a_time_series_edge(
 ) -> None:
     with pytest.raises(ConfigurationError, match=message):
         edge(**changes)
+
+
+def test_every_trigger_field_is_a_declared_column_of_the_market_triggers_group() -> None:
+    """The fields the placement reads exist (kept equal to the group's declaration)."""
+    prefix = f"market.{triggers.NAME}@v{triggers.VERSION}."
+    for field in (*markets.MARKET_TRIGGERS.values(), *markets.MARKET_TRIGGER_AGE.values()):
+        assert field.startswith(prefix) and field.removeprefix(prefix) in triggers.COLUMNS
+    assert markets.MARKET_TRIGGERS.keys() == markets.MARKET_TRIGGER_AGE.keys()

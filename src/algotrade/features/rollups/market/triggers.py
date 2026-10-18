@@ -20,7 +20,9 @@ Only observations known by the session are read (``LOOKBACK`` sessions of them),
 judged on what the session knew; a spike needs ``QUIET_SESSIONS`` of history before it, so
 none is found in the first sessions of the history read. Stale is not quiet: when the newest
 VIX or VIX3M observation known is more than ``MAX_AGE_SESSIONS`` sessions old, every column is
-null (UNKNOWN), never an older spike and never "no spike".
+null (UNKNOWN), never an older spike and never "no spike". Fresh readings with no spike in
+the lookback have ``sessions_since_vix_spike = NONE_SEEN`` and a null date and level, so a reader
+(``time_series/triggers.py``) tells "none seen" from "not known".
 """
 
 from datetime import date
@@ -41,12 +43,14 @@ SPIKE_LEVEL = 30.0  # a high day: VIX at least this
 QUIET_SESSIONS = 21  # sessions without a high day before a spike (and of history it needs)
 MAX_AGE_SESSIONS = 3  # the newest observation older than this is stale
 LOOKBACK = 300  # sessions of observations read: spikes older than this are not seen
+NONE_SEEN = LOOKBACK + 1  # sessions_since_vix_spike when the readings are fresh and hold no spike
 VIX, VIX3M = ID["VIX"], ID["VIX3M"]
 _UNKNOWN = (
     "VIX or VIX3M has no observation known by the session, or its newest is more than "
     f"{MAX_AGE_SESSIONS} sessions old (stale: nothing is read, never 'no spike')"
 )
 _NONE = f"{_UNKNOWN}; or no spike in the last {LOOKBACK} sessions of observations"
+_SINCE_NONE = _UNKNOWN
 _INPUTS = ("series:VIX", "series:VIX3M")
 
 FEATURES = (
@@ -60,7 +64,8 @@ FEATURES = (
     Feature(
         "sessions_since_vix_spike", "int", "sessions",
         "Exchange sessions from the latest VIX spike's session up to the session (0: the "
-        "session is that day)", _NONE, valid_range=(0, LOOKBACK + 1), inputs=_INPUTS,
+        f"session is that day); {NONE_SEEN} when the readings are fresh and no spike is in the "
+        f"last {LOOKBACK} sessions", _SINCE_NONE, valid_range=(0, NONE_SEEN), inputs=_INPUTS,
         licence="personal",
     ),
     Feature(
@@ -108,9 +113,11 @@ def trigger_row(series: dict[str, Series], session: date) -> dict[str, object]:
     empty: dict[str, object] = {
         "vix_spike_date": None, "sessions_since_vix_spike": np.nan, "vix_spike_level": np.nan,
     }  # fmt: skip
-    found = None if vix_stale(series, session) else spike(series, session)
-    if found is None:
+    if vix_stale(series, session):
         return empty
+    found = spike(series, session)
+    if found is None:  # a fresh reading and no spike seen: told apart from stale by this count
+        return {**empty, "sessions_since_vix_spike": NONE_SEEN}
     day, level = found
     return {
         "vix_spike_date": day,
