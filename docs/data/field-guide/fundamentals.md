@@ -739,3 +739,132 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 - STALE is not the old value: a snapshot past 21 days serves nothing, so a vendor outage shows as STALE rather than as old numbers.
 
 Sources: Financial Modeling Prep analyst estimates and price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
+
+### `rollup.mispricing@v1.composite_rank`
+
+**How to read it.** The composite mispricing rank, 0 to 1: the mean percentile rank of seven published anomalies (net share issuance, accruals, net operating assets, asset growth, a simplified Ohlson O-score, and inverted gross profitability and return on assets), each oriented so that high means overpriced. 1 is the most overpriced name of the session, 0 the most underpriced; 0.5 is the middle. Combining many noisy anomalies predicts returns better than any one, and most of the spread in the literature sits on the overpriced end.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the most underpriced fifth (the long leg) | `lte 0.2` | hard | - | null (too few anomalies known) never passes |
+| the most overpriced fifth (the short leg, or an avoid list) | `gte 0.8` | hard | - | - |
+
+**When the reading lies**
+
+- It is not Stambaugh, Yu and Yuan's composite: four of their eleven anomalies are missing (composite equity issuance and investment-to-assets need cash-flow detail we do not store, financial distress needs returns and volatility, and momentum lives in the price fields). rollup.mispricing@v1.composite_inputs says how many of the seven an instrument's rank averages; a rank on five is less reliable than one on seven.
+- Missing is left out, never filled: an anomaly a company cannot report (an untagged debt line, no gross profit) drops out of its own mean, and fewer than five of seven gives null. A hard criterion therefore drops those names rather than passing them.
+- A rank is relative to the session's cross-section, so it moves when other names move and carries no level. It uses all instruments with statements, across industries and sizes; banks, brokers and insurers have most inputs null and are usually unranked.
+- Statement figures enter on their filing date, so a rank can be up to four months stale for a company that has not filed lately; rollup.balance_sheet@v1.bs_as_of shows how old the balance sheet is. Individual anomalies have decayed since publication (accruals especially); the composite is the more robust form, and it is also the benchmark any other cross-sectional edge has to beat.
+
+Sources: Stambaugh, Yu and Yuan (2015), Journal of Finance 70(5); docs/edge-ideas/altdata-text-ml.md (composite_mispricing_score)
+
+### `rollup.mispricing@v1.quality_score`
+
+**How to read it.** A quality score from 0 to 1: the mean percentile rank, among all instruments with a value that session, of return on equity, return on assets, gross margin, net margin, operating cash flow over total assets and low debt to equity. 0.8 is better than about 80% of the cross-section on the average measure. Quality names are profitable, cash-generating and conservatively financed; the idea is to hold momentum within them so the junk that drives momentum crashes is excluded.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a high-quality name | `gte 0.7` | soft | 0.1 x the threshold | - |
+
+**When the reading lies**
+
+- QMJ-like, not QMJ: it omits Asness, Frazzini and Pedersen's growth (five-year changes), payout (buybacks, dividends, accruals) and low-beta parts, uses one year of data with no stability measure, ranks across industries (an asset-light software firm outranks a utility on margins), and weights the six measures equally.
+- Needs at least four of the six measures. Gross margin is missing for the many filers that do not tag GrossProfit, and debt to equity for those with negative equity or untagged debt, so a score rests on different measures for different names. Missing is dropped, never counted as zero; a hard criterion drops names with too few.
+- Banks and insurers are scored on the measures they report (return on equity and assets, net margin) and their debt to equity is not comparable; read them separately.
+- Statement figures enter on their filing date and can be four months old; the score is relative to the session's cross-section and has no level.
+
+Sources: Asness, Frazzini and Pedersen (2019), Review of Accounting Studies 24(1), Quality Minus Junk; docs/edge-ideas/cross-sectional.md (momentum_x_quality_interaction)
+
+### `rollup.mispricing@v1.asset_growth`
+
+**How to read it.** Growth of total assets over the year to the latest balance sheet: total assets over the same line a year earlier, less one (0.10 is +10%). Firms that expand their balance sheet fast, by acquisition, capex or hoarding, tend to earn lower returns afterwards (Cooper, Gulen and Schill), so high growth counts as overpriced in rollup.mispricing@v1.composite_rank.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| assets not growing fast | `lte 0.2` | soft | 0.5 x the threshold | - |
+
+**When the reading lies**
+
+- An acquisition or a financing round can double assets overnight without any organic growth; nothing here separates them. Check rollup.balance_sheet@v1.total_assets and the filings.
+- The year-ago figure is the balance sheet ending within 40 days of the latest one's date minus 365 days, as restated by any filing made by the session; a company with less than a year of filings, or a gap, is null.
+- Rate of change of a size measure: a small company swings more than a large one. Banks and insurers grow assets by lending and are not comparable.
+
+Sources: Cooper, Gulen and Schill (2008), Journal of Finance 63(4), Asset Growth and the Cross-Section of Stock Returns
+
+### `rollup.mispricing@v1.accruals`
+
+**How to read it.** Accruals as a share of total assets: net income minus operating cash flow, both over the trailing twelve months, over total assets at the latest balance sheet. Positive means reported earnings exceed the cash behind them (accounting profit not yet realised), negative means cash exceeds earnings. Sloan found high accruals followed by low returns.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| earnings backed by cash | `lte 0` | soft | 0.5 x the threshold | - |
+
+**When the reading lies**
+
+- A weak signal on its own: the accruals anomaly has largely vanished in US large caps since about 2002 and is subsumed by cash-based profitability. It is here as one input of rollup.mispricing@v1.composite_rank, not a screen to trade alone.
+- Uses the latest total assets, not the average of two years as Sloan did, and the whole income-less-cash gap, not only working-capital accruals; depreciation and large non-cash items move it.
+- Net income and operating cash flow come from different groups: check rollup.cash_flow@v1.cf_as_of and rollup.financials@v2.ttm_as_of that they end on the same quarter. Null for banks, brokers and insurers, whose cash flows are not comparable.
+
+Sources: Sloan (1996), The Accounting Review 71(3), Do Stock Prices Fully Reflect Information in Accruals and Cash Flows about Future Earnings
+
+### `rollup.mispricing@v1.gross_profit_to_assets`
+
+**How to read it.** Gross profitability: gross profit over the trailing twelve months over total assets at the latest balance sheet (0.30 is 30 cents of gross profit a year per dollar of assets). Novy-Marx found it predicts returns about as well as value, and it hedges value; high is underpriced, so it enters rollup.mispricing@v1.composite_rank inverted.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a high gross profit on assets | `gte 0.3` | soft | 0.2 x the threshold | - |
+
+**When the reading lies**
+
+- Null for the many filers that do not tag GrossProfit, and null is not zero: a hard criterion drops them. Filers draw the line between cost of revenue and operating costs differently, so compare within an industry.
+- Asset-heavy businesses score low and asset-light ones high regardless of quality; intangible assets that are not on the balance sheet (brands, software) understate the base.
+- Null for banks, brokers and insurers.
+
+Sources: Novy-Marx (2013), Journal of Financial Economics 108(1), The Other Side of Value: The Gross Profitability Premium
+
+### `rollup.mispricing@v1.net_operating_assets`
+
+**How to read it.** Net operating assets as a share of total assets: operating assets (assets less cash) minus operating liabilities (assets less debt and equity), which is debt plus equity less cash, over total assets. A high value means the business has tied up much capital in operations beyond what it has funded from operating liabilities, which Hirshleifer, Hou, Teoh and Zhang link to accumulated accruals and low future returns.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a lean balance sheet | `lte 1` | soft | 0.2 x the threshold | - |
+
+**When the reading lies**
+
+- Short-term investments, minority interest and preferred stock are not separated: investments count as operating, so a company holding treasuries looks asset-heavy. The base is the latest total assets, not the year-ago assets of the paper.
+- Null when total_debt is null (an untagged debt line is not zero) and for banks, brokers and insurers, whose balance sheets are not operating ones.
+- Moves slowly and with every acquisition; a negative value (net cash larger than the capital employed) is possible and valid.
+
+Sources: Hirshleifer, Hou, Teoh and Zhang (2004), Journal of Accounting and Economics 38, Do Investors Overvalue Firms with Bloated Balance Sheets?
+
+### `rollup.mispricing@v1.ohlson_o`
+
+**How to read it.** A simplified Ohlson O-score, a bankruptcy-risk index from size, leverage, working capital, current ratio, a negative-equity flag, profitability and cash flow. Higher is riskier; it is a rank input to rollup.mispricing@v1.composite_rank, not a probability and not comparable with the paper's levels.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a low bankruptcy-risk rank input (compare within one session) | `lte -3` | soft | 0.3 x the threshold | - |
+
+**When the reading lies**
+
+- Two of Ohlson's terms are omitted because they need last year's net income, which no group stores (a loss in both of the last two years, and the change in net income), and the GNP price-index deflator on the size term is omitted. The deflator is a constant within a session, so ranks are unaffected, but the level shifts across sessions: compare only within one session.
+- Operating cash flow stands in for funds from operations, and total assets are in dollars, not thousands of 1968 dollars; both only shift or rescale the score.
+- Null for banks, brokers and insurers, for a filer missing current assets, current liabilities, total liabilities or operating cash flow, and when a statement is stale.
+
+Sources: Ohlson (1980), Journal of Accounting Research 18(1), Financial Ratios and the Probabilistic Prediction of Bankruptcy

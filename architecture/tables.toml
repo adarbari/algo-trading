@@ -244,6 +244,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "revenue and diluted EPS TTMs about 3 and 5 years back from instruments/shares (the bases of the multi-year growth rates)"
 
 [[table]]
+name = "rollups/instrument/mispricing@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the Stambaugh-Yuan anomaly inputs, a QMJ-like quality score and the cross-sectional composite mispricing rank from the statement groups"
+
+[[table]]
 name = "rollups/instrument/balance_sheet@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the latest balance sheet lines (instants) from instruments/statements (ADR 0067)"
