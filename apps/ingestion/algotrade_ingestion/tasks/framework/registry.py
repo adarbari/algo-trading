@@ -55,9 +55,9 @@ from algotrade_ingestion.tasks.market import (
     ibkr_iv,
     option_chains,
     rates,
-    vx_futures,
 )
 from algotrade_ingestion.tasks.market.futures import curves as futures_curves
+from algotrade_ingestion.tasks.market.volatility import vx_futures
 from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     company_details,

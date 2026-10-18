@@ -20,8 +20,8 @@ from algotrade_ingestion.tasks.market import (
     fund_nav,
     option_chains,
     rates,
-    vx_futures,
 )
+from algotrade_ingestion.tasks.market.volatility import vx_futures
 
 
 def run_earnings(ctx: TaskContext, p: Params) -> RunRecord:

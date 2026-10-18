@@ -384,7 +384,7 @@ def macro_checks(
     ]
 
 
-VX_TASK = "vx_futures"  # the vx-futures task's run-record job name (tasks/market/vx_futures.py)
+VX_TASK = "vx_futures"  # the vx-futures task's job name (tasks/market/volatility/)
 
 
 def check_vx_futures(ctx: TaskContext, session: date) -> list[Check]:

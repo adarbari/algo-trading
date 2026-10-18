@@ -100,7 +100,7 @@ Verified 2026-10-17.
 - **VX futures** `https://cdn.cboe.com/data/us/futures/market_statistics/historical_data/VX/VX_<expiry>.csv`,
   one file per contract holding its whole life: `Trade Date,Futures,Open,High,Low,Close,Settle,Change,
   Total Volume,EFP,Open Interest`. History starts with the 2013 contracts (403 for earlier ones). The
-  directory cannot be listed, so `tasks/market/vx_futures.py` generates the expiries by Cboe's rule
+  directory cannot be listed, so `tasks/market/volatility/vx_futures.py` generates the expiries by Cboe's rule
   (monthly: the Wednesday 30 days before the third Friday of the next month, 30 days before the
   preceding business day when that Friday is a holiday; weeklies: every Wednesday; a holiday
   Wednesday moves to the session before: 2024-06-18 and 2014-03-18 exist, the Wednesdays after them

@@ -15,7 +15,7 @@ about 01:05 New York time on the day AFTER the trade date, so the row of a sessi
 file before the next morning (the task's ``knowledge_ts`` is its fetch instant).
 
 Which expiries exist (the directory cannot be listed) is the task's rule
-(``tasks/market/vx_futures.py``); this module reads one file.
+(``tasks/market/volatility/vx_futures.py``); this module reads one file.
 """
 
 from datetime import date
