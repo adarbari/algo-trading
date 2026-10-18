@@ -118,6 +118,7 @@ def _root_curve(
     key = (
         f"futures__{root.symbol}__{root.exchange}__{root.trading_class}__{front}"  # IbkrSource keys
     )
+    started = run.clock()
     try:
         normalized = run.fetch(source, FetchRequest(key, None, session))
     except LookupError as exc:  # IB lists nothing for the root, or refuses it: not an error
@@ -125,11 +126,14 @@ def _root_curve(
     if normalized is None or "futures" not in normalized.parsed:
         return "NO_DATA: nothing parsed"
     rows = normalized.parsed["futures"]
+    ended = run.clock()  # the stream takes seconds: both ends must give the same kind
     try:
-        kind = root_kind(rows, run.clock())
+        kind = root_kind(rows, started)
+        if root_kind(rows, ended) != kind or ended >= settle_cutoff(session):
+            return "NO_DATA: the read crossed a session boundary (next open or the settle bound)"
     except LookupError as exc:
         return f"NO_DATA: {exc}"
-    frame = curve_frame(root.symbol, rows, pd.Timestamp(run.clock()), session, kind)
+    frame = curve_frame(root.symbol, rows, pd.Timestamp(ended), session, kind)
     priced = int(frame["price"].notna().sum())
     if priced == 0:
         return (

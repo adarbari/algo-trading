@@ -2,6 +2,7 @@
 and open interest), a root without data a NO_DATA item, an unreachable gateway a skip."""
 
 import math
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, date, datetime
 
@@ -127,9 +128,9 @@ def test_it_never_calls_an_order_or_account_api() -> None:
     assert "reqHistoricalData" not in ib.calls  # live streams only: no historical pacing
 
 
-def at(year: int, month: int, day: int, hour: int, minute: int = 0) -> datetime:
+def at(year: int, month: int, day: int, hour: int, minute: int = 0, second: int = 0) -> datetime:
     """A New York wall time."""
-    return datetime(year, month, day, hour, minute, tzinfo=EXCHANGE_TZ)
+    return datetime(year, month, day, hour, minute, second, tzinfo=EXCHANGE_TZ)
 
 
 QUOTES = {  # (last, close, volume, open interest): `last` is S+1's trade once its session opened
@@ -151,14 +152,16 @@ def exchanges(hours: dict[str, tuple[str, str]]) -> FakeIB:
     )
 
 
-def run_at(now: datetime, ib: FakeIB, session: date = SESSION) -> tuple[RunRecord, StoreReader]:
+def run_ctx(clock: Callable[[], datetime]) -> tuple[TaskContext, StoreReader]:
     backend = MemoryBackend()
     writer, reader = StoreWriter(backend), StoreReader(backend)
     roots = tuple(FuturesRoot(r, "X", r) for r in ("CL", "ZC", "SB"))
     ibkr = replace(IbkrSettings(), futures_roots=roots, futures_front=1, stream_wait_s=0.05)
-    ctx = task_ctx(
-        writer, reader, clock=lambda: now.astimezone(UTC), settings=SourcesSettings(ibkr=ibkr)
-    )
+    return task_ctx(writer, reader, clock=clock, settings=SourcesSettings(ibkr=ibkr)), reader
+
+
+def run_at(now: datetime, ib: FakeIB, session: date = SESSION) -> tuple[RunRecord, StoreReader]:
+    ctx, reader = run_ctx(lambda: now.astimezone(UTC))
     return nightly_curves(ctx, ibkr_source(ib, stream_wait_s=0.05), session), reader
 
 
@@ -279,3 +282,20 @@ def test_a_resumed_run_past_the_bound_keeps_its_done_roots() -> None:
     assert record.items["root:ZN"].startswith("NO_DATA: read after")
     assert record.stats["served"] == 1 and record.stats["rows"] == 3
     assert len(futures_curve(reader, SESSION, SESSION)) == 3
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [
+        (at(2026, 10, 4, 17, 59, 58), at(2026, 10, 4, 18, 0, 3)),  # CME reopens mid-stream
+        (at(2026, 10, 5, 11, 59, 58), at(2026, 10, 5, 12, 0, 3)),  # the settle bound passes
+    ],
+)
+def test_a_stream_that_crosses_a_session_boundary_stores_nothing(
+    start: datetime, end: datetime
+) -> None:
+    ib = exchanges(HOURS)
+    ctx, reader = run_ctx(lambda: (end if "reqMktData 588" in ib.calls else start).astimezone(UTC))
+    record = nightly_curves(ctx, ibkr_source(ib, stream_wait_s=0.05), SESSION, ["CL"])
+    assert record.items["root:CL"].startswith("NO_DATA: the read crossed a session boundary")
+    assert futures_curve(reader, SESSION, SESSION).empty
