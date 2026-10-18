@@ -19,6 +19,7 @@ screeners = [
 base = "benchmark"
 oos_class = "trend"
 status = "candidate"
+mechanism_kind = "cross_market_trends"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history and evaluated. LIMITS: (1)
 the source's fallback is the aggregate bond index when neither stock fund has beaten the bill; here

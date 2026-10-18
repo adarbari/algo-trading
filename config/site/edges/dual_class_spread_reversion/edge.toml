@@ -18,6 +18,7 @@ base = "universe"
 screeners = ["dual_class_cheap_leg"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "value_gaps"
 frozen_from = 2026-04-01
 notes = """The outcome is the pair_spread of EB H9: a pick is the cheap class of a pair, and its value is its return
 over the horizon less its sibling's, less two round trips and the borrow on the sibling (the rich leg);

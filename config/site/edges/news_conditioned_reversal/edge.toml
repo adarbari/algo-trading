@@ -19,6 +19,7 @@ base = "universe"
 screeners = ["news_free_residual_reversal"]
 baselines = ["momentum_12_1", "size_small", "residual_reversal"]
 status = "candidate"
+mechanism_kind = "liquidity_provision"
 frozen_from = 2026-04-01
 notes = """A variant of short_term_residual_reversal filed as its own edge (its own screener, one trial):
 the same market-residual 20-session return (rollup.momentum_variants@v1.resid_ret_20d, lowest first) among

@@ -18,6 +18,7 @@ base = "universe"
 screeners = ["target_upside_high"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """No exploration period exists: our own nightly snapshots of the analyst consensus targets (analyst_targets, EB D2) start on
 2026-10-19 at the earliest, after frozen_from, and a target carries no date of its own, so the first measurable month end is

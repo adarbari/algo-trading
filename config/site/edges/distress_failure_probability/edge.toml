@@ -12,6 +12,7 @@ top_k = 50
 screeners = ["distress_ohlson"]
 baselines = ["size_small", "momentum_12_1"]
 status = "candidate"
+mechanism_kind = "mispriced_fundamentals"
 frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). Only what the stored statements support is built: ohlson_o is a simplified Ohlson O-score (the INTWO and CHIN terms need last year's net income and the price-index deflator is a per-session constant, all omitted), a rank input, not a probability. Campbell, Hilscher and Szilagyi's failure probability needs market terms (excess return, volatility, relative size, market to book, price) from another group and is not built; this edge is therefore the accounting-only distress screen (Ohlson 1980 and Dichev 1998 style), and the harness's verdict on it says nothing about the market-based model. The main outcome is the avoid list: the 50 most distressed held short (ADR 0053 amendment, outcome sides; owner decision O2), with the long side and the spread as variants (diagnostic only)."""
 

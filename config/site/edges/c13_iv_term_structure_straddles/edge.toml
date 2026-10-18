@@ -18,6 +18,7 @@ top_k = 20
 screeners = []
 baselines = ["vrp_iv_hv"]
 status = "blocked"
+mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 rejection_reason = """The slope has no history. The long end (term_ratio_30_90, the iv_90d of iv_term@v1)
 is computed from option chains, which are stored from 2026-10-02 only, about two weeks of sessions;

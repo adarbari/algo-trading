@@ -20,6 +20,7 @@ base = "event"
 screeners = ["earnings_gap_volume", "earnings_gap_only"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """Variant of small_cap_earnings_drift (the same schedule, entry and horizons): the question
 this edge asks is the increment, whether volume-confirmed large reactions drift more than same-size

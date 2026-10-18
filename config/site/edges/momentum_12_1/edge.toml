@@ -20,6 +20,7 @@ screeners = [
 ]
 baselines = ["size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 family = "A"
 frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1

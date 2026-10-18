@@ -18,6 +18,7 @@ top_k = "all"
 screeners = []
 base = "out_of_window"
 status = "candidate"
+mechanism_kind = "forced_flows"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09). This is the
 unconditional version only: every quarter-end window, whichever asset led. The source's signal

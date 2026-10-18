@@ -17,6 +17,7 @@ base = "universe"
 screeners = ["earnings_date_early"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """Long side only: the advancers. The delayers (shorting later-than-last-year dates) are the
 other half of Johnson and So's spread and need their own screener and a short outcome, so they are

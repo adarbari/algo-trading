@@ -18,6 +18,7 @@ base = "universe"
 screeners = ["short_squeeze_dtc"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "lottery_demand"
 frozen_from = 2026-04-01
 notes = """The outcome is the SHORT on the 30 names with the highest days to cover among the
 eligible names, common stocks above 5 dollars trading 5M dollars a day (side = short, net of the site's borrow assumption): the source's low-minus-high
