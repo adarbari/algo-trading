@@ -40,9 +40,11 @@ from algotrade.services.evaluation.cross_section.hit import (
     INVALID_IMPLIED_VOL,
     NO_IMPLIED_VOL,
     UNMEASURED,
+    Pairs,
     apply_outcome,
     is_return,
     needs_implied_vol,
+    needs_pairs,
     short_view,
 )
 from algotrade.services.evaluation.cross_section.legs.key import (
@@ -158,7 +160,14 @@ def _outcomes(
             if needs_implied_vol(scope.edge)
             else None
         )
-        return apply_outcome(scope.edge, inside, implied).set_index("instrument_id")
+        pairs = (
+            Pairs(
+                session.siblings(scope.edge.outcome.pair_field or "", eligible, day), eligible, rows
+            )
+            if needs_pairs(scope.edge)
+            else None
+        )
+        return apply_outcome(scope.edge, inside, implied, pairs).set_index("instrument_id")
 
     return session.outcomes(scope.key, horizon, day, score)
 

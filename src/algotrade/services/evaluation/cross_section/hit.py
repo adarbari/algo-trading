@@ -30,6 +30,15 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   borrow ``borrow_bps_annual / 1e4 * horizon / 252`` (an assumption: no borrow data is stored);
   ``short_hit`` is ``short_value > 0`` (the name underperformed by more than the costs). The
   long columns are unchanged: the deciles and the base are over them whatever the side.
+- ``pair_spread`` (ADR 0053 amendment, EB H9): a row is one share class, read as the cheap leg of
+  its pair; ``value = fwd_return(name) - fwd_return(sibling) - 2 * cost_bps / 1e4 - borrow``
+  (two round trips; the borrow on the rich leg, the sibling, as for a short: ``borrow_cost``),
+  the sibling's id read at D from the ``pair_field`` (never the sibling of today's reference),
+  its return from the same outcome partition at S. A name with no sibling, a sibling outside
+  the universe, a sibling that does not name it back, a sibling with no row at S or one that is
+  UNMEASURED is excluded with that reason, never a zero. A hit is ``value > 0``. The base is
+  the same value of every eligible name (each class against its sibling), so it is the spread
+  of a random side of the pair.
 - ``max_drawdown`` set: a hit also needs ``fwd_max_drawdown <= max_drawdown``.
 
 A row whose value cannot be computed is *excluded with a reason*, never a miss and never a
@@ -42,6 +51,7 @@ as an ``above`` one's.
 """
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -71,6 +81,12 @@ MODEL_PNL_FIELDS: Mapping[str, tuple[str, ...]] = {
     "delta_hedged_atm": ("fwd_realised_vol",),
     "delta_hedged_atm_short": ("fwd_realised_vol",),
 }  # the stored fields each option_model_pnl structure reads, beside the implied vol
+PAIR_FIELDS = ("fwd_return",)  # the stored field a pair_spread reads, for each leg
+NO_SIBLING = "no_sibling"  # the pair field names no sibling for the name at D
+SIBLING_NOT_ELIGIBLE = "sibling_not_eligible"  # the sibling is not in the universe at D
+SIBLING_MISMATCH = "sibling_mismatch"  # the sibling's own sibling at D is not the name
+NO_SIBLING_ROW = "no_sibling_row"  # the sibling has no outcome row at S (not listed, no bar)
+SIBLING_UNMEASURED = "sibling_unmeasured"  # the sibling's window is UNMEASURED
 MISSING_VALUE = "missing_value"  # a row, but the measure is null (no benchmark bar, no vol)
 NO_IMPLIED_VOL = "no_implied_vol"  # the implied vol at S is missing or not positive
 INVALID_IMPLIED_VOL = "invalid_implied_vol"  # ... or non-finite or above MAX_IMPLIED_VOL: garbage
@@ -87,6 +103,22 @@ RESULT_COLUMNS = (
 def is_return(edge: Edge) -> bool:
     """Whether the outcome's value is the net excess return (``apply_outcome``'s own test)."""
     return edge.outcome.is_return
+
+
+@dataclass(frozen=True)
+class Pairs:
+    """What a ``pair_spread`` reads besides the outcome rows: each eligible name's sibling id read
+    at D (``pair_field``; None: none stored) and the names eligible at D, and ``stored``, every
+    outcome row of the horizon at S (the sibling's return is read from the same partition,
+    whatever the base names are)."""
+
+    siblings: Mapping[str, str | None]
+    eligible: frozenset[str]
+    stored: pd.DataFrame
+
+
+def needs_pairs(edge: Edge) -> bool:
+    return edge.outcome.kind == "pair_spread"
 
 
 def needs_implied_vol(edge: Edge) -> bool:
@@ -187,6 +219,46 @@ def _model_outcome(
     return value
 
 
+def _sibling_reason(name: str, sibling: str | None, pairs: Pairs, stored: pd.DataFrame) -> str:
+    """Why ``name`` has no pair (``""``: it has one), checked in the order the data is read."""
+    if sibling is None or sibling == name:
+        return NO_SIBLING
+    if sibling not in pairs.eligible:
+        return SIBLING_NOT_ELIGIBLE
+    if pairs.siblings.get(sibling) != name:
+        return SIBLING_MISMATCH
+    if sibling not in stored.index:
+        return NO_SIBLING_ROW
+    if stored.at[sibling, "outcome_status"] == "UNMEASURED":
+        return SIBLING_UNMEASURED
+    return ""
+
+
+def _pair_outcome(
+    edge: Edge, outcomes: pd.DataFrame, pairs: Pairs | None, excluded: np.ndarray
+) -> np.ndarray:
+    """The ``pair_spread`` value per row (see the module doc); ``excluded`` gets the reason of
+    each row that has none."""
+    if pairs is None:
+        raise ConfigurationError(f"{edge.id}: pair_spread needs the siblings")
+    o = edge.outcome
+    stored = pairs.stored.drop_duplicates("instrument_id").set_index("instrument_id")
+    own = _numbers(outcomes, "fwd_return")
+    other = np.full(len(outcomes), np.nan)
+    for at, name in enumerate(outcomes["instrument_id"]):
+        sibling = pairs.siblings.get(name)
+        reason = _sibling_reason(name, sibling, pairs, stored)
+        if reason:
+            excluded[at] = reason
+        else:
+            assert sibling is not None
+            other[at] = pd.to_numeric(stored.at[sibling, "fwd_return"], errors="coerce")
+    horizon = _numbers(outcomes, "horizon_sessions")
+    value = own - other - 2 * (o.cost_bps or 0.0) / 1e4 - borrow_cost(o.borrow_bps_annual, horizon)
+    excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE
+    return np.asarray(value, dtype=np.float64)
+
+
 def _numbers(frame: pd.DataFrame, column: str) -> np.ndarray:
     return pd.to_numeric(frame[column], errors="coerce").to_numpy(dtype=np.float64, na_value=np.nan)
 
@@ -239,12 +311,15 @@ def short_view(res: pd.DataFrame) -> pd.DataFrame:
 
 
 def apply_outcome(
-    edge: Edge, outcomes: pd.DataFrame, implied: Mapping[str, float | None] | None = None
+    edge: Edge,
+    outcomes: pd.DataFrame,
+    implied: Mapping[str, float | None] | None = None,
+    pairs: Pairs | None = None,
 ) -> pd.DataFrame:
     """``outcomes`` (the rows of one horizon at one session) as ``RESULT_COLUMNS``: the value,
     its higher-is-better orientation, whether it hit, why it was excluded (``""`` when counted)
     and whether the name was delisted. ``implied``: the IV at S by instrument id (needed when
-    ``needs_implied_vol``)."""
+    ``needs_implied_vol``); ``pairs``: the siblings (needed when ``needs_pairs``)."""
     o = edge.outcome
     n = len(outcomes)
     excluded = np.full(n, "", dtype=object)
@@ -262,6 +337,8 @@ def apply_outcome(
         excluded[(excluded == "") & ~np.isfinite(value)] = MISSING_VALUE  # no horizon: no strike
     elif o.kind == "option_model_pnl":
         value = _model_outcome(edge, outcomes, implied, excluded)
+    elif o.kind == "pair_spread":
+        value = _pair_outcome(edge, outcomes, pairs, excluded)
     elif is_return(edge):
         value = _numbers(outcomes, "fwd_excess_return") - (o.cost_bps or 0.0) / 1e4
         excluded[~np.isfinite(value)] = MISSING_VALUE

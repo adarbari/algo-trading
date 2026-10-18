@@ -20,7 +20,11 @@ and the key.
                       ``iv_field`` is allowed on a ratio measure too (default: the run's); an
                       ``option_model_pnl`` outcome (a model P&L, basis ``model``) names its
                       ``structure`` (MODEL_STRUCTURES), the ``iv_field`` and ``benchmark =
-                      "none"``, and takes no strike;
+                      "none"``, and takes no strike; a ``pair_spread`` outcome (the cheap
+                      share class against its sibling; ADR 0053 amendment, EB H9) names the
+                      ``pair_field`` (a declared string feature read at D that gives each
+                      name's sibling id), takes ``benchmark = "none"``, side ``long`` and the
+                      optional ``borrow_bps_annual`` (the rich leg's);
                       ``side`` (SIDES; ADR 0053 amendment, outcome sides): ``long`` (default),
                       ``short`` (the picks are the bottom ``top_k`` of the ranked, liquid names;
                       the value is minus the excess return, less cost and borrow) or
@@ -97,6 +101,7 @@ from datetime import UTC, date, datetime
 from typing import Any, NoReturn
 
 from algotrade.config.edges.follow import Audit, Follow, parse_audit, parse_follow
+from algotrade.config.edges.tenor import tenor_sessions
 from algotrade.config.edges.verdict import LEGS
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.strategy.schema import Selection, parse_selection
@@ -113,20 +118,16 @@ MIN_INDEPENDENT_SESSIONS = 40  # the quality bar's count: a fit and a promotion 
 FAMILIES = tuple("ABCDEFGHI")  # the idea catalogue's families (docs/edge-ideas/)
 STATUSES = ("researching", "candidate", "evidenced", "live", "retired", "rejected", "blocked")
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
-OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm", "option_model_pnl")
+OUTCOME_KINDS = ("excess_return", "hit_target", "expires_otm", "option_model_pnl", "pair_spread")
 STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
 # An option_model_pnl outcome's position: one at-the-money straddle held to the horizon's close,
 # long or short, or delta-hedged, long or short (ADR 0053 amendment 2026-10-17).
 MODEL_STRUCTURES = (
     "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
 )  # fmt: skip
-# The implied vol is one tenor (``iv30``: 30 calendar days, about 21 sessions) and prices every
-# horizon of the outcome, so a horizon far from it prices the wrong option: an option_model_pnl
-# horizon must lie within ``[tenor / 2, tenor * 2]`` sessions of the field's tenor, read from its
-# name (a field with no ``iv<days>`` in its name has no known tenor and is refused).
-TRADING_DAYS_PER_YEAR, CALENDAR_DAYS_PER_YEAR = 252, 365
-_IV_TENOR = re.compile(r"(?<![a-z0-9])iv(\d+)(?![0-9])")
+# An option_model_pnl horizon must lie within half to double the IV field's tenor (``tenor.py``).
 MODEL_KIND = "option_model_pnl"
+PAIR_KIND = "pair_spread"  # the cheap name's return minus its sibling's (ADR 0053, EB H9)
 MODEL_BASIS = "model"  # what a price from a model, not a quote, is labelled (results and UI)
 BENCHMARKS = ("SPY", "none")
 LONG, SHORT, LONG_SHORT = "long", "short", "long_short"
@@ -207,7 +208,7 @@ KEYS = (
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
-    "side", "borrow_bps_annual",
+    "side", "borrow_bps_annual", "pair_field",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -241,6 +242,13 @@ class Outcome:
     iv_field: str | None = None
     side: str = LONG  # SIDES; a short leg pays ``borrow_bps_annual`` (None: the site's default)
     borrow_bps_annual: float | None = None
+    pair_field: str | None = None  # a pair_spread's sibling-id feature, read at D
+
+    @property
+    def result_side(self) -> str:
+        """The side results are stored and judged under: a pair spread is ``long_short`` (a
+        diagnostic, never a verdict basis); its ``side`` stays ``long``."""
+        return LONG_SHORT if self.kind == PAIR_KIND else self.side
 
     @property
     def is_return(self) -> bool:
@@ -701,6 +709,7 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
     side = o.choice("side", LONG, SIDES)
     borrow = o.number("borrow_bps_annual", None, 0)
     _check_side(o, side, borrow, kind, drawdown)
+    pair_field = _pair_field(o, kind, benchmark, side, drawdown)
     return Outcome(
         kind=kind,
         horizon_sessions=horizons,
@@ -717,16 +726,28 @@ def _outcome_of(o: Table, schedule: str) -> Outcome:
         iv_field=iv_field,
         side=side,
         borrow_bps_annual=borrow,
+        pair_field=pair_field,
     )
 
 
-def tenor_sessions(iv_field: str) -> int | None:
-    """The tenor of an implied-vol field in sessions (``iv30`` is 30 calendar days: 21), from its
-    name; None when the name carries none."""
-    found = _IV_TENOR.search(iv_field.lower())
-    if found is None:
+def _pair_field(
+    o: Table, kind: str, benchmark: str, side: str, drawdown: float | None
+) -> str | None:
+    """The ``pair_field`` of a ``pair_spread`` (required there, refused elsewhere): the picks are
+    the cheap legs (side ``long``), both legs are raw returns, a spread's dip is not stored."""
+    named = _prose(o, "pair_field") or None
+    if kind != PAIR_KIND:
+        if named is not None:
+            raise ConfigurationError(f"{o.where} pair_field: only a pair_spread outcome has one")
         return None
-    return round(int(found.group(1)) * TRADING_DAYS_PER_YEAR / CALENDAR_DAYS_PER_YEAR)
+    if named is None:
+        _missing(o, "pair_field")
+    if benchmark != "none" or side != LONG or drawdown is not None:
+        raise ConfigurationError(
+            f"{o.where}: a pair_spread needs benchmark = 'none', side long (the picks are the "
+            f"cheap legs; the sibling is the short leg) and no max_drawdown"
+        )
+    return named
 
 
 def _check_tenor(o: Table, horizons: tuple[int, ...], iv_field: str | None) -> None:
@@ -754,7 +775,7 @@ def _check_side(
     """A short or long-short outcome is an excess return with no drawdown limit (the dip of a
     short is the rally, which the store keeps apart); the borrow cost belongs to a short leg."""
     if side == LONG:
-        if borrow is not None:
+        if borrow is not None and kind != PAIR_KIND:
             raise ConfigurationError(f"{o.where} borrow_bps_annual: only a short leg pays borrow")
         return
     if kind != "excess_return" or drawdown is not None:
@@ -769,10 +790,12 @@ def identity_dict(value: Any) -> Any:
     run is recomputed by their arrival (ADR 0053 amendment, outcome sides)."""
     if isinstance(value, dict):
         long = value.get("side") == LONG and value.get("borrow_bps_annual") is None
+        unpaired = "pair_field" in value and value["pair_field"] is None
         return {
             k: identity_dict(v)
             for k, v in value.items()
             if not (long and k in ("side", "borrow_bps_annual"))
+            and not (unpaired and k == "pair_field")
         }
     if isinstance(value, (list, tuple)):
         return [identity_dict(v) for v in value]

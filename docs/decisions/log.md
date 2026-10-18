@@ -577,3 +577,11 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: the nightly starts about 18:00 New York time and SEC lists 17:30-22:00 acceptances in the next day's index, so S's own 8-Ks are usually unstored when the nightly runs; counting through S read 0 live and 1 on a recompute. The span through S-1 gives the same value live and in a backtest. A history before the first nightly walk reads null. Known limits: the session after a market day EDGAR was closed reads null, and on a SEC-only holiday Friday an after-17:30 acceptance can be missing from the walked index until the next walk.
+
+## 2026-10-18 | EB H9 (pair spread) | Result side, costs, base and eligibility of a pair
+- Question: how is a pair spread judged, what does it charge, what is its base and which pairs count?
+- Options: verdict-eligible as a long outcome / diagnostic only like `long_short`; one round trip / two; the base as one value per pair / per name against its sibling; a sibling outside the universe counts / is excluded.
+- Decision: results stored and judged as `long_short` (`Outcome.result_side`: Diagnostic only, not paper traded) while the document's `side` stays `long`; `cost_bps` per leg (two round trips) plus borrow on the sibling; the base is every eligible name against its own sibling (a pair twice, once per side), so its hit rate is near one half; a pair needs both legs in the universe at D and each naming the other (`sibling_not_eligible`, `sibling_mismatch`), and an issuer with three or more classes or a class under several ids is AMBIGUOUS, never guessed.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the spec builds the pair on `long_short` and the owner decision of 2026-10-17 makes a spread diagnostic only, so a pair spread is never a verdict basis unless the owner says so; two legs cost two trades; per-name orientation is the one base that a random side of the pair produces; a one-sided or mismatched pair would pair a name with the wrong class.

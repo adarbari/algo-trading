@@ -44,6 +44,7 @@ from algotrade.config.edges.document import (
     LONG,
     LONG_SHORT,
     MAIN,
+    PAIR_KIND,
     Edge,
     Outcome,
     identity_dict,
@@ -475,7 +476,7 @@ def evaluate_edge(
                         variant.id,
                         _trial_hash(scope, variant),
                         random_measures(pooled),
-                        scope.edge.outcome.side,
+                        scope.edge.outcome.result_side,
                     )
                 )
             found = stats.legs.get((plan.key, variant.id), {})
@@ -505,7 +506,7 @@ def evaluate_edge(
                     block_stats,
                     measures,
                     edge_variant=scope.key,
-                    side=scope.edge.outcome.side,
+                    side=scope.edge.outcome.result_side,
                     iv_source=scope.iv_field if needs_iv else None,
                     licences=trial_licences(
                         features, scope.edge, scope.universe, variant.config, licences[scope.key]
@@ -652,8 +653,10 @@ def _scopes(configs: ConfigStore, user: UserContext, edge: Edge, iv_field: str) 
 def _borrowing(outcome: Outcome, site_default: float) -> Outcome:
     """``outcome`` with the borrow rate its short leg pays made explicit (its own, else the site's
     ``verdict.toml`` default), so the trial hash and the values see one number; a long outcome has
-    no short leg and is returned as it is."""
-    if outcome.side == LONG or outcome.borrow_bps_annual is not None:
+    no short leg and is returned as it is (a pair spread's short leg is the sibling)."""
+    if outcome.borrow_bps_annual is not None or (
+        outcome.side == LONG and outcome.kind != PAIR_KIND
+    ):
         return outcome
     return replace(outcome, borrow_bps_annual=site_default)
 

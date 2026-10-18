@@ -130,6 +130,40 @@ next = "Read the mean value and the worst windows before the hit rate."
 see_also = ["outcome_option_model_pnl", "model_basis", "delta_hedged_straddle", "win_rate"]
 
 [[term]]
+id = "outcome_pair_spread"
+term = "Outcome: Pair spread"
+short = "A pick is the cheap share class of an issuer, and it works when it returns more than its sibling class."
+body = """
+Some issuers list two share classes with the same cash flows. The sibling of each is read the
+session the screen runs (rollup.share_classes@v1.sibling_id), never from today's reference, so a
+later reclassification cannot leak in. The value is the pick's return minus its sibling's over the
+same window. Two round-trip costs come off, and so does the borrow cost of the sibling, the leg
+sold short. A pick hits when the value is above zero. The comparison rate is every eligible class
+against its own sibling. The result is judged as a spread, so it is a diagnostic and never a
+verdict basis. Some names cannot be paired: a name with no sibling, a sibling not in the universe,
+a sibling that does not name it back, or one with no return. Each is excluded with its reason, never counted as zero. Few issuers
+qualify, about 15 to 25, so read the number of independent windows beside the figure. Don't read
+it as a trade: the borrow cost is an assumed rate, and no short availability is stored.
+"""
+next = "Check how many pairs and independent windows stand behind the figure before the mean."
+see_also = ["outcome_excess_return", "share_class_pair", "side_long_short", "verdict_basis", "base_rate"]
+
+[[term]]
+id = "share_class_pair"
+term = "Share class pair"
+short = "Two listed share classes of one issuer, found from the reference snapshot the session sees."
+body = """
+A pair is PAIRED when an issuer has exactly two share classes with one listed id each. It is
+AMBIGUOUS when it has three or more classes, or a class listed under several ids. Then no sibling
+is named, because a guess could pair a name with the wrong class. Classes are told apart by the
+issuer and the share-class FIGI the reference stores. Only operating companies count; a fund or a preferred share is
+not a class. The z-score field (rollup.share_classes@v1.spread_z_252d) says how far today's price ratio is from its
+own year: below zero means this class is cheap against its sibling.
+"""
+next = "Read the status before the z-score; an ambiguous issuer has no pair to compare."
+see_also = ["outcome_pair_spread"]
+
+[[term]]
 id = "model_basis"
 term = "Model basis"
 short = "A value priced by a formula on stored inputs, not read from a market quote."
