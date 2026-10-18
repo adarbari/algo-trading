@@ -27,7 +27,7 @@ Sources: Site convention (docs/data/instruments.md; ADR 0018, FIGI ids)
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a small-cap tilt | `gte 0.3` | soft | 0.1 | a loading against IWM minus SPY, not a size rank |
+| a small-cap tilt | `gte 0.3` | soft | 0.1 | illustrative screen, not a published cut-off: 0.3 is a clear lean on a one-year fit; a loading against IWM minus SPY, not a size rank |
 
 **When the reading lies**
 
@@ -45,7 +45,7 @@ Sources: Fama and French (1993), Common risk factors in the returns on stocks an
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a name that trades like recent winners | `gte 0.3` | soft | 0.1 | a loading against MTUM minus SPY |
+| a name that trades like recent winners | `gte 0.3` | soft | 0.1 | illustrative screen, not a published cut-off: 0.3 is a clear lean on a one-year fit; a loading against MTUM minus SPY |
 
 **When the reading lies**
 
@@ -63,7 +63,7 @@ Sources: Carhart (1997), On persistence in mutual fund performance, JF 52(1); th
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a name that trades like cheap stocks | `gte 0.3` | soft | 0.1 | a loading against VLUE minus SPY, not a valuation |
+| a name that trades like cheap stocks | `gte 0.3` | soft | 0.1 | illustrative screen, not a published cut-off: 0.3 is a clear lean on a one-year fit; a loading against VLUE minus SPY, not a valuation |
 
 **When the reading lies**
 
@@ -81,7 +81,7 @@ Sources: Fama and French (1993), Common risk factors in the returns on stocks an
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a name that moves with its sector | `gte 0.5` | soft | 0.2 | low values mean the name ignores its sector; check factor_status for NO_SECTOR |
+| a name that moves with its sector | `gte 0.5` | soft | 0.2 | illustrative screen, not a published cut-off: half the sector ETF move marks a name that follows its sector; check factor_status for NO_SECTOR |
 
 **When the reading lies**
 
@@ -99,7 +99,7 @@ Sources: Site convention over the select-sector SPDR ETFs (rollup.relative_stren
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a regression on a full year of sessions | `gte 250` | hard | - | under about 250 the betas are noisy |
+| a regression on a full year of sessions | `gte 250` | hard | - | illustrative screen: 250 is about a full year of sessions; below it the fit has fewer observations than the window and wider error |
 
 **When the reading lies**
 
@@ -205,7 +205,7 @@ Sources: iShares fund files (issuer's daily shares outstanding), edge build D4
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| issuers with more than one share class | `gte 2` | hard | - | then read sibling_status; three or more is AMBIGUOUS |
+| issuers with more than one share class | `gte 2` | hard | - | two or more classes is the definition of a pair candidate; then read sibling_status, as three or more is AMBIGUOUS |
 
 **When the reading lies**
 
