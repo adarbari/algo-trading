@@ -76,7 +76,7 @@ def window_rows(
     ``benchmark``: its instrument id, or None; ``delisted``: id -> delisting date, as the
     latest reference snapshot records it; ``flagged``: the (instrument, session) of the bars
     dropped as flagged (``SessionBars.flagged``)."""
-    close, high, low = (_wide(bars, window, field) for field in ("close", "high", "low"))
+    close, high, low = (wide_closes(bars, window, field) for field in ("close", "high", "low"))
     bad = {i for i, d in flagged if window.start <= d <= window.end and i in eligible}
     unmeasured = sorted(
         i
@@ -99,7 +99,7 @@ def window_rows(
     kept = complete | gone
     reasons = {str(i): NO_END_BAR for i in ids[~kept]}
     ids, c, complete = ids[kept], c[:, kept], complete[kept]
-    last = _last_bar(c)
+    last = last_bar(c)
     start = c[0]
     fwd = c[last, np.arange(len(ids))] / start - 1
     rows = pd.DataFrame(
@@ -134,18 +134,18 @@ def _unmeasured_rows(ids: Sequence[str]) -> pd.DataFrame:
     )
 
 
-def _wide(bars: pd.DataFrame, window: Window, field: str) -> pd.DataFrame:
+def wide_closes(bars: pd.DataFrame, window: Window, field: str) -> pd.DataFrame:
     """``field`` as sessions x instruments over exactly S..T (a session with no bars: NaN)."""
     frame = bars.assign(instrument_id=bars["instrument_id"].astype(str))
-    wide = frame.pivot(index="session_date", columns="instrument_id", values=field)
-    return wide.reindex(list(window.sessions))
+    table = frame.pivot(index="session_date", columns="instrument_id", values=field)
+    return table.reindex(list(window.sessions))
 
 
 def _gone(delisted_on: date | None, window: Window) -> bool:
     return delisted_on is not None and pd.notna(delisted_on) and delisted_on > window.start
 
 
-def _last_bar(c: np.ndarray) -> np.ndarray:
+def last_bar(c: np.ndarray) -> np.ndarray:
     """Per column, the row of its last bar (row 0, S, always has one)."""
     present = ~np.isnan(c)
     return len(c) - 1 - np.argmax(present[::-1], axis=0)

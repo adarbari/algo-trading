@@ -14,14 +14,24 @@ from algotrade.data.outcomes.reading import (
     select_outcomes,
     stored_sessions,
 )
+from algotrade.data.outcomes.residuals import (
+    NO_RESIDUAL_ROW,
+    RESIDUAL_FIELDS,
+    attach_residuals,
+    read_residuals,
+)
 
 __all__ = [
+    "NO_RESIDUAL_ROW",
     "OUTCOME_FIELDS",
+    "RESIDUAL_FIELDS",
+    "attach_residuals",
     "missing_outcomes",
     "outcome_known",
     "outcome_seqs",
     "outcome_stamps",
     "read_outcomes",
+    "read_residuals",
     "read_stored",
     "select_outcomes",
     "stored_sessions",
