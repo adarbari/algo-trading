@@ -1,0 +1,33 @@
+# L3 site setting: the Guide's playbook for the site preset cash_op_profitability (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "cash_op_profitability"
+version = 1  # the preset version this prose was written for
+summary = "Ranks every tradeable stock by how much cash operating profit it earns on each dollar of assets, highest first: operating income less the accruals in earnings, over total assets. It is a quality ranking from the finance literature, a candidate edge under test, not a proven trade."
+hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and it has a cash-based operating profitability value. Every such name qualifies; the order is the point, the most profitable per dollar of assets first."
+not_checked = "It does not check price (a profitable company can be expensive), momentum, size or sector, and banks, brokers and insurers have no value. It is the screen of the cash-based operating profitability edge, which the harness is still testing."
+before_acting = [
+  "The value is built from what is stored: the paper's line by line accrual changes and R&D add-back are not, so read feature.cash_op_profitability as the cash earnings measure it approximates, not as the paper's number.",
+  "A high value on a small asset base can be a one-quarter swing in feature.cash_op_profitability's inputs; compare it with rollup.mispricing@v1.gross_profit_to_assets, which moves slowly.",
+  "Profitability is not cheapness: feature.composite_value_yield shows what you pay for it, and the composite value playbook screens for both.",
+]
+sources = [
+  "Ball, Gerakos, Linnainmaa and Nikolaev, Accruals, cash flows, and operating profitability in the cross section of stock returns (2016)",
+  "Novy-Marx, The Other Side of Value: The Gross Profitability Premium (2013)",
+]
+related = [
+  { id = "composite_value", reason = "the same measure combined with value" },
+  { id = "qmj", reason = "quality as a composite" },
+]
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+cash_op = "Has a cash-based operating profitability value"

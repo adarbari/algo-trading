@@ -18,7 +18,7 @@ purpose = "L3 site settings: one <name>.toml per settings group, each loaded by 
 
 [[config_dir]]
 path = "config/site/field_guide"
-purpose = "L3 field guide, one <theme>.toml per theme (the situations sit in instrument.toml; statements.toml holds the SEC statement groups, analyst.toml the analyst consensus fields): how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
+purpose = "L3 field guide, one <theme>.toml per theme (the situations sit in instrument.toml; statements.toml holds the SEC statement groups, analyst.toml the analyst consensus fields and, while the other files sit at the 1000-line cap, the edge build's fundamentals entries under their own themes): how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
 
 [[config_dir]]
 path = "config/site/features"
@@ -109,6 +109,10 @@ path = "config/site/guide/playbooks/filings"
 purpose = "the Guide's playbooks of the filings and index changes family (adverse 8-K items, late filers, tender offers, S&P 500 deletions): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
+path = "config/site/guide/playbooks/fundamentals"
+purpose = "the Guide's playbooks of the quality and value family (cash-based operating profitability, composite value, quality minus junk, net share issuance, asset growth, distress, BDC price to NAV): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
 path = "config/site/regime"
 purpose = "regime track reference data: the crash episodes, the NBER recession chronology and the plain-language indicator cards (ADR 0047)"
 
@@ -180,6 +184,10 @@ purpose = "the web UI: frontend architecture (layers, rules) and the design syst
 path = "docs/decisions"
 purpose = "the decision log: product-direction and policy decisions, by the owner or by a Fable agent on their behalf, append-only (.claude/skills/review-and-release)"
 kind = "log"
+
+[[docs_dir]]
+path = "docs/edges"
+purpose = "the generated edge pages, one per family (a.md .. i.md, other.md for an edge with no family); rendered by make features-doc from config/site/edges/, indexed by docs/edges.md"
 
 [[docs_dir]]
 path = "docs/edge-ideas"

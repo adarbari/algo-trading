@@ -44,6 +44,7 @@ from algotrade.services.evaluation.cross_section.results import (
     oos_haircuts,
     records,
     report_containment,
+    sibling_coverage,
     survivorship,
     write_edge_eval,
 )
@@ -216,6 +217,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         "lost_sessions": lost_sessions(evaluation),
         "oos_haircut": oos_haircuts(evaluation),
         "iv_coverage": iv_coverage(evaluation),
+        "sibling_coverage": sibling_coverage(evaluation),
         "report_containment": report_containment(evaluation),
         "decoys": decoys(evaluation),
         "rows": records(rows[rows["role"] != RANDOM]),  # the draws are stored, not reported

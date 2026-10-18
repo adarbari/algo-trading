@@ -21,7 +21,7 @@ and the key.
                       ``iv_field`` is allowed on a ratio measure too (default: the run's); an
                       ``option_model_pnl`` outcome (a model P&L, basis ``model``) names its
                       ``structure`` (MODEL_STRUCTURES), ``iv_field``, ``benchmark = "none"``, no
-                      strike; ``option_pnl``: ``chain.py``;
+                      strike; ``option_pnl``: ``chain.py``; ``pair_spread``: ``pair_field``;
                       ``side`` (SIDES; ADR 0053 amendment, outcome sides): ``long`` (default),
                       ``short`` (the picks are the bottom ``top_k`` of the ranked, liquid names;
                       the value is minus the excess return, less cost and borrow) or
@@ -112,6 +112,7 @@ from algotrade.config.edges.identity import (
     SIDES,
     check_side,
     hold_rank_of,
+    pair_field_of,
 )
 from algotrade.config.edges.portfolio import (
     BENCHMARK_BASE,
@@ -141,15 +142,9 @@ STATUSES = ("researching", "candidate", "evidenced", "live", "retired", "rejecte
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
 OUTCOME_KINDS = (
     "excess_return", "hit_target", "expires_otm", "option_model_pnl", PORTFOLIO_KIND,
-    chain.CHAIN_KIND,
+    chain.CHAIN_KIND, "pair_spread",
 )  # fmt: skip
-STRUCTURES = ("put", "call", "strangle")  # an expires_otm outcome's short option(s)
-# An option_model_pnl outcome's position: one at-the-money straddle held to the horizon's close,
-# long or short, or delta-hedged, long or short (ADR 0053 amendment 2026-10-17).
-MODEL_STRUCTURES = (
-    "atm_straddle_long", "atm_straddle_short", "delta_hedged_atm", "delta_hedged_atm_short",
-)  # fmt: skip
-MODEL_KIND = "option_model_pnl"
+MODEL_KIND, PAIR_KIND = "option_model_pnl", "pair_spread"  # pair: cheap return less sibling's
 MODEL_BASIS = "model"  # what a price from a model, not a quote, is labelled (results and UI)
 BENCHMARKS = ("SPY", "none")
 SCHEDULES = ("every_session", "month_end")
@@ -230,7 +225,7 @@ KEYS = (
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
-    "side", "borrow_bps_annual", "tenor_days", "hold_rank", "weighting", "vol_field",
+    "side", "borrow_bps_annual", "tenor_days", "hold_rank", "weighting", "vol_field", "pair_field",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -265,11 +260,17 @@ class Outcome:
     side: str = LONG  # SIDES; a short leg pays ``borrow_bps_annual`` (None: the site's default)
     borrow_bps_annual: float | None = None
     tenor_days: int | None = None  # an option_pnl's tenor rule (chain.py)
+    pair_field: str | None = None  # a pair_spread's sibling-id feature, read at D
     hold_rank: int | None = None  # buy/hold band: held while rank <= this (None: no band)
     # A portfolio_return book (ADR 0074): how the picks are weighted, and for ``inverse_vol`` the
     # declared feature whose value at D is each name's volatility.
     weighting: str = "equal"
     vol_field: str | None = None
+
+    @property
+    def result_side(self) -> str:
+        """The side results are judged under: ``long_short`` (diagnostic only) for a pair spread."""
+        return LONG_SHORT if self.kind == PAIR_KIND else self.side
 
     @property
     def is_return(self) -> bool:
@@ -752,7 +753,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
     drawdown = o.number("max_drawdown", None, 0)
     if drawdown is not None and not 0 < drawdown <= 1:
         raise ConfigurationError(f"{o.where} max_drawdown: expected a fraction in (0, 1]")
-    structure, strike_delta, otm_pct, iv_field = _expires_otm(o, kind)
+    structure, strike_delta, otm_pct, iv_field = chain.option_fields(o, kind)
     if kind == MODEL_KIND:
         chain.check_tenor(o, horizons, iv_field)
     side = o.choice("side", LONG, SIDES)
@@ -778,43 +779,11 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         side=side,
         borrow_bps_annual=borrow,
         tenor_days=chain.chain_tenor(o, kind),
+        pair_field=pair_field_of(o, kind == PAIR_KIND, benchmark, side, drawdown),
         hold_rank=hold_rank,
         weighting=weighting,
         vol_field=vol_field,
     )
-
-
-def _expires_otm(o: Table, kind: str) -> tuple[str | None, float | None, float | None, str | None]:
-    """``(structure, strike_delta, otm_pct, iv_field)``: a structure only for the option kinds."""
-    delta, pct = o.number("strike_delta", None), o.number("otm_pct", None)
-    iv_field = _prose(o, "iv_field") or None
-    structures = chain.structures_of(kind, STRUCTURES, MODEL_STRUCTURES)
-    structure = o.choice("structure", "", structures) if "structure" in o.names() else None
-    if kind == chain.CHAIN_KIND:
-        return chain.check_chain(o, structure, delta, pct, iv_field)
-    if kind not in ("expires_otm", MODEL_KIND, chain.CHAIN_KIND):
-        for key, value in (("structure", structure), ("strike_delta", delta), ("otm_pct", pct)):
-            if value is not None:
-                raise ConfigurationError(f"{o.where} {key}: only an expires_otm outcome has one")
-        return None, None, None, iv_field
-    if structure is None:
-        _missing(o, "structure")
-    if kind == "option_model_pnl":
-        for key, value in (("strike_delta", delta), ("otm_pct", pct)):
-            if value is not None:
-                raise ConfigurationError(
-                    f"{o.where} {key}: an option_model_pnl is at the money, it has no strike"
-                )
-    elif (delta is None) == (pct is None):
-        raise ConfigurationError(
-            f"{o.where}: an expires_otm outcome names exactly one of strike_delta and otm_pct"
-        )
-    for key, value in (("strike_delta", delta), ("otm_pct", pct)):
-        if value is not None and not 0 < value < 1:
-            raise ConfigurationError(f"{o.where} {key}: expected a fraction in (0, 1), got {value}")
-    if iv_field is None:
-        raise ConfigurationError(f"{o.where} iv_field: required for an {kind} outcome")
-    return structure, delta, pct, iv_field
 
 
 def _horizons(o: Table) -> tuple[int, ...]:

@@ -69,6 +69,7 @@ class SessionReads:
         self._labels: dict[date, str] = {}
         self._implied: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
         self._adv: dict[tuple[frozenset[str], date], dict[str, float | None]] = {}
+        self._siblings: dict[tuple[str, frozenset[str], date], dict[str, str | None]] = {}
         self._sectors: dict[tuple[frozenset[str], date], dict[str, str | None]] = {}
         self._numbers: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
         self._bills: dict[date, float | None] = {}
@@ -152,6 +153,7 @@ class SessionReads:
         self._labels.clear()
         self._implied.clear()
         self._adv.clear()
+        self._siblings.clear()
         self._sectors.clear()
         self._numbers.clear()
         self._bills.clear()
@@ -170,6 +172,15 @@ class SessionReads:
         if key not in self._implied:
             self._implied[key] = implied_at(self._reader, field_name, ids, day)
         return self._implied[key]
+
+    def siblings(self, field_name: str, ids: frozenset[str], day: date) -> dict[str, str | None]:
+        """The sibling id ``field_name`` gives each of ``ids`` read at D (None: not stored), through
+        the recording reader: a restated reference partition invalidates the legs that read it,
+        and a sibling that changed is the one D saw, never today's (EB H9)."""
+        key = (field_name, ids, day)
+        if key not in self._siblings:
+            self._siblings[key] = strings_at(self._reader, field_name, ids, day)
+        return self._siblings[key]
 
     def adv(self, ids: frozenset[str], day: date) -> dict[str, float | None]:
         """``adv_usd_20d`` of ``ids`` at D (None: not stored, never 0), read once per eligible
@@ -264,3 +275,13 @@ def numbers_at(
         i: float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
         for i, v in values.items()
     }
+
+
+def strings_at(
+    reader: StoreReader, field_name: str, ids: Iterable[str], day: date
+) -> dict[str, str | None]:
+    """The text field ``field_name`` of ``ids`` read at ``day`` (None: not stored or not text)."""
+    wanted = sorted(ids)
+    view, _ = fields_view(reader, (field_name,), day, wanted, historical=True, held=HARNESS_ALL)
+    values = {i: view.get(i, field_name) for i in wanted}
+    return {i: v if isinstance(v, str) and v else None for i, v in values.items()}

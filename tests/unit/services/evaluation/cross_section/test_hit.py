@@ -18,9 +18,11 @@ from algotrade.quant.black_scholes import (
     strike_from_delta,
 )
 from algotrade.services.evaluation.cross_section.hit import (
+    Pairs,
     apply_outcome,
     borrow_cost,
     needs_implied_vol,
+    needs_pairs,
     short_view,
 )
 from algotrade.storage.tables.schemas import RESIDUAL_RETURNS
@@ -369,6 +371,15 @@ def test_a_long_outcome_has_no_short_value_and_borrow_scales_with_the_holding_pe
     assert np.allclose(borrow_cost(None, np.array([20.0])), [0.0])
 
 
+def pair_edge(**outcome: object):  # type: ignore[no-untyped-def]
+    base = {
+        "kind": "pair_spread", "horizon_sessions": [20], "benchmark": "none",
+        "start_offset_sessions": 1, "pair_field": "rollup.share_classes@v1.sibling_id",
+        "cost_bps": 10, "borrow_bps_annual": 252,
+    }  # fmt: skip
+    return edge(outcome={**base, **outcome}, top_k=5)
+
+
 # ---- option_pnl: the P&L of quoted prices from the chain grain (basis "chain") ------------
 
 CHAIN = {
@@ -467,6 +478,104 @@ def _residual(**outcome: object) -> object:
         "benchmark": "SPY", "start_offset_sessions": 1, "cost_bps": 100,
     }  # fmt: skip
     return edge(outcome={**base, **outcome}, top_k=5)
+
+
+def pair_rows(returns: dict[str, float], **columns: object) -> pd.DataFrame:
+    """The stored outcome rows of one horizon at S, one per name."""
+    n = len(returns)
+    return pd.DataFrame(
+        {
+            "instrument_id": list(returns), "fwd_return": list(returns.values()),
+            "horizon_sessions": [20] * n, "outcome_status": ["COMPLETE"] * n, **columns,
+        }
+    )  # fmt: skip
+
+
+def pairs_of(stored: pd.DataFrame, siblings: dict[str, str | None], **kw: object) -> Pairs:
+    eligible = kw.get("eligible", frozenset(siblings))
+    return Pairs(siblings, eligible, stored)  # type: ignore[arg-type]
+
+
+AB = {"EQ:A": "EQ:B", "EQ:B": "EQ:A"}
+
+
+def test_a_pair_spread_is_the_name_less_its_sibling_net_of_two_costs_and_the_rich_legs_borrow() -> (
+    None
+):
+    """A returned 5%, B 2%: 3 points; two round trips of 10 bp and 252 bp a year over 20 of 252
+    sessions (20 bp) of borrow on B: 3% - 0.2% - 0.2% = 2.6%. B as the cheap leg is its mirror."""
+    e = pair_edge()
+    assert needs_pairs(e) and not needs_implied_vol(e)
+    stored = pair_rows({"EQ:A": 0.05, "EQ:B": 0.02})
+    out = apply_outcome(e, stored, pairs=pairs_of(stored, AB)).set_index("instrument_id")
+    assert np.isclose(out.at["EQ:A", "value"], 0.026)
+    assert np.isclose(out.at["EQ:B", "value"], -0.03 - 0.004)  # the sign flips, the costs do not
+    assert out.at["EQ:A", "hit"] and not out.at["EQ:B", "hit"]
+    assert set(out["excluded"]) == {""}
+    assert np.allclose(out["oriented"], out["value"])
+
+
+def test_the_borrow_is_charged_on_the_sibling_and_scales_with_the_holding_period() -> None:
+    stored = pair_rows({"EQ:A": 0.0, "EQ:B": 0.0}, horizon_sessions=[63, 63])
+    short = pair_edge(horizon_sessions=[63], cost_bps=0, borrow_bps_annual=400)
+    out = apply_outcome(short, stored, pairs=pairs_of(stored, AB)).set_index("instrument_id")
+    assert np.isclose(out.at["EQ:A", "value"], -0.04 * 63 / 252)
+    free = pair_edge(horizon_sessions=[63], cost_bps=0, borrow_bps_annual=0)
+    out = apply_outcome(free, stored, pairs=pairs_of(stored, AB))
+    assert np.allclose(out["value"], 0.0)
+
+
+def test_a_name_with_no_usable_pair_is_excluded_with_the_reason_never_a_zero() -> None:
+    """No sibling at D, a sibling outside the universe, one that names another, one with no
+    row at S, one UNMEASURED, and one with a null return: each its own reason."""
+    names = ["EQ:A", "EQ:B", "EQ:C", "EQ:D", "EQ:E", "EQ:F", "EQ:G", "EQ:H", "EQ:I", "EQ:J"]
+    siblings = {
+        "EQ:A": "EQ:B", "EQ:B": "EQ:A",  # a good pair
+        "EQ:C": None,  # no sibling stored at D
+        "EQ:D": "EQ:Z",  # the sibling is outside the universe
+        "EQ:E": "EQ:F", "EQ:F": "EQ:A",  # F names A, not E
+        "EQ:G": "EQ:H", "EQ:H": "EQ:G",  # H has no outcome row
+        "EQ:I": "EQ:J", "EQ:J": "EQ:I",  # J is UNMEASURED
+    }  # fmt: skip
+    stored = pair_rows({n: 0.01 for n in names if n != "EQ:H"})
+    stored.loc[stored["instrument_id"] == "EQ:J", "outcome_status"] = "UNMEASURED"
+    got = pair_rows({n: 0.01 for n in names if n not in ("EQ:H", "EQ:Z")})
+    got.loc[got["instrument_id"] == "EQ:J", "outcome_status"] = "UNMEASURED"
+    eligible = frozenset(siblings) | {"EQ:H"}
+    out = apply_outcome(pair_edge(), got, pairs=Pairs(siblings, eligible, stored)).set_index(
+        "instrument_id"
+    )
+    reasons = out["excluded"].to_dict()
+    assert reasons["EQ:A"] == "" and reasons["EQ:B"] == ""
+    assert reasons["EQ:C"] == "no_sibling"
+    assert reasons["EQ:D"] == "sibling_not_eligible"
+    assert reasons["EQ:E"] == "sibling_mismatch"
+    assert reasons["EQ:G"] == "no_sibling_row"
+    assert reasons["EQ:I"] == "sibling_unmeasured" and reasons["EQ:J"] == "unmeasured"
+    bad = out[out["excluded"] != ""]
+    assert bad["value"].isna().all() and not bad["hit"].any()  # never a zero, never a miss
+
+
+def test_a_null_return_on_either_leg_is_a_missing_value_not_a_zero() -> None:
+    stored = pair_rows({"EQ:A": 0.05, "EQ:B": NAN})
+    out = apply_outcome(pair_edge(), stored, pairs=pairs_of(stored, AB)).set_index("instrument_id")
+    assert list(out["excluded"]) == ["missing_value", "missing_value"]
+
+
+def test_the_sibling_is_the_one_read_at_d_not_the_one_the_partition_would_pair() -> None:
+    """A reclassified name: at D, A's sibling was B; today's reference pairs A with C. The value
+    uses only the siblings handed in (read at D), whatever other names are in the partition."""
+    stored = pair_rows({"EQ:A": 0.05, "EQ:B": 0.02, "EQ:C": 0.5})
+    at_d = {"EQ:A": "EQ:B", "EQ:B": "EQ:A", "EQ:C": None}
+    out = apply_outcome(
+        pair_edge(cost_bps=0, borrow_bps_annual=0), stored, pairs=pairs_of(stored, at_d)
+    )
+    assert np.isclose(out.set_index("instrument_id").at["EQ:A", "value"], 0.03)
+
+
+def test_a_pair_spread_needs_the_siblings() -> None:
+    with pytest.raises(ConfigurationError, match="needs the siblings"):
+        apply_outcome(pair_edge(), pair_rows({"EQ:A": 0.05, "EQ:B": 0.02}))
 
 
 def _with_residual(**columns: list[object]) -> pd.DataFrame:

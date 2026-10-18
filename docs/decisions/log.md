@@ -739,6 +739,38 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: Promising can be read on the out-of-sample figures alone, but Works needs a basis not chosen after seeing the result, which the rule can only vouch for with an in-sample period.
 
+## 2026-10-18 | EB H9 (pair spread) | Result side, costs, base and eligibility of a pair
+- Question: how is a pair spread judged, what does it charge, what is its base and which pairs count?
+- Options: verdict-eligible as a long outcome / diagnostic only like `long_short`; one round trip / two; the base as one value per pair / per name against its sibling; a sibling outside the universe counts / is excluded.
+- Decision: results stored and judged as `long_short` (`Outcome.result_side`: Diagnostic only, not paper traded) while the document's `side` stays `long`; `cost_bps` per leg (two round trips) plus borrow on the sibling; the base is every eligible name against its own sibling (a pair twice, once per side), so its hit rate is near one half; a pair needs both legs in the universe at D and each naming the other (`sibling_not_eligible`, `sibling_mismatch`), and an issuer with three or more classes or a class under several ids is AMBIGUOUS, never guessed.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the spec builds the pair on `long_short` and the owner decision of 2026-10-17 makes a spread diagnostic only, so a pair spread is never a verdict basis unless the owner says so; two legs cost two trades; per-name orientation is the one base that a random side of the pair produces; a one-sided or mismatched pair would pair a name with the wrong class.
+
+## 2026-10-18 | PR #661 review (EB H9) | Pair tests, verdict, and two follow-ups
+- Question: where do the pair harness tests live, is a pair spread ever a verdict basis, and are per-reason exclusion counts and a sibling ADV floor in this PR?
+- Options: split the test folder now / in the next PR touching it; diagnostic only / verdict-eligible; counts and floor now / follow-up.
+- Decision: tests stay in `test_harness_trials.py` (split the folder by kind in the next PR touching it); a pair spread stays Diagnostic only through `result_side`; per-reason exclusion counts (today folded into `excluded_missing`, the reason is on each pick) and an ADV floor on the sibling (short) leg are follow-ups. A reference snapshot without `cik` / `share_class_figi` is MissingDataError, never an empty pair set.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the architect review found `REFERENCE_FACTS` dropped the ids so every pick read `no_sibling`; the loader now carries them. The folder split and the two counts touch other modules and need their own review.
+
+## 2026-10-18 | PR #661 CI (EB H9) | A reference snapshot without issuer or class ids
+- Question: does `share_classes@v1` raise MissingDataError when the reference snapshot has no `cik` / `share_class_figi` column?
+- Options: raise / return no rows.
+- Decision: no rows (every read is UNKNOWN; a pair pick reads `no_sibling`, counted), reversing the earlier review ask.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the ingestion nightly end-to-end tests build a reference without those columns and the critical rollups step failed, holding back the workflow; a snapshot built without issuer ids is a normal state, not a broken one.
+
+## 2026-10-18 | EB E2 (PR 667 review) | How the BDC universe is defined
+- Question: how is the universe of the BDC price-to-NAV edge defined, when the reference has no BDC type and the SEC company table no SIC for them?
+- Options: a ticker list with a maintenance rule / key the list by instrument_id / drop the edge.
+- Decision: key by instrument_id: the tickers are resolved once through the SymbolResolver and the ids are committed in the selection preset and the screener (a fitness test keeps them equal); the edge notes say history before the frozen period is survivor-only (BDCs merged away are missing; renamed ones such as ORCC to OBDC 2023 and AINV to MFIC 2022 are the same id). The screener also requires the balance sheet to be at most 135 days old (`rollup.qmj@v1.balance_sheet_age_days`) and discloses that the cover-page share count and the balance-sheet equity can differ by a quarter.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a ticker is reused and renamed, an id is not (ADR 0018); a list with no maintenance rule is a silent survivor filter, so it is named as one; dropping the edge loses a clean, cheap test of a documented structural niche.
+
 ## 2026-10-18 | EB H10b (ensembles and the haircut) | What an ensemble counts as and how its members are treated
 - Question: how many trials is a pre-registered grid whose weights are averaged, may a member be the basis, and what does the out-of-sample haircut do?
 - Options: every member a trial plus the ensemble / the ensemble once; a member may be promoted as the basis / never; the haircut a verdict gate / a display; one haircut for every edge / a class per edge.

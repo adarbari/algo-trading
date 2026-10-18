@@ -214,6 +214,7 @@ EDGE_LEGS = fixed(
     *floats("rest_mean", "rest_m2", "top_decile", "spread"),
     "pre_snapshot bool",
     "implied_stored bool",
+    "siblings_stored bool",  # pair_spread: the pair field had a value for some name; null: n/a
     "tombstone bool",  # a leg row that says its key has no leg any more (ADR 0063 amendment 7)
     "value_sums float32[]",
     "hit_sums float32[]",

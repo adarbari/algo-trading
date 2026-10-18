@@ -273,6 +273,27 @@ def oos_haircuts(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
     return found
 
 
+def sibling_coverage(evaluation: EdgeEvaluation) -> list[dict[str, Any]]:
+    """Per variant and horizon of a pair spread, the measured sessions and those at which its
+    ``pair_field`` had a value for no eligible name (an unbuilt or empty ``share_classes``
+    group): their picks read ``no_sibling``, which would otherwise look like a normal session.
+    Only where the field fell short."""
+    out = []
+    for r in evaluation.results:
+        measured = [s for s in r.stats if not s.excluded_coverage]
+        lacking = sum(not s.siblings_stored for s in measured)
+        if lacking:
+            out.append(
+                {
+                    "variant": f"{r.edge_variant}/{r.variant}",
+                    "horizon": r.horizon,
+                    "sessions": len(measured),
+                    "no_sibling_data": lacking,
+                }
+            )
+    return out
+
+
 def survivorship(evaluation: EdgeEvaluation) -> dict[int, tuple[int, int]]:
     """Per horizon, how many of the evaluated sessions read a universe snapshot taken after
     them (``(n, m)``: the survivorship caveat beside every number over them)."""

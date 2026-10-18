@@ -70,7 +70,7 @@ def unit_of(edge: Edge) -> str:
     o = edge.outcome
     if o.kind == "expires_otm":
         return CUSHION
-    if o.kind in ("option_model_pnl", "option_pnl"):
+    if o.kind in ("option_model_pnl", "option_pnl", "pair_spread"):
         return PNL
     if is_return(edge):
         return RETURN if o.benchmark == "none" else EXCESS_RETURN
