@@ -1,0 +1,471 @@
+# Continues levels.toml: the same keys, the same theme; see its header.
+
+[[field]]
+name = "rollup.pivot_strength@v1.support_touches"
+theme = "price levels"
+reads = "How many separate times the last 252 sessions tested the current support (rollup.swing_levels@v1.swing_low), the pivot bar counted: a bar touches when its low came within half an ATR of the level and it closed at or above it; consecutive bars count once. 1 is the pivot alone; 2 to 3 is a floor that held; each further test is also a chance that the buyers there are exhausted."
+caveats = [
+  "A floor that held three times has not been broken yet, which is all it says; a fourth test can fail. Check rollup.pivot_strength@v1.support_age and feature.trend_state (support in a downtrend breaks more than it holds).",
+  "Needs the close above a swing low: null at a one-year low, and when atr_14 is unknown.",
+]
+sources = ["docs/data/swing.md; Edwards and Magee, Technical Analysis of Stock Trends"]
+[[field.use]]
+for = "tested support twice"
+op = "gte"
+value = 2
+mode = "soft"
+tolerance = 1
+note = "with feature.trend_state eq UPTREND and feature.dist_to_support_atr lte 1"
+
+[[field]]
+name = "rollup.pivot_strength@v1.resistance_age"
+theme = "price levels"
+reads = "Sessions since the swing high that is the current resistance (5 to 246). A level from the last two months is recent supply that many holders still remember; one from ten months ago is mostly forgotten, and a stock that clears it has little overhead memory."
+caveats = [
+  "At least 5 by construction (a pivot is confirmed 5 sessions later); a very recent high is not yet a level.",
+  "The age of the pivot, not of the last test: rollup.pivot_strength@v1.resistance_touches says whether it was tested since.",
+  "Null when there is no resistance above the close.",
+]
+sources = ["docs/data/swing.md"]
+[[field.use]]
+for = "a recent resistance"
+op = "lte"
+value = 60
+mode = "soft"
+tolerance = 20
+[[field.use]]
+for = "an old resistance (little memory)"
+op = "gte"
+value = 120
+mode = "soft"
+tolerance = 30
+
+[[field]]
+name = "rollup.pivot_strength@v1.support_age"
+theme = "price levels"
+reads = "Sessions since the swing low that is the current support (5 to 246). A recent low is a floor the market has recently defended; an old one is a memory."
+caveats = [
+  "At least 5 by construction; the age of the pivot, not of its last test (rollup.pivot_strength@v1.support_touches).",
+  "Null when there is no support below the close.",
+]
+sources = ["docs/data/swing.md"]
+[[field.use]]
+for = "a recently defended support"
+op = "lte"
+value = 60
+mode = "soft"
+tolerance = 20
+
+[[field]]
+name = "rollup.retest@v1.sessions_since_breakout"
+theme = "price levels"
+reads = "Sessions since the latest 20-session breakout of the last 60 (0 is today). A breakout from the last few days is fresh and is where a retest, if there is one, comes next; one from two months ago has either worked or faded."
+caveats = [
+  "A breakout today is never a retest (rollup.retest@v1.retest_state FRESH); look again in a few sessions.",
+  "Null when there was no breakout in the last 60 sessions.",
+]
+sources = ["docs/data/swing.md"]
+[[field.use]]
+for = "a fresh breakout"
+op = "lte"
+value = 10
+mode = "soft"
+tolerance = 5
+note = "with rollup.retest@v1.retest_state ne FAILED"
+
+[[field]]
+name = "rollup.retest@v1.failed_breakouts_252d"
+theme = "price levels"
+reads = "How many of the name's 20-session breakouts in the last 252 sessions fell back below their level within 20 sessions (a run of consecutive breakout days counts once; one younger than 20 sessions counts only if it has already failed). 0 means its breakouts have worked, or it has had none; 2 or more is a name whose breakouts do not stick, which is the pattern a breakout buyer should fade or avoid."
+caveats = [
+  "0 mixes two cases: breakouts that held and no breakouts at all. Check rollup.retest@v1.breakout_date, which is null without a recent one.",
+  "A pending breakout (under 20 sessions old) that has not failed yet counts as 0 today and can turn into 1 tomorrow.",
+  "Null unless every one of the last 292 sessions has a bar, so a name with a gap or under 14 months of history never passes a hard criterion on it (use soft).",
+]
+sources = ["docs/data/swing.md; Bulkowski, Encyclopedia of Chart Patterns (breakout failure); Raschke and Connors, Street Smarts (failed breakouts)"]
+[[field.use]]
+for = "breakouts that stick"
+op = "lte"
+value = 1
+mode = "soft"
+tolerance = 1
+[[field.use]]
+for = "a record of failed breakouts"
+op = "gte"
+value = 2
+mode = "soft"
+tolerance = 1
+
+[[field]]
+name = "rollup.gaps@v1.gap_open_pct"
+theme = "price levels"
+reads = "Today's open against the previous close, as a fraction: 0.03 opened 3% above, -0.02 opened 2% below. Overnight news shows here before the day's range does: earnings, a downgrade, a market-wide move. Whether the gap is then held or filled is the day's story, not this number's."
+caveats = [
+  "Most large gaps are news (rollup.earnings@v1.last_earnings_date, rollup.earnings@v1.next_earnings_date); a gap on no news and thin volume more often fills.",
+  "The open is the first print, which can be far from where the day trades; judge the day with the close and rollup.momentum@v1.rel_volume.",
+  "Null when the previous session has no bar (a halt, a listing day); a hard criterion then rejects the name.",
+]
+sources = ["docs/data/swing.md; Edwards and Magee, Technical Analysis of Stock Trends (gaps)"]
+[[field.use]]
+for = "gapped up at the open"
+op = "gte"
+value = 0.03
+mode = "hard"
+note = "with rollup.momentum@v1.rel_volume gte 1.5 to tell news from noise"
+[[field.use]]
+for = "gapped down at the open"
+op = "lte"
+value = -0.03
+mode = "hard"
+
+[[field]]
+name = "feature.dist_to_gap_above"
+theme = "price levels"
+reads = "How far above the close the nearest unfilled down gap begins, as a fraction of the close: 0.03 is 3% above. Close to 0 the close is right under a gap zone where supply sat when price dropped through; 0.10 or more is out of play for a swing trade. The zone is rollup.gaps@v1.gap_above (its lower edge)."
+caveats = [
+  "Null when no unfilled down gap lies wholly above the close (all filled, or the close is inside one): that is a clean overhead, not a zero distance.",
+  "A gap from an earnings reaction (rollup.gaps@v1.gap_above_date near rollup.earnings@v1.last_earnings_date) is a weaker level than one on no news.",
+]
+sources = ["docs/data/swing.md; Murphy, Technical Analysis of the Financial Markets (gaps as resistance)"]
+[[field.use]]
+for = "an overhead gap close by"
+op = "lte"
+value = 0.05
+mode = "soft"
+tolerance = 0.02
+note = "a resistance to respect; with feature.dist_to_resistance for the swing high"
+[[field.use]]
+for = "room before the next overhead gap"
+op = "gte"
+value = 0.08
+mode = "soft"
+tolerance = 0.03
+note = "soft, so a name with a clean overhead (null) is listed rather than rejected"
+
+[[field]]
+name = "feature.dist_to_gap_below"
+theme = "price levels"
+reads = "How far below the close the nearest unfilled up gap begins, as a fraction of the close: 0.03 is 3% below. Close to 0 the close is right above a gap zone, where a pullback meets the old gap; the zone is rollup.gaps@v1.gap_below (its upper edge). A gap that far below has not been tested since it formed."
+caveats = [
+  "Null when no unfilled up gap lies wholly below the close (all filled, or the close is inside one).",
+  "A breakaway gap on news may never fill; check rollup.gaps@v1.gap_below_date and rollup.earnings@v1.last_earnings_date.",
+]
+sources = ["docs/data/swing.md; Murphy, Technical Analysis of the Financial Markets (gaps as support)"]
+[[field.use]]
+for = "a support gap just under the price"
+op = "lte"
+value = 0.03
+mode = "soft"
+tolerance = 0.02
+note = "with feature.trend_state eq UPTREND"
+
+[[field]]
+name = "rollup.pivot_strength@v1.pivot_structure"
+theme = "price levels"
+reads = "The shape of the last two swing highs and the last two swing lows over the past year. HH_HL: the later high is above the earlier and the later low above the earlier (higher highs and higher lows: the Dow definition of an uptrend). LH_LL: both lower (a downtrend). MIXED: one up and one down, or an equal pair (a range, an expanding or contracting wedge). Unlike feature.trend_state it reads the pivots, not the averages, so it turns earlier and is blind to the size of the steps."
+caveats = [
+  "Only the last two pivots of each kind: one higher low after a long decline reads HH_HL if the last two highs also rose, long before a trend exists. Confirm with feature.trend_state and rollup.price_stats@v2.ret_60d.",
+  "Pivots are confirmed 5 sessions late, so the newest swing is not in it yet.",
+  "Null with fewer than two swing highs or two swing lows in the 252 sessions read (a steady trend with no pullbacks has few pivots) or a missing bar around them.",
+]
+sources = ["docs/data/swing.md; Dow theory (higher highs and higher lows) as in Murphy, Technical Analysis of the Financial Markets"]
+[[field.use]]
+for = "higher highs and higher lows"
+op = "eq"
+value = "HH_HL"
+mode = "hard"
+note = "with feature.trend_state eq UPTREND to ask for both the pivots and the averages"
+[[field.use]]
+for = "not in a downtrend structure"
+op = "ne"
+value = "LH_LL"
+mode = "soft"
+tolerance = 0
+
+[[field]]
+name = "feature.breakout_retest_held"
+theme = "price levels"
+reads = "True when the latest 20-session breakout came back to within half an ATR of its level on an earlier session and no close since has gone below the level (rollup.retest@v1.retest_state HELD). The breakout has been tested and survived; it does not say price is at the level now (RETESTING is today's retest)."
+caveats = [
+  "False covers every other state: not yet retested (FRESH), retesting today, failed and no breakout. Use rollup.retest@v1.retest_state in to include RETESTING.",
+  "One held retest is a sample of one; combine with feature.trend_state eq UPTREND.",
+  "Null when the name has no retest row (no bar on the session).",
+]
+sources = ["docs/data/swing.md; Bulkowski, Encyclopedia of Chart Patterns"]
+[[field.use]]
+for = "a breakout that held its retest"
+op = "eq"
+value = true
+mode = "hard"
+note = "with feature.trend_state eq UPTREND"
+
+[[field]]
+name = "feature.breakout_failed"
+theme = "price levels"
+reads = "True when the latest 20-session breakout of the last 60 sessions has since closed below its level (rollup.retest@v1.retest_state FAILED): a bull trap. Used to drop names whose breakout did not work, or to look for the reversal."
+caveats = [
+  "One close below the level is enough, even if price recovered after: check rollup.retest@v1.sessions_since_breakout and feature.dist_to_resistance_atr for whether it is back above.",
+  "False includes names with no breakout at all; it is not a quality mark.",
+  "Null when the name has no retest row (no bar on the session).",
+]
+sources = ["docs/data/swing.md; Raschke and Connors, Street Smarts (failed breakouts)"]
+[[field.use]]
+for = "a failed breakout"
+op = "eq"
+value = true
+mode = "hard"
+[[field.use]]
+for = "no failed breakout behind it"
+op = "eq"
+value = false
+mode = "soft"
+tolerance = 0
+
+# Volume at price (volume_profile@v1, a daily-bar approximation) and the swing-anchored VWAPs
+# (anchored_vwap@v2): levels in dollars per share, compared with the close.
+
+[[field]]
+name = "rollup.anchored_vwap@v2.avwap_earnings"
+theme = "price levels"
+reads = "The volume-weighted average price since the last earnings reaction session, in dollars per share: where the average share bought since the report is positioned. The close above it means holders since the report are in profit (the post-earnings drift has support); below it they are under water and rallies into it meet sellers. Compare with the close; rollup.anchored_vwap@v2.avwap_anchor_date says how old the anchor is."
+caveats = [
+  "A fresh anchor (a few sessions old) is nearly the current price and says little; the level means more after two to four weeks of trading.",
+  "Null without a report in the last 126 sessions, with fewer than 2 sessions since it, a gap in the range, or no volume.",
+]
+sources = ["Anchored VWAP (Brian Shannon, Maximum Trading Gains with Anchored VWAP)"]
+[[field.use]]
+for = "has an earnings-anchored VWAP"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close in a rule"
+
+[[field]]
+name = "rollup.anchored_vwap@v2.avwap_anchor_date"
+theme = "price levels"
+reads = "The session avwap_earnings is anchored on: the last report date for a pre-market or unknown-time report, the next session for one after the close. Its age is how long the earnings VWAP has had to form."
+caveats = [
+  "Null without a report in the last 126 sessions.",
+]
+sources = ["Anchored VWAP (Brian Shannon)"]
+[[field.use]]
+for = "has an earnings anchor"
+op = "not_null"
+mode = "hard"
+note = "rollup.earnings@v1.last_earnings_date is the report date itself"
+
+[[field]]
+name = "rollup.anchored_vwap@v2.avwap_swing_low"
+theme = "price levels"
+reads = "The volume-weighted average price since the most recent confirmed swing low below the close (the support swing_levels@v1 found), in dollars per share: the average cost of everyone who bought since the bottom. In an uptrend the close holds above it and pullbacks to it are bought; a close below it means the rally's buyers are under water, the first sign the swing is over. A rising anchored VWAP with the price above is the cleanest statement of a healthy leg up."
+caveats = [
+  "Support is the most recent swing low, which can be a minor pivot a week old; then the VWAP is a few sessions long and close to the price. Check rollup.swing_levels@v1.swing_low_date.",
+  "Null without a confirmed swing low below the close, with fewer than 2 sessions since it, a gap in the range, or no volume.",
+]
+sources = ["Anchored VWAP from swing lows (Brian Shannon, Maximum Trading Gains with Anchored VWAP)"]
+[[field.use]]
+for = "has a swing-low VWAP"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close: above it the leg up is intact"
+
+[[field]]
+name = "rollup.anchored_vwap@v2.avwap_swing_high"
+theme = "price levels"
+reads = "The volume-weighted average price since the most recent confirmed swing high above the close (the resistance swing_levels@v1 found), in dollars per share: the average cost of everyone who bought since the top, all of whom are under water while the close stays below it. A close back above it means the sellers since the top have been absorbed, the first sign of a turn; below it, rallies into it are sold."
+caveats = [
+  "Resistance is the most recent swing high, possibly a minor one; check rollup.swing_levels@v1.swing_high_date.",
+  "Null without a confirmed swing high above the close, with fewer than 2 sessions since it, a gap in the range, or no volume.",
+]
+sources = ["Anchored VWAP from swing highs (Brian Shannon)"]
+[[field.use]]
+for = "has a swing-high VWAP"
+op = "not_null"
+mode = "hard"
+note = "compare with rollup.price_stats@v2.close: a close above it is the reclaim"
+
+[[field]]
+name = "rollup.bands@v2.sma_150"
+theme = "price levels"
+reads = "The mean close of the last 150 sessions (30 weeks), in dollars per share: the one average off the 20 / 50 / 200 stack that two named methods threshold. Minervini's trend template requires the close above it, it above the 200-day and the 50-day above it; Weinstein's stage analysis reads a rising 30-week average with the price above as stage 2 (the only stage to buy). feature.pct_vs_sma_150 is the distance."
+caveats = [
+  "An average over seven months lags a turn by weeks; pair with rollup.bands@v2.ema20_slope_5d or feature.ema_stack for the recent direction.",
+  "Null after any missing bar in the last 150 sessions or a shorter history.",
+]
+sources = [
+  "Minervini (2013), Trade Like a Stock Market Wizard: the trend template",
+  "Weinstein (1988), Secrets for Profiting in Bull and Bear Markets: the 30-week moving average",
+]
+[[field.use]]
+for = "has a 30-week average"
+op = "not_null"
+mode = "hard"
+note = "threshold feature.pct_vs_sma_150 gt 0, with rollup.price_stats@v2.sma_200 below it for the template"
+
+[[field]]
+name = "feature.bb_upper"
+theme = "volatility"
+reads = "The upper Bollinger band: the 20-session mean close plus two standard deviations of those closes, in dollars per share. Price touches it on about 5% of sessions in a random walk; in a trend it rides along it (the band walk, rollup.bands@v2.band_walk). Compare with the close through feature.bb_pct_b (1 is on the band, above 1 is outside it) rather than the level itself."
+caveats = [
+  "A band is a statement about the last 20 closes, not resistance: in a strong uptrend the close lives on or above the upper band for weeks. Pair a 'too far above' reading with feature.trend_state and rollup.momentum@v1.rsi_14 before reading it as a top.",
+  "After a one-day shock (earnings, a takeover) both bands jump apart for 20 sessions and the price sits 'inside' them; the squeeze that follows is the shock leaving the window, not a new base. Check rollup.price_moves@v1.one_day_move.",
+  "Null after a gap in the last 20 sessions or a shorter history.",
+]
+sources = [
+  "Bollinger (2001), Bollinger on Bollinger Bands: the 20 / 2 defaults",
+  "Bollinger Bands, Wikipedia: https://en.wikipedia.org/wiki/Bollinger_Bands",
+]
+[[field.use]]
+for = "has Bollinger bands"
+op = "not_null"
+mode = "hard"
+note = "threshold the position instead: feature.bb_pct_b"
+
+[[field]]
+name = "feature.bb_lower"
+theme = "volatility"
+reads = "The lower Bollinger band: the 20-session mean close minus two standard deviations of those closes, in dollars per share. A close at or under it (feature.bb_pct_b at or below 0) is a two-sigma dip against the last month; in an uptrend that is the classic mean-reversion entry, in a downtrend it is where the price lives."
+caveats = [
+  "A close below the band in a downtrend keeps falling: a dip is a dip only with feature.trend_state UPTREND or feature.pct_vs_sma_200 above 0.",
+  "The band widens after a shock and narrows as the shock leaves the window, so a touch 20 sessions after an earnings gap means less than one in a quiet month. Check rollup.earnings@v1.last_earnings_date.",
+  "Null after a gap in the last 20 sessions or a shorter history.",
+]
+sources = [
+  "Bollinger (2001), Bollinger on Bollinger Bands",
+  "Mean reversion with bands (Connors and Alvarez, Short Term Trading Strategies That Work)",
+]
+[[field.use]]
+for = "has Bollinger bands"
+op = "not_null"
+mode = "hard"
+note = "threshold the position instead: feature.bb_pct_b"
+
+[[field]]
+name = "feature.kc_upper"
+theme = "volatility"
+reads = "The upper Keltner channel: the 20-session EMA plus two Wilder ATR(14), in dollars per share. Unlike a Bollinger band it is built from the daily range, so it moves with how much the name trades each day rather than with the dispersion of closes; price closes above it on a strong day, and a Bollinger band inside it is the squeeze (feature.bb_squeeze). Compare with the close through feature.kc_position."
+caveats = [
+  "The channel uses ATR(14) where the classic uses ATR(10); the width is the same within a few percent on most names and the reading is unchanged. For the exact TTM construction see the sources.",
+  "A takeover pins the price with an ATR near zero, so the channel collapses onto the EMA and every close is 'outside' it. Check feature.atr_pct and the 'pending takeover' situation.",
+  "Null with fewer than 20 consecutive bars ending on the session.",
+]
+sources = [
+  "Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel",
+  "Carter (2005), Mastering the Trade: the TTM squeeze (Bollinger 20/2 inside Keltner 20/1.5 ATR)",
+]
+[[field.use]]
+for = "has a Keltner channel"
+op = "not_null"
+mode = "hard"
+note = "threshold the position instead: feature.kc_position"
+
+[[field]]
+name = "feature.kc_lower"
+theme = "volatility"
+reads = "The lower Keltner channel: the 20-session EMA minus two Wilder ATR(14), in dollars per share. A close below it is a strong down day against the name's own daily range; a Bollinger band inside it is part of the squeeze. Compare with the close through feature.kc_position."
+caveats = [
+  "A gap down on news puts the close far below the channel for one day and the ATR catches up over the next two weeks; the channel widens after the move, not before. Check rollup.price_moves@v1.one_day_move.",
+  "Null with fewer than 20 consecutive bars ending on the session.",
+]
+sources = [
+  "Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel",
+]
+[[field.use]]
+for = "has a Keltner channel"
+op = "not_null"
+mode = "hard"
+note = "threshold the position instead: feature.kc_position"
+
+# The EMA stack, the longer channels and the prior extremes (bands@v2, trend_stats@v2): levels
+# in dollars per share. Compared with the close; the distances (feature.pct_vs_ema_*,
+# feature.dist_to_high_*, feature.breakout_magnitude_20d) carry the thresholds.
+
+# Edge build entries for the option-implied status and change fields (theme: implied volatility),
+# kept here while options-chain.toml sits at the 1000-line cap.
+
+[[field]]
+name = "rollup.cp_iv_history@v1.cp_iv_spread_chg_21d"
+theme = "implied volatility"
+reads = "The call-put IV spread now minus 21 sessions ago (about a month), as a fraction: 0.03 is three vol points. Positive means calls got richer against puts over the month. It is the slow version of rollup.cp_iv_history@v1.cp_iv_spread_chg_5d. Chains are stored from 2026-10-02 only, so it reads null until 2026-11-02."
+caveats = [
+  "Judge it as a rank across names on the same session, never against zero. A market-wide scare moves every name's spread together, so the change says little about one name.",
+  "It inherits every caveat of rollup.cp_iv@v1.cp_iv_spread: a hard-to-borrow name has a large spread that is borrow cost, not a view. Check rollup.cp_iv@v1.cp_iv_dte, and the earnings fields, since a report inside the window moves both ends of the pair.",
+  "Null when the spread is missing today or 21 sessions ago; a gap is never filled. With under a few dozen names in the cross-section on a session, a rank is noise.",
+]
+sources = ["Cremers and Weinbaum, Deviations from Put-Call Parity and Stock Return Predictability, JFQA 2010: https://ideas.repec.org/a/cup/jfinqa/v45y2010i02p335-367_00.html"]
+[[field.use]]
+for = "calls getting richer against puts over a month"
+op = "gte"
+value = 0.02
+mode = "soft"
+tolerance = 0.005
+note = "illustrative screen, not a published cut-off: 0.02 is two vol points over a month; Cremers and Weinbaum rank names and set no level"
+
+[[field]]
+name = "rollup.cp_iv_history@v1.atm_call_iv_chg_5d"
+theme = "implied volatility"
+reads = "The ATM call IV now minus 5 sessions ago, as a fraction: 0.03 is three vol points. A week-long rise says call buyers have paid up; it is the short window of rollup.cp_iv_history@v1.atm_call_iv_chg_21d, which is the one the published sort uses. History starts 2026-10-02, so it reads null until 2026-10-09."
+caveats = [
+  "A week of IV is mostly the market's week: when the index sells off every call IV rises. Compare names on one session, and read rollup.iv30@v1.iv30 for the name's own level.",
+  "An earnings report inside the five sessions lifts IV into the report and drops it after; read rollup.earnings@v1.days_to_earnings first.",
+  "Null if the ATM call IV is missing at either end of the five sessions.",
+]
+sources = ["An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181"]
+[[field.use]]
+for = "call IV up three vol points in a week"
+op = "gte"
+value = 0.03
+mode = "soft"
+tolerance = 0.01
+note = "illustrative screen, not a published cut-off: 0.03 is three vol points, a move larger than a week of ordinary noise on most names; the published rule ranks names"
+
+[[field]]
+name = "rollup.cp_iv_history@v1.atm_put_iv_chg_5d"
+theme = "implied volatility"
+reads = "The ATM put IV now minus 5 sessions ago, as a fraction: 0.03 is three vol points. A rise says put buyers have paid up. In the published sort a put-IV rise precedes lower returns, the opposite sign to the call's (rollup.cp_iv_history@v1.atm_call_iv_chg_5d). History starts 2026-10-02, so it reads null until 2026-10-09."
+caveats = [
+  "Put IV rises in any sell-off with no view on the name behind it; read it against the call-side change and across names on one session.",
+  "A report or a dividend inside the window moves it; check rollup.earnings@v1.days_to_earnings.",
+  "Null if the ATM put IV is missing at either end; the published edge uses the month (rollup.cp_iv_history@v1.atm_put_iv_chg_21d).",
+]
+sources = ["An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options, JF 2014: https://onlinelibrary.wiley.com/doi/10.1111/jofi.12181"]
+[[field.use]]
+for = "put IV up three vol points in a week (a caution)"
+op = "gte"
+value = 0.03
+mode = "soft"
+tolerance = 0.01
+note = "illustrative screen, not a published cut-off: 0.03 is three vol points, a move larger than a week of ordinary noise on most names; the published rule ranks names"
+
+[[field]]
+name = "rollup.cp_iv@v1.cp_iv_status"
+theme = "implied volatility"
+reads = "Whether the option-implied signals of the session could be formed, and the first step that failed if not. OK: a call-put spread exists. NO_SPOT: no positive close or price for the underlying. NO_CHAIN: no option quotes stored. NO_EXPIRY: no listed expiry 10 to 60 days out. NO_PAIRS: an expiry, but no same-strike call and put with quotes and open interest on both sides; the ATM vols and the smirk may still be set."
+caveats = [
+  "Read it before any other cp_iv field: every null there has one of these causes. NO_CHAIN is common for a small name and for any session before 2026-10-02, when chains were first stored; it is a gap, never a calm market.",
+  "It is a status of our data, not a view on the name. A name that flips between OK and NO_PAIRS from night to night has a thin chain; rollup.option_liquidity@v1.chain_oi says how thin.",
+]
+sources = ["Site convention over the stored chains"]
+[[field.use]]
+for = "names with a usable option-implied spread"
+op = "eq"
+value = "OK"
+mode = "hard"
+note = "the gate before any cp_iv rule; NO_CHAIN before 2026-10-02 is a gap, not a calm market"
+
+[[field]]
+name = "rollup.cp_iv@v1.cp_iv_dte"
+theme = "implied volatility"
+reads = "Calendar days from the session to the expiry the cp_iv columns read: the listed expiry 10 to 60 days out nearest 30. A value of 30 is an ordinary monthly; 12 is a weekly close to the 10-day floor; 58 means no nearer monthly was listed. Every cp_iv column and change of a name describes that one expiry."
+caveats = [
+  "The expiry changes as expiries roll, so a change over weeks (rollup.cp_iv_history@v1.cp_iv_spread_chg_21d) can compare vols of different maturities. A dte that jumps by 20 or more in the window is a warning.",
+  "An expiry after a report carries the report's premium and one before it does not. Check rollup.earnings@v1.days_to_earnings against this value.",
+  "Null with no chain or spot, or no expiry in range (cp_iv_status says which).",
+]
+sources = ["Site convention (the expiry rule of rollup.cp_iv@v1)"]
+[[field.use]]
+for = "an expiry near a month out"
+op = "between"
+value = [20, 40]
+mode = "soft"
+tolerance = 5
+note = "illustrative screen: 20 to 40 days keeps the vol near the 30-day target so changes compare like with like; the rule uses 10 to 60"
