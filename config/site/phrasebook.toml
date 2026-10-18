@@ -634,3 +634,18 @@ hint = "pb_ratio lt 1.5 (soft, tolerance 0.5); pair with roe gt 0.08 so a low pr
 say = ["gross margin", "operating margin", "margins on sales"]
 fields = ["feature.gross_margin", "feature.operating_margin", "feature.net_margin"]
 hint = "operating_margin gt 0.10 (soft, tolerance 0.03) is the general gate; gross_margin gte 0.4 for a product company (null where the filer reports no gross profit); compare margins within one sector"
+
+[[phrase]]
+say = ["forward P/E", "cheap on expected earnings", "low forward PE"]
+fields = ["feature.forward_pe", "feature.forward_eps_growth"]
+hint = "forward_pe lte 15 (soft, tolerance 3); pair with forward_eps_growth gte 0 so a low multiple is not a shrinking profit; null for names the analyst data does not cover, forecast losses and ADRs, so a hard criterion drops them"
+
+[[phrase]]
+say = ["forward revenue growth", "sales expected to grow", "analysts expect revenue growth"]
+fields = ["feature.forward_revenue_growth", "feature.forward_eps_growth"]
+hint = "forward_revenue_growth gte 0.08 (soft, tolerance 0.04); null for names the analyst data does not cover and for ADRs, so a hard criterion drops them"
+
+[[phrase]]
+say = ["target upside", "upside to the price target", "below the analyst target"]
+fields = ["feature.target_upside"]
+hint = "target_upside gte 0.15 (soft, tolerance 0.05); a name the analyst data does not cover has none, so a hard criterion drops it; large upside often follows a fall"

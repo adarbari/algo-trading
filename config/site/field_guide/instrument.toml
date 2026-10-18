@@ -251,6 +251,13 @@ value = 0.0
 mode = "soft"
 tolerance = 0.02
 note = "feature.rs_improving is the same gate as a flag; pair with rollup.relative_strength@v1.rs_spy_63d gt 0 to exclude laggards that merely stopped falling"
+[[field.use]]
+for = "an upward trend soon against the market"
+op = "gt"
+value = 0.0
+mode = "soft"
+tolerance = 0.02
+note = "a name gaining on SPY over the last month; a leader's trend can still be falling, so pair with rollup.relative_strength@v1.rs_spy_63d gt 0"
 
 [[field]]
 name = "rollup.relative_strength@v1.ret_5d_pctile"
