@@ -404,3 +404,63 @@ ensemble is there to avoid.
 """
 next = "Compare a member with the ensemble only to see the spread, never to pick one."
 see_also = ["edge_ensemble", "outcome_portfolio_return", "deflated_sharpe", "sharpe_ratio"]
+
+[[term]]
+id = "vol_target_sizing"
+term = "Volatility target"
+short = "A book scaled down so its recent volatility is at most a stated level, the rest held in cash."
+body = """
+Some books are sized to a risk level, not only to a mix. The edge states a target (10% a year, for
+example). Each session the book's volatility is measured from the daily returns its current weights
+would have had over the last 60 sessions, as known on each of those days. If that is above the target,
+every name is multiplied by the target over the volatility, and the freed share goes to cash at the
+bill yield. A book already under the target is left as it is, so the book never borrows. Example: a
+book with 20% volatility and a 10% target holds half its weights and half cash. A name with no
+return on some day of the window leaves the session out, with the reason. Scaling changes weights from
+one session to the next, and that turnover pays the cost.
+"""
+next = "Look at how much of the time the book was scaled down, and compare it with the same book unscaled."
+see_also = ["book_volatility", "cash_position", "outcome_portfolio_return"]
+
+[[term]]
+id = "book_volatility"
+term = "Book volatility"
+short = "How much a book's daily returns varied over the last 60 sessions, as a yearly figure."
+body = """
+It is the sample standard deviation of the book's daily returns, times the square root of 252. Each
+daily return is the sum of every held name's weight times its return that day, taken from what was
+stored on that day. Cash adds no variation. It is measured with today's weights on past returns, so it
+describes the book as held now, not the book that was held back then. Example: daily moves of about
+1.3% give about 20% a year. It looks backwards: a calm window does not warn of a sudden move.
+"""
+next = "Read it beside the volatility target to see how often the book was scaled down."
+see_also = ["vol_target_sizing", "outcome_portfolio_return"]
+
+[[term]]
+id = "canary_gate"
+term = "Canary gate"
+short = "A few scout assets whose signal moves part or all of the book into a defensive asset when it turns negative."
+body = """
+Some allocation rules watch a small set of scouts, such as emerging-market stocks and aggregate bonds.
+The edge names the scouts, the score to read and a breadth. At each decision session every scout's score is
+read as known that day. The share of scouts that is negative, counted in breadths, is the risk-off share,
+capped at all of the book. That share of the book moves to the defensive asset and the rest stays as the
+weighting formed it. Example: two scouts, a breadth of 2 and one negative score move half the book. With a
+breadth of 1 the same score moves all of it. A scout with no score leaves the session out, with the reason,
+and is never read as positive. The score is never read after the decision session.
+"""
+next = "Check how often the gate was on, and what the defensive asset earned in those sessions."
+see_also = ["defensive_asset", "vol_target_sizing", "outcome_portfolio_return"]
+
+[[term]]
+id = "defensive_asset"
+term = "Defensive asset"
+short = "Where the canary gate sends the risk-off share of a book: cash, or the safest-looking of a few funds."
+body = """
+The edge names it in advance. It is either cash, earning the Treasury bill yield, or a short list of funds.
+The fund with the highest score at the decision session is held, and ties go to the first ticker alphabetically. A fund with no score leaves the session out, with the reason. The asset's own return over
+the window counts like any other holding, and a switch from one fund to another pays the cost of the
+weight change. Cash costs nothing to hold or leave.
+"""
+next = "Compare the book with the defensive asset held alone to see what the gate added."
+see_also = ["canary_gate", "cash_position", "outcome_portfolio_return"]

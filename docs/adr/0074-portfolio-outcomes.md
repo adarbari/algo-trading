@@ -104,3 +104,58 @@ belongs in it.
     Sharpe ratio, what it becomes after the haircut and the out-of-sample one, per decision session
     and not annualised: display, never a verdict input. The read model and the edge page do not
     show it yet.
+
+## Amendment (2026-10-18, EB E5): allocation signals, volatility targeting and the canary
+13. **A bridge of macro and market series to the universe.** The signals an allocation edge
+    reads (credit spreads, the VIX family, VX basis and roll, real yields, the dollar, country
+    CAPE, FX carry) are stored per universe ETF as one nightly group, `etf_macro@v1`, so an edge
+    reads them as any feature (the harness reads no macro table). The series-to-ETF map is code
+    with a version (a fitness test pins its hash), ETF ids come from the resolver, and the group is
+    not optional: a null is a row with a reason, never a missing table. Point in time: a macro value
+    is the one whose vintage was known on S (`known_window`), a VX settle is read with
+    `known_from <= S`, a VX basis only when the VX trade date is the VIX observation date, a value
+    older than its series' `max_age_days` is null, a moving average needs 80% of its window, and a
+    row's licence is the strictest of the series it read. Country CAPE is revised after
+    publication, so its history is not as known; the edge's notes carry that caveat.
+14. **`vol_target`.** `[outcome] vol_target = 0.10` (a fraction a year in `(0, 1]`) sizes a book
+    to a volatility. With `sigma` the annualised sample standard deviation of the book's daily
+    returns, `k = min(1, vol_target / sigma)`; every name is multiplied by `k` and the rest is cash
+    at the bill yield (an existing cash share stays, the freed share joins it). There is no
+    leverage and no weight below zero; a book already under the target is not changed (its
+    `book_vol` is still stored); an all-cash book has no volatility and is not scaled.
+    `vol_window` (60 sessions, at least 20) and `vol_return_field`
+    (`rollup.trend_stats@v2.ret_1d`) are its other keys, refused without a target and outside a
+    `portfolio_return` outcome. The scaled book pays its weight change: the turnover pass charges
+    the rescaling like any other trade, cash stays free. The benchmark is not scaled (owner
+    decision pending, `docs/decisions/log.md`).
+15. **Realised volatility is read as it was known.** `sigma` is the book's volatility *at D*:
+    today's weights on the daily returns of the `vol_window` sessions ending at D, each return read
+    at its own session `t <= D` (`SessionReads.history`, `fields_view` historical, through the
+    recording reader, cached per decision session so each leg logs its own reads) and never a value stored later. A restatement of any of those partitions
+    invalidates the legs of the sessions that read it (ADR 0063), nothing after D is read, and a
+    name with no finite return on a day of the window leaves the session out with the reason
+    `no_book_vol`: sigma is never measured over the names that happen to have returns, and a
+    missing return is never a zero.
+16. **Leg columns.** `book_vol` (the book's volatility before scaling) and `risk_off` (the canary's
+    risk-off share, item 17) are nullable floats of the leg (`SessionStat`, `legs/rows.py`,
+    `edge_schemas.py`); null in every other leg and in a leg written before them, so
+    `LEG_VERSION` stays 4. The vol target, its window and its return field join an outcome's
+    identity only when a target is set (`identity_dict`), so no existing edge's hash moves.
+17. **The canary and the defensive asset.** `[outcome.canary] tickers = ["VWO", "BND"], field =
+    "<numeric feature>", breadth = 2, defensive = ["CASH"]` (or `["SHY", "IEF", "LQD"]`) gates
+    the book. The canaries are resolved to ids at D (the resolver, ADR 0018) and the field is read
+    at D (`SessionReads.numbers`), never at S: a signal that turns negative only after D does not
+    move the book. `bad` counts the canaries with a value below zero, `f = min(1, bad / breadth)`
+    is the risk-off share (VAA is a breadth of 1, DAA of 2) and the book becomes `(1 - f) * book +
+    f * defensive`. The defensive asset is `CASH` (the bill yield, item 4) or the defensive ticker
+    with the highest field at D, ties by ticker; it is chosen only when `f > 0`. A canary that is
+    not a known instrument at D or has no finite value is `no_canary:<ticker>`, a defensive
+    candidate likewise `no_defensive:<ticker>`, and a defensive asset with no return at S is
+    `no_pick_return`: the session is left out, never read as positive. `risk_off` stores `f` in the
+    leg; the canary table joins the outcome's identity only when present. A switch of defensive
+    asset pays the weight change; `CASH` is free; the benchmark is not scaled.
+18. **Composition order.** The overlays apply once per session, in `measuring._valued`, in this
+    order: the weighting (with the cash of unfilled slots), the ensemble average, then the canary
+    (item 17), then `vol_target`. A volatility target is measured on the book that will be held,
+    so it sees what the canary left. The verdict is unchanged: a book is judged by the same
+    criteria, and the guards of the weight-change cost (item 5) cover every overlay.

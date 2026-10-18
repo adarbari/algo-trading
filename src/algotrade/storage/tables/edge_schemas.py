@@ -177,6 +177,8 @@ EDGE_PAPER = fixed(
 # Leg v4 (ADR 0053 amendment 2026-10-18): the names of a buy/hold band as ``band_*`` lists.
 # Leg v5 (ADR 0074): a portfolio_return leg's book as ``weight_ids`` / ``weight_values`` and, for a
 # session with no value, ``portfolio_reason``; null in every other leg, which no key change moves.
+# Overlays of a book (ADR 0074 amendment): ``book_vol`` (the book's annualised volatility before a
+# vol_target scaling) and ``risk_off`` (the canary's share moved to the defensive asset), nullable.
 EDGE_LEGS = fixed(
     "results/edge_legs",
     "results",
@@ -211,7 +213,7 @@ EDGE_LEGS = fixed(
         "inputs_seq", "outcome_seq", "id_eligible_flag", "id_eligible_proxy", "id_screened_flag",
         "id_screened_proxy",
     )),
-    *floats("rest_mean", "rest_m2", "top_decile", "spread"),
+    *floats("rest_mean", "rest_m2", "top_decile", "spread", "book_vol", "risk_off"),
     "pre_snapshot bool",
     "implied_stored bool",
     "siblings_stored bool",  # pair_spread: the pair field had a value for some name; null: n/a
