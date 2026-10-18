@@ -6,6 +6,8 @@
  */
 import { feature, type gqlTypes } from '@/shared/api';
 
+import { groupsOf, pruneGroups, type CriterionGroup } from '../lib/groups';
+
 type ServedDetail = NonNullable<gqlTypes.ScreenDetailQuery['screenDetail']>;
 type Table = Record<string, unknown>;
 
@@ -32,6 +34,8 @@ export interface Criterion {
   mode: CriterionMode;
   tolerance?: Tolerance | undefined;
   on_miss?: MissDecision | undefined;
+  /** The group it sits in (ADR 0071), as `criteriaOf` reads it; never stored on the criterion. */
+  group?: string | undefined;
 }
 
 type CriteriaTable = Record<string, Record<string, unknown>>;
@@ -40,6 +44,8 @@ type CriteriaTable = Record<string, Record<string, unknown>>;
 export interface ScreenDocument extends Record<string, unknown> {
   id: string;
   criteria?: CriteriaTable;
+  /** The boolean groups (`[groups.<id>]`: one of all / any / none, a list of member ids). */
+  groups?: Record<string, Record<string, unknown>>;
 }
 
 /** The keys the authoring flow manages (a draft never carries them). */
@@ -96,24 +102,59 @@ export function toCriterion(id: string, table: Record<string, unknown>): Criteri
   return criterion;
 }
 
-/**
- * The enabled criteria in order: the working copy's (`base`, resolved through the preset)
- * first, then any the draft added; the draft's keys win per criterion; `enabled = false`
- * removes one.
- */
-export function criteriaOf(
+/** The enabled criterion tables in order, before a disabled group takes any out. */
+function enabledTables(
   base: Readonly<Record<string, unknown>> | null | undefined,
   document: ScreenDocument,
-): Criterion[] {
+): Map<string, Record<string, unknown>> {
   const merged = new Map<string, Record<string, unknown>>();
   for (const [id, table] of Object.entries(tableOf(base?.['criteria'])))
     merged.set(id, { ...table });
   for (const [id, table] of Object.entries(tableOf(document.criteria))) {
     merged.set(id, { ...merged.get(id), ...table });
   }
-  return [...merged]
-    .filter(([, table]) => table['enabled'] !== false)
-    .map(([id, table]) => toCriterion(id, table));
+  return new Map([...merged].filter(([, table]) => table['enabled'] !== false));
+}
+
+/**
+ * The enabled groups (ADR 0071) and the ids a disabled group takes out, merged through the
+ * layers like the criteria.
+ */
+function groupState(
+  base: Readonly<Record<string, unknown>> | null | undefined,
+  document: ScreenDocument,
+  live: ReadonlySet<string>,
+) {
+  return groupsOf(base?.['groups'], document.groups, live);
+}
+
+/**
+ * The enabled criteria in order: the working copy's (`base`, resolved through the preset)
+ * first, then any the draft added; the draft's keys win per criterion; `enabled = false`
+ * removes one, and so does a disabled group; `group` names the group a criterion sits in.
+ */
+export function criteriaOf(
+  base: Readonly<Record<string, unknown>> | null | undefined,
+  document: ScreenDocument,
+): Criterion[] {
+  const enabled = enabledTables(base, document);
+  const { groups, off } = groupState(base, document, new Set(enabled.keys()));
+  const parent = new Map(groups.flatMap((g) => g.members.map((m) => [m, g.id] as const)));
+  return [...enabled]
+    .filter(([id]) => !off.has(id))
+    .map(([id, table]) => {
+      const criterion = toCriterion(id, table);
+      const group = parent.get(id);
+      return group === undefined ? criterion : { ...criterion, group };
+    });
+}
+
+/** The enabled groups of the working copy (ADR 0071), members that are gone removed. */
+export function groupsFor(
+  base: Readonly<Record<string, unknown>> | null | undefined,
+  document: ScreenDocument,
+): CriterionGroup[] {
+  return groupState(base, document, new Set(enabledTables(base, document).keys())).groups;
 }
 
 /** The base's criterion ids (they cannot be deleted from a draft, only switched off). */
@@ -126,12 +167,17 @@ export function criterionIds(
   base: Readonly<Record<string, unknown>> | null | undefined,
   document: ScreenDocument,
 ): string[] {
-  return [...new Set([...baseIds(base), ...Object.keys(tableOf(document.criteria))])];
+  const groups = [
+    ...Object.keys(tableOf(base?.['groups'])),
+    ...Object.keys(tableOf(document.groups)),
+  ];
+  // criteria and groups share one key space
+  return [...new Set([...baseIds(base), ...Object.keys(tableOf(document.criteria)), ...groups])];
 }
 
 /** The table the document holds for `criterion` (its keys but the id). */
 export const tableFor = (criterion: Criterion): Record<string, unknown> => {
-  const { id: _id, ...keys } = criterion;
+  const { id: _id, group: _group, ...keys } = criterion;
   return Object.fromEntries(Object.entries(keys).filter(([, v]) => v !== undefined));
 };
 
@@ -151,10 +197,14 @@ export function withoutCriterion(
   const rest = Object.fromEntries(
     Object.entries(tableOf(document.criteria)).filter(([key]) => key !== id),
   );
-  return {
-    ...document,
-    criteria: baseIds(base).has(id) ? { ...rest, [id]: { enabled: false } } : rest,
-  };
+  // a draft group loses the member, and dissolves when it is left too small
+  return pruneGroups(
+    {
+      ...document,
+      criteria: baseIds(base).has(id) ? { ...rest, [id]: { enabled: false } } : rest,
+    },
+    [id],
+  );
 }
 
 /** Is the criterion ready to run (a field, and a threshold where its op needs one)? */
@@ -173,10 +223,12 @@ export function isComplete(criterion: Criterion): boolean {
 /** The document as the preview takes it: criteria still being filled in are left out. */
 export function previewDocument(document: ScreenDocument): ScreenDocument {
   const kept: CriteriaTable = {};
+  const left: string[] = [];
   for (const [id, table] of Object.entries(tableOf(document.criteria))) {
     if (table['enabled'] === false || isComplete(toCriterion(id, table))) kept[id] = table;
+    else left.push(id);
   }
-  return { ...document, criteria: kept };
+  return pruneGroups({ ...document, criteria: kept }, left);
 }
 
 /** An unused criterion id from its field (`rollup.iv30@v1.iv30` -> `iv30`). */

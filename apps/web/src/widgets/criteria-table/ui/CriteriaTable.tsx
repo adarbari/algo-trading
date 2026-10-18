@@ -7,10 +7,11 @@ import { Button, Divider, EmptyState, Legend, Panel, PendingRow, Stack, Text } f
 import { useState } from 'react';
 
 import { useFeatureCatalogue } from '@/entities/feature';
-import { CriterionRow, TieBreakField, useScreenerBuilder } from '@/features/screener-builder';
+import { TieBreakField, useScreenerBuilder } from '@/features/screener-builder';
 import { FormulaFeatureDialog } from '@/features/formula-feature';
-import { GuideHelp, termHelp } from '@/features/guide-help';
+import { termHelp } from '@/features/guide-help';
 
+import { CriteriaRows } from './CriteriaRows';
 import { pendingLine } from '../model/pending';
 import { plainEnglish } from '../model/plain-english';
 
@@ -25,7 +26,7 @@ export function CriteriaTable() {
   const catalogue = useFeatureCatalogue();
   const [formula, setFormula] = useState(false);
   const features = catalogue.data ?? [];
-  const sentence = plainEnglish(builder.criteria, features, builder.notes);
+  const sentence = plainEnglish(builder.criteria, features, builder.notes, builder.groups);
   const waiting = builder.pendingFormulas.flatMap((formula) => {
     const line = pendingLine(formula);
     return line ? [{ formula, line }] : [];
@@ -59,24 +60,7 @@ export function CriteriaTable() {
               description="Add a criterion to start; the preview follows as you type."
             />
           )}
-          {builder.criteria.map((criterion, index) => (
-            <Stack gap={3} key={criterion.id}>
-              {index > 0 && <Divider tone="soft" />}
-              <CriterionRow
-                criterion={criterion}
-                catalogue={features}
-                catalogueLoading={catalogue.isPending}
-                onChange={builder.setCriterion}
-                onRemove={() => {
-                  builder.removeCriterion(criterion.id);
-                }}
-                renderFieldHelp={(field, onUse) => (
-                  <GuideHelp entry={{ kind: 'field', id: field }} onUse={onUse} />
-                )}
-                error={builder.errorCriterion === criterion.id ? builder.preview.error : null}
-              />
-            </Stack>
-          ))}
+          <CriteriaRows nodes={builder.layout} />
           {waiting.map(({ formula, line }) => (
             <PendingRow
               key={formula.name}

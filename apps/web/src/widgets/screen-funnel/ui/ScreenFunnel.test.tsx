@@ -5,11 +5,19 @@ import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { ScreenFunnel } from './ScreenFunnel';
 
-const state = vi.hoisted(() => ({ preview: {}, criteria: [] as unknown[] }));
+const state = vi.hoisted(() => ({
+  preview: {},
+  criteria: [] as unknown[],
+  groups: [] as unknown[],
+}));
 
 vi.mock('@/features/screener-builder', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useScreenerBuilder: () => ({ preview: state.preview, criteria: state.criteria }),
+  useScreenerBuilder: () => ({
+    preview: state.preview,
+    criteria: state.criteria,
+    groups: state.groups,
+  }),
 }));
 vi.mock('@/entities/feature', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -32,6 +40,7 @@ const DATA = {
 beforeEach(() => {
   state.preview = { data: DATA, pending: false, error: null, idle: false };
   state.criteria = [];
+  state.groups = [];
 });
 
 describe('ScreenFunnel', () => {
@@ -54,6 +63,25 @@ describe('ScreenFunnel', () => {
     ).getAllByRole('listitem');
     expect(rows[1]?.textContent).toBe('IV30 > 150%486');
     expect(rows[2]?.textContent).toBe('close45');
+  });
+
+  it('shows a gate that is a group as one step named by its expression (ADR 0071)', () => {
+    state.criteria = [
+      { id: 'a', field: 'feature.vrp_iv30', op: 'gt', value: 1.5, mode: 'hard', group: 'g' },
+      { id: 'b', field: 'feature.vrp_iv30', op: 'lt', value: 0.5, mode: 'hard', group: 'g' },
+    ];
+    state.groups = [{ id: 'g', kind: 'any', members: ['a', 'b'] }];
+    state.preview = {
+      data: { ...DATA, funnel: [step('g', 4203, 900)] },
+      pending: false,
+      error: null,
+      idle: false,
+    };
+    render(<ScreenFunnel />);
+    const rows = within(
+      screen.getByRole('list', { name: 'Funnel (gating criteria)' }),
+    ).getAllByRole('listitem');
+    expect(rows[1]?.textContent).toBe('IV30 > 150% or IV30 < 50%900');
   });
 
   it('says when there is no gating criterion', () => {

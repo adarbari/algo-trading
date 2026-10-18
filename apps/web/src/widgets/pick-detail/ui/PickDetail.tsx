@@ -4,15 +4,32 @@
  * its criteria scorecard (value, rule, outcome), and the review actions (open in Explore, add to the compare set,
  * dismiss) with their keys. The chart and anything else about the ticker is composed beside it.
  */
-import { ActionGroup, KeyHints, type KeyHint, Panel, Stack, Text } from '@algotrade/ui';
+import {
+  ActionGroup,
+  Box,
+  ConditionGroup,
+  KeyHints,
+  type KeyHint,
+  Panel,
+  Stack,
+  StatusBadge,
+  Text,
+} from '@algotrade/ui';
 
 import type { CriterionInfo, TableRow } from '@/entities/feature';
 import {
+  CONNECTOR_LABEL,
   CriteriaScorecard,
   DecisionBadge,
   decisionLabel,
+  KIND_LABEL,
+  KIND_TERM,
+  outcomeLabel,
+  outcomeTone,
+  type GroupKind,
   type ScorecardEntry,
 } from '@/entities/screen';
+import { termHelp } from '@/features/guide-help';
 
 export interface PickDetailProps {
   row: TableRow;
@@ -87,7 +104,44 @@ export function PickDetail({
         {row.flags && row.flags.length > 0 ? (
           <Text size="sm" tone="muted">{`Flags: ${row.flags.join(', ')}`}</Text>
         ) : null}
-        <CriteriaScorecard screenerId={screenerId} entries={entries} />
+        <CriteriaScorecard
+          screenerId={screenerId}
+          entries={entries}
+          groups={row.groups ?? []}
+          renderGroup={({ group, names, decidedBy, members }) => {
+            const kind = group.kind as GroupKind;
+            return (
+              <Stack direction="row" gap={2} align="start" key={group.id}>
+                <Box grow>
+                  <ConditionGroup
+                    kind={kind}
+                    kindLabel={KIND_LABEL[kind]}
+                    title={names.join(` ${CONNECTOR_LABEL[kind]} `)}
+                    connectorLabel={CONNECTOR_LABEL[kind]}
+                    joinedByLabel="joined by"
+                    // The read-only row is one button and shows no header actions: its Guide
+                    // help is drawn beside it.
+                    actions={termHelp(KIND_TERM[kind])}
+                    expression={
+                      <>
+                        {group.outcome ? (
+                          <StatusBadge tone={outcomeTone(group.outcome)}>
+                            {outcomeLabel(group.outcome)}
+                          </StatusBadge>
+                        ) : null}
+                        {decidedBy ? ` via ${decidedBy}` : ''}
+                      </>
+                    }
+                    readOnly
+                  >
+                    {members}
+                  </ConditionGroup>
+                </Box>
+                {termHelp(KIND_TERM[kind])}
+              </Stack>
+            );
+          }}
+        />
         {showActions ? (
           <ActionGroup
             label="Pick actions"
