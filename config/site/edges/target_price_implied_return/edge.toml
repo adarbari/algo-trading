@@ -13,7 +13,7 @@ persistence = """The raw implied return is dominated by optimism bias, and beate
 reversal bet), so the signal needs normalising; the post-2010 evidence is thin and the decay result known is for
 recommendations, not targets. Persistence is a claim to test."""
 schedule = "month_end"
-top_k = 20
+top_k = 10
 base = "universe"
 screeners = ["target_upside_high"]
 baselines = ["momentum_12_1", "size_small"]
@@ -24,14 +24,14 @@ notes = """No exploration period exists: our own nightly snapshots of the analys
 the one after that day. Every measurable session is frozen-period data and the verdict accrues over months: the bar's 40 independent
 months is about three and a half years away and the harness reports the count beside every number. Licence: the targets are a
 personal-licence feed (ADRs 0068 and 0069), so this edge's rows are for the owner's own use. The universe holds only names with a
-target (feature.target_upside present; the free vendor key covers few names), so every base name is scored and the variants are ranked;
+target (feature.target_upside present; the free vendor key covers few names), so every base name is scored (the free vendor key covers about 15 of the 104 scope names: 21 of 25 mega-caps, 2 of 25 mid-caps; a covered base of about 20 would make 20 picks the whole base and the lift about 0, so top_k is 10 and a session is measured only with a base of at least 2 x top_k) and the variants are ranked;
 the base is the covered names. Proxies, each stated: the source demeans the implied return within the industry, here the RAW
 upside (no industry demeaning: the optimism bias of a sector enters the ranking, and an industry-relative version is a follow-up
 once a sector map is joined to the score); one snapshot's consensus target, not a revision (Brav and Lehavy's target
 changes need the history, a follow-up); a target is the vendor's current figure the day it was asked, so a stale target of a
-covered name is not distinguished beyond targets_status. The outcome is the long on the 20 highest upside; the variant
-lowest_upside_short is the short on the 20 lowest among liquid names (owner decision O2, 2026-10-17), net of cost and the
-assumed borrow; long_short is diagnostic only. Month-end start sessions at least 20 sessions apart."""
+covered name is not distinguished beyond targets_status. The outcome is the long on the 10 highest upside; the variant
+lowest_upside_short is the short on the 10 lowest among liquid names (owner decision O2, 2026-10-17), net of cost and the
+assumed borrow; long_short is diagnostic only. A session before the data exists has an empty eligible set and is recorded as no_picks, not as measured. Month-end start sessions at least 20 sessions apart."""
 
 [universe.where]
 all = [
@@ -61,12 +61,12 @@ side = "long_short"
 
 [quality_bar]
 outcome = """Excess return over SPY over 20 and 60 sessions after the entry close (the session after a month-end decision),
-net of 10 bps a round trip: a long hold of the 20 covered stocks whose average analyst target sits furthest above the close."""
+net of 10 bps a round trip: a long hold of the 10 covered stocks whose average analyst target sits furthest above the close."""
 trigger_timing = """A target is read from our own snapshot as the session sees it (counting from the session that stored it, never from the
 vendor's date, which a target does not have); the upside is read at D (a month end) against D's close, and the entry session
 is S = D + 1 (start_offset_sessions = 1)."""
 replication = """Da and Schaumburg: the consensus target over the price less 1, demeaned within the industry, quintile sorts rebalanced
-monthly, long the top and short the bottom. Here: the raw upside (no industry demeaning), the 20 highest among the covered liquid
+monthly, long the top and short the bottom. Here: the raw upside (no industry demeaning), the 10 highest among the covered liquid
 stocks, held 20 and 60 sessions. The paper's spread (about 1 to 2 percent a month) is from memory in the idea page, so nothing is
 filed under [published]."""
 expected_size = """About 1 to 2 percent a month for the quintile spread (Da and Schaumburg 2011, from memory, not verified); no post-2010

@@ -25,16 +25,18 @@ the same market-residual 20-session return (rollup.momentum_variants@v1.resid_re
 names with feature.news_free_5d true, that is, no 8-K or 8-K/A through the previous session and no
 earnings window in the last 5 sessions. The unconditioned residual_reversal is a baseline on the same
 sessions, so the question the harness answers is whether the news filter adds to the ranking; the
-universe holds the news-free liquid common stocks, so the base is every news-free name and the picks are
-the 50 most extreme of them. Proxies, each stated: the source's no-news test is a headline or news-wire
+base is every liquid optionable common stock with a residual return (the main universe has no news
+gate: the harness reads every screener and baseline over the same eligible set, so a gate there would make
+the baseline pick the same names), and the picks are the 50 most extreme of the news-free ones. Proxies, each stated: the source's no-news test is a headline or news-wire
 search over the move's day, here only 8-K filings and earnings windows (a press story, an analyst note or
 a rumour is not seen, so some news moves read as no-news; the bias is toward weaker measured reversal); the
 window is 5 sessions while the residual return runs 20, so news older than 5 sessions inside the
 window is not excluded; the residual is market-only (the paper also strips size and value). news_free_5d
 is null until the filings coverage reaches a session (the 8-K history of EB D1 from its backfill), so
-sessions before it screen nothing, count as not measured, and the first measurable sessions are the
+sessions before it screen nothing (an empty pick set is recorded as no_picks, not as a coverage exclusion), and the first measurable sessions are the
 backfill's. Short side, owner decision O2 (2026-10-17): the variant winners_short shorts the 50 highest
-residuals among the news-free names (liquid, net of cost and the assumed borrow); the long_short spread is
+residuals among the news-free names (its own universe adds the news gate, because a short leg ranks by
+score over every pickable name; liquid, net of cost and the assumed borrow); the long_short spread is
 diagnostic only. Month-end start sessions at least 20 sessions apart."""
 
 [universe.where]
@@ -44,7 +46,6 @@ all = [
   { field = "instrument.optionable", op = "eq", value = true },
   { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
   { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
-  { field = "feature.news_free_5d", op = "eq", value = true },
   { field = "rollup.momentum_variants@v1.resid_ret_20d", op = "gt", value = -5 },
 ]
 
@@ -60,10 +61,34 @@ id = "winners_short"
 [variants.outcome]
 side = "short"
 
+# The short legs rank by score over every pickable name, so their eligible set is the news-free names
+# (an unscored name is in neither leg): the gate lives here, not in the main universe.
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { field = "feature.news_free_5d", op = "eq", value = true },
+  { field = "rollup.momentum_variants@v1.resid_ret_20d", op = "gt", value = -5 },
+]
+
 [[variants]]
 id = "long_short"
 [variants.outcome]
 side = "long_short"
+
+[variants.universe.where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 50_000_000 },
+  { field = "feature.news_free_5d", op = "eq", value = true },
+  { field = "rollup.momentum_variants@v1.resid_ret_20d", op = "gt", value = -5 },
+]
 
 [quality_bar]
 outcome = """Excess return over SPY over the 20 sessions after the entry close (the session after a

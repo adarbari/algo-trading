@@ -23,8 +23,10 @@ notes = """A per-name entry filter on momentum_12_1, filed as its own edge (one 
 UPTREND and rollup.bands@v2.bb_width_pctile_252d at or below 0.2 (the Bollinger bandwidth narrower than 80 percent
 of the last 252 sessions), ranked by 12-1 momentum. The 0.2 cut is declared, not tuned (the TTM squeeze,
 feature.bb_squeeze, is the tighter-in-volatility variant and a follow-up). The main baseline is momentum_12_1
-on the same sessions: the question is whether the squeeze beats the same ranking without it. A narrower screener
-scores fewer names than the base, so the harness reports its picks and lift but no decile spread. Proxies,
+on the same sessions: the question is whether the squeeze beats the same ranking without it. Every screened name carries its
+12-1 momentum as its score, so the decile figures the harness reports are momentum's over the whole universe,
+the momentum_12_1 baseline's ranking, not the squeeze's: the verdict reads the picks' lift and
+mean excess against momentum_12_1's on the same sessions. Proxies,
 each stated: the source's tight base is a count of successive contractions of pullback depth and a pivot
 buy (Minervini), and Crabel's NR7 is intraday; this is a bandwidth percentile, which sees neither; the
 every-session schedule of the idea is not available to a month-end edge, so only names in a squeeze at the
