@@ -182,6 +182,10 @@ purpose = "the decision log: product-direction and policy decisions, by the owne
 kind = "log"
 
 [[docs_dir]]
+path = "docs/edges"
+purpose = "the generated edge pages, one per family (a.md .. i.md, other.md for an edge with no family); rendered by make features-doc from config/site/edges/, indexed by docs/edges.md"
+
+[[docs_dir]]
 path = "docs/edge-ideas"
 purpose = "the edge idea catalogue: researched hypotheses not yet filed as edge documents, one page per family with evidence, data needs and a verdict, and the index ranking them (docs/edges-plan.md quality bar; an idea becomes config/site/edges/<id>/edge.toml when it is picked up)"
 
