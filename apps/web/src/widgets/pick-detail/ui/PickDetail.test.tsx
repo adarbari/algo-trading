@@ -102,7 +102,7 @@ describe('PickDetail', () => {
         groups: [{ id: 'either', kind: 'any', members: ['iv30', 'ratio'], outcome: 'NEAR' }],
       },
     });
-    const gate = screen.getByRole('button', { name: /Any of/ });
+    const gate = await screen.findByRole('button', { name: /Any of/ });
     expect(gate).toHaveTextContent('IV30 or IV/HV');
     expect(gate).toHaveTextContent('Near miss');
     expect(gate).toHaveTextContent('Decided by IV/HV');

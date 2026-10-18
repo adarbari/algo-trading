@@ -4,32 +4,18 @@
  * its criteria scorecard (value, rule, outcome), and the review actions (open in Explore, add to the compare set,
  * dismiss) with their keys. The chart and anything else about the ticker is composed beside it.
  */
-import {
-  ActionGroup,
-  ConditionGroup,
-  KeyHints,
-  type KeyHint,
-  Panel,
-  Stack,
-  StatusBadge,
-  Text,
-} from '@algotrade/ui';
+import { ActionGroup, KeyHints, type KeyHint, Panel, Stack, Text } from '@algotrade/ui';
 
 import type { CriterionInfo, TableRow } from '@/entities/feature';
 import {
-  CONNECTOR_LABEL,
   CriteriaScorecard,
-  DECIDED_BY_LABEL,
   DecisionBadge,
   decisionLabel,
-  KIND_LABEL,
-  KIND_TERM,
-  outcomeLabel,
-  outcomeTone,
-  type GroupKind,
   type ScorecardEntry,
 } from '@/entities/screen';
-import { termHelp } from '@/features/guide-help';
+import { lazy, Suspense } from 'react';
+
+const GateRow = lazy(() => import('./GateRow'));
 
 export interface PickDetailProps {
   row: TableRow;
@@ -108,33 +94,11 @@ export function PickDetail({
           screenerId={screenerId}
           entries={entries}
           groups={row.groups ?? []}
-          renderGroup={({ group, names, decidedBy, members }) => {
-            const kind = group.kind as GroupKind;
-            return (
-              <ConditionGroup
-                key={group.id}
-                kind={kind}
-                kindLabel={KIND_LABEL[kind]}
-                title={names.join(` ${CONNECTOR_LABEL[kind]} `)}
-                connectorLabel={CONNECTOR_LABEL[kind]}
-                joinedByLabel="joined by"
-                info={termHelp(KIND_TERM[kind])}
-                expression={
-                  <>
-                    {group.outcome ? (
-                      <StatusBadge tone={outcomeTone(group.outcome)}>
-                        {outcomeLabel(group.outcome)}
-                      </StatusBadge>
-                    ) : null}
-                    {decidedBy ? ` ${DECIDED_BY_LABEL} ${decidedBy}` : ''}
-                  </>
-                }
-                readOnly
-              >
-                {members}
-              </ConditionGroup>
-            );
-          }}
+          renderGroup={(gate) => (
+            <Suspense key={gate.group.id} fallback={null}>
+              <GateRow gate={gate} />
+            </Suspense>
+          )}
         />
         {showActions ? (
           <ActionGroup
