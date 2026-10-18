@@ -1,0 +1,33 @@
+# L3 site setting: the Guide's playbook for the site preset composite_value (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "composite_value"
+version = 1  # the preset version this prose was written for
+summary = "Finds cheap stocks that are also profitable in cash terms: positive cash-based operating profitability and a positive value yield (the mean of the operating earnings yield and the free cash flow yield), the cheapest first. Value only pays alongside profitability in the catalogue's reading of the research; this is a candidate edge under test."
+hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, whose cash-based operating profitability is above zero and whose composite value yield is above zero. The highest yield, the cheapest, ranks first."
+not_checked = "It does not check quality beyond positive cash profit, momentum, size or sector, and cheap names cluster in cyclical sectors. The value yield has no book to market or growth part. It is the composite value variant inside the cash-based operating profitability edge."
+before_acting = [
+  "A very high feature.composite_value_yield is often a peak-earnings cyclical or a company the market expects to shrink; check feature.revenue_cagr_3y before treating it as cheap.",
+  "Both yields use the latest filings: feature.ev_ebit and feature.fcf_yield are as old as the last report, up to four months before the session.",
+  "Enterprise value ignores minority interest and preferred stock (feature.enterprise_value), so a company with large ones looks cheaper than it is.",
+]
+sources = [
+  "Lakonishok, Shleifer and Vishny, Contrarian Investment, Extrapolation, and Risk (1994)",
+  "Asness and Frazzini, The Devil in HML's Details (2013)",
+]
+related = [
+  { id = "cash_op_profitability", reason = "the profitability ranking it builds on" },
+]
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+profitable = "Earns a positive cash operating profit on its assets"
+cheap = "Has a positive composite value yield"

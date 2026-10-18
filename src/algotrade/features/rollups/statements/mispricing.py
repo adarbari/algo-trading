@@ -101,6 +101,16 @@ _BS_INPUTS = (
     "balance_sheet.bs_status@v2",
 )
 
+GROUP_INPUTS = (  # the statement groups every cross-section group over these measures reads
+    Input(PRICE_STATS),
+    Input(BALANCE, required=False),
+    Input(INCOME, required=False),
+    Input(CASH_FLOW, required=False),
+    Input(FINANCIALS, required=False),
+    Input(FUNDAMENTALS, required=False),
+    Input(STATEMENTS, required=False),
+)
+
 FEATURES = (
     Feature(
         "total_assets_1y_ago", "float", "usd",
@@ -425,15 +435,7 @@ GROUP = FeatureGroup(
     "operating assets, a simplified Ohlson O-score), a QMJ-like quality score and the "
     "cross-sectional composite mispricing rank, from the stored SEC statement groups, point in "
     "time by filing acceptance; missing inputs are left out of a rank and too few make it null",
-    (
-        Input(PRICE_STATS),
-        Input(BALANCE, required=False),
-        Input(INCOME, required=False),
-        Input(CASH_FLOW, required=False),
-        Input(FINANCIALS, required=False),
-        Input(FUNDAMENTALS, required=False),
-        Input(STATEMENTS, required=False),
-    ),
+    GROUP_INPUTS,
     FEATURES,
     compute,
     MispricingParams(),

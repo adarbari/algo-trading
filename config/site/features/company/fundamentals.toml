@@ -100,3 +100,21 @@ description = "Change of the share count over a year: shares_outstanding / the c
 null_meaning = "shares_outstanding or shares_outstanding_year_ago is null (no count, or none whose period ended 9 to 15 months before shares_as_of under the same concept: a company that began tagging the cover page recently has no cover count a year back), or the count is stale (market_cap_status STALE: the change would be of an old year)"
 valid_range = [-1, inf]
 version = 1
+
+[net_issuance_pct_12m]
+expr = 'if(fundamentals.shares_outstanding_year_ago > 0 and fundamentals.shares_outstanding > 0 and fundamentals.market_cap_status != "STALE", log(fundamentals.shares_outstanding / fundamentals.shares_outstanding_year_ago), null)'
+dtype = "float"
+unit = "decimal"
+description = "Net share issuance over a year as Pontiff and Woodgate define it: the log change of the split-adjusted share count, ln(shares_outstanding / the count a year earlier); 0.05 is about +5% shares issued, -0.05 about 5% bought back. The same ranking as shares_change_yoy on a log scale"
+null_meaning = "shares_outstanding or shares_outstanding_year_ago is null or not positive (no count, or none a year back under the same concept), or the count is stale (market_cap_status STALE: the change would be of an old year)"
+valid_range = [-inf, inf]
+version = 1
+
+[buyback_flag]
+expr = "if(is_null(shares_change_yoy), null, shares_change_yoy <= -min_shrink)"
+dtype = "bool"
+unit = "flag"
+description = "A net buyback: the share count fell at least min_shrink (1%) over the year (shares_change_yoy), true for a company shrinking its count and false for one that held or grew it; a flag on the issuance measure, not a repurchase announcement"
+null_meaning = "shares_change_yoy is null (see it: no count a year back, or a stale count)"
+params = { min_shrink = 0.01 }  # methodology choice: a smaller change is rounding in the cover-page counts
+version = 1

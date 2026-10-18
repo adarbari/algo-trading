@@ -1,0 +1,53 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Catalogue: docs/edge-ideas/ (edge build E2).
+id = "quality_minus_junk"
+name = "Quality minus junk"
+family = "A"
+thesis = "Stocks with high profitability and low leverage and distress risk keep outperforming the market, and junk lags."
+mechanism = """Quality is under-priced relative to its justified premium: investors overpay for junk because of lottery preferences and benchmark-relative incentives, and leverage-constrained managers prefer high-beta junk to levering up quality (Asness, Frazzini and Pedersen 2019)."""
+persistence = """Risk explanations are weak (quality has lower beta and did well in crises) and the long leg is a boring large-cap tilt that mandates do not chase; crowding has grown since quality ETFs (2015) but the 2010s and 2022 still paid. The premium is largely profitability (Novy-Marx 2014), which is why the harness tests whether the composite beats cash profitability alone."""
+schedule = "month_end"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["qmj"]
+baselines = ["size_small", "momentum_12_1"]
+status = "candidate"
+frozen_from = 2026-04-01
+notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). qmj_score is built from what the stored statements support: profitability in full (gross profit over assets, ROE, ROA, cash flow over assets, gross margin, low accruals) and safety only as low leverage and low Ohlson O-score; the paper's growth part (five-year changes), low beta, Altman Z and earnings volatility are not built (no stored five-year history of the measures, beta and volatility are price based and another group). Not size-neutral and not within industry, as the paper is. long_short, where run, is diagnostic only."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY over the 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip (an assumption; the PRD's proposal for liquid names, ADR 0053 open decisions)."""
+
+trigger_timing = """Every statement figure is read as of the session its filing's acceptance was public (statements_accepted, H2), never at its period end, so the month-end decision session D sees only filings accepted by D. The entry session is S = D + 1 (start_offset_sessions = 1): the first fill is the next session's close and the window runs from S's close; the screen is read at D, the outcome at S."""
+
+replication = """Asness, Frazzini and Pedersen: quality = z(profitability) + z(growth) + z(safety), long the top 30%, short the bottom 30%, size-neutral, monthly rebalance on data lagged to be public. Here the top 50 of the liquid common stocks on qmj_score (profitability and a leverage-and-distress safety, no growth part): a partial replication, with the omissions named in the field and the notes."""
+
+expected_size = """About 0.39% a month for the US long-short factor, t above 5 (Asness, Frazzini and Pedersen 2019; approximate, not re-verified), 4.7% a year 1964-2023 by the AQR data; a long-only top 50 earns a fraction of the spread. A few independent sessions cannot distinguish that from zero: the harness reports the t statistic and the sessions beside it."""
+
+capacity_costs = """Huge capacity on the mega-cap long leg; price over 5 dollars and 50M dollars of 20-day volume here. Turnover is low; the 10 bps round trip is the assumption. No short leg in the main outcome."""
+
+failure_modes = """Quality lags when junk rallies (2023's mega-cap tech was high quality, but low-quality rebounds and rate shocks hurt it) and when it is expensive. Retire if the frozen-period decile spread is not above zero or the top 50 does not beat the buy-and-hold mean of the eligible names."""
+
+decoys = """Cash-based operating profitability alone (Novy-Marx finds most quality definitions are dominated by gross profitability), low volatility and low beta, and a large-cap growth tilt (the size and 12-1 momentum baselines on the same sessions)."""
+
+[[sources]]
+title = "Asness, C., Frazzini, A. and Pedersen, L., Quality Minus Junk, Review of Accounting Studies, 2019"
+
+[[sources]]
+title = "Novy-Marx, R., The Quality Dimension of Value Investing, working paper, 2014"
+
+[[sources]]
+title = "Alpha Architect, Value and Quality Stocks (summary of the AQR data)"
+url = "https://alphaarchitect.com/value-and-quality-stocks/"
+
+[[variants]]
+id = "spread"
+[variants.outcome]
+side = "long_short"

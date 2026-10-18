@@ -106,3 +106,8 @@ presets = [
   "momentum_x_quality_interaction", "fifty_two_week_high", "industry_momentum", "low_beta",
   "low_volatility",
 ]
+
+[[family]]
+id = "fundamentals"
+title = "Quality and value"
+presets = ["cash_op_profitability", "composite_value", "qmj", "net_share_issuance", "asset_growth", "distress_ohlson", "bdc_price_to_nav"]
