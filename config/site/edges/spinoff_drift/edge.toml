@@ -10,6 +10,7 @@ schedule = "month_end"
 top_k = "all"
 screeners = []
 status = "blocked"
+mechanism_kind = "forced_flows"
 rejection_reason = """No event class reads a spin-off: the schedule above is a placeholder. A spin-off needs the class spinoff in EVENT_CLASSES (src/algotrade/config/edges/document.py) and its field in services/evaluation/cross_section/events.py, a feature group that dates the distribution (sessions_since_spinoff), and the event itself, which the stored filings do not give: events/filing holds Form 10 registration statements (known from their acceptance), not the distribution date, and a spin-off with no price history cannot be measured before it trades. Spin-off events (a new instrument with parent_id, Form 10 plus the 8-K) are partly derivable but not stored."""
 notes = """The first regular-way session after the distribution is the anchor (known_from, announced ahead); the entry 20 to 60 sessions after it, after the forced selling (the page's own horizon is 250 to 750 sessions). About 20 to 40 US spin-offs a year, so 40 events need two years or more of history. Idea page: docs/edge-ideas/events.md (spinoff_parent_and_spinco). Filing it as a candidate needs the harness-side class, which this PR does not touch."""
 

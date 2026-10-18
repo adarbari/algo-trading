@@ -19,6 +19,7 @@ top_k = 50
 baselines = ["momentum_12_1", "size_small"]
 screeners = ["earnings_vwap_overhang"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """THE SIGNAL IS A PROXY. The source's overhang is (price - reference price) / price where the
 reference price is a turnover-weighted average of past prices over one to five years; the stored

@@ -19,6 +19,7 @@ base = "universe"
 screeners = ["sp500_deletion"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "forced_flows"
 frozen_from = 2026-04-01
 notes = """Long side. The anchor is the session the removal was first stored in events/index_change,
 which is when it became known to us and is later than the announcement and the effective date, so

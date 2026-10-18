@@ -19,6 +19,7 @@ screeners = ["cp_iv_spread", "cp_iv_spread_rise"]
 baselines = ["momentum_12_1", "size_small"]
 universe = "liquid_common_stocks"
 status = "candidate"
+mechanism_kind = "informed_footprints"
 frozen_from = 2026-04-01
 notes = """The window is the report session and the two after it (3 sessions from S = A - 1 for the
 expected report A, start_offset_sessions -1: the decision session D = A - 2 reads the chain). The

@@ -20,6 +20,7 @@ top_k = 50
 screeners = ["cp_iv_spread", "iv_smirk", "iv_change_call", "iv_change_ibkr"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "informed_footprints"
 frozen_from = 2026-04-01
 notes = """Four screeners, one per source rule, read on every session. History differs by screener.
 cp_iv_spread, iv_smirk and iv_change_call read cp_iv@v1 and cp_iv_history@v1, which are derived

@@ -18,6 +18,7 @@ screeners = [
 base = "benchmark"
 oos_class = "trend"
 status = "candidate"
+mechanism_kind = "cross_market_trends"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. PROXY: the source builds long-short
 factor return series for about 20 factors and goes long a factor whose past year is up. This edge
