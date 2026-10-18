@@ -19,6 +19,7 @@ top_k = 50
 screeners = ["residual_reversal", "sector_reversal"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "liquidity_provision"
 family = "A"
 frozen_from = 2026-04-01
 notes = """Two screeners, one trial each: residual_reversal ranks on the 20-session return net of

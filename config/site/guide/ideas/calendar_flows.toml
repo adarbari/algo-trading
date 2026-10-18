@@ -1,0 +1,237 @@
+# Researched, not built: family D (calendar flows) of the edge-idea catalogue, one [[idea]] each (ADR 0051; keys in config/site/guide/ideas.py).
+
+family = "D"
+
+[[idea]]
+id = "month_end_index_rebalancing"
+title = "Index rebalance day flows at month end"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and the Nasdaq-100 and MSCI change calendars are not stored; low priority after the S&P result."
+
+[[idea]]
+id = "fomc_cycle_even_weeks"
+title = "Fed meeting cycle even-week premium"
+mechanism_kind = "informed_footprints"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; it is cheap to test but retires if no even-week spread shows, so it is not built."
+
+[[idea]]
+id = "pre_fomc_drift"
+title = "Drift before Fed announcements"
+mechanism_kind = "paid_for_risk"
+verdict = "dead"
+feasibility = "data_ready"
+why_not_built = "Dead in recent years; at most a conditional variant, so it is not filed on its own."
+
+[[idea]]
+id = "macro_announcement_days"
+title = "Premium on macro announcement days"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak, and likely too small after costs for an individual, so it is not built."
+
+[[idea]]
+id = "overnight_vs_intraday_tug_of_war"
+title = "Overnight versus intraday returns"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as a measurement tool for other edges; weak as a stand-alone edge."
+
+[[idea]]
+id = "overnight_momentum"
+title = "Persistence of overnight returns"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak for an individual; it is worth measuring only as a decomposition of other edges."
+
+[[idea]]
+id = "close_to_open_gap_reversal"
+title = "Overnight gap reversal in single stocks"
+mechanism_kind = "liquidity_provision"
+verdict = "weak"
+feasibility = "out_of_scope"
+why_not_built = "Weak, and it needs intraday execution, so it is out of scope."
+
+[[idea]]
+id = "intraday_momentum_last_half_hour"
+title = "First half-hour predicts the last half-hour"
+mechanism_kind = "informed_footprints"
+verdict = "promising"
+feasibility = "out_of_scope"
+why_not_built = "It needs intraday data and is not actionable at the end of the day, so it is out of scope."
+
+[[idea]]
+id = "day_of_week"
+title = "Day-of-the-week effects"
+mechanism_kind = "lottery_demand"
+verdict = "dead"
+feasibility = "data_ready"
+why_not_built = "Dead for the index and weak across stocks, so it is low priority."
+
+[[idea]]
+id = "pre_holiday"
+title = "Pre-holiday effect"
+mechanism_kind = "forced_flows"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The effect has faded; the catalogue would test it once with turn-of-month dates removed, then retire it."
+
+[[idea]]
+id = "halloween_sell_in_may"
+title = "Halloween indicator: winter beats summer"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak with too few events for the harness minimum; kept only as a covariate for other edges."
+
+[[idea]]
+id = "january_effect_small_caps"
+title = "January small-cap premium"
+mechanism_kind = "forced_flows"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The effect has faded; the catalogue folds it into the December losers reversal idea."
+
+[[idea]]
+id = "december_losers_reversal"
+title = "December tax-loss sellers rebound"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as a seasonal overlay; one event a year gives low statistical power."
+
+[[idea]]
+id = "quarter_end_window_dressing"
+title = "Funds window-dress at quarter end"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; only the price-only version can be tested, and the holdings version needs fund holdings data."
+
+[[idea]]
+id = "flow_induced_trading_lou"
+title = "Mutual fund flows push prices"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but it needs fund holdings and flows data, which the store does not hold."
+
+[[idea]]
+id = "etf_premium_discount_reversion"
+title = "ETF price reverts to its net asset value"
+mechanism_kind = "value_gaps"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Planned, but it needs a history of daily ETF net asset values, which is not stored."
+
+[[idea]]
+id = "all_time_high_breakout"
+title = "All-time-high breakout continuation"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; the catalogue folds it into the 52-week-high idea, which the momentum edge already carries."
+
+[[idea]]
+id = "post_split_drift"
+title = "Drift after a stock split"
+mechanism_kind = "slow_to_update"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The effect has faded and the events are few, so it is low priority."
+
+[[idea]]
+id = "dividend_capture_and_month_premium"
+title = "Dividend capture and dividend-month premium"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; ex-day capture has decayed in large US stocks, and the dividend-month premium is its own filed edge."
+
+[[idea]]
+id = "circuit_breaker_price_limits"
+title = "Trading halts and circuit breakers"
+mechanism_kind = "liquidity_provision"
+verdict = "dead"
+feasibility = "out_of_scope"
+why_not_built = "Dead for our purposes, and halt records and intraday data are not stored."
+
+[[idea]]
+id = "share_class_arbitrage"
+title = "Spread between two share classes"
+mechanism_kind = "value_gaps"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Too small for an individual; it would be a benchmark only, and the dual-class spread edge is already filed."
+
+[[idea]]
+id = "leveraged_etf_decay_pairs"
+title = "Shorting both legs of leveraged ETF pairs"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "out_of_scope"
+why_not_built = "Weak; it needs borrow and short volatility, which the filed volatility premium already covers."
+
+[[idea]]
+id = "sector_etf_lead_lag"
+title = "Sector and size ETF lead-lag"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; it is useful at most as a regime covariate, so it is not built."
+
+[[idea]]
+id = "breadth_thrust"
+title = "Market breadth thrusts"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak with too few events; it is used as a regime feature, not as an edge."
+
+[[idea]]
+id = "etf_creation_redemption_arbitrage"
+title = "ETF creation and redemption arbitrage"
+mechanism_kind = "value_gaps"
+verdict = "not_graded"
+feasibility = "out_of_scope"
+why_not_built = "The catalogue gives it no grade and rules it out as not accessible to an individual."
+
+[[idea]]
+id = "index_option_expiry_pinning"
+title = "Price pinning to option strikes at expiry"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak as a stock edge; at most a variant of the volatility premium at the open-interest wall."
+
+[[idea]]
+id = "etf_flows_to_underlying"
+title = "ETF flows push prices of their holdings"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but the holdings version needs ETF ownership per stock; the filed ETF flow edge covers only the fund level."
+
+[[idea]]
+id = "retail_attention_herding"
+title = "Retail attention and herding"
+mechanism_kind = "lottery_demand"
+filed_as = "retail_options_lottery_attention"
+
+[[idea]]
+id = "volume_shock_with_no_news"
+title = "Volume shock with no news"
+mechanism_kind = "lottery_demand"
+filed_as = "high_volume_return_premium"
+
+[[idea]]
+id = "extreme_return_reversal"
+title = "One-day extreme moves reverse without news"
+mechanism_kind = "liquidity_provision"
+filed_as = "news_conditioned_reversal"

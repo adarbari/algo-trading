@@ -27,7 +27,8 @@ class Period:
     inside: bool  # a window of the schedule (else an out-of-window stretch)
 
 
-def _period(sessions: list[date], inside: bool) -> Period:
+def period(sessions: list[date], inside: bool) -> Period:
+    """The period of a window or stretch given as its sessions."""
     return Period(sessions[0], entry_session(sessions), decision_session(sessions), inside)
 
 
@@ -38,5 +39,5 @@ def periods(name: str, first: date, last: date) -> list[Period]:
     placed = windows(name, first, last)
     occupied = windows(name, first, last + _REACH)
     out = out_of_window_stretches(occupied, window_length(name), last)
-    found = [*(_period(w, True) for w in placed), *(_period(s, False) for s in out)]
+    found = [*(period(w, True) for w in placed), *(period(s, False) for s in out)]
     return sorted(found, key=lambda p: p.first)

@@ -62,6 +62,7 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/earnings_surprise@v1",
     "rollups/instrument/episode_behaviour@v1",   # 42 MB
     "rollups/instrument/etf_flows@v1",
+    "rollups/instrument/etf_macro@v1",   # about 1 MB a year (32 float32 columns, 60 fund rows a session)
     "rollups/instrument/filing_activity@v1",
     "rollups/instrument/filing_events@v1",
     "rollups/instrument/ipo_lockups@v1",

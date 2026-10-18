@@ -161,10 +161,13 @@ class Edge:
 def _picks(e: document.Edge) -> str:
     event = document.event_class(e.schedule)
     window = window_name(e.schedule)
+    market = e.market_trigger
     when = (
         f"after each {event.replace('_', ' ')}"
         + (f" ({document.event_subtype(e.schedule)})" if document.event_subtype(e.schedule) else "")
         if event
+        else f"after each {market.replace('_', ' ')}"
+        if market
         else f"every {window.replace('_', ' ')}"
         if window
         else {"every_session": "every session", "month_end": "every month end"}.get(

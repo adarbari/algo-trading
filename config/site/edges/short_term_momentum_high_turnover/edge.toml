@@ -16,6 +16,7 @@ top_k = 25
 baselines = ["momentum_12_1", "size_small"]
 screeners = ["short_term_momentum_turnover"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """The paper's rule is a double sort: among the top turnover decile, long the top past-month
 return decile and short the bottom, held one month. Here the universe is the liquid common stocks

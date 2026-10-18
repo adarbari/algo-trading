@@ -1,0 +1,26 @@
+/* ProseList: a reading-width list with token spacing; markers keep the muted colour. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  list-style: disc;
+}
+
+.list[data-ordered] {
+  list-style: decimal;
+}
+
+.item {
+  min-width: 0;
+  padding-inline-start: var(--space-1);
+  color: var(--color-text-2);
+}
+
+.item::marker {
+  color: var(--color-muted);
+}

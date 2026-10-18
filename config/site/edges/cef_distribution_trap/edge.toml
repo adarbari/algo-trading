@@ -17,6 +17,7 @@ top_k = 10
 screeners = []
 baselines = ["size_small"]
 status = "blocked"
+mechanism_kind = "value_gaps"
 frozen_from = 2026-04-01
 rejection_reason = """Two things are missing. Closed-end funds are not in the covered universe (ADR 0013:
 security_types of config/site/universe.toml; a fund typed FUND is the reference's CEF and is not in the nightly

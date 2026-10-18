@@ -19,6 +19,7 @@ screeners = [
 base = "benchmark"
 oos_class = "trend"
 status = "candidate"
+mechanism_kind = "cross_market_trends"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history and evaluated. LIMITS: ETF
 momentum only. The roll-yield leg (backwardation long, contango avoided) needs futures curves that

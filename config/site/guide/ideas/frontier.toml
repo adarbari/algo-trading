@@ -1,0 +1,247 @@
+# Researched, not built: family I (frontier) of the edge-idea catalogue, one [[idea]] each (ADR 0051; keys in config/site/guide/ideas.py).
+
+family = "I"
+
+[[idea]]
+id = "beta_anomaly_after_uptrend"
+title = "Low-risk anomaly after a market uptrend"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued: the filed low-beta edge does not yet include its 24-month market uptrend condition."
+
+[[idea]]
+id = "odte_gamma_vol_regime"
+title = "Short-dated option gamma dampens volatility"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as a conditioning feature; the evidence is about volatility, not returns."
+
+[[idea]]
+id = "vol_control_deleveraging_proxy"
+title = "Volatility-target funds de-leveraging"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as a cross-asset feature; it retires if it adds nothing over plain realised volatility."
+
+[[idea]]
+id = "benchmarking_intensity_switch"
+title = "Index switches shift benchmarked demand"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned as a variant of the index-reconstitution edge, but S&P 400 and 600 membership is not stored."
+
+[[idea]]
+id = "passive_share_reconstitution_volume"
+title = "Passive ownership read from rebalance-day volume"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as a feature, not as a stand-alone edge."
+
+[[idea]]
+id = "tariff_exposure_overreaction"
+title = "Overreaction to tariff shocks by exposure"
+mechanism_kind = "paid_for_risk"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but it needs a foreign-revenue-share feature built from filings."
+
+[[idea]]
+id = "tdf_contrarian_flows"
+title = "Target-date fund rebalancing flows"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but target-date fund ownership per stock is not stored; only an index-level proxy is possible."
+
+[[idea]]
+id = "llm_headline_score"
+title = "Language-model sentiment on news headlines"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak and decaying, and it needs a full news feed; only capped headlines are stored."
+
+[[idea]]
+id = "llm_earnings_call_unusual"
+title = "Unusual management language on earnings calls"
+mechanism_kind = "informed_footprints"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Earnings call transcripts have no licence-clean free feed, so the build plan leaves it out until a source appears."
+
+[[idea]]
+id = "quarter_end_markup_reversal"
+title = "Last-day quarter mark-up then reversal"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak and likely small after costs, so it is not built."
+
+[[idea]]
+id = "dealer_gamma_regime"
+title = "Dealer gamma as a volatility regime"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as a regime feature, not as an edge."
+
+[[idea]]
+id = "insider_10b5_1_plan_disclosure"
+title = "Insider trading-plan adoption and termination"
+mechanism_kind = "informed_footprints"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "It needs plan disclosures extracted from filing text; the filed insider-buying edge shows the plan flag but does not test it."
+
+[[idea]]
+id = "single_stock_letf_flows"
+title = "Single-stock leveraged ETF rebalancing"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and a daily series of single-stock leveraged fund assets is not stored."
+
+[[idea]]
+id = "scheduled_corporate_event_drift"
+title = "Drift around scheduled non-earnings events"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and there is no calendar of non-earnings corporate events."
+
+[[idea]]
+id = "leveraged_etf_low_vol_regime"
+title = "Holding leveraged ETFs only in calm markets"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak as alpha; it is useful at most as a sizing rule."
+
+[[idea]]
+id = "early_inclusion_runup_reversal"
+title = "Fast-tracked index inclusions"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak, and too few events to meet the harness's minimum event count."
+
+[[idea]]
+id = "overnight_return_persistence"
+title = "Overnight versus intraday return persistence"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak as a stand-alone edge; useful as a feature."
+
+[[idea]]
+id = "ai_exposure_amh"
+title = "Portfolio by exposure to generative AI"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "out_of_scope"
+why_not_built = "Weak and one-off; at most a decoy or regime variable, and exposure scores are not stored."
+
+[[idea]]
+id = "tech_sector_leadership"
+title = "Industry momentum concentrated in tech"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak and fading; it belongs with the allocation ideas and is not built."
+
+[[idea]]
+id = "election_uncertainty_collapse"
+title = "Post-election unwind of risk legs"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "out_of_scope"
+why_not_built = "Weak, and too few events to meet the harness's minimum."
+
+[[idea]]
+id = "retail_order_imbalance_decay"
+title = "Retail order imbalance and its decay"
+mechanism_kind = "informed_footprints"
+verdict = "decayed"
+feasibility = "needs_data"
+why_not_built = "The effect has decayed, and it needs trade-level data we do not have; listed so it is not researched again."
+
+[[idea]]
+id = "treasury_refunding_equity"
+title = "Treasury refunding announcements and equities"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; at most a macro event tag, so it is not built as an edge."
+
+[[idea]]
+id = "cta_positioning_proxy"
+title = "Trend-follower positioning as a flow signal"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak, so it is not built."
+
+[[idea]]
+id = "green_flows_esg"
+title = "Flow-driven green and ESG returns"
+mechanism_kind = "forced_flows"
+verdict = "decayed"
+feasibility = "needs_data"
+why_not_built = "The green premium has decayed, and ESG scores are not stored."
+
+[[idea]]
+id = "buyback_window_support"
+title = "Buyback support in the open window"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak, so it is not built."
+
+[[idea]]
+id = "gold_miners_vs_bullion"
+title = "Gold miners lag gold itself"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak and low priority for a US-equity platform."
+
+[[idea]]
+id = "meme_score_options"
+title = "Options-based meme-stock score"
+mechanism_kind = "lottery_demand"
+filed_as = "retail_options_lottery_attention"
+
+[[idea]]
+id = "fund_flow_price_pressure"
+title = "Fund and ETF flows push their holdings"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "The filed ETF flow edge covers iShares funds; the wider thematic and active fund complex needs share-count data we do not store."
+
+[[idea]]
+id = "thematic_etf_launch_underperformance"
+title = "Avoid what new thematic ETFs hold"
+mechanism_kind = "value_gaps"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Avoiding what new thematic ETFs hold needs issuer holdings beyond iShares and SSGA, which are not stored."
+
+[[idea]]
+id = "pension_quarter_end_rebalancing"
+title = "Pension rebalancing at quarter end"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued: the filed quarter-end edge tests only the unconditional window, not the equity-minus-bond signal."
+
+[[idea]]
+id = "retail_options_lottery_share"
+title = "Retail share of option demand"
+mechanism_kind = "lottery_demand"
+filed_as = "retail_options_lottery_attention"

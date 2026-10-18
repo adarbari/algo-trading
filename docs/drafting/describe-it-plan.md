@@ -267,7 +267,9 @@ formula. Only a formula part beside an "or" or an exclusion keeps the draft flat
 `groups-*` pin one tree per phrasing (`expect.groups`, compared by `golden.score(groups=...)`); the
 owner verifies them. Live (claude, 2026-10-18): 9 of 11 passed under v12; the two failures were a
 wrong expectation and a non-maths sentence, fixed, and both pass live (v13). Every other block (a part
-not available, dropped or not understood) keeps the draft flat with a note. The save diff (ADR 0066) lists groups added, removed and changed.
+not available, dropped or not understood) keeps the draft flat with a note.
+Prompt v14 (2026-10-18): missing data never passes, an exclusion included; a recorded note had said names with
+no IV rank were not excluded (the engine leaves them out). A replay test now rejects such notes. The save diff (ADR 0066) lists groups added, removed and changed.
 
 ## Risks
 

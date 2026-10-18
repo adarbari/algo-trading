@@ -20,6 +20,7 @@ base = "universe"
 screeners = ["ivol_avoid", "lottery_max"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "lottery_demand"
 frozen_from = 2026-04-01
 notes = """Two screeners, one trial each, both ranked with the jumpiest name LAST so the harness's
 short leg (the worst scores) takes them first: ivol_avoid on rollup.factor_betas@v1.ivol_252d (the

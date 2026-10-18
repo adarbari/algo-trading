@@ -345,6 +345,7 @@ owner = [
 allowed = [
     "src/algotrade/storage/tables/schemas/market.py",  # declares the table
     "src/algotrade/data/volatility.py",  # the one read (data.volatility.vx_futures)
+    "src/algotrade/features/rollups/bridges/etf_macro.py",  # names its input; read through data.feature_inputs (EB E5)
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (vx_futures_fresh, WARN-only)
 ]
 section = "docs/adr/0007-point-in-time-data.md#decision"

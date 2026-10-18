@@ -20,6 +20,7 @@ screeners = ["pre_earnings_reversal", "earnings_neutral_reversal"]
 baselines = ["momentum_12_1", "size_small"]
 universe = "liquid_common_stocks"
 status = "candidate"
+mechanism_kind = "liquidity_provision"
 frozen_from = 2026-04-01
 notes = """The window is the 3 sessions of days -1, 0 and +1 around the expected report A, entered at
 the close of A - 2 (start_offset_sessions -2, the same window as the Savor-Wilson variant of the

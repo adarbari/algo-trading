@@ -19,6 +19,7 @@ top_k = 10
 screeners = []
 baselines = ["size_small"]
 status = "blocked"
+mechanism_kind = "value_gaps"
 frozen_from = 2026-04-01
 rejection_reason = """Closed-end funds are not in the covered universe, so they have no bars, no outcomes and
 no screener rows. Universe coverage is the stock, ADR and ETF types of ADR 0013 (security_types in

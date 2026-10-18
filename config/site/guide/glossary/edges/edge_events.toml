@@ -214,3 +214,22 @@ The trigger is a reverse split, where each holder gets one new share for several
 """
 next = "Open the edge's result and read how many reverse splits lie behind it."
 see_also = ["base_rate", "out_of_sample"]
+
+id = "schedule_on_market"
+term = "After a market-wide trigger"
+short = "The edge starts after something that happens to the whole market, not to one company."
+body = """
+Some timing is one fact about the whole market, such as a spike in the VIX, the market's fear gauge. It is not an event of one name, so there is no crowd of other names to compare with. The edge names a few funds or indexes. Each time the trigger fires, the edge holds them for its one horizon, starting at the close of the session after the trigger. The result sets those windows beside equal-length stretches of the same instrument outside every window. A second trigger inside a running window is skipped, so windows never overlap and each counts once. The base uses the triggers in the whole range, so a stretch near the end can change when the range is extended. A market trigger fires only a few times in a range, so the result shows the count of windows beside every number. Example: a VIX spike on Monday, entry at Tuesday's close, a 10-session window.
+"""
+next = "Open the edge's result and read the number of windows behind it before the averages."
+see_also = ["base_out_of_window", "out_of_sample", "market_trigger_vix_spike"]
+
+[[term]]
+id = "market_trigger_vix_spike"
+term = "VIX spike"
+short = "The market-wide trigger for the first day of a fear spike after a quiet month."
+body = """
+The trigger is the first session where the VIX closed at 30 or more. The three-month VIX must be below it, so the short-term price of fear is above the longer one (backwardation). It must come after at least 21 sessions with no such day, so a month of high readings is one spike, not twenty. The date is the session the reading was first known: the VIX close is published the day after, so a Monday close dates the spike Tuesday. The levels are fixed, and a change makes a new version of the field. A stale VIX reading makes the day unknown, never a day without a spike. The history starts with the first VIX close we hold, and the first 21 sessions of it cannot hold a spike. The VIX comes from Cboe via FRED, for personal use only. Example: the VIX closes at 36 on a Friday after a calm month, and the spike is dated Monday.
+"""
+next = "Open the edge's result and read how many spikes lie behind it."
+see_also = ["schedule_on_market", "base_out_of_window"]

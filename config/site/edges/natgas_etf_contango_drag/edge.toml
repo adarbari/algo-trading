@@ -15,6 +15,7 @@ top_k = 3
 screeners = ["trend_positive_12m"]
 base = "benchmark"
 status = "candidate"
+mechanism_kind = "cross_market_trends"
 frozen_from = 2026-04-01
 notes = """DOCUMENTED-LIMIT VARIANT. VERDICTS ARE UNMEASURED until the screen is run and evaluated. An
 allocation edge is long (ADR 0074), so the source's AVOID or SHORT rule cannot be filed as such:

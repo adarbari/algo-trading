@@ -17,6 +17,7 @@ top_k = 50
 screeners = ["dividend_month"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "forced_flows"
 frozen_from = 2026-04-01
 notes = """The expected month is the calendar month after the decision session's own (a month-end
 D reads the coming month): expected_div_month_flag is true when the name had an ex-dividend date
