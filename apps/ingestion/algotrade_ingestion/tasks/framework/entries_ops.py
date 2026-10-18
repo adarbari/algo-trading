@@ -15,6 +15,7 @@ from algotrade_ingestion.tasks.maintenance import (
     retire_features,
 )
 from algotrade_ingestion.tasks.market import (
+    futures_curves,
     ibkr_iv,
 )
 from algotrade_ingestion.tasks.profile import descriptions
@@ -71,6 +72,12 @@ def run_ibkr_iv(ctx: TaskContext, p: Params) -> RunRecord:
         source = source_guards.ibkr_source(ctx)
         return ibkr_iv.backfill_ivs(ctx, source, p["start"], end, symbols(p), p.get("limit"))
     return ibkr_iv.nightly_ivs(ctx, source_guards.ibkr_source(ctx), session_of(p), symbols(p))
+
+
+def run_futures_curves(ctx: TaskContext, p: Params) -> RunRecord:
+    return futures_curves.nightly_curves(
+        ctx, source_guards.ibkr_source(ctx), session_of(p), symbols(p)
+    )
 
 
 def run_ibkr_iv_repair(ctx: TaskContext, p: Params) -> RunRecord:

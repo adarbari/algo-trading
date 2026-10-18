@@ -5,7 +5,8 @@ primary exchange), daily bars, the implied- and historical-volatility history of
 a streamed snapshot of the underlying's option implied vol and historical vol (generic ticks
 106 and 104), IB dividends (generic tick 456), option chain parameters and option quote
 snapshots (one contract; or, streamed, the calls and puts of an expiry at given strikes: the
-API's live quotes, ADR 0028). Each returns plain JSON-able values; no ``ib_async`` object
+API's live quotes, ADR 0028), and the listed futures contracts of a root with their streamed
+quotes (the nightly futures curve). Each returns plain JSON-able values; no ``ib_async`` object
 leaves this module.
 
 Read-only by construction (ADR 0026), three layers:
@@ -48,7 +49,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from ib_async import IB, Option, Stock
+from ib_async import IB, Future, Option, Stock
 
 from algotrade_sources.framework.base import SessionUnavailableError, TransientFetchError
 from algotrade_sources.framework.http import Pacer
@@ -58,6 +59,7 @@ MARKET_DATA_CALLS = frozenset(
     {
         "reqMarketDataType",
         "qualifyContracts",
+        "reqContractDetails",  # the listed contracts of a futures root (a lookup, no account data)
         "reqHistoricalData",
         "reqMktData",
         "cancelMktData",  # ends a market-data subscription (not an order)
@@ -68,6 +70,8 @@ MARKET_DATA_CALLS = frozenset(
     }
 )
 CLIENT_CALLS = frozenset({"connect", "isReady"})  # the API handshake only
+NO_QUOTE = -1.0  # what IB sends for a price it has no quote for
+FUTURES_TICKS = "588"  # futures open interest (the quote fields come with every stream)
 DIVIDEND_TICKS = "456"  # IB dividends: past 12 months, next 12 months, next date and amount
 VOL_TICKS = "104,106"  # the underlying's historical vol (104) and option implied vol (106)
 VOL_HISTORIES = ("OPTION_IMPLIED_VOLATILITY", "HISTORICAL_VOLATILITY")  # what a payload may hold
@@ -197,12 +201,26 @@ def _price(value: Any) -> float | None:
     return number if math.isfinite(number) and number >= 0 else None
 
 
+def _settle(value: Any) -> float | None:
+    """A finite futures price, else ``None``. Not ``_price``: a future can settle below zero
+    (WTI, 2020-04-20); IB's "no quote" is exactly -1."""
+    number = _number(value)
+    return None if number is None or number == NO_QUOTE else number
+
+
 def _number(value: Any) -> float | None:
     """A finite number (a delta may be negative), else ``None``."""
     if value is None:
         return None
     number = float(value)
     return number if math.isfinite(number) else None
+
+
+def _expiry(contract: Any) -> date | None:
+    """A futures contract's last trade date (``20261120``), ``None`` when IB gives only the
+    month (``202611``)."""
+    text = str(contract.lastTradeDateOrContractMonth)
+    return date(int(text[:4]), int(text[4:6]), int(text[6:8])) if len(text) >= 8 else None
 
 
 @dataclass
@@ -539,6 +557,62 @@ class IbkrMarketData:
             while (left := deadline - self.clock()) > 0 and any(
                 _price(t.bid) is None or _price(t.ask) is None for _, t in streams
             ):
+                self.ib.waitOnUpdate(timeout=left)
+        finally:
+            for contract, _ in streams:
+                self._call("cancelMktData", contract)
+        return [t for _, t in streams]
+
+    # ------------------------------------------------------------------ futures curves
+
+    def future_curve(
+        self, root: str, exchange: str, trading_class: str, front: int, session: date
+    ) -> list[dict[str, Any]]:
+        """The ``front`` nearest unexpired contracts of futures ``root`` listed on ``exchange``
+        (only those of ``trading_class``: VX also lists weeklies), each with the quote streamed
+        now: last, close (IB's prior settle), bid, ask, day volume and open interest (tick 588),
+        ``None`` where IB sent none. ``LookupError`` when IB lists no contract for the root."""
+        details = self._call("reqContractDetails", Future(root, exchange=exchange, currency="USD"))
+        listed = [d.contract for d in details or [] if d.contract.tradingClass == trading_class]
+        live = [c for c in listed if (_expiry(c) or session) >= session]
+        live.sort(key=lambda c: (_expiry(c) or date.max, c.lastTradeDateOrContractMonth))
+        if not live:
+            raise LookupError(f"IBKR lists no {root} ({trading_class}) futures on {exchange}")
+        chosen = live[: max(1, front)]
+        tickers = self._stream_futures(chosen)
+        return [
+            {
+                "conid": int(c.conId),
+                "local_symbol": str(c.localSymbol or ""),
+                "contract_month": str(c.lastTradeDateOrContractMonth)[:6],
+                "expiry": e.isoformat() if (e := _expiry(c)) else None,
+                "multiplier": _number(c.multiplier or None),
+                "last": _settle(t.last),
+                "close": _settle(t.close),
+                "bid": _price(t.bid),
+                "ask": _price(t.ask),
+                "volume": _price(t.volume),
+                "open_interest": _price(getattr(t, "futuresOpenInterest", None)),
+            }
+            for c, t in zip(chosen, tickers, strict=True)
+        ]
+
+    def _stream_futures(self, contracts: list[Any]) -> list[Any]:
+        """Stream ``contracts`` together until each has a price and an open interest (at most
+        ``stream_wait_s``), then cancel every stream: their tickers, in order."""
+        streams: list[tuple[Any, Any]] = []
+
+        def waiting(t: Any) -> bool:
+            return (_settle(t.last) is None and _settle(t.close) is None) or (
+                _price(getattr(t, "futuresOpenInterest", None)) is None
+            )
+
+        try:
+            for contract in contracts:
+                ticker = self._call("reqMktData", contract, FUTURES_TICKS, False, False)
+                streams.append((contract, ticker))
+            deadline = self.clock() + self.config.stream_wait_s
+            while (left := deadline - self.clock()) > 0 and any(waiting(t) for _, t in streams):
                 self.ib.waitOnUpdate(timeout=left)
         finally:
             for contract, _ in streams:

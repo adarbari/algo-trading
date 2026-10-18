@@ -27,6 +27,7 @@ from algotrade.data.chains import (
     stale_in_tier,
 )
 from algotrade.data.events import ALL_TIME, read_events
+from algotrade.data.futures.curves import futures_curve
 from algotrade.data.macro.series import latest_vintages, stored_vintages
 from algotrade.data.reference import snapshot
 from algotrade.data.volatility import ibkr_iv30
@@ -317,6 +318,29 @@ def check_ibkr_vols(reader: StoreReader, session: date, s: SourcesSettings) -> l
             f"{len(rejected)} of {len(frame)} rows ({share:.1%}) had a vol out of bounds "
             f"(zero, or an IV above 5), stored null (max {s.max_ibkr_vol_rejected:.0%})"
             + (f"; e.g. {names}" if names else ""),
+        )
+    ]
+
+
+def check_futures_curves(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
+    """The session's futures curves (``futures-curves``): WARN when fewer roots than configured
+    stored a priced contract (a root the gateway or the account's market data does not serve),
+    never FAIL (optional, personal-licence data). Nothing when ``[ibkr]`` is disabled, no root
+    is configured or no row was written (the step was skipped, with its own WARN)."""
+    roots = {r.symbol for r in s.ibkr.futures_roots}
+    if not s.vendor("ibkr").enabled or not roots:
+        return []
+    frame = futures_curve(reader, session, session)
+    if frame.empty:
+        return []
+    served = set(frame.loc[frame["price"].notna(), "root"])
+    missing = sorted(roots - served)
+    return [
+        Check(
+            "futures_roots_served",
+            "WARN" if missing else "PASS",
+            f"{len(served & roots)} of {len(roots)} futures roots stored a priced curve"
+            + (f"; none for {', '.join(missing)}" if missing else ""),
         )
     ]
 

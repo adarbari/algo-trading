@@ -173,7 +173,7 @@ def test_enrichment_calls_are_market_data_only_and_paced() -> None:
         hv={"AAPL": BARS[-1:]},
         vols={"AAPL": (0.31, 0.25), "SPY": (0.12, float("nan"))},
     )
-    gw, general, historical = gateway(fake, stream_wait_s=0.01)
+    gw, general, historical = gateway(fake, stream_wait_s=0.21)
     gw.connect()
     found = gw.stock_contracts(["AAPL", "SPY", "ZZZZ"])
     assert found["AAPL"] == {"conid": 1004, "primary_exchange": "NASDAQ", "sec_type": "STK",
@@ -381,3 +381,65 @@ def test_the_error_listener_works_on_ib_asyncs_own_event() -> None:
     gw.close()
     raw.errorEvent.emit(5, 162, "again", None)
     assert seen == [(5, 162, "pacing violation")] and gw._events is None
+
+
+FUTURES = {
+    "CL": [("20261120", "CL"), ("20261022", "CL"), ("20260918", "CL"), ("20261218", "CL"),
+           ("20261120", "LO")],  # an expired month, a month of another class
+}  # fmt: skip
+CL_QUOTES = {
+    ("CL", "20261022"): (71.5, 71.0, 1000.0, 5000.0),
+    ("CL", "20261120"): (-1.0, 70.2, 800.0, float("nan")),  # last: IB's "no quote"
+}
+
+
+def test_future_curve_lists_the_front_unexpired_contracts_of_the_class_and_streams_them() -> None:
+    fake = FakeIB(futures=FUTURES, fut_quotes=CL_QUOTES)
+    gw, general, historical = gateway(fake, stream_wait_s=0.2)
+    gw.connect()
+    rows = gw.future_curve("CL", "NYMEX", "CL", 2, SESSION)
+    assert [(r["contract_month"], r["expiry"]) for r in rows] == [
+        ("202610", "2026-10-22"), ("202611", "2026-11-20")
+    ]  # fmt: skip
+    first, second = rows
+    assert (first["last"], first["close"], first["volume"], first["open_interest"]) == (
+        71.5, 71.0, 1000.0, 5000.0
+    )  # fmt: skip
+    assert second["last"] is None and second["close"] == 70.2  # -1 is no quote
+    assert second["open_interest"] is None and second["multiplier"] == 1000.0
+    assert fake.calls.count("reqContractDetails") == 1
+    assert fake.calls.count("reqMktData 588") == 2 and fake.calls.count("cancelMktData") == 2
+    assert historical.waits == 0 and general.waits >= 5  # every message is paced
+    assert set(gw.calls) <= MARKET_DATA_CALLS | CLIENT_CALLS
+    assert not set(FORBIDDEN) & set(fake.calls)
+
+
+def test_a_future_can_settle_below_zero() -> None:
+    fake = FakeIB(futures={"CL": [("20261022", "CL")]},
+                  fut_quotes={("CL", "20261022"): (-37.6, -36.0, 1.0, 1.0)})  # fmt: skip
+    gw, _, _ = gateway(fake, stream_wait_s=0.2)
+    gw.connect()
+    assert gw.future_curve("CL", "NYMEX", "CL", 1, SESSION)[0]["last"] == -37.6
+
+
+def test_future_curve_of_a_root_nothing_is_listed_for_is_a_lookup_error() -> None:
+    fake = FakeIB(futures=FUTURES)
+    gw, _, _ = gateway(fake)
+    gw.connect()
+    with pytest.raises(LookupError, match="no ZZ"):
+        gw.future_curve("ZZ", "CBOT", "ZZ", 3, SESSION)
+    assert "reqMktData 588" not in fake.calls
+
+
+def test_future_streams_are_cancelled_even_when_waiting_fails() -> None:
+    fake = FakeIB(futures=FUTURES, fut_quotes=CL_QUOTES)
+
+    def broken(timeout: float = 0) -> bool:
+        raise RuntimeError("socket closed")
+
+    fake.waitOnUpdate = broken  # type: ignore[method-assign]
+    gw, _, _ = gateway(fake)
+    gw.connect()
+    with pytest.raises(RuntimeError):
+        gw.future_curve("CL", "NYMEX", "CL", 2, SESSION)
+    assert fake.calls.count("cancelMktData") == 2

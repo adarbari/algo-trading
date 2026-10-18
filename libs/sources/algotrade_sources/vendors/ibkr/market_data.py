@@ -21,6 +21,8 @@ Request keys (``FetchRequest.session_date`` is the session verified):
                              ``<CONID>`` may be empty (looked up)
     quotes__<SYMBOL>__<YYYY-MM-DD>__<strike>+<strike>...   quotes now (streamed) of the calls
                              and puts of an expiry at those strikes (the API's live quotes)
+    futures__<ROOT>__<EXCHANGE>__<CLASS>__<FRONT>   the FRONT nearest unexpired contracts of a
+                             futures root with their quotes now (streamed): the curve
 
 Batch keys (``contracts``, ``vols``) can be long: tasks pass a short ``raw_key`` to
 ``IngestRun.fetch``; the payload names every symbol, so it normalises on its own.
@@ -41,12 +43,14 @@ from algotrade_sources.vendors.ibkr.gateway import VOL_HISTORIES, IbkrMarketData
 SOURCE = "ibkr"
 # Request kind -> number of ``SEP``-separated parts after it.
 ARITY = {"bars": 1, "iv": 1, "div": 1, "option_params": 1, "option": 4, "contracts": 1,
-         "volhist": 3, "vols": 1, "quotes": 3}  # fmt: skip
+         "volhist": 3, "vols": 1, "quotes": 3, "futures": 4}  # fmt: skip
 KINDS = tuple(ARITY)
 BATCH = "+"  # joins the symbols of a batch key
 VOL_COLUMNS = ("iv30_ibkr", "hv30_ibkr")
 QUOTE_COLUMNS = ("strike", "right", "listed", "conid", "bid", "ask", "last", "close", "volume",
                  "iv", "delta")  # fmt: skip
+FUTURES_COLUMNS = ("conid", "local_symbol", "contract_month", "expiry", "multiplier", "last",
+                   "close", "bid", "ask", "volume", "open_interest")  # fmt: skip
 # Request keys double as raw storage keys, which may not contain "/" (storage/backends).
 SEP = "__"
 DEFAULT_SESSIONS = 260
@@ -143,6 +147,8 @@ class IbkrSource:
             answer = self.gateway.volatility_history(symbol, start, end, conid)
         elif kind == "vols":
             answer = self.gateway.underlying_vols(_conids(symbol))
+        elif kind == "futures":
+            answer = self.gateway.future_curve(symbol, parts[1], parts[2], int(parts[3]), end)
         elif kind == "quotes":
             strikes = [float(k) for k in parts[2].split(BATCH)]
             answer = self.gateway.option_quotes(symbol, date.fromisoformat(parts[1]), strikes)
@@ -176,6 +182,8 @@ class IbkrSource:
             parsed = {kind: pd.DataFrame(rows)}
         elif kind == "quotes":
             parsed = {kind: pd.DataFrame(data, columns=list(QUOTE_COLUMNS))}
+        elif kind == "futures":
+            parsed = {kind: pd.DataFrame(data, columns=list(FUTURES_COLUMNS))}
         elif kind in ("bars", "iv"):
             parsed = {kind: _frame(data)}
         else:

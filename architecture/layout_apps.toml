@@ -217,7 +217,7 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/market"
-purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates, IBKR implied / historical vol, ETF holdings"
+purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates, IBKR implied / historical vol, IBKR futures curves, ETF holdings"
 kind = "task-domain"
 
 [[dir]]

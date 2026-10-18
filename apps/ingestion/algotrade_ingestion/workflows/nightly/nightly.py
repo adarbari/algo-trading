@@ -70,6 +70,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_chains,
     check_earnings,
     check_filings,
+    check_futures_curves,
     check_ibkr_vols,
     check_macro,
     check_macro_calendar,
@@ -198,6 +199,16 @@ NIGHTLY: tuple[Step, ...] = (
         latest_only=SNAPSHOT,
         critical=False,
         accept=(check_ibkr_vols,),
+    ),
+    # The futures curves (read-only IBKR, personal licence): the front contracts of each
+    # configured root, after the close. Optional like ibkr-iv: SKIPPED with a WARN without the
+    # gateway, a root without data permission is a WARN, never a FAIL; nothing reads it yet
+    # (history accrues), so no step needs it.
+    Step(
+        "futures-curves",
+        latest_only=SNAPSHOT,
+        critical=False,
+        accept=(check_futures_curves,),
     ),
     # Every session (catch-up too), after the market data it reads. A rollup that raises
     # (a gap in a lookback window included) fails the step.
