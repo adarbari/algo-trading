@@ -183,7 +183,7 @@ purpose = "ingestion tasks by domain (no modules of its own)"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/analyst"
-purpose = "analyst-data tasks (ADR 0068): the probe of what each free vendor key may call (analyst/vendor_access) and the FMP daily call budget it counts against"
+purpose = "analyst-data tasks (ADR 0068): the probe of what each free vendor key may call (analyst/vendor_access), the FMP daily call budget it counts against, the nightly snapshot of what the vendors say (analyst/estimate_snapshots) and the check of the names it has not asked yet (ADR 0072)"
 kind = "task-domain"
 
 [[dir]]
@@ -280,6 +280,10 @@ reason = "the one core / rest tier rule (ADR 0043): the chain fetch order, the c
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py"
 reason = "the coverage check is the rollups step's acceptance check (ADR 0043): the workflow declares which check accepts which step and runs it right after the step"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/analyst/backlog.py"
+reason = "`check_analyst_backlog` and `check_finnhub_backlog` are the analyst-snapshot step's acceptance checks beside check_analyst_snapshot (ADR 0072 decision 6): the workflow declares which check accepts which step and runs it right after the step"
 
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/derived/outcomes.py"

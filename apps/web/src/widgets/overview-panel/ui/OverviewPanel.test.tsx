@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { NAMES_PER_REQUEST } from '@/entities/instrument';
 import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
 import { OverviewPanel } from './OverviewPanel';
@@ -253,5 +254,13 @@ describe('OverviewPanel', () => {
     hooks.useInstrumentFacts.mockReturnValue(fakeQuery(undefined, { isError: true }));
     render(<OverviewPanel symbol="KO" />);
     expect(screen.getByText('KO failed to load.')).toBeInTheDocument();
+  });
+});
+
+describe('OverviewPanel names', () => {
+  it('asks for no more names than the API allows in one request', () => {
+    render(<OverviewPanel symbol="KO" />);
+    const names = hooks.useInstrumentFacts.mock.calls.at(-1)?.[1] as readonly string[];
+    expect(names.length).toBeLessThanOrEqual(NAMES_PER_REQUEST);
   });
 });

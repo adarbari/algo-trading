@@ -30,7 +30,7 @@ def _field(graph: Graph, name: str) -> dict[str, Any]:
 
 def test_a_field_page_with_what_the_server_derives(graph: Graph) -> None:
     page = _field(graph, ADV)
-    assert page["info"]["name"] == ADV and page["info"]["guide"]["theme"] == "liquidity"
+    assert page["info"]["name"] == ADV and page["info"]["guide"]["theme"] == "volume and liquidity"
     guide = page["info"]["guide"]
     assert guide["reads"].startswith(guide["summary"]) and guide["summary"].endswith(".")
     assert page["related"] and ADV not in page["related"]

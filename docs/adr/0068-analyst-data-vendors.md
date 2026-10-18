@@ -58,15 +58,34 @@ the latest earlier partition's row (keeping its `checked_ts`) for every `(source
 got no verdict this run (a vendor with no key, a 5xx, an endpoint over the budget): the verdict
 stored before stays across sessions, and `checked_ts` says how old it is.
 
-### Designed, built in later PRs
-- **FMP: a coverage-driven, rotating pull.** 200 calls a day cannot cover the universe, and the
-  free plan covers few names (see the measurement above). The pull learns the covered set (a name
-  answered with 402 is marked `NOT_COVERED`, not retried until the next probe) and spends the
-  200 calls a day only on covered names among the scope list of ADR 0050 plus tier A / B names
-  and the large caps, rotated, each name's estimates, targets and ratings refreshed on a cadence
-  set by the budget. Broad coverage needs a paid plan: an owner decision, not made here.
-- **Finnhub: a whole-universe rotation.** At one call a second the recommendation trend of every
-  name is a few hours of calls; it is spread over nights.
+### The pull as built (amended 2026-10-17; the first design said otherwise)
+- **FMP: a rotating pull over S&P 500 members plus the scope list.** 200 calls a day cannot cover
+  the universe, and the free plan covers few names (see the measurement above). A name answered with
+  402 is `NOT_COVERED` after one call and is asked again only after four refresh windows (not "until
+  the next probe": the table is read each night and nothing re-probes), so the budget goes mostly to
+  the covered large caps; each name's estimates, targets and ratings are refreshed on
+  `[fmp] refresh_days`. The first design also named tier A / B names; they are not in the
+  rotation (the scope list and the S&P 500 are), the owner's recommendation being to keep what is
+  built. Broad coverage needs a paid plan: an owner decision, not made here.
+- **Finnhub: the same names, one call each.** Not a whole-universe rotation: the names are the
+  same S&P 500 plus scope list, at most `[finnhub] per_night`, due on `[finnhub] refresh_days`.
+
+### Built: the nightly snapshot (edge build D2, 2026-10-17)
+`analyst-snapshot` (`tasks/analyst/snapshot.py`, an optional step of the nightly workflow, latest
+session only, after the screens and the edge signals so it cannot delay them, with a run time budget
+`[fmp] run_budget_s`: calls stop when it is spent and the names not yet asked are `OVER_BUDGET`; a
+run for a session before the last closed one is refused) appends each night's slice to `analyst/estimate_snapshots`, keyed (`instrument_id`,
+`source`, `kind`, `period`) per session partition: `ts` the fetch instant, `knowledge_ts` the run's
+publish instant, never a vendor date, no earlier session's row replaced. Names: S&P 500 members and
+the scope list. FMP spends three calls a name within `[fmp] daily_budget` on names due on the
+`[fmp] refresh_days` cadence (never fetched first, then the stalest); a 402 name is `NOT_COVERED`
+and waits four windows. Finnhub reads up to `[finnhub] per_night` names on its own
+`[finnhub] refresh_days`. With neither key set the step is skipped with a WARN (a pass). The rotation
+is read back from the run records' items. Every attempt of a vendor for a name also stores one
+`kind = "coverage"` row (`period = "current"`, `status` OK / EMPTY / NOT_COVERED / FAILED, `ts` the
+attempt), in the same table and on the same key, so a feature reads "the vendor refuses this name"
+(NOT_COVERED) apart from "not fetched yet" (no row) and "the call failed" (FAILED) from storage, not
+from run items; a refused name has that marker and no estimate rows.
 
 ### History starts at the first fetch
 Neither vendor gives a point-in-time history: a value they serve today replaces yesterday's and the

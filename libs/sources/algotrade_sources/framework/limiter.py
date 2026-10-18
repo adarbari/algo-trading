@@ -13,7 +13,8 @@ Adaptive pacing (``Pacing``; docs/configuration.md "Vendor pacing"):
 - the interval starts at ``start_interval_s`` and stays within ``[min_interval_s,
   max_interval_s]`` (the floor is the fastest we ever go);
 - ``throttled(seconds)`` (HTTP 429): hold every process for ``seconds`` (the vendor's
-  ``Retry-After``), then multiply the interval by ``backoff_factor``;
+  ``Retry-After``, at most ``MAX_RETRY_AFTER_S``), then multiply the interval by
+  ``backoff_factor``;
 - ``record(outcome)``: each response is ``ok``, ``missing`` (the vendor answered "no such
   object": not an error) or ``error`` (5xx, a block, a timeout). The last ``error_window``
   responses form a window; once it is full and the share of errors (429s included) exceeds
@@ -46,6 +47,11 @@ from typing import Any, Literal
 
 DEFAULT_DIR = Path("var/run/limits")
 IDLE_RESET_S = 600.0  # a key unused this long starts again from ``start_interval_s``
+# The longest a vendor's ``Retry-After`` is honoured (the per-call ceiling, the default of
+# ``[http] max_retry_s``): a vendor asking for more is given up on by ``get_with_retry`` before
+# any hold, and ``throttled`` clamps to it, so no 429 parks every process (and the ingest lock)
+# for a day.
+MAX_RETRY_AFTER_S = 300.0
 type Sleep = Callable[[float], None]
 type Clock = Callable[[], float]
 type Outcome = Literal["ok", "missing", "error"]
@@ -202,7 +208,10 @@ class Limiter:
     def throttled(self, seconds: float) -> None:
         """The vendor answered 429: hold every process for ``seconds`` (its Retry-After),
         then back off (interval x ``backoff_factor``) unless a hold was already running (the
-        other workers' 429s from the same burst back off once). Counts as an error."""
+        other workers' 429s from the same burst back off once). Counts as an error. ``seconds`` is
+        clamped to ``MAX_RETRY_AFTER_S`` (and a negative or NaN one to 0): the caller gives up on
+        a longer ask, this is the backstop."""
+        seconds = min(MAX_RETRY_AFTER_S, seconds) if seconds > 0 else 0.0  # NaN -> 0
 
         def step(s: _State) -> None:
             now = self._clock()

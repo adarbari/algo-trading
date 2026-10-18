@@ -19,7 +19,7 @@ env:
   # The official Playwright image: browsers and fonts identical to the screenshot baselines
   # (apps/web/scripts/in-playwright-docker.sh uses the same image locally). Its tag must match
   # @playwright/test in apps/web/package-lock.json (checked in the screenshots job).
-  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.64.1-noble
 
 jobs:
   # Which side a pull request touches (docs/ci.md). main (push, post-merge re-test) runs all.
@@ -251,7 +251,7 @@ jobs:
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --ipc=host
     defaults:
       run:
@@ -307,7 +307,7 @@ jobs:
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --ipc=host
     strategy:
       fail-fast: false
@@ -349,7 +349,7 @@ jobs:
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --ipc=host
     defaults:
       run:

@@ -19,11 +19,11 @@ from datetime import date
 from typing import Final
 
 from algotrade.quant.edges import paths
+from algotrade.quant.edges.statistics import window_weights
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk.paper import LOST, WON, PaperTrade, load_trades
 from algotrade.services.read.edge_evidence.series import BasisSeries
 from algotrade.services.read.evaluation.edges import Edge
-from algotrade.services.read.evaluation.runs import window_weights
 
 RECORDED, NONE, OOS_HIDDEN = "recorded", "none", "oos_hidden"
 LIVE_STATES: Final = (RECORDED, NONE, OOS_HIDDEN)

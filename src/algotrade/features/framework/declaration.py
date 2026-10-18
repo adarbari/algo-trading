@@ -100,8 +100,13 @@ class FeatureGroup:
     # The group's source may be absent for a session (IB Gateway down, ADR 0055): a screen that
     # goes without its table is audited, not PARTIAL. Every expression feature reading it falls
     # back to a required table (coalesce or an is_null branch) and no site HARD criterion reads
-    # it directly (fitness).
+    # it directly (fitness), unless the group is ``sole_source``.
     optional: bool = False
+    # Why no other source carries these facts (cite the ADR): an optional group with no fallback
+    # (the analyst consensus has one vendor). Its expressions are exempt from the fallback
+    # fitness test: with the table absent they are null with their reason; they count as
+    # optional fields (no site HARD criterion, ADR 0055 amendment).
+    sole_source: str = ""
 
     def __post_init__(self) -> None:
         owned = tuple(
@@ -175,7 +180,20 @@ def declaration_problems(group: FeatureGroup) -> list[str]:
             problems.append(f"{f.name}: entity must be the group's ({group.entity})")
     if group.params is not None and not is_dataclass(group.params):
         problems.append("params must be a dataclass instance (or None)")
-    return problems + _symbol_problems(group) + _entity_problems(group)
+    return (
+        problems + _sole_source_problems(group) + _symbol_problems(group) + _entity_problems(group)
+    )
+
+
+def _sole_source_problems(group: FeatureGroup) -> list[str]:
+    """``sole_source`` is for an optional group and cites the ADR that says why no other source
+    exists."""
+    problems = []
+    if group.sole_source and not group.optional:
+        problems.append("sole_source is for an optional group (a required one has no gap)")
+    if group.sole_source and "ADR " not in group.sole_source:
+        problems.append("sole_source must cite the ADR that says why there is no other source")
+    return problems
 
 
 def _symbol_problems(group: FeatureGroup) -> list[str]:

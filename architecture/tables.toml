@@ -47,6 +47,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/analyst/probe.py"
 note = "ADR 0068: which analyst endpoints each free vendor key may call (FMP, Finnhub), one row per (vendor, endpoint), from the by-hand analyst-probe"
 
 [[table]]
+name = "analyst/estimate_snapshots"
+owner = "apps/ingestion/algotrade_ingestion/tasks/analyst/snapshot.py"
+note = "ADR 0068: our own point-in-time history of FMP and Finnhub analyst data, appended nightly (ts = fetch, knowledge_ts = publish), never replaced by a later session"
+
+[[table]]
 name = "instruments/index_membership"
 owner = "apps/ingestion/algotrade_ingestion/tasks/listings/index_membership.py"
 
@@ -170,6 +175,26 @@ name = "rollups/instrument/earnings_reaction@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/analyst_estimates@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0068: FY1 / FY2 consensus EPS and revenue from our own analyst snapshots (analyst/estimate_snapshots); personal licence, optional"
+
+[[table]]
+name = "rollups/instrument/analyst_targets@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0068: price-target consensus, median, high and low from our own analyst snapshots; personal licence, optional"
+
+[[table]]
+name = "rollups/instrument/analyst_ratings@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0068: analysts' strong buy to strong sell counts, mean rating and its 90-day change from our own Finnhub snapshots; personal licence, optional"
+
+[[table]]
+name = "rollups/instrument/analyst_revisions@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0068: revisions of the FY1 consensus EPS and revenue over 30, 60 and 90 days, matched on the fiscal year end, from our own FMP snapshots; personal licence, optional"
+
+[[table]]
 name = "rollups/instrument/earnings_revisions@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
@@ -212,6 +237,11 @@ note = "TTM income statement lines from instruments/statements (ADR 0067)"
 name = "rollups/instrument/cash_flow@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "TTM operating cash flow and capex from instruments/statements (ADR 0067)"
+
+[[table]]
+name = "rollups/instrument/growth_history@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "revenue and diluted EPS TTMs about 3 and 5 years back from instruments/shares (the bases of the multi-year growth rates)"
 
 [[table]]
 name = "rollups/instrument/balance_sheet@v1"

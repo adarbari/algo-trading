@@ -100,6 +100,7 @@ class VerdictColumn:
     deflated_sharpe: float | None
     pbo: float | None
     thin: bool
+    picks_t: float | None = None  # the t-ratio of ``sharpe`` over the picks series
     reference_rate: float | None = None  # expires_otm only: the risk-neutral rate of the win
     touch_rate: float | None = None  # expires_otm only: picks whose strike was touched
 
@@ -360,6 +361,8 @@ def _criteria(
               f"at least {t.works_trades} and {t.works_oos_trades}", enough, WORKS),
         _crit("works_t", "Top vs bottom decile t", _num(oos.decile_t),
               f"at least {t.works_t:g}", _at_least(oos.decile_t, t.works_t), WORKS),
+        _crit("works_picks_t", "Picks-series t (Sharpe ratio's t-ratio)", _num(oos.picks_t),
+              f"at least {t.works_picks_t:g}", _at_least(oos.picks_t, t.works_picks_t), WORKS),
         _crit("works_dsr", "Deflated Sharpe", _num(dsr), f"at least {t.works_dsr:g}",
               _at_least(dsr, t.works_dsr), WORKS),
         _overfit("works_pbo", pbo, t.works_max_pbo, WORKS, alone),
@@ -410,7 +413,8 @@ def _column(
         return VerdictColumn(period, None, None, None, None, None, None, None, None, None, thin)
     return VerdictColumn(
         period, r.hit_rate, r.base_rate, runs.lift_points(r.hit_rate, r.base_rate), r.sessions,
-        r.decile_spread, r.decile_t, r.sharpe, deflated, pbo, thin, r.reference_rate, r.touch_rate,
+        r.decile_spread, r.decile_t, r.sharpe, deflated, pbo, thin, r.picks_t,
+        r.reference_rate, r.touch_rate,
     )  # fmt: skip
 
 
@@ -451,6 +455,8 @@ class EdgeFacts:
     after: date | None = None
     measured: Callable[[], Mapping[tuple[str, int], int] | None] | None = None
     wins: bool = False  # the outcome is not a return: the Sharpe ratio is of the excess wins
+    site_trials: Callable[[], int] | None = None  # the variants tried across every site
+    # edge, read when the haircut is (None: not counted)
 
 
 def counts_wins(edge: Edge) -> bool:
@@ -475,11 +481,12 @@ def _haircut(c: _Candidate, facts: EdgeFacts) -> EdgeHaircut | None:
     """The basis's haircut Sharpe ratio over the sessions the run's series measured with picks
     (``measured``); the stored count when the run has no series."""
     whole = c.whole
+    site = facts.site_trials() if facts.site_trials is not None and whole.sharpe else None
     if whole.sharpe is None or facts.measured is None:
-        return load_haircut(whole.sharpe, whole.sessions, whole.trials, facts.wins)
+        return load_haircut(whole.sharpe, whole.sessions, whole.trials, facts.wins, site)
     counted = facts.measured()
     n = whole.sessions if counted is None else counted.get((c.variant, c.horizon), 0)
-    return load_haircut(whole.sharpe, n, whole.trials, facts.wins)
+    return load_haircut(whole.sharpe, n, whole.trials, facts.wins, site)
 
 
 def _at_target(
@@ -570,7 +577,7 @@ def _judge_one(
         columns=_columns(c, t),
         evidence=evidence_of(oos.sessions, whole.sessions, crit, t, outlook),
         haircut=_haircut(c, facts),
-        decay=decay_of(facts.published, c.horizon, c.insample, oos, facts.hidden),
+        decay=decay_of(facts.published, c.horizon, c.insample, oos, facts.hidden, t),
     )
 
 
@@ -813,6 +820,7 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
             after=run.range_to,
             measured=lambda: runs.load_measured_sessions(ctx, run),
             wins=counts_wins(edge),
+            site_trials=None if edge.mine else lambda: runs.load_site_trials(ctx),
         ),
         range_to=run.range_to,
     )

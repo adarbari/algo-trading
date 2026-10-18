@@ -394,3 +394,17 @@ def test_the_site_run_keeps_the_picks_and_a_user_runs_with_the_licences_they_hol
     owner = _screen_job_values("owner")
     assert owner[owner["instrument_id"] == "EQ:AAA"].iloc[0]["value_num"] == 0.3
     assert set(_screen_job_values("trader")["outcome"]) == {"MISSING"}
+
+
+def test_a_run_records_every_fields_licence_for_the_read_to_gate_by() -> None:
+    """The record a stored run is gated by at read (ADR 0069): each field the spec reads with
+    its licence in the owner's catalogue (an expression over a personal feature is personal)."""
+    reader, writer = seeded()
+    store = MemoryConfigStore(
+        {("site", "selections", "active"): ACTIVE, ("site", "strategies", "vrp_like"): VRP_SCREEN}
+    )
+    config = resolve_config(store, "vrp_like", UserContext(SITE_USER))
+    outcome = run_screener(reader, writer, config, DAY, now=T0, held=HARNESS_ALL)
+    recorded = outcome.audit["field_licences"]
+    assert outcome.rules is not None and set(recorded) == set(outcome.rules.spec.fields())
+    assert recorded["feature.vrp_iv30"] == "personal"

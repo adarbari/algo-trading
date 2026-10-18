@@ -16,6 +16,7 @@ SPANS = ((3, 75, 105), (6, 160, 200), (9, 250, 290), (12, 340, 380))
 QUARTER_GAP = (75, 105)  # days between the ends of consecutive quarters
 YEAR_GAP = (340, 380)  # days between a period end and the same period a year earlier
 DERIVE_GAP = 150  # days apart two year-to-date facts may be filed to be subtracted
+AGO_TOLERANCE = 40  # days a TTM end may be off its target of N years before the newest TTM
 
 
 @dataclass(frozen=True)
@@ -112,6 +113,27 @@ def trailing(facts: list[Fact], non_negative: bool = False) -> tuple[Total, floa
     _, end, value, filed, _ = years[-1]
     before_year = [x[2] for x in years if YEAR_GAP[0] <= end - x[1] <= YEAR_GAP[1]]
     return (value, end, filed, True), before_year[-1] if before_year else None
+
+
+def trailing_ago(
+    facts: list[Fact], end: int, years: int, non_negative: bool = False
+) -> float | None:
+    """The TTM ending about ``years`` years before ``end`` (the newest TTM's period end), or
+    ``None``: the four consecutive quarters whose last ends within ``AGO_TOLERANCE`` days of
+    ``end`` minus ``years`` x 365.25 days (the nearest first), else the fiscal year ending that
+    close to it. A hole in that history (a missing quarter and no such fiscal year) is ``None``,
+    never a shorter sum."""
+    target = end - round(365.25 * years)
+    quarters = discrete_quarters(facts, non_negative)
+    near = sorted(
+        (i for i, q in enumerate(quarters) if abs(q[0] - target) <= AGO_TOLERANCE),
+        key=lambda i: abs(quarters[i][0] - target),
+    )
+    for i in near:
+        if (four := _four(quarters, i)) is not None:
+            return four[0]
+    close = [f for f in annual(facts) if abs(f[1] - target) <= AGO_TOLERANCE]
+    return min(close, key=lambda f: abs(f[1] - target))[2] if close else None
 
 
 def latest_quarter(

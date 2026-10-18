@@ -37,6 +37,13 @@ value = 0.02
 mode = "soft"
 tolerance = 0.005
 note = "with feature.atr_pct gte 0.005 so pinned takeover targets do not pass as calm"
+[[field.use]]
+for = "a daily range under a set share of price"
+op = "lt"
+value = 0.03
+mode = "soft"
+tolerance = 0.005
+note = "the typical daily range (14-day average true range) as a share of price: 0.03 is 3%"
 
 [[field]]
 name = "feature.range_20d_pct"

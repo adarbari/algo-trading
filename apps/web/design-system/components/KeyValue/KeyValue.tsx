@@ -1,7 +1,7 @@
 /**
  * KeyValue: a definition list for detail panels: a label column and a value column (`<dl>`),
  * values tabular. Values are text or formatted with a ValueFormat (`$13.99B`, `+1.24%` with its
- * up / down tone); an optional hint (a feature id, a unit, a rule) sits under the label. Loading
+ * up / down tone); an optional action (a help button) beside the label; an optional hint (a feature id, a unit, a rule) sits under the label. Loading
  * shows placeholder values, an empty list shows the empty message.
  */
 import type { ReactNode } from 'react';
@@ -19,6 +19,8 @@ export interface KeyValueItem {
   format?: ValueFormat;
   /** Secondary line under the label (feature id, unit, rule). */
   hint?: ReactNode;
+  /** A control drawn beside the label (a help or term button); it keeps its own touch size. */
+  action?: ReactNode;
   /** Set the value in the monospace face (symbols, ids). */
   mono?: boolean;
 }
@@ -78,7 +80,14 @@ export function KeyValue({
             className={styles.row}
           >
             <dt className={styles.term}>
-              <span className={styles.label}>{item.label}</span>
+              {item.action === undefined ? (
+                <span className={styles.label}>{item.label}</span>
+              ) : (
+                <span className={styles.labelRow}>
+                  <span className={styles.label}>{item.label}</span>
+                  <span className={styles.action}>{item.action}</span>
+                </span>
+              )}
               {item.hint !== undefined && <span className={styles.hint}>{item.hint}</span>}
             </dt>
             <dd className={styles.value} data-tone={tone} data-mono={item.mono || undefined}>

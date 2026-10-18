@@ -222,6 +222,7 @@ Sources: O'Neil (1988), How to Make Money in Stocks: the relative strength line 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
 | relative strength improving | `gt 0.0` | soft | 0.02 | feature.rs_improving is the same gate as a flag; pair with rollup.relative_strength@v1.rs_spy_63d gt 0 to exclude laggards that merely stopped falling |
+| an upward trend soon against the market | `gt 0.0` | soft | 0.02 | a name gaining on SPY over the last month; a leader's trend can still be falling, so pair with rollup.relative_strength@v1.rs_spy_63d gt 0 |
 
 **When the reading lies**
 

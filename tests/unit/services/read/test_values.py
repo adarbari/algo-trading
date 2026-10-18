@@ -63,7 +63,7 @@ def test_unknown_names_its_reason_and_where() -> None:
     assert "rollups/" not in unknown.public_reason
     assert [c.value for c in UnknownCode] == [
         "NO_PARTITION", "NO_ROW", "NULL", "NOT_IN_CATALOGUE", "LICENCE", "NOT_RUN", "PRE_SNAPSHOT",
-        "NOT_APPLICABLE", "ILLIQUID", "EXPLAINED", "PRUNED", "NOT_STORED",
+        "NOT_APPLICABLE", "ILLIQUID", "NOT_COVERED", "EXPLAINED", "PRUNED", "NOT_STORED",
         "NOT_RECORDING",
     ]  # fmt: skip
     assert unknown.reason is None  # only an EXPLAINED value carries a NullReason

@@ -205,7 +205,8 @@ class FeatureSet:
         """What a value's absence may be put down to (ADRs 0042, 0046), inherited by an
         expression from everything it reads like its licence: -> (the non-``any``
         ``applies_to`` values of the stored features it reads, each ``null_status`` field with
-        its ``illiquid_statuses``, ``explained_statuses`` and the declaring feature's table).
+        its ``illiquid_statuses``, ``explained_statuses``, the declaring feature's table and its
+        ``uncovered_statuses``).
         ``name``: a selection field (``rollup.<group>.<col>``, ``feature.<name>``)."""
         applies: set[str] = set()
         statuses: list[StatusRule] = []
@@ -220,6 +221,7 @@ class FeatureSet:
                         frozenset(feature.illiquid_statuses),
                         frozenset(feature.explained_statuses),
                         rollup_table(feature.entity, feature.group),
+                        frozenset(feature.uncovered_statuses),
                     )
                 )
 
@@ -340,8 +342,9 @@ class FeatureSet:
         )
         dtypes = {n: self.expressions[n].feature.dtype for n in names}
         out = conform("expressions", typed, dtypes)
-        out.insert(0, "session_date", keys["session_date"].to_numpy())
-        return out
+        # joined, not inserted: an insert into a catalogue of a hundred columns warns
+        sessions_col = pd.DataFrame({"session_date": keys["session_date"].to_numpy()})
+        return pd.concat([sessions_col, out], axis=1)
 
     # ------------------------------------------------------------------ materialised
     def _materialised(self, e: Expression) -> FeatureGroup:

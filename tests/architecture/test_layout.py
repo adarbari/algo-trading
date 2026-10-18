@@ -232,7 +232,7 @@ def _registered_task_modules() -> set[str]:
 
 @pytest.mark.parametrize("domain", _dirs_of_kind("task-domain"))
 def test_task_domain_modules_stay_inside_their_domain(domain: str) -> None:
-    allowed = {LAYOUT["task_registry"]}
+    allowed = {LAYOUT["task_registry"]} | {_rel(p) for p in REPO_ROOT.glob(LAYOUT["task_entries"])}
     registered = _registered_task_modules()
     for path in sorted((REPO_ROOT / domain).glob("*.py")):
         rel = _rel(path)
