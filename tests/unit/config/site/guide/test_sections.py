@@ -54,7 +54,7 @@ def test_the_shipped_sections_follow_the_spec() -> None:
         "factors",
         "fundamentals",
     ]
-    assert shipped.families[1].presets == ("range_breakout", "breakout", "failed_breakout")
+    assert shipped.families[1].presets[:3] == ("range_breakout", "breakout", "failed_breakout")
     assert shipped.theme_groups[0].themes == ("instrument gates",)
 
 

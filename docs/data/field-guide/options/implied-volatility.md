@@ -332,7 +332,7 @@ Sources: Site convention (docs/edge-ideas/options-volatility.md c03)
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| calls getting richer against puts over a month | `gte 0.02` | soft | 0.005 | a rank across names is the published rule; this is a coarse level cut |
+| calls getting richer against puts over a month | `gte 0.02` | soft | 0.005 | illustrative screen, not a published cut-off: 0.02 is two vol points over a month; Cremers and Weinbaum rank names and set no level |
 
 **When the reading lies**
 
@@ -350,7 +350,7 @@ Sources: Cremers and Weinbaum, Deviations from Put-Call Parity and Stock Return 
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| call IV up three vol points in a week | `gte 0.03` | soft | 0.01 | a level change only; rank it across names on the session |
+| call IV up three vol points in a week | `gte 0.03` | soft | 0.01 | illustrative screen, not a published cut-off: 0.03 is three vol points, a move larger than a week of ordinary noise on most names; the published rule ranks names |
 
 **When the reading lies**
 
@@ -368,7 +368,7 @@ Sources: An, Ang, Bali and Cakici, The Joint Cross Section of Stocks and Options
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| put IV up three vol points in a week (a caution) | `gte 0.03` | soft | 0.01 | avoid or fade; rank it across names on the session |
+| put IV up three vol points in a week (a caution) | `gte 0.03` | soft | 0.01 | illustrative screen, not a published cut-off: 0.03 is three vol points, a move larger than a week of ordinary noise on most names; the published rule ranks names |
 
 **When the reading lies**
 
@@ -403,7 +403,7 @@ Sources: Site convention over the stored chains
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| an expiry near a month out | `between [20, 40]` | soft | 5 | keeps the vol on one comparable maturity |
+| an expiry near a month out | `between [20, 40]` | soft | 5 | illustrative screen: 20 to 40 days keeps the vol near the 30-day target so changes compare like with like; the rule uses 10 to 60 |
 
 **When the reading lies**
 

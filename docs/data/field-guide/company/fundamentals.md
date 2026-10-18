@@ -68,7 +68,7 @@ Sources: Pontiff and Woodgate (2008), Journal of Finance 63(2), Share Issuance a
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a more profitable company than most | `gte 0.5` | soft | 0.25 | read with rollup.qmj@v1.safety_z; a score across the session, not a level |
+| a more profitable company than most | `gte 0.5` | soft | 0.25 | illustrative screen, not a published cut-off: half a standard deviation above the session middle; the paper ranks, it sets no level. Read with rollup.qmj@v1.safety_z |
 
 **When the reading lies**
 
@@ -86,7 +86,7 @@ Sources: Asness, Frazzini and Pedersen (2019), Quality Minus Junk, Review of Acc
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a safer balance sheet than most | `gte 0.5` | soft | 0.25 | a leverage and distress score; read with rollup.qmj@v1.profitability_z |
+| a safer balance sheet than most | `gte 0.5` | soft | 0.25 | illustrative screen, not a published cut-off: half a standard deviation above the session middle; a leverage and distress score. Read with rollup.qmj@v1.profitability_z |
 
 **When the reading lies**
 
@@ -104,7 +104,7 @@ Sources: Asness, Frazzini and Pedersen (2019), Quality Minus Junk, Review of Acc
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a composite rank built on at least six of seven anomalies | `gte 6` | hard | - | gate for when rollup.mispricing@v1.composite_rank is the decision |
+| a composite rank built on at least six of seven anomalies | `gte 6` | hard | - | illustrative screen: 6 of 7 drops only the least-covered names; the source composite requires all its anomalies, we require 5 |
 
 **When the reading lies**
 

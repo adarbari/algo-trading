@@ -490,4 +490,4 @@ for = "a report date that moved in the last five sessions"
 op = "lte"
 value = 5
 mode = "hard"
-note = "the news is freshest in the first sessions after the move"
+note = "illustrative screen: five sessions is one trading week, the window in which the move is still news; no published cut-off"
