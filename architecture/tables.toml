@@ -428,7 +428,7 @@ note = "every rule screen's rows (ADR 0029), framed by services/screening/rule_r
 [[table]]
 name = "results/rule_screen_values"
 owner = "src/algotrade/storage/tables/result_writer.py"
-note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen"
+note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen; group rows (mode = group, field = the kind, value_str = the deciding member) and a nullable group_id (the parent) on member rows (ADR 0071); readers skip group rows beside display columns (is_criterion_row)"
 
 [[table]]
 name = "results/edge_eval"
@@ -482,6 +482,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py"
 [[table]]
 name = "holdings/etf"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py"
+
+[[table]]
+name = "holdings/etf_shares"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py"
+note = "EB D4: an ETF's shares outstanding from the iShares file the holdings task already reads (one row per fund and as-of date, known_from = the session of the New York date of the fetch); read through data/funds/shares.py"
 
 [[table]]
 name = "macro/series"

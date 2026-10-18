@@ -232,7 +232,7 @@ TASKS: dict[str, Task] = {
             "etf-holdings",
             "what each ETF holds, from the issuers' daily files and SEC N-PORT (incremental)",
             etf_holdings,
-            ("holdings/etf",),
+            ("holdings/etf", "holdings/etf_shares"),
             entries_reference.run_etf_holdings,
             optional_sources=source_guards.HOLDINGS_ISSUERS,
             settings="sources.toml [etf_holdings]",
