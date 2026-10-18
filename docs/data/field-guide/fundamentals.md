@@ -394,7 +394,7 @@ Sources: SEC EDGAR company facts (docs/data/vendors.md)
 
 **When the reading lies**
 
-- Not the date it became public: that is later, and a session reads only what SEC had accepted by its close (a filing accepted after 16:00 New York time counts from the next session).
+- Not the date it became public: that is later. A session reads only what SEC had accepted by its close. A filing accepted at or after 16:00 New York time counts from the next session.
 - Null when no quarter can be formed or the quarter is older than 480 days.
 
 Sources: SEC EDGAR company facts (docs/data/vendors.md)

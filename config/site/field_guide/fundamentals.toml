@@ -500,7 +500,7 @@ name = "rollup.financials@v3.qtr_as_of"
 theme = "fundamentals"
 reads = "The end date of the latest reported quarter that rollup.financials@v3.revenue_qtr and rollup.financials@v3.eps_diluted_qtr describe. Up to about four months before the session; the same date for every non-null quarter column of the row."
 caveats = [
-  "Not the date it became public: that is later, and a session reads only what SEC had accepted by its close (a filing accepted after 16:00 New York time counts from the next session).",
+  "Not the date it became public: that is later. A session reads only what SEC had accepted by its close. A filing accepted at or after 16:00 New York time counts from the next session.",
   "Null when no quarter can be formed or the quarter is older than 480 days.",
 ]
 sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
