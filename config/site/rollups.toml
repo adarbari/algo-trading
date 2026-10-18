@@ -83,6 +83,14 @@ history_days = 1100      # facts whose period ended earlier are not read
 stale_days = 480         # the newest TTM ended longer ago than this: STALE (still shown); as income_statement@v2
 history_days = 2700      # facts whose period ended earlier are not read: 480 stale days + 5 years (1826) + 40 tolerance + 3 quarter gaps (273) = 2619
 
+["mispricing@v1"]
+stale_days = 480         # a statement group whose newest period ended longer ago is STALE: its values are not used; as income_statement@v2
+history_days = 1100      # facts whose period ended earlier are not read (the balance sheet a year back)
+ago_tolerance_days = 40  # the balance sheet a year back ends within this many days of the latest one's date minus 365
+min_members = 100        # instruments with a known value a percentile rank needs
+min_quality_inputs = 4   # of the six quality measures quality_score averages
+min_anomalies = 5        # of the seven anomalies composite_rank averages
+
 ["cash_flow@v2"]
 stale_days = 480         # as income_statement@v2
 history_days = 1100

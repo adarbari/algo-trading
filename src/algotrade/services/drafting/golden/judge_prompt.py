@@ -11,7 +11,7 @@ from typing import Any
 from algotrade.core.model.errors import InvalidAnswerError
 from algotrade.services.drafting.screens import ScreenDraft
 
-JUDGE_PROMPT_VERSION = "1"
+JUDGE_PROMPT_VERSION = "2"
 DIMENSIONS = ("segmentation", "coverage", "logic", "fidelity")
 MAX_DETAIL = 160
 MAX_ISSUES = 12
@@ -30,7 +30,10 @@ terms and notes. Score the DRAFT against the SENTENCE on four dimensions, each 0
   unresolved term; nothing silently lost; nothing invented beyond scaffolding (status, instrument
   type).
 - logic: but / yet / although / while mean AND; except / excluding / unless / avoid / without mean
-  AND NOT with the right direction; or means OR (a boolean formula, never two ANDed criteria);
+  AND NOT with the right direction; or means OR (a `group ... any` line over the criteria of its
+  sides, or one boolean formula, never two plainly ANDed criteria); except / without may be a
+  `group ... none` line (none of its members; its criteria are the excluded conditions as they
+  read, not negated); a group member keeps the mode its words ask for ("ideally" is score);
   rank / sort becomes a tie_break with the right direction.
 - fidelity: fields, units and thresholds fit the words (percent vs fraction, 3-month is about 60
   sessions); vague words are handled honestly (unresolved, or a note), never a made-up hard gate.
@@ -109,6 +112,8 @@ def render_draft(draft: ScreenDraft) -> str:
     for cid, crit in draft.document.get("criteria", {}).items():
         keep = {k: crit[k] for k in ("field", "op", "value", "mode") if k in crit}
         lines.append(f"criterion {cid} " + _compact(keep))
+    for gid, body in draft.document.get("groups", {}).items():
+        lines.append(f"group {gid} " + _compact(body))  # {"any": [member ids]} (ADR 0071)
     rank = draft.document.get("rank") or {}
     if rank.get("tie_break"):
         order = "ascending" if rank.get("tie_break_order") == "asc" else "descending"

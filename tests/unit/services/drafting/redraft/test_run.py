@@ -5,6 +5,7 @@ operator, what the trader added by hand stays in the ``kept`` part, ids stay uni
 of the words after the new ones move (in UTF-16 units) and the call is tagged and counted as a
 part re-draft."""
 
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -454,3 +455,51 @@ def test_dropped_criteria_are_bounded_and_the_parts_stop_pointing_at_the_ones_go
     assert "x0" not in kept and f"x{MAX_ITEMS + 9}" in kept  # the oldest went first
     # and what comes back is a request that holds together
     check_request("my_screen", body_of(draft, "p3", "deep oi"))
+
+
+def grouped_prior(ctx: ReadContext, groups: dict[str, Any] | None = None) -> Any:  # noqa: F811
+    """The held draft with an "or" before ``p3`` and the groups its joins give (or ``groups``,
+    the trader's own)."""
+    held = held_draft(ctx)
+    parts = tuple(
+        replace(p, join="or", join_words="or")
+        if p.id == "p3"
+        else replace(p, join=None, join_words="")
+        if p.id == "p4"
+        else p
+        for p in held.parts or ()
+    )
+    ids = {c["field"]: cid for cid, c in held.document["criteria"].items()}
+    derived = {"any_1": {"any": [ids[PRICE], ids[OI]]}}
+    document = {**held.document, "groups": groups or derived}
+    return replace(held, parts=parts, document=document), derived
+
+
+def test_a_retyped_part_keeps_its_join_and_the_groups_of_the_sentence_are_read_again(
+    ctx: ReadContext,  # noqa: F811
+) -> None:
+    """ADR 0071: the groups the draft held were the reading of its parts' joins, so the merge
+    reads the merged parts again (the retyped part keeps its join)."""
+    prior, derived = grouped_prior(ctx)
+    req = check_request("my_screen", body_of(prior, "p2", "over $80"))
+    done = redraft_part(ctx, Canned(answer_for("over $80", PRICE_80)), req)
+    assert done.draft.document["groups"] == derived
+    gone = check_request("my_screen", body_of(prior, "p3", "deep open interest"))
+    flat = redraft_part(ctx, Canned(answer_for("deep open interest")), gone)
+    assert "groups" not in flat.draft.document  # nothing left to group with the part's criterion
+    assert any("not applied" in n for n in flat.draft.notes)  # never silently flat
+
+
+def test_groups_the_trader_edited_stay_without_the_members_that_are_gone(
+    ctx: ReadContext,  # noqa: F811
+) -> None:
+    prior, derived = grouped_prior(ctx)
+    members = derived["any_1"]["any"]
+    mine = {"mine": {"any": [*members]}}
+    prior, _ = grouped_prior(ctx, mine)
+    req = check_request("my_screen", body_of(prior, "p2", "over $80"))
+    done = redraft_part(ctx, Canned(answer_for("over $80", PRICE_80)), req)
+    assert done.draft.document["groups"] == mine
+    again = check_request("my_screen", body_of(prior, "p2", "something else"))
+    none = redraft_part(ctx, Canned(answer_for("something else")), again)
+    assert "groups" not in none.draft.document  # its member left, the group fell under its size

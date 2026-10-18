@@ -367,6 +367,7 @@ def _call(
         [(f.expr, f.criterion) for f in made.formulas],
         [m.key or f"new:{m.new_key_slug}" for m in made.missing],
         [u.term for u in made.unresolved],
+        made.document.get("groups") or {},
     )
     fields = frozenset(c["field"] for c in made.document["criteria"].values())
     drops = tuple(Drop(d.id, d.field, d.detail, d.kind) for d in made.dropped)
