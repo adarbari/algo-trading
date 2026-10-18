@@ -936,6 +936,23 @@ Source: `design-system/components/Legend`
 | `label` | `string` | no | Accessible name of the list, e.g. "Status key". |
 | `size` | `'sm' \| 'xs'` | no | Text size: `sm` 12 px (default) or `xs` 11.5 px. |
 
+### LinkCard
+
+LinkCard: a tile that links to one page: a kicker (the question it answers), the title as the link (the whole tile is its click target), a description, an example line and a `footer` for a row of pills (counts, states). Tiles sit in a `Grid` with `collapse`. The link goes through the app's router link (`LinkProvider`), so the design system stays router-free.
+
+Source: `design-system/components/LinkCard`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `href` | `string` | yes | An in-app path or anchor. |
+| `title` | `string` | yes | The page's name: the link text. |
+| `kicker` | `string` | no | The question the page answers, small and muted above the title. |
+| `description` | `string` | no | What the page is about, a sentence or two. |
+| `exampleLabel` | `string` | no | A marker for the example line ("e.g."); shown before `example`. |
+| `example` | `string` | no | An example, one line, muted. |
+| `headingLevel` | `HeadingLevel` | no | Outline level of the title (default 3). |
+| `footer` | `ReactNode` | no | A row of pills under the text, composed by the caller (StatusBadge, Chip). |
+
 ### LinkedProse
 
 LinkedProse: a paragraph given as parts, some of them links to pages of this app (a field's Guide page inside a caveat): a part with an `href` is a TextLink (the app's router link, so the design system stays router-free), the rest is plain Text in the chosen tone and size. The parts come split from the server (it cuts the sentence at the names it mentions); the caller maps each part to an address. Links to other sites are LinkedText's.
@@ -1210,6 +1227,18 @@ Source: `design-system/components/Popover`
 | `trapFocus` | `boolean` | no | Keep keyboard focus inside the panel while it is open (a small form). |
 | `children` | `ReactNode` | yes |  |
 
+### ProseList
+
+ProseList: a bulleted (or numbered) list of sentences, each optionally opening with a bold lead-in ("It is small and spread out."): the form of a "why it survives" or "how to tell a real one" list in a reference page. Items hold running text (a ReactNode, so a citation link can sit in it); a short list of values is a KeyValue, a table a DataTable.
+
+Source: `design-system/components/ProseList`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly ProseListItem[]` | yes |  |
+| `ordered` | `boolean` | no | Numbered instead of bulleted (a fixed order the reader follows). |
+| `'aria-label'` | `string` | no | Accessible name of the list, when the surrounding heading does not name it. |
+
 ### ScoreMeter
 
 ScoreMeter: a horizontal meter for one score on a bounded scale (0-100 by default): a filled track with a marker at the value, optional threshold ticks with their labels under the track ("50 caution", "75 stress"), and a tone taken from the band the value sits in (the status tones of StatusBadge). The band's label is written next to the value, so colour is never the only signal. The axis always runs from low risk (left) to high risk (right): `direction` `lower-is-risk` (a cushion, a margin) turns the scale around, so a falling value moves toward the risky end and a threshold's band runs below it; a value off the scale pins the marker to the nearer end and the reading says "above range" or "below range". Exposed as a meter (`role="meter"`) whose text names the band; an unknown score draws a dashed empty track with the reason as text (an image named "<label>: unknown").
@@ -1382,6 +1411,17 @@ Source: `design-system/components/SourceLine`
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `sources` | `readonly SourceLineItem[]` | yes | One or more sources, in the order to read them. |
+
+### SourceList
+
+SourceList: a numbered reading list: per source a kind label ("Academic paper"), the title as an ExternalLink and a one-line "why read it". Each item carries its `id`, so a citation in the text ("[3]") links to it with `#<id>`. Where SourceLine names one figure's source in a line, this is the page's bibliography.
+
+Source: `design-system/components/SourceList`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly SourceListItem[]` | yes |  |
+| `'aria-label'` | `string` | yes | Accessible name of the list ("Sources and further reading"). |
 
 ### Sparkline
 
