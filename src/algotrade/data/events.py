@@ -141,6 +141,13 @@ def latest_versions(
     if frame is None or frame.empty:
         return pd.DataFrame()
     frame = _known_by(frame, through).assign(**{KNOWN_FROM: lambda f: known_from(f).dt.date})
+    return latest_of(frame, key)
+
+
+def latest_of(frame: pd.DataFrame, key: Sequence[str]) -> pd.DataFrame:
+    """The latest stored version (``knowledge_ts``, then ``run_id``) of each ``key`` in
+    ``frame``, sorted by ``key``: the one rule ``latest_versions`` and a per-session read of
+    the stored versions share."""
     frame = frame.sort_values(["knowledge_ts", "run_id"], kind="stable")
     frame = frame.drop_duplicates(list(key), keep="last")
     return frame.sort_values(list(key), kind="stable").reset_index(drop=True)

@@ -15,7 +15,8 @@ filing backfilled in 2026 is known from 2012.
 known no earlier than the fetch allows: ``max(own acceptance session, FLOOR)`` with ``FLOOR`` the
 session after the fetch's (``next_session(exchange_date(run.clock()))``, the run's own session,
 never a ``--to``), so a reader of a past session keeps the version it would have seen. The same
-line with the same content keeps its stored ``known_from`` (a rerun changes nothing). A 4/A is
+line with the same content keeps its stored ``known_from`` (a rerun changes nothing; nor does a
+re-extraction that only adds or respells ``owner_name``, which is no restated fact). A 4/A is
 its own filing with its own keys: it is known from its own acceptance session, and the reader
 (``data.insiders``) drops the original it names from then on. Stored means before this run.
 
@@ -47,7 +48,8 @@ LINE_KEY = ["instrument_id", "accession", "line", "owner_cik"]
 COLUMNS = [c.name for c in INSIDER_EVENTS.columns if c.name not in (
     "session_date", "knowledge_ts", "source", "run_id")]  # fmt: skip
 KEY_COLUMNS = [*LINE_KEY, "known_from", "filing_date"]  # all the nightly needs of what is stored
-CONTENT = [c for c in COLUMNS if c not in (*LINE_KEY, "known_from")]  # what a restatement changes
+NOT_CONTENT = (*LINE_KEY, "known_from", "owner_name")  # owner_name: a spelling, not a restated fact
+CONTENT = [c for c in COLUMNS if c not in NOT_CONTENT]  # what a restatement changes
 SYMBOL_SEPARATORS = re.compile(r"[,;/\s]+")
 
 

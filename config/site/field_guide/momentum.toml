@@ -940,3 +940,47 @@ op = "gt"
 value = 0
 mode = "hard"
 note = "rank by it descending for the overhang long leg"
+
+[[field]]
+name = "rollup.ipo_lockups@v1.sessions_to_lockup_expiry"
+theme = "instrument gates"
+reads = "Exchange sessions from the session to the lock-up expiry of a recent IPO. 5 means the lock-up ends in five sessions. 0 means today. -3 means it ended three sessions ago; the earliest read is -20."
+caveats = [
+  "The date comes from the prospectus text. A prospectus that states no term has no value, so the name is unknown, not free of a lock-up. An early-release lock-up can end for part of the shares sooner.",
+]
+sources = ["Field and Hanke (2001), The Effect of Lockup Provisions on the Pricing of IPOs; Brav and Gompers (2003), The Role of Lockups in Initial Public Offerings, Review of Financial Studies"]
+[[field.use]]
+for = "a lock-up ending within the next ten sessions"
+op = "lte"
+value = 10
+mode = "hard"
+note = "illustrative screen for an avoid list; names with no lock-up date drop out, and a negative value is a lock-up already over"
+
+[[field]]
+name = "rollup.ipo_lockups@v1.lockup_expiry_date"
+theme = "instrument gates"
+reads = "The first session on which the lock-up of a recent IPO has ended: the first exchange session after the prospectus date plus the stated term. Insiders and early holders may sell from then."
+caveats = [
+  "Null when the prospectus states no term, when the expiry is more than 20 sessions past, or when the company has no record as of the session.",
+]
+sources = ["Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)"]
+[[field.use]]
+for = "names with a known lock-up date"
+op = "not_null"
+mode = "hard"
+note = "null means no stated lock-up, an expiry long past, or no company record"
+
+[[field]]
+name = "rollup.ipo_lockups@v1.lockup_release_terms"
+theme = "instrument gates"
+reads = "How the prospectus ends the lock-up. The value standard means one expiry date. The value early_release means it lets part of the lock-up end early, for example after an earnings report or at a price level."
+caveats = [
+  "The label comes from phrases in the prospectus. A release clause worded in an unusual way reads as standard. Null when the name has no lock-up in the window.",
+]
+sources = ["Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)"]
+[[field.use]]
+for = "lock-ups with a single expiry date"
+op = "eq"
+value = "standard"
+mode = "hard"
+note = "names with no lock-up in the window drop out"

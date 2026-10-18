@@ -110,14 +110,16 @@ def companies(
 
 
 def company_sectors(reader: StoreReader, on: date) -> pd.DataFrame | None:
-    """``instrument_id``, ``sector``, ``industry`` and ``sic`` (the columns stored) from the
-    ``instruments/company`` snapshot on or before ``on``: how a feature group reads an
+    """``instrument_id``, ``cik``, ``sector``, ``industry`` and ``sic`` (the columns stored) from
+    the ``instruments/company`` snapshot on or before ``on``: how a feature group reads an
     instrument's sector (``companies``' rule: ``None`` before the first snapshot, never a
     later one)."""
     frame = companies(reader, on)
     if frame is None:
         return None
-    return frame[[c for c in ("instrument_id", "sector", "industry", "sic") if c in frame.columns]]
+    return frame[
+        [c for c in ("instrument_id", "cik", "sector", "industry", "sic") if c in frame.columns]
+    ]
 
 
 ALL_TIME = (date(1900, 1, 1), date(9999, 12, 31))

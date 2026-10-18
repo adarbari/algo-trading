@@ -30,6 +30,10 @@ EVENT_CLASSES: Mapping[str, str] = {
     "anchor: the session it became known",
     "earnings_date_shift": "a next report date a week or more away from last year's "
     "(earnings_date_shift@v1); anchor: the session the shifted date was first stored",
+    "ipo_lockup": "an IPO lock-up expiry, announced in the prospectus (ipo_lockups@v1; ADR 0075); "
+    "anchor: the expiry session; may be entered ahead of it",
+    "reverse_split": "a reverse split (reverse_splits@v1; ADR 0075); anchor: the ex-date; "
+    "funds are left out by the edge's universe",
 }
 # A class may be split by a subtype: ``on_event:<class>:<subtype>``. The subtype is one of the
 # class's own values (fail closed on any other, and on a subtype for a class that has none); the
@@ -53,9 +57,14 @@ EVENT_SUBTYPES: Mapping[str, Mapping[str, str]] = {
         "later": "the next report date is a week or more later than last year's",
         "earlier": "the next report date is a week or more earlier than last year's",
     },
+    "ipo_lockup": {
+        "standard": "the prospectus gives one lock-up expiry date",
+        "early_release": "the prospectus lets part of the lock-up end early (on earnings or a "
+        "price condition)",
+    },
 }
 SUBTYPE_REQUIRED = ("filing_8k",)
-# ex_dividend, macro_release and lockup_expiry have no field to read yet (EB H4 follow-ups).
+# ex_dividend and macro_release have no field to read yet (EB H4 follow-ups).
 
 
 def event_class(schedule: str) -> str | None:

@@ -100,6 +100,7 @@ INSIDER_COLUMNS = (
     "period_of_report",
     "amends_date",
     "owner_cik",
+    "owner_name",
     "is_director",
     "is_officer",
     "is_ten_pct_owner",

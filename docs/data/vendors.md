@@ -219,19 +219,36 @@ HTML into plain text (standard library parser, no dependency) and splits the Ite
 header patterns written here (EDGAR-CRAWLER is GPL-3: never imported or vendored; EDGAR-CORPUS,
 Apache-2.0, is 10-K only to 2020 and 40 GB: not used). Only the sections are stored, never the
 HTML (raw saved by the run is the extraction, 7-day retention): `events/filing_text`, one row per
-instrument, filing, item and parser version, `text` plain, `quality` OK / SHORT / TRUNCATED /
+filer (CIK), filing, item and parser version, `text` plain, `quality` OK / SHORT / TRUNCATED /
 NOT_FOUND / NO_ITEMS, `known_from` the acceptance session (a later extraction that changes a text
-is known only from the fetch's session). Kept by default: 10-K items 1, 1A, 3, 7, 7A, 9A; 10-Q
-`I-2` (MD&A), `I-3`, `II-1`, `II-1A`; the notes to the statements are the Financial Statement and
-Notes data sets' (track E). Size: about 175 KB of text a 10-K and 60 KB a 10-Q, 4x smaller in
-zstd Parquet, so about 90 KB per filer-year: 2,000 filers over 2010-2025 is about 2.7 GB, 5,000
-names over their history about 3.6 GB. History: 4 CIK windows newest first, about 160k documents
-at 5 a second plus parse time, 15-30 hours detached (README "Long runs"); the nightly increment
-is optional and WARN-only. Readers go through `data.filing_text` (`known_from <= S`, the latest
-version per item). **Survivorship (must-do before the backfill):** the names are the universe
-snapshot's, so a company delisted before 2026-10-02 is not covered; `instruments/listing_history`
-has no CIK and no honest name-to-CIK mapping exists in the store, so the history waits for a CIK
-source (also D1's Form 25 follow-up).
+is known only from the fetch's session; `text_sha` lets a re-extraction compare without reading the
+text). Kept by default (size): the two highest-value sections, risk factors and MD&A (10-K items
+1A and 7; 10-Q `II-1A` and `I-2`); `--items 1,1A,3,7,7A,9A,I-2,I-3,II-1,II-1A` keeps the full
+set (the notes to the statements are the Financial Statement and Notes data sets', track E).
+**Filer-first (D10b):** the CIKs are every filer of a 10-K / 10-Q in the window, read from the
+EDGAR daily form index (the existing `sec_daily_index` source, one request a business day, about
+250 a year, no raw copy kept; a weekday with no index that is not an SEC holiday fails the run), so
+companies delisted before the first universe snapshot are covered. The full-index and the
+submissions JSON were the other candidates: the daily index needs no new source, and a past
+window's filer list is recorded in the run's stats so the `--limit` loop does not walk the days
+again. **No instrument id is stored**: readers map a CIK to its instruments through the
+`instruments/company` snapshot of their own session on every read (`data.filing_text`: by `ids`,
+or `ids=None` for the scan of every filer, `ciks` narrowing it; the snapshot used is disclosed,
+`pre_snapshot` before the first), so a delisted filer reads with a NULL id and no second copy of a
+text is written. **Size and time** (all filers, about 3x the universe's): about 6,500 filers a
+year, about 26,000 periodic filings a year, so about 416,000 documents over 2010-2025 (the
+universe alone was about 160,000), about 450,000 rows with the default sections. About 55 KB
+per filer-year in zstd Parquet is about 5-6 GB for the default sections, about 9 GB for the full
+set. Requests: about 416,000 documents plus about 35,000 listings at 5 a second plus parse time,
+40-80 hours detached in the three README windows (2021-, 2016-2020, 2010-2015; `--limit` bounds the
+CIKs a run, `filing_text_min_free_gb` stops the run PARTIAL on a short disk). The internal disk
+holds the default set; the full set wants an external volume (the store location is one setting,
+`ALGOTRADE_DATA_URL`), after which a `--items` full run is a new read of every CIK. The nightly
+increment (CIKs due a report and silent less than 400 days) is optional and WARN-only. Readers go
+through `data.filing_text` (`known_from <= S`, the latest version per item). **Delisted names for
+D1:** the daily index gives CIKs, not tickers, so a delisted listing still has no ticker-to-CIK
+mapping in the store; EDGAR's company-names history or the `instruments/company` snapshots over
+time are the candidates for D1's Form 25 follow-up (not built here).
 
 ### S&P 500 membership history (fja05680/sp500; edges ED6b-3)
 

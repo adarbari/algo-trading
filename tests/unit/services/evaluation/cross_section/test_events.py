@@ -220,3 +220,61 @@ def test_an_8k_item_subtype_reads_its_own_count_and_date_fields() -> None:
     other = read_events(w.reader, "filing_8k", 1, [d], lambda _: ALL, "5.02")
     assert got.names == {d: frozenset({IDS[0]})}
     assert other.names == {d: frozenset({IDS[1]})}
+
+
+LOCKUPS = "rollups/instrument/ipo_lockups@v1"
+SPLITS = "rollups/instrument/reverse_splits@v1"
+
+
+def test_a_lockup_announced_ahead_is_known_before_its_expiry_and_split_by_its_terms() -> None:
+    """ADR 0075: ``ipo_lockup`` is read at ``sessions_to_lockup_expiry == 1 - offset`` (offset 0:
+    the entry is the expiry session, D the one before), its date is after D by design, and the
+    subtype is the release terms; a null terms value is UNKNOWN, another value no event."""
+    w = build_world()
+    d, expiry = DAYS[1], DAYS[2]
+    rows = [
+        {"instrument_id": IDS[0], "sessions_to_lockup_expiry": 1, "lockup_expiry_date": expiry,
+         "lockup_release_terms": "standard"},
+        {"instrument_id": IDS[1], "sessions_to_lockup_expiry": 1, "lockup_expiry_date": expiry,
+         "lockup_release_terms": "early_release"},
+        {"instrument_id": IDS[2], "sessions_to_lockup_expiry": 1, "lockup_expiry_date": expiry,
+         "lockup_release_terms": None},
+        {"instrument_id": IDS[3], "sessions_to_lockup_expiry": 9, "lockup_expiry_date": expiry,
+         "lockup_release_terms": "standard"},
+    ]  # fmt: skip
+    w.write_rollup(LOCKUPS, d, rows)
+    assert EVENT_FIELDS["ipo_lockup"].sign == -1 and EVENT_FIELDS["ipo_lockup"].announced_ahead
+    base = read_events(w.reader, "ipo_lockup", 0, [d], lambda _: ALL)
+    standard = read_events(w.reader, "ipo_lockup", 0, [d], lambda _: ALL, "standard")
+    early = read_events(w.reader, "ipo_lockup", 0, [d], lambda _: ALL, "early_release")
+    assert base.names == {d: frozenset(IDS[:3])}  # the expiry is after D: still known at D
+    assert standard.names == {d: frozenset({IDS[0]})}
+    assert early.names == {d: frozenset({IDS[1]})}
+    assert standard.unknown[d] == {NO_EVENT_ROW: 17}  # 16 names with no row, N02's null terms
+    # Three sessions after the expiry the count reads -3: entry offset 4 (D = S - 1 = expiry + 3).
+    w.write_rollup(LOCKUPS, DAYS[5], [{"instrument_id": IDS[0], "sessions_to_lockup_expiry": -3,
+                                       "lockup_expiry_date": expiry,
+                                       "lockup_release_terms": "standard"}])  # fmt: skip
+    after = read_events(w.reader, "ipo_lockup", 4, [DAYS[5]], lambda _: ALL)
+    assert after.names == {DAYS[5]: frozenset({IDS[0]})}
+
+
+def test_a_reverse_split_is_an_event_on_its_ex_date_and_never_before_it() -> None:
+    w = build_world()
+    d, nxt = DAYS[1], DAYS[2]
+    w.write_rollup(
+        SPLITS,
+        d,
+        [
+            {"instrument_id": IDS[0], "sessions_since_reverse_split": 0,
+             "last_reverse_split_date": d},
+            {"instrument_id": IDS[1], "sessions_since_reverse_split": 0,
+             "last_reverse_split_date": nxt},  # an ex-date after D: not known at D
+        ],
+    )  # fmt: skip
+    found = read_events(w.reader, "reverse_split", 1, [d], lambda _: ALL)
+    assert found.names == {d: frozenset({IDS[0]})}
+    assert found.unknown[d][NOT_KNOWN_AT_D] == 1
+    assert not EVENT_FIELDS["reverse_split"].announced_ahead
+    with pytest.raises(ConfigurationError, match="has no subtype 'x'"):
+        event_field("reverse_split", "x")  # no subtypes

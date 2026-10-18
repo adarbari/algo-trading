@@ -15,9 +15,12 @@ from algotrade.config.site.settings import (
     load_phrasebook,
 )
 from algotrade.config.user import UserContext
+from algotrade.features.registry import GROUPS
 from algotrade.services.drafting.golden.golden import GoldenCase, load_cases, recorded_answers
 from algotrade.services.drafting.prompt import (
     PROMPT_BUDGET_TOKENS,
+    UNDRAFTED_GROUPS,
+    draftable,
     index_group,
     prefix_text,
     slice_for,
@@ -135,7 +138,9 @@ def test_the_prefix_is_identical_across_sentences_and_the_slice_is_smaller(site)
     retrieved = {tuple(slice_for(infos, c.sentence, book, guide).fields) for c in CASES}
     assert len({p[len(prefix) :] for p in prompts}) == len(retrieved)
     assert len(retrieved) >= len(CASES) - 1  # sentences do not all retrieve the same fields
-    for field in infos:  # every field is in the index, nameable as heading + entry
+    for field in draftable(
+        infos
+    ):  # every drafted field is in the index, nameable as heading + entry
         head, local = index_group(field.name)
         assert f"\n{head}*\n" in prefix and f"\n{local}|{field.dtype}|" in prefix, field.name
 
@@ -306,7 +311,7 @@ def test_every_field_of_every_recorded_answer_is_reachable_from_the_grouped_inde
             heading = line[:-1]
         elif in_index and "|" in line:
             reachable.add(heading + line.split("|")[0])
-    assert reachable == {i.name for i in infos if i.scope == "site"}
+    assert reachable == {i.name for i in draftable(infos) if i.scope == "site"}
     names = {i.name for i in infos}
     seen = 0
     for case in CASES:
@@ -320,3 +325,13 @@ def test_every_field_of_every_recorded_answer_is_reachable_from_the_grouped_inde
                     seen += 1
                     assert field in reachable, f"{case.id}: {field}"
     assert seen > 50
+
+
+def test_an_undrafted_group_is_in_the_registry_and_kept_out_of_the_prompt(site) -> None:
+    infos, book, guide = site
+    assert set(GROUPS) >= UNDRAFTED_GROUPS  # a retired group is removed from the list
+    hidden = {i.name for i in infos if i.group in UNDRAFTED_GROUPS}
+    assert hidden  # the catalogue still has them (Explore, the Builder)
+    prompt = sliced_system_prompt(infos, "high yield spread above its average", book, guide)
+    assert not any(name in prompt for name in hidden)
+    assert not hidden & set(slice_for(infos, "vix basis", book, guide).fields)

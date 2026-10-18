@@ -89,7 +89,7 @@ def build_frame(filings: pd.DataFrame, owners: pd.DataFrame, lines: pd.DataFrame
     """``INSIDER_COLUMNS`` rows: each line of an accession with each of its owners.
 
     ``filings``: accession, form, issuer_cik, issuer_symbol, filing_date, period_of_report,
-    amends_date, plan_10b5_1; ``owners``: accession, owner_cik, is_director, is_officer,
+    amends_date, plan_10b5_1; ``owners``: accession, owner_cik, owner_name, is_director, is_officer,
     is_ten_pct_owner, is_other, officer_title; ``lines``: accession and ``LINE_ORDER``. A line
     of an accession with no filing or no owner row is dropped (nothing says whose it is)."""
     ordered = lines.sort_values(LINE_ORDER, kind="stable", na_position="last")
@@ -141,6 +141,7 @@ def _owner(node: ET.Element) -> dict[str, Any]:
     relation = node.find("reportingOwnerRelationship")
     return {
         "owner_cik": pad_cik(_text(node, "reportingOwnerId/rptOwnerCik")),
+        "owner_name": _text(node, "reportingOwnerId/rptOwnerName"),
         "is_director": flag(_text(relation, "isDirector")) is True,
         "is_officer": flag(_text(relation, "isOfficer")) is True,
         "is_ten_pct_owner": flag(_text(relation, "isTenPercentOwner")) is True,
