@@ -1,5 +1,7 @@
-"""SEC EDGAR submissions as a filing history: the 8-Ks a company filed, with the second each
-was accepted (ADR 0050; free, no key).
+"""SEC EDGAR submissions as a filing history: the event filings a company made (8-K and 8-K/A
+with their items, NT 10-K / NT 10-Q late-filing notices, SC TO-I issuer tender offers, Form 25
+delisting notices, 424B4 final prospectuses, Form 10 registrations), with the second each was
+accepted (ADR 0050; free, no key).
 
 ``https://data.sec.gov/submissions/CIK##########.json`` holds a company's most recent filings
 (about 1,000, ``filings.recent``) as parallel arrays (``form``, ``filingDate``,
@@ -14,7 +16,7 @@ block; only when ``since`` is before its oldest filing does it also read the old
 reach ``since`` (``filingTo >= since``), one request each. A single document is saved as
 received; with pages they are saved one document after another (one per line), which
 ``normalize`` reads the same way. Every form stays in the raw payload; ``normalize`` keeps the
-``8-K`` and ``8-K/A`` rows filed on or after ``since``. Same pacing, ``User-Agent`` (contact from
+rows of ``FORMS`` filed on or after ``since``. Same pacing, ``User-Agent`` (contact from
 ``ALGOTRADE_SEC_CONTACT``) and 404 rule as the other SEC sources (the ``sec`` limiter,
 ``[sec_edgar]``; 404: no filings for this CIK, ``None``).
 
@@ -39,14 +41,19 @@ from algotrade_sources.framework.base import (
 )
 from algotrade_sources.framework.http import Http
 from algotrade_sources.framework.pages import json_documents
-from algotrade_sources.framework.series import FILING_COLUMNS, FILINGS_FRAME, FilingsRequest
+from algotrade_sources.framework.series import (
+    FILING_COLUMNS,
+    FILING_FORMS,
+    FILINGS_FRAME,
+    FilingsRequest,
+)
 
 SOURCE = "sec_edgar"
 DATASET = "filings"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 PAGES_URL = "https://data.sec.gov/submissions/{name}"
 PAGE_NAME = re.compile(r"CIK\d{10}-submissions-\d+\.json")  # a page stays under submissions/
-FORMS = ("8-K", "8-K/A")
+FORMS = FILING_FORMS  # defined in framework/series.py (the ingestion task names the set too)
 _ARRAYS = {  # our column -> the submissions array
     "form": "form",
     "accession": "accessionNumber",
