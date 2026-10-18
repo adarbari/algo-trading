@@ -20,8 +20,8 @@ from algotrade.config.edges.document import (
     LONG_SHORT,
     SHORT,
     Edge,
-    identity_dict,
 )
+from algotrade.config.edges.identity import identity_dict
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.model.errors import MissingDataError
@@ -66,6 +66,7 @@ from algotrade.services.evaluation.cross_section.legs.rows import (
     encode_leg,
 )
 from algotrade.services.evaluation.cross_section.measures import (
+    UNCOUNTED_BAND,
     Pick,
     SessionStat,
     decile_means,
@@ -198,15 +199,17 @@ def _stat(
     counted = res[res["excluded"] == ""]
     adv = session.adv(eligible, day)
     side = edge.outcome.side
+    hold = edge.outcome.hold_rank  # a buy/hold band: the names ranked top_k + 1 .. hold are stored
     if side == LONG:
         in_universe = [i for i in run.qualified if i in eligible]
         chosen = [i for i in in_universe if i in pickable]
         legs = [(LONG, chosen if edge.top_k is None else chosen[: edge.top_k])]
+        below = chosen[edge.top_k : hold] if hold is not None and edge.top_k else []
     else:  # a short leg is ranked by score: too few scores and there is no honest bottom
         if thin:  # fail closed: the session is not measured, as an incomplete screen is not
             return SessionStat(session=day, regime=session.label(day), excluded_coverage=1)
         in_universe = []
-        legs = _side_picks(edge, run.scores, pickable, adv, adv_floor)
+        legs, below = _side_picks(edge, run.scores, pickable, adv, adv_floor, hold)
     picks = [i for _, ids_ in legs for i in ids_]
     pick_set = set(picks)
     unmeasured = set(res.index[res["excluded"] == UNMEASURED])  # a window over a bad bar (ADR 0061)
@@ -266,6 +269,7 @@ def _stat(
         ),
         base_hits_at=tuple(int(hits.sum()) for hits in levels),
         pick_hits_at=tuple(int(hits.loc[got].sum()) for hits in levels),
+        band=_band(below, (edge.top_k or 0) + 1, base),
         short_values=(
             tuple(float(v) for v in views[SHORT].loc[short_got, "oriented"])
             if side == LONG_SHORT
@@ -280,21 +284,40 @@ def _side_picks(
     pickable: frozenset[str],
     adv: Mapping[str, float | None],
     adv_floor: float | None,
-) -> list[tuple[str, list[str]]]:
+    hold: int | None = None,
+) -> tuple[list[tuple[str, list[str]]], list[str]]:
     """The legs of a ``short`` or ``long_short`` outcome at one session (ADR 0053 amendment,
     outcome sides), each ``(side, ids)`` with rank 1 first: the scored pickable names ranked by
     score (never by the rule rank; a name with no score is in neither leg, as the deciles
     leave it out), the long leg the best ``top_k``, the short leg the worst ``top_k`` among the
     names whose 20-day dollar volume at D is known and at least ``adv_floor`` (the microcap short
-    cannot be done by an individual: ``capacity_adv_floor_usd``; unknown volume is not liquid)."""
+    cannot be done by an individual: ``capacity_adv_floor_usd``; unknown volume is not liquid).
+    Also the ids of a ``short`` outcome's buy/hold band, the shortable names ranked ``top_k + 1``
+    to ``hold`` (none for any other side)."""
     assert edge.top_k is not None  # the document requires it for a side other than long
     ranked = sorted((i for i in pickable if i in scores), key=lambda i: (-scores[i], i))
     floor = adv_floor or 0.0
     shortable = [i for i in ranked if (volume := adv.get(i)) is not None and volume >= floor]
     short = shortable[::-1][: edge.top_k]
     if edge.outcome.side == SHORT:
-        return [(SHORT, short)]
-    return [(LONG, ranked[: edge.top_k]), (SHORT, short)]
+        below = shortable[::-1][edge.top_k : hold] if hold is not None else []
+        return [(SHORT, short)], below
+    return [(LONG, ranked[: edge.top_k]), (SHORT, short)], []
+
+
+def _band(ids: Sequence[str], first: int, view: pd.DataFrame) -> tuple[Pick, ...]:
+    """The picks of a buy/hold band, ranks from ``first``: ``view`` is the counted names of the
+    leg's side (oriented as its picks are). A name with no counted value has none, never 0: it
+    cannot be held (``reporting/turnover.py``)."""
+    return tuple(
+        Pick(
+            i,
+            rank,
+            "" if i in view.index else UNCOUNTED_BAND,
+            value=_finite(view.at[i, "oriented"]) if i in view.index else None,
+        )
+        for rank, i in enumerate(ids, start=first)
+    )
 
 
 def _picks(
@@ -463,6 +486,7 @@ class _RandomSpec:
                 self.costs,
                 None if scope.edge.outcome.side == LONG else self.adv_floor,
                 scope.edge.event_subtype,
+                scope.edge.outcome.hold_rank,
             )
         return found
 
