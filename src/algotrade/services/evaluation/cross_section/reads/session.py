@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from algotrade.services.evaluation.cross_section.measuring import Variant
 
 UNKNOWN = "UNKNOWN"
+SECTOR_FIELD = "instrument.sector"  # the stratum of a pick's sector-matched random draws (ADR 0053)
 ADV_FIELD = "rollup.price_stats@v2.adv_usd_20d"  # a pick's liquidity at D (leg v2, ADR 0064)
 # Not an input table a screener lacks for a session but the run's own wiring (market features
 # not loaded, no universe or reference snapshot): always an error, never a lost session.
@@ -67,6 +68,7 @@ class SessionReads:
         self._labels: dict[date, str] = {}
         self._implied: dict[tuple[str, frozenset[str], date], dict[str, float | None]] = {}
         self._adv: dict[tuple[frozenset[str], date], dict[str, float | None]] = {}
+        self._sectors: dict[tuple[frozenset[str], date], dict[str, str | None]] = {}
         self._outcomes: dict[tuple[str, int, date], pd.DataFrame] = {}
         self._snapshots: set[date] = set()
         self._identity = IdentityTally()
@@ -146,6 +148,7 @@ class SessionReads:
         self._labels.clear()
         self._implied.clear()
         self._adv.clear()
+        self._sectors.clear()
         self._outcomes.clear()
 
     def label(self, day: date) -> str:
@@ -170,6 +173,15 @@ class SessionReads:
             self._adv[key] = numbers_at(self._reader, ADV_FIELD, ids, day)
         return self._adv[key]
 
+    def sectors(self, ids: frozenset[str], day: date) -> dict[str, str | None]:
+        """``instrument.sector`` of ``ids`` at D (None: not stored), read once per set and session
+        through the recording reader, so a restated company snapshot invalidates the legs whose
+        stratified draws read it (ADR 0063 decision 2)."""
+        key = (ids, day)
+        if key not in self._sectors:
+            self._sectors[key] = labels_at(self._reader, SECTOR_FIELD, ids, day)
+        return self._sectors[key]
+
     def outcomes(
         self, scope: str, horizon: int, day: date, score: Callable[[], pd.DataFrame]
     ) -> pd.DataFrame:
@@ -188,6 +200,16 @@ def implied_at(
     stored): what an ``expires_otm`` strike or a vol ratio is measured from, for the harness and
     the paper record alike."""
     return numbers_at(reader, field_name, ids, day)
+
+
+def labels_at(
+    reader: StoreReader, field_name: str, ids: Iterable[str], day: date
+) -> dict[str, str | None]:
+    """The text field ``field_name`` of ``ids`` read at ``day`` (None: not stored or empty)."""
+    wanted = sorted(ids)
+    view, _ = fields_view(reader, (field_name,), day, wanted, historical=True, held=HARNESS_ALL)
+    values = {i: view.get(i, field_name) for i in wanted}
+    return {i: v if isinstance(v, str) and v else None for i, v in values.items()}
 
 
 def numbers_at(
