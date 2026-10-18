@@ -227,8 +227,9 @@ def _expiry(contract: Any) -> date | None:
 def next_session_open(trading_hours: Any, time_zone: Any, session: date) -> str | None:
     """When the contract's trading session AFTER ``session``'s starts (UTC ISO), from IB's
     ``ContractDetails.tradingHours`` (``20261001:1700-20261002:1600;20261003:CLOSED;...`` in the
-    contract's ``timeZoneId``): a segment's END date is its trade date, the next open segment
-    after the one ending on ``session`` is the next session. IB rolls the ``close`` tick when
+    contract's ``timeZoneId``): a segment's END date is its trade date (some have two per
+    date: overnight and day), the next open segment after the last one ending on ``session``
+    is the next session. IB rolls the ``close`` tick when
     the contract's OWN next session starts, which differs by exchange (CME equity-style
     contracts 18:00 New York, CBOT grains 20:00, ICE sugar the next morning, a holiday Monday
     from the Sunday evening). ``None`` when the hours are missing or unparsable, or ``session``
@@ -247,9 +248,9 @@ def next_session_open(trading_hours: Any, time_zone: Any, session: date) -> str 
         return None
     segments.sort()
     own = [i for i, (_, end) in enumerate(segments) if end.date() == session]
-    if not own or own[0] + 1 >= len(segments):
-        return None
-    return segments[own[0] + 1][0].astimezone(UTC).isoformat()
+    if not own or own[-1] + 1 >= len(segments):  # after the LAST segment of the trade date:
+        return None  # CBOT grains have two (overnight, day)
+    return segments[own[-1] + 1][0].astimezone(UTC).isoformat()
 
 
 @dataclass

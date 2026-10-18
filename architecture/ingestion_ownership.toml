@@ -118,7 +118,7 @@ description = "IBKR as an enrichment source, read-only (ADR 0028): conids of the
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/reference/ibkr_contracts.py",
     "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py",
-    "apps/ingestion/algotrade_ingestion/tasks/market/futures_curves.py",
+    "apps/ingestion/algotrade_ingestion/tasks/market/futures/curves.py",
     "src/algotrade/data/volatility.py",
     "src/algotrade/data/futures/curves.py",
 ]

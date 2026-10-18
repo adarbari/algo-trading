@@ -17,7 +17,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.run import TaskContext
-from algotrade_ingestion.tasks.market.futures_curves import (
+from algotrade_ingestion.tasks.market.futures.curves import (
     nightly_curves,
     settle_cutoff,
 )
@@ -39,6 +39,10 @@ GRAINS = ("20261001:1900-20261002:1320;20261003:CLOSED;20261004:1900-20261005:13
           "20261005:1900-20261006:1320", "America/Chicago")  # fmt: skip
 SUGAR = ("20261002:0330-20261002:1300;20261003:CLOSED;20261005:0330-20261005:1300;"
          "20261006:0330-20261006:1300", "America/New_York")  # fmt: skip
+# CBOT grains have two segments per trade date: overnight (19:00-07:45) and day (08:30-13:20).
+GRAINS_TWO = ("20261001:1900-20261002:0745;20261002:0830-20261002:1320;20261003:CLOSED;"
+              "20261004:1900-20261005:0745;20261005:0830-20261005:1320",
+              "America/Chicago")  # fmt: skip
 # Labor Day 2026-09-07: Friday 09-04's next session opens Sunday 17:00 Chicago (the NYSE
 # calendar's next session is Tuesday), and Monday's holiday session settles by 12:00 New York.
 LABOR_DAY = ("20260903:1700-20260904:1600;20260905:CLOSED;20260906:1700-20260907:1200;"
@@ -243,3 +247,35 @@ def test_the_id_is_built_from_the_delivery_month_not_the_last_trade_month() -> N
     [row] = futures_curve(reader, SESSION, SESSION).to_dict("records")
     assert (row["instrument_id"], row["contract_month"]) == ("FUT:CL:2026-12", "2026-12")
     assert row["expiry"] == date(2026, 11, 20)
+
+
+def test_a_trade_date_with_two_segments_opens_its_next_session_after_the_last_one() -> None:
+    ib = exchanges({"CL": CME, "ZC": GRAINS_TWO, "SB": SUGAR})
+    # Friday 17:00 New York: after the day segment's start (08:30 Chicago), before Sunday 20:00
+    record, reader = run_at(at(2026, 10, 2, 17, 0), ib)
+    assert kinds(record)["ZC"] == "last"
+    [row] = futures_curve(reader, SESSION, SESSION).query("root == 'ZC'").to_dict("records")
+    assert row["next_open"] == pd.Timestamp("2026-10-05T00:00:00Z")  # Sunday 19:00 Chicago
+    assert kinds(run_at(at(2026, 10, 4, 20, 5), ib)[0])["ZC"] == "settle"
+
+
+def test_a_resumed_run_past_the_bound_keeps_its_done_roots() -> None:
+    ctx, reader = market()
+    ib = fake()
+    real = ib.reqContractDetails
+
+    def flaky(contract: object) -> list[object]:
+        if getattr(contract, "symbol", "") == "ZN":
+            raise RuntimeError("IB hiccup")
+        return real(contract)
+
+    ib.reqContractDetails = flaky  # type: ignore[method-assign]
+    first = nightly_curves(ctx, ibkr_source(ib, stream_wait_s=0.05), SESSION)
+    assert first.status is RunStatus.PARTIAL and first.items["root:CL"].startswith("OK")
+    late = replace(ctx, clock=lambda: at(2026, 10, 5, 12).astimezone(UTC))
+    record = nightly_curves(late, ibkr_source(fake(), stream_wait_s=0.05), SESSION)
+    assert record.run_id == first.run_id  # the resume
+    assert record.items["root:CL"].startswith("OK")  # not relabelled: its rows publish
+    assert record.items["root:ZN"].startswith("NO_DATA: read after")
+    assert record.stats["served"] == 1 and record.stats["rows"] == 3
+    assert len(futures_curve(reader, SESSION, SESSION)) == 3

@@ -51,11 +51,11 @@ from algotrade_ingestion.tasks.market import (
     corporate_actions,
     earnings,
     etf_holdings,
-    futures_curves,
     ibkr_iv,
     option_chains,
     rates,
 )
+from algotrade_ingestion.tasks.market.futures import curves as futures_curves
 from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     company_details,

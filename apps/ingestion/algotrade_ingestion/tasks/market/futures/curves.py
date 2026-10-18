@@ -151,7 +151,8 @@ def nightly_curves(
         if late:  # point in time: IB's close may be the next settle by now
             why = f"read after {settle_cutoff(session):%Y-%m-%d %H:%M} New York"
             for root in wanted:
-                run.record_item(f"root:{root.symbol}", f"NO_DATA: {why}")
+                if status_label(run.items.get(f"root:{root.symbol}", "")) not in DONE:
+                    run.record_item(f"root:{root.symbol}", f"NO_DATA: {why}")
             run.partial(f"nothing stored for {session}: {why}")
         try:
             with nullcontext() if late else opened(source):

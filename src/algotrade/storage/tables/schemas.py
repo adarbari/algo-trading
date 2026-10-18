@@ -289,7 +289,7 @@ IBKR_IV30 = fixed(
 # delivery month>``, ``parent_id`` ``FUT:<root>`` (ADR 0009). ``price`` is ONE ``price_kind`` per
 # root and session by the read clock against ``next_open`` (IB ``tradingHours``): ``last`` before
 # it, ``settle`` (IB close) from it to 12:00 New York next weekday, else nothing: see
-# ``tasks/market/futures_curves.py``. ``ts``: when the stream was read; a run is the partition.
+# ``tasks/market/futures/curves.py``. ``ts``: when the stream was read; a run is the partition.
 FUTURES_CURVE = fixed(
     "rates/futures_curve", "curve", ("instrument_id", "ts", "root", "contract_month"),
     "instrument_id string!", "ts timestamp_utc!", "parent_id string!", "root string!",

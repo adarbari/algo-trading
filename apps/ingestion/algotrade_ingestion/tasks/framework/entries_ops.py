@@ -15,9 +15,9 @@ from algotrade_ingestion.tasks.maintenance import (
     retire_features,
 )
 from algotrade_ingestion.tasks.market import (
-    futures_curves,
     ibkr_iv,
 )
+from algotrade_ingestion.tasks.market.futures import curves as futures_curves
 from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     ibkr_contracts,

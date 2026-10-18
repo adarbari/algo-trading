@@ -217,7 +217,12 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/market"
-purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates, IBKR implied / historical vol, IBKR futures curves, ETF holdings"
+purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates, IBKR implied / historical vol, ETF holdings (futures: its own folder)"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/market/futures"
+purpose = "futures tasks: the nightly futures curve snapshots from IB Gateway (read-only, personal licence); tasks/market is at its module cap, so these are a folder"
 kind = "task-domain"
 
 [[dir]]
