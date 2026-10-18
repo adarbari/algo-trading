@@ -284,6 +284,27 @@ IBKR_IV30 = fixed(
     "vol_reject string",
     runs="merge",
 )
+# L2: Cboe VIX futures by expiry (EB D3): one partition per TRADE DATE, one row per listed contract
+# (``instrument_id`` = ``FUT:VX-<expiry YYYYMMDD>``, monthly and Wednesday weekly alike), so the
+# curve of a session (roll yield, contango) is its rows ordered by ``expiry``. Prices are index
+# points; a price the file gives as 0 (no trade, or no settlement published before 2013-05-20)
+# is null, never 0. ``contract`` is Cboe's month label (``F (Jan 2025)``, shared by the weeklies
+# of that month: the expiry is the identity). Runs merge on (contract, session) and the latest
+# run's row wins; ``knowledge_ts`` is the fetch instant (the file of a session is not
+# published before the next morning: ``vendors/cboe/vx_futures.py``). Licence: Cboe, personal use.
+VX_FUTURES = fixed(
+    "volatility/vx_futures",
+    "volatility",
+    ("instrument_id", "expiry"),
+    "instrument_id string!",
+    "root string!",
+    "expiry date!",
+    "contract string",
+    *floats("open", "high", "low", "close", "settle", "change"),
+    *("volume int64", "efp int64", "open_interest int64"),
+    runs="merge",
+    key=("instrument_id", "session_date"),
+)
 # Live option quotes the API read from IB Gateway (ADR 0028, the API's one write exception):
 # every answer it served, one partition per session, a row per contract and time taken. Runs
 # merge (each is a few snapshots; all are kept, keyed by contract and ``ts``). Written only
@@ -717,6 +738,7 @@ KNOWN: dict[str, TableSpec] = {
         VERIFICATION_IBKR,
         IBKR_CONTRACTS,
         IBKR_IV30,
+        VX_FUTURES,
         RULE_SCREEN,
         RULE_SCREEN_VALUES,
         EDGE_EVAL,

@@ -35,6 +35,7 @@ KEY_COUNTS: Mapping[str, tuple[str, ...]] = {
     "etf-holdings": ("rows", "requested", "read", "no_file", "rejected", "deferred_by_limit"),
     "earnings": ("rows", "companies", "reported", "unresolved"),
     "rates": ("curves", "latest"),
+    "vx-futures": ("expiries", "listed", "rows", "latest"),
     "corporate-actions": ("events/split", "events/dividend", "unresolved"),
     "chains": ("universe",),
     "ibkr-contracts": (

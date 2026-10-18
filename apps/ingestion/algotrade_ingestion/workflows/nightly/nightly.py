@@ -77,6 +77,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_reference_classification,
     check_rollup_inputs,
     check_universe,
+    check_vx_futures,
 )
 from algotrade_ingestion.workflows.nightly.attempts import Attempts, earlier_attempts
 from algotrade_ingestion.workflows.nightly.notify import Notifier, default_notifier, report
@@ -121,6 +122,7 @@ PURGE = "purge-raw"
 SNAPSHOT = "the source serves only its current snapshot"
 NEW_SINCE_STORED = "it reads every filing since the latest stored one, so one run covers all"
 FORWARD_RECORD = "paper picks are made only on the night they are for (a later one is no record)"
+WHOLE_FILES = "it reads every expiry's whole file, so the latest session's run covers this one"
 WHOLE_YEAR = "it copies the whole year in one run, so the latest session's run covers this one"
 MARKET_DATA = ("bars", "rates", "corporate-actions", "earnings", "chains")
 
@@ -156,6 +158,11 @@ NIGHTLY: tuple[Step, ...] = (
     Step("bars", accept=(check_bars, check_bars_resolved)),
     Step("rates", task_complete=True),
     Step("corporate-actions", task_complete=True),
+    # Cboe's VIX futures by expiry (EB D3): one static file per contract, the new rows after the
+    # latest stored one. Optional, WARN-only acceptance: a Cboe outage never holds the screens
+    # back. Cboe regenerates a file about 01:05 New York time the morning after, so a night
+    # stores the sessions up to the one before and the next night the session itself.
+    Step("vx-futures", latest_only=WHOLE_FILES, critical=False, accept_with=(check_vx_futures,)),
     # Flag the trailing 60 sessions' bars that cannot be right (ADR 0061), after the splits that
     # explain a real jump. Optional; the outcomes need it (a window over a bad bar is UNMEASURED).
     Step("bar-quality", needs=("bars", "corporate-actions"), critical=False),

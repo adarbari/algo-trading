@@ -239,3 +239,18 @@ allowed = [
 ]
 section = "docs/adr/0018-figi-instrument-ids.md#decision"
 detect = [{ call = "match_perma" }, { call = "parse_meta" }]
+
+[[responsibility]]
+id = "vx-futures-ingestion"
+description = "Cboe VIX futures by expiry (EB D3): one CSV per contract from Cboe's CDN, asked for every monthly and weekly expiry by Cboe's settlement rule, stored as volatility/vx_futures (one partition per trade date, a price of 0 stored null, known_from = the fetch instant because a session's file is published the morning after), only the rows after the latest stored one, resumable over a 2013- backfill, read through data.volatility.vx_futures; the VIX-family index levels are macro/series entries, not this table"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/market/vx_futures.py",
+    "libs/sources/algotrade_sources/vendors/cboe/vx_futures.py",
+]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/data/volatility.py",  # the one read (data.volatility.vx_futures)
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (vx_futures_fresh, WARN-only)
+]
+section = "docs/adr/0007-point-in-time-data.md#decision"
+detect = [{ string = "volatility/vx_futures" }]

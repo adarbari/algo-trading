@@ -15,6 +15,7 @@ from algotrade_sources.framework.series import SERIES_COLUMNS, SERIES_FRAME, Ser
 from algotrade_sources.vendors.published.csv_series import PublishedSeries, parse_series
 from algotrade_sources.vendors.published.parsers import PARSERS
 from tests.helpers.ingest_fakes import CountingLimiter, http_for
+from tests.helpers.payloads import cboe as files_cboe
 from tests.helpers.payloads import published as files
 
 STOOQ = SeriesRequest(
@@ -159,3 +160,30 @@ def test_each_registry_file_loads_from_its_recorded_response(
     assert frame["obs_date"].dt.date.iloc[0] == first
     assert frame["value"].iloc[0] == pytest.approx(value)
     assert frame["obs_date"].is_monotonic_increasing
+
+
+@pytest.mark.parametrize(
+    ("key", "payload", "first", "last"),
+    [
+        ("VIX9D", files_cboe.VIX9D, 16.06, 20.12),
+        ("VIX6M", files_cboe.VIX9D, 16.06, 20.12),  # the same five columns, another index
+        ("VVIX", files_cboe.VVIX, 71.73, 100.5),  # the close only: DATE,VVIX
+    ],
+)
+def test_the_cboe_index_files_read_as_index_series_known_a_day_late(
+    key: str, payload: bytes, first: float, last: float
+) -> None:
+    spec = load_macro(FileConfigStore(REPO / "config")).by_key(key)
+    assert spec.source == "published" and spec.kind == "index" and spec.pit == "lag"
+    assert spec.release_lag_days == 1 and spec.licence == "personal"
+    assert spec.url.startswith("https://cdn.cboe.com/api/global/us_indices/daily_prices/")
+    assert spec.instrument_id == f"IDX:{key}"
+    request = SeriesRequest(
+        spec.key, code=spec.vendor_code, url=spec.url, date_column=spec.date_column,
+        value_column=spec.value_column, parser=spec.parser,
+    )  # fmt: skip
+    frame = parse_series(request, payload)
+    assert frame["obs_date"].dt.date.iloc[0] in (date(2011, 1, 4), date(2006, 3, 6))  # MM/DD/YYYY
+    assert frame["value"].iloc[0] == pytest.approx(first)
+    assert frame["value"].iloc[-1] == pytest.approx(last)
+    assert frame["vintage_date"].isna().all()  # the lag rule dates the vintage downstream

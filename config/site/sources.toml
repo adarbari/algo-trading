@@ -88,6 +88,10 @@ fallback_scope = "liquid"        # which funds SEC N-PORT (months-old, quarterly
 fallback_min_adv_usd = 5_000_000 # "liquid": ADV (price_stats.adv_usd_20d) from which a fund is read;
                                  # about 940 non-optionable ETFs trade at least $5M a day, 640 $10M
 
+[cboe_vx]                        # VIX futures by expiry (EB D3): one static CSV per contract on Cboe's CDN
+enabled = true
+min_interval_s = 0.5             # static S3 objects, no published limit; ~730 expiries in a 2013- backfill
+
 [nasdaq_earnings]                # earnings calendar
 enabled = true
 days = 60                        # forward window stored each night

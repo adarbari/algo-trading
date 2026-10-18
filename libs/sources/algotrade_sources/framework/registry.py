@@ -46,6 +46,7 @@ from algotrade_sources.framework.limiter import DEFAULT_DIR, Limiter, Pacing
 from algotrade_sources.llm.chat import ChatCompletions
 from algotrade_sources.llm.claude_cli import ClaudeCli
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
+from algotrade_sources.vendors.cboe.vx_futures import CboeVxFutures
 from algotrade_sources.vendors.finnhub import client as finnhub_client
 from algotrade_sources.vendors.finnhub.probe import FinnhubProbe
 from algotrade_sources.vendors.finnhub.recommendations import FinnhubRecommendations
@@ -240,6 +241,7 @@ SOURCES: dict[str, SourceSpec] = {
     s.name: s
     for s in (
         SourceSpec("cboe", "cboe", "cboe", CboeOptionsSource, not_found=missing_chain),
+        SourceSpec("cboe_vx", "cboe_vx", "cboe_vx", CboeVxFutures, 0.5, not_found=missing_chain),
         SourceSpec("nasdaq_trader", "nasdaq_trader", "nasdaqtrader", NasdaqTraderSource),
         SourceSpec("spy_holdings", "ssga", "ssga", SpyHoldingsSource, 1.0),
         SourceSpec("ssga_holdings", "ssga", "ssga", SsgaHoldings, 1.0, switch="etf_files"),

@@ -4,7 +4,10 @@ FAIL when a series holds fewer vintages than an earlier macro run recorded.
 
 The ``macro-calendar`` step's acceptance (``check_macro_calendar``): FAIL naming the FRED
 releases with fewer scheduled dates after the session than ``[quality] min_calendar_future_dates``,
-a release the latest run skipped is not graded, nothing without FRED releases."""
+a release the latest run skipped is not graded, nothing without FRED releases.
+
+The ``vx-futures`` step's acceptance (``check_vx_futures``), WARN-only: PASS when a row at or after
+the session before is stored, WARN when older, no contract was found or a file failed."""
 
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -23,8 +26,10 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.macro.calendar import TABLE, ingest_macro_calendar, release_rows
 from algotrade_ingestion.tasks.maintenance.quality import (
+    VX_TASK,
     check_macro,
     check_macro_calendar,
+    check_vx_futures,
     macro_checks,
 )
 from tests.apps.ingestion.tasks.macro.test_calendar import (
@@ -35,7 +40,7 @@ from tests.apps.ingestion.tasks.macro.test_calendar import (
     entry,
     rule,
 )
-from tests.helpers.ingest_fakes import task_ctx
+from tests.helpers.ingest_fakes import FIXED, task_ctx
 from tests.helpers.stored_frames import stamped
 
 D = date(2026, 10, 5)
@@ -296,3 +301,46 @@ def test_a_moved_date_does_not_count_as_a_scheduled_one() -> None:
     )
     [check] = check_macro_calendar(ctx, CAL_SESSION)
     assert check.status == "FAIL" and "CPI" in check.detail  # its only future date moved
+
+
+# --- the vx-futures step's acceptance (``check_vx_futures``, WARN-only, EB D3)
+VX_FRIDAY = date(2026, 10, 16)  # the session before is Thursday 10-15
+
+
+def vx_ctx(stats: dict[str, object] | None, session: date = VX_FRIDAY) -> TaskContext:
+    ctx = task_ctx(StoreWriter(MemoryBackend()))
+    if stats is not None:
+        ctx.writer.save_run(start_run(VX_TASK, session, FIXED).finish(FIXED, stats=stats))
+    return ctx
+
+
+def test_the_session_before_is_enough_since_the_session_itself_is_published_next_morning() -> None:
+    [check] = check_vx_futures(vx_ctx({"latest": "2026-10-15", "listed": 20}), VX_FRIDAY)
+    assert check.name == "vx_futures_fresh" and check.status == "PASS"
+    assert (
+        check_vx_futures(vx_ctx({"latest": "2026-10-16", "listed": 20}), VX_FRIDAY)[0].status
+        == "PASS"
+    )
+
+
+def test_older_data_no_contract_and_fetch_errors_warn_and_never_fail() -> None:
+    [stale] = check_vx_futures(vx_ctx({"latest": "2026-10-13", "listed": 20}), VX_FRIDAY)
+    assert stale.status == "WARN" and "2026-10-13" in stale.detail and "2026-10-15" in stale.detail
+    assert check_vx_futures(vx_ctx({"latest": None, "listed": 20}), VX_FRIDAY)[0].status == "WARN"
+    none_listed = check_vx_futures(vx_ctx({"latest": "2026-10-15", "listed": 0}), VX_FRIDAY)[0]
+    assert none_listed.status == "WARN" and "no VX contract" in none_listed.detail
+    errors = {"latest": "2026-10-15", "listed": 20, "items": {"FETCH_ERROR": 3, "OK": 20}}
+    failed = check_vx_futures(vx_ctx(errors), VX_FRIDAY)[0]
+    assert failed.status == "WARN" and "3 expiry files" in failed.detail
+
+
+def test_nothing_without_a_run_of_the_session() -> None:
+    assert check_vx_futures(vx_ctx(None), VX_FRIDAY) == []
+    other = vx_ctx({"latest": "2026-10-15", "listed": 20}, session=date(2026, 10, 15))
+    assert check_vx_futures(other, VX_FRIDAY) == []
+
+
+def test_nothing_without_a_vx_run_of_the_session() -> None:
+    assert check_vx_futures(vx_ctx(None), VX_FRIDAY) == []
+    other = vx_ctx({"latest": "2026-10-15", "listed": 20}, session=date(2026, 10, 15))
+    assert check_vx_futures(other, VX_FRIDAY) == []

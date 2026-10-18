@@ -80,6 +80,16 @@ def nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
     return last - timedelta((last.weekday() - weekday) % 7)
 
 
+def weekdays_between(start: date, end: date, weekday: int) -> list[date]:
+    """Every ``weekday`` (Monday = 0) in ``start..end``, ascending."""
+    day = start + timedelta((weekday - start.weekday()) % 7)
+    out = []
+    while day <= end:
+        out.append(day)
+        day += timedelta(7)
+    return out
+
+
 def third_friday(year: int, month: int) -> date:
     """The standard monthly option expiry day (before any holiday adjustment)."""
     return nth_weekday(year, month, _FRIDAY, 3)

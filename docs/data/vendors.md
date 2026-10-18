@@ -84,6 +84,44 @@ Caveats, handled in `libs/sources/algotrade_sources/vendors/cboe/option_chains.p
 - Raw responses are about 1–3 GB/day across the universe, so raw retention is limited
   (ADR 0014, `algotrade-ingest purge-raw --keep-days 90`).
 
+## Cboe VIX family indices and VX futures (implemented, EB D3)
+
+Free static files on Cboe's CDN, no key; personal non-commercial use only (https://www.cboe.com/terms/),
+never redistributed, so no vendor data is committed (the fixtures are made up in the real format).
+Verified 2026-10-17.
+
+- **Indices** `https://cdn.cboe.com/api/global/us_indices/daily_prices/<VIX9D|VIX6M|VVIX>_History.csv`
+  (a 307 to `cdn-api.cboe.com`, followed): `DATE,OPEN,HIGH,LOW,CLOSE` (VVIX: `DATE,VVIX`, the close
+  only), `MM/DD/YYYY`, VIX9D from 2011, VIX6M from 2008, VVIX from 2006. They are
+  `[[series]]` of `config/site/macro.toml` (`published` source, `csv` parser, `IDX:<KEY>` in
+  `macro/series`): no code. **VIX and VIX3M stay FRED's** (`VIXCLS`, `VXVCLS`, the same closes). The
+  index files' `Last-Modified` was Friday 21:31 UTC (17:31 New York) for Friday's close, so
+  `release_lag_days = 1` errs late (vintage = observation + 1 day, ADR 0048).
+- **VX futures** `https://cdn.cboe.com/data/us/futures/market_statistics/historical_data/VX/VX_<expiry>.csv`,
+  one file per contract holding its whole life: `Trade Date,Futures,Open,High,Low,Close,Settle,Change,
+  Total Volume,EFP,Open Interest`. History starts with the 2013 contracts (403 for earlier ones). The
+  directory cannot be listed, so `tasks/market/vx_futures.py` generates the expiries by Cboe's rule
+  (monthly: the Wednesday 30 days before the third Friday of the next month, 30 days before the
+  preceding business day when that Friday is a holiday; weeklies: every Wednesday; a holiday
+  Wednesday moves to the session before: 2024-06-18 and 2014-03-18 exist, the Wednesdays after them
+  answer 403) and asks for each; a never-listed expiry answers S3's `AccessDenied` 403
+  (`missing_chain`: NO_DATA, not an error, not the circuit breaker). 731 candidates for 2013-2026.
+- **Quirks.** `Futures` is the contract MONTH label (`F (Jan 2025)`), also on the weeklies of that
+  month, so the expiry is the file's date; before 2013-05-20 `Settle` is 0 (none published); a day
+  without a trade has 0 open/high/low/close with a settle: a 0 price is stored null. `Change` and
+  `Total Volume` are as published. A file's `Last-Modified` is about 01:05 New York time the day
+  AFTER the last trade date it holds (a rewritten 2025 file was modified in December 2025), so a
+  night's run after the close does not yet have that night's settle.
+- **known_from (ADR 0007 / 0050).** `knowledge_ts` is the fetch instant (the run's publish time),
+  never the trade date: the next night's run stores the session, and a backfill's rows are known
+  from the backfill. A stored row is not restated by a later fetch (only rows after the latest stored
+  trade date are written; `--force` rewrites). The macro index series use the lag rule above.
+- **Pacing** `[cboe_vx] min_interval_s = 0.5` (static S3 objects, no published limit; a 2013-
+  backfill is ~730 requests, about 6 minutes). Backfill: `algotrade-ingest vx-futures --from
+  2013-01-01 --to 2026-12-31` (`--from` / `--to` bound the expiries; resumable: an interrupted run
+  continues from its staging, a finished one never asks for a settled expiry again). The nightly
+  `vx-futures` step is optional with a WARN-only check (`vx_futures_fresh`).
+
 ## Massive daily bars and corporate actions (implemented, phase 1.4)
 
 Host `https://api.massive.com`; the key (`ALGOTRADE_MASSIVE_API_KEY` in `.env`) is sent as an

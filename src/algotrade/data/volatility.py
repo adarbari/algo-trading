@@ -5,6 +5,11 @@ snapshot one), the latest run's row winning per instrument (``storage/backends``
 ``iv30_ibkr`` / ``hv30_ibkr`` (decimals, IB's 30-day vols) and ``source_kind`` (``history``:
 IB's daily bar, ``snapshot``: the streamed value after the close) and ``vol_reject`` (why a vol
 IB sent is null: zero, or an IV above 5; null when both were kept). ADR 0028.
+
+Also Cboe's VIX futures by expiry (``volatility/vx_futures``, EB D3): one row per listed contract
+and trade date, so a session's rows ordered by ``expiry`` are its futures curve. A read at
+``as_of`` sees a row only from the fetch instant on (the file of a session is published the
+morning after), so the curve a backtest sees never holds a settle it could not have had.
 """
 
 from collections.abc import Sequence
@@ -15,6 +20,11 @@ import pandas as pd
 from algotrade.storage.tables.readers import StoreReader
 
 IBKR_IV30 = "volatility/ibkr_iv30"
+VX_FUTURES = "volatility/vx_futures"
+VX_COLUMNS = (
+    "session_date", "instrument_id", "expiry", "contract", "open", "high", "low", "close",
+    "settle", "change", "volume", "efp", "open_interest",
+)  # fmt: skip
 COLUMNS = (
     "session_date", "instrument_id", "symbol", "iv30_ibkr", "hv30_ibkr", "source_kind", "vol_reject"
 )  # fmt: skip
@@ -56,3 +66,18 @@ def ibkr_stored_hv(
         (str(i), d): float(hv)
         for i, d, hv in zip(kept["instrument_id"], days, kept["hv30_ibkr"], strict=True)
     }
+
+
+def vx_futures(
+    reader: StoreReader, start: date, end: date, as_of: datetime | None = None
+) -> pd.DataFrame:
+    """VIX futures rows with ``start <= session_date <= end`` (``VX_COLUMNS``), sorted by
+    session then expiry, ``session_date`` and ``expiry`` as dates; an empty frame when none.
+    ``settle`` is null where Cboe published none (before 2013-05-20)."""
+    frame = reader.table_range(VX_FUTURES, start, end, as_of)
+    if frame is None or frame.empty:
+        return pd.DataFrame({c: [] for c in VX_COLUMNS})
+    out = frame.reindex(columns=list(VX_COLUMNS))
+    out["session_date"] = pd.to_datetime(out["session_date"]).dt.date
+    out["expiry"] = pd.to_datetime(out["expiry"]).dt.date
+    return out.sort_values(["session_date", "expiry"], kind="stable").reset_index(drop=True)
