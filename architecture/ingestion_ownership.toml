@@ -87,7 +87,7 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (filings_fetched)
     "src/algotrade/storage/tables/schemas.py",  # declares the table
     "src/algotrade/data/feature_inputs.py",  # the feature input read of events/filing (stored_events, known_from <= session), as for events/earnings
-    "src/algotrade/features/rollups/corporate/filing_activity.py",  # reads events/filing as a feature input (known_from <= session); computes only, never writes
+    "src/algotrade/features/rollups/events/filing_activity.py",  # reads events/filing as a feature input (known_from <= session); computes only, never writes
     "src/algotrade/features/rollups/corporate/earnings.py",  # the one reader that must tell the 8-K rows apart (v1 reads the calendar rows only; rollups import no storage, so the source name is spelled there)
     "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py",  # the carry-forward never copies the 8-K rows
     "src/algotrade/services/read/events/filings.py",  # the filings read of InstrumentEvents (known_from <= session), a display read

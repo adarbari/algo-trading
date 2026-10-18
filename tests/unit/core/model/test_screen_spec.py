@@ -1,7 +1,7 @@
 """The rule-screen spec values: modes, tolerance widths, the fields a screen reads."""
 
 from algotrade.core.model.predicates import Group, Rule
-from algotrade.core.model.screen_spec import Criterion, Mode, ScreenSpec, Tolerance
+from algotrade.core.model.screen_spec import Criterion, CriterionGroup, Mode, ScreenSpec, Tolerance
 
 
 def test_tolerance_width_absolute_and_relative() -> None:
@@ -23,3 +23,10 @@ def test_fields_cover_criteria_flags_columns_and_tie_break() -> None:
     )
     assert spec.fields() == ("f.a", "f.col", "f.tb")
     assert spec.criteria[0].field == "f.a" and spec.criteria[0].on_miss == "WATCH"
+
+
+def test_a_spec_has_no_groups_by_default_and_a_group_names_its_members() -> None:
+    spec = ScreenSpec(id="s", criteria=(Criterion("a", Rule("f.a", "gt", 1)),))
+    assert spec.groups == ()
+    group = CriterionGroup("g", "any", ("a", "b"))
+    assert group.enabled and group.members == ("a", "b")

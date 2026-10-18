@@ -67,6 +67,7 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/ibkr_iv@v1",
     "rollups/instrument/implied_move@v1",
     "rollups/instrument/income_statement@v1",
+    "rollups/instrument/index_changes@v1",
     "rollups/instrument/iv30@v1",
     "rollups/instrument/iv_history@v2",
     "rollups/instrument/iv_term@v1",

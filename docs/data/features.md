@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-516 stored features in 60 groups, in dependency order; 146 expression features.
+519 stored features in 61 groups, in dependency order; 146 expression features.
 
 ## `option_liquidity@v1`
 
@@ -198,6 +198,16 @@ How many analysts rate each stock strong buy to strong sell, the mean rating and
 | `rating_month` | window | date | date | personal |  | The month the counts are for, as its first day: the newest month of the newest snapshot | ratings_status is STALE (the newest snapshot is older than stale_days), NOT_COVERED (the vendor has no recommendation trend for the name) or NOT_FETCHED (never asked: the nightly rotation has not reached it) | `analyst/estimate_snapshots.period` |
 | `rating_score_change_90d` | window | float32 | ratio | personal | -4 .. 4 | The score now less the score in our snapshot about 90 days ago: positive is analysts turning more bullish | ratings_status is STALE (the newest snapshot is older than stale_days), NOT_COVERED (the vendor has no recommendation trend for the name) or NOT_FETCHED (never asked: the nightly rotation has not reached it); or no snapshot of ours is 90 days old yet (our history starts 2026-10-19), or either score is null | `analyst/estimate_snapshots.strong_buy`, `analyst/estimate_snapshots.buy`, `analyst/estimate_snapshots.hold`, `analyst/estimate_snapshots.sell`, `analyst/estimate_snapshots.strong_sell`, `analyst/estimate_snapshots.period` |
 | `ratings_status` | label | str | category | personal | OK, STALE, NOT_COVERED, NOT_FETCHED | OK: a snapshot at most stale_days (45) old; STALE: older, values not served; NOT_COVERED: the vendor has no recommendation trend for the name; NOT_FETCHED: never asked | never | `analyst/estimate_snapshots.kind` |
+
+## `index_changes@v1`
+
+The latest S&P 500 membership change of an instrument and the sessions since it. Stored as `rollups/instrument/index_changes@v1`; reads `events/index_change` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `last_index_change_date` | window | date | date | open |  | The date of the latest S&P 500 membership change (the session it was first stored) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
+| `sessions_since_index_change` | window | int | sessions | open | >= 0 | Exchange sessions from the latest S&P 500 membership change up to the session (0: the session is that day) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
+| `last_index_change` | label | str | category | open | sp500_added, sp500_removed | The latest change: sp500_added (joined the index) or sp500_removed (left it) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
 
 ## `ibkr_iv@v1`
 

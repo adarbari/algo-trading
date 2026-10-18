@@ -8,8 +8,9 @@ import pandas as pd
 
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.runner import compute_in_memory
-from algotrade.features.rollups.corporate import earnings, filing_activity
-from algotrade.features.rollups.corporate.filing_activity import FILINGS, GROUP
+from algotrade.features.rollups.corporate import earnings
+from algotrade.features.rollups.events import filing_activity
+from algotrade.features.rollups.events.filing_activity import FILINGS, GROUP
 from algotrade.features.rollups.price import price_stats
 from algotrade.features.site import site_features
 from algotrade.storage.configs.files import FileConfigStore

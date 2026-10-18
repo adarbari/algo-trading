@@ -14,6 +14,11 @@ result (too few observations, a zero denominator) is ``None``, never NaN.
                          uniformly without replacement (the random-pick backtests)
     percentile_of        the share of a sample a value beats (ties half)
     sharpe               per-period mean over sample sd
+    sharpe_t             its t-ratio, ``sharpe sqrt(n)`` (the picks-series t), over the
+                         independent sessions when windows overlap
+    window_weights       the share each decision session's window adds when windows overlap
+    independent_sessions their sum, the count the haircut and the t-ratios rest on
+    overlap_t            a t-ratio over n sessions as it reads over fewer independent ones
     deflated_sharpe      Bailey and Lopez de Prado (2014): the probability the true Sharpe
                          beats what the best of ``n_trials`` noise strategies would show
     haircut_sharpe       Harvey and Liu (2015): the Sharpe ratio left after the multiple-testing
@@ -28,12 +33,14 @@ The normal CDF is ``black_scholes.norm_cdf``, its owner.
 
 import itertools
 import math
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import date
 
 import numpy as np
 import numpy.typing as npt
 
+from algotrade.core.time.calendar import sessions_to
 from algotrade.quant.black_scholes import inverse_normal_cdf, norm_cdf
 
 type Array = npt.NDArray[np.float64]
@@ -188,6 +195,46 @@ def sharpe(x: ArrayLike) -> float | None:
     if mean is None or sd is None or sd <= 0.0 or n < 2:
         return None
     return mean / sd
+
+
+def window_weights(days: Iterable[date], horizon: int) -> dict[date, float]:
+    """The weight of each decision session's window in a sum over windows: ``min(1, spacing /
+    horizon)``, the spacing the sessions since the previous decision (the first takes the next
+    one's). Windows of ``horizon`` sessions started every session overlap: counted whole they
+    add each day ``horizon`` times. A portfolio of ``horizon`` staggered tranches, each 1 /
+    ``horizon`` of the capital, earns each day the average of the windows covering it, which is
+    this weighting; a schedule spaced at least ``horizon`` apart has weight 1."""
+    ordered = sorted(set(days))
+    if len(ordered) < 2 or horizon <= 1:
+        return dict.fromkeys(ordered, 1.0)
+    steps = [sessions_to(a, b) for a, b in itertools.pairwise(ordered)]
+    return {d: min(1.0, n / horizon) for d, n in zip(ordered, [steps[0], *steps], strict=True)}
+
+
+def independent_sessions(days: Iterable[date], horizon: int) -> int:
+    """The independent sessions ``days`` stand for: their ``window_weights`` summed, rounded (the
+    count the haircut Sharpe ratio and the t-ratios rest on)."""
+    return round(sum(window_weights(days, horizon).values()))
+
+
+def overlap_t(t: float | None, n: int, independent: int) -> float | None:
+    """``t`` (a t-ratio over ``n`` sessions) as it reads over ``independent`` ones: ``t sqrt(
+    independent / n)``, the same mean and sd with fewer independent observations; None without
+    a t, a session or an independent one."""
+    if t is None or n < 1 or independent < 1:
+        return None
+    return t * math.sqrt(independent / n)
+
+
+def sharpe_t(x: ArrayLike, independent: int | None = None) -> float | None:
+    """The t-ratio of the per-period Sharpe ratio of ``x`` (``sharpe(x) sqrt(n)``, the ``t`` of
+    ``haircut_sharpe``), signed; None where ``sharpe`` is. ``independent``: the sessions the
+    values stand for when their windows overlap (``independent_sessions``), read in place of
+    ``n``. The picks-series t of an edge's trial values, the figure the "t > 3" bar of the
+    literature is about."""
+    t = spread_summary(x)[2]
+    n = int(_finite(x).size)
+    return t if independent is None else overlap_t(t, n, independent)
 
 
 def deflated_sharpe(x: ArrayLike, n_trials: int, sr_variance: float) -> float | None:

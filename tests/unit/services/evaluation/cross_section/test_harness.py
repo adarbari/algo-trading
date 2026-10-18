@@ -602,11 +602,6 @@ def test_an_event_session_whose_entry_is_not_closed_is_counted_not_measured() ->
     assert [s.session for s in ev.results[0].stats] == [DAYS[1]]
 
 
-def test_an_event_class_without_a_declared_field_is_refused() -> None:
-    with pytest.raises(ConfigurationError, match="no declared field"):
-        run(build_world(), edge(schedule="on_event:index_change", top_k="all"))
-
-
 def test_an_event_edge_with_no_event_in_range_has_empty_blocks_not_a_guess() -> None:
     ev = run(event_world({}), event_edge(2))
     assert ev.results[0].stats == () and ev.results[0].measures[0].sessions == 0
