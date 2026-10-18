@@ -65,9 +65,10 @@ def futures_curve(
 def curve_of(frame: pd.DataFrame, root: str, session: date) -> pd.DataFrame:
     """One root's curve on one session: its rows by expiry with a price, plus ``days`` (to
     expiry) and ``roll_yield`` (annualised, ``ln(front / this) / years``, 0 on the front
-    contract: positive in backwardation, negative in contango). The prices are an evening
-    snapshot read after the exchange's settlement, not the exchange settle; per root and
-    session they are all one ``price_kind`` (see the table's schema comment)."""
+    contract: positive in backwardation, negative in contango). The prices are one
+    ``price_kind`` per root and session: ``settle`` (read after Globex reopened, before 14:00
+    New York on the next session: the exchange settle) or ``last`` (read before the reopen:
+    the session's evening last trade, not the settle)."""
     rows = frame[(frame["root"] == root) & (frame["session_date"] == session)]
     rows = rows[rows["price"].notna() & rows["expiry"].notna()].sort_values("expiry")
     rows = rows.reset_index(drop=True)

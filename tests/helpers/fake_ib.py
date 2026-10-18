@@ -185,8 +185,8 @@ class FakeIB:
             volume=nan, futuresOpenInterest=nan, _fut=None,
         )  # fmt: skip
         if getattr(contract, "secType", "") == "FUT":
-            key = (contract.symbol, contract.lastTradeDateOrContractMonth)
-            ticker._fut = self.fut_quotes.get(key)
+            fut_key = (contract.symbol, contract.lastTradeDateOrContractMonth)
+            ticker._fut = self.fut_quotes.get(fut_key)
         self._streams.append(ticker)
         return ticker
 
