@@ -133,11 +133,19 @@ def test_a_later_filing_never_appears_in_an_earlier_session() -> None:
     assert set(on_7["owner_cik"]) == {"0000888001", "0000888002"}
 
 
-def test_a_restated_line_is_never_read_early_and_a_single_session_sees_its_old_version() -> None:
-    old = row("A1", date(2026, 9, 30), price=12.5)
-    new = row("A1", date(2026, 10, 7), price=12.0)
-    found = reader((S1, [old]), (S2, [new]))
-    assert len(buyer_histories(found, [date(2026, 10, 6)])) == 1  # the nightly: the old version
-    both = buyer_histories(found, [date(2026, 10, 6), date(2026, 10, 7)])
-    assert both[both["as_of"] == date(2026, 10, 7)]["known_from"].tolist() == [date(2026, 10, 7)]
+def test_a_backfill_shows_each_session_what_the_nightly_saw_despite_later_filings() -> None:
+    original = row("A1", date(2026, 9, 30), price=12.5)
+    restated = row("A1", date(2026, 10, 9), price=12.0)  # known from S3
+    amendment = row("A2", date(2026, 10, 9), form="4/A", amends_date=date(2026, 9, 30),
+                    owner_cik="0000888001", line=5, shares=900.0)  # fmt: skip
+    s1, s2, s3 = date(2026, 10, 2), date(2026, 10, 6), date(2026, 10, 9)
+    found = reader((S1, [original]), (S3, [restated, amendment]))
+    both = buyer_histories(found, [s1, s2, s3])
+    for day in (s1, s2):
+        alone = buyer_histories(found, [day]).drop(columns="as_of")
+        got = both[both["as_of"] == day].drop(columns="as_of")
+        assert alone.reset_index(drop=True).equals(got.reset_index(drop=True))
+        assert got["accession"].tolist() == ["A1"]  # the original, never replaced early
+        assert got["known_from"].tolist() == [date(2026, 9, 30)]
+    assert "A2" in set(both[both["as_of"] == s3]["accession"])  # known from S3: replaces A1
     assert buyer_histories(reader(), [S1]).empty

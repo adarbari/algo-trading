@@ -100,36 +100,39 @@ HISTORY_COLUMNS = [
     "instrument_id", "owner_cik", "transaction_date", "transaction_code", "derivative",
     "plan_10b5_1", "known_from", "accession", "owner_count",
 ]  # fmt: skip
+PAIR = ["instrument_id", "owner_cik"]
 OPEN_MARKET = ("P", "S")  # an open-market purchase or sale (Form 4 transaction codes)
 
 
 def buyer_histories(reader: StoreReader, sessions: Sequence[date]) -> pd.DataFrame:
     """For each session, the open-market history of the owners who bought lately: every
-    non-derivative open-market line (code P or S) known by that session (``known_from``) of each
-    (issuer, owner) with a purchase known within ``BUY_WINDOW_DAYS`` calendar days up to it, with
-    ``as_of`` the session. The table is read and resolved once, as of the last session
-    (``known_lines``), and each session keeps the lines known by it, so a later filing never
-    appears in an earlier session; a line restated or amended after a session is absent from it
-    in a multi-session backfill (a single session, the nightly, sees exactly what the one rule
-    shows). Empty (``HISTORY_COLUMNS`` + ``as_of``) when nothing is stored or nobody bought."""
+    non-derivative open-market line (code P or S) of each (issuer, owner) with a purchase known
+    within ``BUY_WINDOW_DAYS`` calendar days up to it, as that session saw it (``known_lines``
+    at the session: a restated line shows its old version, an original a later 4/A replaced
+    still shows), with ``as_of`` the session. A backfill therefore equals the nightly of each
+    session. The table is first narrowed to the pairs with any purchase version known in the
+    window of the sessions (safe: an amendment matches only the same issuer and owner), so each
+    session resolves a small frame. Empty (``HISTORY_COLUMNS`` + ``as_of``) when nothing is
+    stored or nobody bought."""
     empty = pd.DataFrame(columns=[*HISTORY_COLUMNS, "as_of"])
     raw = reader.table_range(TABLE, *ALL_TIME, None, None)
     if raw is None or raw.empty or not sessions:
         return empty
-    lines = known_lines(raw, max(sessions))
-    lines = lines[(lines["transaction_code"].isin(OPEN_MARKET)) & ~lines["derivative"]]
-    known = pd.to_datetime(lines["known_from"])
+    window = pd.Timedelta(days=BUY_WINDOW_DAYS)
+    known = pd.to_datetime(raw["known_from"])
+    bought = (raw["transaction_code"] == "P") & (known > pd.Timestamp(min(sessions)) - window)
+    pairs = raw.loc[bought & (known <= pd.Timestamp(max(sessions))), PAIR].drop_duplicates()
+    if pairs.empty:
+        return empty
+    subset = raw.merge(pairs, on=PAIR)
     parts = []
     for session in sessions:
-        seen = lines[known <= pd.Timestamp(session)]
-        recent = pd.to_datetime(seen["known_from"]) > pd.Timestamp(session) - pd.Timedelta(
-            days=BUY_WINDOW_DAYS
-        )
-        buyers = seen.loc[
-            recent & (seen["transaction_code"] == "P"), ["instrument_id", "owner_cik"]
-        ]
+        seen = known_lines(subset, session)
+        seen = seen[(seen["transaction_code"].isin(OPEN_MARKET)) & ~seen["derivative"]]
+        recent = pd.to_datetime(seen["known_from"]) > pd.Timestamp(session) - window
+        buyers = seen.loc[recent & (seen["transaction_code"] == "P"), PAIR]
         if buyers.empty:
             continue
-        kept = seen.merge(buyers.drop_duplicates(), on=["instrument_id", "owner_cik"])
+        kept = seen.merge(buyers.drop_duplicates(), on=PAIR)
         parts.append(kept[HISTORY_COLUMNS].assign(as_of=session))
     return pd.concat(parts, ignore_index=True) if parts else empty
