@@ -1,5 +1,5 @@
-"""The identity of an edge or outcome for hashing (ADR 0053 amendments): its ``asdict`` without the
-keys a document that never used them would not have had before they existed."""
+"""The identity of an edge document for hashing: ``identity_dict`` drops the keys an outcome that
+never named them would not have had, so a hash is stable across the arrival of a key."""
 
 from typing import Any
 

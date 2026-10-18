@@ -28,8 +28,11 @@ from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.outcomes import (
     OUTCOME_FIELDS,
+    RESIDUAL_FIELDS,
+    attach_residuals,
     missing_outcomes,
     outcome_seqs,
+    read_residuals,
     read_stored,
     select_outcomes,
 )
@@ -45,6 +48,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     is_return,
     needs_implied_vol,
     needs_pairs,
+    needs_residual,
     short_view,
 )
 from algotrade.services.evaluation.cross_section.legs.key import (
@@ -528,7 +532,8 @@ def _measure(
     todo = reuse.days
     legs = [lg for p in plans for b in p.blocks for lg in b if todo is None or lg.decision in todo]
     days = sorted({leg.decision for leg in legs})
-    out.seqs = outcome_seqs(reader, {leg.entry for leg in legs})  # before any outcome row is read
+    residuals = any(needs_residual(p.scope.edge) for p in plans)  # their stamps count too
+    out.seqs = outcome_seqs(reader, {leg.entry for leg in legs}, residuals)  # before any row read
     failed: dict[int, MissingDataError] = {}
     out.closed.update({p.horizon: set(reuse.closed.get(p.horizon, ())) for p in plans})
     for at in range(0, len(days), CHUNK_SESSIONS):
@@ -577,6 +582,8 @@ def _read_closed(
     }  # fmt: skip
     entries = sorted({d for days in wanted.values() for d in days})
     stored = read_stored(reader, entries, as_of) if entries else None  # once for the horizons
+    residual_horizons = {p.horizon for p in plans if needs_residual(p.scope.edge)}
+    residuals = read_residuals(reader, entries, as_of) if entries and residual_horizons else None
     have: set[date] = set()  # the entry sessions with a partition visible at ``as_of``
     if stored is not None:  # plain strings: the ``isin`` over arrow strings is the slow path
         stored = stored.assign(instrument_id=stored["instrument_id"].astype(object))
@@ -589,7 +596,11 @@ def _read_closed(
             failed.setdefault(horizon, missing_outcomes(days))  # nothing stored in its span
             continue
         frame = select_outcomes(stored, horizon, days, BENCHMARK, as_of)
-        kept = frame[list(OUTCOME_COLUMNS)]  # what apply_outcome reads, no more
+        columns = list(OUTCOME_COLUMNS)
+        if horizon in residual_horizons:  # a factor-neutral outcome of this horizon (EB H11)
+            frame = attach_residuals(frame, residuals, horizon)
+            columns += RESIDUAL_FIELDS
+        kept = frame[columns]  # what apply_outcome reads, no more
         closed[horizon] = dict(tuple(kept.groupby(frame["session_date"].map(_day))))
         out.closed[horizon] |= set(closed[horizon])
         for entry, rows in closed[horizon].items():

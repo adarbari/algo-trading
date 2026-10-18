@@ -741,6 +741,32 @@ def test_a_published_figure_of_a_short_edge_defaults_to_the_short_leg() -> None:
     assert leg("mean_excess", "long") == "long"
 
 
+def test_an_excess_return_may_name_the_residual_return_measure() -> None:
+    outcome = {"kind": "excess_return", "horizon_sessions": [20], "benchmark": "SPY",
+               "start_offset_sessions": 1, "measure": "residual_return"}  # fmt: skip
+    edge = parse(outcome=outcome, schedule="every_session")
+    assert edge.outcome.measure == "residual_return" and edge.outcome.is_return
+    plain = {k: v for k, v in outcome.items() if k != "measure"}
+    assert parse(outcome=plain, schedule="every_session").outcome.measure is None
+
+
+@pytest.mark.parametrize("measure", ["excess_return", "realised_to_implied_vol", "nope"])
+def test_an_excess_return_refuses_any_other_measure(measure: str) -> None:
+    outcome = {"kind": "excess_return", "horizon_sessions": [20], "benchmark": "SPY",
+               "start_offset_sessions": 1, "measure": measure}  # fmt: skip
+    with pytest.raises(ConfigurationError, match="measure"):
+        parse(outcome=outcome, schedule="every_session")
+
+
+def test_a_hit_target_still_refuses_the_residual_measure() -> None:
+    outcome = {
+        "kind": "hit_target", "horizon_sessions": [20], "benchmark": "SPY", "target": 0.0,
+        "measure": "residual_return", "direction": "above", "start_offset_sessions": 1,
+    }  # fmt: skip
+    with pytest.raises(ConfigurationError, match="measure"):
+        parse(outcome=outcome, schedule="every_session")
+
+
 def _band(**changes: Any) -> dict[str, Any]:
     """A monthly top-5 edge with a band of 8: the changes override its keys (None drops one)."""
     base = {"schedule": "month_end", "top_k": 5, "outcome": _outcome(hold_rank=8)}

@@ -745,6 +745,72 @@ column, and reads the stored `forward_returns@v2` window and the implied vol at 
    price) are a follow-up PR. The short delta-hedged side is its own structure value
    (`delta_hedged_atm_short`), not a `side` key. The stored basis column is left to H13.
 
+## Amendment 2026-10-18: residual returns, a factor-neutral outcome (edge build H11)
+
+A momentum or small-cap edge can look like alpha when it only holds a cheap, small or
+high-momentum basket. The harness gets a second outcome grain whose value is the return left
+after the loadings the name had before the entry session, so the same statistics can be read
+factor-neutral.
+
+1. **A sibling grain, v2 untouched.** `outcomes/instrument/residual_returns@v1`, partition S,
+   runs merge per (instrument, horizon): `fwd_residual_return`, `fwd_factor_return` (the part
+   removed), `beta_session`, `outcome_status` (COMPLETE, DELISTED, UNMEASURED), `outcome_reason`.
+   `forward_returns@v2` is unchanged, so no stored leg is invalidated and a document that never
+   names the measure hashes as before (`measure` is already in the outcome's identity as None).
+   Written only by ingestion (`tasks/derived/residual_returns.py`, a registered task; the arithmetic
+   is `residual_paths.py`), read only through `algotrade.data.outcomes` (`residuals.py`: the same
+   import contract, importable only from `services/evaluation`).
+2. **The maths.** `residual = fwd_return - sum_k beta_k x factor_k return`, the factor returns the
+   simple returns over S..end of the proxies of `factor_betas@v1` (market SPY; size IWM - SPY;
+   momentum MTUM - SPY; value VLUE - SPY). `end` is T, or a delisted name's last
+   bar, as in the forward row. The betas come from log returns and the window sums simple
+   returns: a first-order match, stated rather than hidden. The sector loading is
+   left out (review decision): `factor_betas@v1` stores the four betas of one four-factor fit and
+   `beta_sector` from a different five-factor fit, so adding it counts sector exposure twice.
+   Sector would need a `factor_betas@v2` storing all five betas of the five-factor fit.
+3. **Point in time.** The betas are the `factor_betas@v1` rows of the session before S
+   (`previous_session(S)`), estimated on the 252 sessions ending there, read through
+   `data.rollups`. Nothing of the
+   window enters them; for the usual offset of 1 they are exactly the betas known at the
+   decision session D. A later partition is never read (the exact session, not "on or before").
+4. **Gaps are UNMEASURED with a reason, never market-only, never zero.** `NO_FACTOR_HISTORY` (a
+   factor ETF has no bar at S: MTUM and VLUE start in 2013, so every earlier window; or the betas
+   row says so), `NO_BETAS` (no partition or no row before S, or a non-finite beta),
+   `SHORT_HISTORY` (the betas say too few joint returns), `NO_FACTOR_BAR` (a factor ETF
+   has no bar at the end), `BAD_BAR` (carried from the forward row). The harness treats such a
+   row like an `UNMEASURED` forward row: excluded as `unmeasured`, counted, and a session most of
+   whose picks are unmeasured is not measured. A forward row with no residual row at all
+   (`NO_RESIDUAL_ROW`: the task has not run for its window) is the same.
+5. **The document.** An `excess_return` outcome may set `measure = "residual_return"`
+   (`EXCESS_MEASURES`); any other measure on an `excess_return`, and this one on a `hit_target`,
+   is refused. Everything else is the excess return's: the cost is charged once, a short side
+   is minus the residual less cost and borrow, the trial statistics are over a return. The
+   benchmark key stays (SPY) and is unused by the value. In `hit.py` the field is
+   `fwd_residual_return` where the excess return's is `fwd_excess_return`; `measuring.py` reads
+   the residual rows once beside the forward ones and attaches them (`attach_residuals`) for the
+   horizons whose edges measure it. A read that did not attach them (the training frame, the
+   paper settlement) fails loudly for a residual edge instead of reading the excess return.
+6. **The verdict says so.** `EdgeFacts.neutral`: the headline names the figure "factor-neutral:
+   market, size, momentum and value taken off". The Guide term `outcome_residual_return`
+   explains it; `tests/architecture/guide/test_outcome_measures.py` fails until every
+   `EXCESS_MEASURES` value has its term.
+7. **Leg reuse and settlement.** The leg-reuse stamps (ADR 0063) cover the residual partitions
+   when any plan measures a residual return: each partition's sequence is the forward one times
+   `SEQ_SCALE` plus the residual one, and a (S, horizon) stamp is the later of the two
+   `knowledge_ts`, so a backfill of the residual grain re-measures exactly the legs stored with
+   `NO_RESIDUAL_ROW` (an edge that does not measure it is unaffected). The paper settlement
+   (`forward/settle.py`) attaches the residual rows for a residual edge: a trade whose residual
+   row is not stored stays open until the grace window ends, then is skipped with the reason; it
+   never reads the excess return and never stops the other edges' settlement. The training frame
+   still refuses a residual edge loudly (no attach there).
+8. **The nightly step.** `residual-returns` (needs `outcomes` and `rollups`, optional) runs the
+   task each night and is accepted by `check_residual_returns`: every forward outcome of the
+   session's windows has a residual row (FAIL otherwise), UNMEASURED rows are a WARN naming
+   their reasons (the ETFs themselves have no betas row, so a WARN is the normal state).
+9. **Not here.** Sector: a `factor_betas@v2` storing all five betas of the five-factor fit would
+   be needed to add it (point 2). Delisted names are residualised over their own window, so
+   their delisting return is not in it (as in the forward row).
+
 ## Amendment 2026-10-18: buy/hold bands for turnover-aware cost (edge build H7)
 
 `[outcome] hold_rank` (optional integer) turns an edge's flat cost into a turnover-aware one: a
