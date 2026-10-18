@@ -15,8 +15,10 @@ from algotrade.config.strategy.schema import RULE_IMPLS
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import RuleValue
+from algotrade.core.model.screen_spec import ScreenSpec
 from algotrade.services.configs import config_ids, resolve_config
 from algotrade.services.read.context import ReadContext, catalogue_key
+from algotrade.strategies.screeners.rules.groups import plan
 
 SCREENER = "screener"
 SITE_SCOPE = "site"
@@ -34,6 +36,22 @@ class ScreenCriterion:
     mode: str
     op: str
     value: RuleValue = None
+    group: str | None = None  # the group it sits in (ADR 0071); None: a gate
+
+
+@dataclass(frozen=True)
+class ScreenGroup:
+    """A group of criteria (ADR 0071): its ``kind`` (``all``, ``any`` or ``none``), its
+    ``members`` (criterion and group ids, in funnel order) and ``parent`` group (None: a gate).
+    In a result, ``outcome`` is the group's PASS / NEAR / FAIL / MISSING for the instrument
+    and ``decided_by`` the member that decided it (both None in the screen's definition)."""
+
+    id: str
+    kind: str
+    members: tuple[str, ...]
+    parent: str | None = None
+    outcome: str | None = None
+    decided_by: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,13 +80,24 @@ class Screener:
     hash: str
     criteria: tuple[ScreenCriterion, ...]
     display_columns: tuple[ScreenColumn, ...]
+    groups: tuple[ScreenGroup, ...] = ()
     regime_enabled: bool = False
     pause_in: tuple[str, ...] = ()
+
+
+def _groups(spec: ScreenSpec) -> tuple[ScreenGroup, ...]:
+    """The spec's groups with their members in funnel order and their parent."""
+    shape = plan(spec)
+    parent = {m: g.id for g in spec.groups for m in g.members}
+    return tuple(
+        ScreenGroup(g.id, g.kind, shape.members[g.id], parent.get(g.id)) for g in spec.groups
+    )
 
 
 def _screener(config: ResolvedConfig) -> Screener:
     owner = config.user.user_id
     spec = config.screen_spec
+    parent = {m: g.id for g in spec.groups for m in g.members}
     regime = config.regime
     return Screener(
         id=config.config.id,
@@ -78,10 +107,11 @@ def _screener(config: ResolvedConfig) -> Screener:
         version=spec.version,
         hash=config.hash,
         criteria=tuple(
-            ScreenCriterion(c.id, c.field, c.mode.value, c.rule.op, c.rule.value)
+            ScreenCriterion(c.id, c.field, c.mode.value, c.rule.op, c.rule.value, parent.get(c.id))
             for c in spec.criteria
         ),
         display_columns=tuple(ScreenColumn(n, f) for n, f in spec.columns),
+        groups=_groups(spec),
         regime_enabled=regime.enabled,
         pause_in=tuple(label for label in REGIME_LABELS if label in config.gate_pauses),
     )

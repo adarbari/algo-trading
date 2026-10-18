@@ -134,7 +134,7 @@ note = "ADR 0050: the macro release calendar (FRED release dates, ISM by rule), 
 [[table]]
 name = "events/filing"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/filings.py"
-note = "ADR 0050: SEC 8-K and 8-K/A filings of every operating company in the universe by acceptance time; known_from = the acceptance's session (New York)"
+note = "ADR 0050: SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q, SC TO-I, 25 / 25-NSE, 424B4, 10-12B) of every operating company in the universe by acceptance time; known_from = the acceptance's session (New York)"
 
 [[table]]
 name = "events/reference_change"
@@ -416,7 +416,7 @@ note = "every rule screen's rows (ADR 0029), framed by services/screening/rule_r
 [[table]]
 name = "results/rule_screen_values"
 owner = "src/algotrade/storage/tables/result_writer.py"
-note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen"
+note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen; group rows (mode = group, field = the kind, value_str = the deciding member) and a nullable group_id (the parent) on member rows (ADR 0071); readers skip group rows beside display columns (is_criterion_row)"
 
 [[table]]
 name = "results/edge_eval"
@@ -470,6 +470,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py"
 [[table]]
 name = "holdings/etf"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py"
+
+[[table]]
+name = "holdings/etf_shares"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py"
+note = "EB D4: an ETF's shares outstanding from the iShares file the holdings task already reads (one row per fund and as-of date, known_from = the session of the New York date of the fetch); read through data/funds/shares.py"
 
 [[table]]
 name = "macro/series"

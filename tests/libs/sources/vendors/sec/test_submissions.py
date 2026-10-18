@@ -208,3 +208,26 @@ def test_arrays_of_different_lengths_raise() -> None:
     doc = {"cik": "1", "filings": {"recent": {"form": ["8-K", "8-K"], "items": ["2.02"]}}}
     with pytest.raises(ValueError, match="differ in length"):
         parse_filings(json.dumps(doc).encode())
+
+
+def test_event_forms_are_kept_and_amendments_of_them_are_not() -> None:
+    forms = ["424B4", "25-NSE", "NT 10-K", "NT 10-Q", "SC TO-I", "10-12B", "8-K"]
+    forms += ["NT 10-K/A", "SC TO-I/A", "10-K", "424B2"]  # amendments and other forms
+    size = len(forms)
+    document = {
+        "cik": "1824920",
+        "filings": {"recent": {
+            "form": forms,
+            "accessionNumber": [f"0000000001-26-{i:06d}" for i in range(size)],
+            "filingDate": ["2026-09-30"] * size,
+            "acceptanceDateTime": [f"2026-09-30T18:03:{i:02d}.000Z" for i in range(size)],
+            "reportDate": [""] * size,
+            "items": ["", "", "", "", "", "", "2.02", "", "", "", ""],
+            "primaryDocument": ["x.htm"] * size,
+        }},
+    }  # fmt: skip
+    frame = parse_filings(json.dumps(document).encode())
+    assert frame["form"].tolist() == forms[:7]
+    assert frame.loc[frame["form"] == "25-NSE", "acceptance_ts"].iloc[0] == pd.Timestamp(
+        "2026-09-30T18:03:01Z"
+    )

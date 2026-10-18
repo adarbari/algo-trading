@@ -37,6 +37,12 @@ from algotrade_sources.framework.base import FetchRequest
 SERIES_FRAME = "series"  # key of ``Normalized.parsed`` holding the normalised frame
 SERIES_COLUMNS = ("series", "obs_date", "vintage_date", "value", "code")
 RELEASE_FRAME = "release_dates"  # key of ``Normalized.parsed`` holding a release's dates (ADR 0050)
+# The SEC event forms kept (ADR 0050): 8-K and 8-K/A (with items; Item 2.02 rows are results
+# releases), late-filing notices (12b-25), the issuer's own tender offer (its amendments SC TO-I/A
+# are left out), delisting notices (25 by the issuer, 25-NSE by the exchange: also filed for a
+# bond or a preferred), final prospectuses and Form 10 registrations of a class. Amendments of the
+# new forms are not kept: the original carries the event.
+FILING_FORMS = ("8-K", "8-K/A", "NT 10-K", "NT 10-Q", "SC TO-I", "25", "25-NSE", "424B4", "10-12B")
 FILINGS_FRAME = "filings"  # key of ``Normalized.parsed`` holding a company's filing rows (ADR 0050)
 DAILY_INDEX_FRAME = "daily_index"  # key of ``Normalized.parsed`` holding a day's 8-K filers
 DAILY_INDEX_COLUMNS = ("cik", "form", "accession", "filing_date")
@@ -82,12 +88,12 @@ class ReleaseRequest(FetchRequest):
 @dataclass(frozen=True, kw_only=True)
 class FilingsRequest(FetchRequest):
     """One company's filings. ``key`` is the CIK (digits); ``since``: the earliest filing date
-    wanted (``None``: the recent block only); ``forms``: the form types kept (default the 8-K
-    and its amendment; ``None``: every form, e.g. the periodic reports an accession is looked up
-    in for its acceptance time)."""
+    wanted (``None``: the recent block only); ``forms``: the form types kept (default
+    ``FILING_FORMS``; ``None``: every form, e.g. the periodic reports an accession is looked up in
+    for its acceptance time)."""
 
     since: date | None = None
-    forms: tuple[str, ...] | None = ("8-K", "8-K/A")
+    forms: tuple[str, ...] | None = FILING_FORMS
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -116,6 +116,7 @@ def run_etf_holdings(ctx: TaskContext, p: Params) -> RunRecord:
         ctx.settings.etf.keep_top,
         ctx.settings.etf.fallback_scope,
         fallback_min_adv_usd=ctx.settings.etf.fallback_min_adv_usd,
+        daily_funds=ctx.settings.etf.daily_funds,
     )
     limit = p.get("limit")
     if limit is None and p.get("nightly") and ctx.settings.etf.per_night > 0:
