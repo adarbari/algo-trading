@@ -3,6 +3,12 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
 
 - ``excess_return``: ``value = fwd_excess_return - cost_bps / 1e4`` (a round trip, charged
   once); a hit is ``value > 0``.
+- ``excess_return`` with ``measure = "residual_return"`` (EB H11): ``fwd_residual_return`` (the
+  return left after the ETF factor loadings known before S, factor-neutral) replaces
+  ``fwd_excess_return`` everywhere, the short side's included. It comes from
+  ``outcomes/instrument/residual_returns@v1`` (``attach_residuals``); a name the factors or betas
+  cannot cover, or with no stored residual row, is UNMEASURED with its reason: excluded as
+  ``UNMEASURED``, never a miss and never the excess return in its place.
 - ``hit_target``: ``value`` is the ``measure`` (the net excess return, or ``fwd_realised_vol``
   over the implied vol at S, ``IMPLIED_VOL_FIELD``); a hit is ``value < target`` for
   ``below`` and ``value > target`` for ``above`` (equal is a miss).
@@ -48,7 +54,7 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
-from algotrade.config.edges.document import Edge
+from algotrade.config.edges.document import EXCESS_MEASURES, Edge
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.quant.black_scholes import (
     atm_straddle_price,
@@ -89,6 +95,16 @@ RESULT_COLUMNS = (
 def is_return(edge: Edge) -> bool:
     """Whether the outcome's value is the net excess return (``apply_outcome``'s own test)."""
     return edge.outcome.is_return
+
+
+def needs_residual(edge: Edge) -> bool:
+    """Whether the outcome reads the residual-returns grain (a factor-neutral return)."""
+    return edge.outcome.measure in EXCESS_MEASURES
+
+
+def _gross_field(edge: Edge) -> str:
+    """The stored return field a return outcome measures (and its short side is minus)."""
+    return "fwd_residual_return" if needs_residual(edge) else "fwd_excess_return"
 
 
 def needs_implied_vol(edge: Edge) -> bool:
@@ -226,7 +242,7 @@ def _short_value(edge: Edge, outcomes: pd.DataFrame, counted: np.ndarray) -> np.
     if o.side == "long":
         return np.full(len(outcomes), np.nan)
     horizon = _numbers(outcomes, "horizon_sessions")
-    gross = _numbers(outcomes, "fwd_excess_return")
+    gross = _numbers(outcomes, _gross_field(edge))
     value = -gross - (o.cost_bps or 0.0) / 1e4 - borrow_cost(o.borrow_bps_annual, horizon)
     return np.where(counted, value, np.nan)
 
@@ -238,6 +254,15 @@ def short_view(res: pd.DataFrame) -> pd.DataFrame:
     out["value"] = out["oriented"] = out["short_value"]
     out["hit"] = out["short_hit"] & (out["excluded"] == "")
     return out
+
+
+def _unmeasured(edge: Edge, outcomes: pd.DataFrame) -> np.ndarray:
+    """The rows with no measurement: an UNMEASURED forward row, or, for a residual outcome, an
+    UNMEASURED residual row too (the residual grain's own status: no factor-neutral return)."""
+    mask = (outcomes["outcome_status"] == "UNMEASURED").to_numpy()
+    if needs_residual(edge):
+        mask = mask | (outcomes["residual_status"] == "UNMEASURED").to_numpy()
+    return mask
 
 
 def apply_outcome(
@@ -270,14 +295,20 @@ def apply_outcome(
     elif o.kind == "option_model_pnl":
         value = _model_outcome(edge, outcomes, implied, excluded)
     elif is_return(edge):
-        value = _numbers(outcomes, "fwd_excess_return") - (o.cost_bps or 0.0) / 1e4
+        if needs_residual(edge) and "residual_status" not in outcomes.columns:
+            raise ConfigurationError(
+                f"{edge.id}: a residual_return outcome needs the residual-returns rows "
+                f"(attach_residuals), which this read did not attach"
+            )
+        value = _numbers(outcomes, _gross_field(edge)) - (o.cost_bps or 0.0) / 1e4
         excluded[~np.isfinite(value)] = MISSING_VALUE
     elif o.measure == "realised_to_implied_vol":
         value = _vol_ratio(edge, outcomes, implied, excluded)
     else:
         raise ConfigurationError(f"{edge.id}: no measure {o.measure!r}")
-    unmeasured = (outcomes["outcome_status"] == "UNMEASURED").to_numpy()
-    excluded[unmeasured] = UNMEASURED  # before any other reason: there is no row to read
+    excluded[_unmeasured(edge, outcomes)] = (
+        UNMEASURED  # before any other reason: there is no row to read
+    )
     counted = excluded == ""
     if otm_hit is not None:
         hit = otm_hit

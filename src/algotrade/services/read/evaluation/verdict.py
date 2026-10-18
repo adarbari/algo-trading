@@ -554,6 +554,12 @@ class EdgeFacts:
     base: str = ""  # the edge's base: ``out_of_window`` words the decile t as a Welch t
     site_trials: Callable[[], int] | None = None  # the variants tried across every site
     # edge, read when the haircut is (None: not counted)
+    neutral: bool = False  # the outcome is a residual return: market, size, momentum, value gone
+
+
+def is_factor_neutral(edge: Edge) -> bool:
+    """Whether the edge's outcome is a residual return (EB H11): the verdict says so."""
+    return edge.settings is not None and edge.settings.factor_neutral
 
 
 def counts_wins(edge: Edge) -> bool:
@@ -642,7 +648,10 @@ def _judge_one(
     oos, whole = c.oos, c.whole
     pts = runs.lift_points(oos.hit_rate, oos.base_rate)
     basis = _basis_words((c.variant, c.horizon))
-    held = " (short leg)" if oos.side == "short" else ""
+    tags = ["short leg"] if oos.side == "short" else []
+    if facts.neutral:  # the figure is the return left after the ETF factor loadings
+        tags.append("factor-neutral: market, size, momentum and value taken off")
+    held = f" ({', '.join(tags)})" if tags else ""
     body = (
         f"Out-of-sample, {basis}: the book beat {facts.benchmark} in {_pct(oos.hit_rate)} of "
         f"sessions, a mean excess return of {_ret(oos.mean_excess_picks)}."
@@ -958,6 +967,7 @@ def load_edge_verdict(ctx: Stores, edge: Edge) -> EdgeVerdict:
             wins=counts_wins(edge),
             portfolio=edge.settings is not None and edge.settings.kind == PORTFOLIO_KIND,
             benchmark=benchword(edge.settings.benchmark) if edge.settings is not None else "",
+            neutral=is_factor_neutral(edge),
             base=edge.base,
             site_trials=None if edge.mine else lambda: runs.load_site_trials(ctx),
         ),

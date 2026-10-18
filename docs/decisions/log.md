@@ -627,6 +627,22 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the owner CIK is an SEC public identifier the data set is keyed on; a hash buys nothing (the hash of a public id is trivially reversible against EDGAR) and loses the join to later filings, amendments (4/A) and the deep-dive dossier. Officer title is attribute data a cluster-buy edge weighs (CEO / CFO buys vs. director buys), stored as filed with no name. The cluster-insider-buy edge needs a distinct-insider count, so a stable per-person key is functionally required. Data never enters the public repo (store is local, git-ignored); the read model serves aggregates. Precedent: ADR 0040 keeps emails (private personal data) out of the repo, not public filing data out of the store. Erasure and shorter retention are owner-only decisions (log 2026-10-11), so the default event retention stands until the owner says otherwise.
 
+## 2026-10-18 | EB H11 (residual returns) | Betas read before S, sector term, no nightly step yet
+- Question: which session's betas measure a window's residual, what to do with the sector loading, and does the task join the nightly workflow in this PR?
+- Options: betas at D / at the session before S / at S; the four-factor residual only / add the sector term where `beta_sector` is set (two fits' betas) / a single five-factor fit; a nightly step now / the task and its backfill command first.
+- Decision: the betas of `previous_session(S)` (exact partition, never an older one), the sector SPDR term only where `beta_sector` is set (the brief's rule, with the two-fit mix stated in the ADR), the task registered with its backfill command and no workflow step in this PR; the leg-reuse stamps do not cover the residual partitions (ADR 0053 amendment, limit a).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the session before S is D for the usual offset of 1 and never holds a window return for a larger one; the sector term is what the plan lists, and the mixed-fit inconsistency is small and visible; a nightly step needs the workflow-step tests and a real-store cost measurement the PR cannot run.
+
+## 2026-10-18 | EB H11 (residual returns) review | Four-factor betas only, stamps, nightly step, settlement
+- Question: how to resolve the architect's four findings on the residual-returns grain (sector counted twice, stale legs, no nightly step, settlement raising for a residual edge)?
+- Options: sector from `beta_sector` / drop it until a five-beta `factor_betas@v2`; leave the stamps / add the residual partitions to them; follow-up step / the step now; attach residuals in settlement / catch the error per edge.
+- Decision: residual on the four-factor betas only (market, size, momentum, value; a `factor_betas@v2` with all five betas of one fit is needed for sector; this supersedes the 2026-10-18 entry's sector choice); the stamps cover the residual partitions when a plan measures them (combined sequence and `knowledge_ts`); the optional nightly step `residual-returns` with an acceptance check; settlement attaches the residual rows, an unstored one waits and is skipped with a reason after the grace window.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the stored sector slope is from a different fit than the other four, so adding it counts sector exposure twice; a leg stored before the backfill must not stand for ever; an unscheduled grain goes stale; one residual edge must not stop every followed edge's settlement.
+
 ## 2026-10-18 | EB H5b (time-series base) | How a window edge is declared and judged
 - Question: how does a raw-return, named-instrument edge fit the edge document and the verdict without a new outcome kind or stored column?
 - Options: a new outcome kind `raw_return` and a new `edge_eval` column for the timing Sharpe / keep `excess_return` over benchmark `none` (legal only with `base = "out_of_window"`), named instruments as one `instrument.symbol in [...]` rule, the Welch t in the verdict's existing t slot and the timing Sharpe in the run record.
@@ -650,6 +666,14 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: a rising instrument would otherwise pass Works on drift alone; the paired difference removes the instrument's drift without a model.
+
+## 2026-10-18 | EB E3 (event edges and avoid lists) | Short-side edges, a delayed tender entry, and what is filed blocked
+- Question: how are the avoid-list edges tested, how is a tender offer's "after expiry" entry expressed, and what happens to ideas whose event class or data is missing?
+- Options: avoid lists as a long edge read for a negative lift / as `side = "short"` (O2); tender entry at the filing / 21 sessions after it / wait for an expiry field; missing classes skipped / filed `blocked` with the reason / classes added in this PR.
+- Decision: 8-K Item 4.02 and NT late filers are `side = "short"` edges over event names, ranked by dollar volume (the harness's short leg takes the lowest scores, so the screeners order ascending and the most liquid filer is shorted first); the tender edge enters 21 sessions after the filing (a tender offer stays open at least 20 business days; the expiry date is not stored, extensions enter early, and SC TO-T joins SC TO-I in one column); spinoff_drift, reverse_split_distress_filter and thematic_etf_launch_fade are filed `blocked` with what is missing (the classes spinoff, reverse_split and etf_launch in `EVENT_CLASSES` and `EVENT_FIELDS`, which this PR does not touch); `eight_k_item_flag` flags 4.02, 4.01 and 5.02 within 20 sessions for the avoid screen while the edge tests 4.02 only; `earnings_gap_volume@v1` adds the last report's volume ratio (the four-report mean in `earnings_reaction@v1` is a habit of the name, not the event).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a long edge reads an avoid list's confirmation as a negative lift (Not working), the short side states the same claim so that it passes; a dense-score short leg over a universe fills up with unflagged names when few are flagged, so a non-event schedule cannot test a small flagged set; entering at the filing would trade the offer's own period, not the post-expiry dip the thesis is about; a blocked document keeps the thesis, the bar and the missing pieces on file without a placeholder passing as a test.
 
 ## 2026-10-18 | EB H10 (portfolio outcomes) | What a book is judged on and how it is built
 - Question: how is an allocation edge (a weighted book against a blended benchmark) measured, and what do Promising and Works rest on when there is no base rate over names?

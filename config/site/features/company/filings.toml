@@ -1,0 +1,10 @@
+# Expression features over the SEC filing events (ADR 0050; edge eight_k_item_drift, EB E3).
+
+[eight_k_item_flag]
+expr = "if(exists(filing_events), min(coalesce(filing_events.sessions_since_8k_4_02, 9999), coalesce(filing_events.sessions_since_8k_4_01, 9999), coalesce(filing_events.sessions_since_8k_5_02, 9999)) <= within_sessions, null)"
+params = { within_sessions = 20 }  # sessions since the filing became known: about a month
+dtype = "bool"
+unit = "flag"
+description = "An 8-K with Item 4.02 (non-reliance on prior financials), 4.01 (a change of auditor) or 5.02 (an officer or director departure) became known in the last 20 sessions (params.within_sessions); the filing counts from the first session whose close follows its SEC acceptance"
+null_meaning = "the instrument has no row in filing_events (no tracked 8-K item, late-filing notice or tender offer became known in the last 60 sessions, or no filings backfill reaches the session): never read as no 8-K"
+version = 1

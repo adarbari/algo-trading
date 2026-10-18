@@ -17,6 +17,7 @@ from algotrade.services.evaluation.forward.settle import outcome_hash
 from algotrade.services.evaluation.forward.signals import advance
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.edge_schemas import EDGE_PAPER
+from algotrade.storage.tables.schemas import RESIDUAL_RETURNS
 from tests.helpers.stored_frames import stamped
 from tests.unit.services.evaluation.cross_section.conftest import (
     DAYS,
@@ -445,3 +446,50 @@ def test_a_long_outcome_hashes_as_it_did_before_sides() -> None:
     short = edge(outcome={"kind": "excess_return", "horizon_sessions": [2], "benchmark": "SPY",
                           "start_offset_sessions": 1, "side": "short"}, top_k=5)  # fmt: skip
     assert outcome_hash(short) != outcome_hash(edge())
+
+
+RESIDUAL = {
+    "kind": "excess_return", "measure": "residual_return", "horizon_sessions": [2],
+    "benchmark": "SPY", "start_offset_sessions": 1,
+}  # fmt: skip
+
+
+def _residuals(d: Desk, day: date) -> None:
+    rows = [
+        {
+            "instrument_id": iid, "ts": pd.Timestamp(f"{day}T20:00Z"), "horizon_sessions": 2,
+            "window_end": day, "beta_session": day, "outcome_status": "COMPLETE",
+            "fwd_residual_return": 0.5 * (i - 9.5) / 100, "fwd_factor_return": 0.0,
+        }
+        for i, iid in enumerate(IDS)
+    ]  # fmt: skip
+    d.world.writer.write_table(
+        RESIDUAL_RETURNS,
+        day,
+        f"res-{day}",
+        stamped(rows, day, f"res-{day}", NOW - timedelta(days=1)),
+    )
+
+
+def test_a_residual_edge_settles_on_the_residual_rows_not_the_excess_return() -> None:
+    d = desk(**{"outcome": RESIDUAL})
+    _residuals(d, BUY)
+    night(d, DAYS[0])
+    result, _ = night(d, SELL)
+    assert result.settled == {"drift": 5}
+    top = book(d).query("signal_session == @DAYS[0]").set_index("instrument_id").loc["EQ:N19"]
+    assert top["status"] == "won" and top["excess_return"] == 0.0475  # 0.5 x 9.5%, not 9.5%
+
+
+def test_a_residual_edge_without_residual_rows_waits_and_never_stops_the_settlement() -> None:
+    d = desk(**{"outcome": RESIDUAL})
+    night(d, DAYS[0])
+    result, _ = night(d, SELL)  # no ConfigurationError: the trades just stay open
+    assert result.settled == {} and set(book(d).query("signal_session == @DAYS[0]")["status"]) == {
+        "open"
+    }
+    late = SELL + timedelta(days=14)
+    night(d, late)
+    skipped = book(d, until=late).query("signal_session == @DAYS[0]")
+    assert set(skipped["status"]) == {"skipped"}
+    assert set(skipped["reason"]) == {"no residual return stored for its window"}

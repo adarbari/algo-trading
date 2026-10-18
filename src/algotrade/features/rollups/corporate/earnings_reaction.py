@@ -36,6 +36,7 @@ counted reports. The windows (two sessions, 20, four reports,
 """
 
 from bisect import bisect_left, bisect_right
+from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import cache
 from typing import Any
@@ -148,6 +149,17 @@ def _share(numerator: float, denominator: float) -> float:
     return numerator / denominator
 
 
+def window_share(grid: list[date], dollar: Matrix, column: int, report: date) -> float:
+    """``report``'s window mean dollar volume over its pre-event 20-session dollar volume (NaN:
+    the window is off the grid, a bar is missing or the history is short)."""
+    w = _window(grid, report)
+    if w is None:
+        return np.nan
+    return _share(
+        float(_mean(dollar[w[0] : w[1] + 1, [column]])[0]), _pre_adv(dollar, column, w[0])
+    )
+
+
 def _one_per_quarter(reports: list[date]) -> list[date]:
     """Newest first, keeping the earliest of reports less than ``SAME_QUARTER`` apart (the
     calendar listed one quarter twice: a moved date)."""
@@ -168,17 +180,7 @@ def _row(
     move = _share(float(px[after, column]), float(px[before, column])) - 1.0
     market = np.nan if spy is None else _share(float(px[after, spy]), float(px[before, spy])) - 1.0
     excess = move - market
-    ratios = []
-    for report in reports[:REPORTS]:
-        w = _window(grid, report)
-        if w is None:
-            ratios.append(np.nan)
-            continue
-        ratios.append(
-            _share(
-                float(_mean(dollar[w[0] : w[1] + 1, [column]])[0]), _pre_adv(dollar, column, w[0])
-            )
-        )
+    ratios = [window_share(grid, dollar, column, report) for report in reports[:REPORTS]]
     ratio = float(np.mean(ratios)) if len(reports) >= REPORTS else np.nan
     return {
         "reaction_excess_return": excess,
@@ -189,7 +191,25 @@ def _row(
     }
 
 
-def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
+@dataclass(frozen=True)
+class Reactions:
+    """What a reaction read needs at one session: the ``grid`` of sessions, the close and dollar
+    volume matrices (``px``, ``dollar``), each instrument's column, SPY's column (None: no
+    SPY bar) and each counted instrument's reports, newest first."""
+
+    grid: list[date]
+    px: Matrix
+    dollar: Matrix
+    ids: npt.NDArray[np.str_]
+    column_of: dict[str, int]
+    spy: int | None
+    by_report: dict[str, list[date]]
+
+
+def read_reactions(inputs: Inputs, session: date) -> Reactions:
+    """The counted reports (known by the session, one per quarter, window on the grid) with the
+    price and volume matrices around them: the one rule ``earnings_reaction@v1`` and the groups
+    that read the same window (``earnings_gap_volume@v1``) share."""
     stored, bars = inputs[earnings.EVENTS], inputs[BARS]
     assert stored is not None and bars is not None  # required inputs
     if earnings.KNOWN_FROM in stored.columns:  # the loader's rule, kept here for the invariant
@@ -200,18 +220,30 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     px = panel(bars, grid)
     column_of = {iid: i for i, iid in enumerate(px.ids)}
     spy = symbol_column(inputs[SYMBOLS], px.ids)
-    dollar = px.close * px.volume
     # the newest report (one per quarter) counts once its reaction window (E-1 .. E+1) is on
     # the grid: E+1 on or before the session, E-1 inside the lookback
     by_report = {
         str(iid): _one_per_quarter(list(g["report"])) for iid, g in rows.groupby("instrument_id")
     }
     by_report = {i: r for i, r in by_report.items() if _window(grid, r[0]) is not None}
+    return Reactions(grid, px.close, px.close * px.volume, px.ids, column_of, spy, by_report)
+
+
+def window_ratio(read: Reactions, iid: str, report: date) -> float:
+    """The window's mean dollar volume (E-1, E, E+1) over the pre-event 20-session dollar volume
+    of ``report`` for ``iid``; NaN when a bar is missing or the history is short."""
+    return window_share(read.grid, read.dollar, read.column_of[iid], report)
+
+
+def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
+    read = read_reactions(inputs, session)
+    grid, px, dollar, spy = read.grid, read.px, read.dollar, read.spy
+    column_of, by_report = read.column_of, read.by_report
     out = []
-    for traded in px.ids[~np.isnan(px.close[-1])]:  # every instrument traded on the session
+    for traded in read.ids[~np.isnan(px[-1])]:  # every instrument traded on the session
         iid = str(traded)
         if iid in by_report:
-            values = _row(by_report[iid], grid, column_of[iid], px.close, dollar, spy)
+            values = _row(by_report[iid], grid, column_of[iid], px, dollar, spy)
             if pd.notna(values["reaction_excess_return"]):  # the ADV may be null: a filter's call
                 out.append({"instrument_id": iid, "reaction_status": OK, **values})
                 continue

@@ -6,7 +6,8 @@ from typing import Any
 
 import pytest
 
-from algotrade.config.edges.document import Edge, identity_dict, parse_edge
+from algotrade.config.edges.document import Edge, parse_edge
+from algotrade.config.edges.identity import identity_dict
 from algotrade.config.edges.portfolio import (
     CASH,
     benchmark_words,

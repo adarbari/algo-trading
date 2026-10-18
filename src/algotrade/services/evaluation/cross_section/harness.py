@@ -46,12 +46,11 @@ from algotrade.config.edges.document import (
     MAIN,
     Edge,
     Outcome,
-    identity_dict,
     job_name,
 )
+from algotrade.config.edges.identity import LONG, LONG_SHORT, identity_dict
 from algotrade.config.edges.named import OUT_OF_WINDOW
 from algotrade.config.edges.portfolio import PORTFOLIO_KIND
-from algotrade.config.edges.sides import LONG, LONG_SHORT
 from algotrade.config.site.settings import load_verdict
 from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.schema import MODEL_IMPL, Selection, parse_selection
@@ -85,6 +84,7 @@ from algotrade.services.evaluation.cross_section.hit import (
     IMPLIED_VOL_FIELD,
     is_return,
     needs_implied_vol,
+    needs_residual,
 )
 from algotrade.services.evaluation.cross_section.legs.key import (
     HARNESS_VERSION,
@@ -478,7 +478,7 @@ def evaluate_edge(
         stored,
         needs,
         as_of,
-        partial(_outcome_stamps, reader, as_of, _earnings_horizons(plans)),
+        partial(_outcome_stamps, reader, as_of, _earnings_horizons(plans), residual_plans(plans)),
         "requested" if full else None,
     )
     stats = _measure(reader, session, plans, variants, schedules, as_of, spec, reuse)
@@ -722,15 +722,25 @@ def _leg_rows(
 
 
 def _outcome_stamps(
-    reader: StoreReader, as_of: datetime, names_for: Collection[int], entries: Collection[date]
+    reader: StoreReader,
+    as_of: datetime,
+    names_for: Collection[int],
+    residuals: bool,
+    entries: Collection[date],
 ) -> tuple[
     dict[tuple[date, int], datetime], dict[tuple[date, int], frozenset[str]], dict[date, int]
 ]:
     """What reuse asks of the outcome partitions of ``entries``: per (S, horizon) the latest
     ``knowledge_ts`` known by ``as_of`` with the names of those rows, and per S the commit
     sequence (the harness is the one reader of outcomes)."""
-    known, names = outcome_stamps(reader, entries, as_of, names_for=names_for)
-    return known, names, outcome_seqs(reader, entries)
+    known, names = outcome_stamps(reader, entries, as_of, names_for=names_for, residuals=residuals)
+    return known, names, outcome_seqs(reader, entries, residuals)
+
+
+def residual_plans(plans: Sequence[_Plan]) -> bool:
+    """Whether any plan measures a residual return: the stamps then cover the residual
+    partitions too (a backfill of them re-measures the legs that held ``NO_RESIDUAL_ROW``)."""
+    return any(needs_residual(p.scope.edge) for p in plans)
 
 
 def _earnings_horizons(plans: Sequence[_Plan]) -> frozenset[int]:

@@ -714,3 +714,13 @@ def test_the_in_sample_basis_of_several_books_is_the_one_with_the_larger_mean_ex
     ]
     choice = choose_basis(rows, T)
     assert choice.key == ("scr2", 20) and "scr2" not in choice.reason
+
+
+def test_a_residual_return_verdict_says_the_figure_is_factor_neutral() -> None:
+    v = judge("e", result(), SPLIT, T, facts=EdgeFacts(neutral=True))
+    assert "factor-neutral" in v.headline
+    assert "factor-neutral" not in verdict(result()).headline
+    both = judge(
+        "e", [replace(r, side="short") for r in result()], SPLIT, T, facts=EdgeFacts(neutral=True)
+    )
+    assert "(short leg, factor-neutral" in both.headline
