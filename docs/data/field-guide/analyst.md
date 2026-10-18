@@ -441,3 +441,57 @@ Sources: Damodaran, Investment Valuation: expected growth in revenues and analys
 - A wide gap between the highest and the lowest target means analysts disagree: check rollup.analyst_targets@v1.target_high and rollup.analyst_targets@v1.target_low.
 
 Sources: Brav and Lehavy (2003), An empirical analysis of analysts' target prices, Journal of Finance; Financial Modeling Prep price-target consensus, stored nightly in analyst/estimate_snapshots (docs/adr/0068-analyst-data-vendors.md)
+
+### `feature.ev_ebit`
+
+**How to read it.** Enterprise value divided by operating income over the last twelve months: 12 means the whole business, debt included, costs twelve years of operating profit before interest and tax. Low is cheap: under 8 is cheap against most of the market, over 25 expensive. It sees through debt and depreciation, unlike a price-to-earnings.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| cheap against operating profit | `lt 10` | soft | 2 | a loss-making company has no multiple, so a hard rule drops it |
+
+**When the reading lies**
+
+- Null for a loss: a company with no positive EBIT has no multiple, so a hard 'lt 10' drops every unprofitable name. A bank, broker or insurer has no EBIT either (see feature.ev_ebitda for the same gap).
+- A cyclical company at a profit peak looks cheap right before earnings fall. Compare it with its own history as well as with other names.
+- A stale income statement gives null (rollup.income_statement@v2.is_status STALE). Enterprise value uses today's price against a statement up to four months old.
+
+Sources: Loughran and Wellman (2011), New evidence on the relation between the enterprise multiple and average stock returns, JFQA 46
+
+### `rollup.earnings_date_shift@v1.earnings_shift_known_date`
+
+**How to read it.** The session the next report date was first stored in a calendar known by the session: when the market could first have seen that the date had moved. A date that moved a week later and first appeared on the 3rd is known from the 3rd, even if the move was decided earlier. It is set only for a date at least 7 days from the same weekday a year ago.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| names whose report date moved by a week or more | `not_null` | hard | - | null means the date did not move, or no year-ago report to compare with |
+
+**When the reading lies**
+
+- The history starts with the first stored calendar snapshot. A date first stored then says nothing about when it became known (vendor backfills carry no time), so it is never an event.
+- Dates are the calendar's scheduled ones; the Nasdaq calendar does not confirm a date, so a move can be an estimate being revised, not a decision.
+- Null with no next date, no report a year ago to compare with, or a shift under 7 days.
+
+Sources: Site convention over the stored earnings calendars (ADR 0050)
+
+### `rollup.earnings_date_shift@v1.sessions_since_earnings_shift`
+
+**How to read it.** Exchange sessions from the session the shifted report date became known up to the session: 0 means it became known today; 5 is a week ago. It measures how fresh the news of the move is; the event reads best in the first sessions after it.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a report date that moved in the last five sessions | `lte 5` | hard | - | the news is freshest in the first sessions after the move |
+
+**When the reading lies**
+
+- Null without a shift of at least 7 days (rollup.earnings_date_shift@v1.earnings_shift_direction null), so a hard criterion drops every name with a normal date.
+- A later date resets the count if the date moves again, so a name whose date keeps changing shows small values for the wrong reason; check rollup.earnings_date_shift@v1.earnings_shift_known_date.
+- The date is scheduled, not confirmed; the report can still move. With few shifted names in a window the evidence is thin.
+
+Sources: Site convention over the stored earnings calendars (ADR 0050)
