@@ -273,8 +273,8 @@ def _assets_a_year_ago(
     book_by_id: dict[str, Book], as_of: pd.Series, ids: pd.Index, p: MispricingParams
 ) -> pd.Series:
     """Per instrument the Assets instant ending nearest to ``as_of`` minus a year, within the
-    tolerance (NaN when none): the facts are already limited to filings on or before the
-    session, so a restatement filed later is never read."""
+    tolerance (NaN when none): the facts are already limited to filings accepted by the
+    session, so a restatement accepted later is never read."""
     out = pd.Series(np.nan, index=ids, dtype=float)
     for iid in ids:
         end = as_of.get(iid)

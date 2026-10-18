@@ -756,7 +756,7 @@ Sources: Financial Modeling Prep analyst estimates and price-target consensus, s
 - It is not Stambaugh, Yu and Yuan's composite: four of their eleven anomalies are missing. Composite equity issuance and investment-to-assets need cash-flow detail we do not store. Financial distress needs returns and volatility. Momentum lives in the price fields. rollup.mispricing@v1.composite_inputs says how many of the seven an instrument's rank averages; a rank on five is less reliable than one on seven.
 - Missing is left out, never filled. An anomaly a company cannot report (an untagged debt line, no gross profit) drops out of its own mean. Fewer than five of seven gives null. A hard criterion therefore drops those names rather than passing them.
 - A rank is relative to the session's cross-section, so it moves when other names move and carries no level. It uses all instruments with statements, across industries and sizes; banks, brokers and insurers have most inputs null and are usually unranked.
-- Statement figures enter on their filing date. A rank can be up to four months stale for a company that has not filed lately. rollup.balance_sheet@v2.bs_as_of shows how old the balance sheet is. Individual anomalies have decayed since publication (accruals especially); the composite holds up better, and it is also the benchmark any other cross-sectional edge has to beat.
+- Statement figures enter from the session after SEC acceptance of the filing. A rank can be up to four months stale for a company that has not filed lately. rollup.balance_sheet@v2.bs_as_of shows how old the balance sheet is. Individual anomalies have decayed since publication (accruals especially); the composite holds up better, and it is also the benchmark any other cross-sectional edge has to beat.
 
 Sources: Stambaugh, Yu and Yuan (2015), Journal of Finance 70(5); docs/edge-ideas/altdata-text-ml.md (composite_mispricing_score)
 
@@ -775,7 +775,7 @@ Sources: Stambaugh, Yu and Yuan (2015), Journal of Finance 70(5); docs/edge-idea
 - QMJ-like, not QMJ. It omits Asness, Frazzini and Pedersen's growth (five-year changes), payout (buybacks, dividends, accruals) and low-beta parts. It uses one year of data with no stability measure. It ranks across industries, so an asset-light software firm outranks a utility on margins. It weights the six measures equally.
 - Needs at least four of the six measures. Gross margin is missing for the many filers that do not tag GrossProfit. Debt to equity is missing for those with negative equity or untagged debt. A score therefore rests on different measures for different names. Missing is dropped, never counted as zero; a hard criterion drops names with too few.
 - Banks and insurers are scored on the measures they report (return on equity and assets, net margin) and their debt to equity is not comparable; read them separately.
-- Statement figures enter on their filing date and can be four months old; the score is relative to the session's cross-section and has no level.
+- Statement figures enter from the session after SEC acceptance of the filing and can be four months old; the score is relative to the session's cross-section and has no level.
 
 Sources: Asness, Frazzini and Pedersen (2019), Review of Accounting Studies 24(1), Quality Minus Junk; docs/edge-ideas/cross-sectional.md (momentum_x_quality_interaction)
 
@@ -792,7 +792,7 @@ Sources: Asness, Frazzini and Pedersen (2019), Review of Accounting Studies 24(1
 **When the reading lies**
 
 - An acquisition or a financing round can double assets overnight without any organic growth; nothing here separates them. Check rollup.balance_sheet@v2.total_assets and the filings.
-- The year-ago figure is the balance sheet ending within 40 days of the latest one's date minus 365 days, as restated by any filing made by the session. A company with less than a year of filings, or a gap, is null.
+- The year-ago figure is the balance sheet ending within 40 days of the latest one's date minus 365 days, as restated by any filing accepted by the session. A company with less than a year of filings, or a gap, is null.
 - Rate of change of a size measure: a small company swings more than a large one. Banks and insurers grow assets by lending and are not comparable.
 
 Sources: Cooper, Gulen and Schill (2008), Journal of Finance 63(4), Asset Growth and the Cross-Section of Stock Returns
