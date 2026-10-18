@@ -1,0 +1,4 @@
+# L3 site setting: the field guide (ADR 0041), the analyst theme: how to read the analyst
+# consensus fields (ratings, price targets, estimate revisions, the forward formulas over them).
+# Entries arrive with the analyst feature groups; the keys and the rules each entry follows are in
+# the header of momentum.toml. A theme file with no [[field]] yet renders no page.
