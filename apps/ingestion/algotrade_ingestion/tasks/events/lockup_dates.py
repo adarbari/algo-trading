@@ -1,10 +1,8 @@
 """The date rules of ``events/ipo_lockup`` (ADR 0050, edge build D8), pure and calendar-only.
 
-- **Acceptance session** (``acceptance_session``): the New York date of the 424B4's acceptance,
-  the one ``known_from`` rule of the ``events/filing`` rows (an acceptance after the close was
-  public that evening, so it is that day's session); a date that is no exchange session (EDGAR
-  accepts nothing on a weekend or holiday, so this guards a bad clock) moves to the next session,
-  never earlier.
+- **Acceptance session** (``acceptance_session``): ``core.time.calendar.acceptance_session``, the
+  repo's one rule for an SEC acceptance: the first session whose close is after the instant (an
+  acceptance at or after 16:00 New York, on a weekend or a holiday counts from the next session).
 - **Lock-up end** (``restriction_end``): ``prospectus_date`` + the term. A term in days adds
   calendar days; one in months adds calendar months (the day clamped to the month's last day).
   ``lockup_days`` is the days between the two dates, so a "six months" term is the exact count
@@ -23,15 +21,15 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 
-from algotrade.core.time.calendar import exchange_date, is_session, next_session
+from algotrade.core.time.calendar import acceptance_session as core_acceptance_session
+from algotrade.core.time.calendar import exchange_date, next_session
 
 DAYS, MONTHS = "days", "months"
 
 
 def acceptance_session(accepted: pd.Timestamp) -> date:
     """The session ``accepted`` (an aware instant) is known from (module doc)."""
-    day = exchange_date(accepted.to_pydatetime())
-    return day if is_session(day) else next_session(day)
+    return core_acceptance_session(accepted.to_pydatetime())
 
 
 def restriction_end(start: date, n: int, unit: str) -> date:

@@ -6,7 +6,7 @@ from datetime import date
 
 import pandas as pd
 
-from algotrade.features.rollups.corporate import index_changes as ic
+from algotrade.features.rollups.events import index_changes as ic
 
 SESSION = date(2026, 10, 9)  # a Friday
 

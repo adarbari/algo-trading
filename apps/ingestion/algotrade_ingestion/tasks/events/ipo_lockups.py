@@ -16,19 +16,24 @@ a fact the text does not state is null with ``extraction`` and ``reason``, never
 that is not an IPO (a follow-on, a note offering) is stored too, ``NOT_IPO``: it is not read twice.
 
 **The row** (``events/ipo_lockup``, one per ``cik`` + ``accession``): ``ts`` the acceptance
-instant; ``known_from`` the New York session of the acceptance (``lockup_dates``); ``lockup_days``
+instant; ``known_from`` the session of the acceptance (``core.time.calendar.acceptance_session``:
+an after-close acceptance counts from the next session); ``lockup_days``
 and ``lockup_expiry`` from the prospectus date and the term (``lockup_dates``: the first session
 after the last restricted day), both null unless ``extraction`` is ``EXTRACTED`` and the text has a
-prospectus date. ``instrument_id`` is the universe instrument of the issuer's CIK in the run
-session's snapshot (``instruments/company``; of several share classes the one whose symbol is the
-prospectus ticker, found through the ``SymbolResolver``), null while the CIK is in none. Each run
-also fills the id of a stored row whose CIK is now in the universe, without a fetch.
+prospectus date. ``instrument_id`` of a first version is always null: the backfill runs on
+today's universe while the row is known from an old session, so an id there would exist only for
+issuers that survived. Each run stages the id as a version of its own (``fill_instruments``,
+known from ``restated_known_from``, no fetch): the universe instrument of the issuer's CIK in the
+run session's snapshot (``instruments/company``; of several share classes the one whose symbol
+is the prospectus ticker, through the ``SymbolResolver``). A reader maps a CIK to an instrument
+through ``instruments/company`` as of its own session.
 
 **Versions** (point in time): a row first stored is known from its acceptance session whenever it
-is found (a backfill is not "known today"). A row read again whose values changed (the rules
-version moved, the id was found) is written as a new version with ``known_from`` = the later of
+is found (a backfill is not "known today"). A row read again whose facts changed
+(or whose id was found) is written as a new version with ``known_from`` = the later of
 its acceptance session and the session after the fetch's exchange date (``restated_known_from``:
-the run's own clock, never ``--until``); an identical row writes nothing. Readers keep the rows
+the run's own clock, never ``--until``); an identical row writes nothing, and one only the rules
+version moved for is restaged under its own ``known_from`` (no new version). Readers keep the rows
 known by their session and the latest of each key (``data.events.latest_versions``).
 
 **Runs**: with no ``--since`` the window is the 30 days before the session (the nightly: a
@@ -50,7 +55,7 @@ import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.instruments import pad_cik
-from algotrade.data.events import latest_versions
+from algotrade.data.events import ALL_TIME, latest_versions
 from algotrade.data.reference import companies, load_universe
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.events.lockup_dates import acceptance_session, restated_known_from
@@ -209,7 +214,6 @@ def _one(
     hit: Hit,
     since: date,
     held: dict[tuple[str, str], dict[str, Any]],
-    known: Issuers,
     sources: tuple[Submissions, Source],
 ) -> str:
     """Read one prospectus, stage its row (new or changed) -> the item status."""
@@ -228,15 +232,22 @@ def _one(
     assert normalized is not None
     facts = {str(k): v for k, v in normalized.parsed[IPO_FRAME].iloc[0].to_dict().items()}
     before = held.get((hit.cik, hit.accession))
-    ticker = facts["ticker"] if isinstance(facts["ticker"], str) else None
-    found_id = instrument_for(run, known, hit.cik, ticker) or (before or {}).get("instrument_id")
-    row = build_row(hit, accepted, document, facts, found_id)
+    # A first version carries no id: the universe is today's, the row is known from an old
+    # session. ``fill_instruments`` stages the id as a version of its own.
+    row = build_row(hit, accepted, document, facts, (before or {}).get("instrument_id"))
     if before is not None:
         if same_values(row, before):
-            return "UNCHANGED"
-        row["known_from"] = restated_known_from(row["known_from"], run.clock())
+            if before["rules_version"] == RULES_VERSION:
+                return "UNCHANGED"
+            row["known_from"] = before["known_from"]  # only the rules moved: not a restatement
+            status = "(rules)"
+        else:
+            row["known_from"] = restated_known_from(row["known_from"], run.clock())
+            status = "(changed)"
+    else:
+        status = ""
     run.stage(TABLE, f"{ACCESSION_PREFIX}{hit.accession}", as_frame([row]), "sec_edgar")
-    return f"OK: {row['extraction']}" + (" (changed)" if before is not None else "")
+    return f"OK: {row['extraction']} {status}".rstrip()
 
 
 def fill_instruments(
@@ -262,6 +273,21 @@ def fill_instruments(
         run.stage(TABLE, "ids", as_frame(rows), "sec_edgar")
         run.record_item("ids", f"OK: {len(rows)}")
     return len(rows)
+
+
+def filing_gap(run: IngestRun, hits: list[Hit], start: date, end: date) -> tuple[int, list[str]]:
+    """The 424B4 rows D1 stored in ``events/filing`` filed in ``start..end`` and the accessions
+    among them the search did not list (its recall gap, e.g. a "lockup" spelling)."""
+    frame = run.reader.table_range(
+        "events/filing", *ALL_TIME, columns=["accession", "form", "filing_date"]
+    )
+    if frame is None or frame.empty:
+        return 0, []
+    day = pd.to_datetime(frame["filing_date"]).dt.date
+    mine = frame[(frame["form"] == FORM) & (day >= start) & (day <= end)]
+    stored = set(mine["accession"].astype(str))
+    missing = sorted(stored - {h.accession for h in hits})
+    return len(stored), missing
 
 
 def ingest_ipo_lockups(
@@ -295,11 +321,12 @@ def ingest_ipo_lockups(
         for i, hit in enumerate(due, 1):
             run.attempt(
                 f"{ACCESSION_PREFIX}{hit.accession}",
-                partial(_one, run, hit, first[hit.cik], held, known, sources),
+                partial(_one, run, hit, first[hit.cik], held, sources),
             )
             if i % CHECKPOINT_EVERY == 0:
                 run.checkpoint()
         filled = fill_instruments(run, held, known, {h.accession for h in due})
+        in_filings, unlisted = filing_gap(run, hits, start, end)
         written = run.publish(TABLE, sort_by="accession")
         run.stats.update(
             since=start.isoformat(),
@@ -311,6 +338,9 @@ def ingest_ipo_lockups(
             read=len(due),
             universe_available=known.available,
             instruments_filled=filled,
+            filing_424b4_in_window=in_filings,
+            filing_424b4_not_listed=len(unlisted) if not failed_windows else None,
+            filing_424b4_not_listed_sample=unlisted[:20] if not failed_windows else [],
             rows=written,
             items=run.counts(),
         )

@@ -15,8 +15,9 @@ Text: tags dropped, entities decoded, whitespace collapsed. **Rules (``RULES_VER
 - ``is_ipo``: a strong marker of a first public offering (no public market for the stock
   before this offering, "this is our initial public offering"). A follow-on offering has none.
   Direct listings and spin-offs file no 424B4 and are out of scope.
-- ``prospectus_date``: ``Prospectus dated <Month D, YYYY>`` (the cover), else "the date of this
-  prospectus is ...". The lock-up clock runs from it (the pricing date; the first trade is
+- ``prospectus_date``: "the date of this prospectus is <Month D, YYYY>", else ``Prospectus dated
+  <Month D, YYYY>`` (the cover). The lock-up clock runs from it (the pricing date; the first
+  trade is
   usually the next session and is not taken from the prospectus).
 - ``offer_price``: the first dollar amount after "initial public offering price" (the cover
   table's per-share column), 0.5 to 5,000.
@@ -66,14 +67,20 @@ EXTRACTED, NOT_IPO, NO_LOCKUP = IPO_EXTRACTED, "NOT_IPO", "NO_LOCKUP"
 AMBIGUOUS, UNANCHORED, SPAC = "AMBIGUOUS", "UNANCHORED", "SPAC"
 DOMINANCE = 2  # the main term has at least this many times the next one's mentions
 EARLY_TEXT_CHARS = 400
-_NUMBERS = {
+_UNITS = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
-    "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "eighteen": 18,
+    "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+    "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
+    "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70,
+    "eighty": 80, "ninety": 90,
 }  # fmt: skip
-_COUNT = rf"(?P<n>\d{{1,3}}|{'|'.join(_NUMBERS)})"
-_ANCHOR = r"the\s+date\s+of\s+(?:this|the\s+final)\s+(?:final\s+)?prospectus"
+_WORD = "|".join([*sorted(_UNITS, key=len, reverse=True), "hundred"])
+_WORDS = rf"(?:{_WORD})(?:[\s-]+(?:and\s+)?(?:{_WORD}))*"
+# "180", "six", "one hundred eighty", or "one hundred eighty (180)" (the digits then win)
+_COUNT = rf"(?:(?P<w>{_WORDS})\s*\(\s*(?P<d>\d{{1,3}})\s*\)|(?P<n>\d{{1,3}}|{_WORDS}))"
+_ANCHOR = r"the\s+date\s+of\s+(?:this|the)\s+(?:final\s+)?prospectus"
 _TERM = re.compile(
-    rf"{_COUNT}[\s-]+(?P<unit>day|month|year)s?(?:[\s-]+(?:lock-?up\s+)?(?:restricted\s+)?period)?"
+    rf"\b{_COUNT}[\s-]+(?P<unit>day|month|year)s?(?:[\s-]+(?:lock-?up\s+)?(?:restricted\s+)?period)?"
     rf"(?:\s+(?:immediately\s+)?(?:after|from|following|beginning\s+on|commencing\s+on|"
     rf"starting\s+on)\s+{_ANCHOR})",
     re.IGNORECASE,
@@ -89,10 +96,10 @@ _IPO = re.compile(
     re.IGNORECASE,
 )
 _SPAC = re.compile(r"blank\s+check\s+company", re.IGNORECASE)
-_DATED = re.compile(
-    r"prospectus\s+dated\s+(?P<d>[A-Z][a-z]+\.?\s+\d{1,2},\s+\d{4})"
-    r"|the\s+date\s+of\s+this\s+prospectus\s+is\s+(?P<e>[A-Z][a-z]+\.?\s+\d{1,2},\s+\d{4})",
-    re.IGNORECASE,
+_ON = r"(?P<d>[A-Z][a-z]+\.?\s+\d{1,2},\s+\d{4})"
+_DATED = (  # the explicit statement first, then the cover's "Prospectus dated ..."
+    re.compile(rf"the\s+date\s+of\s+this\s+prospectus\s+is\s+{_ON}", re.IGNORECASE),
+    re.compile(rf"prospectus\s+dated\s+{_ON}", re.IGNORECASE),
 )
 _PRICE = re.compile(
     r"initial\s+public\s+offering\s+price(?:\s+(?:of|is|was))?(?:\s+per\s+\w+)?[\s:.]*\$\s*"
@@ -125,8 +132,20 @@ def plain_text(payload: bytes) -> str:
     return " ".join(html.unescape(_TAGS.sub(" ", text)).replace("\xa0", " ").split())
 
 
-def _count(raw: str) -> int:
-    return int(raw) if raw.isdigit() else _NUMBERS[raw.lower()]
+def words_to_int(words: str) -> int:
+    """``"one hundred eighty"`` -> 180 (a sum of the unit words, "hundred" multiplying)."""
+    total = 0
+    for token in re.split(r"[\s-]+", words.lower()):
+        if token == "hundred":
+            total = (total or 1) * 100
+        elif token in _UNITS:
+            total += _UNITS[token]
+    return total
+
+
+def _count(match: re.Match[str]) -> int:
+    raw = match["d"] or match["n"]
+    return int(raw) if raw.isdigit() else words_to_int(raw or match["w"])
 
 
 def _months(n: int, unit: str) -> tuple[int, str]:
@@ -151,7 +170,7 @@ def lockup_terms(sentences: list[str]) -> dict[tuple[int, str], int]:
     found: dict[tuple[int, str], int] = {}
     for sentence in sentences:
         for match in _TERM.finditer(sentence):
-            term = _months(_count(match["n"]), match["unit"].lower())
+            term = _months(_count(match), match["unit"].lower())
             found[term] = found.get(term, 0) + 1
     return found
 
@@ -192,8 +211,10 @@ def _date(text: str) -> date | None:
 
 
 def _prospectus_date(text: str) -> date | None:
-    match = _DATED.search(text)
-    return _date(match["d"] or match["e"]) if match else None
+    for pattern in _DATED:
+        if (match := pattern.search(text)) and (found := _date(match["d"])):
+            return found
+    return None
 
 
 def _offer_price(text: str) -> float | None:

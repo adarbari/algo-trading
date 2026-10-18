@@ -85,7 +85,7 @@ def test_a_stored_row_equals_a_fresh_one_across_nulls_dates_and_known_from() -> 
 def test_any_changed_value_is_a_difference() -> None:
     assert not same_values(row(lockup_days=90), row())
     assert not same_values(row(instrument_id="EQ:A"), row())
-    assert not same_values(row(rules_version="v2"), row(rules_version="v1"))
+    assert same_values(row(rules_version="v2"), row(rules_version="v1"))  # the rules are no fact
 
 
 def test_as_frame_has_the_declared_types() -> None:

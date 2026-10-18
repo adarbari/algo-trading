@@ -19,15 +19,14 @@ from algotrade_ingestion.tasks.events.lockup_dates import (
     ("accepted", "session"),
     [
         ("2026-06-12T13:29:00Z", date(2026, 6, 12)),  # morning, New York
-        ("2026-06-12T21:30:00Z", date(2026, 6, 12)),  # 17:30: after the close, still that day
-        ("2026-06-13T03:30:00Z", date(2026, 6, 12)),  # 23:30 New York is still the 12th
+        ("2026-06-12T19:59:00Z", date(2026, 6, 12)),  # 15:59: before the close
+        ("2026-06-12T21:30:00Z", date(2026, 6, 15)),  # 17:30: after the close, the Monday
+        ("2026-06-12T20:00:00Z", date(2026, 6, 15)),  # exactly 16:00: not before the close
         ("2026-06-13T04:00:00Z", date(2026, 6, 15)),  # 00:00 Saturday: no session, the Monday
         ("2026-07-03T15:00:00Z", date(2026, 7, 6)),  # Independence Day observed: the Monday
     ],
 )
-def test_the_acceptance_session_is_the_new_york_date_moved_to_a_session(
-    accepted: str, session: date
-) -> None:
+def test_the_acceptance_session_is_the_cores_rule(accepted: str, session: date) -> None:
     assert acceptance_session(pd.Timestamp(accepted)) == session
 
 

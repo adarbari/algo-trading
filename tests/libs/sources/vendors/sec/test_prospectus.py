@@ -168,3 +168,27 @@ def test_fetch_and_normalize_over_a_fake_transport() -> None:
     normalized = source.normalize(req, source.fetch(req) or b"")
     assert seen == ["https://www.sec.gov/Archives/edgar/data/1234/000119312526123456/a.htm"]
     assert normalized is not None and normalized.parsed[IPO_FRAME]["lockup_n"].iloc[0] == 180
+
+
+@pytest.mark.parametrize(
+    ("phrase", "expected"),
+    [
+        ("one hundred eighty (180) days after the date of this prospectus", (180, "days")),
+        ("one hundred and eighty days after the date of this prospectus", (180, "days")),
+        ("ninety days after the date of the prospectus", (90, "days")),
+        ("sixty (60) days from the date of the final prospectus", (60, "days")),
+        ("one hundred twenty days following the date of this prospectus", (120, "days")),
+        ("twelve (12) months after the date of this prospectus", (12, "months")),
+    ],
+)
+def test_terms_written_in_words_with_digits_and_either_anchor(
+    phrase: str, expected: tuple[int, str]
+) -> None:
+    text = f"Our holders entered into lock-up agreements for {phrase}."
+    assert lockup_terms(lockup_sentences(text)) == {expected: 1}
+
+
+def test_the_explicit_date_of_this_prospectus_wins_over_a_leftmost_date_form() -> None:
+    extra = "<p>The date of this prospectus is June 12, 2026.</p>"
+    row = facts(payloads.prospectus(dated="June 10, 2026", extra=extra))
+    assert row["prospectus_date"] == date(2026, 6, 12)

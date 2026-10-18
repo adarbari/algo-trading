@@ -22,6 +22,12 @@ describe('joinToken', () => {
     });
   });
 
+  it('drops the leading comma the server keeps in the words', () => {
+    expect(joinToken(part('or', ', or'))).toEqual({ join: 'or', label: 'or', words: 'or' });
+    expect(joinToken(part('and_not', '; but'))?.words).toBe('but');
+    expect(joinToken(part('and', ', and'))).toBeNull();
+  });
+
   it('hides a plain and, whatever the case or spacing', () => {
     for (const words of [
       '',

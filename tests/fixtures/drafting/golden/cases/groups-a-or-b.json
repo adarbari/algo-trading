@@ -1,0 +1,75 @@
+{
+  "id": "groups-a-or-b",
+  "sentence": "stocks with RSI14 under 30 or above SMA50",
+  "split": "train",
+  "expect": {
+    "parts": [
+      {
+        "span": "RSI14 under 30",
+        "bucket": "A",
+        "fields": [
+          "rollup.momentum@v1.rsi_14"
+        ],
+        "op": [
+          "lt",
+          "lte"
+        ],
+        "value": 30,
+        "tolerance": 0
+      },
+      {
+        "span": "above SMA50",
+        "bucket": "A",
+        "fields": [
+          "feature.pct_vs_sma_50"
+        ],
+        "op": [
+          "gt",
+          "gte"
+        ],
+        "value": 0,
+        "tolerance": 0
+      }
+    ],
+    "scope_fields": [
+      "instrument.status",
+      "instrument.security_type"
+    ],
+    "contract": true,
+    "explained": {
+      "parts": [
+        {
+          "words": "stocks",
+          "kind": "applied",
+          "origin": "words",
+          "join": null,
+          "join_words": ""
+        },
+        {
+          "words": "RSI14 under 30",
+          "kind": "applied",
+          "origin": "words",
+          "join": "and",
+          "join_words": "with"
+        },
+        {
+          "words": "above SMA50",
+          "kind": "applied",
+          "origin": "words",
+          "join": "or",
+          "join_words": "or"
+        }
+      ],
+      "model_share": 1.0,
+      "not_understood": 0
+    },
+    "groups": [
+      {
+        "any": [
+          "RSI14 under 30",
+          "above SMA50"
+        ]
+      }
+    ]
+  }
+}

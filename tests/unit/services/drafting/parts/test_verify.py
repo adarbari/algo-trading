@@ -49,7 +49,7 @@ def test_an_or_left_out_of_the_words_is_a_connector_doubt() -> None:
     )  # fmt: skip
     found = doubts(parts)
     assert kinds(found) == [("connector_left_out", "g1")]
-    assert "one boolean formula" in found[0].message
+    assert "its own part" in found[0].message  # the connector after the last part is a gap
 
 
 def test_a_negation_left_out_says_to_keep_it_in_the_words() -> None:
@@ -91,6 +91,55 @@ def test_or_with_a_formula_or_one_criterion_or_inside_a_token_is_no_doubt() -> N
     long = "float over 5 and short_float_or_more"
     token = parts_of(long, [{"id": "p1", "words": long}], crit("a", "p1"), crit("b", "p1"))
     assert doubts(with_formula) == () and doubts(one) == () and doubts(token) == ()
+
+
+def test_an_or_between_criterion_parts_is_grouped_so_no_doubt() -> None:
+    parts = parts_of(
+        "RSI under 30 or near the low",
+        [{"id": "p1", "words": "RSI under 30"}, {"id": "p2", "words": "near the low"}],
+        crit("rsi", "p1"), crit("low", "p2"),
+    )  # fmt: skip
+    assert parts[1].join == "or" and doubts(parts) == ()
+
+
+def test_a_formula_part_next_to_an_or_or_an_exclusion_is_a_doubt_grouping_could_not_hold() -> None:
+    for sentence, join in (
+        ("RSI under 30 or maths", "or"),
+        ("RSI under 30 except maths", "and_not"),
+    ):
+        parts = parts_of(
+            sentence,
+            [{"id": "p1", "words": "RSI under 30"}, {"id": "p2", "words": "maths"}],
+            crit("rsi", "p1"), Item("formulas", "f", tag="p2"),
+        )  # fmt: skip
+        assert parts[1].join == join
+        found = doubts(parts)
+        assert kinds(found) == [("or_not_formula", "p2")]
+        assert "one boolean formula" in found[0].message and "group cannot hold" in found[0].message
+
+
+def test_an_or_mixed_with_a_negation_is_a_left_out_connector_doubt() -> None:
+    """ "A or not B": the connector is a gap (never a silent join), so it is doubted."""
+    parts = parts_of(
+        "RSI under 30 or not volume rising",
+        [{"id": "p1", "words": "RSI under 30"}, {"id": "p2", "words": "volume rising"}],
+        crit("rsi", "p1"), crit("vol", "p2"),
+    )  # fmt: skip
+    assert kinds(doubts(parts)) == [("connector_left_out", "g1")]
+
+
+def test_two_kinds_of_instrument_joined_by_or_are_a_doubt() -> None:
+    parts = parts_of(
+        "stocks or ETFs",
+        [{"id": "p1", "words": "stocks"}, {"id": "p2", "words": "ETFs"}],
+        crit("stocks", "p1"), crit("etfs", "p2"),
+    )  # fmt: skip
+    criteria = {c: {"field": "instrument.security_type"} for c in ("stocks", "etfs")}
+    found = doubts(parts, True, criteria)
+    assert (
+        kinds(found) == [("or_not_formula", "p2")]
+        and "ONE instrument.security_type" in found[0].message
+    )
 
 
 def test_kept_parts_and_no_parts_are_no_doubt() -> None:

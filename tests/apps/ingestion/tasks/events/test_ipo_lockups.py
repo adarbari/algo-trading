@@ -164,7 +164,8 @@ def test_an_ipo_row_has_the_facts_the_expiry_and_the_acceptance_session() -> Non
     record = run(writer, Edge([ipo()]))
     assert record.status is RunStatus.COMPLETE and record.items[f"acc:{ACC1}"] == "OK: EXTRACTED"
     row = rows(writer).iloc[0]
-    assert row["instrument_id"] == "EQ:ABCD" and row["cik"] == ABC and row["accession"] == ACC1
+    assert pd.isna(row["instrument_id"])  # a first version never carries today's universe id
+    assert row["cik"] == ABC and row["accession"] == ACC1
     assert bool(row["is_ipo"]) and row["extraction"] == "EXTRACTED" and pd.isna(row["reason"])
     assert row["prospectus_date"] == date(2026, 6, 12) and row["offer_price"] == 18.0
     assert row["lockup_days"] == 180 and row["lockup_expiry"] == date(2026, 12, 10)
@@ -175,18 +176,38 @@ def test_an_ipo_row_has_the_facts_the_expiry_and_the_acceptance_session() -> Non
 
 def test_a_backfilled_row_is_known_from_its_acceptance_not_the_fetch() -> None:
     writer = store()
-    run(writer, Edge([ipo()]))  # the run is on 2026-10-05, the acceptance on 2026-06-12
-    assert rows(writer).iloc[0]["known_from"] == date(2026, 6, 12)
-    assert rows(writer, through=date(2026, 6, 11)).empty  # not known the session before
-    assert len(rows(writer, through=date(2026, 6, 12))) == 1
+    run(writer, Edge([ipo()]))  # the run is on 2026-10-05, the acceptance on 2026-06-12 17:30 ET
+    # after the 16:00 close: known from the next session, the Monday
+    assert rows(writer).iloc[0]["known_from"] == date(2026, 6, 15)
+    assert rows(writer, through=date(2026, 6, 12)).empty  # not known the session before
+    assert len(rows(writer, through=date(2026, 6, 15))) == 1
 
 
-def test_an_evening_acceptance_is_that_days_session_and_the_expiry_is_known_from_it() -> None:
-    late = ipo(accepted="2026-06-13T03:30:00.000Z")  # 23:30 New York on the 12th
+def test_a_backfilled_row_has_no_instrument_id_at_its_acceptance_session() -> None:
+    """Today's universe must not date a 2026-06 row: the id is its own, later version."""
+    writer = store()  # ABCD is in today's universe
+    run(writer, Edge([ipo()]))
+    at_acceptance = rows(writer, through=date(2026, 6, 15))
+    assert pd.isna(at_acceptance.iloc[0]["instrument_id"])
+    run(writer, Edge([ipo()]))  # the next run stages the id, known from the fetch's next session
+    assert rows(writer, through=date(2026, 10, 2)).iloc[0]["instrument_id"] is None or pd.isna(
+        rows(writer, through=date(2026, 10, 2)).iloc[0]["instrument_id"]
+    )
+    assert rows(writer).iloc[0]["instrument_id"] == "EQ:ABCD"
+    assert rows(writer).iloc[0]["known_from"] == date(2026, 10, 5)
+
+
+def test_an_after_close_acceptance_counts_from_the_next_session_and_so_does_the_expiry_base() -> (
+    None
+):
+    late = ipo(accepted="2026-06-13T03:30:00.000Z")  # 23:30 New York on Friday the 12th
+    early = ipo(ACC2, DEF, accepted="2026-06-12T19:59:00.000Z")  # 15:59: before the close
     writer = store()
-    run(writer, Edge([late]))
-    row = rows(writer).iloc[0]
-    assert row["known_from"] == date(2026, 6, 12) and row["lockup_expiry"] == date(2026, 12, 10)
+    run(writer, Edge([late, early]))
+    got = rows(writer).set_index("accession")
+    assert got.loc[ACC1, "known_from"] == date(2026, 6, 15)
+    assert got.loc[ACC2, "known_from"] == date(2026, 6, 12)
+    assert got.loc[ACC1, "lockup_expiry"] == date(2026, 12, 10)  # the prospectus date rules it
 
 
 def test_a_not_ipo_and_a_no_lockup_prospectus_are_stored_with_a_reason_and_no_date() -> None:
@@ -225,13 +246,15 @@ def test_a_stored_prospectus_is_not_read_again_and_writes_nothing() -> None:
     edge.urls.clear()
     record = run(writer, edge)
     assert edge.documents() == [] and record.stats["skipped_stored"] == 1
-    assert record.stats["rows"] == 0 and len(rows(writer)) == 1
+    assert record.stats["instruments_filled"] == 1  # the id version, no fetch
+    third = run(writer, edge)
+    assert third.stats["rows"] == 0 and len(rows(writer)) == 1  # nothing left to write
 
 
 def new_rules(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The extraction rules moved to version v2 (the task and the row builder both read it)."""
-    monkeypatch.setattr(ipo_lockups, "RULES_VERSION", "v2")
-    monkeypatch.setattr(lockup_rows, "RULES_VERSION", "v2")
+    """The extraction rules moved to version v3 (the task and the row builder both read it)."""
+    monkeypatch.setattr(ipo_lockups, "RULES_VERSION", "v3")
+    monkeypatch.setattr(lockup_rows, "RULES_VERSION", "v3")
 
 
 def test_a_changed_reextraction_is_a_new_version_known_from_the_fetch_not_the_window(
@@ -247,33 +270,37 @@ def test_a_changed_reextraction_is_a_new_version_known_from_the_fetch_not_the_wi
     # the clock reads 2026-10-02 18:00 New York (a Friday): the next session is Monday the 5th
     now, before = rows(writer), rows(writer, through=date(2026, 10, 2))
     assert now.iloc[0]["lockup_days"] == 90 and now.iloc[0]["known_from"] == date(2026, 10, 5)
-    assert now.iloc[0]["rules_version"] == "v2"
+    assert now.iloc[0]["rules_version"] == "v3"
     assert before.iloc[0]["lockup_days"] == 180 and before.iloc[0]["known_from"] == date(
-        2026, 6, 12
+        2026, 6, 15
     )
 
 
-def test_a_reread_with_the_same_values_under_a_new_rules_version_is_a_version_too(
+def test_only_the_rules_version_moving_is_restaged_under_the_same_known_from(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     writer, edge = store(), Edge([ipo()])
     run(writer, edge)
     new_rules(monkeypatch)
-    run(writer, edge)
-    assert rows(writer).iloc[0]["known_from"] == date(2026, 10, 5)
-    assert rows(writer, through=date(2026, 10, 2)).iloc[0]["rules_version"] == "v1"
+    record = run(writer, edge)
+    assert record.items[f"acc:{ACC1}"] == "OK: EXTRACTED (rules)"
+    assert rows(writer).iloc[0]["known_from"] == date(2026, 6, 15)  # no restatement
+    assert rows(writer).iloc[0]["rules_version"] == "v3"
+    assert run(writer, edge).stats["read"] == 0  # not read again
 
 
-def test_the_instrument_is_the_universe_one_else_null_then_filled_without_a_fetch() -> None:
+def test_the_instrument_is_filled_as_its_own_version_without_a_fetch() -> None:
     writer = store(universe=("GOOA", "GOOB"))  # ABCD is in no universe yet
     edge = Edge([ipo(ACC1, ABC), ipo(ACC2, GHI, document=payloads.prospectus(ticker="GOOB"))])
     run(writer, edge)
+    assert rows(writer)["instrument_id"].isna().all()  # first versions carry no id
+    edge.urls.clear()
+    run(writer, edge)  # the fill: two share classes, the prospectus ticker picks GOOB
     got = rows(writer).set_index("accession")
     assert pd.isna(got.loc[ACC1, "instrument_id"])  # the issuer is in no universe yet
-    assert got.loc[ACC2, "instrument_id"] == "EQ:GOOB"  # two share classes: the prospectus ticker
-    assert got.loc[ACC1, "known_from"] == date(2026, 6, 12)
+    assert got.loc[ACC2, "instrument_id"] == "EQ:GOOB" and edge.documents() == []
+    assert got.loc[ACC2, "known_from"] == date(2026, 10, 5)
     snapshot(writer, date(2026, 10, 3), ("ABCD", "GOOA", "GOOB"))  # a later snapshot holds ABCD
-    edge.urls.clear()
     record = run(writer, edge)
     assert edge.documents() == [] and record.items["ids"] == "OK: 1"
     after = rows(writer).set_index("accession")
@@ -281,6 +308,22 @@ def test_the_instrument_is_the_universe_one_else_null_then_filled_without_a_fetc
     assert after.loc[ACC1, "known_from"] == date(2026, 10, 5)
     early = rows(writer, through=date(2026, 10, 2)).set_index("accession")
     assert pd.isna(early.loc[ACC1, "instrument_id"])
+
+
+def test_the_gap_against_d1s_424b4_rows_is_in_the_stats() -> None:
+    writer = store()
+    day = date(2026, 10, 2)
+    d1 = [
+        {"instrument_id": "EQ:ABCD", "ts": pd.Timestamp("2026-06-12T21:30:00Z"), "cik": ABC,
+         "form": "424B4", "accession": a, "filing_date": date(2026, 6, 15), "items": "",
+         "known_from": date(2026, 6, 15)}
+        for a in (ACC1, ACC3)
+    ]  # fmt: skip
+    writer.write_table("events/filing", day, "d1", stamped(d1, day, "d1"))
+    record = run(writer, Edge([ipo(ACC1, ABC)]))  # the search lists only ACC1
+    assert record.stats["filing_424b4_in_window"] == 2
+    assert record.stats["filing_424b4_not_listed"] == 1
+    assert record.stats["filing_424b4_not_listed_sample"] == [ACC3]
 
 
 def test_without_a_universe_the_facts_are_stored_with_a_null_instrument() -> None:

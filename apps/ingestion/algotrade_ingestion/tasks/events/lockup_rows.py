@@ -45,7 +45,7 @@ COLUMNS = [
     "reason",
     "rules_version",
 ]
-VALUES = [c for c in COLUMNS if c not in ("known_from",)]  # what a changed row is judged on
+VALUES = [c for c in COLUMNS if c not in ("known_from", "rules_version")]  # the facts compared
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,8 @@ def _norm(value: Any) -> Any:
 
 
 def same_values(new: dict[str, Any], held: dict[str, Any]) -> bool:
-    """Whether ``new`` and ``held`` agree on every column of ``VALUES`` (null equals null)."""
+    """Whether ``new`` and ``held`` agree on every fact in ``VALUES`` (not ``known_from``, not
+    ``rules_version``; null equals null)."""
     return all(_norm(new.get(c)) == _norm(held.get(c)) for c in VALUES)
 
 
