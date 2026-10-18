@@ -1,1 +1,1 @@
-"""Tests of the event-class feature groups (``algotrade.features.rollups.events``)."""
+"""Tests of the event-class and event-window feature groups (``features/rollups/events``)."""
