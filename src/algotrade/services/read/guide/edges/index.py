@@ -1,10 +1,11 @@
 """``GuideEdgeIndex`` (ADR 0051; spec ``docs/ui/guide.md``, "Edges"): the Edges section's top
 page. The mechanisms in ``MECHANISM_KINDS`` order, each a card (id, title, question, the
-one-line ``short``, the ``examples`` line, how many edges rest on it, the count by status and
-the edges as rows); the filter options with their counts (asset class, side, holding band: the
-server counts, the browser derives nothing); the edges set aside (status ``rejected`` or
-``blocked``, each with the reason on file). The counts are over every site edge. Session-free:
-the Guide shows no live number."""
+one-line ``short``, the ``examples`` line, how many edges rest on it, the count by status, the
+edges as rows and how many ideas researched but not built rest on it); the filter options with
+their counts (asset class, side, holding band: the server counts, the browser derives nothing);
+the edges set aside (status ``rejected`` or ``blocked``, each with the reason on file); the
+ideas researched but not built (``ideas.py``). The counts are over every site edge.
+Session-free: the Guide shows no live number."""
 
 from collections import Counter
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from algotrade.config.site.guide.sections import EdgeGroup, load_guide_sections
 from algotrade.services.configs import catalog_of
 from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.edges.edge import ASSET_TEXT, GuideEdgeRow, edge_row
+from algotrade.services.read.guide.edges.ideas import GuideIdea, not_built
 from algotrade.services.read.guide.edges.schedule import BANDS
 from algotrade.services.read.guide.edges.site_edges import SiteEdge, site_edges
 from algotrade.services.read.guide.edges.universe import ASSETS
@@ -44,6 +46,7 @@ class GuideMechanismCard:
     count: int
     statuses: tuple[GuideStatusCount, ...]
     edges: tuple[GuideEdgeRow, ...]
+    ideas: int
 
 
 @dataclass(frozen=True)
@@ -87,19 +90,24 @@ class GuideEdgeIndex:
     set_aside_title: str
     set_aside_purpose: str
     set_aside: tuple[GuideSetAsideEdge, ...]
+    not_built_title: str
+    not_built_purpose: str
+    not_built: tuple[GuideIdea, ...]
 
 
 def load_guide_edge_index(ctx: Stores) -> GuideEdgeIndex:
     """The Edges section's top page (module docstring)."""
     edges = site_edges(ctx)
     prose = load_guide_mechanisms(ctx.configs)
+    idea_counts = Counter(i.mechanism for i in not_built(ctx))
     cards = tuple(
-        _card(m, [e for e in edges if e.mechanism == m.id])
+        _card(m, [e for e in edges if e.mechanism == m.id], idea_counts[m.id])
         for kind in MECHANISM_KINDS
         if (m := prose.get(kind)) is not None
     )
     fields = catalog_of(ctx.features).fields
     group = _group(ctx, "set_aside")
+    ideas_group = _group(ctx, "not_built")
     set_aside = tuple(
         GuideSetAsideEdge(edge_row(e), link_prose(e.edge.rejection_reason, fields))
         for status in SET_ASIDE
@@ -112,6 +120,9 @@ def load_guide_edge_index(ctx: Stores) -> GuideEdgeIndex:
         set_aside_title=group.title if group is not None else "",
         set_aside_purpose=group.purpose if group is not None else "",
         set_aside=set_aside,
+        not_built_title=ideas_group.title if ideas_group is not None else "",
+        not_built_purpose=ideas_group.purpose if ideas_group is not None else "",
+        not_built=not_built(ctx),
     )
 
 
@@ -137,7 +148,7 @@ def _group(ctx: Stores, group_id: str) -> EdgeGroup | None:
     return next((g for g in load_guide_sections(ctx.configs).edge_groups if g.id == group_id), None)
 
 
-def _card(m: MechanismProse, members: list[SiteEdge]) -> GuideMechanismCard:
+def _card(m: MechanismProse, members: list[SiteEdge], ideas: int) -> GuideMechanismCard:
     counts = Counter(e.edge.status for e in members)
     return GuideMechanismCard(
         id=m.id,
@@ -148,6 +159,7 @@ def _card(m: MechanismProse, members: list[SiteEdge]) -> GuideMechanismCard:
         count=len(members),
         statuses=tuple(GuideStatusCount(s, counts[s]) for s in STATUSES if counts[s]),
         edges=tuple(edge_row(e) for e in members),
+        ideas=ideas,
     )
 
 

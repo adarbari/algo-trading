@@ -1,7 +1,8 @@
 """``GuideMechanism`` (ADR 0051; spec ``docs/ui/guide.md``, "Edges"): one mechanism's page, the
 reason an edge should work (``config/site/guide/mechanisms/<id>.toml``, ``MechanismProse``)
 with the site edges that rest on it as rows (``GuideEdgeRow``, in Guide order, every status:
-the row says which are candidates and which are set aside). Its paragraphs are split at the
+the row says which are candidates and which are set aside) and the ideas researched but not
+built that would rest on it (``not_built``, ``ideas.py``). Its paragraphs are split at the
 catalogue names they mention, its ``see_also`` are the glossary terms that exist, and its
 stats and sources are as written (a stat's ``source`` indexes ``sources``, 1-based; ``None``:
 our own bar). Session-free; ``None`` for an id that is no mechanism."""
@@ -13,6 +14,7 @@ from algotrade.config.site.guide.mechanisms import MechanismProse, load_guide_me
 from algotrade.services.configs import catalog_of
 from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.edges.edge import GuideEdgeRow, edge_row
+from algotrade.services.read.guide.edges.ideas import GuideIdea, ideas_of
 from algotrade.services.read.guide.edges.site_edges import site_edges
 from algotrade.services.read.guide.prose import LinkedProse, link_prose
 
@@ -53,6 +55,7 @@ class GuideMechanism:
     stats: tuple[GuideMechanismStat, ...]
     sources: tuple[GuideMechanismSource, ...]
     edges: tuple[GuideEdgeRow, ...]
+    not_built: tuple[GuideIdea, ...]
 
 
 def load_guide_mechanism(ctx: Stores, mechanism_id: str) -> GuideMechanism | None:
@@ -86,4 +89,5 @@ def mechanism_of(ctx: Stores, prose: MechanismProse) -> GuideMechanism:
         stats=tuple(GuideMechanismStat(s.label, s.value, s.note, s.source) for s in prose.stats),
         sources=tuple(GuideMechanismSource(s.title, s.url, s.note) for s in prose.sources),
         edges=tuple(edge_row(e) for e in site_edges(ctx) if e.mechanism == prose.id),
+        not_built=ideas_of(ctx, prose.id),
     )

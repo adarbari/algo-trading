@@ -41,6 +41,12 @@ def test_the_set_aside_are_the_rejected_and_blocked_with_a_reason(site: StoreCon
     assert index.set_aside_title and index.set_aside_purpose
 
 
+def test_the_ideas_not_built_are_counted_per_mechanism_and_listed(site: StoreContext) -> None:
+    index = load_guide_edge_index(site)
+    assert sum(m.ideas for m in index.mechanisms) == len(index.not_built) > 0
+    assert index.not_built_title and index.not_built_purpose
+
+
 def test_the_rail_and_the_section_count(site: StoreContext) -> None:
     rail = mechanism_entries(site)
     assert tuple(m.id for m in rail) == MECHANISM_KINDS and all(m.title for m in rail)

@@ -7,6 +7,7 @@ import strawberry
 
 from algotrade.services.read.guide.edges import index
 from algotrade_api.graphql.types.guide.edges.edge import GuideEdgeRow
+from algotrade_api.graphql.types.guide.edges.ideas import GuideIdea
 from algotrade_api.graphql.types.guide.prose import GuideProse
 
 
@@ -36,7 +37,8 @@ class GuideStatusCount:
 
 @strawberry.type(
     description="A mechanism's card: its question, one-line hero, examples, how many edges "
-    "rest on it, the count by status and the edges as rows"
+    "rest on it, the count by status, the edges as rows and how many `ideas` researched but "
+    "not built rest on it"
 )
 class GuideMechanismCard:
     id: str
@@ -47,6 +49,7 @@ class GuideMechanismCard:
     count: int
     statuses: list[GuideStatusCount]
     edges: list[GuideEdgeRow]
+    ideas: int
 
     @classmethod
     def of(cls, d: index.GuideMechanismCard) -> Self:
@@ -59,6 +62,7 @@ class GuideMechanismCard:
             count=d.count,
             statuses=[GuideStatusCount.of(s) for s in d.statuses],
             edges=[GuideEdgeRow.of(e) for e in d.edges],
+            ideas=d.ideas,
         )
 
 
@@ -103,7 +107,8 @@ class GuideSetAsideEdge:
 
 @strawberry.type(
     description="The Edges section's top page (ADR 0051): the mechanism cards in order, the "
-    "filters with counts and the edges set aside with their reasons; no live number"
+    "filters with counts, the edges set aside with their reasons and the ideas researched but "
+    "not built; no live number"
 )
 class GuideEdgeIndex:
     mechanisms: list[GuideMechanismCard]
@@ -111,6 +116,9 @@ class GuideEdgeIndex:
     set_aside_title: str
     set_aside_purpose: str
     set_aside: list[GuideSetAsideEdge]
+    not_built_title: str
+    not_built_purpose: str
+    not_built: list[GuideIdea]
 
     @classmethod
     def of(cls, d: index.GuideEdgeIndex) -> Self:
@@ -120,4 +128,7 @@ class GuideEdgeIndex:
             set_aside_title=d.set_aside_title,
             set_aside_purpose=d.set_aside_purpose,
             set_aside=[GuideSetAsideEdge.of(e) for e in d.set_aside],
+            not_built_title=d.not_built_title,
+            not_built_purpose=d.not_built_purpose,
+            not_built=[GuideIdea.of(i) for i in d.not_built],
         )

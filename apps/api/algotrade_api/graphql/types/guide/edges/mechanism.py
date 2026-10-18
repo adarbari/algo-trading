@@ -7,6 +7,7 @@ import strawberry
 
 from algotrade.services.read.guide.edges import mechanism
 from algotrade_api.graphql.types.guide.edges.edge import GuideEdgeRow
+from algotrade_api.graphql.types.guide.edges.ideas import GuideIdea
 from algotrade_api.graphql.types.guide.prose import GuideProse
 
 
@@ -43,7 +44,8 @@ class GuideMechanismSource:
     description="A mechanism's Guide page: the card's `question`, `short` and `examples`, the "
     "paragraphs of how it works, why it survives, the research and real against decoy (each "
     "linked), the one thing not to read into it (`dont`), glossary terms (`seeAlso`), the stat "
-    "tiles, the sources and the `edges` that rest on it (every status, Guide order)"
+    "tiles, the sources, the `edges` that rest on it (every status, Guide order) and the ideas "
+    "researched but `notBuilt`"
 )
 class GuideMechanism:
     id: str
@@ -60,6 +62,7 @@ class GuideMechanism:
     stats: list[GuideMechanismStat]
     sources: list[GuideMechanismSource]
     edges: list[GuideEdgeRow]
+    not_built: list[GuideIdea]
 
     @classmethod
     def of(cls, d: mechanism.GuideMechanism) -> Self:
@@ -78,4 +81,5 @@ class GuideMechanism:
             stats=[GuideMechanismStat.of(s) for s in d.stats],
             sources=[GuideMechanismSource.of(s) for s in d.sources],
             edges=[GuideEdgeRow.of(e) for e in d.edges],
+            not_built=[GuideIdea.of(i) for i in d.not_built],
         )
