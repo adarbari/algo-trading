@@ -97,9 +97,9 @@ def filing_row(accepted: str, items: str, known: date) -> dict[str, object]:
 def _filings(writer: StoreWriter) -> None:
     rows = [
         filing_row("2024-02-01 21:05", "2.02,9.01", date(2024, 2, 1)),  # before the window
-        filing_row("2026-07-30 20:10", "2.02,9.01", date(2026, 7, 30)),
+        filing_row("2026-07-30 20:10", "2.02,9.01", date(2026, 7, 30)),  # stale stamp: the day
         filing_row("2026-09-15 13:00", "5.02", date(2026, 9, 15)),
-        filing_row("2026-10-02 20:00", "1.01,9.01", date(2026, 10, 2)),  # after the session
+        filing_row("2026-10-02 19:00", "1.01,9.01", date(2026, 10, 2)),  # after the session
     ]
     run = "filings"
     writer.write_table(FILING, D1, run, stamped(rows, D1, run, source="sec"))

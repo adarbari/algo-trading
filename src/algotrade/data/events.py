@@ -52,8 +52,10 @@ class Events:
 
 
 def event_key(frame: pd.DataFrame) -> list[str]:
-    """``instrument_id`` + ``ts`` (+ ``change`` for tables with several kinds a day)."""
-    return ["instrument_id", "ts", *(["change"] if "change" in frame.columns else [])]
+    """``instrument_id`` + ``ts`` (+ ``change`` for tables with several kinds a day, + ``accession``
+    for filings: two filings accepted the same second are two events)."""
+    extra = [c for c in ("change", "accession") if c in frame.columns]
+    return ["instrument_id", "ts", *extra]
 
 
 def known_from(frame: pd.DataFrame) -> pd.Series:

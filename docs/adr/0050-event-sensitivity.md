@@ -149,12 +149,14 @@ from the next one; an early-close day uses its own close.
    store reads the latest version of a row only among rows already known by S, so a stale row
    stamped by the old rule and left in a partition would still be seen by an old S. Recomputing
    makes the read right whatever the stamp.
-3. **Backfill.** The writer's run tag (`FORMS_TAG`) now includes the rule, so a run before this
-   change does not count as having covered a CIK: `algotrade-ingest run filings --since
-   2018-01-01` re-reads every CIK once and rewrites the rows (same `accession`, later
-   `knowledge_ts`); the nightly also re-reads up to `filings_backfill_per_night` CIKs a night
-   until done. No feature read these rows before this change (`earnings@v1` and
+3. **Backfill (manual).** The writer's run tag (`FORMS_TAG`) now includes the rule, so a run
+   before this change does not count as having covered a CIK: `algotrade-ingest run filings
+   --since 2018-01-01` (`--since 2004-08-23` if any stored rows are older than 2018) re-reads
+   every CIK once and rewrites the rows (same `accession`, later `knowledge_ts`). The nightly
+   does not do it: it only reads names with nothing stored. Then backfill the rollups
+   `filing_events@v1` and `earnings_date_shift@v1`; no version is retired. No feature read these rows before this change (`earnings@v1` and
    `earnings_expected@v1` leave the `sec_8k` rows out), so no feature version is bumped; the
-   display read of the filings list keeps its `known_from <= session` filter.
+   display read of the filings list (`services/read/events/filings.py`) also takes the session
+   from `ts`.
 4. **Forms.** SC TO-T (a third party's tender offer) joins the kept forms; with the form tag
    change the backfill reads it with the rest.

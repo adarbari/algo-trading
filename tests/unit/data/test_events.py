@@ -238,3 +238,17 @@ def test_filings_are_known_from_the_acceptance_session_whatever_their_stored_sta
     got = dict(zip(later["instrument_id"], later["event_date"], strict=True))
     assert got == {"EQ:B": d, "EQ:A": date(2026, 10, 2), "EQ:C": date(2026, 10, 5)}
     assert events_by_acceptance(reader, "events/filing", date(2026, 11, 1), date(2026, 11, 2)).empty
+
+
+def test_two_filings_accepted_the_same_second_are_two_events() -> None:
+    backend = MemoryBackend()
+    d = date(2026, 10, 1)
+    same = pd.Timestamp("2026-10-01T15:00:00Z")
+    rows = [
+        {"instrument_id": "EQ:A", "ts": same, "form": form, "accession": form, "items": "",
+         "cik": "1", "filing_date": d, "known_from": d}
+        for form in ("8-K", "SC TO-I")
+    ]  # fmt: skip
+    StoreWriter(backend).write_table("events/filing", d, "f", stamped(rows, d, "f"))
+    got = events_by_acceptance(StoreReader(backend), "events/filing", d, d)
+    assert sorted(got["form"]) == ["8-K", "SC TO-I"]
