@@ -16,6 +16,11 @@ meets the stored fields of ``outcomes/instrument/forward_returns@v2`` (ADR 0053)
   window's intraday low / high reached a strike (``fwd_max_drawdown`` / ``fwd_max_return``):
   both reported beside the hit rate, never inside it. No premium and no P&L: a win rate
   overstates expectancy.
+- ``side`` ``short`` or ``long_short`` (an ``excess_return`` outcome only): ``short_value`` is the
+  value of being short the name, ``-fwd_excess_return - cost_bps / 1e4 - borrow``, with the
+  borrow ``borrow_bps_annual / 1e4 * horizon / 252`` (an assumption: no borrow data is stored);
+  ``short_hit`` is ``short_value > 0`` (the name underperformed by more than the costs). The
+  long columns are unchanged: the deciles and the base are over them whatever the side.
 - ``max_drawdown`` set: a hit also needs ``fwd_max_drawdown <= max_drawdown``.
 
 A row whose value cannot be computed is *excluded with a reason*, never a miss and never a
@@ -53,6 +58,7 @@ UNMEASURED = "unmeasured"  # an UNMEASURED outcome row (a flagged bar in its win
 TRADING_DAYS = 252  # sessions per year: T of an expires_otm strike
 RESULT_COLUMNS = (
     "instrument_id", "value", "oriented", "hit", "excluded", "delisted", "reference", "touch",
+    "short_value", "short_hit",
 )  # fmt: skip
 
 
@@ -146,6 +152,33 @@ def _vol_ratio(
     return value
 
 
+def borrow_cost(borrow_bps_annual: float | None, horizon_sessions: np.ndarray) -> np.ndarray:
+    """The borrow cost (a fraction) of a short held ``horizon_sessions``: the assumed yearly
+    rate scaled by the share of a year of sessions; zero without a rate."""
+    return (borrow_bps_annual or 0.0) / 1e4 * horizon_sessions / TRADING_DAYS
+
+
+def _short_value(edge: Edge, outcomes: pd.DataFrame, counted: np.ndarray) -> np.ndarray:
+    """The value of being short each counted name (see the module doc); NaN for a long outcome
+    (no short leg) and for a name that does not count."""
+    o = edge.outcome
+    if o.side == "long":
+        return np.full(len(outcomes), np.nan)
+    horizon = _numbers(outcomes, "horizon_sessions")
+    gross = _numbers(outcomes, "fwd_excess_return")
+    value = -gross - (o.cost_bps or 0.0) / 1e4 - borrow_cost(o.borrow_bps_annual, horizon)
+    return np.where(counted, value, np.nan)
+
+
+def short_view(res: pd.DataFrame) -> pd.DataFrame:
+    """``res`` (``apply_outcome``'s, indexed by instrument) as seen from the short side: the
+    value, its orientation and the hit are the short's; everything else is shared."""
+    out = res.copy()
+    out["value"] = out["oriented"] = out["short_value"]
+    out["hit"] = out["short_hit"] & (out["excluded"] == "")
+    return out
+
+
 def apply_outcome(
     edge: Edge, outcomes: pd.DataFrame, implied: Mapping[str, float | None] | None = None
 ) -> pd.DataFrame:
@@ -196,6 +229,7 @@ def apply_outcome(
             hit = hit & (drawdown <= o.max_drawdown)
     hit = hit & counted
     sign = o.sign
+    short_value = _short_value(edge, outcomes, counted)
     return pd.DataFrame(
         {
             "instrument_id": outcomes["instrument_id"].to_numpy(),
@@ -206,6 +240,8 @@ def apply_outcome(
             "delisted": (outcomes["outcome_status"] == "DELISTED").to_numpy() & counted,
             "reference": np.where(counted, reference, np.nan),
             "touch": np.where(counted, touch, np.nan),
+            "short_value": short_value,
+            "short_hit": np.nan_to_num(short_value, nan=-1.0) > 0,
         },
         columns=list(RESULT_COLUMNS),
     )

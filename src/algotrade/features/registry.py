@@ -62,6 +62,7 @@ from algotrade.features.rollups.market import (
 from algotrade.features.rollups.options import (
     call_wing,
     ibkr_iv,
+    ibkr_iv_history,
     iv30,
     iv_history,
     nearest_expiry,
@@ -72,6 +73,8 @@ from algotrade.features.rollups.options import (
 from algotrade.features.rollups.patterns import candle
 from algotrade.features.rollups.positioning import (
     chain_flow,
+    cp_iv,
+    cp_iv_history,
     flow_history,
     implied_move,
     iv_term,
@@ -127,6 +130,7 @@ GROUPS: dict[str, FeatureGroup] = {
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,
+            ibkr_iv_history.GROUP,
             fundamentals.GROUP,
             financials.GROUP,
             income_statement.GROUP,
@@ -158,6 +162,8 @@ GROUPS: dict[str, FeatureGroup] = {
             implied_move.GROUP,
             skew.GROUP,
             skew_history.GROUP,
+            cp_iv.GROUP,
+            cp_iv_history.GROUP,
             iv_term.GROUP,
             nearest_expiry.GROUP,
             trend.GROUP,
