@@ -67,7 +67,7 @@ individual can hold them all; the 20 bps round trip is the assumption."""
 failure_modes = """Deletions that are delistings (takeovers) have no rebound to trade; a deletion is
 often a name that kept falling (momentum), not a value bounce; the demotion to a smaller index
 brings its own buyers. Retire if the frozen-period excess return of the picks is not above the base
-rate of the other deletions after costs."""
+rate of every eligible name after costs."""
 decoys = """Deletions are value plus long-term reversal and additions are momentum: the 12-1 momentum
 and size baselines on the same sessions (a matched value or reversal control is not stored)."""
 
