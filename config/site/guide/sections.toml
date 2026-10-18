@@ -58,7 +58,7 @@ themes = ["events", "fundamentals", "statements", "analyst"]
 [[family]]
 id = "trend"
 title = "Trend"
-presets = ["trend_continuation", "pullback", "momentum_12_1", "size_small"]
+presets = ["trend_continuation", "pullback", "momentum_12_1", "size_small", "residual_momentum", "volatility_scaled_momentum", "frog_in_the_pan", "momentum_x_quality_interaction", "fifty_two_week_high", "industry_momentum", "low_beta", "low_volatility"]
 
 [[family]]
 id = "breakouts"
@@ -68,7 +68,7 @@ presets = ["range_breakout", "breakout", "failed_breakout"]
 [[family]]
 id = "reversals"
 title = "Reversals"
-presets = ["support_reversal", "oversold_reversal", "exhaustion"]
+presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reversal", "sector_reversal"]
 
 [[family]]
 id = "income"

@@ -1,0 +1,76 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screeners: low_beta, low_volatility (EB E1a).
+id = "betting_against_beta_low_vol"
+name = "Low beta and low volatility"
+thesis = "Stocks with low market beta or low volatility earn more for the risk they carry than high-beta stocks."
+mechanism = """Investors who cannot lever buy high-beta stocks to reach a higher return, bidding them
+up, and benchmarked managers avoid the tracking error of low-beta stocks; lottery demand adds to
+the high-volatility end (Frazzini and Pedersen 2014; Blitz and van Vliet 2007)."""
+persistence = """The constraints persist, but the anomaly is crowded (low-volatility funds took large
+inflows in 2012-2019), valuations rose, and low-volatility indexes lagged their parents from late
+2019 to 2024 and did not protect in March 2020. Betting Against Beta's reported Sharpe came largely
+from micro-cap weights (Novy-Marx and Velikov 2022)."""
+schedule = "month_end"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["low_beta", "low_volatility"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+family = "A"
+frozen_from = 2026-04-01
+notes = """The claim is about return per unit of risk, and the harness scores excess return over
+SPY: a low-beta book expects a lower excess return than the market in a rising market and a higher
+one in a falling one by construction, so read the sign with the market of the sessions in mind
+(the by-regime split), not alone. low_beta ranks beta_252d (positive betas only, lowest first;
+no shrinkage toward 1 and no leverage), low_volatility ranks hv60 (the longest stored window; the
+paper sorts on 3-year volatility). The build plan's condition, a 24-month market uptrend before
+holding low beta, needs a feature that is not stored (mkt_uptrend_24m) and is not built. Month-end
+start sessions at least 20 sessions apart."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY over the 20 sessions after the entry close (the session after a
+month-end decision), net of 10 bps a round trip. It is a raw return, not a risk-adjusted one:
+the claim's own measure is not in the harness, a gap the notes and the regime split cover."""
+trigger_timing = """beta_252d and hv60 are computed from the close of the decision session D (nightly
+rollup), so the first fill is the next session's close: the entry session is S = D + 1
+(start_offset_sessions = 1) and the window runs from S's close; the screen is read at D, the
+outcome at S."""
+replication = """Frazzini and Pedersen rank on a shrunk beta, rank-weight long low-beta and short
+high-beta, and lever each side to a beta of 1; Blitz and van Vliet go long the lowest decile of
+3-year volatility. Here: long-only, the lowest 50 by beta_252d (or hv60) of the liquid common stocks,
+unlevered: the closest stored rule, not the papers'."""
+expected_size = """Frazzini and Pedersen report a Sharpe of 0.78 for the levered long-short factor in
+1926-2012 with an insignificant Fama-French five-factor alpha of 16 bp a month (Novy-Marx and
+Velikov's critique); an unlevered long-only book mainly lowers drawdown. Over 25 years a low-
+volatility index had a volatility of 11.6% against 15.3% and a beta of 0.7 (S&P, 2025). In raw
+excess return over SPY the expected size is about zero or negative in a bull market."""
+capacity_costs = """Large and liquid names only (price over 5 dollars, 50M dollars of 20-day volume);
+turnover is low (a beta moves slowly); capacity is large, and crowding is the cost: the 10 bps
+round trip is the assumption."""
+failure_modes = """Crowding and a bond-proxy trade (utilities and staples rally when rates fall and
+lag when they rise), and a sharp market rebound that favours high beta. Retire if the picks do
+not beat the buy-and-hold mean of the eligible names on risk-adjusted terms in the frozen period."""
+decoys = """Quality (low-beta names are profitable ones), size, value, interest-rate sensitivity
+of the defensive sectors, and the market's own drift (the buy-and-hold of the eligible names),
+which a low-beta book trails in a rising market by construction."""
+
+[[sources]]
+title = "Frazzini, A. and Pedersen, L., Betting Against Beta, Journal of Financial Economics, 2014"
+
+[[sources]]
+title = "Novy-Marx, R. and Velikov, M., Betting Against Betting Against Beta, Journal of Financial Economics, 2022"
+url = "https://alphaarchitect.com/betting-against-beta-bab-construction/"
+
+[[sources]]
+title = "Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk without Lower Return, Journal of Portfolio Management, 2007"
+
+[[sources]]
+title = "S&P Dow Jones Indices, Expectations and Anomalies, Indexology Blog, 2025"
+url = "https://www.indexologyblog.com/2025/04/09/expectations-and-anomalies/"

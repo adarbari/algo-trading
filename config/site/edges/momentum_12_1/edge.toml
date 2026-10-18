@@ -13,14 +13,28 @@ the risk that keeps arbitrageurs from removing it."""
 schedule = "month_end"
 universe = "liquid_common_stocks"
 top_k = 50
-screeners = ["momentum_12_1"]
+screeners = [
+  "momentum_12_1", "residual_momentum", "volatility_scaled_momentum", "frog_in_the_pan",
+  "momentum_x_quality_interaction", "fifty_two_week_high",
+]
 baselines = ["size_small"]
 status = "candidate"
+family = "A"
 frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. rollup.trend_stats@v2.mom_12_1
 is stored from about 2025-10-31, so the stored history gives about ten independent sessions, under
 the 40 the bar asks; the harness reports the count beside every number. The frozen period
-starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment)."""
+starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment).
+Variants (EB E1a): five more screeners score the same sessions as one trial each in the trial log:
+residual_momentum (the 12-1 return net of beta x SPY; the paper's size and value residuals are not
+stored), volatility_scaled_momentum (12-1 return per unit of 60-session volatility; a ranking
+stand-in for Barroso and Santa-Clara's time-series scaling of the portfolio), frog_in_the_pan
+(winners with information discreteness below 0), momentum_x_quality_interaction (quality score of
+at least 0.5, ranked by 12-1) and fifty_two_week_high (George and Hwang's nearness to the high).
+Each is the source's rule from stored features, each overlaps raw momentum (a correlation of
+0.5 to 0.7 in the literature), so the harness's number beside momentum_12_1's, not alone, is the
+read. No [published] figure is filed for a variant: the catalogue's figures for them are not
+marked verified."""
 
 [scorer]  # ED7: the fields a learned scorer is fitted on (edge_scores.toml, fit-edge-scorer)
 features = [

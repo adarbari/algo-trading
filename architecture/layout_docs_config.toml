@@ -74,7 +74,7 @@ purpose = "the Guide's playbook prose (ADR 0051), one subfolder per playbook fam
 
 [[config_dir]]
 path = "config/site/guide/playbooks/trend"
-purpose = "the Guide's playbooks of the trend families (trend continuation, pullback, 12-1 momentum, size): one <id>.toml per preset the family lists in sections.toml"
+purpose = "the Guide's playbooks of the trend families (trend continuation, pullback, 12-1 momentum and its variants, size, low beta and volatility): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/guide/playbooks/breakouts"
@@ -82,7 +82,7 @@ purpose = "the Guide's playbooks of the breakout family (range breakout, breakou
 
 [[config_dir]]
 path = "config/site/guide/playbooks/reversals"
-purpose = "the Guide's playbooks of the reversal family (support reversal, oversold reversal, exhaustion): one <id>.toml per preset the family lists in sections.toml"
+purpose = "the Guide's playbooks of the reversal family (support reversal, oversold reversal, exhaustion, residual and sector reversal): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/guide/playbooks/income"

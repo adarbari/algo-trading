@@ -1,0 +1,78 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screeners: residual_reversal, sector_reversal (EB E1a).
+# Long side only: a short side of the same ranking waits on the outcome-sides work (H3).
+id = "short_term_residual_reversal"
+name = "Short-term residual reversal"
+thesis = "Large stocks that fell most last month against what the market (or their sector) explains rise over the next month."
+mechanism = """Uninformed order imbalances (fund flows, index trades, forced sellers) push a name away
+from where its market and sector exposure put it; liquidity providers are paid to lean against
+the move, and the residual is the part of the move no news explains (Nagel 2012; Blitz, Huij,
+Lansdorp and Verbeek 2013)."""
+persistence = """The return is compensation for inventory risk in a stress, so it survives being known,
+but the raw one-month reversal has shrunk since the 1990s as market making got cheaper and is
+near zero after costs (Chen and Velikov 2023); only the residual in liquid names is claimed to
+survive. It is the least capacity of the anomalies (Frazzini, Israel and Moskowitz 2015), and
+high-turnover names show short-term momentum instead (Medhat and Schmeling 2022)."""
+schedule = "month_end"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["residual_reversal", "sector_reversal"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+family = "A"
+frozen_from = 2026-04-01
+notes = """Two screeners, one trial each: residual_reversal ranks on the 20-session return net of
+beta x SPY (resid_ret_20d; the paper also strips size and value, not stored) and sector_reversal
+on the return against the sector fund (rs_sector_20d), the lowest first (the long side). The
+paper's large-cap cut is the ADV gate of liquid_common_stocks, the nearest stored rule. Names that
+moved on an earnings report are not excluded (a news move drifts, it does not reverse): the
+harness's reading by earnings proximity is a follow-up. The costs bind: monthly turnover is high,
+so the 10 bps round trip is the assumption to test, and the harness's cost curve shows the
+break-even. Month-end start sessions at least 20 sessions apart."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY over the 20 sessions after the entry close (the session after a
+month-end decision), net of 10 bps a round trip (an assumption, tested against the cost curve)."""
+trigger_timing = """resid_ret_20d and rs_sector_20d are computed from the close of the decision
+session D (nightly rollup), so the first fill is the next session's close: the entry session is
+S = D + 1 (start_offset_sessions = 1), which also keeps the bid-ask bounce of D's close out of the
+window; the screen is read at D, the outcome at S."""
+replication = """Blitz and co-authors regress 36 months of returns on the Fama-French factors, take last
+month's residual, long the lowest decile and short the highest, held one month, large caps only.
+Here: the long side only, the market residual (or the sector-relative return) from stored
+features, the lowest 50 of the liquid common stocks."""
+expected_size = """The paper reports roughly twice the risk-adjusted return of the raw reversal and a
+significant net return in large caps after 1990 (not re-verified here); the weekly version on the
+100 largest stocks earned 29 bps a week net in 1990-2009 and was negative in a 1,500-stock universe
+(Quantpedia, verified; a different horizon and universe). After 2010 no public net figure is
+verified: expect a small number the harness reports beside its t statistic and sessions."""
+capacity_costs = """Capacity is the lowest of the anomalies (about 9 billion dollars across the US, Frazzini,
+Israel and Moskowitz 2015) and the whole return is cost: the 10 bps round trip is the assumption,
+and a single wide spread on a loser's rebound day can erase a month."""
+failure_modes = """A loser on news does not reverse (the bounce is a drift the other way), and a market
+that keeps falling keeps its losers falling. Retire if the frozen-period decile spread is not above
+zero or the picks do not beat the buy-and-hold mean of the eligible names net of costs."""
+decoys = """Plain one-month return (reversal without the residual), size and liquidity tilts, the
+earnings reaction (a name that just reported), and the low-beta effect (the residual of a
+high-beta name is not a loser)."""
+
+[[sources]]
+title = "Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets, 2013"
+url = "https://repub.eur.nl/pub/40707"
+
+[[sources]]
+title = "Nagel, S., Evaporating Liquidity, Review of Financial Studies, 2012"
+
+[[sources]]
+title = "Chen, A. and Velikov, M., Zeroing In on the Expected Returns of Anomalies, Journal of Financial and Quantitative Analysis, 2023"
+
+[[sources]]
+title = "Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022"
+url = "https://alphaarchitect.com/short-term-momentum/"

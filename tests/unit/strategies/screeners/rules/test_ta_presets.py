@@ -230,3 +230,47 @@ def test_eap_presets_take_an_expected_date_never_unknown_and_eap_volume_ranks_by
             assert spec.tie_break == ratio and spec.tie_break_descending
         else:
             assert set(qualified) >= {"EQ:SCHED", "EQ:PRIOR"}
+
+
+MV = "rollup.momentum_variants@v1."
+MOM = "rollup.trend_stats@v2.mom_12_1"
+RANKING = (  # EB E1a: preset, its tie-break field, a worse and a better value, ranked high first
+    ("residual_momentum", MV + "resid_mom_12_1", 0.1, 0.5, True),
+    ("volatility_scaled_momentum", "feature.mom_12_1_vol_scaled", 1.0, 3.0, True),
+    ("frog_in_the_pan", MOM, 0.2, 0.8, True),
+    ("momentum_x_quality_interaction", MOM, 0.2, 0.8, True),
+    ("fifty_two_week_high", "feature.pct_from_high_52w", -0.3, -0.01, True),
+    ("industry_momentum", MV + "sector_ret_252d", 0.1, 0.3, True),
+    ("residual_reversal", MV + "resid_ret_20d", -0.2, 0.1, False),
+    ("sector_reversal", MV + "rs_sector_20d", -0.2, 0.1, False),
+    ("low_beta", "rollup.episode_behaviour@v1.beta_252d", 0.5, 1.2, False),
+    ("low_volatility", "rollup.vol_stats@v1.hv60", 0.2, 0.6, False),
+)
+
+
+@pytest.mark.parametrize(("preset", "field", "low", "high", "descending"), RANKING)
+def test_edge_ranking_presets_rank_by_their_signal_and_reject_a_missing_value(
+    preset: str, field: str, low: float, high: float, descending: bool
+) -> None:
+    """The edge harness's ranking screens (ADR 0053, EB E1a): the base gates first, the signal
+    after, the order is the signal's in the declared direction, a missing value never passes."""
+    spec = resolve_config(STORE, preset, UserContext("site")).screen_spec
+    assert tuple(c.id for c in spec.criteria)[: len(BASE)] == BASE
+    assert spec.tie_break == field and spec.tie_break_descending is descending
+    base = {c.rule.field: _passing(c) for c in spec.criteria}
+    gone = spec.criteria[len(BASE)].rule.field
+    view = FeatureView(
+        DAY,
+        {
+            "EQ:LOW": {**base, field: low},
+            "EQ:HIGH": {**base, field: high},
+            "EQ:NONE": {k: v for k, v in base.items() if k != gone},
+        },
+    )
+    rows = evaluate_screen(spec, view).rows
+    first, second = ("EQ:HIGH", "EQ:LOW") if descending else ("EQ:LOW", "EQ:HIGH")
+    assert [(r.instrument_id, r.decision) for r in rows] == [
+        (first, Decision.QUALIFIED),
+        (second, Decision.QUALIFIED),
+        ("EQ:NONE", Decision.REJECT),
+    ]
