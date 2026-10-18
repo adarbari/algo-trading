@@ -3,12 +3,17 @@ its outcome, universe, the nine answers and the sources; the committed page is u
 
 from algotrade.config.edges.document import parse_edge
 from algotrade.config.edges.loading import load_edges
-from algotrade.config.edges.page import PATH, render
+from algotrade.config.edges.page import DIR, PATH, pages
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 from tests.unit.config.edges.test_document import document
 
 RULE = {"field": "instrument.status", "op": "eq", "value": "ACTIVE"}
+
+
+def render(edges: list) -> str:
+    """Every page joined: the assertions look at the content, the split tests at the layout."""
+    return "\n".join(pages(edges).values())
 
 
 def test_the_page_lists_edges_by_status_with_their_answers() -> None:
@@ -54,6 +59,7 @@ def test_the_page_lists_edges_by_status_with_their_answers() -> None:
     )
     page = render([closed, open_edge])
     assert page.index("| Drift (`drift`) | candidate") < page.index("| Drift (`gone`) | rejected")
+    assert pages([closed, open_edge]).keys() == {PATH, f"{DIR}/other.md"}
     assert "excess return, over 6 sessions, vs SPY, starting -5 sessions from the event" in page
     assert "costs 20 bps" in page
     assert (
@@ -93,7 +99,22 @@ def test_a_published_figure_is_shown_with_its_source() -> None:
     )
 
 
-def test_the_committed_page_is_up_to_date() -> None:
+def test_edges_are_split_by_family_and_the_index_links_each() -> None:
+    a = parse_edge(document(id="aa", family="A"), "aa", "aa.toml")
+    b = parse_edge(document(id="bb", family="B"), "bb", "bb.toml")
+    none = parse_edge(document(id="cc"), "cc", "cc.toml")
+    out = pages([none, b, a])
+    assert out.keys() == {PATH, f"{DIR}/a.md", f"{DIR}/b.md", f"{DIR}/other.md"}
+    assert "[family B](edges/b.md)" in out[PATH]
+    assert "[no family](edges/other.md)" in out[PATH]
+    assert "## Drift (`bb`)" in out[f"{DIR}/b.md"] and "`aa`" not in out[f"{DIR}/b.md"]
+    assert "## Drift" not in out[PATH]
+
+
+def test_the_committed_pages_are_up_to_date() -> None:
     edges = load_edges(FileConfigStore(REPO_ROOT / "config", local=False))
-    committed = (REPO_ROOT / PATH).read_text()
-    assert committed == render(edges), f"{PATH} is out of date: run `make features-doc`"
+    expected = pages(edges)
+    for rel, text in expected.items():
+        assert (REPO_ROOT / rel).read_text() == text, f"{rel} is out of date: make features-doc"
+    on_disk = {str(p.relative_to(REPO_ROOT)) for p in (REPO_ROOT / DIR).glob("*.md")}
+    assert on_disk == expected.keys() - {PATH}, "a stale family page: run `make features-doc`"
