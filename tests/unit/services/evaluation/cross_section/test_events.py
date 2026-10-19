@@ -7,7 +7,12 @@ from typing import Any
 
 import pytest
 
-from algotrade.config.edges.document import EVENT_CLASSES, EVENT_SUBTYPES, SUBTYPE_REQUIRED
+from algotrade.config.edges.document import (
+    ANNOUNCED_AHEAD,
+    EVENT_CLASSES,
+    EVENT_SUBTYPES,
+    SUBTYPE_REQUIRED,
+)
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.features.registry import GROUPS
 from algotrade.services.evaluation.cross_section import events
@@ -278,3 +283,9 @@ def test_a_reverse_split_is_an_event_on_its_ex_date_and_never_before_it() -> Non
     assert not EVENT_FIELDS["reverse_split"].announced_ahead
     with pytest.raises(ConfigurationError, match="has no subtype 'x'"):
         event_field("reverse_split", "x")  # no subtypes
+
+
+def test_the_document_and_the_harness_agree_on_which_classes_are_announced_ahead() -> None:
+    """The two lists drifted once (``ipo_lockup`` was read ahead by the harness but refused a
+    negative offset by the document): kept equal here, as config cannot import services."""
+    assert set(ANNOUNCED_AHEAD) == {k for k, v in EVENT_FIELDS.items() if v.announced_ahead}
