@@ -1,3 +1,4 @@
+import tomllib
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -13,13 +14,16 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.reference.universe_build import (
     UniverseSettings,
     UniverseSources,
+    asset_classes,
     build_universe,
     check_sp500,
+    coverage,
     review_rows,
 )
 from algotrade_sources.framework.http import RetryPolicy
 from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
+from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for, task_ctx
 from tests.helpers.payloads import universe as fx
 
@@ -294,3 +298,42 @@ def test_registry_task_builds_and_writes_the_review_file(tmp_path: Path) -> None
     record = run_task("universe-build", ctx, {"session": D1, "review_out": out})
     assert record.stats["review_out"] == str(out)
     assert out.read_text().startswith("symbol,leverage,tracks,notes")
+
+
+def listed(rows: list[tuple[str, str, bool, bool]]) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "symbol": [r[0] for r in rows],
+            "security_type": [r[1] for r in rows],
+            "is_etf": [r[2] for r in rows],
+            "status": "ACTIVE",
+            "is_test_issue": [r[3] for r in rows],
+        }
+    )
+
+
+def test_coverage_admits_an_active_closed_end_fund_but_not_a_test_issue() -> None:
+    reference = listed(
+        [
+            ("CEFA", "CEF", False, False),
+            ("CEFT", "CEF", False, True),
+            ("PREF", "PREFERRED", False, False),
+        ]
+    )
+    settings = load_universe(
+        MemoryConfigStore({("site", "settings", "universe"): {"security_types": ["CEF"]}})
+    )
+    assert coverage(reference, settings).tolist() == [True, False, False]
+    site = tomllib.loads((REPO_ROOT / "config" / "site" / "universe.toml").read_text())
+    assert "CEF" in site["security_types"]  # the shipped coverage holds the type (ADR 0013)
+
+
+def test_a_closed_end_fund_is_a_fund_never_a_stock_population_member() -> None:
+    covered = listed(
+        [
+            ("STK", "COMMON_STOCK", False, False),
+            ("ETFA", "ETF", True, False),
+            ("CEFA", "CEF", False, False),
+        ]
+    )
+    assert asset_classes(covered).tolist() == ["STOCK", "ETF", "ETF"]
