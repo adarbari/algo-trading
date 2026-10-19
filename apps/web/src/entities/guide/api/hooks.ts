@@ -5,8 +5,8 @@
  * at the names they mention, related fields, the playbooks that use it, the situations that
  * fool it), `Query.guidePlaybook`, `Query.guideSituation`, `Query.guideIndicator` and
  * `Query.guideEpisode` (the market regime's indicators and reference falls), `Query.guideTerm`
- * and `Query.guideStartPage` (the glossary and the Start here how-tos); the four entry reads
- * (term, start page, indicator, episode) go through the page's one `Query.guideEntries` batch
+ * and `Query.guideStartPage` (the glossary and the Start here how-tos); the six entry reads
+ * (term, start page, indicator, episode, mechanism, edge) go through the page's one `Query.guideEntries` batch
  * (`batch.ts`) under their own query keys. The field's own facts and guide
  * entry come from the catalogue (entities/feature).
  */

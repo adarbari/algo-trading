@@ -15,6 +15,14 @@ export interface RouteBudget {
   dom_nodes: number;
 }
 
+/** An owner's waiver of "a shared budget only goes down": how high it may rise, and the decision. */
+export interface Waiver {
+  /** The highest value the budget may take under this waiver. */
+  max: number;
+  /** The heading (without "## ") of the decision-log entry that grants it. */
+  log: string;
+}
+
 export interface Budgets {
   bundle: {
     /** The entry chunk's own JS + CSS, gzip: what every first visit downloads before any route. */
@@ -33,9 +41,17 @@ export interface Budgets {
    * "YYYY-MM-DD #PR what the owner asked for". Never read by the checks; kept by every update.
    */
   reasons?: Record<string, string>;
+  /**
+   * An owner waiver of the rule that a shared budget only goes down: shared budget path -> a
+   * ceiling and the decision that grants it. A budget may rise to `max` and no higher, in the PR
+   * that adds the waiver or raises its ceiling; a waiver already on the base allows nothing more.
+   * `log` is the heading of the docs/decisions/log.md entry (decided by: owner, status: final);
+   * the budgets test checks that entry exists.
+   */
+  waivers?: Record<string, Waiver>;
 }
 
-/** The budgets every route shares: they only ever go down, whatever the reason. */
+/** The budgets every route shares: they only ever go down, unless the owner waives that (`waivers`). */
 export const SHARED_BUDGETS: readonly string[] = [
   'bundle.entry_gzip_bytes',
   'bundle.entry_closure_gzip_bytes',
@@ -72,7 +88,14 @@ export function unexplainedRises(base: Budgets, head: Budgets): string[] {
     const old = before[path];
     if (old === undefined || value <= old) continue;
     if (SHARED_BUDGETS.includes(path)) {
-      out.push(`${path} rose from ${String(old)} to ${String(value)}: shared budgets only go down`);
+      const waiver = head.waivers?.[path];
+      const granted = waiver !== undefined && waiver.max !== base.waivers?.[path]?.max;
+      if (granted && value <= waiver.max) continue;
+      out.push(
+        granted
+          ? `${path} rose from ${String(old)} to ${String(value)}, over its waiver's ceiling of ${String(waiver.max)}`
+          : `${path} rose from ${String(old)} to ${String(value)}: shared budgets only go down`,
+      );
       continue;
     }
     const reason = head.reasons?.[path];

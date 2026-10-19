@@ -23,6 +23,14 @@ import {
   REGIME_INDEX,
   SITUATION,
 } from './guide/pages-api';
+import {
+  EDGES_SECTION,
+  guideEdge,
+  guideEdgeIndex,
+  guideMechanism,
+  guideMechanisms,
+  guidePlaybookEdges,
+} from './guide/edges-api';
 import { guideSearch, guideStartPage, guideTerm, START_INDEX } from './guide/start-api';
 
 type Json = Record<string, unknown>;
@@ -363,6 +371,7 @@ function guideIndex(): Json {
             purpose: 'The indicators behind the weather and the falls they are judged on.',
             entries: REGIME_INDEX.indicators.length + REGIME_INDEX.episodes.length,
           },
+          EDGES_SECTION,
           { id: 'playbooks', title: 'Playbooks', purpose: 'One page per site screen.', entries: 2 },
           { id: 'fields', title: 'Fields', purpose: 'Every catalogue field.', entries: 3 },
           {
@@ -463,6 +472,13 @@ function graphqlAnswer(operation: Operation): Json | null {
   const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
   if (name === 'FeatureCatalogue' || name === 'FeatureCatalogueDetail') return catalogue();
   if (name === 'GuideIndex') return guideIndex();
+  if (name === 'GuideEdgeIndex') return guideEdgeIndex();
+  if (name === 'GuideMechanisms') return guideMechanisms();
+  if (name === 'GuideMechanism') return guideMechanism(String(operation.variables?.['id']));
+  if (name === 'GuideEdge') return guideEdge(String(operation.variables?.['id']));
+  if (name === 'GuidePlaybookEdges') {
+    return guidePlaybookEdges(String(operation.variables?.['id']));
+  }
   if (name === 'GuidePlaybook') return guidePlaybook(String(operation.variables?.['id']));
   if (name === 'GuideSituation') return guideSituation(String(operation.variables?.['slug']));
   if (name === 'GuideEntries') return guideEntries(operation.variables?.['refs'] as GuideRef[]);

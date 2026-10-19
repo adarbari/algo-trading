@@ -26,7 +26,12 @@ vi.mock('@/features/edge-follow', async () => {
 });
 vi.mock('@/features/guide-help', async () => {
   const { Text } = await import('@algotrade/ui');
-  return { termHelp: (id: string) => <Text>{`help ${id}`}</Text> };
+  return {
+    termHelp: (id: string) => <Text>{`help ${id}`}</Text>,
+    GuideHelp: ({ entry }: { entry: { kind: string; id: string } }) => (
+      <Text>{`guide ${entry.kind} ${entry.id}`}</Text>
+    ),
+  };
 });
 
 const momentum = edgeFixture('momentum_12_1');
@@ -36,6 +41,13 @@ const header = (edge = momentum, onBack = vi.fn()) =>
   render(<EdgeHeader edge={edge} onBack={onBack} onEdit={vi.fn()} />);
 
 describe('EdgeHeader', () => {
+  it('gives a site edge a button to its Guide entry, and a user’s own edge none', () => {
+    header();
+    expect(screen.getByText('guide edge momentum_12_1')).toBeInTheDocument();
+    header(mine);
+    expect(screen.queryByText('guide edge my_momentum')).toBeNull();
+  });
+
   it('shows the name, verdict with the server headline, the actions and the live badge', async () => {
     const { container } = header();
     expect(screen.getByRole('heading', { level: 1, name: 'Momentum 12-1' })).toBeInTheDocument();

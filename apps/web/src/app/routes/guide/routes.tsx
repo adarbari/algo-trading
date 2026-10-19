@@ -6,13 +6,16 @@
  * `/guide/situations` and `/guide/situations/$slug`, `/guide/regime`, `/guide/regime/indicators/$key`
  * and `/guide/regime/episodes/$key` (the market regime's indicators and reference falls),
  * `/guide/start` and `/guide/start/$id` (the how-tos in order) and `/guide/glossary` and
- * `/guide/glossary/$id` (the app's words A to Z). No role gating (`viewerGuard`: any registered
+ * `/guide/glossary/$id` (the app's words A to Z) and `/guide/edges`, `/guide/edges/m/$mechanism`
+ * and `/guide/edges/$id` (why an edge should work: the mechanisms and the site edges). No role gating (`viewerGuard`: any registered
  * viewer) and no workspace: the layout shows the top bar of the workspace the user came from
  * (`GuideLayout`), so an admin stays in ADMIN.
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import type * as GuidePages from '@/pages/guide';
+
+import type * as EdgesRouteModule from './edges-routes';
 
 import { parseFieldsSearch } from '@/entities/guide';
 import { GuideLayout } from '../../layouts';
@@ -42,6 +45,14 @@ const GuideTermPage = lazyPage(guidePages, 'GuideTermPage');
 // Every Guide page shares one chunk and the index reads; each page preloads itself (a lazyPage
 // renders unsuspended only once its own `load` ran).
 const guideLoading = (page: PageModule<typeof GuidePages>) =>
+  pageRoute(page, (module, client) => {
+    module.prefetchGuideReads(client);
+  });
+
+// The Edges routes' components load on first visit (edges-routes.tsx), with the same shared reads.
+const edgesModule = () => import('./edges-routes');
+const EdgesRoutes = lazyPage(edgesModule, 'EdgesRoutes');
+const edgesLoading = (page: PageModule<typeof EdgesRouteModule>) =>
   pageRoute(page, (module, client) => {
     module.prefetchGuideReads(client);
   });
@@ -172,6 +183,13 @@ const episodeRoute = createRoute({
   component: EpisodeRoute,
 });
 
+const edgesRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  ...edgesLoading(EdgesRoutes),
+  path: 'edges/$',
+  component: EdgesRoutes,
+});
+
 const startIndexRoute = createRoute({
   getParentRoute: () => guideRoute,
   ...guideLoading(GuideStartIndexPage),
@@ -220,6 +238,7 @@ export const guideRoutes = guideRoute.addChildren([
   playbookRoute,
   situationsRoute,
   situationRoute,
+  edgesRoute,
   regimeIndexRoute,
   indicatorRoute,
   episodeRoute,

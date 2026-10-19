@@ -6,12 +6,15 @@ import { Text } from '@algotrade/ui';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import {
+  GuideEdgePage,
+  GuideEdgesPage,
   GuideEpisodePage,
   GuideFieldPage,
   GuideFieldsPage,
   GuideGlossaryPage,
   GuideHomePage,
   GuideIndicatorPage,
+  GuideMechanismPage,
   GuidePlaybookPage,
   GuidePlaybooksPage,
   GuideRegimePage,
@@ -32,6 +35,9 @@ const widgets = vi.hoisted(() => ({
   episode: vi.fn(),
   start: vi.fn(),
   term: vi.fn(),
+  edges: vi.fn(),
+  mechanism: vi.fn(),
+  edge: vi.fn(),
 }));
 
 vi.mock('@/widgets/guide-rail', () => ({
@@ -53,6 +59,27 @@ vi.mock('@/widgets/guide-field', () => ({
     return <Text>field page</Text>;
   },
   FieldOutline: () => <Text>outline</Text>,
+}));
+
+vi.mock('@/widgets/guide-edges', () => ({
+  GuideEdgesIndex: (props: Record<string, unknown>) => {
+    widgets.edges(props);
+    return <Text>edges index</Text>;
+  },
+}));
+vi.mock('@/widgets/guide-mechanism', () => ({
+  GuideMechanism: (props: Record<string, unknown>) => {
+    widgets.mechanism(props);
+    return <Text>mechanism page</Text>;
+  },
+  MechanismOutline: () => <Text>mechanism outline</Text>,
+}));
+vi.mock('@/widgets/guide-edge', () => ({
+  GuideEdge: (props: Record<string, unknown>) => {
+    widgets.edge(props);
+    return <Text>edge page</Text>;
+  },
+  EdgeOutline: () => <Text>edge outline</Text>,
 }));
 
 vi.mock('@/widgets/guide-playbooks', () => ({
@@ -155,6 +182,25 @@ describe('Guide pages', () => {
     render(<GuideEpisodePage slug="gfc_2007" />);
     expect(widgets.episode).toHaveBeenLastCalledWith({ slug: 'gfc_2007' });
     expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'episode', episode: 'gfc_2007' });
+  });
+
+  it('frames the Edges index, a mechanism’s page and an edge’s page, with the rail and the outline', () => {
+    const onOpenEdgesPage = vi.fn();
+    render(<GuideEdgesPage onOpenEdgesPage={onOpenEdgesPage} />);
+    expect(widgets.edges).toHaveBeenLastCalledWith({ onOpenEdgesPage });
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'edges' });
+    render(<GuideMechanismPage id="slow_to_update" />);
+    expect(widgets.mechanism).toHaveBeenLastCalledWith({ id: 'slow_to_update' });
+    expect(widgets.rail).toHaveBeenLastCalledWith({
+      page: 'mechanism',
+      mechanism: 'slow_to_update',
+    });
+    expect(screen.getByText('mechanism outline')).toBeInTheDocument();
+    const onSeeEvidence = vi.fn();
+    render(<GuideEdgePage id="momentum_12_1" onSeeEvidence={onSeeEvidence} />);
+    expect(widgets.edge).toHaveBeenLastCalledWith({ id: 'momentum_12_1', onSeeEvidence });
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'edge' });
+    expect(screen.getByText('edge outline')).toBeInTheDocument();
   });
 
   it('frames Start here and a how-to page with the rail on it', () => {

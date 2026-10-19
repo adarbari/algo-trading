@@ -2,7 +2,8 @@
  * The Guide's pages (ADR 0051): the home (`/guide`), Start here (the index and a how-to page),
  * the glossary (the A to Z index and a term's page), the field index (`/guide/fields`) and one
  * field's page (`/guide/fields/$name`), the playbook index and a playbook's page, the situation
- * index and a situation's page, the Market regime index and an indicator's and a market fall's page. Each is the reference frame (a rail on the side, the article,
+ * index and a situation's page, the Market regime index and an indicator's and a market fall's page,
+ * the Edges index, a mechanism's page and a site edge's page. Each is the reference frame (a rail on the side, the article,
  * and on a field page the "On this page" list) around one widget; the choices (view, theme,
  * intent, field, playbook, situation) and where a playbook's buttons go come from the route as
  * props.
@@ -10,10 +11,13 @@
 import { DocLayout } from '@algotrade/ui';
 
 import type { FieldsSearch, FieldsView } from '@/entities/guide';
+import { EdgeOutline, GuideEdge } from '@/widgets/guide-edge';
+import { GuideEdgesIndex } from '@/widgets/guide-edges';
 import { GuideFieldsIndex } from '@/widgets/guide-fields';
 import { FieldOutline, GuideField } from '@/widgets/guide-field';
 import { GuideGlossaryIndex, GuideTerm } from '@/widgets/guide-glossary';
 import { GuideHome } from '@/widgets/guide-home';
+import { GuideMechanism, MechanismOutline } from '@/widgets/guide-mechanism';
 import { GuidePlaybook } from '@/widgets/guide-playbook';
 import { GuidePlaybooksIndex } from '@/widgets/guide-playbooks';
 import { GuideRail } from '@/widgets/guide-rail';
@@ -117,6 +121,42 @@ export function GuideEpisodePage({ slug }: { slug: string }) {
   return (
     <DocLayout rail={<GuideRail page="episode" episode={slug} />}>
       <GuideEpisode slug={slug} />
+    </DocLayout>
+  );
+}
+
+export interface GuideEdgesPageProps {
+  /** Opens the live Edges page. */
+  onOpenEdgesPage: () => void;
+}
+
+export function GuideEdgesPage({ onOpenEdgesPage }: GuideEdgesPageProps) {
+  return (
+    <DocLayout rail={<GuideRail page="edges" />}>
+      <GuideEdgesIndex onOpenEdgesPage={onOpenEdgesPage} />
+    </DocLayout>
+  );
+}
+
+export function GuideMechanismPage({ id }: { id: string }) {
+  return (
+    <DocLayout rail={<GuideRail page="mechanism" mechanism={id} />} aside={<MechanismOutline />}>
+      <GuideMechanism id={id} />
+    </DocLayout>
+  );
+}
+
+export interface GuideEdgePageProps {
+  /** The site edge id in the URL. */
+  id: string;
+  /** Opens that edge's live evidence on the Edges page. */
+  onSeeEvidence: () => void;
+}
+
+export function GuideEdgePage({ id, onSeeEvidence }: GuideEdgePageProps) {
+  return (
+    <DocLayout rail={<GuideRail page="edge" />} aside={<EdgeOutline />}>
+      <GuideEdge id={id} onSeeEvidence={onSeeEvidence} />
     </DocLayout>
   );
 }

@@ -141,17 +141,17 @@ The Edges section answers one question at three levels: why should anything like
 is session-free like every Guide page: it shows no win rate, lift, curve, verdict or run, only
 what the documents say (the Edges page and the evidence pages hold the live figures).
 
-- **Index** `/guide/edges` (`Query.guideEdgeIndex`): the nine mechanisms as cards in the fixed
-  order of `MECHANISM_KINDS` (question, one-line hero, an "e.g." line, how many edges rest on
-  it and their statuses), the filters with counts (asset class: stocks, ETFs and funds,
-  options; side; holding band; computed by the server from the documents, `asset_of` in
-  `services/read/guide/edges/universe.py`) and two groups after the mechanisms: **Set aside**
-  (the edges with status `rejected` or `blocked`, each with the reason on file) and **Researched,
-  not built** (the ideas of `docs/edge-ideas` that no edge document files).
+- **Index** `/guide/edges` (`Query.guideEdgeIndex`): every one of the nine mechanisms as a card
+  in the fixed order of `MECHANISM_KINDS` (question, one-line hero, an "e.g." line, how many edges
+  rest on it and their statuses), whether or not an edge on it is live; no list of edges and no
+  filters here (owner 2026-10-19). After the cards, **Researched, not built** (the ideas of
+  `docs/edge-ideas` that no edge document files) is collapsed until opened.
 - **Mechanism** `/guide/edges/m/<mechanism>` (`Query.guideMechanism(id)`): the prose of
   `config/site/guide/mechanisms/<id>.toml` (how it works, why it survives, the research, real
   against decoy, the one thing not to read into it, stat tiles, sources) and the site edges that
-  rest on it as rows (name, thesis, asset, holding, side, status), then the ideas not built.
+  rest on it as rows (name, thesis, asset, holding, side, status; rejected and blocked edges
+  included) with filters for status, asset, side and holding band, drawn from the values its own
+  edges carry; then the ideas not built, collapsed.
 - **Edge** `/guide/edges/<id>` (`Query.guideEdge(id)`): the thesis; who is on the other side
   (the document's `mechanism`) and why it lasts (`persistence`); **what the research found**
   (the `[published]` figure with the planning haircut of `verdict.toml [published_haircut]` for

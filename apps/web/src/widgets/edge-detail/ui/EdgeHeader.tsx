@@ -3,7 +3,7 @@
  * status and live state, the date of the official result and the data it read, the actions, the
  * headline sentence, and what would change the verdict (the evidence collected against the
  * evidence needed, and the checks that the result is real). The first paint of the page: it
- * reads only the edges the page already holds. Each term carries its Guide button; every word and
+ * reads only the edges the page already holds. A site edge has a button to its Guide entry. Each term carries its Guide button; every word and
  * number is the server's.
  */
 import { Button, Chip, formatValue, Heading, Stack, StatusBadge, Text } from '@algotrade/ui';
@@ -21,7 +21,7 @@ import {
 } from '@/entities/edge';
 import { RunEvaluation } from '@/features/edge-evaluation';
 import { EdgeActions } from '@/features/edge-follow';
-import { termHelp } from '@/features/guide-help';
+import { GuideHelp, termHelp } from '@/features/guide-help';
 
 import { EdgeOutlook } from './EdgeOutlook';
 
@@ -47,7 +47,10 @@ export function EdgeHeader({ edge, onBack, onEdit }: EdgeHeaderProps) {
         </Stack>
         <Stack direction="row" gap={3} align="center" justify="between" wrap>
           <Stack gap={1}>
-            <Heading level={1}>{edge.name}</Heading>
+            <Stack direction="row" gap={2} align="center">
+              <Heading level={1}>{edge.name}</Heading>
+              {!edge.mine && <GuideHelp entry={{ kind: 'edge', id: edge.id }} />}
+            </Stack>
             <Stack direction="row" gap={2} align="center" wrap>
               <StatusBadge tone={verdictTone(v.verdict)}>{verdictLabel(v.verdict)}</StatusBadge>
               {termHelp('verdict')}

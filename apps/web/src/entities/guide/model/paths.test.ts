@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BUILT_SECTIONS,
+  edgeGuidePath,
+  edgesGroupPath,
   episodePath,
   exploreFieldPath,
   fieldPath,
   fieldsPath,
   guideEntryPath,
   indicatorPath,
+  mechanismPath,
   parseFieldsSearch,
   playbookPath,
   screenerBuilderPath,
@@ -31,10 +34,19 @@ describe('guide paths', () => {
     expect(episodePath('gfc_2007')).toBe('/guide/regime/episodes/gfc_2007');
   });
 
+  it('builds the Edges section paths: a mechanism, a site edge and the index groups', () => {
+    expect(mechanismPath('slow_to_update')).toBe('/guide/edges/m/slow_to_update');
+    expect(edgeGuidePath('earnings_date_advance')).toBe('/guide/edges/earnings_date_advance');
+    expect(edgesGroupPath('not-built')).toBe('/guide/edges#not-built');
+    expect(guideEntryPath('mechanism', 'forced_flows')).toBe('/guide/edges/m/forced_flows');
+    expect(guideEntryPath('edge', 'momentum_12_1')).toBe('/guide/edges/momentum_12_1');
+  });
+
   it('has pages for every section, Start here first and the Glossary last', () => {
     expect(BUILT_SECTIONS).toEqual([
       'start',
       'regime',
+      'edges',
       'playbooks',
       'fields',
       'situations',

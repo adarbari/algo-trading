@@ -5,8 +5,11 @@
  * (how to read it, what to use it for, "Use this" when the page passes `onUse`), a regime
  * indicator (why it matters, when it is on, lead time and track record) or a reference market
  * fall (dates, drawdowns, cause), a glossary term (its short line and its body) or a Start here
- * page (its summary and first section). The text is the server's; nothing is written here.
+ * page (its summary and first section), a mechanism or a site edge of the Edges section (its
+ * one-line hero and first paragraphs). The text is the server's; nothing is written here.
  */
+import { lazy, Suspense } from 'react';
+
 import type { GuideUse } from '@/entities/feature';
 
 import type { GuideEntry } from '../model/entry';
@@ -15,6 +18,9 @@ import { FieldHelp } from './FieldHelp';
 import { IndicatorHelp } from './IndicatorHelp';
 import { StartHelp } from './StartHelp';
 import { TermHelp } from './TermHelp';
+
+// The Edges section's drawers load on first use: the entry's shared chunk does not carry them.
+const EdgesHelp = lazy(() => import('./EdgesHelp'));
 
 export interface GuideHelpProps {
   /** The Guide entry the button explains. */
@@ -41,6 +47,13 @@ export function GuideHelp({ entry, onUse, useDisabled = false }: GuideHelpProps)
       return <TermHelp id={entry.id} />;
     case 'start':
       return <StartHelp id={entry.id} />;
+    case 'mechanism':
+    case 'edge':
+      return (
+        <Suspense fallback={null}>
+          <EdgesHelp entry={entry} />
+        </Suspense>
+      );
   }
 }
 

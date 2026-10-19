@@ -25,6 +25,17 @@ describe('SourceList', () => {
     expect(container.querySelector('#s2')).not.toBeNull();
   });
 
+  it('leaves the kind line out when an item has none', () => {
+    render(
+      <SourceList
+        aria-label="Sources"
+        items={[{ id: 's1', title: 'C (2003)', url: 'https://example.org/c' }]}
+      />,
+    );
+    expect(screen.getByRole('link', { name: /C \(2003\)/ })).toBeInTheDocument();
+    expect(screen.queryByText('Academic paper')).toBeNull();
+  });
+
   it('renders nothing without items', () => {
     const { container } = render(<SourceList aria-label="Sources" items={[]} />);
     expect(container).toBeEmptyDOMElement();

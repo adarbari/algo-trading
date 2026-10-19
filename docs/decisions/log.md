@@ -957,6 +957,14 @@ follow-up PR).
 - status: final
 - Reasoning: the name is on the public filing beside the CIK that is already stored, so storing it adds no exposure the CIK did not, and it makes the deep-dive dossier and a later per-insider view readable. Reverses only the "no names" clause; the #651 entry's status is `overruled` for that reason.
 
+## 2026-10-18 | Guide Edges web PR (#712) | Entry-static-imports waiver and trader-ideas budget
+- Question: the Guide Edges web pages (#712) leave the entry static imports 271 B over main's budget (CI 195971 B vs 195700 B, a shared budget that only goes down) and the Ideas page chunk 530 B over main's local size; waive or cut?
+- Options: cut elsewhere in the entry / waive the shared rule for this PR and raise by about 300 B.
+- Decision: owner waiver of the shared rule for the entry static imports budget only, raised to 196040 B (CI 195971 B + 69 B margin) through the new `waivers` map of perf-budgets.json (a waiver names a ceiling and this entry; the budget script lets the budget rise to that ceiling once, in the PR that adds it); every other budget unchanged. The trader-ideas budget is accepted at 42690 B with its reason; follow-up: diagnose the +530 B (a module moved into the page chunk) in a later PR.
+- decided by: owner
+- status: final
+- Reasoning: the section's lazy drawer loader, paths and kinds and its route must be in the entry; the Edges documents, drawers, pages and route components are already lazy, and the remaining bytes were measured against main.
+
 ## 2026-10-18 | EB F PR 1 (filing text similarity) | Measure, tokens and floors of the text-change features
 - Question: how is the change between a filing and its year-ago filing measured, and when is it a value?
 - Options: cosine on TF-IDF / min-edit distance / cosine on raw term counts plus Jaccard on word sets.

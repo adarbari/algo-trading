@@ -6,12 +6,18 @@ import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib
 
 import { GuidePlaybook } from './GuidePlaybook';
 
-const hooks = vi.hoisted(() => ({ useGuidePlaybook: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useGuidePlaybook: vi.fn(), useGuidePlaybookEdges: vi.fn() }));
 
 vi.mock('@/entities/guide', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useGuidePlaybook: hooks.useGuidePlaybook,
+  useGuidePlaybookEdges: hooks.useGuidePlaybookEdges,
 }));
+
+vi.mock('@/features/guide-help', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return { termHelp: (id: string) => <Text>{`help ${id}`}</Text> };
+});
 
 stubElementSize();
 
@@ -67,6 +73,15 @@ const playbook = {
   situations: [{ slug: 'earnings-gap', name: 'Earnings gap inside the window', fields: [volume] }],
 };
 
+const implemented = [
+  {
+    id: 'range_breakout_edge',
+    name: 'Range breakouts',
+    thesis: 'Shares closing above a one-month high keep rising for a few weeks.',
+    status: 'candidate',
+  },
+];
+
 function setup() {
   const onSeeHits = vi.fn();
   const onOpenBuilder = vi.fn();
@@ -78,6 +93,7 @@ function setup() {
 
 beforeEach(() => {
   hooks.useGuidePlaybook.mockReturnValue(fakeQuery(playbook));
+  hooks.useGuidePlaybookEdges.mockReturnValue(fakeQuery(implemented));
 });
 
 describe('GuidePlaybook', () => {
@@ -137,6 +153,23 @@ describe('GuidePlaybook', () => {
     expect(
       within(before).getByRole('link', { name: 'Earnings gap inside the window' }),
     ).toHaveAttribute('href', '/guide/situations/earnings-gap');
+  });
+
+  it('lists the edges it implements, each linked to its Guide page with its status', () => {
+    setup();
+    const edges = screen.getByRole('region', { name: 'Edges it implements' });
+    expect(within(edges).getByRole('link', { name: 'Range breakouts' })).toHaveAttribute(
+      'href',
+      '/guide/edges/range_breakout_edge',
+    );
+    expect(within(edges).getByText('Candidate')).toBeInTheDocument();
+    expect(within(edges).getByText(/keep rising for a few weeks/)).toBeInTheDocument();
+  });
+
+  it('shows no edges panel for a playbook no edge uses', () => {
+    hooks.useGuidePlaybookEdges.mockReturnValue(fakeQuery([]));
+    setup();
+    expect(screen.queryByRole('region', { name: 'Edges it implements' })).toBeNull();
   });
 
   it('links related playbooks with their reasons, and lists the sources', () => {

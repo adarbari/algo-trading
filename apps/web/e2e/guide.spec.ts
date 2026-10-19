@@ -229,6 +229,7 @@ test('the home lists Start here first and the Glossary last, and the rail follow
   await expect(page.getByRole('heading', { level: 2 })).toHaveText([
     'Start here',
     'Market regime',
+    'Edges',
     'Playbooks',
     'Fields',
     'Situations',
@@ -405,4 +406,53 @@ test('an unknown indicator or market fall says so', async ({ page }) => {
   await expect(page.getByText('No such indicator')).toBeVisible();
   await page.goto('/guide/regime/episodes/nope');
   await expect(page.getByText('No such market fall')).toBeVisible();
+});
+
+test('Edges: the index to a mechanism to an edge, and on to the live evidence', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/guide/edges');
+  await expect(page.getByRole('heading', { level: 1, name: 'Edges' })).toBeVisible();
+  const cards = page.getByRole('list', { name: 'The mechanisms' });
+  await expect(cards.getByRole('link')).toHaveText(['Slow to update', 'Forced buyers and sellers']);
+  // The edges are on their mechanism's page; the ideas not built stay closed until opened.
+  await expect(page.getByRole('link', { name: 'Index additions' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Researched, not built' })).toHaveCount(0);
+  await page.getByRole('button', { name: /Researched, not built/ }).click();
+  await expect(page.getByRole('region', { name: 'Researched, not built' })).toContainText('Dead');
+  // The rail opens the mechanisms and the ideas not built on these pages.
+  const rail = page.getByRole('navigation', { name: 'Guide', exact: true });
+  await expect(rail.getByRole('link', { name: 'Researched, not built' })).toBeVisible();
+  await cards.getByRole('link', { name: 'Slow to update' }).click();
+
+  await expect(page).toHaveURL(/\/guide\/edges\/m\/slow_to_update$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Slow to update' })).toBeVisible();
+  await expect(page.getByText('Arbitrage is expensive to run.')).toBeVisible();
+  await expect(page.getByRole('link', { name: '[1]' })).toHaveAttribute('href', /#s1$/);
+  await page
+    .getByRole('region', { name: 'The edges in this mechanism' })
+    .getByRole('link', { name: 'Earnings-date advances' })
+    .click();
+
+  await expect(page).toHaveURL(/\/guide\/edges\/earnings_date_advance$/);
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Earnings-date advances' }),
+  ).toBeVisible();
+  await expect(page.getByText('After our planning haircut')).toBeVisible();
+  await expectAccessible(page);
+  await page.getByRole('button', { name: 'See the live evidence' }).click();
+  await expect(page).toHaveURL(/\/edges\?edge=earnings_date_advance$/);
+  expect(errors).toEqual([]);
+});
+
+test('Edges: a playbook lists the edges it implements, linked to their Guide pages', async ({
+  page,
+}) => {
+  await page.goto('/guide/playbooks/vrp_scanner');
+  const edges = page.getByRole('region', { name: 'Edges it implements' });
+  await expect(edges.getByRole('link', { name: 'Earnings-date advances' })).toHaveAttribute(
+    'href',
+    '/guide/edges/earnings_date_advance',
+  );
 });

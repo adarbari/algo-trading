@@ -6,17 +6,19 @@ import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
 import { GuideHome } from './GuideHome';
 
-const hooks = vi.hoisted(() => ({ useGuideIndex: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useGuideIndex: vi.fn(), useGuideMechanisms: vi.fn() }));
 
 vi.mock('@/entities/guide', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useGuideIndex: hooks.useGuideIndex,
+  useGuideMechanisms: hooks.useGuideMechanisms,
 }));
 
 const index = {
   sections: [
     { id: 'start', title: 'Start here', purpose: 'How the app thinks.', entries: 4 },
     { id: 'regime', title: 'Market regime', purpose: 'The weather.', entries: 20 },
+    { id: 'edges', title: 'Edges', purpose: 'Why an edge should work.', entries: 2 },
     { id: 'playbooks', title: 'Playbooks', purpose: 'One page per site screen.', entries: 3 },
     { id: 'fields', title: 'Fields', purpose: 'Every catalogue field.', entries: 399 },
     { id: 'situations', title: 'Situations', purpose: 'States that fool fields.', entries: 2 },
@@ -64,8 +66,14 @@ const index = {
   episodes: [{ key: 'gfc_2007', name: 'Global financial crisis, 2007-09' }],
 };
 
+const mechanisms = [
+  { id: 'slow_to_update', title: 'Slow to update', count: 13 },
+  { id: 'forced_flows', title: 'Forced buyers and sellers', count: 8 },
+];
+
 beforeEach(() => {
   hooks.useGuideIndex.mockReturnValue(fakeQuery(index));
+  hooks.useGuideMechanisms.mockReturnValue(fakeQuery(mechanisms));
 });
 
 describe('GuideHome', () => {
@@ -84,12 +92,26 @@ describe('GuideHome', () => {
     ).toHaveAttribute('href', '/guide/regime');
   });
 
+  it('lists the mechanisms under Edges with how many edges rest on each, each a link', () => {
+    render(<GuideHome />);
+    const edges = within(screen.getByRole('region', { name: 'Edges' }));
+    expect(edges.getByRole('link', { name: 'Slow to update · 13' })).toHaveAttribute(
+      'href',
+      '/guide/edges/m/slow_to_update',
+    );
+    expect(edges.getByRole('link', { name: 'Why an edge should work' })).toHaveAttribute(
+      'href',
+      '/guide/edges',
+    );
+  });
+
   it('shows every section in the server’s order, Start here first and the Glossary last', () => {
     render(<GuideHome />);
     expect(screen.getByRole('heading', { level: 1, name: 'Guide' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
       'Start here',
       'Market regime',
+      'Edges',
       'Playbooks',
       'Fields',
       'Situations',

@@ -113,6 +113,46 @@ describe('Guide search', () => {
     await expectNoA11yViolations(document.body);
   });
 
+  it('groups the mechanisms and the edges, each hit linking to its Guide page', async () => {
+    GQL.mockResolvedValue({
+      guideSearch: {
+        query: 'drift',
+        groups: [
+          {
+            kind: 'mechanism',
+            hits: [
+              {
+                kind: 'mechanism',
+                id: 'slow_to_update',
+                title: 'Slow to update',
+                snippet: 'Prices absorb news in steps.',
+              },
+            ],
+          },
+          {
+            kind: 'edge',
+            hits: [
+              {
+                kind: 'edge',
+                id: 'pead',
+                title: 'Post-earnings drift',
+                snippet: 'Stocks keep drifting after a surprise.',
+              },
+            ],
+          },
+        ],
+      },
+    });
+    setup();
+    const user = userEvent.setup();
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(await screen.findByRole('searchbox', BOX), 'drift');
+    const mechanisms = within(await screen.findByRole('region', { name: 'Mechanisms' }));
+    expect(mechanisms.getByRole('link')).toHaveAttribute('href', '/guide/edges/m/slow_to_update');
+    const edges = within(screen.getByRole('region', { name: 'Edges' }));
+    expect(edges.getByRole('link')).toHaveAttribute('href', '/guide/edges/pead');
+  });
+
   it('opens the first result on Enter and the focused one after the arrows, under /guide', async () => {
     const { navigate } = setup();
     const user = userEvent.setup();

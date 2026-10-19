@@ -110,7 +110,16 @@ export async function mockNoGuideEntries(page: Page): Promise<void> {
       return;
     }
     await route.fulfill({
-      json: { data: { guideEntries: { indicators: [], episodes: [], terms: [], startPages: [] } } },
+      json: {
+        data: {
+          guideEntries: {
+            indicators: [],
+            episodes: [],
+            terms: [],
+            startPages: [],
+          },
+        },
+      },
     });
   });
 }

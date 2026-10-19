@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { gql } from '@/shared/api';
 
 import { useGuideField, useGuideIndex, useGuidePlaybook, useGuideSituation } from './hooks';
+import { useGuideEdge, useGuideEdgeIndex, useGuideMechanism } from './edges';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -28,6 +29,44 @@ describe('guide hooks', () => {
     });
     expect(String(GQL.mock.calls[0]?.[0])).toContain('query GuideIndex');
     expect(result.current.data).toEqual({ sections: [], themeGroups: [], intents: [] });
+  });
+
+  it('reads the Edges index, and nothing while it is disabled', async () => {
+    GQL.mockClear();
+    GQL.mockResolvedValue({ guideEdgeIndex: { mechanisms: [], setAsideTitle: 'Set aside' } });
+    const idle = renderHook(() => useGuideEdgeIndex({ enabled: false }), { wrapper });
+    expect(idle.result.current.fetchStatus).toBe('idle');
+    const { result } = renderHook(() => useGuideEdgeIndex(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(String(GQL.mock.calls[0]?.[0])).toContain('query GuideEdgeIndex');
+    expect(result.current.data?.setAsideTitle).toBe('Set aside');
+  });
+
+  it('reads a mechanism and a site edge by id, each in its own query', async () => {
+    GQL.mockClear();
+    GQL.mockResolvedValue({ guideMechanism: { id: 'm' }, guideEdge: { summary: { id: 'e' } } });
+    const { result } = renderHook(
+      () => ({ mechanism: useGuideMechanism('m'), edge: useGuideEdge('e') }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.mechanism.isSuccess && result.current.edge.isSuccess).toBe(true);
+    });
+    const asked = GQL.mock.calls.map(([document, variables]) => [String(document), variables]);
+    expect(
+      asked.some(
+        ([d, v]) =>
+          String(d).includes('query GuideMechanism') && JSON.stringify(v) === '{"id":"m"}',
+      ),
+    ).toBe(true);
+    expect(
+      asked.some(
+        ([d, v]) => String(d).includes('query GuideEdge(') && JSON.stringify(v) === '{"id":"e"}',
+      ),
+    ).toBe(true);
+    expect(result.current.mechanism.data?.id).toBe('m');
   });
 
   it('reads a field’s derived parts by name, and nothing without one', async () => {
