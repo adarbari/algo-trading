@@ -118,6 +118,22 @@ def test_a_window_may_start_before_an_event_announced_ahead() -> None:
     assert edge.outcome.start_offset_sessions == -5
 
 
+def test_a_lockup_edge_may_enter_ten_sessions_before_the_expiry_but_a_reverse_split_may_not() -> (
+    None
+):
+    outcome = {
+        "kind": "excess_return",
+        "horizon_sessions": [6],
+        "benchmark": "SPY",
+        "start_offset_sessions": -10,
+    }
+    assert (
+        parse(outcome=outcome, schedule="on_event:ipo_lockup").outcome.start_offset_sessions == -10
+    )
+    with pytest.raises(ConfigurationError, match="an entry before the event needs it announced"):
+        parse(outcome=outcome, schedule="on_event:reverse_split")
+
+
 @pytest.mark.parametrize("status", ["rejected", "blocked"])
 def test_a_closed_edge_needs_its_reason_and_may_skip_the_bar(status: str) -> None:
     edge = parse(status=status, rejection_reason="Gone.", quality_bar={}, mechanism=None)
