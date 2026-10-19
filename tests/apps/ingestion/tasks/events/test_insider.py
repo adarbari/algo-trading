@@ -225,7 +225,7 @@ def test_a_quarter_read_once_is_skipped_and_force_rereads_it_without_changing_a_
     second = run(
         writer, feeds, session=S2, since=date(2026, 7, 1), at=datetime(2026, 10, 12, 22, tzinfo=UTC)
     )
-    assert len(feeds.bulk_urls) == 3  # the first run: 2026q3 and 2026q4; the second: q4 again
+    assert len(feeds.bulk_urls) == 7  # q3 (1 url) and q4 (3 homes, all 404); the second: q4 again
     assert "q:2026q3" not in second.items and second.items["q:2026q4"].startswith("NO_DATA")
     forced = run(writer, feeds, session=S3, since=date(2026, 7, 1), force=True,
                  at=datetime(2026, 10, 14, 22, tzinfo=UTC))  # fmt: skip
@@ -234,6 +234,13 @@ def test_a_quarter_read_once_is_skipped_and_force_rereads_it_without_changing_a_
     keys = ["accession", "line", "owner_cik", "known_from"]
     assert len(rows) == 8 and len(rows.drop_duplicates(keys)) == 4
     assert set(rows[rows["accession"] == FIRST]["known_from"]) == {date(2026, 10, 1)}
+
+
+def test_an_old_quarter_with_no_file_anywhere_fails_loudly_not_as_no_data() -> None:
+    record = run(store(), Feeds(), since=date(2024, 7, 1), limit=1)  # 2024q3: over a year back
+    assert record.items["q:2024q3"].startswith("FETCH_ERROR")
+    assert "no file at any known URL" in record.items["q:2024q3"]
+    assert record.status is not RunStatus.COMPLETE
 
 
 def test_limit_caps_the_quarters_a_run_reads() -> None:

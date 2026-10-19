@@ -2,8 +2,9 @@
 per Form 4 / 4/A transaction line and reporting owner (EB D6; free, no key; the history, from
 2006).
 
-``https://www.sec.gov/files/dera/data/insider-transactions-data-sets/<YYYY>q<N>_form345.zip``
-holds the quarter's ownership filings, flattened "as filed", as tab-separated tables
+``https://www.sec.gov/files/<base>/data/insider-transactions-data-sets/<YYYY>q<N>_form345.zip``
+(``BASES``: SEC moved the files twice, so each is tried in turn) holds the quarter's ownership
+filings, flattened "as filed", as tab-separated tables
 (readme: ``insider_transactions_readme.pdf``): ``SUBMISSION`` (accession, ``FILING_DATE``,
 ``PERIOD_OF_REPORT``, ``DATE_OF_ORIG_SUB``, ``DOCUMENT_TYPE``, issuer CIK and ticker; newer
 files add ``AFF10B5ONE``), ``REPORTINGOWNER`` (owner CIK, ``RPTOWNER_RELATIONSHIP`` such as
@@ -37,7 +38,10 @@ from algotrade_sources.vendors.sec.form4_xml import LINE_ORDER, build_frame, fla
 
 SOURCE = "sec_edgar"
 DATASET = "form345_bulk"
-ZIP_URL = "https://www.sec.gov/files/dera/data/insider-transactions-data-sets/{year}q{quarter}_form345.zip"
+ZIP_URL = "https://www.sec.gov/files/{base}/data/insider-transactions-data-sets/{year}q{quarter}_form345.zip"
+# Where the files live, newest home first: from 2026q2 on, up to 2026q1, and the retired original
+# (404s today; kept last so a quarter is "not published" only when every home says so).
+BASES = ("datastandardsinnovation", "structureddata", "dera")
 QUARTER = re.compile(r"(?P<year>20\d{2})q(?P<quarter>[1-4])")
 OPTIONAL = {"AFF10B5ONE"}  # newer files only
 MAX_TABLE_BYTES = 2 * 1024**3  # a table of a quarter is tens of megabytes
@@ -66,12 +70,14 @@ OWNER_COLUMNS = (
 TRANS_COLUMNS = ("ACCESSION_NUMBER", *LINE_COLUMNS.values())
 
 
-def zip_url(label: str) -> str:
-    """The URL of the file of one quarter (``2019q2``)."""
+def zip_urls(label: str) -> list[str]:
+    """The URLs the file of one quarter (``2019q2``) may be at, in the order to try them."""
     match = QUARTER.fullmatch(label)
     if match is None:
         raise ValueError(f"not a quarter label: {label!r}")
-    return ZIP_URL.format(year=match["year"], quarter=match["quarter"])
+    return [
+        ZIP_URL.format(base=base, year=match["year"], quarter=match["quarter"]) for base in BASES
+    ]
 
 
 def _table(archive: zipfile.ZipFile, stem: str, columns: tuple[str, ...]) -> pd.DataFrame:
@@ -189,7 +195,11 @@ class SecForm345Bulk:
         self._http = http  # paced by the shared ``sec`` limiter; sets the User-Agent itself
 
     def fetch(self, request: FetchRequest) -> bytes | None:
-        return self._http.get(zip_url(insider_request(request).key))
+        for url in zip_urls(insider_request(request).key):
+            payload = self._http.get(url)
+            if payload is not None:
+                return payload
+        return None  # every home answered 404: not published
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
         return Normalized(session_date=None, tables={}, parsed={INSIDER_FRAME: parse_bulk(payload)})
