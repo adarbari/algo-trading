@@ -17,6 +17,8 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import date
 from functools import partial
 
+import pandas as pd
+
 from algotrade.core.time.calendar import exchange_date, next_session
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
@@ -26,9 +28,17 @@ NO_DATA = "NO_DATA"
 
 
 type Known = Callable[[date], Mapping[str, date]]  # a date -> its ``known_from`` (and kin)
+type Combine = Callable[[pd.DataFrame], pd.DataFrame]  # resolved rows -> one row per table key
 
 
-def one_day(run: IngestRun, source: Source, table: str, known: Known, day: date) -> str:
+def one_day(
+    run: IngestRun,
+    source: Source,
+    table: str,
+    known: Known,
+    day: date,
+    combine: Combine | None = None,
+) -> str:
     """Fetch, resolve and write one date's partition; the item status. ``known`` gives the
     columns the point-in-time rule adds (``schedule.py``: the task decides ``known_from``).
 
@@ -37,7 +47,10 @@ def one_day(run: IngestRun, source: Source, table: str, known: Known, day: date)
     a restated row (``revision_flag``) or a re-posted file holds values we did not have before
     the fetch, so no session before it may read them. A nightly fetch of the day's own data
     gets the schedule's date; a backfill's rows are known from the session after the backfill,
-    never from a later ``--to``."""
+    never from a later ``--to``.
+
+    ``combine`` folds the resolved rows to one per table key: several vendor tickers can resolve
+    to one id (FINRA's ``TpC`` and ``TPC``), which a table keyed by id cannot hold twice."""
     try:
         normalized = run.fetch(source, FetchRequest(day.isoformat(), session_date=run.session))
     except NoResponseError:
@@ -51,6 +64,8 @@ def one_day(run: IngestRun, source: Source, table: str, known: Known, day: date)
     resolved = run.resolve(frame[known_names], as_of=day, keep_symbol=False)
     if resolved.empty:
         return f"{NO_DATA}: no ticker resolved"
+    if combine is not None:
+        resolved = combine(resolved)
     fetched = next_session(exchange_date(run.clock()))
     stamps = dict(known(day))
     stamps["known_from"] = max(stamps["known_from"], fetched)  # never before this fetch's session
@@ -68,13 +83,14 @@ def store_days(
     days: Sequence[date],
     session: date,
     force: bool = False,
+    combine: Combine | None = None,
 ) -> RunRecord:
     """Store the partition of every date in ``days`` not already stored."""
     stored = set() if force else set(ctx.reader.dates(table))
     asked = [d for d in days if d not in stored]
     with IngestRun(ctx, task, session) as run:
         for day in asked:
-            run.attempt(day.isoformat(), partial(one_day, run, source, table, known, day))
+            run.attempt(day.isoformat(), partial(one_day, run, source, table, known, day, combine))
             run.checkpoint()
         run.stats.update(
             window=[days[0].isoformat(), days[-1].isoformat()] if days else [],

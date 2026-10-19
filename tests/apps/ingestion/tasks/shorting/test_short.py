@@ -3,6 +3,7 @@ partition per date, ids resolved (unknown tickers dropped), ``known_from`` by th
 resumable (a stored date is skipped, ``force`` refetches), an unpublished date ``NO_DATA``, a
 failed date PARTIAL, and the nightly window defaults."""
 
+import json
 from datetime import UTC, date, datetime
 
 import pytest
@@ -192,3 +193,30 @@ def test_backfilled_dates_resolve_against_their_own_reference() -> None:
     assert early is not None and late is not None
     assert sorted(early["instrument_id"]) == ["EQ:AAA"]
     assert sorted(late["instrument_id"]) == ["EQ:AAA", "EQ:BBB"]
+
+
+def test_tickers_that_resolve_to_one_id_are_summed_into_one_row() -> None:
+    """FINRA lists ``TpC`` beside ``TPC`` (2026-10-16: 4 rows, 2 ids); the resolver reads both
+    as one id, and the table key (id, ts, known_from) holds one row: the first run failed
+    ``duplicate rows for the table key`` on 250 of 251 days."""
+
+    def row(symbol: str, facility: str, short: int, total: int) -> dict:
+        return {
+            "tradeReportDate": "2026-10-16",
+            "securitiesInformationProcessorSymbolIdentifier": symbol,
+            "shortParQuantity": short,
+            "shortExemptParQuantity": 0,
+            "totalParQuantity": total,
+            "reportingFacilityCode": facility,
+        }
+
+    rows = [row("AAA", "NQTRF", 400, 1000), row("AAa", "ADF", 30, 90), row("BBB", "ADF", 10, 40)]
+    source = FinraShortVolume(http_for(lambda url: json.dumps(rows).encode(), RetryPolicy(tries=1)))
+    writer = _writer()
+    ctx = task_ctx(writer, sources={short_volume.SOURCE: source})
+    record = run_task("short-volume", ctx, {"session": SESSION, "start": SESSION, "end": SESSION})
+    assert record.status is RunStatus.COMPLETE and record.items["2026-10-16"] == "OK: 2 rows"
+    stored = StoreReader(writer._backend).table("events/short_volume", SESSION)
+    assert stored is not None
+    aaa = stored[stored["instrument_id"] == "EQ:AAA"].iloc[0]
+    assert (aaa["short_volume"], aaa["total_volume"], aaa["facilities"]) == (430, 1090, 2)
