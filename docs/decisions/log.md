@@ -962,7 +962,8 @@ follow-up PR).
 - Options: cosine on TF-IDF / min-edit distance / cosine on raw term counts plus Jaccard on word sets.
 - Decision: cosine on raw term frequency (the rank field) plus Jaccard; tokens are runs of `[a-z]{2,}` after NFKC and casefold, a pinned stop list in code, no digits, no stemming; an item counts when its quality is OK and it has at least 100 words, the composite at least 500 words each side; the comparator is the same form of the same company with a report date 330 to 400 days earlier; amendments (10-K/A, 10-Q/A) are excluded; the value is carried 150 days (10-K Item 1A: 400); two rollups (`filing_text_change@v1`, `filing_text_similarity@v1`), no new table; a value is null, never zero, when no comparator or too little text.
 - decided by: orchestrator (design call)
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-10-18
 - Reasoning: TF-IDF weights depend on the corpus the night holds, so a value could change with no text changing; raw counts and a pinned tokeniser make it reproducible. The floors keep a short or missing section from reading as "unchanged". Architect design of 2026-10-18.
 ## 2026-10-18 | EB E5 (batch Y, macro allocation documents) | The gate reads the carrier fund, the macro legs are separate trials, two fields stay undrafted
 - Question: how are the volatility-product, curve, credit, CAPE and carry documents filed on the merged bridge, canary gate and vol_target without implying the full source rule?
