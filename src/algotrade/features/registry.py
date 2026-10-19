@@ -55,6 +55,7 @@ from algotrade.features.rollups.corporate import (
 from algotrade.features.rollups.events import (
     earnings_date_shift,
     earnings_gap_volume,
+    etf_launches,
     filing_activity,
     filing_events,
     index_changes,
@@ -150,6 +151,7 @@ GROUPS: dict[str, FeatureGroup] = {
             dividend_months.GROUP,
             filing_activity.GROUP,
             index_changes.GROUP,
+            etf_launches.GROUP,
             filing_events.GROUP,
             insider_buys.GROUP,
             filing_text_change.GROUP,

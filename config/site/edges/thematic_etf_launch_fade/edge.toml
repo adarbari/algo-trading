@@ -1,31 +1,81 @@
-# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
-# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E3) until its event class exists.
+# Edge document (ADR 0053, ADR 0076; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: etf_launch_recent. Built 2026-10-19 (EB E3
+# follow-up) on the etf_launch event class: etf_launches@v1, categories from the Opus-reviewed
+# overrides/thematic_etfs.csv, launch date from the Tiingo listing history. Idea pages:
+# docs/edge-ideas/structural-niches.md (new_thematic_etf_fade) and docs/edge-ideas/frontier.md
+# (thematic_etf_launch_underperformance).
 id = "thematic_etf_launch_fade"
 name = "Thematic ETF launch fade"
-thesis = "Newly launched thematic and specialised ETFs underperform broad ETFs for years after launch, so a new theme ETF is one to avoid."
+thesis = "Newly launched thematic and sector ETFs underperform broad ETFs for years after launch, so a new specialised ETF is one to avoid."
 mechanism = """Sponsors launch funds on themes at peak attention; the holdings are overvalued at launch (high past returns, media coverage) and the fund captures extrapolating retail flows (Ben-David, Franzoni, Kim and Moussawi 2023)."""
 persistence = """Sponsor economics (fees on hype) and retail extrapolation do not change; the paper is published, but shorting thin ETFs is costly, so the decay should be slow."""
 family = "H"
-schedule = "month_end"
-top_k = "all"
-screeners = []
-status = "blocked"
-plain_reason = "Needs ETF launch dates and a theme classification for funds, neither of which we store."
+schedule = "on_event:etf_launch"
+top_k = 20
+base = "universe"
+screeners = ["etf_launch_recent"]
+status = "candidate"
 mechanism_kind = "value_gaps"
-rejection_reason = """Three things are not there. No event class reads an ETF launch (etf_launch is missing from EVENT_CLASSES in src/algotrade/config/edges/document.py and from EVENT_FIELDS in services/evaluation/cross_section/events.py), so the schedule above is a placeholder. Launch dates are known only from the first stored reference snapshot (2024-10) and the Tiingo history of ETFs that exist today, so a launch before them has no date. And no thematic classification is stored: the paper's specialised ETFs are judged by name and holdings concentration, holdings are stored only for iShares and SSGA funds, and any keyword list of themes is a judgement call for the owner, not an implementation detail. A dense-score short leg does not fix it (see reverse_split_distress_filter)."""
-notes = """Long-side use only is an avoid filter on the ETF itself (never buy a theme ETF younger than three years); the short side needs the fund borrowable, and the version that avoids what the new ETFs hold needs issuer holdings beyond iShares and SSGA, which are not stored. Idea pages: docs/edge-ideas/structural-niches.md (new_thematic_etf_fade) and docs/edge-ideas/frontier.md (thematic_etf_launch_underperformance)."""
+frozen_from = 2026-04-01
+notes = """Both halves of the paper's specialised group are flagged and kept apart (owner decision 2026-10-19, ADR 0076): sector funds
+(one industry, XLK and XLF count) are 411 of its 526 funds and thematic funds 115, so the headline result is mostly a sector
+result; the schedule on_event:etf_launch:thematic or :sector tests each half. The category is the site's etf_category (keyword
+rules under a curated list from an Opus review of the names, as of the latest universe build): a renamed fund carries today's
+category on its launch date, and a fund that was delisted before the first reference snapshot has no category, so the sample leans
+to survivors (the paper's own sample includes closed funds, which is where much of the fade sits). The launch date is the Tiingo
+listing start (launch_date_source = tiingo_listing), the first listing of the instrument, not the fund's inception: checked against
+fourteen well-known funds it was 0 to 7 days late, a ticker change or relisting can move it, and funds older than the Tiingo
+history start at its first day. The class anchors on the launch day, but the screener's liquidity gate (the 20-session dollar
+volume) needs twenty sessions of bars, so the entry session is the 21st (start_offset_sessions = 21, D is the 20th session
+after the launch) and the first month is not measured. The avoid window is the evaluated horizon: 250, 750 and 1250 sessions
+(one, three and five years; the paper's headline is months 1 to 60, about -6% a year), three trials of one screener; a
+three-year screen (sessions_since_etf_launch at most 750) is the working avoid rule and is configurable by a new preset version.
+The short side is a liquid-name test (ADV of $5M or more, owner decision O2), so many new thematic funds are too thin to
+enter and the count may be small; the borrow is the site's default, a LOWER BOUND for a new, thin ETF. The base is every
+liquid ETF in the universe that session, broad funds included, so the lift reads the new specialised funds against all
+liquid ETFs (the paper's broad-based funds are the comparison). Funds that launched before the first universe snapshot are
+read through the historical reference rule (a name alive today keeps today's row; a delisted one counts as a common stock and
+is filtered out by security_type = ETF), the same survivor tilt."""
 
 [universe.where]
 all = [
-  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.security_type", op = "eq", value = "ETF" },
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
 ]
 
 [outcome]
 kind = "excess_return"
-horizon_sessions = [250, 500]
+horizon_sessions = [250, 750, 1250]
 benchmark = "SPY"
-start_offset_sessions = 1
+start_offset_sessions = 21
+side = "short"
+cost_bps = 10
+
+[quality_bar]
+outcome = """Minus the excess return over SPY over 250, 750 and 1250 sessions after the entry close (the 21st session
+after the launch), net of 10 bps a round trip and the site's assumed borrow."""
+trigger_timing = """The launch is known on its first listing day (the Tiingo start date, a fact of record the day it
+happens); the decision session D is the 20th session after it and the entry session is S = D + 1 (start_offset_sessions =
+21, the 21st after the launch). The names are read at D from etf_launches@v1 (sessions_since_etf_launch = 20), built
+only from launches dated on or before D. The category is the latest build's reading of the name (an identity read, disclosed),
+never a fact first known later than the launch day, and a fund with no category has no row."""
+replication = """The source's rule: all specialised ETFs (sector and thematic) after launch earn a four-factor alpha of
+about -6% a year in months 1 to 60 (Ben-David, Franzoni, Kim and Moussawi 2023; the figure is the paper's, not verified
+here, so nothing is filed under [published]). Here etf_launch_recent v1 takes the thematic and sector ETFs launched in the
+last 750 sessions that trade $5M a day and the harness shorts the most liquid ones."""
+expected_size = """The paper reports roughly -3% a year after fees across all specialised funds and about -6% a year in the first
+five years, value-weighted over 1993 to 2019. Launches come in waves (about 150 thematic funds in the last three years) and the
+liquid-name gate cuts most of them, so independent events are the binding count and the 1250-session outcome exists only for
+funds launched five years ago."""
+capacity_costs = """New thematic funds are thin and often hard or costly to borrow; the outcome deducts 10 bps and the site's default
+borrow, a LOWER BOUND, so the result is a best case for the short. The usable form for an individual is the avoid rule: do not
+buy a specialised ETF younger than three years, which costs nothing."""
+failure_modes = """A theme that keeps running (a launch near a bottom, not a peak); funds that close early (the fund is gone, the
+sample keeps the survivors); a category that reads the name wrong; the launch-date proxy dating a relisted or renamed fund too
+young. Retire if the frozen-period short return of the picks is not above the mean of every liquid ETF."""
+decoys = """Fund age and size (new funds are small), sector momentum at launch and high fees: compare the picks with other new
+ETFs that are broad, which the base contains."""
 
 [[sources]]
 title = "Ben-David, I., Franzoni, F., Kim, B. and Moussawi, R., Competition for Attention in the ETF Space, Review of Financial Studies, 2023"

@@ -489,3 +489,77 @@ for = "names that have a named sibling class"
 op = "not_null"
 mode = "hard"
 note = "the pair_spread outcome needs it; a name without one is excluded with the reason"
+
+[[field]]
+name = "rollup.etf_launches@v1.sessions_since_etf_launch"
+theme = "instrument gates"
+reads = "Exchange sessions from the launch of a thematic or sector ETF up to the session. 0 means it started trading today. 250 is about a year old. The read goes back five years, the first 60 months in which the research finds such funds fall behind."
+caveats = [
+  "The launch is the first day the ticker was listed in the Tiingo history, not the day the fund was set up, so it can be a few days late. A fund that changed ticker, or listed before the history starts, reads too young. Only thematic and sector funds have a value. It is null for every other fund, and for a fund whose category is unknown.",
+]
+sources = ["Ben-David, Franzoni, Kim and Moussawi (2023), Competition for Attention in the ETF Space, Review of Financial Studies"]
+[[field.use]]
+for = "a thematic or sector fund younger than three years"
+op = "lte"
+value = 750
+mode = "hard"
+note = "an avoid filter; null means not a specialised fund, not an old one"
+
+[[field]]
+name = "rollup.etf_launches@v1.last_etf_launch_date"
+theme = "instrument gates"
+reads = "The first day the ETF was listed in the Tiingo history: its launch date for this site. Only launches on or before the session count, so a fund that lists tomorrow is not read today."
+caveats = [
+  "A ticker change or a relisting can move it, and a fund older than the history is dated at the history's start. Null for funds that are not thematic or sector funds, or launched more than five years ago.",
+]
+sources = ["Site convention over the Tiingo listing history (ADR 0076)"]
+[[field.use]]
+for = "funds with a known launch date"
+op = "not_null"
+mode = "hard"
+note = "null means no thematic or sector launch in the window, not that the fund is old"
+
+[[field]]
+name = "rollup.etf_launches@v1.etf_category"
+theme = "instrument gates"
+reads = "Whether the ETF is thematic, tied to a story that spans several industries such as clean energy or robotics, or sector, tied to one industry such as technology or banks. Both count as specialised funds in the research."
+caveats = [
+  "Read from the fund's name by keyword rules and a curated list, as of the latest build, so a fund renamed since launch carries today's category on its launch date. Funds the rules could not settle have no category and no row.",
+]
+sources = ["Ben-David, Franzoni, Kim and Moussawi (2023), Competition for Attention in the ETF Space, Review of Financial Studies"]
+[[field.use]]
+for = "thematic funds only"
+op = "eq"
+value = "thematic"
+mode = "hard"
+note = "sector funds drop out; null means not a specialised fund"
+
+[[field]]
+name = "rollup.etf_launches@v1.etf_theme"
+theme = "instrument gates"
+reads = "The theme group of a thematic ETF, such as clean_energy, technology or health, or the industry of a sector ETF, such as financials or energy."
+caveats = [
+  "A fund that fits two themes carries one, chosen by the curated list or by the first matching keyword group. Null when the fund has no category.",
+]
+sources = ["Site convention over the ETF names (ADR 0076)"]
+[[field.use]]
+for = "clean energy funds"
+op = "eq"
+value = "clean_energy"
+mode = "hard"
+note = "illustrative; null means not a specialised fund"
+
+[[field]]
+name = "rollup.etf_launches@v1.launch_date_source"
+theme = "instrument gates"
+reads = "Where the launch date comes from. The only value is tiingo_listing: the first day the ticker appears in the Tiingo listing history."
+caveats = [
+  "It is the ticker's first listing, not the fund's inception, which the site does not store. Checked against fourteen well-known funds, it was 0 to 7 days late.",
+]
+sources = ["Site convention (ADR 0076)"]
+[[field.use]]
+for = "funds dated from the Tiingo listing"
+op = "eq"
+value = "tiingo_listing"
+mode = "hard"
+note = "null means no launch date is stored"

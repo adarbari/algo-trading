@@ -1,0 +1,27 @@
+# L3 site setting: the Guide's playbook for the site preset etf_launch_recent (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Typed by src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "etf_launch_recent"
+version = 1  # the preset version this prose was written for
+summary = "Finds thematic and sector ETFs that launched in the last three years and trade at least $5M a day: an avoid list for longs and the short side of the ETF launch edge. It is a candidate edge under test, not a proven trade."
+hit = "The fund is an ETF the site calls thematic or sector, its first listing day in the Tiingo history is within the last 750 sessions, and it trades at least $5M a day. The most liquid ranks first."
+not_checked = "It does not know what the fund holds, what it costs, or whether the theme is still fashionable. The launch date is the ticker's first listing, which can be a few days after the fund was set up, and the category comes from the fund's name."
+before_acting = [
+  "Check rollup.etf_launches@v1.sessions_since_etf_launch: the research finds the drag over the first five years, so a fund of three or four years is still inside it.",
+  "Read rollup.etf_launches@v1.etf_category: sector funds are most of the research's sample, thematic funds the narrower half. Test them apart.",
+  "New funds are small and often hard to borrow, so for most people the use is to leave the fund out of a long screen.",
+]
+sources = [
+  "Ben-David, Franzoni, Kim and Moussawi, Competition for Attention in the ETF Space (2023)",
+]
+related = [
+  { id = "reverse_split_recent", reason = "another avoid list for names that tend to fall behind" },
+]
+
+[asks]
+security_type = "An ETF"
+status = "Still listed and trading"
+adv = "Trades at least $5M a day"
+young = "Launched in the last 750 sessions (about three years)"

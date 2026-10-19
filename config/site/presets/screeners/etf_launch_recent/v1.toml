@@ -1,0 +1,46 @@
+# Recently launched thematic and sector ETFs (ADR 0053, ADR 0076; edge thematic_etf_launch_fade): an
+# ETF the site calls thematic or sector, less than three years old by its Tiingo listing start,
+# trading at least $5M a day: an avoid list for longs and the short side of the edge. The order puts
+# the most liquid first (the lowest score is the harness's short leg, so the highest dollar volume is
+# shorted first). A missing value never passes (ADR 0030): a fund with no category, or whose launch is
+# not stored, has no rollup row and drops out. What it does not check: the fund's holdings, its fees,
+# or whether the theme is still fashionable.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "etf_launch_recent"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Recently launched thematic and sector ETFs"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "ETF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 5_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.young]
+field = "rollup.etf_launches@v1.sessions_since_etf_launch"
+op = "lte"
+value = 750
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+sessions_since_etf_launch = "rollup.etf_launches@v1.sessions_since_etf_launch"
+etf_category = "rollup.etf_launches@v1.etf_category"
+etf_theme = "rollup.etf_launches@v1.etf_theme"
+
+[rank]
+tie_break = "rollup.price_stats@v2.adv_usd_20d"
+tie_break_order = "asc"

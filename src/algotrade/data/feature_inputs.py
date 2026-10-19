@@ -67,6 +67,12 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        known on or before it (``events.latest_of``, the rule of
                        ``latest_versions``); ``None`` when none is known (``ipo_lockups@v1``,
                        ADR 0075)
+- ``instruments/etf_launches``
+                       ``listings.etf_launches``: each specialised ETF's launch date (Tiingo
+                       listing start) as ``event_date`` with its category and theme, from the
+                       latest listing and reference snapshots (the identity exception); the
+                       launches in the ``lookback`` sessions up to the session, none later
+                       (``etf_launches@v1``, ADR 0076)
 - ``events/filing``    ``events.events_by_acceptance``: the SEC event filings that became known
                        (the first session closing after SEC's acceptance, recomputed from the
                        stored instant, not the stored ``known_from``) from ``lookback``
@@ -192,6 +198,7 @@ from algotrade.data.funds.shares import TABLE as ETF_SHARES
 from algotrade.data.funds.shares import share_versions
 from algotrade.data.insiders.reading import TABLE as INSIDERS
 from algotrade.data.insiders.reading import buyer_histories
+from algotrade.data.listings.etf_launches import etf_launches
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.macro.series import known_window, stored_vintages
 from algotrade.data.prices import DateWindow, SessionBars, session_bars, window_closes
@@ -384,6 +391,16 @@ def _ipo_lockups(reader: StoreReader, sessions: Sequence[date], lookback: int) -
     frame = stored_events(reader, IPO_LOCKUPS, sessions[-1])
     days = _days(frame[KNOWN_FROM]) if len(frame) else np.array([], "M8[D]")
     return _Versions(frame, days, IPO_LOCKUP_KEY)
+
+
+ETF_LAUNCHES = "instruments/etf_launches"
+
+
+def _etf_launches(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    """Specialised ETF launches by launch date; ``at`` keeps those in the ``lookback`` sessions up
+    to the session (``etf_launches@v1``; ADR 0076)."""
+    frame = etf_launches(reader)
+    return _Window(frame, _days(frame["event_date"]), need_session=False)
 
 
 def _etf_share_versions(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
@@ -650,6 +667,7 @@ INPUTS: Mapping[str, Loader] = {
     "events/split": _events_by_date("events/split"),
     "events/index_change": _events_by_date("events/index_change"),
     IPO_LOCKUPS: _ipo_lockups,
+    ETF_LAUNCHES: _etf_launches,
     "events/filing": _filings,
     INSIDERS: _insider_views,
     FILING_TEXT: _partition(recent_filing_texts),

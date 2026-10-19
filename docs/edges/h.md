@@ -12,9 +12,9 @@ Back to the [index of every edge](../edges.md).
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | every session | excess return, over 6, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `retail_option_attention` |
 | Reverse-split distress filter (`reverse_split_distress_filter`) | candidate | on each `reverse_split` | excess return, over 250, 500 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `reverse_split_recent` |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | on each `tender_offer` | excess return, over 60, 250 sessions, vs SPY, starting +21 sessions from the event, costs 20 bps | `tender_offer_filed` |
+| Thematic ETF launch fade (`thematic_etf_launch_fade`) | candidate | on each `etf_launch` | excess return, over 250, 750, 1250 sessions, vs SPY, starting +21 sessions from the event, costs 10 bps | `etf_launch_recent` |
 | Treasury funds before month end (`treasury_month_end_extension`) | candidate | calendar:pre month end | excess return, over 3 sessions, entered 1 session after the decision session | none yet |
 | Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
-| Thematic ETF launch fade (`thematic_etf_launch_fade`) | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 
 ## BDC price to NAV reversion (`bdc_price_to_nav_reversion`)
 
@@ -238,6 +238,38 @@ Back to the [index of every edge](../edges.md).
 - Fu, F. and Huang, S., The persistence of long-run abnormal returns following stock repurchases and offerings, Management Science, 2016 <https://ideas.repec.org/a/inm/ormnsc/v62y2016i4p964-984.html>
 - Ikenberry, D., Lakonishok, J. and Vermaelen, T. (1995), Market underreaction to open market share repurchases, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v39y1995i2-3p181-208.html>
 
+## Thematic ETF launch fade (`thematic_etf_launch_fade`)
+
+**Status:** candidate. **Family:** H. **Thesis:** Newly launched thematic and sector ETFs underperform broad ETFs for years after launch, so a new specialised ETF is one to avoid.
+
+- **Outcome:** excess return, over 250, 750, 1250 sessions, vs SPY, starting +21 sessions from the event, costs 10 bps
+- **Schedule:** on each `etf_launch` (the launch of a specialised ETF, a thematic or sector fund (etf_launches@v1; ADR 0076); anchor: its first listing day (Tiingo), known on that day)
+- **Universe:** `instrument.security_type eq 'ETF'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.adv_usd_20d gte 5000000`
+- **Top K:** 20
+- **Screeners:** `etf_launch_recent`
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** Both halves of the paper's specialised group are flagged and kept apart (owner decision 2026-10-19, ADR 0076): sector funds (one industry, XLK and XLF count) are 411 of its 526 funds and thematic funds 115, so the headline result is mostly a sector result; the schedule on_event:etf_launch:thematic or :sector tests each half. The category is the site's etf_category (keyword rules under a curated list from an Opus review of the names, as of the latest universe build): a renamed fund carries today's category on its launch date, and a fund that was delisted before the first reference snapshot has no category, so the sample leans to survivors (the paper's own sample includes closed funds, which is where much of the fade sits). The launch date is the Tiingo listing start (launch_date_source = tiingo_listing), the first listing of the instrument, not the fund's inception: checked against fourteen well-known funds it was 0 to 7 days late, a ticker change or relisting can move it, and funds older than the Tiingo history start at its first day. The class anchors on the launch day, but the screener's liquidity gate (the 20-session dollar volume) needs twenty sessions of bars, so the entry session is the 21st (start_offset_sessions = 21, D is the 20th session after the launch) and the first month is not measured. The avoid window is the evaluated horizon: 250, 750 and 1250 sessions (one, three and five years; the paper's headline is months 1 to 60, about -6% a year), three trials of one screener; a three-year screen (sessions_since_etf_launch at most 750) is the working avoid rule and is configurable by a new preset version. The short side is a liquid-name test (ADV of $5M or more, owner decision O2), so many new thematic funds are too thin to enter and the count may be small; the borrow is the site's default, a LOWER BOUND for a new, thin ETF. The base is every liquid ETF in the universe that session, broad funds included, so the lift reads the new specialised funds against all liquid ETFs (the paper's broad-based funds are the comparison). Funds that launched before the first universe snapshot are read through the historical reference rule (a name alive today keeps today's row; a delisted one counts as a common stock and is filtered out by security_type = ETF), the same survivor tilt.
+
+**Quality bar**
+
+1. **Mechanism:** Sponsors launch funds on themes at peak attention; the holdings are overvalued at launch (high past returns, media coverage) and the fund captures extrapolating retail flows (Ben-David, Franzoni, Kim and Moussawi 2023).
+2. **Persistence:** Sponsor economics (fees on hype) and retail extrapolation do not change; the paper is published, but shorting thin ETFs is costly, so the decay should be slow.
+3. **Outcome:** Minus the excess return over SPY over 250, 750 and 1250 sessions after the entry close (the 21st session after the launch), net of 10 bps a round trip and the site's assumed borrow.
+4. **Trigger timing:** The launch is known on its first listing day (the Tiingo start date, a fact of record the day it happens); the decision session D is the 20th session after it and the entry session is S = D + 1 (start_offset_sessions = 21, the 21st after the launch). The names are read at D from etf_launches@v1 (sessions_since_etf_launch = 20), built only from launches dated on or before D. The category is the latest build's reading of the name (an identity read, disclosed), never a fact first known later than the launch day, and a fund with no category has no row.
+5. **Faithful replication:** The source's rule: all specialised ETFs (sector and thematic) after launch earn a four-factor alpha of about -6% a year in months 1 to 60 (Ben-David, Franzoni, Kim and Moussawi 2023; the figure is the paper's, not verified here, so nothing is filed under [published]). Here etf_launch_recent v1 takes the thematic and sector ETFs launched in the last 750 sessions that trade $5M a day and the harness shorts the most liquid ones.
+6. **Expected size and sample:** The paper reports roughly -3% a year after fees across all specialised funds and about -6% a year in the first five years, value-weighted over 1993 to 2019. Launches come in waves (about 150 thematic funds in the last three years) and the liquid-name gate cuts most of them, so independent events are the binding count and the 1250-session outcome exists only for funds launched five years ago.
+7. **Capacity and costs:** New thematic funds are thin and often hard or costly to borrow; the outcome deducts 10 bps and the site's default borrow, a LOWER BOUND, so the result is a best case for the short. The usable form for an individual is the avoid rule: do not buy a specialised ETF younger than three years, which costs nothing.
+8. **Failure modes and retirement:** A theme that keeps running (a launch near a bottom, not a peak); funds that close early (the fund is gone, the sample keeps the survivors); a category that reads the name wrong; the launch-date proxy dating a relisted or renamed fund too young. Retire if the frozen-period short return of the picks is not above the mean of every liquid ETF.
+9. **Decoys:** Fund age and size (new funds are small), sector momentum at launch and high fees: compare the picks with other new ETFs that are broad, which the base contains.
+
+**Sources**
+
+- Ben-David, I., Franzoni, F., Kim, B. and Moussawi, R., Competition for Attention in the ETF Space, Review of Financial Studies, 2023 <https://www.nber.org/papers/w28369>
+- Alpha Architect, Competition for Attention in the ETF Space (summary) <https://alphaarchitect.com/competition-for-attention-in-the-etf-space/>
+- Brown, D., Davies, S. and Ringgenberg, M. (2021), ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance <https://ideas.repec.org/a/oup/revfin/v25y2021i4p937-972..html>
+- Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html>
+
 ## Treasury funds before month end (`treasury_month_end_extension`)
 
 **Status:** candidate. **Family:** H. **Thesis:** Treasury and aggregate bond funds earn more over the last three sessions of a month than over the same number of sessions elsewhere.
@@ -303,36 +335,3 @@ Back to the [index of every edge](../edges.md).
 - CXO Advisory, Enhanced Exploitation of Closed-End Fund Discounts (summary of Patro, Piccotti and Wu) <https://www.cxoadvisory.com/mutual-hedge-funds/enhanced-exploitation-of-closed-end-fund-discounts/>
 - Pontiff, J. (1995), Closed-End Fund Premia and Returns: Implications for Financial Market Equilibrium, Journal of Financial Economics <https://academicnewsletter.sufe.edu.cn/info/358172>
 - SEC (17 CFR 270.19a-1), Written statement to accompany dividend payments by management companies (the Section 19(a) notice rule; Cornell LII text) <https://www.law.cornell.edu/cfr/text/17/270.19a-1>
-
-## Thematic ETF launch fade (`thematic_etf_launch_fade`)
-
-**Status:** blocked. **Family:** H. **Thesis:** Newly launched thematic and specialised ETFs underperform broad ETFs for years after launch, so a new theme ETF is one to avoid.
-
-**Why blocked:** Three things are not there. No event class reads an ETF launch (etf_launch is missing from EVENT_CLASSES in src/algotrade/config/edges/document.py and from EVENT_FIELDS in services/evaluation/cross_section/events.py), so the schedule above is a placeholder. Launch dates are known only from the first stored reference snapshot (2024-10) and the Tiingo history of ETFs that exist today, so a launch before them has no date. And no thematic classification is stored: the paper's specialised ETFs are judged by name and holdings concentration, holdings are stored only for iShares and SSGA funds, and any keyword list of themes is a judgement call for the owner, not an implementation detail. A dense-score short leg does not fix it (see reverse_split_distress_filter).
-
-- **Outcome:** excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session
-- **Schedule:** month end
-- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'`
-- **Top K:** all qualified names
-- **Screeners:** none yet
-- **Baselines:** none yet
-- **Notes:** Long-side use only is an avoid filter on the ETF itself (never buy a theme ETF younger than three years); the short side needs the fund borrowable, and the version that avoids what the new ETFs hold needs issuer holdings beyond iShares and SSGA, which are not stored. Idea pages: docs/edge-ideas/structural-niches.md (new_thematic_etf_fade) and docs/edge-ideas/frontier.md (thematic_etf_launch_underperformance).
-
-**Quality bar**
-
-1. **Mechanism:** Sponsors launch funds on themes at peak attention; the holdings are overvalued at launch (high past returns, media coverage) and the fund captures extrapolating retail flows (Ben-David, Franzoni, Kim and Moussawi 2023).
-2. **Persistence:** Sponsor economics (fees on hype) and retail extrapolation do not change; the paper is published, but shorting thin ETFs is costly, so the decay should be slow.
-3. **Outcome:** (not answered)
-4. **Trigger timing:** (not answered)
-5. **Faithful replication:** (not answered)
-6. **Expected size and sample:** (not answered)
-7. **Capacity and costs:** (not answered)
-8. **Failure modes and retirement:** (not answered)
-9. **Decoys:** (not answered)
-
-**Sources**
-
-- Ben-David, I., Franzoni, F., Kim, B. and Moussawi, R., Competition for Attention in the ETF Space, Review of Financial Studies, 2023 <https://www.nber.org/papers/w28369>
-- Alpha Architect, Competition for Attention in the ETF Space (summary) <https://alphaarchitect.com/competition-for-attention-in-the-etf-space/>
-- Brown, D., Davies, S. and Ringgenberg, M. (2021), ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance <https://ideas.repec.org/a/oup/revfin/v25y2021i4p937-972..html>
-- Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html>

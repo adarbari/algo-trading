@@ -120,7 +120,7 @@ id = "allocation"
 title = "ETF allocation"
 presets = [
   "etf_priced", "credit_spread_below_ma200", "bond_curve_trend_3m", "bond_curve_trend_2y",
-  "country_cape_cheapest", "fx_carry_positive",
+  "country_cape_cheapest", "fx_carry_positive", "etf_launch_recent",
 ]
 
 [[family]]

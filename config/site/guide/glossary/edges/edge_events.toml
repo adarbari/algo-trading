@@ -206,6 +206,36 @@ next = "Open the edge's result and compare it with the standard lock-ups."
 see_also = ["base_rate", "out_of_sample", "event_class_ipo_lockup_standard"]
 
 [[term]]
+id = "event_class_etf_launch"
+term = "Launch of a thematic or sector ETF"
+short = "The edge starts on the day a fund that bets on one theme or one industry first trades."
+body = """
+The trigger is the launch of a specialised exchange-traded fund. A thematic one is tied to a story that spans several industries, such as clean energy or robotics. A sector one is tied to one industry, such as technology or banks. The research behind it finds that such funds fall behind broad ones for years after they open. The anchor is the launch day: the first day the ticker appears in the Tiingo listing history, which can be a few days after the fund was set up. The category comes from the fund's name, by keyword rules and a curated list, as of the latest build. Funds that closed before the first stored snapshot have no category, so the sample leans toward funds that still exist. Launches come in waves, so several can sit close together. The count behind a result is small for any one theme.
+"""
+next = "Open the edge's result and read how many launches lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_etf_launch_thematic", "event_class_etf_launch_sector"]
+
+[[term]]
+id = "event_class_etf_launch_thematic"
+term = "Thematic ETF launch"
+short = "The edge starts on the day a fund built around a story that spans several industries first trades."
+body = """
+The trigger is the launch of an ETF the site calls thematic: clean energy, robotics, cybersecurity, genomics, cannabis, a single small country, and similar stories. The anchor is the launch day. The label comes from the name, so a fund renamed since launch carries today's label. These funds are the narrower half of the research's specialised group.
+"""
+next = "Open the edge's result and compare it with the sector launches."
+see_also = ["base_rate", "out_of_sample", "event_class_etf_launch_sector"]
+
+[[term]]
+id = "event_class_etf_launch_sector"
+term = "Sector ETF launch"
+short = "The edge starts on the day a fund that holds one industry first trades."
+body = """
+The trigger is the launch of an ETF the site calls a sector fund: one industry, such as technology, financials, energy or health care, without a story on top. The research counts these as specialised too, and they are most of its sample. The anchor is the launch day. The label comes from the name, so a fund renamed since launch carries today's label.
+"""
+next = "Open the edge's result and compare it with the thematic launches."
+see_also = ["base_rate", "out_of_sample", "event_class_etf_launch_thematic"]
+
+[[term]]
 id = "event_class_reverse_split"
 term = "Reverse split"
 short = "The edge starts after a company merges its shares into fewer, higher-priced ones."

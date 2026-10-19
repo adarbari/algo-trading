@@ -79,9 +79,9 @@ Each edge's full section is on its family page (docs/edges/).
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | [family H](edges/h.md) |
 | Reverse-split distress filter (`reverse_split_distress_filter`) | candidate | [family H](edges/h.md) |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | [family H](edges/h.md) |
+| Thematic ETF launch fade (`thematic_etf_launch_fade`) | candidate | [family H](edges/h.md) |
 | Treasury funds before month end (`treasury_month_end_extension`) | candidate | [family H](edges/h.md) |
 | Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | [family H](edges/h.md) |
-| Thematic ETF launch fade (`thematic_etf_launch_fade`) | blocked | [family H](edges/h.md) |
 | Call-put IV spread into earnings (`pre_earnings_cp_iv_spread`) | candidate | [family I](edges/i.md) |
 | Target-date fund contrarian flows (`tdf_contrarian_flows`) | blocked | [family I](edges/i.md) |
 | Earnings announcement premium (`earnings_announcement_premium`) | candidate | [no family](edges/other.md) |
