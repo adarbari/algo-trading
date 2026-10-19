@@ -14,10 +14,13 @@ SESSION = date(2026, 10, 2)
 
 def change(iid: str, known: date, form: str = "10-Q", acc: str = "A", status: str = "OK",
            cosine: float | None = 0.9, rf: float | None = None) -> dict[str, object]:  # fmt: skip
+    k = form == "10-K"  # a 10-K is its own latest 10-K (ftc_k_*); a 10-Q has none
     return {"instrument_id": iid, "session_date": known, "ftc_accession": acc, "ftc_form": form,
             "ftc_known_from": known, "ftc_status": status, "ftc_cosine": cosine,
-            "ftc_jaccard": 0.8, "ftc_rf_cosine": rf,
-            "ftc_rf_len_change": 0.1 if rf is not None else None}  # fmt: skip
+            "ftc_jaccard": 0.8, "ftc_k_accession": acc if k else None,
+            "ftc_k_known_from": known if k else None, "ftc_k_status": status if k else None,
+            "ftc_k_rf_cosine": rf if k else None,
+            "ftc_k_rf_len_change": 0.1 if k and rf is not None else None}  # fmt: skip
 
 
 def compute(*rows: dict[str, object]) -> pd.DataFrame:
@@ -52,6 +55,26 @@ def test_a_10q_does_not_replace_the_10k_risk_factor_value() -> None:
     q = change("EQ:A", SESSION - timedelta(days=10), "10-Q", acc="Q")
     [row] = compute(k, q).to_dict("records")
     assert row["text_sim_form"] == "10-Q" and row["risk_factor_sim_cosine"] == 0.7
+
+
+def test_a_10k_hidden_by_a_later_10q_in_the_window_still_gives_the_risk_factor_value() -> None:
+    """The gap of #720 (review finding 3): both filings in one change row, the 10-Q the latest;
+    the risk factors are the 10-K's, not last year's."""
+    prior_year = change("EQ:A", SESSION - timedelta(days=370), "10-K", acc="K0", rf=0.5)
+    both = change("EQ:A", SESSION - timedelta(days=3), "10-Q", acc="Q", cosine=0.9) | {
+        "ftc_k_accession": "K1", "ftc_k_known_from": SESSION - timedelta(days=4),
+        "ftc_k_status": "OK", "ftc_k_rf_cosine": 0.8, "ftc_k_rf_len_change": 0.3}  # fmt: skip
+    [row] = compute(prior_year, both).to_dict("records")
+    assert row["text_sim_form"] == "10-Q" and row["text_sim_cosine"] == 0.9
+    assert row["risk_factor_sim_cosine"] == 0.8 and row["risk_factor_len_change"] == 0.3
+
+
+def test_a_10k_known_after_the_session_gives_no_risk_factor_value() -> None:
+    future = change("EQ:A", SESSION - timedelta(days=3), "10-Q", acc="Q") | {
+        "ftc_k_accession": "K", "ftc_k_known_from": SESSION + timedelta(days=1),
+        "ftc_k_status": "OK", "ftc_k_rf_cosine": 0.8, "ftc_k_rf_len_change": 0.3}  # fmt: skip
+    [row] = compute(future).to_dict("records")
+    assert pd.isna(row["risk_factor_sim_cosine"]) and pd.isna(row["risk_factor_status"])
 
 
 def test_a_non_ok_status_is_carried_with_null_values_and_item_1a_gap_is_not_comparable() -> None:

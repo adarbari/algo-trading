@@ -305,7 +305,7 @@ note = "open-market insider purchases known in the last 30 days (distinct buyers
 [[table]]
 name = "rollups/instrument/filing_text_change@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "how much the latest 10-K / 10-Q of each operating company (known in the last 5 sessions) reads like its year-ago filing: cosine and Jaccard of the Item sections, the 10-K risk factors on their own; sparse, a row per instrument of a company with a recent filing; reads events/filing_text through data.filing_text.recent per session, never a filing before its known_from; a null measure is never zero (status NO_PRIOR / NOT_COMPARABLE); no value before the D10 backfill, delisted companies have no instrument and no row (EB F)"
+note = "how much the latest 10-K / 10-Q of each operating company (known in the last 5 sessions) reads like its year-ago filing: cosine and Jaccard of the Item sections, the 10-K risk factors on their own (the latest filing of either form in ftc_*, the latest 10-K in ftc_k_*: one comparison per company and form); sparse, a row per instrument of a company with a recent filing; reads events/filing_text through data.filing_text.recent per session, never a filing before its known_from; a null measure is never zero (status NO_PRIOR / NOT_COMPARABLE); no value before the D10 backfill, delisted companies have no instrument and no row (EB F)"
 
 [[table]]
 name = "rollups/instrument/filing_text_similarity@v1"

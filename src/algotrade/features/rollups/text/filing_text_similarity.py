@@ -7,7 +7,8 @@ instrument:
 
     text_sim_*          from the latest periodic filing of either form, carried at most
                         ``CARRY_DAYS`` calendar days from the session it became known
-    risk_factor_*       from the latest 10-K, carried at most ``RISK_CARRY_DAYS`` days
+    risk_factor_*       from the latest 10-K (the source's ``ftc_k_*``, which a 10-Q accepted in
+                        the same window does not hide), carried at most ``RISK_CARRY_DAYS`` days
 
 Past the cap the part has no value (a name with neither has no row: UNKNOWN, as ``insider_buys``).
 ``*_status`` is the filing's own (``OK``, ``NO_PRIOR``, ``NOT_COMPARABLE``); the measures are null
@@ -22,7 +23,7 @@ import pandas as pd
 
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.text.comparison import NOT_COMPARABLE, OK, TEN_K
+from algotrade.features.rollups.text.comparison import NOT_COMPARABLE, OK
 from algotrade.features.rollups.text.filing_text_change import GROUP as CHANGE
 
 NAME = "filing_text_similarity"
@@ -31,7 +32,7 @@ SOURCE = CHANGE.table
 LOOKBACK = 280  # sessions: 400 calendar days, the longest carry, with margin
 CARRY_DAYS = 150
 RISK_CARRY_DAYS = 400
-_SRC = ("filing_text_change.ftc_cosine@v1",)
+_SRC = ("filing_text_change.ftc_cosine@v1", "filing_text_change.ftc_k_rf_cosine@v1")
 _NONE = (
     "no 10-K or 10-Q became known in the carry window, or its status is not OK (no filing of the "
     "year before is stored, or too little comparable text): never read as no change"
@@ -70,19 +71,23 @@ FEATURES = (
 COLUMNS = column_types(FEATURES)
 
 
-def _latest(rows: pd.DataFrame, session: date, days: int) -> pd.DataFrame:
-    """The latest filing per instrument (``ftc_known_from``, then accession) no more than ``days``
-    calendar days before the session."""
+def _latest(rows: pd.DataFrame, session: date, days: int, prefix: str) -> pd.DataFrame:
+    """The latest filing per instrument (``<prefix>known_from``, then accession) no more than
+    ``days`` calendar days before the session and not after it; ``prefix`` picks the latest
+    filing of either form (``ftc_``) or the latest 10-K (``ftc_k_``)."""
+    known = pd.to_datetime(rows[f"{prefix}known_from"])
     since = pd.Timestamp(session) - pd.Timedelta(days=days)
-    rows = rows[(pd.to_datetime(rows["ftc_known_from"]) >= since)]
-    ordered = rows.sort_values(["ftc_known_from", "ftc_accession", "session_date"], kind="stable")
+    rows = rows[(known >= since) & (known <= pd.Timestamp(session))]
+    ordered = rows.sort_values(
+        [f"{prefix}known_from", f"{prefix}accession", "session_date"], kind="stable"
+    )
     return ordered.drop_duplicates("instrument_id", keep="last").set_index("instrument_id")
 
 
 def _risk_status(row: pd.Series) -> str:
-    if row["ftc_status"] == OK and pd.isna(row["ftc_rf_cosine"]):
+    if row["ftc_k_status"] == OK and pd.isna(row["ftc_k_rf_cosine"]):
         return NOT_COMPARABLE
-    return str(row["ftc_status"])
+    return str(row["ftc_k_status"])
 
 
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
@@ -90,17 +95,16 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     stored = inputs.get(SOURCE)
     if stored is None or stored.empty:
         return pd.DataFrame(columns=columns)
-    rows = stored[pd.to_datetime(stored["ftc_known_from"]) <= pd.Timestamp(session)]
-    text = _latest(rows, session, CARRY_DAYS)
-    risk = _latest(rows[rows["ftc_form"] == TEN_K], session, RISK_CARRY_DAYS)
+    text = _latest(stored, session, CARRY_DAYS, "ftc_")
+    risk = _latest(stored, session, RISK_CARRY_DAYS, "ftc_k_")
     out = pd.DataFrame(index=text.index.union(risk.index))
     out.index.name = "instrument_id"
     for col, src in (("text_sim_cosine", "ftc_cosine"), ("text_sim_jaccard", "ftc_jaccard"),
                      ("text_sim_form", "ftc_form"), ("text_sim_known_from", "ftc_known_from"),
                      ("text_sim_status", "ftc_status")):  # fmt: skip
         out[col] = text[src].reindex(out.index)
-    out["risk_factor_sim_cosine"] = risk["ftc_rf_cosine"].reindex(out.index)
-    out["risk_factor_len_change"] = risk["ftc_rf_len_change"].reindex(out.index)
+    out["risk_factor_sim_cosine"] = risk["ftc_k_rf_cosine"].reindex(out.index)
+    out["risk_factor_len_change"] = risk["ftc_k_rf_len_change"].reindex(out.index)
     out["risk_factor_status"] = (
         risk.apply(_risk_status, axis=1).reindex(out.index) if len(risk) else None
     )
