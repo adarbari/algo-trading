@@ -174,3 +174,26 @@ SHIPPED = FileConfigStore(REPO_ROOT / "config")
 def site() -> StoreContext:
     """The repo's site configs (for the fitness tests over the shipped files)."""
     return open_stores(StoreReader(MemoryBackend()), SHIPPED, UserContext(SITE_USER))
+
+
+class CountingConfigs:
+    """The shipped configs, counting every document read (``loads``)."""
+
+    def __init__(self) -> None:
+        self.loads = 0
+
+    def load(self, scope: str, kind: str, name: str) -> Any:
+        self.loads += 1
+        return SHIPPED.load(scope, kind, name)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(SHIPPED, name)
+
+
+@pytest.fixture
+def counted() -> tuple[StoreContext, CountingConfigs]:
+    """A fresh context over the shipped site configs and its read counter: a Guide page built
+    once must not read a config file again (the pages took 0.5 s of TOML parsing a request)."""
+    configs = CountingConfigs()
+    ctx = open_stores(StoreReader(MemoryBackend()), configs, UserContext(SITE_USER))  # type: ignore[arg-type]
+    return ctx, configs

@@ -65,6 +65,8 @@ instrument_tables = [            # the tables Explore reads, copied for the last
     "rollups/instrument/etf_macro@v1",   # about 1 MB a year (32 float32 columns, 60 fund rows a session)
     "rollups/instrument/filing_activity@v1",
     "rollups/instrument/filing_events@v1",
+    "rollups/instrument/filing_text_change@v1",   # sparse: a row per company with a 10-K / 10-Q known in the last 5 sessions
+    "rollups/instrument/filing_text_similarity@v1",
     "rollups/instrument/ipo_lockups@v1",
     "rollups/instrument/reverse_splits@v1",
     "rollups/instrument/factor_betas@v1",   # about 20 MB a year (8 float32 columns, one row per instrument-session): measure before the first backfill

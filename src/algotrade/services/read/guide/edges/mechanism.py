@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from algotrade.config.site.guide.glossary import load_guide_glossary
 from algotrade.config.site.guide.mechanisms import MechanismProse, load_guide_mechanisms
 from algotrade.services.configs import catalog_of
-from algotrade.services.read.context import Stores
+from algotrade.services.read.context import Stores, catalogue_key
 from algotrade.services.read.guide.edges.edge import GuideEdgeRow, edge_row
 from algotrade.services.read.guide.edges.ideas import GuideIdea, ideas_of
 from algotrade.services.read.guide.edges.site_edges import site_edges
@@ -59,11 +59,15 @@ class GuideMechanism:
 
 
 def load_guide_mechanism(ctx: Stores, mechanism_id: str) -> GuideMechanism | None:
-    """The mechanism page ``mechanism_id`` names (module docstring)."""
+    """The mechanism page ``mechanism_id`` names (module docstring), built once per cache and
+    catalogue; an unknown id (``None``) is never cached, so the key space stays the mechanisms'."""
+    key = ("guide-mechanism", mechanism_id, catalogue_key(ctx))
+    return ctx.cache.get_or_compute(key, lambda: _mechanism(ctx, mechanism_id))  # type: ignore[no-any-return]
+
+
+def _mechanism(ctx: Stores, mechanism_id: str) -> GuideMechanism | None:
     prose = load_guide_mechanisms(ctx.configs).get(mechanism_id)
-    if prose is None:
-        return None
-    return mechanism_of(ctx, prose)
+    return mechanism_of(ctx, prose) if prose is not None else None
 
 
 def mechanism_of(ctx: Stores, prose: MechanismProse) -> GuideMechanism:

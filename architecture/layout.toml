@@ -307,6 +307,11 @@ purpose = "feature groups from the SEC financial statements (instruments/stateme
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/text"
+purpose = "feature groups of what a filing's text says and how it changed from the year before (the 10-K / 10-Q Item sections of events/filing_text): comparison.py, the one comparison of a filing with its year-ago filing (comparator window, floors, status), and a module per group with its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/quant"
 purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model, the edge statistics in edges/"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
@@ -314,6 +319,11 @@ contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow
 [[dir]]
 path = "src/algotrade/quant/edges"
 purpose = "the statistics that judge an edge's screeners (ADR 0053; split from quant, at its module cap): lift, effect size, deciles, Sharpe, deflated Sharpe, PBO and the live win-rate band (statistics.py); sign stability, rank-correlation clusters and the permutation null of the discovery study (discovery.py); the maths of a chain P&L: two-sided mids, long P&L, our own delta of a leg, the daily delta-hedged P&L (chain_pnl.py, EB H13)"
+contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/quant/text"
+purpose = "text maths (split from quant): the pinned tokeniser of a filing text (tokens.py) and the measures that compare two texts from their term counts, cosine on raw counts and Jaccard on word sets (similarity.py); stdlib only"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]

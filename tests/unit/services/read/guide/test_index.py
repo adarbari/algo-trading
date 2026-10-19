@@ -71,3 +71,12 @@ def test_the_index_lists_the_start_pages_in_order_and_the_terms() -> None:
     assert [p.order for p in index.start_pages] == sorted(p.order for p in index.start_pages)
     assert index.start_pages[0].title == "How the app thinks about a day"
     assert all(t.id and t.term and t.short for t in index.terms)
+
+
+def test_a_second_read_of_the_index_reads_no_config(counted) -> None:  # type: ignore[no-untyped-def]
+    ctx, configs = counted
+    first = load_guide_index(ctx)
+    assert configs.loads > 0
+    seen = configs.loads
+    assert load_guide_index(ctx) is first
+    assert configs.loads == seen

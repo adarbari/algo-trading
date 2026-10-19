@@ -17,13 +17,14 @@ from algotrade.config.site.guide.start import load_guide_start
 from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.config.site.settings import load_field_guide
-from algotrade.services.read.context import Stores
+from algotrade.services.read.context import Stores, catalogue_key
 from algotrade.services.read.guide.edges.index import (
     GuideMechanismEntry,
     edge_entries,
     mechanism_entries,
 )
-from algotrade.services.read.guide.playbooks import SitePlaybook, site_playbooks
+from algotrade.services.read.guide.edges.site_edges import playbooks_of
+from algotrade.services.read.guide.playbooks import SitePlaybook
 
 
 @dataclass(frozen=True)
@@ -138,10 +139,17 @@ class GuideIndex:
 
 
 def load_guide_index(ctx: Stores) -> GuideIndex:
-    """The Guide's index over the site configs ``ctx.configs`` holds (module docstring)."""
+    """The Guide's index over the site configs ``ctx.configs`` holds (module docstring): built
+    once per cache (site files change only with a deploy, which restarts the API; 0.5 s of TOML
+    parsing a request before), keyed on the caller's catalogue like ``search.guide_entries``."""
+    key = ("guide-index", catalogue_key(ctx))
+    return ctx.cache.get_or_compute(key, lambda: _guide_index(ctx))  # type: ignore[no-any-return]
+
+
+def _guide_index(ctx: Stores) -> GuideIndex:
     sections = load_guide_sections(ctx.configs)
     guide = load_field_guide(ctx.configs)
-    playbooks = site_playbooks(ctx)
+    playbooks = playbooks_of(ctx)
     indicators = tuple(
         GuideIndicator(c.key, c.plain_name, c.pace) for c in load_cards(ctx.configs).cards
     )

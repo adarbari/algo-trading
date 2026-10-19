@@ -65,3 +65,12 @@ def test_the_guide_serves_the_plain_reason_never_the_technical_one(site: StoreCo
         assert page.rejection.text == edge.plain_reason
         shown = " ".join([s.why.text, page.rejection.text])
         assert edge.rejection_reason[:60] not in shown
+
+
+def test_a_second_read_of_the_edge_index_reads_no_config(counted) -> None:  # type: ignore[no-untyped-def]
+    ctx, configs = counted
+    first = load_guide_edge_index(ctx)
+    seen = configs.loads
+    assert seen > 0
+    assert load_guide_edge_index(ctx) is first
+    assert configs.loads == seen

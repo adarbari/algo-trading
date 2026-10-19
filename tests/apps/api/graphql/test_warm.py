@@ -8,6 +8,7 @@ from typing import Any, cast
 
 import pytest
 
+from algotrade.config.edges.document import MECHANISM_KINDS
 from algotrade_api.graphql import warm
 from algotrade_api.graphql.warm import CacheWarmer
 from algotrade_api.main import _start_warming
@@ -232,8 +233,21 @@ def test_warm_home_reads_only_the_home_steps(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(warm, "load_completeness", lambda c, n: ran.append("load_completeness"))
     monkeypatch.setattr(warm, "load_ideas", lambda c, n: ran.append("load_ideas"))
     monkeypatch.setattr(warm, "warm_market_frames", lambda c: ran.append("frames"))
+    monkeypatch.setattr(warm, "warm_guide", lambda c: ran.append("guide"))
     warm.CacheWarmer(lambda: cast(Any, object())).warm_home()
     assert "frames" not in ran and "load_ideas" in ran and "load_regime" in ran
+    assert ran[0] == "guide"  # first: a slow home must not leave the Guide cold
+
+
+def test_warm_guide_builds_the_index_the_edges_index_and_every_mechanism(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ran: list[str] = []
+    monkeypatch.setattr(warm, "load_guide_index", lambda c: ran.append("index"))
+    monkeypatch.setattr(warm, "load_guide_edge_index", lambda c: ran.append("edges"))
+    monkeypatch.setattr(warm, "load_guide_mechanism", lambda c, k: ran.append(k))
+    warm.warm_guide(cast(Any, object()))
+    assert ran == ["index", "edges", *MECHANISM_KINDS]
 
 
 def test_a_slow_home_warm_does_not_hold_the_start_past_its_cap(
