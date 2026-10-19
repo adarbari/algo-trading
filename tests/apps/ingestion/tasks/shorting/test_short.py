@@ -195,10 +195,10 @@ def test_backfilled_dates_resolve_against_their_own_reference() -> None:
     assert sorted(late["instrument_id"]) == ["EQ:AAA", "EQ:BBB"]
 
 
-def test_tickers_that_resolve_to_one_id_are_summed_into_one_row() -> None:
-    """FINRA lists ``TpC`` beside ``TPC`` (2026-10-16: 4 rows, 2 ids); the resolver reads both
-    as one id, and the table key (id, ts, known_from) holds one row: the first run failed
-    ``duplicate rows for the table key`` on 250 of 251 days."""
+def test_a_ticker_whose_case_differs_from_the_reference_is_dropped_and_counted() -> None:
+    """FINRA lists ``TpC`` beside ``TPC`` (2026-10-16: 4 rows, 2 ids); the resolver reads both as
+    one id and the table key held one row: the first run failed ``duplicate rows for the table
+    key`` on 250 of 251 days. The lowercase series is a different security: dropped, counted."""
 
     def row(symbol: str, facility: str, short: int, total: int) -> dict:
         return {
@@ -216,7 +216,8 @@ def test_tickers_that_resolve_to_one_id_are_summed_into_one_row() -> None:
     ctx = task_ctx(writer, sources={short_volume.SOURCE: source})
     record = run_task("short-volume", ctx, {"session": SESSION, "start": SESSION, "end": SESSION})
     assert record.status is RunStatus.COMPLETE and record.items["2026-10-16"] == "OK: 2 rows"
+    assert record.stats["unresolved"] == 1
     stored = StoreReader(writer._backend).table("events/short_volume", SESSION)
-    assert stored is not None
+    assert stored is not None and sorted(stored["instrument_id"]) == ["EQ:AAA", "EQ:BBB"]
     aaa = stored[stored["instrument_id"] == "EQ:AAA"].iloc[0]
-    assert (aaa["short_volume"], aaa["total_volume"], aaa["facilities"]) == (430, 1090, 2)
+    assert (aaa["short_volume"], aaa["total_volume"], aaa["facilities"]) == (400, 1000, 1)
