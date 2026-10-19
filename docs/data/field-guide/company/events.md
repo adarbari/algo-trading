@@ -108,6 +108,12 @@ Sources: Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance
 
 **How to read it.** The share of distinct words that the latest filing and its year-ago filing have in common. 1 is the same vocabulary; 0.8 means one word in five is new or dropped. Carried 150 days.
 
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a changed vocabulary | `lte 0.8` | hard | - | a screen choice; the study used the cosine, not this share |
+
 **When the reading lies**
 
 - It ignores how often a word appears, so a repeated change moves it little. Read rollup.filing_text_similarity@v1.text_sim_cosine for the weighted view.
@@ -135,6 +141,12 @@ Sources: Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance
 ### `rollup.filing_text_similarity@v1.risk_factor_len_change`
 
 **How to read it.** How much longer or shorter the 10-K risk factors are than last year's: new words over old words, minus one. 0.2 is 20 percent longer; -0.1 is 10 percent shorter. Carried 400 days.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| longer risk factors | `gte 0.2` | hard | - | a screen choice: 20 percent more words than last year |
 
 **When the reading lies**
 
@@ -880,20 +892,3 @@ Sources: Bali, Cakici and Whitelaw (2011), Maxing out: stocks as lotteries and t
 - Only reports known on the session are removed, so a past session is read as it was.
 
 Sources: Jegadeesh (1990), Evidence of predictable behavior of security returns; Chan (2003), Stock price reaction to news and no-news; Savor (2012), Stock returns after major price shocks
-
-### `rollup.earnings_neutral_reversal@v1.earnings_days_excluded`
-
-**How to read it.** How many of the last 20 daily returns an earnings reaction window left out of rollup.earnings_neutral_reversal@v1.ret_ex_earnings_20d. 0 means no report fell in the window. 2 is one report with both its reaction days. 1 is a report on the session itself, whose next day has not happened, or on a non-session day.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| the return is the plain month's (no report in it) | `eq 0` | soft | 0 | then rollup.price_stats@v2.ret_20d equals ret_ex_earnings_20d |
-
-**When the reading lies**
-
-- Null where ret_ex_earnings_20d is null: a gap in the closes, a short history, or no report known for the name.
-- More than 2 means two reports in a month, a correction or a rare double date. Treat the return with care.
-
-Sources: Bernard and Thomas (1989), Post-earnings-announcement drift: the E-1 to E+1 window

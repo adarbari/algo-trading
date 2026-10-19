@@ -498,6 +498,12 @@ caveats = [
   "Null unless rollup.filing_text_similarity@v1.text_sim_status is OK. A boilerplate-heavy filer sits near 1 whatever it changed.",
 ]
 sources = ["Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance"]
+[[field.use]]
+for = "a changed vocabulary"
+op = "lte"
+value = 0.8
+mode = "hard"
+note = "a screen choice; the study used the cosine, not this share"
 
 [[field]]
 name = "rollup.filing_text_similarity@v1.risk_factor_sim_cosine"
@@ -524,6 +530,12 @@ caveats = [
   "Null unless rollup.filing_text_similarity@v1.risk_factor_status is OK. A hard threshold drops every name with no comparable Item 1A.",
 ]
 sources = ["Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance"]
+[[field.use]]
+for = "longer risk factors"
+op = "gte"
+value = 0.2
+mode = "hard"
+note = "a screen choice: 20 percent more words than last year"
 
 [[field]]
 name = "rollup.filing_text_similarity@v1.text_sim_status"
