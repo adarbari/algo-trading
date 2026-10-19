@@ -43,3 +43,11 @@ def test_see_also_names_glossary_terms_only(site: StoreContext) -> None:
 
 def test_no_such_mechanism_is_none(site: StoreContext) -> None:
     assert load_guide_mechanism(site, "nope") is None
+
+
+def test_a_second_read_of_a_mechanism_reads_no_config(counted) -> None:  # type: ignore[no-untyped-def]
+    ctx, configs = counted
+    first = load_guide_mechanism(ctx, "value_gaps")
+    seen = configs.loads
+    assert load_guide_mechanism(ctx, "value_gaps") is first
+    assert configs.loads == seen

@@ -41,9 +41,8 @@ class SiteEdge:
 
 
 def playbooks_of(ctx: Stores) -> tuple[SitePlaybook, ...]:
-    """The site playbooks (``guide.playbooks``), resolved once per cache: site files change
-    only with a deploy, which restarts the API, so the answer is shared across requests."""
-    return ctx.cache.get_or_compute(("guide-site-playbooks",), lambda: site_playbooks(ctx))  # type: ignore[no-any-return]
+    """The site playbooks (``guide.playbooks``), shared across requests like ``site_edges``."""
+    return site_playbooks(ctx)
 
 
 def site_edges(ctx: Stores) -> tuple[SiteEdge, ...]:

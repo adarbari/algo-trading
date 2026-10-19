@@ -34,7 +34,13 @@ class SitePlaybook:
 
 
 def site_playbooks(ctx: Stores) -> tuple[SitePlaybook, ...]:
-    """Every site rule-screen preset, in Guide order (module docstring)."""
+    """Every site rule-screen preset, in Guide order (module docstring), resolved once per
+    cache: it resolves ~90 presets (0.4 s of TOML), and site files change only with a deploy,
+    which restarts the API, so every Guide page shares the answer."""
+    return ctx.cache.get_or_compute(("guide-site-playbooks",), lambda: _site_playbooks(ctx))  # type: ignore[no-any-return]
+
+
+def _site_playbooks(ctx: Stores) -> tuple[SitePlaybook, ...]:
     families = load_guide_sections(ctx.configs).families
     family_of = {p: f.id for f in families for p in f.presets}
     listed = [p for f in families for p in f.presets]

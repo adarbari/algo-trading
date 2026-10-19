@@ -362,7 +362,9 @@ def create_app(
     return app
 
 
-READ_CACHE_SIZE = 64  # room for the warmed market tables (warm.py) beside the pages' entries
+# the warmed market tables (warm.py), the pages' entries and the Guide's built pages: frames
+# are bounded by bytes (``ResultCache.max_bytes``), so the count only has to hold the small entries
+READ_CACHE_SIZE = 256
 
 
 def _reads(
