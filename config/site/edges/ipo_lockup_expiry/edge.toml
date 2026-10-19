@@ -33,7 +33,11 @@ mapped to an instrument as of D, so nothing after D enters. Horizons 10 (to the 
 past it, the page's -10 to +2 window): two trials, one screener. Every eligible name is the base and the picks
 are the lock-ups of the window (base universe, picks event), so the lift reads the picks against all liquid
 stocks. The score is the dollar volume, which every eligible name has, so the harness's score coverage is full and
-no universe gate on a sparse score is needed (a test pins the rank direction). The event count is the limit:
+no universe gate on a sparse score is needed (a test pins the rank direction). HISTORY LIMIT: ipo_lockups@v1 maps a filer's SEC CIK to an instrument through the instruments/company snapshot
+as of D, and the store's first snapshot is 2026-10-02, so NO event resolves before that date (the history
+from 2005 that the lock-up extraction covers does not reach the harness); firms that delisted after their IPO never
+map; and the frozen slice from 2026-04-01 is mostly empty. Verdicts stay UNMEASURED until a historical CIK map from
+instruments/listing_history exists (a follow-up). The event count is the limit:
 the lock-up dates come from prospectus text extracted by the text-model seam, so coverage is partial, liquid
 IPOs are few, and the independent count is small; early_release and standard terms (on_event:ipo_lockup:<terms>)
 are not split here. Venture-backed issuers, where the effect sits, are not flagged in the store, and the long
@@ -64,13 +68,15 @@ trigger_timing = """The expiry date is stated in the prospectus and is known ahe
 ADR 0075). The entry session S is the expiry session minus 10 (start_offset_sessions = -10) and the decision
 session D is S - 1, 11 sessions before the expiry. The names are read at D from ipo_lockups@v1
 (sessions_to_lockup_expiry = 11), built from prospectuses known by D, with the CIK mapped to an instrument through
-the company snapshot as of D."""
+the company snapshot as of D. The store's first company snapshot is 2026-10-02, so no event resolves before it;
+a firm delisted after its IPO never maps, and history waits on a historical CIK map from instruments/listing_history."""
 replication = """The source's rule first: the abnormal return around the expiry, larger for venture-backed issuers
 (Field and Hanka 2001). Here ipo_lockup_ahead v1 takes the liquid common stocks whose lock-up expires within 11
 sessions and the harness shorts the 20 most liquid for 10 and 12 sessions."""
 expected_size = """Field and Hanka (2001): about -1.5 percent over the 3 days around the expiry, about -3 percent for
 venture-backed issuers, with volume up about 40 percent; the page marks the figures as from memory and not verified,
-so no published figure is set. Liquid lock-ups are few; independent expiries are the binding count."""
+so no published figure is set. Liquid lock-ups are few, and none resolves to an instrument before 2026-10-02 (the first company snapshot),
+so the independent count starts near zero."""
 capacity_costs = """A fresh issue is shorted at a dear or impossible borrow; the outcome deducts 20 bps and an assumed
 2000 bps a year, a LOWER BOUND on the borrow. The usable form for an individual is the avoid list: do not buy a new
 issue into its expiry, which costs nothing."""
