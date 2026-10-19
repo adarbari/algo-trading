@@ -2,7 +2,7 @@
 (``config/site/guide/sections.toml``): the sections with their entry counts, the field theme
 groups with the number of guided fields per theme, the intents a trader has (each with the
 number of fields offering a criterion for it, most first), the situations with the number of
-fields each fools, the playbooks by family, the regime indicators and reference episodes as
+fields each fools, the screeners by family, the regime indicators and reference episodes as
 their config holds them, the mechanisms of the Edges section with the number of edges on each
 (``edges/index.py``), the Start here pages in order and the glossary terms in file order.
 Counts are computed here, never in the browser (ADR 0038)."""
@@ -23,8 +23,8 @@ from algotrade.services.read.guide.edges.index import (
     edge_entries,
     mechanism_entries,
 )
-from algotrade.services.read.guide.edges.site_edges import playbooks_of
-from algotrade.services.read.guide.playbooks import SitePlaybook
+from algotrade.services.read.guide.edges.site_edges import screeners_of
+from algotrade.services.read.guide.screeners.site_screeners import SiteScreener
 
 
 @dataclass(frozen=True)
@@ -71,7 +71,7 @@ class GuideSituationEntry:
 
 
 @dataclass(frozen=True)
-class GuidePlaybook:
+class GuideScreener:
     """A site preset: its id and display name."""
 
     id: str
@@ -82,7 +82,7 @@ class GuidePlaybook:
 class GuideFamily:
     id: str
     title: str
-    playbooks: tuple[GuidePlaybook, ...]
+    screeners: tuple[GuideScreener, ...]
 
 
 @dataclass(frozen=True)
@@ -149,7 +149,7 @@ def load_guide_index(ctx: Stores) -> GuideIndex:
 def _guide_index(ctx: Stores) -> GuideIndex:
     sections = load_guide_sections(ctx.configs)
     guide = load_field_guide(ctx.configs)
-    playbooks = playbooks_of(ctx)
+    screeners = screeners_of(ctx)
     indicators = tuple(
         GuideIndicator(c.key, c.plain_name, c.pace) for c in load_cards(ctx.configs).cards
     )
@@ -166,7 +166,7 @@ def _guide_index(ctx: Stores) -> GuideIndex:
         "start": len(start),
         "regime": len(indicators) + len(episodes),
         "edges": edge_entries(ctx),
-        "playbooks": len(playbooks),
+        "screeners": len(screeners),
         "fields": len(guide.fields),
         "situations": len(guide.situations),
         "glossary": len(terms),
@@ -184,7 +184,7 @@ def _guide_index(ctx: Stores) -> GuideIndex:
             GuideSituationEntry(s.name, len(s.affects), s.slug) for s in guide.situations
         ),
         families=tuple(
-            GuideFamily(f.id, f.title, _members(playbooks, f.id)) for f in sections.families
+            GuideFamily(f.id, f.title, _members(screeners, f.id)) for f in sections.families
         ),
         indicators=indicators,
         episodes=episodes,
@@ -201,5 +201,5 @@ def _intents(guide: FieldGuideSettings) -> tuple[GuideIntent, ...]:
     return tuple(GuideIntent(intent, n) for intent, n in ranked)
 
 
-def _members(playbooks: tuple[SitePlaybook, ...], family: str) -> tuple[GuidePlaybook, ...]:
-    return tuple(GuidePlaybook(p.id, p.name) for p in playbooks if p.family == family)
+def _members(screeners: tuple[SiteScreener, ...], family: str) -> tuple[GuideScreener, ...]:
+    return tuple(GuideScreener(p.id, p.name) for p in screeners if p.family == family)

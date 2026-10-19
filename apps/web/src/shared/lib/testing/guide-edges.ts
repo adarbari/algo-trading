@@ -87,7 +87,7 @@ export const edgeEntry = (over: Record<string, unknown> = {}) => ({
     { key: 'outcome', title: 'Outcome', text: 'Excess return over SPY', term: 'excess_return' },
     { key: 'universe', title: 'Universe', text: 'Common stocks above $5', term: null },
   ],
-  playbooks: [{ id: 'earnings_date_shift', name: 'Earnings date moved earlier', family: 'Events' }],
+  screeners: [{ id: 'earnings_date_shift', name: 'Earnings date moved earlier', family: 'Events' }],
   fields: ['feature.days_since_date_shift'],
   failureModes: prose('A fiscal-year change looks like news and is not.'),
   decoys: prose('Plain momentum or size.'),

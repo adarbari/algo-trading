@@ -139,7 +139,7 @@ export const GuideEdgeQuery = graphql(`
         text
         term
       }
-      playbooks {
+      screeners {
         id
         name
         family
@@ -292,9 +292,9 @@ export const GuideMechanismsQuery = graphql(`
   }
 `);
 
-export const GuidePlaybookEdgesQuery = graphql(`
-  query GuidePlaybookEdges($id: String!) {
-    guidePlaybook(id: $id) {
+export const GuideScreenerEdgesQuery = graphql(`
+  query GuideScreenerEdges($id: String!) {
+    guideScreener(id: $id) {
       edges {
         id
         name

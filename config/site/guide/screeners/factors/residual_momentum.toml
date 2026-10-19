@@ -1,0 +1,31 @@
+# L3 site setting: the Guide's screener for the site preset residual_momentum (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Typed by src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "residual_momentum"
+version = 1  # the preset version this prose was written for
+line = "Last year's winners after removing what the market itself contributed."
+summary = "Ranks every tradeable name by its 12-month return with the last month left out and the market's share taken off, so a name that only rode a rising market ranks low. It is momentum with the market stripped out,[^1] a candidate edge under test."
+hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, and it has a market-residual 12-1 momentum value. Every such name qualifies; the best residual comes first."
+not_checked = "It does not remove the size and value parts of the return (the paper strips three factors; only the market is stored), and it does not scale by the residual's own volatility. The harness measures whether the order pays."
+before_acting = [
+  "The market share is the name's beta times SPY's return: a wrong beta on a short or noisy history leaves market in the residual. Compare rollup.momentum_variants@v1.resid_mom_12_1 with rollup.trend_stats@v2.mom_12_1; a large gap means the beta did the work.",
+  "Later studies find part of the effect is low beta and factor momentum in disguise: read the harness's decile spread beside the 12-1 momentum list before trusting it.",
+  "It still crashes in sharp rebounds, if less than raw momentum.",
+]
+related = [
+  { id = "momentum_12_1", reason = "the same ranking on the raw return" },
+]
+
+[[sources]]
+title = "Blitz, Huij and Martens, Residual Momentum (2011)"
+url = "https://repub.eur.nl/pub/22252"
+note = "Ranking on returns left after the market and other factors doubles the risk-adjusted profit of momentum and makes it steadier."
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+resid_mom_12_1 = "Has a market-residual 12-1 momentum value"

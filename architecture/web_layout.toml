@@ -122,7 +122,7 @@ purpose = "one page's recorded API responses (JSON), served by its e2e route moc
 
 [[web_dir]]
 path = "apps/web/e2e/guide"
-purpose = "the Guide's end-to-end route mocks (playbooks, situations, regime pages; Start here, glossary and search), served through explore-api.ts"
+purpose = "the Guide's end-to-end route mocks (screeners, situations, regime pages; Start here, glossary and search), served through explore-api.ts"
 
 [[web_dir]]
 path = "apps/web/lint-rules"

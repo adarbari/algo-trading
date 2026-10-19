@@ -1,5 +1,5 @@
 """``Query.guideSituation`` over the repo's site configs (ADR 0051): a situation by slug with
-its signs and what to do linked at catalogue names, the fields it fools and the site playbooks
+its signs and what to do linked at catalogue names, the fields it fools and the site screeners
 deciding on them; null for an unknown slug."""
 
 from typing import Any
@@ -11,7 +11,7 @@ SITUATION = """query S($slug: String!) {
     slug name affects
     signs { text segments { text field } }
     do { text segments { text field } }
-    playbooks { id name fields }
+    screeners { id name fields }
   }
 }"""
 
@@ -29,8 +29,8 @@ def test_a_situation_page(graph: Graph) -> None:
     signs = page["signs"]
     assert "".join(s["text"] for s in signs["segments"]) == signs["text"]
     assert "feature.atr_pct" in [s["field"] for s in signs["segments"]]
-    assert page["playbooks"] and all(
-        set(p["fields"]) <= set(page["affects"]) and p["fields"] for p in page["playbooks"]
+    assert page["screeners"] and all(
+        set(p["fields"]) <= set(page["affects"]) and p["fields"] for p in page["screeners"]
     )
 
 

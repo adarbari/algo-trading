@@ -1,0 +1,47 @@
+# L3 site setting: the Guide's screener for the site preset pead_small_cap (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other screeners), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "pead_small_cap"
+version = 1  # the preset version this prose was written for
+line = "Small Nasdaq stocks that beat the market by 5% or more on earnings."
+summary = "Finds small Nasdaq stocks that jumped on their latest earnings report by at least 5% more than the market, biggest jump first: post-earnings drift, the finding that small stocks keep moving the same way for weeks after a report.[^1] It is a candidate edge under test, not a proven trade."
+hit = "The name is a Nasdaq-listed common stock under $2B of market value, closing above $3, that traded at least $2M a day before its report, and whose close after the report beat SPY's by 5% or more measured from the close before it. The biggest reaction ranks first."
+not_checked = "It does not know whether the report beat estimates (only how the price reacted), why it moved (a takeover bid or an offering looks the same), or how old the reaction is. It is the screen of the small-cap earnings drift edge, which the harness is still testing."
+before_acting = [
+  "Small names trade with wide spreads: compare rollup.earnings_reaction@v1.pre_event_adv_usd_20d with the size you would trade, and expect costs of tens of basis points a round trip.[^2]",
+  "The drift has faded in larger stocks and is strongest only in the smallest; read the harness's results by size bucket before trusting a pick.[^3]",
+  "A reaction of +5% or more can already be the whole move: rollup.earnings_reaction@v1.reaction_excess_return is measured to the close after the report, and you can only buy a session later.",
+]
+related = [
+  { id = "size_small", reason = "the size baseline the edge is compared with" },
+  { id = "momentum_12_1", reason = "the momentum baseline the edge is compared with" },
+]
+
+[[sources]]
+title = "Bernard and Thomas, Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium? (1989)"
+note = "Shows stocks keep moving in the direction of an earnings surprise for about 60 trading days."
+
+[[sources]]
+title = "Chordia, Goyal, Sadka, Sadka and Shivakumar, Liquidity and the Post-Earnings-Announcement Drift (2009)"
+url = "https://ideas.repec.org/a/taf/ufajxx/v65y2009i4p18-32.html"
+note = "Finds the drift is concentrated in illiquid stocks and that trading costs absorb most of the paper profit."
+
+[[sources]]
+title = "Martineau, Rest in Peace Post-Earnings Announcement Drift (2022)"
+url = "https://ideas.repec.org/a/now/jnlcfr/104.00000122.html"
+note = "Finds the drift after earnings has been absent for large stocks since about 2006."
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+exchange = "Listed on Nasdaq"
+market_cap = "Under $2B of market value"
+price = "Closes at $3 or more"
+pre_event_adv = "Traded at least $2M a day before the report"
+reaction_status = "Its last report has a complete reaction window"
+reaction = "Beat SPY by 5% or more over the report"

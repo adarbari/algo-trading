@@ -1,0 +1,42 @@
+# L3 site setting: the Guide's screener for the site preset momentum_volume_confirmed (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other screeners), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "momentum_volume_confirmed"
+version = 1  # the preset version this prose was written for
+line = "Past-year winners that also show net buying on volume over 20 sessions."
+summary = "Ranks past-year winners that also show net buying: on-balance volume rising and closes in the upper half of the day's range on volume, over 20 sessions.[^2] It tests whether volume confirmation improves 12-1 momentum."
+hit = "The name closes above $5, trades at least $50M a day, has positive 12-1 momentum, and both the 20-session OBV trend and Chaikin money flow are above 0. Best momentum first."
+not_checked = "It does not check the size of any one day's volume, news, or earnings. OBV and CMF have no academic test of their own."
+before_acting = [
+  "Lee and Swaminathan found low-volume winners persist longer, the opposite reading of volume: treat this as one test of the two.[^1]",
+  "One heavy day can carry the OBV trend; check rollup.volume@v1.volume_z_20d.",
+  "CMF ignores gaps: a gap down that closes at the high scores well; compare rollup.volume@v1.up_volume_share_20d.",
+]
+related = [
+  { id = "momentum_12_1", reason = "the ranking this conditions" },
+  { id = "momentum_own_trend", reason = "another condition on the same ranking" },
+]
+
+[[sources]]
+title = "Lee and Swaminathan, Price Momentum and Trading Volume (2000)"
+url = "https://ideas.repec.org/a/bla/jfinan/v55y2000i5p2017-2069.html"
+note = "Finds past trading volume predicts how large and how lasting price momentum is; high-volume winners reverse faster."
+
+[[sources]]
+title = "Chordia and Subrahmanyam, Order Imbalance and Individual Stock Returns (2004)"
+url = "https://doi.org/10.1016/S0304-405X(03)00175-2"
+note = "Studies how daily buying and selling imbalances relate to the returns of individual stocks."
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+mom_12_1 = "A past-year winner: positive 12-1 momentum"
+obv_trend = "Net buying: on-balance volume rising over 20 sessions"
+cmf = "Closes in the upper half of the range on volume"

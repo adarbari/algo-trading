@@ -7,7 +7,8 @@ What is searched, per kind (``guide_entries``, the one list of the Guide's entri
 
 - a field (every catalogue field of the caller): its name; its theme and intents (the field
   guide's); its prose (how to read it, the caveats, the catalogue description);
-- a playbook: its id and name; its prose (summary, hit, not checked, before acting, asks);
+- a screener: its id and name; its prose (line, summary, hit, not checked, before acting, asks;
+  source markers left out);
 - a situation: its slug and name; its signs and what to do;
 - a regime indicator: its key and field, its plain and technical names; the card's prose;
 - an episode: its key and name; its cause and notes;
@@ -37,13 +38,14 @@ from dataclasses import dataclass
 
 from algotrade.config.site.guide.glossary import load_guide_glossary
 from algotrade.config.site.guide.mechanisms import load_guide_mechanisms
-from algotrade.config.site.guide.playbooks import load_guide_playbooks
+from algotrade.config.site.guide.screeners import load_guide_screeners
+from algotrade.config.site.guide.sources import plain
 from algotrade.config.site.guide.start import ENTRY_KINDS, load_guide_start
 from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.config.site.settings import load_field_guide
 from algotrade.services.read.context import Stores, catalogue_key
-from algotrade.services.read.guide.edges.site_edges import playbooks_of, site_edges
+from algotrade.services.read.guide.edges.site_edges import screeners_of, site_edges
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 
 SNIPPET = 160  # characters of a snippet, at most (an ellipsis marks a cut)
@@ -186,7 +188,7 @@ def guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
 
 def _guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
     guide = load_field_guide(ctx.configs)
-    prose = load_guide_playbooks(ctx.configs)
+    prose = load_guide_screeners(ctx.configs)
     pages = tuple(
         GuideEntryText(
             "start", p.id, p.title, (p.id,), (p.title,), (),
@@ -227,18 +229,17 @@ def _guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
         )
         for e in site_edges(ctx)
     )  # fmt: skip
-    playbooks = []
-    for p in playbooks_of(ctx):
+    screeners = []
+    for p in screeners_of(ctx):
         written = prose.get(p.id)
         texts = (
-            (written.summary, written.hit, written.not_checked, *written.before_acting,
-             *(a for _, a in written.asks))
+            (written.line, *map(plain, written.texts), *(a for _, a in written.asks))
             if written is not None
             else ()
-        )  # fmt: skip
-        lead = written.summary if written is not None else ""
-        playbooks.append(
-            GuideEntryText("playbook", p.id, p.name, (p.id,), (p.name,), (), texts, lead)
+        )
+        lead = plain(written.summary) if written is not None else ""
+        screeners.append(
+            GuideEntryText("screener", p.id, p.name, (p.id,), (p.name,), (), texts, lead)
         )
     fields = tuple(_field(info) for info in feature_infos(ctx.features, guide=guide).values())
     situations = tuple(
@@ -251,7 +252,7 @@ def _guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
         for t in load_guide_glossary(ctx.configs).terms
     )
     return (
-        *pages, *indicators, *episodes, *mechanisms, *edges, *playbooks, *fields, *situations,
+        *pages, *indicators, *episodes, *mechanisms, *edges, *screeners, *fields, *situations,
         *terms,
     )  # fmt: skip
 

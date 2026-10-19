@@ -2,7 +2,7 @@
 # here"): numbered how-to pages for someone who does not follow markets. One [[page]] each: id
 # (its page's key, snake_case), order (its number), title, summary (one line, the index's), [[page.section]]
 # (title and body, one paragraph each; catalogue names in a body are linked) and links (the
-# Guide entries to read next, {kind, id}: kind one of start, indicator, episode, playbook,
+# Guide entries to read next, {kind, id}: kind one of start, indicator, episode, screener,
 # field, situation, term). Typed by src/algotrade/config/site/guide/start.py; fitness tests in
 # tests/unit/config/site/guide/test_start.py (every link resolves, catalogue names exist).
 
@@ -105,9 +105,9 @@ rows that missed only within tolerance. In the Builder, the funnel shows the gat
 id = "build_a_screen"
 order = 3
 title = "Build a screen"
-summary = "Start from a playbook, take criteria from the field pages, preview on today's data, then finalise to run it nightly."
+summary = "Start from a screener, take criteria from the field pages, preview on today's data, then finalise to run it nightly."
 links = [
-  { kind = "playbook", id = "trend_continuation" },
+  { kind = "screener", id = "trend_continuation" },
   { kind = "field", id = "rollup.price_stats@v2.adv_usd_20d" },
   { kind = "term", id = "criterion" },
   { kind = "term", id = "mode" },
@@ -118,9 +118,9 @@ links = [
 ]
 
 [[page.section]]
-title = "Start from a playbook"
+title = "Start from a screener"
 body = """
-Each site screen has a playbook in the Guide: the setup it looks for, what a hit looks like,
+Each site screen has a screener in the Guide: the setup it looks for, what a hit looks like,
 what it does not check and each criterion in plain words. Open in Builder shows that screen in
 the Builder. Your first edit makes your own copy, which keeps the site's version it started
 from until you choose to rebase onto a newer one.

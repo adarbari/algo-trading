@@ -1,0 +1,31 @@
+# L3 site setting: the Guide's screener for the site preset etf_low_ibs (ADR 0051; docs/ui/guide.md
+# "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
+id = "etf_low_ibs"
+version = 1  # the preset version this prose was written for
+line = "Unleveraged ETFs that closed in the bottom fifth of the day's range."
+summary = "Lists unleveraged ETFs that closed in the bottom fifth of the day's range, the lowest close first. It is the entry rule of a one-day index ETF reversal under test.[^1][^2]"
+hit = "An unleveraged ETF whose close sits less than 20 percent of the way up its high-low range for the session. The weakest close ranks first. A bar with no range is absent."
+not_checked = "It does not check the market regime, the overnight gap, the volume of the day or liquidity. The edge's own short list of index funds is what limits the names."
+before_acting = [
+  "The effect is a few basis points a day and faded after about 2011: read the edge page's measured result, not the study's.",
+  "Part of any gain after a weak close is the overnight return the funds earn on every day, so compare it with holding the same funds always.",
+  "A weak close on a day the market is falling hard can fall further the next day: this screen does not see the day's news.",
+]
+related = [
+  { id = "oversold_reversal", reason = "another list of weak closes, on stocks" },
+]
+
+[[sources]]
+title = "Pagonidis, The IBS Effect: Mean Reversion in Equity ETFs (2013)"
+note = "Reports that ETFs closing near the low of the day tended to rise the next day."
+
+[[sources]]
+title = "Connors and Alvarez, Short Term Trading Strategies That Work (2009)"
+note = "Backtests short-term mean-reversion rules, including buying after a one-day weak close."
+
+[asks]
+security_type = "An ETF"
+status = "Still listed and trading"
+not_leveraged = "Not a leveraged fund"
+not_inverse = "Not an inverse fund"
+ibs = "Closed in the bottom fifth of the day's range"

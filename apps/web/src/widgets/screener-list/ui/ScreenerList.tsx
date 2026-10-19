@@ -30,7 +30,7 @@ import {
   useScreeners,
   type ScreenerRunSummary,
 } from '@/entities/screen';
-import { playbookPath } from '@/entities/guide';
+import { screenerPath } from '@/entities/guide';
 import { CopyPresetDialog } from '@/features/screener-copy';
 import { DeleteScreenerDialog } from '@/features/screener-delete';
 
@@ -198,9 +198,9 @@ function toTableRow(
           row={row}
           summary={summary}
           {...actions}
-          playbook={
-            <TextLink href={playbookPath(row.id)} icon="book" size="sm">
-              Playbook
+          screener={
+            <TextLink href={screenerPath(row.id)} icon="book" size="sm">
+              Screener
             </TextLink>
           }
         />

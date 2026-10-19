@@ -35,7 +35,7 @@ const STRUCTURE = [
   'src/widgets/events-panel/ui/EventsPanel.tsx', // an instrument's stored events
   'src/widgets/event-study-panel/model/columns.tsx', // an instrument's events ahead and its 8-Ks
   'src/widgets/features-panel/model/rows.tsx', // one instrument's features, one row each
-  'src/widgets/guide-playbook/model/columns.tsx', // a playbook's criteria, one row each
+  'src/widgets/guide-screener/model/columns.tsx', // a screener's criteria, one row each
   'src/widgets/feature-request-list/model/columns.tsx', // admin: requested features, one record each
   'src/widgets/harness-run-detail/model/columns.tsx', // admin: one evaluation run's stored rows
   'src/widgets/harness-run-list/model/columns.tsx', // admin: edge evaluation runs, one record each

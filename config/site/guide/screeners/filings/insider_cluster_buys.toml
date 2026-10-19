@@ -1,0 +1,37 @@
+# L3 site setting: the Guide's screener for the site preset insider_cluster_buys (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys as in tender_offer_filed.toml; typed by src/algotrade/config/site/guide/screeners.py.
+id = "insider_cluster_buys"
+version = 1  # the preset version this prose was written for
+line = "Stocks where three or more insiders bought shares on the open market this month."
+summary = "Finds liquid stocks where three or more insiders bought shares on the open market in the last 30 days and a buyer trades at irregular times.[^1] It is a candidate edge under test, not a proven trade."
+hit = "The name is a common stock closing above $5 that trades at least $1M a day, with at least three different insiders buying in the last 30 days (counted from the session each filing became public). The most buyers rank first."
+not_checked = "It does not read the size of the purchases, whether the buyers are officers or directors, or why they bought. A purchase made under a pre-arranged plan is not screened out: its column rollup.insider_buys@v1.plan_10b5_1_flag shows it."
+before_acting = [
+  "Insiders often buy after a price fall, so the name may simply be cheap: read rollup.trend_stats@v2.mom_12_1 beside it.[^2]",
+  "A filing accepted after the close counts from the next session, and the trade itself is up to two business days older than the filing.",
+  "A buyer without a trade in each of the last three years cannot be called routine or not: rollup.insider_buys@v1.insider_opportunistic_flag is then empty and the name drops out.",
+]
+related = [
+  { id = "size_small", reason = "the size baseline the edge is compared with" },
+  { id = "tender_offer_filed", reason = "another filing-driven long idea" },
+]
+
+[[sources]]
+title = "Cohen, Malloy and Pomorski, Decoding Inside Information (2012)"
+url = "https://www.nber.org/digest/apr11/decoding-inside-information"
+note = "Finds insider trades at irregular times predict returns, while routine trades do not."
+
+[[sources]]
+title = "Lakonishok and Lee, Are Insider Trades Informative? (2001)"
+url = "https://ideas.repec.org/a/oup/rfinst/v14y2001i1p79-111.html"
+note = "Finds insiders act as contrarians and that their purchases, not their sales, predict returns, mostly in smaller firms."
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $1M a day"
+cluster = "Three or more insiders bought in the last 30 days"
+opportunistic = "A buyer trades at irregular times, not in the same month every year"

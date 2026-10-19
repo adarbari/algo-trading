@@ -1,0 +1,29 @@
+# L3 site setting: the Guide's screener for the site preset bond_curve_trend_3m (ADR 0051; docs/ui/guide.md
+# "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
+id = "bond_curve_trend_3m"
+version = 1  # the preset version this prose was written for
+line = "Treasury funds that rose over a year while long yields exceed 3-month yields."
+summary = "Lists IEF and TLT while the 10-year minus 3-month Treasury slope is above zero and the fund's 12-month return is positive, the best trend first."
+hit = "An unleveraged Treasury fund, IEF or TLT, with an upward-sloping curve (3-month slope above 0) and a close above its close 252 sessions ago. Other funds carry no slope and are absent."
+not_checked = "It does not measure roll-down, coupon, duration or the level of yields. The slope stands in for carry and the return is price only."
+before_acting = [
+  "The slope alone has not timed bonds out of sample.[^1] This screen passes only when the trend agrees, so read the trend column first.",
+  "Both funds read the same slope, so the choice between them comes only from their own returns.",
+  "A flat or inverted curve turns the book to cash, and cash earns the bill rate, not a bond coupon.",
+]
+related = [
+  { id = "trend_positive_12m", reason = "the same trend test without the curve" },
+]
+
+[[sources]]
+title = "Thornton and Valente, Out-of-Sample Predictions of Bond Excess Returns and Forward Rates (2012)"
+url = "https://ideas.repec.org/a/oup/rfinst/v25y2012i10p3141-3168.html"
+note = "Forward-rate signals, which include the yield curve slope, failed to add value out of sample when used to time bonds."
+
+[asks]
+security_type = "An ETF"
+status = "Still listed and trading"
+not_leveraged = "Not a leveraged fund"
+not_inverse = "Not an inverse fund"
+curve = "A 3-month slope above zero"
+trend = "A positive 12-month return"

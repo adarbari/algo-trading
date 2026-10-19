@@ -5,7 +5,7 @@
 # web code and the shipped Guide entries) and fails when something new is not covered.
 #
 # A Guide reference is `<kind>:<id>` of an entry in `guide_entries` (term, start, indicator,
-# episode, playbook, situation, field). The checks:
+# episode, screener, situation, field). The checks:
 #
 #   [[enum]]   every GraphQL enum and every String field named like a status / state / kind /
 #              trigger / label / verdict (`source = "graphql:Enum"` or `"graphql:Type.field"`)
@@ -451,7 +451,7 @@ sections = ["/admin/harness-runs", "/admin/ingestion", "/admin/llm-usage", "/cal
 "src/widgets/guide-field/ui/RelatedPanel.tsx" = 1
 "src/widgets/guide-field/ui/SeriesPanel.tsx" = 1
 "src/widgets/guide-field/ui/UniversePanel.tsx" = 1
-"src/widgets/guide-playbook/ui/GuidePlaybook.tsx" = 1
+"src/widgets/guide-screener/ui/GuideScreener.tsx" = 1
 "src/widgets/harness-run-detail/ui/HarnessRunDetail.tsx" = 1
 "src/widgets/harness-run-list/ui/HarnessRunList.tsx" = 1
 "src/widgets/holdings-panel/ui/HoldingsPanel.tsx" = 1

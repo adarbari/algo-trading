@@ -110,11 +110,11 @@ def test_a_closed_edge_says_why(site: StoreContext) -> None:
     assert page is not None and page.rejection is None
 
 
-def test_how_it_is_built_links_the_playbooks_and_their_fields(site: StoreContext) -> None:
+def test_how_it_is_built_links_the_screeners_and_their_fields(site: StoreContext) -> None:
     page = load_guide_edge(site, "momentum_12_1")
     assert page is not None
-    assert page.playbooks[0].id == "momentum_12_1"
-    assert page.playbooks[0].family
+    assert page.screeners[0].id == "momentum_12_1"
+    assert page.screeners[0].family
     assert page.fields and not any(f.startswith("instrument.") for f in page.fields)
     assert len(set(page.fields)) == len(page.fields)
 

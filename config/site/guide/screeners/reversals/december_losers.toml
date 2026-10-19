@@ -1,0 +1,35 @@
+# L3 site setting: the Guide's screener for the site preset december_losers (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other screeners), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "december_losers"
+version = 1  # the preset version this prose was written for
+line = "Liquid stocks that fell 30% or more over the past year."
+summary = "Finds liquid stocks that fell 30% or more over the last year: the names year-end tax-loss selling falls on, and the long side of the December losers edge.[^1] It is a candidate edge under test, not a proven trade."
+hit = "The name is a common stock closing above $5 that trades at least $5M a day and whose 252-session return is -30% or lower. The biggest loser ranks first."
+not_checked = "It does not know why the stock fell, whether a bid or a bankruptcy is pending, or whether the selling is tax-driven. The edge holds it for 10 sessions across the turn of the year only; the screen itself has no season."
+before_acting = [
+  "The effect sits in the last sessions of December and the first of January: outside that window this list is only the year's losers, a falling-knife screen.",
+  "Check rollup.price_stats@v2.ret_60d: a name that fell most of its year in the last month is a different case from a slow decline.",
+  "Gate on rollup.price_stats@v2.adv_usd_20d, as this screen does: the small thin losers where the effect is largest are the ones you cannot trade.",
+]
+related = [
+  { id = "news_free_residual_reversal", reason = "another reversal idea on losers" },
+  { id = "size_small", reason = "the size baseline the edge is compared with" },
+]
+
+[[sources]]
+title = "Grinblatt and Keloharju, Tax-Loss Trading and Wash Sales"
+url = "https://www.nber.org/papers/w8745"
+note = "Finnish trade data show investors sell losing positions in late December and repurchase them, which creates buying pressure."
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $5M a day"
+loser = "Fell 30% or more over the last 252 sessions"

@@ -1,5 +1,5 @@
 """``Query.guideField`` over the repo's site configs (ADR 0051): a field's info with its guide
-entry, the related fields, the site playbooks that use it (each rule as text) and the
+entry, the related fields, the site screeners that use it (each rule as text) and the
 situations that fool it, all derived by the server; a name outside the caller's catalogue is
 UNKNOWN_FEATURE, a malformed one BAD_REQUEST."""
 
@@ -14,7 +14,7 @@ FIELD = """query F($name: FeatureName!) {
   guideField(name: $name) {
     info { name format guide { theme reads summary uses { intent op } } }
     related
-    playbooks { id name family rules column rank }
+    screeners { id name family rules column rank }
     situations { name signs do affects }
   }
 }"""
@@ -35,10 +35,10 @@ def test_a_field_page_with_what_the_server_derives(graph: Graph) -> None:
     assert guide["reads"].startswith(guide["summary"]) and guide["summary"].endswith(".")
     assert page["related"] and ADV not in page["related"]
     assert len(set(page["related"])) == len(page["related"])
-    pullback = next(p for p in page["playbooks"] if p["id"] == "pullback")
+    pullback = next(p for p in page["screeners"] if p["id"] == "pullback")
     assert (pullback["name"], pullback["family"]) == ("Pullback", "trend")
     assert pullback["rules"] == ["gte 50000000 soft tolerance relative 0.2 on_miss LIQUIDITY_RISK"]
-    assert page["playbooks"][0]["family"] == "trend"  # Guide order
+    assert page["screeners"][0]["family"] == "trend"  # Guide order
 
 
 def test_the_situations_that_fool_a_field(graph: Graph) -> None:
@@ -62,5 +62,5 @@ def test_a_users_own_feature_is_theirs_only(user_client: Callable[[str], TestCli
 
     assert post("bob").json()["errors"][0]["extensions"]["code"] == "UNKNOWN_FEATURE"
     page = post("alice").json()["data"]["guideField"]
-    assert page["info"]["name"] == "feature.hv20_pct" and page["playbooks"] == []
+    assert page["info"]["name"] == "feature.hv20_pct" and page["screeners"] == []
     assert "rollup.price_stats@v2.hv20" in page["related"]  # its formula's input

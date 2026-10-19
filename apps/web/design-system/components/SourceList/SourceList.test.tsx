@@ -36,6 +36,14 @@ describe('SourceList', () => {
     expect(screen.queryByText('Academic paper')).toBeNull();
   });
 
+  it('shows the title as plain text when a source has no page', () => {
+    render(
+      <SourceList aria-label="Sources" items={[{ id: 's1', title: 'Street Smarts (1995)' }]} />,
+    );
+    expect(screen.getByText('Street Smarts (1995)')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
   it('renders nothing without items', () => {
     const { container } = render(<SourceList aria-label="Sources" items={[]} />);
     expect(container).toBeEmptyDOMElement();

@@ -87,11 +87,11 @@ describe('GuideEdge', () => {
     expect(within(tested).getAllByText(/^help /)).toHaveLength(1);
   });
 
-  it('links its playbooks and the fields they read', () => {
+  it('links its screeners and the fields they read', () => {
     setup();
     expect(
       screen.getByRole('link', { name: 'Earnings date moved earlier · Events' }),
-    ).toHaveAttribute('href', '/guide/playbooks/earnings_date_shift');
+    ).toHaveAttribute('href', '/guide/screeners/earnings_date_shift');
     expect(screen.getByRole('link', { name: 'feature.days_since_date_shift' })).toHaveAttribute(
       'href',
       '/guide/fields/feature.days_since_date_shift',

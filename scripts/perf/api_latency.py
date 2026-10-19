@@ -220,8 +220,8 @@ def render(report: dict) -> str:
         "",
         "Sum = all operations back to back; critical path = the slowest one (the browser sends "
         "them in parallel). Each page also fires the shell's Viewer, StatusStrip and Regime. Ops "
-        "are distinct operation names (a page may send one several times, e.g. /guide/playbooks "
-        "sends GuidePlaybook 20 times). Cold figures are each measured on a fresh process, so the "
+        "are distinct operation names (a page may send one several times, e.g. /guide/screeners "
+        "sends GuideScreener 20 times). Cold figures are each measured on a fresh process, so the "
         "cold sums count the process start-up cost (schema, store handles) once per op: read the "
         "critical path, and the warm / nocache sums, as the page's cost.",
         "",

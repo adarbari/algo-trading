@@ -97,7 +97,7 @@ contracts = ["Layout: site settings never import strategy configs (resolve layer
 
 [[dir]]
 path = "src/algotrade/config/site/guide"
-purpose = "L3 Guide settings (ADR 0051): the Guide-only sources under config/site/guide/ typed and validated (sections.toml: sections, field theme groups, playbook families, the edge groups; playbooks/<id>.toml: each site playbook's prose; mechanisms.py: the nine edge mechanism pages; ideas.py: the researched-not-built ideas of ideas/<family>.toml; glossary/<theme>.toml: the terms; start.toml: the Start here pages; split from config/site, at its module cap)"
+purpose = "L3 Guide settings (ADR 0051): the Guide-only sources under config/site/guide/ typed and validated (sections.toml: sections, field theme groups, screener families, the edge groups; screeners/<id>.toml: each site screener's prose; sources.py: the inline source marker [^n] and the [[sources]] list it points into; mechanisms.py: the nine edge mechanism pages; ideas.py: the researched-not-built ideas of ideas/<family>.toml; glossary/<theme>.toml: the terms; start.toml: the Start here pages; split from config/site, at its module cap)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
@@ -518,12 +518,17 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/guide"
-purpose = "the Guide's read objects (ADR 0051), session-free: GuideIndex (sections with entry counts, field theme groups, intents, situations, playbooks by family, regime indicators and episodes), GuideField (a field's FeatureInfo with what the server derives for it: related fields, the playbooks that use it, the situations that fool it), GuidePlaybookDetail and GuideSituationDetail (a playbook's and a situation's page), the indicator and episode pages, GuideTerm and GuideStartPage (the glossary and Start here pages, written.py), the one Guide search (search.py) and the one splitter of prose at the catalogue names it mentions; at its module cap (10): the next kind splits the folder (edges/ holds the Edges section)"
+purpose = "the Guide's read objects (ADR 0051), session-free: GuideIndex (sections with entry counts, field theme groups, intents, situations, screeners by family, regime indicators and episodes), GuideField (a field's FeatureInfo with what the server derives for it: related fields, the screeners that use it, the situations that fool it), GuideSituationDetail (a situation's page), the indicator and episode pages, GuideTerm and GuideStartPage (the glossary and Start here pages, written.py), the one Guide search (search.py) and the one splitter of prose at the catalogue names it mentions; at its module cap (10): the next kind splits the folder (edges/ holds the Edges section, screeners/ the Screeners section)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/guide/edges"
 purpose = "the Guide's Edges section as read objects (ADR 0051), from the site's edge documents alone and with no harness result or live number: the site edges with the tags the Guide derives (site_edges.py, schedule.py, universe.py), one edge's page (edge.py), one mechanism's page (mechanism.py), the ideas not built (ideas.py: not_built, ideas_of) and the section's index (index.py); never imports the session, a store, services/read/evaluation or an outcome (a fitness test)"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/guide/screeners"
+purpose = "the Guide's Screeners section as read objects (ADR 0051), session-free: the site screeners in Guide order with each criterion's rule as text (site_screeners.py), one screener's page (screener.py), the section's lead page with a card per family (index.py) and one family's page with its screeners as rows (category.py)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]

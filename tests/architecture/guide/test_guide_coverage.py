@@ -43,7 +43,7 @@ FIX = (
 WEB = REPO_ROOT / "apps" / "web"
 STATUS_LIKE = re.compile("status|state|kind|trigger|label|verdict", re.I)
 NOT_SOURCE = ("*.test.ts*", "*.stories.ts*", "*.d.ts")
-REF_KINDS = ("term", "start", "indicator", "episode", "playbook", "situation")  # fields are dynamic
+REF_KINDS = ("term", "start", "indicator", "episode", "screener", "situation")  # fields are dynamic
 
 
 # ------------------------------------------------------------------ scanners (unit-tested below)

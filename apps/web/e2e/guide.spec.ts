@@ -2,7 +2,7 @@
  * The Guide end to end, against the production build with the API mocked (explore-api.ts): the
  * top bar's Guide link and the "?" key, the home with its theme groups, the field index, a
  * field's page (what it means, its spread, criteria, when it lies, related, a ticker), the Start here
- * steps, the glossary and the search dialog (Ctrl+K and the rail's button), the playbook and situation pages reached from the home (a linked field and back, the two
+ * steps, the glossary and the search dialog (Ctrl+K and the rail's button), the screener and situation pages reached from the home (a linked field and back, the two
  * buttons, the linked prose), and the market regime pages (the index, an indicator, an episode);
  * accessible in dark and light.
  */
@@ -89,7 +89,7 @@ for (const theme of ['dark', 'light'] as const) {
 
     await expect(page.locator('#lies').getByText('When it lies')).toBeVisible();
     await expect(page.getByText('Earnings gap inside the window')).toBeVisible();
-    const related = page.getByRole('region', { name: 'Related fields and playbooks' });
+    const related = page.getByRole('region', { name: 'Related fields and screeners' });
     await expect(related.getByRole('link', { name: 'feature.iv_hv_ratio' })).toBeVisible();
     await expect(related).toContainText('VRP scanner');
 
@@ -118,15 +118,15 @@ for (const theme of ['dark', 'light'] as const) {
 }
 
 for (const theme of ['dark', 'light'] as const) {
-  test(`home to a playbook, a linked field and back (${theme})`, async ({ page }) => {
+  test(`home to a screener, a linked field and back (${theme})`, async ({ page }) => {
     const errors = collectErrors(page);
     await page.goto('/guide');
-    await expect(page.getByRole('heading', { level: 2, name: 'Playbooks' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Screeners' })).toBeVisible();
     await page
       .getByRole('region', { name: 'Option income' })
       .getByRole('link', { name: 'VRP scanner' })
       .click();
-    await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
+    await expect(page).toHaveURL(/\/guide\/screeners\/vrp_scanner$/);
     await expect(page.getByRole('heading', { level: 1, name: 'VRP scanner' })).toBeVisible();
     await expect(page.getByText('site preset · vrp_scanner v1 · Option income')).toBeVisible();
     await expect(page.getByText('Finds names whose options price more movement')).toBeVisible();
@@ -149,30 +149,49 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page).toHaveURL(/\/guide\/fields\/rollup\.iv30(%40|@)v1\.iv30$/);
     await expect(page.getByRole('region', { name: 'What this field means' })).toBeVisible();
     await page.goBack();
-    await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
+    await expect(page).toHaveURL(/\/guide\/screeners\/vrp_scanner$/);
     await expect(page.getByRole('heading', { level: 1, name: 'VRP scanner' })).toBeVisible();
     expect(errors).toEqual([]);
   });
 }
 
-test('a playbook opens today’s hits and its Builder; the index lists the families', async ({
-  page,
-}) => {
+test('Screeners: the lead page, a category and a screener, down and back up', async ({ page }) => {
   const errors = collectErrors(page);
-  await page.goto('/guide/playbooks');
-  await expect(page.getByRole('region', { name: 'Breakouts' })).toContainText('Finds shares');
-  await page.getByRole('link', { name: 'VRP scanner' }).first().click();
-  await page.getByRole('button', { name: 'See today’s hits' }).click();
-  await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
-  await page.goto('/guide/playbooks/vrp_scanner');
-  await page.getByRole('button', { name: 'Open in Builder' }).click();
-  await expect(page).toHaveURL(/\/screeners\/vrp_scanner\/edit$/);
-  await page.goto('/guide/playbooks/nope');
-  await expect(page.getByText('No such playbook')).toBeVisible();
+  await page.goto('/guide/screeners');
+  await expect(page.getByRole('heading', { level: 1, name: 'Screeners' })).toBeVisible();
+  await expect(page.getByText('A screener is a saved rule screen')).toBeVisible();
+  const cards = page.getByRole('list', { name: 'The screener categories' });
+  await expect(cards.getByRole('link')).toHaveCount(2);
+  await cards.getByRole('link', { name: /Breakouts/ }).click();
+  await expect(page).toHaveURL(/\/guide\/screeners\/c\/breakouts$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Breakouts' })).toBeVisible();
+  await expect(page.getByText('Closed above the one-month high')).toBeVisible();
+  await page.getByRole('link', { name: 'Breakout', exact: true }).click();
+  await expect(page).toHaveURL(/\/guide\/screeners\/breakout$/);
+  await page.getByRole('link', { name: 'Breakouts', exact: true }).first().click();
+  await expect(page).toHaveURL(/\/guide\/screeners\/c\/breakouts$/);
+  await page.goto('/guide/screeners/c/nope');
+  await expect(page.getByText('No such category')).toBeVisible();
+  await page.goto('/guide/playbooks/breakout');
+  await expect(page).toHaveURL(/\/guide\/screeners\/breakout$/);
   expect(errors).toEqual([]);
 });
 
-test('situations: the index, a situation’s page with its linked fields and playbooks', async ({
+test('a screener opens today’s hits and its Builder', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/guide/screeners/c/income');
+  await page.getByRole('link', { name: 'VRP scanner' }).first().click();
+  await page.getByRole('button', { name: 'See today’s hits' }).click();
+  await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
+  await page.goto('/guide/screeners/vrp_scanner');
+  await page.getByRole('button', { name: 'Open in Builder' }).click();
+  await expect(page).toHaveURL(/\/screeners\/vrp_scanner\/edit$/);
+  await page.goto('/guide/screeners/nope');
+  await expect(page.getByText('No such screener')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('situations: the index, a situation’s page with its linked fields and screeners', async ({
   page,
 }) => {
   const errors = collectErrors(page);
@@ -184,16 +203,16 @@ test('situations: the index, a situation’s page with its linked fields and pla
     page.getByRole('region', { name: 'What to do' }).getByRole('link', { name: IV30 }),
   ).toBeVisible();
   await page
-    .getByRole('region', { name: 'Playbooks it affects' })
+    .getByRole('region', { name: 'Screeners it affects' })
     .getByRole('link', { name: 'VRP scanner' })
     .click();
-  await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
+  await expect(page).toHaveURL(/\/guide\/screeners\/vrp_scanner$/);
   await page.goto('/guide/situations/nope');
   await expect(page.getByText('No such situation')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test('a field page links its caveats’ fields, its situations and its playbooks', async ({
+test('a field page links its caveats’ fields, its situations and its screeners', async ({
   page,
 }) => {
   await page.goto(`/guide/fields/${IV30}`);
@@ -203,10 +222,10 @@ test('a field page links its caveats’ fields, its situations and its playbooks
     '/guide/situations/earnings-gap-inside-the-window',
   );
   await page
-    .getByRole('region', { name: 'Related fields and playbooks' })
+    .getByRole('region', { name: 'Related fields and screeners' })
     .getByRole('link', { name: 'VRP scanner' })
     .click();
-  await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
+  await expect(page).toHaveURL(/\/guide\/screeners\/vrp_scanner$/);
 });
 
 test('the field index has three views', async ({ page }) => {
@@ -230,7 +249,7 @@ test('the home lists Start here first and the Glossary last, and the rail follow
     'Start here',
     'Market regime',
     'Edges',
-    'Playbooks',
+    'Screeners',
     'Fields',
     'Situations',
     'Glossary',
@@ -446,10 +465,10 @@ test('Edges: the index to a mechanism to an edge, and on to the live evidence', 
   expect(errors).toEqual([]);
 });
 
-test('Edges: a playbook lists the edges it implements, linked to their Guide pages', async ({
+test('Edges: a screener lists the edges it implements, linked to their Guide pages', async ({
   page,
 }) => {
-  await page.goto('/guide/playbooks/vrp_scanner');
+  await page.goto('/guide/screeners/vrp_scanner');
   const edges = page.getByRole('region', { name: 'Edges it implements' });
   await expect(edges.getByRole('link', { name: 'Earnings-date advances' })).toHaveAttribute(
     'href',

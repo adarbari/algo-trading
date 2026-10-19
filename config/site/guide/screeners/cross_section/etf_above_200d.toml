@@ -1,0 +1,32 @@
+# L3 site setting: the Guide's screener for the site preset etf_above_200d (ADR 0051; docs/ui/guide.md
+# "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
+id = "etf_above_200d"
+version = 1  # the preset version this prose was written for
+line = "Funds trading above their average price of the last 200 days."
+summary = "Lists unleveraged ETFs trading above their 200-day average, the one furthest above first. It is the moving-average timing rule of the ETF allocation edges.[^1]"
+hit = "An unleveraged ETF whose close is above the mean of its last 200 closes. The largest distance above the average ranks first. A fund with under 200 sessions of history is absent."
+not_checked = "It does not use Faber's 10-month average of month-end closes, add dividends or check liquidity. The 200-day mean is the stored stand-in for about 210 sessions."
+before_acting = [
+  "Faber's rule reads a 10-month average at month end. This screen reads the 200-day mean every day, so a name can pass at month end and not the day after.",
+  "Timing by a moving average gives up return in rising markets and earns its keep in the few deep falls; Zakamulin finds it out of the market most of the time.[^2]",
+  "Read feature.pct_vs_sma_200 for the size of the margin: a fund 0.1 percent above its average is a coin flip.",
+]
+related = [
+  { id = "trend_positive_12m", reason = "the same idea with a trailing return" },
+]
+
+[[sources]]
+title = "Faber, A Quantitative Approach to Tactical Asset Allocation (2007)"
+note = "Holding an asset class only while it is above its 10-month average gave equity-like returns with smaller drawdowns."
+
+[[sources]]
+title = "Zakamulin, A comprehensive look at the empirical performance of moving average trading strategies (2016)"
+url = "https://papers.ssrn.com/abstract=2677212"
+note = "Over 155 years, moving-average timing gave no significant gain in the second half and produced many false signals, but did better in bear markets."
+
+[asks]
+security_type = "An ETF"
+status = "Still listed and trading"
+not_leveraged = "Not a leveraged fund"
+not_inverse = "Not an inverse fund"
+above_average = "Closes above its 200-day average"

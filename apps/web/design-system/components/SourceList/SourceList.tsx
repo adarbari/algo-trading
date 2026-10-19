@@ -1,6 +1,6 @@
 /**
  * SourceList: a numbered reading list: per source a kind label ("Academic paper"), the title as
- * an ExternalLink and a one-line "why read it". Each item carries its `id`, so a citation in the
+ * an ExternalLink (plain text when no page is verified) and a one-line "why read it". Each item carries its `id`, so a citation in the
  * text ("[3]") links to it with `#<id>`. Where SourceLine names one figure's source in a line,
  * this is the page's bibliography.
  */
@@ -15,8 +15,8 @@ export interface SourceListItem {
   kind?: string;
   /** The reference as written: authors, year, title, journal. The link text. */
   title: string;
-  /** The source's page (an absolute http(s) URL). */
-  url: string;
+  /** The source's page (an absolute http(s) URL); omitted when no page is verified: the title is then plain text. */
+  url?: string;
   /** Why it is worth reading, one line. */
   why?: string;
 }
@@ -38,9 +38,15 @@ export function SourceList({ items, 'aria-label': ariaLabel }: SourceListProps) 
               {item.kind}
             </Text>
           )}
-          <ExternalLink size="sm" href={item.url}>
-            {item.title}
-          </ExternalLink>
+          {item.url === undefined ? (
+            <Text as="p" size="sm">
+              {item.title}
+            </Text>
+          ) : (
+            <ExternalLink size="sm" href={item.url}>
+              {item.title}
+            </ExternalLink>
+          )}
           {item.why !== undefined && (
             <Text as="p" size="sm" tone="secondary">
               {item.why}
