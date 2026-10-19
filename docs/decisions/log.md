@@ -956,3 +956,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the name is on the public filing beside the CIK that is already stored, so storing it adds no exposure the CIK did not, and it makes the deep-dive dossier and a later per-insider view readable. Reverses only the "no names" clause; the #651 entry's status is `overruled` for that reason.
+
+## 2026-10-18 | Harness learnings (seven, EB batch) | Brief checklist, live-store authorizations, edge checklist, base fitness test, load guard
+- Question: which of the seven learnings from the EB batch become harness changes?
+- Options: add each in its most specific home / skip.
+- Decision: approved ("approved all 7", relayed by the orchestrating session): worktree path in every brief and `no-automerge` by default for implementers (agent definition + review-and-release); the edge-document checklist (add-screener) and a fitness test `tests/unit/config/site/test_edge_base.py` for the base/picks tautology; live-store authorizations must be the owner's own words in the acting session (review-and-release); `scripts/ops/xdist_workers.py` caps xdist workers to 2 above a load of 12. The auto-merge nudge was already on main (#688).
+- decided by: proposed by orchestrator; awaiting owner
+- status: pending owner confirmation
+- Reasoning: each cost real time in the EB batch (a lost first hour per agent batch, PRs opened without `no-automerge`, eight reviews repeating the same findings, blocked relayed authorizations, runs slowed by load 13+).

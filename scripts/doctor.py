@@ -249,6 +249,14 @@ def check_ibkr(p: Probes) -> Result:
     return Result(INFO, "IB Gateway", "paper :4002 not reachable (only IBKR tasks need it)")
 
 
+def check_load(p: Probes) -> Result:
+    """The 1-minute load and the xdist worker count ``make changed`` will use (informational)."""
+    code, out = p.run(
+        [sys.executable, str(p.repo / "scripts" / "ops" / "xdist_workers.py"), "--explain"]
+    )
+    return Result(INFO, "machine load", out.strip() if code == 0 else "unreadable")
+
+
 def check_store(p: Probes) -> Result:
     url = urlparse(p.data_url())
     if url.scheme != "file":
@@ -535,6 +543,7 @@ def run_checks(p: Probes) -> list[Result]:
         check_worktrees(p),
         check_env(p),
         check_ibkr(p),
+        check_load(p),
         check_store(p),
         check_history_copy(p),
         check_web_dist(p),

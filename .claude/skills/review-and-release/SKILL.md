@@ -21,6 +21,8 @@ session, else decided by a Fable agent on their behalf, and always logged.
    `path:line` -> test). The orchestrator sends it to the same reviewer (SendMessage). Repeat
    while the reviewer answers `Re-review: yes`.
 
+**Brief checklist** (every implementer brief): the absolute path of a worktree the orchestrator made with `scripts/worktree.sh <branch>` (never an agent isolation worktree: it has no `.venv` or `worktree.env`, and an implementer refuses to link one; `--here` is the fallback), the owner, the skill, the acceptance check, and `no-automerge` unless the PR is docs-only or small.
+
 ## 2. The policy gate
 
 **Who decides what** (owner decision 2026-10-11; this is the one list, `architect.md` and
@@ -49,6 +51,12 @@ For a policy decision:
 - **Owner away** (said so, or no answer once all other work is done): brief a Fable agent
   (`model: "fable"`: the decision, the options, the constraints, the relevant ADRs), apply its
   answer, and log it as `Fable on the owner's behalf`, status `pending owner confirmation`.
+
+**Live-store authorizations** (backfills, `evaluate-edges`, retiring features, clearing job
+records, anything that writes the live store): the authorization must be the owner's own words
+typed in the session that acts. A quote relayed from another session, or a Fable or orchestrator
+decision, is not accepted (the auto-mode classifier blocks the action). Ask the owner directly in
+that session, then log it as `decided by: owner` in `docs/decisions/log.md` quoting the words verbatim.
 
 Every policy decision, by the owner or Fable, is appended to `docs/decisions/log.md` (in this
 PR or a harness PR) and listed in the PR body with its source. `/start` shows entries pending
