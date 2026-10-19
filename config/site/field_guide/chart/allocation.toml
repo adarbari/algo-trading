@@ -1,0 +1,207 @@
+# L3 site setting: the field guide (ADR 0041), the "allocation signals" theme: the macro and market
+# series that etf_macro@v1 stores as a column of the fund an allocation edge trades on them (ADR 0074
+# amendment), and the two formulas over them that the allocation screens read (technical/allocation.toml).
+# Each entry says which funds carry the column: every other fund's row is null, and a null never passes.
+# The keys and the rules each entry follows are in the header of chart/momentum.toml.
+
+[[field]]
+name = "rollup.etf_macro@v1.hy_oas"
+theme = "allocation signals"
+reads = "The ICE BofA US high-yield option-adjusted spread over Treasuries, as a decimal: 0.03 is 3 percentage points. Low is calm credit, high is stress. Only HYG's row carries it."
+caveats = [
+  "The level alone says little: a 4 percent spread is tight in a recession year and wide in a boom. Read it against its own mean in feature.credit_spread_vs_ma200.",
+  "Null on every fund but HYG, and null when the latest observation is more than a week old.",
+]
+sources = ["ICE BofA US High Yield Index Option-Adjusted Spread (FRED series BAMLH0A0HYM2)"]
+[[field.use]]
+for = "a credit market that is not in stress"
+op = "lt"
+value = 0.06
+mode = "soft"
+tolerance = 0.01
+note = "with feature.credit_spread_vs_ma200 lt 0 for a tightening trend"
+
+[[field]]
+name = "rollup.etf_macro@v1.hy_oas_ma200"
+theme = "allocation signals"
+reads = "The mean of the high-yield option-adjusted spread over the last 200 sessions, as a decimal. The long-run level the spread is read against. Only HYG's row carries it."
+caveats = [
+  "Needs 160 of the 200 sessions to have an observation; a shorter history is null.",
+  "A mean lags a regime change by months. After a spike it stays high long after the spread has fallen back.",
+]
+sources = ["ICE BofA US High Yield Index Option-Adjusted Spread (FRED series BAMLH0A0HYM2)"]
+[[field.use]]
+for = "a high-yield spread history long enough to read a trend against"
+op = "not_null"
+mode = "hard"
+note = "an operand of feature.credit_spread_vs_ma200; screen on that field, not on this one"
+
+[[field]]
+name = "rollup.etf_macro@v1.ig_oas"
+theme = "allocation signals"
+reads = "The ICE BofA US corporate (investment grade) option-adjusted spread, as a decimal: 0.01 is 1 percentage point. Low is calm, high is stress. Only LQD's row carries it."
+caveats = [
+  "Investment-grade spreads move in a narrow band, so a small change in level is a large change in trend. Read it against its mean in feature.credit_spread_vs_ma200.",
+  "Null on every fund but LQD, and null when the latest observation is more than a week old.",
+]
+sources = ["ICE BofA US Corporate Index Option-Adjusted Spread (FRED series BAMLC0A0CM)"]
+[[field.use]]
+for = "an investment-grade market that is not in stress"
+op = "lt"
+value = 0.02
+mode = "soft"
+tolerance = 0.005
+note = "with feature.credit_spread_vs_ma200 lt 0 for a tightening trend"
+
+[[field]]
+name = "rollup.etf_macro@v1.ig_oas_ma200"
+theme = "allocation signals"
+reads = "The mean of the investment-grade option-adjusted spread over the last 200 sessions, as a decimal. The level the spread is read against. Only LQD's row carries it."
+caveats = [
+  "Needs 160 of the 200 sessions to have an observation; a shorter history is null.",
+  "A mean lags a regime change by months, so the first weeks after a turn read the old regime.",
+]
+sources = ["ICE BofA US Corporate Index Option-Adjusted Spread (FRED series BAMLC0A0CM)"]
+[[field.use]]
+for = "a investment-grade spread history long enough to read a trend against"
+op = "not_null"
+mode = "hard"
+note = "an operand of feature.credit_spread_vs_ma200; screen on that field, not on this one"
+
+[[field]]
+name = "feature.credit_spread_vs_ma200"
+theme = "allocation signals"
+reads = "The credit spread the fund trades over its 200-session mean, minus 1: HYG reads the high-yield spread, LQD the investment-grade one. Below 0 the spread is tighter than its trend and credit is calming; above 0 it is wider and stress is building."
+caveats = [
+  "A spread already high and falling reads below 0 while credit is still stressed. Check rollup.etf_macro@v1.hy_oas for the level.",
+  "Null on every fund but HYG and LQD; a missing spread or mean never passes a hard criterion.",
+]
+sources = ["Jostova, Nikolova, Philipov and Stahel, Momentum in Corporate Bond Returns (2013)"]
+[[field.use]]
+for = "a credit spread tighter than its 200-session mean"
+op = "lt"
+value = 0.0
+mode = "hard"
+note = "the macro trend test of the credit edge"
+
+[[field]]
+name = "rollup.etf_macro@v1.t10y3m"
+theme = "allocation signals"
+reads = "The 10-year Treasury yield minus the 3-month yield, as a decimal: 0.01 is 1 percentage point. Above 0 the curve slopes up; below 0 it is inverted, a recession warning. IEF and TLT carry it."
+caveats = [
+  "The slope alone has not timed bonds out of sample. Pair it with the fund's own trend, as in rollup.trend_stats@v2.ret_252d gt 0.",
+  "Null on every fund but IEF and TLT, and null when the latest observation is more than a week old.",
+]
+sources = [
+  "Thornton and Valente, Out-of-Sample Predictions of Bond Excess Returns and Forward Rates (2012)",
+]
+[[field.use]]
+for = "an upward-sloping curve"
+op = "gt"
+value = 0.0
+mode = "hard"
+note = "with rollup.trend_stats@v2.ret_252d gt 0 for the duration screen"
+
+[[field]]
+name = "rollup.etf_macro@v1.t10y2y"
+theme = "allocation signals"
+reads = "The 10-year Treasury yield minus the 2-year yield, as a decimal. Above 0 the curve slopes up; below 0 it is inverted. It reacts sooner than the 10-year minus 3-month slope. IEF and TLT carry it."
+caveats = [
+  "It sat below 0 for most of 2022 to 2024 while no recession followed, so an inversion is a warning and not a date.",
+  "Null on every fund but IEF and TLT, and null when the latest observation is more than a week old.",
+]
+sources = [
+  "Thornton and Valente, Out-of-Sample Predictions of Bond Excess Returns and Forward Rates (2012)",
+]
+[[field.use]]
+for = "an upward-sloping curve"
+op = "gt"
+value = 0.0
+mode = "hard"
+note = "with rollup.trend_stats@v2.ret_252d gt 0 for the duration screen"
+
+[[field]]
+name = "rollup.etf_macro@v1.cape"
+theme = "allocation signals"
+reads = "The fund's country cyclically adjusted price to earnings ratio: the country's equity index over ten years of inflation-adjusted earnings. Low is cheap against its own history, high is expensive. Country funds and SPY carry it."
+caveats = [
+  "The history is revised in place, so a past session reads today's estimate, not what was known then. Treat a backtest on it as a valuation sort, not an as-known test.",
+  "Cheap countries are often commodity exporters or distressed markets, so a low value mixes value with risk. Check rollup.trend_stats@v2.ret_252d.",
+  "Null on a fund with no country series (EWM, FXI) and when the latest value is over 100 days old.",
+]
+sources = ["Faber, Global Value: Building Trading Models with the 10 Year CAPE (2012)"]
+[[field.use]]
+for = "the cheapest countries by valuation"
+op = "gt"
+value = 0.0
+mode = "hard"
+note = "a presence test; rank the passing funds by this field, lowest first"
+
+[[field]]
+name = "rollup.etf_macro@v1.fx_carry"
+theme = "allocation signals"
+reads = "The currency's 3-month interbank rate minus the US one, as a decimal: 0.02 means the currency yields 2 percentage points more than the dollar. Above 0 holding it pays carry; below 0 it costs carry. The currency funds carry it."
+caveats = [
+  "Only the yen, Australian dollar, Canadian dollar and Swiss franc have a fresh series. The euro and the pound are null until the registry has a rate for them.",
+  "Carry pays until a crash: high-yield currencies fall fastest in a risk-off week. Check feature.credit_spread_vs_ma200 for stress.",
+  "The dollar fund has no carry column. The fund's own deposit yield is not in this number.",
+]
+sources = [
+  "Menkhoff, Sarno, Schmeling and Schrimpf, Carry trades and global foreign exchange volatility (2012)",
+]
+[[field.use]]
+for = "a currency that pays carry over the dollar"
+op = "gt"
+value = 0.0
+mode = "hard"
+note = "with rollup.trend_stats@v2.ret_252d for the momentum leg"
+
+[[field]]
+name = "rollup.etf_macro@v1.vx_basis"
+theme = "allocation signals"
+reads = "The first monthly VIX future's settle over the VIX close, minus 1. Above 0 the futures sit above spot (contango, the usual state, where a short-volatility product earns the roll); below 0 spot is above the futures (backwardation, a stress state). Only SPY's row carries it."
+caveats = [
+  "Needs the futures trade date to equal the VIX observation date, so a day with a stale curve is null.",
+  "Contango is the usual state and the loss comes in the few days the curve flips. A positive basis on a calm Friday says nothing about Monday.",
+  "Read by name through a canary on SPY, not as a field of the volatility funds: SVXY, UVXY and VIXY have no column of their own.",
+]
+sources = ["Simon and Campasano, The VIX Futures Basis: Evidence and Trading Strategies (2014)"]
+[[field.use]]
+for = "futures above spot (contango)"
+op = "gt"
+value = 0.0
+mode = "hard"
+note = "the term-structure filter of a short-volatility book"
+
+[[field]]
+name = "rollup.etf_macro@v1.vx_roll"
+theme = "allocation signals"
+reads = "The second monthly VIX future's settle over the first, minus 1: the roll along the curve. Above 0 the curve rises with maturity (contango); below 0 it falls (backwardation). Only SPY's row carries it."
+caveats = [
+  "It reads the futures only, not the spot index, so it can stay positive while spot jumps above the front future. Check rollup.etf_macro@v1.vx_basis.",
+  "Null with fewer than two monthly futures after the session, or a curve older than a week.",
+]
+sources = ["Cheng, The VIX Premium, Review of Financial Studies (2019)"]
+[[field.use]]
+for = "a rising futures curve (contango)"
+op = "gt"
+value = 0.0
+mode = "hard"
+note = "the second filter beside rollup.etf_macro@v1.vx_basis"
+
+[[field]]
+name = "feature.momentum_13612w"
+theme = "allocation signals"
+reads = "Keller's 13612W momentum score: 12 times the 1-month return, plus 4 times the 3-month, 2 times the 6-month and 1 times the 12-month return. Below 0 the fund is falling across horizons; above 0 it is rising, and the short horizons count most."
+caveats = [
+  "It overweights the last month, so one sharp week moves the sign. Check rollup.trend_stats@v2.ret_252d for the longer view.",
+  "The returns are price only, with no dividends, so a bond fund can read negative while its coupon keeps it level in total return.",
+  "Null with fewer than 252 sessions of history or a gap among them.",
+]
+sources = ["Keller and Keuning, Breadth Momentum and Vigilant Asset Allocation (2017)"]
+[[field.use]]
+for = "a fund with falling momentum"
+op = "lt"
+value = 0.0
+mode = "hard"
+note = "the canary test of the Vigilant and Defensive asset allocation variants"

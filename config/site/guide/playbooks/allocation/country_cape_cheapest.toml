@@ -1,0 +1,25 @@
+# L3 site setting: the Guide's playbook for the site preset country_cape_cheapest (ADR 0051; docs/ui/guide.md
+# "The playbook page"). Keys and tests as in playbooks/trend/momentum_own_trend.toml.
+id = "country_cape_cheapest"
+version = 1  # the preset version this prose was written for
+summary = "Lists country ETFs that have a CAPE, the cheapest first. It is the value leg of the country rotation edges."
+hit = "An unleveraged ETF with a country cyclically adjusted price to earnings ratio above zero. The lowest ratio ranks first. A fund with no country series, such as EWM or FXI, is absent."
+not_checked = "It does not test trend, liquidity or the size of the discount. It ranks every fund with a ratio, so the edge's top-k decides how many are held."
+before_acting = [
+  "The CAPE history is revised, so a past reading is today's estimate. Treat a backtest as a valuation sort, not an as-known test.",
+  "Cheap countries are often commodity exporters or distressed markets. The value is a payment for that risk as much as a mispricing.",
+  "Cheap can stay cheap for years, and the screen ranks every month. Read the edge's page for the horizon it is judged on.",
+]
+sources = [
+  "Faber, Global Value: Building Trading Models with the 10 Year CAPE (2012)",
+]
+related = [
+  { id = "trend_positive_12m", reason = "the momentum leg held beside it" },
+]
+
+[asks]
+security_type = "An ETF"
+status = "Still listed and trading"
+not_leveraged = "Not a leveraged fund"
+not_inverse = "Not an inverse fund"
+has_cape = "A country CAPE above zero"

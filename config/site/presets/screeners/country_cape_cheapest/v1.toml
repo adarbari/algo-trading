@@ -1,0 +1,48 @@
+# The cheapest country funds by CAPE (ADR 0053, ADR 0074, EB E5 batch Y; the value screener of
+# country_etf_momentum_value and trend_carry_value_combo): an unleveraged ETF with a country CAPE
+# (etf_macro@v1, cape) above 0, ranked by it, the LOWEST first, so the edge's top_k keeps the
+# cheapest. A fund with no country series (EWM, FXI) is absent: a missing value never passes
+# (ADR 0030). The CAPE history is revised in place, so a backtest on it is a valuation sort and
+# not an as-known test (decision log 2026-10-18). Faber holds the cheapest quarter or third, once a
+# year; this screen ranks every month.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "country_cape_cheapest"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Country funds, cheapest CAPE first"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "ETF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.not_leveraged]
+field = "instrument.is_leveraged"
+op = "eq"
+value = false
+
+[criteria.not_inverse]
+field = "instrument.is_inverse"
+op = "eq"
+value = false
+
+# ------------------------------------------------------------------------ the signal
+[criteria.has_cape]
+field = "rollup.etf_macro@v1.cape"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+cape = "rollup.etf_macro@v1.cape"
+
+[rank]
+tie_break = "rollup.etf_macro@v1.cape"
+tie_break_order = "asc"

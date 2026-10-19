@@ -6,6 +6,7 @@ Back to the [index of every edge](../edges.md).
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
 | Call-put IV spread into earnings (`pre_earnings_cp_iv_spread`) | candidate | on each `earnings_expected` | excess return, over 3 sessions, vs SPY, starting -1 sessions from the event, costs 10 bps | `cp_iv_spread`, `cp_iv_spread_rise` |
+| Target-date fund contrarian flows (`tdf_contrarian_flows`) | blocked | month end | excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session | none yet |
 
 ## Call-put IV spread into earnings (`pre_earnings_cp_iv_spread`)
 
@@ -38,3 +39,33 @@ Back to the [index of every edge](../edges.md).
 - Jin, W., Livnat, J. and Zhang, Y., Option Prices Leading Equity Prices: Do Options Traders Have an Information Advantage?, Journal of Accounting Research, 2012 <https://ideas.repec.org/a/bla/joares/v50y2012i2p401-432.html>
 - Cremers, M. and Weinbaum, D. (2010), Deviations from Put-Call Parity and Stock Return Predictability, Journal of Financial and Quantitative Analysis <https://ideas.repec.org/a/cup/jfinqa/v45y2010i02p335-367_00.html>
 - Bali, T. and Hovakimian, A. (2009), Volatility Spreads and Expected Stock Returns, Management Science <https://ideas.repec.org/a/inm/ormnsc/v55y2009i11p1797-1812.html>
+
+## Target-date fund contrarian flows (`tdf_contrarian_flows`)
+
+**Status:** blocked. **Family:** I. **Thesis:** After a month of large market moves, stocks held heavily by target-date funds reverse, because the funds rebalance back to fixed glide-path weights.
+
+**Why blocked:** Three things are missing. (1) The signal: the paper's flow is each fund's rebalance, which needs target-date ownership per stock or per fund, and none is stored; target-date funds are mutual funds, not ETFs, so no share-count or flow figure of theirs reaches etf_flows@v1, which covers iShares funds only. (2) A stand-in cannot be disclosed honestly: index weight (the page's proxy) is the same for every holder of the index, so a screen on it is the size effect, not the target-date flow. (3) The trigger: the page's timing is a large market month, and ADR 0075 (decision 5) keeps this edge blocked until an on_market:large_market_month trigger exists, which is not built (the market-trigger vocabulary has vix_spike only). The year-turn window the batch brief named is not the source's timing (the flow follows the month's market move, 5 to 20 sessions after each month end). Unblock: a stored target-date ownership or flow series, or a decided proxy; and the large_market_month trigger with its field in market_triggers@v1.
+
+- **Outcome:** excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** none yet
+- **Notes:** Idea page: docs/edge-ideas/frontier.md (tdf_contrarian_flows). The index-level form (a contrarian position in SPY after a month of plus or minus 5 percent) is a different, time-series claim and would be its own document on the trigger above.
+
+**Quality bar**
+
+1. **Mechanism:** Target-date funds hold trillions of dollars at fixed equity weights and rebalance mechanically, selling after a rise and buying after a fall; the stocks they own in volume absorb the flow and show stronger reversal after large market months (Parker, Schoar and Sun 2023).
+2. **Persistence:** Default retirement plans (auto-enrolment) keep the funds growing and their glide paths are fixed by rule; the paper is recent with no independent replication on file, so persistence is a claim to test.
+3. **Outcome:** (not answered)
+4. **Trigger timing:** (not answered)
+5. **Faithful replication:** (not answered)
+6. **Expected size and sample:** (not answered)
+7. **Capacity and costs:** (not answered)
+8. **Failure modes and retirement:** (not answered)
+9. **Decoys:** (not answered)
+
+**Sources**
+
+- Parker, J., Schoar, A. and Sun, Y., Retail Financial Innovation and Stock Market Dynamics: The Case of Target Date Funds, Journal of Finance, 2023

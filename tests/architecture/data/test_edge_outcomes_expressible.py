@@ -15,6 +15,7 @@ from algotrade.config.edges.chain import MODEL_STRUCTURES
 from algotrade.config.edges.document import ANNOUNCED_AHEAD, CLOSED, Edge
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.portfolio import MIX, PORTFOLIO_KIND
+from algotrade.config.edges.schedules.markets import MARKET_TRIGGERS, market_trigger
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data.outcomes import CHAIN_FIELDS, OUTCOME_FIELDS
@@ -167,6 +168,11 @@ def test_the_schedule_is_one_the_harness_runs(edge: Edge) -> None:
     group is in the catalogue, else the edge waits with no screeners (earnings_reaction@v1 and
     earnings_expected@v1 arrive with ED4b and ED4e)."""
     event = edge.event_class
+    trigger = market_trigger(edge.schedule)
+    if trigger is not None:  # ADR 0075: a market trigger is read by the time-series harness
+        assert trigger in MARKET_TRIGGERS, f"{edge.id}: {trigger!r} is not a declared trigger"
+        assert edge.outcome.start_offset_sessions >= 1, f"{edge.id}: S must be after D"
+        return
     if event is None:
         days = sessions_between(date(2026, 1, 2), date(2026, 3, 31))
         decision_sessions(edge.schedule, days, edge.outcome.horizon_sessions[0])
@@ -192,7 +198,8 @@ def test_the_variants_horizons_and_benchmark_are_written_by_the_outcomes_task(ed
     horizons, benchmarks = horizons_and_benchmarks(STORE)
     for v in edge.variants:
         assert set(v.outcome.horizon_sessions) <= set(horizons), f"{edge.id}/{v.id}: {horizons}"
-        assert v.outcome.benchmark in {*benchmarks, "none"}
+        if not v.outcome.benchmark.startswith(MIX):  # a mix is computed from its constituents
+            assert v.outcome.benchmark in {*benchmarks, "none"}
 
 
 def test_only_the_named_modules_read_outcomes() -> None:

@@ -14,7 +14,7 @@ Before writing:
 - Confirm the owner in `architecture/*_ownership.toml` and the folder in
   `architecture/layout*.toml` with a grep. Extend the owner; never re-implement it.
 
-Work in a worktree (`scripts/worktree.sh <branch>`, then `source worktree.env`), always: never
+Your brief names the worktree to work in (the orchestrator makes it with `scripts/worktree.sh <branch>` and writes its absolute path in every brief: an agent isolation worktree has no `.venv` or `worktree.env`, and every batch without one lost its first hour); a brief without a path: stop and report. Work in a worktree (`scripts/worktree.sh <branch>`, then `source worktree.env`), always: never
 create, switch or commit on a branch in the main checkout — the launchd API, nightly and auto-deploy run from it, and `deploy.sh` refuses while it is off `main` (2026-10-10: a branch left there blocked deploys for 8 h; #460-#463 never went live); never `--no-verify` / `SKIP=`. In any worktree (yours under
 `.claude/worktrees/` too) never run `uv sync`, `uv run` or `make install`: `.venv` is the
 main checkout's, and syncing it points the owner's nightly and API at your branch. Run code
@@ -74,6 +74,8 @@ Foreground rule: every check (`make check`, a gate, a test run) runs in the fore
 as a background command. The hand-back is your last action, exactly one per run, and no
 command may still be running when you hand back.
 Only the orchestrating session removes `no-automerge`, after the reviewer's last `Re-review: no`; an agent never removes `needs-owner` or a label it did not set (CLAUDE.md rule 10, `.claude/skills/review-and-release`).
+
+Open every PR with the `no-automerge` label (or as a draft) unless the brief says docs-only or small: two batches opened without it and would have auto-merged before the architect review. Report a PR link only after `gh pr view <n> --json labels` shows the label (2026-10-18 review).
 
 Finish with a hand-back of at most 150 words: the PR link (or files changed), checks run and
 their result, deviations from the brief, and decisions the caller must make. Everything else

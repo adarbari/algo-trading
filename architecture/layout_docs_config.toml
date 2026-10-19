@@ -42,7 +42,7 @@ purpose = "L3 expression features, one <theme>.toml per theme in the subfolder o
 
 [[config_dir]]
 path = "config/site/features/technical"
-purpose = "expression features of the chart: bands.toml (bands, channels, z-scores, regression trend), price.toml (price statistics, relative strength), swing.toml (swing levels, candles, momentum), volume.toml (volume dry-ups, accumulation)"
+purpose = "expression features of the chart: bands.toml (bands, channels, z-scores, regression trend), price.toml (price statistics, relative strength), swing.toml (swing levels, candles, momentum), volume.toml (volume dry-ups, accumulation), allocation.toml (the credit spread against its trend, Keller's momentum score)"
 
 [[config_dir]]
 path = "config/site/features/options"
@@ -119,6 +119,10 @@ purpose = "the Guide's playbooks of the option income family (VRP scanner): one 
 [[config_dir]]
 path = "config/site/guide/playbooks/options_signals"
 purpose = "the Guide's playbooks of the option-implied signals family (call-put IV spread, smirk, IV change, option-to-stock volume, lottery attention): one <id>.toml per preset the family lists in sections.toml"
+
+[[config_dir]]
+path = "config/site/guide/playbooks/allocation"
+purpose = "the Guide's playbooks of the ETF allocation family (a priced ETF, credit spread against its trend, bond duration by curve and trend, cheap countries by CAPE, currency carry): one <id>.toml per preset the family lists in sections.toml"
 
 [[config_dir]]
 path = "config/site/guide/playbooks/cross_section"

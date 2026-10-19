@@ -2,7 +2,9 @@
 parses closed, the weighting and its volatility feature agree, a book is long, banded by nothing and
 rebalanced on a schedule whose windows never overlap, and ``base = "benchmark"`` is its alone."""
 
+import tomllib
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -17,6 +19,7 @@ from algotrade.config.edges.portfolio import (
     parse_mix,
 )
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.features.rollups.bridges.etf_map import CAPE_ETFS, FX_ETFS, RATE_SERIES, SIGNAL_ETFS
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 from tests.unit.services.evaluation.cross_section.conftest import edge_document
@@ -338,3 +341,95 @@ def test_only_a_portfolio_outcome_has_a_canary() -> None:
     doc["outcome"] = {**doc["outcome"], "canary": {**CANARY, "defensive": ["CASH"]}}
     with pytest.raises(ConfigurationError, match="canary: only a portfolio_return outcome"):
         parse_edge(doc, "drift", "drift.toml")
+
+
+# --- the macro allocation documents of EB E5 batch Y: a signal that lives on one carrier fund of
+# etf_macro@v1 must be read from a fund that carries it, or the screen is silently empty (a null
+# never passes); each document's universe, canary and screener reads are checked against the
+# bridge's own map, so a map change or a typo fails here and not in a run that holds cash.
+
+EDGES = {e.id: e for e in BOOKS}
+PRESETS = REPO_ROOT / "config/site/presets/screeners"
+BRIDGE = "rollup.etf_macro@v1."
+
+
+def symbols(edge: Edge) -> set[str]:
+    return {n for r in edge.universe.where.rules() for n in r.value}  # type: ignore[union-attr]
+
+
+def criteria(screener: str) -> dict[str, dict[str, object]]:
+    return tomllib.loads(Path(PRESETS / screener / "v1.toml").read_text())["criteria"]
+
+
+def test_the_curve_screens_read_a_column_the_bond_funds_carry() -> None:
+    edge = EDGES["bond_curve_timing"]
+    assert symbols(edge) == {"TLT", "IEF"}
+    for screener, column in (("bond_curve_trend_3m", "t10y3m"), ("bond_curve_trend_2y", "t10y2y")):
+        assert screener in edge.screeners
+        assert criteria(screener)["curve"]["field"] == BRIDGE + column
+        assert symbols(edge) <= set(SIGNAL_ETFS[column]), f"{column}: a fund with no slope"
+    assert set(edge.ensemble) == {"bond_curve_trend_3m", "bond_curve_trend_2y"}
+
+
+def test_the_credit_macro_trial_is_not_listed_until_the_spread_history_is_long_enough() -> None:
+    edge = EDGES["credit_spread_trend"]
+    assert "credit_spread_below_ma200" not in edge.screeners  # series start 2023-10-09: ~28 months
+    assert symbols(edge) == {"HYG", "LQD"}
+    assert "HYG" in SIGNAL_ETFS["hy_oas"] and "LQD" in SIGNAL_ETFS["ig_oas"]
+
+
+def test_the_value_leg_ranks_only_funds_with_a_country_series() -> None:
+    value = EDGES["country_etf_momentum_value"]
+    assert "country_cape_cheapest" in value.screeners
+    assert "country_cape_cheapest" not in value.ensemble
+    assert symbols(value) - set(CAPE_ETFS) == {"EWM", "FXI"}  # the two the document discloses
+    assert criteria("country_cape_cheapest")["has_cape"]["field"] == BRIDGE + "cape"
+    combo = EDGES["trend_carry_value_combo"]
+    assert symbols(combo) <= set(CAPE_ETFS), "every fund of the combination has a CAPE"
+    assert set(combo.ensemble) == {"trend_positive_12m", "country_cape_cheapest"}
+
+
+def test_the_carry_leg_is_measured_for_the_funds_that_have_a_rate() -> None:
+    edge = EDGES["fx_etf_carry_momentum"]
+    assert "fx_carry_positive" in edge.screeners
+    assert criteria("fx_carry_positive")["carry"]["field"] == BRIDGE + "fx_carry"
+    with_rate = {t for t, code in FX_ETFS.items() if code in RATE_SERIES}
+    measured = symbols(edge) & with_rate
+    assert measured == {"FXY", "FXA", "FXC"}  # FXE, FXB (no fresh rate) and UUP are not
+
+
+@pytest.mark.parametrize("edge_id", ["vix_roll_yield"])
+def test_the_vix_gate_reads_a_signal_the_canary_fund_carries(edge_id: str) -> None:
+    edge = EDGES[edge_id]
+    assert symbols(edge) == {"SVXY"} and edge.screeners == ("etf_priced",)
+    gates = [edge.outcome.canary, *(v.outcome.canary for v in edge.variants)]
+    assert len(gates) == 2 and all(g is not None for g in gates)
+    columns = set()
+    for gate in gates:
+        assert gate is not None and gate.defensive == ("CASH",) and gate.breadth == 1
+        column = gate.field.removeprefix(BRIDGE)
+        assert column in {"vx_basis", "vx_roll"}
+        assert set(gate.tickers) <= set(SIGNAL_ETFS[column]), f"{column}: not the carrier"
+        columns.add(column)
+    assert columns == {"vx_basis", "vx_roll"}  # the pair of pre-registered gates
+
+
+def test_the_canary_variants_are_vaa_and_daa_on_the_trend_book() -> None:
+    edge = EDGES["absolute_momentum_crash_filter"]
+    by_id = {v.id: v.outcome.canary for v in edge.variants}
+    assert set(by_id) == {"canary_b1", "canary_daa"}
+    vaa, daa = by_id["canary_b1"], by_id["canary_daa"]
+    assert vaa is not None and daa is not None
+    assert (vaa.breadth, daa.breadth) == (1, 2)
+    assert vaa.tickers == daa.tickers == ("BND", "VWO")
+    assert vaa.field == daa.field == "feature.momentum_13612w"
+    assert vaa.defensive == daa.defensive == ("IEF", "LQD", "SHY")
+    assert edge.outcome.canary is None  # the base book has no gate: the variants are the trials
+
+
+def test_the_volatility_managed_book_targets_ten_percent_on_one_fund() -> None:
+    edge = EDGES["vol_managed_equity"]
+    assert symbols(edge) == {"SPY"} and edge.top_k == 1
+    assert edge.outcome.vol_target == pytest.approx(0.10)
+    assert edge.outcome.benchmark == "SPY"  # the benchmark is not scaled (decision log)
+    assert edge.oos_class is None and edge.ensemble == ()  # one rule: no lookback grid

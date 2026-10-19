@@ -9,7 +9,9 @@ GOLDEN_URL ?= file://datasets/golden/store
         evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
-WORKERS ?= auto
+# the xdist worker count: auto, or 2 while the 1-minute load average is above 12 (a shared machine;
+# scripts/ops/xdist_workers.py caps workers only, never a gate); WORKERS=N overrides
+WORKERS ?= $(shell $(PY) scripts/ops/xdist_workers.py 2>/dev/null || echo auto)
 # WEB_WORKERS=N caps vitest workers in web-check / check (vitest reads VITEST_MAX_WORKERS, = --maxWorkers); empty = vitest default
 WEB_WORKERS ?=
 BASE ?= origin/main
@@ -108,7 +110,7 @@ e2e:
 changed:         ## narrow first check: mirrored tests of files changed vs origin/main (BASE=...), tests/architecture + tests/unit/config in full, then the fast gates; `make check` still gates
 	@paths="$$($(PY) scripts/changed_tests.py $(BASE))"; \
 	if [ -n "$$paths" ]; then $(PY) -m pytest -q -x --no-header --tb=short $$paths; else echo "no covering tests changed"; fi
-	@$(PY) -m pytest -q -x --no-header --tb=short -n auto tests/architecture tests/unit/config
+	@$(PY) -m pytest -q -x --no-header --tb=short -n $(WORKERS) tests/architecture tests/unit/config
 	@$(PY) scripts/changed_web.py $(BASE)
 	@$(MAKE) --no-print-directory arch layout ownership
 

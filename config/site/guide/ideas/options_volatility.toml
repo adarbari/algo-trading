@@ -78,9 +78,7 @@ why_not_built = "Queued in the build plan; it runs on stored index chains and wa
 id = "c20_short_vix_roll_yield"
 title = "Roll yield from short VIX futures"
 mechanism_kind = "paid_for_risk"
-verdict = "promising"
-feasibility = "needs_data"
-why_not_built = "Planned, but it needs VIX futures history by expiry, which the catalogue lists as not yet stored."
+filed_as = "vix_roll_yield"
 
 [[idea]]
 id = "c21_vix_futures_basis_signal"

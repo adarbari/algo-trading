@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-646 stored features in 83 groups, in dependency order; 158 expression features.
+646 stored features in 83 groups, in dependency order; 161 expression features.
 
 ## `option_liquidity@v1`
 
@@ -1258,6 +1258,13 @@ The market regime: macro risk (the higher of its early and confirming tiers) and
 
 Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on read) unless stored (materialised, by the `rollups` task after its inputs).
 
+### `allocation.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `credit_spread_vs_ma200` | expression | float | decimal | personal | >= -1 | The credit spread the fund trades over its 200-observation mean, minus 1: HYG reads the high-yield option-adjusted spread, LQD the investment-grade one (below 0: the spread is tighter than its trend) | the fund is not HYG or LQD, or its spread or its 200-observation mean is null (no observation known by the session, one older than the series' maximum age, or fewer than 160 of 200 sessions with an observation) | `coalesce(etf_macro.hy_oas / etf_macro.hy_oas_ma200, etf_macro.ig_oas / etf_macro.ig_oas_ma200) - 1` | virtual |
+| `momentum_13612w` | expression | float | ratio | open | -50 .. 50 | Keller's 13612W momentum score: 12 times the 1-month return plus 4 times the 3-month, 2 times the 6-month and 1 times the 12-month return (20, 60, 120 and 252 sessions); below 0 is a falling trend | a return is null (a gap among the last 252 sessions, or a shorter history) | `12 * price_stats.ret_20d + 4 * price_stats.ret_60d + 2 * trend_stats.ret_120d + trend_stats.ret_252d` | virtual |
+
 ### `bands.toml`
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
@@ -1374,6 +1381,7 @@ Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on rea
 | `rs_spy_positive` | expression | bool | flag | open |  | The instrument beat SPY over the last 63 sessions: rs_spy_63d above 0 (outperforming the market over a quarter) | rs_spy_63d is null (a gap in the 64 closes, or SPY not in the symbol map), or no relative_strength row | `relative_strength.rs_spy_63d > 0` | virtual |
 | `rs_improving` | expression | bool | flag | open |  | Relative strength against SPY is improving: rs_spy_trend_20d above 0 (the 63-session relative strength is higher than it was 20 sessions ago) | rs_spy_trend_20d is null (a gap in either 63-session window, or SPY not in the symbol map), or no relative_strength row | `relative_strength.rs_spy_trend_20d > 0` | virtual |
 | `sector_leader` | expression | bool | flag | open |  | The instrument's sector is one of the three strongest of the eleven sector ETFs over 63 sessions: sector_rank_63d at most 3 (params.leader_rank) | sector_rank_63d is null (no sector or sector ETF, the ETF has no complete window, or fewer than min_sector_etfs ETFs do), or no relative_strength row | `relative_strength.sector_rank_63d <= leader_rank` (leader_rank = 3) | virtual |
+| `year_loser_flag` | expression | bool | flag | open |  | The name fell 30% or more over 252 sessions (params.loser_at): the stock the year-end tax-loss selling falls on, as a fixed level standing in for the bottom decile | ret_252d is null (a gap among the last 253 sessions, or a shorter history), or no trend_stats row | `trend_stats.ret_252d <= loser_at` (loser_at = -0.3) | virtual |
 | `mom_12_1_vol_scaled` | expression | float | ratio | open | -100 .. 100 | The 12-1 momentum divided by the 60-session realised volatility (annualised): the return earned per unit of risk the name carries, so a calm 20% outranks a wild 20%; 1.0 is a 12-1 return equal to a year of one-stdev moves | mom_12_1 is null (a gap among the last 253 sessions, or a shorter history), hv60 is null (a gap among the last 61 sessions) or 0, or no trend_stats or vol_stats row | `trend_stats.mom_12_1 / vol_stats.hv60` | virtual |
 | `stock_tsmom_sign` | expression | float | ratio | open | -1 .. 1 | The name's own trend: 1 when its 252-session return is above 0 and the close is above the 200-session average, -1 when both are below, 0 when they disagree (the time-series momentum sign of Moskowitz, Ooi and Pedersen, confirmed by the average; the raw return is not an excess return over cash) | ret_252d or sma_200 is null (a gap among the last 253 sessions, or a shorter history), or no trend_stats or price_stats row | `if(is_null(trend_stats.ret_252d) or is_null(price_stats.sma_200), null, if(trend_stats.ret_252d > 0 and price_stats.close > price_stats.sma_200, 1, if(trend_stats.ret_252d < 0 and price_stats.close < price_stats.sma_200, -1, 0)))` | virtual |
 | `capital_gains_overhang` | expression | float | decimal | open | -1000 .. 1 | Where the close sits against the volume-weighted average price since the last earnings report: 0.05 is 5% above it, -0.05 is 5% below. A proxy for the capital-gains overhang of Grinblatt and Han, whose reference price is a turnover-weighted average over years of trading | avwap_earnings is null (no report in the last 126 sessions, fewer than 2 sessions since it, a gap in the range, or no volume), or no price_stats row | `(price_stats.close - anchored_vwap.avwap_earnings) / price_stats.close` | virtual |

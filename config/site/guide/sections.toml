@@ -58,7 +58,7 @@ themes = ["instrument gates"]
 [[theme_group]]
 id = "chart"
 title = "The chart"
-themes = ["momentum and trend", "price levels", "volume and liquidity", "volatility"]
+themes = ["momentum and trend", "price levels", "volume and liquidity", "volatility", "allocation signals"]
 
 [[theme_group]]
 id = "options"
@@ -87,7 +87,7 @@ presets = ["range_breakout", "breakout", "failed_breakout", "momentum_squeeze_en
 [[family]]
 id = "reversals"
 title = "Reversals"
-presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reversal", "sector_reversal", "etf_low_ibs", "news_free_residual_reversal"]
+presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reversal", "sector_reversal", "etf_low_ibs", "news_free_residual_reversal", "december_losers"]
 
 [[family]]
 id = "income"
@@ -102,7 +102,7 @@ presets = ["pead_small_cap", "eap_all", "eap_volume", "earnings_date_early", "pr
 [[family]]
 id = "filings"
 title = "Filings and index changes"
-presets = ["eight_k_adverse_items", "nt_late_filer", "tender_offer_filed", "sp500_deletion", "insider_cluster_buys"]
+presets = ["eight_k_adverse_items", "nt_late_filer", "tender_offer_filed", "sp500_deletion", "insider_cluster_buys", "reverse_split_recent", "ipo_lockup_ahead"]
 
 [[family]]
 id = "options_signals"
@@ -114,6 +114,14 @@ id = "cross_section"
 title = "Cross-section ranks"
 presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite", "short_term_momentum_turnover", "short_squeeze_dtc",
   "trend_positive_3m", "trend_positive_6m", "trend_positive_12m", "etf_above_200d", "dual_class_cheap_leg"]
+
+[[family]]
+id = "allocation"
+title = "ETF allocation"
+presets = [
+  "etf_priced", "credit_spread_below_ma200", "bond_curve_trend_3m", "bond_curve_trend_2y",
+  "country_cape_cheapest", "fx_carry_positive",
+]
 
 [[family]]
 id = "factors"

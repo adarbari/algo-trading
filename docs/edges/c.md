@@ -11,6 +11,7 @@ Back to the [index of every edge](../edges.md).
 | Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | candidate | every session | option model pnl, over 15, 21, 31 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle short (basis model, not a quote), costs 35 bps | `iv_rank_high` |
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `lottery_max` |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | every session | excess return, over 5, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cp_iv_spread`, `iv_smirk`, `iv_change_call`, `iv_change_ibkr` |
+| Short volatility fund with a term-structure filter (`vix_roll_yield`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 100% SVXY, entered 1 session after the decision session, costs 10 bps | `etf_priced` |
 | Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | blocked | month end | option model pnl, over 21 sessions, entered 1 session after the decision session, modelled P&L of an atm straddle long (basis model, not a quote), costs 35 bps | none yet |
 | Pre-earnings straddle purchase (`c16_pre_earnings_straddle_buy`) | blocked | on each `earnings_expected` | option model pnl, over 10 sessions, starting -3 sessions from the event, modelled P&L of an atm straddle long (basis model, not a quote), costs 50 bps | none yet |
 | Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`) | blocked | on each `earnings_expected` | option model pnl, over 10 sessions, starting -1 sessions from the event, modelled P&L of an atm straddle short (basis model, not a quote), costs 50 bps | none yet |
@@ -214,6 +215,38 @@ Back to the [index of every edge](../edges.md).
 - An, B.-J., Ang, A., Bali, T. and Cakici, N., The Joint Cross Section of Stocks and Options, Journal of Finance, 2014 (NBER working paper 19590) <https://www.nber.org/papers/w19590>
 - Bali, T. and Hovakimian, A., Volatility Spreads and Expected Stock Returns, Management Science, 2009 <https://pubsonline.informs.org/doi/fpi/10.1287/mnsc.1090.1063>
 - McLean, R. D. and Pontiff, J., Does Academic Research Destroy Stock Return Predictability?, Journal of Finance, 2016 <https://ivey.uwo.ca/media/3775549/pontiff.pdf>
+
+## Short volatility fund with a term-structure filter (`vix_roll_yield`)
+
+**Status:** candidate. **Family:** C. **Thesis:** Holding a short-volatility fund only while VIX futures sit above the VIX collects the roll, and moving to cash when the curve inverts avoids the days the premium is lowest.
+
+- **Outcome:** portfolio return, over 21 sessions, vs a blend of 100% SVXY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.symbol in ('SVXY',)`
+- **Top K:** 1
+- **Screeners:** `etf_priced`
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** VERDICTS ARE UNMEASURED until the screen is run and evaluated, and a PICKS-SERIES t HAS A TAIL-RISK BLIND SPOT: a short-volatility book earns small gains for months and loses most of its value in a day, so a month-end book can show a positive t with no 2018 or 2020 in the sample. The book is ONE fund, SVXY, held in full when the SPY row's first monthly VIX future settles above the VIX close (rollup.etf_macro@v1.vx_basis at or above 0, the previous session's closes) and held as cash at the Treasury bill yield when below 0: the canary gate of ADR 0074 item 17, read at the month-end session D. The variant curve_roll uses the second future over the first (vx_roll) instead. LIMITS, so nothing implies the full source rule: (1) UVXY and VIXY are named and NOT held: they are long-volatility funds that pay the same roll, and a long-volatility book is not this edge; VXX is an ETN and not covered at all. (2) SVXY's own history is not one fund: it was minus 1 times the short-term VIX futures index until February 2018 and minus 0.5 times after it (dates not verified here), so the price series splices two exposures, and XIV, the fund that failed, is not in the store (survivorship: the sample leaves out the fund that died). (3) The source sells the front future against mini S&P futures and collects the roll directly; this book holds a fund whose return also carries its fee, its daily rebalancing and the leverage change. (4) The canary reads the SPY row because the volatility funds carry no column of their own (etf_macro@v1 gives the VIX family to SPY), and the VX futures history in volatility/vx_futures starts in 2013, so a session before the first stored settle has no signal and is left out with the reason no_canary:SPY: the sample starts there, not in 2011 when SVXY listed. (5) The gate switches on month-end values and the curve inverts inside a month, so the book holds the fund through the move the filter exists to avoid; the source's check is daily. (6) A cash month earns the bill, the benchmark holds SVXY every month, so a de-risked book trails it in calm years by design (decision log 2026-10-18). (7) Price only; no distributions. cost_bps 10 a round trip assumed. No [published] figure: the source's 4.3 percent a month (pre-2018 futures, not a fund) is a different series from what the harness measures. No oos_class: the out-of-sample haircut is shown only for a book that declares an ensemble of lookbacks, and this edge has one rule. Size it for a minus 90 percent day: this is the premium paid for a crash, not a gain from information.
+
+**Quality bar**
+
+1. **Mechanism:** Hedgers and long-volatility products create steady demand for forward volatility, so futures sit above the VIX most of the time and a short position collects the difference as the future rolls to spot; the premium falls when risk rises, which is why unfiltered short volatility is hit exactly when it is lowest (Cheng 2019).
+2. **Persistence:** The tail is large enough that few mandates can hold the position unlevered: XIV lost nearly all of its value on 2018-02-05 and was terminated, and SVXY cut its leverage afterwards (exact figures not verified here). The filter is a claim to test, since the curve can invert in a day.
+3. **Outcome:** SVXY's return over the 21 sessions from the close after each month end, less SVXY held always over the same sessions, net of cost on the weight change; when the first monthly VIX future settles below the VIX at D the whole book is cash at the Treasury bill yield. Price only: the stored forward return is close to close and carries no distribution.
+4. **Trigger timing:** The gate reads the VIX close and the first monthly future's settle of the session BEFORE the month-end close D: both are known only from the next session (a settle's known_from, a macro value's release lag of one day), and a basis is stored only when the future's trade date is the VIX date. The book is held from the session after D, at S, for 21 sessions. Nothing after D enters the gate.
+5. **Faithful replication:** Simon and Campasano (2014), via CXO's summary: sell the front future when the futures to spot ratio is above 1, else cash; hedged with mini S&P futures, 2004 to 2014. Here: SVXY only, the month-end basis above 0 as the ratio test, cash otherwise, no hedge, 2013 on.
+6. **Expected size and sample:** Not verified here. CXO's summary of the source reports 4.3 percent a month in excess of cash for 2004 to 2014 on futures, before the 2018 collapse of XIV; filtered versions survived February 2018 but 2020-03 and 2024-08-05 are reported to have cost unfiltered short-volatility funds over half their value (not verified). Expect a high Sharpe ratio with one very bad month.
+7. **Capacity and costs:** SVXY is liquid but small against the futures it tracks; one position, a few switches a year; cost_bps 10 assumed for the fund's spread. The tax and the fund's fee are not modelled. Size at 2 to 5 percent of equity, not the book.
+8. **Failure modes and retirement:** A tail event inside a month, before the next month-end read, takes most of the position while the signal still says contango. The sample leaves out XIV, so survivorship flatters it. Retire if the frozen-period picks-series t is under 2 or one month loses more than the book's whole gain.
+9. **Decoys:** Equity beta (short volatility moves with the market in a crash) and the filed premium at index level (vrp_short_premium): compare with SPY held and with that edge.
+
+**Sources**
+
+- Cheng, I., The VIX Premium, Review of Financial Studies, 2019 <https://academicnewsletter.sufe.edu.cn/info/352766>
+- Simon, D. and Campasano, J., The VIX Futures Basis: Evidence and Trading Strategies, 2014
+- CXO Advisory, Timing VIX Futures with the Futures-Spot Ratio (summary of the source) <https://www.cxoadvisory.com/volatility-effects/timing-vix-futures-with-the-futures-spot-ratio/>
+- Quantpedia, Exploiting Term Structure of VIX Futures <https://quantpedia.com/strategies/exploiting-term-structure-of-vix-futures>
 
 ## Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`)
 
