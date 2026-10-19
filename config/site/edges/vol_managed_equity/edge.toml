@@ -1,0 +1,102 @@
+# Edge document (ADR 0053, ADR 0074; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/trend-macro.md (vol_managed_equity).
+# An allocation edge (EB E5 batch Y): one fund sized to a volatility target, the rest in cash.
+id = "vol_managed_equity"
+name = "Volatility-targeted equity exposure"
+family = "E"
+thesis = "Holding SPY at a 10 percent volatility target, with the rest in cash, gives up little return for much less risk than holding it fully, because volatility spikes are not paid for."
+mechanism = """After a shock volatility stays high for weeks while the expected return does not rise in proportion, and
+leverage-constrained investors cannot lever up in calm times (Moreira and Muir 2017); sizing down
+after a shock is the part an unlevered investor can do."""
+persistence = """The unlevered version is a de-risking rule that gives up the rebound after a crash, so it is held
+by few; Cederburg, O'Doherty, Wang and Yan (2020) find volatility-managed versions of 103 strategies do not
+systematically beat the unmanaged ones in real time. A claim of risk control, not of alpha."""
+schedule = "month_end"
+top_k = 1
+screeners = [
+  "etf_priced",
+]
+base = "benchmark"
+status = "candidate"
+mechanism_kind = "paid_for_risk"
+asset_class = "etfs"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the screen is run and evaluated. WHAT THE NUMBER IS: the harness reads a
+portfolio book as the picks-series t of its excess return over the benchmark and stores no lift (a
+portfolio_return has no base rate to lift from); the benchmark is SPY held always and NOT scaled, so a
+10 percent target loses to it by design in a rising market (decision log 2026-10-18, pending the owner:
+the stricter bar). The informative figures are the book's volatility before scaling (book_vol, a leg
+column) and the drawdown and Sharpe ratio in the run record against SPY. The book is ONE fund, SPY, with
+vol_target = 0.10: sigma is the annualised standard deviation of the book's daily returns over the 60
+sessions ending at D (today's weight on each day's return as it was known, ADR 0074 item 15), the
+multiplier is the smaller of 1 and 0.10 over sigma, and the rest is cash at the Treasury bill yield.
+LIMITS, so nothing implies the full source rule: (1) the source of Moreira and Muir scales by the inverse
+of last month's realised variance and levers up in calm months; this book is unlevered and scales down only,
+so it is a de-risking rule and never above 100 percent. (2) Harvey et al.'s 10 percent target is the
+number used, not a fitted one, and one target is ONE trial: no grid. (3) SPY is the only fund, so the
+cross-asset claims of the paper (value, momentum, carry) are not tested, and the paper finds the gain
+negligible for bonds, currencies and commodities. (4) The bill and not the leverage fills the gap:
+cash earns the Treasury bill, the benchmark has no cash, and price only, no dividends, so SPY's
+yield is missing from the book and the benchmark. (5) Sigma is a 60-session sample, long enough to
+miss the first week of a shock; the realised-variance month of the source is shorter. (6) The scaled book
+pays the cost on its weight change, so rescaling month to month is charged. cost_bps 4 a round trip
+assumed. SPY has bars from the store's start on 2010-01-04, so the sample is one long bull market
+with 2018, 2020 and 2022 in it. No [published] figure: the paper's Sharpe ratios (0.40 unmanaged to
+about 0.48 to 0.51 managed, 60 assets since 1926) are not what the harness measures. No oos_class: the
+out-of-sample haircut is shown only for a book that declares an ensemble of lookbacks, and this edge has
+one rule. The same overlay is available to every allocation
+edge as vol_target; this document is the one that tests it alone."""
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SPY"] },
+]
+
+[outcome]
+kind = "portfolio_return"
+horizon_sessions = [21]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 4
+weighting = "equal"
+vol_target = 0.10
+
+[quality_bar]
+outcome = """SPY's return over the 21 sessions from the close after each month end, scaled by the smaller of 1 and
+0.10 over the 60-session volatility of the position read at D, the rest in cash at the Treasury bill
+yield, less SPY held always over the same sessions, net of cost on the weight change. Price only: the stored
+forward return is close to close and carries no dividend."""
+trigger_timing = """The 60 daily returns of the position are read at D, each as it was known on its own session
+(ADR 0074 item 15), and the book is held from the next session's close S for 21 sessions. Nothing after
+D enters the scale; a missing return in the window leaves the session out with the reason no_book_vol."""
+replication = """Moreira and Muir (2017): weight the market by c over last month's realised variance, monthly, with
+leverage. Harvey et al. (2018): a 10 percent volatility target, more than 60 assets since 1926. Here:
+SPY, a 10 percent target on 60 sessions, down only, cash for the rest."""
+expected_size = """Not verified here. The page records Harvey et al.'s US equity Sharpe ratio rising from about 0.40 to
+0.48 to 0.51 with a target, little change for bonds, currencies and commodities, and a cut in the left
+tail everywhere; and Cederburg et al.'s finding that real-time managed versions of 103 strategies do not
+systematically beat the unmanaged ones. Expect lower return than SPY and a smaller drawdown."""
+capacity_costs = """Unlimited capacity in one fund; the scale moves every month, so the weight change is charged each
+rebalance; cost_bps 4 assumed. The tax cost of the monthly changes is not deducted."""
+failure_modes = """The scale reacts after the shock, so a fast V-shaped fall and rebound (2020) is sold low and re-bought
+late. Volatility can stay low into a fall (a slow bear), leaving the book fully invested. Retire as an
+edge if the frozen-period picks-series t is under 2; it stays useful as a sizing overlay whatever the
+verdict."""
+decoys = """Pure market timing and equity beta: a book that is half cash loses to SPY in a rising market. Overlaps
+the regime label's market-stress reading and the VIX timing ideas. The informative comparison is the
+drawdown and Sharpe ratio against SPY, not the excess return."""
+
+[[sources]]
+title = "Moreira, A. and Muir, T., Volatility-Managed Portfolios, Journal of Finance, 2017 (NBER w22208)"
+url = "https://www.nber.org/papers/w22208"
+
+[[sources]]
+title = "Cederburg, S., O'Doherty, M., Wang, F. and Yan, X., On the Performance of Volatility-Managed Portfolios, Journal of Financial Economics, 2020"
+url = "https://www.lehigh.edu/~xuy219/research/COWY.pdf"
+
+[[sources]]
+title = "Harvey, C., Hoyle, E., Korgaonkar, R., Rattray, S., Sargaison, M. and Van Hemert, O., The Impact of Volatility Targeting, Journal of Portfolio Management, 2018"
+
+[[sources]]
+title = "Alpha Architect, Does Portfolio Timing Based on Volatility Signals Outperform Buy and Hold? (summary)"
+url = "https://alphaarchitect.com/does-portfolio-timing-based-on-volatility-signals-outperform-buy-and-hold/"

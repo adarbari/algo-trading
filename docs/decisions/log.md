@@ -948,3 +948,11 @@ follow-up PR).
 - decided by: owner
 - status: final
 - Reasoning: the name is on the public filing beside the CIK that is already stored, so storing it adds no exposure the CIK did not, and it makes the deep-dive dossier and a later per-insider view readable. Reverses only the "no names" clause; the #651 entry's status is `overruled` for that reason.
+
+## 2026-10-18 | EB E5 (batch Y, macro allocation documents) | The gate reads the carrier fund, the macro legs are separate trials, two fields stay undrafted
+- Question: how are the volatility-product, curve, credit, CAPE and carry documents filed on the merged bridge, canary gate and vol_target without implying the full source rule?
+- Options: a VX column on each volatility fund (a map change and a version bump) / a canary on SPY, the carrier; a macro screener inside the existing ensemble / its own trial; the two new expression features in the Describe-it index / kept out like the bridge group.
+- Decision: `vix_roll_yield` holds SVXY only (UVXY and VIXY named and not held, VXX not covered) under a canary on SPY's `vx_basis` (variant `curve_roll`: `vx_roll`), no `oos_class` (one rule, no lookback grid); the macro legs (`credit_spread_below_ma200`, `country_cape_cheapest`, `fx_carry_positive`) are screeners of the existing edges outside their ensembles, so each is one more trial; `bond_curve_timing` ensembles the two slopes; `trend_carry_value_combo` is the ten-country trend plus CAPE slice, carry skipped (no curve history); `vol_managed_equity` is SPY at `vol_target = 0.10`; VAA and DAA are variants of `absolute_momentum_crash_filter` on a 13612W expression feature; `feature.credit_spread_vs_ma200` and `feature.momentum_13612w` join `UNDRAFTED_FIELDS` (two index lines tip the slice margin).
+- decided by: orchestrator (design call)
+- status: pending architect review and owner confirmation
+- Reasoning: the carrier fund already holds the VX signal and a map change rewrites a stored group; a grid pre-registered as one ensemble must not absorb a different kind of signal; the bridge group's reason to stay out of the drafting prompt applies to its two derived fields.

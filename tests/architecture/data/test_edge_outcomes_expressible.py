@@ -192,7 +192,8 @@ def test_the_variants_horizons_and_benchmark_are_written_by_the_outcomes_task(ed
     horizons, benchmarks = horizons_and_benchmarks(STORE)
     for v in edge.variants:
         assert set(v.outcome.horizon_sessions) <= set(horizons), f"{edge.id}/{v.id}: {horizons}"
-        assert v.outcome.benchmark in {*benchmarks, "none"}
+        if not v.outcome.benchmark.startswith(MIX):  # a mix is computed from its constituents
+            assert v.outcome.benchmark in {*benchmarks, "none"}
 
 
 def test_only_the_named_modules_read_outcomes() -> None:

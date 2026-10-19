@@ -41,8 +41,8 @@ trip assumed for liquid ETFs. (5) The benchmark is the page's passive 60/40 of S
 the nine funds, so a book that is half cash is not rewarded for beating a stock-only index. The
 ensemble of the three lookbacks is ONE trial, the members are never a verdict basis, and the harness
 reads the book against its benchmark on the picks-series t (a Promising edge needs t at or above 2,
-Works 3). The trend leg of trend_carry_value_combo is this edge: no separate document, since carry
-needs futures curves and value needs country CAPE, neither stored. No [published] figure: the paper
+Works 3). The multi-asset trend leg of trend_carry_value_combo is this edge; that document
+adds a value leg (country CAPE) on a ten-country slice only, and carry (futures curves) is not built. No [published] figure: the paper
 Sharpe ratios are of futures books the harness does not measure. verdict.toml [oos_haircut] trend =
 0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one
 beside the result, as display only."""

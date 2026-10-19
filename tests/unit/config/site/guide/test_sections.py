@@ -61,6 +61,7 @@ def test_the_shipped_sections_follow_the_spec() -> None:
         "filings",
         "options_signals",
         "cross_section",
+        "allocation",
         "factors",
         "fundamentals",
     ]

@@ -13,7 +13,7 @@ US; a claim to test on the stored history."""
 schedule = "month_end"
 top_k = 5
 screeners = [
-  "trend_positive_6m", "trend_positive_12m",
+  "trend_positive_6m", "trend_positive_12m", "country_cape_cheapest",
 ]
 base = "benchmark"
 oos_class = "trend"
@@ -22,19 +22,29 @@ mechanism_kind = "cross_market_trends"
 asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history and evaluated. LIMITS:
-this is the MOMENTUM leg only. The value leg of the source (country CAPE, Asness, Moskowitz and
-Pedersen's value and momentum combination) needs a country-to-ETF bridging group of CAPE data that
-is not stored: not built, and no combined rule is claimed. Twenty iShares single-country funds (the
+the momentum screeners are the momentum leg; the VALUE leg (EB E5 batch Y) is the separate trial
+country_cape_cheapest, the cheapest five funds by country CAPE (etf_macro@v1), outside the momentum
+ensemble. The value leg is NOT the source's full rule: (1) EWM and FXI have no country CAPE series
+(Malaysia, and China large caps: only MCHI is mapped), so 18 of the 20 funds can be ranked and the two
+never pass the value screen; the top five of 18 is the cheapest 28 percent, where the source holds the
+cheapest quarter or third. (2) Faber holds annually and CAPE predicts over 3 to 10 years; this book
+re-ranks every month and is held 21 sessions, so the value leg is judged on a horizon far shorter than
+its thesis and is expected to be weak by design. (3) CAPE history is revised in place, so a backtest on
+it is a valuation sort and not an as-known test (decision log 2026-10-18, pending the owner); the value is
+read as the latest value known by the session. (4) The combined rule of Asness, Moskowitz and Pedersen
+(value and momentum ranks combined) is not built here: it is filed as trend_carry_value_combo on a
+ten-fund slice, and no combined claim is made for this document. Twenty iShares single-country funds (the
 page names 25 to 40; funds with a short history, such as INDA and the thinly traded, are left out so
 every constituent of the equal-weight benchmark has rows from 2010 and the weights add to one
-exactly: 20 at 5 percent). The rank is the raw 12-month return where the source skips the last
+exactly: 20 at 5 percent). The momentum rank is the raw 12-month return where the source skips the last
 month, and the 6 and 12 month lookbacks are one ensemble trial. The top five of the funds with a
 positive trend are held at 20 percent each, an unfilled slot is cash at the bill yield; the equal-
 weight twenty is the benchmark, so the value is the pick against a passive country basket, not
 against SPY. Funds are in dollars (the currency effect is inside the price); no distributions;
 cost_bps 20 a round trip assumed for wider country-fund spreads. verdict.toml [oos_haircut] trend =
 0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one
-beside the result, as display only."""
+beside the result, as display only. No [published] figure: the page's 4 to 7 percent a year for the
+cheapest third is gross, in sample and of a different universe than the harness measures."""
 
 [ensemble]
 variants = ["trend_positive_6m", "trend_positive_12m"]

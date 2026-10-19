@@ -1,0 +1,113 @@
+# Edge document (ADR 0053, ADR 0074; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/trend-macro.md (trend_carry_value_combo).
+# An allocation edge (EB E5 batch Y): a weighted book of ETFs against a blended benchmark of its own list.
+id = "trend_carry_value_combo"
+name = "Trend and value across country funds"
+family = "E"
+thesis = "Splitting the book half into the country funds on a rising 12-month trend and half into the cheapest by CAPE gives a smoother result than either alone, because trend and value rarely lose together."
+mechanism = """Each premium has a different holder on the other side: trend, the late reactors; value, the
+extrapolators of recent growth; so losses rarely coincide (Asness, Moskowitz and Pedersen 2013). Value
+and momentum correlate negatively within an asset class, and the mix is steadier than either leg."""
+persistence = """Each leg has had droughts that run for years (value from 2010 to 2020, trend in much of the 2010s), and
+investors quit the worst leg. Live alternative-risk-premia funds disappointed after 2010 (Suhonen, Lennkh
+and Perez 2017 report a median live Sharpe ratio of 0.31 against 1.20 in the backtest, in 215 strategies).
+Persistence is a claim to test."""
+schedule = "month_end"
+top_k = 3
+screeners = [
+  "trend_positive_12m", "country_cape_cheapest",
+]
+base = "benchmark"
+oos_class = "trend"
+status = "candidate"
+mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. LIMITS, so nothing implies the full
+source rule: the source is a book of trend, carry and value across equity indices, bonds, currencies and
+commodities, and THIS DOCUMENT IS ONLY ITS COUNTRY-EQUITY SLICE with two of the three legs. (1) The
+CARRY LEG IS NOT BUILT AND NO CLAIM IS MADE FOR IT: carry for these assets (a curve or futures basis) needs
+the D11 futures curves, which have no history yet and accrue over months; a country fund's dividend yield
+is no stand-in. Skipped. (2) The VALUE LEG is the cheapest three funds by country CAPE (etf_macro@v1,
+country_cape_cheapest); CAPE history is revised in place, so a backtest is a valuation sort and not an
+as-known test (decision log 2026-10-18, pending the owner), and the value of an asset class other than
+equities (the real yield on bonds, the 5-year price ratio of commodities) is not built. (3) The TREND LEG
+is the 12-month raw return above 0 (trend_positive_12m), the three best held, which is
+one lookback of the multi-asset tsmom_multi_asset_etf and not its three-lookback ensemble, and no
+other asset class: that edge holds the multi-asset trend leg and is not repeated. (4) The two legs are
+averaged half and half as an ensemble: ONE trial, never a verdict basis; the legs are also evaluated
+alone as their own trials (the deflated Sharpe ratio counts them), and Asness et al.'s combination is
+50/50 on ranks, where this is 50/50 on books of three funds each. (5) Ten country funds only, SPY included
+(CAPE_USA), equal-weight benchmark of the ten, so the value is against a passive country basket and not
+SPY; funds are in dollars; price only, no distributions; cost_bps 20 a round trip assumed for wider
+country-fund spreads. Funds are chosen to have bars from the store's start on 2010-01-04; the
+latest-starting fund sets the sample. (6) The value signal is monthly and slow (3 to 10 year horizons
+in the literature) and the book is held 21 sessions, so the value leg is judged on a horizon far shorter
+than the thesis; expect it to be weak by design and the combination to be dominated by trend. The
+page grades the source Strong gross and Promising as a long-only ETF book. No [published] figure: the
+source's Sharpe ratios (1.45 for the 50/50 value and momentum book, 1972 to 2011) are of long-short
+futures and index books the harness does not measure. verdict.toml [oos_haircut] trend = 0.45 prints the
+in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one beside the result,
+as display only."""
+
+[ensemble]
+variants = ["trend_positive_12m", "country_cape_cheapest"]
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SPY", "EWJ", "EWG", "EWU", "EWC", "EWA", "EWY", "EWT", "EWZ", "EWH"] },
+]
+
+[outcome]
+kind = "portfolio_return"
+horizon_sessions = [21]
+benchmark = "mix:SPY=0.1,EWJ=0.1,EWG=0.1,EWU=0.1,EWC=0.1,EWA=0.1,EWY=0.1,EWT=0.1,EWZ=0.1,EWH=0.1"
+start_offset_sessions = 1
+cost_bps = 20
+weighting = "equal"
+
+[quality_bar]
+outcome = """The book's return over the 21 sessions from the close after each month end, less the equal ten-fund mix's
+over the same sessions, net of cost on the weight change. The book is half the three best by 12-month
+return where above 0 and half the three cheapest by CAPE, at a sixth each when both legs are filled; an
+unfilled slot is cash at the Treasury bill yield. Price only: the stored forward return is close to
+close and carries no dividend."""
+trigger_timing = """The trailing return and the CAPE value known by the session (a monthly series, published about
+45 days late and read by vintage) are read at the month-end close D; the book is held from the next
+session's close S for 21 sessions. Nothing after D enters a pick. The CAPE history itself is revised in
+place, which the notes carry."""
+replication = """Asness, Moskowitz and Pedersen (2013): value and momentum in each asset class, combined 50/50, long
+the top and short the bottom, monthly; the 50/50 mix across all classes has an annual Sharpe ratio of 1.45
+(1972 to 2011, per the page). Here: ten country funds, long only, trend by 12-month return, value by
+CAPE, books averaged, no carry, no short leg."""
+expected_size = """Not verified here beyond what the page records: Baz et al. (2015) report a gross Sharpe ratio of 1.40
+to 1.61 for books combining carry, momentum and value across equities, rates, currencies and commodities,
+1990 to 2015, and Suhonen et al. (2017) a median live haircut of 73 percent across 215 bank strategies.
+Expect far less from ten long-only country funds."""
+capacity_costs = """Capacity is limited by the thinner country funds; a few switches a year in each leg; cost_bps 20
+assumed; the value leg's turnover is low, the trend leg's higher."""
+failure_modes = """The 2010 to 2024 dominance of US equities makes the cheap countries lag and the trend leg hold SPY. The value
+leg is judged on 21 sessions where its horizon is years, and a CAPE sort is a bet on commodity
+exporters and distressed markets. Retire if the frozen-period picks-series t is under 2."""
+decoys = """Emerging-market and commodity beta in the cheap funds, the dollar regime, and the two filed country edges:
+compare with country_etf_momentum_value, which holds the same ideas over twenty funds, and with
+tsmom_multi_asset_etf for the trend leg."""
+
+[[sources]]
+title = "Asness, C., Moskowitz, T. and Pedersen, L., Value and Momentum Everywhere, Journal of Finance, 2013 (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Value-and-Momentum-Everywhere"
+
+[[sources]]
+title = "Baz, J., Granger, N., Harvey, C., Le Roux, N. and Rattray, S., Dissecting Investment Strategies in the Cross Section and Time Series, SSRN, 2015"
+url = "https://papers.ssrn.com/abstract=2695101"
+
+[[sources]]
+title = "Suhonen, A., Lennkh, M. and Perez, F., Quantifying Backtest Overfitting in Alternative Beta Strategies, Journal of Portfolio Management, 2017 (read via CXO Advisory)"
+url = "https://www.cxoadvisory.com/big-ideas/live-performance-of-alternative-beta-products/"
+
+[[sources]]
+title = "Faber, M., Global Value: Building Trading Models with the 10 Year CAPE, SSRN, 2012"
+url = "https://papers.ssrn.com/abstract=2129474"
+
+[[sources]]
+title = "Koijen, R., Moskowitz, T., Pedersen, L. and Vrugt, E., Carry, Journal of Financial Economics, 2018"

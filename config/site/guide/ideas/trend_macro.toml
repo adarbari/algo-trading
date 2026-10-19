@@ -6,9 +6,7 @@ family = "E"
 id = "taa_keller_vaa_daa"
 title = "Vigilant and Defensive Asset Allocation"
 mechanism_kind = "cross_market_trends"
-verdict = "weak"
-feasibility = "data_ready"
-why_not_built = "Weak as published; only its risk-off canary rule is worth testing, and the harness cannot yet express its signal-weighted cash share."
+filed_as = "absolute_momentum_crash_filter"
 
 [[idea]]
 id = "carry_multi_asset_etf"
@@ -25,22 +23,6 @@ mechanism_kind = "paid_for_risk"
 verdict = "promising"
 feasibility = "needs_data"
 why_not_built = "The roll-yield leg needs futures curves, which are not stored; only the ETF momentum leg of the filed commodity edge is built."
-
-[[idea]]
-id = "bond_curve_timing"
-title = "Bond duration timing from the yield curve"
-mechanism_kind = "cross_market_trends"
-verdict = "promising"
-feasibility = "data_ready"
-why_not_built = "Queued in the build plan; it runs on the stored Treasury curve and ETF prices."
-
-[[idea]]
-id = "vol_managed_equity"
-title = "Volatility-managed equity exposure"
-mechanism_kind = "paid_for_risk"
-verdict = "weak"
-feasibility = "data_ready"
-why_not_built = "Weak as a source of return; planned instead as a position-sizing rule for other edges."
 
 [[idea]]
 id = "risk_parity_etf"
@@ -62,9 +44,7 @@ why_not_built = "The effect has faded in the ETF era, so it is low priority."
 id = "country_cape_value"
 title = "Country rotation on long-run valuation"
 mechanism_kind = "value_gaps"
-verdict = "weak"
-feasibility = "needs_data"
-why_not_built = "Its horizon is too long for the harness's minimum event count, and country valuation data is not stored."
+filed_as = "country_etf_momentum_value"
 
 [[idea]]
 id = "erp_timing_cape"
@@ -161,14 +141,6 @@ mechanism_kind = "paid_for_risk"
 verdict = "promising"
 feasibility = "data_ready"
 why_not_built = "A stock-level factor idea that the catalogue hands to the cross-sectional family, where the low-beta edge is filed."
-
-[[idea]]
-id = "trend_carry_value_combo"
-title = "Trend, carry and value across asset classes"
-mechanism_kind = "cross_market_trends"
-verdict = "strong"
-feasibility = "needs_data"
-why_not_built = "Only the trend leg is built, inside the multi-asset trend edge; carry and value need futures curves and country valuation data."
 
 [[idea]]
 id = "stock_bond_correlation_regime"
