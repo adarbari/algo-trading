@@ -156,6 +156,7 @@ def test_the_shipped_guide_is_complete() -> None:
     # one name per file, two files per stem across the group folders; "-" sorts below letters, so
     # a stem's -2 part follows it and the order of reading is today's
     assert store.names("site", "field_guide") == [
+        "allocation",
         "analyst",
         "analyst-2",
         "events",

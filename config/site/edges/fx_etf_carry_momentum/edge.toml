@@ -12,7 +12,7 @@ percent a year and track poorly; persistence is a claim to test."""
 schedule = "month_end"
 top_k = 3
 screeners = [
-  "trend_positive_6m", "trend_positive_12m",
+  "trend_positive_6m", "trend_positive_12m", "fx_carry_positive",
 ]
 base = "benchmark"
 oos_class = "trend"
@@ -20,16 +20,24 @@ status = "candidate"
 mechanism_kind = "cross_market_trends"
 asset_class = "etfs"
 frozen_from = 2026-04-01
-notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. LIMITS: this is the MOMENTUM leg
-only. The carry leg of the source (sort on the forward discount) needs foreign short-rate series
-that are not stored: not built, and the document does not claim carry. The universe is the five
-major-currency funds and UUP, the dollar, so a falling foreign mix can be held as the dollar; the
-benchmark is an equal mix of the five foreign funds. The top three by raw return where above 0 are
-held at a third each, an unfilled slot is cash at the bill yield. The funds hold deposits, whose
-interest is in the fund's price only as a drag for the dollar fund; no distributions in the stored
-return; cost_bps 10 a round trip assumed. The ensemble of 6 and 12 months is ONE trial. verdict.toml
-[oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and
-the out-of-sample one beside the result, as display only."""
+notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. LIMITS: the momentum screeners are the
+momentum leg; the CARRY leg (EB E5 batch Y) is the separate trial fx_carry_positive, a fund held while its
+currency's 3-month interbank rate is above the US one (etf_macro@v1, fx_carry, OECD rates via FRED),
+outside the momentum ensemble. It is NOT the source's full carry rule: (1) the rate series exist only
+for the yen, Australian dollar, Canadian dollar and Swiss franc, so of this list FXY, FXA and FXC can
+pass: FXE and FXB (the euro and pound rates are stale in the registry) and UUP (the dollar, no carry
+column) are UNMEASURED for carry and never pass, and the screen can hold at most three funds.
+(2) The source sorts on the forward discount (an interest-rate differential in effect) and goes long the
+top and short the bottom; this book is long only with a threshold of 0, so a currency with a negative
+differential is cash, not a short. (3) The rate is the OECD monthly 3-month interbank rate read as the
+latest observation known by the session (a lag of about 60 days), a coarse stand-in for a forward
+discount. The universe is the five major-currency funds and UUP, the dollar, so a falling foreign mix can
+be held as the dollar; the benchmark is an equal mix of the five foreign funds. The top three by raw
+return where above 0 are held at a third each, an unfilled slot is cash at the bill yield. The funds hold
+deposits, whose interest is in the fund's price only as a drag for the dollar fund; no distributions
+in the stored return; cost_bps 10 a round trip assumed. The ensemble of 6 and 12 months is ONE trial.
+verdict.toml [oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it becomes after the
+haircut and the out-of-sample one beside the result, as display only."""
 
 [ensemble]
 variants = ["trend_positive_6m", "trend_positive_12m"]

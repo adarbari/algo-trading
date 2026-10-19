@@ -566,6 +566,8 @@ export const SITE_FEATURES = [
   'rollup.analyst_revisions@v1.revenue_fy1_revision_90d',
   'rollup.analyst_revisions@v1.eps_fy1_analysts_change_90d',
   'rollup.analyst_revisions@v1.revisions_status',
+  'feature.credit_spread_vs_ma200',
+  'feature.momentum_13612w',
   'feature.bb_upper',
   'feature.bb_lower',
   'feature.bb_width',

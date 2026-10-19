@@ -42,6 +42,7 @@ Each edge's full section is on its family page (docs/edges/).
 | Premium selling when implied volatility is high for the name (`c18_iv_rank_conditional_selling`) | candidate | [family C](edges/c.md) |
 | Lottery stocks, avoid list (`c31_lottery_options_short`) | candidate | [family C](edges/c.md) |
 | Option-implied signals (`option_cp_iv_signals`) | candidate | [family C](edges/c.md) |
+| Short volatility fund with a term-structure filter (`vix_roll_yield`) | candidate | [family C](edges/c.md) |
 | Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | blocked | [family C](edges/c.md) |
 | Pre-earnings straddle purchase (`c16_pre_earnings_straddle_buy`) | blocked | [family C](edges/c.md) |
 | Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`) | blocked | [family C](edges/c.md) |
@@ -54,12 +55,15 @@ Each edge's full section is on its family page (docs/edges/).
 | Crowded shorts by days to cover (`short_squeeze_days_to_cover`) | candidate | [family D](edges/d.md) |
 | Turn of the month (`turn_of_the_month`) | candidate | [family D](edges/d.md) |
 | Absolute momentum and moving-average timing (`absolute_momentum_crash_filter`) | candidate | [family E](edges/e.md) |
+| Bond duration timing by curve and trend (`bond_curve_timing`) | candidate | [family E](edges/e.md) |
 | Commodity ETF momentum (`commodity_roll_momentum`) | candidate | [family E](edges/e.md) |
 | Country ETF momentum (`country_etf_momentum_value`) | candidate | [family E](edges/e.md) |
 | Credit trend timing (`credit_spread_trend`) | candidate | [family E](edges/e.md) |
 | Global equities momentum (`dual_momentum_gem`) | candidate | [family E](edges/e.md) |
+| Trend and value across country funds (`trend_carry_value_combo`) | candidate | [family E](edges/e.md) |
 | Multi-asset ETF trend (`tsmom_multi_asset_etf`) | candidate | [family E](edges/e.md) |
 | Buying SPY after a VIX spike (`vix_mean_reversion_entry`) | candidate | [family E](edges/e.md) |
+| Volatility-targeted equity exposure (`vol_managed_equity`) | candidate | [family E](edges/e.md) |
 | Composite mispricing score (`composite_mispricing_score`) | candidate | [family F](edges/f.md) |
 | Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | candidate | [family G](edges/g.md) |
 | Reversal into earnings (`earnings_neutral_reversal`) | candidate | [family G](edges/g.md) |

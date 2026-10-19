@@ -458,6 +458,7 @@ def test_the_committed_feature_files_load() -> None:
     store = open_config_store(str(REPO_ROOT / "config"))
     assert store.names("site", "features") == names
     assert names == [
+        "allocation",
         "bands",
         "corporate_actions",
         "earnings",

@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-646 stored features in 83 groups, in dependency order; 159 expression features.
+646 stored features in 83 groups, in dependency order; 161 expression features.
 
 ## `option_liquidity@v1`
 
@@ -1257,6 +1257,13 @@ The market regime: macro risk (the higher of its early and confirming tiers) and
 ## Expression features
 
 Declared in `config/site/features/<kind>/<theme>.toml`; virtual (computed on read) unless stored (materialised, by the `rollups` task after its inputs).
+
+### `allocation.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `credit_spread_vs_ma200` | expression | float | decimal | personal | >= -1 | The credit spread the fund trades over its 200-observation mean, minus 1: HYG reads the high-yield option-adjusted spread, LQD the investment-grade one (below 0: the spread is tighter than its trend) | the fund is not HYG or LQD, or its spread or its 200-observation mean is null (no observation known by the session, one older than the series' maximum age, or fewer than 160 of 200 sessions with an observation) | `coalesce(etf_macro.hy_oas / etf_macro.hy_oas_ma200, etf_macro.ig_oas / etf_macro.ig_oas_ma200) - 1` | virtual |
+| `momentum_13612w` | expression | float | ratio | open | -50 .. 50 | Keller's 13612W momentum score: 12 times the 1-month return plus 4 times the 3-month, 2 times the 6-month and 1 times the 12-month return (20, 60, 120 and 252 sessions); below 0 is a falling trend | a return is null (a gap among the last 252 sessions, or a shorter history) | `12 * price_stats.ret_20d + 4 * price_stats.ret_60d + 2 * trend_stats.ret_120d + trend_stats.ret_252d` | virtual |
 
 ### `bands.toml`
 
