@@ -219,7 +219,7 @@ def load_guide_edge(ctx: Stores, edge_id: str) -> GuideEdgeEntry | None:
         ),
         failure_modes=linked(edge.quality_bar.get("failure_modes", "")),
         decoys=linked(edge.quality_bar.get("decoys", "")),
-        rejection=linked(edge.rejection_reason),
+        rejection=linked(edge.plain_reason),
         capacity=linked(edge.quality_bar.get("capacity_costs", "")),
         sources=tuple(_source(s.title, s.url) for s in edge.sources),
         related=tuple(edge_row(e) for e in _related(found, edges)),

@@ -13,6 +13,7 @@ schedule = "on_event:index_change"
 top_k = "all"
 screeners = []
 status = "blocked"
+plain_reason = "Too few events to judge for years, and we hold no Russell membership lists."
 mechanism_kind = "forced_flows"
 notes = """The schedule is a placeholder: index_change is the S&P 500 only, and the harness has
 no field to read it from (a fitness test keeps an open edge off such a class). The thesis needs

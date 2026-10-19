@@ -109,10 +109,10 @@ def load_guide_edge_index(ctx: Stores) -> GuideEdgeIndex:
     group = _group(ctx, "set_aside")
     ideas_group = _group(ctx, "not_built")
     set_aside = tuple(
-        GuideSetAsideEdge(edge_row(e), link_prose(e.edge.rejection_reason, fields))
+        GuideSetAsideEdge(edge_row(e), link_prose(e.edge.plain_reason, fields))
         for status in SET_ASIDE
         for e in edges
-        if e.edge.status == status and e.edge.rejection_reason.strip()
+        if e.edge.status == status and e.edge.plain_reason.strip()
     )
     return GuideEdgeIndex(
         mechanisms=cards,

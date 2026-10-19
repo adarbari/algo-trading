@@ -69,6 +69,10 @@ and the key.
     [evidence]        run_id and split_from of the run an evidenced or live edge rests on; its
                       split_from must equal frozen_from (ADR 0053 amendment, ED5a)
     rejection_reason  required when rejected or blocked, allowed when retired, else an error
+    plain_reason      optional, one plain sentence for the Guide reader on why a rejected or
+                      blocked edge was set aside (no paths, ADR numbers or code names; a
+                      fitness test requires it of every closed site edge); bookkeeping, never a
+                      run input; the Guide shows it instead of ``rejection_reason``
     [published]       optional: the number the literature reports, to set beside the harness's:
                       ``measure`` (PUBLISHED_MEASURES; ``mean_excess`` and ``decile_spread`` in
                       return as a fraction, ``lift_pts`` in points), ``value``,
@@ -208,6 +212,7 @@ KEYS = (
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
     "extends", "follow", "audit", "published", "family", "ensemble", "oos_class", "mechanism_kind",
+    "plain_reason",
     "asset_class",
 )  # fmt: skip
 OUTCOME_KEYS = (
@@ -354,6 +359,7 @@ class Edge:
     sources: tuple[Source, ...]
     quality_bar: Mapping[str, str]  # QUALITY_BAR -> answer ("" only when CLOSED)
     rejection_reason: str = ""
+    plain_reason: str = ""  # the Guide's one-sentence why ("" none)
     notes: str = ""
     family: str = ""  # the catalogue family "A".."I" the idea came from ("" none)
     asset_class: str | None = None  # one of ASSET_CLASSES (None: derived by the Guide)
@@ -479,6 +485,7 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         sources=sources,
         quality_bar=_quality_bar(t, closed),
         rejection_reason=_prose(t, "rejection_reason"),
+        plain_reason=_prose(t, "plain_reason"),
         notes=_prose(t, "notes"),
         family=t.choice("family", "", FAMILIES) if "family" in doc else "",
         mechanism_kind=t.choice("mechanism_kind", "", MECHANISM_KINDS)
