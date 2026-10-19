@@ -7,7 +7,11 @@ import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
 import { GuideRail } from './GuideRail';
 
-const hooks = vi.hoisted(() => ({ useFeatureCatalogue: vi.fn(), useGuideIndex: vi.fn() }));
+const hooks = vi.hoisted(() => ({
+  useFeatureCatalogue: vi.fn(),
+  useGuideIndex: vi.fn(),
+  useGuideEdgeIndex: vi.fn(),
+}));
 
 vi.mock('@/entities/feature', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -19,6 +23,7 @@ vi.mock('@/features/guide-search', () => ({
 vi.mock('@/entities/guide', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useGuideIndex: hooks.useGuideIndex,
+  useGuideEdgeIndex: hooks.useGuideEdgeIndex,
 }));
 
 const field = (name: string, theme: string, reads: string) => ({
@@ -38,6 +43,7 @@ const index = {
   sections: [
     { id: 'start', title: 'Start here', purpose: 'p', entries: 4 },
     { id: 'regime', title: 'Market regime', purpose: 'p', entries: 3 },
+    { id: 'edges', title: 'Edges', purpose: 'p', entries: 2 },
     { id: 'playbooks', title: 'Playbooks', purpose: 'p', entries: 3 },
     { id: 'fields', title: 'Fields', purpose: 'p', entries: 11 },
     { id: 'situations', title: 'Situations', purpose: 'p', entries: 2 },
@@ -78,11 +84,21 @@ const index = {
     { key: 'vix_term', plainName: 'Is fear rising?', pace: 'fast' },
   ],
   episodes: [{ key: 'gfc_2007', name: 'Global financial crisis, 2007-09' }],
+  mechanisms: [
+    { id: 'slow_to_update', title: 'Slow to update', count: 13 },
+    { id: 'forced_flows', title: 'Forced buyers and sellers', count: 8 },
+  ],
+};
+
+const edgeIndex = {
+  setAsideTitle: 'Checked and set aside',
+  notBuiltTitle: 'Researched, not built',
 };
 
 beforeEach(() => {
   hooks.useFeatureCatalogue.mockReturnValue(fakeQuery(catalogue));
   hooks.useGuideIndex.mockReturnValue(fakeQuery(index));
+  hooks.useGuideEdgeIndex.mockReturnValue(fakeQuery(edgeIndex));
 });
 
 describe('GuideRail', () => {
@@ -103,18 +119,46 @@ describe('GuideRail', () => {
       .getAllByRole('link')
       .map((l) => l.textContent)
       .filter((t) =>
-        /^(Overview|Start here|Market regime|Playbooks|Fields|Situations|Glossary)/.test(t),
+        /^(Overview|Start here|Market regime|Edges|Playbooks|Fields|Situations|Glossary)/.test(t),
       );
     expect(top).toEqual([
       'Overview',
       'Start here4',
       'Market regime3',
+      'Edges2',
       'Playbooks3',
       'Fields11',
       'Situations2',
       'Glossary28',
     ]);
     expect(within(nav).queryByRole('link', { name: 'Breakout' })).toBeNull();
+  });
+
+  it('opens the nine mechanisms and the two groups under Edges on its pages, marking the current mechanism', () => {
+    render(<GuideRail page="mechanism" mechanism="forced_flows" />);
+    const nav = screen.getByRole('navigation', { name: 'Guide' });
+    expect(within(nav).getByRole('link', { name: /^Slow to update/ })).toHaveAttribute(
+      'href',
+      '/guide/edges/m/slow_to_update',
+    );
+    expect(within(nav).getByRole('link', { name: /^Forced buyers and sellers/ })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(nav).getByRole('link', { name: 'Checked and set aside' })).toHaveAttribute(
+      'href',
+      '/guide/edges#set-aside',
+    );
+    expect(within(nav).getByRole('link', { name: 'Researched, not built' })).toHaveAttribute(
+      'href',
+      '/guide/edges#not-built',
+    );
+  });
+
+  it('keeps the mechanisms folded away on other pages', () => {
+    render(<GuideRail page="fields" />);
+    const nav = screen.getByRole('navigation', { name: 'Guide' });
+    expect(within(nav).queryByRole('link', { name: /^Slow to update/ })).toBeNull();
   });
 
   it('opens the playbooks in family order, marking the current one', () => {

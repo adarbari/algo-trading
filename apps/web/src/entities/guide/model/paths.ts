@@ -11,6 +11,10 @@ export const GUIDE_FIELDS_PATH = '/guide/fields';
 export const GUIDE_PLAYBOOKS_PATH = '/guide/playbooks';
 export const GUIDE_SITUATIONS_PATH = '/guide/situations';
 export const GUIDE_REGIME_PATH = '/guide/regime';
+export const GUIDE_EDGES_PATH = '/guide/edges';
+
+/** The live Edges page in the Trader workspace (the evidence the Guide explains). */
+export const EDGES_PAGE_PATH = '/edges';
 
 /** Today's readings: the Regime page in the Trader workspace. */
 export const REGIME_PAGE_PATH = '/regime';
@@ -19,6 +23,7 @@ export const REGIME_PAGE_PATH = '/regime';
 export const BUILT_SECTIONS: readonly string[] = [
   'start',
   'regime',
+  'edges',
   'playbooks',
   'fields',
   'situations',
@@ -45,6 +50,21 @@ export function episodePath(key: string): string {
   return `${GUIDE_REGIME_PATH}/episodes/${encodeURIComponent(key)}`;
 }
 
+/** A mechanism's page (its id is the mechanism's, `MECHANISM_KINDS`). */
+export function mechanismPath(id: string): string {
+  return `${GUIDE_EDGES_PATH}/m/${encodeURIComponent(id)}`;
+}
+
+/** A site edge's Guide page (its id is the edge document's). */
+export function edgeGuidePath(id: string): string {
+  return `${GUIDE_EDGES_PATH}/${encodeURIComponent(id)}`;
+}
+
+/** The index's group of edges set aside, or of ideas researched but not built. */
+export function edgesGroupPath(group: 'set-aside' | 'not-built'): string {
+  return `${GUIDE_EDGES_PATH}#${group}`;
+}
+
 /** A playbook's page (the id is the site preset's). */
 export function playbookPath(id: string): string {
   return `${GUIDE_PLAYBOOKS_PATH}/${encodeURIComponent(id)}`;
@@ -67,7 +87,7 @@ export function screenerBuilderPath(id: string): string {
 
 /**
  * The page of a Guide entry by the `kind` and `id` the server gives (a search result, a link in
- * a Start here page): start, indicator, episode, playbook, field, situation or term. An
+ * a Start here page): start, indicator, episode, playbook, field, situation, term, mechanism or edge. An
  * unknown kind opens the Guide's home.
  */
 export function guideEntryPath(kind: string, id: string): string {
@@ -86,6 +106,10 @@ export function guideEntryPath(kind: string, id: string): string {
       return situationPath(id);
     case 'term':
       return termPath(id);
+    case 'mechanism':
+      return mechanismPath(id);
+    case 'edge':
+      return edgeGuidePath(id);
     default:
       return GUIDE_PATH;
   }
@@ -100,6 +124,8 @@ export const GUIDE_KIND_TITLES: Readonly<Record<string, string>> = {
   field: 'Fields',
   situation: 'Situations',
   term: 'Glossary',
+  mechanism: 'Mechanisms',
+  edge: 'Edges',
 };
 
 /** The views of the field index. */

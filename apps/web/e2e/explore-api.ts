@@ -23,6 +23,7 @@ import {
   REGIME_INDEX,
   SITUATION,
 } from './guide/pages-api';
+import { edgeEntries, EDGES_SECTION, guideEdgeIndex, MECHANISMS } from './guide/edges-api';
 import { guideSearch, guideStartPage, guideTerm, START_INDEX } from './guide/start-api';
 
 type Json = Record<string, unknown>;
@@ -363,6 +364,7 @@ function guideIndex(): Json {
             purpose: 'The indicators behind the weather and the falls they are judged on.',
             entries: REGIME_INDEX.indicators.length + REGIME_INDEX.episodes.length,
           },
+          EDGES_SECTION,
           { id: 'playbooks', title: 'Playbooks', purpose: 'One page per site screen.', entries: 2 },
           { id: 'fields', title: 'Fields', purpose: 'Every catalogue field.', entries: 3 },
           {
@@ -373,6 +375,7 @@ function guideIndex(): Json {
           },
           START_INDEX.sections[1],
         ],
+        mechanisms: MECHANISMS,
         families: FAMILIES,
         indicators: REGIME_INDEX.indicators,
         episodes: REGIME_INDEX.episodes,
@@ -432,7 +435,7 @@ function guideField(name: string): Json {
 }
 
 interface GuideRef {
-  kind: 'INDICATOR' | 'EPISODE' | 'TERM' | 'START';
+  kind: 'INDICATOR' | 'EPISODE' | 'TERM' | 'START' | 'MECHANISM' | 'EDGE';
   id: string;
 }
 
@@ -450,6 +453,7 @@ function guideEntries(refs: GuideRef[]): Json {
         episodes: found(guideEpisode, 'guideEpisode', 'EPISODE'),
         terms: found(guideTerm, 'guideTerm', 'TERM'),
         startPages: found(guideStartPage, 'guideStartPage', 'START'),
+        ...edgeEntries(refs),
       },
     },
   };
@@ -463,6 +467,7 @@ function graphqlAnswer(operation: Operation): Json | null {
   const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
   if (name === 'FeatureCatalogue' || name === 'FeatureCatalogueDetail') return catalogue();
   if (name === 'GuideIndex') return guideIndex();
+  if (name === 'GuideEdgeIndex') return guideEdgeIndex();
   if (name === 'GuidePlaybook') return guidePlaybook(String(operation.variables?.['id']));
   if (name === 'GuideSituation') return guideSituation(String(operation.variables?.['slug']));
   if (name === 'GuideEntries') return guideEntries(operation.variables?.['refs'] as GuideRef[]);

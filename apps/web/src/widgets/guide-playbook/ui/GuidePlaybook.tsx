@@ -2,7 +2,7 @@
  * A playbook's Guide page (ADR 0051, docs/ui/guide.md section 3): the header (preset id and
  * version, the summary as the hero, a way to today's hits and to the Builder), what a hit
  * looks like beside what it does not check, the criteria table, the caveats before acting, the
- * situations that fool its fields, related playbooks and the sources. The prose is the server's
+ * situations that fool its fields, the edges it implements, related playbooks and the sources. The prose is the server's
  * (linked at catalogue names); a preset with no prose written shows its criteria alone.
  */
 import {
@@ -16,12 +16,22 @@ import {
   Mono,
   Skeleton,
   Stack,
+  StatusBadge,
   Surface,
   Text,
   TextLink,
 } from '@algotrade/ui';
 
-import { GuideProse, playbookPath, useGuidePlaybook, type GuideProseValue } from '@/entities/guide';
+import {
+  edgeGuidePath,
+  edgeStatusText,
+  edgeStatusTone,
+  GuideProse,
+  playbookPath,
+  useGuidePlaybook,
+  type GuideProseValue,
+} from '@/entities/guide';
+import { termHelp } from '@/features/guide-help';
 
 import { criteriaColumns } from '../model/columns';
 import { BeforeActing } from './BeforeActing';
@@ -121,6 +131,30 @@ export function GuidePlaybook({ id, onSeeHits, onOpenBuilder }: GuidePlaybookPro
           </Text>
         )}
       </Stack>
+
+      {playbook.edges.length > 0 && (
+        <Stack gap={2} as="section" aria-label="Edges it implements">
+          <Stack direction="row" gap={2} align="center">
+            <Heading level={2}>Edges it implements</Heading>
+            {termHelp('edge_status')}
+          </Stack>
+          <Stack as="ul" gap={2} aria-label="Edges it implements">
+            {playbook.edges.map((edge) => (
+              <Stack as="li" key={edge.id} gap={1}>
+                <Stack direction="row" gap={2} align="center" wrap>
+                  <TextLink href={edgeGuidePath(edge.id)}>{edge.name}</TextLink>
+                  <StatusBadge tone={edgeStatusTone(edge.status)}>
+                    {edgeStatusText(edge.status)}
+                  </StatusBadge>
+                </Stack>
+                <Text as="p" size="sm" tone="secondary">
+                  {edge.thesis}
+                </Text>
+              </Stack>
+            ))}
+          </Stack>
+        </Stack>
+      )}
 
       {prose && <BeforeActing caveats={prose.beforeActing} situations={playbook.situations} />}
 

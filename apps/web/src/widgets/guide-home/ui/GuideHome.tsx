@@ -3,7 +3,8 @@
  * last). Start here lists its numbered pages with their summaries, the Glossary its terms. Each block is the section's title and purpose as the server gives
  * them; Market regime lists the warning signs and the market falls, Playbooks lists the families with their playbooks, Fields the theme groups in the order
  * a screen uses them (with the field count of every theme, and links to the by-intent and A to Z
- * views), Situations the situations with how many fields each fools.
+ * views), Situations the situations with how many fields each fools, Edges the mechanisms with
+ * how many edges rest on each.
  */
 import {
   EmptyState,
@@ -20,12 +21,14 @@ import {
   BUILT_SECTIONS,
   episodePath,
   fieldsPath,
+  GUIDE_EDGES_PATH,
   GUIDE_GLOSSARY_PATH,
   GUIDE_PLAYBOOKS_PATH,
   GUIDE_REGIME_PATH,
   GUIDE_SITUATIONS_PATH,
   GUIDE_START_PATH,
   indicatorPath,
+  mechanismPath,
   playbookPath,
   situationPath,
   startPath,
@@ -41,8 +44,17 @@ export function GuideHome() {
   }
   if (index.isPending) return <Skeleton variant="rect" height="lg" label="Loading the Guide" />;
   if (!index.data) return <EmptyState bordered title="The Guide has no entries." />;
-  const { sections, themeGroups, families, situations, indicators, episodes, startPages, terms } =
-    index.data;
+  const {
+    sections,
+    themeGroups,
+    families,
+    situations,
+    indicators,
+    episodes,
+    startPages,
+    terms,
+    mechanisms,
+  } = index.data;
   return (
     <Stack gap={6}>
       <Stack gap={1}>
@@ -75,6 +87,11 @@ export function GuideHome() {
               {section.id === 'regime' && (
                 <TextLink href={GUIDE_REGIME_PATH} size="sm">
                   The warning signs and the falls
+                </TextLink>
+              )}
+              {section.id === 'edges' && (
+                <TextLink href={GUIDE_EDGES_PATH} size="sm">
+                  Why an edge should work
                 </TextLink>
               )}
               {section.id === 'playbooks' && (
@@ -149,6 +166,15 @@ export function GuideHome() {
                     </TextLink>
                   ))}
                 </Stack>
+              </Grid>
+            )}
+            {section.id === 'edges' && (
+              <Grid columns={2} gap={2} collapse="md" align="start">
+                {mechanisms.map((m) => (
+                  <TextLink key={m.id} href={mechanismPath(m.id)}>
+                    {`${m.title} · ${String(m.count)}`}
+                  </TextLink>
+                ))}
               </Grid>
             )}
             {section.id === 'playbooks' && (

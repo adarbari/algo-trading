@@ -5,7 +5,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { gql } from '@/shared/api';
 
-import { useGuideField, useGuideIndex, useGuidePlaybook, useGuideSituation } from './hooks';
+import {
+  useGuideEdgeIndex,
+  useGuideField,
+  useGuideIndex,
+  useGuidePlaybook,
+  useGuideSituation,
+} from './hooks';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -28,6 +34,19 @@ describe('guide hooks', () => {
     });
     expect(String(GQL.mock.calls[0]?.[0])).toContain('query GuideIndex');
     expect(result.current.data).toEqual({ sections: [], themeGroups: [], intents: [] });
+  });
+
+  it('reads the Edges index, and nothing while it is disabled', async () => {
+    GQL.mockClear();
+    GQL.mockResolvedValue({ guideEdgeIndex: { mechanisms: [], setAsideTitle: 'Set aside' } });
+    const idle = renderHook(() => useGuideEdgeIndex({ enabled: false }), { wrapper });
+    expect(idle.result.current.fetchStatus).toBe('idle');
+    const { result } = renderHook(() => useGuideEdgeIndex(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(String(GQL.mock.calls[0]?.[0])).toContain('query GuideEdgeIndex');
+    expect(result.current.data?.setAsideTitle).toBe('Set aside');
   });
 
   it('reads a field’s derived parts by name, and nothing without one', async () => {

@@ -5,11 +5,13 @@
  * (how to read it, what to use it for, "Use this" when the page passes `onUse`), a regime
  * indicator (why it matters, when it is on, lead time and track record) or a reference market
  * fall (dates, drawdowns, cause), a glossary term (its short line and its body) or a Start here
- * page (its summary and first section). The text is the server's; nothing is written here.
+ * page (its summary and first section), a mechanism or a site edge of the Edges section (its
+ * one-line hero and first paragraphs). The text is the server's; nothing is written here.
  */
 import type { GuideUse } from '@/entities/feature';
 
 import type { GuideEntry } from '../model/entry';
+import { EdgeHelp, MechanismHelp } from './EdgesHelp';
 import { EpisodeHelp } from './EpisodeHelp';
 import { FieldHelp } from './FieldHelp';
 import { IndicatorHelp } from './IndicatorHelp';
@@ -41,6 +43,10 @@ export function GuideHelp({ entry, onUse, useDisabled = false }: GuideHelpProps)
       return <TermHelp id={entry.id} />;
     case 'start':
       return <StartHelp id={entry.id} />;
+    case 'mechanism':
+      return <MechanismHelp id={entry.id} />;
+    case 'edge':
+      return <EdgeHelp id={entry.id} />;
   }
 }
 

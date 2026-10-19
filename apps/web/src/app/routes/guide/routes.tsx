@@ -6,7 +6,8 @@
  * `/guide/situations` and `/guide/situations/$slug`, `/guide/regime`, `/guide/regime/indicators/$key`
  * and `/guide/regime/episodes/$key` (the market regime's indicators and reference falls),
  * `/guide/start` and `/guide/start/$id` (the how-tos in order) and `/guide/glossary` and
- * `/guide/glossary/$id` (the app's words A to Z). No role gating (`viewerGuard`: any registered
+ * `/guide/glossary/$id` (the app's words A to Z) and `/guide/edges`, `/guide/edges/m/$mechanism`
+ * and `/guide/edges/$id` (why an edge should work: the mechanisms and the site edges). No role gating (`viewerGuard`: any registered
  * viewer) and no workspace: the layout shows the top bar of the workspace the user came from
  * (`GuideLayout`), so an admin stays in ADMIN.
  */
@@ -14,7 +15,7 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import type * as GuidePages from '@/pages/guide';
 
-import { parseFieldsSearch } from '@/entities/guide';
+import { EDGES_PAGE_PATH, parseFieldsSearch } from '@/entities/guide';
 import { GuideLayout } from '../../layouts';
 import { viewerGuard } from '../../workspaces';
 import { rootRoute } from '../root';
@@ -24,12 +25,15 @@ import { pageRoute, type PageModule } from '../page-loader';
 // One chunk for the Guide's pages (they share widgets), loaded when the first Guide page opens.
 // One import call for every Guide page: the entry carries one preload file list, not fourteen.
 const guidePages = () => import('@/pages/guide');
+const GuideEdgePage = lazyPage(guidePages, 'GuideEdgePage');
+const GuideEdgesPage = lazyPage(guidePages, 'GuideEdgesPage');
 const GuideEpisodePage = lazyPage(guidePages, 'GuideEpisodePage');
 const GuideFieldPage = lazyPage(guidePages, 'GuideFieldPage');
 const GuideFieldsPage = lazyPage(guidePages, 'GuideFieldsPage');
 const GuideGlossaryPage = lazyPage(guidePages, 'GuideGlossaryPage');
 const GuideHomePage = lazyPage(guidePages, 'GuideHomePage');
 const GuideIndicatorPage = lazyPage(guidePages, 'GuideIndicatorPage');
+const GuideMechanismPage = lazyPage(guidePages, 'GuideMechanismPage');
 const GuidePlaybookPage = lazyPage(guidePages, 'GuidePlaybookPage');
 const GuidePlaybooksPage = lazyPage(guidePages, 'GuidePlaybooksPage');
 const GuideRegimePage = lazyPage(guidePages, 'GuideRegimePage');
@@ -172,6 +176,48 @@ const episodeRoute = createRoute({
   component: EpisodeRoute,
 });
 
+function EdgesRoute() {
+  const navigate = useNavigate();
+  return <GuideEdgesPage onOpenEdgesPage={() => void navigate({ to: EDGES_PAGE_PATH })} />;
+}
+
+const edgesIndexRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  ...guideLoading(GuideEdgesPage),
+  path: 'edges',
+  component: EdgesRoute,
+});
+
+function MechanismRoute() {
+  const { mechanism } = mechanismRoute.useParams();
+  return <GuideMechanismPage id={mechanism} />;
+}
+
+const mechanismRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  ...guideLoading(GuideMechanismPage),
+  path: 'edges/m/$mechanism',
+  component: MechanismRoute,
+});
+
+function EdgeRoute() {
+  const { id } = edgeRoute.useParams();
+  const navigate = useNavigate();
+  return (
+    <GuideEdgePage
+      id={id}
+      onSeeEvidence={() => void navigate({ to: EDGES_PAGE_PATH, search: { edge: id } })}
+    />
+  );
+}
+
+const edgeRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  ...guideLoading(GuideEdgePage),
+  path: 'edges/$id',
+  component: EdgeRoute,
+});
+
 const startIndexRoute = createRoute({
   getParentRoute: () => guideRoute,
   ...guideLoading(GuideStartIndexPage),
@@ -220,6 +266,9 @@ export const guideRoutes = guideRoute.addChildren([
   playbookRoute,
   situationsRoute,
   situationRoute,
+  edgesIndexRoute,
+  mechanismRoute,
+  edgeRoute,
   regimeIndexRoute,
   indicatorRoute,
   episodeRoute,

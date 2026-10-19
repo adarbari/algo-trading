@@ -5,25 +5,43 @@
  */
 export {
   prefetchGuideIndex,
+  useGuideEdge,
+  useGuideEdgeIndex,
   useGuideEpisode,
   useGuideField,
   useGuideIndex,
   useGuideIndicator,
+  useGuideMechanism,
   useGuidePlaybook,
   useGuideSituation,
   useGuideStartPage,
   useGuideTerm,
 } from './api/hooks';
 export { episodeFacts, type EpisodeFacts } from './model/episode-facts';
+export { edgeSideText, edgeStatusText, edgeStatusTone, ideaVerdictTone } from './model/edge-status';
+export {
+  EdgeRows,
+  IdeaRows,
+  type EdgeRowsProps,
+  type EdgeRowValue,
+  type IdeaRowsProps,
+  type IdeaRowValue,
+} from './ui/EdgeRows';
+export { RelatedTerms, type RelatedTermsProps } from './ui/RelatedTerms';
 export { GuideProse, proseParts, type GuideProseValue } from './ui/GuideProse';
 export {
   BUILT_SECTIONS,
+  edgeGuidePath,
+  edgesGroupPath,
+  EDGES_PAGE_PATH,
   episodePath,
   exploreFieldPath,
   fieldPath,
   fieldsPath,
   guideEntryPath,
   indicatorPath,
+  mechanismPath,
+  GUIDE_EDGES_PATH,
   GUIDE_FIELDS_PATH,
   GUIDE_GLOSSARY_PATH,
   GUIDE_KIND_TITLES,

@@ -3,7 +3,8 @@
  * server ranks), and under it the sections with their entry counts from the server, in the
  * spec's order (Start here first, Glossary last); Fields expands to its themes, and the theme of
  * the current field to its fields; Start here, Market regime (indicators, then market falls),
- * Playbooks (in family order) and Situations list their pages while one of theirs is open.
+ * Playbooks (in family order) and Situations list their pages while one of theirs is open;
+ * Edges lists the mechanisms and the two groups after them (set aside, not built) on its pages.
  */
 import { NavList, Stack, type NavListItem } from '@algotrade/ui';
 
@@ -15,9 +16,11 @@ import {
 } from '@/entities/feature';
 import {
   BUILT_SECTIONS,
+  edgesGroupPath,
   episodePath,
   fieldPath,
   fieldsPath,
+  GUIDE_EDGES_PATH,
   GUIDE_FIELDS_PATH,
   GUIDE_GLOSSARY_PATH,
   GUIDE_PATH,
@@ -26,10 +29,12 @@ import {
   GUIDE_SITUATIONS_PATH,
   GUIDE_START_PATH,
   indicatorPath,
+  mechanismPath,
   playbookPath,
   situationPath,
   startPath,
   themeTitle,
+  useGuideEdgeIndex,
   useGuideIndex,
 } from '@/entities/guide';
 import { GuideSearchButton } from '@/features/guide-search';
@@ -48,6 +53,9 @@ export interface GuideRailProps {
     | 'situations'
     | 'situation'
     | 'regime'
+    | 'edges'
+    | 'mechanism'
+    | 'edge'
     | 'indicator'
     | 'episode'
     | 'start'
@@ -66,6 +74,8 @@ export interface GuideRailProps {
   indicator?: string | undefined;
   /** The market fall whose page is open (its slug). */
   episode?: string | undefined;
+  /** The mechanism whose page is open, or the mechanism of the edge page that is (its id). */
+  mechanism?: string | undefined;
   /** The Start here page that is open (its id). */
   startPage?: string | undefined;
 }
@@ -78,9 +88,13 @@ export function GuideRail({
   situation,
   indicator,
   episode,
+  mechanism,
   startPage,
 }: GuideRailProps) {
   const index = useGuideIndex();
+  const onEdges = page === 'edges' || page === 'mechanism' || page === 'edge';
+  // The titles of the two groups after the mechanisms are the Edges index's own.
+  const edgeIndex = useGuideEdgeIndex({ enabled: onEdges });
   const catalogue = useFeatureCatalogue();
   const all = catalogue.data;
   const openField = field && all ? byName(all).get(field) : undefined;
@@ -176,6 +190,29 @@ export function GuideRail({
         : [],
   });
 
+  const edgesSection = (s: { title: string; entries: number }): NavListItem => ({
+    href: GUIDE_EDGES_PATH,
+    label: s.title,
+    count: s.entries,
+    current: page === 'edges',
+    children: onEdges
+      ? [
+          ...(index.data?.mechanisms ?? []).map((m) => ({
+            href: mechanismPath(m.id),
+            label: m.title,
+            count: m.count,
+            current: page === 'mechanism' && m.id === mechanism,
+          })),
+          ...(edgeIndex.data
+            ? [
+                { href: edgesGroupPath('set-aside'), label: edgeIndex.data.setAsideTitle },
+                { href: edgesGroupPath('not-built'), label: edgeIndex.data.notBuiltTitle },
+              ]
+            : []),
+        ]
+      : [],
+  });
+
   const startSection = (s: { title: string; entries: number }): NavListItem => ({
     href: GUIDE_START_PATH,
     label: s.title,
@@ -202,6 +239,7 @@ export function GuideRail({
     start: startSection,
     glossary: glossarySection,
     regime: regimeSection,
+    edges: edgesSection,
     playbooks: playbooksSection,
     fields: fieldsSection,
     situations: situationsSection,

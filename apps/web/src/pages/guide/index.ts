@@ -1,4 +1,4 @@
-/** Page: the Guide (home, Start here, glossary, field, playbook, situation and market regime pages). */
+/** Page: the Guide (home, Start here, glossary, field, playbook, situation, market regime and Edges pages). */
 import { prefetchFeatureCatalogue } from '@/entities/feature';
 import { prefetchGuideIndex } from '@/entities/guide';
 
@@ -9,12 +9,15 @@ export function prefetchGuideReads(client: Parameters<typeof prefetchGuideIndex>
 }
 
 export {
+  GuideEdgePage,
+  GuideEdgesPage,
   GuideEpisodePage,
   GuideFieldPage,
   GuideFieldsPage,
   GuideGlossaryPage,
   GuideHomePage,
   GuideIndicatorPage,
+  GuideMechanismPage,
   GuidePlaybookPage,
   GuidePlaybooksPage,
   GuideRegimePage,
@@ -23,6 +26,8 @@ export {
   GuideStartIndexPage,
   GuideStartPage,
   GuideTermPage,
+  type GuideEdgePageProps,
+  type GuideEdgesPageProps,
   type GuideFieldPageProps,
   type GuideFieldsPageProps,
   type GuidePlaybookPageProps,

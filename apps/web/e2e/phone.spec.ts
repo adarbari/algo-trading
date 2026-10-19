@@ -26,6 +26,9 @@ const ROUTES = [
   '/guide/regime',
   '/guide/regime/indicators/curve_10y3m',
   '/guide/regime/episodes/gfc_2007',
+  '/guide/edges',
+  '/guide/edges/m/slow_to_update',
+  '/guide/edges/earnings_date_advance',
 ];
 /**
  * The top bar's height bound: the two-row grid under 720 px (brand, Guide and the end slot,
@@ -248,6 +251,27 @@ test('Guide search: the rail button opens the dialog inside the viewport, a tapp
   await expectAccessible(page);
   await result.tap();
   await expect(page).toHaveURL(/\/guide\/glossary\/session$/);
+});
+
+test('Guide Edges: a tapped card opens its mechanism, a tapped edge its page, then the live evidence', async ({
+  page,
+}) => {
+  await page.goto('/guide/edges');
+  await page.getByRole('link', { name: 'Slow to update', exact: true }).first().tap();
+  await expect(page).toHaveURL(/\/guide\/edges\/m\/slow_to_update$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Slow to update' })).toBeVisible();
+  await page
+    .getByRole('region', { name: 'The edges in this mechanism' })
+    .getByRole('link', { name: 'Earnings-date advances' })
+    .tap();
+  await expect(page).toHaveURL(/\/guide\/edges\/earnings_date_advance$/);
+  const evidence = page.getByRole('button', { name: 'See the live evidence' });
+  await expect(evidence).toBeVisible();
+  const innerWidth = await page.evaluate(() => window.innerWidth);
+  const box = await evidence.boundingBox();
+  expect(box && box.x + box.width).toBeLessThanOrEqual(innerWidth);
+  await evidence.tap();
+  await expect(page).toHaveURL(/\/edges\?edge=earnings_date_advance$/);
 });
 
 test('Edges: a tapped edge opens its page', async ({ page }) => {
