@@ -1,6 +1,6 @@
 /**
- * The Screeners section's two own documents: the lead page and a family's page
- * (`Query.guideScreenerIndex`, `guideScreenerCategory`), kept apart from `hooks.ts` and loaded on
+ * The Screeners section's documents: the lead page, a family's page and a screener's page
+ * (`Query.guideScreenerIndex`, `guideScreenerCategory`, `guideScreener`), kept apart from `hooks.ts` and loaded on
  * first use, as the Edges section's are (ADR 0051): only the Screeners pages carry them.
  */
 import { graphql } from '@/shared/api';
@@ -37,6 +37,73 @@ export const GuideScreenerCategoryQuery = graphql(`
           name
           status
         }
+      }
+    }
+  }
+`);
+
+export const GuideScreenerQuery = graphql(`
+  query GuideScreener($id: String!) {
+    guideScreener(id: $id) {
+      id
+      name
+      family
+      familyTitle
+      version
+      prose {
+        summary {
+          segments {
+            text
+            field
+            source
+          }
+        }
+        hit {
+          segments {
+            text
+            field
+            source
+          }
+        }
+        notChecked {
+          segments {
+            text
+            field
+            source
+          }
+        }
+        beforeActing {
+          segments {
+            text
+            field
+            source
+          }
+        }
+        sources {
+          title
+          url
+          note
+        }
+      }
+      criteria {
+        name
+        asks
+        field
+        rule
+        mode
+        onMiss
+      }
+      tieBreak
+      tieBreakDescending
+      related {
+        id
+        name
+        reason
+      }
+      situations {
+        slug
+        name
+        fields
       }
     }
   }

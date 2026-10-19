@@ -166,7 +166,10 @@ test('Screeners: the lead page, a category and a screener, down and back up', as
   await expect(page).toHaveURL(/\/guide\/screeners\/c\/breakouts$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Breakouts' })).toBeVisible();
   await expect(page.getByText('Closed above the one-month high')).toBeVisible();
-  await page.getByRole('link', { name: 'Breakout', exact: true }).click();
+  await page
+    .getByRole('list', { name: 'Screeners' })
+    .getByRole('link', { name: 'Breakout', exact: true })
+    .click();
   await expect(page).toHaveURL(/\/guide\/screeners\/breakout$/);
   await page.getByRole('link', { name: 'Breakouts', exact: true }).first().click();
   await expect(page).toHaveURL(/\/guide\/screeners\/c\/breakouts$/);

@@ -66,7 +66,7 @@ test('a row opens in place, one at a time, with its criteria, hits and actions',
   await expect(page.getByRole('heading', { level: 3, name: 'Criteria' })).toBeVisible();
   await expect(page.getByRole('heading', { level: 3, name: 'Top hits' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Duplicate to edit' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Screener' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Screener', exact: true })).toHaveAttribute(
     'href',
     '/guide/screeners/vrp_scanner',
   );
@@ -84,10 +84,10 @@ test('the list’s Screener link and the Builder header’s link open the preset
 }) => {
   await page.goto('/screeners');
   await page.getByRole('button', { name: /^vrp_scanner Preset/ }).click();
-  await page.getByRole('link', { name: 'Screener' }).click();
+  await page.getByRole('link', { name: 'Screener', exact: true }).click();
   await expect(page).toHaveURL(/\/guide\/screeners\/vrp_scanner$/);
   await page.goto('/screeners/vrp_scanner/edit');
-  await page.getByRole('link', { name: 'Screener' }).click();
+  await page.getByRole('link', { name: 'Screener', exact: true }).click();
   await expect(page).toHaveURL(/\/guide\/screeners\/vrp_scanner$/);
 });
 

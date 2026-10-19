@@ -365,13 +365,6 @@ export type GuideFieldQueryVariables = Exact<{
 
 export type GuideFieldQuery = { guideField: { related: Array<string>, readsLinked: { segments: Array<{ text: string, field: string | null }> } | null, caveatsLinked: Array<{ segments: Array<{ text: string, field: string | null }> }>, screeners: Array<{ id: string, name: string, family: string | null, rules: Array<string>, column: boolean, rank: boolean, flag: boolean }>, situations: Array<{ name: string, slug: string, signsLinked: { segments: Array<{ text: string, field: string | null }> } }> } | null };
 
-export type GuideScreenerQueryVariables = Exact<{
-  id: string;
-}>;
-
-
-export type GuideScreenerQuery = { guideScreener: { id: string, name: string, family: string | null, familyTitle: string | null, version: number | null, tieBreak: string | null, tieBreakDescending: boolean, prose: { summary: { segments: Array<{ text: string, field: string | null, source: number | null }> }, hit: { segments: Array<{ text: string, field: string | null, source: number | null }> }, notChecked: { segments: Array<{ text: string, field: string | null, source: number | null }> }, beforeActing: Array<{ segments: Array<{ text: string, field: string | null, source: number | null }> }>, sources: Array<{ title: string, url: string | null, note: string }> } | null, criteria: Array<{ name: string, asks: string | null, field: string, rule: string, mode: string, onMiss: string | null }>, related: Array<{ id: string, name: string, reason: string }>, situations: Array<{ slug: string, name: string, fields: Array<string> }> } | null };
-
 export type GuideSituationQueryVariables = Exact<{
   slug: string;
 }>;
@@ -390,6 +383,13 @@ export type GuideScreenerCategoryQueryVariables = Exact<{
 
 
 export type GuideScreenerCategoryQuery = { guideScreenerCategory: { id: string, title: string, purpose: string, intro: string, screeners: Array<{ id: string, name: string, line: string, edges: Array<{ id: string, name: string, status: string }> }> } | null };
+
+export type GuideScreenerQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type GuideScreenerQuery = { guideScreener: { id: string, name: string, family: string | null, familyTitle: string | null, version: number | null, tieBreak: string | null, tieBreakDescending: boolean, prose: { summary: { segments: Array<{ text: string, field: string | null, source: number | null }> }, hit: { segments: Array<{ text: string, field: string | null, source: number | null }> }, notChecked: { segments: Array<{ text: string, field: string | null, source: number | null }> }, beforeActing: Array<{ segments: Array<{ text: string, field: string | null, source: number | null }> }>, sources: Array<{ title: string, url: string | null, note: string }> } | null, criteria: Array<{ name: string, asks: string | null, field: string, rule: string, mode: string, onMiss: string | null }>, related: Array<{ id: string, name: string, reason: string }>, situations: Array<{ slug: string, name: string, fields: Array<string> }> } | null };
 
 export type HarnessRunsQueryVariables = Exact<{
   limit: number;
@@ -2420,6 +2420,67 @@ export const GuideFieldDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideFieldQuery, GuideFieldQueryVariables>;
+export const GuideSituationDocument = new TypedDocumentString(`
+    query GuideSituation($slug: String!) {
+  guideSituation(slug: $slug) {
+    slug
+    name
+    signs {
+      segments {
+        text
+        field
+      }
+    }
+    do {
+      segments {
+        text
+        field
+      }
+    }
+    affects
+    screeners {
+      id
+      name
+      fields
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideSituationQuery, GuideSituationQueryVariables>;
+export const GuideScreenerIndexDocument = new TypedDocumentString(`
+    query GuideScreenerIndex {
+  guideScreenerIndex {
+    what
+    versusEdge
+    count
+    categories {
+      id
+      title
+      purpose
+      count
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideScreenerIndexQuery, GuideScreenerIndexQueryVariables>;
+export const GuideScreenerCategoryDocument = new TypedDocumentString(`
+    query GuideScreenerCategory($id: String!) {
+  guideScreenerCategory(id: $id) {
+    id
+    title
+    purpose
+    intro
+    screeners {
+      id
+      name
+      line
+      edges {
+        id
+        name
+        status
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideScreenerCategoryQuery, GuideScreenerCategoryQueryVariables>;
 export const GuideScreenerDocument = new TypedDocumentString(`
     query GuideScreener($id: String!) {
   guideScreener(id: $id) {
@@ -2486,67 +2547,6 @@ export const GuideScreenerDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideScreenerQuery, GuideScreenerQueryVariables>;
-export const GuideSituationDocument = new TypedDocumentString(`
-    query GuideSituation($slug: String!) {
-  guideSituation(slug: $slug) {
-    slug
-    name
-    signs {
-      segments {
-        text
-        field
-      }
-    }
-    do {
-      segments {
-        text
-        field
-      }
-    }
-    affects
-    screeners {
-      id
-      name
-      fields
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<GuideSituationQuery, GuideSituationQueryVariables>;
-export const GuideScreenerIndexDocument = new TypedDocumentString(`
-    query GuideScreenerIndex {
-  guideScreenerIndex {
-    what
-    versusEdge
-    count
-    categories {
-      id
-      title
-      purpose
-      count
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<GuideScreenerIndexQuery, GuideScreenerIndexQueryVariables>;
-export const GuideScreenerCategoryDocument = new TypedDocumentString(`
-    query GuideScreenerCategory($id: String!) {
-  guideScreenerCategory(id: $id) {
-    id
-    title
-    purpose
-    intro
-    screeners {
-      id
-      name
-      line
-      edges {
-        id
-        name
-        status
-      }
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<GuideScreenerCategoryQuery, GuideScreenerCategoryQueryVariables>;
 export const HarnessRunsDocument = new TypedDocumentString(`
     query HarnessRuns($limit: Int!) {
   harnessRuns(limit: $limit) {

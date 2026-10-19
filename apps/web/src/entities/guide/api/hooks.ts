@@ -116,73 +116,6 @@ const GuideFieldQuery = graphql(`
   }
 `);
 
-const GuideScreenerQuery = graphql(`
-  query GuideScreener($id: String!) {
-    guideScreener(id: $id) {
-      id
-      name
-      family
-      familyTitle
-      version
-      prose {
-        summary {
-          segments {
-            text
-            field
-            source
-          }
-        }
-        hit {
-          segments {
-            text
-            field
-            source
-          }
-        }
-        notChecked {
-          segments {
-            text
-            field
-            source
-          }
-        }
-        beforeActing {
-          segments {
-            text
-            field
-            source
-          }
-        }
-        sources {
-          title
-          url
-          note
-        }
-      }
-      criteria {
-        name
-        asks
-        field
-        rule
-        mode
-        onMiss
-      }
-      tieBreak
-      tieBreakDescending
-      related {
-        id
-        name
-        reason
-      }
-      situations {
-        slug
-        name
-        fields
-      }
-    }
-  }
-`);
-
 const GuideSituationQuery = graphql(`
   query GuideSituation($slug: String!) {
     guideSituation(slug: $slug) {
@@ -271,7 +204,10 @@ export function useGuideScreener(id: string) {
   const variables = { id };
   return useQuery({
     queryKey: queryKeys.gql('GuideScreener', variables),
-    queryFn: () => gql(GuideScreenerQuery, variables),
+    queryFn: async () => {
+      const { GuideScreenerQuery } = await import('./screeners-doc');
+      return gql(GuideScreenerQuery, variables);
+    },
     select: (data) => data.guideScreener,
     staleTime: GUIDE_STALE_MS,
   });
