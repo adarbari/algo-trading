@@ -119,7 +119,10 @@ KNOWN_FROM_RULE = "known_from=acceptance_session"  # EB H4: the rule rows are st
 # The form set and the known_from rule a run read: a change to either changes the tag, so a
 # backfill is not skipped as already covered.
 FORMS_TAG = ",".join(sorted(FILING_FORMS)) + f"|{KNOWN_FROM_RULE}"
-FUND_TYPES = ("ETF", "ETN")  # security types that file no 8-K
+FUND_TYPES = (
+    "ETF",
+    "ETN",
+)  # security types that file no 8-K (a CEF is kept on purpose: EB hand-off decision)
 STALE_DAYS = 7  # business days after which a missing daily index is an error, not "not yet"
 RESULTS_ITEM = "2.02"
 RESULTS_FORM = "8-K"  # an 8-K/A amends a release, it is no new report

@@ -66,6 +66,7 @@
 "etf_flow_pressure/v1.toml" = "f85e4347c8592e877ff93b294068847cf570297b9753aa82cb9cc9dcc9e8c3c1"
 "asset_growth/v1.toml" = "9a10763864e1d8ff594a092c2c8248e33ae5724128ae71e179e3012ed1eee3a7"
 "bdc_price_to_nav/v1.toml" = "2d49621818c4af8b8a2581c744a4668dee09c238ba0cac3fcc65fc711a13f9c3"
+"cef_discount_zscore/v1.toml" = "31f67e9d9203d566d3a59b4d9b383ab739bb66536349056f942ecc9d64614889"
 "cash_op_profitability/v1.toml" = "b39ef78172ccebd5d523f923a4964a188f4ecf3d87b31ed7bf272b5daa563dc0"
 "composite_value/v1.toml" = "74cb33d3d576b458d5b05584301cdb8860dca0079ba18355e2f2fb79dc8a96bd"
 "distress_ohlson/v1.toml" = "cabfbf9ee0fd9536674af3439c480354654a429b7fad3a12d0eb6fb7dc6dd898"

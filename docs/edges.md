@@ -46,6 +46,7 @@ Each edge's full section is on its family page (docs/edges/).
 | Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | blocked | [family C](edges/c.md) |
 | Pre-earnings straddle purchase (`c16_pre_earnings_straddle_buy`) | blocked | [family C](edges/c.md) |
 | Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`) | blocked | [family C](edges/c.md) |
+| Closed-end fund discount reversion (`closed_end_fund_discounts`) | candidate | [family D](edges/d.md) |
 | December losers rebound (`december_losers_reversal`) | candidate | [family D](edges/d.md) |
 | ETF flow pressure (`etf_flow_pressure`) | candidate | [family D](edges/d.md) |
 | High-volume return premium (`high_volume_return_premium`) | candidate | [family D](edges/d.md) |
@@ -53,7 +54,6 @@ Each edge's full section is on its family page (docs/edges/).
 | Quarter-end rebalancing (`quarter_end_rebalancing`) | candidate | [family D](edges/d.md) |
 | Crowded shorts by days to cover (`short_squeeze_days_to_cover`) | candidate | [family D](edges/d.md) |
 | Turn of the month (`turn_of_the_month`) | candidate | [family D](edges/d.md) |
-| Closed-end fund discount reversion (`closed_end_fund_discounts`) | blocked | [family D](edges/d.md) |
 | Absolute momentum and moving-average timing (`absolute_momentum_crash_filter`) | candidate | [family E](edges/e.md) |
 | Bond duration timing by curve and trend (`bond_curve_timing`) | candidate | [family E](edges/e.md) |
 | Commodity ETF momentum (`commodity_roll_momentum`) | candidate | [family E](edges/e.md) |
