@@ -11,6 +11,7 @@ Back to the [index of every edge](../edges.md).
 | Credit trend timing (`credit_spread_trend`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 50% HYG and 50% LQD, entered 1 session after the decision session, costs 10 bps | `trend_positive_6m`, `trend_positive_12m` |
 | Global equities momentum (`dual_momentum_gem`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 50% SPY and 50% EFA, entered 1 session after the decision session, costs 6 bps | `trend_positive_6m`, `trend_positive_12m` |
 | Multi-asset ETF trend (`tsmom_multi_asset_etf`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 60% SPY and 40% AGG, entered 1 session after the decision session, costs 6 bps | `trend_positive_3m`, `trend_positive_6m`, `trend_positive_12m` |
+| Buying SPY after a VIX spike (`vix_mean_reversion_entry`) | candidate | on market:vix spike | excess return, over 63 sessions, entered 1 session after the decision session | none yet |
 
 ## Absolute momentum and moving-average timing (`absolute_momentum_crash_filter`)
 
@@ -207,3 +208,34 @@ Back to the [index of every edge](../edges.md).
 - Moskowitz, T., Ooi, Y. and Pedersen, L., Time Series Momentum, Journal of Financial Economics, 2012 <https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum>
 - Hurst, B., Ooi, Y. and Pedersen, L., A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management, 2017 <https://www.TrendFollowing.com/whitepaper/Century_Evidence_Trend_Following.pdf>
 - Huang, D., Li, J., Wang, L. and Zhou, G., Time series momentum: Is it there?, Journal of Financial Economics, 2020 <https://doi.org/10.1016/j.jfineco.2019.08.004>
+
+## Buying SPY after a VIX spike (`vix_mean_reversion_entry`)
+
+**Status:** candidate. **Family:** E. **Thesis:** SPY earns more over the 63 sessions after a VIX spike with an inverted term structure than over the same number of sessions at other times.
+
+- **Outcome:** excess return, over 63 sessions, entered 1 session after the decision session
+- **Schedule:** on market:vix spike
+- **Universe:** `instrument.symbol in ('SPY',)`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09) gives SPY its outcome history. The trigger is the market_triggers@v1 spike (ADR 0075): the first session with a VIX close of at least 30 and VIX / VIX3M above 1 after at least 21 sessions without one, both from the macro table (FRED VIXCLS and VXVCLS, personal use only, so the edge's evidence is personal-licence). The decision session D is the session the reading was first known (the day after its close, the series' release lag) and the entry session S = D + 1; the fixed thresholds are the feature's, a change is a version bump. The value of a window is SPY's raw return over the 63 sessions from S's close, compared with SPY's own non-overlapping 63-session stretches outside every window (ADR 0073); a trigger within 63 sessions of the last counted one is skipped, so windows never overlap. The source's 21 to 63 session range is cut to one horizon, 63, because the page says the next month is worse and months three to twelve are better; one instrument and one horizon are one trial (deflated Sharpe ratio). Counts: the spike is rare (the page puts independent spikes since 1990 at about 25) and the stored outcome history reaches 2018, so a handful of windows fall in the range, far under the 40 independent sessions the bar asks (MIN_INDEPENDENT_SESSIONS): the document cannot reach evidenced, and every figure is shown with its count. A stretch near the range's end can change when the range is extended, because the base avoids triggers that are known only later (ADR 0075). No cost is deducted from a timed position (ADR 0073). Not tested: the page's hit-rate tables (not verified), a VIX-only trigger without the inversion, and any exit rule. No [published] figure: the page's 65 to 75 percent hit rate at three months is from practitioner tables it marks as not verified.
+
+**Quality bar**
+
+1. **Mechanism:** A volatility spike is forced de-risking (volatility-targeting funds, dealers' gamma, margin calls) that overshoots, and the price of insurance is then at its widest; buyers of equity risk are paid for providing liquidity while the sellers follow rules (Johnson 2017 on the VIX term structure; Cheng 2019 on the VIX premium). The equity-timing form is a practitioner rule, not an academic result.
+2. **Persistence:** The selling is rule-driven at exactly the moment a discretionary investor is afraid to buy, and the distribution is bimodal (2008 and 2020 kept falling), which keeps capital away. The practitioner tables behind the rule are not verified and their events are few and clustered, so persistence is a claim to test.
+3. **Outcome:** SPY's raw return (benchmark none) over the 63 sessions after a VIX spike, from the entry close (the session after the day the spike was first known), against its own return over the same number of sessions outside every window; no cost is deducted from a timed position (ADR 0073).
+4. **Trigger timing:** The spike is read at the decision session D from market_triggers@v1 (sessions_since_vix_spike = 0): a VIX close of at least 30 with VIX / VIX3M above 1 after 21 quiet sessions, known from the session after its date (the series' one-day release lag, no revisions). The entry session S = D + 1 (start_offset_sessions = 1). A stale VIX or VIX3M reading (more than 3 sessions old) is UNKNOWN, never 'no spike'. No fact after D places a window.
+5. **Faithful replication:** The practitioner rule: buy SPY when VIX is above 30 and VIX / VIX3M above 1 and hold 21 to 63 sessions (the page's Cboe and SentimentTrader tables). Here the same trigger is the one in market_triggers@v1 and SPY is held 63 sessions, compared with its own other stretches; no exit rule and no cash leg are tested.
+6. **Expected size and sample:** The page quotes hit rates of 65 to 75 percent at three months for VIX above 30 entries since 1990, not verified and over 20 to 30 clustered events, and gives no return figure, so none is set. The range here holds a handful of independent spikes: a t statistic cannot separate a few percentage points over 63 sessions from the market's own drift.
+7. **Capacity and costs:** Unlimited capacity in one index fund, a few round trips a decade, a cost of 1 to 2 bps a side; long only and unlevered. Nothing is deducted in this version. The risk is the drawdown after entry: 2008 and 2020 kept falling for weeks.
+8. **Failure modes and retirement:** The spike sits at the start of a long bear market (2008), so a fixed-horizon entry loses; the events are too few and clustered for any t statistic; the effect is the mean reversion of equity returns after any large drawdown. Retire if the frozen-period in-window minus out-of-window mean is not above zero, or the Welch t over the independent windows stays under 2.
+9. **Decoys:** Mean reversion after any 10 percent drawdown, and the volatility-managed portfolios result (Moreira and Muir 2017) that says to hold less when volatility is high: the two agree only because they differ in horizon (next month against months three to twelve). Overlaps the vrp_short_premium edge, which sells puts on the same spikes. Test against the 'any 63-session window' null, which the 1,000 random draws of the harness are.
+
+**Sources**
+
+- Johnson, T., Risk premia and the VIX term structure, Journal of Financial and Quantitative Analysis, 2017
+- Cheng, I.-H., The VIX premium, Review of Financial Studies, 2019
+- Moreira, A. and Muir, T., Volatility-managed portfolios, Journal of Finance, 2017

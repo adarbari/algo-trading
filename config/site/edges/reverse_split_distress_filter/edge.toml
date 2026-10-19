@@ -1,23 +1,45 @@
-# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
-# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E3) until its event class exists.
+# Edge document (ADR 0053, ADR 0075; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: reverse_split_recent (EB E3, unblocked by the
+# reverse_split event class of H4). Idea page: docs/edge-ideas/structural-niches.md
+# (reverse_split_distress_filter).
 id = "reverse_split_distress_filter"
 name = "Reverse-split distress filter"
 thesis = "Stocks that reverse-split to cure a sub-$1 bid price underperform for one to three years, so they belong on an exclusion list."
 mechanism = """Compliance-driven splits signal distress, continued dilution (at-the-market offerings resume once the price is above $1) and index and retail abandonment; Nasdaq rule changes in 2024 and 2025 tightened cures for repeat offenders."""
 persistence = """Firms must split or delist and the dilution machine is the business model of many micro-cap issuers; shorting is costly, so prices stay too high (Kim, Klein and Rosenfeld 2008, exact figure not verified)."""
 family = "H"
-schedule = "month_end"
-top_k = "all"
-screeners = []
-status = "blocked"
+schedule = "on_event:reverse_split"
+top_k = 20
+base = "universe"
+screeners = ["reverse_split_recent"]
+baselines = ["size_small"]
+status = "candidate"
 mechanism_kind = "value_gaps"
-rejection_reason = """The data is stored (events/split holds the reverse splits with their ratios, ex-dates in ts, from Massive and Tiingo) but the harness has no event class to trigger on a split: the schedule above is a placeholder, and the class reverse_split is missing from EVENT_CLASSES (src/algotrade/config/edges/document.py) and EVENT_FIELDS (services/evaluation/cross_section/events.py). A screen on the universe cannot stand in: the avoid-list claim needs the short leg drawn from the flagged names (a short leg ranks the whole eligible set by score and fills with unflagged names when few are flagged), and the long side's negative lift would read as Not working for a claim that is confirmed. Unblock: a reverse_splits feature group (sessions_since_reverse_split, last_reverse_split_ratio, from events/split by ex-date) and the class; the group is not added here because no edge reads it yet."""
-notes = """Mostly microcaps: a liquid-name test (20-day dollar volume of $5M) will find few events, so the verdict will rest on a small count; the exclusion list is free for a long screen even where the short is not available (borrow often 20% to 100% a year). Idea page: docs/edge-ideas/structural-niches.md (reverse_split_distress_filter)."""
+frozen_from = 2026-04-01
+notes = """Short side, owner decisions O1 and O2 (2026-10-17): a short result on liquid names may be a
+verdict basis; the outcome is minus the excess return over SPY, less cost and the site's assumed borrow
+(100 bps a year; no borrow data stored). The idea's own form is a filter (leave reverse splitters out of a
+long screen); the harness tests it as the short side, which is the same claim stated so that a negative
+drift is a pass. The anchor is the split's ex-date (reverse_splits@v1, event class reverse_split, ADR 0075):
+the decision session D is the ex-date and the entry session S is the next one (start_offset_sessions = 1).
+The events table has no known_from, so a split is read from its ex-date on, which is later than its
+announcement and so never early. Only splits with a ratio below 1 count; the fund universe is left out by
+this document's COMMON_STOCK filter. THE HISTORY LIMITS stand: most reverse splitters are microcaps, so the
+liquid-name floor (20-day dollar volume of $5M) leaves few events and the verdict rests on a small count;
+the assumed 100 bps a year understates the real borrow of such a name (20 to 100 percent a year, often no
+borrow at all), so a short result here is the best case for the short; and the 250 and 500-session horizons
+outlast the frozen period for any split since 2026-04-01, so only a split from before it fills a frozen
+slice, and a 500-session outcome exists only for splits that long ago (stored outcomes reach 2018 after the
+D0 backfill). Every eligible name is the base and the picks are the flagged names ranked by dollar volume
+(the most liquid shorted first), so the lift reads the flagged names against all eligible names, not
+against themselves. A second reverse split of the same name within 250 sessions is counted once per
+decision session, as the harness dedupes. Trial count: one screener, two horizons."""
 
 [universe.where]
 all = [
   { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
 ]
 
 [outcome]
@@ -25,6 +47,34 @@ kind = "excess_return"
 horizon_sessions = [250, 500]
 benchmark = "SPY"
 start_offset_sessions = 1
+side = "short"
+cost_bps = 20
+
+[quality_bar]
+outcome = """Minus the excess return over SPY over 250 and 500 sessions after the entry close (the
+session after the split's ex-date), net of 20 bps a round trip and the assumed borrow."""
+trigger_timing = """The split is known from its ex-date (the anchor and the decision session D); the entry session
+S = D + 1 (start_offset_sessions = 1). The names are read at D from reverse_splits@v1
+(sessions_since_reverse_split = 0), built only from splits with ts <= D, never from one that goes ex after D's
+close. The events table has no known_from, so the ex-date is the earliest the split is read, and a late-stored
+split is read late, never early."""
+replication = """The source's rule first: the three-year abnormal return after a reverse split (Kim, Klein
+and Rosenfeld 2008). Here reverse_split_recent v1 takes the liquid common stocks with a reverse split of the
+last 20 sessions and the harness shorts the 20 most liquid for 250 and 500 sessions."""
+expected_size = """Kim, Klein and Rosenfeld (2008) report negative long-run abnormal returns after a reverse
+split and the page puts them at about -15 to -20 percent over three years, an exact figure it marks as not
+verified, so no published figure is set. Liquid reverse splitters are few; independent events are the binding
+count, and the 500-session outcome needs history the store reaches only from 2018."""
+capacity_costs = """Liquid splitters are shorted at the borrow of a distressed name, often 20 to 100 percent a
+year or none at all; the outcome deducts 20 bps and the site's assumed 100 bps a year, so the result is a
+best case. The usable form for an individual is the exclusion list for a long screen, which costs nothing."""
+failure_modes = """A compliance split that works (the price holds above $1 and the business recovers); a
+split that goes with a merger or a spin-off (ratio and ex-date read the same); the 2024 and 2025 Nasdaq rule
+changes, which may have changed the cycle; heavy overlap with distress, low price and share issuance. Retire if
+the frozen-period short return of the picks is not above the base rate of every eligible name."""
+decoys = """Distress, low price and high share issuance (the net_share_issuance and distress edges) and size:
+the size baseline. A reverse split is the visible end of a long slide, so part of the drift was already in
+the price."""
 
 [[sources]]
 title = "Kim, S., Klein, A. and Rosenfeld, J., Return performance surrounding reverse stock splits: can investors profit?, Financial Management, 2008"

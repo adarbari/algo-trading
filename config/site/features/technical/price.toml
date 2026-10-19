@@ -108,6 +108,15 @@ description = "The instrument's sector is one of the three strongest of the elev
 null_meaning = "sector_rank_63d is null (no sector or sector ETF, the ETF has no complete window, or fewer than min_sector_etfs ETFs do), or no relative_strength row"
 version = 1
 
+[december_loser_flag]
+expr = "trend_stats.ret_252d <= loser_at"
+params = { loser_at = -0.30 }  # fell by 30% or more over a year: a fixed level, not the bottom decile
+dtype = "bool"
+unit = "flag"
+description = "The name fell 30% or more over 252 sessions (params.loser_at): the stock the year-end tax-loss selling falls on, as a fixed level standing in for the bottom decile"
+null_meaning = "ret_252d is null (a gap among the last 253 sessions, or a shorter history), or no trend_stats row"
+version = 1
+
 # Momentum variants (docs/edge-ideas/statarb-technical.md; the residual, discreteness and sector
 # columns are momentum_variants@v1)
 [mom_12_1_vol_scaled]

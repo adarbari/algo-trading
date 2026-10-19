@@ -1,0 +1,67 @@
+# Edge document (ADR 0053, ADR 0075; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB H14, batch X) on one line of the
+# loader. Idea pages: docs/edge-ideas/events.md (ipo_lockup_expiry) and structural-niches.md
+# (ipo_lockup_expiry_pressure).
+id = "ipo_lockup_expiry"
+name = "IPO lock-up expiry (avoid list)"
+thesis = "Stocks fall into and on the expiry of their IPO lock-up as insiders and venture funds become free to sell, so they belong on an avoid list until after it."
+mechanism = """The expiry is a known, dated supply shock: venture funds must distribute, and the market under-reacts
+because the date is in the prospectus but no one is paid to sell ahead; shorting a fresh IPO is dear and
+the borrow scarce, so the price cannot adjust fully before the date (Field and Hanka 2001)."""
+persistence = """The dates are public and the effect is small per event (about -1% to -3% on the page, from
+memory and not verified), so after the borrow of a fresh issue the short is marginal and the avoidance is
+free; buyout-backed issuers show the opposite sign in one thesis. Persistence after 2010 is a claim to
+test."""
+family = "B"
+schedule = "on_event:ipo_lockup"
+top_k = 20
+base = "universe"
+status = "blocked"
+mechanism_kind = "forced_flows"
+rejection_reason = """The event class ipo_lockup exists (ipo_lockups@v1, ADR 0075) but the document cannot enter before
+the expiry: the thesis is a hold from about 10 sessions before the expiry (start_offset_sessions = -10, the
+decision session D 11 sessions ahead) and the document loader accepts an entry before the anchor only for
+the classes in ANNOUNCED_AHEAD (src/algotrade/config/edges/document.py), which lists earnings_expected and
+not ipo_lockup, although ADR 0075 and EVENT_FIELDS (services/evaluation/cross_section/events.py) declare
+ipo_lockup announced ahead. An entry after the anchor tests the long re-entry the page rates weak, not this claim.
+Unblock: ANNOUNCED_AHEAD = ("earnings_expected", "ipo_lockup"), then set status candidate, start_offset_sessions
+-10, horizon_sessions [10, 12], file the screener below and its Guide playbook, and a test that ranks its
+short leg by dollar volume (the other avoid lists')."""
+notes = """The design for the unblock, so the follow-up is one line plus this file. Side short on liquid names only
+(owner decisions O1 and O2, 2026-10-17): a short result on a liquid name may be a verdict basis, the outcome
+is minus the excess return over SPY less cost and the site's assumed borrow. Screener ipo_lockup_ahead: a common
+stock trading at least $5M a day with rollup.ipo_lockups@v1.sessions_to_lockup_expiry between 0 and 11, ranked by
+dollar volume ascending (the most liquid shorted first); every eligible name is the base (base universe,
+picks the event names), so the lift is not read against itself. The class is read from ipo_lockups@v1 with the
+CIK mapped to an instrument as of D, never the row's own instrument_id. Horizons 10 (to the expiry) and 12
+(two sessions past it, the page's -10 to +2 window). Subtypes standard and early_release are available
+(on_event:ipo_lockup:standard) but not split here: one trial. The prospectus lock-up dates come from text the
+text-model seam extracts, so coverage of the events is partial; liquid IPOs with a lock-up in the window are few, and
+the independent count is the binding limit. Venture-backed issuers (where the effect sits) are not flagged in
+the store. No [published] figure: the page's figures are not verified."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 5_000_000 },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [10, 12]
+benchmark = "SPY"
+start_offset_sessions = 1
+side = "short"
+cost_bps = 20
+
+[[sources]]
+title = "Field, L. and Hanka, G., The Expiration of IPO Share Lockups, Journal of Finance, 2001"
+
+[[sources]]
+title = "Aalto University thesis (2003-2022 lock-up expiries: negative abnormal returns and higher volume, buyout-backed issuers positive)"
+url = "https://aaltodoc.aalto.fi/items/05aae052-991d-4947-8363-6b2a5df9fb89"
+
+[[sources]]
+title = "Erasmus University thesis (1990-2022 lock-up expiries: a negative cumulative abnormal return only for venture-backed issuers)"
+url = "https://thesis.eur.nl/pub/67687/572140.pdf"

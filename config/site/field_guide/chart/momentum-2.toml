@@ -517,3 +517,22 @@ op = "eq"
 value = "standard"
 mode = "hard"
 note = "names with no lock-up in the window drop out"
+
+[[field]]
+name = "feature.december_loser_flag"
+theme = "momentum and trend"
+reads = "True when the name fell 30% or more over the last 252 sessions: the stock that year-end tax-loss selling falls on. It is a fixed level standing in for the bottom decile, so in a mild year it flags fewer names than a decile would and in a crash more."
+caveats = [
+  "It is a rolling year, not the calendar year. A name that fell early and has rebounded can read False, and one that fell last month reads True. Check rollup.price_stats@v2.ret_60d.",
+  "Most deep losers are thin and distressed, and some will never rebound. Gate on rollup.price_stats@v2.adv_usd_20d and read rollup.trend_stats@v2.ret_252d for how far each fell.",
+  "Null after a gap in the last 253 sessions or a shorter history. It is never False for a missing value.",
+]
+sources = [
+  "Grinblatt and Keloharju, NBER working paper 8745, on year-end selling of the year's losers: https://www.nber.org/papers/w8745.pdf",
+]
+[[field.use]]
+for = "a name that fell 30% or more over the year"
+op = "eq"
+value = true
+mode = "hard"
+note = "a yes or no, so names with no value drop out; rank the flagged names with rollup.trend_stats@v2.ret_252d lowest first"

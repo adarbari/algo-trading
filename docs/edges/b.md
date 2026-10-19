@@ -15,6 +15,7 @@ Back to the [index of every edge](../edges.md).
 | Pre-earnings run-up in past winners (`pre_earnings_runup_winners`) | candidate | on each `earnings_expected` | excess return, over 5 sessions, vs SPY, starting -6 sessions from the event, costs 10 bps | `pre_earnings_runup` |
 | S&P 500 deletions rebound (`sp500_deletions_long`) | candidate | on each `index_change:deletion` | excess return, over 20, 60, 250 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `sp500_deletion` |
 | Analyst target-price implied return (`target_price_implied_return`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `target_upside_high` |
+| IPO lock-up expiry (avoid list) (`ipo_lockup_expiry`) | blocked | on each `ipo_lockup` | excess return, over 10, 12 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | none yet |
 | Spin-off drift (`spinoff_drift`) | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 
 ## Analyst earnings-estimate revision momentum (`analyst_revision_momentum`)
@@ -336,6 +337,38 @@ Back to the [index of every edge](../edges.md).
 - Da, Z. and Schaumburg, E., Relative Valuation and Analyst Target Price Forecasts, Journal of Financial Markets, 2011 <https://ideas.repec.org/a/eee/finmar/v14y2011i1p161-192.html>
 - Brav, A. and Lehavy, R., An Empirical Analysis of Analysts' Target Prices: Short-term Informativeness and Long-term Dynamics, Journal of Finance, 2003 <https://ideas.repec.org/a/bla/jfinan/v58y2003i5p1933-1967.html>
 - Womack, K. (1996), Do Brokerage Analysts' Recommendations Have Investment Value?, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v51y1996i1p137-67.html>
+
+## IPO lock-up expiry (avoid list) (`ipo_lockup_expiry`)
+
+**Status:** blocked. **Family:** B. **Thesis:** Stocks fall into and on the expiry of their IPO lock-up as insiders and venture funds become free to sell, so they belong on an avoid list until after it.
+
+**Why blocked:** The event class ipo_lockup exists (ipo_lockups@v1, ADR 0075) but the document cannot enter before the expiry: the thesis is a hold from about 10 sessions before the expiry (start_offset_sessions = -10, the decision session D 11 sessions ahead) and the document loader accepts an entry before the anchor only for the classes in ANNOUNCED_AHEAD (src/algotrade/config/edges/document.py), which lists earnings_expected and not ipo_lockup, although ADR 0075 and EVENT_FIELDS (services/evaluation/cross_section/events.py) declare ipo_lockup announced ahead. An entry after the anchor tests the long re-entry the page rates weak, not this claim. Unblock: ANNOUNCED_AHEAD = ("earnings_expected", "ipo_lockup"), then set status candidate, start_offset_sessions -10, horizon_sessions [10, 12], file the screener below and its Guide playbook, and a test that ranks its short leg by dollar volume (the other avoid lists').
+
+- **Outcome:** excess return, over 10, 12 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps
+- **Schedule:** on each `ipo_lockup` (an IPO lock-up expiry, announced in the prospectus (ipo_lockups@v1; ADR 0075); anchor: the expiry session; may be entered ahead of it)
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.adv_usd_20d gte 5000000`
+- **Top K:** 20
+- **Screeners:** none yet
+- **Baselines:** none yet
+- **Notes:** The design for the unblock, so the follow-up is one line plus this file. Side short on liquid names only (owner decisions O1 and O2, 2026-10-17): a short result on a liquid name may be a verdict basis, the outcome is minus the excess return over SPY less cost and the site's assumed borrow. Screener ipo_lockup_ahead: a common stock trading at least $5M a day with rollup.ipo_lockups@v1.sessions_to_lockup_expiry between 0 and 11, ranked by dollar volume ascending (the most liquid shorted first); every eligible name is the base (base universe, picks the event names), so the lift is not read against itself. The class is read from ipo_lockups@v1 with the CIK mapped to an instrument as of D, never the row's own instrument_id. Horizons 10 (to the expiry) and 12 (two sessions past it, the page's -10 to +2 window). Subtypes standard and early_release are available (on_event:ipo_lockup:standard) but not split here: one trial. The prospectus lock-up dates come from text the text-model seam extracts, so coverage of the events is partial; liquid IPOs with a lock-up in the window are few, and the independent count is the binding limit. Venture-backed issuers (where the effect sits) are not flagged in the store. No [published] figure: the page's figures are not verified.
+
+**Quality bar**
+
+1. **Mechanism:** The expiry is a known, dated supply shock: venture funds must distribute, and the market under-reacts because the date is in the prospectus but no one is paid to sell ahead; shorting a fresh IPO is dear and the borrow scarce, so the price cannot adjust fully before the date (Field and Hanka 2001).
+2. **Persistence:** The dates are public and the effect is small per event (about -1% to -3% on the page, from memory and not verified), so after the borrow of a fresh issue the short is marginal and the avoidance is free; buyout-backed issuers show the opposite sign in one thesis. Persistence after 2010 is a claim to test.
+3. **Outcome:** (not answered)
+4. **Trigger timing:** (not answered)
+5. **Faithful replication:** (not answered)
+6. **Expected size and sample:** (not answered)
+7. **Capacity and costs:** (not answered)
+8. **Failure modes and retirement:** (not answered)
+9. **Decoys:** (not answered)
+
+**Sources**
+
+- Field, L. and Hanka, G., The Expiration of IPO Share Lockups, Journal of Finance, 2001
+- Aalto University thesis (2003-2022 lock-up expiries: negative abnormal returns and higher volume, buyout-backed issuers positive) <https://aaltodoc.aalto.fi/items/05aae052-991d-4947-8363-6b2a5df9fb89>
+- Erasmus University thesis (1990-2022 lock-up expiries: a negative cumulative abnormal return only for venture-backed issuers) <https://thesis.eur.nl/pub/67687/572140.pdf>
 
 ## Spin-off drift (`spinoff_drift`)
 

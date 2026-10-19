@@ -5,6 +5,7 @@ Back to the [index of every edge](../edges.md).
 
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
+| December losers rebound (`december_losers_reversal`) | candidate | calendar:year turn | excess return, over 10 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps | `december_losers` |
 | ETF flow pressure (`etf_flow_pressure`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `etf_flow_pressure` |
 | High-volume return premium (`high_volume_return_premium`) | candidate | every session | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `volume_shock`, `volume_shock_no_news` |
 | Option-expiration week (`option_expiration_week`) | candidate | calendar:opex week | excess return, over 5 sessions, entered 1 session after the decision session | none yet |
@@ -12,6 +13,37 @@ Back to the [index of every edge](../edges.md).
 | Crowded shorts by days to cover (`short_squeeze_days_to_cover`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `short_squeeze_dtc` |
 | Turn of the month (`turn_of_the_month`) | candidate | calendar:turn of month | excess return, over 4 sessions, entered 1 session after the decision session | none yet |
 | Closed-end fund discount reversion (`closed_end_fund_discounts`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
+
+## December losers rebound (`december_losers_reversal`)
+
+**Status:** candidate. **Family:** D. **Thesis:** The stocks that fell most over the year rebound over the turn of the year, after the tax-loss selling that pushed them down ends.
+
+- **Outcome:** excess return, over 10 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps
+- **Schedule:** calendar:year turn
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 5000000`
+- **Top K:** 50
+- **Screeners:** `december_losers`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The window is the calendar's year_turn (core/time/windows.py, ADR 0075): the last 5 sessions of December and the first 5 of January, 10 sessions, belonging to December's year. The entry session S is the session before the first of them (about 22 December) and the decision session D the one before S; the return runs from S's close over 10 sessions, so the long hold takes the last week of December and the first of January, the source's 'about 24 December to mid-January' cut to the closed set. THE EVENT COUNT IS THE LIMIT: one window a year gives about 8 since 2018 (stored outcomes start there), far under the 40 independent sessions the bar asks (MIN_INDEPENDENT_SESSIONS), so this document cannot reach evidenced; the cross-section inside each year gives power, but its names are not independent of one another, so every figure is shown with its count and the harness places the edge among random picks. The frozen period starts 2026-04-01, so the window of December 2026 is the first frozen observation. The loser set is feature.december_loser_flag, a 252-session return of -30% or lower: a fixed level that stands in for the source's bottom decile (the decile moves with the year: the page's rule sorts at about 20 December), on a rolling year and not the calendar year to date; the 50 biggest losers are the picks, the base is every eligible name (base universe, picks are the screener's), so the lift reads the losers against all liquid stocks. The universe keeps the liquid end (price above $5, 20-day dollar volume of $5M) and so leaves the small thin losers where the effect is said to be largest; a loser leg with no thin names is the version an individual can trade. Long only, no short leg: the source's January short-loser leg is the momentum edge's decay and is not filed. As a seasonal overlay on the momentum edges, the page's 'skip the loser leg in January' is a use of the result, not a second document. One screener and one horizon are one trial. No [published] figure: the page gives no number the harness measures (the decile spread is a two-group figure).
+
+**Quality bar**
+
+1. **Mechanism:** Individual investors and some funds realise losses before year end, so the year's biggest decliners are sold into December and the selling stops on 31 December (Grinblatt and Keloharju, NBER 8745; Poterba and Weisbenner 2001); arbitrage capital is thin in the last week of the year, and the same names bounce back.
+2. **Persistence:** The tax incentive is permanent and holders cannot defer the loss past the year's end, so the selling is predictable. Only one event a year gives few independent observations, and Kozlowski and Lytle (2023) report the turn-of-year reversal stronger after poor market years, a sample through about 2021 the page marks as not verified, so persistence is a claim to test.
+3. **Outcome:** Excess return over SPY over the 10 sessions of the year-turn window from the entry close (the session before its first session), net of 20 bps a round trip: a long hold of the year's biggest losers across the turn of the year.
+4. **Trigger timing:** The window is fixed by the exchange calendar ahead of time (the last 5 sessions of December and the first 5 of January), so the entry session S is the session before the first of them (start_offset_sessions = 1 from D = S - 1) and the return runs from S's close over 10 sessions. The loser flag is read at D from the 252 closes known by D's close (trend_stats@v2.ret_252d); nothing after D places a window or a pick.
+5. **Faithful replication:** The source's rule first: sort on the year's return at about 20 December and hold the bottom decile from the last 5 sessions of December to mid-January (Grinblatt and Keloharju; Kozlowski and Lytle 2023). Here december_losers v1 takes the liquid stocks that fell 30% or more over 252 sessions, biggest loser first, and the harness holds the 50 biggest for the window's 10 sessions.
+6. **Expected size and sample:** A few percent in small losers over the turn of the year, in samples that end about 2021 and are not verified on the page (Kozlowski and Lytle 2023); no figure the harness measures is on file, so none is set. With one window a year the independent count is about 8 since 2018, and no t statistic can separate a rebound of a few percent from market noise.
+7. **Capacity and costs:** Long only, 10 to 50 names, once a year, with a capacity set by the thin end of the losers: the filter here (price above $5, $5M a day) keeps only the liquid names. The outcome deducts 20 bps a round trip; the spread of a thin loser in the last week of December can be far wider.
+8. **Failure modes and retirement:** A loser that is bankrupt or delisted never rebounds; the tax-loss pressure is smaller since 2018 for investors in tax-advantaged accounts; the effect is the short-term reversal and a size effect in the same names. Retire if the frozen-period excess return of the picks is not above the base rate of every eligible name.
+9. **Decoys:** Short-term reversal, size, the January effect and momentum (this is momentum's seasonal inverse: the momentum_12_1 and size baselines). Window dressing and quarter-end rebalancing share these dates.
+
+**Sources**
+
+- Grinblatt, M. and Keloharju, M., NBER working paper 8745, on year-end selling of the year's losers <https://www.nber.org/papers/w8745.pdf>
+- Poterba, J. and Weisbenner, S., Capital Gains Tax Rules, Tax-loss Trading, and Turn-of-the-Year Returns, Journal of Finance, 2001
+- Kozlowski, S. and Lytle, B., 2023 (title not verified; short-term reversal and momentum at the turn of the year)
 
 ## ETF flow pressure (`etf_flow_pressure`)
 
