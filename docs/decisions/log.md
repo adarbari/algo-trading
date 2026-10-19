@@ -964,3 +964,10 @@ follow-up PR).
 - decided by: proposed by orchestrator; awaiting owner
 - status: pending owner confirmation
 - Reasoning: each cost real time in the EB batch (a lost first hour per agent batch, PRs opened without `no-automerge`, eight reviews repeating the same findings, blocked relayed authorizations, runs slowed by load 13+).
+## 2026-10-18 | EB H14 batch X (reverse_split_distress_filter) | The short is charged an assumed borrow of 2000 bps a year, not the site's 100
+- Question: what borrow does the short side of the reverse-split avoid list pay, when the document itself puts the real borrow at 20 to 100 percent a year?
+- Options: (a) keep the site default of 100 bps and note it / (b) a per-edge `borrow_bps_annual = 2000` / (c) an evidence-only short with no verdict basis.
+- Decision: (b), 2000 bps a year, worded as a lower bound on the real borrow; the universe is liquid-gated (ADV of $5M or more), so owner decision O2 applies.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: 100 bps on a distressed name flatters the short by an order of magnitude; the low end of the document's own range is the least unrealistic number the store supports.

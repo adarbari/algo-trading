@@ -1,0 +1,50 @@
+# December losers (ADR 0053, ADR 0075; edge december_losers_reversal): a common stock trading at
+# least $5M a day that fell 30% or more over the last 252 sessions (feature.year_loser_flag), ranked
+# with the biggest loser first: the stock the year-end tax-loss selling falls on and the long side of the
+# edge, which the harness reads at the decision session before the year_turn window. The flag is a fixed
+# level standing in for the bottom decile. A missing value never passes (ADR 0030). What it does not
+# check: whether the name is distressed for good, or whether the fall came after a takeover bid; and the
+# window is the edge's, not the screen's: run outside December it only lists the year's losers.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "december_losers"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "December losers"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 5_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.loser]
+field = "feature.year_loser_flag"
+op = "eq"
+value = true
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+ret_252d = "rollup.trend_stats@v2.ret_252d"
+ret_60d = "rollup.price_stats@v2.ret_60d"
+
+[rank]
+tie_break = "rollup.trend_stats@v2.ret_252d"
+tie_break_order = "asc"

@@ -83,14 +83,6 @@ feasibility = "needs_data"
 why_not_built = "Weak, and the net share issuance edge already covers its continuous version."
 
 [[idea]]
-id = "ipo_lockup_expiry"
-title = "IPO lockup expiry pressure"
-mechanism_kind = "forced_flows"
-verdict = "weak"
-feasibility = "needs_data"
-why_not_built = "Lockup dates are not stored; it is planned only as an avoid-list filter once they are."
-
-[[idea]]
 id = "ipo_long_run_underperformance"
 title = "Recent IPOs lag for several years"
 mechanism_kind = "lottery_demand"

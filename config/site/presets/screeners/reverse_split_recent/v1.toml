@@ -1,0 +1,44 @@
+# Recent reverse splits (ADR 0053, ADR 0075; edge reverse_split_distress_filter): a common stock
+# trading at least $5M a day whose latest reverse split went ex in the last 20 sessions: an
+# exclusion list for longs and the short side of the edge. The order puts the most liquid first (the
+# lowest score is the harness's short leg, so the highest dollar volume is shorted first). A missing
+# value never passes (ADR 0030). What it does not check: why the split was made (a cure for a
+# sub-$1 bid, a merger, a spin-off look the same), which is not stored.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "reverse_split_recent"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Recent reverse splits"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 5_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.reverse_split]
+field = "rollup.reverse_splits@v1.sessions_since_reverse_split"
+op = "lte"
+value = 20
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+sessions_since_reverse_split = "rollup.reverse_splits@v1.sessions_since_reverse_split"
+reverse_split_ratio = "rollup.reverse_splits@v1.reverse_split_ratio"
+
+[rank]
+tie_break = "rollup.price_stats@v2.adv_usd_20d"
+tie_break_order = "asc"

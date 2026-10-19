@@ -1,0 +1,85 @@
+# Edge document (ADR 0053, ADR 0073, ADR 0075; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/structural-niches.md
+# (treasury_month_end_extension). A time-series edge: no screener, the instruments are the universe.
+id = "treasury_month_end_extension"
+name = "Treasury funds before month end"
+family = "H"
+thesis = "Treasury and aggregate bond funds earn more over the last three sessions of a month than over the same number of sessions elsewhere."
+mechanism = """Bond index duration jumps at month end when new issues enter the indexes and short bonds
+drop out, so passive trackers must buy duration on a known date; pensions and insurers also raise cash
+by selling equities before month-end payments and park it in bonds (Etula, Rinne, Suominen and
+Vaittinen 2020)."""
+persistence = """Index rules are public and mechanical and the flow is non-discretionary, which is why it
+can persist; Etula et al show it for 1980 to 2016. The effect per day is small against the funds' rate
+risk (the rate trend of 2022 to 2024 dominates it), and after 2016 no split is on file, so persistence
+is a claim to test."""
+schedule = "calendar:pre_month_end"
+top_k = "all"
+screeners = []
+base = "out_of_window"
+status = "candidate"
+mechanism_kind = "forced_flows"
+asset_class = "etfs"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09): the stored
+outcome history of the three funds is too short to measure a window edge before it. The window is the
+calendar's pre_month_end (core/time/windows.py, ADR 0075): the last 3 sessions of every month; the entry
+session S is the session before the first of them and the decision session D the one before S, so the
+value is the fund's raw return over the month's last 3 sessions from the close of the session before.
+It is compared with the fund's own non-overlapping 3-session stretches outside every window (ADR
+0073), and the harness pairs each window with the stretch right after it so that a rising fund does
+not pass on its drift. TLT, IEF and AGG are three trials, not one (deflated Sharpe ratio). The source
+holds the funds for 2 to 3 sessions up to the first session after month end; the window here stops at the
+month's last session (the closed set of windows has no window that crosses the month end), and it is
+distinct from the turn_of_month window of the equity edge (the month's last session and the 3 after it),
+so the two edges share at most one session. The equity leg of the source (sell equities into month end)
+is the turn-of-month edge's opposite and is not filed. Schwarz's Sharpe near 1 after costs is from a
+search summary the page did not read, so no [published] figure is set; no cost is deducted from a
+timed position in this version (ADR 0073). About 12 windows a year, so about 100 since 2018."""
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["TLT", "IEF", "AGG"] },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [3]
+benchmark = "none"
+start_offset_sessions = 1
+
+[quality_bar]
+outcome = """The fund's raw return (benchmark none) over the 3 sessions of the pre-month-end window from
+the entry close, against its own return over the same number of sessions outside every window; no cost
+is deducted from a timed position (ADR 0073)."""
+trigger_timing = """The window is fixed by the exchange calendar ahead of time (the last 3 sessions of
+the month), so nothing is read at D: the entry session S is the session before the first of them
+(start_offset_sessions = 1 from D = S - 1) and the return runs from S's close over 3 sessions. No fact
+after D places a window or a stretch of the base."""
+replication = """The source's rule: hold long-duration Treasuries (TLT, IEF) for the last 2 to 3 sessions of
+the month and stay out otherwise (Etula et al 2020; Schwarz, Wharton Rodney White Center, 2019). Here
+three funds are held over the last 3 sessions, and the cash leg is only in the run record's timing Sharpe
+ratio."""
+expected_size = """Etula et al (2020): Treasuries show the mirror image of the equity sell-off around the turn of
+the month in 1980 to 2016; the page gives no basis-point figure it verified, and a Sharpe near 1 after
+costs for Schwarz's strategy comes from a summary of a paper it did not read. A split after 2016 is not on
+file. About 100 windows since 2018 give a t statistic that cannot separate a few basis points a day from
+zero when the funds' own rate moves are far larger."""
+capacity_costs = """Unlimited capacity in three liquid funds, about 12 round trips a year, 1 to 2 bps a
+side; long only. No cost is deducted in this version. The funds carry rate risk: a few days of rising
+yields wipe out many windows of a few basis points."""
+failure_modes = """The effect is small against the funds' own volatility and the rate trend (2022 to 2024)
+dominates it; the Treasury auction calendar and Fed meetings land on the same dates; index extension is
+public, so front-running may have taken it. Retire if the frozen-period in-window minus out-of-window mean
+is not above zero for TLT and IEF, or the Welch t over the independent windows stays under 2."""
+decoys = """The equity turn-of-the-month effect (its mirror image), the Fed-meeting drift and the Treasury
+auction cycle (auctions cluster mid-month, so separable): test against the 'any 3-session window' null,
+which the 1,000 random draws of the harness are."""
+
+[[sources]]
+title = "Etula, E., Rinne, K., Suominen, M. and Vaittinen, L., Dash for Cash: Monthly Market Impact of Institutional Liquidity Needs, Journal of Finance, 2020"
+url = "https://aaltodoc.aalto.fi/items/00fea0ae-963b-444c-8221-912121905b98"
+
+[[sources]]
+title = "Schwarz, K., Wharton Rodney White Center working paper 17-19 (the end-of-month Treasury coupon strategy), 2019"
+url = "https://rodneywhitecenter.wharton.upenn.edu/wp-content/uploads/2019/12/17-19.Schwarz.pdf"
