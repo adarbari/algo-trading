@@ -171,7 +171,27 @@ def test_a_subject_must_be_known_in_the_recent_sessions_and_not_after_the_sessio
     assert run(frame(stale, old)) == []
     assert run(frame(future, old)) == []
     latest = run(frame(stale, ten_q("LATE", REPORT, date(2026, 10, 1)), old))
-    assert [c.accession for c in latest] == ["LATE"]  # the latest known_from, one per company
+    assert [c.accession for c in latest] == ["LATE"]  # the latest known_from per company and form
+
+
+def test_a_10k_and_a_10q_of_one_company_in_the_window_are_both_compared() -> None:
+    """The gap of #720 (review finding 3): one comparison per company, so the 10-K's risk-factor
+    comparison was never stored when a 10-Q was accepted in the same window."""
+    k_report = date(2026, 3, 31)
+
+    def annual(acc: str, report: date, known: date) -> list[dict[str, object]]:
+        return filing(acc, "10-K", report, known,
+                      {"1A": body(words(150), 600), "7": body(words(150, 150), 300)})  # fmt: skip
+
+    got = run(frame(
+        annual("K1", k_report, date(2026, 9, 29)),
+        annual("K0", k_report - timedelta(days=365), date(2025, 5, 1)),
+        ten_q("Q1", REPORT, date(2026, 10, 1)),
+        ten_q("Q0", REPORT - timedelta(days=365), date(2025, 8, 5)),
+    ))  # fmt: skip
+    assert [(c.form, c.accession, c.status) for c in got] == [
+        ("10-K", "K1", cmp.OK), ("10-Q", "Q1", cmp.OK)]  # fmt: skip
+    assert got[0].rf_cosine == pytest.approx(1.0)
 
 
 def test_the_constants_are_the_decided_ones() -> None:

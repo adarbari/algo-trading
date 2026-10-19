@@ -3,8 +3,10 @@
 A subject filing is a 10-K or 10-Q (an amendment, ``10-K/A`` / ``10-Q/A``, is never a subject or
 a comparator) of a filer (``cik``). Its comparator is the same company's filing of the same form
 whose report date is ``WINDOW_DAYS`` before the subject's (a 10-Q against the same quarter a
-year earlier, a 10-K against the previous year's), the closest to 365 days when two qualify. The
-pairing is by ``cik`` and ``accession``: the id-fill versions of a stored filing are one filing.
+year earlier, a 10-K against the previous year's), the closest to 365 days when two qualify. A
+company's latest subject of each form is compared (one comparison per ``cik`` and form), so a
+10-K and a 10-Q both accepted in the window are each compared. The pairing is by ``cik`` and
+``accession``: the id-fill versions of a stored filing are one filing.
 
 Per item the form declares (``ITEMS``) a pair is compared only when both rows are ``OK`` and each
 side has ``MIN_ITEM_TOKENS`` words. The composite sums the term counts of the compared items and
@@ -140,13 +142,15 @@ def _measure(
 
 
 def compare_filings(frame: pd.DataFrame, recent_from: date, session: date) -> list[Comparison]:
-    """The comparison of each company's latest periodic filing known from ``recent_from`` to
-    ``session`` (latest acceptance session, then accession) with its comparator among the filings
-    of ``frame`` (rows ``cik``, ``form``, ``accession``, ``report_date``, ``accepted_session``,
-    ``item``, ``quality``, ``text``), one per ``cik``, sorted by ``cik``."""
+    """The comparison of each company's latest filing of each periodic form known from
+    ``recent_from`` to ``session`` (latest acceptance session, then accession) with its comparator
+    among the filings of ``frame`` (rows ``cik``, ``form``, ``accession``, ``report_date``,
+    ``accepted_session``, ``item``, ``quality``, ``text``), one per ``cik`` and form (a 10-K and a
+    10-Q of one company both inside the window are both compared), sorted by ``cik``, form."""
     filings = _filings(frame)
     subjects = filings[[recent_from <= k <= session for k in filings["known_from"]]]
-    subjects = subjects.drop_duplicates("cik", keep="last")
+    subjects = subjects.sort_values(["cik", "form", "known_from", "accession"], kind="stable")
+    subjects = subjects.drop_duplicates(["cik", "form"], keep="last")
     out = []
     for _, subject in subjects.iterrows():
         base: dict[str, Any] = {"cik": subject["cik"], "accession": subject["accession"],
