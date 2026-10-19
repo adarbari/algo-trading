@@ -17,6 +17,7 @@ top_k = 10
 screeners = []
 baselines = ["size_small"]
 status = "blocked"
+plain_reason = "Needs closed-end fund prices and their distribution history, which we do not collect yet."
 mechanism_kind = "value_gaps"
 frozen_from = 2026-04-01
 rejection_reason = """Two things are missing. Closed-end funds are not in the covered universe (ADR 0013:
