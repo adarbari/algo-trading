@@ -29,6 +29,7 @@ import {
   GuideProse,
   playbookPath,
   useGuidePlaybook,
+  useGuidePlaybookEdges,
   type GuideProseValue,
 } from '@/entities/guide';
 import { termHelp } from '@/features/guide-help';
@@ -62,6 +63,7 @@ function Block({ title, prose }: { title: string; prose: GuideProseValue }) {
 
 export function GuidePlaybook({ id, onSeeHits, onOpenBuilder }: GuidePlaybookProps) {
   const query = useGuidePlaybook(id);
+  const edges = useGuidePlaybookEdges(id).data ?? [];
   if (query.isError) {
     return <ErrorState title="The playbook failed to load." onRetry={() => void query.refetch()} />;
   }
@@ -132,14 +134,14 @@ export function GuidePlaybook({ id, onSeeHits, onOpenBuilder }: GuidePlaybookPro
         )}
       </Stack>
 
-      {playbook.edges.length > 0 && (
+      {edges.length > 0 && (
         <Stack gap={2} as="section" aria-label="Edges it implements">
           <Stack direction="row" gap={2} align="center">
             <Heading level={2}>Edges it implements</Heading>
             {termHelp('edge_status')}
           </Stack>
           <Stack as="ul" gap={2} aria-label="Edges it implements">
-            {playbook.edges.map((edge) => (
+            {edges.map((edge) => (
               <Stack as="li" key={edge.id} gap={1}>
                 <Stack direction="row" gap={2} align="center" wrap>
                   <TextLink href={edgeGuidePath(edge.id)}>{edge.name}</TextLink>

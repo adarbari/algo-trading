@@ -6,11 +6,12 @@ import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib
 
 import { GuidePlaybook } from './GuidePlaybook';
 
-const hooks = vi.hoisted(() => ({ useGuidePlaybook: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useGuidePlaybook: vi.fn(), useGuidePlaybookEdges: vi.fn() }));
 
 vi.mock('@/entities/guide', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useGuidePlaybook: hooks.useGuidePlaybook,
+  useGuidePlaybookEdges: hooks.useGuidePlaybookEdges,
 }));
 
 vi.mock('@/features/guide-help', async () => {
@@ -70,15 +71,16 @@ const playbook = {
     { id: 'failed_breakout', name: 'Failed breakout', reason: 'the same break after it fails' },
   ],
   situations: [{ slug: 'earnings-gap', name: 'Earnings gap inside the window', fields: [volume] }],
-  edges: [
-    {
-      id: 'range_breakout_edge',
-      name: 'Range breakouts',
-      thesis: 'Shares closing above a one-month high keep rising for a few weeks.',
-      status: 'candidate',
-    },
-  ],
 };
+
+const implemented = [
+  {
+    id: 'range_breakout_edge',
+    name: 'Range breakouts',
+    thesis: 'Shares closing above a one-month high keep rising for a few weeks.',
+    status: 'candidate',
+  },
+];
 
 function setup() {
   const onSeeHits = vi.fn();
@@ -91,6 +93,7 @@ function setup() {
 
 beforeEach(() => {
   hooks.useGuidePlaybook.mockReturnValue(fakeQuery(playbook));
+  hooks.useGuidePlaybookEdges.mockReturnValue(fakeQuery(implemented));
 });
 
 describe('GuidePlaybook', () => {
@@ -164,7 +167,7 @@ describe('GuidePlaybook', () => {
   });
 
   it('shows no edges panel for a playbook no edge uses', () => {
-    hooks.useGuidePlaybook.mockReturnValue(fakeQuery({ ...playbook, edges: [] }));
+    hooks.useGuidePlaybookEdges.mockReturnValue(fakeQuery([]));
     setup();
     expect(screen.queryByRole('region', { name: 'Edges it implements' })).toBeNull();
   });

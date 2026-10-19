@@ -35,26 +35,20 @@ import {
   termPath,
   themeTitle,
   useGuideIndex,
+  useGuideMechanisms,
 } from '@/entities/guide';
 
 export function GuideHome() {
   const index = useGuideIndex();
+  const edgeMechanisms = useGuideMechanisms();
   if (index.isError) {
     return <ErrorState title="The Guide failed to load." onRetry={() => void index.refetch()} />;
   }
   if (index.isPending) return <Skeleton variant="rect" height="lg" label="Loading the Guide" />;
   if (!index.data) return <EmptyState bordered title="The Guide has no entries." />;
-  const {
-    sections,
-    themeGroups,
-    families,
-    situations,
-    indicators,
-    episodes,
-    startPages,
-    terms,
-    mechanisms,
-  } = index.data;
+  const { sections, themeGroups, families, situations, indicators, episodes, startPages, terms } =
+    index.data;
+  const mechanisms = edgeMechanisms.data ?? [];
   return (
     <Stack gap={6}>
       <Stack gap={1}>

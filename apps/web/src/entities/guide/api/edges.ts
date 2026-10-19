@@ -53,3 +53,30 @@ export function useGuideEdge(id: string) {
     retry: false,
   });
 }
+
+/** The mechanisms of the Guide index (id, title, how many edges rest on each): the rail and the home. */
+export function useGuideMechanisms() {
+  return useQuery({
+    queryKey: queryKeys.gql('GuideMechanisms', {}),
+    queryFn: async () => {
+      const { GuideMechanismsQuery } = await import('./edges-doc');
+      return gql(GuideMechanismsQuery, {});
+    },
+    select: (data) => data.guideIndex?.mechanisms ?? [],
+    staleTime: GUIDE_STALE_MS,
+  });
+}
+
+/** The site edges a playbook implements (empty for an unknown playbook). */
+export function useGuidePlaybookEdges(id: string) {
+  const variables = { id };
+  return useQuery({
+    queryKey: queryKeys.gql('GuidePlaybookEdges', variables),
+    queryFn: async () => {
+      const { GuidePlaybookEdgesQuery } = await import('./edges-doc');
+      return gql(GuidePlaybookEdgesQuery, variables);
+    },
+    select: (data) => data.guidePlaybook?.edges ?? [],
+    staleTime: GUIDE_STALE_MS,
+  });
+}

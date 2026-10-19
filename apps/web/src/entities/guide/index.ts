@@ -14,7 +14,13 @@ export {
   useGuideStartPage,
   useGuideTerm,
 } from './api/hooks';
-export { useGuideEdge, useGuideEdgeIndex, useGuideMechanism } from './api/edges';
+export {
+  useGuideEdge,
+  useGuideEdgeIndex,
+  useGuideMechanism,
+  useGuideMechanisms,
+  useGuidePlaybookEdges,
+} from './api/edges';
 export { episodeFacts, type EpisodeFacts } from './model/episode-facts';
 export { edgeSideText, edgeStatusText, edgeStatusTone, ideaVerdictTone } from './model/edge-status';
 export {

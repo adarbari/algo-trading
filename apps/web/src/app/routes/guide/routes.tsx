@@ -15,7 +15,7 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import type * as GuidePages from '@/pages/guide';
 
-import type * as EdgesRoutes from './edges-routes';
+import type * as EdgesRouteModule from './edges-routes';
 
 import { parseFieldsSearch } from '@/entities/guide';
 import { GuideLayout } from '../../layouts';
@@ -51,10 +51,8 @@ const guideLoading = (page: PageModule<typeof GuidePages>) =>
 
 // The Edges routes' components load on first visit (edges-routes.tsx), with the same shared reads.
 const edgesModule = () => import('./edges-routes');
-const EdgesIndexRoute = lazyPage(edgesModule, 'EdgesIndexRoute');
-const MechanismRoute = lazyPage(edgesModule, 'MechanismRoute');
-const EdgeRoute = lazyPage(edgesModule, 'EdgeRoute');
-const edgesLoading = (page: PageModule<typeof EdgesRoutes>) =>
+const EdgesRoutes = lazyPage(edgesModule, 'EdgesRoutes');
+const edgesLoading = (page: PageModule<typeof EdgesRouteModule>) =>
   pageRoute(page, (module, client) => {
     module.prefetchGuideReads(client);
   });
@@ -185,25 +183,11 @@ const episodeRoute = createRoute({
   component: EpisodeRoute,
 });
 
-const edgesIndexRoute = createRoute({
+const edgesRoute = createRoute({
   getParentRoute: () => guideRoute,
-  ...edgesLoading(EdgesIndexRoute),
-  path: 'edges',
-  component: EdgesIndexRoute,
-});
-
-const mechanismRoute = createRoute({
-  getParentRoute: () => guideRoute,
-  ...edgesLoading(MechanismRoute),
-  path: 'edges/m/$mechanism',
-  component: MechanismRoute,
-});
-
-const edgeRoute = createRoute({
-  getParentRoute: () => guideRoute,
-  ...edgesLoading(EdgeRoute),
-  path: 'edges/$id',
-  component: EdgeRoute,
+  ...edgesLoading(EdgesRoutes),
+  path: 'edges/$',
+  component: EdgesRoutes,
 });
 
 const startIndexRoute = createRoute({
@@ -254,9 +238,7 @@ export const guideRoutes = guideRoute.addChildren([
   playbookRoute,
   situationsRoute,
   situationRoute,
-  edgesIndexRoute,
-  mechanismRoute,
-  edgeRoute,
+  edgesRoute,
   regimeIndexRoute,
   indicatorRoute,
   episodeRoute,

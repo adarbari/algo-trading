@@ -184,20 +184,6 @@ const EDGE = {
   seeAlso: ['unknown'],
 };
 
-export interface EdgesRef {
-  kind: string;
-  id: string;
-}
-
-/** The mechanisms and edges of a `Query.guideEntries` batch (one of each is known). */
-export function edgeEntries(refs: EdgesRef[]): { mechanisms: Json[]; edges: Json[] } {
-  const asked = (kind: string) => refs.filter((r) => r.kind === kind).map((r) => r.id);
-  return {
-    mechanisms: asked('MECHANISM').includes(MECHANISM.id) ? [MECHANISM] : [],
-    edges: asked('EDGE').includes(row()['id'] as string) ? [EDGE] : [],
-  };
-}
-
 /** The edges a playbook implements (`GuidePlaybookDetail.edges`). */
 export const VRP_EDGES = [
   {
@@ -207,3 +193,23 @@ export const VRP_EDGES = [
     status: 'candidate',
   },
 ];
+
+/** `Query.guideIndex { mechanisms }`: the rail's and the home's list. */
+export function guideMechanisms(): Json {
+  return { data: { guideIndex: { mechanisms: MECHANISMS } } };
+}
+
+/** `Query.guideMechanism(id)`: null for an unknown mechanism. */
+export function guideMechanism(id: string): Json {
+  return { data: { guideMechanism: id === MECHANISM.id ? MECHANISM : null } };
+}
+
+/** `Query.guideEdge(id)`: null for an unknown edge. */
+export function guideEdge(id: string): Json {
+  return { data: { guideEdge: id === row()['id'] ? EDGE : null } };
+}
+
+/** `Query.guidePlaybook(id) { edges }`. */
+export function guidePlaybookEdges(id: string): Json {
+  return { data: { guidePlaybook: { edges: id === 'vrp_scanner' ? VRP_EDGES : [] } } };
+}

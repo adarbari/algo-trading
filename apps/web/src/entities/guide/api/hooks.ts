@@ -73,11 +73,6 @@ const GuideIndexQuery = graphql(`
         term
         short
       }
-      mechanisms {
-        id
-        title
-        count
-      }
     }
   }
 `);
@@ -175,12 +170,6 @@ const GuidePlaybookQuery = graphql(`
         slug
         name
         fields
-      }
-      edges {
-        id
-        name
-        thesis
-        status
       }
     }
   }

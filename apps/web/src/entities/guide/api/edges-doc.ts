@@ -279,3 +279,28 @@ export const GuideEdgeIndexQuery = graphql(`
     }
   }
 `);
+
+export const GuideMechanismsQuery = graphql(`
+  query GuideMechanisms {
+    guideIndex {
+      mechanisms {
+        id
+        title
+        count
+      }
+    }
+  }
+`);
+
+export const GuidePlaybookEdgesQuery = graphql(`
+  query GuidePlaybookEdges($id: String!) {
+    guidePlaybook(id: $id) {
+      edges {
+        id
+        name
+        thesis
+        status
+      }
+    }
+  }
+`);

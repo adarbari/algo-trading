@@ -117,8 +117,6 @@ export async function mockNoGuideEntries(page: Page): Promise<void> {
             episodes: [],
             terms: [],
             startPages: [],
-            mechanisms: [],
-            edges: [],
           },
         },
       },

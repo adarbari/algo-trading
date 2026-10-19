@@ -12,8 +12,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { VRP_EDGES } from './edges-api';
-
 type Json = Record<string, unknown>;
 
 /** Text cut at the first mention of each name: `{ text, field }` segments, as `GuideProse`. */
@@ -85,7 +83,6 @@ const PLAYBOOKS: Record<string, Json> = {
     tieBreakDescending: true,
     related: [{ id: 'vrp_scanner', name: 'VRP scanner', reason: 'the option-income side' }],
     situations: [],
-    edges: [],
   },
   vrp_scanner: {
     id: 'vrp_scanner',
@@ -124,7 +121,6 @@ const PLAYBOOKS: Record<string, Json> = {
     tieBreakDescending: true,
     related: [{ id: 'breakout', name: 'Breakout', reason: 'the chart side' }],
     situations: [{ slug: SITUATION.slug, name: SITUATION.name, fields: [IV30] }],
-    edges: VRP_EDGES,
   },
 };
 

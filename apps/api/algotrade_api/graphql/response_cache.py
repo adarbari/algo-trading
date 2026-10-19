@@ -66,6 +66,8 @@ SHARED_OPERATIONS: frozenset[str] = frozenset(
         "RegimeSignals",
         "GuideIndex",
         "GuideMechanism",
+        "GuideMechanisms",
+        "GuidePlaybookEdges",
         "GuideEdge",
         "GuideEdgeIndex",  # site edge documents and mechanism files: the same for every caller
         "InstrumentPrices",

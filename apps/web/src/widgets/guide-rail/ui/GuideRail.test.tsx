@@ -11,6 +11,7 @@ const hooks = vi.hoisted(() => ({
   useFeatureCatalogue: vi.fn(),
   useGuideIndex: vi.fn(),
   useGuideEdgeIndex: vi.fn(),
+  useGuideMechanisms: vi.fn(),
 }));
 
 vi.mock('@/entities/feature', async (importOriginal) => ({
@@ -24,6 +25,7 @@ vi.mock('@/entities/guide', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useGuideIndex: hooks.useGuideIndex,
   useGuideEdgeIndex: hooks.useGuideEdgeIndex,
+  useGuideMechanisms: hooks.useGuideMechanisms,
 }));
 
 const field = (name: string, theme: string, reads: string) => ({
@@ -84,11 +86,12 @@ const index = {
     { key: 'vix_term', plainName: 'Is fear rising?', pace: 'fast' },
   ],
   episodes: [{ key: 'gfc_2007', name: 'Global financial crisis, 2007-09' }],
-  mechanisms: [
-    { id: 'slow_to_update', title: 'Slow to update', count: 13 },
-    { id: 'forced_flows', title: 'Forced buyers and sellers', count: 8 },
-  ],
 };
+
+const mechanisms = [
+  { id: 'slow_to_update', title: 'Slow to update', count: 13 },
+  { id: 'forced_flows', title: 'Forced buyers and sellers', count: 8 },
+];
 
 const edgeIndex = {
   setAsideTitle: 'Checked and set aside',
@@ -99,6 +102,7 @@ beforeEach(() => {
   hooks.useFeatureCatalogue.mockReturnValue(fakeQuery(catalogue));
   hooks.useGuideIndex.mockReturnValue(fakeQuery(index));
   hooks.useGuideEdgeIndex.mockReturnValue(fakeQuery(edgeIndex));
+  hooks.useGuideMechanisms.mockReturnValue(fakeQuery(mechanisms));
 });
 
 describe('GuideRail', () => {

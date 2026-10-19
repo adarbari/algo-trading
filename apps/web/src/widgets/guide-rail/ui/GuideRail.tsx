@@ -36,6 +36,7 @@ import {
   themeTitle,
   useGuideEdgeIndex,
   useGuideIndex,
+  useGuideMechanisms,
 } from '@/entities/guide';
 import { GuideSearchButton } from '@/features/guide-search';
 
@@ -95,6 +96,7 @@ export function GuideRail({
   const onEdges = page === 'edges' || page === 'mechanism' || page === 'edge';
   // The titles of the two groups after the mechanisms are the Edges index's own.
   const edgeIndex = useGuideEdgeIndex({ enabled: onEdges });
+  const mechanismList = useGuideMechanisms();
   const catalogue = useFeatureCatalogue();
   const all = catalogue.data;
   const openField = field && all ? byName(all).get(field) : undefined;
@@ -197,7 +199,7 @@ export function GuideRail({
     current: page === 'edges',
     children: onEdges
       ? [
-          ...(index.data?.mechanisms ?? []).map((m) => ({
+          ...(mechanismList.data ?? []).map((m) => ({
             href: mechanismPath(m.id),
             label: m.title,
             count: m.count,

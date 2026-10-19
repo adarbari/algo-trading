@@ -6,11 +6,12 @@ import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
 import { GuideHome } from './GuideHome';
 
-const hooks = vi.hoisted(() => ({ useGuideIndex: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useGuideIndex: vi.fn(), useGuideMechanisms: vi.fn() }));
 
 vi.mock('@/entities/guide', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useGuideIndex: hooks.useGuideIndex,
+  useGuideMechanisms: hooks.useGuideMechanisms,
 }));
 
 const index = {
@@ -63,14 +64,16 @@ const index = {
     { key: 'vix_term', plainName: 'Is fear rising?', pace: 'fast' },
   ],
   episodes: [{ key: 'gfc_2007', name: 'Global financial crisis, 2007-09' }],
-  mechanisms: [
-    { id: 'slow_to_update', title: 'Slow to update', count: 13 },
-    { id: 'forced_flows', title: 'Forced buyers and sellers', count: 8 },
-  ],
 };
+
+const mechanisms = [
+  { id: 'slow_to_update', title: 'Slow to update', count: 13 },
+  { id: 'forced_flows', title: 'Forced buyers and sellers', count: 8 },
+];
 
 beforeEach(() => {
   hooks.useGuideIndex.mockReturnValue(fakeQuery(index));
+  hooks.useGuideMechanisms.mockReturnValue(fakeQuery(mechanisms));
 });
 
 describe('GuideHome', () => {
