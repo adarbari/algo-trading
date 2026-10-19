@@ -65,6 +65,7 @@ SHARED_OPERATIONS: frozenset[str] = frozenset(
         "RegimeBands",
         "RegimeSignals",
         "GuideIndex",
+        "GuideEdgeIndex",  # site edge documents and mechanism files: the same for every caller
         "InstrumentPrices",
         "OptionQuotes",
         "EtfHoldings",
