@@ -964,3 +964,10 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: TF-IDF weights depend on the corpus the night holds, so a value could change with no text changing; raw counts and a pinned tokeniser make it reproducible. The floors keep a short or missing section from reading as "unchanged". Architect design of 2026-10-18.
+## 2026-10-18 | EB H14 batch X (reverse_split_distress_filter) | The short is charged an assumed borrow of 2000 bps a year, not the site's 100
+- Question: what borrow does the short side of the reverse-split avoid list pay, when the document itself puts the real borrow at 20 to 100 percent a year?
+- Options: (a) keep the site default of 100 bps and note it / (b) a per-edge `borrow_bps_annual = 2000` / (c) an evidence-only short with no verdict basis.
+- Decision: (b), 2000 bps a year, worded as a lower bound on the real borrow; the universe is liquid-gated (ADV of $5M or more), so owner decision O2 applies.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: 100 bps on a distressed name flatters the short by an order of magnitude; the low end of the document's own range is the least unrealistic number the store supports.

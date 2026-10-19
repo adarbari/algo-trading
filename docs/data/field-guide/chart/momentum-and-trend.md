@@ -457,6 +457,24 @@ Sources: Moskowitz and Grinblatt (1999), Do Industries Explain Momentum?, Journa
 
 Sources: Moskowitz and Grinblatt (1999), Do Industries Explain Momentum?, Journal of Finance; Blitz, Huij, Lansdorp and Verbeek (2013), Short-term residual reversal
 
+### `feature.year_loser_flag`
+
+**How to read it.** True when the name fell 30% or more over the last 252 sessions: the stock that year-end tax-loss selling falls on. It is a fixed level standing in for the bottom decile, so in a mild year it flags fewer names than a decile would and in a crash more.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a name that fell 30% or more over the year | `eq true` | hard | - | a yes or no, so names with no value drop out; rank the flagged names with rollup.trend_stats@v2.ret_252d lowest first |
+
+**When the reading lies**
+
+- It is a rolling year, not the calendar year. A name that fell early and has rebounded can read False, and one that fell last month reads True. Check rollup.price_stats@v2.ret_60d.
+- Most deep losers are thin and distressed, and some will never rebound. Gate on rollup.price_stats@v2.adv_usd_20d and read rollup.trend_stats@v2.ret_252d for how far each fell.
+- Null after a gap in the last 253 sessions or a shorter history. It is never False for a missing value.
+
+Sources: Grinblatt and Keloharju, NBER working paper 8745, on year-end selling of the year's losers: https://www.nber.org/papers/w8745.pdf
+
 ### `rollup.bands@v2.band_walk`
 
 **How to read it.** How many consecutive sessions the close has sat outside the Bollinger bands: positive counts closes above the upper band, negative below the lower, 0 inside. A walk of 3 or more up the band is the signature of a strong trend (Bollinger: 'a tag of the upper band is not a sell signal'); a walk down the lower band is a persistent sell-off. Most walks end within a week; 10 and above is a run that usually ends in a climax.
@@ -867,20 +885,3 @@ Sources: Clenow (2015), Stocks on the Move
 - Null when either input is unknown (a gap among the last 90 sessions, or a flat close).
 
 Sources: Clenow (2015), Stocks on the Move: the ranking formula and the 90-day window
-
-### `rollup.trend_stats@v2.high_100d`
-
-**How to read it.** The highest daily high of the last 100 sessions (about five months), in dollars per share, today's high included. With the 20 and 50-session highs it dates the current advance: the close at all three is a fresh leg, at the 20 but not the 100 a rally inside a longer range. Compare with the close as a share: rollup.price_stats@v2.close / high_100d - 1.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| has a 100-session channel | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule |
-
-**When the reading lies**
-
-- A single spike high (an earnings gap that reversed) sets the level for 100 sessions; feature.dist_to_resistance uses the confirmed swing pivot instead.
-- Null after a gap in the last 100 sessions or a shorter history.
-
-Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
