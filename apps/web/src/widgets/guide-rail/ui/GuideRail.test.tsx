@@ -149,10 +149,7 @@ describe('GuideRail', () => {
       'aria-current',
       'page',
     );
-    expect(within(nav).getByRole('link', { name: 'Checked and set aside' })).toHaveAttribute(
-      'href',
-      '/guide/edges#set-aside',
-    );
+    expect(within(nav).queryByRole('link', { name: 'Checked and set aside' })).toBeNull();
     expect(within(nav).getByRole('link', { name: 'Researched, not built' })).toHaveAttribute(
       'href',
       '/guide/edges#not-built',

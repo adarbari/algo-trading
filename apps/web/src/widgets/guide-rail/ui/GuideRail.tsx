@@ -4,7 +4,7 @@
  * spec's order (Start here first, Glossary last); Fields expands to its themes, and the theme of
  * the current field to its fields; Start here, Market regime (indicators, then market falls),
  * Playbooks (in family order) and Situations list their pages while one of theirs is open;
- * Edges lists the mechanisms and the two groups after them (set aside, not built) on its pages.
+ * Edges lists the mechanisms and, after them, the ideas not built on its pages.
  */
 import { NavList, Stack, type NavListItem } from '@algotrade/ui';
 
@@ -206,10 +206,7 @@ export function GuideRail({
             current: page === 'mechanism' && m.id === mechanism,
           })),
           ...(edgeIndex.data
-            ? [
-                { href: edgesGroupPath('set-aside'), label: edgeIndex.data.setAsideTitle },
-                { href: edgesGroupPath('not-built'), label: edgeIndex.data.notBuiltTitle },
-              ]
+            ? [{ href: edgesGroupPath('not-built'), label: edgeIndex.data.notBuiltTitle }]
             : []),
         ]
       : [],

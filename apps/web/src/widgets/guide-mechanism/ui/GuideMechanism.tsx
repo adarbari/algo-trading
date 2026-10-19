@@ -2,15 +2,17 @@
  * A mechanism's Guide page (`/guide/edges/m/<id>`, ADR 0051, docs/ui/guide.md "Edges"): the
  * question it answers, its title and one-line hero, how it works, why it survives, the research
  * behind the family (stat tiles with their citation, then the paragraphs), how to tell a real
- * edge from a decoy and the one thing not to read into it, the edges that rest on it, the ideas
- * researched but not built, the sources and the glossary terms it sends the reader to. The text
+ * edge from a decoy and the one thing not to read into it, the edges that rest on it (filterable by
+ * status, asset, side and holding), the ideas researched but not built (collapsed), the sources and the glossary terms it sends the reader to. The text
  * is the mechanism file's, as the server links it; nothing is written here.
  */
 import {
   Banner,
+  Disclosure,
   DocSection,
   EmptyState,
   ErrorState,
+  FilterChips,
   Heading,
   NavList,
   ProseList,
@@ -21,6 +23,7 @@ import {
   Text,
   TextLink,
 } from '@algotrade/ui';
+import { useState } from 'react';
 
 import {
   EdgeRows,
@@ -33,6 +36,14 @@ import {
   type GuideProseValue,
 } from '@/entities/guide';
 import { termHelp } from '@/features/guide-help';
+
+import {
+  edgeMatches,
+  FILTER_LABELS,
+  filterOptions,
+  type EdgeFacts,
+  type EdgeFilters,
+} from '../model/filter';
 
 export interface GuideMechanismProps {
   /** The mechanism id in the URL. */
@@ -154,21 +165,22 @@ export function GuideMechanism({ id }: GuideMechanismProps) {
           {m.edges.length === 0 ? (
             <EmptyState bordered title="No edge rests on this mechanism yet." />
           ) : (
-            <EdgeRows aria-label="Edges" edges={m.edges} />
+            <MechanismEdges edges={m.edges} />
           )}
         </Stack>
       </DocSection>
 
       {m.notBuilt.length > 0 && (
         <DocSection id="not-built">
-          <Stack gap={3} as="section" aria-label="Researched, not built">
-            <Stack direction="row" gap={2} align="center">
-              <Heading level={2}>Researched, not built</Heading>
-              {termHelp('idea_verdict')}
-              {termHelp('idea_feasibility')}
+          <Disclosure label="Researched, not built" count={String(m.notBuilt.length)}>
+            <Stack gap={3} as="section" aria-label="Researched, not built">
+              <Stack direction="row" gap={2} align="center">
+                {termHelp('idea_verdict')}
+                {termHelp('idea_feasibility')}
+              </Stack>
+              <IdeaRows aria-label="Ideas not built" ideas={m.notBuilt} />
             </Stack>
-            <IdeaRows aria-label="Ideas not built" ideas={m.notBuilt} />
-          </Stack>
+          </Disclosure>
         </DocSection>
       )}
 
@@ -212,4 +224,35 @@ const SECTIONS = [
 /** "On this page": the anchors of a mechanism page's sections, in the order they appear. */
 export function MechanismOutline() {
   return <NavList aria-label="On this page" size="sm" items={SECTIONS} />;
+}
+
+/** The edges of the mechanism, with filters for status, asset, side and holding when there is a choice. */
+function MechanismEdges({ edges }: { edges: readonly EdgeFacts[] }) {
+  const [filters, setFilters] = useState<EdgeFilters>({});
+  const options = filterOptions(edges);
+  const definitions = (Object.keys(FILTER_LABELS) as (keyof EdgeFilters)[])
+    .filter((id) => options[id].length > 1)
+    .map((id) => ({ id, label: FILTER_LABELS[id], options: options[id] }));
+  const shown = edges.filter((edge) => edgeMatches(edge, filters));
+  return (
+    <Stack gap={3}>
+      {definitions.length > 0 && (
+        <FilterChips
+          filters={definitions}
+          values={filters}
+          onChange={(id, value) => {
+            setFilters({ ...filters, [id]: value });
+          }}
+          onClear={() => {
+            setFilters({});
+          }}
+        />
+      )}
+      {shown.length === 0 ? (
+        <EmptyState bordered title="No edge matches these filters." />
+      ) : (
+        <EdgeRows aria-label="Edges" edges={shown} />
+      )}
+    </Stack>
+  );
 }

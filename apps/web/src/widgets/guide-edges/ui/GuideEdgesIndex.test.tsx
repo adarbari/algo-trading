@@ -53,35 +53,19 @@ describe('GuideEdgesIndex', () => {
     expect(within(cards).getByText('1 ideas not built')).toBeInTheDocument();
   });
 
-  it('narrows the cards by a search and by the server’s filters, and says when none is left', async () => {
+  it('shows every mechanism, with no search, filter or list of edges', () => {
     render(<GuideEdgesIndex onOpenEdgesPage={vi.fn()} />);
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search the edges' }), 'index');
     const cards = screen.getByRole('list', { name: 'The mechanisms' });
-    expect(within(cards).queryByRole('link', { name: 'Slow to update' })).toBeNull();
-    expect(within(cards).getByRole('link', { name: 'Forced buyers and sellers' })).toBeVisible();
-    await userEvent.clear(screen.getByRole('searchbox', { name: 'Search the edges' }));
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search the edges' }), 'zzz');
-    expect(screen.getByText('No mechanism matches these filters.')).toBeInTheDocument();
+    expect(within(cards).getAllByRole('listitem')).toHaveLength(edgeIndex().mechanisms.length);
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Index additions' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Checked and set aside' })).toBeNull();
   });
 
-  it('offers the asset filter with the server’s words and counts', async () => {
+  it('keeps the ideas not built closed until opened, then shows them with their verdict', async () => {
     render(<GuideEdgesIndex onOpenEdgesPage={vi.fn()} />);
-    await userEvent.click(screen.getByRole('button', { name: /Asset/ }));
-    await userEvent.click(await screen.findByRole('button', { name: /ETFs and funds · 1/ }));
-    const cards = screen.getByRole('list', { name: 'The mechanisms' });
-    expect(within(cards).getByRole('link', { name: 'Slow to update' })).toBeVisible();
-    expect(within(cards).queryByRole('link', { name: 'Forced buyers and sellers' })).toBeNull();
-  });
-
-  it('lists the edges set aside with the reason on file, and the ideas not built with their verdict', () => {
-    render(<GuideEdgesIndex onOpenEdgesPage={vi.fn()} />);
-    const aside = screen.getByRole('region', { name: 'Checked and set aside' });
-    expect(within(aside).getByRole('link', { name: 'Index additions' })).toHaveAttribute(
-      'href',
-      '/guide/edges/index_adds',
-    );
-    expect(within(aside).getByText(/index membership history is not licensed/)).toBeVisible();
-    expect(within(aside).getByText('help edge_status')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Researched, not built' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Researched, not built/ }));
     const ideas = screen.getByRole('region', { name: 'Researched, not built' });
     expect(within(ideas).getByText('Dead')).toBeInTheDocument();
     expect(within(ideas).getByText('Gone in large caps since the mid-2000s.')).toBeInTheDocument();
@@ -94,6 +78,7 @@ describe('GuideEdgesIndex', () => {
     );
     hooks.useGuideEdgeIndex.mockReturnValue(fakeQuery(edgeIndex({ notBuilt: many })));
     render(<GuideEdgesIndex onOpenEdgesPage={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: /Researched, not built/ }));
     const list = () => screen.getByRole('list', { name: 'Researched, not built' });
     expect(within(list()).getAllByRole('listitem')).toHaveLength(12);
     await userEvent.click(screen.getByRole('button', { name: 'Show all 30 ideas' }));

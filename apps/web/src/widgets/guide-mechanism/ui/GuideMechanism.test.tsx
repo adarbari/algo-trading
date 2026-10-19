@@ -63,7 +63,7 @@ describe('GuideMechanism', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Do not read a momentum win rate');
   });
 
-  it('lists its edges linked to their pages, then the ideas not built', () => {
+  it('lists its edges linked to their pages, then the ideas not built, closed until opened', async () => {
     render(<GuideMechanism id="slow_to_update" />);
     const edges = screen.getByRole('region', { name: 'The edges in this mechanism' });
     expect(within(edges).getByRole('link', { name: 'Earnings-date advances' })).toHaveAttribute(
@@ -74,6 +74,8 @@ describe('GuideMechanism', () => {
     expect(
       within(edges).getByRole('link', { name: 'Live results on the Edges page' }),
     ).toHaveAttribute('href', '/edges');
+    expect(screen.queryByRole('region', { name: 'Researched, not built' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Researched, not built/ }));
     const ideas = screen.getByRole('region', { name: 'Researched, not built' });
     expect(within(ideas).getByText('Year-on-year change in filing text')).toBeInTheDocument();
   });
@@ -83,6 +85,36 @@ describe('GuideMechanism', () => {
     render(<GuideMechanism id="slow_to_update" />);
     expect(screen.queryByRole('region', { name: 'Researched, not built' })).toBeNull();
     expect(screen.getByText('No edge rests on this mechanism yet.')).toBeInTheDocument();
+  });
+
+  it('filters its edges by status, asset, side and holding when there is a choice', async () => {
+    const [first] = mechanism().edges;
+    const edges = [
+      {
+        ...first,
+        id: 'a',
+        name: 'Alpha edge',
+        status: 'candidate',
+        asset: 'stocks',
+        assetText: 'Stocks',
+      },
+      {
+        ...first,
+        id: 'b',
+        name: 'Beta edge',
+        status: 'rejected',
+        asset: 'etfs',
+        assetText: 'ETFs',
+      },
+    ];
+    hooks.useGuideMechanism.mockReturnValue(fakeQuery(mechanism({ edges })));
+    render(<GuideMechanism id="slow_to_update" />);
+    await userEvent.click(screen.getByRole('button', { name: /Status/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Rejected · 1/ }));
+    expect(screen.queryByRole('link', { name: 'Alpha edge' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Beta edge' })).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getByRole('link', { name: 'Alpha edge' })).toBeVisible();
   });
 
   it('sends the reader on to the glossary terms it names', () => {

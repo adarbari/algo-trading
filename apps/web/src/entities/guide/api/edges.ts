@@ -10,7 +10,7 @@ import { gql, queryKeys } from '@/shared/api';
 
 const GUIDE_STALE_MS = 10 * 60_000;
 
-/** The Edges section's top page: mechanism cards, filters, edges set aside, ideas not built. */
+/** The Edges section's top page: mechanism cards and ideas not built. */
 export function useGuideEdgeIndex({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.gql('GuideEdgeIndex', {}),

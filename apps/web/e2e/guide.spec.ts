@@ -416,12 +416,14 @@ test('Edges: the index to a mechanism to an edge, and on to the live evidence', 
   await expect(page.getByRole('heading', { level: 1, name: 'Edges' })).toBeVisible();
   const cards = page.getByRole('list', { name: 'The mechanisms' });
   await expect(cards.getByRole('link')).toHaveText(['Slow to update', 'Forced buyers and sellers']);
-  const aside = page.getByRole('region', { name: 'Checked and set aside' });
-  await expect(aside).toContainText('index membership history is not licensed');
+  // The edges are on their mechanism's page; the ideas not built stay closed until opened.
+  await expect(page.getByRole('link', { name: 'Index additions' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Researched, not built' })).toHaveCount(0);
+  await page.getByRole('button', { name: /Researched, not built/ }).click();
   await expect(page.getByRole('region', { name: 'Researched, not built' })).toContainText('Dead');
-  // The rail opens the mechanisms and the two groups on these pages.
+  // The rail opens the mechanisms and the ideas not built on these pages.
   const rail = page.getByRole('navigation', { name: 'Guide', exact: true });
-  await expect(rail.getByRole('link', { name: 'Checked and set aside' })).toBeVisible();
+  await expect(rail.getByRole('link', { name: 'Researched, not built' })).toBeVisible();
   await cards.getByRole('link', { name: 'Slow to update' }).click();
 
   await expect(page).toHaveURL(/\/guide\/edges\/m\/slow_to_update$/);

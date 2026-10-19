@@ -60,8 +60,8 @@ export function edgeGuidePath(id: string): string {
   return `${GUIDE_EDGES_PATH}/${encodeURIComponent(id)}`;
 }
 
-/** The index's group of edges set aside, or of ideas researched but not built. */
-export function edgesGroupPath(group: 'set-aside' | 'not-built'): string {
+/** The index's group of ideas researched but not built. */
+export function edgesGroupPath(group: 'not-built'): string {
   return `${GUIDE_EDGES_PATH}#${group}`;
 }
 
