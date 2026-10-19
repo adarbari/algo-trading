@@ -15,6 +15,7 @@ schedule = "month_end"
 top_k = "all"
 status = "blocked"
 mechanism_kind = "forced_flows"
+plain_reason = "No stored data measures target-date fund flows, and the market trigger it needs is not built."
 rejection_reason = """Three things are missing. (1) The signal: the paper's flow is each fund's rebalance, which needs target-date
 ownership per stock or per fund, and none is stored; target-date funds are mutual funds, not ETFs, so no share-count
 or flow figure of theirs reaches etf_flows@v1, which covers iShares funds only. (2) A stand-in cannot be disclosed

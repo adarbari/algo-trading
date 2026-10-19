@@ -18,6 +18,7 @@ top_k = 20
 base = "universe"
 status = "blocked"
 mechanism_kind = "forced_flows"
+plain_reason = "The document cannot yet enter before the lock-up expiry, which is where the effect sits."
 rejection_reason = """The event class ipo_lockup exists (ipo_lockups@v1, ADR 0075) but the document cannot enter before
 the expiry: the thesis is a hold from about 10 sessions before the expiry (start_offset_sessions = -10, the
 decision session D 11 sessions ahead) and the document loader accepts an entry before the anchor only for
