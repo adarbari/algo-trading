@@ -95,3 +95,5 @@
 "bond_curve_trend_2y/v1.toml" = "76ba2af185582a15222a22e0b6f84e3d182792f1c0c11b02c37ffeed1611324f"
 "country_cape_cheapest/v1.toml" = "9620d497c4033370c10170d2cecfb9ca1daefce6c85090cd84a9eaded66e1f3e"
 "fx_carry_positive/v1.toml" = "0a60ad87298ecdacfe33926a033e277f98b1c55a8c9050d9c7f5948f8e16dc95"
+"reverse_split_recent/v1.toml" = "4db7a6c8e3bcec6754055289bd8d0a286b099bdb84ba2e4ccdef85de371453fe"
+"december_losers/v1.toml" = "8f5d9be0ac7c83f52b6f26258ccd15d6a8169b579fd5de1ead57c30b4fd1bea0"

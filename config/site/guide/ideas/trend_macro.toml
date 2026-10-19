@@ -79,14 +79,6 @@ feasibility = "data_ready"
 why_not_built = "Weak with too few events and fitted thresholds; the strict form is rejected as an edge."
 
 [[idea]]
-id = "vix_mean_reversion_entry"
-title = "Buying after a VIX spike"
-mechanism_kind = "liquidity_provision"
-verdict = "promising"
-feasibility = "needs_data"
-why_not_built = "Planned, but events are few and it needs VIX and three-month VIX history, which are not stored."
-
-[[idea]]
 id = "cross_asset_tsmom_bonds_to_equities"
 title = "Bond returns lead equity returns"
 mechanism_kind = "cross_market_trends"

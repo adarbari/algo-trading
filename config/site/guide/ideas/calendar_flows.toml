@@ -99,14 +99,6 @@ feasibility = "data_ready"
 why_not_built = "The effect has faded; the catalogue folds it into the December losers reversal idea."
 
 [[idea]]
-id = "december_losers_reversal"
-title = "December tax-loss sellers rebound"
-mechanism_kind = "forced_flows"
-verdict = "promising"
-feasibility = "data_ready"
-why_not_built = "Queued in the build plan as a seasonal overlay; one event a year gives low statistical power."
-
-[[idea]]
 id = "quarter_end_window_dressing"
 title = "Funds window-dress at quarter end"
 mechanism_kind = "forced_flows"

@@ -34,6 +34,7 @@ Each edge's full section is on its family page (docs/edges/).
 | Pre-earnings run-up in past winners (`pre_earnings_runup_winners`) | candidate | [family B](edges/b.md) |
 | S&P 500 deletions rebound (`sp500_deletions_long`) | candidate | [family B](edges/b.md) |
 | Analyst target-price implied return (`target_price_implied_return`) | candidate | [family B](edges/b.md) |
+| IPO lock-up expiry (avoid list) (`ipo_lockup_expiry`) | blocked | [family B](edges/b.md) |
 | Spin-off drift (`spinoff_drift`) | blocked | [family B](edges/b.md) |
 | Option-to-stock volume ratio (`c04_option_stock_volume_ratio`) | candidate | [family C](edges/c.md) |
 | Per-name volatility premium, ranked (`c12_vrp_cross_section_iv_hv`) | candidate | [family C](edges/c.md) |
@@ -45,6 +46,7 @@ Each edge's full section is on its family page (docs/edges/).
 | Implied-volatility term structure and straddles (`c13_iv_term_structure_straddles`) | blocked | [family C](edges/c.md) |
 | Pre-earnings straddle purchase (`c16_pre_earnings_straddle_buy`) | blocked | [family C](edges/c.md) |
 | Earnings implied-volatility crush (`c17_earnings_iv_crush_sell`) | blocked | [family C](edges/c.md) |
+| December losers rebound (`december_losers_reversal`) | candidate | [family D](edges/d.md) |
 | ETF flow pressure (`etf_flow_pressure`) | candidate | [family D](edges/d.md) |
 | High-volume return premium (`high_volume_return_premium`) | candidate | [family D](edges/d.md) |
 | Option-expiration week (`option_expiration_week`) | candidate | [family D](edges/d.md) |
@@ -60,6 +62,7 @@ Each edge's full section is on its family page (docs/edges/).
 | Global equities momentum (`dual_momentum_gem`) | candidate | [family E](edges/e.md) |
 | Trend and value across country funds (`trend_carry_value_combo`) | candidate | [family E](edges/e.md) |
 | Multi-asset ETF trend (`tsmom_multi_asset_etf`) | candidate | [family E](edges/e.md) |
+| Buying SPY after a VIX spike (`vix_mean_reversion_entry`) | candidate | [family E](edges/e.md) |
 | Volatility-targeted equity exposure (`vol_managed_equity`) | candidate | [family E](edges/e.md) |
 | Composite mispricing score (`composite_mispricing_score`) | candidate | [family F](edges/f.md) |
 | Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | candidate | [family G](edges/g.md) |
@@ -72,11 +75,13 @@ Each edge's full section is on its family page (docs/edges/).
 | Currency ETF momentum (`fx_etf_carry_momentum`) | candidate | [family H](edges/h.md) |
 | Natural gas and oil ETF avoid list (`natgas_etf_contango_drag`) | candidate | [family H](edges/h.md) |
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | [family H](edges/h.md) |
+| Reverse-split distress filter (`reverse_split_distress_filter`) | candidate | [family H](edges/h.md) |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | [family H](edges/h.md) |
+| Treasury funds before month end (`treasury_month_end_extension`) | candidate | [family H](edges/h.md) |
 | Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | [family H](edges/h.md) |
-| Reverse-split distress filter (`reverse_split_distress_filter`) | blocked | [family H](edges/h.md) |
 | Thematic ETF launch fade (`thematic_etf_launch_fade`) | blocked | [family H](edges/h.md) |
 | Call-put IV spread into earnings (`pre_earnings_cp_iv_spread`) | candidate | [family I](edges/i.md) |
+| Target-date fund contrarian flows (`tdf_contrarian_flows`) | blocked | [family I](edges/i.md) |
 | Earnings announcement premium (`earnings_announcement_premium`) | candidate | [no family](edges/other.md) |
 | 12-1 momentum among names that just reported (`momentum_at_earnings`) | candidate | [no family](edges/other.md) |
 | Small-cap post-earnings drift (`small_cap_earnings_drift`) | candidate | [no family](edges/other.md) |

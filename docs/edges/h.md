@@ -10,9 +10,10 @@ Back to the [index of every edge](../edges.md).
 | Currency ETF momentum (`fx_etf_carry_momentum`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 20% FXE, 20% FXY, 20% FXB, 20% FXA and 20% FXC, entered 1 session after the decision session, costs 10 bps | `trend_positive_6m`, `trend_positive_12m`, `fx_carry_positive` |
 | Natural gas and oil ETF avoid list (`natgas_etf_contango_drag`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 34% UNG, 33% USO and 33% DBO, entered 1 session after the decision session, costs 20 bps | `trend_positive_12m` |
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | every session | excess return, over 6, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `retail_option_attention` |
+| Reverse-split distress filter (`reverse_split_distress_filter`) | candidate | on each `reverse_split` | excess return, over 250, 500 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `reverse_split_recent` |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | on each `tender_offer` | excess return, over 60, 250 sessions, vs SPY, starting +21 sessions from the event, costs 20 bps | `tender_offer_filed` |
+| Treasury funds before month end (`treasury_month_end_extension`) | candidate | calendar:pre month end | excess return, over 3 sessions, entered 1 session after the decision session | none yet |
 | Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
-| Reverse-split distress filter (`reverse_split_distress_filter`) | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 | Thematic ETF launch fade (`thematic_etf_launch_fade`) | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 
 ## BDC price to NAV reversion (`bdc_price_to_nav_reversion`)
@@ -174,6 +175,37 @@ Back to the [index of every edge](../edges.md).
 - Boyer, B. and Vorkink, K. (2014), Stock Options as Lotteries, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v69y2014i4p1485-1527.html>
 - Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html>
 
+## Reverse-split distress filter (`reverse_split_distress_filter`)
+
+**Status:** candidate. **Family:** H. **Thesis:** Stocks that reverse-split to cure a sub-$1 bid price underperform for one to three years, so they belong on an exclusion list.
+
+- **Outcome:** excess return, over 250, 500 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps
+- **Schedule:** on each `reverse_split` (a reverse split (reverse_splits@v1; ADR 0075); anchor: the ex-date; funds are left out by the edge's universe)
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.adv_usd_20d gte 5000000`
+- **Top K:** 20
+- **Screeners:** `reverse_split_recent`
+- **Baselines:** `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Short side, owner decisions O1 and O2 (2026-10-17): a short result on liquid names may be a verdict basis; the outcome is minus the excess return over SPY, less cost and an assumed borrow of 2000 bps a year (borrow_bps_annual: the low end of the 20 to 100 percent range below; no borrow data stored). The idea's own form is a filter (leave reverse splitters out of a long screen); the harness tests it as the short side, which is the same claim stated so that a negative drift is a pass. The anchor is the split's ex-date (reverse_splits@v1, event class reverse_split, ADR 0075): the decision session D is the ex-date and the entry session S is the next one (start_offset_sessions = 1). The events table has no known_from, so a split is read from its ex-date on, which is later than its announcement and so never early. Only splits with a ratio below 1 count; the fund universe is left out by this document's COMMON_STOCK filter. THE HISTORY LIMITS stand: most reverse splitters are microcaps, so the liquid-name floor (20-day dollar volume of $5M) leaves few events and the verdict rests on a small count; the assumed 2000 bps a year is a LOWER BOUND on the real borrow of such a name (20 to 100 percent a year, often no borrow at all), so a short result here is still the best case for the short; and the 250 and 500-session horizons outlast the frozen period for any split since 2026-04-01, so only a split from before it fills a frozen slice, and a 500-session outcome exists only for splits that long ago (stored outcomes reach 2018 after the D0 backfill). Every eligible name is the base and the picks are the flagged names ranked by dollar volume (the most liquid shorted first), so the lift reads the flagged names against all eligible names, not against themselves. A second reverse split of the same name within 250 sessions is counted once per decision session, as the harness dedupes. Trial count: one screener, two horizons.
+
+**Quality bar**
+
+1. **Mechanism:** Compliance-driven splits signal distress, continued dilution (at-the-market offerings resume once the price is above $1) and index and retail abandonment; Nasdaq rule changes in 2024 and 2025 tightened cures for repeat offenders.
+2. **Persistence:** Firms must split or delist and the dilution machine is the business model of many micro-cap issuers; shorting is costly, so prices stay too high (Kim, Klein and Rosenfeld 2008, exact figure not verified).
+3. **Outcome:** Minus the excess return over SPY over 250 and 500 sessions after the entry close (the session after the split's ex-date), net of 20 bps a round trip and an assumed borrow of 2000 bps a year.
+4. **Trigger timing:** The split is known from its ex-date (the anchor and the decision session D); the entry session S = D + 1 (start_offset_sessions = 1). The names are read at D from reverse_splits@v1 (sessions_since_reverse_split = 0), built only from splits with ts <= D, never from one that goes ex after D's close. The events table has no known_from, so the ex-date is the earliest the split is read, and a late-stored split is read late, never early.
+5. **Faithful replication:** The source's rule first: the three-year abnormal return after a reverse split (Kim, Klein and Rosenfeld 2008). Here reverse_split_recent v1 takes the liquid common stocks with a reverse split of the last 20 sessions and the harness shorts the 20 most liquid for 250 and 500 sessions.
+6. **Expected size and sample:** Kim, Klein and Rosenfeld (2008) report negative long-run abnormal returns after a reverse split and the page puts them at about -15 to -20 percent over three years, an exact figure it marks as not verified, so no published figure is set. Liquid reverse splitters are few; independent events are the binding count, and the 500-session outcome needs history the store reaches only from 2018.
+7. **Capacity and costs:** Liquid splitters are shorted at the borrow of a distressed name, often 20 to 100 percent a year or none at all; the outcome deducts 20 bps and an assumed 2000 bps a year, a LOWER BOUND on the borrow, so the result is a best case. The usable form for an individual is the exclusion list for a long screen, which costs nothing.
+8. **Failure modes and retirement:** A compliance split that works (the price holds above $1 and the business recovers); a split that goes with a merger or a spin-off (ratio and ex-date read the same); the 2024 and 2025 Nasdaq rule changes, which may have changed the cycle; heavy overlap with distress, low price and share issuance. Retire if the frozen-period short return of the picks is not above the base rate of every eligible name.
+9. **Decoys:** Distress, low price and high share issuance (the net_share_issuance and distress edges) and size: the size baseline. A reverse split is the visible end of a long slide, so part of the drift was already in the price.
+
+**Sources**
+
+- Kim, S., Klein, A. and Rosenfeld, J., Return performance surrounding reverse stock splits: can investors profit?, Financial Management, 2008 <https://ideas.repec.org/a/bla/finmgt/v37y2008i2p173-192.html>
+- Han, K., The effects of reverse splits on the liquidity of the stock, Journal of Financial and Quantitative Analysis, 1995 <https://ideas.repec.org/a/cup/jfinqa/v30y1995i01p159-169_00.html>
+- Campbell, J., Hilscher, J. and Szilagyi, J. (2008), In Search of Distress Risk, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v63y2008i6p2899-2939.html>
+
 ## Tender-offer drift after expiry (`tender_offer_drift`)
 
 **Status:** candidate. **Family:** H. **Thesis:** Stocks whose own tender offer for their shares has run its course outperform the market for a year or more afterwards.
@@ -205,6 +237,36 @@ Back to the [index of every edge](../edges.md).
 - Peyer, U. and Vermaelen, T., The nature and persistence of buyback anomalies, Review of Financial Studies, 2009 <https://ideas.repec.org/a/oup/rfinst/v22y2009i4p1693-1745.html>
 - Fu, F. and Huang, S., The persistence of long-run abnormal returns following stock repurchases and offerings, Management Science, 2016 <https://ideas.repec.org/a/inm/ormnsc/v62y2016i4p964-984.html>
 - Ikenberry, D., Lakonishok, J. and Vermaelen, T. (1995), Market underreaction to open market share repurchases, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v39y1995i2-3p181-208.html>
+
+## Treasury funds before month end (`treasury_month_end_extension`)
+
+**Status:** candidate. **Family:** H. **Thesis:** Treasury and aggregate bond funds earn more over the last three sessions of a month than over the same number of sessions elsewhere.
+
+- **Outcome:** excess return, over 3 sessions, entered 1 session after the decision session
+- **Schedule:** calendar:pre month end
+- **Universe:** `instrument.symbol in ('TLT', 'IEF', 'AGG')`
+- **Top K:** all qualified names
+- **Screeners:** none yet
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** VERDICTS ARE UNMEASURED until the D0 Tiingo outcomes backfill (due 2026-11-09): the stored outcome history of the three funds is too short to measure a window edge before it. The window is the calendar's pre_month_end (core/time/windows.py, ADR 0075): the last 3 sessions of every month; the entry session S is the session before the first of them and the decision session D the one before S, so the value is the fund's raw return over the month's last 3 sessions from the close of the session before. It is compared with the fund's own non-overlapping 3-session stretches outside every window (ADR 0073), and the harness pairs each window with the stretch right after it so that a rising fund does not pass on its drift. TLT, IEF and AGG are three trials, not one (deflated Sharpe ratio). The source holds the funds for 2 to 3 sessions up to the first session after month end; the window here stops at the month's last session (the closed set of windows has no window that crosses the month end), and it is distinct from the turn_of_month window of the equity edge (the month's last session and the 3 after it), so the two edges share at most one session. The equity leg of the source (sell equities into month end) is the turn-of-month edge's opposite and is not filed. Schwarz's Sharpe near 1 after costs is from a search summary the page did not read, so no [published] figure is set; no cost is deducted from a timed position in this version (ADR 0073). About 12 windows a year, so about 100 since 2018.
+
+**Quality bar**
+
+1. **Mechanism:** Bond index duration jumps at month end when new issues enter the indexes and short bonds drop out, so passive trackers must buy duration on a known date; pensions and insurers also raise cash by selling equities before month-end payments and park it in bonds (Etula, Rinne, Suominen and Vaittinen 2020).
+2. **Persistence:** Index rules are public and mechanical and the flow is non-discretionary, which is why it can persist; Etula et al show it for 1980 to 2016. The effect per day is small against the funds' rate risk (the rate trend of 2022 to 2024 dominates it), and after 2016 no split is on file, so persistence is a claim to test.
+3. **Outcome:** The fund's raw return (benchmark none) over the 3 sessions of the pre-month-end window from the entry close, against its own return over the same number of sessions outside every window; no cost is deducted from a timed position (ADR 0073).
+4. **Trigger timing:** The window is fixed by the exchange calendar ahead of time (the last 3 sessions of the month), so nothing is read at D: the entry session S is the session before the first of them (start_offset_sessions = 1 from D = S - 1) and the return runs from S's close over 3 sessions. No fact after D places a window or a stretch of the base.
+5. **Faithful replication:** The source's rule: hold long-duration Treasuries (TLT, IEF) for the last 2 to 3 sessions of the month and stay out otherwise (Etula et al 2020; Schwarz, Wharton Rodney White Center, 2019). Here three funds are held over the last 3 sessions, and the cash leg is only in the run record's timing Sharpe ratio.
+6. **Expected size and sample:** Etula et al (2020): Treasuries show the mirror image of the equity sell-off around the turn of the month in 1980 to 2016; the page gives no basis-point figure it verified, and a Sharpe near 1 after costs for Schwarz's strategy comes from a summary of a paper it did not read. A split after 2016 is not on file. About 100 windows since 2018 give a t statistic that cannot separate a few basis points a day from zero when the funds' own rate moves are far larger.
+7. **Capacity and costs:** Unlimited capacity in three liquid funds, about 12 round trips a year, 1 to 2 bps a side; long only. No cost is deducted in this version. The funds carry rate risk: a few days of rising yields wipe out many windows of a few basis points.
+8. **Failure modes and retirement:** The effect is small against the funds' own volatility and the rate trend (2022 to 2024) dominates it; the Treasury auction calendar and Fed meetings land on the same dates; index extension is public, so front-running may have taken it. Retire if the frozen-period in-window minus out-of-window mean is not above zero for TLT and IEF, or the Welch t over the independent windows stays under 2.
+9. **Decoys:** The equity turn-of-the-month effect (its mirror image), the Fed-meeting drift and the Treasury auction cycle (auctions cluster mid-month, so separable): test against the 'any 3-session window' null, which the 1,000 random draws of the harness are.
+
+**Sources**
+
+- Etula, E., Rinne, K., Suominen, M. and Vaittinen, L., Dash for Cash: Monthly Market Impact of Institutional Liquidity Needs, Journal of Finance, 2020 <https://aaltodoc.aalto.fi/items/00fea0ae-963b-444c-8221-912121905b98>
+- Schwarz, K., Wharton Rodney White Center working paper 17-19 (the end-of-month Treasury coupon strategy), 2019 <https://rodneywhitecenter.wharton.upenn.edu/wp-content/uploads/2019/12/17-19.Schwarz.pdf>
 
 ## Premium closed-end funds that over-distribute (`cef_distribution_trap`)
 
@@ -241,38 +303,6 @@ Back to the [index of every edge](../edges.md).
 - CXO Advisory, Enhanced Exploitation of Closed-End Fund Discounts (summary of Patro, Piccotti and Wu) <https://www.cxoadvisory.com/mutual-hedge-funds/enhanced-exploitation-of-closed-end-fund-discounts/>
 - Pontiff, J. (1995), Closed-End Fund Premia and Returns: Implications for Financial Market Equilibrium, Journal of Financial Economics <https://academicnewsletter.sufe.edu.cn/info/358172>
 - SEC (17 CFR 270.19a-1), Written statement to accompany dividend payments by management companies (the Section 19(a) notice rule; Cornell LII text) <https://www.law.cornell.edu/cfr/text/17/270.19a-1>
-
-## Reverse-split distress filter (`reverse_split_distress_filter`)
-
-**Status:** blocked. **Family:** H. **Thesis:** Stocks that reverse-split to cure a sub-$1 bid price underperform for one to three years, so they belong on an exclusion list.
-
-**Why blocked:** The data is stored (events/split holds the reverse splits with their ratios, ex-dates in ts, from Massive and Tiingo) but the harness has no event class to trigger on a split: the schedule above is a placeholder, and the class reverse_split is missing from EVENT_CLASSES (src/algotrade/config/edges/document.py) and EVENT_FIELDS (services/evaluation/cross_section/events.py). A screen on the universe cannot stand in: the avoid-list claim needs the short leg drawn from the flagged names (a short leg ranks the whole eligible set by score and fills with unflagged names when few are flagged), and the long side's negative lift would read as Not working for a claim that is confirmed. Unblock: a reverse_splits feature group (sessions_since_reverse_split, last_reverse_split_ratio, from events/split by ex-date) and the class; the group is not added here because no edge reads it yet.
-
-- **Outcome:** excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session
-- **Schedule:** month end
-- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'`
-- **Top K:** all qualified names
-- **Screeners:** none yet
-- **Baselines:** none yet
-- **Notes:** Mostly microcaps: a liquid-name test (20-day dollar volume of $5M) will find few events, so the verdict will rest on a small count; the exclusion list is free for a long screen even where the short is not available (borrow often 20% to 100% a year). Idea page: docs/edge-ideas/structural-niches.md (reverse_split_distress_filter).
-
-**Quality bar**
-
-1. **Mechanism:** Compliance-driven splits signal distress, continued dilution (at-the-market offerings resume once the price is above $1) and index and retail abandonment; Nasdaq rule changes in 2024 and 2025 tightened cures for repeat offenders.
-2. **Persistence:** Firms must split or delist and the dilution machine is the business model of many micro-cap issuers; shorting is costly, so prices stay too high (Kim, Klein and Rosenfeld 2008, exact figure not verified).
-3. **Outcome:** (not answered)
-4. **Trigger timing:** (not answered)
-5. **Faithful replication:** (not answered)
-6. **Expected size and sample:** (not answered)
-7. **Capacity and costs:** (not answered)
-8. **Failure modes and retirement:** (not answered)
-9. **Decoys:** (not answered)
-
-**Sources**
-
-- Kim, S., Klein, A. and Rosenfeld, J., Return performance surrounding reverse stock splits: can investors profit?, Financial Management, 2008 <https://ideas.repec.org/a/bla/finmgt/v37y2008i2p173-192.html>
-- Han, K., The effects of reverse splits on the liquidity of the stock, Journal of Financial and Quantitative Analysis, 1995 <https://ideas.repec.org/a/cup/jfinqa/v30y1995i01p159-169_00.html>
-- Campbell, J., Hilscher, J. and Szilagyi, J. (2008), In Search of Distress Risk, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v63y2008i6p2899-2939.html>
 
 ## Thematic ETF launch fade (`thematic_etf_launch_fade`)
 

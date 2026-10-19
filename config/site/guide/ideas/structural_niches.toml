@@ -22,17 +22,7 @@ why_not_built = "Mechanical and rare; the catalogue suggests a small alert rathe
 id = "ipo_lockup_expiry_pressure"
 title = "Supply pressure when IPO lockups end"
 mechanism_kind = "forced_flows"
-verdict = "promising"
-feasibility = "data_ready"
-why_not_built = "Queued in the build plan as an avoid-list filter, not a stand-alone edge."
-
-[[idea]]
-id = "treasury_month_end_extension"
-title = "Treasury index duration extension at month end"
-mechanism_kind = "forced_flows"
-verdict = "promising"
-feasibility = "data_ready"
-why_not_built = "Queued in the build plan; it runs on stored Treasury fund prices and rates."
+filed_as = "ipo_lockup_expiry"
 
 [[idea]]
 id = "treasury_auction_cycle"
