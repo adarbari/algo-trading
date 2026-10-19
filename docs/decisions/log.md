@@ -957,6 +957,14 @@ follow-up PR).
 - status: final
 - Reasoning: the name is on the public filing beside the CIK that is already stored, so storing it adds no exposure the CIK did not, and it makes the deep-dive dossier and a later per-insider view readable. Reverses only the "no names" clause; the #651 entry's status is `overruled` for that reason.
 
+## 2026-10-18 | EB F PR 1 (filing text similarity) | Measure, tokens and floors of the text-change features
+- Question: how is the change between a filing and its year-ago filing measured, and when is it a value?
+- Options: cosine on TF-IDF / min-edit distance / cosine on raw term counts plus Jaccard on word sets.
+- Decision: cosine on raw term frequency (the rank field) plus Jaccard; tokens are runs of `[a-z]{2,}` after NFKC and casefold, a pinned stop list in code, no digits, no stemming; an item counts when its quality is OK and it has at least 100 words, the composite at least 500 words each side; the comparator is the same form of the same company with a report date 330 to 400 days earlier; amendments (10-K/A, 10-Q/A) are excluded; the value is carried 150 days (10-K Item 1A: 400); two rollups (`filing_text_change@v1`, `filing_text_similarity@v1`), no new table; a value is null, never zero, when no comparator or too little text.
+- decided by: orchestrator (design call)
+- status: final
+- confirmed: owner 2026-10-18
+- Reasoning: TF-IDF weights depend on the corpus the night holds, so a value could change with no text changing; raw counts and a pinned tokeniser make it reproducible. The floors keep a short or missing section from reading as "unchanged". Architect design of 2026-10-18.
 ## 2026-10-18 | EB E5 (batch Y, macro allocation documents) | The gate reads the carrier fund, the macro legs are separate trials, two fields stay undrafted
 - Question: how are the volatility-product, curve, credit, CAPE and carry documents filed on the merged bridge, canary gate and vol_target without implying the full source rule?
 - Options: a VX column on each volatility fund (a map change and a version bump) / a canary on SPY, the carrier; a macro screener inside the existing ensemble / its own trial; the two new expression features in the Describe-it index / kept out like the bridge group.

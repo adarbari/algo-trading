@@ -87,6 +87,91 @@ Sources: Hong, Li, Ni, Scheinkman and Yan (2015), Days to Cover and Stock Return
 
 Sources: Boehmer, Huszar and Jordan (2010), The good news in short interest, Journal of Financial Economics
 
+### `rollup.filing_text_similarity@v1.text_sim_cosine`
+
+**How to read it.** How alike the latest 10-K or 10-Q reads to the same company's filing a year earlier, from word counts. 1 is the same words in the same proportions; lower means more rewritten. Carried 150 days.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a rewritten filing | `lte 0.9` | hard | - | the study sorts into fifths; the threshold is a screen choice |
+
+**When the reading lies**
+
+- Null unless rollup.filing_text_similarity@v1.text_sim_status is OK: a missing prior filing or too little text is not 'unchanged', and a hard 'lte' drops the name.
+- No value exists before the filing text backfill, and delisted companies have none. Read rollup.filing_text_similarity@v1.text_sim_form: a 10-Q compares the same quarter a year earlier.
+
+Sources: Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance
+
+### `rollup.filing_text_similarity@v1.text_sim_jaccard`
+
+**How to read it.** The share of distinct words that the latest filing and its year-ago filing have in common. 1 is the same vocabulary; 0.8 means one word in five is new or dropped. Carried 150 days.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a changed vocabulary | `lte 0.8` | hard | - | a screen choice; the study used the cosine, not this share |
+
+**When the reading lies**
+
+- It ignores how often a word appears, so a repeated change moves it little. Read rollup.filing_text_similarity@v1.text_sim_cosine for the weighted view.
+- Null unless rollup.filing_text_similarity@v1.text_sim_status is OK. A boilerplate-heavy filer sits near 1 whatever it changed.
+
+Sources: Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance
+
+### `rollup.filing_text_similarity@v1.risk_factor_sim_cosine`
+
+**How to read it.** How alike the risk factors of the latest 10-K read to last year's, from word counts. 1 is unchanged; lower means the company rewrote what could go wrong. Carried 400 days.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| rewritten risk factors | `lte 0.9` | hard | - | a screen choice; the 10-K is annual, so the signal is seasonal |
+
+**When the reading lies**
+
+- Null when the 10-K has no comparable Item 1A in both years or the prior filing is missing. Check rollup.filing_text_similarity@v1.risk_factor_status before reading a gap as no change.
+- Item 1A exists only from fiscal 2005, and a very short section is not compared. Read rollup.filing_text_similarity@v1.risk_factor_len_change for a section that only grew.
+
+Sources: Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance
+
+### `rollup.filing_text_similarity@v1.risk_factor_len_change`
+
+**How to read it.** How much longer or shorter the 10-K risk factors are than last year's: new words over old words, minus one. 0.2 is 20 percent longer; -0.1 is 10 percent shorter. Carried 400 days.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| longer risk factors | `gte 0.2` | hard | - | a screen choice: 20 percent more words than last year |
+
+**When the reading lies**
+
+- Length is not content: a section can grow with the same words repeated. Read rollup.filing_text_similarity@v1.risk_factor_sim_cosine beside it.
+- Null unless rollup.filing_text_similarity@v1.risk_factor_status is OK. A hard threshold drops every name with no comparable Item 1A.
+
+Sources: Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance
+
+### `rollup.filing_text_similarity@v1.text_sim_status`
+
+**How to read it.** Why the text similarity has a value or not. OK: compared. NO_PRIOR: no filing of the same form a year earlier is stored. NOT_COMPARABLE: too little comparable text in both filings.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a filing with a comparable prior | `eq "OK"` | hard | - | drops every name the text could not be compared for |
+
+**When the reading lies**
+
+- A name with no row has no 10-K or 10-Q in the last 150 days, or no instrument at the session. Delisted companies have no row.
+- Screen on 'eq OK' before reading rollup.filing_text_similarity@v1.text_sim_cosine: the measures are null, never zero, when the status is not OK.
+
+Sources: Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance
+
 ### `rollup.earnings@v1.days_to_earnings`
 
 **How to read it.** Exchange sessions until the next report: 0 reports today, 1 tomorrow, 10 is two weeks out. Options price the report from about ten sessions before (the IV ramp accelerates in the last two or three) and lose that premium within a session after it. 'Avoid earnings' for a short option held a month is days_to_earnings above the holding period; 'play earnings' is under 5.
@@ -807,88 +892,3 @@ Sources: Bali, Cakici and Whitelaw (2011), Maxing out: stocks as lotteries and t
 - Only reports known on the session are removed, so a past session is read as it was.
 
 Sources: Jegadeesh (1990), Evidence of predictable behavior of security returns; Chan (2003), Stock price reaction to news and no-news; Savor (2012), Stock returns after major price shocks
-
-### `rollup.earnings_neutral_reversal@v1.earnings_days_excluded`
-
-**How to read it.** How many of the last 20 daily returns an earnings reaction window left out of rollup.earnings_neutral_reversal@v1.ret_ex_earnings_20d. 0 means no report fell in the window. 2 is one report with both its reaction days. 1 is a report on the session itself, whose next day has not happened, or on a non-session day.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| the return is the plain month's (no report in it) | `eq 0` | soft | 0 | then rollup.price_stats@v2.ret_20d equals ret_ex_earnings_20d |
-
-**When the reading lies**
-
-- Null where ret_ex_earnings_20d is null: a gap in the closes, a short history, or no report known for the name.
-- More than 2 means two reports in a month, a correction or a rare double date. Treat the return with care.
-
-Sources: Bernard and Thomas (1989), Post-earnings-announcement drift: the E-1 to E+1 window
-
-### `rollup.earnings_date_shift@v1.earnings_shift_direction`
-
-**How to read it.** Whether the next report date moved a week or more from last year's. The value earlier means the date is at least seven days before the year-ago report plus 364 days. The value later means at least seven days after. Null: no next date, no year-ago report, or a move under a week. Johnson and So found that early scheduling goes with good news. Late scheduling goes with bad.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a report scheduled earlier than last year | `eq "earlier"` | hard | - | names with no shift or no year-ago report drop out |
-
-**When the reading lies**
-
-- The calendar here is scheduled, never confirmed by the company. A date can move again, so read rollup.earnings_date_shift@v1.sessions_since_earnings_shift for how fresh the shift is.
-- The history starts at the first stored calendar snapshot. A date first stored at or before it says nothing about when it became known, so it is never a shift.
-
-Sources: Johnson and So (2018), Time Will Tell: Information in the Timing of Scheduled Earnings News, Journal of Financial and Quantitative Analysis
-
-### `rollup.earnings_date_shift@v1.earnings_date_shift_days`
-
-**How to read it.** Calendar days the next report date lies after the year-ago report plus 364 days. -10 is ten days earlier than a year ago. +10 is ten days later. Under a week either way is calendar noise, so rollup.earnings_date_shift@v1.earnings_shift_direction is null there.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| the largest advance first | `lte -7` | hard | - | rank ascending to put the biggest advance first |
-
-**When the reading lies**
-
-- Null when there is no next date or no report a year ago within 45 days of the same weekday. A new listing or a company that changed its fiscal calendar has none.
-- A fiscal-year change or a merger moves every date for a reason that is not news. Read rollup.earnings_expected@v1.expected_basis to see how the date is known.
-
-Sources: Johnson and So (2018), Time Will Tell: Information in the Timing of Scheduled Earnings News
-
-### `feature.eight_k_item_flag`
-
-**How to read it.** True when an 8-K with Item 4.02, 4.01 or 5.02 became known in the last 20 sessions. Item 4.02 is non-reliance on prior financials. Item 4.01 is a change of auditor. Item 5.02 is an officer or director leaving or joining. Each counts from the first session whose close follows its SEC acceptance. False when the name has other tracked filings only. Null when the filings group has no row for it.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| an adverse 8-K item this month (an avoid list) | `eq true` | hard | - | pair with rollup.price_stats@v2.adv_usd_20d to keep the names you could trade |
-
-**When the reading lies**
-
-- Item 5.02 also reports routine retirements and new hires, and 4.01 a planned auditor rotation. The flag cannot tell a forced exit from a routine one without reading the text.
-- Null is common: a name with no tracked 8-K item, late-filing notice or tender offer in 60 sessions has no row, and that is unknown, not clean. A hard 'eq true' keeps only the flagged.
-
-Sources: Lerman and Livnat (2010), The New Form 8-K Disclosures, Review of Accounting Studies
-
-### `rollup.filing_events@v1.sessions_since_late_filing`
-
-**How to read it.** Exchange sessions since the latest NT 10-K or NT 10-Q (a Form 12b-25 late-filing notice) became known: 0 is today. It counts from the first session whose close follows the SEC acceptance. Null when none became known in the last 60 sessions. A company files one when it cannot file its annual or quarterly report on time.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a late-filing notice in the last month | `lte 20` | hard | - | null (none known) names drop out |
-
-**When the reading lies**
-
-- The reason is in the text of the notice, which is not stored. A routine delay and an accounting problem look the same here.
-- Small and distressed companies file most of them. Gate on rollup.price_stats@v2.adv_usd_20d, or the screen holds names you cannot trade.
-
-Sources: Dee, Hillison and Pacini (2010), Research in Accounting Regulation, on the reaction to late-filing notices by stated reason

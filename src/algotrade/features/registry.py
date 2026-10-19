@@ -126,6 +126,7 @@ from algotrade.features.rollups.statements import (
     mispricing,
     qmj,
 )
+from algotrade.features.rollups.text import filing_text_change, filing_text_similarity
 
 GROUPS: dict[str, FeatureGroup] = {
     g.key: g
@@ -151,6 +152,8 @@ GROUPS: dict[str, FeatureGroup] = {
             index_changes.GROUP,
             filing_events.GROUP,
             insider_buys.GROUP,
+            filing_text_change.GROUP,
+            filing_text_similarity.GROUP,
             ipo_lockups.GROUP,
             reverse_splits.GROUP,
             short_interest.GROUP,

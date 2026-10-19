@@ -80,6 +80,12 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        line shows its old version until its own ``known_from``), tagged
                        ``as_of``; ``at(session)`` returns the session's own view only (lookback
                        is not supported; ``insider_buys@v1``, EB E6)
+- ``events/filing_text``
+                       ``filing_text.recent.recent_filing_texts``: one session's view only (lazy,
+                       lookback is not supported): the Item texts of the 10-K / 10-Q of every
+                       company with one known in the last 5 sessions plus its filings of the
+                       year before, known on or before the session, only the companies that map
+                       to an instrument then; ``None`` when none (``filing_text_change@v1``)
 - ``events/short_interest``
                        FINRA short interest by the session it became public (``known_from``, set
                        from the publication schedule at ingestion), from ``lookback`` sessions
@@ -178,6 +184,8 @@ from algotrade.data.events import (
     read_events,
     stored_events,
 )
+from algotrade.data.filing_text.recent import TABLE as FILING_TEXT
+from algotrade.data.filing_text.recent import recent_filing_texts
 from algotrade.data.funds.holdings import TABLE as HOLDINGS
 from algotrade.data.funds.holdings import funds_holdings
 from algotrade.data.funds.shares import TABLE as ETF_SHARES
@@ -636,6 +644,7 @@ INPUTS: Mapping[str, Loader] = {
     IPO_LOCKUPS: _ipo_lockups,
     "events/filing": _filings,
     INSIDERS: _insider_views,
+    FILING_TEXT: _partition(recent_filing_texts),
     "events/short_interest": _short_interest,
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,
