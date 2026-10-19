@@ -33,9 +33,18 @@ export interface Budgets {
    * "YYYY-MM-DD #PR what the owner asked for". Never read by the checks; kept by every update.
    */
   reasons?: Record<string, string>;
+  /**
+   * An owner waiver of the rule that a shared budget only goes down: shared budget path ->
+   * "YYYY-MM-DD owner: why". It allows one rise, the PR that adds it; a waiver already on the base
+   * allows nothing more. The decision is in docs/decisions/log.md.
+   */
+  waivers?: Record<string, string>;
 }
 
-/** The budgets every route shares: they only ever go down, whatever the reason. */
+/** The budgets every route shares: they only ever go down, whatever the reason, unless the owner waives the rule for one PR (`waivers`). */
+/** A waiver's shape: the date, then "owner:" and the reason. */
+const OWNER_WAIVER = /^\d{4}-\d{2}-\d{2} owner: \S/;
+
 export const SHARED_BUDGETS: readonly string[] = [
   'bundle.entry_gzip_bytes',
   'bundle.entry_closure_gzip_bytes',
@@ -72,6 +81,10 @@ export function unexplainedRises(base: Budgets, head: Budgets): string[] {
     const old = before[path];
     if (old === undefined || value <= old) continue;
     if (SHARED_BUDGETS.includes(path)) {
+      const waiver = head.waivers?.[path];
+      if (waiver !== undefined && waiver !== base.waivers?.[path] && OWNER_WAIVER.test(waiver)) {
+        continue;
+      }
       out.push(`${path} rose from ${String(old)} to ${String(value)}: shared budgets only go down`);
       continue;
     }

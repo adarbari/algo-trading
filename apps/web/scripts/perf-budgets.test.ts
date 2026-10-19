@@ -46,6 +46,23 @@ describe('unexplainedRises', () => {
   });
 });
 
+describe('an owner waiver of a shared budget', () => {
+  const head = { ...base, bundle: { ...base.bundle, entry_gzip_bytes: 31000 } };
+  const path = 'bundle.entry_gzip_bytes';
+
+  it('allows the rise it names, once', () => {
+    const waivers = { [path]: '2026-10-18 owner: a new section' };
+    expect(unexplainedRises(base, { ...head, waivers })).toEqual([]);
+    expect(unexplainedRises({ ...base, waivers }, { ...head, waivers })).toHaveLength(1);
+  });
+
+  it('needs the owner and a reason in it', () => {
+    expect(
+      unexplainedRises(base, { ...head, waivers: { [path]: '2026-10-18 agent: more' } }),
+    ).toHaveLength(1);
+  });
+});
+
 describe('nearBudgetNotes', () => {
   it('prints the reason of a raised budget that is within 5 % of its limit', () => {
     const budgets = raised({ reasons: { 'e2e./a.requests': '2026-10-09 #420 why' } });
