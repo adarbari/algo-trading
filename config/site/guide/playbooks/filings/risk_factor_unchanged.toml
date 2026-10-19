@@ -7,7 +7,7 @@ hit = "The name is a common stock closing above $5 that trades at least $1M a da
 not_checked = "It does not read what the new risks say, only how much the section changed. Risk sections tend to grow every year, and a rewrite can be a lawyer's style choice, not news."
 before_acting = [
   "A 10-K with no stored prior year, or a risk section that is missing or short in either year, has no value and is left out.",
-  "The 10-K is annual, so the value can be up to 400 days old; a 10-K counts from the session after the SEC accepted it.",
+  "The 10-K is annual, so the value can be up to 400 days old; a 10-K counts from the first session whose close follows the SEC accepting it.",
   "Stable firms repeat their text, so the list leans to size and low volatility: read rollup.trend_stats@v2.mom_12_1 beside it.",
 ]
 sources = [

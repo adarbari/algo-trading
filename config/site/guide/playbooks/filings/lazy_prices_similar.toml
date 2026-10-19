@@ -8,7 +8,7 @@ not_checked = "It does not read what changed, only how much. A rewrite after a d
 before_acting = [
   "A name with no stored report from a year earlier, or too little text to compare, has no value and is left out; it is never read as unchanged.",
   "Stable small firms repeat their text, so the list leans to size and low volatility: read rollup.trend_stats@v2.mom_12_1 beside it.",
-  "A report counts from the session after the SEC accepted it, not from the date on its cover.",
+  "A report counts from the first session whose close follows the SEC accepting it, not from the date on its cover.",
 ]
 sources = [
   "Cohen, Malloy and Nguyen, Lazy Prices (2020)",

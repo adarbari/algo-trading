@@ -7,9 +7,9 @@ family = "F"
 thesis = "Companies whose 10-K risk factors read almost the same as last year's outperform those that rewrote them, because investors are slow to price what a changed risk section says."
 mechanism = """New or reworded risk factors are the firm's own early statement of what worries it,
 written under legal pressure, and the paper finds they move the price and the firm's risk; but
-investors read the section once, not against last year's, so the news is priced late (Campbell and
-others 2014; Cohen, Malloy and Nguyen 2020 find the risk-factor change is where the Lazy Prices
-effect is concentrated)."""
+the section is long and rarely read against last year's, so the news may be priced late: Cohen,
+Malloy and Nguyen (2020) find the Lazy Prices effect concentrated in the risk-factor change, while
+Campbell and others (2014) show only that the section carries information."""
 persistence = """Item 1A runs to dozens of pages and the comparison needs two years of parsed text for
 every firm, which a retail screen does not do; boilerplate and lengthening over time add noise
 that a naive comparison reads as news. The samples end in 2014 and 2008; persistence is a claim
@@ -79,8 +79,8 @@ similar of the liquid common stocks, and as variants the 100 least similar and t
 papers' own portfolios, risk classifications and alphas are not replicated."""
 expected_size = """No figure for the risk-factor section alone is on file here; the Lazy Prices
 long-short alpha is up to 188 bp a month over all sections, 1995-2014 (Cohen, Malloy and Nguyen
-2020). A single section, annual only, so about twelve month-ends see a fresh filing each year per
-name: expect a smaller and noisier effect; the harness reports t and the sessions."""
+2020). A single section, annual only, so only one month-end a year sees a fresh 10-K per name and the
+others hold the carried value: expect a smaller and noisier effect; the harness reports t and the sessions."""
 capacity_costs = """Liquid common stocks above the floor; the short book needs borrow and the
 rewriters include distressed firms. The outcome deducts 20 bps a round trip; the short variant adds
 the site's borrow assumption."""
@@ -98,4 +98,4 @@ url = "https://www.nber.org/papers/w25084"
 
 [[sources]]
 title = "Campbell, J. L., Chen, H., Dhaliwal, D. S., Lu, H. and Steele, L. B., The information content of mandatory risk factor disclosures in corporate filings, Review of Accounting Studies, 2014"
-url = "https://doi.org/10.1007/s11142-014-9298-z"
+url = "https://doi.org/10.1007/s11142-013-9258-3"

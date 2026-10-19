@@ -11,8 +11,7 @@ change, so the price adjusts over the following months; a firm that repeats its 
 carries no such news (Cohen, Malloy and Nguyen 2020; Brown and Tucker 2011)."""
 persistence = """The change is a few lines buried in a long document that few readers compare with
 last year's, and the comparison needs the filing text of every firm stored and parsed, which a
-retail screen does not do. The paper's sample ends in 2014 and the signal is public knowledge since
-2018, so persistence is a claim to test."""
+retail screen does not do. The paper's sample ends in 2014 and the paper has been public for years, so persistence is a claim to test."""
 schedule = "month_end"
 top_k = 100
 base = "universe"
