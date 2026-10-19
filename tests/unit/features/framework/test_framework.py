@@ -3,13 +3,14 @@
 market-entity group returns exactly its one ``MKT:US`` row)."""
 
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import DataValidationError
+from algotrade.core.time.calendar import sessions_between
 from algotrade.features.framework.columns import conform
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.runner import (
@@ -19,7 +20,11 @@ from algotrade.features.framework.runner import (
     rollup_params,
 )
 from algotrade.features.registry import GROUPS
+from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.runs import RunStatus, start_run
+from algotrade.storage.tables.readers import StoreReader
+from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import (
     END,
     MARKET_COUNTS,
@@ -229,6 +234,36 @@ def test_point_in_time_guard() -> None:
     with pytest.raises(AssertionError, match="reached"):
         late = future.assign(known_from=[END, date(2026, 10, 5)])
         runner._check_point_in_time(COUNTING, "events/earnings", late, END)
+
+
+def test_a_filings_read_ledger_with_a_later_session_passes_the_guard_and_no_other_table_does() -> (
+    None
+):
+    """Regression: ``rollups --from 2010-01-04`` failed "filings/read rows from 2026-10-16
+    reached 2010-01-04": the coverage ledger is served whole (ADR 0007 amendment)."""
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    record = start_run("filings", date(2026, 10, 16), datetime(2026, 10, 16, 22, tzinfo=UTC))
+    record.status, record.items = RunStatus.COMPLETE, {"1": "OK"}
+    record.stats = {"covers_since": "2010-01-01"}
+    writer.save_run(record)
+
+    def count(frames: Inputs, session: date, p: None) -> pd.DataFrame:
+        reads = frames["filings/read"]
+        assert reads is not None
+        return pd.DataFrame({"instrument_id": [SPY], "a": [float(len(reads))]})
+
+    ledger = _rollup(inputs=(Input("filings/read"),), compute=count)
+    sessions = sessions_between(date(2010, 1, 4), date(2010, 1, 8))
+    results = list(compute_sessions(reader, ledger, sessions))
+    assert [r.session for r in results] == sessions
+    assert all(r.frame is not None and r.frame["a"].tolist() == [1.0] for r in results)
+
+    from algotrade.features.framework import runner  # noqa: PLC0415
+
+    later = pd.DataFrame({"session_date": [date(2026, 10, 5)]})
+    with pytest.raises(AssertionError, match="reached"):
+        runner._check_point_in_time(COUNTING, "bars/1d", later, END)
 
 
 def test_a_market_group_returns_its_one_row() -> None:

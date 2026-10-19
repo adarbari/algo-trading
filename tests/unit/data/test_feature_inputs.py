@@ -653,3 +653,23 @@ def test_ipo_lockups_read_each_session_the_latest_version_known_by_it() -> None:
     new = loaded.at(restated, 0)
     assert new is not None and list(new["lockup_days"]) == [90]  # one row per prospectus
     assert inputs.load_input(store()[1], "events/ipo_lockup", [restated], 0).at(restated, 0) is None
+
+
+def test_unbounded_inputs_are_exactly_the_ledgers_served_to_every_session() -> None:
+    """Shrink-only: adding a table to ``UNBOUNDED_INPUTS`` needs an ADR (ADR 0007 amendment).
+    It equals ``{"filings/read"}``, the tables whose loader returns ``_EverySession``, and
+    those frames hold a coverage ledger only (no content)."""
+    assert frozenset({"filings/read"}) == inputs.UNBOUNDED_INPUTS
+    _, reader = store()
+    every_session = set()
+    for table, loader in inputs.INPUTS.items():
+        try:
+            loaded = loader(reader, [END], 0)
+        except Exception:
+            continue
+        if isinstance(loaded, inputs._EverySession):
+            every_session.add(table)
+    assert every_session == set(inputs.UNBOUNDED_INPUTS)
+    ledger = inputs._filing_reads(reader, [END], 0)
+    assert isinstance(ledger, inputs._EverySession)
+    assert list(ledger.frame.columns) == ["cik", "session_date", "covers_since"]
