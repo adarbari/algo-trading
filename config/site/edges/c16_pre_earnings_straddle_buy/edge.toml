@@ -20,6 +20,7 @@ picks = "event"
 screeners = []
 baselines = ["vrp_iv_hv"]
 status = "blocked"
+plain_reason = "Needs a short-term implied volatility history to price a three-day straddle, and we only store a 30-day one."
 mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 rejection_reason = """The position's horizon cannot be priced. The model P&L prices every horizon with one
