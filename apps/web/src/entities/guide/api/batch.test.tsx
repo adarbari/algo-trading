@@ -5,13 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { gql } from '@/shared/api';
 
-import {
-  useGuideEdge,
-  useGuideEpisode,
-  useGuideIndicator,
-  useGuideMechanism,
-  useGuideTerm,
-} from './hooks';
+import { useGuideEpisode, useGuideIndicator, useGuideTerm } from './hooks';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -36,8 +30,6 @@ beforeEach(() => {
       episodes: EPISODES.map((key) => ({ episode: { key, name: key } })),
       terms: [],
       startPages: [],
-      mechanisms: [{ id: 'slow_to_update', title: 'Slow to update' }],
-      edges: [{ summary: { id: 'pead', name: 'Post-earnings drift' } }],
     },
   });
 });
@@ -83,31 +75,6 @@ describe('the Guide batch', () => {
     expect(result.current.indicator.data?.key).toBe('vix_level');
     expect(result.current.episode.data?.episode.key).toBe('hikes_2022');
     expect(result.current.term.data).toBeNull();
-  });
-
-  it('reads a mechanism and an edge in the same request, and null for one the Guide lacks', async () => {
-    const { result } = renderHook(
-      () => ({
-        mechanism: useGuideMechanism('slow_to_update'),
-        edge: useGuideEdge('pead'),
-        lacking: useGuideEdge('nope'),
-      }),
-      { wrapper },
-    );
-    await waitFor(() => {
-      expect(result.current.lacking.isSuccess).toBe(true);
-    });
-    expect(GQL).toHaveBeenCalledOnce();
-    expect(GQL.mock.calls[0]?.[1]).toEqual({
-      refs: [
-        { kind: 'MECHANISM', id: 'slow_to_update' },
-        { kind: 'EDGE', id: 'pead' },
-        { kind: 'EDGE', id: 'nope' },
-      ],
-    });
-    expect(result.current.mechanism.data?.title).toBe('Slow to update');
-    expect(result.current.edge.data?.summary.name).toBe('Post-earnings drift');
-    expect(result.current.lacking.data).toBeNull();
   });
 
   it('fails every waiting hook when the request fails', async () => {

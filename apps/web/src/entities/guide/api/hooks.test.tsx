@@ -5,13 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { gql } from '@/shared/api';
 
-import {
-  useGuideEdgeIndex,
-  useGuideField,
-  useGuideIndex,
-  useGuidePlaybook,
-  useGuideSituation,
-} from './hooks';
+import { useGuideField, useGuideIndex, useGuidePlaybook, useGuideSituation } from './hooks';
+import { useGuideEdge, useGuideEdgeIndex, useGuideMechanism } from './edges';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -47,6 +42,31 @@ describe('guide hooks', () => {
     });
     expect(String(GQL.mock.calls[0]?.[0])).toContain('query GuideEdgeIndex');
     expect(result.current.data?.setAsideTitle).toBe('Set aside');
+  });
+
+  it('reads a mechanism and a site edge by id, each in its own query', async () => {
+    GQL.mockClear();
+    GQL.mockResolvedValue({ guideMechanism: { id: 'm' }, guideEdge: { summary: { id: 'e' } } });
+    const { result } = renderHook(
+      () => ({ mechanism: useGuideMechanism('m'), edge: useGuideEdge('e') }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.mechanism.isSuccess && result.current.edge.isSuccess).toBe(true);
+    });
+    const asked = GQL.mock.calls.map(([document, variables]) => [String(document), variables]);
+    expect(
+      asked.some(
+        ([d, v]) =>
+          String(d).includes('query GuideMechanism') && JSON.stringify(v) === '{"id":"m"}',
+      ),
+    ).toBe(true);
+    expect(
+      asked.some(
+        ([d, v]) => String(d).includes('query GuideEdge(') && JSON.stringify(v) === '{"id":"e"}',
+      ),
+    ).toBe(true);
+    expect(result.current.mechanism.data?.id).toBe('m');
   });
 
   it('reads a field’s derived parts by name, and nothing without one', async () => {

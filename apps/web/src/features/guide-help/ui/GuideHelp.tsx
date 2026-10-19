@@ -8,15 +8,19 @@
  * page (its summary and first section), a mechanism or a site edge of the Edges section (its
  * one-line hero and first paragraphs). The text is the server's; nothing is written here.
  */
+import { lazy, Suspense } from 'react';
+
 import type { GuideUse } from '@/entities/feature';
 
 import type { GuideEntry } from '../model/entry';
-import { EdgeHelp, MechanismHelp } from './EdgesHelp';
 import { EpisodeHelp } from './EpisodeHelp';
 import { FieldHelp } from './FieldHelp';
 import { IndicatorHelp } from './IndicatorHelp';
 import { StartHelp } from './StartHelp';
 import { TermHelp } from './TermHelp';
+
+// The Edges section's drawers load on first use: the entry's shared chunk does not carry them.
+const EdgesHelp = lazy(() => import('./EdgesHelp'));
 
 export interface GuideHelpProps {
   /** The Guide entry the button explains. */
@@ -44,9 +48,12 @@ export function GuideHelp({ entry, onUse, useDisabled = false }: GuideHelpProps)
     case 'start':
       return <StartHelp id={entry.id} />;
     case 'mechanism':
-      return <MechanismHelp id={entry.id} />;
     case 'edge':
-      return <EdgeHelp id={entry.id} />;
+      return (
+        <Suspense fallback={null}>
+          <EdgesHelp entry={entry} />
+        </Suspense>
+      );
   }
 }
 

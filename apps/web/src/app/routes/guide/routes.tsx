@@ -15,7 +15,9 @@ import { createRoute, useNavigate } from '@tanstack/react-router';
 
 import type * as GuidePages from '@/pages/guide';
 
-import { EDGES_PAGE_PATH, parseFieldsSearch } from '@/entities/guide';
+import type * as EdgesRoutes from './edges-routes';
+
+import { parseFieldsSearch } from '@/entities/guide';
 import { GuideLayout } from '../../layouts';
 import { viewerGuard } from '../../workspaces';
 import { rootRoute } from '../root';
@@ -25,15 +27,12 @@ import { pageRoute, type PageModule } from '../page-loader';
 // One chunk for the Guide's pages (they share widgets), loaded when the first Guide page opens.
 // One import call for every Guide page: the entry carries one preload file list, not fourteen.
 const guidePages = () => import('@/pages/guide');
-const GuideEdgePage = lazyPage(guidePages, 'GuideEdgePage');
-const GuideEdgesPage = lazyPage(guidePages, 'GuideEdgesPage');
 const GuideEpisodePage = lazyPage(guidePages, 'GuideEpisodePage');
 const GuideFieldPage = lazyPage(guidePages, 'GuideFieldPage');
 const GuideFieldsPage = lazyPage(guidePages, 'GuideFieldsPage');
 const GuideGlossaryPage = lazyPage(guidePages, 'GuideGlossaryPage');
 const GuideHomePage = lazyPage(guidePages, 'GuideHomePage');
 const GuideIndicatorPage = lazyPage(guidePages, 'GuideIndicatorPage');
-const GuideMechanismPage = lazyPage(guidePages, 'GuideMechanismPage');
 const GuidePlaybookPage = lazyPage(guidePages, 'GuidePlaybookPage');
 const GuidePlaybooksPage = lazyPage(guidePages, 'GuidePlaybooksPage');
 const GuideRegimePage = lazyPage(guidePages, 'GuideRegimePage');
@@ -46,6 +45,16 @@ const GuideTermPage = lazyPage(guidePages, 'GuideTermPage');
 // Every Guide page shares one chunk and the index reads; each page preloads itself (a lazyPage
 // renders unsuspended only once its own `load` ran).
 const guideLoading = (page: PageModule<typeof GuidePages>) =>
+  pageRoute(page, (module, client) => {
+    module.prefetchGuideReads(client);
+  });
+
+// The Edges routes' components load on first visit (edges-routes.tsx), with the same shared reads.
+const edgesModule = () => import('./edges-routes');
+const EdgesIndexRoute = lazyPage(edgesModule, 'EdgesIndexRoute');
+const MechanismRoute = lazyPage(edgesModule, 'MechanismRoute');
+const EdgeRoute = lazyPage(edgesModule, 'EdgeRoute');
+const edgesLoading = (page: PageModule<typeof EdgesRoutes>) =>
   pageRoute(page, (module, client) => {
     module.prefetchGuideReads(client);
   });
@@ -176,44 +185,23 @@ const episodeRoute = createRoute({
   component: EpisodeRoute,
 });
 
-function EdgesRoute() {
-  const navigate = useNavigate();
-  return <GuideEdgesPage onOpenEdgesPage={() => void navigate({ to: EDGES_PAGE_PATH })} />;
-}
-
 const edgesIndexRoute = createRoute({
   getParentRoute: () => guideRoute,
-  ...guideLoading(GuideEdgesPage),
+  ...edgesLoading(EdgesIndexRoute),
   path: 'edges',
-  component: EdgesRoute,
+  component: EdgesIndexRoute,
 });
-
-function MechanismRoute() {
-  const { mechanism } = mechanismRoute.useParams();
-  return <GuideMechanismPage id={mechanism} />;
-}
 
 const mechanismRoute = createRoute({
   getParentRoute: () => guideRoute,
-  ...guideLoading(GuideMechanismPage),
+  ...edgesLoading(MechanismRoute),
   path: 'edges/m/$mechanism',
   component: MechanismRoute,
 });
 
-function EdgeRoute() {
-  const { id } = edgeRoute.useParams();
-  const navigate = useNavigate();
-  return (
-    <GuideEdgePage
-      id={id}
-      onSeeEvidence={() => void navigate({ to: EDGES_PAGE_PATH, search: { edge: id } })}
-    />
-  );
-}
-
 const edgeRoute = createRoute({
   getParentRoute: () => guideRoute,
-  ...guideLoading(GuideEdgePage),
+  ...edgesLoading(EdgeRoute),
   path: 'edges/$id',
   component: EdgeRoute,
 });

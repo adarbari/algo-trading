@@ -14,14 +14,7 @@ import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
-import {
-  loadEdge,
-  loadEpisode,
-  loadIndicator,
-  loadMechanism,
-  loadStartPage,
-  loadTerm,
-} from './batch';
+import { loadEpisode, loadIndicator, loadStartPage, loadTerm } from './batch';
 
 /** The Guide changes with a release or a config edit: cache it as long as the catalogue. */
 const GUIDE_STALE_MS = 10 * 60_000;
@@ -84,93 +77,6 @@ const GuideIndexQuery = graphql(`
         id
         title
         count
-      }
-    }
-  }
-`);
-
-const GuideEdgeIndexQuery = graphql(`
-  query GuideEdgeIndex {
-    guideEdgeIndex {
-      mechanisms {
-        id
-        title
-        question
-        short
-        examples
-        count
-        ideas
-        statuses {
-          status
-          count
-        }
-        edges {
-          id
-          name
-          thesis
-          mechanism
-          asset
-          assetText
-          side
-          sideTerm
-          holdingSessions
-          holdingText
-          holdingBand
-          status
-        }
-      }
-      filters {
-        assets {
-          id
-          text
-          count
-        }
-        sides {
-          id
-          text
-          count
-        }
-        holdings {
-          id
-          text
-          count
-        }
-      }
-      setAsideTitle
-      setAsidePurpose
-      setAside {
-        edge {
-          id
-          name
-          thesis
-          mechanism
-          asset
-          assetText
-          side
-          sideTerm
-          holdingSessions
-          holdingText
-          holdingBand
-          status
-        }
-        why {
-          segments {
-            text
-            field
-          }
-        }
-      }
-      notBuiltTitle
-      notBuiltPurpose
-      notBuilt {
-        id
-        title
-        mechanism
-        verdict
-        verdictText
-        feasibilityText
-        feasibilityTerm
-        whyNotBuilt
       }
     }
   }
@@ -404,41 +310,6 @@ export function useGuideEpisode(slug: string) {
     queryKey: queryKeys.gql('GuideEpisode', variables),
     queryFn: () => loadEpisode(variables.slug),
     select: (data) => data.guideEpisode,
-    staleTime: GUIDE_STALE_MS,
-    retry: false,
-  });
-}
-
-/** The Edges section's top page: mechanism cards, filters, edges set aside, ideas not built. */
-export function useGuideEdgeIndex({ enabled = true }: { enabled?: boolean } = {}) {
-  return useQuery({
-    queryKey: queryKeys.gql('GuideEdgeIndex', {}),
-    queryFn: () => gql(GuideEdgeIndexQuery, {}),
-    select: (data) => data.guideEdgeIndex,
-    enabled,
-    staleTime: GUIDE_STALE_MS,
-  });
-}
-
-/** One mechanism's page (null data: no such mechanism); read in the page's batch. */
-export function useGuideMechanism(id: string) {
-  const variables = { id };
-  return useQuery({
-    queryKey: queryKeys.gql('GuideMechanism', variables),
-    queryFn: () => loadMechanism(variables.id),
-    select: (data) => data.guideMechanism,
-    staleTime: GUIDE_STALE_MS,
-    retry: false,
-  });
-}
-
-/** One site edge's Guide page (null data: no such edge); read in the page's batch. */
-export function useGuideEdge(id: string) {
-  const variables = { id };
-  return useQuery({
-    queryKey: queryKeys.gql('GuideEdge', variables),
-    queryFn: () => loadEdge(variables.id),
-    select: (data) => data.guideEdge,
     staleTime: GUIDE_STALE_MS,
     retry: false,
   });

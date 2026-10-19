@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { gql, TestQueryProvider } from '@/shared/api';
-import { edgeEntry, expectNoA11yViolations, mechanism, servedEntries } from '@/shared/lib/testing';
+import { edgeEntry, expectNoA11yViolations, mechanism } from '@/shared/lib/testing';
 
 import { GuideHelpProvider } from '../model/navigation';
 import { GuideHelp } from './GuideHelp';
@@ -28,7 +28,7 @@ function setup(entry: { kind: 'mechanism' | 'edge'; id: string }, navigate = vi.
 
 beforeEach(() => {
   GQL.mockReset();
-  GQL.mockResolvedValue(servedEntries({ guideMechanism: mechanism(), guideEdge: edgeEntry() }));
+  GQL.mockResolvedValue({ guideMechanism: mechanism(), guideEdge: edgeEntry() });
 });
 
 describe('GuideHelp for a mechanism', () => {
@@ -41,13 +41,13 @@ describe('GuideHelp for a mechanism', () => {
     expect(within(drawer).queryByText('The behaviour is old.')).toBeNull();
     expect(drawer).toHaveAccessibleDescription(/Who is slow to update/);
     await expectNoA11yViolations(container);
-    expect(GQL.mock.calls[0]?.[1]).toEqual({ refs: [{ kind: 'MECHANISM', id: 'slow_to_update' }] });
+    expect(GQL.mock.calls[0]?.[1]).toEqual({ id: 'slow_to_update' });
     await userEvent.click(within(drawer).getByRole('button', { name: /Open full page/ }));
     expect(navigate).toHaveBeenCalledWith('/guide/edges/m/slow_to_update');
   });
 
   it('says so when the Guide has no such mechanism', async () => {
-    GQL.mockResolvedValue(servedEntries({ guideMechanism: null }));
+    GQL.mockResolvedValue({ guideMechanism: null });
     setup({ kind: 'mechanism', id: 'nope' });
     await userEvent.click(await screen.findByRole('button', { name: /^About / }));
     expect(await screen.findByText('The Guide has no entry for this mechanism yet.')).toBeVisible();
@@ -66,9 +66,7 @@ describe('GuideHelp for an edge', () => {
     ).toBeVisible();
     expect(within(drawer).getByText(/a few weeks of life each quarter/)).toBeVisible();
     expect(drawer).toHaveAccessibleDescription(/Candidate/);
-    expect(GQL.mock.calls[0]?.[1]).toEqual({
-      refs: [{ kind: 'EDGE', id: 'earnings_date_advance' }],
-    });
+    expect(GQL.mock.calls[0]?.[1]).toEqual({ id: 'earnings_date_advance' });
     await userEvent.click(within(drawer).getByRole('button', { name: /Open full page/ }));
     expect(navigate).toHaveBeenCalledWith('/guide/edges/earnings_date_advance');
   });

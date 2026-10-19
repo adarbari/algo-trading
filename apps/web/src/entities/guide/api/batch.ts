@@ -2,7 +2,7 @@
  * The Guide's batched read (ADR 0051, ADR 0037): every help button of a page asks for its entry
  * on mount, so a page of twenty buttons made twenty requests. Each `load*` call here waits a
  * few milliseconds, then all the entries asked in that window (an indicator, an episode, a
- * term, a Start here page, a mechanism, an edge) go to the API as one `Query.guideEntries` operation, and each caller
+ * term, a Start here page) go to the API as one `Query.guideEntries` operation, and each caller
  * gets exactly what its single-entry query would have returned. The hooks keep their own query
  * keys, so a drawer, a card's button and a full page share one cache entry per entry.
  */
@@ -150,184 +150,6 @@ const GuideEntriesQuery = graphql(`
           title
         }
       }
-      mechanisms {
-        id
-        title
-        question
-        examples
-        short
-        howItWorks {
-          segments {
-            text
-            field
-          }
-        }
-        whyItSurvives {
-          segments {
-            text
-            field
-          }
-        }
-        research {
-          segments {
-            text
-            field
-          }
-        }
-        realVsDecoy {
-          segments {
-            text
-            field
-          }
-        }
-        dont {
-          segments {
-            text
-            field
-          }
-        }
-        seeAlso
-        stats {
-          title
-          value
-          reading
-          source
-        }
-        sources {
-          title
-          url
-          reading
-        }
-        edges {
-          id
-          name
-          thesis
-          mechanism
-          asset
-          assetText
-          side
-          sideTerm
-          holdingSessions
-          holdingText
-          holdingBand
-          status
-        }
-        notBuilt {
-          id
-          title
-          mechanism
-          verdict
-          verdictText
-          feasibilityText
-          feasibilityTerm
-          whyNotBuilt
-        }
-      }
-      edges {
-        summary {
-          id
-          name
-          thesis
-          mechanism
-          asset
-          assetText
-          side
-          sideTerm
-          holdingSessions
-          holdingText
-          holdingBand
-          status
-        }
-        mechanism {
-          id
-          title
-        }
-        thesis {
-          segments {
-            text
-            field
-          }
-        }
-        otherSide {
-          segments {
-            text
-            field
-          }
-        }
-        lasts {
-          segments {
-            text
-            field
-          }
-        }
-        research {
-          measure
-          figure
-          expect
-          haircut
-          horizonText
-          leg
-          sample
-          source
-          terms
-        }
-        tests {
-          key
-          title
-          text
-          term
-        }
-        playbooks {
-          id
-          name
-          family
-        }
-        fields
-        failureModes {
-          segments {
-            text
-            field
-          }
-        }
-        decoys {
-          segments {
-            text
-            field
-          }
-        }
-        rejection {
-          segments {
-            text
-            field
-          }
-        }
-        capacity {
-          segments {
-            text
-            field
-          }
-        }
-        sources {
-          title
-          url
-          form
-        }
-        related {
-          id
-          name
-          thesis
-          mechanism
-          asset
-          assetText
-          side
-          sideTerm
-          holdingSessions
-          holdingText
-          holdingBand
-          status
-        }
-        seeAlso
-      }
     }
   }
 `);
@@ -355,8 +177,6 @@ async function readChunk(chunk: readonly Waiting[]): Promise<void> {
       episodes: [],
       terms: [],
       startPages: [],
-      mechanisms: [],
-      edges: [],
     };
     for (const w of chunk)
       w.settle.forEach((settle) => {
@@ -424,21 +244,5 @@ export function loadStartPage(
 ): Promise<{ guideStartPage: Entries['startPages'][number] | null }> {
   return load('START', id, (e) => ({
     guideStartPage: e.startPages.find((p) => p.entry.id === id) ?? null,
-  }));
-}
-
-/** `Query.guideMechanism`'s answer for `id`, read in the page's batch. */
-export function loadMechanism(
-  id: string,
-): Promise<{ guideMechanism: Entries['mechanisms'][number] | null }> {
-  return load('MECHANISM', id, (e) => ({
-    guideMechanism: e.mechanisms.find((m) => m.id === id) ?? null,
-  }));
-}
-
-/** `Query.guideEdge`'s answer for `id`, read in the page's batch. */
-export function loadEdge(id: string): Promise<{ guideEdge: Entries['edges'][number] | null }> {
-  return load('EDGE', id, (e) => ({
-    guideEdge: e.edges.find((x) => x.summary.id === id) ?? null,
   }));
 }

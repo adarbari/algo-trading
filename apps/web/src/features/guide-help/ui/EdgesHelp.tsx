@@ -11,7 +11,7 @@ import { edgeStatusText, GuideProse, useGuideEdge, useGuideMechanism } from '@/e
 
 import { HelpShell } from './HelpShell';
 
-export function MechanismHelp({ id }: { id: string }) {
+function MechanismHelp({ id }: { id: string }) {
   const query = useGuideMechanism(id);
   const m = query.data;
   const how = m?.howItWorks[0];
@@ -54,7 +54,7 @@ export function MechanismHelp({ id }: { id: string }) {
   );
 }
 
-export function EdgeHelp({ id }: { id: string }) {
+function EdgeHelp({ id }: { id: string }) {
   const query = useGuideEdge(id);
   const edge = query.data;
   return (
@@ -91,4 +91,13 @@ export function EdgeHelp({ id }: { id: string }) {
       )}
     </HelpShell>
   );
+}
+
+/** The drawer of a mechanism or a site edge (one lazy module for both). */
+export default function EdgesHelp({
+  entry,
+}: {
+  entry: { kind: 'mechanism' | 'edge'; id: string };
+}) {
+  return entry.kind === 'mechanism' ? <MechanismHelp id={entry.id} /> : <EdgeHelp id={entry.id} />;
 }

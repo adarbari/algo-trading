@@ -5,18 +5,16 @@
  */
 export {
   prefetchGuideIndex,
-  useGuideEdge,
-  useGuideEdgeIndex,
   useGuideEpisode,
   useGuideField,
   useGuideIndex,
   useGuideIndicator,
-  useGuideMechanism,
   useGuidePlaybook,
   useGuideSituation,
   useGuideStartPage,
   useGuideTerm,
 } from './api/hooks';
+export { useGuideEdge, useGuideEdgeIndex, useGuideMechanism } from './api/edges';
 export { episodeFacts, type EpisodeFacts } from './model/episode-facts';
 export { edgeSideText, edgeStatusText, edgeStatusTone, ideaVerdictTone } from './model/edge-status';
 export {
