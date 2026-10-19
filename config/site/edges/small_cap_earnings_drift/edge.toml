@@ -14,6 +14,7 @@ base = "event"
 screeners = ["pead_small_cap"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """Surprise = the excess return over SPY from the close before the report to the close after
 it (Brandt et al. 2008), earnings_reaction@v1 from events/earnings read by known_from. E is the

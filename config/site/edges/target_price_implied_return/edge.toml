@@ -18,6 +18,7 @@ base = "universe"
 screeners = ["target_upside_high"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """No exploration period exists: our own nightly snapshots of the analyst consensus targets (analyst_targets, EB D2) start on
 2026-10-19 at the earliest, after frozen_from, and a target carries no date of its own, so the first measurable month end is
@@ -82,6 +83,12 @@ upside), size, and the optimism of a sector: the size and momentum baselines on 
 
 [[sources]]
 title = "Da, Z. and Schaumburg, E., Relative Valuation and Analyst Target Price Forecasts, Journal of Financial Markets, 2011"
+url = "https://ideas.repec.org/a/eee/finmar/v14y2011i1p161-192.html"
 
 [[sources]]
 title = "Brav, A. and Lehavy, R., An Empirical Analysis of Analysts' Target Prices: Short-term Informativeness and Long-term Dynamics, Journal of Finance, 2003"
+url = "https://ideas.repec.org/a/bla/jfinan/v58y2003i5p1933-1967.html"
+
+[[sources]]
+title = "Womack, K. (1996), Do Brokerage Analysts' Recommendations Have Investment Value?, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v51y1996i1p137-67.html"

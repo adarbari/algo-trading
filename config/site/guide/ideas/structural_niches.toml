@@ -1,0 +1,221 @@
+# Researched, not built: family H (structural niches) of the edge-idea catalogue, one [[idea]] each (ADR 0051; keys in config/site/guide/ideas.py).
+
+family = "H"
+
+[[idea]]
+id = "cef_activist_target_prediction"
+title = "Front-running activists in closed-end funds"
+mechanism_kind = "value_gaps"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but it needs fund net asset values and parsed Schedule 13D filings, neither of which is stored."
+
+[[idea]]
+id = "odd_lot_tender_priority"
+title = "Odd-lot priority in oversubscribed tender offers"
+mechanism_kind = "forced_flows"
+verdict = "strong"
+feasibility = "needs_data"
+why_not_built = "Mechanical and rare; the catalogue suggests a small alert rather than a screener, and it needs tender filings parsed."
+
+[[idea]]
+id = "ipo_lockup_expiry_pressure"
+title = "Supply pressure when IPO lockups end"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as an avoid-list filter, not a stand-alone edge."
+
+[[idea]]
+id = "treasury_month_end_extension"
+title = "Treasury index duration extension at month end"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan; it runs on stored Treasury fund prices and rates."
+
+[[idea]]
+id = "treasury_auction_cycle"
+title = "Treasury price dip into auctions"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Planned, but the auction calendar is not stored and the evidence is only weak to promising."
+
+[[idea]]
+id = "mnav_treasury_company_premium"
+title = "Premium of crypto treasury companies to net assets"
+mechanism_kind = "value_gaps"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan; only one company has enough history today, so the harness's minimum event count is out of reach."
+
+[[idea]]
+id = "spac_trust_floor_yield"
+title = "SPAC trust-value floor yield"
+mechanism_kind = "value_gaps"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Small, event-driven yield, and it needs a SPAC list and trust value per share as features."
+
+[[idea]]
+id = "merger_arb_cash_deals_individual"
+title = "Cash merger arbitrage for an individual"
+mechanism_kind = "paid_for_risk"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but deal terms are not stored and would have to be extracted from filings."
+
+[[idea]]
+id = "tax_loss_selling_december_reversal"
+title = "Tax-loss selling in December, rebound in January"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan as a seasonal overlay; one event a year gives low statistical power."
+
+[[idea]]
+id = "vix_futures_basis_etp"
+title = "VIX futures basis through exchange-traded products"
+mechanism_kind = "paid_for_risk"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned as a volatility-premium variant, but the VIX futures curve is not stored."
+
+[[idea]]
+id = "post_bankruptcy_equity"
+title = "New shares issued after Chapter 11"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and there is no stored emergence list; many such shares trade over the counter first."
+
+[[idea]]
+id = "gasoline_seasonality_etf"
+title = "Gasoline fund spring seasonality"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak, and one season a year cannot reach the harness's minimum event count."
+
+[[idea]]
+id = "leveraged_pair_decay_short"
+title = "Shorting both legs of a leveraged ETF pair"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak after costs, and borrow fees are not stored."
+
+[[idea]]
+id = "mining_equity_beta_fade"
+title = "Bitcoin miners versus bitcoin"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Planned as an issuance-conditioned pair; the evidence is only weak to promising, so it waits behind stronger ideas."
+
+[[idea]]
+id = "btc_cme_basis_carry"
+title = "Bitcoin futures basis carry"
+mechanism_kind = "paid_for_risk"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and it is carry rather than alpha; futures settlement data is not stored."
+
+[[idea]]
+id = "prediction_market_macro_signal"
+title = "Prediction market odds as macro features"
+mechanism_kind = "informed_footprints"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak as an edge; as a data feature it needs a new vendor source for prediction-market prices."
+
+[[idea]]
+id = "preferred_call_and_exdiv"
+title = "Preferred stock call dates and ex-dividend capture"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and preferred coverage and call dates are not stored."
+
+[[idea]]
+id = "adr_country_lead_lag"
+title = "US close predicts Asian-listed ADRs"
+mechanism_kind = "cross_market_trends"
+verdict = "dead"
+feasibility = "out_of_scope"
+why_not_built = "Dead for ETF and ADR prices, so it is out of scope."
+
+[[idea]]
+id = "etf_closure_liquidation"
+title = "ETF closure announcements"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak and not worth building; closure announcements are not stored."
+
+[[idea]]
+id = "stub_holdco_sotp_discount"
+title = "Holding company discount to its parts"
+mechanism_kind = "value_gaps"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak with few cases, and it needs a map of cross-holdings from filings."
+
+[[idea]]
+id = "muni_cef_december"
+title = "Municipal closed-end fund December discount widening"
+mechanism_kind = "forced_flows"
+verdict = "promising"
+feasibility = "data_ready"
+why_not_built = "Queued in the build plan; one event a year counts as one December, so statistical power is low."
+
+[[idea]]
+id = "bitcoin_etf_flow_and_dow"
+title = "Bitcoin ETF flows and weekday effects"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and it needs a daily flows series; the weekday variant is dead."
+
+[[idea]]
+id = "cef_discount_reversion"
+title = "Closed-end fund discount reversion"
+mechanism_kind = "value_gaps"
+filed_as = "closed_end_fund_discounts"
+
+[[idea]]
+id = "cef_distribution_trap_premium_collapse"
+title = "Premium funds that over-distribute"
+mechanism_kind = "value_gaps"
+filed_as = "cef_distribution_trap"
+
+[[idea]]
+id = "tender_offer_post_expiry_drift"
+title = "Drift after tender offers"
+mechanism_kind = "forced_flows"
+filed_as = "tender_offer_drift"
+
+[[idea]]
+id = "spinoff_post_distribution_drift"
+title = "Spin-offs after the forced-selling window"
+mechanism_kind = "forced_flows"
+filed_as = "spinoff_drift"
+
+[[idea]]
+id = "new_thematic_etf_fade"
+title = "New thematic ETFs lag after launch"
+mechanism_kind = "value_gaps"
+filed_as = "thematic_etf_launch_fade"
+
+[[idea]]
+id = "retail_lottery_option_flow"
+title = "Retail lottery-option buying predicts losses"
+mechanism_kind = "lottery_demand"
+filed_as = "retail_options_lottery_attention"
+
+[[idea]]
+id = "share_issuance_dilution_drift"
+title = "Share issuance and dilution drift"
+mechanism_kind = "mispriced_fundamentals"
+filed_as = "net_share_issuance"

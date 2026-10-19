@@ -555,7 +555,7 @@ when the label is unknown.
 
 - **Auth:** none yet. `--user` is a namespace, not an identity. Phase 4 maps authenticated users
   to `user_id`, and services enforce per-user access to configs, results and jobs.
-- **PII:** none stored; user ids are opaque labels. Public SEC filer identifiers (a Form 4 reporting owner's CIK and officer title) are stored as filed, no names (decision log 2026-10-18).
+- **PII:** none stored; user ids are opaque labels. Public SEC filer identifiers (a Form 4 reporting owner's CIK, name and officer title) are stored as filed; the UI shows aggregates only (decision log 2026-10-18, EB D6b).
 - **Threats:** malicious configs (typed rules only, never code or SQL); path traversal (ids
   restricted to `[a-z0-9_-]{1,64}`); secrets in configs (rejected at load: secret-like keys
   such as `api_key`, `token`, `password`; credentials only from env); cross-user reads (namespaced now, enforced in phase 4).

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Write the feature catalogue (docs/data/features.md) from the feature registry and the
 repository's config/site/features/*.toml, the field guide (docs/data/field-guide.md) from
-config/site/field_guide/*.toml (the index docs/data/field-guide.md and one page per theme under
-docs/data/field-guide/; a theme page no longer rendered is removed), and the edges page
+config/site/field_guide/<group>/*.toml (the index docs/data/field-guide.md and the theme pages
+under docs/data/field-guide/<group>/, a long theme in parts; a page no longer rendered is
+removed), and the edges page
 (the index docs/edges.md and one page per family under docs/edges/) from
 config/site/edges/*/edge.toml (ADR 0053).
 
@@ -19,6 +20,7 @@ from pathlib import Path
 from algotrade.config.edges.loading import load_edges
 from algotrade.config.edges.page import DIR as EDGES_DIR
 from algotrade.config.edges.page import pages as edges_pages
+from algotrade.config.site.guide.sections import load_guide_sections
 from algotrade.config.site.settings import load_field_guide
 from algotrade.features.catalogue import PATH, render
 from algotrade.features.guide import DIR as GUIDE_DIR
@@ -37,7 +39,7 @@ def main() -> int:
     store = FileConfigStore(ROOT / "config")
     pages = {
         PATH: render(site_features(store)),
-        **guide_pages(load_field_guide(store)),
+        **guide_pages(load_field_guide(store), load_guide_sections(store)),
         **edges_pages(load_edges(store)),
     }
     stale = []
@@ -51,7 +53,7 @@ def main() -> int:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
         print(f"wrote {rel}")
-    extras = [*(ROOT / GUIDE_DIR).glob("*.md"), *(ROOT / EDGES_DIR).glob("*.md")]
+    extras = [*(ROOT / GUIDE_DIR).glob("**/*.md"), *(ROOT / EDGES_DIR).glob("*.md")]
     for extra in sorted(extras):  # a theme or family that was renamed or removed
         rel = str(extra.relative_to(ROOT))
         if rel in pages:

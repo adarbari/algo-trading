@@ -16,6 +16,7 @@ top_k = 50
 screeners = ["industry_momentum"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 family = "A"
 frozen_from = 2026-04-01
 notes = """The stored industry is the sector fund (11 sectors of the SEC SIC code, momentum_variants@v1

@@ -20,6 +20,7 @@ picks = "event"
 screeners = []
 baselines = ["vrp_iv_hv"]
 status = "blocked"
+mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 rejection_reason = """The position's horizon cannot be priced. The model P&L prices every horizon with one
 30-day implied volatility (IV30, the only history stored), and the document parser refuses a horizon
@@ -81,3 +82,15 @@ url = "https://resolve.cambridge.org/core/journals/journal-of-financial-and-quan
 [[sources]]
 title = "BSIC, Straddling outside and into earnings (practitioner)"
 url = "https://bsic.it/straddling-outside-and-into-earnings/"
+
+[[sources]]
+title = "Savor, P. and Wilson, M. (2016), Earnings Announcements and Systematic Risk, Journal of Finance (December 2011 draft, Wharton)"
+url = "https://faculty.wharton.upenn.edu/wp-content/uploads/2012/04/Draft20111215p_edited.pdf"
+
+[[sources]]
+title = "Coval, J. and Shumway, T. (2001), Expected Option Returns, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v56y2001i3p983-1009.html"
+
+[[sources]]
+title = "Bakshi, G. and Kapadia, N. (2003), Delta-Hedged Gains and the Negative Market Volatility Risk Premium, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v16y2003i2p527-566.html"

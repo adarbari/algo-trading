@@ -7,7 +7,12 @@ from typing import Any
 
 import pytest
 
-from algotrade.config.site.guide.sections import SECTIONS, GuideSections, load_guide_sections
+from algotrade.config.site.guide.sections import (
+    EDGE_GROUPS,
+    SECTIONS,
+    GuideSections,
+    load_guide_sections,
+)
 from algotrade.config.site.settings import load_field_guide
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import SCREENERS, FileConfigStore, MemoryConfigStore
@@ -41,7 +46,12 @@ def test_every_site_preset_is_in_exactly_one_family_and_every_listed_one_exists(
 def test_the_shipped_sections_follow_the_spec() -> None:
     shipped = load_guide_sections(SHIPPED)
     assert tuple(s.id for s in shipped.sections) == SECTIONS
-    assert [s.title for s in shipped.sections][:2] == ["Start here", "Market regime"]
+    assert [s.title for s in shipped.sections][:3] == ["Start here", "Market regime", "Edges"]
+    assert [g.id for g in shipped.edge_groups] == list(EDGE_GROUPS)
+    assert [g.title for g in shipped.edge_groups] == [
+        "Checked and set aside",
+        "Researched, not built",
+    ]
     assert [f.id for f in shipped.families] == [
         "trend",
         "breakouts",
@@ -63,12 +73,18 @@ GROUP = {"id": "chart", "title": "The chart", "themes": ["volume", "volatility"]
 FAMILY = {"id": "trend", "title": "Trend", "presets": ["pullback"]}
 
 
+GROUP_DOC = {"id": "set_aside", "title": "Set aside", "purpose": "Tested and rejected."}
+
+
 def test_a_document_is_typed_in_order_and_a_missing_file_has_nothing() -> None:
     doc = {"section": [SECTION], "theme_group": [GROUP], "family": [FAMILY]}
     found = load_guide_sections(MemoryConfigStore({("site", "guide", "sections"): doc}))
     assert found.sections[0].purpose == "Every field."
     assert found.theme_groups[0].themes == ("volume", "volatility")
     assert found.presets == ("pullback",)
+    assert found.edge_groups == ()
+    with_groups = GuideSections.from_document({"edge_group": [GROUP_DOC]})
+    assert with_groups.edge_groups[0].purpose == "Tested and rejected."
     assert load_guide_sections(MemoryConfigStore({})) == GuideSections()
 
 
@@ -85,6 +101,10 @@ def test_a_document_is_typed_in_order_and_a_missing_file_has_nothing() -> None:
         ({"family": [{**FAMILY, "colour": "red"}]}, "unknown keys"),
         ({"family": {"id": "x"}}, r"expected a list of tables \(\[\[family\]\]\)"),
         ({"chapter": []}, "unknown keys"),
+        ({"edge_group": [{**GROUP_DOC, "id": "ideas"}]}, "got 'ideas'"),
+        ({"edge_group": [{"title": "x", "purpose": "y"}]}, "id: expected one of"),
+        ({"edge_group": [GROUP_DOC, GROUP_DOC]}, "edge group ids listed more than once"),
+        ({"edge_group": [{**GROUP_DOC, "purpose": " "}]}, "purpose: expected a non-empty"),
         ({"section": [SECTION], "api_key": "x"}, "looks like a secret"),
     ],
 )

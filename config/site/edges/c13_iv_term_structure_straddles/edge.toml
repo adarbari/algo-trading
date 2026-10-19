@@ -18,6 +18,7 @@ top_k = 20
 screeners = []
 baselines = ["vrp_iv_hv"]
 status = "blocked"
+mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 rejection_reason = """The slope has no history. The long end (term_ratio_30_90, the iv_90d of iv_term@v1)
 is computed from option chains, which are stored from 2026-10-02 only, about two weeks of sessions;
@@ -73,3 +74,15 @@ url = "https://www.cambridge.org/core/journals/journal-of-financial-and-quantita
 [[sources]]
 title = "Alpha Architect, Equity Term Structure and Option Returns (summary)"
 url = "https://alphaarchitect.com/2014/01/equity-term-structure-and-option-returns/"
+
+[[sources]]
+title = "Coval, J. and Shumway, T. (2001), Expected Option Returns, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v56y2001i3p983-1009.html"
+
+[[sources]]
+title = "Goyal, A. and Saretto, A. (2009), Cross-section of option returns and volatility, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html"
+
+[[sources]]
+title = "Bakshi, G. and Kapadia, N. (2003), Delta-Hedged Gains and the Negative Market Volatility Risk Premium, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v16y2003i2p527-566.html"

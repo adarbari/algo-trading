@@ -19,6 +19,8 @@ screeners = [
 base = "benchmark"
 oos_class = "trend"
 status = "candidate"
+mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history and evaluated. LIMITS: (1)
 the source's fallback is the aggregate bond index when neither stock fund has beaten the bill; here
@@ -75,3 +77,15 @@ title = "Antonacci, G., Dual Momentum Investing, McGraw-Hill, 2014"
 [[sources]]
 title = "ReSolve Asset Management, Global Equity Momentum: A Craftsman's Perspective, 2019"
 url = "https://files.advisorperspectives.com/articles/2019/05/06/global-equity-momentum-a-craftsmans-perspective"
+
+[[sources]]
+title = "CXO Advisory, Intrinsic Momentum across Asset Classes (summary of Antonacci (2013), Absolute Momentum)"
+url = "https://www.cxoadvisory.com/momentum-investing/intrinsic-momentum-across-asset-classes/"
+
+[[sources]]
+title = "Moskowitz, T., Ooi, Y. and Pedersen, L. (2012), Time Series Momentum, Journal of Financial Economics (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum"
+
+[[sources]]
+title = "Hurst, B., Ooi, Y. and Pedersen, L. (2017), A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing"

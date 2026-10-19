@@ -18,6 +18,7 @@ base = "universe"
 screeners = ["eps_revision_up"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """No exploration period exists: our own nightly snapshots of FMP's annual estimates (analyst_estimates, EB D2) start on
 2026-10-19 at the earliest, after frozen_from, and a revision needs an earlier snapshot of the same fiscal year,
@@ -88,6 +89,7 @@ earnings surprise: the size and momentum baselines on the same sessions."""
 
 [[sources]]
 title = "Chan, L., Jegadeesh, N. and Lakonishok, J., Momentum Strategies, Journal of Finance, 1996"
+url = "https://www.nber.org/papers/w5375"
 
 [[sources]]
 title = "Gleason, C. and Lee, C., Analyst Forecast Revisions and Market Price Discovery, The Accounting Review, 2003"
@@ -95,3 +97,11 @@ title = "Gleason, C. and Lee, C., Analyst Forecast Revisions and Market Price Di
 [[sources]]
 title = "Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022"
 url = "https://papers.ssrn.com/abstract=3604626"
+
+[[sources]]
+title = "Womack, K. (1996), Do Brokerage Analysts' Recommendations Have Investment Value?, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v51y1996i1p137-67.html"
+
+[[sources]]
+title = "Hong, H., Lim, T. and Stein, J. (1998), Bad News Travels Slowly: Size, Analyst Coverage and the Profitability of Momentum Strategies, NBER working paper 6553 (Journal of Finance 2000)"
+url = "https://www.nber.org/papers/w6553"

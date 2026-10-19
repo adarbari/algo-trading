@@ -19,6 +19,7 @@ base = "universe"
 screeners = ["tender_offer_filed"]
 baselines = ["size_small"]
 status = "candidate"
+mechanism_kind = "forced_flows"
 frozen_from = 2026-04-01
 notes = """The anchor is the session the SC TO-I or SC TO-T filing became known (the first session
 whose close follows its acceptance), not the expiry: the expiry is not stored. A tender offer must
@@ -78,9 +79,16 @@ prompted the offer: the size baseline. Overlaps any buyback idea (variant: tende
 
 [[sources]]
 title = "Lakonishok, J. and Vermaelen, T., Anomalous price behavior around repurchase tender offers, Journal of Finance, 1990"
+url = "https://ideas.repec.org/a/bla/jfinan/v45y1990i2p455-77.html"
 
 [[sources]]
 title = "Peyer, U. and Vermaelen, T., The nature and persistence of buyback anomalies, Review of Financial Studies, 2009"
+url = "https://ideas.repec.org/a/oup/rfinst/v22y2009i4p1693-1745.html"
 
 [[sources]]
 title = "Fu, F. and Huang, S., The persistence of long-run abnormal returns following stock repurchases and offerings, Management Science, 2016"
+url = "https://ideas.repec.org/a/inm/ormnsc/v62y2016i4p964-984.html"
+
+[[sources]]
+title = "Ikenberry, D., Lakonishok, J. and Vermaelen, T. (1995), Market underreaction to open market share repurchases, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v39y1995i2-3p181-208.html"

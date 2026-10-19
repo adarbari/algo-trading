@@ -20,6 +20,7 @@ screeners = ["pre_earnings_reversal", "earnings_neutral_reversal"]
 baselines = ["momentum_12_1", "size_small"]
 universe = "liquid_common_stocks"
 status = "candidate"
+mechanism_kind = "liquidity_provision"
 frozen_from = 2026-04-01
 notes = """The window is the 3 sessions of days -1, 0 and +1 around the expected report A, entered at
 the close of A - 2 (start_offset_sessions -2, the same window as the Savor-Wilson variant of the
@@ -78,6 +79,15 @@ url = "https://quantpedia.com/strategies/reversal-during-earnings-announcements/
 # The literature's figure (ADR 0064): So and Wang's low-minus-high 3-day return of the largest size
 # quintile around the report, 1.45% against 0.22% in pseudo-announcement windows, 1996-2011,
 # before costs. A long-short spread of the extreme quintiles.
+
+[[sources]]
+title = "Nagel, S. (2011), Evaporating Liquidity, NBER working paper 17653 (Review of Financial Studies 2012)"
+url = "https://www.nber.org/papers/w17653"
+
+[[sources]]
+title = "Da, Z., Liu, Q. and Schaumburg, E. (2011), Decomposing Short-Term Return Reversal, Federal Reserve Bank of New York staff report 513 (Management Science 2014, as A Closer Look at the Short-Term Return Reversal)"
+url = "https://www.newyorkfed.org/research/staff_reports/sr513.html"
+
 [published]
 measure = "decile_spread"
 value = 0.0145

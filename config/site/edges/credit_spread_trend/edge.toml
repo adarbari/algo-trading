@@ -19,6 +19,8 @@ screeners = [
 base = "benchmark"
 oos_class = "trend"
 status = "candidate"
+mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. PROXY: the idea is a spread trend;
 this version uses the funds' own price trend as the stand-in (HYG for high yield, LQD for investment
@@ -73,7 +75,16 @@ tsmom_multi_asset_etf and the regime label's market-stress reading."""
 
 [[sources]]
 title = "Jostova, G., Nikolova, S., Philipov, A. and Stahel, C., Momentum in Corporate Bond Returns, Review of Financial Studies, 2013"
+url = "https://ideas.repec.org/a/oup/rfinst/v26y2013i7p1649-1693.html"
 
 [[sources]]
 title = "Faber, M., A Quantitative Approach to Tactical Asset Allocation, Journal of Wealth Management, 2007"
 url = "https://papers.ssrn.com/abstract=962461"
+
+[[sources]]
+title = "Hurst, B., Ooi, Y. and Pedersen, L. (2017), A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing"
+
+[[sources]]
+title = "Moskowitz, T., Ooi, Y. and Pedersen, L. (2012), Time Series Momentum, Journal of Financial Economics (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum"

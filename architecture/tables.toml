@@ -139,7 +139,7 @@ note = "ADR 0050: SEC event filings (8-K and 8-K/A with items, NT 10-K / NT 10-Q
 [[table]]
 name = "events/filing_text"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/filing_text.py"
-note = "Edge build D10: the plain text of the Item sections of every 10-K / 10-K/A / 10-Q / 10-Q/A of the universe's operating companies (never the HTML), one row per instrument, accession, item, parser_version and known_from (every version stays), partitioned by the filing's acceptance session; known_from = acceptance_sessions(ts) for a filing's first extraction, max(that, the session after the fetch) for a later row that changes or adds a text (a parser bump never rewrites history as known earlier), the stored stamp kept for an identical one; readers go through data/filing_text (known_from <= S, the latest version per item), never a raw partition read"
+note = "Edge build D10 / D10b: the plain text of the Item sections (by default risk factors and MD&A) of every 10-K / 10-K/A / 10-Q / 10-Q/A of EVERY filer, delisted companies included (the filers of the EDGAR daily form index; never the HTML), one row per cik, accession, item, parser_version and known_from (every version stays), partitioned by the filing's acceptance session; no instrument_id is stored (NULL): readers map a cik to instruments through instruments/company as of their session; known_from = acceptance_sessions(ts) for a filing's first extraction, max(that, the session after the fetch) for a later row that changes or adds a text (a parser bump never rewrites history as known earlier), the stored stamp kept for an identical one; readers go through data/filing_text (known_from <= S, the latest version per item), never a raw partition read"
 
 [[table]]
 name = "events/short_interest"
@@ -161,7 +161,7 @@ note = "Edge build D5: the daily NAV per share of a closed-end fund from Tiingo'
 [[table]]
 name = "events/insider_transaction"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/insider.py"
-note = "EB D6: SEC Form 4 / 4/A insider transactions, a row per transaction line and reporting owner, ts = SEC's acceptance instant; known_from = the acceptance_session of SEC's acceptance time (first session whose close is after it), later for a line restated with different content; known_from is in the key, so a restated line sits beside the version it replaces; read through data.insiders"
+note = "EB D6: SEC Form 4 / 4/A insider transactions, a row per transaction line and reporting owner, ts = SEC's acceptance instant; known_from = the acceptance_session of SEC's acceptance time (first session whose close is after it), later for a line restated with different content; known_from is in the key, so a restated line sits beside the version it replaces; owner_name = the reporting owner's name as filed (public SEC data, trimmed, never in the key or a restatement compare); read through data.insiders"
 
 [[table]]
 name = "events/ipo_lockup"
@@ -328,6 +328,16 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the last earnings report's window volume over the 20 sessions before it (E3); reads events/earnings and bars/1d through earnings_reaction's window rule"
 
 [[table]]
+name = "rollups/instrument/ipo_lockups@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0075: the nearest IPO lock-up expiry of an instrument, the sessions to it (negative after, down to -20) and its release terms; reads events/ipo_lockup as the latest version known by the session, the CIK mapped to an instrument through instruments/company as of the session"
+
+[[table]]
+name = "rollups/instrument/reverse_splits@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "ADR 0075: the latest reverse split of an instrument (ratio below 1, new shares per old), the sessions since its ex-date and the count in a year; reads events/split by event date up to the session"
+
+[[table]]
 name = "rollups/instrument/fundamentals@v4"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
@@ -472,6 +482,10 @@ name = "rollups/instrument/factor_betas@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/etf_macro@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
 name = "rollups/instrument/illiquidity@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
@@ -529,6 +543,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 name = "rollups/market/market_macro@v3"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 note = "v1 (RG3a) was never materialised; v2 added ebp, ebp_recession_prob, ofr_fsi and epu; v3 let the unemployment windows tolerate a missing month (v2 rows on the owner's store are superseded and read by nothing, deleted by hand once v3 is backfilled)"
+
+[[table]]
+name = "rollups/market/market_triggers@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+note = "ADR 0075: the VIX spike trigger of the on_market time-series edges, from FRED VIXCLS and VXVCLS (personal licence)"
 
 [[table]]
 name = "rollups/market/regime_indicators@v1"

@@ -17,6 +17,7 @@ top_k = 10
 screeners = []
 baselines = ["size_small"]
 status = "blocked"
+mechanism_kind = "value_gaps"
 frozen_from = 2026-04-01
 rejection_reason = """Two things are missing. Closed-end funds are not in the covered universe (ADR 0013:
 security_types of config/site/universe.toml; a fund typed FUND is the reference's CEF and is not in the nightly
@@ -76,3 +77,19 @@ url = "https://hedgefundalpha.com/strategies/closed-end-fund-discounts/"
 
 [[sources]]
 title = "SEC, Section 19(a) notices of distribution sources (return of capital disclosure)"
+
+[[sources]]
+title = "Patro, D., Piccotti, L. and Wu, Y. (2017), Exploiting Closed-End Fund Discounts: A Systematic Examination of Alphas, Journal of Financial Research"
+url = "https://ideas.repec.org/a/bla/jfnres/v40y2017i2p223-248.html"
+
+[[sources]]
+title = "CXO Advisory, Enhanced Exploitation of Closed-End Fund Discounts (summary of Patro, Piccotti and Wu)"
+url = "https://www.cxoadvisory.com/mutual-hedge-funds/enhanced-exploitation-of-closed-end-fund-discounts/"
+
+[[sources]]
+title = "Pontiff, J. (1995), Closed-End Fund Premia and Returns: Implications for Financial Market Equilibrium, Journal of Financial Economics"
+url = "https://academicnewsletter.sufe.edu.cn/info/358172"
+
+[[sources]]
+title = "SEC (17 CFR 270.19a-1), Written statement to accompany dividend payments by management companies (the Section 19(a) notice rule; Cornell LII text)"
+url = "https://www.law.cornell.edu/cfr/text/17/270.19a-1"

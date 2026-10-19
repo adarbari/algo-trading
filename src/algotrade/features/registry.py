@@ -32,6 +32,7 @@ from algotrade.features.rollups.activity import (
     vol_stats,
     volume_profile,
 )
+from algotrade.features.rollups.bridges import etf_macro
 from algotrade.features.rollups.consensus import (
     analyst_estimates,
     analyst_ratings,
@@ -58,6 +59,8 @@ from algotrade.features.rollups.events import (
     filing_events,
     index_changes,
     insider_buys,
+    ipo_lockups,
+    reverse_splits,
     short_interest,
 )
 from algotrade.features.rollups.levels import gaps, pivot_strength, retest, swing_levels
@@ -68,6 +71,7 @@ from algotrade.features.rollups.market import (
     macro,
     regime,
     trend,
+    triggers,
 )
 from algotrade.features.rollups.options import (
     call_wing,
@@ -147,6 +151,8 @@ GROUPS: dict[str, FeatureGroup] = {
             index_changes.GROUP,
             filing_events.GROUP,
             insider_buys.GROUP,
+            ipo_lockups.GROUP,
+            reverse_splits.GROUP,
             short_interest.GROUP,
             earnings_date_shift.GROUP,
             earnings_gap_volume.GROUP,
@@ -198,6 +204,7 @@ GROUPS: dict[str, FeatureGroup] = {
             macro.GROUP,
             indicators.GROUP,
             regime.GROUP,
+            triggers.GROUP,
             fund_reference.GROUP,
             cef_nav.GROUP,
             etf_flows.GROUP,
@@ -205,6 +212,7 @@ GROUPS: dict[str, FeatureGroup] = {
             relative_strength.GROUP,
             momentum_variants.GROUP,
             factor_betas.GROUP,
+            etf_macro.GROUP,
             illiquidity.GROUP,
         ),
         # iv30@v1, put_wing@v1 and call_wing@v1 read the materialised div_yield@v1 (FeatureSet

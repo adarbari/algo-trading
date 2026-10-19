@@ -19,6 +19,7 @@ base = "universe"
 screeners = ["news_free_residual_reversal"]
 baselines = ["momentum_12_1", "size_small", "residual_reversal"]
 status = "candidate"
+mechanism_kind = "liquidity_provision"
 frozen_from = 2026-04-01
 notes = """A variant of short_term_residual_reversal filed as its own edge (its own screener, one trial):
 the same market-residual 20-session return (rollup.momentum_variants@v1.resid_ret_20d, lowest first) among
@@ -118,13 +119,20 @@ size and liquidity, the earnings reaction (the filter removes the earnings windo
 
 [[sources]]
 title = "Chan, W., Stock Price Reaction to News and No-News: Drift and Reversal after Headlines, Journal of Financial Economics, 2003"
+url = "https://academicnewsletter.sufe.edu.cn/info/357702"
 
 [[sources]]
 title = "Pritamani, M. and Singal, V., Return Predictability Following Large Price Changes and Information Releases, Journal of Banking and Finance, 2001"
+url = "https://ideas.repec.org/a/eee/jbfina/v25y2001i4p631-656.html"
 
 [[sources]]
 title = "Da, Z., Liu, Q. and Schaumburg, E., A Closer Look at the Short-Term Return Reversal, Management Science, 2014"
+url = "https://www.newyorkfed.org/research/staff_reports/sr513.html"
 
 [[sources]]
 title = "Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets, 2013"
 url = "https://repub.eur.nl/pub/40707"
+
+[[sources]]
+title = "Cox, D. and Peterson, D. (1994), Stock Returns Following Large One-Day Declines, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v49y1994i1p255-67.html"

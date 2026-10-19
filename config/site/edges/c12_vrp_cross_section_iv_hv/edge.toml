@@ -20,6 +20,7 @@ top_k = 20
 screeners = ["vrp_cross_section"]
 baselines = ["vrp_iv_hv", "size_small"]
 status = "candidate"
+mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 notes = """The P&L is a model, not a quote (basis model; ADR 0053 amendment 2026-10-17, EB H8). No
 historical option chains are stored (owner decision O3: no paid history), so the position is one
@@ -113,6 +114,7 @@ unranked premium) and the size baseline on the same sessions, and with the no_ea
 
 [[sources]]
 title = "Goyal, A. and Saretto, A., Cross-section of option returns and volatility, Journal of Financial Economics, 2009"
+url = "https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html"
 
 [[sources]]
 title = "Bali, T., Beckmeyer, H., Moerke, M. and Weigert, F., Option Return Predictability with Machine Learning and Big Data, Review of Financial Studies, 2023"
@@ -121,3 +123,11 @@ url = "https://www.wiwi.uni-muenster.de/fcm/en/publication/98329575"
 [[sources]]
 title = "EDHEC, Empirical properties of straddle returns"
 url = "https://risk.edhec.edu/publications/empirical-properties-straddle-returns"
+
+[[sources]]
+title = "Carr, P. and Wu, L. (2009), Variance Risk Premiums, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v22y2009i3p1311-1341.html"
+
+[[sources]]
+title = "Bakshi, G. and Kapadia, N. (2003), Delta-Hedged Gains and the Negative Market Volatility Risk Premium, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v16y2003i2p527-566.html"

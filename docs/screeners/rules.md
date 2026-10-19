@@ -49,7 +49,7 @@ which field is the gate, which a confirmation or a score, and the usual threshol
 a free model gets the mapping right; extend it by PR when a sentence maps badly (every field
 it names must exist in the catalogue: a test checks).
 
-The prompt ends with the site **field guide** (`config/site/field_guide/*.toml`): for each
+The prompt ends with the site **field guide** (`config/site/field_guide/<group>/*.toml`): for each
 catalogue field how to read it, the usual criterion for each intent a trader has (the
 operator, value, mode and tolerance as this grammar takes them), and the caveats where the
 number is right and the conclusion wrong (a pending takeover pins RSI high with no trend

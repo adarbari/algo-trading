@@ -6,6 +6,7 @@ from typing import Self
 import strawberry
 
 from algotrade.services.read.guide import playbook
+from algotrade_api.graphql.types.guide.edges.edge import GuideEdgeRow
 from algotrade_api.graphql.types.guide.prose import GuideProse
 
 
@@ -78,7 +79,8 @@ class GuidePlaybookSituation:
 @strawberry.type(
     description="A site playbook's Guide page: the preset's latest `version`, its family, the "
     "prose (null: none written), the criteria in file order (the base gates are not marked "
-    "apart), the tie-break, related playbooks and the situations that fool its fields"
+    "apart), the tie-break, related playbooks, the situations that fool its fields and the "
+    "site edges it implements (`edges`, as rows)"
 )
 class GuidePlaybookDetail:
     id: str
@@ -92,6 +94,7 @@ class GuidePlaybookDetail:
     tie_break_descending: bool
     related: list[GuideRelatedPlaybook]
     situations: list[GuidePlaybookSituation]
+    edges: list[GuideEdgeRow]
 
     @classmethod
     def of(cls, d: playbook.GuidePlaybookDetail) -> Self:
@@ -107,4 +110,5 @@ class GuidePlaybookDetail:
             tie_break_descending=d.tie_break_descending,
             related=[GuideRelatedPlaybook.of(r) for r in d.related],
             situations=[GuidePlaybookSituation.of(s) for s in d.situations],
+            edges=[GuideEdgeRow.of(e) for e in d.edges],
         )

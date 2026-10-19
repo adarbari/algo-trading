@@ -361,9 +361,11 @@ def _valued(
     valued at S against the blended benchmark with the cash at the bill yield read at D
     (``portfolio/session.py``)."""
     o, day = scope.edge.outcome, leg.decision
-    regime, book_vol = session.label(day), None
+    regime = session.label(day)
+    book_vol: float | None = None
+    risk_off: float | None = None
     if not why:
-        weights, book_vol, why = apply_overlays(o, session, day, weights)
+        weights, book_vol, risk_off, why = apply_overlays(o, session, day, weights)
     if why:
         return portfolio_stat(day, regime, None, why, (), o.cost_bps)
     constituents = blend(o.benchmark)
@@ -376,7 +378,7 @@ def _valued(
         cash_return(session.bill_yield(day), horizon) if held_cash else None,
     )
     return portfolio_stat(
-        day, regime, value, why, weights, o.cost_bps, deciles, ranked, book_vol=book_vol
+        day, regime, value, why, weights, o.cost_bps, deciles, ranked, book_vol, risk_off
     )
 
 

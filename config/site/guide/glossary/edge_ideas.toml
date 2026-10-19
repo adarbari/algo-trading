@@ -1,0 +1,23 @@
+# L3 site setting: the Guide glossary, edges: the ideas researched but not built (ADR 0051, docs/edge-ideas/). One [[term]]
+# each: id, term, short (one sentence), body, see_also. Typed by
+# src/algotrade/config/site/guide/glossary.py; fitness tests: tests/unit/config/site/guide/test_glossary.py.
+
+[[term]]
+id = "idea_verdict"
+term = "Researched idea verdict"
+short = "How strong the published research behind an idea is, as the idea catalogue graded it: strong, promising, weak, decayed, dead or not graded."
+body = """
+The verdict grades the published evidence for an idea, never a test run here: none of these ideas has been run. Strong: several independent papers agree and the effect survived after publication. Promising: good evidence with a gap, such as a short sample or a single market. Weak: thin or mixed evidence. Decayed: it worked once and later evidence shows it faded to little. Dead: the effect is gone or never held up. Not graded: the catalogue gave no grade. A verdict says how much an idea deserves a test, not that it will work for us.
+"""
+next = "Read the verdict beside the build feasibility: a strong idea we cannot build yet is a data task, not a result."
+see_also = ["idea_feasibility", "verdict", "edge_status"]
+
+[[term]]
+id = "idea_feasibility"
+term = "Build feasibility"
+short = "What building an idea would take: data ready, needs data, needs code or out of scope."
+body = """
+Feasibility says what stands between an idea and a test. Data ready: every input is stored, so a written edge and a screen are enough. Needs data: the idea reads a series the store does not hold yet, such as per-analyst estimates. Needs code: the data is stored but the app cannot yet express the rule or the outcome. Out of scope: it needs something this app does not do, such as trading in size or paid data. Feasibility describes today's store and code and changes when either does. Don't read needs data as a bad idea: it is a missing input.
+"""
+next = "Ideas that are data ready and strong or promising are the first to become edges."
+see_also = ["idea_verdict", "edge_status"]

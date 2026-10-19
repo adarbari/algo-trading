@@ -12,6 +12,7 @@ top_k = 50
 screeners = ["composite_value"]
 baselines = ["cash_op_profitability", "size_small"]
 status = "candidate"
+mechanism_kind = "mispriced_fundamentals"
 frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). A variant of cash_based_operating_profitability filed as its own edge so that edge's published figure is not read against this rule: the screener holds names with positive cash-based operating profitability and a positive composite_value_yield (the mean of EBIT / enterprise value and the free cash flow yield, a catalogue formalisation with no book to market or growth part), cheapest first; cash_op_profitability is the baseline, so the harness shows whether cheapness adds to profitability. No published figure is carried: the sources give approximate sizes only. long_short, where run, is diagnostic only."""
 
@@ -39,13 +40,19 @@ decoys = """The profitability tilt alone (the cash_op_profitability baseline), s
 
 [[sources]]
 title = "Lakonishok, J., Shleifer, A. and Vishny, R., Contrarian Investment, Extrapolation, and Risk, Journal of Finance, 1994"
+url = "https://www.nber.org/papers/w4360"
 
 [[sources]]
 title = "Asness, C. and Frazzini, A., The Devil in HML's Details, Journal of Portfolio Management, 2013"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/The-Devil-in-HMLs-Details"
 
 [[sources]]
 title = "Novy-Marx, R., The Other Side of Value: The Gross Profitability Premium, Journal of Financial Economics, 2013"
 url = "https://www.nber.org/system/files/working_papers/w15940/w15940.pdf"
+
+[[sources]]
+title = "Ball, R., Gerakos, J., Linnainmaa, J. and Nikolaev, V. (2016), Accruals, Cash Flows, and Operating Profitability in the Cross Section of Stock Returns, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v121y2016i1p28-45.html"
 
 [[variants]]
 id = "spread"

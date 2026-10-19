@@ -20,6 +20,8 @@ screeners = [
 base = "benchmark"
 oos_class = "trend"
 status = "candidate"
+mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history (the outcome rows of all
 nine funds start with the store on 2010-01-04, so that is the common start; the grid needs every fund
@@ -89,6 +91,7 @@ nulls; compare the book with SPY alone in the run record."""
 
 [[sources]]
 title = "Moskowitz, T., Ooi, Y. and Pedersen, L., Time Series Momentum, Journal of Financial Economics, 2012"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum"
 
 [[sources]]
 title = "Hurst, B., Ooi, Y. and Pedersen, L., A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management, 2017"

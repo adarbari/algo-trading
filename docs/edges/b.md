@@ -44,9 +44,11 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Chan, L., Jegadeesh, N. and Lakonishok, J., Momentum Strategies, Journal of Finance, 1996
+- Chan, L., Jegadeesh, N. and Lakonishok, J., Momentum Strategies, Journal of Finance, 1996 <https://www.nber.org/papers/w5375>
 - Gleason, C. and Lee, C., Analyst Forecast Revisions and Market Price Discovery, The Accounting Review, 2003
 - Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022 <https://papers.ssrn.com/abstract=3604626>
+- Womack, K. (1996), Do Brokerage Analysts' Recommendations Have Investment Value?, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v51y1996i1p137-67.html>
+- Hong, H., Lim, T. and Stein, J. (1998), Bad News Travels Slowly: Size, Analyst Coverage and the Profitability of Momentum Strategies, NBER working paper 6553 (Journal of Finance 2000) <https://www.nber.org/papers/w6553>
 
 ## Dividend-month premium (`dividend_month_premium`)
 
@@ -77,7 +79,7 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Hartzmark, S. and Solomon, D., The Dividend Month Premium, Journal of Financial Economics, 2013 <https://doi.org/10.1016/j.jfineco.2013.02.015>
-- Hartzmark, S. and Solomon, D., The Dividend Disconnect, Journal of Finance, 2019
+- Hartzmark, S. and Solomon, D., The Dividend Disconnect, Journal of Finance, 2019 <https://ideas.repec.org/a/bla/jfinan/v74y2019i5p2153-2199.html>
 - Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (signal DivSeason) <https://github.com/OpenSourceAP/CrossSection>
 
 ## Earnings-date advances (`earnings_date_shift`)
@@ -109,7 +111,8 @@ Back to the [index of every edge](../edges.md).
 
 - Johnson, T. and So, E., Time Will Tell: Information in the Timing of Scheduled Earnings News, Journal of Financial and Quantitative Analysis, 2018 <https://doi.org/10.1017/S0022109018000492>
 - Skinner, D., Information in Mandatory and Voluntary Earnings Announcement Date Forecasts, ABFER annual conference slides, 2021 <https://www.abfer.org/media/abfer-events-2021/annual-conference/slides-accounting/Information-in-Mandatory-and-Voluntary-Earnings-Announcement-Date-Forecasts_Douglas-Skinner.pdf>
-- deHaan, E., Shevlin, T. and Thornock, J., Journal of Accounting and Economics, 2015 (advance-notice length and bad news)
+- deHaan, E., Shevlin, T. and Thornock, J., Market (in)attention and the strategic scheduling and timing of earnings announcements, Journal of Accounting and Economics, 2015 (advance-notice length and bad news) <https://ideas.repec.org/a/eee/jaecon/v60y2015i1p36-55.html>
+- Stanford GSB Insights, Want to Soft-Pedal That Shaky Earnings Report? Don't File on Friday (summary of deHaan, Shevlin and Thornock (2015)) <https://www.gsb.stanford.edu/insights/ed-dehaan-want-soft-pedal-shaky-earnings-report-dont-file-friday>
 
 ## Earnings gap on heavy volume (`earnings_gap_volume_drift`)
 
@@ -140,8 +143,8 @@ Back to the [index of every edge](../edges.md).
 
 - Bernard, V. and Thomas, J., Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium?, Journal of Accounting Research, 1989 <https://doi.org/10.2307/2491062>
 - Martineau, C., Rest in Peace Post-Earnings Announcement Drift, Critical Finance Review, 2022 <https://doi.org/10.1561/104.00000122>
-- Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001
-- Pritamani, M. and Singal, V., Return predictability following large price changes and information releases, Journal of Banking and Finance, 2001
+- Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001 <https://ideas.repec.org/a/bla/jfinan/v56y2001i3p877-919.html>
+- Pritamani, M. and Singal, V., Return predictability following large price changes and information releases, Journal of Banking and Finance, 2001 <https://ideas.repec.org/a/eee/jbfina/v25y2001i4p631-656.html>
 
 ## Adverse 8-K item drift (`eight_k_item_drift`)
 
@@ -205,6 +208,7 @@ Back to the [index of every edge](../edges.md).
 
 - Cohen, L., Malloy, C. and Pomorski, L., Decoding Inside Information, Journal of Finance, 2012 <https://www.nber.org/papers/w16454>
 - Lakonishok, J. and Lee, I., Are Insider Trades Informative?, Review of Financial Studies, 2001 <https://doi.org/10.1093/rfs/14.1.79>
+- Jeng, L., Metrick, A. and Zeckhauser, R. (1999), The Profits to Insider Trading: A Performance-Evaluation Perspective, NBER working paper 6913 (Review of Economics and Statistics 2003) <https://www.nber.org/papers/w6913>
 
 ## Late filers (NT 10-K and NT 10-Q) (`late_filer_nt_drift`)
 
@@ -268,7 +272,8 @@ Back to the [index of every edge](../edges.md).
 
 - Aboody, D., Lehavy, R. and Trueman, B., Limited attention and the earnings announcement returns of past stock market winners, Review of Accounting Studies, 2010 <https://ideas.repec.org/a/spr/reaccs/v15y2010i2d10.1007_s11142-009-9104-9.html>
 - Chen, J., Cohen, L. and Wang, C., Famous Firms, Earnings Clusters, and the Stock Market (working paper) <https://papers.ssrn.com/abstract=3685452>
-- So, E. and Wang, S., News-driven return reversals: Liquidity provision ahead of earnings announcements, Journal of Financial Economics, 2014
+- So, E. and Wang, S., News-driven return reversals: Liquidity provision ahead of earnings announcements, Journal of Financial Economics, 2014 <https://dspace.mit.edu/handle/1721.1/119665>
+- Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html>
 
 ## S&P 500 deletions rebound (`sp500_deletions_long`)
 
@@ -328,8 +333,9 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Da, Z. and Schaumburg, E., Relative Valuation and Analyst Target Price Forecasts, Journal of Financial Markets, 2011
-- Brav, A. and Lehavy, R., An Empirical Analysis of Analysts' Target Prices: Short-term Informativeness and Long-term Dynamics, Journal of Finance, 2003
+- Da, Z. and Schaumburg, E., Relative Valuation and Analyst Target Price Forecasts, Journal of Financial Markets, 2011 <https://ideas.repec.org/a/eee/finmar/v14y2011i1p161-192.html>
+- Brav, A. and Lehavy, R., An Empirical Analysis of Analysts' Target Prices: Short-term Informativeness and Long-term Dynamics, Journal of Finance, 2003 <https://ideas.repec.org/a/bla/jfinan/v58y2003i5p1933-1967.html>
+- Womack, K. (1996), Do Brokerage Analysts' Recommendations Have Investment Value?, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v51y1996i1p137-67.html>
 
 ## Spin-off drift (`spinoff_drift`)
 
@@ -359,6 +365,7 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Cusatis, P., Miles, J. and Woolridge, J., Restructuring through spinoffs: The stock market evidence, Journal of Financial Economics, 1993
+- Cusatis, P., Miles, J. and Woolridge, J., Restructuring through spinoffs: The stock market evidence, Journal of Financial Economics, 1993 <https://ideas.repec.org/a/eee/jfinec/v33y1993i3p293-311.html>
 - S&P Global Market Intelligence, Capital Market Implications of Spinoffs, 2017 <https://www.spglobal.com/marketintelligence/en/documents/capital-market-implications-of-spinoffs.pdf>
 - McConnell, J., Sibley, S. and Xu, W., Journal of Portfolio Management, 2015 (spin-offs, 2001 to 2013)
+- Desai, H. and Jain, P. (1999), Firm performance and focus: long-run stock market performance following spinoffs, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v54y1999i1p75-101.html>

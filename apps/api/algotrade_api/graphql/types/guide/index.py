@@ -6,6 +6,7 @@ from typing import Self
 import strawberry
 
 from algotrade.services.read.guide import index
+from algotrade_api.graphql.types.guide.edges.index import GuideMechanismEntry
 
 
 @strawberry.type(
@@ -148,8 +149,8 @@ class GuideTermEntry:
 @strawberry.type(
     description="What the Guide holds (ADR 0051): the sections in order with entry counts, the "
     "field theme groups, the intents (most fields first), the situations, the playbooks by "
-    "family, the regime indicators, the reference episodes, the Start here pages in order and "
-    "the glossary terms"
+    "family, the regime indicators, the reference episodes, the mechanisms of the Edges section "
+    "with their edge counts, the Start here pages in order and the glossary terms"
 )
 class GuideIndex:
     sections: list[GuideSection]
@@ -161,6 +162,7 @@ class GuideIndex:
     episodes: list[GuideEpisode]
     start_pages: list[GuideStartEntry]
     terms: list[GuideTermEntry]
+    mechanisms: list[GuideMechanismEntry]
 
     @classmethod
     def of(cls, d: index.GuideIndex) -> Self:
@@ -174,4 +176,5 @@ class GuideIndex:
             episodes=[GuideEpisode.of(e) for e in d.episodes],
             start_pages=[GuideStartEntry.of(p) for p in d.start_pages],
             terms=[GuideTermEntry.of(t) for t in d.terms],
+            mechanisms=[GuideMechanismEntry.of(m) for m in d.mechanisms],
         )

@@ -20,6 +20,7 @@ base = "universe"
 screeners = ["ivol_avoid", "lottery_max"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "lottery_demand"
 frozen_from = 2026-04-01
 notes = """Two screeners, one trial each, both ranked with the jumpiest name LAST so the harness's
 short leg (the worst scores) takes them first: ivol_avoid on rollup.factor_betas@v1.ivol_252d (the
@@ -93,6 +94,7 @@ way."""
 
 [[sources]]
 title = "Ang, A., Hodrick, R., Xing, Y. and Zhang, X., The Cross-Section of Volatility and Expected Returns, Journal of Finance, 2006"
+url = "https://ideas.repec.org/a/bla/jfinan/v61y2006i1p259-299.html"
 
 [[sources]]
 title = "Bali, T., Cakici, N. and Whitelaw, R., Maxing Out: Stocks as Lotteries and the Cross-Section of Expected Returns, Journal of Financial Economics, 2011"
@@ -101,3 +103,11 @@ url = "https://www.nber.org/papers/w14804"
 [[sources]]
 title = "Stambaugh, R., Yu, J. and Yuan, Y., Arbitrage Asymmetry and the Idiosyncratic Volatility Puzzle, Journal of Finance, 2015"
 url = "https://ideas.repec.org/a/bla/jfinan/v70y2015i5p1903-1948.html"
+
+[[sources]]
+title = "Bali, T., Brown, S., Murray, S. and Tang, Y. (2017), A Lottery-Demand-Based Explanation of the Beta Anomaly, Journal of Financial and Quantitative Analysis"
+url = "https://ideas.repec.org/a/cup/jfinqa/v52y2017i06p2369-2397_00.html"
+
+[[sources]]
+title = "Hou, K., Xue, C. and Zhang, L. (2020), Replicating Anomalies, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html"

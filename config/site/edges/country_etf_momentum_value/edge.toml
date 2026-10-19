@@ -18,6 +18,8 @@ screeners = [
 base = "benchmark"
 oos_class = "trend"
 status = "candidate"
+mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history and evaluated. LIMITS:
 this is the MOMENTUM leg only. The value leg of the source (country CAPE, Asness, Moskowitz and
@@ -78,3 +80,12 @@ url = "https://w4.stern.nyu.edu/facdir/lpederse/papers/ValMomEverywhere.pdf"
 
 [[sources]]
 title = "Andreu, L., Swinkels, L. and Tjong-A-Tjoe, L., Can Exchange Traded Funds be used to exploit country and industry momentum?, 2013"
+url = "https://ideas.repec.org/a/kap/fmktpm/v27y2013i2p127-148.html"
+
+[[sources]]
+title = "CXO Advisory, Exploiting Industry Momentum via ETFs? (summary of Swinkels and Tjong-A-Tjoe (2008), the industry-only predecessor)"
+url = "https://www.cxoadvisory.com/momentum-investing/exploiting-industry-momentum-via-etfs/"
+
+[[sources]]
+title = "Moskowitz, T., Ooi, Y. and Pedersen, L. (2012), Time Series Momentum, Journal of Financial Economics (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum"

@@ -1,7 +1,7 @@
 # L3 site setting: the Guide's order and grouping (ADR 0051, docs/ui/guide.md section 3).
 # The Guide's sections in order, from the market down to one number; the field themes
 # grouped in the order a screen uses them; the playbooks (one per site rule-screen preset)
-# by family, ordered within it. Typed by src/algotrade/config/site/guide/sections.py. Fitness
+# by family, ordered within it; the two groups of the Edges section beside its mechanisms. Typed by src/algotrade/config/site/guide/sections.py. Fitness
 # tests (tests/unit/config/site/guide/test_sections.py): every field-guide theme is in exactly
 # one group, every site preset in exactly one family, and every listed preset exists.
 
@@ -14,6 +14,11 @@ purpose = "How the app thinks about a day, and how to read and build a screen, a
 id = "regime"
 title = "Market regime"
 purpose = "The indicators behind the market's weather and the past market falls they are judged on."
+
+[[section]]
+id = "edges"
+title = "Edges"
+purpose = "Why an edge should work: the nine mechanisms, each edge under its mechanism, the ideas checked and set aside, and the ones researched but not built."
 
 [[section]]
 id = "playbooks"
@@ -34,6 +39,16 @@ purpose = "States of the world that fool several fields at once, and what a scre
 id = "glossary"
 title = "Glossary"
 purpose = "The app's own words and the rule grammar, to look up."
+
+[[edge_group]]
+id = "set_aside"
+title = "Checked and set aside"
+purpose = "Edges the harness tested and rejected or blocked, each with the reason, kept so nobody re-runs them."
+
+[[edge_group]]
+id = "not_built"
+title = "Researched, not built"
+purpose = "Ideas from the catalogue that have no edge document yet: what each is, and why it was not built."
 
 [[theme_group]]
 id = "tradeable"

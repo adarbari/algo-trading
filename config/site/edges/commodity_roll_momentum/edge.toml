@@ -19,6 +19,8 @@ screeners = [
 base = "benchmark"
 oos_class = "trend"
 status = "candidate"
+mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history and evaluated. LIMITS: ETF
 momentum only. The roll-yield leg (backwardation long, contango avoided) needs futures curves that
@@ -71,6 +73,16 @@ trend: the benchmark is the null for owning the ten."""
 
 [[sources]]
 title = "Miffre, J. and Rallis, G., Momentum strategies in commodity futures markets, Journal of Banking and Finance, 2007"
+url = "https://ideas.repec.org/a/eee/jbfina/v31y2007i6p1863-1886.html"
 
 [[sources]]
 title = "Fuertes, A., Miffre, J. and Rallis, G., Tactical allocation in commodity futures markets: Combining momentum and term structure signals, Journal of Banking and Finance, 2010"
+url = "https://openaccess.city.ac.uk/id/eprint/6416/"
+
+[[sources]]
+title = "Gorton, G., Hayashi, F. and Rouwenhorst, K. (2007), The Fundamentals of Commodity Futures Returns, NBER working paper 13249 (Review of Finance 2013)"
+url = "https://www.nber.org/papers/w13249"
+
+[[sources]]
+title = "Erb, C. and Harvey, C. (2006), The Strategic and Tactical Value of Commodity Futures, Financial Analysts Journal"
+url = "https://ideas.repec.org/a/taf/ufajxx/v62y2006i2p69-97.html"

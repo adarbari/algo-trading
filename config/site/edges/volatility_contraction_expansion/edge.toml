@@ -18,6 +18,7 @@ top_k = 50
 screeners = ["momentum_squeeze_entry"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """A per-name entry filter on momentum_12_1, filed as its own edge (one trial): positive 12-1 momentum, trend_state
 UPTREND and rollup.bands@v2.bb_width_pctile_252d at or below 0.2 (the Bollinger bandwidth narrower than 80 percent
@@ -69,6 +70,15 @@ title = "Bollinger, J., Bollinger on Bollinger Bands, McGraw-Hill, 2001"
 
 [[sources]]
 title = "Bajgrowicz, P. and Scaillet, O., Technical Trading Revisited: False Discoveries, Persistence Tests, and Transaction Costs, Journal of Financial Economics, 2012"
+url = "https://ideas.repec.org/a/eee/jfinec/v106y2012i3p473-491.html"
 
 [[sources]]
 title = "Crabel, T., Day Trading with Short Term Price Patterns and Opening Range Breakout, Traders Press, 1990"
+
+[[sources]]
+title = "Lo, A., Mamaysky, H. and Wang, J. (2000), Foundations of Technical Analysis: Computational Algorithms, Statistical Inference, and Empirical Implementation, NBER working paper 7613 (Journal of Finance 2000)"
+url = "https://www.nber.org/papers/w7613"
+
+[[sources]]
+title = "Brock, W., Lakonishok, J. and LeBaron, B. (1992), Simple Technical Trading Rules and the Stochastic Properties of Stock Returns, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v47y1992i5p1731-64.html"

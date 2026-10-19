@@ -19,6 +19,7 @@ base = "universe"
 screeners = ["insider_cluster_buys"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "informed_footprints"
 frozen_from = 2026-04-01
 notes = """Filed as a cross-section screen, not an on_event edge: no insider_filing event class is
 declared in config/edges/document.py (EVENT_CLASSES), so the event is read as a feature at each
@@ -93,3 +94,7 @@ url = "https://www.nber.org/papers/w16454"
 [[sources]]
 title = "Lakonishok, J. and Lee, I., Are Insider Trades Informative?, Review of Financial Studies, 2001"
 url = "https://doi.org/10.1093/rfs/14.1.79"
+
+[[sources]]
+title = "Jeng, L., Metrick, A. and Zeckhauser, R. (1999), The Profits to Insider Trading: A Performance-Evaluation Perspective, NBER working paper 6913 (Review of Economics and Statistics 2003)"
+url = "https://www.nber.org/papers/w6913"

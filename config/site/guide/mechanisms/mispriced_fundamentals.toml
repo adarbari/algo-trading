@@ -1,0 +1,106 @@
+id = "mispriced_fundamentals"
+title = "Quality and value the crowd misprices"
+question = "Who ignores the boring numbers?"
+examples = "cash profitability, net share issuance, quality minus junk"
+short = "Holders price the headline earnings and the growth story; the accounts say which profits last, who is issuing shares and who is close to failing."
+how_it_works = [
+  "A company's filings carry more than the earnings number: how much of the profit is cash, how fast assets and share count grow, how near failure it is. You rank on those lines and hold the names the accounts favour, or drop the names they warn about.",
+  "The other side is the holder who reads the headline: earnings as reported, growth as a story, a cheap price as a bargain whatever the business. They pay for accruals that reverse, for assets bought at the top, for shares issued when management thinks the price is high. They also pay for the long shot in a distressed stub.",
+  "The family covers cash-based profitability, the quality composite, cheapness among the profitable, net share issuance, asset growth, distress and the composite of several anomalies. Three of them are avoid lists: the measured result is what you escape by not holding the fast growers, the distressed and the overpriced end.",
+]
+why_it_survives = [
+  "The long leg is a comfortable, slow trade in large names, so nobody is pushed to arbitrage it. The short leg is where the premium concentrates, and where borrow is costly and a rally is violent. Stambaugh, Yu and Yuan find the anomalies pay most after high sentiment, mainly through their short legs: overpricing is easier to create than to correct.",
+  "Part of it may be a premium for risk rather than a mistake. Fama and French adopted profitability and investment as factors in 2015. Lakonishok, Shleifer and Vishny argue value pays because it exploits the errors of the typical investor, not because it is riskier. Either way the holder of the story stock is the one paying.",
+]
+research = [
+  "Novy-Marx: gross profit over assets predicts returns about as well as book to market, and profitable firms earn more despite being larger and dearer. Controlling for it improves value most among the largest, most liquid stocks. Ball, Gerakos, Linnainmaa and Nikolaev: profitability measured in cash predicts better than measures that include accruals and subsumes the accruals effect.",
+  "Asness, Frazzini and Pedersen: a quality-minus-junk factor earns significant risk-adjusted returns in the US and 24 other countries, and the price of quality is modest. Pontiff and Woodgate: share issuance predicts returns after 1970 more significantly than size, value or momentum alone. Cooper, Gulen and Schill: asset growth predicts returns and the effect holds among large caps; Fama and French find it weaker, present in small stocks but not big ones.",
+  "Dichev finds firms with high bankruptcy risk earn below-average returns since 1980. Campbell, Hilscher and Szilagyi find the same for predicted failure since 1981, despite higher volatility and beta, and most where arbitrage is hard. Hou, Xue and Zhang replicate 452 anomalies with large-stock breakpoints and value weights: 65% fail a t of 1.96 and the survivors are much smaller than published.",
+  "McLean and Pontiff track 97 published predictors and find their returns decay after publication without vanishing. Jensen, Kelly and Pedersen find most factors replicate and hold out of sample in 93 countries. Novy-Marx and Velikov: these slow signals turn over little, and most anomalies with one-sided turnover under 50% a month keep a net spread. Our bar: a paper's long/short figure is expected to lose half by the time it trades, a long-only one a third. Works needs t > 3 on the deciles and on the picks.",
+]
+real_vs_decoy = [
+  "A real fundamentals edge names the line in the accounts and the reader who ignores it. It is built from figures public at the time, and adds to plain profitability and size on the same sessions. A decoy is a growth or large-cap tilt under a new name, or a signal read from a filing before it was accepted. It can also be a short-leg effect quoted as if the long leg alone earned it.",
+  "The harness reads every statement only from the session its filing was public. It compares each edge with the standard decoys (size, momentum, idiosyncratic volatility, lottery, illiquidity, low beta), and with cash profitability where that is the question. It charges the assumed borrow on every avoid list, keeps a frozen period the rule never saw and asks for t > 3 before it says Works.",
+]
+dont = "Don't read a published long/short spread as what the long leg earns: here most of it sits in the short leg, the costly, squeeze-prone side you are not holding."
+see_also = ["edge_how_sure", "edge_evidence_section", "published_haircut"]
+
+[[stats]]
+label = "Our bar"
+value = "t > 3"
+note = "Works needs t above 3 on the deciles and on the picks, on sessions the rule never saw."
+
+[[stats]]
+label = "Haircut on a paper's figure"
+value = "50% / one third"
+note = "Expect a long/short or short-leg figure to lose half by the time it trades, a long-only one a third."
+
+[[sources]]
+title = "Novy-Marx, R., The Other Side of Value: Good Growth and the Gross Profitability Premium, NBER working paper 15940 (2010; Journal of Financial Economics 2013)"
+url = "https://www.nber.org/papers/w15940"
+note = "Gross profit over assets predicts returns about as well as book to market; profitable firms earn more despite being dearer."
+
+[[sources]]
+title = "Ball, R., Gerakos, J., Linnainmaa, J. and Nikolaev, V., Accruals, Cash Flows, and Operating Profitability in the Cross Section of Stock Returns, Journal of Financial Economics (2016)"
+url = "https://ideas.repec.org/a/eee/jfinec/v121y2016i1p28-45.html"
+note = "Cash-based operating profitability predicts better than accrual-inclusive measures and subsumes the accruals effect."
+
+[[sources]]
+title = "Asness, C., Frazzini, A. and Pedersen, L., Quality Minus Junk, Review of Accounting Studies (2019)"
+url = "https://ideas.repec.org/a/spr/reaccs/v24y2019i1d10.1007_s11142-018-9470-2.html"
+note = "A quality factor earns significant risk-adjusted returns in the US and 24 countries; the price of quality is modest."
+
+[[sources]]
+title = "Lakonishok, J., Shleifer, A. and Vishny, R., Contrarian Investment, Extrapolation, and Risk, NBER working paper 4360 (1993; Journal of Finance 1994)"
+url = "https://www.nber.org/papers/w4360"
+note = "Value strategies pay because they exploit the typical investor's mistakes, not because they are riskier."
+
+[[sources]]
+title = "Pontiff, J. and Woodgate, A., Share Issuance and Cross-sectional Returns, Journal of Finance (2008)"
+url = "https://ideas.repec.org/a/bla/jfinan/v63y2008i2p921-945.html"
+note = "Share issuance predicts returns after 1970 more significantly than size, book to market or momentum alone."
+
+[[sources]]
+title = "Fama, E. and French, K., Dissecting Anomalies, Journal of Finance (2008)"
+url = "https://ideas.repec.org/a/bla/jfinan/v63y2008i4p1653-1678.html"
+note = "Net issues, accruals and momentum hold in every size group; asset growth and profitability are less robust."
+
+[[sources]]
+title = "Cooper, M., Gulen, H. and Schill, M., Asset Growth and the Cross-Section of Stock Returns, Journal of Finance (2008)"
+url = "https://ideas.repec.org/a/bla/jfinan/v63y2008i4p1609-1651.html"
+note = "Asset growth strongly predicts abnormal returns, also among large caps, after the usual controls."
+
+[[sources]]
+title = "Campbell, J., Hilscher, J. and Szilagyi, J., In Search of Distress Risk, Journal of Finance (2008)"
+url = "https://ideas.repec.org/a/bla/jfinan/v63y2008i6p2899-2939.html"
+note = "Since 1981 high predicted failure risk earns unusually low returns despite higher volatility and beta."
+
+[[sources]]
+title = "Dichev, I., Is the Risk of Bankruptcy a Systematic Risk?, Journal of Finance (1998)"
+url = "https://academicnewsletter.sufe.edu.cn/info/361843"
+note = "Bankruptcy risk is not rewarded; high-risk firms earn below-average returns since 1980."
+
+[[sources]]
+title = "Stambaugh, R., Yu, J. and Yuan, Y., The Short of It: Investor Sentiment and Anomalies, NBER working paper 16898 (2011; Journal of Financial Economics 2012)"
+url = "https://www.nber.org/papers/w16898"
+note = "Anomalies pay more after high sentiment, mainly through their short legs; overpricing outweighs underpricing."
+
+[[sources]]
+title = "Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies (2020)"
+url = "https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html"
+note = "With large-stock breakpoints and value weights, 65% of 452 anomalies fail t = 1.96; survivors are much smaller."
+
+[[sources]]
+title = "Jensen, T. I., Kelly, B. and Pedersen, L. H., Is There a Replication Crisis in Finance?, NBER working paper 28432 (2021; Journal of Finance 2023)"
+url = "https://www.nber.org/papers/w28432"
+note = "Most factors replicate, cluster into 13 themes and hold out of sample across 93 countries."
+
+[[sources]]
+title = "McLean, R. D. and Pontiff, J., Does Academic Research Destroy Stock Return Predictability?, Journal of Finance (2016; Boston College summary)"
+url = "https://www.bc.edu/content/bc-web/schools/carroll-school/news/2017/pontiff-paper.html"
+note = "97 predictors from 79 papers; returns decay after publication but do not disappear."
+
+[[sources]]
+title = "Novy-Marx, R. and Velikov, M., A Taxonomy of Anomalies and their Trading Costs, NBER working paper 20721 (2014; Review of Financial Studies 2016)"
+url = "https://www.nber.org/papers/w20721"
+note = "Anomalies turning over under 50% a month mostly keep a net spread; faster ones rarely do."

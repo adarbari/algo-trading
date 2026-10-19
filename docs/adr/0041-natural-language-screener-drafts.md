@@ -603,3 +603,9 @@ rest).
 - Thresholds are bounded by the field guide: a field without an entry gets the model's own
   number. A bad threshold in a draft is fixed in `config/site/field_guide/`, with its source, once
   for the page, the Builder and the prompt; `make features-doc` regenerates the page.
+
+- Amended 2026-10-18: the files are `config/site/field_guide/<group>/<file>.toml`, one folder per theme group of `config/site/guide/sections.toml`, each file with a `-2` part so none passes 900 lines; the generated pages are `docs/data/field-guide/<group>/<theme>.md` (a long theme in parts). Load order, entries and prompt are unchanged.
+
+## Amended 2026-10-18: prompt v14, missing data never passes an exclusion
+
+A recorded note said names with no IV rank were not excluded by "except ... IV rank above 80%"; the engine (ADR 0015, 0071) leaves them out. Prompt v14 states the rule, but the model ignored it live (the note came back in 3 of 5 re-records), so the server also drops a model note that says names with no value pass or are not excluded, and adds one note per field of a `none` group: "Names with no <field> are also left out (missing data never passes)." (`contract/missing_notes.py`). Owner approved 2026-10-18.

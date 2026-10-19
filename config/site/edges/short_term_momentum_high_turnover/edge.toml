@@ -16,6 +16,7 @@ top_k = 25
 baselines = ["momentum_12_1", "size_small"]
 screeners = ["short_term_momentum_turnover"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """The paper's rule is a double sort: among the top turnover decile, long the top past-month
 return decile and short the bottom, held one month. Here the universe is the liquid common stocks
@@ -81,7 +82,16 @@ size_small baselines run on the same sessions, and the base is the heavy-turnove
 
 [[sources]]
 title = "Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022"
+url = "https://openaccess.city.ac.uk/id/eprint/31278/"
 
 [[sources]]
 title = "Alpha Architect, Short-term Momentum (summary of Medhat and Schmeling 2022)"
 url = "https://alphaarchitect.com/short-term-momentum/"
+
+[[sources]]
+title = "Jegadeesh, N. (1990), Evidence of Predictable Behavior of Security Returns, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v45y1990i3p881-98.html"
+
+[[sources]]
+title = "Avramov, D., Chordia, T. and Goyal, A. (2006), Liquidity and Autocorrelations in Individual Stock Returns, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v61y2006i5p2365-2394.html"

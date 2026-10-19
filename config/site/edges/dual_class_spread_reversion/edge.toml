@@ -18,6 +18,7 @@ base = "universe"
 screeners = ["dual_class_cheap_leg"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "value_gaps"
 frozen_from = 2026-04-01
 notes = """The outcome is the pair_spread of EB H9: a pick is the cheap class of a pair, and its value is its return
 over the horizon less its sibling's, less two round trips and the borrow on the sibling (the rich leg);
@@ -88,6 +89,12 @@ url = "https://papers.ssrn.com/abstract=1338885"
 
 [[sources]]
 title = "Froot, K. and Dabora, E., How Are Stock Prices Affected by the Location of Trade?, Journal of Financial Economics, 1999"
+url = "https://www.nber.org/papers/w6572"
 
 [[sources]]
 title = "Lamont, O. and Thaler, R., Can the Market Add and Subtract? Mispricing in Tech Stock Carve-outs, Journal of Political Economy, 2003"
+url = "https://www.nber.org/papers/w8302"
+
+[[sources]]
+title = "Mitchell, M., Pulvino, T. and Stafford, E. (2002), Limited Arbitrage in Equity Markets, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v57y2002i2p551-584.html"

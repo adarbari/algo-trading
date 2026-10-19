@@ -12,6 +12,7 @@ import pytest
 
 from algotrade.config.edges.chain import MODEL_STRUCTURES, tenor_sessions
 from algotrade.config.edges.document import (
+    MECHANISM_KINDS,
     QUALITY_BAR,
     STATUSES,
     Edge,
@@ -867,6 +868,27 @@ def test_every_shipped_edge_with_a_band_keeps_it_at_or_below_top_k() -> None:
             assert got.outcome.hold_rank is None or got.outcome.hold_rank >= (got.top_k or 0)
 
 
+def test_mechanism_kind_is_an_optional_closed_set_key() -> None:
+    assert parse_edge(document(), "drift", WHERE).mechanism_kind is None
+    for kind in MECHANISM_KINDS:
+        assert parse_edge(document(mechanism_kind=kind), "drift", WHERE).mechanism_kind == kind
+    with pytest.raises(ConfigurationError, match="mechanism_kind") as caught:
+        parse_edge(document(mechanism_kind="vibes"), "drift", WHERE)
+    assert WHERE in str(caught.value)
+
+
+def test_every_site_edge_names_a_mechanism_kind_of_the_closed_set() -> None:
+    """Fitness: the Guide's Edges section groups by ``mechanism_kind``; a site edge without one
+    (or with an unknown one) fails here, naming its id."""
+    root = Path(__file__).resolve().parents[4] / "config" / "site" / "edges"
+    bad = [
+        path.parent.name
+        for path in sorted(root.glob("*/edge.toml"))
+        if tomllib.loads(path.read_text()).get("mechanism_kind") not in MECHANISM_KINDS
+    ]
+    assert not bad, f"site edges without a mechanism_kind of {MECHANISM_KINDS}: {bad}"
+
+
 def _pair(**changes: Any) -> dict[str, Any]:
     base = {"kind": "pair_spread", "benchmark": "none"}
     return _outcome(**{"pair_field": "rollup.share_classes@v1.sibling_id", **base, **changes})
@@ -904,3 +926,15 @@ def test_a_document_with_no_pair_field_hashes_as_it_did_before_pairs() -> None:
     assert "pair_field" not in identity_dict(asdict(parse().outcome))
     pair = parse(top_k=5, outcome=_pair()).outcome
     assert identity_dict(asdict(pair))["pair_field"] == "rollup.share_classes@v1.sibling_id"
+
+
+def test_the_lockup_and_reverse_split_classes_parse_with_their_subtypes() -> None:
+    """ADR 0075: ``ipo_lockup`` splits by its release terms, ``reverse_split`` has no subtypes."""
+    base = parse(schedule="on_event:ipo_lockup")
+    assert (base.event_class, base.event_subtype, base.base) == ("ipo_lockup", None, "event")
+    assert parse(schedule="on_event:ipo_lockup:early_release").event_subtype == "early_release"
+    assert parse(schedule="on_event:reverse_split").event_class == "reverse_split"
+    with pytest.raises(ConfigurationError, match="'late' is not a subtype of 'ipo_lockup'"):
+        parse(schedule="on_event:ipo_lockup:late")
+    with pytest.raises(ConfigurationError, match="is not a subtype of 'reverse_split'"):
+        parse(schedule="on_event:reverse_split:x")

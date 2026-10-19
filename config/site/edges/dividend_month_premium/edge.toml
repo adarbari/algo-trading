@@ -17,6 +17,7 @@ top_k = 50
 screeners = ["dividend_month"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "forced_flows"
 frozen_from = 2026-04-01
 notes = """The expected month is the calendar month after the decision session's own (a month-end
 D reads the coming month): expected_div_month_flag is true when the name had an ex-dividend date
@@ -63,6 +64,7 @@ url = "https://doi.org/10.1016/j.jfineco.2013.02.015"
 
 [[sources]]
 title = "Hartzmark, S. and Solomon, D., The Dividend Disconnect, Journal of Finance, 2019"
+url = "https://ideas.repec.org/a/bla/jfinan/v74y2019i5p2153-2199.html"
 
 [[sources]]
 title = "Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (signal DivSeason)"
@@ -71,6 +73,7 @@ url = "https://github.com/OpenSourceAP/CrossSection"
 # The literature's figure (ADR 0064): Hartzmark and Solomon's abnormal return of stocks in their
 # predicted dividend month over all other stocks, 53 bp a month, CRSP 1927-2009, before costs
 # (the long leg).
+
 [published]
 measure = "mean_excess"
 value = 0.0053

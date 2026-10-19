@@ -110,7 +110,7 @@ def test_companies_follow_the_snapshot_rule() -> None:
     assert every is not None and len(every) == 2
 
 
-def test_company_sectors_are_the_snapshot_on_or_before_with_four_columns() -> None:
+def test_company_sectors_are_the_snapshot_on_or_before_with_five_columns() -> None:
     writer, reader = store()
     company = "instruments/company"
     assert company_sectors(reader, D2) is None  # no company snapshot at all
@@ -124,6 +124,7 @@ def test_company_sectors_are_the_snapshot_on_or_before_with_four_columns() -> No
     found = company_sectors(reader, D2 + timedelta(days=3))
     assert found is not None and list(found.columns) == [
         "instrument_id",
+        "cik",
         "sector",
         "industry",
         "sic",
