@@ -62,7 +62,7 @@ the e2e spec named after it, else `smoke`; story or CSS module -> that component
 printed as a Docker command off Linux; any `.ts` / `.tsx` -> `npm run typecheck`), then the
 fast gates. Then push: CI is the full gate (owner decision 2026-10-08: the machine never
 runs the full `make check`); after a CI failure rerun only the failed gate locally. The vitest pool is `vmThreads`: jsdom is created once per
-worker instead of once per file.
+worker instead of once per file. The Makefile's `WORKERS` is `scripts/ops/xdist_workers.py`'s answer: `auto`, or 2 while the machine's 1-minute load average is above 12 (it caps the worker count only, no gate; `make doctor` shows the load; `WORKERS=N` overrides).
 
 ### Scope-aware `make check` (the release, and a deliberate full run)
 

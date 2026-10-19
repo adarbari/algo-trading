@@ -11,11 +11,11 @@ Back to the [index of every edge](../edges.md).
 | Earnings gap on heavy volume (`earnings_gap_volume_drift`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `earnings_gap_volume`, `earnings_gap_only` |
 | Adverse 8-K item drift (`eight_k_item_drift`) | candidate | on each `filing_8k:4.02` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `eight_k_adverse_items` |
 | Opportunistic insider cluster buys (`insider_opportunistic_cluster_buys`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps | `insider_cluster_buys` |
+| IPO lock-up expiry (avoid list) (`ipo_lockup_expiry`) | candidate | on each `ipo_lockup` | excess return, over 10, 12 sessions, vs SPY, starting -10 sessions from the event, costs 20 bps | `ipo_lockup_ahead` |
 | Late filers (NT 10-K and NT 10-Q) (`late_filer_nt_drift`) | candidate | on each `nt_late_filing` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `nt_late_filer` |
 | Pre-earnings run-up in past winners (`pre_earnings_runup_winners`) | candidate | on each `earnings_expected` | excess return, over 5 sessions, vs SPY, starting -6 sessions from the event, costs 10 bps | `pre_earnings_runup` |
 | S&P 500 deletions rebound (`sp500_deletions_long`) | candidate | on each `index_change:deletion` | excess return, over 20, 60, 250 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `sp500_deletion` |
 | Analyst target-price implied return (`target_price_implied_return`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `target_upside_high` |
-| IPO lock-up expiry (avoid list) (`ipo_lockup_expiry`) | blocked | on each `ipo_lockup` | excess return, over 10, 12 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | none yet |
 | Spin-off drift (`spinoff_drift`) | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
 
 ## Analyst earnings-estimate revision momentum (`analyst_revision_momentum`)
@@ -211,6 +211,37 @@ Back to the [index of every edge](../edges.md).
 - Lakonishok, J. and Lee, I., Are Insider Trades Informative?, Review of Financial Studies, 2001 <https://doi.org/10.1093/rfs/14.1.79>
 - Jeng, L., Metrick, A. and Zeckhauser, R. (1999), The Profits to Insider Trading: A Performance-Evaluation Perspective, NBER working paper 6913 (Review of Economics and Statistics 2003) <https://www.nber.org/papers/w6913>
 
+## IPO lock-up expiry (avoid list) (`ipo_lockup_expiry`)
+
+**Status:** candidate. **Family:** B. **Thesis:** Stocks fall into and on the expiry of their IPO lock-up as insiders and venture funds become free to sell, so they belong on an avoid list until after it.
+
+- **Outcome:** excess return, over 10, 12 sessions, vs SPY, starting -10 sessions from the event, costs 20 bps
+- **Schedule:** on each `ipo_lockup` (an IPO lock-up expiry, announced in the prospectus (ipo_lockups@v1; ADR 0075); anchor: the expiry session; may be entered ahead of it)
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.adv_usd_20d gte 5000000`
+- **Top K:** 20
+- **Screeners:** `ipo_lockup_ahead`
+- **Baselines:** `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Short side on liquid names only (owner decisions O1 and O2, 2026-10-17): a short result on a liquid name may be a verdict basis; the outcome is minus the excess return over SPY less cost and an assumed borrow of 2000 bps a year (borrow_bps_annual, a LOWER BOUND: a fresh issue is often hard or impossible to borrow, and no borrow data is stored). The idea's own form is an avoid list (do not buy a new issue into its expiry); the harness tests it as the short side, the same claim stated so that a negative drift is a pass. The event is the lock-up expiry read from ipo_lockups@v1 (ADR 0075): the class is announced ahead, so the entry session S is 10 sessions before the expiry (start_offset_sessions = -10) and the decision session D is 11 sessions before it (sessions_to_lockup_expiry = 11 at D); the group is read at D with only prospectuses known by D, and the CIK is mapped to an instrument as of D, so nothing after D enters. Horizons 10 (to the expiry) and 12 (two sessions past it, the page's -10 to +2 window): two trials, one screener. Every eligible name is the base and the picks are the lock-ups of the window (base universe, picks event), so the lift reads the picks against all liquid stocks. The score is the dollar volume, which every eligible name has, so the harness's score coverage is full and no universe gate on a sparse score is needed (a test pins the rank direction). HISTORY LIMIT: ipo_lockups@v1 maps a filer's SEC CIK to an instrument through the instruments/company snapshot as of D, and the store's first snapshot is 2026-10-02, so NO event resolves before that date (the history from 2005 that the lock-up extraction covers does not reach the harness); firms that delisted after their IPO never map; and the frozen slice from 2026-04-01 is mostly empty. Verdicts stay UNMEASURED until a historical CIK map from instruments/listing_history exists (a follow-up). The event count is the limit: the lock-up dates come from prospectus text extracted by the text-model seam, so coverage is partial, liquid IPOs are few, and the independent count is small; early_release and standard terms (on_event:ipo_lockup:<terms>) are not split here. Venture-backed issuers, where the effect sits, are not flagged in the store, and the long re-entry after the expiry (the page rates it weak) is not filed. The frozen period starts 2026-04-01, so only an expiry from then on fills a frozen slice. No [published] figure: the page's numbers are from memory and not verified.
+
+**Quality bar**
+
+1. **Mechanism:** The expiry is a known, dated supply shock: venture funds must distribute, and the market under-reacts because the date is in the prospectus but no one is paid to sell ahead; shorting a fresh IPO is dear and the borrow scarce, so the price cannot adjust fully before the date (Field and Hanka 2001).
+2. **Persistence:** The dates are public and the effect is small per event (about -1% to -3% on the page, from memory and not verified), so after the borrow of a fresh issue the short is marginal and the avoidance is free; buyout-backed issuers show the opposite sign in one thesis. Persistence after 2010 is a claim to test.
+3. **Outcome:** Minus the excess return over SPY over 10 and 12 sessions after the entry close (10 sessions before the lock-up expiry), net of 20 bps a round trip and an assumed borrow of 2000 bps a year.
+4. **Trigger timing:** The expiry date is stated in the prospectus and is known ahead (the class is announced ahead, ADR 0075). The entry session S is the expiry session minus 10 (start_offset_sessions = -10) and the decision session D is S - 1, 11 sessions before the expiry. The names are read at D from ipo_lockups@v1 (sessions_to_lockup_expiry = 11), built from prospectuses known by D, with the CIK mapped to an instrument through the company snapshot as of D. The store's first company snapshot is 2026-10-02, so no event resolves before it; a firm delisted after its IPO never maps, and history waits on a historical CIK map from instruments/listing_history.
+5. **Faithful replication:** The source's rule first: the abnormal return around the expiry, larger for venture-backed issuers (Field and Hanka 2001). Here ipo_lockup_ahead v1 takes the liquid common stocks whose lock-up expires within 11 sessions and the harness shorts the 20 most liquid for 10 and 12 sessions.
+6. **Expected size and sample:** Field and Hanka (2001): about -1.5 percent over the 3 days around the expiry, about -3 percent for venture-backed issuers, with volume up about 40 percent; the page marks the figures as from memory and not verified, so no published figure is set. Liquid lock-ups are few, and none resolves to an instrument before 2026-10-02 (the first company snapshot), so the independent count starts near zero.
+7. **Capacity and costs:** A fresh issue is shorted at a dear or impossible borrow; the outcome deducts 20 bps and an assumed 2000 bps a year, a LOWER BOUND on the borrow. The usable form for an individual is the avoid list: do not buy a new issue into its expiry, which costs nothing.
+8. **Failure modes and retirement:** The expiry is priced in because the date is public; buyout-backed issuers show the opposite sign; an early-release term moves the real date before the stated one. Retire if the frozen-period short return of the picks is not above the base rate of every eligible name.
+9. **Decoys:** IPO long-run underperformance (the slow decline of a new issue, not the expiry), momentum and size: the size baseline.
+
+**Sources**
+
+- Field, L. and Hanka, G., The Expiration of IPO Share Lockups, Journal of Finance, 2001
+- Aalto University thesis (2003-2022 lock-up expiries: negative abnormal returns and higher volume, buyout-backed issuers positive) <https://aaltodoc.aalto.fi/items/05aae052-991d-4947-8363-6b2a5df9fb89>
+- Erasmus University thesis (1990-2022 lock-up expiries: a negative cumulative abnormal return only for venture-backed issuers) <https://thesis.eur.nl/pub/67687/572140.pdf>
+
 ## Late filers (NT 10-K and NT 10-Q) (`late_filer_nt_drift`)
 
 **Status:** candidate. **Family:** B. **Thesis:** Stocks that file a late-filing notice (Form 12b-25) keep drifting down over the following months.
@@ -337,38 +368,6 @@ Back to the [index of every edge](../edges.md).
 - Da, Z. and Schaumburg, E., Relative Valuation and Analyst Target Price Forecasts, Journal of Financial Markets, 2011 <https://ideas.repec.org/a/eee/finmar/v14y2011i1p161-192.html>
 - Brav, A. and Lehavy, R., An Empirical Analysis of Analysts' Target Prices: Short-term Informativeness and Long-term Dynamics, Journal of Finance, 2003 <https://ideas.repec.org/a/bla/jfinan/v58y2003i5p1933-1967.html>
 - Womack, K. (1996), Do Brokerage Analysts' Recommendations Have Investment Value?, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v51y1996i1p137-67.html>
-
-## IPO lock-up expiry (avoid list) (`ipo_lockup_expiry`)
-
-**Status:** blocked. **Family:** B. **Thesis:** Stocks fall into and on the expiry of their IPO lock-up as insiders and venture funds become free to sell, so they belong on an avoid list until after it.
-
-**Why blocked:** The event class ipo_lockup exists (ipo_lockups@v1, ADR 0075) but the document cannot enter before the expiry: the thesis is a hold from about 10 sessions before the expiry (start_offset_sessions = -10, the decision session D 11 sessions ahead) and the document loader accepts an entry before the anchor only for the classes in ANNOUNCED_AHEAD (src/algotrade/config/edges/document.py), which lists earnings_expected and not ipo_lockup, although ADR 0075 and EVENT_FIELDS (services/evaluation/cross_section/events.py) declare ipo_lockup announced ahead. An entry after the anchor tests the long re-entry the page rates weak, not this claim. Unblock: ANNOUNCED_AHEAD = ("earnings_expected", "ipo_lockup"), then set status candidate, start_offset_sessions -10, horizon_sessions [10, 12], file the screener below and its Guide playbook, and a test that ranks its short leg by dollar volume (the other avoid lists').
-
-- **Outcome:** excess return, over 10, 12 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps
-- **Schedule:** on each `ipo_lockup` (an IPO lock-up expiry, announced in the prospectus (ipo_lockups@v1; ADR 0075); anchor: the expiry session; may be entered ahead of it)
-- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.adv_usd_20d gte 5000000`
-- **Top K:** 20
-- **Screeners:** none yet
-- **Baselines:** none yet
-- **Notes:** The design for the unblock, so the follow-up is one line plus this file. Side short on liquid names only (owner decisions O1 and O2, 2026-10-17): a short result on a liquid name may be a verdict basis, the outcome is minus the excess return over SPY less cost and the site's assumed borrow. Screener ipo_lockup_ahead: a common stock trading at least $5M a day with rollup.ipo_lockups@v1.sessions_to_lockup_expiry between 0 and 11, ranked by dollar volume ascending (the most liquid shorted first); every eligible name is the base (base universe, picks the event names), so the lift is not read against itself. The class is read from ipo_lockups@v1 with the CIK mapped to an instrument as of D, never the row's own instrument_id. Horizons 10 (to the expiry) and 12 (two sessions past it, the page's -10 to +2 window). Subtypes standard and early_release are available (on_event:ipo_lockup:standard) but not split here: one trial. The prospectus lock-up dates come from text the text-model seam extracts, so coverage of the events is partial; liquid IPOs with a lock-up in the window are few, and the independent count is the binding limit. Venture-backed issuers (where the effect sits) are not flagged in the store. No [published] figure: the page's figures are not verified.
-
-**Quality bar**
-
-1. **Mechanism:** The expiry is a known, dated supply shock: venture funds must distribute, and the market under-reacts because the date is in the prospectus but no one is paid to sell ahead; shorting a fresh IPO is dear and the borrow scarce, so the price cannot adjust fully before the date (Field and Hanka 2001).
-2. **Persistence:** The dates are public and the effect is small per event (about -1% to -3% on the page, from memory and not verified), so after the borrow of a fresh issue the short is marginal and the avoidance is free; buyout-backed issuers show the opposite sign in one thesis. Persistence after 2010 is a claim to test.
-3. **Outcome:** (not answered)
-4. **Trigger timing:** (not answered)
-5. **Faithful replication:** (not answered)
-6. **Expected size and sample:** (not answered)
-7. **Capacity and costs:** (not answered)
-8. **Failure modes and retirement:** (not answered)
-9. **Decoys:** (not answered)
-
-**Sources**
-
-- Field, L. and Hanka, G., The Expiration of IPO Share Lockups, Journal of Finance, 2001
-- Aalto University thesis (2003-2022 lock-up expiries: negative abnormal returns and higher volume, buyout-backed issuers positive) <https://aaltodoc.aalto.fi/items/05aae052-991d-4947-8363-6b2a5df9fb89>
-- Erasmus University thesis (1990-2022 lock-up expiries: a negative cumulative abnormal return only for venture-backed issuers) <https://thesis.eur.nl/pub/67687/572140.pdf>
 
 ## Spin-off drift (`spinoff_drift`)
 

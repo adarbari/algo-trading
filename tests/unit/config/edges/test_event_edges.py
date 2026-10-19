@@ -231,8 +231,9 @@ BATCH_X = {
     "vix_mean_reversion_entry": "on_market:vix_spike",
     "treasury_month_end_extension": "calendar:pre_month_end",
     "december_losers_reversal": "calendar:year_turn",
+    "ipo_lockup_expiry": "on_event:ipo_lockup",
 }
-BLOCKED_X = ("ipo_lockup_expiry", "tdf_contrarian_flows")
+BLOCKED_X = ("tdf_contrarian_flows",)
 
 
 def test_batch_x_candidates_read_the_class_trigger_or_window_they_were_built_for() -> None:
@@ -296,3 +297,18 @@ def test_the_cef_discount_edge_ranks_the_widest_discount_first() -> None:
     )
     assert screener["criteria"]["security_type"]["value"] == "CEF"
     assert "survivor" in edge.notes.lower() and "known from the next session" in edge.notes
+
+
+def test_the_lockup_edge_enters_before_the_expiry_and_shorts_the_most_liquid_first() -> None:
+    """Announced ahead: S is 10 sessions before the expiry; a short on liquid names with the whole
+    universe as base; the score is the (dense) dollar volume, ascending, so the short leg is the
+    most liquid names; the screen reads the window 0..11 sessions ahead."""
+    edge = {e.id: e for e in load_edges(STORE)}["ipo_lockup_expiry"]
+    assert edge.outcome.start_offset_sessions == -10 and edge.outcome.side == "short"
+    assert edge.base == "universe" and edge.picks == "event" and edge.outcome.borrow_bps_annual
+    assert _rank(edge.screeners[0]) == (ADV, "asc")
+    doc = tomllib.loads(
+        (REPO_ROOT / f"config/site/presets/screeners/{edge.screeners[0]}/v1.toml").read_text()
+    )
+    window = {c["op"]: c["value"] for c in doc["criteria"].values() if "lockup" in c["field"]}
+    assert window == {"gte": 0, "lte": 11}

@@ -46,3 +46,23 @@ Owners are listed in `architecture/*_ownership.toml`.
    "nightly"` if it should run every night). Never filter instruments inside the screener
    itself; that is the selection's job. Check it with `algotrade-backtest config validate <id>`.
 9. Run `make changed`, then push: CI is the full gate.
+
+## Edge-document checklist (from eight architect reviews; the edge document is `config/site/edges/<id>/edge.toml`)
+
+- **Do not gate the base on the screener's own field**: picks equal the base, lift is about 0
+  and a retire rule on it is a tautology (`tests/unit/config/site/test_edge_base.py` flags it;
+  a `not_null` coverage gate is fine).
+- **A sparse score** needs the universe gated on the score (`not_null`) and a coverage test
+  (`MIN_SCORE_COVERAGE` 0.8).
+- **No `[published]`** for a two-group spread or a figure the harness does not measure; a proxy
+  is disclosed as a proxy.
+- **A variant cannot carry screeners**: a different screener is a separate edge.
+- **Time-series edges**: `base = "out_of_window"`, `benchmark = "none"`, horizon = window length.
+  `portfolio_return`: `lift` is `None` and the verdict is a picks-series t.
+- **Every new feature column ships its field-guide entry**, whether or not a screen reads it
+  (`scripts/features_doc.py` lists unguided fields).
+- **Guide text**: sentences under 30 words, no banned words (`tests/unit/config/site/guide/test_style.py`,
+  not mapped by `make changed`: run it); a playbook folder holds at most 12 files.
+- **After a merge of main**: recount preset and screener test totals as the SUM; on a
+  `benchmarks/baseline.json` conflict take main's, then `make baseline`, never hand-edit. Run
+  `git fetch origin main` before every merge, never merge a local copy.
