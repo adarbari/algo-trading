@@ -7,7 +7,9 @@
 source = "nasdaq_trader"
 
 # Security types the universe covers. instruments/reference keeps every listed type.
-security_types = ["COMMON_STOCK", "ADR", "ETF"]
+# CEF (closed-end funds, vendor type FUND) joined on 2026-10-18 (ADR 0013 amendment): NAV-priced
+# funds, not ETFs; their universe asset_class is "ETF" (a fund, never a stock population member).
+security_types = ["COMMON_STOCK", "ADR", "ETF", "CEF"]
 exclude_test_issues = true
 
 # Always / never cover these symbols (ACT style, e.g. BRK.B).

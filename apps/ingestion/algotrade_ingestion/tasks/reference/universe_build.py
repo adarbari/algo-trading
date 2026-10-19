@@ -176,6 +176,15 @@ def coverage(reference: pd.DataFrame, settings: UniverseSettings) -> pd.Series:
     return covered & ~reference["symbol"].isin(settings.exclude_symbols)
 
 
+def asset_classes(covered: pd.DataFrame) -> pd.Series:
+    """The universe's two-way ``asset_class``: ``STOCK`` (common stocks and ADRs, the population
+    of breadth, relative strength and analyst coverage) or ``ETF`` (any fund). A closed-end fund
+    is a fund, not a stock, so it never joins a stock population; its own type stays in
+    ``security_type`` (``CEF``; ADR 0013 amendment 2026-10-18)."""
+    fund = covered["is_etf"].astype(bool) | covered["security_type"].eq("CEF")
+    return fund.map({True: "ETF", False: "STOCK"})
+
+
 def review_rows(reference: pd.DataFrame) -> list[dict[str, str]]:
     """UNKNOWN leverage to curate, in ``leveraged_etfs.csv`` format. The name states no
     leverage the rules can parse, so ``leverage`` is left for the curator."""
@@ -320,7 +329,7 @@ def _build(
             "symbol": covered["symbol"],
             "company_name": covered["name"],
             "security_type": covered["security_type"],
-            "asset_class": covered["is_etf"].map({True: "ETF", False: "STOCK"}),
+            "asset_class": asset_classes(covered),
             "exchange": covered["exchange"],
             "status": covered["status"],
             "optionable": covered["optionable"],

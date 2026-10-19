@@ -1,0 +1,54 @@
+# Closed-end fund discount against its own year, v1: the active closed-end funds (security type
+# CEF) that trade at least $500k a day above $3, ranked by rollup.cef_nav@v1.cef_discount_zscore,
+# LOWEST first: the widest discount against the fund's own last 252 sessions on top. The discount
+# pairs the issuer's NAV with the close of the NAV's own date (the NAV is known from the next
+# session), the NAV is put in the close's split terms, and the score is empty (so the fund is not
+# screened) when the latest NAV is more than 5 sessions old, no NAV is stored or under 120 discounts
+# make a year. A missing value never passes (ADR 0030). What it does not check: whether the
+# discount is fair (fees, leverage, payout), the fund's category (bond and municipal funds carry
+# rate and credit beta), or the distribution coverage (cef_distribution_trap, blocked).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "cef_discount_zscore"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Closed-end fund discount (widest against its own year first)"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "CEF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 3
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 500_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $400k-$500k is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.discount_zscore]
+field = "rollup.cef_nav@v1.cef_discount_zscore"
+op = "not_null"
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+cef_discount_to_nav = "rollup.cef_nav@v1.cef_discount_to_nav"
+cef_discount_zscore = "rollup.cef_nav@v1.cef_discount_zscore"
+
+[rank]
+tie_break = "rollup.cef_nav@v1.cef_discount_zscore"
+tie_break_order = "asc"

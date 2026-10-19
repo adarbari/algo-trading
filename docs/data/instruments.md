@@ -46,6 +46,7 @@ universe *as it was*, which avoids survivorship bias.
 | All Nasdaq-listed stocks | Nasdaq Trader `nasdaqlisted.txt` | Exclude test issues (`Test Issue = Y`) |
 | All ETFs (any exchange) | `nasdaqlisted.txt` + `otherlisted.txt` (`ETF = Y`) | Most ETFs list on NYSE Arca, so they come from `otherlisted.txt` |
 | Leveraged and inverse ETFs | Subset of ETFs, flagged | See below |
+| Closed-end funds (CEF) | Massive ticker type `FUND` (needs a Massive key) | NAV-priced funds, not ETFs (ADR 0013 amendment 2026-10-18); about 330 active |
 | Optionable flag | Nasdaq Trader `options.txt` (underlying symbols) | About 4.2k underlyings as of 2026-10 |
 | Futures (later) | Curated root list (ES, NQ, RTY, CL, GC, ZN, …) | Added as roots; contracts come from the vendor |
 
@@ -120,8 +121,9 @@ the curator. Curate by checking the issuer's factsheet and adding the row to the
 When a Massive key is configured, the universe build also reads Massive's ticker list (~13
 requests): every row gets `figi` (composite), `share_class_figi` and `cik`, and **Massive's
 security type wins over the name rules** (`security_type_source` = `vendor` or `name_rule`;
-disagreements are counted in the run stats). Notably, closed-end funds (`FUND`) become `CEF`
-and drop out of the default coverage.
+disagreements are counted in the run stats). Notably, closed-end funds (`FUND`) become `CEF`.
+They joined the default coverage on 2026-10-18 (ADR 0013 amendment): NAV-priced funds, not ETFs,
+with the universe `asset_class` `ETF` (stock or fund) and `security_type` `CEF`.
 
 `instruments/symbol_history` tracks which symbol each FIGI used and when; a FIGI that comes
 back under a new symbol closes the old row and emits `events/reference_change` with

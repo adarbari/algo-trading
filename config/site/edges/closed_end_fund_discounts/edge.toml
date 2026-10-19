@@ -1,6 +1,7 @@
 # Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
-# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E4) until closed-end funds are in
-# the covered universe. Features: cef_nav@v1 (cef_discount_to_nav, cef_discount_zscore). Idea page:
+# src/algotrade/config/edges/document.py. Filed blocked 2026-10-18 (EB E4); a candidate since closed-end
+# funds joined the covered universe (ADR 0013 amendment, same day). Screener: cef_discount_zscore over
+# cef_nav@v1 (cef_discount_to_nav, cef_discount_zscore). Idea page:
 # docs/edge-ideas/calendar-flows.md (closed_end_fund_discounts).
 id = "closed_end_fund_discounts"
 name = "Closed-end fund discount reversion"
@@ -16,22 +17,22 @@ found; 2024 press reports funds buying wide discounts."""
 family = "D"
 schedule = "month_end"
 top_k = 10
-screeners = []
+screeners = ["cef_discount_zscore"]
 baselines = ["size_small"]
-status = "blocked"
-plain_reason = "Needs daily closed-end fund prices; closed-end funds are outside the stocks and ETFs we collect."
+status = "candidate"
 mechanism_kind = "value_gaps"
 frozen_from = 2026-04-01
-rejection_reason = """Closed-end funds are not in the covered universe, so they have no bars, no outcomes and
-no screener rows. Universe coverage is the stock, ADR and ETF types of ADR 0013 (security_types in
-config/site/universe.toml); a fund the vendor types as FUND is stored in the reference as CEF and "drops out of
-the default coverage" (docs/data/instruments.md). The NAV side exists (events/fund_nav, EB D5: 273 of 332 CEFs
-mapped, history to 2004, licence personal) and so does cef_nav@v1, which pairs a NAV with a close, but a
-discount needs the fund's close from bars/1d. Unblock by an owner decision: add the CEF type to
-security_types (or the funds to include_symbols) with an ADR 0013 amendment, accept about 330 more symbols
-in the nightly bars and the Tiingo monthly symbol budget (docs/data/vendors.md), and run bars-history
-for them. The screener is then written over rollup.cef_nav@v1.cef_discount_zscore."""
-notes = """Long only, as the source's short leg is unnecessary for an individual (the page). Tested
+notes = """THE UNIVERSE IS SURVIVORS ONLY BEFORE 2026-10-02. Closed-end funds joined the covered universe on 2026-10-18
+(ADR 0013 amendment) and the universe snapshot has them only from then; before it the harness builds the
+population from the listing history, where a delisted fund reads as an ETF (the vendor listing types 291 of the
+funds as ETF) and the rule security_type eq CEF keeps only the survivors, so a fund that was liquidated, merged
+or open-ended after a wide discount is missing from the earlier sessions: the history carries the today_flag tilt
+(ADR 0053 amendment, historical.py) and flatters a discount strategy. The NAV is known from the next session
+(known_from), and the discount pairs it with the close of its own date; around a split the NAV is put in the
+close's split terms in cef_nav@v1, so a reverse split is no false discount. The base is every fund of the
+universe with a score (cef_discount_zscore gated in the universe: a fund with no NAV, a stale one or under 120
+discounts has none, and the harness reads a base under 80% scored as too thin), the picks are the screener's 10
+widest. Long only, as the source's short leg is unnecessary for an individual (the page). Tested
 against SPY, which is a mismatch for a bond or municipal fund (a benchmark by fund category is a follow-up);
 a leveraged fund's discount also carries rate and credit beta. Proxies, each stated: the source's relative
 discount is a sort on the discount against its history, here the 252-session z-score (cef_nav@v1); the
@@ -46,6 +47,7 @@ all = [
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
   { field = "rollup.price_stats@v2.close", op = "gt", value = 3 },
   { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 500_000 },
+  { field = "rollup.cef_nav@v1.cef_discount_zscore", op = "gte", value = -10 },
 ]
 
 [outcome]
@@ -69,7 +71,7 @@ z-score over 252 sessions."""
 expected_size = """18.2% a year for the long-short quintile spread in-sample (Patro et al., via Quantpedia,
 not verified in the paper); activism cuts discounts to about half (Bradley et al. 2010). Funds with a mapped
 NAV number about 273, so a decile is under 30 names; 40 independent month-ends need over three years of
-history, which the NAV series (to 2004) supplies once bars exist."""
+history, which the NAV series (to 2004) and the stored bars (from 2010) supply."""
 capacity_costs = """Spreads of 0.3 to 1% on small funds; capacity $20k to $100k a fund, hundreds of funds. The
 filter keeps funds trading $500k a day and the cost is 50 bps a round trip."""
 failure_modes = """A discount that is fair (a fund that cut its payout or lost its manager) never closes; a

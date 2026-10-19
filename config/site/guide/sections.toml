@@ -127,4 +127,4 @@ presets = [
 [[family]]
 id = "fundamentals"
 title = "Quality and value"
-presets = ["cash_op_profitability", "composite_value", "qmj", "net_share_issuance", "asset_growth", "distress_ohlson", "bdc_price_to_nav", "eps_revision_up", "target_upside_high"]
+presets = ["cash_op_profitability", "composite_value", "qmj", "net_share_issuance", "asset_growth", "distress_ohlson", "bdc_price_to_nav", "cef_discount_zscore", "eps_revision_up", "target_upside_high"]
