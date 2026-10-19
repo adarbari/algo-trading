@@ -28,9 +28,13 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from algotrade.config.edges.document import MECHANISM_KINDS
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.edge_desk.desk import load_edge_desk
+from algotrade.services.read.guide.edges.index import load_guide_edge_index
+from algotrade.services.read.guide.edges.mechanism import load_guide_mechanism
+from algotrade.services.read.guide.index import load_guide_index
 from algotrade.services.read.market.history import warm_market_frames
 from algotrade.services.read.ops.ingestion import load_completeness
 from algotrade.services.read.regime.regime import load_regime
@@ -68,6 +72,8 @@ def home_steps(ctx: ReadContext) -> list[Step]:
     cold store: the API finishes them (``CacheWarmer.warm_home``) before it accepts a request, so
     the first visit after a start is served from the cache."""
     return [
+        # first: a second in all, and a slow home must not leave the Guide cold
+        ("guide", lambda: warm_guide(ctx)),  # the Guide's index, Edges index and mechanisms
         # the resolved screeners (18 TOML configs): the regime strip, status strip and Ideas read it
         ("screeners", lambda: load_screeners(ctx)),
         ("screen rows", lambda: screen_rows(ctx)),  # the screener pages' and the preview's runs
@@ -78,6 +84,15 @@ def home_steps(ctx: ReadContext) -> list[Step]:
         # the Explore detail pane's hits of any ticker are a lookup in this index (hits.py)
         ("screener hits", lambda: load_screener_hits(ctx, [])),
     ]
+
+
+def warm_guide(ctx: ReadContext) -> None:
+    """The Guide's built pages: the index, the Edges index and each mechanism's page (0.5 s of
+    TOML parsing each, cold), so the first visit after a start is served from the cache."""
+    load_guide_index(ctx)
+    load_guide_edge_index(ctx)
+    for kind in MECHANISM_KINDS:
+        load_guide_mechanism(ctx, kind)
 
 
 def warm(ctx: ReadContext, extra: ExtraSteps | None = None, home: bool = True) -> None:
