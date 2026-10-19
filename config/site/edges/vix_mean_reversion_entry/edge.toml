@@ -37,7 +37,7 @@ reaches 2018, so a handful of windows fall in the range, far under the 40 indepe
 asks (MIN_INDEPENDENT_SESSIONS): the document cannot reach evidenced, and every figure is shown with its
 count. A stretch near the range's end can change when the range is extended, because the base avoids
 triggers that are known only later (ADR 0075). No cost is deducted from a timed position (ADR 0073).
-Not tested: the page's hit-rate tables (not verified), a VIX-only trigger without the inversion, and any
+BIAS: the out-of-window base includes the 63-session stretches that lead into each spike (the falls that caused it), which lowers the base and biases in-window minus out-of-window towards a pass; read a pass with that in mind. Not tested: the page's hit-rate tables (not verified), a VIX-only trigger without the inversion, and any
 exit rule. No [published] figure: the page's 65 to 75 percent hit rate at three months is from
 practitioner tables it marks as not verified."""
 
@@ -72,7 +72,7 @@ points over 63 sessions from the market's own drift."""
 capacity_costs = """Unlimited capacity in one index fund, a few round trips a decade, a cost of 1 to 2 bps a
 side; long only and unlevered. Nothing is deducted in this version. The risk is the drawdown after entry:
 2008 and 2020 kept falling for weeks."""
-failure_modes = """The spike sits at the start of a long bear market (2008), so a fixed-horizon entry loses;
+failure_modes = """The base includes the falls leading into each spike, which biases the comparison towards a pass; the spike sits at the start of a long bear market (2008), so a fixed-horizon entry loses;
 the events are too few and clustered for any t statistic; the effect is the mean reversion of equity
 returns after any large drawdown. Retire if the frozen-period in-window minus out-of-window mean is not
 above zero, or the Welch t over the independent windows stays under 2."""

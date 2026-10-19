@@ -31,7 +31,7 @@ independent sessions the bar asks (MIN_INDEPENDENT_SESSIONS), so this document c
 cross-section inside each year gives power, but its names are not independent of one another, so every figure
 is shown with its count and the harness places the edge among random picks. The frozen period starts
 2026-04-01, so the window of December 2026 is the first frozen observation. The loser set is
-feature.december_loser_flag, a 252-session return of -30% or lower: a fixed level that stands in for the
+feature.year_loser_flag, a 252-session return of -30% or lower: a fixed level that stands in for the
 source's bottom decile (the decile moves with the year: the page's rule sorts at about 20 December), on a
 rolling year and not the calendar year to date; the 50 biggest losers are the picks, the base is every
 eligible name (base universe, picks are the screener's), so the lift reads the losers against all liquid

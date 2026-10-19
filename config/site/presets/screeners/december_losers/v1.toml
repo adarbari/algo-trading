@@ -1,5 +1,5 @@
 # December losers (ADR 0053, ADR 0075; edge december_losers_reversal): a common stock trading at
-# least $5M a day that fell 30% or more over the last 252 sessions (feature.december_loser_flag), ranked
+# least $5M a day that fell 30% or more over the last 252 sessions (feature.year_loser_flag), ranked
 # with the biggest loser first: the stock the year-end tax-loss selling falls on and the long side of the
 # edge, which the harness reads at the decision session before the year_turn window. The flag is a fixed
 # level standing in for the bottom decile. A missing value never passes (ADR 0030). What it does not
@@ -35,7 +35,7 @@ value = 5_000_000
 
 # ------------------------------------------------------------------------ the signal
 [criteria.loser]
-field = "feature.december_loser_flag"
+field = "feature.year_loser_flag"
 op = "eq"
 value = true
 

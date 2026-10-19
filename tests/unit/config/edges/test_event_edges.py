@@ -260,7 +260,7 @@ def test_the_december_losers_screen_gates_on_the_flag_and_ranks_the_biggest_lose
     path = REPO_ROOT / f"config/site/presets/screeners/{edge.screeners[0]}/v1.toml"
     doc = tomllib.loads(path.read_text())
     assert doc["criteria"]["loser"] == {
-        "field": "feature.december_loser_flag", "op": "eq", "value": True,
+        "field": "feature.year_loser_flag", "op": "eq", "value": True,
     }  # fmt: skip
     assert doc["rank"]["tie_break"] == "rollup.trend_stats@v2.ret_252d"
     assert doc["rank"]["tie_break_order"] == "asc"  # the long leg takes the best score first

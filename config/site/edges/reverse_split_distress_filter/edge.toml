@@ -17,8 +17,8 @@ status = "candidate"
 mechanism_kind = "value_gaps"
 frozen_from = 2026-04-01
 notes = """Short side, owner decisions O1 and O2 (2026-10-17): a short result on liquid names may be a
-verdict basis; the outcome is minus the excess return over SPY, less cost and the site's assumed borrow
-(100 bps a year; no borrow data stored). The idea's own form is a filter (leave reverse splitters out of a
+verdict basis; the outcome is minus the excess return over SPY, less cost and an assumed borrow
+of 2000 bps a year (borrow_bps_annual: the low end of the 20 to 100 percent range below; no borrow data stored). The idea's own form is a filter (leave reverse splitters out of a
 long screen); the harness tests it as the short side, which is the same claim stated so that a negative
 drift is a pass. The anchor is the split's ex-date (reverse_splits@v1, event class reverse_split, ADR 0075):
 the decision session D is the ex-date and the entry session S is the next one (start_offset_sessions = 1).
@@ -26,8 +26,8 @@ The events table has no known_from, so a split is read from its ex-date on, whic
 announcement and so never early. Only splits with a ratio below 1 count; the fund universe is left out by
 this document's COMMON_STOCK filter. THE HISTORY LIMITS stand: most reverse splitters are microcaps, so the
 liquid-name floor (20-day dollar volume of $5M) leaves few events and the verdict rests on a small count;
-the assumed 100 bps a year understates the real borrow of such a name (20 to 100 percent a year, often no
-borrow at all), so a short result here is the best case for the short; and the 250 and 500-session horizons
+the assumed 2000 bps a year is a LOWER BOUND on the real borrow of such a name (20 to 100 percent a year, often no
+borrow at all), so a short result here is still the best case for the short; and the 250 and 500-session horizons
 outlast the frozen period for any split since 2026-04-01, so only a split from before it fills a frozen
 slice, and a 500-session outcome exists only for splits that long ago (stored outcomes reach 2018 after the
 D0 backfill). Every eligible name is the base and the picks are the flagged names ranked by dollar volume
@@ -48,11 +48,12 @@ horizon_sessions = [250, 500]
 benchmark = "SPY"
 start_offset_sessions = 1
 side = "short"
+borrow_bps_annual = 2000
 cost_bps = 20
 
 [quality_bar]
 outcome = """Minus the excess return over SPY over 250 and 500 sessions after the entry close (the
-session after the split's ex-date), net of 20 bps a round trip and the assumed borrow."""
+session after the split's ex-date), net of 20 bps a round trip and an assumed borrow of 2000 bps a year."""
 trigger_timing = """The split is known from its ex-date (the anchor and the decision session D); the entry session
 S = D + 1 (start_offset_sessions = 1). The names are read at D from reverse_splits@v1
 (sessions_since_reverse_split = 0), built only from splits with ts <= D, never from one that goes ex after D's
@@ -66,7 +67,7 @@ split and the page puts them at about -15 to -20 percent over three years, an ex
 verified, so no published figure is set. Liquid reverse splitters are few; independent events are the binding
 count, and the 500-session outcome needs history the store reaches only from 2018."""
 capacity_costs = """Liquid splitters are shorted at the borrow of a distressed name, often 20 to 100 percent a
-year or none at all; the outcome deducts 20 bps and the site's assumed 100 bps a year, so the result is a
+year or none at all; the outcome deducts 20 bps and an assumed 2000 bps a year, a LOWER BOUND on the borrow, so the result is a
 best case. The usable form for an individual is the exclusion list for a long screen, which costs nothing."""
 failure_modes = """A compliance split that works (the price holds above $1 and the business recovers); a
 split that goes with a merger or a spin-off (ratio and ex-date read the same); the 2024 and 2025 Nasdaq rule

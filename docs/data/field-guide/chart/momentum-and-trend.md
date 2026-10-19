@@ -457,7 +457,7 @@ Sources: Moskowitz and Grinblatt (1999), Do Industries Explain Momentum?, Journa
 
 Sources: Moskowitz and Grinblatt (1999), Do Industries Explain Momentum?, Journal of Finance; Blitz, Huij, Lansdorp and Verbeek (2013), Short-term residual reversal
 
-### `feature.december_loser_flag`
+### `feature.year_loser_flag`
 
 **How to read it.** True when the name fell 30% or more over the last 252 sessions: the stock that year-end tax-loss selling falls on. It is a fixed level standing in for the bottom decile, so in a mild year it flags fewer names than a decile would and in a crash more.
 

@@ -1,7 +1,7 @@
 """The relative-strength and own-trend expression features (``config/site/features/technical/
 price.toml``): ``rs_spy_positive``, ``rs_improving`` and ``sector_leader`` over
 ``relative_strength@v1`` rows, ``stock_tsmom_sign`` and ``capital_gains_overhang`` (EB E1),
-and ``december_loser_flag``."""
+and ``year_loser_flag``."""
 
 import numpy as np
 import pandas as pd
@@ -120,7 +120,7 @@ def test_capital_gains_overhang_is_the_close_against_the_earnings_vwap(fs: Featu
     assert pd.isna(value["EQ:NOVWAP"])  # no earnings anchor: unknown
 
 
-def test_december_loser_flag_is_a_fixed_level_on_the_year_return_and_null_when_unknown(
+def test_year_loser_flag_is_a_fixed_level_on_the_year_return_and_null_when_unknown(
     fs: FeatureSet,
 ) -> None:
     """A 252-session return of -30% or lower flags (the level is the flag's own, not a decile);
@@ -132,7 +132,7 @@ def test_december_loser_flag_is_a_fixed_level_on_the_year_return_and_null_when_u
             "ret_252d": [-0.55, -0.30, -0.29, np.nan],
         }
     )
-    out = fs.evaluate({"rollups/instrument/trend_stats@v2": trend}, ["december_loser_flag"])
-    flags = out.set_index("instrument_id")["december_loser_flag"]
+    out = fs.evaluate({"rollups/instrument/trend_stats@v2": trend}, ["year_loser_flag"])
+    flags = out.set_index("instrument_id")["year_loser_flag"]
     assert [flags["EQ:A"], flags["EQ:B"], flags["EQ:C"]] == [True, True, False]
     assert pd.isna(flags["EQ:D"])
