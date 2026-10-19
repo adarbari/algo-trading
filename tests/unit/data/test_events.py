@@ -10,6 +10,7 @@ from algotrade.data import StoreReader
 from algotrade.data.events import (
     acceptance_sessions,
     events_by_acceptance,
+    filing_coverage,
     filing_walks,
     latest_versions,
     read_events,
@@ -313,3 +314,32 @@ def test_filing_walks_are_the_clean_published_walks_of_the_filings_task() -> Non
     assert frame["session_date"].tolist() == [date(2026, 10, 7), date(2026, 10, 12)]
     assert frame["walked_to"].tolist() == [date(2026, 10, 6), date(2026, 10, 9)]
     assert filing_walks(StoreReader(MemoryBackend())).empty
+
+
+def test_filing_coverage_reads_walks_and_full_per_cik_reads_of_the_current_form_set() -> None:
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+
+    def save(day: date, items: dict[str, str], **stats: object) -> None:
+        record = start_run("filings", day, datetime(day.year, day.month, day.day, 22, tzinfo=UTC))
+        record.status, record.items, record.stats = RunStatus.COMPLETE, items, stats
+        writer.save_run(record)
+
+    save(date(2026, 10, 5), {"1": "OK: 2 filings", "2": "FETCH_ERROR: x", "idx:a": "OK"},
+         covers_since="2010-01-01", forms="F")  # fmt: skip
+    save(date(2026, 10, 6), {"3": "NO_DATA: none"}, covers_since="2012-01-01", forms="old")
+    save(date(2026, 10, 7), {"1": "OK", "4": "OK", "5": "FETCH_ERROR"}, backfilled=["1", "4", "5"],
+         walked_to="2026-10-06", forms="F")  # fmt: skip
+    coverage = filing_coverage(StoreReader(backend), "F")
+    assert coverage.asked_since() == {"1": date(2010, 1, 1), "4": date(2018, 1, 1)}
+    assert coverage.reads["session_date"].tolist() == [date(2026, 10, 5)] + [date(2026, 10, 7)] * 2
+    assert coverage.walked_to == date(2026, 10, 6)
+    assert set(filing_coverage(StoreReader(backend)).asked_since()) == {
+        "1",
+        "3",
+        "4",
+    }  # any form set
+    assert filing_coverage(StoreReader(backend), "F").walks.equals(
+        filing_walks(StoreReader(backend))
+    )
+    assert filing_coverage(StoreReader(MemoryBackend())).walked_to is None
