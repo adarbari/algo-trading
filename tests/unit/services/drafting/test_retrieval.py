@@ -19,6 +19,7 @@ from algotrade.features.registry import GROUPS
 from algotrade.services.drafting.golden.golden import GoldenCase, load_cases, recorded_answers
 from algotrade.services.drafting.prompt import (
     PROMPT_BUDGET_TOKENS,
+    UNDRAFTED_FIELDS,
     UNDRAFTED_GROUPS,
     draftable,
     index_group,
@@ -330,7 +331,8 @@ def test_every_field_of_every_recorded_answer_is_reachable_from_the_grouped_inde
 def test_an_undrafted_group_is_in_the_registry_and_kept_out_of_the_prompt(site) -> None:
     infos, book, guide = site
     assert set(GROUPS) >= UNDRAFTED_GROUPS  # a retired group is removed from the list
-    hidden = {i.name for i in infos if i.group in UNDRAFTED_GROUPS}
+    hidden = {i.name for i in infos if i.group in UNDRAFTED_GROUPS or i.name in UNDRAFTED_FIELDS}
+    assert hidden >= UNDRAFTED_FIELDS  # a named field is in the catalogue and kept out too
     assert hidden  # the catalogue still has them (Explore, the Builder)
     prompt = sliced_system_prompt(infos, "high yield spread above its average", book, guide)
     assert not any(name in prompt for name in hidden)

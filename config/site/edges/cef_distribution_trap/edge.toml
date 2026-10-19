@@ -1,6 +1,6 @@
 # Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
-# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E4): closed-end funds are not covered
-# and the payout side is not stored. An avoid list and a filter on closed_end_fund_discounts. Idea page:
+# src/algotrade/config/edges/document.py. Blocked 2026-10-18 (EB E4): the payout side (earned income
+# against the distribution) is not stored; closed-end funds joined the covered universe the same day. An avoid list and a filter on closed_end_fund_discounts. Idea page:
 # docs/edge-ideas/structural-niches.md (cef_distribution_trap_premium_collapse).
 id = "cef_distribution_trap"
 name = "Premium closed-end funds that over-distribute"
@@ -20,14 +20,15 @@ status = "blocked"
 plain_reason = "Needs closed-end fund prices and their distribution history, which we do not collect yet."
 mechanism_kind = "value_gaps"
 frozen_from = 2026-04-01
-rejection_reason = """Two things are missing. Closed-end funds are not in the covered universe (ADR 0013:
-security_types of config/site/universe.toml; a fund typed FUND is the reference's CEF and is not in the nightly
-bars), so there are no closes, outcomes or screener rows; the owner decision and the bars-history run are
-the same as for closed_end_fund_discounts. And the rule's second half, distribution coverage (the payout
-against earned income), needs the fund's distribution history and its Section 19(a) notices: no CEF dividend
-rows are stored (dividends follow the covered universe) and 19(a) notices are not ingested. The premium half is
-available through cef_nav@v1 (cef_discount_to_nav above 0.10) once bars exist; that alone is a weaker
-rule than the practitioner's, and a premium-only screener should be filed as that proxy, named."""
+rejection_reason = """The rule's second half, distribution coverage (the payout against what the fund earns), is not
+stored. Closed-end funds are in the covered universe since the ADR 0013 amendment of 2026-10-18, so their
+closes, dividends (dividends@v2, the cash paid) and div_yield exist, but the earned-income split of a
+distribution is not: it lives in the fund's Section 19(a) notices (source of the distribution: net
+investment income, gains, return of capital), which are not ingested, and the paid amount alone cannot tell
+earned income from return of capital. The premium half is available through cef_nav@v1
+(cef_discount_to_nav above 0.10); that alone is a weaker rule than the practitioner's, and a premium-only
+screener should be filed as that proxy, named. Unblock by ingesting the 19(a) notices (a new source, an
+owner decision)."""
 notes = """Short side, owner decision O2 (2026-10-17): a short result on liquid names may be a verdict
 basis. Small funds are expensive to short (borrow plus the distribution owed) and rarely have an ADV
 over the capacity floor; the useful form for an individual is an avoid filter on closed_end_fund_discounts, never to
@@ -60,7 +61,7 @@ last session of the month), the entry session is S = D + 1 (start_offset_session
 replication = """The practitioner rule (Morningstar and CEFA, not verified): premium above 10% and distribution
 coverage below 90% means a negative expected price return, exit on any announced cut. The premium
 quintile in Patro, Piccotti and Wu supplies the short leg of their long-short spread (a two-group figure,
-not filed). No screener is written until closes and payout data exist."""
+not filed). No screener is written until the earned-income split of the distributions is stored."""
 expected_size = """No published panel number. The case series show price falls of 20 to 40% on a cut day,
 at funds that held large premiums for years; the premium itself predicts negative price returns in
 the quintile sort. Few funds ever hold a 10% premium, so the independent count is the binding limit."""

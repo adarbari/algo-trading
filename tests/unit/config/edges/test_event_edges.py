@@ -82,8 +82,7 @@ BLOCKED = {
     "c13_iv_term_structure_straddles": "no history",
     "c16_pre_earnings_straddle_buy": "tenor_sessions",
     "c17_earnings_iv_crush_sell": "tenor_sessions",
-    "closed_end_fund_discounts": "covered universe",
-    "cef_distribution_trap": "covered universe",
+    "cef_distribution_trap": "earned-income split",
 }  # the keyword each blocked document's reason names
 
 
@@ -187,6 +186,7 @@ def test_the_etf_flow_base_is_the_funds_that_carry_a_score() -> None:
 SPARSE = (
     "insider_opportunistic_cluster_buys", "short_squeeze_days_to_cover",
     "analyst_revision_momentum", "target_price_implied_return", "dual_class_spread_reversion",
+    "closed_end_fund_discounts",
 )  # fmt: skip
 
 
@@ -231,8 +231,9 @@ BATCH_X = {
     "vix_mean_reversion_entry": "on_market:vix_spike",
     "treasury_month_end_extension": "calendar:pre_month_end",
     "december_losers_reversal": "calendar:year_turn",
+    "ipo_lockup_expiry": "on_event:ipo_lockup",
 }
-BLOCKED_X = ("ipo_lockup_expiry", "tdf_contrarian_flows")
+BLOCKED_X = ("tdf_contrarian_flows",)
 
 
 def test_batch_x_candidates_read_the_class_trigger_or_window_they_were_built_for() -> None:
@@ -278,3 +279,36 @@ def test_the_time_series_documents_name_their_instruments_and_one_horizon() -> N
         assert edge.base == "out_of_window" and edge.outcome.benchmark == "none"
         assert edge.outcome.horizon_sessions == horizons
         assert next(r.value for r in edge.universe.where.rules()) == tuple(symbols)  # type: ignore[union-attr]
+
+
+def test_the_cef_discount_edge_ranks_the_widest_discount_first() -> None:
+    """The universe rule is the CEF type (ADR 0013 amendment 2026-10-18), the screener ranks
+    the most negative z-score first, the universe is gated on that score, nothing is published,
+    and the survivor-only history is disclosed."""
+    edge = {e.id: e for e in load_edges(STORE)}["closed_end_fund_discounts"]
+    assert edge.status == "candidate" and edge.screeners == ("cef_discount_zscore",)
+    assert edge.mechanism_kind == "value_gaps" and not edge.published
+    field, order = _rank("cef_discount_zscore")
+    assert (field, order) == ("rollup.cef_nav@v1.cef_discount_zscore", "asc")
+    rules = {r.field: r for r in edge.universe.where.rules()}  # type: ignore[union-attr]
+    assert rules["instrument.security_type"].value == "CEF" and field in rules
+    screener = tomllib.loads(
+        (REPO_ROOT / "config/site/presets/screeners/cef_discount_zscore/v1.toml").read_text()
+    )
+    assert screener["criteria"]["security_type"]["value"] == "CEF"
+    assert "survivor" in edge.notes.lower() and "known from the next session" in edge.notes
+
+
+def test_the_lockup_edge_enters_before_the_expiry_and_shorts_the_most_liquid_first() -> None:
+    """Announced ahead: S is 10 sessions before the expiry; a short on liquid names with the whole
+    universe as base; the score is the (dense) dollar volume, ascending, so the short leg is the
+    most liquid names; the screen reads the window 0..11 sessions ahead."""
+    edge = {e.id: e for e in load_edges(STORE)}["ipo_lockup_expiry"]
+    assert edge.outcome.start_offset_sessions == -10 and edge.outcome.side == "short"
+    assert edge.base == "universe" and edge.picks == "event" and edge.outcome.borrow_bps_annual
+    assert _rank(edge.screeners[0]) == (ADV, "asc")
+    doc = tomllib.loads(
+        (REPO_ROOT / f"config/site/presets/screeners/{edge.screeners[0]}/v1.toml").read_text()
+    )
+    window = {c["op"]: c["value"] for c in doc["criteria"].values() if "lockup" in c["field"]}
+    assert window == {"gte": 0, "lte": 11}

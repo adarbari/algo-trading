@@ -5,6 +5,7 @@ Back to the [index of every edge](../edges.md).
 
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
+| Closed-end fund discount reversion (`closed_end_fund_discounts`) | candidate | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | `cef_discount_zscore` |
 | December losers rebound (`december_losers_reversal`) | candidate | calendar:year turn | excess return, over 10 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps | `december_losers` |
 | ETF flow pressure (`etf_flow_pressure`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `etf_flow_pressure` |
 | High-volume return premium (`high_volume_return_premium`) | candidate | every session | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `volume_shock`, `volume_shock_no_news` |
@@ -12,7 +13,39 @@ Back to the [index of every edge](../edges.md).
 | Quarter-end rebalancing (`quarter_end_rebalancing`) | candidate | calendar:quarter end | excess return, over 5 sessions, entered 1 session after the decision session | none yet |
 | Crowded shorts by days to cover (`short_squeeze_days_to_cover`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `short_squeeze_dtc` |
 | Turn of the month (`turn_of_the_month`) | candidate | calendar:turn of month | excess return, over 4 sessions, entered 1 session after the decision session | none yet |
-| Closed-end fund discount reversion (`closed_end_fund_discounts`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
+
+## Closed-end fund discount reversion (`closed_end_fund_discounts`)
+
+**Status:** candidate. **Family:** D. **Thesis:** Closed-end funds trading at an unusually wide discount to their own net asset value, against their own history, outperform the market as the discount narrows.
+
+- **Outcome:** excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'CEF'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 3` and `rollup.price_stats@v2.adv_usd_20d gte 500000` and `rollup.cef_nav@v1.cef_discount_zscore gte -20`
+- **Top K:** 10
+- **Screeners:** `cef_discount_zscore`
+- **Baselines:** `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** THE UNIVERSE IS SURVIVORS ONLY BEFORE 2026-10-02. Closed-end funds joined the covered universe on 2026-10-18 (ADR 0013 amendment) and the universe snapshot has them only from then; before it the harness builds the population from the listing history, where a delisted fund reads as an ETF (the vendor listing types 291 of the funds as ETF; about 37 live funds listed as Stock on NYSE are missing too, 293 of 330 CEF ids have outcomes at 2026-09-30, and sessions 2026-10-02 to 2026-10-17 have no CEF universe or outcome rows until backfilled) and the rule security_type eq CEF keeps only the survivors, so a fund that was liquidated, merged or open-ended after a wide discount is missing from the earlier sessions: the history carries the today_flag tilt (ADR 0053 amendment, historical.py) and flatters a discount strategy. The NAV is known from the next session (known_from), and the discount pairs it with the close of its own date; around a split the NAV is put in the close's split terms in cef_nav@v1, so a reverse split is no false discount. The base is every fund of the universe with a score (cef_discount_zscore gated in the universe: a fund with no NAV, a stale one or under 120 discounts has none, and the harness reads a base under 80% scored as too thin), the picks are the screener's 10 widest. Long only, as the source's short leg is unnecessary for an individual (the page). Tested against SPY, which is a mismatch for a bond or municipal fund (a benchmark by fund category is a follow-up); a leveraged fund's discount also carries rate and credit beta. Proxies, each stated: the source's relative discount is a sort on the discount against its history, here the 252-session z-score (cef_nav@v1); the NAV is the issuer's own, struck after the close and known from the next session (known_from), so the discount pairs the NAV with the close of the NAV's own date, one session old at the decision; the BDC half is out (their NAV is quarterly, from 10-Q filings). Fund edges are keyed by instrument_id (ADR 0018), never by hand-listed tickers. The activism half (13D filings by fund) is cef_activist_target_prediction, not filed here.
+
+**Quality bar**
+
+1. **Mechanism:** Retail-held and without creation or redemption, closed-end funds trade on sentiment, not on the value of their assets (Lee, Shleifer and Thaler 1991); activists such as Saba and Bulldog force tender offers and open-endings that roughly halve the discount (Bradley, Brav, Goldstein and Jiang 2010).
+2. **Persistence:** A small, retail, illiquid market that institutions avoid, with capacity of about $1M to $10M for the strategy; part of the discount is a fair cash-flow drag (fees, leverage, payout policy), so the discount does not close fully and is not arbitraged away. No systematic 2015 to 2024 study was found; 2024 press reports funds buying wide discounts.
+3. **Outcome:** Excess return over SPY over 60, 125 and 250 sessions after the entry close, net of 50 bps a round trip: a long hold in the funds with the widest discount against their own year.
+4. **Trigger timing:** The NAV is struck after the close of its date and known from the next session (events/fund_nav known_from); the discount pairs it with the close of its own date. The rank is read at D (the last session of the month) from the latest NAV known by D, at most five sessions old, and the entry session is S = D + 1 (start_offset_sessions = 1).
+5. **Faithful replication:** The source's rule: sort funds on the discount relative to its history, long the widest quintile and short the narrowest, 18.2% a year and Sharpe 1.9 over 1998-2011 (Patro, Piccotti and Wu; a two-group long-short figure, not filed under [published]). Here the long side only: the 10 funds with the lowest discount z-score over 252 sessions.
+6. **Expected size and sample:** 18.2% a year for the long-short quintile spread in-sample (Patro et al., via Quantpedia, not verified in the paper); activism cuts discounts to about half (Bradley et al. 2010). Funds with a mapped NAV number about 273, so a decile is under 30 names; 40 independent month-ends need over three years of history, which the NAV series (to 2004) and the stored bars (from 2010) supply.
+7. **Capacity and costs:** Spreads of 0.3 to 1% on small funds; capacity $20k to $100k a fund, hundreds of funds. The filter keeps funds trading $500k a day and the cost is 50 bps a round trip.
+8. **Failure modes and retirement:** A discount that is fair (a fund that cut its payout or lost its manager) never closes; a rate rise hits levered bond funds across the board; a stale NAV makes a discount that is not there. Retire if the frozen-period excess return of the picks is not above the mean of every eligible fund.
+9. **Decoys:** Leverage (most funds are about 30% levered: rate and credit beta), the payout-rate trap (the next edge, cef_distribution_trap), duration of the bond and municipal funds, and small-size tilt: the size baseline; compare funds of one category in a follow-up.
+
+**Sources**
+
+- Lee, C., Shleifer, A. and Thaler, R., Investor Sentiment and the Closed-End Fund Puzzle, Journal of Finance, 1991 <https://www.nber.org/papers/w3465>
+- Bradley, M., Brav, A., Goldstein, I. and Jiang, W., Activist Arbitrage: A Study of Open-Ending Attempts of Closed-End Funds, Journal of Financial Economics, 2010 <https://ideas.repec.org/a/eee/jfinec/v95y2010i1p1-19.html>
+- Patro, D., Piccotti, L. and Wu, Y., closed-end fund discounts (Quantpedia strategy summary) <https://hedgefundalpha.com/strategies/closed-end-fund-discounts/>
+- Patro, D., Piccotti, L. and Wu, Y. (2017), Exploiting Closed-End Fund Discounts: A Systematic Examination of Alphas, Journal of Financial Research <https://ideas.repec.org/a/bla/jfnres/v40y2017i2p223-248.html>
+- Pontiff, J. (1996), Costly Arbitrage: Evidence from Closed-End Funds, Quarterly Journal of Economics <https://ideas.repec.org/a/oup/qjecon/v111y1996i4p1135-1151..html>
 
 ## December losers rebound (`december_losers_reversal`)
 
@@ -238,38 +271,3 @@ Back to the [index of every edge](../edges.md).
 - Quantpedia, Turn of the Month in Equity Indexes <https://quantpedia.com/strategies/turn-of-the-month-in-equity-indexes>
 - Ogden, J. (1990), Turn-of-Month Evaluations of Liquid Profits and Stock Returns: A Common Explanation for the Monthly and January Effects, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v45y1990i4p1259-72.html>
 - Lakonishok, J. and Smidt, S. (1988), Are Seasonal Anomalies Real? A Ninety-Year Perspective, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v1y1988i4p403-425.html>
-
-## Closed-end fund discount reversion (`closed_end_fund_discounts`)
-
-**Status:** blocked. **Family:** D. **Thesis:** Closed-end funds trading at an unusually wide discount to their own net asset value, against their own history, outperform the market as the discount narrows.
-
-**Why blocked:** Closed-end funds are not in the covered universe, so they have no bars, no outcomes and no screener rows. Universe coverage is the stock, ADR and ETF types of ADR 0013 (security_types in config/site/universe.toml); a fund the vendor types as FUND is stored in the reference as CEF and "drops out of the default coverage" (docs/data/instruments.md). The NAV side exists (events/fund_nav, EB D5: 273 of 332 CEFs mapped, history to 2004, licence personal) and so does cef_nav@v1, which pairs a NAV with a close, but a discount needs the fund's close from bars/1d. Unblock by an owner decision: add the CEF type to security_types (or the funds to include_symbols) with an ADR 0013 amendment, accept about 330 more symbols in the nightly bars and the Tiingo monthly symbol budget (docs/data/vendors.md), and run bars-history for them. The screener is then written over rollup.cef_nav@v1.cef_discount_zscore.
-
-- **Outcome:** excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps
-- **Schedule:** month end
-- **Universe:** `instrument.security_type eq 'CEF'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 3` and `rollup.price_stats@v2.adv_usd_20d gte 500000`
-- **Top K:** 10
-- **Screeners:** none yet
-- **Baselines:** `size_small`
-- **Frozen period:** from 2026-04-01
-- **Notes:** Long only, as the source's short leg is unnecessary for an individual (the page). Tested against SPY, which is a mismatch for a bond or municipal fund (a benchmark by fund category is a follow-up); a leveraged fund's discount also carries rate and credit beta. Proxies, each stated: the source's relative discount is a sort on the discount against its history, here the 252-session z-score (cef_nav@v1); the NAV is the issuer's own, struck after the close and known from the next session (known_from), so the discount pairs the NAV with the close of the NAV's own date, one session old at the decision; the BDC half is out (their NAV is quarterly, from 10-Q filings). Fund edges are keyed by instrument_id (ADR 0018), never by hand-listed tickers. The activism half (13D filings by fund) is cef_activist_target_prediction, not filed here.
-
-**Quality bar**
-
-1. **Mechanism:** Retail-held and without creation or redemption, closed-end funds trade on sentiment, not on the value of their assets (Lee, Shleifer and Thaler 1991); activists such as Saba and Bulldog force tender offers and open-endings that roughly halve the discount (Bradley, Brav, Goldstein and Jiang 2010).
-2. **Persistence:** A small, retail, illiquid market that institutions avoid, with capacity of about $1M to $10M for the strategy; part of the discount is a fair cash-flow drag (fees, leverage, payout policy), so the discount does not close fully and is not arbitraged away. No systematic 2015 to 2024 study was found; 2024 press reports funds buying wide discounts.
-3. **Outcome:** Excess return over SPY over 60, 125 and 250 sessions after the entry close, net of 50 bps a round trip: a long hold in the funds with the widest discount against their own year.
-4. **Trigger timing:** The NAV is struck after the close of its date and known from the next session (events/fund_nav known_from); the discount pairs it with the close of its own date. The rank is read at D (the last session of the month) from the latest NAV known by D, at most five sessions old, and the entry session is S = D + 1 (start_offset_sessions = 1).
-5. **Faithful replication:** The source's rule: sort funds on the discount relative to its history, long the widest quintile and short the narrowest, 18.2% a year and Sharpe 1.9 over 1998-2011 (Patro, Piccotti and Wu; a two-group long-short figure, not filed under [published]). Here the long side only: the 10 funds with the lowest discount z-score over 252 sessions.
-6. **Expected size and sample:** 18.2% a year for the long-short quintile spread in-sample (Patro et al., via Quantpedia, not verified in the paper); activism cuts discounts to about half (Bradley et al. 2010). Funds with a mapped NAV number about 273, so a decile is under 30 names; 40 independent month-ends need over three years of history, which the NAV series (to 2004) supplies once bars exist.
-7. **Capacity and costs:** Spreads of 0.3 to 1% on small funds; capacity $20k to $100k a fund, hundreds of funds. The filter keeps funds trading $500k a day and the cost is 50 bps a round trip.
-8. **Failure modes and retirement:** A discount that is fair (a fund that cut its payout or lost its manager) never closes; a rate rise hits levered bond funds across the board; a stale NAV makes a discount that is not there. Retire if the frozen-period excess return of the picks is not above the mean of every eligible fund.
-9. **Decoys:** Leverage (most funds are about 30% levered: rate and credit beta), the payout-rate trap (the next edge, cef_distribution_trap), duration of the bond and municipal funds, and small-size tilt: the size baseline; compare funds of one category in a follow-up.
-
-**Sources**
-
-- Lee, C., Shleifer, A. and Thaler, R., Investor Sentiment and the Closed-End Fund Puzzle, Journal of Finance, 1991 <https://www.nber.org/papers/w3465>
-- Bradley, M., Brav, A., Goldstein, I. and Jiang, W., Activist Arbitrage: A Study of Open-Ending Attempts of Closed-End Funds, Journal of Financial Economics, 2010 <https://ideas.repec.org/a/eee/jfinec/v95y2010i1p1-19.html>
-- Patro, D., Piccotti, L. and Wu, Y., closed-end fund discounts (Quantpedia strategy summary) <https://hedgefundalpha.com/strategies/closed-end-fund-discounts/>
-- Patro, D., Piccotti, L. and Wu, Y. (2017), Exploiting Closed-End Fund Discounts: A Systematic Examination of Alphas, Journal of Financial Research <https://ideas.repec.org/a/bla/jfnres/v40y2017i2p223-248.html>
-- Pontiff, J. (1996), Costly Arbitrage: Evidence from Closed-End Funds, Quarterly Journal of Economics <https://ideas.repec.org/a/oup/qjecon/v111y1996i4p1135-1151..html>

@@ -42,7 +42,7 @@ from algotrade.config.site.guide.start import ENTRY_KINDS, load_guide_start
 from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.config.site.settings import load_field_guide
-from algotrade.services.read.context import Stores
+from algotrade.services.read.context import Stores, catalogue_key
 from algotrade.services.read.guide.edges.site_edges import playbooks_of, site_edges
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 
@@ -177,7 +177,14 @@ def _cut(text: str, start: int) -> str:
 
 def guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
     """Every Guide entry the caller can open, in ``ENTRY_KINDS`` order, each kind in its
-    source's order (module docstring)."""
+    source's order (module docstring). Built once per cache and catalogue (re-reading some
+    120 TOML files per request cost 0.2-0.6 s); site files change only with a deploy, which
+    restarts the API (as ``site_edges``), so a fresh cache sees an edited file."""
+    key = ("guide-entries", catalogue_key(ctx))
+    return ctx.cache.get_or_compute(key, lambda: _guide_entries(ctx))  # type: ignore[no-any-return]
+
+
+def _guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
     guide = load_field_guide(ctx.configs)
     prose = load_guide_playbooks(ctx.configs)
     pages = tuple(

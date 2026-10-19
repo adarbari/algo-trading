@@ -1,0 +1,34 @@
+# ETFs with a close (ADR 0053, ADR 0074, EB E5 batch Y; the screener of the allocation edges whose
+# signal is not a property of the fund itself but of a gate on the book): any listed ETF with a
+# positive close passes, ranked by that close, the highest first. It has NO leveraged or inverse gate,
+# so the short-volatility fund of vix_roll_yield (leverage -0.5) can be held; the edge's own list of
+# ETFs is the universe and a canary in its outcome is the signal. A missing close never passes (ADR 0030).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "etf_priced"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "ETFs with a close"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "ETF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+# ------------------------------------------------------------------------ the signal
+[criteria.priced]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+
+[rank]
+tie_break = "rollup.price_stats@v2.close"

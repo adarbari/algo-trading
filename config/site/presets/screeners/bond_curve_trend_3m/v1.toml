@@ -1,0 +1,52 @@
+# Treasury funds on a rising curve and a positive 12-month trend (ADR 0053, ADR 0074, EB E5 batch Y;
+# a screener of bond_curve_timing): IEF and TLT carry the 10-year minus 3-month Treasury slope
+# (etf_macro@v1, t10y3m), above 0 means the curve slopes up, and their own 252-session close-to-close
+# return is above 0, ranked by that return, the best first. The slope is the carry stand-in: the
+# roll-down of Ilmanen's rule is not stored. The return is raw price, no coupon. Every other fund
+# has no slope and is absent: a missing value never passes (ADR 0030).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "bond_curve_trend_3m"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Treasury funds on an upward curve and a rising trend (3-month slope)"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "ETF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.not_leveraged]
+field = "instrument.is_leveraged"
+op = "eq"
+value = false
+
+[criteria.not_inverse]
+field = "instrument.is_inverse"
+op = "eq"
+value = false
+
+# ------------------------------------------------------------------------ the signal
+[criteria.curve]
+field = "rollup.etf_macro@v1.t10y3m"
+op = "gt"
+value = 0
+
+[criteria.trend]
+field = "rollup.trend_stats@v2.ret_252d"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+t10y3m = "rollup.etf_macro@v1.t10y3m"
+ret_252d = "rollup.trend_stats@v2.ret_252d"
+
+[rank]
+tie_break = "rollup.trend_stats@v2.ret_252d"

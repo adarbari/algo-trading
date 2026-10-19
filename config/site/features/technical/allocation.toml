@@ -1,0 +1,21 @@
+# Allocation signals (EB E5 batch Y; ADR 0074): formulas over the per-fund macro columns of etf_macro@v1 and the stored
+# returns, computed on read. The language and the keys: docs/configuration.md "Expression
+# features". Changing a formula or a param: bump its version.
+
+[credit_spread_vs_ma200]
+expr = "coalesce(etf_macro.hy_oas / etf_macro.hy_oas_ma200, etf_macro.ig_oas / etf_macro.ig_oas_ma200) - 1"
+dtype = "float"
+unit = "decimal"
+description = "The credit spread the fund trades over its 200-observation mean, minus 1: HYG reads the high-yield option-adjusted spread, LQD the investment-grade one (below 0: the spread is tighter than its trend)"
+null_meaning = "the fund is not HYG or LQD, or its spread or its 200-observation mean is null (no observation known by the session, one older than the series' maximum age, or fewer than 160 of 200 sessions with an observation)"
+valid_range = [-1, inf]
+version = 1
+
+[momentum_13612w]
+expr = "12 * price_stats.ret_20d + 4 * price_stats.ret_60d + 2 * trend_stats.ret_120d + trend_stats.ret_252d"
+dtype = "float"
+unit = "ratio"
+description = "Keller's 13612W momentum score: 12 times the 1-month return plus 4 times the 3-month, 2 times the 6-month and 1 times the 12-month return (20, 60, 120 and 252 sessions); below 0 is a falling trend"
+null_meaning = "a return is null (a gap among the last 252 sessions, or a shorter history)"
+valid_range = [-50, 50]
+version = 1

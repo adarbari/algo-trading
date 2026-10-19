@@ -1,0 +1,47 @@
+# ETFs whose credit spread is tighter than its 200-session mean (ADR 0053, ADR 0074, EB E5 batch Y;
+# the macro screener of credit_spread_trend): HYG on the high-yield option-adjusted spread, LQD on
+# the investment-grade one (etf_macro@v1, each fund carries its own series), the tightest against its
+# mean first. The spread rising above its mean is the source's risk-off signal. Every other fund
+# has no spread and is absent: a missing value never passes (ADR 0030). The 200-session mean of
+# daily observations stands for the source's 200-day average; the 50-day crossing is not built.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "credit_spread_below_ma200"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Credit spread tighter than its 200-day mean"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "ETF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.not_leveraged]
+field = "instrument.is_leveraged"
+op = "eq"
+value = false
+
+[criteria.not_inverse]
+field = "instrument.is_inverse"
+op = "eq"
+value = false
+
+# ------------------------------------------------------------------------ the signal
+[criteria.tighter]
+field = "feature.credit_spread_vs_ma200"
+op = "lt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+credit_spread_vs_ma200 = "feature.credit_spread_vs_ma200"
+
+[rank]
+tie_break = "feature.credit_spread_vs_ma200"
+tie_break_order = "asc"

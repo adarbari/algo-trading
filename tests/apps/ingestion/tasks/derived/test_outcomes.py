@@ -5,13 +5,13 @@ before the stored history is not computed; a window not yet closed is refused; h
 from the open edge documents; the acceptance check passes on the run's own rows and fails on a
 name that has neither a row nor a reason."""
 
+from dataclasses import replace
 from datetime import UTC, date, datetime
 
 import pandas as pd
 import pytest
 
 from algotrade.config.edges.document import parse_edge
-from algotrade.config.edges.loading import load_edges
 from algotrade.core.time.calendar import close_time, next_session, sessions_ending
 from algotrade.data.prices import FLAGS_TABLE, raw_bars
 from algotrade.storage.configs.files import FileConfigStore
@@ -74,21 +74,22 @@ def _outcomes(reader: StoreReader) -> pd.DataFrame:
     return frame.drop(columns=["run_id", "knowledge_ts"]).sort_values(keys).reset_index(drop=True)
 
 
-def test_horizons_come_from_the_open_edge_documents() -> None:
+def test_horizons_come_from_the_open_edge_documents(monkeypatch: pytest.MonkeyPatch) -> None:
     horizons, benchmarks = horizons_and_benchmarks()
     assert DEFAULT_HORIZON in horizons and {6, 60} <= set(horizons)
-    edges = load_edges(FileConfigStore(REPO_ROOT / "config", local=False))
-    held = {
-        h for e in edges if e.status not in outcomes_task.CLOSED for h in e.outcome.horizon_sessions
-    }
-    only_closed = (
-        {h for e in edges if e.status in outcomes_task.CLOSED for h in e.outcome.horizon_sessions}
-        - held
-        - {DEFAULT_HORIZON}
-    )
-    assert only_closed and not only_closed & set(horizons)  # a rejected edge's horizon adds none
     assert 1 in horizons  # ibs_etf_mean_reversion, a candidate, holds one session (EB E5)
     assert benchmarks == ["SPY"]
+    # a rejected edge's horizon adds none: a synthetic rejected edge with a horizon no open edge
+    # holds (the shipped closed edges' horizons drift into open ones as edges are filed)
+    real = outcomes_task.load_edges(FileConfigStore(REPO_ROOT / "config", local=False))
+    closed = replace(
+        real[0],
+        status="rejected",
+        outcome=replace(real[0].outcome, horizon_sessions=(987,)),
+        variants=(),
+    )
+    monkeypatch.setattr(outcomes_task, "load_edges", lambda _configs: [*real, closed])
+    assert 987 not in horizons_and_benchmarks()[0]
 
 
 def test_horizons_include_study_horizon() -> None:

@@ -964,6 +964,20 @@ follow-up PR).
 - decided by: orchestrator (design call)
 - status: pending owner confirmation
 - Reasoning: TF-IDF weights depend on the corpus the night holds, so a value could change with no text changing; raw counts and a pinned tokeniser make it reproducible. The floors keep a short or missing section from reading as "unchanged". Architect design of 2026-10-18.
+## 2026-10-18 | EB E5 (batch Y, macro allocation documents) | The gate reads the carrier fund, the macro legs are separate trials, two fields stay undrafted
+- Question: how are the volatility-product, curve, credit, CAPE and carry documents filed on the merged bridge, canary gate and vol_target without implying the full source rule?
+- Options: a VX column on each volatility fund (a map change and a version bump) / a canary on SPY, the carrier; a macro screener inside the existing ensemble / its own trial; the two new expression features in the Describe-it index / kept out like the bridge group.
+- Decision: `vix_roll_yield` holds SVXY only (UVXY and VIXY named and not held, VXX not covered) under a canary on SPY's `vx_basis` (variant `curve_roll`: `vx_roll`), no `oos_class` (one rule, no lookback grid); the macro legs (`credit_spread_below_ma200`, `country_cape_cheapest`, `fx_carry_positive`) are screeners of the existing edges outside their ensembles, so each is one more trial; `bond_curve_timing` ensembles the two slopes; `trend_carry_value_combo` is the ten-country trend plus CAPE slice, carry skipped (no curve history); `vol_managed_equity` is SPY at `vol_target = 0.10`; VAA and DAA are variants of `absolute_momentum_crash_filter` on a 13612W expression feature; `feature.credit_spread_vs_ma200` and `feature.momentum_13612w` join `UNDRAFTED_FIELDS` (two index lines tip the slice margin).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the carrier fund already holds the VX signal and a map change rewrites a stored group; a grid pre-registered as one ensemble must not absorb a different kind of signal; the bridge group's reason to stay out of the drafting prompt applies to its two derived fields.
+## 2026-10-18 | Harness learnings (seven, EB batch) | Brief checklist, live-store authorizations, edge checklist, base fitness test, load guard
+- Question: which of the seven learnings from the EB batch become harness changes?
+- Options: add each in its most specific home / skip.
+- Decision: approved ("approved all 7", relayed by the orchestrating session): worktree path in every brief and `no-automerge` by default for implementers (agent definition + review-and-release); the edge-document checklist (add-screener) and a fitness test `tests/unit/config/site/test_edge_base.py` for the base/picks tautology; live-store authorizations must be the owner's own words in the acting session (review-and-release); `scripts/ops/xdist_workers.py` caps xdist workers to 2 above a load of 12. The auto-merge nudge was already on main (#688).
+- decided by: proposed by orchestrator; awaiting owner
+- status: pending owner confirmation
+- Reasoning: each cost real time in the EB batch (a lost first hour per agent batch, PRs opened without `no-automerge`, eight reviews repeating the same findings, blocked relayed authorizations, runs slowed by load 13+).
 ## 2026-10-18 | EB H14 batch X (reverse_split_distress_filter) | The short is charged an assumed borrow of 2000 bps a year, not the site's 100
 - Question: what borrow does the short side of the reverse-split avoid list pay, when the document itself puts the real borrow at 20 to 100 percent a year?
 - Options: (a) keep the site default of 100 bps and note it / (b) a per-edge `borrow_bps_annual = 2000` / (c) an evidence-only short with no verdict basis.
