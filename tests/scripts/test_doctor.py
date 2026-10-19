@@ -119,6 +119,14 @@ def test_ibkr_port_is_info_either_way(tmp_path: Path) -> None:
     assert doctor.check_ibkr(probes(tmp_path, {}, port_open=lambda h, p: True)).level == doctor.INFO
 
 
+def test_machine_load_is_info_and_names_the_worker_count(tmp_path: Path) -> None:
+    line = "1-minute load 14.0 (limit 12): xdist workers 2"
+    r = doctor.check_load(doctor.Probes(repo=tmp_path, run=lambda cmd, cwd=None: (0, line + "\n")))
+    assert (r.level, r.detail) == (doctor.INFO, line)
+    r = doctor.check_load(doctor.Probes(repo=tmp_path, run=lambda cmd, cwd=None: (1, "")))
+    assert r.level == doctor.INFO and r.detail == "unreadable"
+
+
 def test_store_path_must_exist(tmp_path: Path) -> None:
     missing = doctor.check_store(probes(tmp_path, {}, data_url=lambda: "file://./var/data"))
     assert missing.level == doctor.FAIL and "ALGOTRADE_DATA_URL" in missing.fix
