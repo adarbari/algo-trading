@@ -6,17 +6,13 @@ family = "F"
 id = "lazy_prices_10k_change"
 title = "Year-on-year change in filing text"
 mechanism_kind = "slow_to_update"
-verdict = "strong"
-feasibility = "needs_data"
-why_not_built = "Planned as the first filing-text edge, but filing text is not ingested yet."
+filed_as = "lazy_prices_10k_change"
 
 [[idea]]
 id = "risk_factor_section_change"
 title = "Newly added risk factors in annual filings"
 mechanism_kind = "slow_to_update"
-verdict = "promising"
-feasibility = "needs_data"
-why_not_built = "A refinement of the filing-text edge; it waits for filing text ingestion and section parsing."
+filed_as = "risk_factor_change"
 
 [[idea]]
 id = "tnic_text_peer_momentum"

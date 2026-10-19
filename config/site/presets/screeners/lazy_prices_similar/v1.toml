@@ -1,0 +1,51 @@
+# Filings that changed little (ADR 0053, EB F PR2; edge lazy_prices_10k_change): a common stock trading at least $1M a day, ranked by the
+# cosine of the word counts of its latest 10-K or 10-Q against last year's (text_sim_cosine), the most
+# similar first. A name with no stored prior filing, too little comparable text or no filing in
+# the carry window has no value and never passes (ADR 0030): it is not read as unchanged. The
+# edge's universe also gates on status OK. What it does not check: whether the change is news the
+# market priced at once (an acquisition, a restatement), or whether the text is boilerplate.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "lazy_prices_similar"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Filings that changed little"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "COMMON_STOCK"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 1_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.similarity]
+field = "rollup.filing_text_similarity@v1.text_sim_cosine"
+op = "gte"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+text_sim_cosine = "rollup.filing_text_similarity@v1.text_sim_cosine"
+text_sim_jaccard = "rollup.filing_text_similarity@v1.text_sim_jaccard"
+text_sim_status = "rollup.filing_text_similarity@v1.text_sim_status"
+text_sim_form = "rollup.filing_text_similarity@v1.text_sim_form"
+
+[rank]
+tie_break = "rollup.filing_text_similarity@v1.text_sim_cosine"
+tie_break_order = "desc"

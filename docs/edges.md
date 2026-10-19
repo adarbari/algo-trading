@@ -65,6 +65,8 @@ Each edge's full section is on its family page (docs/edges/).
 | Buying SPY after a VIX spike (`vix_mean_reversion_entry`) | candidate | [family E](edges/e.md) |
 | Volatility-targeted equity exposure (`vol_managed_equity`) | candidate | [family E](edges/e.md) |
 | Composite mispricing score (`composite_mispricing_score`) | candidate | [family F](edges/f.md) |
+| Lazy Prices: filings that change little (`lazy_prices_10k_change`) | candidate | [family F](edges/f.md) |
+| Risk factors that did not change (`risk_factor_change`) | candidate | [family F](edges/f.md) |
 | Above the earnings-anchored VWAP (capital-gains overhang proxy) (`anchored_vwap_reversion_retest`) | candidate | [family G](edges/g.md) |
 | Reversal into earnings (`earnings_neutral_reversal`) | candidate | [family G](edges/g.md) |
 | Index ETF weak-close reversal (`ibs_etf_mean_reversion`) | candidate | [family G](edges/g.md) |
