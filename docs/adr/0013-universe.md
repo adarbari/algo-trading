@@ -28,7 +28,9 @@ US universe, without survivorship bias.
   bars are Massive's). Cost: about +330 universe rows a session, about +3% storage.
 - The first universe snapshot with CEFs is the first build after this change. Earlier sessions
   keep the old snapshot; before it, the listing history reads a delisted CEF as an ETF, so a
-  rule `security_type eq CEF` is survivors only there (ADR 0053 `today_flag`).
+  rule `security_type eq CEF` is survivors only there (ADR 0053 `today_flag`), and about 37
+  live CEFs listed as Stock on NYSE are missing too; sessions 2026-10-02 to 2026-10-17 have no CEF
+  universe or outcome rows until the backfills run.
 
 ## Consequences
 - About 10k+ instruments for bars and about 4.2k optionable underlyings, so storage is

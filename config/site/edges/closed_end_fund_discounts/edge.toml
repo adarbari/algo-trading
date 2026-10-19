@@ -25,7 +25,7 @@ frozen_from = 2026-04-01
 notes = """THE UNIVERSE IS SURVIVORS ONLY BEFORE 2026-10-02. Closed-end funds joined the covered universe on 2026-10-18
 (ADR 0013 amendment) and the universe snapshot has them only from then; before it the harness builds the
 population from the listing history, where a delisted fund reads as an ETF (the vendor listing types 291 of the
-funds as ETF) and the rule security_type eq CEF keeps only the survivors, so a fund that was liquidated, merged
+funds as ETF; about 37 live funds listed as Stock on NYSE are missing too, 293 of 330 CEF ids have outcomes at 2026-09-30, and sessions 2026-10-02 to 2026-10-17 have no CEF universe or outcome rows until backfilled) and the rule security_type eq CEF keeps only the survivors, so a fund that was liquidated, merged
 or open-ended after a wide discount is missing from the earlier sessions: the history carries the today_flag tilt
 (ADR 0053 amendment, historical.py) and flatters a discount strategy. The NAV is known from the next session
 (known_from), and the discount pairs it with the close of its own date; around a split the NAV is put in the
@@ -47,7 +47,7 @@ all = [
   { field = "instrument.status", op = "eq", value = "ACTIVE" },
   { field = "rollup.price_stats@v2.close", op = "gt", value = 3 },
   { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 500_000 },
-  { field = "rollup.cef_nav@v1.cef_discount_zscore", op = "gte", value = -10 },
+  { field = "rollup.cef_nav@v1.cef_discount_zscore", op = "gte", value = -20 },  # the z-score is bounded near -(n-1)/sqrt(n), about -15.8 at n=252; -20 never drops a pick
 ]
 
 [outcome]
