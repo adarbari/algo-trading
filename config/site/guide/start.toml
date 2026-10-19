@@ -330,6 +330,7 @@ links = [
   { kind = "term", id = "not_a_return" },
   { kind = "term", id = "edge_definition" },
   { kind = "term", id = "edge_persistence" },
+  { kind = "mechanism", id = "slow_to_update" },
 ]
 
 [[page.section]]
