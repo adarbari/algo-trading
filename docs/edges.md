@@ -30,11 +30,11 @@ Each edge's full section is on its family page (docs/edges/).
 | Earnings gap on heavy volume (`earnings_gap_volume_drift`) | candidate | [family B](edges/b.md) |
 | Adverse 8-K item drift (`eight_k_item_drift`) | candidate | [family B](edges/b.md) |
 | Opportunistic insider cluster buys (`insider_opportunistic_cluster_buys`) | candidate | [family B](edges/b.md) |
+| IPO lock-up expiry (avoid list) (`ipo_lockup_expiry`) | candidate | [family B](edges/b.md) |
 | Late filers (NT 10-K and NT 10-Q) (`late_filer_nt_drift`) | candidate | [family B](edges/b.md) |
 | Pre-earnings run-up in past winners (`pre_earnings_runup_winners`) | candidate | [family B](edges/b.md) |
 | S&P 500 deletions rebound (`sp500_deletions_long`) | candidate | [family B](edges/b.md) |
 | Analyst target-price implied return (`target_price_implied_return`) | candidate | [family B](edges/b.md) |
-| IPO lock-up expiry (avoid list) (`ipo_lockup_expiry`) | blocked | [family B](edges/b.md) |
 | Spin-off drift (`spinoff_drift`) | blocked | [family B](edges/b.md) |
 | Option-to-stock volume ratio (`c04_option_stock_volume_ratio`) | candidate | [family C](edges/c.md) |
 | Per-name volatility premium, ranked (`c12_vrp_cross_section_iv_hv`) | candidate | [family C](edges/c.md) |
