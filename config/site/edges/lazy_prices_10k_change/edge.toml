@@ -1,0 +1,106 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: lazy_prices_similar (EB F PR2;
+# filing_text_similarity@v1, from filing_text_change@v1).
+id = "lazy_prices_10k_change"
+name = "Lazy Prices: filings that change little"
+family = "F"
+thesis = "Companies whose latest 10-K or 10-Q reads almost the same as last year's outperform those that rewrote it, because investors react slowly to what a changed report says."
+mechanism = """A rewritten annual or quarterly report carries news about the firm, mostly bad (new
+risks, new wording on operations), yet investors read the filings of the year before, not the
+change, so the price adjusts over the following months; a firm that repeats its text last year
+carries no such news (Cohen, Malloy and Nguyen 2020; Brown and Tucker 2011)."""
+persistence = """The change is a few lines buried in a long document that few readers compare with
+last year's, and the comparison needs the filing text of every firm stored and parsed, which a
+retail screen does not do. The paper's sample ends in 2014 and the signal is public knowledge since
+2018, so persistence is a claim to test."""
+schedule = "month_end"
+top_k = 100
+base = "universe"
+screeners = ["lazy_prices_similar"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+mechanism_kind = "slow_to_update"
+frozen_from = 2026-04-01
+notes = """UNMEASURED until the filing text is stored for enough years (the D10 backfill) and the
+filing_text_similarity@v1 history is rolled up: before that no name has a value, and a name
+without one never enters the picks or the base. The measure is the cosine of raw word counts of
+the latest 10-K or 10-Q against the filing of the same period a year earlier, over Items 1, 1A, 3
+and 7 (10-K) and I-2 and II-1A (10-Q), carried for 150 days; the paper's four measures
+(cosine, Jaccard, minimum edit distance, simple) are reduced to the cosine and the Jaccard share is
+stored beside it. A filing counts from known_from, the first session whose close follows SEC's
+acceptance, never the filing date; a name whose year-ago filing is not stored (status NO_PRIOR) or
+whose text is too short to compare (NOT_COMPARABLE) has no value and is dropped, never read as
+unchanged. The universe is common stocks above 5 dollars trading 1M dollars a day with a comparable
+filing (text_sim_status = OK), so the base is 'any firm with a comparable report' and the control is
+honest: do the least-changed beat the typical filer. The picks are the 100 with the highest cosine
+(the paper's non-changers); the short_changers variant holds the 100 lowest (the paper's
+changers) and long_short is their spread, a diagnostic. The paper's 188 bp a month is a
+long-short alpha of non-changers against changers, so no [published] figure. Delisted firms are
+not covered, which flatters the changers; a note, not a fix. Month-end start sessions spaced at
+least 20 sessions apart."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 1_000_000 },
+  { field = "rollup.filing_text_similarity@v1.text_sim_status", op = "eq", value = "OK" },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 20
+
+[[variants]]
+id = "short_changers"
+
+[variants.outcome]
+side = "short"
+
+[[variants]]
+id = "long_short"
+
+[variants.outcome]
+side = "long_short"
+
+[quality_bar]
+outcome = """Excess return over SPY over 20 and 60 sessions after the entry close (the session after a
+month-end decision), net of 20 bps a round trip; the short_changers variant is the short's value,
+less cost and borrow; long_short is the spread of the top 100 minus the bottom 100, a diagnostic."""
+trigger_timing = """The text similarity is read at D, the month-end decision session, from filings
+whose known_from is on or before D: a filing accepted after the close of D counts from D + 1. The
+entry session is S = D + 1 (start_offset_sessions = 1). The comparison filing is the same base
+form dated 330 to 400 days earlier, public long before."""
+replication = """Cohen, Malloy and Nguyen: each month, the quintile of firms whose 10-K or 10-Q
+changed least against the year before (non-changers) against the quintile that changed most,
+four similarity measures, long the non-changers, short the changers, 1995-2014. Here one measure
+(cosine of word counts, Jaccard stored beside it), the 100 most similar of the liquid common stocks
+and, as variants, the 100 least similar and the spread; value weighting and the paper's
+Fama-French alpha are not replicated."""
+expected_size = """The paper reports up to 188 bp a month of long-short alpha for non-changers
+against changers, 1995-2014, strongest in 10-K filings and with the largest effect from changes in
+the risk factors and legal sections (Cohen, Malloy and Nguyen 2020). With one measure, 100 liquid
+names and a post-2018 public signal, expect much less; the harness reports t and the sessions."""
+capacity_costs = """The long book is liquid common stocks above the floor, the short book needs borrow
+and the changers are often distressed or hard to borrow. The outcome deducts 20 bps a round trip;
+the short_changers variant adds the site's borrow assumption."""
+failure_modes = """A change in wording that follows an acquisition, an IPO or a restatement is real
+news priced fast, not a lazy reaction; a filing that is a clone of last year's is common among
+small, stable firms, so the long book tilts to size and low volatility. Retire if the frozen-period
+excess return of the picks is not above the base rate of every comparable filer, or the decile
+spread is not above zero."""
+decoys = """Size, low volatility and 12-1 momentum (stable firms repeat their text): the size and
+momentum baselines on the same sessions. Whether the non-changers beat a plain low-turnover,
+stable-firm tilt is the real question."""
+
+[[sources]]
+title = "Cohen, L., Malloy, C. and Nguyen, Q., Lazy Prices, Journal of Finance, 2020"
+url = "https://www.nber.org/papers/w25084"
+
+[[sources]]
+title = "Brown, S. V. and Tucker, J. W., Large-Sample Evidence on Firms' Year-over-Year MD&A Modifications, Journal of Accounting Research, 2011"
+url = "https://doi.org/10.1111/j.1475-679X.2010.00396.x"

@@ -1,0 +1,27 @@
+# L3 site setting: the Guide's playbook for the site preset lazy_prices_similar (ADR 0051; docs/ui/guide.md
+# "The playbook page"). Keys as in insider_cluster_buys.toml; typed by src/algotrade/config/site/guide/playbooks.py.
+id = "lazy_prices_similar"
+version = 1  # the preset version this prose was written for
+summary = "Finds liquid stocks whose latest 10-K or 10-Q reads almost the same as the one a year earlier. Research finds that firms which rewrite their reports do worse; this is a candidate edge under test, not a proven trade."
+hit = "The name is a common stock closing above $5 that trades at least $1M a day, with a 10-K or 10-Q that became public in the last 150 days and a stored report from a year earlier to compare with. The most similar text ranks first."
+not_checked = "It does not read what changed, only how much. A rewrite after a deal or a restatement is news the market prices at once, and a report that repeats last year's may simply be boilerplate."
+before_acting = [
+  "A name with no stored report from a year earlier, or too little text to compare, has no value and is left out; it is never read as unchanged.",
+  "Stable small firms repeat their text, so the list leans to size and low volatility: read rollup.trend_stats@v2.mom_12_1 beside it.",
+  "A report counts from the session after the SEC accepted it, not from the date on its cover.",
+]
+sources = [
+  "Cohen, Malloy and Nguyen, Lazy Prices (2020)",
+  "Brown and Tucker, Year-over-Year MD&A Modifications (2011)",
+]
+related = [
+  { id = "risk_factor_unchanged", reason = "the same idea on the risk-factor section only" },
+  { id = "size_small", reason = "the size baseline the edge is compared with" },
+]
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $1M a day"
+similarity = "Has a similarity value, the most similar first"

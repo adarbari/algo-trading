@@ -6,6 +6,8 @@ Back to the [index of every edge](../edges.md).
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
 | Composite mispricing score (`composite_mispricing_score`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `mispricing_composite` |
+| Lazy Prices: filings that change little (`lazy_prices_10k_change`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps | `lazy_prices_similar` |
+| Risk factors that did not change (`risk_factor_change`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps | `risk_factor_unchanged` |
 
 ## Composite mispricing score (`composite_mispricing_score`)
 
@@ -38,3 +40,63 @@ Back to the [index of every edge](../edges.md).
 - Stambaugh, R., Yu, J. and Yuan, Y., Arbitrage Asymmetry and the Idiosyncratic Volatility Puzzle, Journal of Finance, 2015 <https://www.nber.org/papers/w18560>
 - Jensen, T. I., Kelly, B. and Pedersen, L. H., Is There a Replication Crisis in Finance?, Journal of Finance, 2023 <https://www.nber.org/papers/w28432>
 - Novy-Marx, R. and Velikov, M., A Taxonomy of Anomalies and Their Trading Costs, Review of Financial Studies, 2016 <https://www.nber.org/papers/w20721>
+
+## Lazy Prices: filings that change little (`lazy_prices_10k_change`)
+
+**Status:** candidate. **Family:** F. **Thesis:** Companies whose latest 10-K or 10-Q reads almost the same as last year's outperform those that rewrote it, because investors react slowly to what a changed report says.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 1000000` and `rollup.filing_text_similarity@v1.text_sim_status eq 'OK'`
+- **Top K:** 100
+- **Screeners:** `lazy_prices_similar`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** UNMEASURED until the filing text is stored for enough years (the D10 backfill) and the filing_text_similarity@v1 history is rolled up: before that no name has a value, and a name without one never enters the picks or the base. The measure is the cosine of raw word counts of the latest 10-K or 10-Q against the filing of the same period a year earlier, over Items 1, 1A, 3 and 7 (10-K) and I-2 and II-1A (10-Q), carried for 150 days; the paper's four measures (cosine, Jaccard, minimum edit distance, simple) are reduced to the cosine and the Jaccard share is stored beside it. A filing counts from known_from, the first session whose close follows SEC's acceptance, never the filing date; a name whose year-ago filing is not stored (status NO_PRIOR) or whose text is too short to compare (NOT_COMPARABLE) has no value and is dropped, never read as unchanged. The universe is common stocks above 5 dollars trading 1M dollars a day with a comparable filing (text_sim_status = OK), so the base is 'any firm with a comparable report' and the control is honest: do the least-changed beat the typical filer. The picks are the 100 with the highest cosine (the paper's non-changers); the short_changers variant holds the 100 lowest (the paper's changers) and long_short is their spread, a diagnostic. The paper's 188 bp a month is a long-short alpha of non-changers against changers, so no [published] figure. Delisted firms are not covered, which flatters the changers; a note, not a fix. Month-end start sessions spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** A rewritten annual or quarterly report carries news about the firm, mostly bad (new risks, new wording on operations), yet investors read the filings of the year before, not the change, so the price adjusts over the following months; a firm that repeats its text last year carries no such news (Cohen, Malloy and Nguyen 2020; Brown and Tucker 2011).
+2. **Persistence:** The change is a few lines buried in a long document that few readers compare with last year's, and the comparison needs the filing text of every firm stored and parsed, which a retail screen does not do. The paper's sample ends in 2014 and the signal is public knowledge since 2018, so persistence is a claim to test.
+3. **Outcome:** Excess return over SPY over 20 and 60 sessions after the entry close (the session after a month-end decision), net of 20 bps a round trip; the short_changers variant is the short's value, less cost and borrow; long_short is the spread of the top 100 minus the bottom 100, a diagnostic.
+4. **Trigger timing:** The text similarity is read at D, the month-end decision session, from filings whose known_from is on or before D: a filing accepted after the close of D counts from D + 1. The entry session is S = D + 1 (start_offset_sessions = 1). The comparison filing is the same base form dated 330 to 400 days earlier, public long before.
+5. **Faithful replication:** Cohen, Malloy and Nguyen: each month, the quintile of firms whose 10-K or 10-Q changed least against the year before (non-changers) against the quintile that changed most, four similarity measures, long the non-changers, short the changers, 1995-2014. Here one measure (cosine of word counts, Jaccard stored beside it), the 100 most similar of the liquid common stocks and, as variants, the 100 least similar and the spread; value weighting and the paper's Fama-French alpha are not replicated.
+6. **Expected size and sample:** The paper reports up to 188 bp a month of long-short alpha for non-changers against changers, 1995-2014, strongest in 10-K filings and with the largest effect from changes in the risk factors and legal sections (Cohen, Malloy and Nguyen 2020). With one measure, 100 liquid names and a post-2018 public signal, expect much less; the harness reports t and the sessions.
+7. **Capacity and costs:** The long book is liquid common stocks above the floor, the short book needs borrow and the changers are often distressed or hard to borrow. The outcome deducts 20 bps a round trip; the short_changers variant adds the site's borrow assumption.
+8. **Failure modes and retirement:** A change in wording that follows an acquisition, an IPO or a restatement is real news priced fast, not a lazy reaction; a filing that is a clone of last year's is common among small, stable firms, so the long book tilts to size and low volatility. Retire if the frozen-period excess return of the picks is not above the base rate of every comparable filer, or the decile spread is not above zero.
+9. **Decoys:** Size, low volatility and 12-1 momentum (stable firms repeat their text): the size and momentum baselines on the same sessions. Whether the non-changers beat a plain low-turnover, stable-firm tilt is the real question.
+
+**Sources**
+
+- Cohen, L., Malloy, C. and Nguyen, Q., Lazy Prices, Journal of Finance, 2020 <https://www.nber.org/papers/w25084>
+- Brown, S. V. and Tucker, J. W., Large-Sample Evidence on Firms' Year-over-Year MD&A Modifications, Journal of Accounting Research, 2011 <https://doi.org/10.1111/j.1475-679X.2010.00396.x>
+
+## Risk factors that did not change (`risk_factor_change`)
+
+**Status:** candidate. **Family:** F. **Thesis:** Companies whose 10-K risk factors read almost the same as last year's outperform those that rewrote them, because investors are slow to price what a changed risk section says.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 20 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 1000000` and `rollup.filing_text_similarity@v1.risk_factor_status eq 'OK'`
+- **Top K:** 100
+- **Screeners:** `risk_factor_unchanged`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** UNMEASURED until the filing text is stored for enough years (the D10 backfill) and the filing_text_similarity@v1 history is rolled up. A separate edge from lazy_prices_10k_change: it uses only the 10-K Item 1A (from fiscal 2005), carried 400 days from the session the 10-K became known (known_from, the first session whose close follows SEC's acceptance), against the 10-K of the year before. The measure is the cosine of word counts (risk_factor_sim_cosine); the change in length (risk_factor_len_change) is stored beside it. A 10-K with no stored prior year, or with an Item 1A missing or short in either year, has status NO_PRIOR or NOT_COMPARABLE and no value: it is dropped, never read as unchanged. The universe is common stocks above 5 dollars trading 1M dollars a day with a comparable risk section (risk_factor_status = OK), so the control is: do the unchanged beat the typical 10-K filer. The picks are the 100 with the highest cosine; the short_rewriters variant holds the 100 lowest and long_short is their spread, a diagnostic. Item 1A was required from fiscal 2005, so history is shorter than the full filing text. Delisted firms are not covered. Month-end start sessions spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** New or reworded risk factors are the firm's own early statement of what worries it, written under legal pressure, and the paper finds they move the price and the firm's risk; but investors read the section once, not against last year's, so the news is priced late (Campbell and others 2014; Cohen, Malloy and Nguyen 2020 find the risk-factor change is where the Lazy Prices effect is concentrated).
+2. **Persistence:** Item 1A runs to dozens of pages and the comparison needs two years of parsed text for every firm, which a retail screen does not do; boilerplate and lengthening over time add noise that a naive comparison reads as news. The samples end in 2014 and 2008; persistence is a claim to test.
+3. **Outcome:** Excess return over SPY over 20 and 60 sessions after the entry close (the session after a month-end decision), net of 20 bps a round trip; the short_rewriters variant is the short's value, less cost and borrow; long_short is the spread of the top 100 minus the bottom 100, a diagnostic.
+4. **Trigger timing:** The risk-factor similarity is read at D, the month-end decision session, from 10-K filings whose known_from is on or before D: a 10-K accepted after the close of D counts from D + 1. The entry session is S = D + 1 (start_offset_sessions = 1). The prior-year 10-K is dated 330 to 400 days before and was public long before.
+5. **Faithful replication:** Cohen, Malloy and Nguyen compare the year-over-year change of each filing section and find the largest effect in Item 1A; Campbell and others measure the information in the risk factor section. Here the cosine of word counts of Item 1A against the prior 10-K, the 100 most similar of the liquid common stocks, and as variants the 100 least similar and the spread; the papers' own portfolios, risk classifications and alphas are not replicated.
+6. **Expected size and sample:** No figure for the risk-factor section alone is on file here; the Lazy Prices long-short alpha is up to 188 bp a month over all sections, 1995-2014 (Cohen, Malloy and Nguyen 2020). A single section, annual only, so about twelve month-ends see a fresh filing each year per name: expect a smaller and noisier effect; the harness reports t and the sessions.
+7. **Capacity and costs:** Liquid common stocks above the floor; the short book needs borrow and the rewriters include distressed firms. The outcome deducts 20 bps a round trip; the short variant adds the site's borrow assumption.
+8. **Failure modes and retirement:** Risk sections lengthen every year and legal departments reuse text, so a rewrite can be style and not news; a rewrite after an event the market priced at once is not lazy. Retire if the frozen-period excess return of the picks is not above the base rate of every comparable 10-K filer, or the decile spread is not above zero.
+9. **Decoys:** Size, low volatility and 12-1 momentum (stable firms repeat their text) and lazy_prices_10k_change, which holds the same filings: the size and momentum baselines on the same sessions; the real question is whether the risk section adds anything to the whole-filing measure.
+
+**Sources**
+
+- Cohen, L., Malloy, C. and Nguyen, Q., Lazy Prices, Journal of Finance, 2020 <https://www.nber.org/papers/w25084>
+- Campbell, J. L., Chen, H., Dhaliwal, D. S., Lu, H. and Steele, L. B., The information content of mandatory risk factor disclosures in corporate filings, Review of Accounting Studies, 2014 <https://doi.org/10.1007/s11142-014-9298-z>

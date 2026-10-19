@@ -1,0 +1,101 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: risk_factor_unchanged (EB F PR2;
+# filing_text_similarity@v1, from filing_text_change@v1).
+id = "risk_factor_change"
+name = "Risk factors that did not change"
+family = "F"
+thesis = "Companies whose 10-K risk factors read almost the same as last year's outperform those that rewrote them, because investors are slow to price what a changed risk section says."
+mechanism = """New or reworded risk factors are the firm's own early statement of what worries it,
+written under legal pressure, and the paper finds they move the price and the firm's risk; but
+investors read the section once, not against last year's, so the news is priced late (Campbell and
+others 2014; Cohen, Malloy and Nguyen 2020 find the risk-factor change is where the Lazy Prices
+effect is concentrated)."""
+persistence = """Item 1A runs to dozens of pages and the comparison needs two years of parsed text for
+every firm, which a retail screen does not do; boilerplate and lengthening over time add noise
+that a naive comparison reads as news. The samples end in 2014 and 2008; persistence is a claim
+to test."""
+schedule = "month_end"
+top_k = 100
+base = "universe"
+screeners = ["risk_factor_unchanged"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+mechanism_kind = "slow_to_update"
+frozen_from = 2026-04-01
+notes = """UNMEASURED until the filing text is stored for enough years (the D10 backfill) and the
+filing_text_similarity@v1 history is rolled up. A separate edge from lazy_prices_10k_change: it
+uses only the 10-K Item 1A (from fiscal 2005), carried 400 days from the session the 10-K became
+known (known_from, the first session whose close follows SEC's acceptance), against the 10-K of
+the year before. The measure is the cosine of word counts (risk_factor_sim_cosine); the change in
+length (risk_factor_len_change) is stored beside it. A 10-K with no stored prior year, or with an
+Item 1A missing or short in either year, has status NO_PRIOR or NOT_COMPARABLE and no value: it is
+dropped, never read as unchanged. The universe is common stocks above 5 dollars trading 1M dollars
+a day with a comparable risk section (risk_factor_status = OK), so the control is: do the
+unchanged beat the typical 10-K filer. The picks are the 100 with the highest cosine; the
+short_rewriters variant holds the 100 lowest and long_short is their spread, a diagnostic. Item 1A
+was required from fiscal 2005, so history is shorter than the full filing text. Delisted firms are
+not covered. Month-end start sessions spaced at least 20 sessions apart."""
+
+[universe.where]
+all = [
+  { field = "instrument.security_type", op = "eq", value = "COMMON_STOCK" },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "rollup.price_stats@v2.close", op = "gt", value = 5 },
+  { field = "rollup.price_stats@v2.adv_usd_20d", op = "gte", value = 1_000_000 },
+  { field = "rollup.filing_text_similarity@v1.risk_factor_status", op = "eq", value = "OK" },
+]
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20, 60]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 20
+
+[[variants]]
+id = "short_rewriters"
+
+[variants.outcome]
+side = "short"
+
+[[variants]]
+id = "long_short"
+
+[variants.outcome]
+side = "long_short"
+
+[quality_bar]
+outcome = """Excess return over SPY over 20 and 60 sessions after the entry close (the session after a
+month-end decision), net of 20 bps a round trip; the short_rewriters variant is the short's value,
+less cost and borrow; long_short is the spread of the top 100 minus the bottom 100, a diagnostic."""
+trigger_timing = """The risk-factor similarity is read at D, the month-end decision session, from 10-K
+filings whose known_from is on or before D: a 10-K accepted after the close of D counts from D + 1.
+The entry session is S = D + 1 (start_offset_sessions = 1). The prior-year 10-K is dated 330 to
+400 days before and was public long before."""
+replication = """Cohen, Malloy and Nguyen compare the year-over-year change of each filing section
+and find the largest effect in Item 1A; Campbell and others measure the information in the risk
+factor section. Here the cosine of word counts of Item 1A against the prior 10-K, the 100 most
+similar of the liquid common stocks, and as variants the 100 least similar and the spread; the
+papers' own portfolios, risk classifications and alphas are not replicated."""
+expected_size = """No figure for the risk-factor section alone is on file here; the Lazy Prices
+long-short alpha is up to 188 bp a month over all sections, 1995-2014 (Cohen, Malloy and Nguyen
+2020). A single section, annual only, so about twelve month-ends see a fresh filing each year per
+name: expect a smaller and noisier effect; the harness reports t and the sessions."""
+capacity_costs = """Liquid common stocks above the floor; the short book needs borrow and the
+rewriters include distressed firms. The outcome deducts 20 bps a round trip; the short variant adds
+the site's borrow assumption."""
+failure_modes = """Risk sections lengthen every year and legal departments reuse text, so a rewrite
+can be style and not news; a rewrite after an event the market priced at once is not lazy. Retire
+if the frozen-period excess return of the picks is not above the base rate of every comparable
+10-K filer, or the decile spread is not above zero."""
+decoys = """Size, low volatility and 12-1 momentum (stable firms repeat their text) and
+lazy_prices_10k_change, which holds the same filings: the size and momentum baselines on the same
+sessions; the real question is whether the risk section adds anything to the whole-filing measure."""
+
+[[sources]]
+title = "Cohen, L., Malloy, C. and Nguyen, Q., Lazy Prices, Journal of Finance, 2020"
+url = "https://www.nber.org/papers/w25084"
+
+[[sources]]
+title = "Campbell, J. L., Chen, H., Dhaliwal, D. S., Lu, H. and Steele, L. B., The information content of mandatory risk factor disclosures in corporate filings, Review of Accounting Studies, 2014"
+url = "https://doi.org/10.1007/s11142-014-9298-z"
