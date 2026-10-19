@@ -189,7 +189,7 @@ SCHEDULES = ("every_session", "month_end")
 BASES = ("event", "universe", named.OUT_OF_WINDOW, BENCHMARK_BASE)
 PICKS = ("event", "universe")  # where an event schedule's picks may come from
 MAIN = "main"  # the edge itself, as the key of a results row (a variant has its own id)
-ANNOUNCED_AHEAD = ("earnings_expected",)  # an entry may precede these
+ANNOUNCED_AHEAD = ("earnings_expected", "ipo_lockup")  # an entry may precede these
 # Quality bar answers 3 to 9 (1 and 2 are the document's mechanism and persistence).
 # What a hit_target compares with its target over the window (ED2 stores each as a field).
 MEASURES = ("excess_return", "realised_to_implied_vol")
