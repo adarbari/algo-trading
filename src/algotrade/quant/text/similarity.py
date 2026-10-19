@@ -4,7 +4,8 @@ Jaccard on the word sets.
 Raw term frequency, no weighting by how rare a word is across filings: the weight would depend on
 the corpus the night happens to hold, so a value could change without either text changing. The
 sums are exact integer sums and one square root of an exact product, so the result does not
-depend on insertion order or the platform, and identical texts give exactly 1. Both measures are in
+depend on insertion order or the platform, and identical texts give exactly 1 (checked, as the
+product of large squares can pass 2^53). Both measures are in
 [0, 1]; a text with no words has no similarity (``None``), never zero.
 """
 
@@ -18,6 +19,8 @@ def term_cosine(a: Mapping[str, int], b: Mapping[str, int]) -> float | None:
     square_b = sum(n * n for n in b.values())
     if square_a == 0 or square_b == 0:
         return None
+    if dict(a) == dict(b):
+        return 1.0
     dot = sum(a[k] * b[k] for k in a.keys() & b.keys())
     return min(1.0, max(0.0, dot / math.sqrt(square_a * square_b)))
 

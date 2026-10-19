@@ -40,3 +40,9 @@ def test_the_result_does_not_depend_on_insertion_order() -> None:
 
 def test_merge_counts_sums_per_word() -> None:
     assert merge_counts([{"x": 1, "y": 2}, {"y": 3}, {}]) == {"x": 1, "y": 5}
+
+
+def test_identical_large_counts_give_exactly_one() -> None:
+    """Review of #720: the product of two large squares passes 2^53 and rounds."""
+    counts = {f"w{i}": 3_000_000 + i for i in range(40)}
+    assert term_cosine(counts, dict(counts)) == 1.0

@@ -102,7 +102,7 @@ detect = [{ call = "sliding_window_view" }]
 
 [[responsibility]]
 id = "text-similarity-measures"
-description = "Compare two filing texts from their words: the pinned tokeniser (NFKC, casefold, runs of a-z of two letters or more, digits dropped, written stop list, no stemming) and the term counts, cosine on raw counts and Jaccard on word sets, summed over sorted keys with fsum so a value never depends on order or corpus (no document-frequency weight). Written once in quant/text/; the filing-text groups call it, nothing re-implements a text distance"
+description = "Compare two filing texts from their words: the pinned tokeniser (NFKC, casefold, runs of a-z of two letters or more, digits dropped, written stop list, no stemming) and the term counts, cosine on raw counts and Jaccard on word sets, summed as exact integers so a value never depends on order or corpus (no document-frequency weight). Written once in quant/text/; the filing-text groups call it, nothing re-implements a text distance"
 owner = ["src/algotrade/quant/text/*"]
 allowed = ["src/algotrade/features/rollups/text/comparison.py"]  # the one comparison calls the measures
 section = "docs/data/vendors.md#what-reads-it-filing-text-similarity-eb-f-pr-1"

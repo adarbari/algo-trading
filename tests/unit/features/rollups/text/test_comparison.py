@@ -46,7 +46,7 @@ def filing(
 ) -> list[dict[str, object]]:
     return [
         {"instrument_id": iid, "cik": cik, "form": form, "accession": accession,
-         "report_date": report, "known_from": known, "item": item,
+         "report_date": report, "known_from": known, "accepted_session": known, "item": item,
          "quality": (quality or {}).get(item, "OK"), "text": text}
         for item, text in items.items()
     ]  # fmt: skip
@@ -113,7 +113,8 @@ def test_amendments_are_never_a_comparator_or_a_subject() -> None:
     amended = [dict(r, form="10-Q/A") for r in old]
     [c] = run(frame(ten_q("NEW", REPORT, date(2026, 9, 30)), amended))
     assert c.status == cmp.NO_PRIOR  # the only year-ago filing is an amendment
-    newer_amendment = [dict(r, form="10-Q/A", accession="AMD", known_from=date(2026, 10, 1))
+    newer_amendment = [dict(r, form="10-Q/A", accession="AMD", known_from=date(2026, 10, 1),
+                            accepted_session=date(2026, 10, 1))
                        for r in ten_q("X", REPORT, date(2026, 10, 1))]  # fmt: skip
     got = run(frame(ten_q("NEW", REPORT, date(2026, 9, 30)), old, newer_amendment))
     assert [g.accession for g in got] == ["NEW"]  # the amendment is not the latest subject
@@ -177,3 +178,22 @@ def test_the_constants_are_the_decided_ones() -> None:
     assert (cmp.MIN_ITEM_TOKENS, cmp.MIN_COMPOSITE_TOKENS) == (100, 500)
     assert cmp.WINDOW_DAYS == (330, 400) and cmp.RECENT_SESSIONS == 5
     assert cmp.ITEMS == {"10-K": ("1", "1A", "3", "7"), "10-Q": ("I-2", "II-1A")}
+
+
+def test_a_reparsed_old_filing_never_replaces_the_real_new_filing_as_subject() -> None:
+    """Review of #720: a parser re-run gives an old 10-K a late ``known_from``; the subject is
+    chosen by the acceptance session, so the recent 10-Q stays the subject."""
+    new_q = ten_q("NEWQ", REPORT, date(2026, 9, 28))
+    old_k = [dict(r, form="10-K", accession="OLDK", report_date=REPORT - timedelta(days=240),
+                  known_from=date(2026, 9, 29), accepted_session=date(2026, 2, 20))
+             for r in ten_q("X", REPORT, date(2026, 9, 29))]  # fmt: skip
+    got = run(frame(new_q, old_k))
+    assert [(g.accession, g.known_from) for g in got] == [("NEWQ", date(2026, 9, 28))]
+
+
+def test_the_subject_date_does_not_depend_on_the_order_of_a_filings_item_rows() -> None:
+    rows = ten_q("NEW", REPORT, date(2026, 9, 30))
+    rows[0] = dict(rows[0], known_from=date(2026, 10, 2))  # one item re-parsed later
+    for ordered in (rows, rows[::-1]):
+        [c] = run(frame(ordered))
+        assert c.known_from == date(2026, 9, 30)

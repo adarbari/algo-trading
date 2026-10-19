@@ -108,3 +108,14 @@ def test_the_reader_constants_equal_the_groups() -> None:
     assert set(recent.ITEMS) == {i for items in comparison.ITEMS.values() for i in items}
     assert comparison.OK_QUALITY == reading.OK  # the group's "OK" is the reader's
     assert max(comparison.WINDOW_DAYS) + 60 <= recent.LOOKBACK_DAYS  # a late filer's margin
+
+
+def test_a_reparsed_old_filing_is_not_recent_news() -> None:
+    """Review of #720: a parser re-run stores an old filing with a late ``known_from``; it is not
+    a recent filing, and the rows carry the acceptance session."""
+    old = pd.Timestamp("2026-02-20 15:00", tz="UTC")
+    reparsed = filing("OLDK", "10-K", old, date(2025, 12, 31), known_from=KNOWN)
+    reader = store(reparsed, (("EQ:AAA", "1"),))
+    assert recent.recent_filing_texts(reader, KNOWN) is None
+    view = recent.recent_filing_texts(store(RECENT, (("EQ:AAA", "1"),)), KNOWN)
+    assert view is not None and set(view["accepted_session"]) == {KNOWN, date(2025, 8, 6)}

@@ -13,6 +13,10 @@ Two reads: a scan without text for the companies with a recent filing, then one 
 narrowed to those companies. A recent filing is found from acceptance dates ``SCAN_MARGIN_DAYS``
 before the first recent session on (a filing is known the session after its acceptance); a text
 re-extracted later than that, from an older filing, is not recent news and is not read.
+
+``accepted_session`` is the session each row's filing was accepted into (``acceptance_sessions``
+of ``ts``): the date a filing is recent from. ``known_from`` is only the visibility filter, since
+a parser re-run gives an old filing a new ``known_from`` that must never make it recent news.
 """
 
 from datetime import date, timedelta
@@ -20,6 +24,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from algotrade.core.time.calendar import sessions_ending
+from algotrade.data.events import acceptance_sessions
 from algotrade.data.filing_text.reading import TABLE, filing_text
 from algotrade.storage.tables.readers import StoreReader
 
@@ -42,9 +47,8 @@ def recent_filing_texts(reader: StoreReader, session: date) -> pd.DataFrame | No
     )
     if scan.empty:
         return None
-    recent = scan[
-        scan["instrument_id"].notna() & (pd.to_datetime(scan["known_from"]) >= pd.Timestamp(first))
-    ]
+    accepted = pd.to_datetime(acceptance_sessions(scan["ts"]))
+    recent = scan[scan["instrument_id"].notna() & (accepted >= pd.Timestamp(first))]
     if recent.empty:
         return None
     frame = filing_text(
@@ -52,4 +56,7 @@ def recent_filing_texts(reader: StoreReader, session: date) -> pd.DataFrame | No
         ciks=sorted(set(recent["cik"])),
     )  # fmt: skip
     frame = frame[frame["instrument_id"].notna()]
-    return frame.reset_index(drop=True) if not frame.empty else None
+    if frame.empty:
+        return None
+    frame = frame.assign(accepted_session=acceptance_sessions(frame["ts"]))
+    return frame.reset_index(drop=True)

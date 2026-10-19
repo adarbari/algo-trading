@@ -66,12 +66,21 @@ def _day(value: Any) -> date | None:
 
 
 def _filings(frame: pd.DataFrame) -> pd.DataFrame:
-    """One row per periodic (cik, accession): form, report date and the day it became known."""
+    """One row per periodic (cik, accession): form, report date and ``known_from``, the session
+    the filing was accepted into (``accepted_session``, the earliest over its item rows), never the
+    day a parser re-run re-stored it."""
     rows = frame[frame["form"].isin(PERIODIC)]
-    keep = ["cik", "accession", "form", "report_date", "known_from"]
+    keep = ["cik", "accession", "form", "report_date"]
     out = rows[keep].drop_duplicates(["cik", "accession"]).copy()
+    first: dict[tuple[str, str], date] = {}
+    for cik, accession, value in zip(
+        rows["cik"], rows["accession"], rows["accepted_session"], strict=True
+    ):
+        day = _day(value)
+        if day is not None:
+            first[(cik, accession)] = min(day, first.get((cik, accession), day))
     out["report_date"] = [_day(v) for v in out["report_date"]]
-    out["known_from"] = [_day(v) for v in out["known_from"]]
+    out["known_from"] = [first[(c, a)] for c, a in zip(out["cik"], out["accession"], strict=True)]
     return out.sort_values(["cik", "known_from", "accession"], kind="stable")
 
 
@@ -132,9 +141,9 @@ def _measure(
 
 def compare_filings(frame: pd.DataFrame, recent_from: date, session: date) -> list[Comparison]:
     """The comparison of each company's latest periodic filing known from ``recent_from`` to
-    ``session`` (latest ``known_from``, then accession) with its comparator among the filings of
-    ``frame`` (rows ``cik``, ``form``, ``accession``, ``report_date``, ``known_from``, ``item``,
-    ``quality``, ``text``), one per ``cik``, sorted by ``cik``."""
+    ``session`` (latest acceptance session, then accession) with its comparator among the filings
+    of ``frame`` (rows ``cik``, ``form``, ``accession``, ``report_date``, ``accepted_session``,
+    ``item``, ``quality``, ``text``), one per ``cik``, sorted by ``cik``."""
     filings = _filings(frame)
     subjects = filings[[recent_from <= k <= session for k in filings["known_from"]]]
     subjects = subjects.drop_duplicates("cik", keep="last")
