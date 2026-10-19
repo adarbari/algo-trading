@@ -24,17 +24,21 @@ asset_class = "etfs"
 frozen_from = 2026-04-01
 notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. PROXY: the idea is a spread trend;
 this version uses the funds' own price trend as the stand-in (HYG for high yield, LQD for investment
-grade). LIMITS: (1) the source switches to Treasuries (IEF) when credit weakens; the outcome has no
+grade). MACRO VERSION NOT RUN, DROPPED FOR NOW (EB E5 batch Y): the screener credit_spread_below_ma200
+(each fund's option-adjusted spread below its 200-observation mean, etf_macro@v1) is built and kept as a
+preset, but not listed here: the stored ICE BofA series BAMLH0A0HYM2 and BAMLC0A0CM start on 2023-10-09
+(FRED serves about three years), so with the 160 observations the mean needs the first signal falls in
+mid-2024 and the sample is about 28 month-ends, under the 40 independent sessions a verdict needs, and
+every earlier month would be cash counted against a fully invested benchmark. It returns when a longer
+history is stored. LIMITS: (1) the source switches to Treasuries (IEF) when credit weakens; the outcome has no
 conditional fallback asset, so the slot is cash at the Treasury bill yield and the IEF leg is not
-built. (2) The macro version (the option-adjusted spread series BAMLH0A0HYM2 and BAMLC0A0CM crossing
-its 50 and 200 day average) needs a bridging group that makes a macro series a per-fund field: not
-built, no claim. (3) Price only: the coupon of both funds (the larger part of a credit return) is in
-neither the book nor the benchmark, and the cash leg earns the bill, so a falling-trend period is
-compared with the benchmark's price alone. (4) The book holds each fund at half while its trend is
-up; cost_bps 10 a round trip assumed. The ensemble of 6 and 12 months is ONE trial; the 10-month
-average variant is in absolute_momentum_crash_filter's family and is not repeated. verdict.toml
-[oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and
-the out-of-sample one beside the result, as display only."""
+built. (2) The 50-day crossing and BAA10Y are not built either. (3) Price only: the coupon of both funds
+(the larger part of a credit return) is in neither the book nor the benchmark, and the cash leg earns the
+bill, so a falling-trend period is compared with the benchmark's price alone. (4) The book holds each fund
+at half while its trend is up; cost_bps 10 a round trip assumed. The ensemble of 6 and 12 months is ONE
+trial; the 10-month average variant is in absolute_momentum_crash_filter's family and is not repeated.
+verdict.toml [oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it becomes after the
+haircut and the out-of-sample one beside the result, as display only."""
 
 [ensemble]
 variants = ["trend_positive_6m", "trend_positive_12m"]

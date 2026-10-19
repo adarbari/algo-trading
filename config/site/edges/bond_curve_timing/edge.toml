@@ -1,0 +1,100 @@
+# Edge document (ADR 0053, ADR 0074; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/trend-macro.md (bond_curve_timing).
+# An allocation edge (EB E5 batch Y): a weighted book of ETFs against a blended benchmark of its own list.
+id = "bond_curve_timing"
+name = "Bond duration timing by curve and trend"
+family = "E"
+thesis = "Holding a long Treasury fund only while the yield curve slopes upward and the fund's own 12-month return is positive beats holding both long funds always."
+mechanism = """Term premia move with inflation uncertainty and supply, investors anchor on the level of yields, and the
+Fed reacts slowly; bond mandates are fixed to a benchmark duration, so few can act on carry and
+trend together (Ilmanen, Expected Returns, 2011)."""
+persistence = """Timing on the slope alone has repeatedly failed out of sample (Thornton and Valente 2012), so the
+rule asks for trend as well; the survivor is the pair, which few bond mandates are allowed to run.
+The 1982 to 2020 fall in yields lifted every duration rule, so persistence is a claim to test."""
+schedule = "month_end"
+top_k = 2
+screeners = [
+  "bond_curve_trend_3m", "bond_curve_trend_2y",
+]
+base = "benchmark"
+oos_class = "trend"
+status = "candidate"
+mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. LIMITS, so nothing implies the full
+source rule: (1) the source's carry is the curve slope plus the roll-down (the yield change from rolling
+down the curve); only the slope is stored, as the 10-year minus 3-month and 10-year minus 2-year
+Treasury spreads (etf_macro@v1, t10y3m and t10y2y: each is one screener, the pair is ONE ensemble
+trial). The roll-down is not built, and no claim is made that the book is the source's carry plus
+trend. (2) The slope is a national series and both funds read the same value, so the choice between
+TLT and IEF is made by each fund's own 12-month return alone, and a flat curve turns both off
+together. (3) The source shortens duration in a flat curve (TLT against SHY); SHY carries no slope
+column and would never pass, so a switched-off slot is cash at the Treasury bill yield and the
+short-duration leg is not built. (4) The slope-only rule is not run as a separate trial: the source
+and its critics find it dead. (5) Price only: the stored forward return carries no coupon, so the book
+and the benchmark both miss their yield, which is most of a bond return, and cash earns the bill.
+(6) The benchmark is the equal two-fund mix, always held, so the book trails it by design when the
+curve stays steep and duration pays; the informative figures are the drawdowns in the run record.
+(7) Both funds have bars from the store's start on 2010-01-04 and the Treasury slope series are
+daily with a one-day lag, so the sample is the store's, one long bond bull market with the 2022
+loss in it. cost_bps 6 a round trip assumed. verdict.toml [oos_haircut] trend = 0.45 prints the
+in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one beside the
+result, as display only. No [published] figure: the source's R-squared and Sharpe ratios are not
+what the harness measures (a picks-series t, with no lift for a portfolio book)."""
+
+[ensemble]
+variants = ["bond_curve_trend_3m", "bond_curve_trend_2y"]
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["TLT", "IEF"] },
+]
+
+[outcome]
+kind = "portfolio_return"
+horizon_sessions = [21]
+benchmark = "mix:TLT=0.5,IEF=0.5"
+start_offset_sessions = 1
+cost_bps = 6
+weighting = "equal"
+
+[quality_bar]
+outcome = """The book's return over the 21 sessions from the close after each month end, less half TLT and half IEF
+over the same sessions, net of cost on the weight change; a fund that fails the curve or the trend
+test is held as cash. Price only: the stored forward return is close to close and carries no coupon, so
+the book and the benchmark both miss their yield and cash earns the Treasury bill."""
+trigger_timing = """The curve slope (a macro value known by the session) and the 252-session return are read at the
+month-end close D; the book is held from the next session's close S for 21 sessions. Nothing after D
+enters a pick."""
+replication = """Ilmanen (Expected Returns, ch. 9): monthly, overweight duration when the slope plus the roll-down is
+above 0 and the 12-month bond excess return is above 0. Here: TLT and IEF, the 10-year minus 3-month
+or minus 2-year slope above 0 and the raw 12-month return above 0, the two screeners averaged, no
+roll-down, a switched-off slot in cash."""
+expected_size = """Not verified here. Fama-Bliss and Campbell-Shiller find the term spread predicts excess bond returns
+at annual horizons, but Thornton and Valente (2012) find no systematic economic value out of sample;
+carry plus trend holds (Koijen et al., Baltussen et al.). The page records that in 2022 the curve flattened
+and trend turned down together, which would have sidestepped TLT's fall (not verified here)."""
+capacity_costs = """Very large capacity in two funds; a few switches a year; spreads are a cent or two; cost_bps 6 assumed.
+The coupon forgone while in cash is the real drag and is not modelled."""
+failure_modes = """The slope is a weak signal (the one that fails alone), both funds read it, and two funds leave
+few independent choices. A bond bull market from 2010 to 2020 flatters any rule that holds duration. Retire
+if the frozen-period picks-series t is under 2."""
+decoys = """Duration beta and the secular fall in rates, and the tsmom_multi_asset_etf edge (TLT and IEF are two of its
+nine funds): compare with it, and with a plain 12-month trend on TLT alone (trend_positive_12m)."""
+
+[[sources]]
+title = "Thornton, D. and Valente, G., Out-of-Sample Predictions of Bond Excess Returns and Forward Rates: An Asset Allocation Perspective, Review of Financial Studies, 2012"
+
+[[sources]]
+title = "Cochrane, J. and Piazzesi, M., Bond Risk Premia, American Economic Review, 2005"
+
+[[sources]]
+title = "Ilmanen, A., Expected Returns: An Investor's Guide to Harvesting Market Rewards, Wiley, 2011"
+
+[[sources]]
+title = "Koijen, R., Moskowitz, T., Pedersen, L. and Vrugt, E., Carry, Journal of Financial Economics, 2018"
+
+[[sources]]
+title = "Moskowitz, T., Ooi, Y. and Pedersen, L. (2012), Time Series Momentum, Journal of Financial Economics (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum"

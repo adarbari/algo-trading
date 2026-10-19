@@ -28,20 +28,52 @@ five held always, so the value is what the timing adds or costs against a passiv
 Three screeners, ensembled into ONE trial: the 6 and 12 month raw return above 0 (Antonacci's
 absolute momentum, which uses 12 months of excess return over the bill) and the close above the
 200-session average (Faber's 10-month average of month-end closes: the daily 200-session mean is the
-stored stand-in). LIMITS: not built, and the document does not claim them: (1) Keller's VAA and DAA
-canary (a breadth count of negative-momentum assets among VWO and BND setting the cash share, with
-the 13612W momentum weights) is not expressible: the outcome has no signal-weighted cash share, and
-the canary needs the cash fraction b/B per month. Only the canary rule alone would be testable, and
-it needs that weighting. (2) Dual momentum's relative leg is in dual_momentum_gem. (3) Index levels
-before the ETFs (IDX:SPX) are not used. (4) Cash is the Treasury bill yield, not the 90-day bill of
-Faber; no distributions, so a fund's yield is missing from book and benchmark; cost_bps 6 a round
-trip assumed. The page's near-identical signals (Faber's rule and absolute momentum correlate near
-0.9) are why the three are averaged and not run as three trials. verdict.toml [oos_haircut] trend =
-0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one
-beside the result, as display only."""
+stored stand-in). CANARY VARIANTS (EB E5 batch Y, ADR 0074 item 17): canary_b1 and canary_daa put
+Keller's breadth rule on the same book through the canary gate: the canaries are VWO and BND, a
+canary is bad when its 13612W momentum score (feature.momentum_13612w, read at D) is below 0, and the
+risk-off share is the bad count over the breadth: canary_daa is Keller's DAA (breadth 2, one of two
+moves half); canary_b1 is breadth 1 on the same VWO and BND pair (one bad canary moves the whole
+book), a variant that is NOT VAA, whose breadth is counted over its own four risky funds (SPY, VEA, VWO,
+BND), which is not built. The defensive asset is the one of SHY, IEF and LQD with the highest
+score at D. Each variant is its own trial, not part of the ensemble. LIMITS, so nothing implies the
+full source rule, and the document does not claim them: (1) Keller's OFFENSIVE selection is not built:
+VAA holds the single best of its four risky funds and DAA the best six of twelve, where the book beneath
+the gate is Faber's equal-weight five-fund trend book, so the variants test the canary rule on that book
+and are not Keller's portfolios. (2) The 13612W score is built from the stored 20, 60, 120 and 252
+session price returns for the 1, 3, 6 and 12 month returns (no dividends), and the defensive
+asset is the best of SHY, IEF and LQD with no test against 0, as in Keller's VAA and DAA (the source's
+rule, so no departure). (3) The cash alone case (the canary moving to cash with no
+defensive fund) is not a trial. (4) The gate reads at the month-end close D and moves the book from the
+next session, one session after the signal, and VWO and BND have bars from the store's start on
+2010-01-04, so the sample is the store's. (5) Dual momentum's relative leg is in dual_momentum_gem.
+(6) Index levels before the ETFs (IDX:SPX) are not used. (7) Cash is the Treasury bill yield, not the
+90-day bill of Faber; no distributions, so a fund's yield is missing from book and benchmark; cost_bps
+6 a round trip assumed. The page's near-identical signals (Faber's rule and absolute momentum correlate
+near 0.9) are why the three are averaged and not run as three trials. The canary is a risk
+management overlay: the claim is drawdown control, not alpha. verdict.toml [oos_haircut] trend = 0.45
+prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one beside
+the result, as display only."""
 
 [ensemble]
 variants = ["trend_positive_6m", "trend_positive_12m", "etf_above_200d"]
+
+[[variants]]
+id = "canary_b1"
+
+[variants.outcome.canary]
+tickers = ["VWO", "BND"]
+field = "feature.momentum_13612w"
+breadth = 1
+defensive = ["SHY", "IEF", "LQD"]
+
+[[variants]]
+id = "canary_daa"
+
+[variants.outcome.canary]
+tickers = ["VWO", "BND"]
+field = "feature.momentum_13612w"
+breadth = 2
+defensive = ["SHY", "IEF", "LQD"]
 
 [universe.where]
 all = [

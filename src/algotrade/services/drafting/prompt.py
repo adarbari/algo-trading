@@ -487,13 +487,19 @@ OPEN_HEADER = "Open requests (key | what it is); reuse one as a missing item's k
 
 # Feature groups kept out of the drafting prompt: their columns are not for natural-language drafts
 # yet (etf_macro@v1: macro signals on about 30 carrier funds), and 32 more index lines crowd the
-# budget. Remove a group here when the first edge screens on it (decision log 2026-10-18).
+# budget. The first edges screen on them since EB E5 batch Y, and the group stays out: removing it
+# pushes golden cases' fields out of the slice (open, for the architect). Decision log 2026-10-18.
 UNDRAFTED_GROUPS = frozenset({"etf_macro@v1"})
+# Expression features of the allocation edges (EB E5 batch Y) that read those columns or are for a
+# canary gate: two more index lines tip the slice margin, and neither is a stock screen's field.
+UNDRAFTED_FIELDS = frozenset({"feature.credit_spread_vs_ma200", "feature.momentum_13612w"})
 
 
 def draftable(catalogue: Iterable[FeatureInfo]) -> list[FeatureInfo]:
-    """``catalogue`` without the fields of ``UNDRAFTED_GROUPS``."""
-    return [i for i in catalogue if i.group not in UNDRAFTED_GROUPS]
+    """``catalogue`` without the fields of ``UNDRAFTED_GROUPS`` and ``UNDRAFTED_FIELDS``."""
+    return [
+        i for i in catalogue if i.group not in UNDRAFTED_GROUPS and i.name not in UNDRAFTED_FIELDS
+    ]
 
 
 def prefix_text(catalogue: Iterable[FeatureInfo]) -> str:

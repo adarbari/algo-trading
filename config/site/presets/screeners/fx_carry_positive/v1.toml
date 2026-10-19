@@ -1,0 +1,45 @@
+# Currency funds that pay carry over the dollar (ADR 0053, ADR 0074, EB E5 batch Y; the carry
+# screener of fx_etf_carry_momentum): a fund whose currency's 3-month interbank rate is above the US
+# one (etf_macro@v1, fx_carry), the largest carry first. Only the yen, Australian dollar, Canadian
+# dollar and Swiss franc have a fresh series; the euro and pound funds and the dollar fund are
+# absent: a missing value never passes (ADR 0030). The fund's own deposit yield is not in the number.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "fx_carry_positive"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Currency funds paying carry over the dollar"
+
+# ------------------------------------------------ who is screened and tradeable
+[criteria.security_type]
+field = "instrument.security_type"
+op = "eq"
+value = "ETF"
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.not_leveraged]
+field = "instrument.is_leveraged"
+op = "eq"
+value = false
+
+[criteria.not_inverse]
+field = "instrument.is_inverse"
+op = "eq"
+value = false
+
+# ------------------------------------------------------------------------ the signal
+[criteria.carry]
+field = "rollup.etf_macro@v1.fx_carry"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+fx_carry = "rollup.etf_macro@v1.fx_carry"
+
+[rank]
+tie_break = "rollup.etf_macro@v1.fx_carry"

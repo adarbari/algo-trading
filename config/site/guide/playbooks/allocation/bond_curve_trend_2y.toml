@@ -1,0 +1,26 @@
+# L3 site setting: the Guide's playbook for the site preset bond_curve_trend_2y (ADR 0051; docs/ui/guide.md
+# "The playbook page"). Keys and tests as in playbooks/trend/momentum_own_trend.toml.
+id = "bond_curve_trend_2y"
+version = 1  # the preset version this prose was written for
+summary = "Lists IEF and TLT while the 10-year minus 2-year Treasury slope is above zero and the fund's 12-month return is positive, the best trend first."
+hit = "An unleveraged Treasury fund, IEF or TLT, with an upward-sloping curve (2-year slope above 0) and a close above its close 252 sessions ago. Other funds carry no slope and are absent."
+not_checked = "It does not measure roll-down, coupon, duration or the level of yields. The slope stands in for carry and the return is price only."
+before_acting = [
+  "The slope alone has not timed bonds out of sample. This screen passes only when the trend agrees, so read the trend column first.",
+  "Both funds read the same slope, so the choice between them comes only from their own returns.",
+  "A flat or inverted curve turns the book to cash, and cash earns the bill rate, not a bond coupon.",
+]
+sources = [
+  "Thornton and Valente, Out-of-Sample Predictions of Bond Excess Returns and Forward Rates (2012)",
+]
+related = [
+  { id = "trend_positive_12m", reason = "the same trend test without the curve" },
+]
+
+[asks]
+security_type = "An ETF"
+status = "Still listed and trading"
+not_leveraged = "Not a leveraged fund"
+not_inverse = "Not an inverse fund"
+curve = "A 2-year slope above zero"
+trend = "A positive 12-month return"

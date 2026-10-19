@@ -2,14 +2,15 @@
 the rail), the playbook page's backlinks, the batched entries and the one search."""
 
 import time
+from typing import Any
 
 from algotrade.config.edges.document import MECHANISM_KINDS
-from algotrade.services.read.context import StoreContext
+from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.services.read.guide.edges.site_edges import site_edges
 from algotrade.services.read.guide.entries import GuideEntryKind, GuideRef, load_guide_entries
 from algotrade.services.read.guide.index import load_guide_index
 from algotrade.services.read.guide.playbook import load_guide_playbook
-from algotrade.services.read.guide.search import entry_titles, load_guide_search
+from algotrade.services.read.guide.search import entry_titles, guide_entries, load_guide_search
 
 
 def test_the_guide_index_counts_the_edges_section_and_lists_the_rail(site: StoreContext) -> None:
@@ -67,3 +68,27 @@ def test_the_search_keeps_its_budget_with_every_edge_in_it(site: StoreContext) -
     start = time.perf_counter()
     load_guide_search(site, "earnings", 5)
     assert time.perf_counter() - start < 0.5
+
+
+def test_the_search_reads_the_files_once_per_cache_and_a_fresh_cache_sees_an_edit(
+    site: StoreContext,
+) -> None:
+    assert guide_entries(site) is guide_entries(site)  # built once per cache
+    title = next(e.title for e in guide_entries(site) if e.kind == "edge")
+    assert [e for e in guide_entries(site) if e.title == "Renamed edge"] == []
+
+    class Renamed:
+        def __init__(self, inner: Any) -> None:
+            self._inner = inner
+
+        def load(self, scope: str, kind: str, name: str) -> Any:
+            found = self._inner.load(scope, kind, name)
+            if kind == "edges" and found is not None and found.get("name") == title:
+                return {**found, "name": "Renamed edge"}
+            return found
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self._inner, name)
+
+    edited = open_stores(site.reader, Renamed(site.configs), site.user)  # type: ignore[arg-type]
+    assert any(e.title == "Renamed edge" for e in guide_entries(edited))

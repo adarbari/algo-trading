@@ -1,0 +1,25 @@
+# L3 site setting: the Guide's playbook for the site preset credit_spread_below_ma200 (ADR 0051; docs/ui/guide.md
+# "The playbook page"). Keys and tests as in playbooks/trend/momentum_own_trend.toml.
+id = "credit_spread_below_ma200"
+version = 1  # the preset version this prose was written for
+summary = "Lists HYG and LQD while their credit spread is tighter than its 200-day mean, the tightest first. It is the macro trend rule of the credit timing edge."
+hit = "An unleveraged ETF whose own credit spread is below its 200-session mean: the high-yield spread for HYG, the investment-grade spread for LQD. Every other fund has no spread and is absent."
+not_checked = "It does not read the 50-day mean, the Baa spread, the fund's price trend or its coupon. A spread that is high and falling still passes."
+before_acting = [
+  "A spread below its mean can sit at a stressed level. Read rollup.etf_macro@v1.hy_oas for where the spread stands, not only which way it moves.",
+  "Credit spreads turn fast in a V-shaped year, so the rule exits late and re-enters late in 2011, 2018 and 2020.",
+  "Only two funds can pass, so the book is two names or cash. Read the edge's page for what stands in for cash.",
+]
+sources = [
+  "Jostova, Nikolova, Philipov and Stahel, Momentum in Corporate Bond Returns (2013)",
+]
+related = [
+  { id = "trend_positive_12m", reason = "the price-trend version of the same timing" },
+]
+
+[asks]
+security_type = "An ETF"
+status = "Still listed and trading"
+not_leveraged = "Not a leveraged fund"
+not_inverse = "Not an inverse fund"
+tighter = "A credit spread below its 200-day mean"

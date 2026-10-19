@@ -1,0 +1,118 @@
+# Edge document (ADR 0053, ADR 0074; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/options-volatility.md (c20_short_vix_roll_yield).
+# An allocation edge (EB E5 batch Y): a one-fund book gated by a canary on the VIX futures curve.
+id = "vix_roll_yield"
+name = "Short volatility fund with a term-structure filter"
+family = "C"
+thesis = "Holding a short-volatility fund only while VIX futures sit above the VIX collects the roll, and moving to cash when the curve inverts avoids the days the premium is lowest."
+mechanism = """Hedgers and long-volatility products create steady demand for forward volatility, so futures sit above
+the VIX most of the time and a short position collects the difference as the future rolls to spot; the
+premium falls when risk rises, which is why unfiltered short volatility is hit exactly when it
+is lowest (Cheng 2019)."""
+persistence = """The tail is large enough that few mandates can hold the position unlevered: XIV lost nearly all of its
+value on 2018-02-05 and was terminated, and SVXY cut its leverage afterwards (exact figures not
+verified here). The filter is a claim to test, since the curve can invert in a day."""
+schedule = "month_end"
+top_k = 1
+screeners = [
+  "etf_priced",
+]
+base = "benchmark"
+status = "candidate"
+mechanism_kind = "paid_for_risk"
+asset_class = "etfs"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the screen is run and evaluated, and a PICKS-SERIES t HAS A TAIL-RISK
+BLIND SPOT: a short-volatility book earns small gains for months and loses most of its value in a
+day, so a month-end book can show a positive t with no 2018 or 2020 in the sample. The book is ONE
+fund, SVXY, held in full when the SPY row's first monthly VIX future settles above the VIX close
+(rollup.etf_macro@v1.vx_basis at or above 0, the previous session's closes) and held as cash at the
+Treasury bill yield when below 0: the canary gate of ADR 0074 item 17, read at the month-end session D. The variant curve_roll uses the
+second future over the first (vx_roll) instead. LIMITS, so nothing implies the full source rule:
+(1) UVXY and VIXY are named and NOT held: they are long-volatility funds that pay the same roll, and a
+long-volatility book is not this edge; VXX is an ETN and not covered at all. (2) SVXY's own history
+is not one fund: it was minus 1 times the short-term VIX futures index until February 2018 and minus 0.5
+times after it (dates not verified here), so the price series splices two exposures, and XIV, the fund that failed, is not
+in the store (survivorship: the sample leaves out the fund that died). (3) The source sells the
+front future against mini S&P futures and collects the roll directly; this book holds a fund whose
+return also carries its fee, its daily rebalancing and the leverage change. (4) The canary reads the
+SPY row because the volatility funds carry no column of their own (etf_macro@v1 gives the VIX family
+to SPY), and the VX futures history in volatility/vx_futures starts in 2013, so a session before
+the first stored settle has no signal and is left out with the reason no_canary:SPY: the sample
+starts there, not in 2011 when SVXY listed. (5) The gate switches on month-end values and the curve
+inverts inside a month, so the book holds the fund through the move the filter exists to avoid; the
+source's check is daily. (6) A cash month earns the bill, the benchmark holds SVXY every month, so a
+de-risked book trails it in calm years by design (decision log 2026-10-18). (7) Price only; no
+distributions. cost_bps 10 a round trip assumed. No [published] figure: the source's 4.3 percent a
+month (pre-2018 futures, not a fund) is a different series from what the harness measures.
+No oos_class: the out-of-sample haircut is shown only for a book that declares an ensemble of
+lookbacks, and this edge has one rule. Size it for a minus 90 percent
+day: this is the premium paid for a crash, not a gain from information."""
+
+[[variants]]
+id = "curve_roll"
+
+[variants.outcome.canary]
+tickers = ["SPY"]
+field = "rollup.etf_macro@v1.vx_roll"
+breadth = 1
+defensive = ["CASH"]
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SVXY"] },
+]
+
+[outcome]
+kind = "portfolio_return"
+horizon_sessions = [21]
+benchmark = "mix:SVXY=1.0"
+start_offset_sessions = 1
+cost_bps = 10
+weighting = "equal"
+
+[outcome.canary]
+tickers = ["SPY"]
+field = "rollup.etf_macro@v1.vx_basis"
+breadth = 1
+defensive = ["CASH"]
+
+[quality_bar]
+outcome = """SVXY's return over the 21 sessions from the close after each month end, less SVXY held always over the
+same sessions, net of cost on the weight change; when the first monthly VIX future settles below the
+VIX at D the whole book is cash at the Treasury bill yield. Price only: the stored forward return is
+close to close and carries no distribution."""
+trigger_timing = """The gate reads the VIX close and the first monthly future's settle of the session BEFORE the month-end
+close D: both are known only from the next session (a settle's known_from, a macro value's release lag
+of one day), and a basis is stored only when the future's trade date is the VIX date. The book is held
+from the session after D, at S, for 21 sessions. Nothing after D enters the gate."""
+replication = """Simon and Campasano (2014), via CXO's summary: sell the front future when the futures to spot ratio
+is above 1, else cash; hedged with mini S&P futures, 2004 to 2014. Here: SVXY only, the month-end basis
+above 0 as the ratio test, cash otherwise, no hedge, 2013 on."""
+expected_size = """Not verified here. CXO's summary of the source reports 4.3 percent a month in excess of cash for
+2004 to 2014 on futures, before the 2018 collapse of XIV; filtered versions survived February 2018 but
+2020-03 and 2024-08-05 are reported to have cost unfiltered short-volatility funds over half their value
+(not verified). Expect a high Sharpe ratio with one very bad month."""
+capacity_costs = """SVXY is liquid but small against the futures it tracks; one position, a few switches a year;
+cost_bps 10 assumed for the fund's spread. The tax and the fund's fee are not modelled. Size at 2 to 5
+percent of equity, not the book."""
+failure_modes = """A tail event inside a month, before the next month-end read, takes most of the position while the
+signal still says contango. The sample leaves out XIV, so survivorship flatters it. Retire if the
+frozen-period picks-series t is under 2 or one month loses more than the book's whole gain."""
+decoys = """Equity beta (short volatility moves with the market in a crash) and the filed premium at index level
+(vrp_short_premium): compare with SPY held and with that edge."""
+
+[[sources]]
+title = "Cheng, I., The VIX Premium, Review of Financial Studies, 2019"
+url = "https://academicnewsletter.sufe.edu.cn/info/352766"
+
+[[sources]]
+title = "Simon, D. and Campasano, J., The VIX Futures Basis: Evidence and Trading Strategies, 2014"
+
+[[sources]]
+title = "CXO Advisory, Timing VIX Futures with the Futures-Spot Ratio (summary of the source)"
+url = "https://www.cxoadvisory.com/volatility-effects/timing-vix-futures-with-the-futures-spot-ratio/"
+
+[[sources]]
+title = "Quantpedia, Exploiting Term Structure of VIX Futures"
+url = "https://quantpedia.com/strategies/exploiting-term-structure-of-vix-futures"

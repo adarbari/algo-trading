@@ -58,7 +58,7 @@ themes = ["instrument gates"]
 [[theme_group]]
 id = "chart"
 title = "The chart"
-themes = ["momentum and trend", "price levels", "volume and liquidity", "volatility"]
+themes = ["momentum and trend", "price levels", "volume and liquidity", "volatility", "allocation signals"]
 
 [[theme_group]]
 id = "options"
@@ -114,6 +114,14 @@ id = "cross_section"
 title = "Cross-section ranks"
 presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite", "short_term_momentum_turnover", "short_squeeze_dtc",
   "trend_positive_3m", "trend_positive_6m", "trend_positive_12m", "etf_above_200d", "dual_class_cheap_leg"]
+
+[[family]]
+id = "allocation"
+title = "ETF allocation"
+presets = [
+  "etf_priced", "credit_spread_below_ma200", "bond_curve_trend_3m", "bond_curve_trend_2y",
+  "country_cape_cheapest", "fx_carry_positive",
+]
 
 [[family]]
 id = "factors"
