@@ -408,6 +408,14 @@ class _EverySession:
         return self.frame if len(self.frame) else None
 
 
+# Coverage ledgers served whole, whatever the session (ADR 0007 amendment 2026-10-19): a ledger
+# carries no content (``filings/read``: ``cik``, ``session_date``, ``covers_since``), and a later
+# run's full read of a CIK says its filings known on an earlier session were complete, so the
+# runner does not require its ``session_date`` to be on or before the session. Shrink-only:
+# adding a table needs an ADR (``tests/unit/data/test_feature_inputs.py``).
+UNBOUNDED_INPUTS = frozenset({"filings/read"})
+
+
 def _filing_reads(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
     return _EverySession(filing_coverage(reader).reads)
 

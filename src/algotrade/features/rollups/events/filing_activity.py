@@ -43,6 +43,12 @@ null until a walk reads past it: fail closed, no closed-day list yet. ``earnings
 null when the instrument has no earnings report known by the session at all. A report that was
 not yet known on the session never counts. The windows (5) are part of the definition:
 changing one is a new version. ``feature.news_free_5d`` combines the two columns.
+
+Selection effect of the per-CIK reads: they cover the CIKs a later run read (the universe of
+that run), so a historical session is non-null from them only for names still in a later
+universe; an early delisted name stays null (fail closed, never zero). The ledger is read
+unbounded (``UNBOUNDED_INPUTS``, ADR 0007 amendment): it holds no content, and the counts come
+only from ``events/filing`` rows with ``event_date`` on or before S-1.
 """
 
 from datetime import date
