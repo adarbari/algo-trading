@@ -10,7 +10,7 @@ const splatOf = (path: string): { id: string; splat: unknown } | undefined => {
 
 describe('the Guide Edges route', () => {
   it('matches the index, a mechanism page and an edge page', () => {
-    expect(splatOf('/guide/edges')?.splat ?? '').toBe('');
+    expect(splatOf('/guide/edges')).toBeDefined();
     expect(splatOf('/guide/edges/m/slow_to_update')?.splat).toBe('m/slow_to_update');
     expect(splatOf('/guide/edges/momentum_12_1')?.splat).toBe('momentum_12_1');
   });
