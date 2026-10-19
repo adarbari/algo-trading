@@ -371,10 +371,9 @@ def test_the_curve_screens_read_a_column_the_bond_funds_carry() -> None:
     assert set(edge.ensemble) == {"bond_curve_trend_3m", "bond_curve_trend_2y"}
 
 
-def test_the_credit_macro_trial_reads_the_funds_that_carry_a_spread() -> None:
+def test_the_credit_macro_trial_is_not_listed_until_the_spread_history_is_long_enough() -> None:
     edge = EDGES["credit_spread_trend"]
-    assert "credit_spread_below_ma200" in edge.screeners
-    assert "credit_spread_below_ma200" not in edge.ensemble  # its own trial, not a lookback
+    assert "credit_spread_below_ma200" not in edge.screeners  # series start 2023-10-09: ~28 months
     assert symbols(edge) == {"HYG", "LQD"}
     assert "HYG" in SIGNAL_ETFS["hy_oas"] and "LQD" in SIGNAL_ETFS["ig_oas"]
 
@@ -418,8 +417,8 @@ def test_the_vix_gate_reads_a_signal_the_canary_fund_carries(edge_id: str) -> No
 def test_the_canary_variants_are_vaa_and_daa_on_the_trend_book() -> None:
     edge = EDGES["absolute_momentum_crash_filter"]
     by_id = {v.id: v.outcome.canary for v in edge.variants}
-    assert set(by_id) == {"canary_vaa", "canary_daa"}
-    vaa, daa = by_id["canary_vaa"], by_id["canary_daa"]
+    assert set(by_id) == {"canary_b1", "canary_daa"}
+    vaa, daa = by_id["canary_b1"], by_id["canary_daa"]
     assert vaa is not None and daa is not None
     assert (vaa.breadth, daa.breadth) == (1, 2)
     assert vaa.tickers == daa.tickers == ("BND", "VWO")

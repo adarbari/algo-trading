@@ -74,8 +74,8 @@ unfilled slot is cash at the Treasury bill yield. Price only: the stored forward
 close and carries no dividend."""
 trigger_timing = """The trailing return and the CAPE value known by the session (a monthly series, published about
 45 days late and read by vintage) are read at the month-end close D; the book is held from the next
-session's close S for 21 sessions. Nothing after D enters a pick. The CAPE history itself is revised in
-place, which the notes carry."""
+session's close S for 21 sessions. Nothing published after D enters a pick, except later revisions
+of CAPE, which rewrite the history in place and which the notes carry."""
 replication = """Asness, Moskowitz and Pedersen (2013): value and momentum in each asset class, combined 50/50, long
 the top and short the bottom, monthly; the 50/50 mix across all classes has an annual Sharpe ratio of 1.45
 (1972 to 2011, per the page). Here: ten country funds, long only, trend by 12-month return, value by

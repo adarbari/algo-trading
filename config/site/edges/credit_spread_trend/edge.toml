@@ -14,7 +14,7 @@ react, and regulated investors sell after a downgrade; the rule whipsaws in fast
 schedule = "month_end"
 top_k = 2
 screeners = [
-  "trend_positive_6m", "trend_positive_12m", "credit_spread_below_ma200",
+  "trend_positive_6m", "trend_positive_12m",
 ]
 base = "benchmark"
 oos_class = "trend"
@@ -22,28 +22,23 @@ status = "candidate"
 mechanism_kind = "cross_market_trends"
 asset_class = "etfs"
 frozen_from = 2026-04-01
-notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. TWO KINDS OF TRIAL: the price-trend
-screeners trend_positive_6m and trend_positive_12m (the ensemble of 6 and 12 months is ONE trial, the
-10-month average variant is in absolute_momentum_crash_filter's family and is not repeated) use the funds'
-own price trend as the stand-in for a spread trend (HYG for high yield, LQD for investment grade); the
-MACRO trial credit_spread_below_ma200 (EB E5 batch Y, etf_macro@v1) holds a fund while its own
-option-adjusted spread is tighter than its 200-observation mean: HYG on BAMLH0A0HYM2, LQD on BAMLC0A0CM,
-read as the previous session's value (release lag one day), a separate trial that is not in the ensemble.
-LIMITS: (1) the source switches to Treasuries (IEF) when credit weakens; the outcome has no
+notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. PROXY: the idea is a spread trend;
+this version uses the funds' own price trend as the stand-in (HYG for high yield, LQD for investment
+grade). MACRO VERSION NOT RUN, DROPPED FOR NOW (EB E5 batch Y): the screener credit_spread_below_ma200
+(each fund's option-adjusted spread below its 200-observation mean, etf_macro@v1) is built and kept as a
+preset, but not listed here: the stored ICE BofA series BAMLH0A0HYM2 and BAMLC0A0CM start on 2023-10-09
+(FRED serves about three years), so with the 160 observations the mean needs the first signal falls in
+mid-2024 and the sample is about 28 month-ends, under the 40 independent sessions a verdict needs, and
+every earlier month would be cash counted against a fully invested benchmark. It returns when a longer
+history is stored. LIMITS: (1) the source switches to Treasuries (IEF) when credit weakens; the outcome has no
 conditional fallback asset, so the slot is cash at the Treasury bill yield and the IEF leg is not
-built. (2) The macro trial reads the 200-observation mean only: the 50-day crossing of the source
-is not built, and BAA10Y (a column of LQD beside the investment-grade spread, so it adds no fund)
-is not a trial. The stored spread series set the sample, which may start later than the 2010 bars
-(the latest start of the series, the fund and the 200-observation mean sets it); a fund with no
-spread value fails the screen (a missing value never passes), so the book is cash in a session before
-the series are stored, never read as tight, and the run record's picks show it. The spread is not
-revised, so there is no vintage caveat, but the ICE series carry a personal licence. (3) Price only: the coupon
-of both funds (the larger part of a credit return) is in neither the book nor the benchmark, and the
-cash leg earns the bill, so a falling-trend period is compared with the benchmark's price alone.
-(4) The book holds each fund at half while its signal is on; cost_bps 10 a round trip assumed. For the
-macro trial a spread above its mean is the exit, and a fund with a high but falling spread still
-passes. verdict.toml [oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it becomes
-after the haircut and the out-of-sample one beside the result, as display only."""
+built. (2) The 50-day crossing and BAA10Y are not built either. (3) Price only: the coupon of both funds
+(the larger part of a credit return) is in neither the book nor the benchmark, and the cash leg earns the
+bill, so a falling-trend period is compared with the benchmark's price alone. (4) The book holds each fund
+at half while its trend is up; cost_bps 10 a round trip assumed. The ensemble of 6 and 12 months is ONE
+trial; the 10-month average variant is in absolute_momentum_crash_filter's family and is not repeated.
+verdict.toml [oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it becomes after the
+haircut and the out-of-sample one beside the result, as display only."""
 
 [ensemble]
 variants = ["trend_positive_6m", "trend_positive_12m"]
