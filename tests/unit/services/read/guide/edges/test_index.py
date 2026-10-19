@@ -51,3 +51,17 @@ def test_the_rail_and_the_section_count(site: StoreContext) -> None:
     rail = mechanism_entries(site)
     assert tuple(m.id for m in rail) == MECHANISM_KINDS and all(m.title for m in rail)
     assert edge_entries(site) == len(MECHANISM_KINDS) + len(site_edges(site))
+
+
+def test_the_guide_serves_the_plain_reason_never_the_technical_one(site: StoreContext) -> None:
+    from algotrade.services.read.guide.edges.edge import load_guide_edge  # noqa: PLC0415
+
+    index = load_guide_edge_index(site)
+    for s in index.set_aside:
+        edge = next(e.edge for e in site_edges(site) if e.edge.id == s.edge.id)
+        assert s.why.text == edge.plain_reason != edge.rejection_reason
+        page = load_guide_edge(site, edge.id)
+        assert page is not None and page.rejection is not None
+        assert page.rejection.text == edge.plain_reason
+        shown = " ".join([s.why.text, page.rejection.text])
+        assert edge.rejection_reason[:60] not in shown
