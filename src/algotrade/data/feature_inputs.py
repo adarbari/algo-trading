@@ -43,6 +43,11 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        (``session_date`` of the run, ``walked_to``), only runs of sessions on or
                        before the session; ``None`` when there is none. How far the stored
                        filings are complete, which a row cannot say
+- ``filings/read``     ``events.filing_coverage(...).reads``: the full per-CIK reads of the filings
+                       task (``cik``, the run's ``session_date``, ``covers_since``), of every run
+                       whatever the session: a read made after a session still says that CIK's
+                       filings known on it are complete (the same on every later run); ``None``
+                       when there is none
 - ``chains/*``         ``chains``: the session's own partition, read per session (chains are
                        large; a lookback is not supported)
 - ``events/dividend_declared``
@@ -168,7 +173,7 @@ from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
 from algotrade.data.events import (
     events_by_acceptance,
     events_by_event_date,
-    filing_walks,
+    filing_coverage,
     latest_of,
     read_events,
     stored_events,
@@ -381,8 +386,22 @@ def _etf_share_versions(reader: StoreReader, sessions: Sequence[date], lookback:
 
 
 def _filing_walks(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
-    frame = filing_walks(reader)
+    frame = filing_coverage(reader).walks
     return _Snapshots(frame, _days(frame["session_date"]) if len(frame) else np.array([], "M8[D]"))
+
+
+@dataclass(frozen=True)
+class _EverySession:
+    """One frame served for every session, unbounded by it (``at`` ignores the session)."""
+
+    frame: pd.DataFrame
+
+    def at(self, session: date, lookback: int) -> pd.DataFrame | None:
+        return self.frame if len(self.frame) else None
+
+
+def _filing_reads(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    return _EverySession(filing_coverage(reader).reads)
 
 
 def _share_facts(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
@@ -606,6 +625,7 @@ INPUTS: Mapping[str, Loader] = {
     "events/fund_nav": _event_snapshots("events/fund_nav"),
     ETF_SHARES: _etf_share_versions,
     "filings/walk": _filing_walks,
+    "filings/read": _filing_reads,
     "chains/status": _partition(chain_status),
     "chains/option_quotes": _partition(option_quotes),
     "chains/underlying_quotes": _partition(underlying_quotes),

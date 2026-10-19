@@ -27,7 +27,9 @@ and no earnings reaction window in them; it is a practitioner hypothesis with no
 news_free_5d is null until the filings walk covers the session (filing_activity@v1 fails closed):
 the live store has no filing history until the filings backfill runs (EDGAR submissions from
 2018-01-01 is the planned span), so volume_shock_no_news has no sessions today. Once the backfill
-is done, about 100 independent 20-session windows from 2018-01 are expected (about 2,000 sessions);
+is done and filing_activity@v1 is rebuilt over history (algotrade-ingest rollups --from <first
+session> --to <last session> --only filing_activity@v1: a per-CIK read covers the past sessions of its
+own company),  about 100 independent 20-session windows from 2018-01 are expected (about 2,000 sessions);
 volume_shock needs only bars and the volume rollup, so it has the bar history (2010 on, once the
 rollup is backfilled). The sign depends on the horizon and on an extreme return (the retail-herding
 literature finds the opposite at 5 days): the harness's 20 sessions is the paper's horizon.
