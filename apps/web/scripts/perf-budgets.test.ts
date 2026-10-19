@@ -1,6 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
-import { nearBudgetNotes, unexplainedRises, type Budgets } from './perf-budgets';
+import { loadBudgets, nearBudgetNotes, unexplainedRises, type Budgets } from './perf-budgets';
 
 const base: Budgets = {
   bundle: {
@@ -49,18 +53,43 @@ describe('unexplainedRises', () => {
 describe('an owner waiver of a shared budget', () => {
   const head = { ...base, bundle: { ...base.bundle, entry_gzip_bytes: 31000 } };
   const path = 'bundle.entry_gzip_bytes';
+  const waiver = { max: 31000, log: '2026-10-18 | A section | Why' };
 
-  it('allows the rise it names, once', () => {
-    const waivers = { [path]: '2026-10-18 owner: a new section' };
+  it('allows a rise up to its ceiling, once', () => {
+    const waivers = { [path]: waiver };
     expect(unexplainedRises(base, { ...head, waivers })).toEqual([]);
     expect(unexplainedRises({ ...base, waivers }, { ...head, waivers })).toHaveLength(1);
   });
 
-  it('needs the owner and a reason in it', () => {
+  it('allows nothing over its ceiling', () => {
+    const waivers = { [path]: { ...waiver, max: 30500 } };
+    expect(unexplainedRises(base, { ...head, waivers })[0]).toContain("over its waiver's ceiling");
+  });
+
+  it('a reworded waiver with the same ceiling grants nothing more', () => {
+    const waivers = { [path]: { ...waiver, log: 'another entry' } };
     expect(
-      unexplainedRises(base, { ...head, waivers: { [path]: '2026-10-18 agent: more' } }),
+      unexplainedRises({ ...base, waivers: { [path]: waiver } }, { ...head, waivers }),
     ).toHaveLength(1);
   });
+});
+
+describe('every waiver in perf-budgets.json', () => {
+  const log = readFileSync(resolve(process.cwd(), '../../docs/decisions/log.md'), 'utf8');
+  const waivers =
+    loadBudgets(pathToFileURL(resolve(process.cwd(), 'perf-budgets.json'))).waivers ?? {};
+
+  it.each(Object.entries(waivers))(
+    '%s has an owner-final entry in the decision log',
+    (_path, w) => {
+      const start = log.indexOf(`## ${w.log}\n`);
+      expect(start, `no "## ${w.log}" entry in docs/decisions/log.md`).toBeGreaterThanOrEqual(0);
+      const next = log.indexOf('\n## ', start + 1);
+      const entry = log.slice(start, next < 0 ? undefined : next);
+      expect(entry).toContain('- decided by: owner\n');
+      expect(entry).toContain('- status: final\n');
+    },
+  );
 });
 
 describe('nearBudgetNotes', () => {

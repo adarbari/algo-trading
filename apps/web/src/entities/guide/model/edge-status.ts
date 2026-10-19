@@ -29,7 +29,7 @@ export function edgeStatusText(status: string): string {
 const SIDE_TEXTS: Readonly<Record<string, string>> = {
   long: 'Long',
   short: 'Short',
-  long_short: 'Long and short',
+  long_short: 'Long-short',
 };
 
 /** The side of an edge as a label (the words of the index's side filter). */
