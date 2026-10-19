@@ -5,8 +5,11 @@ without a category (UNKNOWN stays out)."""
 from datetime import date
 
 import pandas as pd
+import pytest
 
-from algotrade.data.listings.etf_launches import LAUNCH_SOURCE, etf_launches, launched_by
+from algotrade.core.model.errors import MissingDataError
+from algotrade.data.feature_inputs import INPUTS
+from algotrade.data.listings.etf_launches import LAUNCH_SOURCE, etf_launches
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
@@ -65,10 +68,22 @@ def test_only_specialised_funds_with_a_listing_get_a_launch_date() -> None:
     assert LAUNCH_SOURCE == "tiingo_listing"
 
 
-def test_a_snapshot_without_the_category_columns_has_no_launches() -> None:
-    assert etf_launches(reader(with_category=False)).empty
+def test_a_snapshot_without_the_category_columns_is_missing_data() -> None:
+    with pytest.raises(MissingDataError, match="no etf_category"):
+        etf_launches(reader(with_category=False))
 
 
-def test_a_launch_after_the_session_is_not_known() -> None:
-    out = launched_by(etf_launches(reader()), date(2010, 1, 4))
-    assert set(out["instrument_id"]) == {"EQ:XLK", "EQ:ICLN"}
+def test_the_input_never_reads_a_launch_after_the_session_or_before_the_window() -> None:
+    load = INPUTS["instruments/etf_launches"]
+    found = load(reader(), [date(2010, 1, 4)], 1300)
+    after = found.at(date(2010, 1, 4), 1300)  # type: ignore[union-attr]
+    assert set(after["instrument_id"]) == {"EQ:ICLN"}  # XLK is 12 years back, ARKK not yet listed
+    wide = found.at(date(2010, 1, 4), 5000)  # type: ignore[union-attr]
+    assert set(wide["instrument_id"]) == {"EQ:XLK", "EQ:ICLN"}  # never EQ:ARKK (2014)
+
+
+def test_without_a_category_snapshot_the_input_is_absent_not_empty() -> None:
+    absent = INPUTS["instruments/etf_launches"](
+        reader(with_category=False), [date(2026, 10, 5)], 1300
+    )
+    assert absent.at(date(2026, 10, 5), 1300) is None  # a required input: the session is skipped

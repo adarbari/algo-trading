@@ -16,6 +16,8 @@ delisted before the first reference snapshot has none and no row).
     launch_date_source        ``tiingo_listing``
 
 One row per specialised ETF launched in the window; none: no row (UNKNOWN, never "not launched").
+Without the listing history or a reference snapshot carrying the category the input is absent and
+the session is not written (required), never written empty.
 """
 
 from datetime import date
@@ -97,7 +99,7 @@ GROUP = FeatureGroup(
     NAME,
     VERSION,
     "How long ago a specialised ETF (thematic or sector) launched, from its first listing day",
-    (Input(LAUNCHES, lookback=LOOKBACK, required=False),),
+    (Input(LAUNCHES, lookback=LOOKBACK),),
     FEATURES,
     compute,
 )

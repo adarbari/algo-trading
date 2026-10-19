@@ -310,6 +310,15 @@ def test_an_etf_launch_is_an_event_on_its_listing_day_split_by_category() -> Non
     assert sector.names == {d: frozenset({IDS[1]})}
     assert base.unknown[d][NOT_KNOWN_AT_D] == 1
     assert not EVENT_FIELDS["etf_launch"].announced_ahead
+    # the edge enters on the 21st session after launch: D = launch + 20 sessions
+    w.write_rollup(
+        "rollups/instrument/etf_launches@v1",
+        DAYS[5],
+        [{"instrument_id": IDS[3], "sessions_since_etf_launch": 20, "last_etf_launch_date": d,
+          "etf_category": "sector"}],
+    )  # fmt: skip
+    late = read_events(w.reader, "etf_launch", 21, [DAYS[5]], lambda _: ALL, "sector")
+    assert late.names == {DAYS[5]: frozenset({IDS[3]})}
 
 
 def test_the_document_and_the_harness_agree_on_which_classes_are_announced_ahead() -> None:

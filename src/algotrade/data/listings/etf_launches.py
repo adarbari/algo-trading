@@ -12,14 +12,14 @@ snapshot carries today's name-rule category): a fund is offered for a session on
 start date, so point in time is kept by the dates, not the snapshot. The category is the one the
 latest build resolved from the fund's name, so a fund renamed since launch carries today's
 category on its launch date (a disclosed tilt), and a fund that never reached a reference
-snapshot (delisted before the first) has none and is not in the sample (a survivorship tilt).
+snapshot, or that the latest snapshot no longer lists, has none and is not in the sample
+(a survivorship tilt: its row is in the edge's base without a category).
 The listing's closing date is not read.
 """
 
-from datetime import date
-
 import pandas as pd
 
+from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.fields import REFERENCE_TABLE
 from algotrade.data.listings.universe import TABLE as LISTINGS
 from algotrade.data.reference import REFERENCE_HINT, read_snapshot
@@ -32,11 +32,16 @@ COLUMNS = ["instrument_id", "event_date", "etf_category", "etf_theme"]
 
 def etf_launches(reader: StoreReader) -> pd.DataFrame:
     """One row per specialised ETF (``etf_category`` in ``SPECIALISED``): ``instrument_id``, its
-    launch date as ``event_date`` and the category and theme. Empty when no reference snapshot
-    carries the category yet (``MissingDataError`` when a table has no snapshot at all)."""
+    launch date as ``event_date`` and the category and theme. ``MissingDataError`` when a table
+    has no snapshot, or the latest reference snapshot carries no category yet (the universe
+    build has not run since ADR 0076): missing data is an error, never "no launches"."""
     reference, _ = read_snapshot(reader, REFERENCE_TABLE, None, REFERENCE_HINT)
     if "etf_category" not in reference.columns:
-        return pd.DataFrame(columns=COLUMNS)
+        raise MissingDataError(
+            REFERENCE_TABLE,
+            "the latest reference snapshot has no etf_category (built before ADR 0076)",
+            REFERENCE_HINT,
+        )
     funds = reference[reference["etf_category"].isin(SPECIALISED)]
     funds = funds[["instrument_id", "etf_category", "etf_theme"]]
     listings, _ = read_snapshot(reader, LISTINGS, None, REFERENCE_HINT)
@@ -46,8 +51,3 @@ def etf_launches(reader: StoreReader) -> pd.DataFrame:
     out = funds.merge(first, left_on="instrument_id", right_index=True, how="inner")
     out = out.assign(instrument_id=out["instrument_id"].astype(str))
     return out[COLUMNS].sort_values(["event_date", "instrument_id"]).reset_index(drop=True)
-
-
-def launched_by(frame: pd.DataFrame, session: date) -> pd.DataFrame:
-    """The launches on or before ``session`` (a later launch is not known yet)."""
-    return frame[frame["event_date"] <= session]

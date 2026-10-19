@@ -211,7 +211,7 @@ The latest S&P 500 membership change of an instrument and the sessions since it.
 
 ## `etf_launches@v1`
 
-How long ago a specialised ETF (thematic or sector) launched, from its first listing day. Stored as `rollups/instrument/etf_launches@v1`; reads `instruments/etf_launches` (optional).
+How long ago a specialised ETF (thematic or sector) launched, from its first listing day. Stored as `rollups/instrument/etf_launches@v1`; reads `instruments/etf_launches`.
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|

@@ -411,6 +411,6 @@ follow-up PR).
 - Question: when is the launch fade entered, how liquid must the fund be, and which horizons are tried?
 - Options: enter on the launch day with no liquidity gate / enter after twenty sessions of bars with the site's $5M a day gate (owner decision O2) / a lower gate for thin funds.
 - Decision: entry the 21st session after launch (the 20-session dollar volume needs twenty sessions of bars), the $5M a day gate, horizons 250, 750 and 1250 sessions (one, three and five years), short side with the site's default borrow.
-- decided by: orchestrator (design call)
+- decided by: proposed by orchestrator; awaiting owner
 - status: pending owner confirmation
 - Reasoning: a gate that cannot be read on the launch day would leave the edge with no events; the established O2 gate keeps the short side a liquid-name test, at the cost of a small count, which the edge's notes disclose.

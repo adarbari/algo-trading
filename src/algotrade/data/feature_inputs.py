@@ -396,10 +396,23 @@ def _ipo_lockups(reader: StoreReader, sessions: Sequence[date], lookback: int) -
 ETF_LAUNCHES = "instruments/etf_launches"
 
 
+@dataclass(frozen=True)
+class _Absent:
+    """An input with no data at all: every session reads ``None`` (a required input then skips
+    the session with its reason, so a night is never written as "no rows")."""
+
+    def at(self, session: date, lookback: int) -> pd.DataFrame | None:
+        return None
+
+
 def _etf_launches(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
     """Specialised ETF launches by launch date; ``at`` keeps those in the ``lookback`` sessions up
-    to the session (``etf_launches@v1``; ADR 0076)."""
-    frame = etf_launches(reader)
+    to the session (``etf_launches@v1``; ADR 0076). Without a listing or category snapshot every
+    session reads ``None`` (the group is required: it writes nothing rather than an empty night)."""
+    try:
+        frame = etf_launches(reader)
+    except MissingDataError:
+        return _Absent()
     return _Window(frame, _days(frame["event_date"]), need_session=False)
 
 

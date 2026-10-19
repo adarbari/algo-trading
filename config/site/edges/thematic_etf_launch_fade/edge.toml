@@ -33,9 +33,10 @@ three-year screen (sessions_since_etf_launch at most 750) is the working avoid r
 The short side is a liquid-name test (ADV of $5M or more, owner decision O2), so many new thematic funds are too thin to
 enter and the count may be small; the borrow is the site's default, a LOWER BOUND for a new, thin ETF. The base is every
 liquid ETF in the universe that session, broad funds included, so the lift reads the new specialised funds against all
-liquid ETFs (the paper's broad-based funds are the comparison). Funds that launched before the first universe snapshot are
-read through the historical reference rule (a name alive today keeps today's row; a delisted one counts as a common stock and
-is filtered out by security_type = ETF), the same survivor tilt."""
+liquid ETFs (the paper's broad-based funds are the comparison). Funds that launched before the first universe snapshot are read through the historical reference rule (a name alive today
+keeps today's row; a delisted ETF stays an ETF). A fund delisted before the latest reference snapshot has no category and
+so is never a pick, but it is still in the base: the base then holds the closed funds, where much of the fade sits, and the
+picks do not, so the lift is UNDERSTATED, never flattered (the direction of the survivor tilt)"""
 
 [universe.where]
 all = [
@@ -72,7 +73,7 @@ capacity_costs = """New thematic funds are thin and often hard or costly to borr
 borrow, a LOWER BOUND, so the result is a best case for the short. The usable form for an individual is the avoid rule: do not
 buy a specialised ETF younger than three years, which costs nothing."""
 failure_modes = """A theme that keeps running (a launch near a bottom, not a peak); funds that close early (the fund is gone, the
-sample keeps the survivors); a category that reads the name wrong; the launch-date proxy dating a relisted or renamed fund too
+sample keeps the survivors); a category that reads the name wrong (and closed funds with no category, which sit in the base and not in the picks); the launch-date proxy dating a relisted or renamed fund too
 young. Retire if the frozen-period short return of the picks is not above the mean of every liquid ETF."""
 decoys = """Fund age and size (new funds are small), sector momentum at launch and high fees: compare the picks with other new
 ETFs that are broad, which the base contains."""
