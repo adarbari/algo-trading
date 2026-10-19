@@ -1,0 +1,52 @@
+# Idiosyncratic-volatility avoid list (ADR 0053, EB E3b; edge idiosyncratic_volatility_and_max):
+# every tradeable common stock or ADR with a four-factor IVOL value, ranked with the most
+# volatile LAST so the harness's short leg (the worst scores) takes the jumpiest names first
+# (Ang, Hodrick, Xing and Zhang 2006: high IVOL went with lower returns). Same base gates as the
+# ivol_high decoy, whose order is the opposite. A missing IVOL never passes (ADR 0030). What it
+# does not check: trend, quality, borrow cost or availability, a squeeze under way. The IVOL is
+# the 252-session four-factor residual volatility, not the paper's prior-month one.
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+id = "ivol_avoid"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Idiosyncratic volatility (avoid list)"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# the same as ivol_high and size_small, so the decoys compare on one universe)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 3
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 2_000_000
+
+# ------------------------------------------------------------------------ the signal
+[criteria.ivol]
+field = "rollup.factor_betas@v1.ivol_252d"
+op = "gt"
+value = 0
+
+[columns]
+close = "rollup.price_stats@v2.close"
+ivol_252d = "rollup.factor_betas@v1.ivol_252d"
+beta_mkt = "rollup.factor_betas@v1.beta_mkt"
+factor_status = "rollup.factor_betas@v1.factor_status"
+adv_usd_20d = "rollup.price_stats@v2.adv_usd_20d"
+
+[rank]
+tie_break = "rollup.factor_betas@v1.ivol_252d"
+tie_break_order = "asc"

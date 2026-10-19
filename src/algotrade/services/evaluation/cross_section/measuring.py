@@ -76,6 +76,7 @@ from algotrade.services.evaluation.cross_section.measures import (
     decile_means,
 )
 from algotrade.services.evaluation.cross_section.picks import RankedRun
+from algotrade.services.evaluation.cross_section.portfolio.overlays import apply_overlays
 from algotrade.services.evaluation.cross_section.portfolio.session import (
     cash_return,
     portfolio_stat,
@@ -361,6 +362,10 @@ def _valued(
     (``portfolio/session.py``)."""
     o, day = scope.edge.outcome, leg.decision
     regime = session.label(day)
+    book_vol: float | None = None
+    risk_off: float | None = None
+    if not why:
+        weights, book_vol, risk_off, why = apply_overlays(o, session, day, weights)
     if why:
         return portfolio_stat(day, regime, None, why, (), o.cost_bps)
     constituents = blend(o.benchmark)
@@ -372,7 +377,9 @@ def _valued(
         window_returns(rows),
         cash_return(session.bill_yield(day), horizon) if held_cash else None,
     )
-    return portfolio_stat(day, regime, value, why, weights, o.cost_bps, deciles, ranked)
+    return portfolio_stat(
+        day, regime, value, why, weights, o.cost_bps, deciles, ranked, book_vol, risk_off
+    )
 
 
 def _portfolio_stat(

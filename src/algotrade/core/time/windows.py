@@ -12,12 +12,17 @@ outcome window starts at S's close) and its decision session D is the one before
 - ``opex_week``: the 5 sessions ending on the month's option expiry (Monday to Friday; after a
   Thursday expiry the window starts on the Friday before)
 - ``quarter_end``: the last 5 sessions of March, June, September and December
+- ``pre_month_end``: the last 3 sessions of every month, 3 sessions (not ``month_end``: that is the
+  rebalance schedule of an edge document, ADR 0075)
+- ``year_turn``: the last 5 sessions of December and the first 5 of January, 10 sessions; it
+  belongs to December's year (ADR 0075)
 - ``pre_holiday``: the session before a scheduled full-day holiday (an unscheduled closure, such
   as a day of mourning or a storm, was not known ahead and is no holiday here), 1 session
 
 Windows of one kind never overlap: ``turn_of_month`` windows are a month apart, ``opex_week``
-windows end on different months' expiries, ``quarter_end`` windows a quarter apart and
-``pre_holiday`` windows are single sessions of distinct days.
+windows end on different months' expiries, ``quarter_end`` windows a quarter apart,
+``pre_month_end`` windows a month apart, ``year_turn`` windows a year apart and ``pre_holiday``
+windows are single sessions of distinct days.
 
 ``out_of_window_stretches`` tiles the sessions outside every window of a range into stretches of a
 window's length, the base of a time-series edge (ADR 0073): from the session after each window,
@@ -32,6 +37,7 @@ from datetime import date
 from algotrade.core.time.calendar import (
     SPECIAL_CLOSURES,
     holidays,
+    is_session,
     last_session_of_month,
     monthly_expiry,
     next_session,
@@ -44,6 +50,8 @@ WINDOW_LENGTHS: dict[str, int] = {
     "turn_of_month": 4,
     "opex_week": 5,
     "quarter_end": 5,
+    "pre_month_end": 3,
+    "year_turn": 10,
     "pre_holiday": 1,
 }
 WINDOW_NAMES = tuple(WINDOW_LENGTHS)
@@ -80,6 +88,11 @@ def _year_windows(name: str, year: int) -> list[list[date]]:
         return [sessions_ending(monthly_expiry(year, m), 5) for m in range(1, 13)]
     if name == "quarter_end":
         return [sessions_ending(last_session_of_month(year, m), 5) for m in _QUARTER_MONTHS]
+    if name == "pre_month_end":
+        return [sessions_ending(last_session_of_month(year, m), 3) for m in range(1, 13)]
+    if name == "year_turn":
+        close = sessions_ending(last_session_of_month(year, 12), 5)
+        return [close + _starting_at(next_session(close[-1]), 5)]
     if name == "pre_holiday":
         return [[d] for d in _holiday_eves(year)]  # January 1's eve is in the year before
     raise KeyError(name)
@@ -99,16 +112,23 @@ def windows(name: str, first: date, last: date) -> list[list[date]]:
     return [list(w) for w in sorted(found)]
 
 
-def out_of_window_stretches(placed: list[list[date]], length: int, last: date) -> list[list[date]]:
+def out_of_window_stretches(
+    placed: list[list[date]], length: int, last: date, start: date | None = None
+) -> list[list[date]]:
     """The non-overlapping stretches of ``length`` sessions that end by ``last`` and
     touch no session of ``placed`` (the windows of the range), in order, tiled from the session
-    after each window. Deterministic: a function of the windows and the range only."""
+    after each window, and from ``start`` first when given (the first session of the range, so
+    sessions before the first window are in the base too; a calendar edge passes none).
+    Deterministic: a function of the windows and the range only."""
     if length < 1:
         raise ValueError(f"a stretch is at least 1 session, got {length}")
     taken = {d for w in placed for d in w}
     stretches: list[list[date]] = []
-    for window in sorted(placed, key=lambda w: w[0]):
-        cursor = next_session(window[-1])
+    cursors = [next_session(w[-1]) for w in sorted(placed, key=lambda w: w[0])]
+    if start is not None:
+        cursors.insert(0, start if is_session(start) else next_session(start))
+    for first in cursors:
+        cursor = first
         while True:
             stretch = _starting_at(cursor, length)
             if stretch[-1] > last or any(d in taken for d in stretch):

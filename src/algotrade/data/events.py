@@ -141,6 +141,13 @@ def latest_versions(
     if frame is None or frame.empty:
         return pd.DataFrame()
     frame = _known_by(frame, through).assign(**{KNOWN_FROM: lambda f: known_from(f).dt.date})
+    return latest_of(frame, key)
+
+
+def latest_of(frame: pd.DataFrame, key: Sequence[str]) -> pd.DataFrame:
+    """The latest stored version (``knowledge_ts``, then ``run_id``) of each ``key`` in
+    ``frame``, sorted by ``key``: the one rule ``latest_versions`` and a per-session read of
+    the stored versions share."""
     frame = frame.sort_values(["knowledge_ts", "run_id"], kind="stable")
     frame = frame.drop_duplicates(list(key), keep="last")
     return frame.sort_values(list(key), kind="stable").reset_index(drop=True)
@@ -207,15 +214,77 @@ def events_by_event_date(
 FILINGS_JOB = "filings"  # the ingestion task that writes events/filing: its run records
 
 
+FILINGS_DEFAULT_SINCE = date(2018, 1, 1)  # where a full per-CIK read of the filings task starts
+_READ_OK = ("OK", "NO_DATA")  # item statuses of a CIK that was read (a CIK with none is NO_DATA)
+
+
+@dataclass(frozen=True)
+class FilingCoverage:
+    """What the filings task's published runs say the stored ``events/filing`` rows are complete
+    for (``filing_coverage``): the clean daily-index walks (``walks``: ``session_date`` of the
+    run, ``walked_to``) and the full per-CIK reads (``reads``: ``cik``, the run's
+    ``session_date`` and ``covers_since``; one row per CIK and run, sorted by ``session_date``).
+    A walk says every CIK is complete through ``walked_to``; a read says that one CIK is
+    complete from ``covers_since`` through its run's session, whenever the session is asked
+    about: the filings known on a past session are the same on every later run."""
+
+    walks: pd.DataFrame
+    reads: pd.DataFrame
+
+    @property
+    def walked_to(self) -> date | None:
+        """The last index day an earlier clean walk read: where the next walk starts. Stored
+        filing dates do not say: a per-CIK run or a failed CIK moves them past unread days."""
+        return None if self.walks.empty else self.walks["walked_to"].max()
+
+    def asked_since(self) -> dict[str, date]:
+        """CIK -> the earliest date a read covers it from."""
+        if self.reads.empty:
+            return {}
+        return {str(c): s for c, s in self.reads.groupby("cik")["covers_since"].min().items()}
+
+
+def filing_coverage(
+    reader: StoreReader, forms: str | None = None, exclude: str | None = None
+) -> FilingCoverage:
+    """The coverage the filings task's published runs record. ``forms`` (the task's form-set
+    tag, ``stats["forms"]``) keeps only runs that read that form set (a run before the set grew
+    does not count: the ingestion backfill re-reads every CIK once; ``filing_activity`` needs
+    8-Ks only and passes none); ``exclude`` is a run id to leave out (the run asking).
+
+    A per-CIK run (``stats["covers_since"]``) reads each CIK it asked from that date; a nightly
+    only the CIKs it read in full (``stats["backfilled"]``) from ``FILINGS_DEFAULT_SINCE``. A CIK
+    counts when its item is OK or NO_DATA."""
+    walks, reads = [], []
+    for record in reader.runs(FILINGS_JOB):
+        if not published(record) or record.run_id == exclude:
+            continue
+        stats = record.stats
+        if stats.get("walked_to"):
+            walked = date.fromisoformat(stats["walked_to"])
+            walks.append({"session_date": record.session_date, "walked_to": walked})
+        if forms is not None and stats.get("forms") != forms:
+            continue
+        if stats.get("covers_since"):
+            start, ciks = date.fromisoformat(stats["covers_since"]), list(record.items)
+        else:
+            start, ciks = FILINGS_DEFAULT_SINCE, list(stats.get("backfilled") or [])
+        reads += [
+            {"cik": c, "session_date": record.session_date, "covers_since": start}
+            for c in ciks
+            if c.isdigit() and record.items.get(c, "").split(":", 1)[0] in _READ_OK
+        ]
+    frames = (
+        pd.DataFrame(walks, columns=["session_date", "walked_to"]),
+        pd.DataFrame(reads, columns=["cik", "session_date", "covers_since"]),
+    )
+    walk_frame, read_frame = (
+        f.sort_values("session_date", kind="stable").reset_index(drop=True) for f in frames
+    )
+    return FilingCoverage(walk_frame, read_frame)
+
+
 def filing_walks(reader: StoreReader) -> pd.DataFrame:
-    """The clean daily-index walks of the filings task: one row per published run that recorded
-    a ``walked_to`` (the last index day it read with no failed day or CIK), as ``session_date``
-    (the run's session) and ``walked_to``, sorted by ``session_date``. A per-CIK run or a
-    failed walk records none. Empty when there is none."""
-    rows = [
-        {"session_date": r.session_date, "walked_to": date.fromisoformat(r.stats["walked_to"])}
-        for r in reader.runs(FILINGS_JOB)
-        if published(r) and r.stats.get("walked_to")
-    ]
-    frame = pd.DataFrame(rows, columns=["session_date", "walked_to"])
-    return frame.sort_values("session_date", kind="stable").reset_index(drop=True)
+    """The clean daily-index walks of the filings task (``filing_coverage(reader).walks``):
+    ``session_date`` of the run, ``walked_to``, sorted by ``session_date``; empty when none."""
+    return filing_coverage(reader).walks

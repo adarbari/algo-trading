@@ -40,8 +40,10 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Ben-David, I., Franzoni, F. and Moussawi, R., Do ETFs Increase Volatility?, Journal of Finance, 2018
-- Brown, D., Davies, S. and Ringgenberg, M., ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance, 2021
+- Ben-David, I., Franzoni, F. and Moussawi, R., Do ETFs Increase Volatility?, Journal of Finance, 2018 <https://www.nber.org/papers/w20071>
+- Brown, D., Davies, S. and Ringgenberg, M., ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance, 2021 <https://ideas.repec.org/a/oup/revfin/v25y2021i4p937-972..html>
+- Coval, J. and Stafford, E. (2005), Asset Fire Sales (and Purchases) in Equity Markets, NBER working paper 11357 (Journal of Financial Economics 2007) <https://www.nber.org/papers/w11357>
+- Wurgler, J. and Zhuravskaya, E. (2002), Does Arbitrage Flatten Demand Curves for Stocks?, Journal of Business <https://ideas.repec.org/a/ucp/jnlbus/v75y2002i4p583-608.html>
 
 ## High-volume return premium (`high_volume_return_premium`)
 
@@ -55,7 +57,7 @@ Back to the [index of every edge](../edges.md).
 - **Baselines:** `momentum_12_1`, `size_small`
 - **Frozen period:** from 2026-04-01
 - **Published:** decile spread 0.50% over 20 sessions (Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001, 34 years)
-- **Notes:** volume_shock is today's volume at or above 2 standard deviations over the previous 20 sessions (Gervais et al. use the top 10% of a 50-day reference: a looser, own-history version). volume_shock_no_news adds news_free_5d: no 8-K or 8-K/A through the previous session in the last 5 and no earnings reaction window in them; it is a practitioner hypothesis with no published number. The catalogue's variant also drops days with an absolute return of 1 standard deviation or more; the screener omits that condition. news_free_5d is null until the filings walk covers the session (filing_activity@v1 fails closed): the live store has no filing history until the filings backfill runs (EDGAR submissions from 2018-01-01 is the planned span), so volume_shock_no_news has no sessions today. Once the backfill is done, about 100 independent 20-session windows from 2018-01 are expected (about 2,000 sessions); volume_shock needs only bars and the volume rollup, so it has the bar history (2010 on, once the rollup is backfilled). The sign depends on the horizon and on an extreme return (the retail-herding literature finds the opposite at 5 days): the harness's 20 sessions is the paper's horizon. Earnings-day shocks are in volume_shock; the no-news variant removes them. Long side only.
+- **Notes:** volume_shock is today's volume at or above 2 standard deviations over the previous 20 sessions (Gervais et al. use the top 10% of a 50-day reference: a looser, own-history version). volume_shock_no_news adds news_free_5d: no 8-K or 8-K/A through the previous session in the last 5 and no earnings reaction window in them; it is a practitioner hypothesis with no published number. The catalogue's variant also drops days with an absolute return of 1 standard deviation or more; the screener omits that condition. news_free_5d is null until the filings walk covers the session (filing_activity@v1 fails closed): the live store has no filing history until the filings backfill runs (EDGAR submissions from 2018-01-01 is the planned span), so volume_shock_no_news has no sessions today. Once the backfill is done and filing_activity@v1 is rebuilt over history (algotrade-ingest rollups --from <first session> --to <last session> --only filing_activity@v1: a per-CIK read covers the past sessions of its own company), about 100 independent 20-session windows from 2018-01 are expected (about 2,000 sessions); volume_shock needs only bars and the volume rollup, so it has the bar history (2010 on, once the rollup is backfilled). The sign depends on the horizon and on an extreme return (the retail-herding literature finds the opposite at 5 days): the harness's 20 sessions is the paper's horizon. Earnings-day shocks are in volume_shock; the no-news variant removes them. Long side only.
 
 **Quality bar**
 
@@ -72,8 +74,9 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001 <https://rodneywhitecenter.wharton.upenn.edu/wp-content/uploads/2014/04/9901.pdf>
-- Kaniel, R., Ozoguz, A. and Starks, L., The High Volume Return Premium: Cross-Country Evidence, Journal of Financial Economics, 2012
+- Kaniel, R., Ozoguz, A. and Starks, L., The High Volume Return Premium: Cross-Country Evidence, Journal of Financial Economics, 2012 <https://ideas.repec.org/a/eee/jfinec/v103y2012i2p255-279.html>
 - Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (the signal catalogue; no volume-shock predictor of this paper) <https://github.com/OpenSourceAP/CrossSection>
+- Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html>
 
 ## Option-expiration week (`option_expiration_week`)
 
@@ -134,8 +137,10 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Harvey, C., Mazzoleni, M. and Melone, A., The Unintended Consequences of Rebalancing, NBER working paper 33554, 2025 <https://www.nber.org/papers/w33554>
-- Bikker, J., Broeders, D. and de Dreu, J., Stock market performance and pension fund investment policy: rebalancing, free float, or market timing?, International Journal of Central Banking, 2010
+- Bikker, J., Broeders, D. and de Dreu, J., Stock market performance and pension fund investment policy: rebalancing, free float, or market timing?, International Journal of Central Banking, 2010 <https://www.ijcb.org/journal/ijcb10q2a3.htm>
 - CXO Advisory, Exploiting predictable institutional portfolio rebalancing <https://cxoadvisory.com/calendar-effects/exploiting-predictable-institutional-portfolio-rebalancing>
+- Etula, E., Rinne, K., Suominen, M. and Vaittinen, L. (2020), Dash for Cash: Monthly Market Impact of Institutional Liquidity Needs, Review of Financial Studies (Aalto repository) <https://aaltodoc.aalto.fi/items/00fea0ae-963b-444c-8221-912121905b98>
+- McConnell, J. and Xu, W. (2008), Equity Returns at the Turn of the Month, Financial Analysts Journal <https://ideas.repec.org/a/taf/ufajxx/v64y2008i2p49-64.html>
 
 ## Crowded shorts by days to cover (`short_squeeze_days_to_cover`)
 
@@ -165,8 +170,9 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Hong, H., Li, W., Ni, S., Scheinkman, J. and Yan, P., Days to Cover and Stock Returns, NBER working paper 21166, 2015 <https://www.nber.org/papers/w21166>
-- Boehmer, E., Huszar, Z. and Jordan, B., The good news in short interest, Journal of Financial Economics, 2010
-- Rapach, D., Ringgenberg, M. and Zhou, G., Short interest and aggregate stock returns, Journal of Financial Economics, 2016
+- Boehmer, E., Huszar, Z. and Jordan, B., The good news in short interest, Journal of Financial Economics, 2010 <https://ideas.repec.org/a/eee/jfinec/v96y2010i1p80-97.html>
+- Rapach, D., Ringgenberg, M. and Zhou, G., Short interest and aggregate stock returns, Journal of Financial Economics, 2016 <https://ideas.repec.org/a/eee/jfinec/v121y2016i1p46-65.html>
+- CXO Advisory, Aggregate Short Interest and Future Stock Market Returns (summary of Rapach, Ringgenberg and Zhou) <https://cxoadvisory.com/short-selling/aggregate-short-interest-and-future-stock-market-returns>
 
 ## Turn of the month (`turn_of_the_month`)
 
@@ -195,9 +201,11 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- McConnell, J. and Xu, W., Equity Returns at the Turn of the Month, Financial Analysts Journal, 2008
+- McConnell, J. and Xu, W., Equity Returns at the Turn of the Month, Financial Analysts Journal, 2008 <https://ideas.repec.org/a/taf/ufajxx/v64y2008i2p49-64.html>
 - Etula, E., Rinne, K., Suominen, M. and Vaittinen, L., Dash for Cash: Monthly Market Impact of Institutional Liquidity Needs, Review of Financial Studies, 2020 <https://aaltodoc.aalto.fi/items/00fea0ae-963b-444c-8221-912121905b98>
 - Quantpedia, Turn of the Month in Equity Indexes <https://quantpedia.com/strategies/turn-of-the-month-in-equity-indexes>
+- Ogden, J. (1990), Turn-of-Month Evaluations of Liquid Profits and Stock Returns: A Common Explanation for the Monthly and January Effects, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v45y1990i4p1259-72.html>
+- Lakonishok, J. and Smidt, S. (1988), Are Seasonal Anomalies Real? A Ninety-Year Perspective, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v1y1988i4p403-425.html>
 
 ## Closed-end fund discount reversion (`closed_end_fund_discounts`)
 
@@ -228,6 +236,8 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Lee, C., Shleifer, A. and Thaler, R., Investor Sentiment and the Closed-End Fund Puzzle, Journal of Finance, 1991
-- Bradley, M., Brav, A., Goldstein, I. and Jiang, W., Activist Arbitrage: A Study of Open-Ending Attempts of Closed-End Funds, Journal of Financial Economics, 2010
+- Lee, C., Shleifer, A. and Thaler, R., Investor Sentiment and the Closed-End Fund Puzzle, Journal of Finance, 1991 <https://www.nber.org/papers/w3465>
+- Bradley, M., Brav, A., Goldstein, I. and Jiang, W., Activist Arbitrage: A Study of Open-Ending Attempts of Closed-End Funds, Journal of Financial Economics, 2010 <https://ideas.repec.org/a/eee/jfinec/v95y2010i1p1-19.html>
 - Patro, D., Piccotti, L. and Wu, Y., closed-end fund discounts (Quantpedia strategy summary) <https://hedgefundalpha.com/strategies/closed-end-fund-discounts/>
+- Patro, D., Piccotti, L. and Wu, Y. (2017), Exploiting Closed-End Fund Discounts: A Systematic Examination of Alphas, Journal of Financial Research <https://ideas.repec.org/a/bla/jfnres/v40y2017i2p223-248.html>
+- Pontiff, J. (1996), Costly Arbitrage: Evidence from Closed-End Funds, Quarterly Journal of Economics <https://ideas.repec.org/a/oup/qjecon/v111y1996i4p1135-1151..html>

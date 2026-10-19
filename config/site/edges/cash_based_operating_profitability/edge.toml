@@ -12,6 +12,7 @@ top_k = 50
 screeners = ["cash_op_profitability"]
 baselines = ["size_small", "momentum_12_1"]
 status = "candidate"
+mechanism_kind = "mispriced_fundamentals"
 frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). cash_op_profitability is built from stored lines (EBIT less the gap between net income and operating cash flow, over total assets): the paper's line by line accrual changes and its R&D add-back are not stored, so it is a proxy, not a replication; decile sorts are the harness's, not the paper's NYSE breakpoints. long_short, where run, is diagnostic only (ADR 0053 amendment, outcome sides)."""
 

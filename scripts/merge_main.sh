@@ -13,7 +13,7 @@
 #   apps/web/src/shared/api/generated/*           npm run api:generate        (apps/web)
 #   apps/web/design-system/COMPONENTS.md          npm run components:md       (apps/web)
 #   apps/web/design-system/tokens/tokens.css      npm run tokens              (apps/web)
-#   docs/data/features.md, docs/data/field-guide.md   make features-doc
+#   docs/data/features.md, docs/data/field-guide.md, docs/data/field-guide/**   make features-doc
 #   *.png (screenshots)                           main's; rerun `make web-visual` afterwards
 #
 # Gates after the commit: `npm run generated:check` when a web file was regenerated, and a clean
@@ -42,7 +42,7 @@ kind_of() {
     apps/web/src/shared/api/generated/*) echo webgen ;;
     apps/web/design-system/COMPONENTS.md) echo components ;;
     apps/web/design-system/tokens/tokens.css) echo tokens ;;
-    docs/data/features.md | docs/data/field-guide.md) echo docs ;;
+    docs/data/features.md | docs/data/field-guide.md | docs/data/field-guide/*) echo docs ;;
     *.png) echo png ;;
     *) echo "" ;;
   esac

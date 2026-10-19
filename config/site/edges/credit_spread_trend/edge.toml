@@ -1,0 +1,90 @@
+# Edge document (ADR 0053, ADR 0074; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/trend-macro.md (credit_spread_trend).
+# An allocation edge (EB E5): a weighted book of ETFs against a blended benchmark of its own list.
+id = "credit_spread_trend"
+name = "Credit trend timing"
+family = "E"
+thesis = "High-yield and investment-grade bond funds on a rising trend keep rising, so holding each only while its own 12-month return is positive beats holding both always."
+mechanism = """Credit cycles are slow (default waves take quarters), fund flows and dealer balance-sheet limits
+make high-yield trends persistent, and high-yield returns are equity beta with a coupon that trends
+like equities (Jostova, Nikolova, Philipov and Stahel 2013)."""
+persistence = """Credit's negative convexity (a small coupon and a large crash) keeps buy-and-hold owners slow to
+react, and regulated investors sell after a downgrade; the rule whipsaws in fast V-shaped years
+(2011, 2018, 2020)."""
+schedule = "month_end"
+top_k = 2
+screeners = [
+  "trend_positive_6m", "trend_positive_12m",
+]
+base = "benchmark"
+oos_class = "trend"
+status = "candidate"
+mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the screens are run and evaluated. PROXY: the idea is a spread trend;
+this version uses the funds' own price trend as the stand-in (HYG for high yield, LQD for investment
+grade). LIMITS: (1) the source switches to Treasuries (IEF) when credit weakens; the outcome has no
+conditional fallback asset, so the slot is cash at the Treasury bill yield and the IEF leg is not
+built. (2) The macro version (the option-adjusted spread series BAMLH0A0HYM2 and BAMLC0A0CM crossing
+its 50 and 200 day average) needs a bridging group that makes a macro series a per-fund field: not
+built, no claim. (3) Price only: the coupon of both funds (the larger part of a credit return) is in
+neither the book nor the benchmark, and the cash leg earns the bill, so a falling-trend period is
+compared with the benchmark's price alone. (4) The book holds each fund at half while its trend is
+up; cost_bps 10 a round trip assumed. The ensemble of 6 and 12 months is ONE trial; the 10-month
+average variant is in absolute_momentum_crash_filter's family and is not repeated. verdict.toml
+[oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and
+the out-of-sample one beside the result, as display only."""
+
+[ensemble]
+variants = ["trend_positive_6m", "trend_positive_12m"]
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["HYG", "LQD"] },
+]
+
+[outcome]
+kind = "portfolio_return"
+horizon_sessions = [21]
+benchmark = "mix:HYG=0.5,LQD=0.5"
+start_offset_sessions = 1
+cost_bps = 10
+weighting = "equal"
+
+[quality_bar]
+outcome = """The book's return over the 21 sessions from the close after each month end, less half HYG and half
+LQD over the same sessions, net of cost on the weight change; a fund whose trend is down is held as
+cash. Price only: the stored forward return is close to close and carries no dividend or
+distribution, so the book and the benchmark both miss their yield and cash earns the Treasury bill."""
+trigger_timing = """Trailing returns are read at the month-end close D; the book is held from the next session's close S
+for 21 sessions. Nothing after D enters a pick."""
+replication = """The practitioner rule (Faber-style): monthly, the high-yield index above its 10-month average or a
+positive 12-month excess return, long high yield, else Treasuries. Jostova et al. (2013) find
+momentum in non-investment-grade bonds (not verified here). Here: HYG and LQD, positive 6 and 12
+month raw return, else cash."""
+expected_size = """Trend rules cut the 2008 (HYG down 26 percent) and 2015 to 2016 energy drawdowns in backtests and
+cost whipsaw in 2011, 2018 and 2020 (the page's specific study was not fetched; figures not
+verified)."""
+capacity_costs = """Large capacity in two funds; about 3 to 5 switches a year; spreads are small; cost_bps 10 assumed;
+the cost of the missed coupon is the real drag and is not modelled."""
+failure_modes = """Equity beta (HYG correlates near 0.7 with SPY) and duration; two funds give few independent choices.
+Retire if the frozen-period picks-series t is under 2."""
+decoys = """Equity beta, duration, and the tsmom edge (HYG is one of its assets): compare with
+tsmom_multi_asset_etf and the regime label's market-stress reading."""
+
+[[sources]]
+title = "Jostova, G., Nikolova, S., Philipov, A. and Stahel, C., Momentum in Corporate Bond Returns, Review of Financial Studies, 2013"
+url = "https://ideas.repec.org/a/oup/rfinst/v26y2013i7p1649-1693.html"
+
+[[sources]]
+title = "Faber, M., A Quantitative Approach to Tactical Asset Allocation, Journal of Wealth Management, 2007"
+url = "https://papers.ssrn.com/abstract=962461"
+
+[[sources]]
+title = "Hurst, B., Ooi, Y. and Pedersen, L. (2017), A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing"
+
+[[sources]]
+title = "Moskowitz, T., Ooi, Y. and Pedersen, L. (2012), Time Series Momentum, Journal of Financial Economics (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum"

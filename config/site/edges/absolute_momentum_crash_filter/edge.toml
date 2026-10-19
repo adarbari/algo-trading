@@ -1,0 +1,113 @@
+# Edge document (ADR 0053, ADR 0074; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/trend-macro.md (absolute_momentum_crash_filter, sma10_timing_faber).
+# An allocation edge (EB E5): a weighted book of ETFs against a blended benchmark of its own list.
+id = "absolute_momentum_crash_filter"
+name = "Absolute momentum and moving-average timing"
+family = "E"
+thesis = "Holding each of five asset classes only while its own price trend is up, and cash otherwise, keeps most of the return of holding them all and cuts the drawdowns."
+mechanism = """Bear markets last longer than a year at the median, so a slow exit still avoids most of the damage;
+the same under-reaction and forced selling as trend (Antonacci 2013; Faber 2007)."""
+persistence = """The rule costs return in sideways and V-shaped markets (2011, 2015 to 2016, 2020, 2023), which is
+when holders abandon it; it is out of the market most of the time it beats buy and hold only in the
+few deep falls (Zakamulin). A claim of drawdown control, not of alpha."""
+schedule = "month_end"
+top_k = 5
+screeners = [
+  "trend_positive_6m", "trend_positive_12m", "etf_above_200d",
+]
+base = "benchmark"
+oos_class = "trend"
+status = "candidate"
+mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history and evaluated. The
+universe is Faber's five asset classes as ETFs (US stocks, foreign stocks, US 10-year Treasuries,
+commodities, real estate), 20 percent each when invested, equal weights; the benchmark is the same
+five held always, so the value is what the timing adds or costs against a passive five-asset mix.
+Three screeners, ensembled into ONE trial: the 6 and 12 month raw return above 0 (Antonacci's
+absolute momentum, which uses 12 months of excess return over the bill) and the close above the
+200-session average (Faber's 10-month average of month-end closes: the daily 200-session mean is the
+stored stand-in). LIMITS: not built, and the document does not claim them: (1) Keller's VAA and DAA
+canary (a breadth count of negative-momentum assets among VWO and BND setting the cash share, with
+the 13612W momentum weights) is not expressible: the outcome has no signal-weighted cash share, and
+the canary needs the cash fraction b/B per month. Only the canary rule alone would be testable, and
+it needs that weighting. (2) Dual momentum's relative leg is in dual_momentum_gem. (3) Index levels
+before the ETFs (IDX:SPX) are not used. (4) Cash is the Treasury bill yield, not the 90-day bill of
+Faber; no distributions, so a fund's yield is missing from book and benchmark; cost_bps 6 a round
+trip assumed. The page's near-identical signals (Faber's rule and absolute momentum correlate near
+0.9) are why the three are averaged and not run as three trials. verdict.toml [oos_haircut] trend =
+0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one
+beside the result, as display only."""
+
+[ensemble]
+variants = ["trend_positive_6m", "trend_positive_12m", "etf_above_200d"]
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SPY", "EFA", "IEF", "DBC", "VNQ"] },
+]
+
+[outcome]
+kind = "portfolio_return"
+horizon_sessions = [21]
+benchmark = "mix:SPY=0.2,EFA=0.2,IEF=0.2,DBC=0.2,VNQ=0.2"
+start_offset_sessions = 1
+cost_bps = 6
+weighting = "equal"
+
+[quality_bar]
+outcome = """The five-fund book's return over the 21 sessions from the close after each month end, less the equal
+five-fund mix's over the same sessions, net of the cost on the weight change; a fund whose trend is
+down is held as cash at the bill yield. Price only: the stored forward return is close to close and
+carries no dividend or distribution, so the book and the benchmark both miss their yield and cash
+earns the Treasury bill."""
+trigger_timing = """The trailing returns and the 200-session mean are read at the month-end close D; the book is held
+from the next session's close S for 21 sessions. Nothing after D enters a pick."""
+replication = """Antonacci (2013): monthly, hold the asset if its 12-month excess return over the bill is above 0,
+else bills; eight asset classes, 1973 to 2012, 0.2 percent a switch. Faber (2007): month-end close
+above the 10-month average, 20 percent per asset, bills otherwise. Here: five ETFs, raw returns and
+a 200-day stand-in, the three averaged."""
+expected_size = """Antonacci (index data, in sample): for a 60/40 mix the Sharpe ratio rises from 0.47 to 0.72 and the
+drawdown falls from 29 to 13 percent; for an equal-weight five-asset mix the Sharpe ratio rises from
+0.62 to 1.06. Faber in sample 1972 to 2005: Sharpe 0.81; out of sample 2006
+to 2025 (a 200-day variant): 0.68 (Concretum). Expect the timing to lose to a passive mix on return
+in most years."""
+capacity_costs = """Unlimited capacity in five liquid funds; about 5 to 8 trades a year in all; a few basis points a
+trade (6 assumed). The tax cost of the switches is not deducted."""
+failure_modes = """The 12-month lookback was the best of 2 to 18 months in sample, and the 2020 fall was too fast to
+exit before the bottom. Retire if the frozen-period picks-series t is under 2 or the book does not
+lower the passive mix's drawdown in the run record."""
+decoys = """Pure beta timing, so a rising market makes the book trail its benchmark by design: the informative
+figures are the drawdown and the Sharpe ratio, in the run record, against the passive five. The
+1970s bond bear and 2008 dominate the published samples."""
+
+[[sources]]
+title = "Antonacci, G., Absolute Momentum: A Simple Rule-Based Strategy and Universal Trend-Following Overlay, SSRN, 2013"
+
+[[sources]]
+title = "Faber, M., A Quantitative Approach to Tactical Asset Allocation, Journal of Wealth Management, 2007"
+url = "https://papers.ssrn.com/abstract=962461"
+
+[[sources]]
+title = "Zakamulin, V., A comprehensive look at the empirical performance of moving average trading strategies, SSRN, 2016"
+url = "https://papers.ssrn.com/abstract=2677212"
+
+[[sources]]
+title = "Keller, W. and Keuning, J., Breadth momentum and Vigilant Asset Allocation, SSRN, 2017"
+
+[[sources]]
+title = "CXO Advisory, Intrinsic Momentum across Asset Classes (summary of Antonacci (2013), Absolute Momentum)"
+url = "https://www.cxoadvisory.com/momentum-investing/intrinsic-momentum-across-asset-classes/"
+
+[[sources]]
+title = "Moskowitz, T., Ooi, Y. and Pedersen, L. (2012), Time Series Momentum, Journal of Financial Economics (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum"
+
+[[sources]]
+title = "CXO Advisory, Market Timing with Moving Averages over the Very Long Run (summary of Zakamulin (2015))"
+url = "https://www.cxoadvisory.com/technical-trading/market-timing-with-moving-averages-over-the-very-long-run"
+
+[[sources]]
+title = "Hurst, B., Ooi, Y. and Pedersen, L. (2017), A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing"

@@ -1,0 +1,245 @@
+# Researched, not built: family B (events) of the edge-idea catalogue, one [[idea]] each (ADR 0051; keys in config/site/guide/ideas.py).
+
+family = "B"
+
+[[idea]]
+id = "double_surprise_pead_small"
+title = "Drift after both earnings and revenue beat"
+mechanism_kind = "slow_to_update"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned as a variant of small-cap earnings drift, but it needs historical revenue consensus, which the store does not hold."
+
+[[idea]]
+id = "analyst_dispersion_short"
+title = "High analyst disagreement predicts weak returns"
+mechanism_kind = "lottery_demand"
+verdict = "decayed"
+feasibility = "needs_data"
+why_not_built = "The effect has faded to a filter at best, and per-analyst estimate spread is not stored."
+
+[[idea]]
+id = "recommendation_change_drift"
+title = "Analyst upgrades and downgrades"
+mechanism_kind = "slow_to_update"
+verdict = "dead"
+feasibility = "out_of_scope"
+why_not_built = "Published evidence is dead and the free feed is too coarse, so it is out of scope."
+
+[[idea]]
+id = "guidance_change_drift"
+title = "Management guidance raises and cuts"
+mechanism_kind = "slow_to_update"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but guidance figures are not stored and would have to be extracted from earnings releases by the text model."
+
+[[idea]]
+id = "call_tone_change_drift"
+title = "Earnings call tone and tone change"
+mechanism_kind = "informed_footprints"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Earnings call transcripts have no licence-clean free feed, so the build plan leaves it out until a source appears."
+
+[[idea]]
+id = "earnings_streak_drift"
+title = "Streaks of earnings beats and their breaks"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Published evidence is weak, so it is not built."
+
+[[idea]]
+id = "pead_large_vs_small_since_2010"
+title = "Where earnings drift still lives"
+mechanism_kind = "slow_to_update"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "It is a retirement check for the small-cap earnings-drift edge, not an edge of its own."
+
+[[idea]]
+id = "activist_13d_drift"
+title = "Activist Schedule 13D filings"
+mechanism_kind = "informed_footprints"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Planned, but Schedule 13D filings are not ingested yet and the evidence is mixed."
+
+[[idea]]
+id = "merger_arb_cash_deals"
+title = "Spreads on announced cash takeovers"
+mechanism_kind = "paid_for_risk"
+verdict = "promising"
+feasibility = "needs_data"
+why_not_built = "Planned, but announced-deal terms are not stored and would have to be extracted from filings."
+
+[[idea]]
+id = "acquirer_stock_deal_underperformance"
+title = "Acquirers that pay with their own stock"
+mechanism_kind = "mispriced_fundamentals"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak, and the net share issuance edge already covers its continuous version."
+
+[[idea]]
+id = "ipo_lockup_expiry"
+title = "IPO lockup expiry pressure"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Lockup dates are not stored; it is planned only as an avoid-list filter once they are."
+
+[[idea]]
+id = "ipo_long_run_underperformance"
+title = "Recent IPOs lag for several years"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak as a return source; it is useful only as an exclusion filter, so it is not built as an edge."
+
+[[idea]]
+id = "despac_underperformance"
+title = "Weak returns after a SPAC merger"
+mechanism_kind = "lottery_demand"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The effect has faded as trading volume dried up; it is kept only as a flag."
+
+[[idea]]
+id = "nasdaq100_reconstitution"
+title = "Nasdaq-100 yearly index changes"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "out_of_scope"
+why_not_built = "Too few events a year to meet the harness's minimum event count, and the change calendar is not stored."
+
+[[idea]]
+id = "sp400_600_additions_from_outside"
+title = "Additions to the mid and small-cap S&P indexes"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak evidence, and only S&P 500 membership is stored; low priority."
+
+[[idea]]
+id = "credit_rating_downgrade_drift"
+title = "Drift after credit rating downgrades"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak evidence, and no free structured feed of rating actions exists."
+
+[[idea]]
+id = "bankruptcy_emergence_equity"
+title = "Shares issued when a company leaves bankruptcy"
+mechanism_kind = "forced_flows"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Too few events and no stored list of emergences; low priority."
+
+[[idea]]
+id = "dividend_initiation_omission"
+title = "Dividend starts and cuts as events"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Published evidence is weak, so it is not built."
+
+[[idea]]
+id = "dividend_change_at_earnings"
+title = "Dividend raises announced with earnings"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Published evidence is weak, so it is not built."
+
+[[idea]]
+id = "special_dividend_announcement"
+title = "One-off special dividends"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak evidence, since modern special dividends are mostly tax-driven; low priority."
+
+[[idea]]
+id = "ex_dividend_capture"
+title = "Buying just before the ex-dividend day"
+mechanism_kind = "forced_flows"
+verdict = "dead"
+feasibility = "out_of_scope"
+why_not_built = "The published effect is dead, so it is out of scope."
+
+[[idea]]
+id = "stock_split_announcement_drift"
+title = "Stock split announcements"
+mechanism_kind = "slow_to_update"
+verdict = "decayed"
+feasibility = "out_of_scope"
+why_not_built = "The effect has faded and momentum already explains it, so it is out of scope."
+
+[[idea]]
+id = "seo_announcement_underperformance"
+title = "Share offerings by existing public companies"
+mechanism_kind = "mispriced_fundamentals"
+verdict = "decayed"
+feasibility = "data_ready"
+why_not_built = "The event effect has faded; the net share issuance edge already covers it."
+
+[[idea]]
+id = "earnings_timing_afterhours_friday"
+title = "Bad news released late or on a Friday"
+mechanism_kind = "slow_to_update"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak as a signal; it is useful only as a covariate, so it is not built as an edge."
+
+[[idea]]
+id = "conference_presentation_drift"
+title = "Broker conferences and investor days"
+mechanism_kind = "informed_footprints"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak evidence, and there is no stored calendar of conference events."
+
+[[idea]]
+id = "pdufa_decision_drift"
+title = "FDA drug decision dates"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak evidence, and no calendar of decision dates is stored; low priority."
+
+[[idea]]
+id = "uplisting_otc_to_nasdaq"
+title = "Move from over-the-counter to a major exchange"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "needs_data"
+why_not_built = "Weak evidence, and over-the-counter names sit outside our universe."
+
+[[idea]]
+id = "name_change_fad"
+title = "Company renamed toward a fad"
+mechanism_kind = "lottery_demand"
+verdict = "weak"
+feasibility = "data_ready"
+why_not_built = "Weak; at most an avoid filter, and it needs name-change filings tagged first."
+
+[[idea]]
+id = "earnings_date_advance_delay"
+title = "Earnings dates moved earlier or later"
+mechanism_kind = "slow_to_update"
+filed_as = "earnings_date_shift"
+
+[[idea]]
+id = "net_share_count_change"
+title = "Net share issuance and buybacks"
+mechanism_kind = "mispriced_fundamentals"
+filed_as = "net_share_issuance"
+
+[[idea]]
+id = "spinoff_parent_and_spinco"
+title = "Spin-offs: parent and new company"
+mechanism_kind = "forced_flows"
+filed_as = "spinoff_drift"

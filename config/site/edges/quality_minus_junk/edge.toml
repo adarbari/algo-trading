@@ -12,6 +12,7 @@ top_k = 50
 screeners = ["qmj"]
 baselines = ["size_small", "momentum_12_1"]
 status = "candidate"
+mechanism_kind = "mispriced_fundamentals"
 frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). qmj_score is built from what the stored statements support: profitability in full (gross profit over assets, ROE, ROA, cash flow over assets, gross margin, low accruals) and safety only as low leverage and low Ohlson O-score; the paper's growth part (five-year changes), low beta, Altman Z and earnings volatility are not built (no stored five-year history of the measures, beta and volatility are price based and another group). Not size-neutral and not within industry, as the paper is. long_short, where run, is diagnostic only."""
 
@@ -39,6 +40,7 @@ decoys = """Cash-based operating profitability alone (Novy-Marx finds most quali
 
 [[sources]]
 title = "Asness, C., Frazzini, A. and Pedersen, L., Quality Minus Junk, Review of Accounting Studies, 2019"
+url = "https://ideas.repec.org/a/spr/reaccs/v24y2019i1d10.1007_s11142-018-9470-2.html"
 
 [[sources]]
 title = "Novy-Marx, R., The Quality Dimension of Value Investing, working paper, 2014"
@@ -46,6 +48,14 @@ title = "Novy-Marx, R., The Quality Dimension of Value Investing, working paper,
 [[sources]]
 title = "Alpha Architect, Value and Quality Stocks (summary of the AQR data)"
 url = "https://alphaarchitect.com/value-and-quality-stocks/"
+
+[[sources]]
+title = "Novy-Marx, R. (2010), The Other Side of Value: Good Growth and the Gross Profitability Premium, NBER working paper 15940 (Journal of Financial Economics 2013)"
+url = "https://www.nber.org/papers/w15940"
+
+[[sources]]
+title = "Ball, R., Gerakos, J., Linnainmaa, J. and Nikolaev, V. (2016), Accruals, Cash Flows, and Operating Profitability in the Cross Section of Stock Returns, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v121y2016i1p28-45.html"
 
 [[variants]]
 id = "spread"

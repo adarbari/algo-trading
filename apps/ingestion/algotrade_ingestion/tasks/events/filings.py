@@ -13,7 +13,7 @@ Only names in the
 universe snapshot the run reads are fetched: a name already delisted is not.
 A run records ``stats["forms"] = FORMS_TAG`` (the form set and ``KNOWN_FROM_RULE``): a run that
 read a CIK before the form set grew, or before the ``known_from`` rule changed, does not count as
-having covered it (``asked_since``), so one backfill re-reads every CIK once; the rows it writes
+having covered it (``filing_coverage``), so one backfill re-reads every CIK once; the rows it writes
 supersede the stored ones (same ``accession``, later ``knowledge_ts``).
 
 **Names**: the session's universe snapshot minus the funds (``security_type`` ETF / ETN: a fund
@@ -84,7 +84,12 @@ import pandas as pd
 
 from algotrade.core.model.instruments import pad_cik
 from algotrade.core.time.calendar import EXCHANGE_TZ, is_weekend
-from algotrade.data.events import ALL_TIME, acceptance_sessions, filing_walks
+from algotrade.data.events import (
+    ALL_TIME,
+    FILINGS_DEFAULT_SINCE,
+    acceptance_sessions,
+    filing_coverage,
+)
 from algotrade.data.reference import companies, load_universe
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.schemas import EARNINGS_8K_SOURCE
@@ -108,7 +113,7 @@ from algotrade_sources.framework.series import (
 TASK = "filings"
 TABLE = "events/filing"  # the table this task owns (architecture/tables.toml)
 EARNINGS = "events/earnings"  # also written: the Item 2.02 rows (its writers: tables.toml)
-DEFAULT_SINCE = date(2018, 1, 1)
+DEFAULT_SINCE = FILINGS_DEFAULT_SINCE
 HISTORY_SINCE = date(2004, 8, 23)  # the backfill's depth: SEC's current 8-K item numbers start here
 KNOWN_FROM_RULE = "known_from=acceptance_session"  # EB H4: the rule rows are stamped with
 # The form set and the known_from rule a run read: a change to either changes the tag, so a
@@ -306,33 +311,12 @@ def previous_runs(run: IngestRun, task: str = TASK) -> list[RunRecord]:
     return [r for r in run.reader.runs(task) if r.status in PUBLISHED and r.run_id != run.run_id]
 
 
-def asked_since(run: IngestRun) -> dict[str, date]:
-    """CIK -> the earliest date an earlier run of the current form set (``FORMS_TAG``) read it
-    from (item ``OK`` or ``NO_DATA``): a
-    per-CIK run covers every CIK it asked from its ``covers_since``, a nightly only the CIKs it
-    read in full (``backfilled``, from ``DEFAULT_SINCE``)."""
-    out: dict[str, date] = {}
-    for record in previous_runs(run):
-        stats = record.stats
-        if stats.get("covers_since"):
-            start, ciks = date.fromisoformat(stats["covers_since"]), list(record.items)
-        else:
-            start, ciks = DEFAULT_SINCE, list(stats.get("backfilled") or [])
-        if stats.get("forms") != FORMS_TAG:  # read before the form set grew: not covered
-            continue
-        for cik in ciks:
-            if status_label(record.items.get(cik, "")) in ("OK", "NO_DATA"):
-                out[cik] = min(start, out.get(cik, start))
-    return out
-
-
 def last_walked(run: IngestRun, task: str = TASK) -> date | None:
     """The last index day an earlier nightly read cleanly (no failed day or index-asked CIK):
     where the next walk starts. Stored filing dates do not say: a per-CIK run (``--symbols``,
     ``--limit``) or a failed CIK moves them past days never read."""
     if task == TASK:
-        walks = filing_walks(run.reader)  # the one clean-walk rule, also read by filing_activity
-        return None if walks.empty else walks["walked_to"].max()
+        return filing_coverage(run.reader).walked_to  # the one clean-walk rule
     walked = [  # another task walking the same index (insider): the same rule over its own runs
         date.fromisoformat(r.stats["walked_to"])
         for r in previous_runs(run, task)
@@ -510,7 +494,8 @@ def ingest_filings(
         start = walked or (max(stored["filing_date"]) if len(stored) else None)
         daily = index is not None and since is None and not requested and start is not None
         skipped, days_asked, first_day, last_day, clean = 0, 0, None, None, False
-        asked, backfilled = asked_since(run), []
+        asked = filing_coverage(run.reader, FORMS_TAG, exclude=run.run_id).asked_since()
+        backfilled: list[str] = []
         if daily:
             assert index is not None and start is not None
             filers, days_asked = read_index_days(run, index, filing_days(start, session))

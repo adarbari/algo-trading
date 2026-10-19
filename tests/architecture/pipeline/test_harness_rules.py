@@ -127,3 +127,16 @@ def test_claude_md_names_the_four_model_tiers() -> None:
     for tier in ("Haiku = `checker`", "Sonnet = `implementer`", "Opus = `architect`",
                  "orchestrating session"):  # fmt: skip
         assert tier in section, f"CLAUDE.md must name the tier: {tier}"
+
+
+def test_append_only_logs_merge_by_union() -> None:
+    # parallel PRs each append a row; without this every pair conflicted (2026-10 edge build)
+    attrs = (REPO / ".gitattributes").read_text().split("\n")
+    for log in ("docs/decisions/log.md", "docs/history.md"):
+        assert f"{log} merge=union" in attrs, log
+
+
+def test_the_release_skill_names_the_auto_merge_nudge() -> None:
+    skill = (REPO / ".claude/skills/review-and-release/SKILL.md").read_text()
+    assert "gh workflow run auto-merge.yml" in skill
+    assert "workflow_dispatch" in (REPO / ".github/workflows/auto-merge.yml").read_text()

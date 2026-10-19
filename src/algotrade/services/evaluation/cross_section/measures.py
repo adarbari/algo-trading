@@ -130,6 +130,11 @@ class SessionStat:
     # volatility or score to weight by, no bill yield for the cash.
     weights: tuple[tuple[str, float], ...] = ()
     portfolio_reason: str = ""
+    # ``portfolio_return`` overlays (ADR 0074 amendment): the book's annualised volatility before
+    # the vol_target scaling (None: none) and the share of the book moved to the defensive asset
+    # by the canary (None: no canary). Stored with the leg (nullable columns, no version bump).
+    book_vol: float | None = None
+    risk_off: float | None = None
 
     @property
     def net_values(self) -> tuple[float, ...]:

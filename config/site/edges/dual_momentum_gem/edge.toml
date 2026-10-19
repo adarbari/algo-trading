@@ -1,0 +1,91 @@
+# Edge document (ADR 0053, ADR 0074; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/trend-macro.md (dual_momentum_gem).
+# An allocation edge (EB E5): a weighted book of ETFs against a blended benchmark of its own list.
+id = "dual_momentum_gem"
+name = "Global equities momentum"
+family = "E"
+thesis = "Holding the better of US and foreign stocks by trailing return, and cash when neither has risen, beats holding both."
+mechanism = """Relative momentum picks up cross-country under-reaction and absolute momentum is the crash filter
+(Antonacci 2014); capital that benchmarks to a world index does not chase the winner."""
+persistence = """A two-asset switch is too concentrated for institutions, and the whipsaw and the US lead of 2015 to
+2024 (when the relative leg added nothing and the absolute leg cost the 2020 and 2023 re-entries)
+deter followers; ReSolve (2019) finds the result very sensitive to the lookback and the rebalance
+day."""
+schedule = "month_end"
+top_k = 1
+screeners = [
+  "trend_positive_6m", "trend_positive_12m",
+]
+base = "benchmark"
+oos_class = "trend"
+status = "candidate"
+mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history and evaluated. LIMITS: (1)
+the source's fallback is the aggregate bond index when neither stock fund has beaten the bill; here
+the slot is cash at the Treasury bill yield (the outcome has no conditional fallback asset), so the
+bond leg of the rule is not built. (2) The foreign fund is EFA (developed markets ex US), not MSCI
+ACWI ex US; no distributions. (3) The absolute test is a raw return above 0, not an excess return
+over the bill. (4) The relative leg is the rank by trailing return among the two funds that pass
+(top_k = 1). The ensemble of 6 and 12 months is ONE trial (ReSolve's craftsman critique: an ensemble
+halves the dispersion over lookbacks); the single 12-month rule is a member and never a verdict
+basis. The benchmark is an equal mix of the two funds, so the value is what the switch adds to
+holding both. The relative leg alone would be mostly the US lead of 2010 to 2024. cost_bps 6 a round
+trip assumed. verdict.toml [oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it
+becomes after the haircut and the out-of-sample one beside the result, as display only."""
+
+[ensemble]
+variants = ["trend_positive_6m", "trend_positive_12m"]
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["SPY", "EFA"] },
+]
+
+[outcome]
+kind = "portfolio_return"
+horizon_sessions = [21]
+benchmark = "mix:SPY=0.5,EFA=0.5"
+start_offset_sessions = 1
+cost_bps = 6
+weighting = "equal"
+
+[quality_bar]
+outcome = """The one-fund book's return over the 21 sessions from the close after each month end, less half SPY
+and half EFA over the same sessions, net of the cost on the weight change; cash when neither fund's
+trend is up. Price only: the stored forward return is close to close and carries no dividend or
+distribution, so the book and the benchmark both miss their yield and cash earns the Treasury bill."""
+trigger_timing = """The ranking and the filter read trailing returns at the month-end close D; the book is held from the
+next session's close S for 21 sessions. Nothing after D enters the pick."""
+replication = """Antonacci (2014): monthly, hold US stocks if they beat ex-US stocks over 12 months and beat the
+bill, else ex-US if it beats the bill, else aggregate bonds. Here: SPY or EFA by the larger raw
+return when above 0 (6 and 12 months averaged), else cash."""
+expected_size = """The book's 1974 to 2013 backtest (CAGR near 17 percent against 12 for the world index, drawdown near
+18 against 60 percent) is not verified here and is in sample; the live record since 2014 lagged the
+S&P 500. Expect a Sharpe ratio near half the backtest."""
+capacity_costs = """Unlimited capacity in two liquid funds; about two trades a year; the cost is a few basis points a
+trade (6 assumed) plus tax on the switches, not deducted."""
+failure_modes = """Two funds and one pick make a book with few distinct sessions, and the result is sensitive to the
+rebalance day. Retire if the frozen-period picks-series t is under 2."""
+decoys = """The US beat the world through 2010 to 2024 and the absolute leg is a trend filter: compare with
+absolute_momentum_crash_filter, which holds the same funds without the relative leg."""
+
+[[sources]]
+title = "Antonacci, G., Dual Momentum Investing, McGraw-Hill, 2014"
+
+[[sources]]
+title = "ReSolve Asset Management, Global Equity Momentum: A Craftsman's Perspective, 2019"
+url = "https://files.advisorperspectives.com/articles/2019/05/06/global-equity-momentum-a-craftsmans-perspective"
+
+[[sources]]
+title = "CXO Advisory, Intrinsic Momentum across Asset Classes (summary of Antonacci (2013), Absolute Momentum)"
+url = "https://www.cxoadvisory.com/momentum-investing/intrinsic-momentum-across-asset-classes/"
+
+[[sources]]
+title = "Moskowitz, T., Ooi, Y. and Pedersen, L. (2012), Time Series Momentum, Journal of Financial Economics (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum"
+
+[[sources]]
+title = "Hurst, B., Ooi, Y. and Pedersen, L. (2017), A Century of Evidence on Trend-Following Investing, Journal of Portfolio Management (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/A-Century-of-Evidence-on-Trend-Following-Investing"

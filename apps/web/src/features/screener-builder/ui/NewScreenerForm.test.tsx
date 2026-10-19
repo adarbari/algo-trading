@@ -49,6 +49,23 @@ function setup() {
 }
 
 describe('NewScreenerForm', () => {
+  it('does not call the new name taken once its own save refreshes the lists', async () => {
+    const { onCreated } = setup();
+    GQL.mockImplementation((document: unknown) =>
+      Promise.resolve(
+        String(document).includes('query MyScreens')
+          ? { myScreens: [{ screenerId: 'fresh', status: 'DRAFT' }] }
+          : { configs: [{ configId: 'fresh', scope: 'u', kind: 'screener' }] },
+      ),
+    );
+    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'fresh');
+    await userEvent.click(screen.getByRole('button', { name: 'Create draft' }));
+    await waitFor(() => {
+      expect(onCreated).toHaveBeenCalledWith('fresh');
+    });
+    expect(screen.queryByText('A screener with this name already exists.')).toBeNull();
+  });
+
   it('saves a draft with the base gates and opens it', async () => {
     const { onCreated, container } = setup();
     await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'mine');

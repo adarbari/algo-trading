@@ -10,6 +10,8 @@ schedule = "month_end"
 top_k = "all"
 screeners = []
 status = "blocked"
+plain_reason = "The reverse-split data is stored, but the test cannot yet trigger on a split event."
+mechanism_kind = "value_gaps"
 rejection_reason = """The data is stored (events/split holds the reverse splits with their ratios, ex-dates in ts, from Massive and Tiingo) but the harness has no event class to trigger on a split: the schedule above is a placeholder, and the class reverse_split is missing from EVENT_CLASSES (src/algotrade/config/edges/document.py) and EVENT_FIELDS (services/evaluation/cross_section/events.py). A screen on the universe cannot stand in: the avoid-list claim needs the short leg drawn from the flagged names (a short leg ranks the whole eligible set by score and fills with unflagged names when few are flagged), and the long side's negative lift would read as Not working for a claim that is confirmed. Unblock: a reverse_splits feature group (sessions_since_reverse_split, last_reverse_split_ratio, from events/split by ex-date) and the class; the group is not added here because no edge reads it yet."""
 notes = """Mostly microcaps: a liquid-name test (20-day dollar volume of $5M) will find few events, so the verdict will rest on a small count; the exclusion list is free for a long screen even where the short is not available (borrow often 20% to 100% a year). Idea page: docs/edge-ideas/structural-niches.md (reverse_split_distress_filter)."""
 
@@ -27,6 +29,12 @@ start_offset_sessions = 1
 
 [[sources]]
 title = "Kim, S., Klein, A. and Rosenfeld, J., Return performance surrounding reverse stock splits: can investors profit?, Financial Management, 2008"
+url = "https://ideas.repec.org/a/bla/finmgt/v37y2008i2p173-192.html"
 
 [[sources]]
 title = "Han, K., The effects of reverse splits on the liquidity of the stock, Journal of Financial and Quantitative Analysis, 1995"
+url = "https://ideas.repec.org/a/cup/jfinqa/v30y1995i01p159-169_00.html"
+
+[[sources]]
+title = "Campbell, J., Hilscher, J. and Szilagyi, J. (2008), In Search of Distress Risk, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v63y2008i6p2899-2939.html"

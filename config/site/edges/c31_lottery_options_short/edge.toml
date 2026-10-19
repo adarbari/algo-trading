@@ -18,6 +18,7 @@ top_k = 30
 screeners = ["lottery_max"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "lottery_demand"
 frozen_from = 2026-04-01
 notes = """The source is Boyer and Vorkink's sort on ex-ante option skewness, and its short-call P&L
 needs the option model outcome (H8) and chains from 2026-10-02 only. What is filed here is the
@@ -72,6 +73,20 @@ title = "Boyer, B. and Vorkink, K., Stock Options as Lotteries, Journal of Finan
 # The literature's figure (ADR 0064): Bali, Cakici and Whitelaw's low-minus-high MAX decile spread,
 # more than 1% a month (a lower bound, from the paper's abstract), 1962-2005, before costs; it is
 # of the MAX proxy, not of Boyer and Vorkink's option-skewness sort.
+url = "https://ideas.repec.org/a/bla/jfinan/v69y2014i4p1485-1527.html"
+
+[[sources]]
+title = "Byun, S.-J. and Kim, D.-H. (2016), Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v122y2016i1p155-174.html"
+
+[[sources]]
+title = "Barberis, N. and Huang, M. (2007), Stocks as Lotteries: The Implications of Probability Weighting for Security Prices, NBER working paper 12936 (American Economic Review 2008)"
+url = "https://www.nber.org/papers/w12936"
+
+[[sources]]
+title = "Kumar, A. (2009), Who Gambles in the Stock Market?, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v64y2009i4p1889-1933.html"
+
 [published]
 measure = "decile_spread"
 value = 0.01

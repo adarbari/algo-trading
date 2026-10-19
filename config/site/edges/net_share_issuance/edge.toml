@@ -12,6 +12,7 @@ top_k = 50
 screeners = ["net_share_issuance"]
 baselines = ["size_small", "momentum_12_1"]
 status = "candidate"
+mechanism_kind = "mispriced_fundamentals"
 frozen_from = 2026-04-01
 notes = """Month-end start sessions spaced at least 20 sessions apart. The statement groups and the rollups of this edge are stored only from the nightly that first carries them, so the stored history gives few independent sessions, under the 40 the bar asks; the harness reports the count beside every number. The frozen period starts 2026-04-01 (owner decision 2026-10-08, ADR 0053 amendment). The score is the log change of the split-adjusted share count over a year (net_issuance_pct_12m, Pontiff and Woodgate's definition) from the cover-page or weighted-average count of fundamentals@v4 (a cover count against a cover count, never mixed); the screener ranks lowest first, so the main outcome holds the top 50 net repurchasers. The issuers are the variant issuers_short (the bottom 50 held short, an avoid list: ADR 0053 amendment, outcome sides, with the site's borrow cost); the spread is diagnostic only. The 3-year composite issuance of Daniel and Titman is not built (it needs a five-year return history joined to market value)."""
 
@@ -43,9 +44,11 @@ url = "https://doi.org/10.1111/j.1540-6261.2008.01335.x"
 
 [[sources]]
 title = "Fama, E. and French, K., Dissecting Anomalies, Journal of Finance, 2008"
+url = "https://ideas.repec.org/a/bla/jfinan/v63y2008i4p1653-1678.html"
 
 [[sources]]
 title = "Daniel, K. and Titman, S., Market Reactions to Tangible and Intangible Information, Journal of Finance, 2006"
+url = "https://ideas.repec.org/a/bla/jfinan/v61y2006i4p1605-1643.html"
 
 [[sources]]
 title = "Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022"

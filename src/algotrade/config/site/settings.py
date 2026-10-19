@@ -7,7 +7,7 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
     llm.toml       -> LlmSettings       (the text model behind screener drafts, ADR 0041)
     phrasebook.toml -> PhrasebookSettings (trader vocabulary -> catalogue fields, ADR 0041)
     feature_backlog.toml -> FeatureBacklogSettings (drafting/backlog.py: missing features)
-    field_guide/*.toml -> FieldGuideSettings (how to read a field, thresholds, caveats, ADR 0041)
+    field_guide/<group>/*.toml -> FieldGuideSettings (how to read a field, caveats, ADR 0041)
     macro.toml     -> MacroSettings     (config/site/macro.py: macro series, index levels; ADR 0048)
     universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv, overrides/figi.csv)
     nightly.toml   -> NightlySettings
@@ -928,7 +928,7 @@ _FIELD_GUIDES: dict[int, tuple[SiteDocuments, FieldGuideSettings]] = {}
 
 
 def load_field_guide(configs: SiteDocuments) -> FieldGuideSettings:
-    """``config/site/field_guide/*.toml`` (ADR 0041, amended): how to read each field, in
+    """``config/site/field_guide/<group>/*.toml`` (ADR 0041, amended): how to read each field, in
     file-name order; none without files. Read once per store."""
     built = _FIELD_GUIDES.get(id(configs))
     if built is None or built[0] is not configs:

@@ -20,6 +20,7 @@ top_k = 30
 screeners = ["retail_option_attention"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "lottery_demand"
 frozen_from = 2026-04-01
 notes = """The papers' feature, the share of option volume in short-dated out-of-the-money calls
 (lottery_call_share), and a meme score are not stored: the screener is a proxy, names with a best
@@ -68,6 +69,16 @@ sessions."""
 
 [[sources]]
 title = "Bryzgalova, S., Pavlova, A. and Sikorskaya, T., Retail Trading in Options and the Rise of the Big Three Wholesalers, Journal of Finance, 2023"
+url = "https://ideas.repec.org/a/bla/jfinan/v78y2023i6p3465-3514.html"
 
 [[sources]]
 title = "Byun, S.-J. and Kim, D.-H., Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics, 2016"
+url = "https://ideas.repec.org/a/eee/jfinec/v122y2016i1p155-174.html"
+
+[[sources]]
+title = "Boyer, B. and Vorkink, K. (2014), Stock Options as Lotteries, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v69y2014i4p1485-1527.html"
+
+[[sources]]
+title = "Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html"

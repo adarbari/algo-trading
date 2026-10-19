@@ -1,0 +1,485 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06), one folder per theme group, each file
+# at most 900 lines (a file and its -2 part); loaded together by config/site/settings.py load_field_guide. Every
+# [[field]] says how to read one catalogue field, which criterion means what, and when the
+# reading lies; a [[situation]] is one state of the world that fools several thresholds at once.
+# The keys are documented in chart/momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+[[field]]
+name = "rollup.earnings@v1.days_to_earnings"
+theme = "events"
+reads = "Exchange sessions until the next report: 0 reports today, 1 tomorrow, 10 is two weeks out. Options price the report from about ten sessions before (the IV ramp accelerates in the last two or three) and lose that premium within a session after it. 'Avoid earnings' for a short option held a month is days_to_earnings above the holding period; 'play earnings' is under 5."
+caveats = [
+  "Null means no report date is known for the name, not 'no report soon': ETFs have none, and a company's next date is often unknown until it announces it (two to four weeks before). A hard 'gt 10' therefore rejects every ETF and every company that has not announced; use soft with EVENT_RISK.",
+  "Unconfirmed dates move: rollup.earnings@v1.date_confirmed false (the Nasdaq calendar never confirms) means the date is an estimate from last year's pattern and can shift by days.",
+  "rollup.earnings@v1.earnings_time says before the open (pre) or after the close (post): 'reports tomorrow, pre' means the move happens before you can act.",
+]
+sources = [
+  "IV ramp and crush around earnings: https://flashalpha.com/articles/iv-crush-explained-earnings-volatility-collapse and https://optionalpha.com/learn/iv-crush",
+]
+[[field.use]]
+for = "no earnings in the next N sessions (short options)"
+op = "gt"
+value = 10
+mode = "soft"
+tolerance = 2
+on_miss = "EVENT_RISK"
+note = "N is the holding period; 25 for a 30-day short option held to expiry; or feature.earnings_before_expiry eq false"
+[[field.use]]
+for = "earnings this week (an event play)"
+op = "lte"
+value = 5
+mode = "hard"
+note = "suggest rollup.earnings@v1.date_confirmed eq true when the date must be right"
+
+[[field]]
+name = "feature.earnings_before_expiry"
+theme = "events"
+reads = "True when the next report falls on or before the nearest listed expiry: a short option held to that expiry carries the earnings move. False is the clean case for premium selling at the nearest expiry; for a later expiry read rollup.earnings@v1.days_to_earnings against its days."
+caveats = [
+  "Null when the report date or the nearest expiry is unknown (no date announced, no stored chain): a hard 'eq false' rejects those names; soft with EVENT_RISK keeps them listed.",
+  "The nearest expiry can be a weekly a few days out; a 30-day short option needs days_to_earnings against its own expiry, not this flag.",
+]
+sources = ["Site convention over the earnings calendar and the stored chains"]
+[[field.use]]
+for = "no earnings before the nearest expiry"
+op = "eq"
+value = false
+mode = "soft"
+tolerance = 0
+on_miss = "EVENT_RISK"
+
+[[field]]
+name = "rollup.dividend_schedule@v1.dividend_status"
+theme = "events"
+reads = "Whether a next ex-dividend date is known: SCHEDULED (the source has listed an ex-dividend date after the session) or NOT_ANNOUNCED (none yet: a payer between declarations, or a name that pays nothing). The source lists a date only about 30 days ahead, so NOT_ANNOUNCED on a quarterly payer is normal for most of the quarter."
+caveats = [
+  "NOT_ANNOUNCED is not 'no dividend soon': a payer's next ex-date is unlisted until about a month before it. For a 30 to 60 day option the dividend can fall inside the term and still be unannounced; rollup.dividends@v2.last_ex_date and div_ttm say whether the name pays at all, and the interval between last_ex_date values says when the next is due.",
+  "A date a later listing moved is read from the latest listing; a date withdrawn without another listed stays until it passes (an empty fetch stores nothing to say so).",
+]
+sources = ["Site convention (the corporate-actions window, config/site/sources.toml)"]
+[[field.use]]
+for = "a dividend date is known"
+op = "eq"
+value = "SCHEDULED"
+mode = "soft"
+tolerance = 0
+note = "a hard filter drops every payer between declarations; pair a known date with rollup.dividend_schedule@v1.days_to_ex_date"
+
+[[field]]
+name = "rollup.dividend_schedule@v1.next_ex_date"
+theme = "events"
+reads = "The next ex-dividend date after the session, as the stored corporate-actions listings knew it on the session: a share bought on or after that day does not receive the dividend. A date to show next to an expiry: a short call held through it risks early assignment, a short put misses the dividend."
+caveats = [
+  "Null (NOT_ANNOUNCED) means none is listed yet, not none coming; the source lists dates about 30 days ahead only. See rollup.dividend_schedule@v1.dividend_status.",
+  "A declared date can move; the listing the session saw is the one shown, and the next night's can differ.",
+  "Special dividends count: the date can be a one-off, not the regular payment (rollup.dividends@v2.div_count_ttm says how often the name usually pays).",
+]
+sources = ["Site convention (Massive dividends, ex_dividend_date)"]
+[[field.use]]
+for = "has a known ex-dividend date"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.dividend_schedule@v1.next_div_amount"
+theme = "events"
+reads = "The next dividend's cash amount per share, in today's share terms (a split since the listing divides it). $0.25 on a $100 stock is a 0.25% dividend for the period: against the call premium it is the amount an in-the-money short call is assigned early to capture. Compare with rollup.call_wing@v1.best_call_mid: a dividend larger than the call's remaining time value is the early-assignment case."
+caveats = [
+  "Per share, not a yield: divide by rollup.price_stats@v2.close, or read feature.div_yield for the trailing annual yield.",
+  "A declared amount can be revised before the ex-date; an irregular payer's special dividend can be many times the usual.",
+  "Null when no ex-date after the session is known (NOT_ANNOUNCED).",
+]
+sources = ["Site convention; the early-exercise rule (Hull, Options, Futures and Other Derivatives: a call is exercised early just before an ex-dividend date when the dividend exceeds the time value)"]
+[[field.use]]
+for = "a dividend worth watching against a short call"
+op = "gte"
+value = 0.25
+mode = "soft"
+tolerance = 0.1
+
+[[field]]
+name = "rollup.dividend_schedule@v1.days_to_ex_date"
+theme = "events"
+reads = "Calendar days from the session to the next ex-dividend date, 1 or more (an ex-date today is not the next one). A known date is at most about 30 days out, because that is as far ahead as the source lists. 1 to 3 is the early-assignment window for a short in-the-money call; 10 to 30 is a dividend inside the term of a monthly option."
+caveats = [
+  "Calendar days, not sessions: rollup.earnings@v1.days_to_earnings counts sessions. Compare with rollup.call_wing@v1.target_dte or rollup.nearest_expiry@v1.dte, which are calendar days.",
+  "Null when no date is known (NOT_ANNOUNCED): a hard 'lte 5' rejects every name without a listed date; use soft with EVENT_RISK.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "an ex-dividend date within a week (early-assignment risk for a short call)"
+op = "lte"
+value = 7
+mode = "soft"
+tolerance = 3
+on_miss = "EVENT_RISK"
+
+[[field]]
+name = "rollup.dividend_schedule@v1.next_pay_date"
+theme = "events"
+reads = "The payment date of the next dividend, which follows its ex-date by a week or two. Shown with the ex-date; it matters to a holder of the shares, not to an option holder (assignment and the dividend capture turn on the ex-date)."
+caveats = [
+  "Null when no ex-date is known (NOT_ANNOUNCED) and also when the source gives no payment date for a listed one: a null here with a known ex-date is a gap in the listing, not a missing dividend.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "has a payment date"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "feature.ex_div_before_expiry"
+theme = "events"
+reads = "True when the next known ex-dividend date falls on or before the target expiry (rollup.put_wing@v1.target_expiry, the 30 to 60 day expiry both option wings use). For a short call that is the early-assignment risk: a call near the money goes through the ex-date with the dividend as the incentive to exercise first. For a short put it is a dividend the stock drops by and the seller does not collect; for a covered call the shares collect it. False is the clean case; null is not."
+caveats = [
+  "Null when no ex-date is known (the source lists dates about 30 days ahead, so for a 45 day expiry a dividend 35 days out is not listed yet) or no target expiry: an 'eq false' criterion never passes a null, so a payer whose date is unlisted is unknown, not clean. Pair with rollup.dividends@v2.last_ex_date: a quarterly payer last paid about three months ago is due.",
+  "Early assignment needs an in-the-money call and a dividend above its time value: an out-of-the-money covered call at 0.25 delta is rarely assigned early. rollup.call_wing@v1.best_call_delta says how near the money it is.",
+  "The target expiry is the put wing's: the same expiry as rollup.call_wing@v1.target_expiry unless one right has no quotes at it.",
+]
+sources = ["Hull, Options, Futures and Other Derivatives: early exercise of American calls just before an ex-dividend date"]
+[[field.use]]
+for = "no ex-dividend date before the wing's expiry"
+op = "eq"
+value = false
+mode = "soft"
+tolerance = 0
+on_miss = "EVENT_RISK"
+
+[[field]]
+name = "feature.ex_div_before_nearest_expiry"
+theme = "events"
+reads = "True when the next known ex-dividend date falls on or before the nearest listed expiry (rollup.nearest_expiry@v1.expiry_date): a short option expiring then carries the dividend, a weekly short call most of all. The nearest-expiry counterpart of feature.ex_div_before_expiry."
+caveats = [
+  "Null when no ex-date is known or no chain is stored; the nearest expiry is often within a week, inside the 30-day window, so a payer's date is usually listed when it matters here.",
+  "The nearest expiry can be a weekly a few days out; for a 30 to 60 day short option read feature.ex_div_before_expiry.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "no dividend before the nearest expiry"
+op = "eq"
+value = false
+mode = "soft"
+tolerance = 0
+on_miss = "EVENT_RISK"
+
+[[field]]
+name = "rollup.fund_reference@v1.reference_instrument_id"
+theme = "events"
+reads = "For a leveraged or inverse fund, the one stock it tracks (TSLL: Tesla), as an instrument id. The fund has no events of its own: its earnings, ex-dividends and big moves are its reference's, scaled by its leverage (instrument.leverage, negative for an inverse fund). Null for a fund that tracks a basket, and for every instrument that is not a leveraged or inverse fund."
+caveats = [
+  "Null does not mean 'no events': a basket fund (rollup.fund_reference@v1.reference_kind index, sector or commodity) inherits macro and market-structure events and, for an index or sector, the earnings of its largest holdings; read the kind before the id.",
+  "The link comes from the fund's stored holdings when they name exactly one stock, else from its name (rollup.fund_reference@v1.reference_source says which). A name rule is a parse of text: check a surprising link against the fund's own page, and rollup.fund_reference@v1.reference_status UNLISTED means the stock is named but not in the reference snapshot.",
+  "A fund whose holdings are not stored yet (etf-holdings has not read it) is linked by its name only; a NO_REFERENCE status is a gap in our data, not a fact about the fund.",
+]
+sources = ["Site convention (ADR 0050 decision 2: the holdings table, ADR 0035, with a name rule as the fallback)"]
+[[field.use]]
+for = "funds that track one stock (their events are the stock's)"
+op = "not_null"
+mode = "hard"
+note = "pair with rollup.fund_reference@v1.reference_kind eq single_stock"
+
+[[field]]
+name = "rollup.fund_reference@v1.reference_kind"
+theme = "events"
+reads = "What a leveraged or inverse fund tracks: single_stock (TSLL), index (TQQQ, SPXL), sector (SOXL, NAIL), commodity (UCO, gold and bitcoin funds) or none (a volatility fund, or a fund nothing is known of). It decides which events the fund inherits: a single stock's own calendar, the macro and market-structure events plus the top holdings' earnings, or macro events only."
+caveats = [
+  "'none' covers two different things: a fund that tracks no stock, index or commodity (a volatility fund) and a fund we know nothing about; rollup.fund_reference@v1.reference_status says which (BASKET with kind none is volatility, NO_REFERENCE is unknown).",
+  "index versus sector is read from the name's keywords first and the holdings' sectors second; a fund with neither is an index by default, so a thematic fund can read as an index until its holdings are stored.",
+]
+sources = ["Site convention (ADR 0050)"]
+[[field.use]]
+for = "single-stock leveraged funds"
+op = "eq"
+value = "single_stock"
+mode = "hard"
+note = "then rollup.fund_reference@v1.reference_instrument_id is the stock"
+
+[[field]]
+name = "rollup.fund_reference@v1.reference_source"
+theme = "events"
+reads = "What settled a leveraged or inverse fund's link: holdings (its stored holdings name one stock, or show the basket) or name_rule (its name states the ticker or the kind). Null when nothing did. Holdings are the stronger evidence: they are what the fund owns today, while the name is a parse of text."
+caveats = [
+  "name_rule is the only source for a fund whose holdings are not stored; after etf-holdings reads it the same fund can move to holdings and, rarely, to a different reference.",
+]
+sources = ["Site convention (ADR 0050)"]
+[[field.use]]
+for = "links settled by the holdings, not a parse of the name"
+op = "eq"
+value = "holdings"
+mode = "hard"
+
+[[field]]
+name = "rollup.fund_reference@v1.reference_status"
+theme = "events"
+reads = "Why a leveraged or inverse fund's reference is what it is: LINKED (one stock found), BASKET (an index, sector or commodity fund: no one stock by design), UNLISTED (a stock is named but is not in the reference snapshot, so no id) or NO_REFERENCE (neither holdings nor the name say what it tracks)."
+caveats = [
+  "Only BASKET with rollup.fund_reference@v1.reference_kind none is a settled 'tracks nothing' (a volatility fund); NO_REFERENCE is a gap to close by reading the fund's holdings.",
+]
+sources = ["Site convention (ADR 0050)"]
+[[field.use]]
+for = "funds whose single-stock link is found"
+op = "eq"
+value = "LINKED"
+mode = "hard"
+
+[[field]]
+name = "feature.ex_div_before_call_expiry"
+theme = "events"
+reads = "True when the next known ex-dividend date falls on or before the covered-call wing's target expiry (rollup.call_wing@v1.target_expiry). It is feature.ex_div_before_expiry read against the call side's own expiry, so it answers the covered-call writer's question directly: will the shares go ex-dividend while the call is open? If so, a call near the money is the one assigned early (the holder exercises to capture the dividend), and an out-of-the-money one leaves the dividend with the shares. False is the clean case; null means the date or the expiry is unknown, not that there is none."
+caveats = [
+  "Null when no ex-date is known yet (the source lists dates about 30 days ahead; a quarterly payer whose last ex-date, rollup.dividends@v2.last_ex_date, was about three months ago is due even when unlisted) or when the call wing has no target expiry.",
+  "Early assignment needs the call in the money with a dividend above its remaining time value; check rollup.call_wing@v1.best_call_delta (above about 0.6 is at risk, 0.25 rarely).",
+  "The two wings usually share the expiry; when they differ (one right has no quotes at the monthly), this flag and feature.ex_div_before_expiry can disagree, and this one is the covered-call answer.",
+]
+sources = ["Hull, Options, Futures and Other Derivatives: early exercise of American calls before an ex-dividend date"]
+[[field.use]]
+for = "no ex-dividend date before the covered call's expiry"
+op = "eq"
+value = false
+mode = "hard"
+note = "for a covered call; with rollup.call_wing@v1.best_call_delta lte 0.3 the dividend is usually kept even when true"
+[[field.use]]
+for = "a dividend to collect while the call is open"
+op = "eq"
+value = true
+mode = "hard"
+note = "a covered-call writer who wants the dividend: pair with rollup.call_wing@v1.best_call_delta lte 0.3 so the call is not assigned first"
+
+[[field]]
+name = "rollup.earnings_reaction@v1.reaction_excess_return"
+theme = "events"
+reads = "How far the last report moved the stock beyond SPY: the close after the report over the close before it, minus SPY's return over the same two sessions, as a decimal (0.05 is +5% against the market). It is the surprise measure of the post-earnings-drift literature: the price reaction stands in for the surprise, so it needs no analyst estimates. Large and positive means the market read the report as good news."
+caveats = [
+  "The window is two sessions around the report, so it holds the move whether the company reported before the open or after the close, and it can include other news of those days (a deal, an offering, a guidance change). Read the headline before treating a +20% as an earnings surprise.",
+  "Null while the window is open (the session after the report has not closed), when a bar of the stock or of SPY is missing, or for a name with no report known: a hard criterion rejects those names. Pair it with rollup.earnings_reaction@v1.reaction_status eq OK to say why a name was left out.",
+  "The reaction is already in the price when you can first buy: the drift studies measure what follows it, over weeks, and it has faded in larger stocks; check feature.market_cap and rollup.earnings_reaction@v1.pre_event_adv_usd_20d.",
+]
+sources = [
+  "Brandt, Kishore, Santa-Clara and Venkatachalam, Earnings Announcements are Full of Surprises (2008)",
+  "Martineau, Rest in Peace Post-Earnings Announcement Drift (2022)",
+]
+[[field.use]]
+for = "a big positive earnings reaction (post-earnings drift)"
+op = "gte"
+value = 0.05
+mode = "hard"
+note = "the small-cap drift screen uses 0.05; combine with rollup.earnings_reaction@v1.reaction_status eq OK and a market cap ceiling"
+
+[[field]]
+name = "rollup.earnings_reaction@v1.reaction_status"
+theme = "events"
+reads = "Whether the name's last report has a measured reaction: OK when the report's two-session window has closed with every bar it needs; NO_REPORT when no report is known by the session (a name with none, such as an ETF); INCOMPLETE when a report is known but its window is still open or a stock or SPY bar is missing."
+caveats = [
+  "OK says the numbers exist, not that the report is recent: rollup.earnings_reaction@v1.sessions_since_reaction counts the sessions since it, and a name stays OK for months until its next report. Add sessions_since_reaction when only fresh reactions matter.",
+  "A report that only an 8-K dated (not the earnings calendar) is missed until the earnings feed adds its results rows, so a recent reporter can read NO_REPORT.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_reaction@v1)"]
+[[field.use]]
+for = "only names with a measured reaction"
+op = "eq"
+value = "OK"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_reaction@v1.pre_event_adv_usd_20d"
+theme = "events"
+reads = "The average dollars traded a day (close times volume) over the 20 sessions before the last report, the report's own volume left out. It is the liquidity you could count on before the news; after a big reaction the current volume is inflated for days and says little about what a later exit can trade."
+caveats = [
+  "Null when the history is shorter than 20 sessions before the report or a session has no bar: a hard floor rejects new listings. Check instrument.listed_on.",
+  "It is measured before the report that moved the stock, so a name whose volume dried up since is not flagged; compare rollup.price_stats@v2.adv_usd_20d for today.",
+]
+sources = ["Chordia, Goyal, Sadka, Sadka and Shivakumar, Liquidity and the Post-Earnings-Announcement Drift (2009)"]
+[[field.use]]
+for = "liquid enough to trade before the news"
+op = "gte"
+value = 2000000
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_expected@v1.expected_basis"
+theme = "events"
+reads = "How the name's next report date is known: SCHEDULED (a report date the calendars had published by the session), PRIOR_YEAR (no date published, so the year-ago report plus 364 days, the same weekday a year on) or UNKNOWN (neither: no report in the past year either). It says how far to trust rollup.earnings_expected@v1.expected_report_date: an announced date is firm, a year-ago guess is usually within days but can be weeks out."
+caveats = [
+  "UNKNOWN is not 'no earnings': a recent listing or a name the calendars do not cover has no date by either route. A hard 'in SCHEDULED, PRIOR_YEAR' criterion leaves those names out, which is the intent for an edge that must know the date by the decision session.",
+  "PRIOR_YEAR dates miss when a company changes its calendar (a fiscal-year change, a merger): a window built on one can fall on the wrong sessions.",
+]
+sources = ["Frazzini and Lamont, The Earnings Announcement Premium and Trading Volume (2007): the year-ago date as the expected one"]
+[[field.use]]
+for = "a report date known by the decision session (an announcement edge)"
+op = "in"
+value = ["SCHEDULED", "PRIOR_YEAR"]
+mode = "hard"
+note = "SCHEDULED alone keeps only announced dates, which are a few weeks ahead at most"
+
+[[field]]
+name = "rollup.earnings_reaction@v1.earnings_volume_ratio"
+theme = "events"
+reads = "How much trading a report usually draws: over the last four reports, the mean dollars traded a day in the report's two-session window divided by the 20-session average before it. 2 means the window trades twice the normal volume; 5 is a name whose reports are events. Frazzini and Lamont found the earnings announcement premium concentrated in the names whose reports draw the most volume."
+caveats = [
+  "It describes the last four reports, not the coming one, and it is null until four reports have a closed window: a name with a short history is left out by a hard criterion.",
+  "A report window can carry other news (an offering, a deal), which inflates the ratio without the report being the cause.",
+]
+sources = ["Frazzini and Lamont, The Earnings Announcement Premium and Trading Volume (2007)"]
+[[field.use]]
+for = "names whose reports draw heavy volume"
+op = "gte"
+value = 2
+mode = "hard"
+note = "the earnings announcement premium screen ranks by it instead of cutting"
+
+[[field]]
+name = "rollup.earnings_surprise@v1.surprise_status"
+theme = "events"
+reads = "Whether the name's last known report can be compared with its forecast. OK: it has a reported result and a forecast. NO_REPORT: no reported result is known by the session (a name that has not reported, or an ETF). NO_FORECAST: the report has a result, but the calendar held no forecast. SIGN_CONFLICT: the sign of the forecast is in doubt, so the report has no surprise."
+caveats = [
+  "OK says the figure exists, not that the report is recent. rollup.earnings_surprise@v1.last_report_date gives its date, and a name stays OK for months until its next report.",
+  "NO_FORECAST is common for small names that few analysts cover. A hard criterion on a surprise field leaves them out, and this field says why.",
+  "SIGN_CONFLICT is rare (fewer than 1 report in 1,000). The calendar sometimes drops the minus sign of a loss-maker's forecast, so 1.00 beside a result of -0.67 may be a forecast of -1.00. We flag a report when the vendor's own surprise matches the negated forecast, and we never flip the forecast ourselves.",
+  "The check needs the vendor's figure. Where the calendar gave none, a lost sign goes unseen, so treat a positive forecast beside a negative result with care.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_surprise@v1)"]
+[[field.use]]
+for = "only names whose last report has a surprise"
+op = "eq"
+value = "OK"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_surprise@v1.last_report_date"
+theme = "events"
+reads = "The date of the latest report whose result the calendar had stored by the session. It tells how fresh every other surprise figure is: a report from last week is news, one from last year is history."
+caveats = [
+  "It is the date the calendar lists. For a report after the close the market reacts the next day: rollup.earnings_reaction@v1.reaction_end_date gives the last session of the reaction window.",
+  "Reports the calendar never stored are missing, so the date can be older than the real last report. Compare it with rollup.earnings@v1.last_earnings_date.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_surprise@v1)"]
+[[field.use]]
+for = "names with a stored report to date the surprise figures by"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_surprise@v1.last_eps_reported"
+theme = "events"
+reads = "The earnings per share the latest report gave, in dollars per share, as the earnings calendar stores it. Microsoft's report of 2026-07-29 reads 4.74. It is the actual half of the surprise; rollup.earnings_surprise@v1.last_eps_forecast is the other half."
+caveats = [
+  "The figure is the calendar's own, usually adjusted earnings, and can differ from the filing. Real estate trusts report cash flow per share, on a basis that can differ from the forecast.",
+  "A few rows hold a placeholder such as 999. Check the value against rollup.earnings_surprise@v1.last_eps_forecast before using it.",
+]
+sources = ["Nasdaq earnings calendar (the stored events/earnings rows)"]
+[[field.use]]
+for = "names with a reported result to read the surprise from"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_surprise@v1.last_eps_forecast"
+theme = "events"
+reads = "The consensus forecast of earnings per share, in dollars per share, that the latest report was measured against. It is the figure the calendar showed with the result. Microsoft's forecast for the report of 2026-07-29 was 4.21."
+caveats = [
+  "Null when the calendar held no forecast, which is common for small names. The forecast shown with a result can be the day's own figure, not the one a week before.",
+  "For a company expected to lose money the calendar can drop the minus sign. The value is shown as stored: rollup.earnings_surprise@v1.surprise_status reads SIGN_CONFLICT when the vendor's figure shows it happened.",
+]
+sources = ["Nasdaq earnings calendar (the stored events/earnings rows)"]
+[[field.use]]
+for = "names whose last report had a consensus forecast"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_surprise@v1.last_surprise_eps"
+theme = "events"
+reads = "How many dollars per share the latest report landed above (positive) or below (negative) the consensus forecast: reported minus forecast. Microsoft's report of 2026-07-29 reads +0.53 (4.74 against 4.21). It has no base, so a tiny forecast does not blow it up, and it is the figure to read for a name with a forecast near zero."
+caveats = [
+  "A cent means more to a stock earning 0.10 a share than to one earning 10. Read it beside rollup.earnings_surprise@v1.last_surprise_pct and rollup.earnings_surprise@v1.last_eps_forecast.",
+  "Null when there is no forecast or the report is a SIGN_CONFLICT. Check rollup.earnings_surprise@v1.surprise_status.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_surprise@v1)"]
+[[field.use]]
+for = "names that beat the forecast by at least 5 cents a share"
+op = "gte"
+value = 0.05
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_surprise@v1.last_surprise_pct"
+theme = "events"
+reads = "How far the latest report landed from the consensus forecast, in percent of the forecast: (reported - forecast) / |forecast|. A value of +12.6 is a report 12.6% above the forecast (Microsoft, 2026-07-29: 4.74 against 4.21). A value of -87.5 is a report far below it (Tesla, 2026-07-22: 0.04 against 0.32). We compute it from the two stored numbers, not from the vendor's figure."
+caveats = [
+  "A small forecast makes the percentage huge: a result of 0.30 against a forecast of 0.06 is +400. It is null below a forecast of five cents; there rollup.earnings_surprise@v1.last_surprise_eps gives the size. Bound a threshold, for example below 100.",
+  "Most reports beat: the middle name beats by about 6. Compare a surprise with rollup.earnings_surprise@v1.surprise_median_4q, not with zero.",
+  "The price reaction can disagree with the surprise: a beat on weak guidance falls. Check rollup.earnings_reaction@v1.reaction_excess_return.",
+  "Null when there is no forecast, the forecast is below five cents in size, or the report is a SIGN_CONFLICT. A hard criterion rejects those names, so pair it with rollup.earnings_surprise@v1.surprise_status eq OK.",
+]
+sources = [
+  "Bernard and Thomas, Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium? (1989)",
+  "Livnat and Mendenhall, Comparing the Post-Earnings Announcement Drift for Surprises Calculated from Analyst and Time Series Forecasts (2006)",
+]
+[[field.use]]
+for = "a clear earnings beat on the last report"
+op = "gte"
+value = 5
+mode = "hard"
+note = "pair with rollup.earnings_surprise@v1.surprise_status eq OK and an upper bound, because a small forecast inflates the figure"
+
+[[field]]
+name = "rollup.earnings_surprise@v1.surprise_median_4q"
+theme = "events"
+reads = "The middle percent surprise of the last four known reports that can be compared. A median of +5 means the name cleared its forecast by about 5% in a typical report. A negative median means it fell short more often than not. Apple's reads +5.1, Tesla's -30."
+caveats = [
+  "It is a median, so one report with a placeholder result or a small forecast cannot move it. Reports with a forecast below five cents are left out, so it can be null while rollup.earnings_surprise@v1.beats_4q is not.",
+  "It covers the last four reports however far back they are. With rollup.earnings_surprise@v1.reports_4q below 4, or a rollup.earnings_surprise@v1.last_report_date a year old, the history is thin.",
+]
+sources = ["Livnat and Mendenhall, Comparing the Post-Earnings Announcement Drift for Surprises Calculated from Analyst and Time Series Forecasts (2006)"]
+[[field.use]]
+for = "a name that habitually clears its forecast"
+op = "gte"
+value = 3
+mode = "hard"
+note = "with rollup.earnings_surprise@v1.reports_4q eq 4, so the median rests on a full year"
+
+[[field]]
+name = "rollup.earnings_surprise@v1.beats_4q"
+theme = "events"
+reads = "How many of the last four known reports came in above their forecast, from 0 to 4. It counts in dollars, so a small forecast still counts. 4 means every report beat (Apple, Microsoft). 0 means none did, which holds for about 6 names in 100 with four reports. A report equal to its forecast is not a beat."
+caveats = [
+  "The count is out of rollup.earnings_surprise@v1.reports_4q, which can be below 4: 3 of 3 is a better record than 3 of 4.",
+  "Beating is the norm: about 3 names in 10 with four reports beat every time, so 4 of 4 is a mild signal, not a rare one.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_surprise@v1)"]
+[[field.use]]
+for = "a name that beat its forecast in every one of its last four reports"
+op = "gte"
+value = 4
+mode = "hard"
+note = "with rollup.earnings_surprise@v1.reports_4q eq 4"
+
+[[field]]
+name = "rollup.earnings_surprise@v1.reports_4q"
+theme = "events"
+reads = "How many of the last four known reports can be compared, meaning a result and a forecast whose sign is not in doubt. It is the base of rollup.earnings_surprise@v1.beats_4q. 4 is a full record; 1 or 2 is a newer listing or a thinly covered name."
+caveats = [
+  "A low count is not a bad sign. It says the beat count and the median rest on few reports, so below 3 treat them as noise.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_surprise@v1)"]
+[[field.use]]
+for = "four reports with a forecast behind the beat count and the median"
+op = "eq"
+value = 4
+mode = "hard"
+
+[[field]]
+name = "rollup.earnings_revisions@v1.revision_status"
+theme = "events"
+reads = "Whether the next report's forecast can be compared with an earlier one. OK: a snapshot of the calendar from a week ago holds the same fiscal quarter. BUILDING: no stored snapshot reaches back that far yet (they start on 2026-10-02). NO_PRIOR: one does, but it holds no row of this quarter for the name. NO_FORECAST: the next report has no forecast. NO_NEXT: no next report is known."
+caveats = [
+  "OK says a 7-day comparison exists, not that the forecast moved: most names read OK with a revision of 0. rollup.earnings_revisions@v1.forecast_revision_7d gives the size.",
+  "NO_NEXT includes names that have reported lately. The calendar lists reports about 60 days ahead, so a company that reported last week can have none listed yet.",
+  "rollup.earnings_revisions@v1.forecast_revision_30d is null until about 2026-11-01, whatever the status says.",
+]
+sources = ["Site convention (docs/data/features.md, earnings_revisions@v1)"]
+[[field.use]]
+for = "only names whose forecast revision over a week can be measured"
+op = "eq"
+value = "OK"
+mode = "hard"

@@ -1,0 +1,84 @@
+# Edge document (ADR 0053; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Screener: momentum_squeeze_entry (new, EB E3b), an entry filter
+# on momentum_12_1. Idea page: docs/edge-ideas/statarb-technical.md (volatility_contraction_expansion).
+id = "volatility_contraction_expansion"
+name = "Momentum winners in a volatility squeeze"
+family = "G"
+thesis = "Past-year winners in an uptrend whose price range has narrowed to the tightest fifth of their year break out more cleanly, so they beat the market over the next month by more than winners that are not compressed."
+mechanism = """Volatility clusters, so a contraction is followed by an expansion (a GARCH fact); the direction is not
+predictable from the squeeze alone, so it is the momentum and the trend that supply it: a winner that
+consolidates in a tight base is one where the sellers have run out (the O'Neil and Minervini tight base). The
+squeeze times the entry; it is not a source of return of its own."""
+persistence = """Volatility clustering is permanent, but direction never had an edge: Bollinger-band breakout rules
+are among those that fail data-snooping tests (Bajgrowicz and Scaillet 2012; Lento 2007), so what is tested is only
+whether the squeeze improves an entry into a premium that exists (12-1 momentum). A claim to test."""
+schedule = "month_end"
+universe = "liquid_common_stocks"
+top_k = 50
+screeners = ["momentum_squeeze_entry"]
+baselines = ["momentum_12_1", "size_small"]
+status = "candidate"
+mechanism_kind = "slow_to_update"
+frozen_from = 2026-04-01
+notes = """A per-name entry filter on momentum_12_1, filed as its own edge (one trial): positive 12-1 momentum, trend_state
+UPTREND and rollup.bands@v2.bb_width_pctile_252d at or below 0.2 (the Bollinger bandwidth narrower than 80 percent
+of the last 252 sessions), ranked by 12-1 momentum. The 0.2 cut is declared, not tuned (the TTM squeeze,
+feature.bb_squeeze, is the tighter-in-volatility variant and a follow-up). The main baseline is momentum_12_1
+on the same sessions: the question is whether the squeeze beats the same ranking without it. Every screened name carries its
+12-1 momentum as its score, so the decile figures the harness reports are momentum's over the whole universe,
+the momentum_12_1 baseline's ranking, not the squeeze's: the verdict reads the picks' lift and
+mean excess against momentum_12_1's on the same sessions. Proxies,
+each stated: the source's tight base is a count of successive contractions of pullback depth and a pivot
+buy (Minervini), and Crabel's NR7 is intraday; this is a bandwidth percentile, which sees neither; the
+every-session schedule of the idea is not available to a month-end edge, so only names in a squeeze at the
+month end are seen and the list is short. The options version (buy cheap gamma when realised and implied are both
+compressed) belongs to the options family. Month-end start sessions at least 20 sessions apart; the bands
+rollup is stored from about 2025-10, so the first percentile is about a year old."""
+
+[outcome]
+kind = "excess_return"
+horizon_sessions = [20]
+benchmark = "SPY"
+start_offset_sessions = 1
+cost_bps = 10
+
+[quality_bar]
+outcome = """Excess return over SPY over the 20 sessions after the entry close (the session after a month-end decision),
+net of 10 bps a round trip, the same as 12-1 momentum, so the two compare on one footing."""
+trigger_timing = """The bandwidth percentile, the trend state and mom_12_1 come from the closes through the decision session D
+(nightly rollups); the entry session is S = D + 1 (start_offset_sessions = 1); the screen is read at D, the outcome
+at S."""
+replication = """The sources' rules are not replicated exactly: Bollinger's squeeze is the bandwidth at a six-month low
+with a trade on the first close outside the band, Crabel's NR7 an intraday opening-range trade, Minervini's VCP a
+count of contractions and a pivot buy. Here: the 12-1 momentum winners in an uptrend with the bandwidth in the
+lowest 20 percent of its year, the top 50 of the liquid common stocks by momentum."""
+expected_size = """No academic direct test of the squeeze as a return source is on file (the idea page: practitioner
+evidence only), and the band-breakout rules fail data-snooping tests; the expectation is no gain over 12-1 momentum
+alone, and the filter shrinks the list, so a handful of names a month and under ten independent sessions
+so far."""
+capacity_costs = """Liquid common stocks above $50M a day trade at a few basis points; monthly turnover is momentum's, and
+the filter reduces the names, so a concentrated list is the larger cost. The 10 bps round trip is the assumption."""
+failure_modes = """A squeeze resolves downward as often as up (the trend and momentum filters supply the direction and a
+trend can end), a short list makes the result noisy, and a tight month can be a quiet market, not a base. Retire if the
+frozen-period picks do not beat 12-1 momentum's top 50 on the same sessions."""
+decoys = """Low volatility (a name with narrow bands may simply be a low-volatility stock; the bandwidth percentile
+is against its own year, which removes most of that), 12-1 momentum itself (the baseline), size, and the
+52-week-high effect."""
+
+[[sources]]
+title = "Bollinger, J., Bollinger on Bollinger Bands, McGraw-Hill, 2001"
+
+[[sources]]
+title = "Bajgrowicz, P. and Scaillet, O., Technical Trading Revisited: False Discoveries, Persistence Tests, and Transaction Costs, Journal of Financial Economics, 2012"
+url = "https://ideas.repec.org/a/eee/jfinec/v106y2012i3p473-491.html"
+
+[[sources]]
+title = "Crabel, T., Day Trading with Short Term Price Patterns and Opening Range Breakout, Traders Press, 1990"
+
+[[sources]]
+title = "Lo, A., Mamaysky, H. and Wang, J. (2000), Foundations of Technical Analysis: Computational Algorithms, Statistical Inference, and Empirical Implementation, NBER working paper 7613 (Journal of Finance 2000)"
+url = "https://www.nber.org/papers/w7613"
+
+[[sources]]
+title = "Brock, W., Lakonishok, J. and LeBaron, B. (1992), Simple Technical Trading Rules and the Stochastic Properties of Stock Returns, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v47y1992i5p1731-64.html"

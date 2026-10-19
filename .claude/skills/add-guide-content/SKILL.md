@@ -23,14 +23,14 @@ an item, then delete its baseline line.
    session's data (a gap, a missing snapshot, a run's coverage), it stays on the page as a
    banner, and the terms it uses open their drawers. If it tells the user what to do next, it
    is microcopy: one sentence.
-2. **Find the entry's kind and its source** (`grep -n "<term>" config/site/field_guide/*.toml
+2. **Find the entry's kind and its source** (`grep -n "<term>" config/site/field_guide/*/*.toml
    config/site/regime/*.toml`, and the Guide sources below); extend an existing entry rather
    than adding a near-duplicate:
 
    | Kind | Source (one owner each, `architecture/*_ownership.toml`) | Written by |
    |---|---|---|
-   | field (a catalogue feature) | `config/site/field_guide/<theme>.toml` `[[field]]` | `add-feature` ships it with the feature |
-   | situation (fools many fields at once) | `config/site/field_guide/situations.toml` `[[situation]]` | |
+   | field (a catalogue feature) | `config/site/field_guide/<group>/<file>.toml` `[[field]]` (`<group>` a theme group of `sections.toml`; a file under 900 lines, else the `-2` part) | `add-feature` ships it with the feature |
+   | situation (fools many fields at once) | `config/site/field_guide/tradeable/instrument-2.toml` `[[situation]]` | |
    | regime indicator, episode | `config/site/regime/cards.toml`, `episodes.toml` | |
    | playbook (one per site preset screen) | `config/site/guide/playbooks/<family>/<id>.toml` (`[asks]`: one line per criterion of the latest version) | `add-screener` for a site preset |
    | glossary term, how-to page | `config/site/guide/glossary/<theme>.toml` `[[term]]`, `start.toml` `[[page]]`; the button takes `{ kind: 'term' | 'start', id }` | |

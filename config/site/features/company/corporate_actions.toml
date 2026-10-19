@@ -1,0 +1,10 @@
+# Expression features over corporate actions (ADR 0075; edge reverse_split_drift).
+
+[reverse_split_recent]
+expr = "if(exists(reverse_splits), reverse_splits.sessions_since_reverse_split <= within_sessions, null)"
+params = { within_sessions = 252 }  # sessions since the ex-date: about a year, the group's window
+dtype = "bool"
+unit = "flag"
+description = "A reverse split had its ex-date in the last 252 sessions (params.within_sessions), a year; funds reverse-split too, so an edge on it names the operating-company universe"
+null_meaning = "the instrument has no row in reverse_splits (no reverse split with an ex-date on or before the session in the last 252 sessions, or no splits stored): never read as no reverse split"
+version = 1

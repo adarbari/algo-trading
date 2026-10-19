@@ -5,6 +5,7 @@ Back to the [index of every edge](../edges.md).
 
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
+| Analyst earnings-estimate revision momentum (`analyst_revision_momentum`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `eps_revision_up` |
 | Dividend-month premium (`dividend_month_premium`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `dividend_month` |
 | Earnings-date advances (`earnings_date_shift`) | candidate | on each `earnings_date_shift:earlier` | excess return, over 20 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `earnings_date_early` |
 | Earnings gap on heavy volume (`earnings_gap_volume_drift`) | candidate | on each `earnings_reaction` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `earnings_gap_volume`, `earnings_gap_only` |
@@ -13,7 +14,41 @@ Back to the [index of every edge](../edges.md).
 | Late filers (NT 10-K and NT 10-Q) (`late_filer_nt_drift`) | candidate | on each `nt_late_filing` | excess return, over 20, 60 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `nt_late_filer` |
 | Pre-earnings run-up in past winners (`pre_earnings_runup_winners`) | candidate | on each `earnings_expected` | excess return, over 5 sessions, vs SPY, starting -6 sessions from the event, costs 10 bps | `pre_earnings_runup` |
 | S&P 500 deletions rebound (`sp500_deletions_long`) | candidate | on each `index_change:deletion` | excess return, over 20, 60, 250 sessions, vs SPY, starting +1 sessions from the event, costs 20 bps | `sp500_deletion` |
+| Analyst target-price implied return (`target_price_implied_return`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `target_upside_high` |
 | Spin-off drift (`spinoff_drift`) | blocked | month end | excess return, over 250, 500 sessions, vs SPY, entered 1 session after the decision session | none yet |
+
+## Analyst earnings-estimate revision momentum (`analyst_revision_momentum`)
+
+**Status:** candidate. **Family:** B. **Thesis:** Stocks whose consensus earnings estimate for the current year was revised up over the last month keep outperforming the market over the next one to three months.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 5000000` and `rollup.analyst_revisions@v1.eps_fy1_revision_30d gte -10000`
+- **Top K:** 10
+- **Screeners:** `eps_revision_up`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** No exploration period exists: our own nightly snapshots of FMP's annual estimates (analyst_estimates, EB D2) start on 2026-10-19 at the earliest, after frozen_from, and a revision needs an earlier snapshot of the same fiscal year, so the 30-day column is null until about 2026-11-18 and the 90-day one until about 2027-01-17. Every measurable session is therefore frozen-period data, and the verdict accrues over months: the bar's 40 independent months is about three and a half years away and the harness reports the count beside every number. Licence: the estimates are a personal-licence feed (ADRs 0068 and 0069), so this edge's rows are for the owner's own use. The universe holds only names that carry a 30-day revision (the free vendor key covers few names, and a revision is null for the rest), so every base name is scored (the roadmap's measurement of 2026-10-16: the free vendor key covers 15 of 104 scope names; a covered base of about 20 would make 20 picks the whole base and the lift about 0, so top_k is 10; nothing in the harness enforces it, but the lift is expected to be reliable only with a base of at least 2 x top_k, 20 names) and the short variant is ranked; the base is the covered names. Proxies, each stated: the source's REV6 sums six months of changes in the consensus scaled by price, here a 30-day percent change of the current fiscal year's EPS estimate (the longer windows are stored and are follow-ups); no breadth (the share of analysts moving up) and no dispersion; a free-tier consensus is a small subset of the analysts, so a revision can be one analyst's. The outcome is the long on the 10 largest upward revisions; the variant downgrades_short is the short on the 10 largest downward ones among liquid names (owner decision O2, 2026-10-17: a verdict basis), net of cost and the assumed borrow; long_short is diagnostic only. A session before the data exists has an empty eligible set and is recorded as no_picks, not as measured. Month-end start sessions at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Analysts herd and under-revise, anchoring on their last number, so each revision is a partial step toward the truth and revisions predict revisions; investors wait for the reported number (Chan, Jegadeesh and Lakonishok 1996; Gleason and Lee 2003).
+2. **Persistence:** Revision signals are old and sold as ranks (Zacks, StarMine) yet survive because turnover is moderate and the effect lives in mid and small caps, crowded in large ones; the post-2005 decline across all anomalies roughly halves a published spread (Chen and Zimmermann 2022). Persistence is a claim to test.
+3. **Outcome:** Excess return over SPY over 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip: a long hold of the 10 names with the largest upward revision of the current-year EPS estimate over the last 30 days.
+4. **Trigger timing:** A revision is read from our own snapshots: the newest snapshot a session sees against the one 30 days earlier for the same fiscal year, each snapshot counting from the session that stored it (the reader hides one taken after the next open), never from the vendor's date; the revision is read at D (a month end) and the entry session is S = D + 1 (start_offset_sessions = 1).
+5. **Faithful replication:** Chan, Jegadeesh and Lakonishok's REV6: the sum of six months of consensus changes over price, deciles, held 6 to 12 months. Here: the 30-day percent change of the current fiscal year's EPS estimate (analyst_revisions@v1), the 10 largest upward among the covered liquid stocks, held 20 and 60 sessions. The paper's decile spread is from memory, so nothing is filed under [published].
+6. **Expected size and sample:** About 7 to 8 percent over 12 months for the REV6 decile spread (Chan and co-authors 1996, from memory, not verified); across about 200 signals the median post-2005 anomaly fell from 48 to 19 basis points a month (Chen, Lopez-Lira and Zimmermann, verified), so expect about half. With history from 2026-10-19 and a first 30-day value about 2026-11-18, no measurement exists yet.
+7. **Capacity and costs:** Covered stocks above $5M a day, long only, capacity of tens of thousands of dollars a name; monthly turnover is moderate. The 10 bps round trip is the assumption; the short variant pays the site's assumed borrow.
+8. **Failure modes and retirement:** Revisions follow price (analysts chase the move), so the picks are a momentum bet: the 12-1 momentum screen is the baseline; a revision after a report is the earnings surprise again (PEAD); one analyst moving a thin consensus; the free vendor's coverage skews to large names where the effect is weakest. Retire if the frozen-period excess return of the picks is not above the base rate of every covered name.
+9. **Decoys:** 12-1 momentum and post-earnings drift (both correlate with revisions: the test is incremental to them), size, and the earnings surprise: the size and momentum baselines on the same sessions.
+
+**Sources**
+
+- Chan, L., Jegadeesh, N. and Lakonishok, J., Momentum Strategies, Journal of Finance, 1996 <https://www.nber.org/papers/w5375>
+- Gleason, C. and Lee, C., Analyst Forecast Revisions and Market Price Discovery, The Accounting Review, 2003
+- Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022 <https://papers.ssrn.com/abstract=3604626>
+- Womack, K. (1996), Do Brokerage Analysts' Recommendations Have Investment Value?, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v51y1996i1p137-67.html>
+- Hong, H., Lim, T. and Stein, J. (1998), Bad News Travels Slowly: Size, Analyst Coverage and the Profitability of Momentum Strategies, NBER working paper 6553 (Journal of Finance 2000) <https://www.nber.org/papers/w6553>
 
 ## Dividend-month premium (`dividend_month_premium`)
 
@@ -44,7 +79,7 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Hartzmark, S. and Solomon, D., The Dividend Month Premium, Journal of Financial Economics, 2013 <https://doi.org/10.1016/j.jfineco.2013.02.015>
-- Hartzmark, S. and Solomon, D., The Dividend Disconnect, Journal of Finance, 2019
+- Hartzmark, S. and Solomon, D., The Dividend Disconnect, Journal of Finance, 2019 <https://ideas.repec.org/a/bla/jfinan/v74y2019i5p2153-2199.html>
 - Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing (signal DivSeason) <https://github.com/OpenSourceAP/CrossSection>
 
 ## Earnings-date advances (`earnings_date_shift`)
@@ -76,7 +111,8 @@ Back to the [index of every edge](../edges.md).
 
 - Johnson, T. and So, E., Time Will Tell: Information in the Timing of Scheduled Earnings News, Journal of Financial and Quantitative Analysis, 2018 <https://doi.org/10.1017/S0022109018000492>
 - Skinner, D., Information in Mandatory and Voluntary Earnings Announcement Date Forecasts, ABFER annual conference slides, 2021 <https://www.abfer.org/media/abfer-events-2021/annual-conference/slides-accounting/Information-in-Mandatory-and-Voluntary-Earnings-Announcement-Date-Forecasts_Douglas-Skinner.pdf>
-- deHaan, E., Shevlin, T. and Thornock, J., Journal of Accounting and Economics, 2015 (advance-notice length and bad news)
+- deHaan, E., Shevlin, T. and Thornock, J., Market (in)attention and the strategic scheduling and timing of earnings announcements, Journal of Accounting and Economics, 2015 (advance-notice length and bad news) <https://ideas.repec.org/a/eee/jaecon/v60y2015i1p36-55.html>
+- Stanford GSB Insights, Want to Soft-Pedal That Shaky Earnings Report? Don't File on Friday (summary of deHaan, Shevlin and Thornock (2015)) <https://www.gsb.stanford.edu/insights/ed-dehaan-want-soft-pedal-shaky-earnings-report-dont-file-friday>
 
 ## Earnings gap on heavy volume (`earnings_gap_volume_drift`)
 
@@ -107,8 +143,8 @@ Back to the [index of every edge](../edges.md).
 
 - Bernard, V. and Thomas, J., Post-Earnings-Announcement Drift: Delayed Price Response or Risk Premium?, Journal of Accounting Research, 1989 <https://doi.org/10.2307/2491062>
 - Martineau, C., Rest in Peace Post-Earnings Announcement Drift, Critical Finance Review, 2022 <https://doi.org/10.1561/104.00000122>
-- Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001
-- Pritamani, M. and Singal, V., Return predictability following large price changes and information releases, Journal of Banking and Finance, 2001
+- Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001 <https://ideas.repec.org/a/bla/jfinan/v56y2001i3p877-919.html>
+- Pritamani, M. and Singal, V., Return predictability following large price changes and information releases, Journal of Banking and Finance, 2001 <https://ideas.repec.org/a/eee/jbfina/v25y2001i4p631-656.html>
 
 ## Adverse 8-K item drift (`eight_k_item_drift`)
 
@@ -172,6 +208,7 @@ Back to the [index of every edge](../edges.md).
 
 - Cohen, L., Malloy, C. and Pomorski, L., Decoding Inside Information, Journal of Finance, 2012 <https://www.nber.org/papers/w16454>
 - Lakonishok, J. and Lee, I., Are Insider Trades Informative?, Review of Financial Studies, 2001 <https://doi.org/10.1093/rfs/14.1.79>
+- Jeng, L., Metrick, A. and Zeckhauser, R. (1999), The Profits to Insider Trading: A Performance-Evaluation Perspective, NBER working paper 6913 (Review of Economics and Statistics 2003) <https://www.nber.org/papers/w6913>
 
 ## Late filers (NT 10-K and NT 10-Q) (`late_filer_nt_drift`)
 
@@ -235,7 +272,8 @@ Back to the [index of every edge](../edges.md).
 
 - Aboody, D., Lehavy, R. and Trueman, B., Limited attention and the earnings announcement returns of past stock market winners, Review of Accounting Studies, 2010 <https://ideas.repec.org/a/spr/reaccs/v15y2010i2d10.1007_s11142-009-9104-9.html>
 - Chen, J., Cohen, L. and Wang, C., Famous Firms, Earnings Clusters, and the Stock Market (working paper) <https://papers.ssrn.com/abstract=3685452>
-- So, E. and Wang, S., News-driven return reversals: Liquidity provision ahead of earnings announcements, Journal of Financial Economics, 2014
+- So, E. and Wang, S., News-driven return reversals: Liquidity provision ahead of earnings announcements, Journal of Financial Economics, 2014 <https://dspace.mit.edu/handle/1721.1/119665>
+- Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html>
 
 ## S&P 500 deletions rebound (`sp500_deletions_long`)
 
@@ -268,6 +306,37 @@ Back to the [index of every edge](../edges.md).
 - Greenwood, R. and Sammon, M., The Disappearing Index Effect, NBER Working Paper 30748, 2022 <https://www.nber.org/papers/w30748>
 - Alpha Architect, The Disappearing Index Effect (summary) <https://alphaarchitect.com/disappearing-index-effect/>
 
+## Analyst target-price implied return (`target_price_implied_return`)
+
+**Status:** candidate. **Family:** B. **Thesis:** Stocks whose analysts' average price target sits furthest above the price outperform the market over the next one to three months.
+
+- **Outcome:** excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 5000000` and `feature.target_upside gte -1`
+- **Top K:** 10
+- **Screeners:** `target_upside_high`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** No exploration period exists: our own nightly snapshots of the analyst consensus targets (analyst_targets, EB D2) start on 2026-10-19 at the earliest, after frozen_from, and a target carries no date of its own, so the first measurable month end is the one after that day. Every measurable session is frozen-period data and the verdict accrues over months: the bar's 40 independent months is about three and a half years away and the harness reports the count beside every number. Licence: the targets are a personal-licence feed (ADRs 0068 and 0069), so this edge's rows are for the owner's own use. The universe holds only names with a target (feature.target_upside present; the free vendor key covers few names), so every base name is scored (the roadmap's measurement of 2026-10-16: the free vendor key covers 15 of 104 scope names; a covered base of about 20 would make 20 picks the whole base and the lift about 0, so top_k is 10; nothing in the harness enforces it, but the lift is expected to be reliable only with a base of at least 2 x top_k, 20 names) and the variants are ranked; the base is the covered names. Proxies, each stated: the source demeans the implied return within the industry, here the RAW upside (no industry demeaning: the optimism bias of a sector enters the ranking, and an industry-relative version is a follow-up once a sector map is joined to the score); one snapshot's consensus target, not a revision (Brav and Lehavy's target changes need the history, a follow-up); a target is the vendor's current figure the day it was asked, so a stale target of a covered name is not distinguished beyond targets_status. The outcome is the long on the 10 highest upside; the variant lowest_upside_short is the short on the 10 lowest among liquid names (owner decision O2, 2026-10-17), net of cost and the assumed borrow; long_short is diagnostic only. A session before the data exists has an empty eligible set and is recorded as no_picks, not as measured. Month-end start sessions at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Target prices carry analysts' valuation work, and investors focus on the rating label rather than the target; the implied return is a target over the price less 1, and netting it within the industry removes the sector's optimism bias (Da and Schaumburg 2011; Brav and Lehavy 2003).
+2. **Persistence:** The raw implied return is dominated by optimism bias, and beaten-down names show a high one (a value and reversal bet), so the signal needs normalising; the post-2010 evidence is thin and the decay result known is for recommendations, not targets. Persistence is a claim to test.
+3. **Outcome:** Excess return over SPY over 20 and 60 sessions after the entry close (the session after a month-end decision), net of 10 bps a round trip: a long hold of the 10 covered stocks whose average analyst target sits furthest above the close.
+4. **Trigger timing:** A target is read from our own snapshot as the session sees it (counting from the session that stored it, never from the vendor's date, which a target does not have); the upside is read at D (a month end) against D's close, and the entry session is S = D + 1 (start_offset_sessions = 1).
+5. **Faithful replication:** Da and Schaumburg: the consensus target over the price less 1, demeaned within the industry, quintile sorts rebalanced monthly, long the top and short the bottom. Here: the raw upside (no industry demeaning), the 10 highest among the covered liquid stocks, held 20 and 60 sessions. The paper's spread (about 1 to 2 percent a month) is from memory in the idea page, so nothing is filed under [published].
+6. **Expected size and sample:** About 1 to 2 percent a month for the quintile spread (Da and Schaumburg 2011, from memory, not verified); no post-2010 replication is on file, and the raw version without the industry adjustment is expected to be weaker. With history from 2026-10-19 no measurement exists yet.
+7. **Capacity and costs:** Covered stocks above $5M a day, long only, capacity of tens of thousands of dollars a name; monthly turnover is moderate. The 10 bps round trip is the assumption; the short variant pays the site's assumed borrow.
+8. **Failure modes and retirement:** The highest upside is mostly beaten-down names (a value and long-term reversal bet), a sector with chronic optimism dominates the list, and a stale target is the vendor's old figure. Retire if the frozen-period excess return of the picks is not above the base rate of every covered name.
+9. **Decoys:** Long-term reversal and value (beaten-down names have high upside), 12-1 momentum (the opposite sign: losers have the high upside), size, and the optimism of a sector: the size and momentum baselines on the same sessions.
+
+**Sources**
+
+- Da, Z. and Schaumburg, E., Relative Valuation and Analyst Target Price Forecasts, Journal of Financial Markets, 2011 <https://ideas.repec.org/a/eee/finmar/v14y2011i1p161-192.html>
+- Brav, A. and Lehavy, R., An Empirical Analysis of Analysts' Target Prices: Short-term Informativeness and Long-term Dynamics, Journal of Finance, 2003 <https://ideas.repec.org/a/bla/jfinan/v58y2003i5p1933-1967.html>
+- Womack, K. (1996), Do Brokerage Analysts' Recommendations Have Investment Value?, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v51y1996i1p137-67.html>
+
 ## Spin-off drift (`spinoff_drift`)
 
 **Status:** blocked. **Family:** B. **Thesis:** Spun-off subsidiaries outperform their industry peers over one to three years after the distribution, as forced sellers exit in the first months.
@@ -296,6 +365,7 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Cusatis, P., Miles, J. and Woolridge, J., Restructuring through spinoffs: The stock market evidence, Journal of Financial Economics, 1993
+- Cusatis, P., Miles, J. and Woolridge, J., Restructuring through spinoffs: The stock market evidence, Journal of Financial Economics, 1993 <https://ideas.repec.org/a/eee/jfinec/v33y1993i3p293-311.html>
 - S&P Global Market Intelligence, Capital Market Implications of Spinoffs, 2017 <https://www.spglobal.com/marketintelligence/en/documents/capital-market-implications-of-spinoffs.pdf>
 - McConnell, J., Sibley, S. and Xu, W., Journal of Portfolio Management, 2015 (spin-offs, 2001 to 2013)
+- Desai, H. and Jain, P. (1999), Firm performance and focus: long-run stock market performance following spinoffs, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v54y1999i1p75-101.html>

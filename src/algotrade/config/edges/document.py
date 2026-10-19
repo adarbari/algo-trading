@@ -56,11 +56,23 @@ and the key.
     status            researching | candidate | evidenced | live | retired | rejected | blocked
     family            optional "A".."I": the idea catalogue's family (docs/edge-ideas/); the
                       edges page groups by it
+    mechanism_kind    optional, one of MECHANISM_KINDS: the closed set of why the edge should
+                      exist (the Guide's Edges section groups by it); unknown values fail; a
+                      site edge must have one (fitness test), a user draft or copy may omit it
+                      (a copy inherits it through ``extends``)
+    asset_class       optional, one of ASSET_CLASSES (stocks | etfs | options): what the edge
+                      trades, for the Guide's filter; bookkeeping, never a run input. Needed
+                      where the universe cannot say (a hand-listed symbol universe with no
+                      security_type rule: a fitness test); else the Guide derives it
     frozen_from       optional date: the harness reports sessions from it on their own as the
                       frozen period (fixed once chosen, never rolling; none: no frozen slice)
     [evidence]        run_id and split_from of the run an evidenced or live edge rests on; its
                       split_from must equal frozen_from (ADR 0053 amendment, ED5a)
     rejection_reason  required when rejected or blocked, allowed when retired, else an error
+    plain_reason      optional, one plain sentence for the Guide reader on why a rejected or
+                      blocked edge was set aside (no paths, ADR numbers or code names; a
+                      fitness test requires it of every closed site edge); bookkeeping, never a
+                      run input; the Guide shows it instead of ``rejection_reason``
     [published]       optional: the number the literature reports, to set beside the harness's:
                       ``measure`` (PUBLISHED_MEASURES; ``mean_excess`` and ``decile_spread`` in
                       return as a fraction, ``lift_pts`` in points), ``value``,
@@ -117,12 +129,30 @@ from algotrade.config.edges.identity import (
 from algotrade.config.edges.portfolio import (
     BENCHMARK_BASE,
     PORTFOLIO_KIND,
+    Canary,
     benchmark_of,
+    canary_of,
     check_base,
     check_portfolio,
     ensemble_of,
     oos_class_of,
+    vol_target_of,
     weighting_of,
+)
+from algotrade.config.edges.schedules.events import (
+    EVENT_CLASSES,
+    EVENT_SUBTYPES,
+    ON_EVENT,
+    SUBTYPE_REQUIRED,
+    event_class,
+    event_schedule_ok,
+    event_subtype,
+)
+from algotrade.config.edges.schedules.markets import (
+    MARKET_TRIGGERS,
+    ON_MARKET,
+    market_schedule_ok,
+    market_trigger,
 )
 from algotrade.config.edges.verdict import LEGS
 from algotrade.config.site.fields import Table, reject_secrets
@@ -138,6 +168,11 @@ from algotrade.core.time.windows import (
 
 MIN_INDEPENDENT_SESSIONS = 40  # the quality bar's count: a fit and a promotion need this many
 FAMILIES = tuple("ABCDEFGHI")  # the idea catalogue's families (docs/edge-ideas/)
+MECHANISM_KINDS = (
+    "slow_to_update", "forced_flows", "paid_for_risk", "lottery_demand", "mispriced_fundamentals",
+    "informed_footprints", "liquidity_provision", "cross_market_trends", "value_gaps",
+)  # fmt: skip
+ASSET_CLASSES = ("stocks", "etfs", "options")
 STATUSES = ("researching", "candidate", "evidenced", "live", "retired", "rejected", "blocked")
 CLOSED = ("rejected", "blocked")  # kept on file with the reason; the bar is not required
 OUTCOME_KINDS = (
@@ -147,57 +182,13 @@ OUTCOME_KINDS = (
 MODEL_KIND, PAIR_KIND = "option_model_pnl", "pair_spread"  # pair: cheap return less sibling's
 MODEL_BASIS = "model"  # what a price from a model, not a quote, is labelled (results and UI)
 BENCHMARKS = ("SPY", "none")
+# The event vocabulary lives in ``schedules/events.py`` (ADR 0075); re-exported here.
+__all__ = ["EVENT_CLASSES", "EVENT_SUBTYPES", "ON_EVENT", "SUBTYPE_REQUIRED", "event_class",
+           "event_subtype"]  # fmt: skip
 SCHEDULES = ("every_session", "month_end")
 BASES = ("event", "universe", named.OUT_OF_WINDOW, BENCHMARK_BASE)
 PICKS = ("event", "universe")  # where an event schedule's picks may come from
 MAIN = "main"  # the edge itself, as the key of a results row (a variant has its own id)
-ON_EVENT = "on_event:"
-# The event classes a schedule may trigger on, and its ANCHOR session. The entry session is
-# S = anchor + start_offset_sessions, the decision session D = S - 1, the outcome's horizons
-# count from S's close, and the event must be known by D (``known_from <= D``, ADR 0050): the
-# harness skips an event that is not, never reads it early (``cross_section/events.py`` names
-# the stored field each class is read from).
-EVENT_CLASSES: Mapping[str, str] = {
-    "earnings_reaction": "a reported result's two-session reaction (earnings_reaction@v1); "
-    "anchor: the reaction's last session, E+1 (E: the report date)",
-    "earnings_expected": "a next report expected, scheduled or from the year-ago report "
-    "(earnings_expected@v1); anchor: the expected report date's session",
-    "index_change": "an S&P 500 membership change (index_changes@v1); anchor: the session it is "
-    "first stored (never the announcement)",
-    "filing_8k": "an 8-K carrying one Item (filing_events@v1); needs the item as its subtype; "
-    "anchor: the session the filing became known, the first whose close is after SEC accepted it",
-    "nt_late_filing": "an NT 10-K or NT 10-Q late-filing notice (filing_events@v1); anchor: the "
-    "session it became known",
-    "tender_offer": "an SC TO-I issuer or SC TO-T third-party tender offer (filing_events@v1); "
-    "anchor: the session it became known",
-    "earnings_date_shift": "a next report date a week or more away from last year's "
-    "(earnings_date_shift@v1); anchor: the session the shifted date was first stored",
-}
-# A class may be split by a subtype: ``on_event:<class>:<subtype>``. The subtype is one of the
-# class's own values (fail closed on any other, and on a subtype for a class that has none); the
-# base of an edge on it is the same class and subtype (``base = "event"``) or the universe. A
-# class in ``SUBTYPE_REQUIRED`` has no field of its own to read without one. The stored field of
-# each is declared in ``cross_section/events.py`` (kept equal by a fitness test).
-EVENT_SUBTYPES: Mapping[str, Mapping[str, str]] = {
-    "index_change": {
-        "addition": "joined the S&P 500 (sp500_added)",
-        "deletion": "left the S&P 500 (sp500_removed)",
-    },
-    "filing_8k": {
-        "1.02": "Item 1.02, termination of a material agreement",
-        "2.05": "Item 2.05, exit or disposal costs (a restructuring)",
-        "3.01": "Item 3.01, a delisting or listing-standard notice",
-        "4.01": "Item 4.01, a change of the auditor",
-        "4.02": "Item 4.02, non-reliance on previously issued financial statements",
-        "5.02": "Item 5.02, the departure or appointment of a director or an officer",
-    },
-    "earnings_date_shift": {
-        "later": "the next report date is a week or more later than last year's",
-        "earlier": "the next report date is a week or more earlier than last year's",
-    },
-}
-SUBTYPE_REQUIRED = ("filing_8k",)
-# ex_dividend, macro_release and lockup_expiry have no field to read yet (EB H4 follow-ups).
 ANNOUNCED_AHEAD = ("earnings_expected",)  # an entry may precede these
 # Quality bar answers 3 to 9 (1 and 2 are the document's mechanism and persistence).
 # What a hit_target compares with its target over the window (ED2 stores each as a field).
@@ -220,12 +211,15 @@ KEYS = (
     "id", "name", "thesis", "mechanism", "persistence", "outcome", "schedule", "universe",
     "top_k", "screeners", "baselines", "status", "rejection_reason", "sources", "quality_bar",
     "notes", "frozen_from", "base", "picks", "variants", "evidence", "scorer", "implementation",
-    "extends", "follow", "audit", "published", "family", "ensemble", "oos_class",
+    "extends", "follow", "audit", "published", "family", "ensemble", "oos_class", "mechanism_kind",
+    "plain_reason",
+    "asset_class",
 )  # fmt: skip
 OUTCOME_KEYS = (
     "kind", "horizon_sessions", "benchmark", "start_offset_sessions", "target", "max_drawdown",
     "cost_bps", "measure", "direction", "structure", "strike_delta", "otm_pct", "iv_field",
     "side", "borrow_bps_annual", "tenor_days", "hold_rank", "weighting", "vol_field", "pair_field",
+    "vol_target", "vol_window", "vol_return_field", "canary",
 )  # fmt: skip
 SHARED_KEYS = ("horizon_sessions", "benchmark", "start_offset_sessions", "iv_field")
 VARIANT_KEYS = ("id", "outcome", "universe", "base", "picks")
@@ -266,6 +260,13 @@ class Outcome:
     # declared feature whose value at D is each name's volatility.
     weighting: str = "equal"
     vol_field: str | None = None
+    # Volatility targeting of the book (ADR 0074 amendment): None, or the annualised volatility
+    # the book is scaled down to (never up), measured over ``vol_window`` sessions of
+    # ``vol_return_field``; the rest is cash.
+    vol_target: float | None = None
+    vol_window: int = 60
+    vol_return_field: str = "rollup.trend_stats@v2.ret_1d"
+    canary: Canary | None = None  # a risk-off gate on the book (ADR 0074 amendment)
 
     @property
     def result_side(self) -> str:
@@ -358,8 +359,11 @@ class Edge:
     sources: tuple[Source, ...]
     quality_bar: Mapping[str, str]  # QUALITY_BAR -> answer ("" only when CLOSED)
     rejection_reason: str = ""
+    plain_reason: str = ""  # the Guide's one-sentence why ("" none)
     notes: str = ""
     family: str = ""  # the catalogue family "A".."I" the idea came from ("" none)
+    asset_class: str | None = None  # one of ASSET_CLASSES (None: derived by the Guide)
+    mechanism_kind: str | None = None  # one of MECHANISM_KINDS (None: a draft that omits it)
     frozen_from: date | None = None
     base: str = "universe"  # what the picks are compared with: the event's names | the universe
     picks: str = "event"  # an event schedule's pick set: within the event names | the universe
@@ -394,6 +398,11 @@ class Edge:
         return event_class(self.schedule)
 
     @property
+    def market_trigger(self) -> str | None:
+        """The trigger of an ``on_market:`` schedule, else None."""
+        return market_trigger(self.schedule)
+
+    @property
     def event_subtype(self) -> str | None:
         """The subtype of an ``on_event:<class>:<subtype>`` schedule, else None."""
         return event_subtype(self.schedule)
@@ -423,41 +432,6 @@ def job_name(edge_id: str, user_id: str) -> str:
     return f"edge-eval:{edge_id}:{user_id}"
 
 
-def event_class(schedule: str) -> str | None:
-    """The event class of an ``on_event:<class>[:<subtype>]`` schedule, else None."""
-    if not schedule.startswith(ON_EVENT):
-        return None
-    return schedule.removeprefix(ON_EVENT).partition(":")[0]
-
-
-def event_subtype(schedule: str) -> str | None:
-    """The subtype of an ``on_event:<class>:<subtype>`` schedule, else None."""
-    if not schedule.startswith(ON_EVENT):
-        return None
-    return schedule.removeprefix(ON_EVENT).partition(":")[2] or None
-
-
-def _event_schedule_ok(t: Table, schedule: str) -> bool:
-    """Whether an ``on_event:`` schedule names a known class and, fail closed, one of its
-    subtypes (required for ``SUBTYPE_REQUIRED``, refused for a class that has none)."""
-    cls, sub = event_class(schedule), event_subtype(schedule)
-    if cls is None or cls not in EVENT_CLASSES:
-        return False
-    allowed = EVENT_SUBTYPES.get(cls, {})
-    if sub is None:
-        if cls in SUBTYPE_REQUIRED:
-            raise ConfigurationError(
-                f"{t.where} schedule: {schedule!r} needs a subtype, one of {sorted(allowed)}"
-            )
-        return True
-    if sub not in allowed:
-        raise ConfigurationError(
-            f"{t.where} schedule: {sub!r} is not a subtype of {cls!r} "
-            f"(known: {sorted(allowed) or 'none'})"
-        )
-    return True
-
-
 def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     """``doc`` (the layered document of ``<name>.toml``) as an ``Edge``; ``where`` names it."""
     reject_secrets(doc, where)
@@ -472,7 +446,10 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
     base = _base(t, schedule, BENCHMARK_BASE if _kind_of(t) == PORTFOLIO_KIND else None)
     outcome = _outcome(t, schedule, base)
     universe = _universe(t, edge_id)
-    named.check_time_series(base, window_name(schedule) in WINDOW_NAMES, universe, where)
+    named.check_time_series(
+        base, window_name(schedule) in WINDOW_NAMES, universe, where,
+        market=market_trigger(schedule) is not None,
+    )  # fmt: skip
     picks = _picks(t, schedule, base)
     sources = _sources(t)
     screeners = _ids(t, "screeners")
@@ -508,8 +485,13 @@ def parse_edge(doc: Mapping[str, Any], name: str, where: str) -> Edge:
         sources=sources,
         quality_bar=_quality_bar(t, closed),
         rejection_reason=_prose(t, "rejection_reason"),
+        plain_reason=_prose(t, "plain_reason"),
         notes=_prose(t, "notes"),
         family=t.choice("family", "", FAMILIES) if "family" in doc else "",
+        mechanism_kind=t.choice("mechanism_kind", "", MECHANISM_KINDS)
+        if "mechanism_kind" in doc
+        else None,
+        asset_class=t.choice("asset_class", "", ASSET_CLASSES) if "asset_class" in doc else None,
         frozen_from=_frozen_from(t),
         base=base,
         picks=picks,
@@ -645,7 +627,8 @@ def _schedule(t: Table) -> str:
     schedule = _required(t, "schedule")
     if (
         schedule in SCHEDULES
-        or _event_schedule_ok(t, schedule)
+        or event_schedule_ok(t, schedule)
+        or market_schedule_ok(t, schedule)
         or window_name(schedule) in WINDOW_NAMES
     ):
         return schedule
@@ -653,6 +636,7 @@ def _schedule(t: Table) -> str:
         *SCHEDULES,
         *(f"{CALENDAR}{w}" for w in WINDOW_NAMES),
         *(f"{ON_EVENT}{c}" for c in EVENT_CLASSES),
+        *(f"{ON_MARKET}{m}" for m in MARKET_TRIGGERS),
     ]
     raise ConfigurationError(f"{t.where} schedule: expected one of {options}, got {schedule!r}")
 
@@ -664,6 +648,11 @@ def _base(t: Table, schedule: str, default: str | None = None) -> str:
         if "base" in t.names()
         else default or ("event" if event else "universe")
     )
+    if market_trigger(schedule) is not None and base != named.OUT_OF_WINDOW:
+        raise ConfigurationError(
+            f"{t.where} base: {schedule} is measured against the out-of-window stretches, so "
+            f"base = 'out_of_window', got {base!r}"
+        )
     if base == "event" and not event:
         raise ConfigurationError(f"{t.where} base: 'event' needs an on_event schedule")
     return base
@@ -726,6 +715,12 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
     offset = o.integer("start_offset_sessions", 0)
     event = event_class(schedule)
     window = window_name(schedule)
+    if market_trigger(schedule) is not None and (offset != 1 or len(horizons) != 1):
+        raise ConfigurationError(
+            f"{o.where}: {schedule} enters at the session after the trigger session "
+            f"(start_offset_sessions = 1) and has one horizon_sessions value, got "
+            f"{offset} and {list(horizons)}"
+        )
     if window is not None:
         if offset != 1:
             raise ConfigurationError(
@@ -761,6 +756,7 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
     check_side(o, side, borrow, kind, drawdown)
     hold_rank = hold_rank_of(o, side, kind, schedule, SCHEDULES, horizons)
     weighting, vol_field = weighting_of(o, kind)
+    vol_target, vol_window, vol_return_field = vol_target_of(o, kind)
     check_portfolio(o, kind, side, drawdown, hold_rank is not None, schedule, SCHEDULES, horizons)
     return Outcome(
         kind=kind,
@@ -783,6 +779,10 @@ def _outcome_of(o: Table, schedule: str, base: str = "universe") -> Outcome:
         hold_rank=hold_rank,
         weighting=weighting,
         vol_field=vol_field,
+        vol_target=vol_target,
+        vol_window=vol_window,
+        vol_return_field=vol_return_field,
+        canary=canary_of(o, kind),
     )
 
 

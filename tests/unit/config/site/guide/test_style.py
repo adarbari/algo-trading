@@ -1,8 +1,8 @@
 """The writing style of the Guide's prose (``docs/ui/guide-quality.md`` section 3(b), the
 checklist of 3(a); mechanics ``.claude/skills/add-guide-content``), over the shipped glossary,
-Start here pages and field guide: a ``short`` or ``summary`` is at most 25 words; every
-sentence of a body, a ``reads`` or a caveat at most 30; no marketing words, hedging filler,
-exclamation marks or trading advice; a glossary term used in another entry is in its
+Start here pages, mechanism pages and field guide: a ``short`` or ``summary`` is at most 25
+words; every sentence of a body, a ``reads`` or a caveat at most 30; no marketing words,
+hedging filler, exclamation marks or trading advice; a glossary term used in another entry is in its
 ``see_also`` (a Start page: its ``links``); every state or status term has a ``next``; a Start
 page has at most 7 sections.
 
@@ -17,6 +17,7 @@ from collections.abc import Iterator
 from typing import NamedTuple
 
 from algotrade.config.site.guide.glossary import GlossaryTerm, load_guide_glossary
+from algotrade.config.site.guide.mechanisms import load_guide_mechanisms
 from algotrade.config.site.guide.start import load_guide_start
 from algotrade.config.site.settings import load_field_guide
 from algotrade.storage.configs.files import FileConfigStore
@@ -61,6 +62,12 @@ def _prose() -> Iterator[Prose]:
         yield Prose(f"start:{page.id}:summary", "summary", page.summary)
         for section in page.sections:
             yield Prose(f"start:{page.id}:{section.title}", "body", section.body)
+    for m in load_guide_mechanisms(SHIPPED).mechanisms:
+        yield Prose(f"mechanism:{m.id}:short", "short", m.short)
+        for part in ("how_it_works", "why_it_survives", "research", "real_vs_decoy"):
+            for paragraph in getattr(m, part):
+                yield Prose(f"mechanism:{m.id}:{part}", "body", paragraph)
+        yield Prose(f"mechanism:{m.id}:dont", "body", m.dont)
     guide = load_field_guide(SHIPPED)
     for field in guide.fields:
         yield Prose(f"field:{field.name}:reads", "reads", field.reads)

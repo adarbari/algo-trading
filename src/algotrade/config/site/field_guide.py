@@ -1,5 +1,7 @@
-"""Site field guide (ADR 0041, amended 2026-10-06): ``config/site/field_guide/*.toml`` (one file
-per theme, plus the situations) typed into frozen dataclasses. Per catalogue field: how to read
+"""Site field guide (ADR 0041, amended 2026-10-06): ``config/site/field_guide/<group>/*.toml``
+(a folder per theme group, files of at most 900 lines in ``<stem>.toml`` and ``<stem>-2.toml``
+pairs, the situations in ``tradeable/instrument-2.toml``) typed into frozen dataclasses. Per
+catalogue field: how to read
 it (``reads``), the usual criterion for each intent a trader has (``uses``: op, value, mode,
 tolerance, as the rule grammar takes them), the caveats (when the reading lies, each naming what
 to check) and the sources; plus the ``situations`` that fool several thresholds at once (a
@@ -77,7 +79,7 @@ class Situation:
 
 @dataclass(frozen=True)
 class FieldGuideSettings:
-    """``config/site/field_guide/*.toml``: the entries and situations in file order (none
+    """``config/site/field_guide/<group>/*.toml``: the entries and situations in file order (none
     without files)."""
 
     fields: tuple[FieldGuideEntry, ...] = ()
@@ -85,7 +87,7 @@ class FieldGuideSettings:
 
     @classmethod
     def from_documents(cls, docs: Mapping[str, Mapping[str, Any] | None]) -> "FieldGuideSettings":
-        """The files of ``config/site/field_guide/`` by name, in the order given (the loader
+        """The files of ``config/site/field_guide/`` by file stem, in the order given (the loader
         gives file-name order); a field guided in two files is an error."""
         fields: list[FieldGuideEntry] = []
         situations: list[Situation] = []

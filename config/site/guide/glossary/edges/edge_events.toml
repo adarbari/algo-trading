@@ -174,3 +174,63 @@ The trigger is a next report date at least 7 days before the year-ago report plu
 """
 next = "Open the edge's result and read how many shifted dates lie behind it."
 see_also = ["base_rate", "out_of_sample", "event_class_earnings_date_shift_later"]
+
+[[term]]
+id = "event_class_ipo_lockup"
+term = "IPO lock-up expiry"
+short = "The edge starts around the day an IPO's lock-up ends and insiders may sell."
+body = """
+The trigger is the expiry of a new issue's lock-up, a period after the offering when insiders agreed not to sell. The prospectus states the term, usually 180 days. The anchor is the expiry session, so an entry can come before it, as for an expected report. Many studies find the stock tends to drift down around the expiry, and the edge is built as the short, avoid-list side. The date is read from the prospectus text, and a name whose prospectus states none is unknown. A prospectus is matched to a name through the company record as of the decision session, so a name that listed later is never counted early. Few IPOs expire in a month, so counts are small. Use a subtype to split the standard terms from the early-release ones.
+"""
+next = "Open the edge's result and read how many lock-up expiries lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_ipo_lockup_standard", "event_class_ipo_lockup_early_release"]
+
+[[term]]
+id = "event_class_ipo_lockup_standard"
+term = "Standard IPO lock-up"
+short = "The edge starts around an IPO lock-up with one fixed expiry date."
+body = """
+The trigger is a lock-up whose prospectus gives one expiry date and no early release. Insiders and early holders know the day they may sell, and so does the market. The anchor is the expiry session. The date is the first session after the prospectus date plus the stated term. Example: a prospectus dated 2 March with a 180-day term expires on 29 August. Compare the picks with other recent IPOs, not with the whole market.
+"""
+next = "Open the edge's result and read how many expiries lie behind it."
+see_also = ["base_rate", "out_of_sample", "event_class_ipo_lockup_early_release"]
+
+[[term]]
+id = "event_class_ipo_lockup_early_release"
+term = "IPO lock-up with early release"
+short = "The edge starts around an IPO lock-up that the prospectus lets end early."
+body = """
+The trigger is a lock-up whose prospectus lets part of it end early, for example after an earnings report or when the price stays above a level. The stated expiry date is then the latest one, and some shares may be free to sell before it. The anchor is still the stated expiry session. The release can come before the anchor, so the effect may arrive earlier and be smaller on the day. Compare the picks with the standard terms of the same weeks.
+"""
+next = "Open the edge's result and compare it with the standard lock-ups."
+see_also = ["base_rate", "out_of_sample", "event_class_ipo_lockup_standard"]
+
+[[term]]
+id = "event_class_reverse_split"
+term = "Reverse split"
+short = "The edge starts after a company merges its shares into fewer, higher-priced ones."
+body = """
+The trigger is a reverse split, where each holder gets one new share for several old ones, such as one for ten. Companies near a low price or a listing-standard limit often do it, and shares tend to drift down afterwards. The anchor is the ex-date, the first session at the new price. Only splits with an ex-date on or before the decision session count, so a declared one is never read early. Funds reverse-split too, so the edge's universe leaves them out. Splits per year are few, and several can sit close together for one name. Compare the picks with other low-priced names of the same weeks.
+"""
+next = "Open the edge's result and read how many reverse splits lie behind it."
+see_also = ["base_rate", "out_of_sample"]
+
+[[term]]
+id = "schedule_on_market"
+term = "After a market-wide trigger"
+short = "The edge starts after something that happens to the whole market, not to one company."
+body = """
+Some timing is one fact about the whole market, such as a spike in the VIX, the market's fear gauge. It is not an event of one name, so there is no crowd of other names to compare with. The edge names a few funds or indexes. Each time the trigger fires, the edge holds them for its one horizon, starting at the close of the session after the trigger. The result sets those windows beside equal-length stretches of the same instrument outside every window. A second trigger inside a running window is skipped, so windows never overlap and each counts once. The base uses the triggers in the whole range, so a stretch near the end can change when the range is extended. A market trigger fires only a few times in a range, so the result shows the count of windows beside every number. Example: a VIX spike on Monday, entry at Tuesday's close, a 10-session window.
+"""
+next = "Open the edge's result and read the number of windows behind it before the averages."
+see_also = ["base_out_of_window", "out_of_sample", "market_trigger_vix_spike"]
+
+[[term]]
+id = "market_trigger_vix_spike"
+term = "VIX spike"
+short = "The market-wide trigger for the first day of a fear spike after a quiet month."
+body = """
+The trigger is the first session where the VIX closed at 30 or more. The three-month VIX must be below it, so the short-term price of fear is above the longer one (backwardation). It must come after at least 21 sessions with no such day, so a month of high readings is one spike, not twenty. The date is the session the reading was first known: the VIX close is published the day after, so a Monday close dates the spike Tuesday. The levels are fixed, and a change makes a new version of the field. A stale VIX reading makes the day unknown, never a day without a spike. The history starts with the first VIX close we hold, and the first 21 sessions of it cannot hold a spike. The VIX comes from Cboe via FRED, for personal use only. Example: the VIX closes at 36 on a Friday after a calm month, and the spike is dated Monday.
+"""
+next = "Open the edge's result and read how many spikes lie behind it."
+see_also = ["schedule_on_market", "base_out_of_window"]

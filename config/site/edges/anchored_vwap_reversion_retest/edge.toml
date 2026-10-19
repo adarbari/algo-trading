@@ -19,6 +19,7 @@ top_k = 50
 baselines = ["momentum_12_1", "size_small"]
 screeners = ["earnings_vwap_overhang"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """THE SIGNAL IS A PROXY. The source's overhang is (price - reference price) / price where the
 reference price is a turnover-weighted average of past prices over one to five years; the stored
@@ -79,6 +80,11 @@ url = "https://doi.org/10.1016/j.jfineco.2004.06.007"
 
 [[sources]]
 title = "An, L., Asset pricing when traders sell extreme winners and losers, Review of Financial Studies, 2016"
+url = "https://eng.pbcsf.tsinghua.edu.cn/info/1075/1547.htm"
 
 [[sources]]
 title = "Shannon, B., Maximum Trading Gains with Anchored VWAP, 2023"
+
+[[sources]]
+title = "Hong, H. and Stein, J. (1999), A Unified Theory of Underreaction, Momentum Trading, and Overreaction in Asset Markets, Journal of Finance"
+url = "https://ideas.repec.org/a/bla/jfinan/v54y1999i6p2143-2184.html"

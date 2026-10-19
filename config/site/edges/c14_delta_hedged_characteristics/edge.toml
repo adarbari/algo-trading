@@ -20,6 +20,7 @@ top_k = 20
 screeners = ["ivol_high"]
 baselines = ["vrp_cross_section", "vrp_iv_hv"]
 status = "candidate"
+mechanism_kind = "paid_for_risk"
 frozen_from = 2026-04-01
 notes = """A selection overlay on c12, filed as its own edge so the harness can say whether the
 characteristic adds anything to the premium ranking (the baselines are the c12 ranking and the filed
@@ -88,7 +89,16 @@ url = "https://research.polyu.edu.hk/en/publications/option-return-predictabilit
 
 [[sources]]
 title = "Cao, J. and Han, B., Cross section of option returns and idiosyncratic stock volatility, Journal of Financial Economics, 2013"
+url = "https://ideas.repec.org/a/eee/jfinec/v108y2013i1p231-249.html"
 
 [[sources]]
 title = "CXO Advisory, Option Strategies Based on Factor Sorts (summary)"
 url = "https://www.cxoadvisory.com/equity-options/option-strategies-based-on-factor-sorts"
+
+[[sources]]
+title = "Bali, T., Beckmeyer, H., Moerke, M. and Weigert, F. (2021), Option Return Predictability with Machine Learning and Big Data, CFR working paper 21-08 (Review of Financial Studies 2023)"
+url = "https://www.cfr-cologne.de/download/workingpaper/cfr-21-08.pdf"
+
+[[sources]]
+title = "Goyal, A. and Saretto, A. (2009), Cross-section of option returns and volatility, Journal of Financial Economics"
+url = "https://ideas.repec.org/a/eee/jfinec/v94y2009i2p310-326.html"

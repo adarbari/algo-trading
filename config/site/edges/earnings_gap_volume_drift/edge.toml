@@ -20,6 +20,7 @@ base = "event"
 screeners = ["earnings_gap_volume", "earnings_gap_only"]
 baselines = ["momentum_12_1", "size_small"]
 status = "candidate"
+mechanism_kind = "slow_to_update"
 frozen_from = 2026-04-01
 notes = """Variant of small_cap_earnings_drift (the same schedule, entry and horizons): the question
 this edge asks is the increment, whether volume-confirmed large reactions drift more than same-size
@@ -89,6 +90,8 @@ url = "https://doi.org/10.1561/104.00000122"
 
 [[sources]]
 title = "Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance, 2001"
+url = "https://ideas.repec.org/a/bla/jfinan/v56y2001i3p877-919.html"
 
 [[sources]]
 title = "Pritamani, M. and Singal, V., Return predictability following large price changes and information releases, Journal of Banking and Finance, 2001"
+url = "https://ideas.repec.org/a/eee/jbfina/v25y2001i4p631-656.html"

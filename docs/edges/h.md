@@ -6,6 +6,9 @@ Back to the [index of every edge](../edges.md).
 | Edge | Status | Schedule | Outcome | Screeners |
 |---|---|---|---|---|
 | BDC price to NAV reversion (`bdc_price_to_nav_reversion`) | candidate | month end | excess return, over 60 sessions, vs SPY, entered 1 session after the decision session, costs 30 bps | `bdc_price_to_nav` |
+| Dual-class share spread reversion (`dual_class_spread_reversion`) | candidate | month end | pair spread, over 20, 60 sessions, entered 1 session after the decision session, the cheap share class against its sibling from rollup.share_classes@v1.sibling_id, short leg pays borrow, costs 10 bps | `dual_class_cheap_leg` |
+| Currency ETF momentum (`fx_etf_carry_momentum`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 20% FXE, 20% FXY, 20% FXB, 20% FXA and 20% FXC, entered 1 session after the decision session, costs 10 bps | `trend_positive_6m`, `trend_positive_12m` |
+| Natural gas and oil ETF avoid list (`natgas_etf_contango_drag`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 34% UNG, 33% USO and 33% DBO, entered 1 session after the decision session, costs 20 bps | `trend_positive_12m` |
 | Retail lottery-option attention (`retail_options_lottery_attention`) | candidate | every session | excess return, over 6, 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `retail_option_attention` |
 | Tender-offer drift after expiry (`tender_offer_drift`) | candidate | on each `tender_offer` | excess return, over 60, 250 sessions, vs SPY, starting +21 sessions from the event, costs 20 bps | `tender_offer_filed` |
 | Premium closed-end funds that over-distribute (`cef_distribution_trap`) | blocked | month end | excess return, over 60, 125, 250 sessions, vs SPY, entered 1 session after the decision session, costs 50 bps | none yet |
@@ -44,6 +47,101 @@ Back to the [index of every edge](../edges.md).
 - CXO Advisory, Enhanced Exploitation of Closed-End Fund Discounts (summary of Patro, Piccotti and Wu) <https://www.cxoadvisory.com/mutual-hedge-funds/enhanced-exploitation-of-closed-end-fund-discounts/>
 - CEFdata, BDC portfolio summary and the 3-year relative discount metric <https://legacy.cefdata.com/portfolios/194/summary/>
 
+## Dual-class share spread reversion (`dual_class_spread_reversion`)
+
+**Status:** candidate. **Family:** H. **Thesis:** When one share class of a company trades much cheaper than its sibling class against their own history, the spread narrows: the cheap class beats the rich one over the next one to three months.
+
+- **Outcome:** pair spread, over 20, 60 sessions, entered 1 session after the decision session, the cheap share class against its sibling from rollup.share_classes@v1.sibling_id, short leg pays borrow, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type in ('COMMON_STOCK', 'ADR')` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 3` and `rollup.price_stats@v2.adv_usd_20d gte 2000000` and `rollup.share_classes@v1.sibling_status eq 'PAIRED'` and `rollup.share_classes@v1.spread_z_252d gte -20`
+- **Top K:** 5
+- **Screeners:** `dual_class_cheap_leg`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** The outcome is the pair_spread of EB H9: a pick is the cheap class of a pair, and its value is its return over the horizon less its sibling's, less two round trips and the borrow on the sibling (the rich leg); a hit is a positive value. It is a two-leg spread, so the result is the spread and nothing is filed under [published] (Schultz and Shive's figures are for trades opened at a fixed spread and held to closure, not this monthly rule). The pair is read from share_classes@v1 at D (the issuer's two classes of the reference snapshot the session sees, joined on CIK and share-class FIGI, never a hand list and never today's reference): only issuers with exactly two listed classes are PAIRED, three or more are AMBIGUOUS and no pair is guessed, and the universe requires PAIRED, so both classes must pass the liquidity floors (a pair with one class below $3 or 2M dollars a day is out). Declared thresholds, not tuned: the cheap class is one at or below -2 standard deviations of its own log price ratio over the last 252 sessions (spread_z_252d), at least 200 sessions of both bars needed; the stored bars start 2024-10, so the first z-scores are about a year old. The base is every eligible class against its sibling (a random side of the pair), so the lift is over the pair's own noise. Few pairs (about 15 to 25 US issuers) and few below -2 at any month end: the harness reports the picks and the sessions beside each number, and most sessions will pick none. Proxies, each stated: a z-score of the ratio against its own year, not Schultz and Shive's deviation from a moving average; no dividend or voting parity check (a class with different dividend or voting rights holds a gap for years: the z-score then measures drift inside the gap); the entry and exit are month-end closes with no convergence exit; the borrow is the site's default, not a quote. Month-end start sessions at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Two classes with the same cash flows should keep a stable price ratio, but index membership, option hedging and retail flow hit one ticker more than the other, and nobody is paid to arbitrage a one to three percent spread that closes slowly and costs borrow to hold (Schultz and Shive 2010; Froot and Dabora 1999).
+2. **Persistence:** Capacity is tens of pairs and the carry is negative for arbitrageurs, so capital stays away; but Froot and Dabora's twins deviated 10 to 30 percent for years, so a spread can keep widening, and collapses of a class structure deliver it in one jump. Persistence is a claim to test.
+3. **Outcome:** The cheap class's return less its sibling's over 20 and 60 sessions after the entry close, net of two round trips at 10 bps and the borrow on the sibling: a hit is a positive spread.
+4. **Trigger timing:** The pair and the z-score are read at the decision session D (a month end) from the closes through D and the reference snapshot D sees, so a reclassification counts from its own date; the entry session is S = D + 1 (start_offset_sessions = 1); both legs are valued from the same stored outcome rows at S.
+5. **Faithful replication:** Schultz and Shive: when the relative price deviation of two classes exceeds a threshold against its moving average, long the cheap and short the rich class, exit on reversion. Here: the cheap class of a paired issuer at 2 or more standard deviations under its own 252-session ratio, held 20 and 60 sessions, the sibling shorted, the pick limit 5 pairs a month.
+6. **Expected size and sample:** Schultz and Shive report that 82 percent of 3,687 trades opened at a 1 percent spread and held to closure were profitable, and 9.75 percent on average over 213 days for spreads above 10 percent, 100 US pairs 1993-2006 (verified through Alpha Architect's summary of the paper); those are trades held to closure, not this rule. Recent US spreads are one to two percent and narrowing (GOOG and GOOGL), so expect little, in very few pairs; the history holds a year of month-ends, under the 40 the bar asks.
+7. **Capacity and costs:** Tiny: capacity of tens to hundreds of thousands of dollars a pair on the liquid pairs, which is why large funds do not trade it. Two legs pay two round trips (the 10 bps is the assumption) and the borrow on the rich class, cheap on mega-caps; the convergence date is unknown, so the carry can be negative.
+8. **Failure modes and retirement:** Control events legitimately widen a spread (a takeover rumour, a proxy fight, a recapitalisation), a class with different voting or dividend rights keeps a gap for years, and a spread can widen for longer than the horizon. Retire if the frozen-period mean spread of the picks is not above the mean of every eligible class against its sibling, or the sample stays under a handful of picks after the 40 months.
+9. **Decoys:** The liquidity premium of the thinner class, voting premia around control events, and index membership of one class: the 12-1 momentum and size baselines on the same sessions (stock rankings, so a rough read for a pair); the base here is every class against its sibling.
+
+**Sources**
+
+- Schultz, P. and Shive, S., Mispricing of Dual-Class Shares: Profit Opportunities, Arbitrage, and Trading, Journal of Financial Economics, 2010 <https://papers.ssrn.com/abstract=1338885>
+- Froot, K. and Dabora, E., How Are Stock Prices Affected by the Location of Trade?, Journal of Financial Economics, 1999 <https://www.nber.org/papers/w6572>
+- Lamont, O. and Thaler, R., Can the Market Add and Subtract? Mispricing in Tech Stock Carve-outs, Journal of Political Economy, 2003 <https://www.nber.org/papers/w8302>
+- Mitchell, M., Pulvino, T. and Stafford, E. (2002), Limited Arbitrage in Equity Markets, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v57y2002i2p551-584.html>
+
+## Currency ETF momentum (`fx_etf_carry_momentum`)
+
+**Status:** candidate. **Family:** H. **Thesis:** Currency ETFs that rose most over the past year keep rising, so holding the three strongest beats an equal mix of the five major currencies.
+
+- **Outcome:** portfolio return, over 21 sessions, vs a blend of 20% FXE, 20% FXY, 20% FXB, 20% FXA and 20% FXC, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.symbol in ('FXE', 'FXY', 'FXB', 'FXA', 'FXC', 'UUP')`
+- **Top K:** 3
+- **Screeners:** `trend_positive_6m`, `trend_positive_12m`
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** VERDICTS ARE UNMEASURED until the screens are run and evaluated. LIMITS: this is the MOMENTUM leg only. The carry leg of the source (sort on the forward discount) needs foreign short-rate series that are not stored: not built, and the document does not claim carry. The universe is the five major-currency funds and UUP, the dollar, so a falling foreign mix can be held as the dollar; the benchmark is an equal mix of the five foreign funds. The top three by raw return where above 0 are held at a third each, an unfilled slot is cash at the bill yield. The funds hold deposits, whose interest is in the fund's price only as a drag for the dollar fund; no distributions in the stored return; cost_bps 10 a round trip assumed. The ensemble of 6 and 12 months is ONE trial. verdict.toml [oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one beside the result, as display only.
+
+**Quality bar**
+
+1. **Mechanism:** Currency momentum comes from slow-moving capital flows and central-bank reaction functions rather than profit maximisation (Menkhoff, Sarno, Schmeling and Schrimpf 2012).
+2. **Persistence:** The effect has been weak since 2010 in G10 (near-zero rate dispersion) and the funds cost 0.4 percent a year and track poorly; persistence is a claim to test.
+3. **Outcome:** The three-fund book's return over the 21 sessions from the close after each month end, less an equal mix of the five foreign-currency funds, net of cost on the weight change. Price only: the stored forward return is close to close and carries no dividend or distribution, so the book and the benchmark both miss their yield and cash earns the Treasury bill.
+4. **Trigger timing:** Trailing returns are read at the month-end close D; the book is held from the next session's close S for 21 sessions. Nothing after D enters a pick.
+5. **Faithful replication:** Menkhoff, Sarno, Schmeling and Schrimpf (2012): sort currencies on the 1 to 12 month return, long the top and short the bottom, monthly. Here: six ETFs, top three by 6 and 12 month raw return where above 0, long only.
+6. **Expected size and sample:** Carry has worked for forty years with crashes and weakly since 2010; the momentum figures are not verified here. An ETF wrapper's 0.4 percent cost is large against a 2 to 4 percent carry.
+7. **Capacity and costs:** Capacity is limited by FXF and FXC volume, not by the large funds; about 8 switches a year; cost_bps 10 assumed.
+8. **Failure modes and retirement:** A dollar regime dominates all six series, and six funds leave few independent choices. Retire if the frozen-period picks-series t is under 2.
+9. **Decoys:** Dollar beta and risk-on equity beta; the benchmark excludes the dollar fund on purpose (a held UUP is a bet against the foreign mix).
+
+**Sources**
+
+- Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A., Currency momentum strategies, Journal of Financial Economics, 2012 <https://www.bis.org/publ/work366.pdf>
+- Menkhoff, L., Sarno, L., Schmeling, M. and Schrimpf, A., Carry trades and global foreign exchange volatility, Journal of Finance, 2012 <https://ideas.repec.org/a/bla/jfinan/v67y2012i2p681-718.html>
+- Lustig, H., Roussanov, N. and Verdelhan, A. (2008), Common Risk Factors in Currency Markets, NBER working paper 14082 (Review of Financial Studies 2011) <https://www.nber.org/papers/w14082>
+
+## Natural gas and oil ETF avoid list (`natgas_etf_contango_drag`)
+
+**Status:** candidate. **Family:** H. **Thesis:** Funds that roll futures in a market in contango lose value by structure, so holding them only while their own price trend is up, and cash otherwise, beats holding them always.
+
+- **Outcome:** portfolio return, over 21 sessions, vs a blend of 34% UNG, 33% USO and 33% DBO, entered 1 session after the decision session, costs 20 bps
+- **Schedule:** month end
+- **Universe:** `instrument.symbol in ('UNG', 'USO', 'DBO')`
+- **Top K:** 3
+- **Screeners:** `trend_positive_12m`
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** DOCUMENTED-LIMIT VARIANT. VERDICTS ARE UNMEASURED until the screen is run and evaluated. An allocation edge is long (ADR 0074), so the source's AVOID or SHORT rule cannot be filed as such: this document expresses the avoid list as a long book that holds each fund only while its own 12-month raw return is above 0 and holds cash at the Treasury bill yield for the rest, measured against an near-equal mix of the three funds held always (34, 33 and 33 percent: weights must add to one). A fund the structure drags down is mostly out of the book, so the book earns the bill where the fund's drift is negative. NOT BUILT: the source's trigger (short when the front and second futures are in contango beyond the cost of carry) needs the Henry Hub futures curve, which is not stored (the D11 history); the price-drift version (the fund against the spot price) needs the spot series. A positive excess means cash in the funds' falling years beat holding them; it is the effect of the trend rule, so a pass is still not evidence of a contango drag. The short side with a borrow cost (Quantpedia's UNG and BOIL) is not expressible here: an excess-return short over three names has no decile figures. Three funds, price only, cost_bps 20 a round trip assumed. Leveraged BOIL and KOLD are excluded by the screen.
+
+**Quality bar**
+
+1. **Mechanism:** A commodity ETF must roll its futures monthly; natural gas has steep seasonal contango, so each roll sells low and buys high, and its holders are retail speculators on weather (Erb and Harvey 2006; Guedj, Li and McCann 2011).
+2. **Persistence:** The structure has not changed (UNG has lost most of its value since 2007, not verified), but a cold snap can lift the fund by 50 percent, which is the risk that keeps shorts small.
+3. **Outcome:** The book's return over the 21 sessions from the close after each month end, less the near-equal mix of the three funds held always, net of the cost on the weight change; a fund with a falling trend is held as cash. Price only: the stored forward return is close to close and carries no dividend or distribution, so the book and the benchmark both miss their yield and cash earns the Treasury bill.
+4. **Trigger timing:** The 12-month raw return is read at the month-end close D; the book is held from the next session's close S for 21 sessions. No fact after D enters a pick.
+5. **Faithful replication:** The source's rule is a futures-curve trigger on the single ETP (Erb and Harvey 2006; Gorton, Hayashi and Rouwenhorst 2013). Here only the trend filter and a cash position exist, so the replication is partial: it tests whether staying out of a drag fund after a falling year helps.
+6. **Expected size and sample:** Guedj, Li and McCann (2011) document the roll losses in UNG and USO; no recent split is on file. The size of a trend-filtered avoidance is not published.
+7. **Capacity and costs:** Capacity is small to moderate in three funds; a few switches a year; cost_bps 20 assumed. The source's short side needs borrow (1 to 5 percent on UNG, not verified): not charged.
+8. **Failure modes and retirement:** A cold-snap rally while the book is in cash costs a month against the held mix; the result rests on three funds and a few years of falling prices. Retire if the frozen-period picks-series t is under 2.
+9. **Decoys:** The energy market's own direction: in the funds' falling years cash looks good by construction. Read it beside commodity_roll_momentum's energy funds.
+
+**Sources**
+
+- Erb, C. and Harvey, C., The Strategic and Tactical Value of Commodity Futures, Financial Analysts Journal, 2006 <https://ideas.repec.org/a/taf/ufajxx/v62y2006i2p69-97.html>
+- Gorton, G., Hayashi, F. and Rouwenhorst, K., The Fundamentals of Commodity Futures Returns, Review of Finance, 2013 <https://www.nber.org/papers/w13249>
+- Guedj, I., Li, G. and McCann, C., Futures-based commodity ETFs, Journal of Index Investing, 2011
+- Fuertes, A.-M., Miffre, J. and Rallis, G. (2010), Tactical allocation in commodity futures markets: Combining momentum and term structure signals, Journal of Banking and Finance (City Research Online) <https://openaccess.city.ac.uk/id/eprint/6416/>
+
 ## Retail lottery-option attention (`retail_options_lottery_attention`)
 
 **Status:** candidate. **Family:** H. **Thesis:** Lottery-like stocks with heavy option volume against their share volume, the names retail traders buy short-dated calls in, underperform over the next weeks.
@@ -71,8 +169,10 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Bryzgalova, S., Pavlova, A. and Sikorskaya, T., Retail Trading in Options and the Rise of the Big Three Wholesalers, Journal of Finance, 2023
-- Byun, S.-J. and Kim, D.-H., Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics, 2016
+- Bryzgalova, S., Pavlova, A. and Sikorskaya, T., Retail Trading in Options and the Rise of the Big Three Wholesalers, Journal of Finance, 2023 <https://ideas.repec.org/a/bla/jfinan/v78y2023i6p3465-3514.html>
+- Byun, S.-J. and Kim, D.-H., Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics, 2016 <https://ideas.repec.org/a/eee/jfinec/v122y2016i1p155-174.html>
+- Boyer, B. and Vorkink, K. (2014), Stock Options as Lotteries, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v69y2014i4p1485-1527.html>
+- Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html>
 
 ## Tender-offer drift after expiry (`tender_offer_drift`)
 
@@ -101,9 +201,10 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Lakonishok, J. and Vermaelen, T., Anomalous price behavior around repurchase tender offers, Journal of Finance, 1990
-- Peyer, U. and Vermaelen, T., The nature and persistence of buyback anomalies, Review of Financial Studies, 2009
-- Fu, F. and Huang, S., The persistence of long-run abnormal returns following stock repurchases and offerings, Management Science, 2016
+- Lakonishok, J. and Vermaelen, T., Anomalous price behavior around repurchase tender offers, Journal of Finance, 1990 <https://ideas.repec.org/a/bla/jfinan/v45y1990i2p455-77.html>
+- Peyer, U. and Vermaelen, T., The nature and persistence of buyback anomalies, Review of Financial Studies, 2009 <https://ideas.repec.org/a/oup/rfinst/v22y2009i4p1693-1745.html>
+- Fu, F. and Huang, S., The persistence of long-run abnormal returns following stock repurchases and offerings, Management Science, 2016 <https://ideas.repec.org/a/inm/ormnsc/v62y2016i4p964-984.html>
+- Ikenberry, D., Lakonishok, J. and Vermaelen, T. (1995), Market underreaction to open market share repurchases, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v39y1995i2-3p181-208.html>
 
 ## Premium closed-end funds that over-distribute (`cef_distribution_trap`)
 
@@ -136,6 +237,10 @@ Back to the [index of every edge](../edges.md).
 
 - Patro, D., Piccotti, L. and Wu, Y., closed-end fund discounts (Quantpedia strategy summary) <https://hedgefundalpha.com/strategies/closed-end-fund-discounts/>
 - SEC, Section 19(a) notices of distribution sources (return of capital disclosure)
+- Patro, D., Piccotti, L. and Wu, Y. (2017), Exploiting Closed-End Fund Discounts: A Systematic Examination of Alphas, Journal of Financial Research <https://ideas.repec.org/a/bla/jfnres/v40y2017i2p223-248.html>
+- CXO Advisory, Enhanced Exploitation of Closed-End Fund Discounts (summary of Patro, Piccotti and Wu) <https://www.cxoadvisory.com/mutual-hedge-funds/enhanced-exploitation-of-closed-end-fund-discounts/>
+- Pontiff, J. (1995), Closed-End Fund Premia and Returns: Implications for Financial Market Equilibrium, Journal of Financial Economics <https://academicnewsletter.sufe.edu.cn/info/358172>
+- SEC (17 CFR 270.19a-1), Written statement to accompany dividend payments by management companies (the Section 19(a) notice rule; Cornell LII text) <https://www.law.cornell.edu/cfr/text/17/270.19a-1>
 
 ## Reverse-split distress filter (`reverse_split_distress_filter`)
 
@@ -165,8 +270,9 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Kim, S., Klein, A. and Rosenfeld, J., Return performance surrounding reverse stock splits: can investors profit?, Financial Management, 2008
-- Han, K., The effects of reverse splits on the liquidity of the stock, Journal of Financial and Quantitative Analysis, 1995
+- Kim, S., Klein, A. and Rosenfeld, J., Return performance surrounding reverse stock splits: can investors profit?, Financial Management, 2008 <https://ideas.repec.org/a/bla/finmgt/v37y2008i2p173-192.html>
+- Han, K., The effects of reverse splits on the liquidity of the stock, Journal of Financial and Quantitative Analysis, 1995 <https://ideas.repec.org/a/cup/jfinqa/v30y1995i01p159-169_00.html>
+- Campbell, J., Hilscher, J. and Szilagyi, J. (2008), In Search of Distress Risk, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v63y2008i6p2899-2939.html>
 
 ## Thematic ETF launch fade (`thematic_etf_launch_fade`)
 
@@ -198,3 +304,5 @@ Back to the [index of every edge](../edges.md).
 
 - Ben-David, I., Franzoni, F., Kim, B. and Moussawi, R., Competition for Attention in the ETF Space, Review of Financial Studies, 2023 <https://www.nber.org/papers/w28369>
 - Alpha Architect, Competition for Attention in the ETF Space (summary) <https://alphaarchitect.com/competition-for-attention-in-the-etf-space/>
+- Brown, D., Davies, S. and Ringgenberg, M. (2021), ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance <https://ideas.repec.org/a/oup/revfin/v25y2021i4p937-972..html>
+- Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html>

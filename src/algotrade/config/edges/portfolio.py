@@ -11,6 +11,7 @@ line cap)."""
 import math
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
@@ -21,6 +22,9 @@ MIX = "mix:"  # a benchmark of this form is a blend of the listed instruments
 CASH = "CASH"  # a pick that earns the T-bill yield (``rates/treasury``) instead of an instrument
 ENSEMBLE = "ensemble"  # the id of the combined variant of an ``[ensemble]`` (a screener may not be)
 OOS_CLASSES = ("trend",)  # ``oos_class``: what ``verdict.toml [oos_haircut]`` has a share for
+VOL_RETURN_FIELD = "rollup.trend_stats@v2.ret_1d"  # the daily return a vol_target book is sized by
+VOL_WINDOW = 60  # sessions of the book's daily returns its volatility is measured over
+MIN_VOL_WINDOW = 20  # a sample standard deviation over fewer sessions says nothing
 WEIGHTINGS = ("equal", "inverse_vol", "score")
 EQUAL, INVERSE_VOL, SCORE = WEIGHTINGS
 # A blend's weights add to one within this tolerance (``0.6, 0.4`` is exact, thirds are not).
@@ -105,6 +109,74 @@ def weighting_of(o: Table, kind: str) -> tuple[str, str | None]:
     if weighting != INVERSE_VOL and vol_field is not None:
         raise ConfigurationError(f"{o.where} vol_field: only an inverse_vol book reads one")
     return weighting, vol_field
+
+
+def vol_target_of(o: Table, kind: str) -> tuple[float | None, int, str]:
+    """``(vol_target, vol_window, vol_return_field)`` of an outcome: the book's annualised
+    volatility target (a fraction in ``(0, 1]``, None: none), the sessions it is measured over
+    and the daily return feature it is measured from (ADR 0074 amendment). Only a
+    ``portfolio_return`` outcome has any; ``vol_window`` and ``vol_return_field`` need a target."""
+    names = o.names()
+    keys = ("vol_target", "vol_window", "vol_return_field")
+    if kind != PORTFOLIO_KIND:
+        for key in keys:
+            if key in names:
+                raise ConfigurationError(
+                    f"{o.where} {key}: only a portfolio_return outcome has one"
+                )
+        return None, VOL_WINDOW, VOL_RETURN_FIELD
+    target = o.number("vol_target", None, 0)
+    if target is None:
+        for key in keys[1:]:
+            if key in names:
+                raise ConfigurationError(f"{o.where} {key}: needs a vol_target")
+        return None, VOL_WINDOW, VOL_RETURN_FIELD
+    if not math.isfinite(target) or not 0 < target <= 1:
+        raise ConfigurationError(
+            f"{o.where} vol_target: expected a fraction in (0, 1], got {target}"
+        )
+    window = o.integer("vol_window", VOL_WINDOW, MIN_VOL_WINDOW)
+    return target, window, o.text("vol_return_field", VOL_RETURN_FIELD)
+
+
+@dataclass(frozen=True)
+class Canary:
+    """``[outcome.canary]`` (ADR 0074 amendment): the book moves to a defensive asset by the share
+    of ``tickers`` whose ``field`` is negative at D, in units of ``breadth`` (a breadth of 1 is
+    VAA's, 2 is DAA's). ``defensive``: ``("CASH",)``, or tickers of which the one with the highest
+    ``field`` at D is held."""
+
+    tickers: tuple[str, ...]
+    field: str
+    breadth: int
+    defensive: tuple[str, ...]
+
+
+def canary_of(o: Table, kind: str) -> Canary | None:
+    """The outcome's ``[outcome.canary]`` (None: none). A portfolio outcome only; tickers are
+    distinct plain symbols (turned into ids at D through the resolver, never here), ``breadth`` is
+    between one and the number of canaries, and ``defensive`` is ``["CASH"]`` or tickers."""
+    if "canary" not in o.names():
+        return None
+    if kind != PORTFOLIO_KIND:
+        raise ConfigurationError(f"{o.where} canary: only a portfolio_return outcome has one")
+    c = o.table("canary", ("tickers", "field", "breadth", "defensive"))
+    tickers, defensive = c.strings("tickers", ()), c.strings("defensive", ())
+    for key, found in (("tickers", tickers), ("defensive", defensive)):
+        plain = [t for t in found if t != CASH]
+        if not found or len(set(found)) != len(found):
+            raise ConfigurationError(f"{c.where} {key}: expected one or more distinct symbols")
+        if not all(_TICKER.fullmatch(t) for t in plain):
+            raise ConfigurationError(f"{c.where} {key}: {list(found)} are not plain symbols")
+    if CASH in tickers or (CASH in defensive and len(defensive) > 1):
+        raise ConfigurationError(f"{c.where}: CASH is only the whole defensive choice ['CASH']")
+    breadth = c.integer("breadth", 1, 1)
+    if breadth > len(tickers):
+        raise ConfigurationError(
+            f"{c.where} breadth: {breadth} is more than the {len(tickers)} canaries"
+        )
+    # sorted: the order written decides nothing (the tie-break is by ticker), so it is no trial
+    return Canary(tuple(sorted(tickers)), c.line("field"), breadth, tuple(sorted(defensive)))
 
 
 def check_portfolio(

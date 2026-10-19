@@ -10,6 +10,8 @@ Back to the [index of every edge](../edges.md).
 | Cash-based operating profitability (`cash_based_operating_profitability`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `cash_op_profitability` |
 | Composite value among cash-profitable names (`composite_value`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `composite_value` |
 | Financial distress (an avoid list) (`distress_failure_probability`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `distress_ohlson` |
+| Factor ETF momentum (`factor_momentum`) | candidate | month end | portfolio return, over 21 sessions, vs a blend of 20% MTUM, 20% QUAL, 20% VLUE, 20% USMV and 20% IWM, entered 1 session after the decision session, costs 10 bps | `trend_positive_6m`, `trend_positive_12m` |
+| High idiosyncratic volatility and lottery stocks, avoid list (`idiosyncratic_volatility_and_max`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `ivol_avoid`, `lottery_max` |
 | Industry momentum (`industry_momentum`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `industry_momentum` |
 | 12-1 momentum (`momentum_12_1`) | candidate | month end | excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `momentum_12_1`, `residual_momentum`, `volatility_scaled_momentum`, `frog_in_the_pan`, `momentum_x_quality_interaction`, `fifty_two_week_high`, `momentum_own_trend`, `momentum_pullback_entry`, `momentum_volume_confirmed` |
 | Net share issuance (`net_share_issuance`) | candidate | month end | excess return, over 20, 60 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps | `net_share_issuance` |
@@ -75,10 +77,12 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Frazzini, A. and Pedersen, L., Betting Against Beta, Journal of Financial Economics, 2014
+- Frazzini, A. and Pedersen, L., Betting Against Beta, Journal of Financial Economics, 2014 <https://www.nber.org/papers/w16601>
 - Novy-Marx, R. and Velikov, M., Betting Against Betting Against Beta, Journal of Financial Economics, 2022 <https://alphaarchitect.com/betting-against-beta-bab-construction/>
-- Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk without Lower Return, Journal of Portfolio Management, 2007
+- Blitz, D. and van Vliet, P., The Volatility Effect: Lower Risk without Lower Return, Journal of Portfolio Management, 2007 <https://repub.eur.nl/pub/10460>
 - S&P Dow Jones Indices, Expectations and Anomalies, Indexology Blog, 2025 <https://www.indexologyblog.com/2025/04/09/expectations-and-anomalies/>
+- Baker, M., Bradley, B. and Wurgler, J. (2011), Benchmarks as Limits to Arbitrage: Understanding the Low-Volatility Anomaly, Financial Analysts Journal <https://ideas.repec.org/a/taf/ufajxx/v67y2011i1p40-54.html>
+- Bali, T., Brown, S., Murray, S. and Tang, Y. (2017), A Lottery-Demand-Based Explanation of the Beta Anomaly, Journal of Financial and Quantitative Analysis <https://ideas.repec.org/a/cup/jfinqa/v52y2017i06p2369-2397_00.html>
 
 ## Cash-based operating profitability (`cash_based_operating_profitability`)
 
@@ -139,9 +143,10 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Lakonishok, J., Shleifer, A. and Vishny, R., Contrarian Investment, Extrapolation, and Risk, Journal of Finance, 1994
-- Asness, C. and Frazzini, A., The Devil in HML's Details, Journal of Portfolio Management, 2013
+- Lakonishok, J., Shleifer, A. and Vishny, R., Contrarian Investment, Extrapolation, and Risk, Journal of Finance, 1994 <https://www.nber.org/papers/w4360>
+- Asness, C. and Frazzini, A., The Devil in HML's Details, Journal of Portfolio Management, 2013 <https://www.aqr.com/Insights/Research/Journal-Article/The-Devil-in-HMLs-Details>
 - Novy-Marx, R., The Other Side of Value: The Gross Profitability Premium, Journal of Financial Economics, 2013 <https://www.nber.org/system/files/working_papers/w15940/w15940.pdf>
+- Ball, R., Gerakos, J., Linnainmaa, J. and Nikolaev, V. (2016), Accruals, Cash Flows, and Operating Profitability in the Cross Section of Stock Returns, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v121y2016i1p28-45.html>
 
 ## Financial distress (an avoid list) (`distress_failure_probability`)
 
@@ -170,10 +175,75 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Campbell, J., Hilscher, J. and Szilagyi, J., In Search of Distress Risk, Journal of Finance, 2008
+- Campbell, J., Hilscher, J. and Szilagyi, J., In Search of Distress Risk, Journal of Finance, 2008 <https://ideas.repec.org/a/bla/jfinan/v63y2008i6p2899-2939.html>
 - Campbell, J., Hilscher, J. and Szilagyi, J., Predicting Financial Distress and the Performance of Distressed Stocks, Journal of Investment Management, 2011 <https://joim.com/article/predicting-financial-distress-and-the-performance-of-distressed-stocks/>
-- Dichev, I., Is the Risk of Bankruptcy a Systematic Risk?, Journal of Finance, 1998
+- Dichev, I., Is the Risk of Bankruptcy a Systematic Risk?, Journal of Finance, 1998 <https://academicnewsletter.sufe.edu.cn/info/361843>
 - Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies, 2020 <https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html>
+
+## Factor ETF momentum (`factor_momentum`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Factors that did well over the past year keep doing well next month, so holding the two best-trending factor funds beats an equal mix of all five.
+
+- **Outcome:** portfolio return, over 21 sessions, vs a blend of 20% MTUM, 20% QUAL, 20% VLUE, 20% USMV and 20% IWM, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.symbol in ('MTUM', 'QUAL', 'VLUE', 'USMV', 'IWM')`
+- **Top K:** 2
+- **Screeners:** `trend_positive_6m`, `trend_positive_12m`
+- **Baselines:** none yet
+- **Frozen period:** from 2026-04-01
+- **Notes:** VERDICTS ARE UNMEASURED until the screens are run and evaluated. PROXY: the source builds long-short factor return series for about 20 factors and goes long a factor whose past year is up. This edge uses five long-only ETFs as stand-ins (MTUM momentum, QUAL quality, VLUE value, USMV minimum volatility, IWM size), each the factor's tilt plus the market, so the market is in every leg and the factor momentum is mixed with plain trend; the series with a market-neutral factor return is a data- construction follow-up. The funds start in 2013, so earlier sessions are not measured (a missing benchmark constituent leaves the session out with its reason). The book holds the top two by raw return where above 0 at half each, an unfilled slot cash at the bill yield, against an equal-weight five; no distributions; cost_bps 10 a round trip assumed. The ensemble of 6 and 12 months is ONE trial. The decoy is the page's: momentum applied to ETFs. verdict.toml [oos_haircut] trend = 0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one beside the result, as display only.
+
+**Quality bar**
+
+1. **Mechanism:** Factor premia are time-varying and persistent (mispricing that corrects slowly, flows into factor products); stock momentum is largely the sum of this factor autocorrelation (Ehsani and Linnainmaa 2022).
+2. **Persistence:** Factor timing is rarely done and the effect sits at a one to twelve month horizon that benchmark- relative managers cannot use; 2023's abrupt flip hurt it, so persistence is a claim to test.
+3. **Outcome:** The two-fund book's return over the 21 sessions from the close after each month end, less an equal mix of the five funds, net of cost on the weight change; an unfilled slot is cash. Price only: the stored forward return is close to close and carries no dividend or distribution, so the book and the benchmark both miss their yield and cash earns the Treasury bill.
+4. **Trigger timing:** Trailing returns are read at the month-end close D; the book is held from the next session's close S for 21 sessions. Nothing after D enters a pick.
+5. **Faithful replication:** Ehsani and Linnainmaa (2022): each month, go long a factor whose past 12-month return is above 0, else short, about 20 factors. Gupta and Kelly (2019) scale by the past 1 or 12 month return. Here: five long-only factor ETFs, top two with positive returns.
+6. **Expected size and sample:** Ehsani and Linnainmaa: a factor earns 6 basis points a month after a losing year and 51 after a winning one (1963 to 2019); Gupta and Kelly report time-series factor momentum Sharpe near 0.8 to 1.0 (approximate). A long-only five-fund book keeps a fraction.
+7. **Capacity and costs:** High capacity in five liquid funds; about 8 switches a year; cost_bps 10 assumed; fund fees differ and are inside the price.
+8. **Failure modes and retirement:** A short life of the funds (from 2013) gives about 150 months at most and few independent factor flips. Retire if the frozen-period picks-series t is under 2.
+9. **Decoys:** Sector and stock momentum applied to ETFs and the market beta inside every factor fund; the equal five-fund benchmark removes the market, not the factors' trends.
+
+**Sources**
+
+- Ehsani, S. and Linnainmaa, J., Factor Momentum and the Momentum Factor, Journal of Finance, 2022 <https://www.nber.org/papers/w25551>
+- Gupta, T. and Kelly, B., Factor Momentum Everywhere, Journal of Portfolio Management, 2019 <https://www.aqr.com/Insights/Research/Working-Paper/Factor-Momentum-Everywhere>
+- Asness, C., Frazzini, A., Israel, R. and Moskowitz, T. (2014), Fact, Fiction and Momentum Investing, Journal of Portfolio Management (AQR page) <https://www.aqr.com/Insights/Research/Journal-Article/Fact-Fiction-and-Momentum-Investing>
+- Moskowitz, T. and Grinblatt, M. (1999), Do Industries Explain Momentum?, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v54y1999i4p1249-1290.html>
+
+## High idiosyncratic volatility and lottery stocks, avoid list (`idiosyncratic_volatility_and_max`)
+
+**Status:** candidate. **Family:** A. **Thesis:** Stocks with the highest idiosyncratic volatility, or an extreme best day last month, underperform the market over the next month, so they are the names to drop from a long list.
+
+- **Outcome:** excess return, over 20 sessions, vs SPY, entered 1 session after the decision session, costs 10 bps
+- **Schedule:** month end
+- **Universe:** `instrument.security_type eq 'COMMON_STOCK'` and `instrument.status eq 'ACTIVE'` and `rollup.price_stats@v2.close gt 5` and `rollup.price_stats@v2.adv_usd_20d gte 5000000` and `rollup.factor_betas@v1.ivol_252d gt 0` and `rollup.max_return@v1.max_ret_21d gt -1`
+- **Top K:** 30
+- **Screeners:** `ivol_avoid`, `lottery_max`
+- **Baselines:** `momentum_12_1`, `size_small`
+- **Frozen period:** from 2026-04-01
+- **Notes:** Two screeners, one trial each, both ranked with the jumpiest name LAST so the harness's short leg (the worst scores) takes them first: ivol_avoid on rollup.factor_betas@v1.ivol_252d (the four-factor residual volatility over 252 sessions) and lottery_max on rollup.max_return@v1.max_ret_21d (the best one-day return of the last 21 sessions; the screener is shared with c31_lottery_options_short, whose own question is the covered-call use). Proxies, each stated: Ang and co-authors measure idiosyncratic volatility over the prior month against the three Fama-French factors, here the 252-session four-factor residual (the stored measure, H6), a slower number; Bali and co-authors sort deciles, the harness takes the 30 worst of the eligible names; the paper's stock universe includes microcaps, this universe floors price at $5 and dollar volume at $5M a day. The outcome is the SHORT on those 30 (side = short, owner decision O2, 2026-10-17: a liquid short may be a verdict basis), outcome minus the excess return over SPY less 10 bps and the site's assumed borrow, which is far below the real borrow of the names the effect lives in; the variant long_short (diagnostic only) reads the spread against the least volatile names. The plan files this as a filter overlay: the use is dropping these names from a long list, which the short result prices. The universe holds only names that carry both scores (ivol_252d above 0 and max_ret_21d stored), so every base name is scored and the short leg is ranked. No [published] figure: the AHXZ spread (about 1 percent a month) is from memory in the idea page, and the one verified MAX figure sits on c31_lottery_options_short, where its screener is the one measured. Month-end start sessions spaced at least 20 sessions apart.
+
+**Quality bar**
+
+1. **Mechanism:** Retail demand for lottery-like payoffs bids up volatile, skewed stocks, and short-sale constraints with limits to arbitrage keep the overpricing in place: in these names idiosyncratic risk is the arbitrage risk itself (Ang, Hodrick, Xing and Zhang 2006; Bali, Cakici and Whitelaw 2011; Stambaugh, Yu and Yuan 2015).
+2. **Persistence:** Short-sale constraints and the retail taste for lottery tickets are structural, and the effect lived on after publication (Alpha Architect 2020), but it concentrates in microcaps and hard-to-short names and is weak in value-weighted large caps (Hou, Xue and Zhang); the low-risk theme is mostly a long-leg effect in the later replications. Persistence is a claim to test.
+3. **Outcome:** Minus the excess return over SPY for the 20 sessions after the entry close (the session after a month-end decision), less 10 bps a round trip and the assumed borrow: a short position in the 30 names with the highest idiosyncratic volatility (ivol_avoid) or the highest MAX (lottery_max).
+4. **Trigger timing:** ivol_252d and max_ret_21d are computed from the closes through the decision session D (a month end, nightly rollups); the entry session is S = D + 1 (start_offset_sessions = 1) and the window runs from S's close; the screen is read at D, the outcome at S.
+5. **Faithful replication:** Ang, Hodrick, Xing and Zhang: the standard deviation of the prior month's three-factor residuals, quintile sorts, one-month hold; Bali, Cakici and Whitelaw: the largest daily return of the prior month, decile sorts, one-month hold, long low and short high. Here: the 30 highest of the eligible stocks on the stored 252-session four-factor residual volatility, and on the stored 21-session MAX, as the short.
+6. **Expected size and sample:** About 1.06 percent a month for the top-minus-bottom quintile of value-weighted idiosyncratic volatility, 1963-2000 (Ang and co-authors, approximate, from memory) and more than 1 percent a month for low-minus-high MAX, 1962-2005 (Bali and co-authors, the paper's abstract); both concentrate in small and illiquid names and are weak in large liquid ones, so expect much less here; the stored history gives about a year of month-ends, under the 40 the bar asks, and the harness reports the count.
+7. **Capacity and costs:** Liquid names at the $5M a day floor trade at a few basis points; the 10 bps round trip is the assumption and the borrow is the site's default. The effect lives where shorting is costly or impossible, so an individual's gain is the avoid list: not owning these names, which costs nothing.
+8. **Failure modes and retirement:** Squeezes (the 2021 meme names) and the premium living only in microcaps: the liquid short may show nothing. The two screeners overlap heavily (a jumpy name has both), so they are one result read twice. Retire if the frozen-period short value is not above zero after borrow, or the picks do not do worse than the buy-and-hold mean of every eligible name.
+9. **Decoys:** Size, price level, distress, illiquidity and low beta (one small-cap cluster), short-term reversal and 12-1 momentum (lottery names are often last month's winners): the size and momentum baselines on the same sessions, and the site's decoy battery, whose ivol_high and max_ret_high rank the same fields the other way.
+
+**Sources**
+
+- Ang, A., Hodrick, R., Xing, Y. and Zhang, X., The Cross-Section of Volatility and Expected Returns, Journal of Finance, 2006 <https://ideas.repec.org/a/bla/jfinan/v61y2006i1p259-299.html>
+- Bali, T., Cakici, N. and Whitelaw, R., Maxing Out: Stocks as Lotteries and the Cross-Section of Expected Returns, Journal of Financial Economics, 2011 <https://www.nber.org/papers/w14804>
+- Stambaugh, R., Yu, J. and Yuan, Y., Arbitrage Asymmetry and the Idiosyncratic Volatility Puzzle, Journal of Finance, 2015 <https://ideas.repec.org/a/bla/jfinan/v70y2015i5p1903-1948.html>
+- Bali, T., Brown, S., Murray, S. and Tang, Y. (2017), A Lottery-Demand-Based Explanation of the Beta Anomaly, Journal of Financial and Quantitative Analysis <https://ideas.repec.org/a/cup/jfinqa/v52y2017i06p2369-2397_00.html>
+- Hou, K., Xue, C. and Zhang, L. (2020), Replicating Anomalies, Review of Financial Studies <https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html>
 
 ## Industry momentum (`industry_momentum`)
 
@@ -273,8 +343,8 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Pontiff, J. and Woodgate, A., Share Issuance and Cross-Sectional Returns, Journal of Finance, 2008 <https://doi.org/10.1111/j.1540-6261.2008.01335.x>
-- Fama, E. and French, K., Dissecting Anomalies, Journal of Finance, 2008
-- Daniel, K. and Titman, S., Market Reactions to Tangible and Intangible Information, Journal of Finance, 2006
+- Fama, E. and French, K., Dissecting Anomalies, Journal of Finance, 2008 <https://ideas.repec.org/a/bla/jfinan/v63y2008i4p1653-1678.html>
+- Daniel, K. and Titman, S., Market Reactions to Tangible and Intangible Information, Journal of Finance, 2006 <https://ideas.repec.org/a/bla/jfinan/v61y2006i4p1605-1643.html>
 - Chen, A. and Zimmermann, T., Open Source Cross-Sectional Asset Pricing, Critical Finance Review, 2022 <https://papers.ssrn.com/abstract=3604626>
 
 ## Quality minus junk (`quality_minus_junk`)
@@ -304,9 +374,11 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Asness, C., Frazzini, A. and Pedersen, L., Quality Minus Junk, Review of Accounting Studies, 2019
+- Asness, C., Frazzini, A. and Pedersen, L., Quality Minus Junk, Review of Accounting Studies, 2019 <https://ideas.repec.org/a/spr/reaccs/v24y2019i1d10.1007_s11142-018-9470-2.html>
 - Novy-Marx, R., The Quality Dimension of Value Investing, working paper, 2014
 - Alpha Architect, Value and Quality Stocks (summary of the AQR data) <https://alphaarchitect.com/value-and-quality-stocks/>
+- Novy-Marx, R. (2010), The Other Side of Value: Good Growth and the Gross Profitability Premium, NBER working paper 15940 (Journal of Financial Economics 2013) <https://www.nber.org/papers/w15940>
+- Ball, R., Gerakos, J., Linnainmaa, J. and Nikolaev, V. (2016), Accruals, Cash Flows, and Operating Profitability in the Cross Section of Stock Returns, Journal of Financial Economics <https://ideas.repec.org/a/eee/jfinec/v121y2016i1p28-45.html>
 
 ## Short-term momentum in heavily traded stocks (`short_term_momentum_high_turnover`)
 
@@ -335,8 +407,10 @@ Back to the [index of every edge](../edges.md).
 
 **Sources**
 
-- Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022
+- Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022 <https://openaccess.city.ac.uk/id/eprint/31278/>
 - Alpha Architect, Short-term Momentum (summary of Medhat and Schmeling 2022) <https://alphaarchitect.com/short-term-momentum/>
+- Jegadeesh, N. (1990), Evidence of Predictable Behavior of Security Returns, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v45y1990i3p881-98.html>
+- Avramov, D., Chordia, T. and Goyal, A. (2006), Liquidity and Autocorrelations in Individual Stock Returns, Journal of Finance <https://ideas.repec.org/a/bla/jfinan/v61y2006i5p2365-2394.html>
 
 ## Short-term residual reversal (`short_term_residual_reversal`)
 
@@ -366,6 +440,6 @@ Back to the [index of every edge](../edges.md).
 **Sources**
 
 - Blitz, D., Huij, J., Lansdorp, S. and Verbeek, M., Short-Term Residual Reversal, Journal of Financial Markets, 2013 <https://repub.eur.nl/pub/40707>
-- Chen, A. and Velikov, M., Zeroing In on the Expected Returns of Anomalies, Journal of Financial and Quantitative Analysis, 2023
+- Chen, A. and Velikov, M., Zeroing In on the Expected Returns of Anomalies, Journal of Financial and Quantitative Analysis, 2023 <https://www.cambridge.org/core/product/identifier/S0022109022000874/type/journal_article>
 - Medhat, M. and Schmeling, M., Short-term Momentum, Review of Financial Studies, 2022 <https://alphaarchitect.com/short-term-momentum/>
-- Nagel, S., Evaporating Liquidity, Review of Financial Studies, 2012
+- Nagel, S., Evaporating Liquidity, Review of Financial Studies, 2012 <https://www.nber.org/papers/w17653>

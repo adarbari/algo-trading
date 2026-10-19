@@ -10,6 +10,8 @@ schedule = "month_end"
 top_k = "all"
 screeners = []
 status = "blocked"
+plain_reason = "Needs ETF launch dates and a theme classification for funds, neither of which we store."
+mechanism_kind = "value_gaps"
 rejection_reason = """Three things are not there. No event class reads an ETF launch (etf_launch is missing from EVENT_CLASSES in src/algotrade/config/edges/document.py and from EVENT_FIELDS in services/evaluation/cross_section/events.py), so the schedule above is a placeholder. Launch dates are known only from the first stored reference snapshot (2024-10) and the Tiingo history of ETFs that exist today, so a launch before them has no date. And no thematic classification is stored: the paper's specialised ETFs are judged by name and holdings concentration, holdings are stored only for iShares and SSGA funds, and any keyword list of themes is a judgement call for the owner, not an implementation detail. A dense-score short leg does not fix it (see reverse_split_distress_filter)."""
 notes = """Long-side use only is an avoid filter on the ETF itself (never buy a theme ETF younger than three years); the short side needs the fund borrowable, and the version that avoids what the new ETFs hold needs issuer holdings beyond iShares and SSGA, which are not stored. Idea pages: docs/edge-ideas/structural-niches.md (new_thematic_etf_fade) and docs/edge-ideas/frontier.md (thematic_etf_launch_underperformance)."""
 
@@ -32,3 +34,11 @@ url = "https://www.nber.org/papers/w28369"
 [[sources]]
 title = "Alpha Architect, Competition for Attention in the ETF Space (summary)"
 url = "https://alphaarchitect.com/competition-for-attention-in-the-etf-space/"
+
+[[sources]]
+title = "Brown, D., Davies, S. and Ringgenberg, M. (2021), ETF Arbitrage, Non-Fundamental Demand, and Return Predictability, Review of Finance"
+url = "https://ideas.repec.org/a/oup/revfin/v25y2021i4p937-972..html"
+
+[[sources]]
+title = "Barber, B. and Odean, T. (2008), All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies"
+url = "https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html"

@@ -19,6 +19,8 @@ KINDS = (
     "guide_playbooks",
     "guide_glossary",
     "guide_glossary_edges",
+    "guide_mechanisms",
+    "guide_ideas",
     "events",
     "studies",
     "edges",
@@ -34,15 +36,18 @@ class ConfigStore(Protocol):
         documents read by ingestion (``universe``, ``sources``, ``rollups``, ...); ``features``
         are expression-feature files (``site/features/<theme>.toml``, or a user's
         ``users/<id>/features/<theme>.toml``); ``field_guide`` the site's field guide files
-        (``site/field_guide/<theme>.toml``, site-only); ``regime`` the site's regime reference
-        files (``site/regime/{cards,episodes}.toml``, ADR 0047, site-only); ``events`` the site's
-        event-sensitivity files (``site/events/{scope,releases}.toml``, ADR 0050, site-only);
+        (``site/field_guide/<group>/<file>.toml``, site-only); ``regime`` the site's regime
+        reference files (``site/regime/{cards,episodes}.toml``, ADR 0047, site-only); ``events``
+        the site's event-sensitivity files (``site/events/{scope,releases}.toml``, ADR 0050,
+        site-only);
         ``studies`` the site's research-study settings (``site/studies/<name>.toml``, ADR 0053,
         site-only); ``guide`` the Guide's own files (``site/guide/sections.toml``, ADR 0051,
         site-only);
         ``guide_playbooks`` its playbook prose (``site/guide/playbooks/<family>/<id>.toml``);
         ``guide_glossary`` its glossary terms (``site/guide/glossary/<theme>.toml``),
-        ``guide_glossary_edges`` the edge ones (``site/guide/glossary/edges/<theme>.toml``);
+        ``guide_glossary_edges`` the edge ones (``site/guide/glossary/edges/<theme>.toml``),
+        ``guide_mechanisms`` its edge-mechanism pages (``site/guide/mechanisms/<id>.toml``),
+        ``guide_ideas`` the researched-not-built ideas (``site/guide/ideas/<family>.toml``);
         ``edges`` the edge documents (``site/edges/<id>/edge.toml``, or a user's draft under
         ``users/<id>/edges/``, ADR 0053).
         ``preferences`` and

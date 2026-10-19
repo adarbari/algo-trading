@@ -1,0 +1,488 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06), the "statements" theme:
+# the lines of the SEC financial statements (instruments/statements, ADR 0067), as
+# rollup.income_statement@v2, rollup.cash_flow@v2 and rollup.balance_sheet@v2.
+# The keys are documented in chart/momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+[[field]]
+name = "rollup.income_statement@v2.ebit_ttm"
+theme = "statements"
+reads = "Operating income over the trailing twelve months, in dollars: revenue less the costs of running the business, before interest and tax (us-gaap OperatingIncomeLoss, as the filer reports it). Negative for an operating loss. The profit behind interest cover and EV to EBIT; against rollup.financials@v3.revenue_ttm it gives the operating margin (10% is healthy for most industries, 25% and above is software or a franchise)."
+caveats = [
+  "Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v2.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company. A hard criterion drops them: use pretax income for them instead.",
+  "Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date. Check rollup.income_statement@v2.is_ttm_as_of for the quarter it ends at.",
+  "Includes one-offs the filer leaves in operating income (impairments, restructuring, legal charges); nothing here separates them, so one bad quarter can turn a sound operating business negative.",
+  "Null for funds, foreign filers that do not report in USD and companies without four consecutive quarters or a fiscal year of the line.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "an operating profit"
+op = "gt"
+value = 0
+mode = "hard"
+[[field.use]]
+for = "a large operating earner"
+op = "gte"
+value = 1000000000
+mode = "soft"
+tolerance = { relative = 0.3 }
+
+[[field]]
+name = "rollup.income_statement@v2.gross_profit_ttm"
+theme = "statements"
+reads = "Gross profit over the trailing twelve months, in dollars: sales less the direct cost of what was sold, as the filer reports it (us-gaap GrossProfit). Against rollup.financials@v3.revenue_ttm it is the gross margin: 20% is a distributor or retailer, 40% a branded manufacturer, 70% and above software."
+caveats = [
+  "A filer that does not tag the line has none, and null is not zero. A service company with no gross profit line still has costs: read rollup.income_statement@v2.ebit_ttm instead.",
+  "Filers draw the line between cost of revenue and operating costs differently. A software company that puts support in cost of revenue shows a lower margin than one that does not. Compare within an industry only.",
+  "Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.",
+  "Null for funds, foreign filers that do not report in USD and companies without four consecutive quarters or a fiscal year of the line.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "a gross profit is reported"
+op = "gt"
+value = 0
+mode = "hard"
+note = "null for the many companies that do not report the line: a hard criterion drops them"
+
+[[field]]
+name = "rollup.income_statement@v2.cost_of_revenue_ttm"
+theme = "statements"
+reads = "Cost of revenue over the trailing twelve months, in dollars: the direct cost of what was sold (us-gaap CostOfRevenue, else CostOfGoodsAndServicesSold, else CostOfGoodsSold). Revenue less this is gross profit when the filer reports both."
+caveats = [
+  "A filer that does not tag the line has none, and null is not zero: a bank or a holding company has no cost of revenue line.",
+  "The tags are alternatives of one figure. A filer that switches tag mid-year shows each quarter under one tag only. The sum is never built across tags, so a missing quarter gives null, not a short sum.",
+  "Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.",
+  "Null for funds, foreign filers that do not report in USD and companies without four consecutive quarters or a fiscal year of the line.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "a cost of revenue is reported"
+op = "gt"
+value = 0
+mode = "hard"
+note = "mostly a building block: divide by rollup.financials@v3.revenue_ttm for the cost ratio"
+
+[[field]]
+name = "rollup.income_statement@v2.da_ttm"
+theme = "statements"
+reads = "Depreciation and amortisation over the trailing twelve months, in dollars, the non-cash charge in the cost of assets (us-gaap DepreciationDepletionAndAmortization, else DepreciationAndAmortization, else DepreciationAmortizationAndAccretionNet). EBITDA is rollup.income_statement@v2.ebit_ttm plus this."
+caveats = [
+  "Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v2.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company. A hard criterion drops them: use pretax income for them instead.",
+  "The cash flow statement and the income statement can report different totals, as the cash flow line often adds amortisation of debt costs and leases. This is the line the filer tagged, not a rebuilt one. A filer that does not tag the line has none, and null is not zero.",
+  "Heavy for capital-intensive industries (utilities, telecom, shipping) and light for software: a high EBITDA with a low EBIT is the signature of an asset-heavy business, not of a better one.",
+  "Null for funds, foreign filers that do not report in USD and companies without four consecutive quarters or a fiscal year of the line.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "a depreciation charge is reported"
+op = "gt"
+value = 0
+mode = "hard"
+note = "mostly a building block: ebit_ttm plus this is EBITDA, null when either is"
+
+[[field]]
+name = "rollup.income_statement@v2.interest_expense_ttm"
+theme = "statements"
+reads = "Interest expense over the trailing twelve months, in dollars, a positive cost (us-gaap InterestExpense, else InterestExpenseNonoperating, else InterestExpenseDebt). Operating income over this is the interest cover: under 2 is thin, above 8 comfortable."
+caveats = [
+  "Null for banks, brokers and insurers (SIC 6000 to 6411), where rollup.income_statement@v2.is_status says FINANCIAL. Their operating income, interest and debt are not those of an operating company. A hard criterion drops them: use pretax income for them instead.",
+  "A filer that does not tag the line has none, and null is not zero. A company without an interest line is not debt-free: check the filing before reading it that way.",
+  "Some filers net interest income against it or report it inside another line. A missing or tiny figure does not mean no borrowing: check the debt in the filing.",
+  "Null for funds, foreign filers that do not report in USD and companies without four consecutive quarters or a fiscal year of the line.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "interest is paid"
+op = "gt"
+value = 0
+mode = "hard"
+note = "null for filers without the line: a hard criterion drops them, which is not the same as debt-free"
+
+[[field]]
+name = "rollup.income_statement@v2.pretax_income_ttm"
+theme = "statements"
+reads = "Income from continuing operations before income taxes over the trailing twelve months, in dollars; negative for a loss. Operating income less interest plus other income: what the owners' business earned before the tax charge. The one profit line kept for banks and insurers."
+caveats = [
+  "Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.",
+  "Includes one-offs below operating income (investment gains, debt write-offs); a large gain can make a weak business look profitable.",
+  "Foreign operations and discontinued businesses are reported separately by some filers; this is the continuing-operations line only.",
+  "Null for funds, foreign filers that do not report in USD and companies without four consecutive quarters or a fiscal year of the line.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "profitable before tax"
+op = "gt"
+value = 0
+mode = "hard"
+[[field.use]]
+for = "a large earner before tax"
+op = "gte"
+value = 500000000
+mode = "soft"
+tolerance = { relative = 0.3 }
+
+[[field]]
+name = "rollup.income_statement@v2.income_tax_ttm"
+theme = "statements"
+reads = "Income tax expense over the trailing twelve months, in dollars; negative for a net benefit. Over rollup.income_statement@v2.pretax_income_ttm it is the effective tax rate: 21% is the US statutory rate, 10% or less means credits, losses or foreign income."
+caveats = [
+  "Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.",
+  "A rate from one year is noisy. A one-off release of a valuation allowance can make the tax negative and the rate meaningless. A loss-maker's rate is undefined: derive the rate only where pretax income is positive.",
+  "Includes deferred tax, which is not cash paid.",
+  "Null for funds, foreign filers that do not report in USD and companies without four consecutive quarters or a fiscal year of the line.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "a tax charge is reported"
+op = "not_null"
+mode = "hard"
+note = "a building block for the effective tax rate: divide by pretax_income_ttm where that is above 0"
+
+[[field]]
+name = "rollup.income_statement@v2.is_ttm_as_of"
+theme = "statements"
+reads = "The period end of the first income statement TTM present, looking at operating income, then pretax income, tax, gross profit, cost of revenue, D&A and interest. It is the quarter the figures of the row end at, or the fiscal year end of an annual one. It tells how old rollup.income_statement@v2.ebit_ttm and its siblings are."
+caveats = [
+  "Not the date the figures became public: that is the filing date, up to about six weeks later, and the session reads only what was filed by it.",
+  "Lines of one row can end at different quarters when a filer's tags differ in timing; this is the first present, so the others are the same or older. A fiscal-year basis lags a quarter basis by up to a year.",
+  "Null when no line has a TTM.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "a statement TTM is known"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.income_statement@v2.is_status"
+theme = "statements"
+reads = "Whether the income statement lines of the name can be trusted as a set. OK: operating income, pretax income and tax all have a TTM, and all end on the same period. PARTIAL: at least one line has a TTM, but not all three or not on the same period. NO_TTM: facts are filed but no line has a TTM (a recent filer without four quarters or a year). NO_FACTS: no fact is filed (funds, foreign filers that do not report in USD). STALE: the first TTM ended more than 480 days before the session; the values are shown but old. FINANCIAL: a current bank, broker or insurer (SIC 6000 to 6411); the EBIT, D&A and interest lines are null by design."
+caveats = [
+  "OK says the three core lines exist, not that gross profit, cost of revenue, D&A or interest do. Those are optional and many filers do not tag them, so read the line itself.",
+  "STALE is checked first, so a bank with old filings reads STALE, not FINANCIAL. FINANCIAL is decided from the SIC code of the company snapshot. A company with no snapshot is treated as not financial. A holding company with a bank inside it may not be flagged.",
+  "STALE is a filer 16 months behind its filings (a late filer, a delisting in progress); a name between its quarterly and annual report is not stale.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "complete operating figures"
+op = "eq"
+value = "OK"
+mode = "hard"
+[[field.use]]
+for = "leave out banks and insurers"
+op = "ne"
+value = "FINANCIAL"
+mode = "hard"
+
+[[field]]
+name = "rollup.cash_flow@v2.ocf_ttm"
+theme = "statements"
+reads = "Net cash provided by operating activities over the trailing twelve months, in dollars; negative when operations used cash. Cash the business generated before investing and financing: the cleanest check on whether profit is real. Against rollup.financials@v3.net_income_ttm it is the earnings quality (above 1 is cash-backed, well under 1 is accrual-heavy)."
+caveats = [
+  "10-Qs report cash flow cumulatively from the fiscal year start. Each quarter is derived as the difference of two year-to-date figures of one fiscal year and one tag. When a quarter is missing or the figures come from different tags, the TTM is null rather than wrong.",
+  "Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.",
+  "Moves with working capital: a company that stretches its suppliers or collects early shows a high figure that reverses; check two years, not one.",
+  "Null for funds, foreign filers that do not report in USD and companies without four consecutive quarters or a fiscal year of the line.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "operations generate cash"
+op = "gt"
+value = 0
+mode = "hard"
+[[field.use]]
+for = "a large cash generator"
+op = "gte"
+value = 1000000000
+mode = "soft"
+tolerance = { relative = 0.3 }
+
+[[field]]
+name = "rollup.cash_flow@v2.capex_ttm"
+theme = "statements"
+reads = "Cash paid for property, plant and equipment over the trailing twelve months, in dollars, as a positive number: the payment as the filer tags it, not a negative cash flow. Free cash flow is rollup.cash_flow@v2.ocf_ttm minus this."
+caveats = [
+  "Positive by construction: do not subtract a negative. A negative value cannot occur.",
+  "Only property, plant and equipment (or productive assets, for filers that use that tag). Acquisitions, software development, leased assets and intangible purchases are other lines. An asset-light or acquisitive company can show a small figure and heavy investment.",
+  "Null where the filer tags neither line, which is not zero capex. Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.",
+  "Null for funds, foreign filers that do not report in USD and companies without four consecutive quarters or a fiscal year of the line.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "a capital spending line is reported"
+op = "gt"
+value = 0
+mode = "hard"
+note = "mostly a building block: ocf_ttm minus this is free cash flow, null when either is"
+
+[[field]]
+name = "rollup.cash_flow@v2.cf_as_of"
+theme = "statements"
+reads = "The period end of the first cash flow TTM present, operating cash flow or else capex. It is the quarter the figures end at, or the fiscal year end of an annual one."
+caveats = [
+  "Not the date the figures became public: that is the filing date, and the session reads only what was filed by it.",
+  "The two lines can end at different quarters when only one has four quarters of history; this is the first present.",
+  "Null when neither line has a TTM.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "a cash flow TTM is known"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.cash_flow@v2.cf_status"
+theme = "statements"
+reads = "Whether the cash flow lines of the name can be trusted as a set. OK: operating cash flow and capex both have a TTM, ending on the same period. PARTIAL: only one does, or they end on different periods. NO_TTM: facts are filed but neither has a TTM (a recent filer without four quarters or a year). NO_FACTS: no fact is filed (funds, foreign filers that do not report in USD). STALE: the first TTM ended more than 480 days before the session; the values are shown but old."
+caveats = [
+  "PARTIAL is common and often means no capex line: an asset-light company that tags no property purchase is PARTIAL for good, and free cash flow is null for it.",
+  "STALE is a filer 16 months behind its filings; a name between its quarterly and annual report is not stale.",
+  "Banks and insurers get a cash flow too, but their operating cash flow includes deposit and loan movements, so it is not comparable with an industrial's.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "complete cash flow figures"
+op = "eq"
+value = "OK"
+mode = "hard"
+
+[[field]]
+name = "rollup.balance_sheet@v2.cash"
+theme = "statements"
+reads = "Cash and cash equivalents at the balance sheet date (bs_as_of), in dollars (us-gaap CashAndCashEquivalentsAtCarryingValue, else the figure that includes restricted cash). The first line of the balance sheet: what the business can spend without selling anything. Against rollup.balance_sheet@v2.total_debt it is the net debt."
+caveats = [
+  "A balance sheet is a snapshot at a quarter or year end and lags like every filing. It is up to four months old on the day it is filed. A restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v2.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.",
+  "Restricted cash is included only for filers that report only the combined figure; the two tags are never added. Short-term investments are a separate line (rollup.balance_sheet@v2.sti), so a company holding its money in treasury bills looks cash-poor here.",
+  "A quarter-end figure can be managed: some companies repay credit lines shortly before the date and draw them again after.",
+  "Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "cash is reported"
+op = "gt"
+value = 0
+mode = "hard"
+[[field]]
+name = "rollup.balance_sheet@v2.sti"
+theme = "statements"
+reads = "Short-term investments at the balance sheet date (bs_as_of), in dollars (us-gaap ShortTermInvestments, else MarketableSecuritiesCurrent, never both added): money parked in securities that mature within a year. Cash plus this is the liquid reserve."
+caveats = [
+  "A balance sheet is a snapshot at a quarter or year end and lags like every filing. It is up to four months old on the day it is filed. A restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v2.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.",
+  "Filers draw the line between cash equivalents and short-term investments differently, so compare the sum, not the parts. Long-term investments are not included.",
+  "A filer that does not tag either has none and the value is null. Null is not zero: a company with no such line may hold securities under another label.",
+  "Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "short-term investments are reported"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.balance_sheet@v2.total_debt"
+theme = "statements"
+reads = "Debt at the balance sheet date (bs_as_of), in dollars, added up from the parts of ONE filing by the first rule that applies (rollup.balance_sheet@v2.debt_basis says which). Rule a: LongTermDebt plus short-term borrowings, else commercial paper. Rule b: LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term borrowings, else commercial paper. Rule c: DebtCurrent plus LongTermDebtNoncurrent. Rules d to g serve filers whose tags group debt with leases. Rule d: the noncurrent plus current parts of long-term debt and capital lease obligations, plus short-term borrowings. Rule e: that noncurrent figure plus DebtCurrent. Rule f: the figure including current maturities, plus short-term borrowings. Rule g: the all-debt total. Against equity it is the leverage; less cash it is the net debt."
+caveats = [
+  "Null when no filing has a complete set of parts (rollup.balance_sheet@v2.debt_basis NOT_TAGGED). A filer without the tags and a debt-free filer look the same in the document, so the value is null, never zero: do not read null as no debt.",
+  "Parts are never taken from two filings: a quarterly report and an amendment are not mixed. Commercial paper is added only when the filer has no short-term borrowings line, as borrowings usually include it.",
+  "Operating lease liabilities, pension deficits and off-balance-sheet obligations are not included, so a retailer or an airline understates what it owes. Finance leases are in the figure under rules d to f, and their current part under rules c and e through DebtCurrent. Rules a, b and g do not claim them. Banks keep this line, but a bank's deposits and borrowings are its business, not leverage: rollup.balance_sheet@v2.is_financial says which names to leave out of a debt screen.",
+  "A balance sheet is a snapshot at a quarter or year end and lags like every filing. It is up to four months old on the day it is filed. A restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v2.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "debt is reported"
+op = "gt"
+value = 0
+mode = "hard"
+[[field]]
+name = "rollup.balance_sheet@v2.debt_basis"
+theme = "statements"
+reads = "Which rule built rollup.balance_sheet@v2.total_debt. Rule a: LongTermDebt plus short-term borrowings (else commercial paper), from one filing. Rule b: LongTermDebtNoncurrent plus LongTermDebtCurrent plus short-term borrowings (else commercial paper). Rule c: DebtCurrent plus LongTermDebtNoncurrent. Rule d: noncurrent plus current long-term debt and capital lease obligations, plus short-term borrowings. Rule e: that noncurrent figure plus DebtCurrent. Rule f: the same including current maturities, plus short-term borrowings. Rule g: the all-debt total. NOT_TAGGED: no filing has a complete set of parts, so the total is null. Null when no balance sheet fact is filed."
+caveats = [
+  "NOT_TAGGED does not mean the company has no debt: it means the filer does not tag the parts a rule needs. Read the filing before treating it as debt-free.",
+  "The rules differ in what they include: a, f and g take a total, b to e add the noncurrent and current portions. Rules d to f include finance leases, and rules c and e their current part through DebtCurrent. Rules a, b and g do not claim them. Across companies the totals are comparable, not identical.",
+  "A filer that tags only a noncurrent debt figure, with no current portion, stays NOT_TAGGED: adding it up from one part would understate what it owes.",
+  "Null (not NOT_TAGGED) with no balance sheet filed: the status in rollup.balance_sheet@v2.bs_status is NO_FACTS.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "a debt total was built"
+op = "ne"
+value = "NOT_TAGGED"
+mode = "hard"
+[[field]]
+name = "rollup.balance_sheet@v2.total_assets"
+theme = "statements"
+reads = "Total assets at the balance sheet date (bs_as_of), in dollars (us-gaap Assets): everything the company owns, the denominator of return on assets and the size of the business. Against rollup.balance_sheet@v2.total_liabilities it gives the book value."
+caveats = [
+  "A balance sheet is a snapshot at a quarter or year end and lags like every filing. It is up to four months old on the day it is filed. A restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v2.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.",
+  "Book value, not market value. A company that carries a brand or a property at old cost shows less than it is worth. Goodwill from acquisitions can be a large share of the total.",
+  "For banks and insurers total assets includes loans and investments funded by deposits and policies: it is not comparable with an industrial's.",
+  "Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "total assets are reported"
+op = "gt"
+value = 0
+mode = "hard"
+[[field]]
+name = "rollup.balance_sheet@v2.total_liabilities"
+theme = "statements"
+reads = "Total liabilities at the balance sheet date (bs_as_of), in dollars: everything the company owes. The reported Liabilities when the filer tags it, else the total of liabilities and stockholders' equity less equity of the same date (rollup.balance_sheet@v2.liabilities_basis says which: REPORTED, DERIVED, NONE)."
+caveats = [
+  "DERIVED is the total less the equity of the same date, the figure including the noncontrolling interest when the filer tags it. Redeemable shares between liabilities and equity can still leave the derived figure a little high. A reported figure is exact, a derived one is a reconstruction.",
+  "Includes everything owed, not only borrowing: payables, deferred revenue, leases and pensions are in it. Debt is rollup.balance_sheet@v2.total_debt.",
+  "A balance sheet is a snapshot at a quarter or year end and lags like every filing. It is up to four months old on the day it is filed. A restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v2.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.",
+  "Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "liabilities are known"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.balance_sheet@v2.liabilities_basis"
+theme = "statements"
+reads = "How rollup.balance_sheet@v2.total_liabilities was found. REPORTED: the filer tags Liabilities. DERIVED: the total of liabilities and stockholders' equity less equity, both at the same date. NONE: neither can be formed (the total is null). Null when no balance sheet fact is filed."
+caveats = [
+  "NONE is a missing tag, not a debt-free company: the liabilities exist, the filer does not label the total.",
+  "Many filers, mostly small ones and some banks, tag only the total of liabilities and equity, so DERIVED is common among them. A screen that needs exact figures can ask for REPORTED.",
+  "Null with no balance sheet filed: rollup.balance_sheet@v2.bs_status is NO_FACTS.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "the liabilities are reported, not derived"
+op = "eq"
+value = "REPORTED"
+mode = "hard"
+
+[[field]]
+name = "rollup.balance_sheet@v2.stockholders_equity"
+theme = "statements"
+reads = "Stockholders' equity at the balance sheet date (bs_as_of), in dollars (us-gaap StockholdersEquity, else the figure including the portion attributable to noncontrolling interests). It is what is left for the owners after the liabilities. Over total assets it is the equity ratio; under shares it is the book value per share; against profit it gives the return on equity. Negative after accumulated losses or heavy buybacks."
+caveats = [
+  "Book value, not market value. Years of buybacks can push equity below zero for a profitable business (negative equity is not distress by itself); a ratio over it then has no meaning.",
+  "The two tags differ by the noncontrolling interest: a company with large minority shareholders shows a larger figure under the including tag. The tag in use is not stored, so compare within a company over time, not across.",
+  "A balance sheet is a snapshot at a quarter or year end and lags like every filing. It is up to four months old on the day it is filed. A restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v2.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.",
+  "Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "positive book equity"
+op = "gt"
+value = 0
+mode = "hard"
+[[field]]
+name = "rollup.balance_sheet@v2.current_assets"
+theme = "statements"
+reads = "Current assets at the balance sheet date (bs_as_of), in dollars (us-gaap AssetsCurrent): cash, securities, receivables and inventory, what turns to cash within a year. Over rollup.balance_sheet@v2.current_liabilities it is the current ratio (above 1 covers the year's bills, under 1 leans on new financing)."
+caveats = [
+  "Banks, insurers and many financial filers do not report a classified balance sheet, so the line is null for them; null is not zero.",
+  "Inventory counts in full: a retailer with unsold stock can show a healthy ratio and still be short of cash. Read rollup.balance_sheet@v2.cash too.",
+  "A balance sheet is a snapshot at a quarter or year end and lags like every filing. It is up to four months old on the day it is filed. A restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v2.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.",
+  "Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "current assets are reported"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.balance_sheet@v2.current_liabilities"
+theme = "statements"
+reads = "Current liabilities at the balance sheet date (bs_as_of), in dollars (us-gaap LiabilitiesCurrent): payables, accrued costs, deferred revenue and the debt due within a year. The bills of the next twelve months; rollup.balance_sheet@v2.current_assets over it is the current ratio."
+caveats = [
+  "Banks, insurers and many financial filers do not report a classified balance sheet, so the line is null for them; null is not zero.",
+  "Includes the current portion of debt: a company that must refinance soon shows it here before rollup.balance_sheet@v2.total_debt tells you.",
+  "A balance sheet is a snapshot at a quarter or year end and lags like every filing. It is up to four months old on the day it is filed. A restatement filed later changes the figure only from its filing date. Check rollup.balance_sheet@v2.bs_as_of for the date. Lines other than cash, total assets and equity are read only at that date: a line the filer did not report on it is null, never an older figure.",
+  "Null for funds, foreign filers that do not report in USD and companies whose filer does not tag the line; null is not zero.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "current liabilities are reported"
+op = "gt"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.balance_sheet@v2.bs_as_of"
+theme = "statements"
+reads = "The newest balance sheet date of the core lines (cash, total assets, stockholders equity): the quarter end or fiscal year end every other line of the row is read at. It tells how old rollup.balance_sheet@v2.cash and its siblings are, and the status is OK only when the core lines end on it."
+caveats = [
+  "Not the date the figures became public: that is rollup.balance_sheet@v2.bs_filed, and the session reads only what was filed by it.",
+  "When rollup.balance_sheet@v2.bs_status is PARTIAL some line can end on an older date. A core line that ends earlier keeps its own latest figure. The newest date is this one, and every other line is read at it.",
+  "Null when no balance sheet fact is filed.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "a balance sheet is known"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.balance_sheet@v2.bs_filed"
+theme = "statements"
+reads = "The filing date of the newest balance sheet fact: the day the figures became public, the earliest session that could have known them. Between rollup.balance_sheet@v2.bs_as_of and this date is the reporting lag."
+caveats = [
+  "A filing made in the evening counts for the session of its filing date: a few hours of look-ahead, the same as every statement figure.",
+  "It dates the newest fact of the newest balance sheet; a restated line of an older date can have been filed later, which does not move this date.",
+  "Null when no balance sheet fact is filed.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "a balance sheet is filed"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.balance_sheet@v2.is_financial"
+theme = "statements"
+reads = "Whether the issuer is a bank, broker or insurer (SIC code 6000 to 6411 in the company snapshot). Their balance sheet is kept as filed; only the operating income (rollup.income_statement@v2.ebit_ttm), D&A and interest lines are null for them. A bank's debt and operating income are not those of an operating company. False for a name with no company snapshot."
+caveats = [
+  "Leverage ratios mean something else for these names. A bank's deposits and borrowings are its raw material, and a ratio over its total debt or total liabilities is not comparable with an industrial's. Use it to leave them out of a debt screen.",
+  "Decided from the SIC code of the company snapshot: a holding company with a bank inside it may not be flagged, and a name with no snapshot reads false.",
+  "Equity, total assets, cash and debt are kept and are as good as any filer's; return on equity and price to book are the usual lenses for banks.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "leave out banks and insurers"
+op = "eq"
+value = false
+mode = "hard"
+[[field]]
+name = "rollup.balance_sheet@v2.bs_status"
+theme = "statements"
+reads = "Whether the balance sheet lines of the name can be trusted as a set. OK: cash, total assets and stockholders equity all end on the newest balance sheet date. Every other line is read at that date and is null when the filer did not report it then. PARTIAL: at least one of them is missing or ends on an older date, so the lines may describe different dates. NO_FACTS: no balance sheet fact is filed (funds, foreign filers that do not report in USD). STALE: the newest balance sheet date is more than 480 days before the session; the values are shown but old. A bank keeps its balance sheet: it is flagged by rollup.balance_sheet@v2.is_financial, not by a status."
+caveats = [
+  "OK says the three core lines share a date, not that debt, short-term investments or current items exist. Those are optional and many filers do not tag them, so read the line itself.",
+  "STALE is checked first: a filer 16 months behind its filings is STALE even when its lines match. A name between its quarterly and annual report is not stale.",
+  "PARTIAL is common for filers that switch the tag of a line (for example cash with or without restricted cash) between reports. Read rollup.balance_sheet@v2.bs_as_of and check the figures before a ratio.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "complete balance sheet figures"
+op = "eq"
+value = "OK"
+mode = "hard"
+
+[[field]]
+name = "rollup.growth_history@v2.revenue_ttm_3y_ago"
+theme = "statements"
+reads = "Revenue over the trailing twelve months that ended about three years before the newest one, in dollars. It is the four consecutive quarters, else the fiscal year, ending within 40 days of that date. The base of feature.revenue_cagr_3y."
+caveats = [
+  "Null for a company with less than three years of filed history, such as a recent listing, and for a gap in it. A missing quarter gives null, never a shorter sum.",
+  "Restatements and acquisitions are as filed: the figure is the one public at the session, not a like-for-like base. A merged company can show growth that no customer ever bought.",
+  "Lags like every TTM: it ends at the last filed quarter, up to four months before the session. A restatement filed later changes the figure only from its filing date.",
+  "Null for funds, foreign filers that do not report in USD and companies without the filed history. A hard criterion drops them all.",
+]
+sources = ["SEC EDGAR company facts, the statement lines of instruments/statements (docs/adr/0067-sec-financial-statements-table.md)"]
+[[field.use]]
+for = "three years of revenue history exist"
+op = "not_null"
+mode = "hard"
+note = "mostly a building block for feature.revenue_cagr_3y; a hard criterion drops every company younger than three years"

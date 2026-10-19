@@ -5,6 +5,7 @@ from datetime import date
 
 import pytest
 
+from algotrade.config.edges.document import SCHEDULES
 from algotrade.core.time.calendar import is_session, next_session, previous_session
 from algotrade.core.time.windows import (
     WINDOW_LENGTHS,
@@ -150,3 +151,37 @@ def test_a_stretch_that_does_not_fit_whole_is_dropped() -> None:
     first_window = windows("pre_holiday", date(2025, 1, 1), date(2025, 12, 31))[0]
     short = out_of_window_stretches([first_window], 3, next_session(next_session(first_window[0])))
     assert short == []
+
+
+@pytest.mark.parametrize("name", WINDOW_NAMES)
+def test_windows_of_one_kind_never_overlap_over_forty_years(name: str) -> None:
+    seen: set[date] = set()
+    for w in windows(name, date(2000, 1, 1), date(2040, 12, 31)):
+        assert not seen & set(w), f"{name}: {w} overlaps an earlier window"
+        seen |= set(w)
+
+
+def test_pre_month_end_is_the_last_three_sessions_of_each_month() -> None:
+    w = windows("pre_month_end", date(2026, 1, 1), date(2026, 3, 31))
+    assert len(w) == 3
+    assert w[0] == [date(2026, 1, 28), date(2026, 1, 29), date(2026, 1, 30)]
+    assert w[1] == [date(2026, 2, 25), date(2026, 2, 26), date(2026, 2, 27)]
+
+
+def test_year_turn_spans_december_and_january_and_is_found_once() -> None:
+    w = windows("year_turn", date(2025, 12, 1), date(2027, 1, 31))
+    assert len(w) == 2
+    assert w[0] == [
+        date(2025, 12, 24), date(2025, 12, 26), date(2025, 12, 29), date(2025, 12, 30),
+        date(2025, 12, 31), date(2026, 1, 2), date(2026, 1, 5), date(2026, 1, 6),
+        date(2026, 1, 7), date(2026, 1, 8),
+    ]  # fmt: skip
+    assert len(w[0]) == window_length("year_turn") == 10
+    # a range cutting the window in two finds none; the window is found by either scan year once
+    assert windows("year_turn", date(2025, 12, 1), date(2026, 1, 5)) == []
+    assert windows("year_turn", date(2025, 12, 24), date(2026, 1, 8)) == [w[0]]
+    assert windows("year_turn", date(2026, 1, 1), date(2026, 12, 1)) == []
+
+
+def test_window_names_do_not_clash_with_the_document_schedules() -> None:
+    assert not set(WINDOW_NAMES) & set(SCHEDULES)

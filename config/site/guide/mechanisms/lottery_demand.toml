@@ -1,0 +1,106 @@
+id = "lottery_demand"
+title = "Overpaying for lottery tickets"
+question = "Who buys for the thrill?"
+examples = "lottery stocks, retail option attention, crowded shorts"
+short = "Some buyers pay up for a small chance of a big win; the names they crowd into lag, and shorting them is the hard part."
+how_it_works = [
+  "A stock that jumped 20% last week, a cheap weekly call, a crowded short that might squeeze: each offers a small chance of a big win. Buyers who want that chance bid the price above what the average outcome is worth.",
+  "The other side is the retail buyer who holds a few names and likes a skewed payoff. It is also the trader who buys attention: a stock in the news, on heavy volume, with an extreme day. Their demand lifts the price now and the price gives it back later.",
+  "The family covers the stocks with the biggest recent best day or the highest idiosyncratic volatility, and the names where retail buys short-dated calls. It also covers the volume shock, the run-up of past winners into a report, and the crowded short. Most of these edges are avoid lists: the measured result is what you escape by not holding them.",
+]
+why_it_survives = [
+  "The overpricing sits where it is hardest to correct. The names are small, volatile and costly to borrow, and a short can lose several times its size in a squeeze. Buying is easier than shorting, so the demand side wins more often than the arbitrage side.",
+  "The behaviour is a preference, not a mistake that one lesson removes. Kumar finds the people who buy lottery tickets also hold lottery stocks, and the demand rises in downturns. Barberis and Huang show why a skewed payoff gets overpriced when people overweight small probabilities.",
+]
+research = [
+  "Bali, Cakici and Whitelaw: the stocks with the largest single-day return last month earn over 1% a month less than those with the smallest, raw and risk-adjusted. The gap survives controls for size, value, momentum, reversal, liquidity and skewness. Ang, Hodrick, Xing and Zhang find the same low returns for high idiosyncratic volatility, unexplained by the usual factors.",
+  "Stambaugh, Yu and Yuan show the effect is one-sided: among overpriced stocks, high idiosyncratic volatility means lower returns, most where shorting is hard; among underpriced stocks the sign flips. The options side is larger. Boyer and Vorkink find option portfolios sorted on expected skewness differ by 10% to 50% a week. Byun and Kim find calls on the most lottery-like stocks lag comparable calls by 10% to 20% a month.",
+  "Attention works the same way. Barber and Odean find individuals are net buyers of stocks in the news, on heavy volume or with an extreme day. Gervais, Kaniel and Mingelgrin find a day of unusual volume is followed by a month of gains. Aboody, Lehavy and Trueman find past winners gain 1.58% in the five days before a report and give back 1.86% after. Hong and co-authors' days-to-cover sort earns 1.2% a month long-short.",
+  "Hou, Xue and Zhang replicate 452 anomalies with large-stock breakpoints and value weighting: 65% fail a t of 1.96, and the survivors are much smaller than first reported. Bryzgalova, Pavlova and Sikorskaya find retail is over 60% of option volume, favours weekly options with a 12.6% average spread, and loses money on average. Our bar: a paper's short or long/short figure is expected to lose half by the time it trades, a long-only one a third. Works needs t > 3 on the deciles and on the picks.",
+]
+real_vs_decoy = [
+  "A real lottery edge names the skewed payoff and the buyer who overpays, and survives in names you can borrow. It still shows once size, idiosyncratic volatility and the best-day sort are controlled. A decoy is a small-cap or low-price effect under a new name. It lives only in microcaps, in a short leg you cannot hold, or in a squeeze you did not model.",
+  "The harness compares every edge with the standard decoys (size, momentum, idiosyncratic volatility, the best-day sort, illiquidity, low beta) on the same sessions. It charges the assumed borrow on every short result, keeps a frozen period the rule never saw and asks for t > 3 before it says Works. Read the short's value after borrow and the lift against those baselines before the hit rate.",
+]
+dont = "Don't turn an avoid list into a short book: a lottery name can rally several times its size in a month, and real borrow costs far exceed the harness's assumption."
+see_also = ["edge_how_sure", "edge_evidence_section", "published_haircut"]
+
+[[stats]]
+label = "Our bar"
+value = "t > 3"
+note = "Works needs t above 3 on the deciles and on the picks, on sessions the rule never saw."
+
+[[stats]]
+label = "Haircut on a paper's figure"
+value = "50% / one third"
+note = "Expect a long/short or short-leg figure to lose half by the time it trades, a long-only one a third."
+
+[[sources]]
+title = "Bali, T., Cakici, N. and Whitelaw, R., Maxing Out: Stocks as Lotteries and the Cross-Section of Expected Returns, NBER working paper 14804 (2009; Journal of Financial Economics 2011)"
+url = "https://www.nber.org/papers/w14804"
+note = "Highest best-day decile lags the lowest by over 1% a month, raw and risk-adjusted, after the usual controls."
+
+[[sources]]
+title = "Ang, A., Hodrick, R., Xing, Y. and Zhang, X., The Cross-Section of Volatility and Expected Returns, Journal of Finance (2006)"
+url = "https://ideas.repec.org/a/bla/jfinan/v61y2006i1p259-299.html"
+note = "High idiosyncratic volatility stocks earn very low average returns; size, value, momentum and liquidity do not explain it."
+
+[[sources]]
+title = "Stambaugh, R., Yu, J. and Yuan, Y., Arbitrage Asymmetry and the Idiosyncratic Volatility Puzzle, Journal of Finance (2015)"
+url = "https://ideas.repec.org/a/bla/jfinan/v70y2015i5p1903-1948.html"
+note = "Buying is easier than shorting: the volatility effect is negative among overpriced stocks, positive among underpriced."
+
+[[sources]]
+title = "Kumar, A., Who Gambles in the Stock Market?, Journal of Finance (2009)"
+url = "https://ideas.repec.org/a/bla/jfinan/v64y2009i4p1889-1933.html"
+note = "Individuals prefer lottery-like stocks, more so in downturns; those stocks underperform and low-income holders lose most."
+
+[[sources]]
+title = "Barberis, N. and Huang, M., Stocks as Lotteries: The Implications of Probability Weighting for Security Prices, NBER working paper 12936 (2007; American Economic Review 2008)"
+url = "https://www.nber.org/papers/w12936"
+note = "The model: a positively skewed security can be overpriced and earn a negative average excess return."
+
+[[sources]]
+title = "Boyer, B. and Vorkink, K., Stock Options as Lotteries, Journal of Finance (2014)"
+url = "https://ideas.repec.org/a/bla/jfinan/v69y2014i4p1485-1527.html"
+note = "Option portfolios sorted on expected skewness differ by 10% to 50% a week; intermediaries are paid to supply them."
+
+[[sources]]
+title = "Byun, S.-J. and Kim, D.-H., Gambling Preference and Individual Equity Option Returns, Journal of Financial Economics (2016)"
+url = "https://ideas.repec.org/a/eee/jfinec/v122y2016i1p155-174.html"
+note = "Calls on the most lottery-like stocks lag comparable calls by 10% to 20% a month, more in high sentiment."
+
+[[sources]]
+title = "Bryzgalova, S., Pavlova, A. and Sikorskaya, T., Retail Trading in Options and the Rise of the Big Three Wholesalers, Journal of Finance (2023)"
+url = "https://ideas.repec.org/a/bla/jfinan/v78y2023i6p3465-3514.html"
+note = "Retail is over 60% of option volume, favours weekly options with a 12.6% average spread, and loses money on average."
+
+[[sources]]
+title = "Barber, B. and Odean, T., All That Glitters: The Effect of Attention and News on the Buying Behavior of Individual and Institutional Investors, Review of Financial Studies (2008)"
+url = "https://ideas.repec.org/a/oup/rfinst/v21y2008i2p785-818.html"
+note = "Individuals are net buyers of attention-grabbing stocks: in the news, on heavy volume, with an extreme day."
+
+[[sources]]
+title = "Gervais, S., Kaniel, R. and Mingelgrin, D., The High-Volume Return Premium, Journal of Finance (2001)"
+url = "https://ideas.repec.org/a/bla/jfinan/v56y2001i3p877-919.html"
+note = "A day or week of unusually high volume is followed by gains over the next month; low volume by losses."
+
+[[sources]]
+title = "Aboody, D., Lehavy, R. and Trueman, B., Limited Attention and the Earnings Announcement Returns of Past Stock Market Winners, Review of Accounting Studies (2010)"
+url = "https://ideas.repec.org/a/spr/reaccs/v15y2010i2d10.1007_s11142-009-9104-9.html"
+note = "Top 12-month winners gain 1.58% in the five days before a report and lose 1.86% in the five after."
+
+[[sources]]
+title = "Hong, H., Li, W., Ni, S., Scheinkman, J. and Yan, P., Days to Cover and Stock Returns, NBER working paper 21166 (2015)"
+url = "https://www.nber.org/papers/w21166"
+note = "Days to cover predicts poor returns better than the short ratio; the long-short sort earns 1.2% a month."
+
+[[sources]]
+title = "Bali, T., Brown, S., Murray, S. and Tang, Y., A Lottery-Demand-Based Explanation of the Beta Anomaly, Journal of Financial and Quantitative Analysis (2017)"
+url = "https://ideas.repec.org/a/cup/jfinqa/v52y2017i06p2369-2397_00.html"
+note = "The low-beta anomaly disappears once lottery demand is controlled; it sits in stocks with low institutional ownership."
+
+[[sources]]
+title = "Hou, K., Xue, C. and Zhang, L., Replicating Anomalies, Review of Financial Studies (2020)"
+url = "https://ideas.repec.org/a/oup/rfinst/v33y2020i5p2019-2133..html"
+note = "With large-stock breakpoints and value weights, 65% of 452 anomalies fail t = 1.96; survivors are much smaller."

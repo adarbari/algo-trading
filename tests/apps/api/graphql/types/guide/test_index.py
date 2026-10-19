@@ -27,7 +27,7 @@ def _index(graph: Graph) -> dict[str, Any]:
 def test_the_guide_index_in_the_spec_order(graph: Graph) -> None:
     index = _index(graph)
     assert [s["id"] for s in index["sections"]] == [
-        "start", "regime", "playbooks", "fields", "situations", "glossary",
+        "start", "regime", "edges", "playbooks", "fields", "situations", "glossary",
     ]  # fmt: skip
     counts = {s["id"]: s["entries"] for s in index["sections"]}
     assert counts["fields"] == sum(t["fields"] for g in index["themeGroups"] for t in g["themes"])

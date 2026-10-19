@@ -1,0 +1,91 @@
+# Edge document (ADR 0053, ADR 0074; the quality bar: docs/edges-plan.md), typed in
+# src/algotrade/config/edges/document.py. Idea page: docs/edge-ideas/trend-macro.md (country_momentum_etf).
+# An allocation edge (EB E5): a weighted book of ETFs against a blended benchmark of its own list.
+id = "country_etf_momentum_value"
+name = "Country ETF momentum"
+family = "E"
+thesis = "Single-country ETFs that rose most over the past year, and are above zero, keep outperforming an equal-weight basket of countries over the next month."
+mechanism = """Country-level news (policy, currency, commodity exposure) spreads slowly, and home bias and
+benchmark hugging stop global allocators from chasing winners (Asness, Moskowitz and Pedersen 2013)."""
+persistence = """Country momentum has lasted longer than sector momentum, but the ETFs outside the top ten are thin
+and track noisily, and the US dominance of 2010 to 2024 made country momentum mean overweight the
+US; a claim to test on the stored history."""
+schedule = "month_end"
+top_k = 5
+screeners = [
+  "trend_positive_6m", "trend_positive_12m",
+]
+base = "benchmark"
+oos_class = "trend"
+status = "candidate"
+mechanism_kind = "cross_market_trends"
+asset_class = "etfs"
+frozen_from = 2026-04-01
+notes = """VERDICTS ARE UNMEASURED until the screens are run over the stored history and evaluated. LIMITS:
+this is the MOMENTUM leg only. The value leg of the source (country CAPE, Asness, Moskowitz and
+Pedersen's value and momentum combination) needs a country-to-ETF bridging group of CAPE data that
+is not stored: not built, and no combined rule is claimed. Twenty iShares single-country funds (the
+page names 25 to 40; funds with a short history, such as INDA and the thinly traded, are left out so
+every constituent of the equal-weight benchmark has rows from 2010 and the weights add to one
+exactly: 20 at 5 percent). The rank is the raw 12-month return where the source skips the last
+month, and the 6 and 12 month lookbacks are one ensemble trial. The top five of the funds with a
+positive trend are held at 20 percent each, an unfilled slot is cash at the bill yield; the equal-
+weight twenty is the benchmark, so the value is the pick against a passive country basket, not
+against SPY. Funds are in dollars (the currency effect is inside the price); no distributions;
+cost_bps 20 a round trip assumed for wider country-fund spreads. verdict.toml [oos_haircut] trend =
+0.45 prints the in-sample Sharpe ratio, what it becomes after the haircut and the out-of-sample one
+beside the result, as display only."""
+
+[ensemble]
+variants = ["trend_positive_6m", "trend_positive_12m"]
+
+[universe.where]
+all = [
+  { field = "instrument.symbol", op = "in", value = ["EWA", "EWC", "EWD", "EWG", "EWH", "EWI", "EWJ", "EWL", "EWM", "EWN", "EWP", "EWQ", "EWS", "EWT", "EWU", "EWW", "EWY", "EWZ", "EZA", "FXI"] },
+]
+
+[outcome]
+kind = "portfolio_return"
+horizon_sessions = [21]
+benchmark = "mix:EWA=0.05,EWC=0.05,EWD=0.05,EWG=0.05,EWH=0.05,EWI=0.05,EWJ=0.05,EWL=0.05,EWM=0.05,EWN=0.05,EWP=0.05,EWQ=0.05,EWS=0.05,EWT=0.05,EWU=0.05,EWW=0.05,EWY=0.05,EWZ=0.05,EZA=0.05,FXI=0.05"
+start_offset_sessions = 1
+cost_bps = 20
+weighting = "equal"
+
+[quality_bar]
+outcome = """The five-fund book's return over the 21 sessions from the close after each month end, less an equal-
+weight basket of the twenty funds over the same sessions, net of the cost on the weight change; an
+unfilled slot is cash. Price only: the stored forward return is close to close and carries no
+dividend or distribution, so the book and the benchmark both miss their yield and cash earns the
+Treasury bill."""
+trigger_timing = """The ranking reads trailing returns at the month-end close D; the book is held from the next
+session's close S for 21 sessions. The source skips the last month; this version does not (a
+documented departure), and nothing after D enters a pick."""
+replication = """Asness, Moskowitz and Pedersen (2013): the 12-month return skipping the last month, monthly, 18
+country indices; momentum Sharpe near 0.5 to 0.6, higher with value (not verified). Here: 20 country
+ETFs, top five by raw return where above 0, equal weight."""
+expected_size = """Andreu et al. (2013) find about 5 percent a year in country ETFs, not significant; the source's
+index figures are in sample. The US lead of 2010 to 2024 makes the expectation for the stored
+history small and noisy."""
+capacity_costs = """Capacity is limited by the thinner country funds (spreads of 10 to 20 basis points); about 6 to 10
+switches a year; cost_bps 20 a round trip assumed; no tax effect deducted."""
+failure_modes = """A dollar regime (a strong dollar makes the US win) explains much of it; a short sample of
+independent months gives a wide interval. Retire if the frozen-period picks-series t is under 2."""
+decoys = """The dollar's regime and 12-1 stock momentum (this is the country version): the equal-weight
+benchmark is the null that separates choosing countries from owning them."""
+
+[[sources]]
+title = "Asness, C., Moskowitz, T. and Pedersen, L., Value and Momentum Everywhere, Journal of Finance, 2013"
+url = "https://w4.stern.nyu.edu/facdir/lpederse/papers/ValMomEverywhere.pdf"
+
+[[sources]]
+title = "Andreu, L., Swinkels, L. and Tjong-A-Tjoe, L., Can Exchange Traded Funds be used to exploit country and industry momentum?, 2013"
+url = "https://ideas.repec.org/a/kap/fmktpm/v27y2013i2p127-148.html"
+
+[[sources]]
+title = "CXO Advisory, Exploiting Industry Momentum via ETFs? (summary of Swinkels and Tjong-A-Tjoe (2008), the industry-only predecessor)"
+url = "https://www.cxoadvisory.com/momentum-investing/exploiting-industry-momentum-via-etfs/"
+
+[[sources]]
+title = "Moskowitz, T., Ooi, Y. and Pedersen, L. (2012), Time Series Momentum, Journal of Financial Economics (AQR page)"
+url = "https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum"

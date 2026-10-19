@@ -416,7 +416,8 @@ follow-up PR).
 - Options: the logic's own names (AND, OR, AND NOT) / the trader's register.
 - Decision: and -> "and", or -> "or", and_not -> "but not" (one negation beside a card that already states the exclusion, never two); read as "joined by {words}, read as {label}" (just "joined by {words}" when the words equal the label); the Guide entry `describe_part_join` explains it.
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-10-18
 - Reasoning: the traders' own words (but, except, unless) stay visible and the reading beside them is what they would say; a second negation would read as a double negative.
 
 ## 2026-10-17 | PR #589 (Describe it connector) | When the connector token shows
@@ -424,7 +425,8 @@ follow-up PR).
 - Options: every join / only those that change the reading.
 - Decision: join "or" and "and_not" always; join "and" only when the words are not a plain conjunction: hidden when every word (commas ignored) is a plain conjunction: and, with, plus, also, then, or there are no words; shown for but, yet, while, although, though, whereas, as long as, so long as, only if, provided (that).
 - decided by: orchestrator (design call)
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-10-18
 - Reasoning: a token between every pair of cards is noise; "but" or "only if" changes how the second part reads and is where a misread hides.
 
 ## 2026-10-17 | PR #590 (ADR 0071) | Boolean groups: a tree in the engine, one level in the Builder
@@ -561,7 +563,8 @@ follow-up PR).
 - Options: and binds tighter than or, a comma or "ideally" starts a new condition, an exclusion is its own gate / a flat left-to-right reading / the model decides per sentence.
 - Decision: and binds tighter than or (as the expression parser does); a comma or "ideally" starts a new condition, so an "or" never reaches across it; "except A or B" is neither; "except A and B" is neither only for a bare "and" (", and" ends the exclusion); "A or B except C" is (A or B) and not C. One golden case per phrasing pins it.
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-10-18
 - Reasoning: one rule set gives the same reading every time and a wrong reading is one line and one golden case; the owner verifies the cases in the PR. Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it unchanged: "and" narrows a condition and "or" offers alternatives, the narrower screen costs a few missed names where a wider one buries the idea, and the Builder's plain-English line shows any wrong reading before a save. No golden case changes.
 
 ## 2026-10-18 | PR #642 (ADR 0071 PR 6) | Flat fallback when a part cannot sit in a group
@@ -569,7 +572,8 @@ follow-up PR).
 - Options: keep the draft flat as before groups / group the available sides only.
 - Decision: keep it flat; only the formula case gets the verifier's doubt (draft one boolean formula), every other block leaves a visible note ("... is not available, so the 'or' or exclusion is not applied"); two kinds of instrument joined by "or" are doubted (one security_type criterion).
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: final
+- confirmed: owner 2026-10-18
 - Reasoning: grouping the available sides would silently change the meaning (an "or" side dropped makes the other side mandatory). Proposed by the Opus architect in the review; Fable, briefed with the options, confirmed it and asked that the note say the other conditions apply on their own (done): blocking the draft would throw away the parts that worked.
 
 ## 2026-10-17 | PR #644 (E1c option-implied features) | IBKR IV30 change as a personal-licence feature
@@ -603,6 +607,14 @@ follow-up PR).
 - status: pending owner confirmation
 - Reasoning: the nightly starts about 18:00 New York time and SEC lists 17:30-22:00 acceptances in the next day's index, so S's own 8-Ks are usually unstored when the nightly runs; counting through S read 0 live and 1 on a recompute. The span through S-1 gives the same value live and in a backtest. A history before the first nightly walk reads null. Known limits: the session after a market day EDGAR was closed reads null, and on a SEC-only holiday Friday an after-17:30 acceptance can be missing from the walked index until the next walk.
 
+## 2026-10-18 | filing_activity follow-up to PR #645 | History before the first nightly walk
+- Question: how does `filing_count_5d` get values for sessions before the first nightly walk, so `volume_shock_no_news` can be backtested?
+- Options: leave null until walks accumulate / let a full per-CIK read (`covers_since` on or before the span, run of S-1 or later) cover past sessions for that CIK only / treat the backfill as covering every CIK.
+- Decision: `data/events.filing_coverage(reader)` is the one reader of the filings task's coverage (`walks`, `reads`, `asked_since`, `walked_to`; the ingestion's own copies are gone); `filing_activity@v1` reads its per-CIK reads through the `filings/read` input, whatever the session, and counts a CIK's 8-Ks when a clean walk covers S-1 (as before) or a read of that CIK covers the span. No version change: values only appear where they were null. Rebuild: `algotrade-ingest rollups --from <first session> --to <last session> --only filing_activity@v1` (owner's go-ahead for the live store). No SEC-closed-day list: the session after Columbus Day or Veterans Day stays null until a walk reads past it (fail closed, as accepted).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the 8-Ks known on a past session do not change once read, so a later full read of a CIK says its history is complete; coverage stays per CIK because a read says nothing about another company, and an instrument with no 8-K in the lookback stays null (no CIK to match). Past sessions use the knowledge of a later run for coverage only, never for a value (rows are still bounded by `known_from <= S-1`).
+
 ## 2026-10-18 | EB H7 (buy/hold bands) | Where a band applies, long_short, and what the net series is
 - Question: which edges may carry `hold_rank`, what happens for `long_short`, how is a name's cost split between entry and exit, and which figures follow the banded series?
 - Options: allow a band on every schedule / only where decision sessions do not overlap; a band on both legs of a spread / refuse it; the whole round trip at entry / half in, half out; replace `pick_values` (and so every statistic) / keep gross figures and bind only the net series.
@@ -624,7 +636,8 @@ follow-up PR).
 - Options: store `owner_cik` + `officer_title` as filed / store a salted hash of the owner CIK + role flags only / store role flags only (no per-person key).
 - Decision: store `owner_cik` and `officer_title` as filed, no names, no other identifiers (no address, no owner name from the XML). The table carries the Form 4 public filing data only; the UI shows counts and roles (distinct insiders, officer / director / 10%-owner), never a per-person list. Retention: as the other event grains (indefinite, point-in-time), per D6's plan. `docs/architecture.md` section 10 ("PII: none stored") gets a one-line amendment in a follow-up: "public SEC filer identifiers (reporting-owner CIK, officer title) are stored as filed; no names."
 - decided by: Fable on the owner's behalf
-- status: pending owner confirmation
+- status: overruled
+- confirmed: owner 2026-10-18
 - Reasoning: the owner CIK is an SEC public identifier the data set is keyed on; a hash buys nothing (the hash of a public id is trivially reversible against EDGAR) and loses the join to later filings, amendments (4/A) and the deep-dive dossier. Officer title is attribute data a cluster-buy edge weighs (CEO / CFO buys vs. director buys), stored as filed with no name. The cluster-insider-buy edge needs a distinct-insider count, so a stable per-person key is functionally required. Data never enters the public repo (store is local, git-ignored); the read model serves aggregates. Precedent: ADR 0040 keeps emails (private personal data) out of the repo, not public filing data out of the store. Erasure and shorter retention are owner-only decisions (log 2026-10-11), so the default event retention stands until the owner says otherwise.
 
 ## 2026-10-18 | EB H11 (residual returns) | Betas read before S, sector term, no nightly step yet
@@ -796,3 +809,150 @@ follow-up PR).
 - Owner read the disclaimer: personal research use, monthly automated pull, no redistribution, no product built on the index.
 - Clause to respect: no reproduction, distribution or transmission without Barclays' consent, so CAPE values and every feature derived from them are never served to other users (`licence = "personal"`, held only by the owners listed in `config/site/users.toml`, ADR 0069).
 - Reasoning: the file is public and unauthenticated and has been served for years, a monthly pull is a light use, and the series is optional (the macro step is non-critical), so withdrawing it costs one registry block.
+
+## 2026-10-18 | EB H4 follow-ups | Market-level triggers are a schedule family, not event classes
+- Question: should a VIX spike or FOMC date be an event class?
+- Options: an event class (base = the universe, N counts per trigger) / a schedule family `on_market:<trigger>` on the 0073 time-series harness.
+- Decision: `on_market:<trigger>` (named universe, `base = out_of_window`, benchmark none, one horizon); `market_triggers@v1` in rollups/market, licence personal; FOMC joins as `on_market:fomc`; `tdf_contrarian_flows` stays blocked on `on_market:large_market_month`; amends the time-series schedule rule.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: an event base would equal the universe and each trigger would count once per name.
+
+## 2026-10-18 | EB H4 follow-ups | VIX spike definition and its placement
+- Question: how is a VIX spike defined and placed?
+- Options: a level only / level plus term-structure inversion; thresholds in config / fixed in the feature.
+- Decision: first session with the latest fresh VIX >= 30 and VIX/VIX3M > 1 after >= 21 sessions without one; thresholds fixed in the feature (a change is a version bump); D = the session the reading was first known, both legs FRED `VIXCLS` / `VXVCLS` (`pit = "lag"`, one-day release lag, personal licence), known by D when observation date plus lag is at or before D; a trigger within h sessions of the last counted window is skipped; the base depends on later triggers inside the range (known by range end, never a decision input) and a stretch near range end can change when the range is extended.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: fixed thresholds leave no tuning knob (multiple testing), and the skip rule keeps windows from overlapping.
+
+## 2026-10-18 | EB H4 follow-ups | ipo_lockup and reverse_split classes
+- Question: how are lockup expiries and reverse splits read without lookahead?
+- Options: the row's instrument_id / CIK mapped through instruments/company as of D; latest version / `latest_versions(through=D)`.
+- Decision: CIK mapped through `instruments/company` as of D, `latest_versions(through=D)`, `is_ipo` rows only; `reverse_split` anchored on the ex-date with `ts <= D`, ratio < 1 pinned by a test, funds excluded; `ipo_lockup` sign -1, `announced_ahead`, short avoid-list side.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a later version or a later instrument mapping would leak survivorship into the entry.
+
+## 2026-10-18 | EB H4 follow-ups | pre_month_end and year_turn windows; weekend and etf_launch skipped
+- Question: which calendar windows are added?
+- Options: last 3 sessions of the month / turn of the year / weekend / etf_launch.
+- Decision: `pre_month_end` (last 3 sessions, names disjoint from `SCHEDULES`) and `year_turn` (last 5 of December + first 5 of January, length 10, belongs to December's year; about 8 windows since 2018 so it cannot reach evidenced); non-overlap property test 2000-2040; weekend skipped (decayed evidence, adds a trial); `etf_launch` deferred until the owner supplies a keyword list.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: each window is one more trial; only those with a documented, undecayed mechanism are worth it.
+
+## 2026-10-18 | EB track E | Owner approvals: shares --force and the stale edge-eval record
+- Question: may the owner-approved ops actions run: a forced refetch of every SEC company-facts CIK (`algotrade-ingest shares --force`), and clearing the stale `edge-eval` job record for edge `momentum_12_1` (status running since 2026-10-18T10:00:35Z, no process)?
+- Options: wait for the nightly backlog (400 CIKs a night) / run `shares --force` once locally; hand-edit or delete the stale record / clear it only through the jobs service.
+- Decision: owner, in the session chat: "run shares --force"; for the stale record: "Approved" (to "clear the stale momentum_12_1 job record through the jobs service"). Bounds: local ingestion through the normal writer, detached, one at a time under the claim lock; no deletes, no `--waive`, no `--force` on anything else, no new vendor calls beyond SEC EDGAR (free, the `shares` task's own pace); the stale record is cleared only through the jobs service (`LocalJobRunner.recover`), never by deleting files by hand.
+- decided by: owner
+- status: final
+- Note: the parent (orchestrating) session ran `shares --force`, not the implementer that recorded this entry; the stale record was cleared by this task through `LocalJobRunner.recover` (kind `edge-eval`, the only running record).
+- Reasoning: the statements groups v2/v3/v4 need every CIK refetched: 5,260 CIKs are in the backlog at 400 a night, about 14 nights; `--force` does it in about 40 minutes. The stale record would otherwise block its owner's edge evaluations until the 2 h staleness window, and it is marked failed ("abandoned: the process running it stopped") with a `finished_at`.
+
+## 2026-10-18 | EB track E | Owner approval: CEF coverage while Tiingo Power is active
+- Question: may closed-end funds be pulled into coverage (and their history) while the Tiingo Power account is active?
+- Options: keep CEFs out of the universe (ADR 0013) / amend coverage to pull CEFs and their history before Tiingo Power ends.
+- Decision: owner, in the session chat: "pull cef also until tingo power is there. If the edges is strong we can reconsider our decision to continue tingo power account"
+- decided by: owner
+- status: final
+- Reasoning: `closed_end_fund_discounts` (Strong), `cef_distribution_trap` and `muni_cef_december` are blocked because CEFs are not in universe coverage (ADR 0013). Bars already exist for 330 CEFs (the nightly Massive grouped-daily and Tiingo bars-history from 2010), so the Tiingo cost is 0 symbols; the change is the universe coverage amendment, with no deadline pressure. Continuing the Tiingo Power account is to be reconsidered if the CEF (or other) edges prove strong.
+
+## 2026-10-18 | EB E5 (vol_target) | A volatility-targeted book is scaled down from today's weights over past returns
+- Question: how is a book sized to a volatility target without look-ahead, leverage or a hidden re-weighting?
+- Options: scale by the stored realised vol of each name / by the book's own daily returns; scale up as well as down / down only; use the returns as stored today / as each day read them; a missing return counts as zero / leaves the session out.
+- Decision: sigma is the annualised sample std of `sum(w_i r_i,t)` over `vol_window` (60) sessions ending at D, today's weights on the returns each day `t <= D` read at `t` (through the recording reader, so a restated partition invalidates the legs); `k = min(1, target / sigma)`, names times `k`, the rest cash at the bill yield; a missing return is `no_book_vol`; an all-cash book is not scaled; the target and its window and field join an outcome's hash only when set. The scaled weights go through the turnover pass, so rescaling pays the cost.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the book's own series captures correlation, which per-name vols do not; down-only keeps the outcome a long, unlevered book; reading each day as it was known keeps a later restatement from moving an earlier session. Architect design of 2026-10-18 (ADR 0074 items 14 to 16 and 18).
+
+## 2026-10-18 | EB E5 (vol_target) | A de-risked book is still judged against the fully invested blend
+- Question: when a book holds cash by a volatility target or a canary, is its benchmark scaled the same way or left as the fully invested blend?
+- Options: leave the benchmark as written / scale it by the same cash share / add `CASH` as a benchmark constituent on request.
+- Decision: leave it: the book is judged against the fully invested blend, so the cost of de-risking shows up as a lower excess return in rising markets; a `CASH` constituent of the benchmark is added only if the owner asks.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: scaling the benchmark by the book's own choices would hide what de-risking cost; the proposed default is the stricter bar. Owner to confirm or overrule.
+
+## 2026-10-18 | EB E5 (macro bridge) | Revised CAPE history is accepted with a caveat
+- Question: country CAPE values are revised, so a backfill is not as it was known on each date; is the history used?
+- Options: use the history with a caveat in the edge's notes / start the series at the first stored vintage / drop the signal.
+- Decision: use it, flagged `revised` with the caveat in the notes of every edge that reads it; a signal built from it is never presented as an as-known test.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the series is monthly and slow-moving, a vintage-only start would leave years of history empty, and the caveat keeps the limit visible. Owner to confirm or overrule.
+## 2026-10-18 | EB E5 (allocation extensions, macro series) | FX 3-month rates and the broad dollar added; two owner calls logged
+- Question: which series feed the etf_macro bridge's dollar and FX carry columns, and what does the allocation overlay measure against?
+- Options: DTWEXBGS + OECD 3-month interbank rates via FRED (free) / a paid FX source; de-risked book judged against the fully invested blend / against a book with CASH as a constituent; revised CAPE history accepted with a caveat / dropped.
+- Decision: add DTWEXBGS (daily, lag 10 days) and the OECD rates for USD, JPY, AUD, CAD and CHF (monthly, lag 60 days), all `pit = "lag"` and open. EUR (IR3TIB01EZM156N) and GBP (IR3TIB01GBM156N) are left out: their last observation is January 2026, so those currencies' `fx_carry` is null until a fresher series is found. Owner decision 1: a de-risked book is still judged against the fully invested blend (CASH becomes a benchmark constituent only if the owner asks). Owner decision 2: the revised CAPE history is accepted for the bridge with a caveat (the backfill is not as-known).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: no paid source is needed; a stale series would make carry look known when it is not; the benchmark stays comparable across edges.
+
+## 2026-10-18 | EB E5 (PR 680 review) | Allocation edges the harness measures only in part
+- Question: how are the IBS edge (the source day is close(D) to close(D+1), but S = D + 1 at the earliest), the natgas avoid list and the 9-month lookback filed?
+- Options: IBS dropped / filed as a documented-limit variant; natgas against SPY / against the mix of its own funds; a 189-session return column (changes stored group trend_stats@v2) / the 3, 6 and 12 month grid.
+- Decision: IBS filed as a documented-limit variant that tests the second-day return, its failure_modes saying the always-held benchmark makes cash days negative by construction; natgas benchmark is the near-equal mix of UNG, USO and DBO, so a positive excess means cash in falling years beat holding them; keep the 3, 6 and 12 month ensemble, no ret_189d (a full-history recompute, catalogue and golden regeneration, every @v2 preset moves; the 9-month return correlates about 0.9 with 6 and 12; a later 4-member grid is a new trial by hash; revisit only if the 3-member ensemble reaches Promising).
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a document that states what it cannot measure is better than none, and a stored-group change for a highly correlated member is cost without information.
+
+## 2026-10-18 | Field guide files: folders by theme group, files split in two
+- Question: the twelve `config/site/field_guide/*.toml` files sit at 934-991 lines (the 1000-line cap), so every new entry fails `make filelen`; how is the guide filed?
+- Options: raise the cap for these files / split each file in two in place / subfolders named after the four Guide theme groups (tradeable, chart, options, company) with each file split `<stem>.toml` + `<stem>-2.toml` / re-home entries by theme.
+- Decision: subfolders by theme group, each file split at an entry boundary near its midpoint (a pure move: no entry changes, no re-homing, since themes interleave across files); the loader reads the folders one level deep and the stem order keeps `x-2` right after `x`, so the order of fields and situations, the drafting prompt bytes and the Builder's help are identical (proved by a before/after snapshot); generated pages move to `docs/data/field-guide/<group>/`, a long theme split into parts under 900 lines; a contract test keeps the layout.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Note: planned by the architect agent on the owner's behalf; CLAUDE.md's settled line names `field_guide/*.toml`; the owner may reword it to `field_guide/**/*.toml` (this PR does not edit CLAUDE.md).
+- Reasoning: the cap is a settled rule, the move costs no behaviour, and the groups are the ones the Guide already shows.
+## 2026-10-18 | EB H4 follow-up (ipo_lockup, reverse_split) | Where the lock-up versions and the CIK map are read
+- Question: ADR 0075 says read the lock-up table with `latest_versions(through=D)` and map the CIK through `instruments/company` as of D, but a rollup is pure (no storage, no data) and reads its inputs per session.
+- Options: a loader that returns the latest version known by each session (`feature_inputs._Versions`, sharing `events.latest_of` with `latest_versions`) / a version filter inside `compute`; the CIK from `instruments/reference` / from `instruments/company` with its `cik` column added to `company_sectors`.
+- Decision: the loader dedupes per session by the one shared rule, and `compute` joins the CIK to `instruments/company` of the session (`company_sectors` now returns `cik` too, one more column for its other readers); a CIK with several share classes gives each the event; the nearest lock-up is the earliest expiry from 20 sessions back on.
+- decided by: proposed by orchestrator; awaiting owner
+- status: pending owner confirmation
+- Reasoning: keeps the one version rule in `data/`, keeps the rollup pure, and honours the ADR's company snapshot; the stored reverse-split ratio is new shares per old (a forward 4-for-1 is 4), pinned by a test, a ratio below 1 is a reverse split.
+
+## 2026-10-18 | EB H4 follow-up (ipo_lockup, reverse_split) | Field-guide entries of the new groups sit under the instrument-gates theme
+- Question: `events.toml` (977 lines) and the events theme page `docs/data/field-guide/events.md` cannot take 11 more entries (cap 1000 each), the field_guide folder and the docs page folder are both at 12 files, and a new theme would be a 13th page.
+- Options: entries under the events theme (fails `make filelen`); a new theme or file (breaks the 12-file cap); the entries under `instrument gates`, whose page has room (the names are avoid-list gates), filed in the files that have room (trend, momentum, options-wing).
+- Decision: the third; a structural fix (raise the page cap, or split the events theme) is for the architect.
+- decided by: proposed by orchestrator; awaiting owner
+- status: pending owner confirmation
+- Reasoning: the entries must ship with the columns (coverage test); a mislabelled group is cheaper to move later than a failing gate.
+
+## 2026-10-18 | EB H4 follow-up (PR 700 review) | Dual-class CIKs and the events field-guide split
+- Decision: a CIK with two share classes counts the same lock-up expiry twice, which overstates the independent events of an `ipo_lockup` edge: the edge's run record notes it. The events field-guide theme (`events.toml` and its docs page at the cap) needs a sub-folder split; Now / Next is full, so the follow-up is here only.
+- decided by: proposed by orchestrator; awaiting owner
+- status: pending owner confirmation
+## 2026-10-18 | EB E5 (etf_macro bridge) | Field guide entries ship with the first edge that screens on the columns
+- Question: does the etf_macro@v1 PR carry field guide entries for its 32 columns?
+- Options: entries now (needs a split of the field guide folders, both at their caps) / entries with the folder split or the first edge PR that screens on them.
+- Decision: the entries ship with the folder split or the first edge PR that screens on a bridge column; no site preset screens on them yet, so nothing requires one.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the field guide folders are at their file caps and a guide entry without a user of the field is untestable prose.
+
+## 2026-10-18 | EB E5 (etf_macro bridge) | The bridge fields stay out of the Describe-it prompt
+- Question: do the 32 etf_macro@v1 columns enter the natural-language drafting index?
+- Options: raise the 13k-token budget / keep the group out of the drafting prompt until an edge screens on it.
+- Decision: keep the group out (`services/drafting/prompt.py UNDRAFTED_GROUPS`, a fitness test checks the list and that the prompt honours it); the columns stay in the catalogue, Explore and the Builder. They return to the index, by removing the group from the list, when the first edge screens on them. The budget is not raised.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: the columns apply to about 30 carrier funds and are not for drafts yet; their index lines pushed two golden cases' fields (atr_pct, days_to_earnings) out of the slice.
+## 2026-10-18 | EB E5 (canary) | The canary gate reads its signal at D and fails closed
+- Question: how does a risk-off gate on a book read its scouts and choose its defensive asset without look-ahead or a silent default?
+- Options: read the signal at D / at S; a missing scout counts as positive / leaves the session out; the defensive asset fixed / the highest signal among a declared few; chosen always / only when the gate is on.
+- Decision: scouts resolved to ids and the field read at D, never S; the risk-off share is `min(1, bad / breadth)` and the book is `(1 - f) * book + f * defensive`; a missing scout or defensive value is `no_canary:<T>` / `no_defensive:<T>` and leaves the session out; the defensive asset (`CASH`, or the highest signal, ties by ticker) is resolved only when the share is above zero; the canary table is in the outcome hash only when present.
+- decided by: orchestrator (design call)
+- status: pending owner confirmation
+- Reasoning: a signal read at S would trade on the window it is measured over; a missing scout read as positive would be a silent decision to stay invested. Architect design of 2026-10-18 (ADR 0074 item 17).
+
+## 2026-10-18 | EB D6b (Form 4 insider transactions) | The reporting owner's name is stored as filed
+- Question: may the insider transaction table store the Form 4 reporting owner's name (`owner_name`), reversing the "no names" part of the PR #651 entry above?
+- Options: keep no names (CIK and officer title only) / store the name as filed.
+- Decision: store `owner_name` as filed (SEC bulk `RPTOWNERNAME`, Form 4 XML `rptOwnerName`), whitespace trimmed, NULL when absent, never lowercased or altered; a changed spelling across filings is another value, the owner key stays `owner_cik`. Officer and director names are public SEC filing data. Everything else of the #651 entry stands (CIK and officer title as filed, no address, no other identifiers). The name is not part of the row key and never moves a `known_from`. UI rule unchanged: aggregates only, no per-person list unless a screen is explicitly built later.
+- decided by: owner
+- status: final
+- Reasoning: the name is on the public filing beside the CIK that is already stored, so storing it adds no exposure the CIK did not, and it makes the deep-dive dossier and a later per-insider view readable. Reverses only the "no names" clause; the #651 entry's status is `overruled` for that reason.
