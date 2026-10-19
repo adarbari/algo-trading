@@ -16,8 +16,10 @@ from algotrade_ingestion.tasks.reference.universe_build import (
     UniverseSources,
     asset_classes,
     build_universe,
+    categorise_carried,
     check_sp500,
     coverage,
+    etf_review_rows,
     review_rows,
 )
 from algotrade_sources.framework.http import RetryPolicy
@@ -116,6 +118,16 @@ def test_two_days_of_universe_builds() -> None:
     assert ref1.loc["SOXL", "leverage"] == 3.0 and ref1.loc["SOXL", "leverage_source"] == (
         "name_parsed"
     )
+    # no [etf_category] phrases in SETTINGS: the geared funds are excluded, the rest unclassified
+    assert first.stats["etf_category"] == {
+        "override": 0,
+        "name_rule": 2,  # TQQQ, SOXL: leveraged
+        "needs_review": 1,  # HDGE: its leverage is UNKNOWN
+        "unclassified": 2,  # SPY, SCHO
+        "not_etf": 5,
+    }
+    assert ref1.loc["SOXL", "etf_category"] == "excluded"
+    assert ref1.loc["SOXL", "etf_theme"] == "leveraged"
 
     second = build_universe(task_ctx(writer, reader, CLOCK), DAY2, SETTINGS, D2)
     ref2 = reader.table("instruments/reference", D2).set_index("symbol")  # type: ignore[union-attr]
@@ -295,9 +307,14 @@ def test_registry_task_builds_and_writes_the_review_file(tmp_path: Path) -> None
     )
     ctx.configs = MemoryConfigStore({("site", "settings", "universe"): {"source": "nasdaq_trader"}})
     out = tmp_path / "review" / "leveraged.csv"
-    record = run_task("universe-build", ctx, {"session": D1, "review_out": out})
+    etf_out = tmp_path / "review" / "etfs.csv"
+    record = run_task(
+        "universe-build", ctx, {"session": D1, "review_out": out, "etf_review_out": etf_out}
+    )
     assert record.stats["review_out"] == str(out)
     assert out.read_text().startswith("symbol,leverage,tracks,notes")
+    assert record.stats["etf_review_out"] == {"path": str(etf_out), "rows": 3}  # SPY, SCHO, HDGE
+    assert etf_out.read_text().startswith("symbol,category,theme,notes")
 
 
 def listed(rows: list[tuple[str, str, bool, bool]]) -> pd.DataFrame:
@@ -337,3 +354,42 @@ def test_a_closed_end_fund_is_a_fund_never_a_stock_population_member() -> None:
         ]
     )
     assert asset_classes(covered).tolist() == ["STOCK", "ETF", "ETF"]
+
+
+def test_etf_review_rows_list_only_active_unknown_categories() -> None:
+    frame = pd.DataFrame(
+        {
+            "symbol": ["AAA", "BBB", "CCC", "DDD"],
+            "name": ["Alpha ETF", "Beta Equal Weight Tech ETF", "Gamma Gone ETF", "Delta Bond ETF"],
+            "status": ["ACTIVE", "ACTIVE", "DELISTED", "ACTIVE"],
+            "etf_category_source": ["unclassified", "needs_review", "unclassified", "name_rule"],
+        }
+    )
+    assert etf_review_rows(frame) == [
+        {"symbol": "AAA", "category": "", "theme": "", "notes": "unclassified: Alpha ETF"},
+        {
+            "symbol": "BBB",
+            "category": "",
+            "theme": "",
+            "notes": "needs_review: Beta Equal Weight Tech ETF",
+        },
+    ]
+
+
+def test_delisted_rows_from_before_the_etf_category_are_classified_by_name() -> None:
+    gone = pd.DataFrame(
+        {
+            "symbol": ["CLSD", "OLD"],
+            "name": ["Closed Clean Energy ETF", "Old Co Common Stock"],
+            "is_etf": [True, False],
+            "is_leveraged": [False, False],
+            "is_inverse": [False, False],
+            "leverage_source": ["name_rule", "not_etf"],
+        }
+    )
+    rules = tomllib.loads((REPO_ROOT / "config" / "site" / "universe.toml").read_text())
+    got = categorise_carried(gone, UniverseSettings.from_documents(rules)).set_index("symbol")
+    assert got.loc["CLSD", "etf_category"] == "thematic"
+    assert got.loc["OLD", "etf_category_source"] == "not_etf"
+    kept = gone.assign(etf_category_source="override")
+    assert categorise_carried(kept, UniverseSettings()) is kept

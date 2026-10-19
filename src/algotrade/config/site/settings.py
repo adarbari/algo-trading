@@ -60,6 +60,7 @@ from algotrade.config.site.macro import MacroSettings as MacroSettings  # noqa: 
 from algotrade.config.site.nightly import (
     NightlySettings as NightlySettings,  # noqa: PLC0414 - re-export
 )
+from algotrade.config.site.universe.etf_category import EtfCategoryRules, etf_overrides
 from algotrade.config.site.users import IDENTITY, identity
 from algotrade.config.site.users import UsersSettings as UsersSettings  # noqa: PLC0414 - re-export
 from algotrade.config.user import SITE_USER
@@ -642,6 +643,7 @@ def _typed(section: Table, key: str, default: Any) -> Any:
 @dataclass(frozen=True)
 class UniverseSettings:
     """``config/site/universe.toml`` (coverage) + the curated ``overrides/leveraged_etfs.csv``
+    + ``overrides/thematic_etfs.csv`` (``etf_overrides``)
     + the owner's ``overrides/figi.csv`` (``figi_overrides``: symbol -> the FIGI its id must
     use, ``None`` for "no FIGI, symbol id"; ADR 0018).
     ``source``: "nasdaq_trader" (built nightly) or "csv_import" (also when the file is missing).
@@ -658,6 +660,8 @@ class UniverseSettings:
     inverse_markers: tuple[str, ...] = DEFAULT_INVERSE_MARKERS
     leverage_exclusions: tuple[str, ...] = DEFAULT_LEVERAGE_EXCLUSIONS
     overrides: tuple[Mapping[str, str], ...] = field(default=())
+    etf_category: EtfCategoryRules = field(default_factory=EtfCategoryRules)
+    etf_overrides: Mapping[str, tuple[str, str | None]] = field(default_factory=dict)
     figi_overrides: Mapping[str, str | None] = field(default_factory=dict)
 
     @classmethod
@@ -667,6 +671,7 @@ class UniverseSettings:
         overrides: Iterable[Mapping[str, str]] = (),
         where: str = "universe.toml",
         figi_overrides: Iterable[Mapping[str, str]] = (),
+        etf_override_rows: Iterable[Mapping[str, str]] = (),
     ) -> "UniverseSettings":
         d = cls()
         root = Table(doc, where)
@@ -682,6 +687,7 @@ class UniverseSettings:
                 "leverage_patterns",
                 "inverse_markers",
                 "leverage_exclusions",
+                "etf_category",
             ]
         )
         patterns = _regexes(root, "leverage_patterns", d.leverage_patterns)
@@ -702,6 +708,8 @@ class UniverseSettings:
             inverse_markers=_regexes(root, "inverse_markers", d.inverse_markers),
             leverage_exclusions=_regexes(root, "leverage_exclusions", d.leverage_exclusions),
             overrides=tuple(overrides),
+            etf_category=EtfCategoryRules.from_document(root.raw("etf_category"), where),
+            etf_overrides=etf_overrides(etf_override_rows),
             figi_overrides=_figi_overrides(figi_overrides),
         )
 
@@ -978,5 +986,8 @@ def load_universe(configs: SiteDocuments) -> UniverseSettings:
     """``universe.toml`` + curated overrides. Missing file: CSV import mode."""
     doc = site_document(configs.load, "universe")
     return UniverseSettings.from_documents(
-        doc, configs.overrides("leveraged_etfs"), figi_overrides=configs.overrides("figi")
+        doc,
+        configs.overrides("leveraged_etfs"),
+        figi_overrides=configs.overrides("figi"),
+        etf_override_rows=configs.overrides("thematic_etfs"),
     )

@@ -64,8 +64,12 @@ def test_only_the_orchestrator_releases_no_automerge() -> None:
 
 
 def _log_entries() -> list[str]:
-    entries = REPO.joinpath("docs", "decisions", "log.md").read_text().split("\n## ")[1:]
+    entries = []
+    for log in sorted(REPO.joinpath("docs", "decisions").glob("log*.md")):
+        entries += log.read_text().split("\n## ")[1:]
     assert entries
+    headings = [e.split("\n", 1)[0] for e in entries]
+    assert len(headings) == len(set(headings)), "an entry is in two log files (a union merge)"
     return entries
 
 
@@ -132,7 +136,8 @@ def test_claude_md_names_the_four_model_tiers() -> None:
 def test_append_only_logs_merge_by_union() -> None:
     # parallel PRs each append a row; without this every pair conflicted (2026-10 edge build)
     attrs = (REPO / ".gitattributes").read_text().split("\n")
-    for log in ("docs/decisions/log.md", "docs/history.md"):
+    logs = [p.relative_to(REPO).as_posix() for p in REPO.glob("docs/decisions/log*.md")]
+    for log in (*logs, "docs/history.md"):
         assert f"{log} merge=union" in attrs, log
 
 

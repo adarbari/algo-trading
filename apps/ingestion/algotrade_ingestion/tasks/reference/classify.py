@@ -1,4 +1,5 @@
-"""Classify listings into security types and apply the leverage rule (site coverage inputs).
+"""Classify listings into security types and apply the leverage and ETF category rules (site
+coverage inputs).
 
 Nasdaq Trader gives only an ETF flag, so the rest comes from the security name and the ACT
 symbol. Order matters: preferred depositary shares are preferred, not ADRs; SPAC units are
@@ -11,6 +12,7 @@ from collections.abc import Iterable
 import pandas as pd
 
 from algotrade.config.site.settings import UniverseSettings
+from algotrade.config.site.universe.etf_category import Phrases
 
 _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("ETN", re.compile(r"\bETNs?\b|exchange[- ]traded notes?", re.I)),
@@ -130,4 +132,94 @@ def leverage_flags(frame: pd.DataFrame, settings: UniverseSettings) -> pd.DataFr
         rows,
         columns=["is_leveraged", "is_inverse", "leverage", "tracks", "leverage_source"],
         index=frame.index,
+    )
+
+
+class EtfCategoryResolver:
+    """The ``[etf_category]`` rules of ``config/site/universe.toml``, compiled (case-insensitive).
+
+    ``resolve(name)`` -> (category, theme, source) for an ETF that is not leveraged / inverse and
+    has no curated override (ADR 0076):
+
+    1. an ``exclusions`` phrase (bond, spot commodity, option income, allocation) -> ``excluded``
+    2. a ``themes`` phrase and no ``broad`` phrase -> ``thematic``; else a ``sectors`` phrase and
+       no ``broad`` phrase -> ``sector``; else a ``broad`` phrase alone -> ``broad`` (all
+       ``name_rule``, ``theme`` = the first matching group)
+    3. a theme or sector phrase next to a ``broad`` one -> UNKNOWN, ``needs_review``
+    4. no phrase at all -> UNKNOWN, ``unclassified``
+    """
+
+    def __init__(self, settings: UniverseSettings) -> None:
+        rules = settings.etf_category
+        self.broad = _any_of(rules.broad)
+        self.exclusions = _groups(rules.exclusions)
+        self.themes = _groups(rules.themes)
+        self.sectors = _groups(rules.sectors)
+
+    def resolve(self, name: str) -> tuple[str | None, str | None, str]:
+        excluded = _first(self.exclusions, name)
+        if excluded:
+            return "excluded", excluded, "name_rule"
+        broad = bool(self.broad.search(name))
+        theme, sector = _first(self.themes, name), _first(self.sectors, name)
+        if (theme or sector) and broad:
+            return None, None, "needs_review"
+        if theme:
+            return "thematic", theme, "name_rule"
+        if sector:
+            return "sector", sector, "name_rule"
+        if broad:
+            return "broad", None, "name_rule"
+        return None, None, "unclassified"
+
+
+def _any_of(patterns: Iterable[str]) -> re.Pattern[str]:
+    return re.compile("|".join(f"(?:{p})" for p in patterns) or r"(?!)", re.I)
+
+
+def _groups(phrases: Phrases) -> tuple[tuple[str, re.Pattern[str]], ...]:
+    return tuple((group, _any_of(patterns)) for group, patterns in phrases)
+
+
+def _first(groups: tuple[tuple[str, re.Pattern[str]], ...], name: str) -> str | None:
+    return next((group for group, pattern in groups if pattern.search(name)), None)
+
+
+def etf_category_flags(frame: pd.DataFrame, settings: UniverseSettings) -> pd.DataFrame:
+    """``etf_category``, ``etf_theme``, ``etf_category_source`` per row (``frame`` carries the
+    ``leverage_flags`` columns):
+
+    - non-ETFs: no category (source ``not_etf``)
+    - curated override (``config/site/overrides/thematic_etfs.csv``): its values (``override``)
+    - a leveraged or inverse fund: ``excluded``, theme ``leveraged`` (``name_rule``); a fund
+      whose leverage is itself UNKNOWN (``leverage_source`` ``needs_review``): UNKNOWN too, never
+      read by its name (a geared fund the leverage rules missed must not become thematic)
+    - otherwise ``EtfCategoryResolver.resolve`` on the name
+    """
+    resolver = EtfCategoryResolver(settings)
+    rows: list[tuple[str | None, str | None, str]] = []
+    unknown_leverage = frame.get("leverage_source", pd.Series("", index=frame.index)).eq(
+        "needs_review"
+    )
+    for symbol, name, is_etf, geared, gear_unknown in zip(
+        frame["symbol"],
+        frame["name"],
+        frame["is_etf"],
+        frame["is_leveraged"].fillna(False) | frame["is_inverse"].fillna(False),
+        unknown_leverage,
+        strict=True,
+    ):
+        if not is_etf:
+            rows.append((None, None, "not_etf"))
+        elif symbol in settings.etf_overrides:
+            category, theme = settings.etf_overrides[symbol]
+            rows.append((category, theme, "override"))
+        elif geared:
+            rows.append(("excluded", "leveraged", "name_rule"))
+        elif gear_unknown:
+            rows.append((None, None, "needs_review"))
+        else:
+            rows.append(resolver.resolve(str(name)))
+    return pd.DataFrame(
+        rows, columns=["etf_category", "etf_theme", "etf_category_source"], index=frame.index
     )

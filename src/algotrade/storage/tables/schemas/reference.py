@@ -17,6 +17,10 @@ INSTRUMENT_REFERENCE = fixed(
     *strings("symbol", "name", "asset_class", "security_type", "security_type_source"),
     *strings("exchange", "currency", "financial_status", "status", "vendor_type"),
     *strings("figi", "share_class_figi", "cik", "tracks", "leverage_source"),
+    # ETF category (ADR 0076): thematic / sector / broad / excluded (null = UNKNOWN), the theme
+    # group (the exclusion kind for excluded), and how it was resolved (override / name_rule /
+    # needs_review / unclassified / not_etf).
+    *strings("etf_category", "etf_theme", "etf_category_source"),
     # FIGI review (ADR 0018): the vendor's FIGI when the build kept a different one or the
     # FIGI is shared, and the session that was first seen.
     "vendor_figi string",

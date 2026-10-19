@@ -68,3 +68,102 @@ leverage_exclusions = [
     '\bultra dividend\b',
     '\bultra[- ]small\b',
 ]
+
+# ETF category (docs/data/instruments.md "Flagging specialised ETFs"; ADR 0076): the paper behind
+# the thematic_etf_launch_fade edge (Ben-David, Franzoni, Kim and Moussawi, RFS 2023) calls an ETF
+# "specialised" when it invests in a sector or in sectors tied by a theme, so both `sector` and
+# `thematic` are flagged and kept apart. Each ETF gets one etf_category, in order:
+#   1. a curated row in overrides/thematic_etfs.csv (symbol, category, theme, notes)  -> "override"
+#   2. a leveraged or inverse fund (is_leveraged / is_inverse)                          -> excluded
+#   3. an `exclusions` phrase (bond, spot commodity, option income, allocation, ...)    -> excluded
+#   4. a `themes` phrase and no `broad` phrase                                          -> thematic
+#   5. a `sector` phrase and no `broad` phrase                                          -> sector
+#   6. a `broad` phrase and nothing else                                                -> broad
+#   7. a theme or sector phrase next to a broad one, or no phrase at all                -> UNKNOWN
+#      (`needs_review` / `unclassified`: listed in the review file, curated in the overrides)
+# etf_theme is the group (`themes`), the sector, or the exclusion kind. Phrases are regular
+# expressions matched case-insensitively against the name; the first matching group names the theme.
+# Words of a broad-market, style, factor or generally active fund: with no theme or sector
+# phrase the fund is `broad` (the paper's broad-index and smart-beta groups).
+[etf_category]
+broad = ['total (stock )?market', 's&p ?(500|400|600|1500)', 'russell (1000|2000|3000|midcap)', 'nasdaq[- ]100', '\bdow jones (industrial|u\.?s\.? )', '\bmsci (eafe|acwi|world|emerging|all)', '\binternational\b', '\bdeveloped (markets?|ex)', '\bemerging markets?\b', '\b(large|mid|small|micro|all)[- ]?cap\b', '\bcore\b', '\bbroad\b', 'equal[- ]weight', '\bvalue\b', '\bgrowth\b', '\bmomentum\b', '\bquality\b', '(low|min(imum)?)[- ]?volatility', '\bdividend', '\bbuyback', 'multi-?factor', 'profitab', '\bfundamental\b', '\bdefensive\b', '\bhigh beta\b', '\bmoat\b', 'aristocrat', 'cash cows', 'free cash flow', '\bactive(ly)?\b', '\bconcentrated\b', 'focused (equity|growth|value)', 'opportunit', 'best ideas', 'capital appreciation', '\bstyle\b', '\bworld\b', '\bglobal (equity|stock)', '\bu\.?s\.? (equity|stock|large|small|mid)']
+
+# Phrase groups: `name` is the group (a theme, a sector or an exclusion kind); the first group with
+# a matching phrase names etf_theme.
+[[etf_category.exclusions]]
+name = "bond"
+phrases = ['\bbonds?\b', 'treasur', 'fixed income', '\bmuni', '\bcredit\b', 'high yield', 'floating rate', '\bduration\b', 'mortgage', '\bt-bill', '\btips\b', 'corporate debt', 'aggregate', 'investment grade', 'senior loan', '\bloans?\b', 'money market', 'ultra[- ]short income', 'preferred (stock|securities|income)', 'convertible']
+[[etf_category.exclusions]]
+name = "commodity_fx"
+phrases = ['\b(gold|silver|platinum|palladium|copper|oil|crude|natural gas|gasoline|wheat|corn|soybean|sugar|coffee|cocoa|cotton)\s+(trust|fund|shares|bullion|futures|index fund|etf)\b', 'bullion', 'commodit', 'currency', '\bdollar\b', '\b(euro|yen|yuan|pound|franc)\b(?!.*equit)', 'bitcoin(?!.*(miners?|mining|strategy|industry))', '\bether\b', '\bethereum\b', '\bsolana\b', '\bxrp\b', '\bvix\b', 'volatility futures', 'carbon credit']
+[[etf_category.exclusions]]
+name = "option_income"
+phrases = ['covered call', '\bbuffer', 'defined outcome', 'premium income', 'buy-?write', 'put ?write', '\bcollar\b', 'hedged equity', 'option income', '\byieldmax\b', 'autocall', 'income strategy', '\bfloor\b', 'barrier', '\bstructured\b', 'enhanced income']
+[[etf_category.exclusions]]
+name = "allocation"
+phrases = ['target (date|risk|retirement)', '\b20[2-7]\d\b', '\bbalanced\b', 'allocation', 'multi-?asset', 'risk parity', 'managed futures', '\btrend\b', 'long[/ -]short', 'market neutral', 'merger arb', 'tactical', 'fund of funds', 'hedge fund', 'global macro', '\bmacro\b']
+
+# Theme groups: a story that ties several industries (the paper's "thematic"). The first group
+# with a matching phrase names etf_theme. Order: specific groups before general ones.
+[[etf_category.themes]]
+name = "clean_energy"
+phrases = ['clean ?(energy|tech)', 'solar', '\bwind\b', 'lithium', 'batter', 'uranium', 'nuclear', 'hydrogen', 'fuel cell', 'renewable', 'climate', 'decarbon', 'net zero', 'energy transition', '\bwater\b', '\bgrid\b', 'smart (grid|energy)', 'electrification', 'low carbon', 'carbon (transition|reduction)']
+[[etf_category.themes]]
+name = "natural_resources"
+phrases = ['critical minerals?', 'rare earth', 'copper', '(gold|silver|metals?|uranium|copper|lithium|steel|coal) (miners?|mining|producers?)', '\bminers?\b', '\bmining\b', '\bmidstream\b', '\bmlp\b', '\bshipping\b', '\btankers?\b', 'agribusiness', 'timber', 'natural resources', 'global x (silver|gold|copper|uranium)', 'junior (gold|silver)']
+[[etf_category.themes]]
+name = "technology"
+phrases = ['\bai\b', 'artificial intelligence', 'robot', 'automation', 'machine learning', 'generative', '\bcloud\b', 'cyber', 'semiconductor', '\bchips?\b', 'quantum', 'data cent', '\b5g\b', '\binternet\b', 'digital', 'fintech', 'innovati', 'disruptive', 'next gen', '\bfuture\b', 'autonomous', 'electric vehicle', '\bev\b', 'self[- ]driving', '\bspace\b', 'aerospace & space', '\bdrones?\b', '3d print', 'software', 'magnificent', 'big data', 'internet of things', '\biot\b', 'metaverse', 'web3', 'e-?commerce', 'online retail', 'social media', 'streaming', 'mobility', 'transformational', 'tech(nology)? (leaders|titans|disrupt)']
+[[etf_category.themes]]
+name = "health"
+phrases = ['genomic', 'biotech', 'immunolog', 'precision medicine', 'medical (device|innovation|technolog)', 'cancer', 'oncolog', 'longevity', '\baging\b', 'obesity', 'glp', 'psychedelic', 'digital health', 'telehealth', 'healthcare innovation', 'life science', 'cell therapy', 'gene ']
+[[etf_category.themes]]
+name = "crypto"
+phrases = ['blockchain', 'bitcoin (miners?|mining|strategy|industry)', 'crypto (industry|economy|equity)', 'digital assets? (economy|equity|industry)', 'bitcoin and ether', 'bitcoin (and|&) ', 'tokeni', 'bitcoin ecosystem', 'bitcoin miners']
+[[etf_category.themes]]
+name = "consumer"
+phrases = ['cannabis', 'marijuana', '\bhemp\b', '\bvice\b', 'alcohol', 'gambl', 'casino', 'sports betting', 'igaming', 'esports', 'video game', 'gaming', 'luxury', '\bpets?\b', 'millennial', 'gen(eration)? z', 'travel', 'airline', 'cruise', 'hotel', 'restaurant', 'food (&|and) beverage', 'work from home', 'sports', 'entertainment', 'metaverse', 'plant[- ]based', 'consumer (trends?|brands?|lifestyle)', 'wellness', 'fitness', 'beauty', 'fashion', 'hunting|outdoor']
+[[etf_category.themes]]
+name = "esg_values"
+phrases = ['\besg\b', 'sustainab', 'socially responsible', 'catholic', 'christian', 'biblical', 'islamic', 'sharia', 'halal', 'faith', 'gender', 'diversity', '\bwomen\b', '\bveterans?\b', '\bimpact\b', 'vegan', 'responsible', 'environmental', 'ethic', 'lgbt', 'black owned']
+[[etf_category.themes]]
+name = "regional_niche"
+phrases = ['china (tech|internet|consumer|a)', 'india (tech|consumer|small|infrastructure|earnings)', 'israel', '\bkorea', 'vietnam', 'saudi', '\bgulf\b', 'africa', 'greece', 'poland', 'turkey', 'nigeria', 'pakistan', 'argentin', '\bperu\b', 'colombia', '\bchile\b', 'philippines', 'indonesia', 'malaysia', 'thailand', 'nordic', 'frontier', 'hong kong', 'taiwan', '\bchina\b', '\bindia\b', '\bbrazil\b', '\bmexico\b', '\bjapan\b', 'latin america', '\bgcc\b']
+[[etf_category.themes]]
+name = "demographic_other"
+phrases = ['demograph', 'baby boom', 'silver economy', 'emerging consumer', 'middle class', 'infrastructure', 'smart cit', 'housing', 'home construction', 'supply chain', 'reshor', 'made in america', 'national security', 'defense tech', 'private equity', '\bspac\b', '\bipo\b', 'spin-?off', 'unicorn', 'venture', '\bmeme\b', 'social sentiment', 'activist', 'insider', 'politic', 'congress', 'buyback leaders', 'hedge fund (vip|holdings)', 'iconic', 'themes?\b']
+
+# Sector words (the paper's other half of "specialised"): one industry, no story.
+[[etf_category.sectors]]
+name = "financials"
+phrases = ['financial', '\bbanks?\b', 'banking', 'insurance', 'regional banks', 'capital markets', 'brokers?']
+[[etf_category.sectors]]
+name = "industrials"
+phrases = ['industrial', 'transportation', 'transport\b', 'aerospace', 'defense', 'machinery', 'construction', 'engineering']
+[[etf_category.sectors]]
+name = "materials"
+phrases = ['\bmaterials\b', 'chemical', '\bsteel\b', 'metals']
+[[etf_category.sectors]]
+name = "consumer_discretionary"
+phrases = ['consumer discretionary', 'retail', 'homebuild', 'leisure']
+[[etf_category.sectors]]
+name = "consumer_staples"
+phrases = ['consumer staples', 'food', 'beverage', 'household', 'tobacco', 'agricultur']
+[[etf_category.sectors]]
+name = "utilities"
+phrases = ['utilit']
+[[etf_category.sectors]]
+name = "real_estate"
+phrases = ['real estate', '\breits?\b', 'mortgage reit', 'property', 'realty']
+[[etf_category.sectors]]
+name = "communication"
+phrases = ['communication', 'telecom', '\bmedia\b']
+[[etf_category.sectors]]
+name = "health_care"
+phrases = ['health ?care', 'pharma', 'health sciences?', '\bmedical\b', 'hospital']
+[[etf_category.sectors]]
+name = "energy"
+phrases = ['\benergy\b', 'oil (&|and) gas', 'oil services', 'exploration', 'petroleum', '\bcoal\b']
+[[etf_category.sectors]]
+name = "technology"
+phrases = ['technology', 'information tech', '\btech\b', 'semiconductor', 'software', 'internet', 'networking', 'hardware']

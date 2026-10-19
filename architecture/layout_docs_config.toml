@@ -226,7 +226,7 @@ purpose = "the web UI: frontend architecture (layers, rules) and the design syst
 
 [[docs_dir]]
 path = "docs/decisions"
-purpose = "the decision log: product-direction and policy decisions, by the owner or by a Fable agent on their behalf, append-only (.claude/skills/review-and-release)"
+purpose = "the decision log: product-direction and policy decisions, by the owner or by a Fable agent on their behalf, append-only, log.md plus dated archives log-*.md (.claude/skills/review-and-release)"
 kind = "log"
 
 [[docs_dir]]

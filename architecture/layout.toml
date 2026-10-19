@@ -106,6 +106,11 @@ purpose = "L3 regime settings: the plain-language indicator cards and the refere
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
+path = "src/algotrade/config/site/universe"
+purpose = "L3 universe settings split from config/site (at its module cap): the ETF category rules of config/site/universe.toml [etf_category] and the validation of the curated overrides/thematic_etfs.csv (etf_category.py, ADR 0076), typed and fail closed"
+contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
+
+[[dir]]
 path = "src/algotrade/config/strategy"
 purpose = "strategy / screener configs and selections: schema, layer resolution, field catalog, rule-screen spec parser"
 

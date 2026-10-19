@@ -26,6 +26,10 @@ key (``reference_diff.one_per_key``): several id changes into one id on a sessio
 Leverage (``classify.leverage_flags``): a curated row in
 ``config/site/overrides/leveraged_etfs.csv`` wins, then the leverage the name states, then the
 name rules of ``universe.toml``; ETFs still UNKNOWN are listed by ``review_rows`` for curation.
+
+ETF category (``classify.etf_category_flags``, ADR 0076): a curated row in
+``config/site/overrides/thematic_etfs.csv`` wins, then the name rules of ``universe.toml``
+``[etf_category]``; ETFs still UNKNOWN are listed by ``write_etf_review`` for curation.
 """
 
 import csv
@@ -36,12 +40,14 @@ from pathlib import Path
 import pandas as pd
 
 from algotrade.config.site.settings import UniverseSettings
+from algotrade.config.site.universe.etf_category import CATEGORY_SOURCES
 from algotrade.core.model.instruments import AssetClass
 from algotrade.data import StoreReader
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.reference.classify import (
     LEVERAGE_SOURCES,
+    etf_category_flags,
     leverage_flags,
     security_type,
 )
@@ -122,6 +128,7 @@ def build_reference(
     ref, previous = assigned.reference, rename_ids(previous, assigned.upgrades)
     ref["is_etf"] = ref["is_etf"] | ref["security_type"].eq("ETF")
     ref = pd.concat([ref, leverage_flags(ref, settings)], axis=1)
+    ref = pd.concat([ref, etf_category_flags(ref, settings)], axis=1)
     if previous is not None and not previous.empty:
         seen = previous.set_index("instrument_id")
         if "first_seen" in seen.columns:
@@ -133,9 +140,18 @@ def build_reference(
             was_active = gone["status"].eq("ACTIVE")
             gone.loc[was_active, "delisted_on"] = session
             gone["status"], gone["in_sp500"] = "DELISTED", False
+            gone = categorise_carried(gone, settings)
             keep = [c for c in ref.columns if c in gone.columns]
             ref = pd.concat([ref, gone[keep]], ignore_index=True)
     return ref.sort_values("instrument_id").reset_index(drop=True), disagreements, assigned
+
+
+def categorise_carried(gone: pd.DataFrame, settings: UniverseSettings) -> pd.DataFrame:
+    """Delisted rows carried from a snapshot older than ADR 0076 have no ETF category: classify
+    them from their stored name, so closed funds stay in the specialised sample."""
+    if "etf_category_source" in gone.columns:
+        return gone
+    return gone.assign(**etf_category_flags(gone, settings))
 
 
 def apply_identifiers(
@@ -206,6 +222,34 @@ def write_review(reader: StoreReader, session: date, path: Path) -> None:
         out = csv.DictWriter(fh, fieldnames=["symbol", "leverage", "tracks", "notes"])
         out.writeheader()
         out.writerows(rows)
+
+
+def etf_review_rows(reference: pd.DataFrame) -> list[dict[str, str]]:
+    """UNKNOWN ETF categories to curate, in ``thematic_etfs.csv`` format: the name carries a theme
+    or sector word next to a broad one (``needs_review``) or none of them (``unclassified``), so
+    ``category`` is left for the curator and the reason goes in ``notes`` with the name."""
+    pending = reference[
+        reference["etf_category_source"].isin(["needs_review", "unclassified"])
+        & reference["status"].eq("ACTIVE")
+    ]
+    return [
+        {"symbol": symbol, "category": "", "theme": "", "notes": f"{source}: {name}"}
+        for symbol, name, source in zip(
+            pending["symbol"], pending["name"], pending["etf_category_source"], strict=True
+        )
+    ]
+
+
+def write_etf_review(reader: StoreReader, session: date, path: Path) -> int:
+    """Write ``etf_review_rows`` for the session's reference to ``path`` (CSV); -> the rows."""
+    reference = reader.table(REFERENCE, session)
+    rows = etf_review_rows(reference) if reference is not None else []
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as fh:
+        out = csv.DictWriter(fh, fieldnames=["symbol", "category", "theme", "notes"])
+        out.writeheader()
+        out.writerows(rows)
+    return len(rows)
 
 
 def write_figi_review(reader: StoreReader, session: date, path: Path) -> int:
@@ -371,6 +415,9 @@ def _build(
         "sp500_unmatched": unmatched,
         "leverage": {
             s: int(reference["leverage_source"].eq(s).sum()) for s in LEVERAGE_SOURCES
+        },
+        "etf_category": {
+            s: int(reference["etf_category_source"].eq(s).sum()) for s in CATEGORY_SOURCES
         },
         "identifiers": {
             "with_figi": int(reference["figi"].notna().sum()),

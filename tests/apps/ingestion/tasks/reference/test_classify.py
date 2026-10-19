@@ -1,4 +1,5 @@
-"""Leverage from ETF names (``classify.LeverageRules`` driven by ``config/site/universe.toml``).
+"""Leverage and ETF category from ETF names (``classify.LeverageRules`` and
+``EtfCategoryResolver`` driven by ``config/site/universe.toml``).
 
 Resolution order: curated override -> leverage the name states -> exclusions -> unleveraged;
 anything else is UNKNOWN (``needs_review``). The names are real fund names from the
@@ -10,7 +11,12 @@ import pandas as pd
 import pytest
 
 from algotrade.config.site.settings import UniverseSettings
-from algotrade_ingestion.tasks.reference.classify import LeverageRules, leverage_flags
+from algotrade_ingestion.tasks.reference.classify import (
+    EtfCategoryResolver,
+    LeverageRules,
+    etf_category_flags,
+    leverage_flags,
+)
 from tests.conftest import REPO_ROOT
 
 # The committed rules, so a config edit that breaks a real name fails here.
@@ -210,3 +216,64 @@ def test_committed_overrides_correct_the_vix_conventions() -> None:
     }
     assert curated["UVXY"] == 1.5 and RULES.parse("ProShares Ultra VIX Short Term Futures") == 2
     assert curated["SVXY"] == -0.5
+
+
+ETF_NAMES = [
+    # (name, category, theme, source): the committed [etf_category] rules on real fund names
+    ("Technology Select Sector SPDR Fund", "sector", "technology", "name_rule"),
+    ("ARK Innovation ETF", "thematic", "technology", "name_rule"),
+    ("iShares Global Clean Energy ETF", "thematic", "clean_energy", "name_rule"),
+    ("Global X Robotics & Artificial Intelligence ETF", "thematic", "technology", "name_rule"),
+    ("Global X Gold Miners ETF", "thematic", "natural_resources", "name_rule"),
+    ("SPDR S&P 500 ETF Trust", "broad", None, "name_rule"),
+    ("iShares Core U.S. Aggregate Bond ETF", "excluded", "bond", "name_rule"),
+    ("SPDR Gold Shares", "excluded", "commodity_fx", "name_rule"),
+    ("YieldMax NVDA Option Income Strategy ETF", "excluded", "option_income", "name_rule"),
+    ("Invesco S&P 500 Equal Weight Technology ETF", None, None, "needs_review"),
+    ("Corgi Acme ETF", None, None, "unclassified"),
+]
+
+
+@pytest.mark.parametrize(("name", "category", "theme", "source"), ETF_NAMES)
+def test_etf_category_name_rules(
+    name: str, category: str | None, theme: str | None, source: str
+) -> None:
+    assert EtfCategoryResolver(SETTINGS).resolve(name) == (category, theme, source)
+
+
+def test_etf_category_flags_resolution_order() -> None:
+    frame = pd.DataFrame(
+        {
+            "symbol": ["AAPL", "XLK", "ICLN", "TQQQ", "FOO"],
+            "name": [
+                "Apple Inc. - Common Stock",
+                "Technology Select Sector SPDR Fund",
+                "iShares Global Clean Energy ETF",
+                "ProShares UltraPro QQQ",
+                "Corgi Acme ETF",
+            ],
+            "is_etf": [False, True, True, True, True],
+            "is_leveraged": [False, False, False, True, None],
+            "is_inverse": [False, False, False, False, None],
+            "leverage_source": ["not_etf", "name_rule", "name_rule", "override", "name_rule"],
+        }
+    )
+    settings = UniverseSettings(
+        etf_category=SETTINGS.etf_category,
+        etf_overrides={"XLK": ("thematic", "technology"), "TQQQ": ("broad", None)},
+    )
+    flags = etf_category_flags(frame, settings).set_index(frame["symbol"])
+    got = {s: tuple(None if pd.isna(v) else v for v in row) for s, row in flags.iterrows()}
+    assert got["AAPL"] == (None, None, "not_etf")  # not an ETF: no category
+    assert got["XLK"] == ("thematic", "technology", "override")  # the curated row wins the rule
+    assert got["ICLN"] == ("thematic", "clean_energy", "name_rule")
+    assert got["TQQQ"] == ("broad", None, "override")  # an override also wins over leverage
+    assert got["FOO"] == (None, None, "unclassified")
+    unsure = frame.assign(is_leveraged=[False] * 2 + [None] + [False] * 2)
+    unsure["leverage_source"] = ["not_etf", "name_rule", "needs_review", "name_rule", "name_rule"]
+    unknown = etf_category_flags(unsure, settings)  # ICLN's leverage is UNKNOWN: so is its category
+    assert unknown.iloc[2].isna().tolist()[:2] == [True, True]
+    assert unknown.iloc[2]["etf_category_source"] == "needs_review"
+    geared = frame.assign(symbol=["A", "B", "C", "D", "E"])  # no override: leveraged is excluded
+    plain = etf_category_flags(geared, UniverseSettings(etf_category=SETTINGS.etf_category))
+    assert tuple(plain.iloc[3]) == ("excluded", "leveraged", "name_rule")

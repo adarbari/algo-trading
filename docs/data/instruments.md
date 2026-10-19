@@ -19,7 +19,7 @@ Data is keyed by `instrument_id`, never by ticker string.
 | `contract_month`, `root` | Futures only (for example root `ES`, month `2026-12`) |
 | `calendar` | Exchange calendar id. Defines sessions and `session_date`. |
 | `tick_size` | Minimum price increment |
-| `etf_flags` | `is_etf`, `is_leveraged`, `is_inverse`, `leverage` (for example `3.0`, `-1.0`), `tracks` (underlying index) |
+| `etf_flags` | `is_etf`, `is_leveraged`, `is_inverse`, `leverage` (for example `3.0`, `-1.0`), `tracks` (underlying index), `etf_category` / `etf_theme` (specialised-ETF flag, below) |
 | `valid_from`, `valid_to` | Reference rows are versioned history (delistings, renames) |
 
 ### Why this makes futures (and options) "just more data"
@@ -49,6 +49,29 @@ universe *as it was*, which avoids survivorship bias.
 | Closed-end funds (CEF) | Massive ticker type `FUND` (needs a Massive key) | NAV-priced funds, not ETFs (ADR 0013 amendment 2026-10-18); about 330 active |
 | Optionable flag | Nasdaq Trader `options.txt` (underlying symbols) | About 4.2k underlyings as of 2026-10 |
 | Futures (later) | Curated root list (ES, NQ, RTY, CL, GC, ZN, …) | Added as roots; contracts come from the vendor |
+
+### Flagging specialised ETFs (sector and thematic)
+
+The `thematic_etf_launch_fade` edge follows Ben-David, Franzoni, Kim and Moussawi (RFS 2023), whose
+"specialised" funds are sector funds (one industry) and thematic funds (a story tying several). Each
+ETF carries `etf_category` (`thematic`, `sector`, `broad`, `excluded`; null = UNKNOWN), `etf_theme`
+(the theme group, the sector, or the exclusion kind) and `etf_category_source`
+(`tasks/reference/classify.py`, rules in `config/site/universe.toml [etf_category]`, ADR 0076),
+resolved in this order:
+
+1. **Curated override** (`config/site/overrides/thematic_etfs.csv`: symbol, category, theme, notes)
+   wins → `override`. It was built by an Opus review of the rules' output (2026-10-19).
+2. A **leveraged or inverse** fund → `excluded`, theme `leveraged`.
+3. An **exclusion** phrase (bond, spot commodity or currency, option income, allocation) →
+   `excluded`, theme = the kind.
+4. A **theme** phrase and no broad phrase → `thematic`; else a **sector** phrase and no broad phrase
+   → `sector`; else a **broad** phrase alone → `broad` (all `name_rule`; theme = the first matching
+   group).
+5. A theme or sector phrase next to a broad one → UNKNOWN, `needs_review`; no phrase at all →
+   UNKNOWN, `unclassified`. UNKNOWN fails closed. `universe-build --etf-review-out` writes these
+   ETFs in `thematic_etfs.csv` format for curation.
+
+The category reads the name as of the build. A non-ETF has no category (`not_etf`).
 
 ### Flagging leveraged and inverse ETFs
 

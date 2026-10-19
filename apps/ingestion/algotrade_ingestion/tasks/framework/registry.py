@@ -120,6 +120,12 @@ TASKS: dict[str, Task] = {
                 SESSION,
                 Param("review_out", ("--review-out",), Path, "write leverage candidates (CSV)"),
                 Param(
+                    "etf_review_out",
+                    ("--etf-review-out",),
+                    Path,
+                    "write ETFs whose category the rules could not settle (CSV)",
+                ),
+                Param(
                     "accept_sp500",
                     ("--accept-sp500",),
                     None,
