@@ -87,7 +87,7 @@ presets = ["range_breakout", "breakout", "failed_breakout", "momentum_squeeze_en
 [[family]]
 id = "reversals"
 title = "Reversals"
-presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reversal", "sector_reversal", "etf_low_ibs", "news_free_residual_reversal"]
+presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reversal", "sector_reversal", "etf_low_ibs", "news_free_residual_reversal", "december_losers"]
 
 [[family]]
 id = "income"
@@ -102,7 +102,7 @@ presets = ["pead_small_cap", "eap_all", "eap_volume", "earnings_date_early", "pr
 [[family]]
 id = "filings"
 title = "Filings and index changes"
-presets = ["eight_k_adverse_items", "nt_late_filer", "tender_offer_filed", "sp500_deletion", "insider_cluster_buys"]
+presets = ["eight_k_adverse_items", "nt_late_filer", "tender_offer_filed", "sp500_deletion", "insider_cluster_buys", "reverse_split_recent"]
 
 [[family]]
 id = "options_signals"

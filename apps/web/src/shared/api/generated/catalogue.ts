@@ -638,6 +638,7 @@ export const SITE_FEATURES = [
   'feature.rs_spy_positive',
   'feature.rs_improving',
   'feature.sector_leader',
+  'feature.year_loser_flag',
   'feature.mom_12_1_vol_scaled',
   'feature.stock_tsmom_sign',
   'feature.capital_gains_overhang',

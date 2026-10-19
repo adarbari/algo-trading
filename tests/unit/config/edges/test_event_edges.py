@@ -223,3 +223,58 @@ def test_the_stock_leftover_edges_rank_the_short_leg_and_gate_the_universe() -> 
     assert gate not in {r.field for r in news.universe.where.rules()}  # type: ignore[union-attr]
     for v in news.variants:  # a short leg ranks by score over every pickable name: gate it there
         assert gate in {r.field for r in v.universe.where.rules()}  # type: ignore[union-attr]
+
+
+# ---- EB H14 batch X: the documents the H4 classes, triggers and windows unblocked
+BATCH_X = {
+    "reverse_split_distress_filter": "on_event:reverse_split",
+    "vix_mean_reversion_entry": "on_market:vix_spike",
+    "treasury_month_end_extension": "calendar:pre_month_end",
+    "december_losers_reversal": "calendar:year_turn",
+}
+BLOCKED_X = ("ipo_lockup_expiry", "tdf_contrarian_flows")
+
+
+def test_batch_x_candidates_read_the_class_trigger_or_window_they_were_built_for() -> None:
+    edges = {e.id: e for e in load_edges(STORE)}
+    for edge_id, schedule in BATCH_X.items():
+        edge = edges[edge_id]
+        assert edge.status == "candidate" and edge.schedule == schedule, edge_id
+        assert str(edge.frozen_from) == "2026-04-01" and edge.mechanism_kind, edge_id
+    for edge_id in BLOCKED_X:
+        assert edges[edge_id].status == "blocked" and edges[edge_id].rejection_reason, edge_id
+
+
+def test_the_reverse_split_edge_is_a_liquid_short_with_the_whole_universe_as_its_base() -> None:
+    """Short on liquid names only (O1, O2); the flagged names are the picks and every eligible name
+    the base, so the lift does not read the picks against themselves (``names_for``)."""
+    edge = {e.id: e for e in load_edges(STORE)}["reverse_split_distress_filter"]
+    assert edge.outcome.side == "short" and edge.base == "universe" and edge.picks == "event"
+    assert _rank(edge.screeners[0]) == (ADV, "asc")
+    where = edge.universe.where.rules()  # type: ignore[union-attr]
+    assert any(r.field == ADV and r.op == "gte" for r in where)
+
+
+def test_the_december_losers_screen_gates_on_the_flag_and_ranks_the_biggest_loser_first() -> None:
+    edge = {e.id: e for e in load_edges(STORE)}["december_losers_reversal"]
+    path = REPO_ROOT / f"config/site/presets/screeners/{edge.screeners[0]}/v1.toml"
+    doc = tomllib.loads(path.read_text())
+    assert doc["criteria"]["loser"] == {
+        "field": "feature.year_loser_flag", "op": "eq", "value": True,
+    }  # fmt: skip
+    assert doc["rank"]["tie_break"] == "rollup.trend_stats@v2.ret_252d"
+    assert doc["rank"]["tie_break_order"] == "asc"  # the long leg takes the best score first
+    assert edge.outcome.side == "long" and edge.base == "universe" and edge.top_k == 50
+
+
+def test_the_time_series_documents_name_their_instruments_and_one_horizon() -> None:
+    edges = {e.id: e for e in load_edges(STORE)}
+    named = {
+        "vix_mean_reversion_entry": (["SPY"], (63,)),
+        "treasury_month_end_extension": (["TLT", "IEF", "AGG"], (3,)),
+    }
+    for edge_id, (symbols, horizons) in named.items():
+        edge = edges[edge_id]
+        assert edge.base == "out_of_window" and edge.outcome.benchmark == "none"
+        assert edge.outcome.horizon_sessions == horizons
+        assert next(r.value for r in edge.universe.where.rules()) == tuple(symbols)  # type: ignore[union-attr]

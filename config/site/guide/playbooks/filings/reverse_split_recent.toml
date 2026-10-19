@@ -1,0 +1,31 @@
+# L3 site setting: the Guide's playbook for the site preset reverse_split_recent (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "reverse_split_recent"
+version = 1  # the preset version this prose was written for
+summary = "Finds liquid stocks that reverse-split in the last month: an exclusion list for longs and the short side of the reverse-split edge. It is a candidate edge under test, not a proven trade."
+hit = "The name is a common stock that trades at least $5M a day and whose latest reverse split went ex within the last 20 sessions. The most liquid ranks first."
+not_checked = "It does not know why the company split (a cure for a sub-$1 bid, a merger and a spin-off look the same) or whether the business has recovered. It is the screen of the reverse-split edge, which the harness is still testing."
+before_acting = [
+  "Most reverse splitters are microcaps: gate on rollup.price_stats@v2.adv_usd_20d, as this screen does, and expect few liquid names.",
+  "Check rollup.reverse_splits@v1.reverse_split_ratio and rollup.reverse_splits@v1.reverse_splits_1y: a repeat splitter is the clearest distress.",
+  "Shorting a distressed name costs a hard borrow, often 20 to 100 percent a year; for most people the use is to leave the name out of a long screen.",
+]
+sources = [
+  "Kim, Klein and Rosenfeld, on returns after reverse stock splits (2008)",
+]
+related = [
+  { id = "nt_late_filer", reason = "another avoid list for distressed names" },
+  { id = "size_small", reason = "the size baseline the edge is compared with" },
+]
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+adv = "Trades at least $5M a day"
+reverse_split = "Reverse-split in the last 20 sessions"
