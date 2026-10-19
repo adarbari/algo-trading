@@ -49,13 +49,20 @@ def _walk(walked_to: date | None = PREV, run_session: date = SESSION) -> pd.Data
     return pd.DataFrame(rows, columns=["session_date", "walked_to"])
 
 
+def _reads(rows: list[tuple[str, date, date]]) -> pd.DataFrame:
+    """Full per-CIK reads: (cik, the run's session, covers_since)."""
+    return pd.DataFrame(rows, columns=["cik", "session_date", "covers_since"])
+
+
 def _compute(
     filings: pd.DataFrame | None,
     earn: pd.DataFrame | None = None,
     walk: pd.DataFrame | None = None,
+    reads: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     walk = _walk() if walk is None else walk
     inputs = {
+        "filings/read": reads,
         filing_activity.PRICE_STATS: STATS,
         FILINGS: filings,
         NIGHT: walk,
@@ -252,3 +259,25 @@ def test_a_1630_acceptance_on_the_previous_session_is_outside_the_span_live_and_
     frame = out[GROUP.key][0].frame
     assert frame is not None
     assert frame["filing_count_5d"].tolist() == [0]  # known from S: not in the span
+
+
+def test_history_before_the_first_nightly_walk_is_covered_only_for_ciks_read_in_full() -> None:
+    """No walk at all: a CIK with a full read (from before the span, by a run of S-1 or later)
+    has a count; the others stay unknown. A recompute after more runs gives the same values."""
+    rows = _filings([("EQ:A", PREV), ("EQ:B", PREV), ("EQ:C", GRID[0])])
+    rows["cik"] = rows["instrument_id"].map({"EQ:A": "1", "EQ:B": "2", "EQ:C": "3"})
+    after = SESSION + timedelta(days=9)
+    reads = _reads([
+        ("0000000001", after, date(2018, 1, 1)),  # padded like the run's items
+        ("2", after, SESSION - timedelta(days=3)),  # read from inside the span: not complete
+        ("3", PREV - timedelta(days=1), date(2018, 1, 1)),  # run before S-1: misses S-1's filings
+    ])  # fmt: skip
+    no_walk = pd.DataFrame(columns=["session_date", "walked_to"])
+    out = _compute(rows, walk=no_walk, reads=reads)
+    assert out["filing_count_5d"].isna().tolist() == [False, True, True]
+    assert out.loc["EQ:A", "filing_count_5d"] == 1
+    later = pd.concat([reads, _reads([("3", after, date(2018, 1, 1))])], ignore_index=True)
+    again = _compute(rows, walk=no_walk, reads=later)
+    assert again["filing_count_5d"].isna().tolist() == [False, True, False]
+    assert again["filing_count_5d"].dropna().tolist() == [1, 0]
+    assert _compute(rows, walk=no_walk, reads=None)["filing_count_5d"].isna().all()
