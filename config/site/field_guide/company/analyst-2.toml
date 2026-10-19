@@ -472,3 +472,71 @@ value = 10
 mode = "soft"
 tolerance = 2
 note = "illustrative screen, not a published cut-off: Loughran and Wellman sort names into groups by the multiple and set no level, and 10 is a round figure for the cheap end; a loss-making company has no multiple, so a hard rule drops it"
+
+[[field]]
+name = "rollup.filing_text_similarity@v1.text_sim_cosine"
+theme = "events"
+reads = "How alike the latest 10-K or 10-Q reads to the same company's filing a year earlier, from word counts. 1 is the same words in the same proportions; lower means more rewritten. Carried 150 days."
+caveats = [
+  "Null unless rollup.filing_text_similarity@v1.text_sim_status is OK: a missing prior filing or too little text is not 'unchanged', and a hard 'lte' drops the name.",
+  "No value exists before the filing text backfill, and delisted companies have none. Read rollup.filing_text_similarity@v1.text_sim_form: a 10-Q compares the same quarter a year earlier.",
+]
+sources = ["Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance"]
+[[field.use]]
+for = "a rewritten filing"
+op = "lte"
+value = 0.9
+mode = "hard"
+note = "the study sorts into fifths; the threshold is a screen choice"
+
+[[field]]
+name = "rollup.filing_text_similarity@v1.text_sim_jaccard"
+theme = "events"
+reads = "The share of distinct words that the latest filing and its year-ago filing have in common. 1 is the same vocabulary; 0.8 means one word in five is new or dropped. Carried 150 days."
+caveats = [
+  "It ignores how often a word appears, so a repeated change moves it little. Read rollup.filing_text_similarity@v1.text_sim_cosine for the weighted view.",
+  "Null unless rollup.filing_text_similarity@v1.text_sim_status is OK. A boilerplate-heavy filer sits near 1 whatever it changed.",
+]
+sources = ["Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance"]
+
+[[field]]
+name = "rollup.filing_text_similarity@v1.risk_factor_sim_cosine"
+theme = "events"
+reads = "How alike the risk factors of the latest 10-K read to last year's, from word counts. 1 is unchanged; lower means the company rewrote what could go wrong. Carried 400 days."
+caveats = [
+  "Null when the 10-K has no comparable Item 1A in both years or the prior filing is missing. Check rollup.filing_text_similarity@v1.risk_factor_status before reading a gap as no change.",
+  "Item 1A exists only from fiscal 2005, and a very short section is not compared. Read rollup.filing_text_similarity@v1.risk_factor_len_change for a section that only grew.",
+]
+sources = ["Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance"]
+[[field.use]]
+for = "rewritten risk factors"
+op = "lte"
+value = 0.9
+mode = "hard"
+note = "a screen choice; the 10-K is annual, so the signal is seasonal"
+
+[[field]]
+name = "rollup.filing_text_similarity@v1.risk_factor_len_change"
+theme = "events"
+reads = "How much longer or shorter the 10-K risk factors are than last year's: new words over old words, minus one. 0.2 is 20 percent longer; -0.1 is 10 percent shorter. Carried 400 days."
+caveats = [
+  "Length is not content: a section can grow with the same words repeated. Read rollup.filing_text_similarity@v1.risk_factor_sim_cosine beside it.",
+  "Null unless rollup.filing_text_similarity@v1.risk_factor_status is OK. A hard threshold drops every name with no comparable Item 1A.",
+]
+sources = ["Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance"]
+
+[[field]]
+name = "rollup.filing_text_similarity@v1.text_sim_status"
+theme = "events"
+reads = "Why the text similarity has a value or not. OK: compared. NO_PRIOR: no filing of the same form a year earlier is stored. NOT_COMPARABLE: too little comparable text in both filings."
+caveats = [
+  "A name with no row has no 10-K or 10-Q in the last 150 days, or no instrument at the session. Delisted companies have no row.",
+  "Screen on 'eq OK' before reading rollup.filing_text_similarity@v1.text_sim_cosine: the measures are null, never zero, when the status is not OK.",
+]
+sources = ["Cohen, Malloy and Nguyen (2020), Lazy Prices, Journal of Finance"]
+[[field.use]]
+for = "a filing with a comparable prior"
+op = "eq"
+value = "OK"
+mode = "hard"
+note = "drops every name the text could not be compared for"

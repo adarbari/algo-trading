@@ -1,0 +1,55 @@
+"""The recent filings a text-comparison feature group reads, one session's view (edge build F).
+
+For session S: the Item texts of every 10-K and 10-Q of a company that has one known in the last
+``RECENT_SESSIONS`` sessions, together with that company's filings of the year before
+(``LOOKBACK_DAYS`` of acceptance dates), each as ``reading.filing_text`` reads it on S: known on
+or before S (a filing accepted after the close is first in the view of the next session), the
+latest version per item, amendments left out by form. The rows are the companies that map to an
+instrument at S (``instrument_id`` not null); a delisted company's filings have none and are not
+in the view (the group has no row for it). The view is read lazily per session, never for a
+chunk of them, and never beyond S.
+
+Two reads: a scan without text for the companies with a recent filing, then one read with text
+narrowed to those companies. A recent filing is found from acceptance dates ``SCAN_MARGIN_DAYS``
+before the first recent session on (a filing is known the session after its acceptance); a text
+re-extracted later than that, from an older filing, is not recent news and is not read.
+"""
+
+from datetime import date, timedelta
+
+import pandas as pd
+
+from algotrade.core.time.calendar import sessions_ending
+from algotrade.data.filing_text.reading import TABLE, filing_text
+from algotrade.storage.tables.readers import StoreReader
+
+RECENT_SESSIONS = 5  # equals features.rollups.text.comparison.RECENT_SESSIONS (tested)
+LOOKBACK_DAYS = 460  # acceptance dates read: the year-ago comparator and a late filer's margin
+SCAN_MARGIN_DAYS = 10
+FORMS = ("10-K", "10-Q")
+ITEMS = ("1", "1A", "3", "7", "I-2", "II-1A")  # equals comparison.ITEMS, all forms (tested)
+
+__all__ = ["FORMS", "ITEMS", "TABLE", "recent_filing_texts"]
+
+
+def recent_filing_texts(reader: StoreReader, session: date) -> pd.DataFrame | None:
+    """The view of ``session`` (module doc): ``COLUMNS`` rows with text and a non-null
+    ``instrument_id``; ``None`` when no company has a periodic filing known in the last
+    ``RECENT_SESSIONS`` sessions."""
+    first = sessions_ending(session, RECENT_SESSIONS)[0]
+    scan = filing_text(
+        reader, None, session, ITEMS, FORMS, first - timedelta(days=SCAN_MARGIN_DAYS), None, False
+    )
+    if scan.empty:
+        return None
+    recent = scan[
+        scan["instrument_id"].notna() & (pd.to_datetime(scan["known_from"]) >= pd.Timestamp(first))
+    ]
+    if recent.empty:
+        return None
+    frame = filing_text(
+        reader, None, session, ITEMS, FORMS, session - timedelta(days=LOOKBACK_DAYS),
+        ciks=sorted(set(recent["cik"])),
+    )  # fmt: skip
+    frame = frame[frame["instrument_id"].notna()]
+    return frame.reset_index(drop=True) if not frame.empty else None

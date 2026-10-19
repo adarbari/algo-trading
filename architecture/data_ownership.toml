@@ -70,7 +70,7 @@ detect = [
 [[responsibility]]
 id = "filing-text-reading"
 description = "Read events/filing_text (edge build D10): the rows known on a session (effective known_from = the stored stamp floored by the acceptance session recomputed from ts), per instrument, accession and item the latest version (known_from, parser_version, knowledge_ts; null items equal), a filing's null-item row dropped when it has an item row; every stored version for the producer. No consumer reads the table itself"
-owner = ["src/algotrade/data/filing_text/reading.py"]
+owner = ["src/algotrade/data/filing_text/reading.py", "src/algotrade/data/filing_text/recent.py"]  # recent.py: the lazy per-session view of recent filings and their year-ago comparators that filing_text_change@v1 reads (EB F)
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/events/filing_text.py",  # the producer reads what it already holds, to skip it and to stamp a revision
 ]

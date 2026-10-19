@@ -250,6 +250,24 @@ D1:** the daily index gives CIKs, not tickers, so a delisted listing still has n
 mapping in the store; EDGAR's company-names history or the `instruments/company` snapshots over
 time are the candidates for D1's Form 25 follow-up (not built here).
 
+#### What reads it: filing text similarity (EB F, PR 1)
+
+`filing_text_change@v1` compares each company's latest 10-K / 10-Q (known in the last five
+sessions) with its year-ago filing, and `filing_text_similarity@v1` carries the result (150 days;
+the 10-K risk factors 400). Cosine on raw word counts plus Jaccard on word sets, over the Item
+sections the store holds; the maths is `quant/text/`, the pairing `features/rollups/text/
+comparison.py`. Limits to know before reading a value: **no values exist until the D10 backfill
+has run** (the groups are empty on every session before it), and the groups are computed over
+history afterwards by `algotrade-ingest rollups --from D --to D2 --only filing_text_change@v1`
+then `--only filing_text_similarity@v1` (in that order); **delisted names are uncovered**: the text
+is stored for them (D10b) but a group row needs an instrument at the session, so a company with no
+instrument in the `instruments/company` snapshot has no row; **Items 1 and 3 are read only if
+stored** (the default keeps 1A, 7, I-2 and II-1A; a comparison uses the items present in both
+filings); an Item 1A exists only from fiscal 2005; **amendments are excluded** as subject and as
+comparator; a filing re-extracted by a later parser version is read from the session that version
+ran, never earlier; a text re-extracted from a filing older than the five recent sessions is not
+read as news.
+
 ### S&P 500 membership history (fja05680/sp500; edges ED6b-3)
 
 `sp500_ticker_start_end.csv` of https://github.com/fja05680/sp500 (MIT licence, free, no key):
