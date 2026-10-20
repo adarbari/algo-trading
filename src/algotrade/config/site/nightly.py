@@ -62,8 +62,8 @@ TABLE_NAME = re.compile(r"rollups/[a-z_]+/[a-z0-9_]+@v\d+")
 @dataclass(frozen=True)
 class Backfilling:
     """One ``[backfilling]`` entry: a stored table whose history is still being filled, and the
-    last session date until which a screener short of coverage only for want of it is a WARN
-    (ADR 0055 amendment 2026-10-20)."""
+    last UTC calendar date (wall clock) until which a screener short of coverage only for want
+    of it is a WARN (ADR 0055 amendment 2026-10-20)."""
 
     until: date
     reason: str
