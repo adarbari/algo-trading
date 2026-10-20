@@ -1,3 +1,4 @@
+import dataclasses
 import tomllib
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
@@ -391,5 +392,24 @@ def test_delisted_rows_from_before_the_etf_category_are_classified_by_name() -> 
     got = categorise_carried(gone, UniverseSettings.from_documents(rules)).set_index("symbol")
     assert got.loc["CLSD", "etf_category"] == "thematic"
     assert got.loc["OLD", "etf_category_source"] == "not_etf"
-    kept = gone.assign(etf_category_source="override")
-    assert categorise_carried(kept, UniverseSettings()) is kept
+
+
+def test_changed_override_reaches_an_already_classified_delisted_row() -> None:
+    gone = pd.DataFrame(
+        {
+            "symbol": ["CLSD"],
+            "name": ["Closed Clean Energy ETF"],
+            "is_etf": [True],
+            "is_leveraged": [False],
+            "is_inverse": [False],
+            "leverage_source": ["name_rule"],
+            "etf_category": ["thematic"],
+            "etf_theme": ["clean_energy"],
+            "etf_category_source": ["name_rule"],
+        }
+    )
+    rules = tomllib.loads((REPO_ROOT / "config" / "site" / "universe.toml").read_text())
+    settings = UniverseSettings.from_documents(rules)
+    settings = dataclasses.replace(settings, etf_overrides={"CLSD": ("broad", None)})
+    got = categorise_carried(gone, settings).iloc[0]
+    assert (got["etf_category"], got["etf_category_source"]) == ("broad", "override")

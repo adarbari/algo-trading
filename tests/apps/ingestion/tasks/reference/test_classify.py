@@ -277,3 +277,18 @@ def test_etf_category_flags_resolution_order() -> None:
     geared = frame.assign(symbol=["A", "B", "C", "D", "E"])  # no override: leveraged is excluded
     plain = etf_category_flags(geared, UniverseSettings(etf_category=SETTINGS.etf_category))
     assert tuple(plain.iloc[3]) == ("excluded", "leveraged", "name_rule")
+
+
+def test_etf_category_flags_nan_is_etf_is_not_an_etf() -> None:
+    frame = pd.DataFrame(
+        {
+            "symbol": ["ICLN"],
+            "name": ["iShares Global Clean Energy ETF"],
+            "is_etf": [None],
+            "is_leveraged": [False],
+            "is_inverse": [False],
+            "leverage_source": ["name_rule"],
+        }
+    )
+    got = etf_category_flags(frame, SETTINGS).iloc[0]
+    assert got["etf_category_source"] == "not_etf"

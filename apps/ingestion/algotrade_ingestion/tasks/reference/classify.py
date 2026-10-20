@@ -204,7 +204,7 @@ def etf_category_flags(frame: pd.DataFrame, settings: UniverseSettings) -> pd.Da
     for symbol, name, is_etf, geared, gear_unknown in zip(
         frame["symbol"],
         frame["name"],
-        frame["is_etf"],
+        frame["is_etf"].fillna(False),
         frame["is_leveraged"].fillna(False) | frame["is_inverse"].fillna(False),
         unknown_leverage,
         strict=True,

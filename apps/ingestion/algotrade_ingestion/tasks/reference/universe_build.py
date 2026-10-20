@@ -147,10 +147,9 @@ def build_reference(
 
 
 def categorise_carried(gone: pd.DataFrame, settings: UniverseSettings) -> pd.DataFrame:
-    """Delisted rows carried from a snapshot older than ADR 0076 have no ETF category: classify
-    them from their stored name, so closed funds stay in the specialised sample."""
-    if "etf_category_source" in gone.columns:
-        return gone
+    """Classify delisted carried rows afresh from their stored name and flags on every build
+    (the rules are deterministic), so an edit to ``[etf_category]`` or the curated overrides
+    reaches them and closed funds stay in the specialised sample."""
     return gone.assign(**etf_category_flags(gone, settings))
 
 
