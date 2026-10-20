@@ -8,6 +8,7 @@ from algotrade_ingestion.tasks.framework.params import Params, session_of, symbo
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.maintenance import (
     bar_quality,
+    compact_runs,
     golden,
     migrate_ids,
     purge,
@@ -121,3 +122,15 @@ def run_golden_load(ctx: TaskContext, p: Params) -> RunRecord:
     if not isinstance(source, FixtureSource):
         raise TypeError("synthetic must be a FixtureSource (the golden CSVs)")
     return golden.load_golden(ctx, source)
+
+
+def run_compact_runs(ctx: TaskContext, p: Params) -> RunRecord:
+    return compact_runs.compact(
+        ctx,
+        session_of(p),
+        str(p["table"]),
+        p.get("start"),
+        p.get("end"),
+        p.get("limit"),
+        bool(p.get("dry_run")),
+    )

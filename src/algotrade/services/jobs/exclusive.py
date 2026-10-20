@@ -23,6 +23,7 @@ from algotrade.storage.locks import held
 from algotrade.storage.tables.interfaces import Backend
 
 INGEST_LOCK = "ingest"
+DEPLOY_LOCK = "deploy"  # the deploy hold (ADR 0057); long maintenance jobs hold it too
 EDGE_EVAL = "edge-eval"  # the job kind (and the lock-name prefix) of an edge evaluation
 EDGE_EVAL_STALE = timedelta(hours=2)  # the longest run takes ~40 minutes: older, "running", is dead
 

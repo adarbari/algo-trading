@@ -35,6 +35,12 @@ arrow_cpu_threads = 2            # Arrow's decode threads in the ingest process 
 arrow_io_threads = 4
 min_free_gb = 15                 # the nightly refuses to start with less free on the data volume (a full disk stops every agent); make doctor warns below it
 
+[backfilling]                    # ADR 0055 amendment 2026-10-20: a table still being backfilled. A screener short of coverage
+                                 # only for want of these (HARD criteria on them) is a WARN `backfilling` while until >= today's UTC date
+                                 # (wall clock: lapses even for catch-up; a 22:00 ET run is already the next UTC day), never a failed screens step; after `until` it fails again. The PR that confirms a backfill deletes its entry.
+"rollups/instrument/filing_text_similarity@v1" = { until = "2026-11-03", reason = "filing text backfill (lazy_prices_similar, risk_factor_unchanged) takes days" }
+"rollups/instrument/etf_launches@v1" = { until = "2026-11-03", reason = "etf_launches backfill (etf_launch_recent) in progress" }
+
 [history_copy]                   # the history-copy step (ADR 0060): a read-optimised copy of long reads
 enabled = true                   # false: the nightly skips the step (the copies already built still serve)
 market_prefix = "rollups/market/"   # every table under it is copied, all years (a few MB each)
@@ -124,3 +130,11 @@ recent_years = 2                 # calendar years kept: the session's and the on
 budget_gb = 2.6                  # the instrument tables' copies together (1.8 GB measured 2026-10-17, ~2.0 by year end); the step skips (WARN) a table
                                  # whose copy would not fit. Add a table only after measuring its size
 free_disk_floor_gb = 10.0        # no build when the disk has less free (WARN): a rebuilt year exists twice
+
+[compaction]                     # the compact-runs job (ADR 0078): `algotrade-ingest run compact-runs --table T`, run by hand
+tables = ["outcomes/instrument/forward_returns@v2"]   # merge-mode tables with no history copy only (test_nightly.py); anything else is refused
+nice = 10                        # CPU niceness the job takes on, so the API's reads win
+batch_size = 20                  # partitions compacted, then one wait out of the swap grace and one sweep of the batch
+pause_seconds = 1.0              # sleep between partitions: bounded disk I/O
+partition_seconds = 300.0        # a partition slower than this stops the run (the disk is struggling)
+sweep_grace_seconds = 125.0      # the swap spares the old files for 120 s; the batch waits out the rest before sweeping

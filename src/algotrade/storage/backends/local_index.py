@@ -22,6 +22,7 @@ index refers to: ``abort_run`` deletes them (the ingestion startup recovery, or 
 Every file is written to a unique temp file in its directory and renamed into place.
 """
 
+import contextlib
 import json
 import os
 import secrets
@@ -29,7 +30,7 @@ import shutil
 import tempfile
 import threading
 import time
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
@@ -45,6 +46,7 @@ INDEX = "_runs.json"
 INDEX_LOCK = ".runs.lock"
 TXN = "_txn"
 ORPHAN_GRACE_S = 60.0  # a loose file younger than this may be a write about to be indexed
+SWAP_GRACE_S = 120.0  # a file a compaction swap superseded is swept no sooner than this (ADR 0078)
 
 
 def atomic_write(path: Path, data: bytes) -> None:
@@ -367,6 +369,45 @@ class Commits:
             atomic_write(self.base / "seq", str(self.published() + 1).encode())
             return len(gone)
 
+    def swap_runs(
+        self,
+        directory: Path,
+        expected: dict[str, RunEntry],
+        replacement: dict[str, RunEntry],
+        grace_s: float = SWAP_GRACE_S,
+        clock: Callable[[], float] = time.time,
+        refuse: Path | None = None,
+    ) -> bool:
+        """Compare-and-swap one partition's index (ADR 0078): ``replacement`` becomes the index
+        only if it still equals ``expected``; -> whether it was swapped. Not a commit: the
+        sequence file is never written, so ``visible_seq`` and every ``partition_seq`` stay. The
+        caller wrote the files ``replacement`` names beforehand, under fresh names. Takes the
+        commit lock and recovers first; ``PartitionBusyError`` when a pending run wrote to the
+        partition. The files only ``expected`` named get a modification time that ``sweep`` spares
+        for ``grace_s`` from now (a read that resolved them finishes on them): the caller deletes
+        nothing. ``refuse``: a path that must not exist (a history copy made since the plan): the
+        swap is not done. The index write is the last step and nothing after it can raise."""
+        with held(self._commit_lock()):
+            self._recover()
+            busy = {
+                self._dir(item["table"], item["date"])
+                for run_id in self.pending_runs()
+                for item in self.journal(run_id).values()
+            }
+            if directory in busy:
+                raise PartitionBusyError(str(directory))
+            with held(index_lock(directory)):
+                if read_index(directory) != expected or (refuse is not None and refuse.exists()):
+                    return False
+                stamp = (
+                    clock() + grace_s - ORPHAN_GRACE_S
+                )  # sweep deletes below now - ORPHAN_GRACE_S
+                for name in _named(expected) - _named(replacement):  # before the swap, best effort
+                    with contextlib.suppress(OSError):
+                        os.utime(directory / name, (stamp, stamp))
+                write_index(directory, replacement)
+            return True
+
     def _forget(self, run_id: str) -> None:
         with self._guard:
             self._journals.pop(run_id, None)
@@ -405,6 +446,16 @@ class Commits:
         self._marker_path(run_id).unlink(missing_ok=True)
         for directory in touched:
             drop_unreferenced(directory, run_id)
+
+
+def _named(entries: dict[str, RunEntry]) -> set[str]:
+    """Every file name an index names: each run's version and the one before."""
+    return {
+        run_file(run, version)
+        for run, entry in entries.items()
+        for version in (entry, entry.prev)
+        if version is not None
+    }
 
 
 def _referenced(directory: Path, run_id: str) -> set[str]:

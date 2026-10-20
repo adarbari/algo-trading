@@ -72,6 +72,10 @@ path = "tests/contract/storage"
 purpose = "the storage contract: every table backend passes it"
 
 [[test_dir]]
+path = "tests/contract/storage/rewrites"
+purpose = "the contract of the admin rewrites of a partition's runs (purge_runs, sweep_orphans, compact_runs): every table backend passes it"
+
+[[test_dir]]
 path = "tests/e2e"
 purpose = "the CLIs end to end against the committed golden datasets and baseline"
 
