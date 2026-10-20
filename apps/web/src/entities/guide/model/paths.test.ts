@@ -8,6 +8,7 @@ import {
   exploreFieldPath,
   fieldPath,
   fieldsPath,
+  GUIDE_KIND_TITLES,
   guideEntryPath,
   indicatorPath,
   mechanismPath,
@@ -42,6 +43,11 @@ describe('guide paths', () => {
     expect(edgesGroupPath('not-built')).toBe('/guide/edges#not-built');
     expect(guideEntryPath('mechanism', 'forced_flows')).toBe('/guide/edges/m/forced_flows');
     expect(guideEntryPath('edge', 'momentum_12_1')).toBe('/guide/edges/momentum_12_1');
+  });
+
+  it('opens a screener category from a search result', () => {
+    expect(guideEntryPath('screener_category', 'income')).toBe('/guide/screeners/c/income');
+    expect(GUIDE_KIND_TITLES['screener_category']).toBe('Screener categories');
   });
 
   it('has pages for every section, Start here first and the Glossary last', () => {

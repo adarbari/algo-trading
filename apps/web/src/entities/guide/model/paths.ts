@@ -92,7 +92,7 @@ export function screenerBuilderPath(id: string): string {
 
 /**
  * The page of a Guide entry by the `kind` and `id` the server gives (a search result, a link in
- * a Start here page): start, indicator, episode, screener, field, situation, term, mechanism or edge. An
+ * a Start here page): start, indicator, episode, screener category, screener, field, situation, term, mechanism or edge. An
  * unknown kind opens the Guide's home.
  */
 export function guideEntryPath(kind: string, id: string): string {
@@ -103,6 +103,8 @@ export function guideEntryPath(kind: string, id: string): string {
       return indicatorPath(id);
     case 'episode':
       return episodePath(id);
+    case 'screener_category':
+      return screenerCategoryPath(id);
     case 'screener':
       return screenerPath(id);
     case 'field':
@@ -125,6 +127,7 @@ export const GUIDE_KIND_TITLES: Readonly<Record<string, string>> = {
   start: 'Start here',
   indicator: 'Warning signs',
   episode: 'Market falls',
+  screener_category: 'Screener categories',
   screener: 'Screeners',
   field: 'Fields',
   situation: 'Situations',

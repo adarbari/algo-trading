@@ -214,7 +214,9 @@ prose; every result is a URL under `/guide`. ⌘K anywhere; the rail's box on Gu
 Server side (GD6a, `Query.guideSearch(q, limit)`, `services/read/guide/search.py`; ADR 0038:
 the browser does not search): fields have no display name, so a field matches by its
 catalogue name, then its intents and theme, then its reads, caveats and catalogue description;
-every other kind by its id and title, then its prose. Tiers: the query is a name or title;
+every other kind by its id and title, then its prose (a screener category, a family of
+`sections.toml`, by its id and title, then its purpose and intro; it links to
+`/guide/screeners/c/<id>` and is grouped as "Screener categories"). Tiers: the query is a name or title;
 a name or title contains it; an intent or theme contains it; every word of it starts a word of
 the prose. Case-insensitive, ties by match position, title length, title, kind and id, at most
 `limit` results per kind, the groups by their best result. Each result is `{kind, id, title,
