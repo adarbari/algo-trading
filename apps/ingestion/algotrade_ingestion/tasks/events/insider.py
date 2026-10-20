@@ -6,7 +6,8 @@ date, ``known_from`` the NY session of SEC's acceptance time, restatements later
 
 - **Bulk** (``--since``, the history from 2006): SEC's quarterly Insider Transactions Data Sets
   (``sec_form345_bulk``), one file per quarter from the quarter of ``--since`` through that of
-  ``--until`` (default the session; a quarter not published yet is ``NO_DATA``, read again later).
+  ``--until`` (default the session; a quarter not published yet is ``NO_DATA``, read again later;
+  one that began over a year ago and has no file at any known URL fails the quarter).
   The sets carry the filing date only, so the ACCEPTANCE time comes from the submissions JSON
   of each issuer (``sec_filings`` with the insider forms: one request per issuer CIK, its older
   pages when ``--since`` precedes the recent block), joined by accession; a line whose filing
@@ -73,6 +74,7 @@ BOOTSTRAP_DAYS = 7  # the first nightly with nothing stored reads this many days
 QUARTER_ITEM, FILING_ITEM, CIK_ITEM = "q:", "acc:", "cik:"
 DATE_COLUMNS = ["filing_date", "period_of_report", "amends_date", "transaction_date"]
 CHECKPOINT_EVERY = 25
+PUBLISHED_WITHIN_DAYS = 366  # a quarter that began longer ago has a file: no file is a failure
 Tally = dict[str, int]  # lines dropped or restamped, by reason (module doc)
 
 
@@ -207,6 +209,10 @@ def _quarter(
     try:
         found = run.fetch(sources.bulk, InsiderRequest(key=label, session_date=run.session))
     except NoResponseError:
+        if quarter_start(label) < run.session - timedelta(days=PUBLISHED_WITHIN_DAYS):
+            raise RuntimeError(  # an old quarter is always published: the URL or SEC moved
+                f"{label}: no file at any known URL, a quarter this old is published"
+            ) from None
         return "NO_DATA: not published yet"
     assert found is not None
     frame = found.parsed[INSIDER_FRAME]

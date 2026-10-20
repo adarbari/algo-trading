@@ -13,7 +13,7 @@ from algotrade_sources.framework.base import FetchRequest
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.framework.series import INSIDER_COLUMNS, INSIDER_FRAME, InsiderRequest
 from algotrade_sources.vendors.sec.form4_xml import parse_form4
-from algotrade_sources.vendors.sec.form345_bulk import SecForm345Bulk, parse_bulk, zip_url
+from algotrade_sources.vendors.sec.form345_bulk import SecForm345Bulk, parse_bulk, zip_urls
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for
 from tests.helpers.payloads import sec as payloads
@@ -56,10 +56,26 @@ def test_the_same_filing_has_the_same_line_numbers_whichever_source_read_it() ->
     assert from_xml.to_dict() == from_bulk.to_dict()
 
 
-def test_the_url_names_the_quarter() -> None:
-    assert zip_url("2019q2").endswith("/insider-transactions-data-sets/2019q2_form345.zip")
+def test_the_urls_name_the_quarter_newest_home_first() -> None:
+    urls = zip_urls("2019q2")
+    assert all(u.endswith("/insider-transactions-data-sets/2019q2_form345.zip") for u in urls)
+    assert "/datastandardsinnovation/" in urls[0] and "/structureddata/" in urls[1]
     with pytest.raises(ValueError, match="not a quarter label"):
-        zip_url("2019q5")
+        zip_urls("2019q5")
+
+
+def test_a_quarter_is_read_from_the_first_home_that_has_it() -> None:
+    asked: list[str] = []
+
+    def transport(url: str) -> bytes:
+        asked.append(url)
+        if "/structureddata/" in url:
+            return b"zip"
+        raise HttpError(404)
+
+    source = SecForm345Bulk(http_for(transport, RetryPolicy(tries=1)))
+    assert source.fetch(InsiderRequest(key="2025q4")) == b"zip"
+    assert len(asked) == 2 and "/datastandardsinnovation/" in asked[0]
 
 
 def test_a_quarter_not_published_yet_is_none() -> None:
@@ -68,6 +84,18 @@ def test_a_quarter_not_published_yet_is_none() -> None:
 
     source = SecForm345Bulk(http_for(transport, RetryPolicy(tries=1)))
     assert source.fetch(InsiderRequest(key="2026q4")) is None
+
+
+def test_every_home_is_asked_before_a_quarter_is_called_not_published() -> None:
+    asked: list[str] = []
+
+    def transport(url: str) -> bytes:
+        asked.append(url)
+        raise HttpError(404)
+
+    source = SecForm345Bulk(http_for(transport, RetryPolicy(tries=1)))
+    assert source.fetch(InsiderRequest(key="2026q4")) is None
+    assert asked == zip_urls("2026q4")
 
 
 def test_the_source_reads_a_quarter_and_a_zip_without_a_table_is_an_error() -> None:

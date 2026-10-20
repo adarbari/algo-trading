@@ -7,7 +7,8 @@ a date not published yet is ``NO_DATA`` and asked again). The API serves a rolli
 backfill (``algotrade-ingest run short-volume --from D``) reaches back at most that far; older
 days exist only as ``cdn.finra.org`` files, which the finra.org website terms bar from machine
 learning and from building a database, so they are not read. ``known_from`` is the session after
-the trade date (``schedule.py``). The table is ``no_ml`` (see ``short_interest``).
+the trade date (``schedule.py``). Lowercase-lettered symbols (preferred series) are dropped and
+counted as unresolved (``daily.py``). The table is ``no_ml`` (see ``short_interest``).
 """
 
 from collections.abc import Mapping

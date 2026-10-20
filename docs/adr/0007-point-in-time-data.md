@@ -2,7 +2,7 @@
 
 **Status:** accepted (2026-10-02); amended 2026-10-02 (restructure R2: what `as_of` means,
 the snapshot rule, events by event date); amended 2026-10-03 (how runs combine: event runs
-merge); amended 2026-10-03 (a run is visible from its commit, ADR 0022)
+merge); amended 2026-10-03 (a run is visible from its commit, ADR 0022); amended 2026-10-19 (coverage ledgers may be read unbounded)
 
 ## Context
 Vendors revise data, index membership changes, and feature logic evolves. Without
@@ -66,6 +66,17 @@ return the combined view and every backend agrees (`tests/contract/storage/`).
   parameter, so intraday runs later are a scheduling change.
 - Feature definitions are a shared library, so research in `apps/backtest` can compute
   an experimental feature on the fly with exactly the same code.
+
+## Amendment 2026-10-19: coverage ledgers may be read unbounded; content never
+A feature input that is a coverage ledger (no content: only keys and the date a read covers
+from, today `filings/read`: `cik`, `session_date`, `covers_since`) may be served whole to every
+session (`feature_inputs.UNBOUNDED_INPUTS`), so the runner does not require its `session_date`
+to be on or before the session: a later run's full read of a CIK says the filings known on an
+earlier session were complete. Content (counts, values, text) still comes only from rows known
+on or before the session (`events/filing`, `event_date` <= S-1). The set is shrink-only; adding
+a table needs an ADR, and a fitness test pins the set to the loaders that serve every session
+and to the ledger columns. Selection effect: only CIKs a later run read are covered, so early
+delisted names stay null (fail closed).
 
 ## Consequences
 - Storage is larger (history is kept), which is acceptable at our scale.

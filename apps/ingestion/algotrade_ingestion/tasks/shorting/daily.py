@@ -7,7 +7,10 @@ revision of a short-interest date, so a stored date is never refetched in a norm
 first-seen value stays the point-in-time one. A date FINRA holds nothing for (a weekend, an
 unpublished date, a date beyond the API's history) is ``NO_DATA``, not a failure, and is asked
 again by the next run that covers it. Tickers the session's reference does not know are dropped
-and counted (``stats["unresolved"]``): the tables hold the universe's names only.
+and counted (``stats["unresolved"]``): the tables hold the universe's names only. So is a
+ticker whose case differs from the reference's (FINRA writes a preferred or other share series
+with lowercase letters, ``TpC`` beside ``TPC``): the resolver upper-cases, so it would read as
+the common stock and collide with it; only the exact-case ticker is the instrument.
 
 A backfill is the same loop over a wider window (``--from``): it checkpoints after every date, so
 an interrupted run is repeated and continues where the stored partitions end.
@@ -18,6 +21,7 @@ from datetime import date
 from functools import partial
 
 from algotrade.core.time.calendar import exchange_date, next_session
+from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
 from algotrade_sources.framework.base import FetchRequest, Source
@@ -26,6 +30,11 @@ NO_DATA = "NO_DATA"
 
 
 type Known = Callable[[date], Mapping[str, date]]  # a date -> its ``known_from`` (and kin)
+
+
+def _exact(resolver: SymbolResolver, symbol: str) -> bool:
+    """The reference knows ``symbol`` AS WRITTEN (``TPC`` yes, ``TpC`` no)."""
+    return resolver.knows(symbol) and resolver.symbol_for(resolver.id_for(symbol)) == symbol
 
 
 def one_day(run: IngestRun, source: Source, table: str, known: Known, day: date) -> str:
@@ -46,7 +55,7 @@ def one_day(run: IngestRun, source: Source, table: str, known: Known, day: date)
     if frame is None or frame.empty:
         return NO_DATA
     resolver = run.resolver(day)
-    known_names = frame["symbol"].map(resolver.knows)
+    known_names = frame["symbol"].map(lambda s: _exact(resolver, s))
     run.unresolved += int((~known_names).sum())  # a ticker the reference does not know is dropped
     resolved = run.resolve(frame[known_names], as_of=day, keep_symbol=False)
     if resolved.empty:

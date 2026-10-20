@@ -33,7 +33,7 @@ from algotrade.config.site.settings import SiteDocuments, load_rollups
 from algotrade.core.model.errors import DataValidationError
 from algotrade.core.model.instruments import market_id
 from algotrade.data import StoreReader
-from algotrade.data.feature_inputs import Produced, load_input
+from algotrade.data.feature_inputs import UNBOUNDED_INPUTS, Produced, load_input
 from algotrade.features.framework.columns import conform
 from algotrade.features.framework.declaration import FeatureGroup
 from algotrade.features.framework.graph import dependency_order
@@ -121,7 +121,7 @@ def _compute_chunk(
             frame = loaded[spec.key].at(session, lookbacks[spec.key])
             if frame is None and spec.required:
                 missing.append(spec.table)
-            if frame is not None:
+            if frame is not None and spec.table not in UNBOUNDED_INPUTS:
                 _check_point_in_time(rollup, spec.key, frame, session)
             frames[spec.key] = frame
         if missing:
