@@ -1,12 +1,13 @@
 """Site settings for the nightly workflow (``config/site/nightly.toml``): which sessions it
 ingests, its alerts and notifications, the duration alert of the post-session workflow (ADR 0070),
-and until when a step whose source has not published
-the session yet waits instead of failing (ADR 0043)."""
+until when a step whose source has not published
+the session yet waits instead of failing (ADR 0043), and the tables whose backfill is declared
+under way (ADR 0055 amendment 2026-10-20)."""
 
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import time
+from datetime import date, time
 from typing import Any
 
 from algotrade.config.site.fields import Table
@@ -55,6 +56,39 @@ class HistoryCopySettings:
         )
 
 
+TABLE_NAME = re.compile(r"rollups/[a-z_]+/[a-z0-9_]+@v\d+")
+
+
+@dataclass(frozen=True)
+class Backfilling:
+    """One ``[backfilling]`` entry: a stored table whose history is still being filled, and the
+    last UTC calendar date (wall clock) until which a screener short of coverage only for want
+    of it is a WARN (ADR 0055 amendment 2026-10-20)."""
+
+    until: date
+    reason: str
+
+
+def backfilling(section: Table) -> Mapping[str, Backfilling]:
+    """``[backfilling]``: table name -> its window; each entry needs ``until`` and ``reason``."""
+    found: dict[str, Backfilling] = {}
+    for name in section.names():
+        if not TABLE_NAME.fullmatch(name):
+            raise ConfigurationError(
+                f"{section.where}: {name!r} is not a rollup table name (rollups/<entity>/<name>@vN)"
+            )
+        entry = section.table(name, ["until", "reason"])
+        text = entry.text("until", "")
+        try:
+            until = date.fromisoformat(text)
+        except ValueError:
+            raise ConfigurationError(
+                f'{entry.where}: until: expected a date like "2026-11-03", got {text!r}'
+            ) from None
+        found[name] = Backfilling(until=until, reason=entry.line("reason"))
+    return found
+
+
 @dataclass(frozen=True)
 class NightlySettings:
     """``config/site/nightly.toml``: sessions, catch-up, the duration alert, notification."""
@@ -81,6 +115,8 @@ class NightlySettings:
     arrow_cpu_threads: int = 2  # Arrow decode threads (the API caps itself at the same 2)
     arrow_io_threads: int = 4
     min_free_gb: float = 15.0  # the nightly refuses to start with less free on the data volume
+    # [backfilling]: tables still being filled; a screener short only of them warns until `until`
+    backfilling: Mapping[str, Backfilling] = field(default_factory=dict)
 
     def deadline_for(self, step: str) -> time:
         return self.step_deadlines.get(step, self.data_deadline)
@@ -104,6 +140,7 @@ class NightlySettings:
                 "history_copy",
                 "post",
                 "resources",
+                "backfilling",
             ]
         )
         schedule = root.table("schedule", ["data_deadline"])
@@ -127,7 +164,11 @@ class NightlySettings:
                 ],
             )
         )
+        declared_backfills = root.raw("backfilling") or {}
+        if not isinstance(declared_backfills, Mapping):
+            raise ConfigurationError(f"{where} backfilling: expected a table")
         return cls(
+            backfilling=backfilling(root.table("backfilling", list(declared_backfills))),
             history_copy=history_copy,
             arrow_cpu_threads=resources.integer("arrow_cpu_threads", d.arrow_cpu_threads, 1),
             arrow_io_threads=resources.integer("arrow_io_threads", d.arrow_io_threads, 1),

@@ -41,7 +41,7 @@ run, the market-daily path, and never the post-session run.
 """
 
 from collections.abc import Container, Mapping
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -90,6 +90,7 @@ from algotrade_ingestion.workflows.nightly.screens import (
     ScreenStep,
     screen_jobs,
     signal_jobs,
+    while_backfilling,
     without_chains,
 )
 from algotrade_ingestion.workflows.nightly.sessions import (
@@ -601,6 +602,9 @@ def run_session(
                 if step.name == SCREENS:
                     unfetched = not latest and done["chains"].status is StepStatus.SKIPPED
                     result = without_chains(result, unfetched)
+                    result = while_backfilling(
+                        result, settings.backfilling, datetime.now(UTC).date()
+                    )
                 # a done step that ran although none of its inputs did is a refetch
                 refetch = (
                     step.name in before.done
