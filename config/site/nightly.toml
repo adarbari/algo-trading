@@ -33,13 +33,14 @@ max_examples = 5                 # examples listed per failure group
 [resources]                      # what a running ingest may take from the Mac that also serves the web (2026-10-19)
 arrow_cpu_threads = 2            # Arrow's decode threads in the ingest process (the API caps itself at 2 / 4 too)
 arrow_io_threads = 4
-min_free_gb = 15                 # the nightly refuses to start with less free on the data volume (a full disk stops every agent); make doctor warns below it
+min_free_gb = 6                  # TEMPORARY 2026-10-20 (owner): lowered from 15 so the outcomes compaction (needs the floor + a partition free) can run beside the backfill; restore 15 once it is done. The nightly refuses to start with less free on the data volume (a full disk stops every agent); make doctor warns below it
 
 [backfilling]                    # ADR 0055 amendment 2026-10-20: a table still being backfilled. A screener short of coverage
                                  # only for want of these (HARD criteria on them) is a WARN `backfilling` while until >= today's UTC date
                                  # (wall clock: lapses even for catch-up; a 22:00 ET run is already the next UTC day), never a failed screens step; after `until` it fails again. The PR that confirms a backfill deletes its entry.
 "rollups/instrument/filing_text_similarity@v1" = { until = "2026-11-03", reason = "filing text backfill (lazy_prices_similar, risk_factor_unchanged) takes days" }
 "rollups/instrument/etf_launches@v1" = { until = "2026-11-03", reason = "etf_launches backfill (etf_launch_recent) in progress" }
+"rollups/instrument/short_interest@v1" = { until = "2026-11-03", reason = "short-interest backfill stamped known_from 2026-10-20: no session before it reads it until restamped (ADR 0050 amendment)" }
 
 [history_copy]                   # the history-copy step (ADR 0060): a read-optimised copy of long reads
 enabled = true                   # false: the nightly skips the step (the copies already built still serve)

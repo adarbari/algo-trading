@@ -9,16 +9,18 @@ from typing import Any
 import pytest
 
 from algotrade.config.site.nightly import Backfilling
+from algotrade.config.site.settings import load_nightly
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.services.jobs import JobRecord, JobStatus
 from algotrade.services.read.context import NotFoundError
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
 from algotrade.storage.locks import held
 from algotrade_ingestion.workflows.nightly import screens as screens_module
 from algotrade_ingestion.workflows.nightly.nightly import EDGE_SIGNALS, NIGHTLY, SNAPSHOT
 from algotrade_ingestion.workflows.nightly.steps import StepResult, StepStatus
 from algotrade_ingestion.workflows.post_session.post_session import EDGE_EVAL, POST_SESSION
+from tests.conftest import REPO_ROOT
 
 D = date(2026, 10, 2)
 IBKR = "rollups/instrument/ibkr_iv@v1"
@@ -451,5 +453,24 @@ def test_any_other_shortfall_still_fails_while_a_backfill_is_declared(
 ) -> None:
     window = _window(**{FILING: until})
     assert screens_module.while_backfilling(_screens(*jobs), window, TODAY).status is (
+        StepStatus.FAILED
+    )
+
+
+def test_the_declared_backfills_excuse_the_stored_nightly_of_2026_10_19() -> None:
+    """The nightly of 2026-10-19 failed its critical screens step: lazy_prices_similar and
+    risk_factor_unchanged were PARTIAL on filing_text_similarity and short_squeeze_dtc on
+    short_interest (its partition empty: the backfill stamped known_from 2026-10-20), and the
+    last was not declared, so nothing was excused. Replayed over the site's own [backfilling]."""
+    site = load_nightly(FileConfigStore(REPO_ROOT / "config", local=False)).backfilling
+    short = "rollups/instrument/short_interest@v1"
+    replay = _screens(("complete", []), ("partial", [FILING]), ("partial", [short]))
+    result = screens_module.while_backfilling(replay, site, TODAY)
+    assert result.status is StepStatus.SUCCEEDED
+    # ... and a table nobody declared still fails it
+    other = _screens(("partial", [short]), ("partial", ["rollups/instrument/price_stats@v2"]))
+    assert screens_module.while_backfilling(other, site, TODAY).status is StepStatus.FAILED
+    # ... as does the declared one once its entry lapsed
+    assert screens_module.while_backfilling(replay, site, date(2026, 11, 4)).status is (
         StepStatus.FAILED
     )
