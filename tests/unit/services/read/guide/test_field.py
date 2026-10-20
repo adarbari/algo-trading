@@ -1,12 +1,12 @@
 """``load_guide_field``: the field's info with its guide entry, the related fields (first
 mention first across reads, caveats and use notes, then the formula's inputs; catalogue names
-only, never itself), the playbooks that name it in a criterion, a column or the rank, and the
+only, never itself), the screeners that name it in a criterion, a column or the rank, and the
 situations that fool it; a name outside the catalogue is an error."""
 
 import pytest
 
 from algotrade.services.read.context import StoreContext
-from algotrade.services.read.guide.field import GuidePlaybookUse, load_guide_field
+from algotrade.services.read.guide.field import GuideScreenerUse, load_guide_field
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from tests.unit.services.read.guide.conftest import ADV, CLOSE, PULLBACK, REL_VOLUME
 
@@ -33,18 +33,18 @@ def test_a_field_without_a_guide_entry_relates_only_its_inputs(ctx: StoreContext
     assert all(name != "feature.atr_pct" for name in page.related) and page.related
 
 
-def test_playbooks_that_use_the_field(ctx: StoreContext) -> None:
-    assert load_guide_field(ctx, ADV).playbooks == (
-        GuidePlaybookUse("alpha", "Alpha", "trend", (LIQUIDITY_RULE,), column=True, rank=False),
-        GuidePlaybookUse("zeta", "Zeta", None, (), column=True, rank=False),
+def test_screeners_that_use_the_field(ctx: StoreContext) -> None:
+    assert load_guide_field(ctx, ADV).screeners == (
+        GuideScreenerUse("alpha", "Alpha", "trend", (LIQUIDITY_RULE,), column=True, rank=False),
+        GuideScreenerUse("zeta", "Zeta", None, (), column=True, rank=False),
     )  # fmt: skip
-    (alpha,) = load_guide_field(ctx, PULLBACK).playbooks
+    (alpha,) = load_guide_field(ctx, PULLBACK).screeners
     assert (alpha.rules, alpha.column, alpha.rank) == (
         ("between [-0.5, 0.5] soft tolerance 0.25",), False, True,
     )  # fmt: skip
-    assert load_guide_field(ctx, "rollup.momentum@v1.rsi_14").playbooks == ()
-    assert load_guide_field(ctx, REL_VOLUME).playbooks == (
-        GuidePlaybookUse("zeta", "Zeta", None, (), column=False, rank=False, flag=True),
+    assert load_guide_field(ctx, "rollup.momentum@v1.rsi_14").screeners == ()
+    assert load_guide_field(ctx, REL_VOLUME).screeners == (
+        GuideScreenerUse("zeta", "Zeta", None, (), column=False, rank=False, flag=True),
     )  # a field read only by a flag
 
 

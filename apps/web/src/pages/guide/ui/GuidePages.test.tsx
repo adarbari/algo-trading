@@ -15,8 +15,9 @@ import {
   GuideHomePage,
   GuideIndicatorPage,
   GuideMechanismPage,
-  GuidePlaybookPage,
-  GuidePlaybooksPage,
+  GuideScreenerCategoryPage,
+  GuideScreenerPage,
+  GuideScreenersPage,
   GuideRegimePage,
   GuideSituationPage,
   GuideSituationsPage,
@@ -29,7 +30,8 @@ const widgets = vi.hoisted(() => ({
   rail: vi.fn(),
   fields: vi.fn(),
   field: vi.fn(),
-  playbook: vi.fn(),
+  screener: vi.fn(),
+  category: vi.fn(),
   situation: vi.fn(),
   indicator: vi.fn(),
   episode: vi.fn(),
@@ -82,13 +84,19 @@ vi.mock('@/widgets/guide-edge', () => ({
   EdgeOutline: () => <Text>edge outline</Text>,
 }));
 
-vi.mock('@/widgets/guide-playbooks', () => ({
-  GuidePlaybooksIndex: () => <Text>playbook index</Text>,
+vi.mock('@/widgets/guide-screeners', () => ({
+  GuideScreenersIndex: () => <Text>screener index</Text>,
 }));
-vi.mock('@/widgets/guide-playbook', () => ({
-  GuidePlaybook: (props: Record<string, unknown>) => {
-    widgets.playbook(props);
-    return <Text>playbook page</Text>;
+vi.mock('@/widgets/guide-screener-category', () => ({
+  GuideScreenerCategory: (props: Record<string, unknown>) => {
+    widgets.category(props);
+    return <Text>category page</Text>;
+  },
+}));
+vi.mock('@/widgets/guide-screener', () => ({
+  GuideScreener: (props: Record<string, unknown>) => {
+    widgets.screener(props);
+    return <Text>screener page</Text>;
   },
 }));
 vi.mock('@/widgets/guide-regime', () => ({
@@ -152,15 +160,25 @@ describe('Guide pages', () => {
     expect(screen.getByText('outline')).toBeInTheDocument();
   });
 
-  it('frames the playbook index and a playbook’s page, handing the buttons to the route', () => {
-    render(<GuidePlaybooksPage />);
-    expect(screen.getByText('playbook index')).toBeInTheDocument();
-    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'playbooks' });
+  it('frames a screener family’s page with its category open in the rail', () => {
+    render(<GuideScreenerCategoryPage id="breakouts" />);
+    expect(screen.getByText('category page')).toBeInTheDocument();
+    expect(widgets.category).toHaveBeenLastCalledWith({ id: 'breakouts' });
+    expect(widgets.rail).toHaveBeenLastCalledWith({
+      page: 'screener_category',
+      category: 'breakouts',
+    });
+  });
+
+  it('frames the screener index and a screener’s page, handing the buttons to the route', () => {
+    render(<GuideScreenersPage />);
+    expect(screen.getByText('screener index')).toBeInTheDocument();
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'screeners' });
     const onSeeHits = vi.fn();
     const onOpenBuilder = vi.fn();
-    render(<GuidePlaybookPage id="breakout" onSeeHits={onSeeHits} onOpenBuilder={onOpenBuilder} />);
-    expect(widgets.playbook).toHaveBeenLastCalledWith({ id: 'breakout', onSeeHits, onOpenBuilder });
-    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'playbook', playbook: 'breakout' });
+    render(<GuideScreenerPage id="breakout" onSeeHits={onSeeHits} onOpenBuilder={onOpenBuilder} />);
+    expect(widgets.screener).toHaveBeenLastCalledWith({ id: 'breakout', onSeeHits, onOpenBuilder });
+    expect(widgets.rail).toHaveBeenLastCalledWith({ page: 'screener', screener: 'breakout' });
   });
 
   it('frames the situation index and a situation’s page with the rail on it', () => {

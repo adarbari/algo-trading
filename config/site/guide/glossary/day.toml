@@ -109,17 +109,17 @@ A preset's versions are numbered and never change: a new rule is a new version, 
 latest is the highest number. You cannot edit a preset itself; your first edit in the Builder
 makes your own copy, which extends the preset at the version you started from. When the site
 publishes a newer version, the Builder offers to rebase your copy onto it. Each site preset
-has a playbook in the Guide.
+has a screener in the Guide.
 """
-see_also = ["playbook", "draft", "run"]
+see_also = ["screener", "draft", "run"]
 
 [[term]]
-id = "playbook"
-term = "Playbook"
+id = "screener"
+term = "Screener"
 short = "The Guide's page for one site preset screen: the setup it looks for, what it checks and what it leaves to you."
 body = """
-There is one playbook per site preset, grouped by family (trend, breakouts, reversals, option
-income). It says what a hit looks like and what the screen does not check. It lists each criterion in plain words with its field and rule. It gives the caveats to read before acting on a hit and the situations that fool its fields. It also links to related playbooks. Open in Builder
+There is one screener per site preset, grouped by family (trend, breakouts, reversals, option
+income). It says what a hit looks like and what the screen does not check. It lists each criterion in plain words with its field and rule. It gives the caveats to read before acting on a hit and the situations that fool its fields. It also links to related screeners. Open in Builder
 shows the preset in the Builder, where your first edit makes your own copy.
 """
 see_also = ["preset", "criterion"]

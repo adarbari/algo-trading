@@ -3,7 +3,7 @@
  * order: the idea (the thesis, with its status, asset, side and holding, and the way to the live
  * evidence), who is on the other side, why it lasts, what the research found (the published
  * figure and the planning haircut, where the document has one), how it is tested (each fact with
- * its glossary button), how it is built (its playbooks and the fields they read), what fools it,
+ * its glossary button), how it is built (its screeners and the fields they read), what fools it,
  * whether you can trade it, the sources and related edges. Session-free: no win rate, verdict or
  * curve, only what the document says. The text is the server's; nothing is written here.
  */
@@ -37,7 +37,7 @@ import {
   GUIDE_EDGES_PATH,
   GuideProse,
   mechanismPath,
-  playbookPath,
+  screenerPath,
   RelatedTerms,
   useGuideEdge,
 } from '@/entities/guide';
@@ -177,15 +177,15 @@ export function GuideEdge({ id, onSeeEvidence }: GuideEdgeProps) {
         </Stack>
       </DocSection>
 
-      {(edge.playbooks.length > 0 || edge.fields.length > 0) && (
+      {(edge.screeners.length > 0 || edge.fields.length > 0) && (
         <DocSection id="built">
           <Stack gap={2}>
             <Heading level={2}>How it is built</Heading>
-            {edge.playbooks.length > 0 && (
+            {edge.screeners.length > 0 && (
               <Stack gap={1}>
-                <Text weight="semibold">Playbooks</Text>
-                {edge.playbooks.map((p) => (
-                  <TextLink key={p.id} href={playbookPath(p.id)}>
+                <Text weight="semibold">Screeners</Text>
+                {edge.screeners.map((p) => (
+                  <TextLink key={p.id} href={screenerPath(p.id)}>
                     {p.family ? `${p.name} · ${p.family}` : p.name}
                   </TextLink>
                 ))}

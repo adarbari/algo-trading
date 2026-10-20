@@ -2,7 +2,7 @@
  * The Guide's Start here pages, glossary and search for the end-to-end tests (a mock of what the
  * server reads from `start.toml` and `glossary/*.toml` and ranks in `Query.guideSearch`): the index
  * entries, `Query.guideStartPage(id)`, `Query.guideTerm(id)` and a search that matches the words
- * of a query in the titles and prose of those entries, the fields and the playbook, grouped by
+ * of a query in the titles and prose of those entries, the fields and the screener, grouped by
  * kind. The ranking is the server's job (its own tests); here only the grouping is checked.
  */
 type Json = Record<string, unknown>;
@@ -45,7 +45,7 @@ export const START_PAGES = [
     title: 'Read a screen result',
     summary: 'What a hit, a near miss and a reject mean.',
     sections: [{ title: 'A hit', body: `It passed every hard rule; ${IV30} is one it may read.` }],
-    links: [{ kind: 'playbook', id: 'vrp_scanner', title: 'VRP scanner' }],
+    links: [{ kind: 'screener', id: 'vrp_scanner', title: 'VRP scanner' }],
   },
 ];
 
@@ -139,7 +139,7 @@ interface Entry {
 const ENTRIES: Entry[] = [
   ...START_PAGES.map((p) => ({ kind: 'start', id: p.id, title: p.title, text: p.summary })),
   {
-    kind: 'playbook',
+    kind: 'screener',
     id: 'vrp_scanner',
     title: 'VRP scanner',
     text: 'Finds names whose options price more movement than the shares delivered.',
@@ -153,7 +153,7 @@ const ENTRIES: Entry[] = [
   ...TERMS.map((t) => ({ kind: 'term', id: t.id, title: t.term, text: t.short })),
 ];
 
-const KIND_ORDER = ['start', 'indicator', 'episode', 'playbook', 'field', 'situation', 'term'];
+const KIND_ORDER = ['start', 'indicator', 'episode', 'screener', 'field', 'situation', 'term'];
 
 /** `Query.guideSearch(q, limit)`: entries whose title or text holds every word, by kind. */
 export function guideSearch(q: string, limit: number): Json {

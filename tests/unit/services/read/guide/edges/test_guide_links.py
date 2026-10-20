@@ -1,5 +1,5 @@
 """How the Edges section joins the rest of the Guide: the Guide index (the section's count and
-the rail), the playbook page's backlinks, the batched entries and the one search."""
+the rail), the screener page's backlinks, the batched entries and the one search."""
 
 import time
 from typing import Any
@@ -9,7 +9,7 @@ from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.services.read.guide.edges.site_edges import site_edges
 from algotrade.services.read.guide.entries import GuideEntryKind, GuideRef, load_guide_entries
 from algotrade.services.read.guide.index import load_guide_index
-from algotrade.services.read.guide.playbook import load_guide_playbook
+from algotrade.services.read.guide.screeners.screener import load_guide_screener
 from algotrade.services.read.guide.search import entry_titles, guide_entries, load_guide_search
 
 
@@ -21,14 +21,14 @@ def test_the_guide_index_counts_the_edges_section_and_lists_the_rail(site: Store
     assert sum(m.count for m in index.mechanisms) == len(site_edges(site))
 
 
-def test_a_playbook_page_lists_the_edges_it_implements(site: StoreContext) -> None:
-    page = load_guide_playbook(site, "momentum_12_1")
+def test_a_screener_page_lists_the_edges_it_implements(site: StoreContext) -> None:
+    page = load_guide_screener(site, "momentum_12_1")
     assert page is not None
     assert "momentum_12_1" in [e.id for e in page.edges]
     assert all(e.id in {x.edge.id for x in site_edges(site)} for e in page.edges)
-    for edge in site_edges(site):  # the other way round: every edge shows on its playbooks
-        for playbook in edge.playbooks:
-            shown = load_guide_playbook(site, playbook)
+    for edge in site_edges(site):  # the other way round: every edge shows on its screeners
+        for screener in edge.screeners:
+            shown = load_guide_screener(site, screener)
             assert shown is not None and edge.edge.id in [e.id for e in shown.edges]
 
 

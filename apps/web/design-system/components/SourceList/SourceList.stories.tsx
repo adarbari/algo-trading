@@ -41,6 +41,16 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+/** A source with no verified page is its title as plain text. */
+export const WithoutUrl: Story = {
+  args: {
+    items: [
+      { id: 's1', title: 'Raschke and Connors, Street Smarts (1995)', why: 'A book, no page.' },
+      { id: 's2', title: 'SEC Form 8-K, Items 2.02 and 5.02', url: 'https://www.sec.gov/' },
+    ],
+  },
+};
+
 /** Many sources; a long title wraps. */
 export const Dense: Story = {
   args: {

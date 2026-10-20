@@ -3,7 +3,9 @@
  * Guide page inside a caveat): a part with an `href` is a TextLink (the app's router link, so
  * the design system stays router-free), the rest is plain Text in the chosen tone and size. The
  * parts come split from the server (it cuts the sentence at the names it mentions); the
- * caller maps each part to an address. Links to other sites are LinkedText's.
+ * caller maps each part to an address. A `cite` part is a source marker: its `href` (an anchor,
+ * "#s2", an item of a SourceList) set as a small raised link, the way a footnote number reads
+ * in a printed page. Links to other sites are LinkedText's.
  */
 import type { FontSize } from '../../tokens';
 import { Text, type TextTone } from '../../primitives/Text';
@@ -15,6 +17,8 @@ export interface LinkedProsePart {
   text: string;
   /** Present for a link: an in-app path ("/guide/fields/rel_volume"). */
   href?: string;
+  /** With an `href`: a source marker ("[2]") set raised and small, pointing at its source. */
+  cite?: boolean;
 }
 
 export interface LinkedProseProps {
@@ -40,6 +44,12 @@ export function LinkedProse({
         {parts.map((part, index) =>
           part.href === undefined ? (
             part.text
+          ) : part.cite === true ? (
+            <sup key={`${String(index)}-${part.href}`} className={styles.cite}>
+              <TextLink href={part.href} size="inherit">
+                {part.text}
+              </TextLink>
+            </sup>
           ) : (
             <TextLink
               key={`${String(index)}-${part.href}`}

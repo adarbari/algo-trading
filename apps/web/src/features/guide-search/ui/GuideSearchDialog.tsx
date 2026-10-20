@@ -45,8 +45,8 @@ export function GuideSearchDialog({ open, onOpenChange, onNavigate }: GuideSearc
       open={open}
       onOpenChange={change}
       title="Search the Guide"
-      placeholder="Search fields, playbooks, terms and how-tos"
-      hint="Type a field, a playbook or a word the app uses."
+      placeholder="Search fields, screeners, terms and how-tos"
+      hint="Type a field, a screener or a word the app uses."
       query={query}
       onQueryChange={setQuery}
       groups={groups}

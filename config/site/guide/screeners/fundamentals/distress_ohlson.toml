@@ -1,0 +1,39 @@
+# L3 site setting: the Guide's screener for the site preset distress_ohlson (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other screeners), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "distress_ohlson"
+version = 1  # the preset version this prose was written for
+line = "Stocks ranked by risk of financial distress, safest first."
+summary = "Ranks every tradeable stock by financial distress risk, the safest first and the most distressed last, using a simplified Ohlson O-score from the stored statements.[^1] Distressed stocks have earned low returns in the research;[^2] the most distressed at the bottom are the avoid list. A candidate edge under test."
+hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and it has an O-score. Every such name qualifies; the order is the point, the lowest distress score first."
+not_checked = "It does not use market terms (volatility, price, size against the market), which the stronger distress models do, and the O-score here omits two terms and the price-index deflator, so its level is not comparable with the paper's. Banks have no score."
+before_acting = [
+  "Read rollup.mispricing@v1.ohlson_o as a rank, not a probability: only its order across today's names means anything.",
+  "Distressed names can rally hard on a rescue or a squeeze; the avoid list is not a short list, and feature.interest_cover and feature.debt_to_equity show how near a name is to the edge.",
+  "A thin or negative equity makes the debt ratio blank, not safe: a missing feature.debt_to_equity is a gap, not a pass.",
+]
+related = [
+  { id = "asset_growth", reason = "another avoid list from the same statements" },
+]
+
+[[sources]]
+title = "Ohlson, Financial Ratios and the Probabilistic Prediction of Bankruptcy (1980)"
+url = "https://doi.org/10.2307/2490395"
+note = "It builds the O-score, a logit model that predicts bankruptcy from nine financial statement ratios."
+
+[[sources]]
+title = "Campbell, Hilscher and Szilagyi, In Search of Distress Risk (2008)"
+url = "https://www.nber.org/papers/w12362"
+note = "Financially distressed stocks have earned anomalously low returns since 1981."
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+ohlson = "Has an Ohlson O-score"

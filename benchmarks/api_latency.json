@@ -312,7 +312,7 @@
    "nocache_p50_ms": 35.08068749999893,
    "nocache_p95_ms": 48.14686700009361
   },
-  "GuidePlaybook": {
+  "GuideScreener": {
    "status": 200,
    "cold_ms": 118.0101669999658,
    "warm_p50_ms": 1.1629169999878286,
@@ -640,14 +640,14 @@
    "critical_nocache_p50_ms": 42.34497900006318,
    "slowest": "StatusStrip"
   },
-  "/guide/playbooks": {
+  "/guide/screeners": {
    "ops": [
     "Viewer",
     "Regime",
     "StatusStrip",
     "GuideIndex",
     "FeatureCatalogue",
-    "GuidePlaybook"
+    "GuideScreener"
    ],
    "count": 6,
    "sum_cold_ms": 3445.611375999988,

@@ -1,0 +1,30 @@
+# L3 site setting: the Guide's screener for the site preset volatility_scaled_momentum (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Typed by src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "volatility_scaled_momentum"
+version = 1  # the preset version this prose was written for
+line = "Last year's winners ranked by gain per unit of recent price swing."
+summary = "Ranks every tradeable name by its 12-1 return per unit of recent volatility, so a calm 20% outranks a wild 20%. It is a ranking stand-in for risk-managed momentum,[^1] a candidate edge under test."
+hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, and it has a 12-1 momentum value and a 60-session volatility. Every such name qualifies; the most return per unit of risk comes first."
+not_checked = "It does not do what Barroso and Santa-Clara do, which is to scale the whole momentum portfolio's exposure down when its own volatility is high; that is a timing overlay a one-day ranking cannot show. The harness measures whether the order pays."
+before_acting = [
+  "A name with a very low volatility and a small return can rank above a strong winner: read feature.mom_12_1_vol_scaled beside rollup.trend_stats@v2.mom_12_1.",
+  "A calm run-up before a takeover bid looks like ideal momentum; check the news before acting on the top of the list.",
+]
+related = [
+  { id = "momentum_12_1", reason = "the same ranking on the raw return" },
+]
+
+[[sources]]
+title = "Barroso and Santa-Clara, Momentum Has Its Moments (2015)"
+url = "https://ideas.repec.org/a/eee/jfinec/v116y2015i1p111-120.html"
+note = "Momentum risk varies over time and can be forecast, and scaling by it nearly doubles the Sharpe ratio."
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+mom_vol_scaled = "Has a 12-1 return per unit of recent volatility"

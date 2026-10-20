@@ -3,3 +3,9 @@
   display: inline;
   overflow-wrap: anywhere;
 }
+
+/* A source marker: small and raised without opening a gap in the line. */
+.cite {
+  font-size: var(--font-size-xs);
+  line-height: 0;
+}

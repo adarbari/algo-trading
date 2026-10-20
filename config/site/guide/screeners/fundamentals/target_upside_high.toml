@@ -1,0 +1,37 @@
+# L3 site setting: the Guide's screener for the site preset target_upside_high (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Typed by src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "target_upside_high"
+version = 1  # the preset version this prose was written for
+line = "Stocks whose analyst price target sits furthest above the current price."
+summary = "Ranks stocks by how far the analysts' average price target sits above the close, the highest first. Da and Schaumburg find the highest implied return does best.[^1] It is a candidate edge under test."
+hit = "The name is a common stock closing above $5 that trades at least $5M a day, with an analyst consensus target. The highest upside to the average target ranks first."
+not_checked = "It does not check the date of the target, how many analysts set it or the industry: the paper compares within an industry and this is the raw figure. The free data covers few names."
+before_acting = [
+  "Analysts are optimistic: a high upside is common in some sectors, so compare feature.target_upside with the sector's usual figure.[^2]",
+  "A target has no date of its own: read rollup.analyst_targets@v1.targets_age_days before trusting an old one.",
+  "Beaten-down names show the highest upside, so the list is partly a bet on value and reversal. The data is for personal use under its licence.",
+]
+related = [
+  { id = "eps_revision_up", reason = "the estimate revision instead of the price target" },
+  { id = "composite_value", reason = "a value ranking that overlaps with beaten-down names" },
+]
+
+[[sources]]
+title = "Da and Schaumburg, Relative Valuation and Analyst Target Price Forecasts (2011)"
+url = "https://ideas.repec.org/a/eee/finmar/v14y2011i1p161-192.html"
+note = "Analyst target prices from relative valuation models carry useful information about returns."
+
+[[sources]]
+title = "Brav and Lehavy, An Empirical Analysis of Analysts' Target Prices (2003)"
+url = "https://scholars.duke.edu/publication/762064"
+note = "Target prices average about 28 percent above the market price, and the market reacts to revisions of them."
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $5M a day"
+upside = "Has an analyst consensus price target"

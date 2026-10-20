@@ -1,0 +1,37 @@
+# L3 site setting: the Guide's screener for the site preset eps_revision_up (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Typed by src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "eps_revision_up"
+version = 1  # the preset version this prose was written for
+line = "Stocks whose analysts raised this year's earnings estimate most in a month."
+summary = "Ranks stocks by how much analysts revised their current-year earnings estimate over the last 30 days, the biggest upward revision first. Revisions tend to continue.[^1][^2] It is a candidate edge under test."
+hit = "The name is a common stock closing above $5 that trades at least $5M a day, with a 30-day revision of the average current-year EPS estimate. The largest upward revision ranks first."
+not_checked = "It does not check how many analysts moved, the size of the old estimate or whether a report caused the change. The free data covers few names, so most stocks have no revision."
+before_acting = [
+  "The estimate history starts on 2026-10-19, so the 30-day revision is unknown until about 2026-11-18: read rollup.analyst_revisions@v1.revisions_status.",
+  "A revision from a small old estimate can be huge; read rollup.analyst_revisions@v1.eps_fy1_revision_90d beside it.",
+  "The data is for personal use under its licence and covers a subset of names, often the large ones where the effect is weakest.",
+]
+related = [
+  { id = "target_upside_high", reason = "the analyst price target instead of the estimate" },
+  { id = "momentum_12_1", reason = "the momentum baseline the edge is compared with" },
+]
+
+[[sources]]
+title = "Chan, Jegadeesh and Lakonishok, Momentum Strategies (1996)"
+url = "https://ideas.repec.org/a/bla/jfinan/v51y1996i5p1681-1713.html"
+note = "Past returns and past earnings surprises each predict drifts in later returns over six to twelve months."
+
+[[sources]]
+title = "Gleason and Lee, Analyst Forecast Revisions and Market Price Discovery (2003)"
+url = "https://iro.uiowa.edu/esploro/outputs/journalArticle/Analyst-Forecast-Revisions-and-Market-Price/9984380448602771"
+note = "Prices adjust only slowly to analyst forecast revisions, so a revision is followed by further drift."
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $5M a day"
+revision = "Has a 30-day revision of the current-year EPS estimate"

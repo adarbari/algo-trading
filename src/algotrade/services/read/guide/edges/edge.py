@@ -10,7 +10,7 @@ read from the edge document alone, session-free and with no harness result. In t
   verdict;
 - ``tests``: how we test it, as structured facts (outcome, horizon, trigger, entry, universe,
   picks, cost, baselines, frozen period), each with the glossary term that explains it;
-- ``playbooks`` and ``fields``: how it is built (the site playbooks among its screeners and the
+- ``screeners`` and ``fields``: how it is built (the site screeners among its screeners and the
   catalogue fields their criteria read);
 - ``failure_modes``, ``decoys`` and ``rejection``: what fools it (the quality bar's answers
   and, for a rejected or blocked edge, why);
@@ -34,7 +34,7 @@ from algotrade.config.site.settings import site_document
 from algotrade.services.configs import catalog_of
 from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.edges.schedule import trigger_term
-from algotrade.services.read.guide.edges.site_edges import SiteEdge, playbooks_of, site_edges
+from algotrade.services.read.guide.edges.site_edges import SiteEdge, screeners_of, site_edges
 from algotrade.services.read.guide.edges.universe import universe_text
 from algotrade.services.read.guide.prose import LinkedProse, link_prose
 
@@ -124,8 +124,8 @@ class GuideEdgeFact:
 
 
 @dataclass(frozen=True)
-class GuideEdgePlaybook:
-    """A site playbook an edge's screeners include: its id, name and family title."""
+class GuideEdgeScreener:
+    """A site screener an edge's screeners include: its id, name and family title."""
 
     id: str
     name: str
@@ -150,7 +150,7 @@ class GuideEdgeEntry:
     lasts: LinkedProse
     research: GuideEdgeResearch | None
     tests: tuple[GuideEdgeFact, ...]
-    playbooks: tuple[GuideEdgePlaybook, ...]
+    screeners: tuple[GuideEdgeScreener, ...]
     fields: tuple[str, ...]
     failure_modes: LinkedProse | None
     decoys: LinkedProse | None
@@ -190,9 +190,9 @@ def load_guide_edge(ctx: Stores, edge_id: str) -> GuideEdgeEntry | None:
     terms = {t.id for t in load_guide_glossary(ctx.configs).terms}
     mechanisms = load_guide_mechanisms(ctx.configs)
     prose = mechanisms.get(found.mechanism) if found.mechanism is not None else None
-    playbooks = {p.id: p for p in playbooks_of(ctx)}
+    screeners = {p.id: p for p in screeners_of(ctx)}
     titles = {f.id: f.title for f in load_guide_sections(ctx.configs).families}
-    mine = [playbooks[p] for p in found.playbooks]
+    mine = [screeners[p] for p in found.screeners]
 
     def linked(text: str) -> LinkedProse | None:
         return link_prose(text, fields) if text.strip() else None
@@ -204,9 +204,9 @@ def load_guide_edge(ctx: Stores, edge_id: str) -> GuideEdgeEntry | None:
         other_side=link_prose(edge.mechanism, fields),
         lasts=link_prose(edge.persistence, fields),
         research=_research(ctx, edge, terms),
-        tests=_tests(found, edge, terms, {p.id: p.name for p in playbooks.values()}),
-        playbooks=tuple(
-            GuideEdgePlaybook(p.id, p.name, titles.get(p.family) if p.family else None)
+        tests=_tests(found, edge, terms, {p.id: p.name for p in screeners.values()}),
+        screeners=tuple(
+            GuideEdgeScreener(p.id, p.name, titles.get(p.family) if p.family else None)
             for p in mine
         ),
         fields=tuple(

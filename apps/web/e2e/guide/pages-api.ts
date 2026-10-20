@@ -1,7 +1,7 @@
 /**
- * The Guide's playbook and situation reads for the end-to-end tests (a mock of what the
+ * The Guide's screener and situation reads for the end-to-end tests (a mock of what the
  * server derives, docs/ui/guide.md section 3): the index's families and situations,
- * `Query.guidePlaybook` and `Query.guideSituation` for a breakout and a VRP playbook and one
+ * `Query.guideScreener` and `Query.guideSituation` for a breakout and a VRP screener and one
  * situation, and the linked prose (text cut at the catalogue names it mentions, as the
  * server does); and the market regime's: `GuideIndex`'s indicators and episodes,
  * `Query.guideIndicator(key)` and `Query.guideEpisode(slug)`, built from the same recorded
@@ -46,11 +46,11 @@ export const SITUATION = {
 };
 
 export const FAMILIES = [
-  { id: 'breakouts', title: 'Breakouts', playbooks: [{ id: 'breakout', name: 'Breakout' }] },
-  { id: 'income', title: 'Option income', playbooks: [{ id: 'vrp_scanner', name: 'VRP scanner' }] },
+  { id: 'breakouts', title: 'Breakouts', screeners: [{ id: 'breakout', name: 'Breakout' }] },
+  { id: 'income', title: 'Option income', screeners: [{ id: 'vrp_scanner', name: 'VRP scanner' }] },
 ];
 
-const PLAYBOOKS: Record<string, Json> = {
+const SCREENERS: Record<string, Json> = {
   breakout: {
     id: 'breakout',
     name: 'Breakout',
@@ -67,7 +67,9 @@ const PLAYBOOKS: Record<string, Json> = {
           [],
         ),
       ],
-      sources: ['O’Neil, How to Make Money in Stocks'],
+      sources: [
+        { title: 'O’Neil, How to Make Money in Stocks', url: null, note: 'The breakout setup.' },
+      ],
     },
     criteria: [
       {
@@ -124,12 +126,67 @@ const PLAYBOOKS: Record<string, Json> = {
   },
 };
 
-/** `Query.guidePlaybook(id)`: null for an id that is not a site playbook. */
-export function guidePlaybook(id: string): Json {
-  return { data: { guidePlaybook: PLAYBOOKS[id] ?? null } };
+const CATEGORIES: Json[] = [
+  {
+    id: 'breakouts',
+    title: 'Breakouts',
+    purpose: 'Shares that leave a narrow range, or fail to.',
+    intro: 'A breakout is a close above a price ceiling that held for weeks.',
+    screeners: [
+      {
+        id: 'breakout',
+        name: 'Breakout',
+        line: 'Closed above the one-month high on more volume than normal.',
+        edges: [],
+      },
+    ],
+  },
+  {
+    id: 'income',
+    title: 'Option income',
+    purpose: 'Option names priced above the movement the share delivers.',
+    intro: 'Selling options pays when implied volatility runs above what the share then does.',
+    screeners: [
+      {
+        id: 'vrp_scanner',
+        name: 'VRP scanner',
+        line: 'Options price more movement than the stock delivered.',
+        edges: [],
+      },
+    ],
+  },
+];
+
+/** `Query.guideScreenerIndex`: the lead page's texts and a card per family. */
+export function guideScreenerIndex(): Json {
+  return {
+    data: {
+      guideScreenerIndex: {
+        what: 'A screener is a saved rule screen run each night over the whole universe.',
+        versusEdge: 'An edge is a claim that a behaviour pays; a screener finds today’s names.',
+        count: CATEGORIES.length,
+        categories: CATEGORIES.map((c) => ({
+          id: c['id'],
+          title: c['title'],
+          purpose: c['purpose'],
+          count: (c['screeners'] as Json[]).length,
+        })),
+      },
+    },
+  };
 }
 
-/** `Query.guideSituation(slug)`: the one situation, with the playbooks reading its fields. */
+/** `Query.guideScreenerCategory(id)`: null for an id that is not a family. */
+export function guideScreenerCategory(id: string): Json {
+  return { data: { guideScreenerCategory: CATEGORIES.find((c) => c['id'] === id) ?? null } };
+}
+
+/** `Query.guideScreener(id)`: null for an id that is not a site screener. */
+export function guideScreener(id: string): Json {
+  return { data: { guideScreener: SCREENERS[id] ?? null } };
+}
+
+/** `Query.guideSituation(slug)`: the one situation, with the screeners reading its fields. */
 export function guideSituation(slug: string): Json {
   if (slug !== SITUATION.slug) return { data: { guideSituation: null } };
   return {
@@ -140,7 +197,7 @@ export function guideSituation(slug: string): Json {
         signs: linked(SITUATION.signs, []),
         do: linked(SITUATION.do, SITUATION.affects),
         affects: SITUATION.affects,
-        playbooks: [{ id: 'vrp_scanner', name: 'VRP scanner', fields: [IV30] }],
+        screeners: [{ id: 'vrp_scanner', name: 'VRP scanner', fields: [IV30] }],
       },
     },
   };

@@ -11,6 +11,7 @@ from algotrade.config.site.guide.sections import (
     EDGE_GROUPS,
     SECTIONS,
     GuideSections,
+    ScreenersPage,
     load_guide_sections,
 )
 from algotrade.config.site.settings import load_field_guide
@@ -43,6 +44,16 @@ def test_every_site_preset_is_in_exactly_one_family_and_every_listed_one_exists(
     )
 
 
+def test_every_shipped_family_says_its_purpose_and_intro_and_the_page_its_lead() -> None:
+    shipped = load_guide_sections(SHIPPED)
+    for family in shipped.families:
+        assert family.purpose and family.intro, f"write a purpose and an intro for {family.id}"
+        assert len(family.purpose.split()) <= 25, (
+            f"{family.id}: purpose is a line, 25 words at most"
+        )
+    assert shipped.screeners_page is not None
+
+
 def test_the_shipped_sections_follow_the_spec() -> None:
     shipped = load_guide_sections(SHIPPED)
     assert tuple(s.id for s in shipped.sections) == SECTIONS
@@ -71,7 +82,14 @@ def test_the_shipped_sections_follow_the_spec() -> None:
 
 SECTION = {"id": "fields", "title": "Fields", "purpose": "Every field."}
 GROUP = {"id": "chart", "title": "The chart", "themes": ["volume", "volatility"]}
-FAMILY = {"id": "trend", "title": "Trend", "presets": ["pullback"]}
+FAMILY = {
+    "id": "trend",
+    "title": "Trend",
+    "purpose": "Shares already rising.",
+    "intro": "Charts first.",
+    "presets": ["pullback"],
+}
+LEAD = {"what": "A saved rule screen.", "versus_edge": "A claim, not a screen."}
 
 
 GROUP_DOC = {"id": "set_aside", "title": "Set aside", "purpose": "Tested and rejected."}
@@ -84,6 +102,13 @@ def test_a_document_is_typed_in_order_and_a_missing_file_has_nothing() -> None:
     assert found.theme_groups[0].themes == ("volume", "volatility")
     assert found.presets == ("pullback",)
     assert found.edge_groups == ()
+    assert (found.families[0].purpose, found.families[0].intro) == (
+        "Shares already rising.",
+        "Charts first.",
+    )
+    assert found.screeners_page is None
+    lead = GuideSections.from_document({"screeners_page": LEAD}).screeners_page
+    assert lead == ScreenersPage("A saved rule screen.", "A claim, not a screen.")
     with_groups = GuideSections.from_document({"edge_group": [GROUP_DOC]})
     assert with_groups.edge_groups[0].purpose == "Tested and rejected."
     assert load_guide_sections(MemoryConfigStore({})) == GuideSections()
@@ -100,6 +125,10 @@ def test_a_document_is_typed_in_order_and_a_missing_file_has_nothing() -> None:
         ({"theme_group": [GROUP, {**GROUP, "id": "b"}]}, r"themes listed more than once: \['vol"),
         ({"family": [FAMILY, {**FAMILY, "id": "b"}]}, "presets listed more than once"),
         ({"family": [{**FAMILY, "colour": "red"}]}, "unknown keys"),
+        ({"family": [{**FAMILY, "purpose": " "}]}, "purpose: expected a non-empty string"),
+        ({"family": [{k: v for k, v in FAMILY.items() if k != "intro"}]}, "intro: expected a non"),
+        ({"screeners_page": {"what": "x"}}, "versus_edge: expected a non-empty string"),
+        ({"screeners_page": {**LEAD, "more": "x"}}, "unknown keys"),
         ({"family": {"id": "x"}}, r"expected a list of tables \(\[\[family\]\]\)"),
         ({"chapter": []}, "unknown keys"),
         ({"edge_group": [{**GROUP_DOC, "id": "ideas"}]}, "got 'ideas'"),

@@ -107,17 +107,17 @@ def test_the_guide_files_are_site_only(root: Path) -> None:
     assert store.load("alice", "guide", "sections") is None  # never a user's
 
 
-def test_the_guide_playbooks_are_site_only_under_the_guide_folder(root: Path) -> None:
-    (root / "site" / "guide" / "playbooks" / "trend").mkdir(parents=True)  # a folder per family
-    (root / "site" / "guide" / "playbooks" / "trend" / "pullback.toml").write_text(
+def test_the_guide_screeners_are_site_only_under_the_guide_folder(root: Path) -> None:
+    (root / "site" / "guide" / "screeners" / "trend").mkdir(parents=True)  # a folder per family
+    (root / "site" / "guide" / "screeners" / "trend" / "pullback.toml").write_text(
         'id = "pullback"\n'
     )
     (root / "site" / "guide" / "sections.toml").write_text("")
     store = FileConfigStore(root)
-    assert store.names("site", "guide_playbooks") == ["pullback"]
+    assert store.names("site", "guide_screeners") == ["pullback"]
     assert store.names("site", "guide") == ["sections"]  # the subfolder is not a guide file
-    assert store.load("site", "guide_playbooks", "pullback") == {"id": "pullback"}
-    assert store.load("alice", "guide_playbooks", "pullback") is None  # never a user's
+    assert store.load("site", "guide_screeners", "pullback") == {"id": "pullback"}
+    assert store.load("alice", "guide_screeners", "pullback") is None  # never a user's
 
 
 def test_the_field_guide_is_filed_in_group_folders_and_read_in_stem_order(root: Path) -> None:

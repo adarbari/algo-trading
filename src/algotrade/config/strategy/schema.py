@@ -24,6 +24,7 @@ __all__ = [
     "RULES_IMPL",
     "RULE_IMPLS",
     "RULE_SCREEN_KEYS",
+    "SCREENER",
     "Group",
     "Rule",
     "RuleValue",
@@ -36,7 +37,8 @@ __all__ = [
     "parse_strategy",
 ]
 
-KINDS = frozenset({"screener", "strategy"})
+SCREENER = "screener"  # the kind of a screener config
+KINDS = frozenset({SCREENER, "strategy"})
 RULES_IMPL = "rules"
 # A model screen (ADR 0053, ED7b) is a rule screen whose ranking is a learned score: the same
 # base gates, plus ``score = "feature.edge_score_<edge>"`` (a missing score never passes).

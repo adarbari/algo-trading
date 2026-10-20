@@ -74,21 +74,32 @@ detect = [{ import = "strawberry" }]
 
 [[responsibility]]
 id = "guide-edges-read"
-description = "The Guide's Edges section as read objects (ADR 0051), from the site's edge documents alone through load_edges as the site user (a user's draft never appears), session-free and with no harness result: the site edges with the tags derived from the document (asset class, side, holding band, plain trigger text, the playbooks among an edge's screeners and the edges a playbook implements), the one edge page (thesis, the other side, why it lasts, the published figure with its planning haircut, how it is tested as facts with glossary terms, how it is built, what fools it, sources, related edges), the mechanism page (the mechanism prose with its edges as rows and its ideas not built, ideas.py: not_built / ideas_of) and the section's index (mechanism cards, filters with counts, edges set aside); never the session, a store, evaluation or an outcome (tests/architecture/guide/test_edges_session_free.py)"
+description = "The Guide's Edges section as read objects (ADR 0051), from the site's edge documents alone through load_edges as the site user (a user's draft never appears), session-free and with no harness result: the site edges with the tags derived from the document (asset class, side, holding band, plain trigger text, the screeners among an edge's screeners and the edges a screener implements), the one edge page (thesis, the other side, why it lasts, the published figure with its planning haircut, how it is tested as facts with glossary terms, how it is built, what fools it, sources, related edges), the mechanism page (the mechanism prose with its edges as rows and its ideas not built, ideas.py: not_built / ideas_of) and the section's index (mechanism cards, filters with counts, edges set aside); never the session, a store, evaluation or an outcome (tests/architecture/guide/test_edges_session_free.py)"
 owner = ["src/algotrade/services/read/guide/edges/*"]
 allowed = [
-    "src/algotrade/services/read/guide/*",  # the Guide's index, playbook page, batched entries and search read the edges through the section's loaders
+    "src/algotrade/services/read/guide/*",  # the Guide's index, screener page, batched entries and search read the edges through the section's loaders
     "apps/api/algotrade_api/graphql/*",  # Query.guideEdgeIndex / guideMechanism / guideEdge serve them (one loader call per resolver)
 ]
 section = "docs/ui/guide.md#edges"
-detect = [{ call = "site_edges" }, { call = "edges_of_playbook" }, { call = "load_guide_edge" }, { call = "load_guide_mechanism" }, { call = "load_guide_edge_index" }]
+detect = [{ call = "site_edges" }, { call = "edges_of_screener" }, { call = "load_guide_edge" }, { call = "load_guide_mechanism" }, { call = "load_guide_edge_index" }]
 
 [[responsibility]]
 id = "guide-read"
-description = "The Guide's read objects: the index of every entry kind, the field page with what the server derives for it (related fields from the guide entry's text and the formula's inputs, the site playbooks that use the field with each rule as text, the situations that fool it), the playbook page (prose, criteria table with what each asks, related playbooks, the situations that fool its fields) and the situation page (by slug; the playbooks whose fields it fools), the regime indicator page (a card's explanation without a session value) and episode page (by key; the cards whose before-line means it, one rule: before_episode), the glossary term and Start here pages (written.py; links titled from the one list of Guide entries), the one Guide search (search.py: every entry kind, ranked exact name, name or title, intent or theme, prose; grouped by kind; computed per request, no stored index), and Guide prose split at the catalogue names it mentions (the browser parses no text, ADR 0038), ADR 0051; session-free, over the site configs and the caller's catalogue"
+description = "The Guide's read objects: the index of every entry kind, the field page with what the server derives for it (related fields from the guide entry's text and the formula's inputs, the site screeners that use the field with each rule as text, the situations that fool it), the situation page (by slug; the screeners whose fields it fools), the regime indicator page (a card's explanation without a session value) and episode page (by key; the cards whose before-line means it, one rule: before_episode), the glossary term and Start here pages (written.py; links titled from the one list of Guide entries), the one Guide search (search.py: every entry kind, ranked exact name, name or title, intent or theme, prose; grouped by kind; computed per request, no stored index), and Guide prose split at the catalogue names it mentions (the browser parses no text, ADR 0038), ADR 0051; session-free, over the site configs and the caller's catalogue"
 owner = ["src/algotrade/services/read/guide/*"]
 section = "docs/ui/guide.md#5-the-rule-and-its-checks"
-detect = [{ call = "load_guide_sections" }, { call = "site_playbooks" }, { call = "rule_text" }, { call = "load_guide_playbooks" }, { call = "link_prose" }, { call = "guide_entries" }]
+detect = [{ call = "load_guide_sections" }, { call = "load_guide_screeners" }, { call = "link_prose" }, { call = "guide_entries" }]
+
+[[responsibility]]
+id = "guide-screeners-read"
+description = "The Guide's Screeners section as read objects (ADR 0051), session-free, over the site rule-screen presets resolved as the site user and their prose files: the site screeners in Guide order with the rule of a criterion as text (site_screeners.py: site_screeners, rule_text), one screener's page (screener.py: prose with its source markers as segments, the sources with their https urls, criteria, related, the situations that fool its fields, the edges using it), the section's lead page (index.py: what a screener is, how it differs from an edge, a card per family with its count) and one family's page (category.py: its purpose and intro, its screeners as rows with what each asks and the edges that use it); the edge links come from guide-edges-read"
+owner = ["src/algotrade/services/read/guide/screeners/*"]
+allowed = [
+    "src/algotrade/services/read/guide/*",  # the Guide's index, field and situation pages, batched entries, search and the edges read the site screeners through site_screeners
+    "apps/api/algotrade_api/graphql/*",  # Query.guideScreener / guideScreenerIndex / guideScreenerCategory serve them (one loader call per resolver)
+]
+section = "docs/ui/guide.md#screeners-three-levels"
+detect = [{ call = "site_screeners" }, { call = "rule_text" }, { call = "load_guide_screener" }, { call = "load_guide_screener_index" }, { call = "load_guide_screener_category" }]
 
 [[responsibility]]
 id = "ideas-ranking"

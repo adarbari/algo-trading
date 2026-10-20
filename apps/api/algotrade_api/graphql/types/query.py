@@ -28,7 +28,6 @@ from algotrade.services.read.formulas import accepted as accepted_formulas
 from algotrade.services.read.guide import entries as entries_page
 from algotrade.services.read.guide import field as field_page
 from algotrade.services.read.guide import index as guide_contents
-from algotrade.services.read.guide import playbook as playbook_page
 from algotrade.services.read.guide import regime as regime_page
 from algotrade.services.read.guide import search as guide_search
 from algotrade.services.read.guide import situation as situation_page
@@ -36,6 +35,9 @@ from algotrade.services.read.guide import written as written_page
 from algotrade.services.read.guide.edges import edge as edge_page
 from algotrade.services.read.guide.edges import index as edge_index_page
 from algotrade.services.read.guide.edges import mechanism as mechanism_page
+from algotrade.services.read.guide.screeners import category as screener_category_page
+from algotrade.services.read.guide.screeners import index as screener_index_page
+from algotrade.services.read.guide.screeners import screener as screener_page
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
 from algotrade.services.read.market import market
@@ -74,7 +76,9 @@ from algotrade_api.graphql.types.guide.episode import GuideEpisodeDetail
 from algotrade_api.graphql.types.guide.field import GuideField
 from algotrade_api.graphql.types.guide.index import GuideIndex
 from algotrade_api.graphql.types.guide.indicator import GuideIndicatorDetail
-from algotrade_api.graphql.types.guide.playbook import GuidePlaybookDetail
+from algotrade_api.graphql.types.guide.screeners.category import GuideScreenerCategory
+from algotrade_api.graphql.types.guide.screeners.index import GuideScreenerIndex
+from algotrade_api.graphql.types.guide.screeners.screener import GuideScreenerDetail
 from algotrade_api.graphql.types.guide.search import GuideSearch
 from algotrade_api.graphql.types.guide.situation import GuideSituationDetail
 from algotrade_api.graphql.types.guide.written import GuideStartPage, GuideTerm
@@ -292,7 +296,7 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="What the Guide holds, in its order (ADR 0051): sections with entry counts, "
-        "field theme groups, intents, situations, playbooks by family, regime indicators and "
+        "field theme groups, intents, situations, screeners by family, regime indicators and "
         "episodes (not session data)"
     )
     def guide_index(self, info: Ctx) -> GuideIndex | None:
@@ -301,7 +305,7 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The Guide page of the catalogue field `name` (ADR 0051): its info and "
-        "guide entry, related fields, the playbooks that use it and the situations that fool "
+        "guide entry, related fields, the screeners that use it and the situations that fool "
         "it; a name outside the caller's catalogue is an UNKNOWN_FEATURE error"
     )
     def guide_field(self, info: Ctx, name: FeatureName) -> GuideField | None:
@@ -309,18 +313,41 @@ class Query:
         return GuideField.of(field_page.load_guide_field(ctx, name)) if ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
-        description="The Guide page of the site playbook `id` (ADR 0051): its prose, the "
-        "preset's latest version and criteria, related playbooks and the situations that fool "
+        description="The Guide page of the site screener `id` (ADR 0051): its prose, the "
+        "preset's latest version and criteria, related screeners and the situations that fool "
         "its fields; null: no site rule-screen preset of that id"
     )
-    def guide_playbook(self, info: Ctx, id: str) -> GuidePlaybookDetail | None:
+    def guide_screener(self, info: Ctx, id: str) -> GuideScreenerDetail | None:
         ctx = info.context.stores()
-        found = playbook_page.load_guide_playbook(ctx, id) if ctx is not None else None
-        return GuidePlaybookDetail.of(found) if found is not None else None
+        found = screener_page.load_guide_screener(ctx, id) if ctx is not None else None
+        return GuideScreenerDetail.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Screeners section's lead page (ADR 0051): what a screener is, how it "
+        "differs from an edge and a card per family with its screener count; no live number"
+    )
+    def guide_screener_index(self, info: Ctx) -> GuideScreenerIndex | None:
+        ctx = info.context.stores()
+        found = screener_index_page.load_guide_screener_index(ctx) if ctx is not None else None
+        return GuideScreenerIndex.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Guide page of the screener family `id` (ADR 0051): its purpose and "
+        "intro and its site screeners as rows (what each asks, the edges that use it); null: "
+        "no such family"
+    )
+    def guide_screener_category(self, info: Ctx, id: str) -> GuideScreenerCategory | None:
+        ctx = info.context.stores()
+        found = (
+            screener_category_page.load_guide_screener_category(ctx, id)
+            if ctx is not None
+            else None
+        )
+        return GuideScreenerCategory.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The Guide page of the situation `slug` (ADR 0051): its signs and what to "
-        "do, the fields it fools and the site playbooks reading them; null: no such situation"
+        "do, the fields it fools and the site screeners reading them; null: no such situation"
     )
     def guide_situation(self, info: Ctx, slug: str) -> GuideSituationDetail | None:
         ctx = info.context.stores()

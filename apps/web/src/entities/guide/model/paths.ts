@@ -8,7 +8,7 @@ export const GUIDE_PATH = '/guide';
 export const GUIDE_START_PATH = '/guide/start';
 export const GUIDE_GLOSSARY_PATH = '/guide/glossary';
 export const GUIDE_FIELDS_PATH = '/guide/fields';
-export const GUIDE_PLAYBOOKS_PATH = '/guide/playbooks';
+export const GUIDE_SCREENERS_PATH = '/guide/screeners';
 export const GUIDE_SITUATIONS_PATH = '/guide/situations';
 export const GUIDE_REGIME_PATH = '/guide/regime';
 export const GUIDE_EDGES_PATH = '/guide/edges';
@@ -24,7 +24,7 @@ export const BUILT_SECTIONS: readonly string[] = [
   'start',
   'regime',
   'edges',
-  'playbooks',
+  'screeners',
   'fields',
   'situations',
   'glossary',
@@ -65,9 +65,14 @@ export function edgesGroupPath(group: 'not-built'): string {
   return `${GUIDE_EDGES_PATH}#${group}`;
 }
 
-/** A playbook's page (the id is the site preset's). */
-export function playbookPath(id: string): string {
-  return `${GUIDE_PLAYBOOKS_PATH}/${encodeURIComponent(id)}`;
+/** A screener's page (the id is the site preset's). */
+export function screenerPath(id: string): string {
+  return `${GUIDE_SCREENERS_PATH}/${encodeURIComponent(id)}`;
+}
+
+/** A screener family's page (the id is `sections.toml`'s family id). */
+export function screenerCategoryPath(id: string): string {
+  return `${GUIDE_SCREENERS_PATH}/c/${encodeURIComponent(id)}`;
 }
 
 /** A situation's page. */
@@ -87,7 +92,7 @@ export function screenerBuilderPath(id: string): string {
 
 /**
  * The page of a Guide entry by the `kind` and `id` the server gives (a search result, a link in
- * a Start here page): start, indicator, episode, playbook, field, situation, term, mechanism or edge. An
+ * a Start here page): start, indicator, episode, screener, field, situation, term, mechanism or edge. An
  * unknown kind opens the Guide's home.
  */
 export function guideEntryPath(kind: string, id: string): string {
@@ -98,8 +103,8 @@ export function guideEntryPath(kind: string, id: string): string {
       return indicatorPath(id);
     case 'episode':
       return episodePath(id);
-    case 'playbook':
-      return playbookPath(id);
+    case 'screener':
+      return screenerPath(id);
     case 'field':
       return fieldPath(id);
     case 'situation':
@@ -120,7 +125,7 @@ export const GUIDE_KIND_TITLES: Readonly<Record<string, string>> = {
   start: 'Start here',
   indicator: 'Warning signs',
   episode: 'Market falls',
-  playbook: 'Playbooks',
+  screener: 'Screeners',
   field: 'Fields',
   situation: 'Situations',
   term: 'Glossary',

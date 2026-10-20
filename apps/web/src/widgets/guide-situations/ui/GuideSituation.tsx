@@ -1,6 +1,6 @@
 /**
  * One situation's Guide page: how it shows itself (signs), what a screen does about it (the
- * field names linked to their pages), every field it fools and the playbooks reading any of them.
+ * field names linked to their pages), every field it fools and the screeners reading any of them.
  */
 import {
   EmptyState,
@@ -13,7 +13,7 @@ import {
   TextLink,
 } from '@algotrade/ui';
 
-import { fieldPath, GuideProse, playbookPath, useGuideSituation } from '@/entities/guide';
+import { fieldPath, GuideProse, screenerPath, useGuideSituation } from '@/entities/guide';
 
 export interface GuideSituationProps {
   /** The situation's slug in the URL. */
@@ -72,16 +72,16 @@ export function GuideSituation({ slug }: GuideSituationProps) {
           ))}
         </Stack>
       </Stack>
-      <Stack gap={2} as="section" aria-label="Playbooks it affects">
-        <Heading level={2}>Playbooks it affects</Heading>
-        {situation.playbooks.length === 0 ? (
+      <Stack gap={2} as="section" aria-label="Screeners it affects">
+        <Heading level={2}>Screeners it affects</Heading>
+        {situation.screeners.length === 0 ? (
           <Text size="sm" tone="muted">
             No site screen reads a field it fools.
           </Text>
         ) : (
-          situation.playbooks.map((p) => (
+          situation.screeners.map((p) => (
             <Stack key={p.id} gap={0}>
-              <TextLink href={playbookPath(p.id)}>{p.name}</TextLink>
+              <TextLink href={screenerPath(p.id)}>{p.name}</TextLink>
               <Text size="sm" tone="muted">
                 {`reads ${p.fields.join(', ')}`}
               </Text>

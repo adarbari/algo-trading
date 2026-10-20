@@ -16,7 +16,7 @@ KINDS = (
     "field_guide",
     "regime",
     "guide",
-    "guide_playbooks",
+    "guide_screeners",
     "guide_glossary",
     "guide_glossary_edges",
     "guide_mechanisms",
@@ -43,7 +43,7 @@ class ConfigStore(Protocol):
         ``studies`` the site's research-study settings (``site/studies/<name>.toml``, ADR 0053,
         site-only); ``guide`` the Guide's own files (``site/guide/sections.toml``, ADR 0051,
         site-only);
-        ``guide_playbooks`` its playbook prose (``site/guide/playbooks/<family>/<id>.toml``);
+        ``guide_screeners`` its screener prose (``site/guide/screeners/<family>/<id>.toml``);
         ``guide_glossary`` its glossary terms (``site/guide/glossary/<theme>.toml``),
         ``guide_glossary_edges`` the edge ones (``site/guide/glossary/edges/<theme>.toml``),
         ``guide_mechanisms`` its edge-mechanism pages (``site/guide/mechanisms/<id>.toml``),

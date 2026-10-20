@@ -1,6 +1,6 @@
 """Fitness test over the shipped ``config/site/verdict.toml [decoys]`` (ADR 0053 amendment
 2026-10-18): every decoy the standard battery names is a site rule-screen preset with its Guide
-playbook (the Guide says what a decoy ranks by before an edge is compared with it), and ranks
+screener (the Guide says what a decoy ranks by before an edge is compared with it), and ranks
 by something (a decoy is a ranking)."""
 
 import tomllib
@@ -8,7 +8,7 @@ import tomllib
 import pytest
 
 from algotrade.config.edges.verdict import DECOYS_STANDARD, VerdictSettings
-from algotrade.config.site.guide.playbooks import FOLDER, load_guide_playbooks
+from algotrade.config.site.guide.screeners import FOLDER, load_guide_screeners
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.services.configs import resolve_config
 from algotrade.storage.configs.files import SCREENERS, FileConfigStore
@@ -35,9 +35,9 @@ def test_every_standard_decoy_is_a_site_preset(decoy: str) -> None:
 
 
 @pytest.mark.parametrize("decoy", STANDARD)
-def test_every_standard_decoy_has_a_guide_playbook(decoy: str) -> None:
-    assert load_guide_playbooks(SHIPPED).get(decoy) is not None, (
-        f"verdict.toml [decoys] names {decoy!r}: write config/site/guide/playbooks/<family>/"
+def test_every_standard_decoy_has_a_guide_screener(decoy: str) -> None:
+    assert load_guide_screeners(SHIPPED).get(decoy) is not None, (
+        f"verdict.toml [decoys] names {decoy!r}: write config/site/guide/screeners/<family>/"
         f"{decoy}.toml ({FOLDER}) so the Guide says what the decoy ranks by"
     )
 

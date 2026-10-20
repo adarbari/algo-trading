@@ -3,7 +3,7 @@
  * is a copy of ("Your copy of vrp_scanner v1"), and Delete (the user's own screen, after a
  * confirmation) / Discard (the unsaved edits and the saved draft) / Save draft / Finalize (a
  * finalised screen runs nightly, ADR 0033). A newer preset version shows the rebase banner. A
- * site preset (or a copy of one) carries a link to its playbook in the Guide. A site
+ * site preset (or a copy of one) carries a link to its screener in the Guide. A site
  * preset not yet copied is shown as it is (its live preview runs); the first edit makes the
  * user's copy, so there is no separate read-only mode. Opened from an edge's builder it also
  * offers "Save and return to edge". Finalize waits while a formula Describe it proposed is
@@ -12,7 +12,7 @@
  */
 import { Banner, Button, Heading, Mono, Stack, StatusBadge, Text, TextLink } from '@algotrade/ui';
 
-import { playbookPath } from '@/entities/guide';
+import { screenerPath } from '@/entities/guide';
 import { useScreenerBuilder } from '@/features/screener-builder';
 import { DeleteScreenerButton } from '@/features/screener-delete';
 import { GuideHelp } from '@/features/guide-help';
@@ -64,8 +64,8 @@ export function DraftBar({ compact = false, onDeleted, onReturn }: DraftBarProps
               </Text>
             )}
             {copyOf && (
-              <TextLink href={playbookPath(copyOf.id)} icon="book" size="sm">
-                Playbook
+              <TextLink href={screenerPath(copyOf.id)} icon="book" size="sm">
+                Screener
               </TextLink>
             )}
           </Stack>

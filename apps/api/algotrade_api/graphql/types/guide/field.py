@@ -1,5 +1,5 @@
 """``GuideField``: a catalogue field's Guide page (ADR 0051): its ``FeatureInfo`` with the
-field guide's entry, and what the server derives for it (related fields, the playbooks that
+field guide's entry, and what the server derives for it (related fields, the screeners that
 use it, the situations that fool it; ADR 0038)."""
 
 from typing import Self
@@ -16,7 +16,7 @@ from algotrade_api.graphql.types.instruments.feature import FeatureInfo
     "value mode tolerance`; `column`: a display column; `rank`: its tie-break; `flag`: a rule "
     "of one of its flags"
 )
-class GuidePlaybookUse:
+class GuideScreenerUse:
     id: str
     name: str
     family: str | None
@@ -26,7 +26,7 @@ class GuidePlaybookUse:
     flag: bool
 
     @classmethod
-    def of(cls, d: field.GuidePlaybookUse) -> Self:
+    def of(cls, d: field.GuideScreenerUse) -> Self:
         return cls(
             id=d.id,
             name=d.name,
@@ -68,14 +68,14 @@ class GuideSituation:
 @strawberry.type(
     description="A field's Guide page: `info` with the field guide's entry; `related` the "
     "other catalogue fields its entry names, then its formula's inputs (first mention first); "
-    "the site playbooks that use it; the situations that fool it; `readsLinked` and "
+    "the site screeners that use it; the situations that fool it; `readsLinked` and "
     "`caveatsLinked`, the entry's reads and caveats split at the catalogue names they mention "
     "(null / empty without an entry)"
 )
 class GuideField:
     info: FeatureInfo
     related: list[str]
-    playbooks: list[GuidePlaybookUse]
+    screeners: list[GuideScreenerUse]
     situations: list[GuideSituation]
     reads_linked: GuideProse | None
     caveats_linked: list[GuideProse]
@@ -85,7 +85,7 @@ class GuideField:
         return cls(
             info=FeatureInfo.of(d.info),
             related=list(d.related),
-            playbooks=[GuidePlaybookUse.of(p) for p in d.playbooks],
+            screeners=[GuideScreenerUse.of(p) for p in d.screeners],
             situations=[GuideSituation.of(s) for s in d.situations],
             reads_linked=GuideProse.of(d.reads_linked) if d.reads_linked is not None else None,
             caveats_linked=[GuideProse.of(c) for c in d.caveats_linked],

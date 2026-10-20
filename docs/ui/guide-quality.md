@@ -81,7 +81,7 @@ review sites (StockBrokers.com, NerdWallet, Bankrate, Finder), Trustpilot and a 
 9. **Active voice, present tense, second person** for what the reader does, "the app" for what the app does; sentences at most 30 words.
 10. **Source and version**: a field entry cites its `sources`; a threshold names where it comes from; the entry names the feature `name@version` it describes, and the page shows the entry's last-reviewed date.
 11. **One idea per section**: a Start page section is one paragraph under a question-shaped or verb-shaped title; a page has at most 7 sections and ends with `links` to read next.
-12. **Honest about risk**: a playbook or Start page that leads to a trade says what the screen does not check and the loss case, before the hit case.
+12. **Honest about risk**: a screener or Start page that leads to a trade says what the screen does not check and the loss case, before the hit case.
 
 ### (b) Fitness tests over the TOML (per-value terms: `tests/architecture/guide/`; style: `tests/unit/config/site/guide/test_style.py`, long sentences shipped before it in the shrink-only `architecture/guide_style_baseline.toml`)
 
@@ -95,7 +95,7 @@ review sites (StockBrokers.com, NerdWallet, Bankrate, Finder), Trustpilot and a 
 | Caveat ends with a check | each caveat's last sentence names a catalogue field, a `situation` or "see" | new (bullet 6) |
 | Banned words | the list in bullet 8 fails on every text above (case-insensitive, whole word); "leverage" only as a verb, advice as "should buy/sell/trade", "buy now" or a sentence starting Buy / Sell ("buy" describing a rule is not advice) | exists (`test_style.py`) |
 | No orphan jargon | every glossary `term` string that appears in another entry's body is in that entry's `see_also` (or a Start page's `links`); a term is spotted when it is a code (`NOT_RUN`, `on_miss`, as written) or a phrase of two or more words (any case); single plain words ("Run", "Edge") read as English and are skipped | exists (`test_style.py`) |
-| Version named is current | a `name@vN` in prose is the catalogue's latest version (playbooks already check `asks` vs latest) | extend |
+| Version named is current | a `name@vN` in prose is the catalogue's latest version (screeners already check `asks` vs latest) | extend |
 | Reviewed date | each `[[term]]` / `[[page]]` / `[[field]]` has `reviewed = YYYY-MM-DD`; a fitness test lists entries older than 180 days as a warning, and fails when a feature version bumped after the date | not built (optional, advisory) |
 | Section caps | a Start page has <= 7 sections, each body one paragraph (no blank line) | 7-section cap exists (`test_style.py`); one paragraph not checked (the loader collapses whitespace) |
 | Readability | a Flesch-Kincaid grade estimate (syllable heuristic in the test, no dependency) <= 10 on `short` and `summary` | not built (optional, advisory) |

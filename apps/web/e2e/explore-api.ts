@@ -17,7 +17,9 @@ import {
   FAMILIES,
   guideEpisode,
   guideIndicator,
-  guidePlaybook,
+  guideScreener,
+  guideScreenerCategory,
+  guideScreenerIndex,
   guideSituation,
   linked,
   REGIME_INDEX,
@@ -29,7 +31,7 @@ import {
   guideEdgeIndex,
   guideMechanism,
   guideMechanisms,
-  guidePlaybookEdges,
+  guideScreenerEdges,
 } from './guide/edges-api';
 import { guideSearch, guideStartPage, guideTerm, START_INDEX } from './guide/start-api';
 
@@ -372,7 +374,7 @@ function guideIndex(): Json {
             entries: REGIME_INDEX.indicators.length + REGIME_INDEX.episodes.length,
           },
           EDGES_SECTION,
-          { id: 'playbooks', title: 'Playbooks', purpose: 'One page per site screen.', entries: 2 },
+          { id: 'screeners', title: 'Screeners', purpose: 'One page per site screen.', entries: 2 },
           { id: 'fields', title: 'Fields', purpose: 'Every catalogue field.', entries: 3 },
           {
             id: 'situations',
@@ -417,7 +419,7 @@ function guideField(name: string): Json {
         readsLinked: linked(typeof guide['reads'] === 'string' ? guide['reads'] : '', names),
         caveatsLinked: ((guide['caveats'] ?? []) as string[]).map((c) => linked(c, names)),
         related: name === 'rollup.iv30@v1.iv30' ? ['feature.iv_hv_ratio'] : [],
-        playbooks: [
+        screeners: [
           {
             id: 'vrp_scanner',
             name: 'VRP scanner',
@@ -476,10 +478,14 @@ function graphqlAnswer(operation: Operation): Json | null {
   if (name === 'GuideMechanisms') return guideMechanisms();
   if (name === 'GuideMechanism') return guideMechanism(String(operation.variables?.['id']));
   if (name === 'GuideEdge') return guideEdge(String(operation.variables?.['id']));
-  if (name === 'GuidePlaybookEdges') {
-    return guidePlaybookEdges(String(operation.variables?.['id']));
+  if (name === 'GuideScreenerEdges') {
+    return guideScreenerEdges(String(operation.variables?.['id']));
   }
-  if (name === 'GuidePlaybook') return guidePlaybook(String(operation.variables?.['id']));
+  if (name === 'GuideScreenerIndex') return guideScreenerIndex();
+  if (name === 'GuideScreenerCategory') {
+    return guideScreenerCategory(String(operation.variables?.['id']));
+  }
+  if (name === 'GuideScreener') return guideScreener(String(operation.variables?.['id']));
   if (name === 'GuideSituation') return guideSituation(String(operation.variables?.['slug']));
   if (name === 'GuideEntries') return guideEntries(operation.variables?.['refs'] as GuideRef[]);
   if (name === 'GuideSearch') {

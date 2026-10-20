@@ -52,3 +52,31 @@ def test_mentions_across_texts() -> None:
 def test_name_tokens_are_dotted_words_without_the_sentence_dot() -> None:
     text = f"Check {ATR}. Then {REL}, not rel_volume or e.g. 0.005."
     assert name_tokens(text) == [ATR, REL, "e.g", "0.005"]
+
+
+def test_a_marker_is_its_own_segment_when_the_page_has_sources() -> None:
+    text = f"Quiet weeks lift {ATR}.[^2] Winners persist.[^1][^3]"
+    linked = link_prose(text, NAMES, sources=3)
+    assert linked.segments == (
+        ProseSegment("Quiet weeks lift "),
+        ProseSegment(ATR, ATR),
+        ProseSegment("."),
+        ProseSegment("[^2]", source=2),
+        ProseSegment(" Winners persist."),
+        ProseSegment("[^1]", source=1),
+        ProseSegment("[^3]", source=3),
+    )
+    assert "".join(s.text for s in linked.segments) == text  # the segments join back
+    assert linked.sources == (2, 1, 3) and linked.fields == (ATR,)
+
+
+def test_a_marker_outside_the_sources_or_on_a_page_without_any_stays_text() -> None:
+    text = "Winners persist.[^4] And again.[^1]"
+    assert link_prose(text, NAMES).segments == (ProseSegment(text),)  # no count: plain text
+    two = link_prose(text, NAMES, sources=2)
+    assert two.sources == (1,) and two.segments[0] == ProseSegment(
+        "Winners persist.[^4] And again."
+    )
+    assert link_prose("No marker.", NAMES, sources=2) == LinkedProse(
+        "No marker.", (ProseSegment("No marker."),)
+    )

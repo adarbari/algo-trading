@@ -27,7 +27,7 @@ const ROUTES = (
     '/explore', '/explore?sel=AAPL', '/regime', '/calendar',
     '/admin/ingestion', '/admin/llm-usage', '/admin/harness-runs', '/admin/screener-runs',
     '/admin/users', '/guide', '/guide/start', '/guide/glossary', '/guide/fields',
-    '/guide/playbooks', '/guide/situations', '/guide/regime',
+    '/guide/screeners', '/guide/situations', '/guide/regime',
   ].join(',')
 ).split(',');
 

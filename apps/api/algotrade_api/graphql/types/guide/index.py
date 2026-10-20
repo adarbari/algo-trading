@@ -69,25 +69,25 @@ class GuideSituationEntry:
         return cls(name=d.name, fields=d.fields, slug=d.slug)
 
 
-@strawberry.type(description="A playbook: a site rule-screen preset's id and name")
-class GuidePlaybook:
+@strawberry.type(description="A screener: a site rule-screen preset's id and name")
+class GuideScreener:
     id: str
     name: str
 
     @classmethod
-    def of(cls, d: index.GuidePlaybook) -> Self:
+    def of(cls, d: index.GuideScreener) -> Self:
         return cls(id=d.id, name=d.name)
 
 
-@strawberry.type(description="A family of playbooks, in reading order")
+@strawberry.type(description="A family of screeners, in reading order")
 class GuideFamily:
     id: str
     title: str
-    playbooks: list[GuidePlaybook]
+    screeners: list[GuideScreener]
 
     @classmethod
     def of(cls, d: index.GuideFamily) -> Self:
-        return cls(id=d.id, title=d.title, playbooks=[GuidePlaybook.of(p) for p in d.playbooks])
+        return cls(id=d.id, title=d.title, screeners=[GuideScreener.of(p) for p in d.screeners])
 
 
 @strawberry.type(
@@ -148,7 +148,7 @@ class GuideTermEntry:
 
 @strawberry.type(
     description="What the Guide holds (ADR 0051): the sections in order with entry counts, the "
-    "field theme groups, the intents (most fields first), the situations, the playbooks by "
+    "field theme groups, the intents (most fields first), the situations, the screeners by "
     "family, the regime indicators, the reference episodes, the mechanisms of the Edges section "
     "with their edge counts, the Start here pages in order and the glossary terms"
 )

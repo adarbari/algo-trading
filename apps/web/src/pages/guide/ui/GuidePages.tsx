@@ -1,11 +1,11 @@
 /**
  * The Guide's pages (ADR 0051): the home (`/guide`), Start here (the index and a how-to page),
  * the glossary (the A to Z index and a term's page), the field index (`/guide/fields`) and one
- * field's page (`/guide/fields/$name`), the playbook index and a playbook's page, the situation
+ * field's page (`/guide/fields/$name`), the screener index, a screener family's page and a screener's page, the situation
  * index and a situation's page, the Market regime index and an indicator's and a market fall's page,
  * the Edges index, a mechanism's page and a site edge's page. Each is the reference frame (a rail on the side, the article,
  * and on a field page the "On this page" list) around one widget; the choices (view, theme,
- * intent, field, playbook, situation) and where a playbook's buttons go come from the route as
+ * intent, field, screener, situation) and where a screener's buttons go come from the route as
  * props.
  */
 import { DocLayout } from '@algotrade/ui';
@@ -18,8 +18,9 @@ import { FieldOutline, GuideField } from '@/widgets/guide-field';
 import { GuideGlossaryIndex, GuideTerm } from '@/widgets/guide-glossary';
 import { GuideHome } from '@/widgets/guide-home';
 import { GuideMechanism, MechanismOutline } from '@/widgets/guide-mechanism';
-import { GuidePlaybook } from '@/widgets/guide-playbook';
-import { GuidePlaybooksIndex } from '@/widgets/guide-playbooks';
+import { GuideScreener } from '@/widgets/guide-screener';
+import { GuideScreenerCategory } from '@/widgets/guide-screener-category';
+import { GuideScreenersIndex } from '@/widgets/guide-screeners';
 import { GuideRail } from '@/widgets/guide-rail';
 import { GuideEpisode, GuideIndicator, GuideRegimeIndex } from '@/widgets/guide-regime';
 import { GuideSituation, GuideSituationsIndex } from '@/widgets/guide-situations';
@@ -60,15 +61,23 @@ export function GuideFieldPage({ name, onAddToBuilder }: GuideFieldPageProps) {
   );
 }
 
-export function GuidePlaybooksPage() {
+export function GuideScreenersPage() {
   return (
-    <DocLayout rail={<GuideRail page="playbooks" />}>
-      <GuidePlaybooksIndex />
+    <DocLayout rail={<GuideRail page="screeners" />}>
+      <GuideScreenersIndex />
     </DocLayout>
   );
 }
 
-export interface GuidePlaybookPageProps {
+export function GuideScreenerCategoryPage({ id }: { id: string }) {
+  return (
+    <DocLayout rail={<GuideRail page="screener_category" category={id} />}>
+      <GuideScreenerCategory id={id} />
+    </DocLayout>
+  );
+}
+
+export interface GuideScreenerPageProps {
   /** The preset id in the URL. */
   id: string;
   /** Opens that screener's results. */
@@ -77,10 +86,10 @@ export interface GuidePlaybookPageProps {
   onOpenBuilder: () => void;
 }
 
-export function GuidePlaybookPage({ id, onSeeHits, onOpenBuilder }: GuidePlaybookPageProps) {
+export function GuideScreenerPage({ id, onSeeHits, onOpenBuilder }: GuideScreenerPageProps) {
   return (
-    <DocLayout rail={<GuideRail page="playbook" playbook={id} />}>
-      <GuidePlaybook id={id} onSeeHits={onSeeHits} onOpenBuilder={onOpenBuilder} />
+    <DocLayout rail={<GuideRail page="screener" screener={id} />}>
+      <GuideScreener id={id} onSeeHits={onSeeHits} onOpenBuilder={onOpenBuilder} />
     </DocLayout>
   );
 }

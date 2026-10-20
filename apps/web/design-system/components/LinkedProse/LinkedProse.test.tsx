@@ -41,6 +41,22 @@ describe('LinkedProse', () => {
     expect(screen.getByText('Plain')).toHaveAttribute('data-size', 'sm');
   });
 
+  it('sets a source marker as a raised link to its source, in the text order', () => {
+    const { container } = render(
+      <LinkedProse
+        parts={[
+          { text: 'Winners persist.' },
+          { text: '[1]', href: '#s1', cite: true },
+          { text: ' Costs bite.' },
+        ]}
+      />,
+    );
+    const marker = screen.getByRole('link', { name: '[1]' });
+    expect(marker).toHaveAttribute('href', '#s1');
+    expect(marker.closest('sup')).not.toBeNull();
+    expect(container.textContent).toBe('Winners persist.[1] Costs bite.');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(<LinkedProse parts={PARTS} monoLinks />);
     await expectNoA11yViolations(container);

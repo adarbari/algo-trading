@@ -1,6 +1,6 @@
 """Small Guide configs: a field guide of two entries and two situations, the sections file
-(one family listing ``alpha`` and a preset that does not exist), ``alpha``'s playbook prose
-(a related id that is no playbook, one criterion without ``asks``), and three site presets:
+(one family listing ``alpha`` and a preset that does not exist), ``alpha``'s screener prose
+(a related id that is no screener, one criterion without ``asks``), and three site presets:
 ``alpha`` (two versions: v2 is read), ``zeta`` (in no family) and ``broken`` (not a rule
 screen); apart (``regime``), one regime card over three episodes. The catalogue is the
 site's (a store without feature files sees the site's)."""
@@ -51,14 +51,33 @@ GUIDE = {
 SECTIONS = {
     "section": [
         {"id": "fields", "title": "Fields", "purpose": "Every field."},
-        {"id": "playbooks", "title": "Playbooks", "purpose": "Every screen."},
+        {"id": "screeners", "title": "Screeners", "purpose": "Every screen."},
         {"id": "glossary", "title": "Glossary", "purpose": "Words."},
     ],
     "theme_group": [
         {"id": "tradeable", "title": "Who is tradeable", "themes": ["liquidity", "volume"]},
         {"id": "chart", "title": "The chart", "themes": ["momentum and trend"]},
     ],
-    "family": [{"id": "trend", "title": "Trend", "presets": ["alpha", "missing"]}],
+    "family": [
+        {
+            "id": "trend",
+            "title": "Trend",
+            "purpose": "Shares already rising.",
+            "intro": "Charts first.",
+            "presets": ["alpha", "missing"],
+        },
+        {
+            "id": "empty",
+            "title": "Empty",
+            "purpose": "No screen yet.",
+            "intro": "Nothing listed.",
+            "presets": ["absent"],
+        },
+    ],
+    "screeners_page": {
+        "what": "A screener is a saved rule screen.",
+        "versus_edge": "An edge is a claim; a screener finds today's names.",
+    },
 }
 
 
@@ -86,18 +105,22 @@ ALPHA_V2 = preset(
 ALPHA_PROSE = {
     "id": "alpha",
     "version": 2,
-    "summary": f"Finds dips; read {PULLBACK} first.",
+    "line": "Dips in a rising share.",
+    "summary": f"Finds dips; read {PULLBACK} first.[^1]",
     "hit": "Near the average.",
     "not_checked": "News.",
-    "before_acting": [f"Thin names: {ADV} under $40M."],
+    "before_acting": [f"Thin names: {ADV} under $40M.[^2]"],
     "related": [{"id": "zeta", "reason": "the other one"}, {"id": "missing", "reason": "gone"}],
-    "sources": ["A book"],
+    "sources": [
+        {"title": "A book", "url": "https://example.com/book", "note": "The dip."},
+        {"title": "A paper", "note": "No page found."},
+    ],
     "asks": {"adv": "Trades $50M a day", "band": "Near its average"},  # no "listed"
 }
 DOCUMENTS: dict[tuple[str, str, str], Mapping[str, Any]] = {
     ("site", "field_guide", "liquidity"): GUIDE,
     ("site", "guide", "sections"): SECTIONS,
-    ("site", "guide_playbooks", "alpha"): ALPHA_PROSE,
+    ("site", "guide_screeners", "alpha"): ALPHA_PROSE,
     ("site", "screeners", "alpha@1"): preset(
         "alpha", "Alpha v1", {"c": {"field": CLOSE, "op": "gt", "value": 1}}
     ),

@@ -19,7 +19,7 @@ const index = {
     { id: 'start', title: 'Start here', purpose: 'How the app thinks.', entries: 4 },
     { id: 'regime', title: 'Market regime', purpose: 'The weather.', entries: 20 },
     { id: 'edges', title: 'Edges', purpose: 'Why an edge should work.', entries: 2 },
-    { id: 'playbooks', title: 'Playbooks', purpose: 'One page per site screen.', entries: 3 },
+    { id: 'screeners', title: 'Screeners', purpose: 'One page per site screen.', entries: 3 },
     { id: 'fields', title: 'Fields', purpose: 'Every catalogue field.', entries: 399 },
     { id: 'situations', title: 'Situations', purpose: 'States that fool fields.', entries: 2 },
     { id: 'glossary', title: 'Glossary', purpose: 'The app’s own words.', entries: 28 },
@@ -36,12 +36,12 @@ const index = {
     {
       id: 'breakouts',
       title: 'Breakouts',
-      playbooks: [
+      screeners: [
         { id: 'range_breakout', name: 'Range breakout' },
         { id: 'breakout', name: 'Breakout' },
       ],
     },
-    { id: 'income', title: 'Option income', playbooks: [{ id: 'vrp_scanner', name: 'VRP' }] },
+    { id: 'income', title: 'Option income', screeners: [{ id: 'vrp_scanner', name: 'VRP' }] },
   ],
   situations: [
     { name: 'Pending takeover', fields: 12, slug: 'pending-takeover' },
@@ -112,7 +112,7 @@ describe('GuideHome', () => {
       'Start here',
       'Market regime',
       'Edges',
-      'Playbooks',
+      'Screeners',
       'Fields',
       'Situations',
       'Glossary',
@@ -163,16 +163,16 @@ describe('GuideHome', () => {
     );
   });
 
-  it('lists the playbook families with each playbook linked to its page', () => {
+  it('lists the screener families with each screener linked to its page', () => {
     render(<GuideHome />);
     const family = screen.getByRole('region', { name: 'Breakouts' });
     expect(within(family).getByRole('link', { name: 'Range breakout' })).toHaveAttribute(
       'href',
-      '/guide/playbooks/range_breakout',
+      '/guide/screeners/range_breakout',
     );
     expect(screen.getByRole('link', { name: 'What each one says' })).toHaveAttribute(
       'href',
-      '/guide/playbooks',
+      '/guide/screeners',
     );
   });
 

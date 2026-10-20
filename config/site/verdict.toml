@@ -51,7 +51,7 @@ trend = 0.45               # sample, by the edge's `oos_class`; the run's report
 standard = [               # the decoy battery every edge is compared with on the same sessions: the
   "size_small",            # size and momentum yardsticks, then the idiosyncratic-volatility, lottery
   "momentum_12_1",         # (MAX), illiquidity and low-beta anomalies; each needs a screener preset and
-  "ivol_high",             # a Guide playbook (a fitness test). composite_mispricing joins once filed.
+  "ivol_high",             # a Guide screener (a fitness test). composite_mispricing joins once filed.
   "max_ret_high",          # A decoy that is the edge's own screener is dropped for that edge. A changed
   "amihud_illiquid",       # list is a new run (baselines are in the run hash), never a new trial.
   "beta_low",

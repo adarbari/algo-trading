@@ -2,10 +2,10 @@
  * A field's Guide page body (ADR 0051, docs/ui/guide.md section 3), the sections in a fixed
  * order, each anchored for the "On this page" list: the header and what the number means, its
  * spread across the universe, the criterion per intent (with Add to Builder), when it lies and
- * the situations that fool it, how it is computed, related fields and the playbooks that use
+ * the situations that fool it, how it is computed, related fields and the screeners that use
  * it, one name's history with a way into Explore, and the sources. The field comes from the
  * catalogue; what the server derives for it (its reads and caveats with the field names linked,
- * related, playbooks, situations) from `guideField`, the plain text standing in while it loads.
+ * related, screeners, situations) from `guideField`, the plain text standing in while it loads.
  */
 import { DocSection, EmptyState, ErrorState, Skeleton, Stack } from '@algotrade/ui';
 import { useState } from 'react';
@@ -65,7 +65,7 @@ function FieldSections({
       <DocSection id="related">
         <RelatedPanel
           related={guide.data?.related ?? []}
-          playbooks={guide.data?.playbooks ?? []}
+          screeners={guide.data?.screeners ?? []}
           state={guide.isError ? 'error' : guide.isPending ? 'loading' : 'ready'}
           onRetry={() => void guide.refetch()}
         />
