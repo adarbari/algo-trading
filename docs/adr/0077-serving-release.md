@@ -71,7 +71,7 @@ requests use. The owner accepts data up to a day stale and wants fast loads alwa
    (the disk is at 94-96%).
 7. **Which session is served (amends 0062).** The default session is the current release's
    session, not the latest complete one (else S+1 is complete but unreleased and pages
-   disagree). `Session.newer` gains `PUBLISHING` (complete, release not yet promoted) with a
+   disagree). `Session.newer` gains `PUBLISHING` (complete, release not yet promoted; disclosed only after 15 minutes, owner decision 2026-10-19) with a
    Guide term (ADR 0051). `newer` and `complete` stay live from the nightly and post-session
    run records through a new `workflow_generation` (excludes job checkpoints); only
    `StatusStrip` and `SessionDate` key on it, and `served_token` leaves every other key.
@@ -129,5 +129,6 @@ fitness test requires release inputs to be stored tables, never `own_run`.
 - Risks: a pinned history-copy read leaking a later version (decision 2); missing data cast to
   zero in Arrow (tests with a missing table); non-deterministic row order (sort before write).
 - Owner decisions 2026-10-19: r2 is promoted after post-session; ceiling 300 MB and floor
-  max(5 GB, 3x the last release); blue/green through a front proxy. Open: the wording of
-  `PUBLISHING` (proposed: shown only after about 15 minutes, neutral tone).
+  max(5 GB, 3x the last release); blue/green through a front proxy. `PUBLISHING` is shown only after about 15 minutes
+  without promotion, in a neutral tone (the exact words are Guide content, ADR 0051). No
+  owner decision is open.

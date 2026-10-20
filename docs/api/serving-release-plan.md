@@ -59,5 +59,5 @@ pinning, locks, deploys).
 
 ## Owner decisions
 Decided 2026-10-19: r2 after post-session; size ceiling 300 MB and free-space floor
-max(5 GB, 3x the last release); blue/green through a front proxy. Open: the wording of
-`PUBLISHING` (proposed: shown only after about 15 minutes, neutral tone).
+max(5 GB, 3x the last release); blue/green through a front proxy. `PUBLISHING` is shown only after about 15 minutes
+without promotion, neutral tone (Guide entry in P3). None open.
