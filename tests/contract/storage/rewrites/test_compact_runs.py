@@ -12,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from algotrade.storage.backends import local as local_module
 from algotrade.storage.backends import local_index, run_compaction
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
@@ -391,3 +392,48 @@ def test_a_history_copy_made_between_the_plan_and_the_swap_aborts_it(
     report = local.tables.compact_runs(TABLE, DAY)
     assert report.skipped == "the table has a history copy"
     assert view(local) == before and files(tmp_path) == seen
+
+
+@pytest.mark.parametrize("moment", ["plan", "verify"])
+def test_a_commit_during_the_plan_or_between_verify_and_swap_swaps_nothing(
+    local: LocalBackend, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, moment: str
+) -> None:
+    """A writer committing while a worker (which holds no lock) is mid-way: no swap, no fresh
+    file left, the reason reported, the commit intact, and the next pass compacts."""
+    history(local)
+    seen = files(tmp_path)
+    name = "plan_compaction" if moment == "plan" else "verify_plan"
+    real = getattr(local_module, name)
+
+    def then_commit(*args: object, **kwargs: object) -> object:
+        out = real(*args, **kwargs)
+        monkeypatch.setattr(local_module, name, real)  # once
+        put(local, "r7", {"EQ:Q": 1.0}, 7)
+        return out
+
+    monkeypatch.setattr(local_module, name, then_commit)
+    report = local.tables.compact_runs(TABLE, DAY)
+    assert report.skipped == "the index moved" and report.runs_dropped == 0
+    assert files(tmp_path) == sorted([*seen, "run=r7.parquet"])  # no fresh file left
+    assert local.tables.partition_runs(TABLE, DAY)[-1] == "r7"
+    assert local.tables.compact_runs(TABLE, DAY).runs_dropped >= 2
+
+
+def test_a_run_pending_at_the_swap_raises_and_leaves_no_fresh_file(
+    local: LocalBackend, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    history(local)
+    seen, before = files(tmp_path), view(local)
+    real = local_module.verify_plan
+
+    def then_stage(*args: object, **kwargs: object) -> object:
+        out = real(*args, **kwargs)
+        monkeypatch.setattr(local_module, "verify_plan", real)
+        put(local, "busy", {"EQ:Z": 1.0}, 9, commit=False)  # staged after the plan, uncommitted
+        return out
+
+    monkeypatch.setattr(local_module, "verify_plan", then_stage)
+    with pytest.raises(PartitionBusyError):
+        local.tables.compact_runs(TABLE, DAY)
+    assert files(tmp_path) == sorted([*seen, "run=busy.parquet"])  # the fresh files were removed
+    assert view(local) == before

@@ -161,6 +161,7 @@ description = "Execute long-running work: threads, locks, recovery, idempotency;
 owner = ["src/algotrade/services/jobs/*"]
 allowed = [
     "libs/sources/algotrade_sources/framework/session_thread.py",  # a gateway session's own thread (its socket + event loop), not work (ADR 0028)
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/compaction/pool.py",  # the compact-runs worker processes (spawn, their own signals and parent watch) and the in-process thread seam of its tests: an OS process pool around one partition's storage call, not a job fan-out (ADR 0078 amendment 2026-10-20)
     "src/algotrade/storage/recording.py",  # the API's background batch writer (live quotes ADR 0028, usage ADR 0058): one thread draining a queue, not a job
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"

@@ -226,6 +226,11 @@ purpose = "maintenance tasks: quality checks, bad-bar flags, raw purge, id migra
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/maintenance/compaction"
+purpose = "the compact-runs job (ADR 0078): the entry (task.py), the worker processes and the dispatch loop (pool.py), the rolling sweep of superseded files (sweep.py), the totals and progress lines (report.py); tasks/maintenance is at its module cap, so this is a folder"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/market"
 purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates, IBKR implied / historical vol, ETF holdings (futures: its own folder)"
 kind = "task-domain"

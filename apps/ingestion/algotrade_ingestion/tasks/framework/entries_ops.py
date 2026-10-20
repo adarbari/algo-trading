@@ -8,13 +8,13 @@ from algotrade_ingestion.tasks.framework.params import Params, session_of, symbo
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.maintenance import (
     bar_quality,
-    compact_runs,
     golden,
     migrate_ids,
     purge,
     quality,
     retire_features,
 )
+from algotrade_ingestion.tasks.maintenance.compaction import task as compact_task
 from algotrade_ingestion.tasks.market import (
     ibkr_iv,
 )
@@ -125,7 +125,7 @@ def run_golden_load(ctx: TaskContext, p: Params) -> RunRecord:
 
 
 def run_compact_runs(ctx: TaskContext, p: Params) -> RunRecord:
-    return compact_runs.compact(
+    return compact_task.compact(
         ctx,
         session_of(p),
         str(p["table"]),
@@ -134,4 +134,6 @@ def run_compact_runs(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("limit"),
         bool(p.get("dry_run")),
         verify=bool(p.get("verify")),
+        workers=p.get("workers"),
+        beside_ingest=bool(p.get("beside_ingest")),
     )

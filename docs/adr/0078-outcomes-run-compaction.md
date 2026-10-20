@@ -41,7 +41,7 @@ ADR 0063 reuses a leg only when `partition_seq` and the recorded `knowledge_ts` 
    them (else `StaleSnapshotError` and a retry of a whole range read). A crash leaves unindexed
    files, which `sweep_orphans` removes; a second pass finds nothing to do.
 5. **The job** `algotrade-ingest run compact-runs --table T [--from D --to D] [--limit N] [--dry-run]`
-   (`tasks/maintenance/compact_runs.py`, beside `history_copy`; writes no run). Tables are listed in
+   (`tasks/maintenance/compaction/`, beside `history_copy`; writes no run). Tables are listed in
    `config/site/nightly.toml [compaction] tables` (merge mode, no history copy: a fitness test; the
    history copy signs the index by inode, mtime and size). One partition at a time, background QoS
    (#734), `limit_threads`, one partition of scratch, refusing below `[resources] min_free_gb`;
@@ -76,3 +76,55 @@ ADR 0063 reuses a leg only when `partition_seq` and the recorded `knowledge_ts` 
    reads empty and would be refused). Recommended: E2, the only one that meets "no harness answer
    changes" literally.
 2. **Accept decision 3** (`knowledge_ts` = first known).
+
+## Amendment 2026-10-20: parallel workers, a rolling sweep, three storage fixes
+A serial run over ~1,100 `forward_returns@v2` partitions took too long (verification now takes
+seconds, #751, so the planning and I/O per partition dominate). Decisions 4 and 5 change as follows;
+the rest of the ADR stands.
+
+- **Storage fixes first (blocking).** (a) `Commits.journal` / `pending_item` cached another
+  process's journal for ever, so a long-lived worker missed a backfill that staged later, and
+  `sweep` (which decides what a pending run staged) could delete a file that backfill had written
+  more than 60 s earlier: a commit would then name a missing file. A journal this process did not
+  stage is now re-read when `(st_size, st_mtime_ns)` changed (journals are append-only); only the
+  staging process keeps its own in memory. (b) `swap_runs` returns `False` when a file the new
+  index names (and the old one did not) is missing. (c) `sweep` also removes `.run=*.tmp`
+  leftovers older than 60 s (a killed `atomic_write`).
+- **Decision 4 (grace and sweep).** `SWAP_GRACE_S` 120 s becomes 30 s: a reader's window from reading
+  the index to opening the file is one partition's eager `ParquetFile.read`, measured at 1.5 to 3 s.
+  Correctness never depends on it (a lost file is a `FileNotFoundError`, then `StaleSnapshotError`,
+  then a retry; after `OPTIMISTIC_TRIES` the read holds `no_commits`, which excludes sweeps).
+  `ORPHAN_GRACE_S` stays 60 s. The job sweeps a swapped partition once 30 s + 1 s have passed since
+  the parent saw the swap, as the run goes, and once more at the end; `[compaction]
+  sweep_grace_seconds` is gone (derived from `SWAP_GRACE_S`), and so are `batch_size` and
+  `pause_seconds` (nothing batches or pauses any more).
+- **Decision 5 (the job).** `[compaction] workers` (default 4, `--workers N`) `spawn` processes, each
+  with its own backend (opened from the data URL), `lower_priority` (the disk policy is per process),
+  one Arrow thread (`worker_arrow_threads`), SIGINT ignored, SIGTERM turned into `SystemExit` (the
+  partition in flight discards its files), exiting when its parent does. **A worker takes no
+  lock**: `swap_runs` (a compare-and-swap under the commit lock) and `PartitionBusyError` already
+  protect a partition from a writer (a commit after the plan or between verify and swap: "the index
+  moved"; a pending run at the swap: `PartitionBusyError`; a run staged after the swap merges on
+  top; every case discards the fresh files, counts in `skipped` and is retried next pass). The
+  parent holds the `ingest-tree` lock for the whole run and probes the `ingest` lock (taken
+  without waiting, released at once) before every dispatch and every sweep: held, it stops
+  dispatching, the partitions in flight finish (each bounded by `partition_seconds`) and the rest is
+  left for the next run. **`--beside-ingest`** (opt-in, off by default) skips the probe so the job
+  runs beside a nightly or a backfill. The risk: it competes for disk and CPU with the ingest, and
+  it relies on the journal fix above (without it a worker's stale journal could let a sweep delete
+  a backfill's staged file); with the fix, a writer is protected by the swap's refusal. A worker
+  silent for `partition_seconds + 60` s stops the run (the pool is terminated); SIGINT / SIGTERM
+  stop the dispatch and terminate the workers. Free space: before each dispatch, at least
+  `min_free_gb` plus `workers` times the largest partition seen. `--limit` counts partitions
+  compacted plus in flight. Only the parent writes stderr (`[wN] day ...`, a summary each minute).
+  `--dry-run [--verify]` runs through the same pool and takes no lock.
+- **Tests (named in the PR):** a sweep spares a foreign run's file staged after its journal was first
+  read (`test_local_index.py`, first); commits during the plan, between verify and swap, and a
+  pending run at the swap swap nothing and leave no fresh file; a worker SIGKILLed after writing
+  leaves a clean next pass; two worker processes on adjacent days beside a committing writer end
+  value-exact with no deadlock; a `read_range` loop under sweeps never raises; the rolling sweep
+  never runs before swap + grace (a fake clock, a failing `utime`); an ingest lock taken mid-run
+  stops the dispatch and lets the partitions in flight finish; SIGTERM leaves no workers and no
+  temp files; a swap naming a missing file is refused.
+- **Later, optional:** a job state file of done / no-op digests would skip re-planning (about 26 min
+  of planning at 4 workers).

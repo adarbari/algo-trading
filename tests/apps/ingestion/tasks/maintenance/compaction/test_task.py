@@ -23,12 +23,12 @@ from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.run_compaction import Budget, CompactionVerificationError
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.locks import held
-from algotrade.storage.runs import RunStatus
+from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework import registry
 from algotrade_ingestion.tasks.framework.run import TaskContext
-from algotrade_ingestion.tasks.maintenance import compact_runs
-from algotrade_ingestion.tasks.maintenance.compact_runs import compact, lower_priority
+from algotrade_ingestion.tasks.maintenance.compaction import task
+from algotrade_ingestion.tasks.maintenance.compaction.pool import lower_priority, thread_executor
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import T0, stamped
 
@@ -38,7 +38,7 @@ DAYS = (date(2026, 10, 1), date(2026, 10, 2))
 
 
 def _document(**keys: Any) -> dict[str, Any]:
-    compaction = {"tables": [TABLE], "pause_seconds": 0, "sweep_grace_seconds": 0, **keys}
+    compaction = {"tables": [TABLE], **keys}
     return {"compaction": compaction, "resources": {"min_free_gb": 0}}
 
 
@@ -55,7 +55,6 @@ def _put(
 @pytest.fixture
 def ctx(tmp_path: Path) -> TaskContext:
     backend = LocalBackend(tmp_path / "data")
-    backend.tables.swap_grace_s = 0.0  # a swap's old files may be swept at once
     base = {"EQ:A": 1.0, "EQ:B": 1.0, "EQ:C": 1.0}
     for n, day in enumerate(DAYS):
         for k in range(1, 5):  # four identical rewrites per partition: the middle two are redundant
@@ -78,16 +77,24 @@ def _reads(ctx: TaskContext) -> list[Any]:
     return out
 
 
+def compact(ctx: TaskContext, session: date, table: str, **kw: Any) -> RunRecord:
+    """The job with its test seams: threads for workers (the tests patch what they call, and
+    stay fast), one worker unless asked (the order of partitions is then fixed), a zero swap
+    grace and no waiting."""
+    kw.setdefault("workers", 1)
+    kw.setdefault("sleep", lambda s: None)
+    return task.compact(ctx, session, table, make_executor=thread_executor, swap_grace_s=0.0, **kw)
+
+
 def _run(ctx: TaskContext, **kw: Any) -> dict[str, Any]:
-    record = compact(ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None, **kw)
-    return dict(record.stats)
+    return dict(compact(ctx, SESSION, TABLE, **kw).stats)
 
 
 def test_settings_default_to_no_table_and_read_the_toml() -> None:
     assert load_nightly(MemoryConfigStore({})).compaction == CompactionSettings()
     assert CompactionSettings().tables == ()
-    store = MemoryConfigStore({("site", "settings", "nightly"): _document(batch_size=3)})
-    assert load_nightly(store).compaction.batch_size == 3
+    store = MemoryConfigStore({("site", "settings", "nightly"): _document(workers=3)})
+    assert load_nightly(store).compaction.workers == 3
 
 
 def test_a_dry_run_writes_nothing_and_reports_the_saving(ctx: TaskContext) -> None:
@@ -129,7 +136,7 @@ def test_a_range_compacts_only_its_partitions(ctx: TaskContext) -> None:
 def test_a_held_ingest_lock_stops_the_run_and_nothing_changes(ctx: TaskContext) -> None:
     before = _files(ctx)
     with held(ctx.writer.backend.lock(INGEST_LOCK)):
-        record = compact(ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None)
+        record = compact(ctx, SESSION, TABLE)
     assert record.status == RunStatus.PARTIAL
     assert "ingest lock is held" in record.stats["stopped"] and record.stats["compacted"] == 0
     assert _files(ctx) == before
@@ -157,12 +164,13 @@ def test_a_partition_it_cannot_compact_is_skipped_with_the_reason(ctx: TaskConte
 
 def test_a_table_the_config_does_not_list_is_refused(ctx: TaskContext) -> None:
     with pytest.raises(ConfigurationError, match=r"not in nightly\.toml"):
-        compact(ctx, SESSION, "events/other", sleep=lambda s: None, prioritise=lambda n: None)
+        compact(ctx, SESSION, "events/other")
 
 
 def test_the_task_is_registered_with_its_flags() -> None:
     spec = registry.TASKS["compact-runs"]
     assert {p.name for p in spec.params} >= {"table", "start", "end", "limit", "dry_run"}
+    assert {p.name for p in spec.params} >= {"workers", "beside_ingest"}
     assert next(p for p in spec.params if p.name == "table").required
 
 
@@ -174,10 +182,24 @@ def test_the_task_saves_no_run_and_moves_no_cache_key(ctx: TaskContext, dry_run:
     assert (ctx.reader.visible_seq(), ctx.reader.runs_generation()) == (seq, runs)
 
 
+def test_beside_ingest_skips_the_probe_and_compacts_with_the_lock_held(ctx: TaskContext) -> None:
+    with held(ctx.writer.backend.lock(INGEST_LOCK)):
+        record = compact(ctx, SESSION, TABLE, beside_ingest=True)
+    assert "stopped" not in record.stats and record.stats["compacted"] == 2
+    assert record.stats["beside_ingest"] is True
+
+
+def test_workers_default_to_the_config_and_the_flag_overrides_it(ctx: TaskContext) -> None:
+    assert _run(ctx, dry_run=True, workers=None)["workers"] == 4
+    assert _run(ctx, dry_run=True, workers=2)["workers"] == 2
+    with pytest.raises(ConfigurationError, match="at least 1"):
+        _run(ctx, workers=0)
+
+
 def test_a_held_deploy_lock_does_not_stop_the_run(ctx: TaskContext) -> None:
     # serving deploys run from the release tree (ADR 0079): a deploy must not block a compaction
     with held(ctx.writer.backend.lock(DEPLOY_LOCK)):
-        record = compact(ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None)
+        record = compact(ctx, SESSION, TABLE)
     assert "stopped" not in record.stats and record.stats["compacted"] == 2
 
 
@@ -188,7 +210,7 @@ def test_the_deploy_lock_stays_free_while_a_partition_is_compacted(ctx: TaskCont
         with held(ctx.writer.backend.lock(DEPLOY_LOCK), wait=False) as taken:
             seen.append(taken)
 
-    compact(ctx, SESSION, TABLE, sleep=pause, prioritise=lambda n: None)
+    compact(ctx, SESSION, TABLE, sleep=pause)
     assert seen and all(seen)  # a deploy can start in the pauses
 
 
@@ -199,14 +221,14 @@ def test_the_ingest_tree_lock_is_held_for_the_whole_run(ctx: TaskContext) -> Non
         with held(ctx.writer.backend.lock(INGEST_TREE_LOCK), wait=False) as taken:
             seen.append(taken)
 
-    compact(ctx, SESSION, TABLE, sleep=pause, prioritise=lambda n: None)
+    compact(ctx, SESSION, TABLE, sleep=pause)
     assert seen and not any(seen)  # the ingest-tree sync cannot start in the pauses
 
 
 def test_a_held_ingest_tree_lock_stops_the_run_before_any_change(ctx: TaskContext) -> None:
     before = _files(ctx)
     with held(ctx.writer.backend.lock(INGEST_TREE_LOCK)):
-        record = compact(ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None)
+        record = compact(ctx, SESSION, TABLE)
     assert "ingest-tree lock is held" in record.stats["stopped"] and _files(ctx) == before
 
 
@@ -227,28 +249,26 @@ def test_lower_priority_never_raises_and_asks_for_the_cpu_nice(
 
 def test_progress_has_one_flushed_line_per_partition_and_per_sweep(ctx: TaskContext) -> None:
     lines: list[str] = []
-    compact(
-        ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None, progress=lines.append
-    )
-    partitions = [line for line in lines if line.startswith(f"compact-runs {DAYS[0].year}")]
+    compact(ctx, SESSION, TABLE, progress=lines.append)
+    partitions = [line for line in lines if line.startswith("compact-runs [w1] ")]
     assert len(partitions) == 2 and "files 4 -> 2" in partitions[0] and " s" in partitions[0]
-    assert [d.isoformat() in lines[1 + i] for i, d in enumerate(DAYS)] == [True, True]
-    assert sum("sweep" in line for line in lines) == 1  # one batch
+    assert [d.isoformat() in partitions[i] for i, d in enumerate(DAYS)] == [True, True]
+    assert any("sweep" in line for line in lines)
 
 
 def test_the_default_progress_sink_writes_and_flushes_stderr(
     ctx: TaskContext, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    compact(ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None, limit=1)
-    assert f"compact-runs {DAYS[0]}: files" in capsys.readouterr().err
+    compact(ctx, SESSION, TABLE, limit=1)
+    assert f"compact-runs [w1] {DAYS[0]}: files" in capsys.readouterr().err
 
 
 @pytest.fixture
 def spent(monkeypatch: pytest.MonkeyPatch) -> None:
     """A partition budget of zero seconds (the config minimum is one): spent at once."""
-    original = compact_runs.settings_of
+    original = task.settings_of
     monkeypatch.setattr(
-        compact_runs,
+        task,
         "settings_of",
         lambda c: (replace(original(c)[0], partition_seconds=0.0), original(c)[1]),
     )
@@ -262,8 +282,6 @@ def test_a_partition_over_its_budget_is_skipped_and_nothing_changes(ctx: TaskCon
         ctx,
         SESSION,
         TABLE,
-        sleep=lambda s: None,
-        prioritise=lambda n: None,
         progress=lines.append,
     ).stats
     assert stats["skipped"] == {"verification over budget": 2} and stats["compacted"] == 0
@@ -274,9 +292,7 @@ def test_a_partition_over_its_budget_is_skipped_and_nothing_changes(ctx: TaskCon
 
 def test_a_dry_run_is_plan_only_by_default_and_says_so(ctx: TaskContext) -> None:
     lines: list[str] = []
-    stats = compact(
-        ctx, SESSION, TABLE, dry_run=True, prioritise=lambda n: None, progress=lines.append
-    ).stats
+    stats = compact(ctx, SESSION, TABLE, dry_run=True, progress=lines.append).stats
     assert stats["verified"] is False and any("plan only" in line for line in lines)
 
 
@@ -295,7 +311,6 @@ def test_a_verifying_dry_run_runs_the_verification_a_live_run_does(
         TABLE,
         dry_run=True,
         verify=True,
-        prioritise=lambda n: None,
         progress=lines.append,
     ).stats
     assert len(calls) == 2 and stats["verified"] is True and stats["compacted"] == 2
@@ -310,7 +325,6 @@ def test_a_verifying_dry_run_reports_a_partition_over_budget(ctx: TaskContext) -
         TABLE,
         dry_run=True,
         verify=True,
-        prioritise=lambda n: None,
         progress=lambda line: None,
     ).stats
     assert stats["skipped"] == {"verification over budget": 2}
@@ -345,9 +359,7 @@ def test_a_verification_error_skips_that_partition_and_the_run_continues(
     monkeypatch.setattr(local, "verify_plan", flaky)
     before = _files(ctx)
     lines: list[str] = []
-    stats = compact(
-        ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None, progress=lines.append
-    ).stats
+    stats = compact(ctx, SESSION, TABLE, progress=lines.append).stats
     assert stats["compacted"] == 1 and "stopped" not in stats
     assert list(stats["skipped"]) == ["verification failed: values differ at None"]
     assert any("verification failed" in line for line in lines)
@@ -373,7 +385,6 @@ def test_a_verifying_dry_run_lists_a_failing_partition_and_goes_on(
         TABLE,
         dry_run=True,
         verify=True,
-        prioritise=lambda n: None,
         progress=lambda line: None,
     ).stats
     assert stats["compacted"] == 1

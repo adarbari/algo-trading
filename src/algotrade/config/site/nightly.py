@@ -92,14 +92,14 @@ def backfilling(section: Table) -> Mapping[str, Backfilling]:
 @dataclass(frozen=True)
 class CompactionSettings:
     """``[compaction]``: the tables the ``compact-runs`` job may compact (ADR 0078) and how
-    gently it works. Only merge-mode tables without a history copy (a fitness test)."""
+    gently it works. Only merge-mode tables without a history copy (a fitness test). The wait
+    before a swap's superseded files are swept is the storage's ``SWAP_GRACE_S``."""
 
     tables: tuple[str, ...] = ()  # nightly.toml names them (forward_returns@v2 today)
     nice: int = 10  # os.nice increment the job takes on, so the API's reads win CPU contests
-    batch_size: int = 20  # partitions compacted before one wait out of the swap grace and sweep
-    pause_seconds: float = 1.0  # sleep between partitions (bounded I/O)
     partition_seconds: float = 300.0  # a partition slower than this stops the run (slow disk)
-    sweep_grace_seconds: float = 125.0  # a swap spares the old files 120 s; wait out the rest
+    workers: int = 4  # worker processes, each compacting one partition at a time
+    worker_arrow_threads: int = 1  # Arrow CPU and I/O threads of each worker
 
     @classmethod
     def from_table(cls, section: Table) -> "CompactionSettings":
@@ -107,10 +107,9 @@ class CompactionSettings:
         return cls(
             tables=section.strings("tables", d.tables),
             nice=section.integer("nice", d.nice, 0),
-            batch_size=section.integer("batch_size", d.batch_size, 1),
-            pause_seconds=section.number("pause_seconds", d.pause_seconds, 0),
             partition_seconds=section.number("partition_seconds", d.partition_seconds, 1),
-            sweep_grace_seconds=section.number("sweep_grace_seconds", d.sweep_grace_seconds, 0),
+            workers=section.integer("workers", d.workers, 1),
+            worker_arrow_threads=section.integer("worker_arrow_threads", d.worker_arrow_threads, 1),
         )
 
 
@@ -198,8 +197,8 @@ class NightlySettings:
             root.table(
                 "compaction",
                 [
-                    *("tables", "nice", "batch_size", "pause_seconds"),
-                    *("partition_seconds", "sweep_grace_seconds"),
+                    *("tables", "nice"),
+                    *("partition_seconds", "workers", "worker_arrow_threads"),
                 ],
             )
         )
