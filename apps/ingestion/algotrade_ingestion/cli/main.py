@@ -277,7 +277,8 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
     )
     add_wait(ps)
     dh = sub.add_parser(
-        "deploy-hold", help="run a command under the deploy and ingest locks (exit 75: busy)"
+        "deploy-hold",
+        help="run a command under the deploy, ingest and ingest-tree locks (exit 75: busy)",
     )
     dh.add_argument("--deploy-only", action="store_true", help="take the deploy lock alone")
     dh.add_argument("cmd", nargs=argparse.REMAINDER)
