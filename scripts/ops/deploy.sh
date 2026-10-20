@@ -79,10 +79,9 @@ main() {
 
   # ---- phase A: guards, fetch, plan (no lock) ----------------------------------------------
   if [ "$mode" = auto ] && [ -f "$state/blocked" ]; then
-    # a serving block must not stall the ingest checkout: bring it to the last fetched target
-    local held
-    held=$(git rev-parse -q --verify "$PRIVATE_REF" 2> /dev/null || true)
-    if [ -n "$held" ]; then ingest_sync "$script" "$slot" "$held"; fi
+    # a serving block must not stall the ingest checkout, but it only moves to the last commit
+    # served successfully (last_sha): never to the target whose deploy just failed
+    if [ -f "$state/last_sha" ]; then ingest_sync "$script" "$slot" "$(cat "$state/last_sha")"; fi
     return 0
   fi
   need_tools || return 1

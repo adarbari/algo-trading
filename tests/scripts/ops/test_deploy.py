@@ -714,14 +714,28 @@ def test_an_index_lock_on_the_ingest_checkout_is_busy_not_a_block(site: Site) ->
     assert site.run("--auto").returncode == 0 and _main_head(site) == sha  # retried
 
 
-def test_a_serving_block_does_not_stall_the_ingest_checkout(site: Site) -> None:
-    site.seed()
-    sha = _advance(site.repo, "src/a.py")
-    before_main = _main_head(site)
-    assert site.run("--auto", STUB_VERIFY_RC="1").returncode == 1  # serving blocks
-    assert site.state("blocked").exists() and _main_head(site) == before_main
-    assert site.run("--auto").returncode == 0  # blocked cycle: still syncs the ingest checkout
-    assert _main_head(site) == sha and site.state("blocked").exists()
+def test_a_serving_block_syncs_the_ingest_checkout_only_to_the_last_served_commit(
+    site: Site,
+) -> None:
+    served = _advance(site.repo, "src/a.py")
+    site.state("last_sha").parent.mkdir(parents=True, exist_ok=True)
+    assert site.run("--auto").returncode == 0  # seeds last_sha at the tree's HEAD
+    site.state("last_sha").write_text(served + "\n")  # the last commit served successfully
+    failed = _advance(site.repo, "src/b.py")
+    assert site.run("--auto", STUB_VERIFY_RC="1").returncode == 1  # serving blocks at `failed`
+    assert site.state("blocked").exists()
+    assert site.run("--auto").returncode == 0  # blocked cycle: the ingest sync still runs
+    assert _main_head(site) == served != failed  # never the commit serving rejected
+    assert site.state("blocked").exists()
+
+
+def test_a_serving_block_with_no_last_sha_skips_the_ingest_sync(site: Site) -> None:
+    before = _main_head(site)
+    _advance(site.repo, "src/a.py")
+    site.state("blocked").parent.mkdir(parents=True, exist_ok=True)
+    site.state("blocked").write_text("x\n")
+    assert site.run("--auto").returncode == 0
+    assert _main_head(site) == before and site.called() == []
 
 
 def test_the_default_ingest_program_is_the_release_trees_own(site: Site) -> None:
