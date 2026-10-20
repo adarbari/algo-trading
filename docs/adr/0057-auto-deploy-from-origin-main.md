@@ -30,7 +30,7 @@ without a bad deploy silently taking the site down.
    parsed it before the merge rewrites it.
 4. **Never over an ingest.** The merge and every action run under the store's `deploy` lock and
    its `ingest` run lock (`Backend.lock`, `exclusive_run`, no waiting). Either taken: log
-   "skipped" and try again in five minutes. A nightly that finds the deploy lock held is rerun by
+   "skipped" and try again in five minutes. A nightly that finds the ingest lock held (it takes only that lock) is rerun by
    its watchdog; a manual ingest exits busy as for any second run.
    *Amendment 2026-10-09 (owner):* the ingest lock is taken only when the change touches
    something a running ingest loads, because a multi-hour backfill otherwise blocked even
@@ -65,3 +65,6 @@ without a bad deploy silently taking the site down.
 
 ## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
 See [0077](0077-serving-release.md): the deploy gate checks release format compatibility (rebuilds or holds) and deploys blue/green after a health and latency probe, replacing decision 6's restart (plists written by code, installed by the owner).
+
+## Amendment 2026-10-20: the release tree (accepted, ADR 0079)
+See [0079](0079-release-tree-deploy.md): serving deploys from a separate release tree and takes only the `deploy` lock; the ingest lock of decision 4 and its 2026-10-09 amendment applies only to bringing the main checkout (what ingestion runs) forward, which never blocks serving.
