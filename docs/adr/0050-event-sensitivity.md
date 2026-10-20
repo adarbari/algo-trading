@@ -160,3 +160,31 @@ from the next one; an early-close day uses its own close.
    from `ts`.
 4. **Forms.** SC TO-T (a third party's tender offer) joins the kept forms; with the form tag
    change the backfill reads it with the rest.
+
+## Amendment 2026-10-20: FINRA backfills are known from the publication schedule
+
+The short-interest and short-volume tasks floored every row's `known_from` at the session after
+the fetch (`max(schedule, next session after the run)`). The history backfilled on 2026-10-19
+was therefore known only from 2026-10-20: `rollups/instrument/short_interest@v1` was empty for
+every earlier session, the nightly of 2026-10-19 failed its `screens` step on `short_squeeze_dtc`,
+and the edge `short_squeeze_days_to_cover` had no usable history. That floor contradicted
+decision 3 (a backfilled past event gets its event date) and the rejected option of hiding
+backfilled events behind the storage stamp.
+
+1. **Rule** (`tasks/shorting/daily.py::row_known_from`, the rule `fund_nav` already uses). A row
+   never stored and not flagged revised (`revision_flag` null or blank; short volume has no
+   flag) is known from the schedule's date (`schedule.py`). A flagged row, or a stored row
+   whose values differ (a restatement or re-posted file), is known from
+   `max(schedule, next session after the fetch)`: merge mode replaces the original row, so no
+   session before it may read the new value. A stored row with identical values keeps the
+   earlier of its stamp and the schedule's date (a flagged one keeps its stamp), which is what
+   lets a `--force` refetch repair the old stamps.
+2. **Disclosed residual risk.** A re-post that arrived before our first fetch, or a restatement
+   FINRA does not flag, cannot be told from the original: history may carry a small lookahead of
+   that kind. A restated row erases the first-seen one, so it reads as missing in between,
+   never as wrong.
+3. **Repair (manual, live store).** `algotrade-ingest run short-interest --from 2017-12-29
+   --force` and `run short-volume --from <first stored date> --force`, then rerun the rollups
+   `short_interest@v1` (and any short-volume rollup) over the history and the screens and edge
+   evaluation of the sessions since. No feature version is bumped: no consumer read the empty
+   history.

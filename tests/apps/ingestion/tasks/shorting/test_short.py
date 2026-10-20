@@ -4,8 +4,9 @@ resumable (a stored date is skipped, ``force`` refetches), an unpublished date `
 failed date PARTIAL, and the nightly window defaults."""
 
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
+import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
@@ -15,6 +16,7 @@ from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.registry import run_task
 from algotrade_ingestion.tasks.shorting import short_interest, short_volume
+from algotrade_ingestion.tasks.shorting.daily import row_known_from
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.finra.short_interest import FinraShortInterest
 from algotrade_sources.vendors.finra.short_volume import FinraShortVolume
@@ -155,28 +157,101 @@ def test_a_session_is_required(module) -> None:
         module.run(task_ctx(_writer()), {})
 
 
-def test_known_from_is_never_before_the_session_after_the_fetch() -> None:
-    """A backfill, a ``--force`` refetch or a restated row holds values we did not have before the
-    fetch: known_from = max(schedule, next session after the fetch), never the schedule alone."""
+def _clock() -> datetime:
+    return datetime(2026, 11, 20, 22, tzinfo=UTC)  # a Friday evening in New York
 
+
+FETCH_FLOOR = date(2026, 11, 23)  # the session after that fetch
+
+
+def _interest_known(writer: StoreWriter, settlement: date) -> dict[str, date]:
+    frame = StoreReader(writer._backend).table("events/short_interest", settlement)
+    assert frame is not None
+    return dict(zip(frame["instrument_id"], frame["known_from"], strict=True))
+
+
+def _fetch_interest(
+    writer: StoreWriter, settlement: date, later: bool = False, **params: object
+) -> None:
     def clock() -> datetime:
-        return datetime(2026, 11, 20, 22, tzinfo=UTC)  # a Friday evening in New York
+        return _clock() + timedelta(seconds=2 if later else 0)  # a later run id wins the merge
 
-    writer = _writer()
     ctx = task_ctx(writer, clock=clock, sources={short_interest.SOURCE: _interest([])})
     short_interest.run(
-        ctx, {"session": date(2026, 11, 20), "start": date(2026, 9, 30), "end": date(2026, 9, 30)}
+        ctx,
+        {"session": date(2026, 11, 20), "start": settlement, "end": settlement, **params},
     )
-    ctx = task_ctx(writer, clock=clock, sources={short_volume.SOURCE: _volume([])})
+
+
+def test_a_backfilled_report_is_known_from_its_publication_not_the_fetch() -> None:
+    """The bug of 2026-10-19: a backfill stamped every past report known_from the session after
+    the fetch, so rollups short_interest@v1 was empty for every session before it. A report
+    FINRA does not flag as revised is known from the schedule's date; a flagged one (OTCX, not
+    in the universe, so BBB is made flagged below) only from the session after the fetch."""
+    writer = _writer()
+    _fetch_interest(writer, date(2026, 9, 30))
+    known = _interest_known(writer, date(2026, 9, 30))
+    assert set(known.values()) == {date(2026, 10, 12)}  # the schedule's date, not the fetch's
+    ctx = task_ctx(writer, clock=_clock, sources={short_volume.SOURCE: _volume([])})
     short_volume.run(
         ctx, {"session": date(2026, 11, 20), "start": date(2026, 10, 16), "end": date(2026, 10, 16)}
     )
-    reader = StoreReader(writer._backend)
-    interest = reader.table("events/short_interest", date(2026, 9, 30))
-    volume = reader.table("events/short_volume", date(2026, 10, 16))
-    assert interest is not None and volume is not None
-    assert set(interest["known_from"]) == {date(2026, 11, 23)}  # schedule said 2026-10-12
-    assert set(volume["known_from"]) == {date(2026, 11, 23)}  # schedule said 2026-10-19
+    volume = StoreReader(writer._backend).table("events/short_volume", date(2026, 10, 16))
+    assert volume is not None and set(volume["known_from"]) == {date(2026, 10, 19)}
+
+
+def _row(**values: object) -> pd.DataFrame:
+    base = {
+        "instrument_id": "EQ:AAA",
+        "ts": pd.Timestamp("2026-09-30", tz="UTC"),
+        "short_position": 5,
+    }
+    return pd.DataFrame([{**base, **values}])
+
+
+SCHED = date(2026, 10, 12)
+
+
+def _stored(known_from: date, **values: object) -> pd.DataFrame:
+    return _row(known_from=known_from, published=date(2026, 10, 9), **values)
+
+
+@pytest.mark.parametrize(
+    ("row", "stored", "expected"),
+    [
+        (_row(revision_flag=None), None, SCHED),  # never stored, unflagged
+        (_row(revision_flag=" "), None, SCHED),  # a blank flag is no flag
+        (_row(revision_flag="R"), None, FETCH_FLOOR),  # flagged: when restated is unknown
+        (_row(), _stored(FETCH_FLOOR), SCHED),  # stored identical unflagged: restamped earlier
+        (_row(), _stored(date(2026, 10, 8)), date(2026, 10, 8)),  # never later than stored
+        (_row(revision_flag="R"), _stored(FETCH_FLOOR, revision_flag="R"), FETCH_FLOOR),
+        (_row(short_position=6), _stored(date(2026, 10, 12)), FETCH_FLOOR),  # restated value
+    ],
+)
+def test_row_known_from_rule(
+    row: pd.DataFrame, stored: pd.DataFrame | None, expected: date
+) -> None:
+    assert row_known_from(row, SCHED, FETCH_FLOOR, stored).iloc[0] == expected
+
+
+def test_a_forced_refetch_restamps_rows_stamped_by_the_old_rule() -> None:
+    """The live-store repair: partitions stamped with the fetch session by the old rule move to
+    the schedule's date when forced again and their values are unchanged."""
+    writer = _writer()
+    _fetch_interest(writer, date(2026, 9, 30))
+    frame = StoreReader(writer._backend).table("events/short_interest", date(2026, 9, 30))
+    assert frame is not None
+    old = frame.assign(known_from=FETCH_FLOOR)
+    writer.write_table(
+        "events/short_interest",
+        date(2026, 9, 30),
+        "short-interest-2026-11-20-20261120T220001Z",
+        old,
+        restates=True,
+    )
+    assert set(_interest_known(writer, date(2026, 9, 30)).values()) == {FETCH_FLOOR}
+    _fetch_interest(writer, date(2026, 9, 30), later=True, force=True)
+    assert set(_interest_known(writer, date(2026, 9, 30)).values()) == {date(2026, 10, 12)}
 
 
 def test_backfilled_dates_resolve_against_their_own_reference() -> None:

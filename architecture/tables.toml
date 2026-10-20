@@ -145,13 +145,13 @@ note = "Edge build D10 / D10b: the plain text of the Item sections (by default r
 name = "events/short_interest"
 owner = "apps/ingestion/algotrade_ingestion/tasks/shorting/short_interest.py"
 no_ml = true
-note = "EB D9: FINRA short interest twice a month by settlement date; known_from = the session after the 7th business day (publication); no_ml: the finra.org terms bar machine learning, so no learned scorer reads it (tests/architecture/data/test_no_ml_tables.py)"
+note = "EB D9: FINRA short interest twice a month by settlement date; known_from = the session after the 7th business day (publication), a flagged or restated row the session after the fetch (ADR 0050 amendment 2026-10-20); no_ml: the finra.org terms bar machine learning, so no learned scorer reads it (tests/architecture/data/test_no_ml_tables.py)"
 
 [[table]]
 name = "events/short_volume"
 owner = "apps/ingestion/algotrade_ingestion/tasks/shorting/short_volume.py"
 no_ml = true
-note = "EB D9: FINRA Reg SHO daily short-sale volume by trade date (facilities summed, off-exchange only); known_from = the session after the trade date; no_ml, as events/short_interest"
+note = "EB D9: FINRA Reg SHO daily short-sale volume by trade date (facilities summed, off-exchange only); known_from = the session after the trade date (a changed re-post: the session after the fetch); no_ml, as events/short_interest"
 
 [[table]]
 name = "events/fund_nav"
