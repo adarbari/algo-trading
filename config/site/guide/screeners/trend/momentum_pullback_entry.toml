@@ -24,6 +24,7 @@ related = [
 
 [[sources]]
 title = "Connors and Alvarez, Short Term Trading Strategies That Work (2009)"
+url = "https://openlibrary.org/works/OL19901979W"
 note = "Backtests short-term mean-reversion rules, including buying after a one-day weak close."
 
 [[sources]]

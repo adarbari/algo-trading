@@ -17,6 +17,7 @@ related = [
 
 [[sources]]
 title = "Faber, Global Value: Building Trading Models with the 10 Year CAPE (2012)"
+url = "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2129474"
 note = "Choosing country markets by their 10-year CAPE beat an equal-weight basket in a backtest of more than 30 countries."
 
 [asks]

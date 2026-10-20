@@ -8,7 +8,7 @@ hit = "An unleveraged ETF whose close is above the mean of its last 200 closes. 
 not_checked = "It does not use Faber's 10-month average of month-end closes, add dividends or check liquidity. The 200-day mean is the stored stand-in for about 210 sessions."
 before_acting = [
   "Faber's rule reads a 10-month average at month end. This screen reads the 200-day mean every day, so a name can pass at month end and not the day after.",
-  "Timing by a moving average gives up return in rising markets and earns its keep in the few deep falls; Zakamulin finds it out of the market most of the time.[^2]",
+  "Timing by a moving average gives up return in rising markets and earns its keep in the few deep falls; Zakamulin finds it gave no significant gain in the later half of 155 years and many false signals.[^2]",
   "Read feature.pct_vs_sma_200 for the size of the margin: a fund 0.1 percent above its average is a coin flip.",
 ]
 related = [
@@ -17,11 +17,12 @@ related = [
 
 [[sources]]
 title = "Faber, A Quantitative Approach to Tactical Asset Allocation (2007)"
+url = "https://doi.org/10.3905/jwm.2007.674809"
 note = "Holding an asset class only while it is above its 10-month average gave equity-like returns with smaller drawdowns."
 
 [[sources]]
-title = "Zakamulin, A comprehensive look at the empirical performance of moving average trading strategies (2016)"
-url = "https://papers.ssrn.com/abstract=2677212"
+title = "Zakamulin, A comprehensive look at the empirical performance of moving average trading strategies (2015)"
+url = "https://doi.org/10.2139/ssrn.2677212"
 note = "Over 155 years, moving-average timing gave no significant gain in the second half and produced many false signals, but did better in bear markets."
 
 [asks]
