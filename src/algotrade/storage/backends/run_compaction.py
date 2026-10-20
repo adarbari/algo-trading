@@ -12,17 +12,20 @@ same values; only a row's stamps can differ (earlier: when the value was first k
 The plan is pure: it takes the entries and a function reading a run's rows, and touches no store.
 A partition the argument does not hold for is skipped with a reason: ``knowledge_ts`` order
 differing from ``visible_from`` order (or commit order), or any restating run. ``verify`` checks
-the result before a backend swaps it in (``Commits.swap_runs`` locally).
+the result before a backend swaps it in (``Commits.swap_runs`` locally). Verification is
+vectorised Arrow (a per-row Python hash of ~120 views took minutes on a 20-run partition) and
+bounded by a ``Budget``.
 """
 
 import math
-from collections import Counter
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from itertools import pairwise
+from time import monotonic
 
 import pandas as pd
 import pyarrow as pa
+import pyarrow.compute as pc
 
 from algotrade.storage.backends.arrow import concat, table_spec
 from algotrade.storage.backends.run_selection import (
@@ -37,10 +40,28 @@ from algotrade.storage.tables.schemas import table_key
 
 STAMPS = frozenset({"knowledge_ts", "run_id"})
 _NAN = ("nan",)  # one value for every NaN, so two NaNs are equal
+_LEFT, _RIGHT = "__left", "__right"  # row counts per side in a multiset comparison
+OVER_BUDGET = "verification over budget"
 
 
 class CompactionVerificationError(RuntimeError):
     """The compacted partition does not read as the original at some cut: nothing was swapped."""
+
+
+class CompactionOverBudgetError(RuntimeError):
+    """The partition's time budget was spent: nothing was swapped, the partition is skipped."""
+
+
+class Budget:
+    """A partition's time budget: ``check`` raises once ``seconds`` have passed since it began."""
+
+    def __init__(self, seconds: float | None, clock: Callable[[], float] = monotonic) -> None:
+        self.clock = clock
+        self.end = None if seconds is None else clock() + seconds
+
+    def check(self) -> None:
+        if self.end is not None and self.clock() >= self.end:
+            raise CompactionOverBudgetError(OVER_BUDGET)
 
 
 @dataclass(frozen=True)
@@ -89,6 +110,7 @@ def plan_compaction(
     table: str,
     entries: Mapping[str, RunEntry],
     read_run_table: Callable[[str, RunEntry], pa.Table],
+    budget: Budget | None = None,
 ) -> CompactionPlan:
     """Scheme E2 over one partition's current entries (see the module docstring)."""
     spec = table_spec(table)
@@ -104,6 +126,8 @@ def plan_compaction(
     merged_columns: list[str] = []
     kept_columns: set[str] = set()
     for i, run in enumerate(order):
+        if budget:
+            budget.check()
         data = read_run_table(run, entries[run])
         names = [c for c in data.column_names if c not in STAMPS]
         key = table_key(spec, data.column_names)
@@ -155,8 +179,72 @@ def _merged(table: str, runs: list[str], tables: Mapping[str, pa.Table]) -> pa.T
     return merge_rows(table, data) if len(runs) > 1 else data
 
 
-def _digest(data: pa.Table | None, names: list[str]) -> list[int]:
-    return [] if data is None else sorted(hash(repr(row)) for row in _rows(data, names))
+def _comparable(data: pa.Table | None, names: list[str], rows: int) -> pa.Table:
+    """``names`` of ``data`` as groupable columns (a missing one is null; a list column, which
+    Arrow cannot group on, becomes one string per row, NaNs as one value)."""
+    columns: list[pa.ChunkedArray | pa.Array] = []
+    for name in names:
+        if data is None or name not in data.column_names:
+            columns.append(pa.nulls(rows))
+        elif pa.types.is_nested(data.schema.field(name).type):
+            columns.append(pa.array([repr(v) for v in _column(data, name)], pa.string()))
+        else:
+            columns.append(data.column(name))
+    return pa.table(columns, names=names)
+
+
+def _multiset_gap(
+    left: pa.Table | None, right: pa.Table | None, names: list[str], subset: bool
+) -> bool:
+    """Whether ``left`` is not equal (``subset`` False) or not contained (``subset`` True) as a
+    multiset of rows over ``names``: null equals null and NaN equals NaN, any other value only
+    itself. One vectorised group-by over both tables, no per-row Python."""
+    n_left = 0 if left is None else left.num_rows
+    n_right = 0 if right is None else right.num_rows
+    if not names or not n_left or not n_right:
+        return n_left > n_right if subset else n_left != n_right
+    both = pa.concat_tables(
+        [
+            _comparable(left, names, n_left).append_column(_LEFT, pa.array([1] * n_left)),
+            _comparable(right, names, n_right).append_column(_LEFT, pa.array([0] * n_right)),
+        ],
+        promote_options="permissive",
+    )
+    both = both.append_column(_RIGHT, pc.subtract(1, both.column(_LEFT)))
+    sums = both.group_by(names, use_threads=False).aggregate([(_LEFT, "sum"), (_RIGHT, "sum")])
+    a, b = sums.column(f"{_LEFT}_sum"), sums.column(f"{_RIGHT}_sum")
+    return bool(pc.any(pc.greater(a, b) if subset else pc.not_equal(a, b)).as_py())
+
+
+def _check_sources(
+    kept_tables: Mapping[str, pa.Table], sources: Mapping[str, pa.Table], budget: Budget | None
+) -> None:
+    for run, kept in kept_tables.items():
+        if budget:
+            budget.check()
+        source = sources[run]
+        if kept.column_names != source.column_names or _multiset_gap(
+            kept, source, kept.column_names, subset=True
+        ):
+            raise CompactionVerificationError(f"run {run}: a kept row is not in its source")
+
+
+def _views(
+    entries: Mapping[str, RunEntry], kept: Mapping[str, RunEntry]
+) -> list[tuple[Mapping[str, RunEntry], Mapping[str, RunEntry], pd.Timestamp | None]]:
+    cuts: list[pd.Timestamp | None] = [None]
+    for entry in entries.values():
+        cuts += [entry.visible_from, entry.visible_from - pd.Timedelta(microseconds=1)]
+    views = [(entries, kept, cut) for cut in cuts]
+    for upto in sorted({e.seq for e in entries.values() if e.seq is not None}):
+        old_seen = visible_entries(entries, upto)
+        if any(old_seen[r] is not entries[r] for r in old_seen):
+            continue  # an older version of a run is involved: its rows are not loaded here
+        try:
+            views.append((old_seen, visible_entries(kept, upto), None))
+        except StaleSnapshotError:
+            continue  # the read retries at a fresh sequence: it never mixes
+    return views
 
 
 def verify_plan(
@@ -165,41 +253,41 @@ def verify_plan(
     sources: Mapping[str, pa.Table],
     kept_entries: Mapping[str, RunEntry],
     kept_tables: Mapping[str, pa.Table],
+    budget: Budget | None = None,
 ) -> None:
     """Raise ``CompactionVerificationError`` unless the kept runs read, at every ``visible_from``,
-    one microsecond before it and with no ``as_of``, as the original runs do: same key set and
-    row count and the same sorted hash of every column but the stamps; each row stamped at or
-    before the cut; and every kept row exists unchanged in its source run."""
-    for run, kept in kept_tables.items():
-        source = sources[run]
-        extra = Counter(_rows(kept, kept.column_names)) - Counter(_rows(source, kept.column_names))
-        if kept.column_names != source.column_names or extra:
-            raise CompactionVerificationError(f"run {run}: a kept row is not in its source")
-    cuts: list[pd.Timestamp | None] = [None]
-    for entry in entries.values():
-        cuts += [entry.visible_from, entry.visible_from - pd.Timedelta(microseconds=1)]
-    views = [(entries, kept_entries, cut) for cut in cuts]
-    for upto in sorted({e.seq for e in entries.values() if e.seq is not None}):
-        old_seen = visible_entries(entries, upto)
-        if any(old_seen[r] is not entries[r] for r in old_seen):
-            continue  # an older version of a run is involved: its rows are not loaded here
-        try:
-            views.append((old_seen, visible_entries(kept_entries, upto), None))
-        except StaleSnapshotError:
-            continue  # the read retries at a fresh sequence: it never mixes
-    for old_entries, new_entries, cut in views:
-        old = _merged(table, select_runs(old_entries, cut, "merge"), sources)
-        new = _merged(table, select_runs(new_entries, cut, "merge"), kept_tables)
+    one microsecond before it, with no ``as_of`` and at every pinned sequence, as the original
+    runs do: same columns, key set, row count and values of every column but the stamps (as
+    multisets of rows); each row stamped at or before the cut; and every kept row exists
+    unchanged in its source run. A view whose selected runs (old and kept) were already compared
+    is not compared again (only its cut is added to the stamp check). ``budget`` raises
+    ``CompactionOverBudgetError`` when spent."""
+    _check_sources(kept_tables, sources, budget)
+    seen: dict[tuple[tuple[str, ...], tuple[str, ...]], list[pd.Timestamp | None]] = {}
+    for old_entries, new_entries, cut in _views(entries, kept_entries):
+        if budget:
+            budget.check()
+        old_runs = tuple(select_runs(old_entries, cut, "merge"))
+        new_runs = tuple(select_runs(new_entries, cut, "merge"))
+        if (old_runs, new_runs) in seen:
+            held = seen[old_runs, new_runs]
+            if cut is not None and (held[1] is None or cut < held[1]):
+                held[1] = cut
+            continue
+        old = _merged(table, list(old_runs), sources)
+        new = _merged(table, list(new_runs), kept_tables)
         old_cols = [] if old is None else old.column_names
         new_cols = [] if new is None else new.column_names
         if set(old_cols) != set(new_cols):
             raise CompactionVerificationError(f"columns differ at {cut}")
         names = sorted(c for c in old_cols if c not in STAMPS)
-        if (0 if old is None else old.num_rows) != (0 if new is None else new.num_rows) or (
-            _digest(old, names) != _digest(new, names)
-        ):
+        if _multiset_gap(old, new, names, subset=False):
             raise CompactionVerificationError(f"values differ at {cut}")
-        if cut is not None and new is not None and "knowledge_ts" in new.column_names:
-            stamped = [pd.Timestamp(v) for v in new.column("knowledge_ts").to_pylist() if v]
-            if stamped and max(stamped) > cut:
-                raise CompactionVerificationError(f"a row is stamped after the cut {cut}")
+        newest = None
+        if new is not None and "knowledge_ts" in new.column_names:
+            top = pc.max(new.column("knowledge_ts")).as_py()
+            newest = None if top is None else pd.Timestamp(top)
+        seen[old_runs, new_runs] = [newest, cut]
+    for newest, tightest in seen.values():
+        if newest is not None and tightest is not None and newest > tightest:
+            raise CompactionVerificationError(f"a row is stamped after the cut {tightest}")

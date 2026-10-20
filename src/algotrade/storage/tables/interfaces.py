@@ -188,7 +188,12 @@ class TableStore(Protocol):
         ...
 
     def compact_runs(
-        self, table: str, session_date: date, dry_run: bool = False
+        self,
+        table: str,
+        session_date: date,
+        dry_run: bool = False,
+        verify: bool = False,
+        budget_s: float | None = None,
     ) -> CompactionReport:
         """Replace one merge-table partition's runs by the fewest rows that read the same at every
         ``as_of`` and every pinned sequence (ADR 0078, ``backends/run_compaction.py``). A swap of
@@ -197,7 +202,10 @@ class TableStore(Protocol):
         untouched with ``skipped`` saying why; a result that fails its own verification raises
         ``CompactionVerificationError`` with nothing changed; ``PartitionBusyError`` when a pending
         run wrote to it. The superseded files stay for ``SWAP_GRACE_S`` (a read that resolved them
-        finishes) and go with ``sweep_orphans``. ``dry_run``: the report only. Admin rewrite,
+        finishes) and go with ``sweep_orphans``. ``dry_run``: the report only, from the plan alone
+        unless ``verify`` (then the plan is also verified, in memory). ``budget_s`` bounds the
+        partition's planning and verifying: over it nothing is swapped and the partition is
+        skipped (``skipped`` "verification over budget"). Admin rewrite,
         never part of a run."""
         ...
 

@@ -17,13 +17,20 @@ caller:
 - a swap leaves the superseded files for ``sweep_orphans`` once their grace has passed: a batch
   is compacted, the remaining grace is waited out once, then the batch is swept; a partition
   that needed no swap is swept at once (leftovers of an earlier crash or stop);
-- a partition slower than ``partition_seconds`` stops the run.
+- ``partition_seconds`` bounds each partition: planning and verifying stop at it (the partition
+  is skipped with "verification over budget", nothing swapped, new files discarded), and a
+  partition that took longer in total (a slow disk) stops the run;
+- one progress line per partition and per sweep goes to stderr, flushed, from the first
+  partition (a long run must not look dead).
 
 ``--limit N`` stops after N partitions were compacted. ``--dry-run`` writes nothing, takes no
 lock, and reports per-partition files and bytes before and after, the runs dropped, the
-partitions it would skip and why, and the estimated saving. The report is the task's printed
-summary; no run record is saved (it would move ``runs_generation`` and evict every cached
-page) and no table is published. The ``deploy`` lock is held for the whole run (ADR 0057),
+partitions it would skip and why, and the estimated saving. It plans only (fast) unless
+``--verify``, which also runs the verification a live run does (the slow part: minutes on a
+partition of many runs) in memory; the report and a progress line say which it did. The report
+is the task's printed summary; no run record is saved (it would move ``runs_generation`` and
+evict every cached page) and no table is published. The ``deploy`` lock is held for the whole
+run (ADR 0057),
 never waited for.
 """
 
@@ -46,6 +53,7 @@ from algotrade.services.jobs.exclusive import (
     RunLockedError,
     exclusive_run,
 )
+from algotrade.storage.backends.run_compaction import OVER_BUDGET
 from algotrade.storage.locks import held
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.interfaces import CompactionReport, PartitionBusyError
@@ -61,6 +69,23 @@ def settings_of(ctx: TaskContext) -> tuple[CompactionSettings, float]:
     """``[compaction]`` and ``[resources] min_free_gb`` of ``nightly.toml``."""
     nightly = load_nightly(ctx.configs) if ctx.configs is not None else NightlySettings()
     return nightly.compaction, nightly.min_free_gb
+
+
+def to_stderr(line: str) -> None:
+    """The default progress sink: one flushed line on stderr (the log of a detached run)."""
+    sys.stderr.write(line + "\n")
+    sys.stderr.flush()
+
+
+def describe(day: date, report: CompactionReport, seconds: float) -> str:
+    """One partition's progress line."""
+    if report.skipped:
+        return f"compact-runs {day}: skipped ({report.skipped}) in {seconds:.1f} s"
+    return (
+        f"compact-runs {day}: files {report.files_before} -> {report.files_after}, "
+        f"bytes {report.bytes_before} -> {report.bytes_after}, "
+        f"{report.runs_dropped} runs dropped, {seconds:.1f} s"
+    )
 
 
 IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE = 1, 0, 3  # <sys/resource.h> (darwin)
@@ -145,9 +170,10 @@ class Compactor:
         floor_bytes: float,
         sleep: Callable[[float], None],
         clock: Callable[[], float],
+        progress: Callable[[str], None] = to_stderr,
     ) -> None:
         self.ctx, self.table, self.cfg, self.floor = ctx, table, cfg, floor_bytes
-        self.sleep, self.clock = sleep, clock
+        self.sleep, self.clock, self.progress = sleep, clock, progress
         self.totals = Totals()
         self.stopped: str | None = None
         self.lock_busy = False  # the ingest lock was held: wait for nothing, a later run sweeps
@@ -179,7 +205,7 @@ class Compactor:
                 self.stopped, self.lock_busy = LOCK_HELD, True
                 return False
             try:
-                report = writer.compact_runs(self.table, day)
+                report = writer.compact_runs(self.table, day, budget_s=self.cfg.partition_seconds)
             except PartitionBusyError:
                 report = CompactionReport(skipped="a pending run is writing the partition")
             self.scratch = max(self.scratch, report.bytes_before)
@@ -188,7 +214,9 @@ class Compactor:
                 self.last_swap = self.clock()
             else:
                 self.totals.swept_files += writer.sweep_orphans(self.table, day)
-        if self.clock() - started > self.cfg.partition_seconds:
+        seconds = self.clock() - started
+        self.progress(describe(day, report, seconds))
+        if seconds > self.cfg.partition_seconds and report.skipped != OVER_BUDGET:
             self.stopped = f"{day} took over {self.cfg.partition_seconds:g} s (the disk is slow)"
             return False
         return True
@@ -216,20 +244,39 @@ class Compactor:
         writer = self.ctx.writer
         with held(writer.backend.lock(INGEST_LOCK), wait=False) as taken:
             if taken:
+                swept = self.totals.swept_files
                 for day in self.swapped:
                     self.totals.swept_files += writer.sweep_orphans(self.table, day)
+                self.progress(
+                    f"compact-runs sweep: {self.totals.swept_files - swept} files of "
+                    f"{len(self.swapped)} partitions removed"
+                )
                 self.swapped = []
             elif self.stopped is None:
                 self.stopped, self.lock_busy = LOCK_HELD, True
 
 
-def dry_run_report(ctx: TaskContext, table: str, days: list[date], limit: int | None) -> Totals:
-    """What a run would do, partition by partition; writes nothing and takes no lock."""
+def dry_run_report(
+    ctx: TaskContext,
+    table: str,
+    days: list[date],
+    limit: int | None,
+    verify: bool = False,
+    budget_s: float | None = None,
+    clock: Callable[[], float] = monotonic,
+    progress: Callable[[str], None] = to_stderr,
+) -> Totals:
+    """What a run would do, partition by partition; writes nothing and takes no lock. With
+    ``verify`` each partition's plan is also verified (in memory), as a live run does."""
     totals = Totals()
+    progress(f"compact-runs dry run: {'plan and verify' if verify else 'plan only'}")
     for day in days:
         if limit is not None and totals.compacted >= limit:
             break
-        totals.add(day, ctx.writer.compact_runs(table, day, dry_run=True))
+        started = clock()
+        report = ctx.writer.compact_runs(table, day, dry_run=True, verify=verify, budget_s=budget_s)
+        progress(describe(day, report, clock() - started))
+        totals.add(day, report)
     return totals
 
 
@@ -244,6 +291,8 @@ def compact(
     sleep: Callable[[float], None] = nap,
     clock: Callable[[], float] = monotonic,
     prioritise: Callable[[int], None] = lower_priority,
+    verify: bool = False,
+    progress: Callable[[str], None] = to_stderr,
 ) -> RunRecord:
     """Compact ``table``'s partitions in ``start``..``end`` (oldest first) as the module says."""
     cfg, min_free_gb = settings_of(ctx)
@@ -260,11 +309,15 @@ def compact(
     with IngestRun(ctx, TASK, session, save=False) as run:  # no run record: a saved one would
         # move runs_generation and evict every cached page (ADR 0078 decisions 1 and 5)
         run.stats.update(table=table, dry_run=dry_run, partitions_in_range=len(days))
+        progress(f"compact-runs {table}: {len(days)} partitions in range")
         if dry_run:
-            totals = dry_run_report(ctx, table, days, limit)
+            run.stats["verified"] = verify
+            totals = dry_run_report(
+                ctx, table, days, limit, verify, cfg.partition_seconds, clock, progress
+            )
         else:
             prioritise(cfg.nice)
-            job = Compactor(ctx, table, cfg, min_free_gb * GB, sleep, clock)
+            job = Compactor(ctx, table, cfg, min_free_gb * GB, sleep, clock, progress)
             try:  # a deploy must not run between partitions (ADR 0057): hold its lock throughout
                 with exclusive_run(ctx.writer.backend, DEPLOY_LOCK, wait=False):
                     job.run(days, limit)

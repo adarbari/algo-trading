@@ -767,6 +767,12 @@ TASKS: dict[str, Task] = {
                 TO,
                 Param("limit", ("--limit",), int, "stop after N partitions were compacted"),
                 Param("dry_run", ("--dry-run",), None, "report the saving only; write nothing"),
+                Param(
+                    "verify",
+                    ("--verify",),
+                    None,
+                    "with --dry-run: also verify the plan (slow), as a live run does",
+                ),
             ),
         ),
         Task(
