@@ -77,6 +77,10 @@ class NightlySettings:
     # [steps.<name>] settle_minutes: wait this long after the close before fetching (0: no wait)
     step_settle_minutes: Mapping[str, int] = field(default_factory=dict)
     history_copy: HistoryCopySettings = field(default_factory=HistoryCopySettings)
+    # [resources]: what a running ingest may take from the Mac that also serves the web
+    arrow_cpu_threads: int = 2  # Arrow decode threads (the API caps itself at the same 2)
+    arrow_io_threads: int = 4
+    min_free_gb: float = 15.0  # the nightly refuses to start with less free on the data volume
 
     def deadline_for(self, step: str) -> time:
         return self.step_deadlines.get(step, self.data_deadline)
@@ -90,7 +94,18 @@ class NightlySettings:
     ) -> "NightlySettings":
         d = cls()
         root = Table(doc, where)
-        root.only(["sessions", "alerts", "notify", "schedule", "steps", "history_copy", "post"])
+        root.only(
+            [
+                "sessions",
+                "alerts",
+                "notify",
+                "schedule",
+                "steps",
+                "history_copy",
+                "post",
+                "resources",
+            ]
+        )
         schedule = root.table("schedule", ["data_deadline"])
         declared = root.raw("steps") or {}
         steps_table = root.table("steps", list(declared))
@@ -100,6 +115,9 @@ class NightlySettings:
         post = root.table("post", ["max_duration_minutes"])
         notify = root.table("notify", ["enabled", "desktop", "summary_path", "email"])
         email = notify.table("email", ["enabled", "smtp_host", "smtp_port", "max_examples"])
+        resources = root.table(
+            "resources", ["arrow_cpu_threads", "arrow_io_threads", "min_free_gb"]
+        )
         history_copy = HistoryCopySettings.from_table(
             root.table(
                 "history_copy",
@@ -111,6 +129,9 @@ class NightlySettings:
         )
         return cls(
             history_copy=history_copy,
+            arrow_cpu_threads=resources.integer("arrow_cpu_threads", d.arrow_cpu_threads, 1),
+            arrow_io_threads=resources.integer("arrow_io_threads", d.arrow_io_threads, 1),
+            min_free_gb=resources.number("min_free_gb", d.min_free_gb, 0),
             settle_minutes=sessions.integer("settle_minutes", d.settle_minutes, 0),
             max_catch_up=sessions.integer("max_catch_up", d.max_catch_up, 1),
             max_duration_minutes=alerts.number("max_duration_minutes", d.max_duration_minutes, 0),

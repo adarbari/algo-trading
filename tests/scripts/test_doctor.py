@@ -419,3 +419,11 @@ def test_an_api_out_of_step_with_its_build_warns_with_the_fix(tmp_path: Path) ->
     assert (warn.level, warn.detail) == (doctor.WARN, stale[0])
     assert doctor.check_api_build(probes(tmp_path, {}, api_build=lambda: ())).level == doctor.OK
     assert doctor.check_api_build(probes(tmp_path, {})).level == doctor.INFO  # none answering
+
+
+def test_the_disk_floor_is_the_nightlys_configured_one(tmp_path: Path) -> None:
+    (tmp_path / "config" / "site").mkdir(parents=True)
+    (tmp_path / "config" / "site" / "nightly.toml").write_text("[resources]\nmin_free_gb = 40\n")
+    p = probes(tmp_path, {}, main=lambda: tmp_path, free_bytes=lambda path: 30 * 10**9)
+    assert doctor.check_disk(p).level == doctor.WARN  # 30 GB: fine at the default 15, not at 40
+    assert "40 GB" in doctor.check_disk(p).detail

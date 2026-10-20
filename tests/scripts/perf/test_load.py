@@ -5,6 +5,7 @@ import asyncio
 import importlib.util
 import random
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -171,3 +172,18 @@ def test_verdict_passes_and_fails_on_each_criterion() -> None:
 
 def test_client_keepalive_expires_before_uvicorn_closes_idle_connections() -> None:
     assert load.KEEPALIVE_EXPIRY < 5.0
+
+
+def test_the_writer_publishes_to_its_store_while_it_runs(tmp_path: Path) -> None:
+    """Writer mode: every commit raises the store's ``visible_seq``, which is what makes the
+    API drop its caches and re-warm during a nightly."""
+    import argparse  # noqa: PLC0415
+
+    from algotrade.storage.factory import open_backend  # noqa: PLC0415
+
+    url = f"file://{tmp_path}"
+    args = argparse.Namespace(writer_store=url, publish_every=0.01, writer_cmd="/usr/bin/true")
+    with load.concurrent_writer(args) as report:
+        time.sleep(0.2)
+    assert report["publishes"] >= 2
+    assert open_backend(url).tables.visible_seq() >= report["publishes"]

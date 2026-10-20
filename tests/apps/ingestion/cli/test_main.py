@@ -36,6 +36,9 @@ DAY = fx.SESSION.isoformat()
 def _any_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
     """These tests run from worktrees too; the main-checkout guard has its own tests."""
     monkeypatch.setattr(cli, "ensure_main_checkout", lambda: None)
+    monkeypatch.setattr(
+        cli, "require_free_disk", lambda *_a: None
+    )  # the machine's disk is not a fixture
 
 
 def massive_feed(url: str) -> bytes:
@@ -646,3 +649,27 @@ def test_post_session_runs_after_the_nightly_then_is_a_quiet_no_op(
     assert len(open_backend(data_url()).runs.find("post-session")) == 2
     assert cli.main(["post-session", "--date", "2020-01-02"]) == 2  # no done nightly for it
     assert "no done nightly for 2020-01-02" in capsys.readouterr().err
+
+
+def test_the_nightly_refuses_to_start_on_a_nearly_full_disk(
+    env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """2026-10-19: the disk was 96% full with a nightly writing to it; one clear early refusal."""
+    from collections import namedtuple  # noqa: PLC0415
+
+    from algotrade_ingestion.ops import disk  # noqa: PLC0415
+
+    usage = namedtuple("usage", "total used free")
+    monkeypatch.setattr(cli, "require_free_disk", disk.require_free_disk)
+    monkeypatch.setattr(disk.shutil, "disk_usage", lambda _p: usage(500e9, 490e9, 9.4e9))
+    assert cli.main(["nightly", "--date", DAY, "--workers", "1"]) == 2
+    assert "9.4 GB free" in capsys.readouterr().err
+
+
+def test_ingestion_caps_arrow_threads_from_the_site_config(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[tuple[int, int]] = []
+    monkeypatch.setattr(cli, "limit_threads", lambda cpu, io: seen.append((cpu, io)))
+    cli.main(["arrivals"])
+    assert seen == [(2, 4)]

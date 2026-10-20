@@ -84,6 +84,17 @@ def api_stamp(sdl: str, repo: Path = REPO, now: datetime | None = None) -> Stamp
     return Stamp(git_sha(repo), schema_hash(sdl), now or datetime.now(UTC))
 
 
+def checkout_moved(api: Stamp, repo: Path = REPO) -> str | None:
+    """Why the code this process runs is no longer the checkout's (the deploy merged a newer
+    commit and has not restarted the API yet), else ``None``. The configs are read from the
+    checkout, the code is the process's: until the restart a config key the old code does not
+    know fails every read of it (2026-10-19: hundreds of ``unknown keys`` warm failures)."""
+    now = git_sha(repo)
+    if UNKNOWN in (api.git_sha, now) or now == api.git_sha:
+        return None
+    return f"the checkout is at {now[:SHORT]}, this process runs {api.git_sha[:SHORT]}"
+
+
 def checkout_stamp(repo: Path = REPO) -> Stamp | None:
     """The checkout as it is now (commit, committed schema); ``None`` without the schema file
     (an installed package, not a checkout)."""

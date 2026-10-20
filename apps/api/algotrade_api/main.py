@@ -71,7 +71,7 @@ from algotrade_api.graphql.response_cache import CountWrites, OperationLog, Writ
 from algotrade_api.graphql.schema import CachingRouter, graphql_router, sdl
 from algotrade_api.graphql.warm import CacheWarmer, seed_operations
 from algotrade_api.live import no_live, open_live
-from algotrade_api.ops.build import api_stamp
+from algotrade_api.ops.build import api_stamp, checkout_moved
 from algotrade_api.routes import PUBLIC_ROUTERS, ROUTERS
 from algotrade_api.text_model import OFF as TEXT_MODEL_OFF
 from algotrade_api.text_model import open_text_model
@@ -353,6 +353,7 @@ def create_app(
             lambda: reads(user, None),
             extra=partial(warm_steps, app.state.store.preview_cache),
             replay=gql.replay,
+            stale=lambda: checkout_moved(app.state.build),
         )
         if settings.live
         else None
