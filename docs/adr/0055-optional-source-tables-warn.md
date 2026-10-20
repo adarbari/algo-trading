@@ -90,3 +90,23 @@ is unchanged (a stored field of an optional group is covered, so a screen withou
 warns and is not PARTIAL). The fallback test still applies to every other optional group.
 
 **Who decides.** `architect` review of the diff, for each new sole-source group.
+
+## Amendment: a declared backfill window (2026-10-20)
+**Context.** `lazy_prices_similar`, `risk_factor_unchanged` (HARD criteria on
+`filing_text_similarity@v1`) and `etf_launch_recent` (HARD on `etf_launches@v1`) are PARTIAL
+while those tables have no data, and the critical `screens` step failed on 2026-10-19 and held
+every later session (the filing text backfill takes days). Marking the groups optional would
+break the fitness rule above (no HARD criterion on an optional group), and they are not
+optional: after the backfill the screens need them.
+
+**Rule.** `config/site/nightly.toml [backfilling]` declares per table (the name a run's
+`missing_tables` lists) `{ until = "YYYY-MM-DD", reason }`; `NightlySettings` refuses a name that
+is not a rollup table, a missing or malformed `until`, or a missing `reason`
+(`test_every_declared_backfill_names_a_stored_rollup_table` checks the table is stored).
+`screens.while_backfilling` turns a FAILED screens step into SUCCEEDED when every screener short
+of coverage is a PARTIAL job whose non-empty `missing_tables` are all declared with `until` on or
+after the wall-clock date; each is one WARN `backfilling` naming the table, date and reason. The
+run stays stored PARTIAL. A FAILED job, any other missing table or an expired entry still fails
+the step, so a forgotten entry lapses and fails loudly. Once data lands the sessions are COMPLETE
+and the entry is inert; the PR that confirms a backfill deletes its entry. Sessions already
+stored PARTIAL are rerun with `algotrade-ingest screen --date D --config <id>`.

@@ -5,8 +5,9 @@ before the stored history is not computed; a window not yet closed is refused; h
 from the open edge documents; the acceptance check passes on the run's own rows and fails on a
 name that has neither a row nor a reason."""
 
+from collections.abc import Callable
 from dataclasses import replace
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -29,7 +30,7 @@ from algotrade_ingestion.tasks.derived.outcomes import (
     horizons_and_benchmarks,
 )
 from tests.conftest import REPO_ROOT
-from tests.helpers.ingest_fakes import task_ctx
+from tests.helpers.ingest_fakes import FIXED, task_ctx
 from tests.helpers.rollup_store import (
     END,
     SPY,
@@ -146,7 +147,7 @@ def test_a_delisting_the_reference_notices_later_turns_a_reason_into_a_row() -> 
     assert "EQ:D" not in set(_partition(reader, start, days[-3])["instrument_id"])
     # the weekly build notices on days[-1]; that night rechecks the window ending days[-3]
     write_rows(writer, "instruments/reference", days[-1], _reference(days[-1]))
-    compute_outcomes(task_ctx(writer), days[-1])
+    compute_outcomes(task_ctx(writer, clock=_night(1)), days[-1])
     d = _partition(reader, start, days[-3])
     assert d.loc[d["instrument_id"] == "EQ:D", "outcome_status"].tolist() == ["DELISTED"]
     assert [c.status for c in check_outcomes(reader, days[-3], task_ctx(writer).settings)] == [
@@ -256,7 +257,7 @@ def test_outcome_rows_bounded() -> None:
     [check] = check_outcomes(reader, END, settings)
     assert check.status == "FAIL" and "EQ:A" in check.detail and "bar-quality" in check.detail
     _flag(writer, reader, "EQ:A", END)  # flagged: the row becomes UNMEASURED, nothing to explain
-    compute_outcomes(task_ctx(writer), END)
+    compute_outcomes(task_ctx(writer, clock=_night(1)), END)
     assert [c.status for c in check_outcomes(reader, END, settings)] == ["PASS"]
 
 
@@ -284,3 +285,81 @@ def test_a_blended_benchmark_is_never_a_stored_benchmark(monkeypatch: pytest.Mon
     monkeypatch.setattr(outcomes_task, "load_edges", lambda configs: (book,))
     horizons, benchmarks = horizons_and_benchmarks()
     assert 21 in horizons and benchmarks == ["SPY"]  # the default only, no ``mix:``
+
+
+def _night(hours: int) -> Callable[[], datetime]:
+    """A clock ``hours`` after the fixed one: a run id carries its start time, so a second run on
+    the same clock would overwrite the first run's files."""
+    return lambda: FIXED + timedelta(hours=hours)
+
+
+def _spy_written(monkeypatch: pytest.MonkeyPatch) -> list[pd.DataFrame]:
+    """The frames the task would write: ``changed_rows``' result (nightly) per partition."""
+    seen: list[pd.DataFrame] = []
+    real = outcomes_task.changed_rows
+
+    def spy(stored: pd.DataFrame | None, out: pd.DataFrame) -> pd.DataFrame:
+        fresh = real(stored, out)
+        seen.append(fresh)
+        return fresh
+
+    monkeypatch.setattr(outcomes_task, "changed_rows", spy)
+    return seen
+
+
+def _stored_rows(reader: StoreReader) -> int:
+    return sum(len(p) for d in reader.dates(TABLE) if (p := reader.table(TABLE, d)) is not None)
+
+
+def test_a_rerun_that_changes_nothing_writes_no_rows_and_passes_acceptance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    writer, reader, _days = _store()
+    compute_outcomes(task_ctx(writer), END)
+    before = _stored_rows(reader)
+    seen = _spy_written(monkeypatch)
+    record = compute_outcomes(task_ctx(writer, clock=_night(1)), END)
+    assert seen and sum(len(f) for f in seen) == 0
+    assert _stored_rows(reader) == before
+    assert record.stats["h6"]["rows"] > 0 and record.stats["h6"]["written"] == 0
+    assert [c.status for c in check_outcomes(reader, END, task_ctx(writer).settings)] == ["PASS"]
+
+
+def test_a_delisting_writes_exactly_the_changed_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    writer, _reader, days = _store()
+    write_rows(writer, "instruments/reference", days[0], _reference(None))  # not noticed yet
+    compute_outcomes(task_ctx(writer), days[-1])
+    write_rows(writer, "instruments/reference", days[-1], _reference(days[-1]))
+    seen = _spy_written(monkeypatch)
+    compute_outcomes(task_ctx(writer, clock=_night(1)), days[-1])
+    written = pd.concat(seen)
+    assert len(written) and set(written["instrument_id"]) == {"EQ:D"}
+    assert set(written["outcome_status"]) == {"DELISTED"}
+    assert len(written) == len(written.drop_duplicates(["horizon_sessions", "window_end"]))
+
+
+def test_changed_rows_writes_new_keys_and_value_changes_only() -> None:
+    writer, reader, _days = _store()
+    compute_outcomes(task_ctx(writer), END)
+    start = sessions_ending(END, DEFAULT_HORIZON + 1)[0]
+    stored = reader.table(TABLE, start)
+    assert stored is not None
+    cols = [c for c in stored.columns if c not in ("knowledge_ts", "run_id")]
+    out = stored[cols].reset_index(drop=True)
+    assert len(outcomes_task.changed_rows(stored, out)) == 0  # NaN-equal, stamps ignored
+    moved = out.copy()
+    moved.loc[0, "fwd_return"] = 123.0
+    assert len(outcomes_task.changed_rows(stored, moved)) == 1
+    fresh = out.iloc[[0]].assign(instrument_id="EQ:NEW")
+    assert outcomes_task.changed_rows(stored, fresh)["instrument_id"].tolist() == ["EQ:NEW"]
+    assert len(outcomes_task.changed_rows(None, out)) == len(out)
+
+
+def test_a_backfill_writes_every_row_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    writer, reader, days = _store()
+    compute_outcomes(task_ctx(writer), END)
+    seen = _spy_written(monkeypatch)
+    before = _stored_rows(reader)
+    compute_outcomes(task_ctx(writer, clock=_night(1)), END, days[-1], END)
+    assert not seen  # a restating backfill never filters
+    assert _stored_rows(reader) == before  # same keys: runs merge, the view is unchanged

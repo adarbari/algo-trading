@@ -11,7 +11,9 @@ needed (``missing_optional_tables``: an optional source's, e.g. ``ibkr_iv@v1`` w
 down, or a required one whose coalesce fallback is present, e.g. ``iv30@v1`` before it was
 stored) is a WARN check on the step, never its failure (ADR 0055, coverage of coalescing
 expressions). In a catch-up session whose chains were never fetched, a screener short of coverage
-only is a WARN too (``without_chains``, ADR 0039 amendment 2026-10-16).
+only is a WARN too (``without_chains``, ADR 0039 amendment 2026-10-16), as is one short only for
+want of a table whose backfill is declared under way (``while_backfilling``, ADR 0055
+amendment 2026-10-20).
 
 The ``edge-signals`` step (``signal_jobs``) mirrors it: each job makes the owner's tonight picks of
 its evidenced or live edges (a follower's bookmark trades nothing) and settles the open paper
@@ -33,7 +35,7 @@ that is not COMPLETE fails the step, a warning naming the edge, never a hold on 
 """
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from contextlib import nullcontext
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
@@ -42,6 +44,7 @@ from typing import Any
 
 from algotrade.config.edges.document import CLOSED, Edge
 from algotrade.config.edges.loading import load_all_edges
+from algotrade.config.site.nightly import Backfilling
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import AlgoTradeError
 from algotrade.core.time.calendar import last_session_of_week
@@ -118,6 +121,32 @@ def chain_tables() -> frozenset[str]:
     return frozenset(found)
 
 
+def _short(result: StepResult) -> list[Mapping[str, Any]]:
+    complete = JobStatus.COMPLETE.value
+    return [s for s in (result.result or {}).get("screens", []) if s["status"] != complete]
+
+
+def _excused(
+    result: StepResult, tables: Collection[str], check: str, why: Callable[[Mapping[str, Any]], str]
+) -> StepResult:
+    """``result`` with its FAILED step SUCCEEDED when every screener short of coverage is a
+    PARTIAL job (its run stored) whose missing tables are a non-empty subset of ``tables``;
+    each is one WARN ``check``. Anything else short (a FAILED job, another missing table, a
+    shortfall with no missing table) leaves the step failed."""
+    short = _short(result)
+    if not short:
+        return result
+    partial = JobStatus.PARTIAL.value
+    for s in short:
+        missing = s.get("missing_tables") or []
+        if s["status"] != partial or not missing or not set(missing) <= set(tables):
+            return result
+    warnings = [{"name": check, "status": "WARN", "detail": why(s)} for s in short]
+    return replace(
+        result, status=StepStatus.SUCCEEDED, reason=None, checks=[*result.checks, *warnings]
+    )
+
+
 def without_chains(result: StepResult, unfetched: bool) -> StepResult:
     """The screens of a catch-up session whose chains were never fetched (``unfetched``: SKIPPED,
     the source no longer serves the session; ADR 0039 amendment 2026-10-16). A screener short of
@@ -127,27 +156,40 @@ def without_chains(result: StepResult, unfetched: bool) -> StepResult:
     shortfall with no missing table) still fails the step."""
     if result.status is not StepStatus.FAILED or not unfetched:
         return result
-    complete, partial = JobStatus.COMPLETE.value, JobStatus.PARTIAL.value
-    short = [s for s in (result.result or {}).get("screens", []) if s["status"] != complete]
-    chained = chain_tables()
+    return _excused(
+        result,
+        chain_tables(),
+        "no_chains",
+        lambda s: (
+            f"{s['config']} short of coverage: no chains stored for this session "
+            f"({', '.join(s['missing_tables'])})"
+        ),
+    )
 
-    def for_want_of_chains(summary: Mapping[str, Any]) -> bool:
-        missing = summary.get("missing_tables") or []
-        return summary["status"] == partial and bool(missing) and set(missing) <= chained
 
-    if not short or not all(map(for_want_of_chains, short)):
+def while_backfilling(
+    result: StepResult, backfills: Mapping[str, Backfilling], today: date
+) -> StepResult:
+    """The screens whose shortfall is a declared backfill (``[backfilling]`` in nightly.toml,
+    ADR 0055 amendment 2026-10-20): a screener PARTIAL only for want of tables whose ``until`` is
+    not before ``today`` (the wall-clock date: a forgotten entry lapses) is one WARN
+    ``backfilling`` naming the reason; the run
+    stays stored PARTIAL. A FAILED job, another missing table or an expired entry still fails."""
+    if result.status is not StepStatus.FAILED:
         return result
-    warnings = [
-        {
-            "name": "no_chains",
-            "status": "WARN",
-            "detail": f"{s['config']} short of coverage: no chains stored for this session "
-            f"({', '.join(s['missing_tables'])})",
-        }
-        for s in short
-    ]
-    checks = [*result.checks, *warnings]
-    return replace(result, status=StepStatus.SUCCEEDED, reason=None, checks=checks)
+    live = {t for t, b in backfills.items() if b.until >= today}
+    return _excused(
+        result,
+        live,
+        "backfilling",
+        lambda s: (
+            f"{s['config']} short of coverage: backfill under way "
+            + "; ".join(
+                f"{t} until {backfills[t].until} ({backfills[t].reason})"
+                for t in s["missing_tables"]
+            )
+        ),
+    )
 
 
 def _below_range(
