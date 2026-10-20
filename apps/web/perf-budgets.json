@@ -1,7 +1,7 @@
 {
   "bundle": {
     "entry_gzip_bytes": 24900,
-    "entry_closure_gzip_bytes": 196040,
+    "entry_closure_gzip_bytes": 196190,
     "lazy_only": ["design-system/components/Chart/engine.ts"],
     "routes": {
       "src/pages/admin-feature-requests/index.ts": 29967,
@@ -97,11 +97,11 @@
     "bundle.routes.src/pages/login/index.ts": "2026-10-10 #486 chain coverage merged with main: shared chunks (Guide glossary) grow; measured 1769 B, +70 B margin for CI/local and main drift",
     "bundle.routes.src/pages/trader-explore/ui/FinancialsTab.tsx": "2026-10-18 EB H3 outcome sides: the Guide glossary the chunk renders gains the side and Diagnostic only terms (+29 B over main's 66490 B at CI), on top of #642's +24 B: combined about 66543 B, +70 B margin, budget 66620; then, before it: 2026-10-18 #642 Describe it: the connector chip drops a leading comma (one regex in features/screener-describe joins.ts, which shares a chunk with this tab): measured by CI 66514 B (+24 B over main's 66490 B), +70 B margin; then, before it: 2026-10-17 #630 the Analysts section gains the ratings rows (nine), the revisions rows (six) and two status badges, and the panel reads every figure through useFeatureValues (one request, one session) beside the identity read: the chunk moves to 66441 B locally (+63 B over #627's 66378 B budget, +70 B margin for CI/local drift; shared chunks and the entry unchanged); then, before it: 2026-10-17 #627 the Analysts section, the collapsed gap row and the third request move the chunk to 66308 B locally (+70 B margin for CI/local drift; #625 rows will need their own justified raise); then, before it: 2026-10-17 the Explore Financials tab: its own lazy chunk (the panel, its section spec and the Guide help it renders); measured locally 66236 B, +70 B margin",
     "bundle.routes.src/pages/trader-edges/ui/EdgeSections.tsx": "2026-10-17 #585 the features tab's request fan-out fix: DataTable gains the onVisibleRowsChange window callback (shared table chunk code moves into page chunks; measured by CI: 76797 B, +70 B margin); then, before it: previous budget 76748 B",
-    "bundle.entry_closure_gzip_bytes": "2026-10-18 #712 Guide Edges web: the entry carries the lazy drawer's loader, the new paths and kinds, the Edges route and a router link anchor (measured by CI 195971 B against main's 195700 B; +69 B margin)"
+    "bundle.entry_closure_gzip_bytes": "2026-10-19 #725 Guide Screeners: the rename carries the three screener routes and the playbooks redirect in the entry (measured by CI 196123 B, +83 B over the 196040 B budget; +67 B margin); then, before it: 2026-10-18 #712 Guide Edges web: the entry carries the lazy drawer's loader, the new paths and kinds, the Edges route and a router link anchor (measured by CI 195971 B against main's 195700 B; +69 B margin)"
   },
   "waivers": {
     "bundle.entry_closure_gzip_bytes": {
-      "max": 196040,
+      "max": 196190,
       "log": "2026-10-18 | Guide Edges web PR (#712) | Entry-static-imports waiver and trader-ideas budget"
     }
   }
