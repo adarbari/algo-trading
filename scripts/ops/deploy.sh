@@ -285,8 +285,12 @@ apply_phase() {
   local acts=" $* " before
   before=$(git -C "$tree" rev-parse HEAD)
   # a later manual deploy must not be rewound by an earlier-planned cycle
-  git merge-base --is-ancestor "$before" "$target" \
-    || { say "skipped: tree already past ${target:0:9}"; return 0; }
+  if [ "$before" != "$target" ] && git merge-base --is-ancestor "$target" "$before"; then
+    say "skipped: tree already past ${target:0:9}"; return 0
+  fi
+  if ! git merge-base --is-ancestor "$before" "$target"; then
+    block "the release tree ${before:0:9} has diverged from ${target:0:9}"; return 1
+  fi
   slot_prepare || return 1
   slot_update "$target" || return 1
   slot_activate "$target" || return 1
