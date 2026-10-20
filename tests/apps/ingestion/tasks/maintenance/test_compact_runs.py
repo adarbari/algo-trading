@@ -18,13 +18,16 @@ from algotrade.config.site.nightly import CompactionSettings
 from algotrade.config.site.settings import load_nightly
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.jobs.exclusive import DEPLOY_LOCK, INGEST_LOCK, INGEST_TREE_LOCK
+from algotrade.storage.backends import local
 from algotrade.storage.backends.local import LocalBackend
+from algotrade.storage.backends.run_compaction import Budget, CompactionVerificationError
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.locks import held
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework import registry
 from algotrade_ingestion.tasks.framework.run import TaskContext
+from algotrade_ingestion.tasks.maintenance import compact_runs
 from algotrade_ingestion.tasks.maintenance.compact_runs import compact, lower_priority
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import T0, stamped
@@ -220,3 +223,158 @@ def test_lower_priority_never_raises_and_asks_for_the_cpu_nice(
     monkeypatch.setattr(sys, "platform", "darwin")
     monkeypatch.setattr(ctypes, "CDLL", lambda *a, **k: (_ for _ in ()).throw(OSError("no libc")))
     lower_priority(0)  # the disk policy failing is swallowed too
+
+
+def test_progress_has_one_flushed_line_per_partition_and_per_sweep(ctx: TaskContext) -> None:
+    lines: list[str] = []
+    compact(
+        ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None, progress=lines.append
+    )
+    partitions = [line for line in lines if line.startswith(f"compact-runs {DAYS[0].year}")]
+    assert len(partitions) == 2 and "files 4 -> 2" in partitions[0] and " s" in partitions[0]
+    assert [d.isoformat() in lines[1 + i] for i, d in enumerate(DAYS)] == [True, True]
+    assert sum("sweep" in line for line in lines) == 1  # one batch
+
+
+def test_the_default_progress_sink_writes_and_flushes_stderr(
+    ctx: TaskContext, capsys: pytest.CaptureFixture[str]
+) -> None:
+    compact(ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None, limit=1)
+    assert f"compact-runs {DAYS[0]}: files" in capsys.readouterr().err
+
+
+@pytest.fixture
+def spent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A partition budget of zero seconds (the config minimum is one): spent at once."""
+    original = compact_runs.settings_of
+    monkeypatch.setattr(
+        compact_runs,
+        "settings_of",
+        lambda c: (replace(original(c)[0], partition_seconds=0.0), original(c)[1]),
+    )
+
+
+@pytest.mark.usefixtures("spent")
+def test_a_partition_over_its_budget_is_skipped_and_nothing_changes(ctx: TaskContext) -> None:
+    before, reads = _files(ctx), _reads(ctx)
+    lines: list[str] = []
+    stats = compact(
+        ctx,
+        SESSION,
+        TABLE,
+        sleep=lambda s: None,
+        prioritise=lambda n: None,
+        progress=lines.append,
+    ).stats
+    assert stats["skipped"] == {"verification over budget": 2} and stats["compacted"] == 0
+    assert "stopped" not in stats  # the run goes on to the next partition
+    assert _files(ctx) == before and _reads(ctx) == reads  # new files discarded, nothing swapped
+    assert sum("verification over budget" in line for line in lines) == 2
+
+
+def test_a_dry_run_is_plan_only_by_default_and_says_so(ctx: TaskContext) -> None:
+    lines: list[str] = []
+    stats = compact(
+        ctx, SESSION, TABLE, dry_run=True, prioritise=lambda n: None, progress=lines.append
+    ).stats
+    assert stats["verified"] is False and any("plan only" in line for line in lines)
+
+
+def test_a_verifying_dry_run_runs_the_verification_a_live_run_does(
+    ctx: TaskContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+
+    calls: list[int] = []
+    original = local.verify_plan
+    monkeypatch.setattr(local, "verify_plan", lambda *a, **k: calls.append(1) or original(*a, **k))
+    before = _files(ctx)
+    lines: list[str] = []
+    stats = compact(
+        ctx,
+        SESSION,
+        TABLE,
+        dry_run=True,
+        verify=True,
+        prioritise=lambda n: None,
+        progress=lines.append,
+    ).stats
+    assert len(calls) == 2 and stats["verified"] is True and stats["compacted"] == 2
+    assert any("plan and verify" in line for line in lines) and _files(ctx) == before
+
+
+@pytest.mark.usefixtures("spent")
+def test_a_verifying_dry_run_reports_a_partition_over_budget(ctx: TaskContext) -> None:
+    stats = compact(
+        ctx,
+        SESSION,
+        TABLE,
+        dry_run=True,
+        verify=True,
+        prioritise=lambda n: None,
+        progress=lambda line: None,
+    ).stats
+    assert stats["skipped"] == {"verification over budget": 2}
+
+
+def test_the_task_has_a_verify_flag() -> None:
+    assert "verify" in {p.name for p in registry.TASKS["compact-runs"].params}
+
+
+def test_a_budget_spent_during_verification_discards_the_files_it_wrote(
+    ctx: TaskContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ticks = iter(range(10_000))  # every clock read is one second: planning fits, verifying does not
+    monkeypatch.setattr(local, "Budget", lambda s: Budget(5.5, lambda: float(next(ticks))))
+    before, reads = _files(ctx), _reads(ctx)
+    stats = _run(ctx)
+    assert stats["skipped"] == {"verification over budget": 2} and stats["compacted"] == 0
+    assert _files(ctx) == before and _reads(ctx) == reads
+
+
+def test_a_verification_error_skips_that_partition_and_the_run_continues(
+    ctx: TaskContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original, seen = local.verify_plan, []
+
+    def flaky(*args: Any, **kw: Any) -> None:
+        seen.append(1)
+        if len(seen) == 1:
+            raise CompactionVerificationError("values differ at None")
+        original(*args, **kw)
+
+    monkeypatch.setattr(local, "verify_plan", flaky)
+    before = _files(ctx)
+    lines: list[str] = []
+    stats = compact(
+        ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None, progress=lines.append
+    ).stats
+    assert stats["compacted"] == 1 and "stopped" not in stats
+    assert list(stats["skipped"]) == ["verification failed: values differ at None"]
+    assert any("verification failed" in line for line in lines)
+    after = {n for n, _ in _files(ctx)}
+    assert {n for n, _ in before if DAYS[0].strftime("%d") in n} <= after  # first day untouched
+
+
+def test_a_verifying_dry_run_lists_a_failing_partition_and_goes_on(
+    ctx: TaskContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original, seen = local.verify_plan, []
+
+    def flaky(*args: Any, **kw: Any) -> None:
+        seen.append(1)
+        if len(seen) == 1:
+            raise CompactionVerificationError("values differ at None")
+        original(*args, **kw)
+
+    monkeypatch.setattr(local, "verify_plan", flaky)
+    stats = compact(
+        ctx,
+        SESSION,
+        TABLE,
+        dry_run=True,
+        verify=True,
+        prioritise=lambda n: None,
+        progress=lambda line: None,
+    ).stats
+    assert stats["compacted"] == 1
+    assert list(stats["skipped"]) == ["verification failed: values differ at None"]

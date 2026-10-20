@@ -102,7 +102,7 @@ Deleting `_history/` loses nothing. The nightly's `history-copy` step builds the
 
 ### Run compaction (ADR 0078)
 
-A merge table's old partitions hold redundant runs (value-identical rewrites). `algotrade-ingest run compact-runs --table T [--from D --to D] [--limit N] [--dry-run]` replaces them value-exactly (no sequence moves, so no web cache key changes); the commands and safety limits are in the README, "Long runs".
+A merge table's old partitions hold redundant runs (value-identical rewrites). `algotrade-ingest run compact-runs --table T [--from D --to D] [--limit N] [--dry-run]` replaces them value-exactly (no sequence moves, so no web cache key changes); the commands and safety limits are in the README, "Long runs". Verification (every cut of the partition's runs compared as Arrow multisets, each distinct selection once) is bounded by `[compaction] partition_seconds`: over it the partition is skipped ("verification over budget"), nothing swapped. A `--dry-run` plans only unless `--verify`, which also verifies in memory and is the real cost of a live run; timing, read-only, on live partitions of `forward_returns@v2` (20 and 22 runs, 2026-10-20): verification 195 s and 100 s before the Arrow rewrite, 3.0 s and 2.0 s after (planning 2.7 s and 0.7 s). The job writes one progress line per partition and per sweep to stderr.
 
 ### Retention
 

@@ -79,11 +79,17 @@ class StoreWriter(ResultWriter):
         return self._backend.tables.drop(table)
 
     def compact_runs(
-        self, table: str, session_date: date, dry_run: bool = False
+        self,
+        table: str,
+        session_date: date,
+        dry_run: bool = False,
+        verify: bool = False,
+        budget_s: float | None = None,
     ) -> CompactionReport:
         """Compact one partition's runs value-exactly (``TableStore.compact_runs``, ADR 0078);
-        ``dry_run`` only reports. Ingestion only (``compact-runs``)."""
-        return self._backend.tables.compact_runs(table, session_date, dry_run)
+        ``dry_run`` only reports (``verify``: after verifying the plan too); ``budget_s`` bounds
+        the partition. Ingestion only (``compact-runs``)."""
+        return self._backend.tables.compact_runs(table, session_date, dry_run, verify, budget_s)
 
     def sweep_orphans(self, table: str, session_date: date) -> int:
         """Delete the files of one partition no run names (``TableStore.sweep_orphans``): what a

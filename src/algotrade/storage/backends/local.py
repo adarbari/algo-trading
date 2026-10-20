@@ -66,7 +66,14 @@ from algotrade.storage.backends.local_index import (
     safe,
     write_index,
 )
-from algotrade.storage.backends.run_compaction import kept_entries, plan_compaction, verify_plan
+from algotrade.storage.backends.run_compaction import (
+    OVER_BUDGET,
+    Budget,
+    CompactionOverBudgetError,
+    kept_entries,
+    plan_compaction,
+    verify_plan,
+)
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     StaleSnapshotError,
@@ -388,11 +395,27 @@ class LocalTables:
         return self.commits.remove_runs(self._dir(table, session_date), runs)
 
     def compact_runs(
-        self, table: str, session_date: date, dry_run: bool = False
+        self,
+        table: str,
+        session_date: date,
+        dry_run: bool = False,
+        verify: bool = False,
+        budget_s: float | None = None,
+    ) -> CompactionReport:
+        """ADR 0078; a spent ``budget_s`` skips the partition, swapping nothing."""
+        try:
+            return self._compact_runs(table, session_date, dry_run, verify, Budget(budget_s))
+        except CompactionOverBudgetError:
+            return CompactionReport(skipped=OVER_BUDGET)
+
+    def _compact_runs(
+        self, table: str, session_date: date, dry_run: bool, verify: bool, budget: Budget
     ) -> CompactionReport:
         """ADR 0078: plan from the index as read now, write the kept rows under fresh names,
         verify what was written, then ``Commits.swap_runs`` (which aborts if the index moved).
-        The superseded files are left for ``sweep_orphans`` once their grace has passed."""
+        The superseded files are left for ``sweep_orphans`` once their grace has passed. A
+        ``dry_run`` plans only unless ``verify`` (then it verifies the plan in memory, writing
+        nothing); ``budget_s`` bounds planning and verifying: over it the partition is skipped."""
         directory = self._dir(table, session_date)
         expected = read_index(directory)
         if (self.root / table / HISTORY).exists() or not expected:
@@ -407,9 +430,10 @@ class LocalTables:
                 sources[run] = _read_file(directory / run_file(run, entry), None, None)
                 return sources[run]
 
-            plan = plan_compaction(table, expected, load)
+            plan = plan_compaction(table, expected, load, budget)
         except FileNotFoundError:  # a commit replaced a version meanwhile: try again later
             return CompactionReport(skipped="the partition changed while planning")
+
         size_before = sum(sizes.values())
         if plan.skipped or plan.noop:
             return CompactionReport(before, before, size_before, size_before, 0, plan.skipped)
@@ -419,6 +443,8 @@ class LocalTables:
         size_after = sum(len(encoded[r]) if r in encoded else sizes[r] for r in plan.kept)
         report = CompactionReport(before, len(kept), size_before, size_after, len(plan.dropped))
         if dry_run:
+            if verify:
+                verify_plan(table, expected, sources, kept, {r: plan.kept[r] for r in kept}, budget)
             return report
         for run, name in fresh.items():
             atomic_write(directory / name, encoded[run])
@@ -426,7 +452,7 @@ class LocalTables:
             written = {
                 r: _read_file(directory / run_file(r, e), None, None) for r, e in kept.items()
             }
-            verify_plan(table, expected, sources, kept, written)
+            verify_plan(table, expected, sources, kept, written, budget)
             swapped = self.commits.swap_runs(
                 directory, expected, kept, self.swap_grace_s, refuse=self.root / table / HISTORY
             )

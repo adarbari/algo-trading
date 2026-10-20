@@ -22,7 +22,14 @@ from algotrade.storage.backends.arrow import (
     to_frame,
 )
 from algotrade.storage.backends.local_index import safe
-from algotrade.storage.backends.run_compaction import kept_entries, plan_compaction, verify_plan
+from algotrade.storage.backends.run_compaction import (
+    OVER_BUDGET,
+    Budget,
+    CompactionOverBudgetError,
+    kept_entries,
+    plan_compaction,
+    verify_plan,
+)
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     committed,
@@ -272,7 +279,21 @@ class MemoryTables:
             return len(gone)
 
     def compact_runs(
-        self, table: str, session_date: date, dry_run: bool = False
+        self,
+        table: str,
+        session_date: date,
+        dry_run: bool = False,
+        verify: bool = False,
+        budget_s: float | None = None,
+    ) -> CompactionReport:
+        """ADR 0078; a spent ``budget_s`` skips the partition, swapping nothing."""
+        try:
+            return self._compact_runs(table, session_date, dry_run, verify, Budget(budget_s))
+        except CompactionOverBudgetError:
+            return CompactionReport(skipped=OVER_BUDGET)
+
+    def _compact_runs(
+        self, table: str, session_date: date, dry_run: bool, verify: bool, budget: Budget
     ) -> CompactionReport:
         """ADR 0078, as ``LocalTables.compact_runs``; one lock hold makes it atomic, so there is
         no concurrent commit to abort for and no file to leave for a sweep."""
@@ -289,7 +310,7 @@ class MemoryTables:
                 sources[run] = to_arrow(table, self._frames[(key, run, entry.ref)])
                 return sources[run]
 
-            plan = plan_compaction(table, expected, load)
+            plan = plan_compaction(table, expected, load, budget)
             size = {r: len(parquet_bytes(sources[r])) for r in sources}
             before, size_before = len(expected), sum(size.values())
             if plan.skipped or plan.noop:
@@ -300,9 +321,11 @@ class MemoryTables:
                 len(parquet_bytes(plan.kept[r])) if r in fresh else size[r] for r in kept
             )
             report = CompactionReport(before, len(kept), size_before, size_after, len(plan.dropped))
+            if dry_run and not verify:
+                return report
+            verify_plan(table, expected, sources, kept, {r: plan.kept[r] for r in kept}, budget)
             if dry_run:
                 return report
-            verify_plan(table, expected, sources, kept, {r: plan.kept[r] for r in kept})
             frames = {
                 (key, r, e.ref): self._frames[(key, r, expected[r].ref)] for r, e in kept.items()
             }

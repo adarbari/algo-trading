@@ -133,4 +133,5 @@ def run_compact_runs(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("end"),
         p.get("limit"),
         bool(p.get("dry_run")),
+        verify=bool(p.get("verify")),
     )
