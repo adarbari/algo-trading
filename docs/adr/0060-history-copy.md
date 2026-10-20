@@ -105,3 +105,6 @@ days of a range of 31 days or fewer (one `stat` of the day's index each) instead
 partition of the table (75 ms for `price_stats@v2`'s 4,200); and `instrument_view` reads only the
 asked instruments' rows of a rollup (a partition with none of them is read whole, so "no row" and
 "no partition" stay distinct) and joins all of a table's columns at once.
+
+## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
+See [0077](0077-serving-release.md): a pinned read serves the copy only when every requested day's `partition_seq` is at most `upto`; releases retain the versions they name.

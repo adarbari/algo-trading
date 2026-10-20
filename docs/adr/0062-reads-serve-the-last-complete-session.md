@@ -65,3 +65,6 @@ under 100 ms); when the session date or the viewer says the record is another se
 user's, what it restored is reset. A returning visit on a new session may therefore show the
 previous session for one round trip (each page's status strip names its own session date); a
 failed session-date read leaves the record until its queries refetch.
+
+## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
+See [0077](0077-serving-release.md): the default session is the current serving release's session, not the latest complete one; `Session.newer` gains `PUBLISHING`; `newer` and `complete` key on a `workflow_generation`, and `served_token` leaves other keys.
