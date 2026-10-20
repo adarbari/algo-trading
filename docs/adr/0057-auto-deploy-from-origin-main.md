@@ -62,3 +62,6 @@ without a bad deploy silently taking the site down.
   says so) and does not retry until the owner looks.
 - `ALGOTRADE_DEPLOY_API`, `ALGOTRADE_DEPLOY_NOTIFY` and `ALGOTRADE_DEPLOY_AGENTS` exist for the
   tests (stub tools in a temp git repo); the real script is never run against the checkout there.
+
+## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
+See [0077](0077-serving-release.md): the deploy gate checks release format compatibility (rebuilds or holds) and deploys blue/green after a health and latency probe.

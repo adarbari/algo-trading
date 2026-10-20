@@ -70,3 +70,6 @@ partitions a pending run wrote to are kept.
 - Readers may key caches on `TableStore.visible_seq()` (the latest committed publish
   sequence; read-only, no recovery, no writes). It is the only cache-validity signal:
   never paths or mtimes.
+
+## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
+See [0077](0077-serving-release.md): a serving release is built at one pinned seq (`StoreReader.pinned`), and the history copy serves a pinned read only when every requested day's `partition_seq` is at most `upto`.
