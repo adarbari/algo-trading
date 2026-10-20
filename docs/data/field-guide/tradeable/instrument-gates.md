@@ -788,6 +788,86 @@ Sources: Site convention (ADR 0053 amendment, EB H9)
 
 Sources: Site convention (ADR 0018, ADR 0053 amendment, EB H9)
 
+### `rollup.etf_launches@v1.sessions_since_etf_launch`
+
+**How to read it.** Exchange sessions from the launch of a thematic or sector ETF up to the session. 0 means it started trading today. 250 is about a year old. The read goes back five years, the first 60 months in which the research finds such funds fall behind.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a thematic or sector fund younger than three years | `lte 750` | hard | - | an avoid filter; null means not a specialised fund, not an old one |
+
+**When the reading lies**
+
+- The launch is the first day the ticker was listed in the Tiingo history, not the day the fund was set up, so it can be a few days late. A fund that changed ticker, or listed before the history starts, reads too young. Only thematic and sector funds have a value. It is null for every other fund, and for a fund whose category is unknown.
+
+Sources: Ben-David, Franzoni, Kim and Moussawi (2023), Competition for Attention in the ETF Space, Review of Financial Studies
+
+### `rollup.etf_launches@v1.last_etf_launch_date`
+
+**How to read it.** The first day the ETF was listed in the Tiingo history: its launch date for this site. Only launches on or before the session count, so a fund that lists tomorrow is not read today.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| funds with a known launch date | `not_null` | hard | - | null means no thematic or sector launch in the window, not that the fund is old |
+
+**When the reading lies**
+
+- A ticker change or a relisting can move it, and a fund older than the history is dated at the history's start. Null for funds that are not thematic or sector funds, or launched more than five years ago.
+
+Sources: Site convention over the Tiingo listing history (ADR 0076)
+
+### `rollup.etf_launches@v1.etf_category`
+
+**How to read it.** Whether the ETF is thematic, tied to a story that spans several industries such as clean energy or robotics, or sector, tied to one industry such as technology or banks. Both count as specialised funds in the research.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| thematic funds only | `eq "thematic"` | hard | - | sector funds drop out; null means not a specialised fund |
+
+**When the reading lies**
+
+- Read from the fund's name by keyword rules and a curated list, as of the latest build, so a fund renamed since launch carries today's category on its launch date. Funds the rules could not settle have no category and no row.
+
+Sources: Ben-David, Franzoni, Kim and Moussawi (2023), Competition for Attention in the ETF Space, Review of Financial Studies
+
+### `rollup.etf_launches@v1.etf_theme`
+
+**How to read it.** The theme group of a thematic ETF, such as clean_energy, technology or health, or the industry of a sector ETF, such as financials or energy.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| clean energy funds | `eq "clean_energy"` | hard | - | illustrative; null means not a specialised fund |
+
+**When the reading lies**
+
+- A fund that fits two themes carries one, chosen by the curated list or by the first matching keyword group. Null when the fund has no category.
+
+Sources: Site convention over the ETF names (ADR 0076)
+
+### `rollup.etf_launches@v1.launch_date_source`
+
+**How to read it.** Where the launch date comes from. The only value is tiingo_listing: the first day the ticker appears in the Tiingo listing history.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| funds dated from the Tiingo listing | `eq "tiingo_listing"` | hard | - | null means no launch date is stored |
+
+**When the reading lies**
+
+- It is the ticker's first listing, not the fund's inception, which the site does not store. Checked against fourteen well-known funds, it was 0 to 7 days late.
+
+Sources: Site convention (ADR 0076)
+
 ### `rollup.ipo_lockups@v1.sessions_to_lockup_expiry`
 
 **How to read it.** Exchange sessions from the session to the lock-up expiry of a recent IPO. 5 means the lock-up ends in five sessions. 0 means today. -3 means it ended three sessions ago; the earliest read is -20.
@@ -803,83 +883,3 @@ Sources: Site convention (ADR 0018, ADR 0053 amendment, EB H9)
 - The date comes from the prospectus text. A prospectus that states no term has no value, so the name is unknown, not free of a lock-up. An early-release lock-up can end for part of the shares sooner.
 
 Sources: Field and Hanke (2001), The Effect of Lockup Provisions on the Pricing of IPOs; Brav and Gompers (2003), The Role of Lockups in Initial Public Offerings, Review of Financial Studies
-
-### `rollup.ipo_lockups@v1.lockup_expiry_date`
-
-**How to read it.** The first session on which the lock-up of a recent IPO has ended: the first exchange session after the prospectus date plus the stated term. Insiders and early holders may sell from then.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| names with a known lock-up date | `not_null` | hard | - | null means no stated lock-up, an expiry long past, or no company record |
-
-**When the reading lies**
-
-- Null when the prospectus states no term, when the expiry is more than 20 sessions past, or when the company has no record as of the session.
-
-Sources: Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)
-
-### `rollup.ipo_lockups@v1.lockup_release_terms`
-
-**How to read it.** How the prospectus ends the lock-up. The value standard means one expiry date. The value early_release means it lets part of the lock-up end early, for example after an earnings report or at a price level.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| lock-ups with a single expiry date | `eq "standard"` | hard | - | names with no lock-up in the window drop out |
-
-**When the reading lies**
-
-- The label comes from phrases in the prospectus. A release clause worded in an unusual way reads as standard. Null when the name has no lock-up in the window.
-
-Sources: Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)
-
-### `rollup.ipo_lockups@v1.lockup_days`
-
-**How to read it.** The lock-up term the prospectus states, in calendar days. 180 is the usual term. The term counts from the prospectus date, not from the first day of trading.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| the usual 180-day term | `eq 180` | hard | - | illustrative: the most common term; names with another term or none drop out |
-
-**When the reading lies**
-
-- Null when the prospectus gives the term in a form the extraction does not read.
-
-Sources: Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)
-
-### `rollup.ipo_lockups@v1.ipo_offer_price`
-
-**How to read it.** The IPO offer price per share, in dollars, from the final prospectus. Compare it with the latest close to see how far the stock has moved since the offering.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| names with a stated offer price | `not_null` | hard | - | null means no price could be read from the prospectus |
-
-**When the reading lies**
-
-- Null when the prospectus gives a range or no final price the extraction can read. The price is not adjusted for later splits.
-
-Sources: Site convention over the 424B4 final prospectuses (ADR 0050, ADR 0075)
-
-### `feature.reverse_split_recent`
-
-**How to read it.** True when the name had a reverse split with an ex-date in the last 252 sessions, a year. Null when none is stored, which is not the same as no reverse split.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| names that reverse-split within a year | `eq true` | hard | - | names with no stored split drop out |
-
-**When the reading lies**
-
-- Funds reverse-split too, so an edge on this flag names the operating-company universe. A hard 'eq true' keeps only names with a stored split.
-
-Sources: Desai and Jain (1997), Long-Run Common Stock Returns Following Stock Splits and Reverse Splits, Journal of Business

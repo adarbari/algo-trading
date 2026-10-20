@@ -34,6 +34,8 @@ EVENT_CLASSES: Mapping[str, str] = {
     "anchor: the expiry session; may be entered ahead of it",
     "reverse_split": "a reverse split (reverse_splits@v1; ADR 0075); anchor: the ex-date; "
     "funds are left out by the edge's universe",
+    "etf_launch": "the launch of a specialised ETF, a thematic or sector fund (etf_launches@v1; "
+    "ADR 0076); anchor: its first listing day (Tiingo), known on that day",
 }
 # A class may be split by a subtype: ``on_event:<class>:<subtype>``. The subtype is one of the
 # class's own values (fail closed on any other, and on a subtype for a class that has none); the
@@ -56,6 +58,10 @@ EVENT_SUBTYPES: Mapping[str, Mapping[str, str]] = {
     "earnings_date_shift": {
         "later": "the next report date is a week or more later than last year's",
         "earlier": "the next report date is a week or more earlier than last year's",
+    },
+    "etf_launch": {
+        "thematic": "a thematic ETF: a story tying several industries (etf_category thematic)",
+        "sector": "a sector ETF: one industry (etf_category sector)",
     },
     "ipo_lockup": {
         "standard": "the prospectus gives one lock-up expiry date",

@@ -36,6 +36,7 @@ from algotrade.services.selection import fields_view
 ADDED, REMOVED = "sp500_added", "sp500_removed"  # ``index_changes@v1.last_index_change``
 SHIFT_DIRECTION = "rollup.earnings_date_shift@v1.earnings_shift_direction"
 LOCKUP_TERMS = "rollup.ipo_lockups@v1.lockup_release_terms"
+ETF_CATEGORY = "rollup.etf_launches@v1.etf_category"
 DEDUPE_SESSIONS = 40  # one report per name in this many sessions
 NO_EVENT_ROW = "no_event_row"  # eligible at D, but the event field has no value for the name
 NOT_KNOWN_AT_D = "event_not_known_at_decision"  # the field's event date is after D
@@ -147,6 +148,16 @@ EVENT_FIELDS: Mapping[str, EventField] = {
         subtypes={
             "standard": Subtype(field=LOCKUP_TERMS, value="standard"),
             "early_release": Subtype(field=LOCKUP_TERMS, value="early_release"),
+        },
+    ),
+    "etf_launch": EventField(
+        "rollup.etf_launches@v1.sessions_since_etf_launch",
+        "rollup.etf_launches@v1.last_etf_launch_date",
+        sign=1,
+        announced_ahead=False,
+        subtypes={
+            "thematic": Subtype(field=ETF_CATEGORY, value="thematic"),
+            "sector": Subtype(field=ETF_CATEGORY, value="sector"),
         },
     ),
     "reverse_split": EventField(

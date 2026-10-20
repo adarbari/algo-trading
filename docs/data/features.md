@@ -21,7 +21,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-667 stored features in 85 groups, in dependency order; 161 expression features.
+672 stored features in 86 groups, in dependency order; 161 expression features.
 
 ## `option_liquidity@v1`
 
@@ -208,6 +208,18 @@ The latest S&P 500 membership change of an instrument and the sessions since it.
 | `last_index_change_date` | window | date | date | open |  | The date of the latest S&P 500 membership change (the session it was first stored) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
 | `sessions_since_index_change` | window | int | sessions | open | >= 0 | Exchange sessions from the latest S&P 500 membership change up to the session (0: the session is that day) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
 | `last_index_change` | label | str | category | open | sp500_added, sp500_removed | The latest change: sp500_added (joined the index) or sp500_removed (left it) | no S&P 500 membership change in the last 60 sessions | `events/index_change.ts`, `events/index_change.change` |
+
+## `etf_launches@v1`
+
+How long ago a specialised ETF (thematic or sector) launched, from its first listing day. Stored as `rollups/instrument/etf_launches@v1`; reads `instruments/etf_launches`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `last_etf_launch_date` | window | date | date | open |  | The launch date of the ETF: its first listing day in the Tiingo listing history (the event's anchor) | not a specialised ETF (thematic or sector) launched in the last 1300 sessions, or the latest universe build gave it no category or no listing start is stored | `instruments/etf_launches.event_date`, `instruments/etf_launches.etf_category`, `instruments/etf_launches.etf_theme` |
+| `sessions_since_etf_launch` | window | int | sessions | open | >= 0 | Exchange sessions from the ETF's launch up to the session (0: the session is the launch day) | not a specialised ETF (thematic or sector) launched in the last 1300 sessions, or the latest universe build gave it no category or no listing start is stored | `instruments/etf_launches.event_date`, `instruments/etf_launches.etf_category`, `instruments/etf_launches.etf_theme` |
+| `etf_category` | label | str | category | open | thematic, sector | thematic (a story tying several industries) or sector (one industry) | not a specialised ETF (thematic or sector) launched in the last 1300 sessions, or the latest universe build gave it no category or no listing start is stored | `instruments/etf_launches.event_date`, `instruments/etf_launches.etf_category`, `instruments/etf_launches.etf_theme` |
+| `etf_theme` | label | str | category | open |  | The theme group of a thematic ETF, or the sector of a sector ETF | not a specialised ETF (thematic or sector) launched in the last 1300 sessions, or the latest universe build gave it no category or no listing start is stored | `instruments/etf_launches.event_date`, `instruments/etf_launches.etf_category`, `instruments/etf_launches.etf_theme` |
+| `launch_date_source` | label | str | category | open | tiingo_listing | Where the launch date comes from: tiingo_listing, the first listing of the instrument (not the fund's inception) | not a specialised ETF (thematic or sector) launched in the last 1300 sessions, or the latest universe build gave it no category or no listing start is stored | `instruments/etf_launches.event_date`, `instruments/etf_launches.etf_category`, `instruments/etf_launches.etf_theme` |
 
 ## `filing_events@v1`
 

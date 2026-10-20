@@ -138,7 +138,7 @@ purpose = "ETFs that stand for an asset class, listed when a macro rule says to 
 intro = "These screens list a handful of funds, bonds, credit, countries or currencies, only while a macro rule holds, such as a positive yield-curve slope or a tight credit spread. They feed the edges that rotate between asset classes."
 presets = [
   "etf_priced", "credit_spread_below_ma200", "bond_curve_trend_3m", "bond_curve_trend_2y",
-  "country_cape_cheapest", "fx_carry_positive",
+  "country_cape_cheapest", "fx_carry_positive", "etf_launch_recent",
 ]
 
 [[family]]

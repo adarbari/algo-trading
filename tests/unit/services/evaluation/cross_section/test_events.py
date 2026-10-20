@@ -285,6 +285,42 @@ def test_a_reverse_split_is_an_event_on_its_ex_date_and_never_before_it() -> Non
         event_field("reverse_split", "x")  # no subtypes
 
 
+def test_an_etf_launch_is_an_event_on_its_listing_day_split_by_category() -> None:
+    """ADR 0076: ``etf_launch`` is read at ``sessions_since_etf_launch == 0`` for entry offset 1
+    (D is the launch day); a launch dated after D is not known at D; the subtype is the category."""
+    w = build_world()
+    d, nxt = DAYS[1], DAYS[2]
+    w.write_rollup(
+        "rollups/instrument/etf_launches@v1",
+        d,
+        [
+            {"instrument_id": IDS[0], "sessions_since_etf_launch": 0, "last_etf_launch_date": d,
+             "etf_category": "thematic"},
+            {"instrument_id": IDS[1], "sessions_since_etf_launch": 0, "last_etf_launch_date": d,
+             "etf_category": "sector"},
+            {"instrument_id": IDS[2], "sessions_since_etf_launch": 0,
+             "last_etf_launch_date": nxt, "etf_category": "thematic"},  # after D: not known
+        ],
+    )  # fmt: skip
+    base = read_events(w.reader, "etf_launch", 1, [d], lambda _: ALL)
+    thematic = read_events(w.reader, "etf_launch", 1, [d], lambda _: ALL, "thematic")
+    sector = read_events(w.reader, "etf_launch", 1, [d], lambda _: ALL, "sector")
+    assert base.names == {d: frozenset(IDS[:2])}
+    assert thematic.names == {d: frozenset({IDS[0]})}
+    assert sector.names == {d: frozenset({IDS[1]})}
+    assert base.unknown[d][NOT_KNOWN_AT_D] == 1
+    assert not EVENT_FIELDS["etf_launch"].announced_ahead
+    # the edge enters on the 21st session after launch: D = launch + 20 sessions
+    w.write_rollup(
+        "rollups/instrument/etf_launches@v1",
+        DAYS[5],
+        [{"instrument_id": IDS[3], "sessions_since_etf_launch": 20, "last_etf_launch_date": d,
+          "etf_category": "sector"}],
+    )  # fmt: skip
+    late = read_events(w.reader, "etf_launch", 21, [DAYS[5]], lambda _: ALL, "sector")
+    assert late.names == {DAYS[5]: frozenset({IDS[3]})}
+
+
 def test_the_document_and_the_harness_agree_on_which_classes_are_announced_ahead() -> None:
     """The two lists drifted once (``ipo_lockup`` was read ahead by the harness but refused a
     negative offset by the document): kept equal here, as config cannot import services."""
