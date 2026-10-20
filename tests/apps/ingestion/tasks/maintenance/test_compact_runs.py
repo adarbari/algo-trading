@@ -353,3 +353,28 @@ def test_a_verification_error_skips_that_partition_and_the_run_continues(
     assert any("verification failed" in line for line in lines)
     after = {n for n, _ in _files(ctx)}
     assert {n for n, _ in before if DAYS[0].strftime("%d") in n} <= after  # first day untouched
+
+
+def test_a_verifying_dry_run_lists_a_failing_partition_and_goes_on(
+    ctx: TaskContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original, seen = local.verify_plan, []
+
+    def flaky(*args: Any, **kw: Any) -> None:
+        seen.append(1)
+        if len(seen) == 1:
+            raise CompactionVerificationError("values differ at None")
+        original(*args, **kw)
+
+    monkeypatch.setattr(local, "verify_plan", flaky)
+    stats = compact(
+        ctx,
+        SESSION,
+        TABLE,
+        dry_run=True,
+        verify=True,
+        prioritise=lambda n: None,
+        progress=lambda line: None,
+    ).stats
+    assert stats["compacted"] == 1
+    assert list(stats["skipped"]) == ["verification failed: values differ at None"]

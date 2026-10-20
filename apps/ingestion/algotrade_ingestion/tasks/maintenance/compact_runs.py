@@ -277,7 +277,12 @@ def dry_run_report(
         if limit is not None and totals.compacted >= limit:
             break
         started = clock()
-        report = ctx.writer.compact_runs(table, day, dry_run=True, verify=verify, budget_s=budget_s)
+        try:
+            report = ctx.writer.compact_runs(
+                table, day, dry_run=True, verify=verify, budget_s=budget_s
+            )
+        except CompactionVerificationError as exc:
+            report = CompactionReport(skipped=f"verification failed: {exc}")
         progress(describe(day, report, clock() - started))
         totals.add(day, report)
     return totals
