@@ -18,10 +18,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
 from algotrade.config.site.users import Role, UserRecord
+from algotrade.data import StoreReader
+from algotrade.storage.backends.local import LocalBackend
 from algotrade_api import main
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.graphql.offload import MAX_WAITING, READ_THREADS, Admission
@@ -40,6 +43,7 @@ from algotrade_api.graphql.response_cache import (
 from algotrade_api.graphql.schema import _accepts_gzip, graphql_router
 from algotrade_api.main import create_app
 from tests.helpers.api_store import END, as_user
+from tests.helpers.stored_frames import T0, stamped
 
 SESSION = "query Day { session { date } }"  # a cached operation (USER_OPERATIONS)
 VIEWER = "query Day { viewer { id role } }"
@@ -551,3 +555,25 @@ def test_two_viewers_with_different_licence_sets_never_share_an_entry() -> None:
     assert response_key(*args, holder, "{ a }", None, "MarketHistory") == response_key(
         *args, same, "{ a }", None, "MarketHistory"
     )  # a shared operation is still shared by viewers with the same set
+
+
+def test_a_run_compaction_leaves_the_cache_key_unchanged(tmp_path: Path) -> None:
+    # ADR 0078: compact-runs swaps a partition's index without a commit, so the published state
+    # the key holds (visible_seq) does not move and no cached page is evicted or recomputed
+    backend = LocalBackend(tmp_path / "data")
+    day = date(2026, 10, 2)
+    for k in range(1, 5):
+        rows = [{"instrument_id": "EQ:A", "ts": pd.Timestamp(day, tz="UTC"), "cash_amount": 1.0}]
+        frame = stamped(rows, day, f"r{k}", T0 + pd.Timedelta(hours=k).to_pytimedelta())
+        backend.tables.write("events/dividend", day, f"r{k}", frame, pending=True)
+        backend.tables.commit_run(f"r{k}", T0 + pd.Timedelta(days=1, hours=k).to_pytimedelta())
+    reader, who = StoreReader(backend), UserRecord("ana", Role.ADMIN)
+
+    def key() -> str:
+        return response_key(
+            reader.visible_seq(), 0, who, SESSION, None, "Day", reader.runs_generation()
+        )
+
+    before = key()
+    assert backend.tables.compact_runs("events/dividend", day).runs_dropped == 2
+    assert key() == before

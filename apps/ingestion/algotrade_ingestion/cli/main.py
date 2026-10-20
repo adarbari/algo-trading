@@ -144,6 +144,8 @@ def writes(args: argparse.Namespace) -> bool:
         "post-session",
     ):  # post-session: own locks
         return False
+    if getattr(args, "task", None) == "compact-runs":  # takes the ingest lock per partition
+        return False
     return not (args.command == "golden" and args.action in ("build", "verify"))
 
 

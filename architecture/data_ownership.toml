@@ -192,6 +192,7 @@ allowed = [
     "src/algotrade/storage/backends/local.py",  # LocalTables.compact_runs: writes the kept rows, verifies, swaps
     "src/algotrade/storage/backends/memory.py",  # MemoryTables.compact_runs: the same under its one lock
     "src/algotrade/storage/tables/writers.py",  # StoreWriter.compact_runs: the facade only ingestion may use
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/compact_runs.py",  # the compact-runs job: the one caller (ADR 0078 decision 5)
 ]
 section = "docs/adr/0078-outcomes-run-compaction.md#decision"
 detect = [{ call = "plan_compaction" }, { call = "swap_runs" }, { call = "compact_runs" }]

@@ -90,6 +90,31 @@ def backfilling(section: Table) -> Mapping[str, Backfilling]:
 
 
 @dataclass(frozen=True)
+class CompactionSettings:
+    """``[compaction]``: the tables the ``compact-runs`` job may compact (ADR 0078) and how
+    gently it works. Only merge-mode tables without a history copy (a fitness test)."""
+
+    tables: tuple[str, ...] = ()  # nightly.toml names them (forward_returns@v2 today)
+    nice: int = 10  # os.nice increment the job takes on, so the API's reads win CPU contests
+    batch_size: int = 20  # partitions compacted before one wait out of the swap grace and sweep
+    pause_seconds: float = 1.0  # sleep between partitions (bounded I/O)
+    partition_seconds: float = 300.0  # a partition slower than this stops the run (slow disk)
+    sweep_grace_seconds: float = 125.0  # a swap spares the old files 120 s; wait out the rest
+
+    @classmethod
+    def from_table(cls, section: Table) -> "CompactionSettings":
+        d = cls()
+        return cls(
+            tables=section.strings("tables", d.tables),
+            nice=section.integer("nice", d.nice, 0),
+            batch_size=section.integer("batch_size", d.batch_size, 1),
+            pause_seconds=section.number("pause_seconds", d.pause_seconds, 0),
+            partition_seconds=section.number("partition_seconds", d.partition_seconds, 1),
+            sweep_grace_seconds=section.number("sweep_grace_seconds", d.sweep_grace_seconds, 0),
+        )
+
+
+@dataclass(frozen=True)
 class NightlySettings:
     """``config/site/nightly.toml``: sessions, catch-up, the duration alert, notification."""
 
@@ -111,6 +136,7 @@ class NightlySettings:
     # [steps.<name>] settle_minutes: wait this long after the close before fetching (0: no wait)
     step_settle_minutes: Mapping[str, int] = field(default_factory=dict)
     history_copy: HistoryCopySettings = field(default_factory=HistoryCopySettings)
+    compaction: CompactionSettings = field(default_factory=CompactionSettings)
     # [resources]: what a running ingest may take from the Mac that also serves the web
     arrow_cpu_threads: int = 2  # Arrow decode threads (the API caps itself at the same 2)
     arrow_io_threads: int = 4
@@ -138,6 +164,7 @@ class NightlySettings:
                 "schedule",
                 "steps",
                 "history_copy",
+                "compaction",
                 "post",
                 "resources",
                 "backfilling",
@@ -167,9 +194,19 @@ class NightlySettings:
         declared_backfills = root.raw("backfilling") or {}
         if not isinstance(declared_backfills, Mapping):
             raise ConfigurationError(f"{where} backfilling: expected a table")
+        compaction = CompactionSettings.from_table(
+            root.table(
+                "compaction",
+                [
+                    *("tables", "nice", "batch_size", "pause_seconds"),
+                    *("partition_seconds", "sweep_grace_seconds"),
+                ],
+            )
+        )
         return cls(
             backfilling=backfilling(root.table("backfilling", list(declared_backfills))),
             history_copy=history_copy,
+            compaction=compaction,
             arrow_cpu_threads=resources.integer("arrow_cpu_threads", d.arrow_cpu_threads, 1),
             arrow_io_threads=resources.integer("arrow_io_threads", d.arrow_io_threads, 1),
             min_free_gb=resources.number("min_free_gb", d.min_free_gb, 0),

@@ -219,6 +219,19 @@ A detached run goes through `taskpolicy -b nice -n 10` (background CPU and IO pr
 launchd nightly) so the website on the same Mac stays fast; put the same prefix before any other
 long backfill below.
 
+Compacting a merge table's redundant run files (ADR 0078; the tables are `nightly.toml [compaction]`,
+today `forward_returns@v2`) is one such long run, resumable and one partition at a time, and it
+stops when the nightly holds the `ingest` lock. Look first, then run detached:
+
+```bash
+algotrade-ingest run compact-runs --table outcomes/instrument/forward_returns@v2 --from 2024-01-02 --to 2024-03-28 --dry-run
+nohup sh -c 'taskpolicy -b nice -n 10 .venv/bin/algotrade-ingest run compact-runs --table outcomes/instrument/forward_returns@v2 --limit 500 \
+  > var/logs/compact-runs.log 2>&1; echo "exit=$?" > var/logs/compact-runs.status' >/dev/null 2>&1 &
+```
+
+Run it again until it reports `compacted: 0`; a stop (`stopped` in the report: the lock was held, the
+disk under `[resources] min_free_gb` plus a partition, a slow disk) exits 1 and the next run resumes.
+
 The nightly step continues the backfill on its own, `[ibkr] iv_backfill_per_night = 100`
 names a night (~17 min), so new names fill in without a command; the email's `ibkr-iv` line
 shows coverage, names still pending and the estimated hours left.
