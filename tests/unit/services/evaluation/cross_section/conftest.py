@@ -16,6 +16,7 @@ from algotrade.core.time.calendar import next_session, sessions_between
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.result_writer import ResultWriter
 from algotrade.storage.tables.schemas import FORWARD_RETURNS
 from algotrade.storage.tables.writers import StoreWriter
@@ -84,7 +85,7 @@ def outcome_row(iid: str, i: int, day: date, **changes: Any) -> dict[str, Any]:
 
 @dataclass
 class World:
-    backend: MemoryBackend
+    backend: Backend
     writer: StoreWriter
     reader: StoreReader
     configs: MemoryConfigStore
@@ -136,11 +137,13 @@ def build_world(
     closed: Sequence[date] | None = None,
     rows_of: Callable[[date], list[dict[str, Any]]] | None = None,
     no_features: Sequence[date] = (),
+    backend: Backend | None = None,
 ) -> World:
     """The store over ``days``; ``price_of(day, i)`` overrides name i's price on a day; the
     universe snapshot is ``snapshot`` (default: before the first day); outcomes are stored
-    for the ``closed`` days only (default: all), with ``rows_of(day)`` as the rows."""
-    backend = MemoryBackend()
+    for the ``closed`` days only (default: all), with ``rows_of(day)`` as the rows; ``backend``:
+    another store than the memory one (a local one, for what needs real run files)."""
+    backend = backend or MemoryBackend()
     writer = StoreWriter(backend)
     universe = universe_rows([f"N{i:02d}" for i in range(N)])
     snapshot = snapshot or days[0] - timedelta(days=3)
