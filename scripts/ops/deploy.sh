@@ -26,6 +26,9 @@
 set -euo pipefail
 
 PRIVATE_REF=refs/deploy/main
+# The git-ignored env files Vite bakes into the web build (apps/web/.gitignore, the root .env);
+# linked into the tree beside the other overlay files (a test keeps this list in step).
+WEB_ENV_OVERLAY=".env .env.local .env.*.local"
 MIN_FREE_KB=5242880  # 5 GB: the floor of the free-space check (else 3x the tree)
 
 main() {
@@ -211,8 +214,8 @@ link_one() {  # link_one <source> <link>: create once, check every cycle
 }
 
 slot_links() {
-  local root_dir=$root f
-  if [ "$dry" = 1 ]; then echo "[dry-run] link var, .env, config/users, config/site/*.local.toml into $tree"; return 0; fi
+  local root_dir=$root f pat
+  if [ "$dry" = 1 ]; then echo "[dry-run] link var, .env, config/users, config/site/*.local.toml, apps/web/{$WEB_ENV_OVERLAY} into $tree"; return 0; fi
   link_one "$root_dir/var" "$tree/var" || return 1
   if [ -e "$root_dir/.env" ]; then link_one "$root_dir/.env" "$tree/.env" || return 1; fi
   mkdir -p "$root_dir/config/users"  # always linked: a first user-config write must not make a real dir in the tree
@@ -220,9 +223,27 @@ slot_links() {
   for f in "$root_dir"/config/site/*.local.toml; do
     if [ -e "$f" ]; then link_one "$f" "$tree/config/site/$(basename "$f")" || return 1; fi
   done
-  for f in "$tree"/config/site/*.local.toml; do  # a local file removed from main
+  for pat in $WEB_ENV_OVERLAY; do  # the web build's own env: without it VITE_SUPABASE_* is baked out
+    for f in "$root_dir"/apps/web/$pat; do
+      if [ -e "$f" ]; then link_one "$f" "$tree/apps/web/$(basename "$f")" || return 1; fi
+    done
+  done
+  for f in "$tree"/config/site/*.local.toml "$tree"/apps/web/.env*; do  # a local file removed from main
     if [ -L "$f" ] && [ ! -e "$f" ]; then rm -f "$f"; fi
   done
+}
+
+# Fail closed: a build made without the Supabase URL the main checkout's apps/web/.env.local
+# holds would swap in a sign-in page that says "not set up". Checked on the finished build.
+web_env_check() {
+  local dist=$1 url
+  [ "$dry" = 0 ] || return 0
+  [ -f "$root/apps/web/.env.local" ] || return 0
+  url=$(grep -E '^VITE_SUPABASE_URL=' "$root/apps/web/.env.local" | tail -1 | cut -d= -f2- | tr -d "\"' ")
+  if [ -n "$url" ] && ! grep -rqF -- "$url" "$dist"; then
+    block "the web build lacks VITE_SUPABASE_URL from apps/web/.env.local (is it linked into the release tree?)"
+    return 1
+  fi
 }
 
 slot_space() {  # refuse under max(5 GB, 3x the tree): the volume runs near full (ADR 0079)
@@ -256,6 +277,7 @@ slot_update() {  # move the tree to the target, then sync and build what the pla
     # Built beside the live one, outside every git path; a changed package-lock.json is newer than node_modules, so make runs npm ci.
     if [ "$dry" = 0 ]; then rm -rf "$webdir.next"; fi
     run make -C "$tree" web-build WEB_DIST="$webdir.next" || { block "the web build failed"; return 1; }
+    web_env_check "$webdir.next" || return 1
   fi
 }
 
@@ -471,6 +493,7 @@ init_build() {
   run_in "$tree" uv sync --all-packages --locked || return 1
   if [ "$dry" = 0 ]; then rm -rf "$webdir.next"; fi
   run make -C "$tree" web-build WEB_DIST="$webdir.next" || return 1
+  web_env_check "$webdir.next" || return 1
   if [ "$dry" = 0 ]; then
     carry_assets "$root/var/web" "$webdir.next"  # tabs open on the old build keep their files
     rm -rf "$webdir"

@@ -87,7 +87,10 @@ sharing the checkout's object store also fetches, so it races them
    through `--git-common-dir`; R1 splits it. A mid-cycle flip of `current` never changes the
    running `$script`.
 8. **What the release tree shares with the main checkout** is only what is git-ignored and
-   live: `var/` (data, logs, deploy state), `.env`, `config/users/` and `config/site/*.local.toml`.
+   live: `var/` (data, logs, deploy state), `.env`, `config/users/`, `config/site/*.local.toml` and the
+   git-ignored env files Vite bakes into the web build (`apps/web/.env`, `.env.local`, `.env.*.local`:
+   `VITE_SUPABASE_*`; amended 2026-10-20 after a key-less build; the deploy also refuses a build
+   lacking the `VITE_SUPABASE_URL` main's `.env.local` holds).
    The deployer symlinks them into the tree (`var` -> the main `var`, the others file by file,
    created once and checked each cycle); `.gitignore` gains `/var` and `/config/users` without a
    trailing slash (a slash pattern never matches a symlink). The web build goes outside any git
