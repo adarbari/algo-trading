@@ -447,6 +447,17 @@ def test_an_earlier_planned_cycle_does_not_rewind_a_later_deploy(site: Site) -> 
     assert f"skipped: tree already past {old[:9]}" in site.log()
 
 
+def test_a_release_tree_that_diverged_from_the_target_blocks(site: Site) -> None:
+    site.seed()
+    (site.tree / "z.txt").write_text("z\n")
+    _git(site.tree, "add", "z.txt")
+    _git(site.tree, "commit", "-qm", "stray commit in the deployer's tree")
+    sha = _advance(site.repo, "src/a.py")
+    out = site.run("--auto")
+    assert out.returncode == 1 and "has diverged from" in site.state("blocked").read_text()
+    assert site.state("last_sha").read_text().strip() != sha
+
+
 def test_config_users_is_always_linked(site: Site) -> None:
     site.seed()
     _advance(site.repo, "src/a.py")
