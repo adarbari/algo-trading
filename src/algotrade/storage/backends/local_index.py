@@ -46,7 +46,7 @@ INDEX = "_runs.json"
 INDEX_LOCK = ".runs.lock"
 TXN = "_txn"
 ORPHAN_GRACE_S = 60.0  # a loose file younger than this may be a write about to be indexed
-SWAP_GRACE_S = 120.0  # a file a compaction swap superseded is swept no sooner than this (ADR 0078)
+SWAP_GRACE_S = 30.0  # a file a compaction swap superseded is swept no sooner than this (ADR 0078)
 
 
 def atomic_write(path: Path, data: bytes) -> None:
@@ -143,6 +143,8 @@ class Commits:
         self.tables = tables_root
         self.base = tables_root / TXN
         self._journals: dict[str, dict[str, dict[str, Any]]] = {}  # this process's runs
+        # other processes' journals: (size, mtime_ns) of the file read -> its parsed lines
+        self._foreign: dict[str, tuple[tuple[int, int], dict[str, dict[str, Any]]]] = {}
         self._guard = threading.Lock()
 
     def _dir(self, table: str, day: str) -> Path:
@@ -175,18 +177,33 @@ class Commits:
 
     def journal(self, run_id: str) -> dict[str, dict[str, Any]]:
         """``table|date`` -> the run's latest pending write there (file, knowledge_ts,
-        restates). Kept in memory by the writing process; read from disk otherwise."""
+        restates). The writing process keeps its own journal in memory; any other run's is
+        re-read when its file changed (journals are append-only, so ``(size, mtime_ns)`` says)."""
         with self._guard:
-            if run_id not in self._journals:
-                self._journals[run_id] = self._load(run_id)
-            return dict(self._journals[run_id])
+            return dict(self._current(run_id))
 
     def pending_item(self, run_id: str, table: str, session_date: date) -> dict[str, Any] | None:
         """The run's pending write to one partition, without copying the whole journal."""
         with self._guard:
-            if run_id not in self._journals:
-                self._journals[run_id] = self._load(run_id)
-            return self._journals[run_id].get(f"{table}|{session_date.isoformat()}")
+            return self._current(run_id).get(f"{table}|{session_date.isoformat()}")
+
+    def _current(self, run_id: str) -> dict[str, dict[str, Any]]:
+        """The journal of ``run_id`` (caller holds the guard). A run this process staged is kept
+        in memory; a foreign one is never trusted from an earlier read: a long-lived process
+        (a compaction worker) must see a backfill that staged after its first look."""
+        if run_id in self._journals:
+            return self._journals[run_id]
+        try:
+            stat = self._journal_path(run_id).stat()
+        except FileNotFoundError:
+            self._foreign.pop(run_id, None)
+            return {}
+        signature = (stat.st_size, stat.st_mtime_ns)
+        cached = self._foreign.get(run_id)
+        if cached is None or cached[0] != signature:
+            cached = (signature, self._load(run_id))
+            self._foreign[run_id] = cached
+        return cached[1]
 
     def _load(self, run_id: str) -> dict[str, dict[str, Any]]:
         path = self._journal_path(run_id)
@@ -210,7 +227,9 @@ class Commits:
         key = f"{table}|{day}"
         directory = self._dir(table, day)
         with self._guard:
-            journal = self._journals.setdefault(run_id, self._load(run_id))
+            if run_id not in self._journals:  # this process now owns the run's journal
+                self._journals[run_id] = self._load(run_id)
+            journal = self._journals[run_id]
             prior = journal.get(key, {}).get("file")
             file = None if known is None else prior or self._fresh(directory, run_id)
             if prior and prior != file:
@@ -339,7 +358,9 @@ class Commits:
                     if self._dir(item["table"], item["date"]) == directory
                 }
                 cutoff = time.time() - ORPHAN_GRACE_S  # a direct write puts its file first
-                orphans = [p for p in found if p.name not in staged and p.stat().st_mtime < cutoff]
+                orphans = [p for p in found if p.name not in staged and _older(p, cutoff)]
+                # the temp file of an ``atomic_write`` a killed process left (a run file's)
+                orphans += [p for p in directory.glob(".run=*.tmp") if _older(p, cutoff)]
                 for path in orphans:
                     path.unlink(missing_ok=True)
             return len(orphans)
@@ -399,6 +420,11 @@ class Commits:
             with held(index_lock(directory)):
                 if read_index(directory) != expected or (refuse is not None and refuse.exists()):
                     return False
+                if any(  # a file the new index names was swept or never landed: never publish it
+                    not (directory / name).exists()
+                    for name in _named(replacement) - _named(expected)
+                ):
+                    return False
                 stamp = (
                     clock() + grace_s - ORPHAN_GRACE_S
                 )  # sweep deletes below now - ORPHAN_GRACE_S
@@ -411,6 +437,7 @@ class Commits:
     def _forget(self, run_id: str) -> None:
         with self._guard:
             self._journals.pop(run_id, None)
+            self._foreign.pop(run_id, None)
             self._journal_path(run_id).unlink(missing_ok=True)
 
     def _recover(self) -> list[str]:
@@ -446,6 +473,14 @@ class Commits:
         self._marker_path(run_id).unlink(missing_ok=True)
         for directory in touched:
             drop_unreferenced(directory, run_id)
+
+
+def _older(path: Path, cutoff: float) -> bool:
+    """Whether ``path`` exists and was modified before ``cutoff`` (it may vanish meanwhile)."""
+    try:
+        return path.stat().st_mtime < cutoff
+    except FileNotFoundError:
+        return False
 
 
 def _named(entries: dict[str, RunEntry]) -> set[str]:
