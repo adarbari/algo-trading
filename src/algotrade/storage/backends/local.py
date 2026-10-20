@@ -29,6 +29,7 @@ only when its run commits, in every partition at once (``local_index.py``).
 import glob
 import gzip
 import os
+import secrets
 import shutil
 import threading
 from collections import OrderedDict
@@ -50,9 +51,10 @@ from algotrade.storage.backends.arrow import (
     to_arrow,
     to_frame,
 )
-from algotrade.storage.backends.history import HistoryCopy
+from algotrade.storage.backends.history import HISTORY, HistoryCopy
 from algotrade.storage.backends.local_index import (
     INDEX,
+    SWAP_GRACE_S,
     TXN,
     Commits,
     atomic_write,
@@ -64,6 +66,7 @@ from algotrade.storage.backends.local_index import (
     safe,
     write_index,
 )
+from algotrade.storage.backends.run_compaction import plan_compaction, verify_plan
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     StaleSnapshotError,
@@ -77,6 +80,7 @@ from algotrade.storage.backends.run_selection import (
 )
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, run_session
+from algotrade.storage.tables.interfaces import CompactionReport
 from algotrade.storage.tables.schemas import require_retention
 
 
@@ -115,6 +119,7 @@ class LocalTables:
         self.root = root / "tables"
         self.commits = Commits(self.root)
         self.history = HistoryCopy(self.root, self.commits.published, self.commits.no_commits)
+        self.swap_grace_s = SWAP_GRACE_S  # tests shorten it
 
     def _dir(self, table: str, session_date: date) -> Path:
         return self.root / table / f"date={session_date.isoformat()}"
@@ -381,6 +386,69 @@ class LocalTables:
 
     def purge_runs(self, table: str, session_date: date, runs: Collection[str]) -> int:
         return self.commits.remove_runs(self._dir(table, session_date), runs)
+
+    def compact_runs(
+        self, table: str, session_date: date, dry_run: bool = False
+    ) -> CompactionReport:
+        """ADR 0078: plan from the index as read now, write the kept rows under fresh names,
+        verify what was written, then ``Commits.swap_runs`` (which aborts if the index moved).
+        The superseded files are left for ``sweep_orphans`` once their grace has passed."""
+        directory = self._dir(table, session_date)
+        expected = read_index(directory)
+        if (self.root / table / HISTORY).exists() or not expected:
+            why = "the table has a history copy" if expected else "no such partition"
+            return CompactionReport(skipped=why)
+        before = len(expected)
+        try:
+            sizes = {r: (directory / run_file(r, e)).stat().st_size for r, e in expected.items()}
+            sources: dict[str, pa.Table] = {}
+
+            def load(run: str, entry: RunEntry) -> pa.Table:
+                sources[run] = _read_file(directory / run_file(run, entry), None, None)
+                return sources[run]
+
+            plan = plan_compaction(table, expected, load)
+        except FileNotFoundError:  # a commit replaced a version meanwhile: try again later
+            return CompactionReport(skipped="the partition changed while planning")
+        size_before = sum(sizes.values())
+        if plan.skipped or plan.noop:
+            return CompactionReport(before, before, size_before, size_before, 0, plan.skipped)
+        fresh = {r: f"run={r}~{secrets.token_hex(4)}.parquet" for r in plan.rewritten}
+        kept = {
+            r: replace(
+                expected[r],
+                ref=fresh.get(r, expected[r].ref),
+                prev=None,
+                dropped=expected[r].dropped or expected[r].prev is not None,
+            )
+            for r in plan.kept
+        }
+        encoded = {r: parquet_bytes(plan.kept[r]) for r in plan.rewritten}
+        size_after = sum(len(encoded[r]) if r in encoded else sizes[r] for r in plan.kept)
+        report = CompactionReport(before, len(kept), size_before, size_after, len(plan.dropped))
+        if dry_run:
+            return report
+        for run, name in fresh.items():
+            atomic_write(directory / name, encoded[run])
+        try:
+            written = {
+                r: _read_file(directory / run_file(r, e), None, None) for r, e in kept.items()
+            }
+            verify_plan(table, expected, sources, kept, written)
+            swapped = self.commits.swap_runs(directory, expected, kept, self.swap_grace_s)
+        except BaseException:
+            self._discard(directory, fresh.values())
+            raise
+        if swapped:
+            return report
+        self._discard(directory, fresh.values())
+        return CompactionReport(before, before, size_before, size_before, 0, "the index moved")
+
+    @staticmethod
+    def _discard(directory: Path, names: Collection[str]) -> None:
+        """Delete files written for a swap that did not happen (nothing names them)."""
+        for name in names:
+            (directory / name).unlink(missing_ok=True)
 
     @staticmethod
     def _remove(days: list[Path]) -> None:

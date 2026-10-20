@@ -453,7 +453,7 @@ src/algotrade/
     strategy/     schema.py, resolve.py, catalog.py           configs and selections
   storage/        runs.py, locks.py, factory.py
     tables/       interfaces, readers, writers, schemas, result_writer
-    backends/     local, memory, arrow, run_selection        the only Parquet / Arrow code
+    backends/     local, memory, arrow, run_selection, run_compaction   the only Parquet / Arrow code
     configs/      store.py (ConfigStore), files.py            config documents only
   quant/          black_scholes, implied_vol, realized_vol, rates,  pure numerics (numpy)
                   covariance, turning_points

@@ -6,11 +6,14 @@ the run index (writes, commits and read snapshots), and named locks for ``Backen
 A commit (ADR 0022) happens under that lock, so it is atomic and never left half-applied.
 """
 
+import secrets
 import threading
 from collections.abc import Collection, Sequence
+from dataclasses import replace
 from datetime import UTC, date, datetime
 
 import pandas as pd
+import pyarrow as pa
 
 from algotrade.storage.backends.arrow import (
     concat,
@@ -20,6 +23,7 @@ from algotrade.storage.backends.arrow import (
     to_frame,
 )
 from algotrade.storage.backends.local_index import safe
+from algotrade.storage.backends.run_compaction import plan_compaction, verify_plan
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     committed,
@@ -34,7 +38,7 @@ from algotrade.storage.backends.run_selection import (
 )
 from algotrade.storage.locks import ThreadLock
 from algotrade.storage.runs import RunRecord, run_session
-from algotrade.storage.tables.interfaces import PartitionBusyError
+from algotrade.storage.tables.interfaces import CompactionReport, PartitionBusyError
 from algotrade.storage.tables.schemas import require_retention
 
 Key = tuple[str, date]  # (table, session_date)
@@ -267,6 +271,57 @@ class MemoryTables:
             if gone:
                 self._seq += 1  # committed like a run: a read sees all of the purge or none
             return len(gone)
+
+    def compact_runs(
+        self, table: str, session_date: date, dry_run: bool = False
+    ) -> CompactionReport:
+        """ADR 0078, as ``LocalTables.compact_runs``; one lock hold makes it atomic, so there is
+        no concurrent commit to abort for and no file to leave for a sweep."""
+        key = (table, session_date)
+        with self._index_lock:
+            if any(key in writes for writes in self._pending.values()):
+                raise PartitionBusyError(f"{table} {session_date}")
+            expected = dict(self._partitions.get(key, {}))
+            if not expected:
+                return CompactionReport(skipped="no such partition")
+            sources: dict[str, pa.Table] = {}
+
+            def load(run: str, entry: RunEntry) -> pa.Table:
+                sources[run] = to_arrow(table, self._frames[(key, run, entry.ref)])
+                return sources[run]
+
+            plan = plan_compaction(table, expected, load)
+            size = {r: len(parquet_bytes(sources[r])) for r in sources}
+            before, size_before = len(expected), sum(size.values())
+            if plan.skipped or plan.noop:
+                return CompactionReport(before, before, size_before, size_before, 0, plan.skipped)
+            fresh = {r: f"{expected[r].ref or ''}~{secrets.token_hex(4)}" for r in plan.rewritten}
+            kept = {
+                r: replace(
+                    expected[r],
+                    ref=fresh.get(r, expected[r].ref),
+                    prev=None,
+                    dropped=expected[r].dropped or expected[r].prev is not None,
+                )
+                for r in plan.kept
+            }
+            size_after = sum(
+                len(parquet_bytes(plan.kept[r])) if r in fresh else size[r] for r in kept
+            )
+            report = CompactionReport(before, len(kept), size_before, size_after, len(plan.dropped))
+            if dry_run:
+                return report
+            verify_plan(table, expected, sources, kept, {r: plan.kept[r] for r in kept})
+            frames = {
+                (key, r, e.ref): self._frames[(key, r, expected[r].ref)] for r, e in kept.items()
+            }
+            for r in fresh:
+                frames[(key, r, kept[r].ref)] = to_frame(plan.kept[r])
+            for frame_key in [f for f in self._frames if f[0] == key]:
+                del self._frames[frame_key]
+            self._frames.update(frames)
+            self._partitions[key] = kept
+            return report
 
     def dates(self, table: str, own_run: str | None = None) -> list[date]:
         with self._index_lock:

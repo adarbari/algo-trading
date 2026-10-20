@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.storage.tables.interfaces import Backend
+from algotrade.storage.tables.interfaces import Backend, CompactionReport
 from algotrade.storage.tables.result_writer import ResultWriter
 from algotrade.storage.tables.schemas import validate_frame
 
@@ -77,3 +77,15 @@ class StoreWriter(ResultWriter):
     def drop_table(self, table: str) -> int:
         """Delete every partition of a superseded table (``retire-features`` only)."""
         return self._backend.tables.drop(table)
+
+    def compact_runs(
+        self, table: str, session_date: date, dry_run: bool = False
+    ) -> CompactionReport:
+        """Compact one partition's runs value-exactly (``TableStore.compact_runs``, ADR 0078);
+        ``dry_run`` only reports. Ingestion only (``compact-runs``)."""
+        return self._backend.tables.compact_runs(table, session_date, dry_run)
+
+    def sweep_orphans(self, table: str, session_date: date) -> int:
+        """Delete the files of one partition no run names (``TableStore.sweep_orphans``): what a
+        compaction swap superseded, once its grace has passed."""
+        return self._backend.tables.sweep_orphans(table, session_date)

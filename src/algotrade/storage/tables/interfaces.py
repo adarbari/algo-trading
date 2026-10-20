@@ -1,6 +1,7 @@
 """Storage protocols. Every backend implements all of them and passes tests/contract/storage."""
 
 from collections.abc import Collection, Sequence
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
 
@@ -8,6 +9,18 @@ import pandas as pd
 
 from algotrade.storage.locks import Lock
 from algotrade.storage.runs import RunRecord
+
+
+@dataclass(frozen=True)
+class CompactionReport:
+    """What ``compact_runs`` did (or, in a dry run, would do) to one partition."""
+
+    files_before: int = 0
+    files_after: int = 0
+    bytes_before: int = 0
+    bytes_after: int = 0
+    runs_dropped: int = 0
+    skipped: str | None = None  # why nothing was changed (never an error)
 
 
 class TableStore(Protocol):
@@ -172,6 +185,20 @@ class TableStore(Protocol):
         ``PartitionBusyError`` when a pending run has written to the partition. The caller must
         hold the table's writers lock (``storage.locks.FEEDBACK_WRITERS``).
         -> files deleted (a backend that keeps no loose files: 0)."""
+        ...
+
+    def compact_runs(
+        self, table: str, session_date: date, dry_run: bool = False
+    ) -> CompactionReport:
+        """Replace one merge-table partition's runs by the fewest rows that read the same at every
+        ``as_of`` and every pinned sequence (ADR 0078, ``backends/run_compaction.py``). A swap of
+        the partition's index, not a commit: ``visible_seq``, ``partition_seq`` and ``dates`` do not
+        move, and only a row's stamps can differ. A partition it cannot compact exactly is left
+        untouched with ``skipped`` saying why; a result that fails its own verification raises
+        ``CompactionVerificationError`` with nothing changed; ``PartitionBusyError`` when a pending
+        run wrote to it. The superseded files stay for ``SWAP_GRACE_S`` (a read that resolved them
+        finishes) and go with ``sweep_orphans``. ``dry_run``: the report only. Admin rewrite,
+        never part of a run."""
         ...
 
 
