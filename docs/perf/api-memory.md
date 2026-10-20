@@ -104,8 +104,7 @@ document only adds that the release build must itself read newest-runs (P1), or 
 the same 8 GB peak, moved into ingestion.
 
 **P4, ingestion:** stop the fragmentation (a rerun of an unchanged config writes no run, ADR 0078
-decision 6) and purge runs whose every key a later run of the same config rewrote
-(`purge_runs`; value-exact only for those, since the merge has no tombstones). Not a
+decision 6) (no purge: the review dropped it). Not a
 `compact-runs` tables entry: its E2 scheme drops rows that differ only in `run_id`, which the
 screen readers group by.
 
@@ -113,6 +112,26 @@ screen readers group by.
 ingestion-only changes (`src/algotrade/workflows`, `libs/sources/.../vendors`, `nightly.toml`,
 `config/site/edges`...) restart it and re-balloon it. Narrow it to the API's import closure
 (computed by a test, deny by default like `_INGEST_FREE`): a follow-up PR.
+
+## Architect review (2026-10-20) folded in
+
+- **P1 is sound but needs guards**: a restating run (`migrate_ids`, `IngestRun.rewrite`)
+  restamps every config's rows and the merge starts from it, so "newest run per config" falls
+  back to the full merge when the partition holds a restating run (or a file whose `user_id` /
+  `config_id` footer min != max). Choose runs from the **visible index entries** (own run
+  included) mapped through the footer statistics, never from run records (the newest record can
+  be running or failed; `screen-{config}-{user}` is ambiguous with `-`), and choose and read inside
+  one `pinned_read(upto)` as a new backend method with `tests/contract/storage/` tests and an
+  ownership entry. Also cover `results.py` `_run_fields` and `_stored_key`, which decode the whole
+  values partition again outside the shared cache.
+- **P2's cache budget goes before "previous session once"**: the previous session is already one
+  cached key, recomputed only because the 400 MB cap evicts it.
+- **P4's purge is dropped**: it commits (moves `visible_seq` / `partition_seq`) and gives up older
+  `as_of` reads (ADRs 0007, 0077); only the rerun skip (ADR 0078 decision 6) stays.
+- **Allocator**: Arrow reads `ARROW_DEFAULT_MEMORY_POOL` once, when it first creates the pool, and
+  the API imports pyarrow before `main`, so P0 calls `pa.set_memory_pool(pa.system_memory_pool())`
+  (`arrow_memory.use_system_pool`, PR #756). The ADR 0077 warm process and release build need it
+  too. Measured on the home warm (newest-run prototype): footprint after `ideas` 0.98 GB vs 2.26 GB.
 
 ## Guards so it cannot regress
 
@@ -123,5 +142,5 @@ ingestion-only changes (`src/algotrade/workflows`, `libs/sources/.../vendors`, `
 3. **Per-read budget test** (with P1): a store with 10 runs x 20 configs in one session; the
    screen-rows read's peak Arrow allocation (`pa.default_memory_pool().max_memory()`) stays within
    2x the newest-run bytes. This is the test that would have caught the fan-out.
-4. **Allocator fitness test**: importing `algotrade_api.main` in a subprocess leaves the default
+4. **Allocator test** (`tests/apps/api/test_main_memory.py`, #756): importing `algotrade_api.main` in a subprocess leaves the default
    Arrow pool `system`.
