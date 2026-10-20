@@ -29,9 +29,10 @@ partitions it would skip and why, and the estimated saving. It plans only (fast)
 ``--verify``, which also runs the verification a live run does (the slow part: minutes on a
 partition of many runs) in memory; the report and a progress line say which it did. The report
 is the task's printed summary; no run record is saved (it would move ``runs_generation`` and
-evict every cached page) and no table is published. The ``deploy`` lock is held for the whole
-run (ADR 0057),
-never waited for.
+evict every cached page) and no table is published. The whole run holds the ``ingest-tree`` lock
+(never waited for), so
+the ingest-tree sync cannot move this checkout between partitions; the ``deploy`` lock is not
+taken, a serving deploy runs from the release tree (ADR 0079).
 """
 
 import contextlib
@@ -48,8 +49,8 @@ from algotrade.config.site.nightly import CompactionSettings, NightlySettings
 from algotrade.config.site.settings import load_nightly
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.jobs.exclusive import (
-    DEPLOY_LOCK,
     INGEST_LOCK,
+    INGEST_TREE_LOCK,
     RunLockedError,
     exclusive_run,
 )
@@ -318,11 +319,11 @@ def compact(
         else:
             prioritise(cfg.nice)
             job = Compactor(ctx, table, cfg, min_free_gb * GB, sleep, clock, progress)
-            try:  # a deploy must not run between partitions (ADR 0057): hold its lock throughout
-                with exclusive_run(ctx.writer.backend, DEPLOY_LOCK, wait=False):
+            try:  # the ingest-tree sync must not rewrite this checkout between partitions
+                with exclusive_run(ctx.writer.backend, INGEST_TREE_LOCK, wait=False):
                     job.run(days, limit)
             except RunLockedError:
-                job.stopped = "a deploy is running (the deploy lock is held)"
+                job.stopped = "the ingest tree is being synced (the ingest-tree lock is held)"
             totals = job.totals
             if job.stopped:
                 run.stats["stopped"] = job.stopped

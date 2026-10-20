@@ -17,7 +17,7 @@ import pytest
 from algotrade.config.site.nightly import CompactionSettings
 from algotrade.config.site.settings import load_nightly
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.jobs.exclusive import DEPLOY_LOCK, INGEST_LOCK
+from algotrade.services.jobs.exclusive import DEPLOY_LOCK, INGEST_LOCK, INGEST_TREE_LOCK
 from algotrade.storage.backends import local
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.run_compaction import Budget
@@ -174,14 +174,14 @@ def test_the_task_saves_no_run_and_moves_no_cache_key(ctx: TaskContext, dry_run:
     assert (ctx.reader.visible_seq(), ctx.reader.runs_generation()) == (seq, runs)
 
 
-def test_a_held_deploy_lock_stops_the_run_before_any_change(ctx: TaskContext) -> None:
-    before = _files(ctx)
+def test_a_held_deploy_lock_does_not_stop_the_run(ctx: TaskContext) -> None:
+    # serving deploys run from the release tree (ADR 0079): a deploy must not block a compaction
     with held(ctx.writer.backend.lock(DEPLOY_LOCK)):
         record = compact(ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None)
-    assert "deploy lock is held" in record.stats["stopped"] and _files(ctx) == before
+    assert "stopped" not in record.stats and record.stats["compacted"] == 2
 
 
-def test_the_deploy_lock_is_held_while_a_partition_is_compacted(ctx: TaskContext) -> None:
+def test_the_deploy_lock_stays_free_while_a_partition_is_compacted(ctx: TaskContext) -> None:
     seen: list[bool] = []
 
     def pause(_: float) -> None:
@@ -189,7 +189,25 @@ def test_the_deploy_lock_is_held_while_a_partition_is_compacted(ctx: TaskContext
             seen.append(taken)
 
     compact(ctx, SESSION, TABLE, sleep=pause, prioritise=lambda n: None)
-    assert seen and not any(seen)  # a deploy cannot start in the pauses
+    assert seen and all(seen)  # a deploy can start in the pauses
+
+
+def test_the_ingest_tree_lock_is_held_for_the_whole_run(ctx: TaskContext) -> None:
+    seen: list[bool] = []
+
+    def pause(_: float) -> None:
+        with held(ctx.writer.backend.lock(INGEST_TREE_LOCK), wait=False) as taken:
+            seen.append(taken)
+
+    compact(ctx, SESSION, TABLE, sleep=pause, prioritise=lambda n: None)
+    assert seen and not any(seen)  # the ingest-tree sync cannot start in the pauses
+
+
+def test_a_held_ingest_tree_lock_stops_the_run_before_any_change(ctx: TaskContext) -> None:
+    before = _files(ctx)
+    with held(ctx.writer.backend.lock(INGEST_TREE_LOCK)):
+        record = compact(ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None)
+    assert "ingest-tree lock is held" in record.stats["stopped"] and _files(ctx) == before
 
 
 def test_lower_priority_never_raises_and_asks_for_the_cpu_nice(

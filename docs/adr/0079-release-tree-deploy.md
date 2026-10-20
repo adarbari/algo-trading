@@ -157,6 +157,12 @@ touches any of them, and P4 builds on R1's slot functions.
   (`docs/hosting.md`), bring the main checkout forward (R2 does it on the next gap).
 - Out of scope: `make web-check`'s own builds, CI, agent worktrees, a second machine.
 
+**Amendment 2026-10-20 (the ingest-tree lock).** A job that frees the ingest run lock between
+steps (`compact-runs`, ADR 0078) would let the step-5 sync rewrite the checkout under it, and it
+must not hold the `deploy` lock for hours to prevent that (it blocked serving deploys). The lock
+`ingest-tree` (`INGEST_TREE_LOCK`) is held by such a job for its whole run, never waited for;
+`deploy-hold` takes it with the ingest lock (the sync), and `--deploy-only` (serving) does not.
+
 ## Review
 Architect review 2026-10-20: design sound; nine edits applied (refmap, rebuild constraint, ingest-sync range, two roots, plists, symlinks, bootstrap, proxy truth, lock wording). A re-review of R1 is required (locks, format and deploy lifecycle change there).
 
