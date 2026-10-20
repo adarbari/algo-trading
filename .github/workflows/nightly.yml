@@ -28,3 +28,29 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with: { name: nightly-scorecard, path: scorecard.md, if-no-files-found: ignore }
+
+  # Python 3.13 compatibility: the whole suite once a night instead of on every push to main
+  # (CI tests 3.12 only; nothing deploys on 3.13). A failure opens (or comments on) an issue.
+  python-313:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 } # tests/architecture dates golden cases from git history
+      - uses: astral-sh/setup-uv@v7
+        with: { python-version: "3.13", enable-cache: true }
+      - run: uv sync --all-packages --locked
+      - name: The full suite on Python 3.13 (coverage gate included)
+        run: make test
+      - name: Open an issue when 3.13 broke
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Nightly: tests fail on Python 3.13"
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          n=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" --body "Still failing: $url"
+          else gh issue create --title "$title" --body "The nightly Python 3.13 run failed: $url"; fi

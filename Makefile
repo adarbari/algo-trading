@@ -119,19 +119,21 @@ test:            ## everything, with the coverage gate, one worker per CPU (WORK
 
 # CI runs the suite as three parallel shards (docs/ci.md "Pipeline"); together they are `make test`.
 # A fitness test (tests/architecture/pipeline) checks the shards cover every tests/ folder.
-TEST_SHARDS = unit-a unit-b unit-c apps rest
+TEST_SHARDS = unit-a unit-b unit-c apps arch rest
 # tests/unit split three ways (the #292 run: unit-a 4.5 min with all of features/, unit-b 1.6):
 # the rollup groups are the slow unit tests, so they are spread over unit-a and unit-b
 TEST_SHARD_unit-a = tests/unit/features/rollups/market tests/unit/features/rollups/bridges tests/unit/features/rollups/price tests/unit/features/rollups/corporate tests/unit/features/rollups/events tests/unit/features/rollups/options tests/unit/features/rollups/activity tests/unit/features/rollups/text
 TEST_SHARD_unit-b = tests/unit/features/rollups/consensus tests/unit/features/rollups/positioning tests/unit/features/rollups/levels tests/unit/features/rollups/reference tests/unit/features/rollups/relative tests/unit/features/rollups/statements tests/unit/features/rollups/patterns tests/unit/features/expressions tests/unit/features/framework tests/unit/features/test_catalogue.py tests/unit/features/test_guide.py tests/unit/features/test_site.py tests/unit/features/test_site_forward.py tests/unit/features/test_site_fundamentals.py tests/unit/features/test_site_patterns.py tests/unit/features/test_site_positioning.py tests/unit/features/test_site_relative.py tests/unit/features/test_site_statements.py tests/unit/quant tests/unit/engines tests/unit/strategies tests/unit/analytics
 TEST_SHARD_unit-c = tests/unit/services tests/unit/config tests/unit/data tests/unit/core tests/unit/storage
-TEST_SHARD_apps = tests/apps tests/libs tests/contract tests/architecture
+TEST_SHARD_apps = tests/apps tests/libs tests/contract
+# arch: its own shard, the one that checks out the full git history (a golden-case commit date test)
+TEST_SHARD_arch = tests/architecture
 # rest: few tests, the slow ones
 TEST_SHARD_rest = tests/property tests/integration tests/e2e tests/scripts tests/reconciliation
 
-test-shard:      ## one CI shard (SHARD=unit-a|unit-b|unit-c|apps|rest): its coverage data in .coverage.<shard>, no gate (coverage-combine gates)
+test-shard:      ## one CI shard (SHARD=unit-a|unit-b|unit-c|apps|arch|rest), optionally one slice of it (GROUP=i SPLITS=n, pytest-split): its coverage data in .coverage.<shard>-<group>, no gate (coverage-combine gates)
 	@test -n "$(TEST_SHARD_$(SHARD))" || { echo "SHARD must be one of: $(TEST_SHARDS)" >&2; exit 2; }
-	COVERAGE_FILE=.coverage.$(SHARD) $(PY) -m pytest -n $(WORKERS) --cov --cov-report= --cov-fail-under=0 $(TEST_SHARD_$(SHARD))
+	COVERAGE_FILE=.coverage.$(SHARD)-$(or $(GROUP),1) $(PY) -m pytest -n $(WORKERS) --splits $(or $(SPLITS),1) --group $(or $(GROUP),1) --splitting-algorithm least_duration --cov --cov-report= --cov-fail-under=0 $(TEST_SHARD_$(SHARD))
 
 coverage-combine: ## the 90% coverage gate over the shards' data files (.coverage.*), then coverage.xml
 	$(BIN)coverage combine --keep $(wildcard .coverage.*)

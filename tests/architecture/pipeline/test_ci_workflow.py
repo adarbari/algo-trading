@@ -76,8 +76,15 @@ def test_pytest_shards_cover_every_test_folder_and_combine_under_the_protected_n
     assert not uncovered, f"tests no shard runs: {uncovered[:5]}"
     assert not twice, f"tests two shards run: {twice[:5]}"
     jobs = _jobs()
-    assert jobs["test"]["strategy"]["matrix"]["shard"] == names
-    assert "make test-shard SHARD=${{ matrix.shard }}" in str(jobs["test"]["steps"])
+    cells = jobs["test"]["strategy"]["matrix"]["cell"]
+    parsed = [re.fullmatch(r"([\w-]+)-(\d+)of(\d+)", cell) for cell in cells]
+    assert all(parsed), "a cell is <shard>-<group>of<splits>"
+    for name in names:
+        groups = sorted(int(m[2]) for m in parsed if m[1] == name)
+        splits = {int(m[3]) for m in parsed if m[1] == name}
+        assert splits and groups == list(range(1, max(splits) + 1)), f"{name}: every slice once"
+    assert {m[1] for m in parsed} == set(names), "every shard has cells"
+    assert "make test-shard SHARD=${{ steps.cell.outputs.shard }}" in str(jobs["test"]["steps"])
     gate = jobs["tests"]
     assert gate["name"] == "Tests (py${{ matrix.python }})"
     assert set(gate["needs"]) == {"changes", "test"}
@@ -103,12 +110,18 @@ def test_the_web_gate_waits_for_every_web_job_and_tolerates_skips() -> None:
 
 def test_python_jobs_skip_web_only_and_docs_only_changes() -> None:
     jobs = _jobs()
-    assert jobs["quality"]["if"] == "needs.changes.outputs.python == 'true'"
+    for name in ("lint", "evaluate"):
+        assert jobs[name]["if"] == "needs.changes.outputs.python == 'true'"
+    assert set(jobs["quality"]["needs"]) == {"lint", "evaluate"}
+    assert jobs["quality"]["if"].strip() == "${{ !cancelled() }}"
+    assert "make evaluate" not in str(jobs["lint"]["steps"]), "evaluation runs in its own job"
     steps = {s.get("name"): s for s in jobs["test"]["steps"]}
     full = next(s for n, s in steps.items() if n and n.startswith("Unit + architecture"))
     assert full["if"] == "needs.changes.outputs.python == 'true'"
     arch = next(s for n, s in steps.items() if n and n.startswith("Architecture tests only"))
-    assert arch["if"] == "needs.changes.outputs.python != 'true' && matrix.shard == 'rest'"
+    assert (
+        arch["if"] == "needs.changes.outputs.python != 'true' && steps.cell.outputs.shard == 'arch'"
+    )
     assert "tests/architecture" in arch["run"]
     classify = jobs["changes"]["steps"][-1]["run"]
     assert "docs/* | .claude/* | *.md" in classify, "docs-only PRs run the architecture tests only"
@@ -192,8 +205,8 @@ def test_the_screenshot_label_and_ci_dispatch_run_outside_the_playwright_contain
 
 def test_full_history_is_fetched_only_by_the_shard_that_runs_the_architecture_tests() -> None:
     """`tests/architecture/drafting/test_golden_unrecorded.py` fails in a shallow clone in CI, so
-    the shard running tests/architecture (`apps` on a Python change, `rest` on a web-only or
-    docs-only one) checks out `fetch-depth: 0`; every other shard stays shallow."""
+    the `arch` shard (on a Python change and on a web-only or docs-only one) checks out
+    `fetch-depth: 0`; every other shard stays shallow."""
     checkout = next(
         step
         for step in _jobs()["test"]["steps"]
@@ -201,28 +214,23 @@ def test_full_history_is_fetched_only_by_the_shard_that_runs_the_architecture_te
     )
     depth = str(checkout["with"]["fetch-depth"])
     assert "'0'" in depth, "a bare 0 is falsy in a GitHub expression: quote it"
+    assert "startsWith(matrix.cell, 'arch-')" in depth
+    cells = _jobs()["test"]["strategy"]["matrix"]["cell"]
+    assert [c for c in cells if c.startswith("arch-")] == ["arch-1of1"]
 
-    def full(shard: str, python: str) -> bool:
-        expr = depth.removeprefix("${{").removesuffix("}}").strip()
-        # evaluate the one expression shape the workflow uses
-        py = python == "true"
-        env = {"shard": shard, "py": py}
-        py_expr = (
-            expr.replace("matrix.shard", "shard")
-            .replace("needs.changes.outputs.python == 'true'", "py")
-            .replace("needs.changes.outputs.python != 'true'", "(not py)")
-            .replace("&&", " and ")
-            .replace("||", " or ")
-        )
-        return eval(py_expr, {}, env) == "0"
 
-    for shard in ("unit-a", "unit-b", "unit-c", "apps", "rest"):
-        for python in ("true", "false"):
-            runs_architecture = (shard == "apps") == (python == "true") and shard in {
-                "apps",
-                "rest",
-            }
-            assert full(shard, python) == runs_architecture, (shard, python)
+def test_python_313_runs_nightly_not_on_every_push() -> None:
+    """CI tests the primary version only (nothing deploys on 3.13); the nightly workflow runs the
+    whole suite on 3.13 and reports a failure as an issue."""
+    jobs = _jobs()
+    assert jobs["test"]["strategy"]["matrix"]["python"] == ["3.12"]
+    assert jobs["tests"]["strategy"]["matrix"]["python"] == ["3.12"]
+    nightly = yaml.safe_load((REPO / ".github" / "workflows" / "nightly.yml").read_text())["jobs"]
+    steps = nightly["python-313"]["steps"]
+    assert any(str(s.get("with", {}).get("python-version")) == "3.13" for s in steps)
+    assert any(str(s.get("run", "")).strip() == "make test" for s in steps)
+    checkout = next(s for s in steps if str(s.get("uses", "")).startswith("actions/checkout"))
+    assert str(checkout["with"]["fetch-depth"]) == "0"
 
 
 def test_every_other_workflow_running_the_architecture_tests_checks_out_full_history() -> None:
