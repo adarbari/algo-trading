@@ -134,3 +134,18 @@ def test_unrecorded_golden_cases_older_than_14_days_are_listed(tmp_path: Path) -
     assert [x.split(":")[0].strip() for x in lines[1:]] == ["old", "undated"]
     assert status.unrecorded_cases(probes(tmp_path, golden_cases=tmp_path / "none")) == []
     assert "Golden cases" in status.report(p)
+
+
+def test_release_lines_are_silent_without_a_release_tree_and_report_one(tmp_path: Path) -> None:
+    def run(cmd: list[str]) -> tuple[int, str]:
+        return (0, "2") if "rev-list" in cmd else (0, "abcdef123456")
+
+    p = status.Probes(run=run, repo=tmp_path)
+    assert status.release(p) == []
+    (tmp_path / "var" / "release" / "blue").mkdir(parents=True)
+    (tmp_path / "var" / "release" / "current").symlink_to(tmp_path / "var" / "release" / "blue")
+    (tmp_path / "var" / "deploy").mkdir()
+    (tmp_path / "var" / "deploy" / "ingest_sync_blocked").write_text("t busy\n")
+    text = "\n".join(status.release(p))
+    assert "blue abcdef123 (2 behind)" in text and "current ->" in text
+    assert "ingest checkout abcdef123 (2 behind" in text and "BLOCKED: t busy" in text
