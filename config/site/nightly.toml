@@ -35,6 +35,12 @@ arrow_cpu_threads = 2            # Arrow's decode threads in the ingest process 
 arrow_io_threads = 4
 min_free_gb = 15                 # the nightly refuses to start with less free on the data volume (a full disk stops every agent); make doctor warns below it
 
+[backfilling]                    # ADR 0055 amendment 2026-10-20: a table still being backfilled. A screener short of coverage
+                                 # only for want of these (HARD criteria on them) is a WARN `backfilling` while until >= the session's
+                                 # date, never a failed screens step; after `until` it fails again. The PR that confirms a backfill deletes its entry.
+"rollups/instrument/filing_text_similarity@v1" = { until = "2026-11-03", reason = "filing text backfill (lazy_prices_similar, risk_factor_unchanged) takes days" }
+"rollups/instrument/etf_launches@v1" = { until = "2026-11-03", reason = "etf_launches backfill (etf_launch_recent) in progress" }
+
 [history_copy]                   # the history-copy step (ADR 0060): a read-optimised copy of long reads
 enabled = true                   # false: the nightly skips the step (the copies already built still serve)
 market_prefix = "rollups/market/"   # every table under it is copied, all years (a few MB each)

@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.site.nightly import Backfilling
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.services.jobs import JobRecord, JobStatus
 from algotrade.services.read.context import NotFoundError
@@ -410,3 +411,45 @@ def test_an_audit_that_fell_back_to_full_or_is_another_edges_does_not_count() ->
     _audited(backend, "drift", "site", WEDNESDAY - timedelta(days=1), mode="full")
     _audited(backend, "other", "site", WEDNESDAY - timedelta(days=1))
     assert screens_module.audit_due(backend, EDGE, WEDNESDAY) is True
+
+
+FILING = "rollups/instrument/filing_text_similarity@v1"
+LAUNCHES = "rollups/instrument/etf_launches@v1"
+TODAY = date(2026, 10, 20)
+
+
+def _window(**until: str) -> dict[str, Backfilling]:
+    return {t: Backfilling(date.fromisoformat(u), "backfill") for t, u in until.items()}
+
+
+def test_screens_short_only_of_a_declared_backfill_warn_and_stay_partial() -> None:
+    # 2026-10-19: lazy_prices_similar, risk_factor_unchanged and etf_launch_recent were PARTIAL
+    # on tables with no data yet (backfill in progress), which failed the critical screens step.
+    window = _window(**{FILING: "2026-11-03", LAUNCHES: "2026-11-03"})
+    result = screens_module.while_backfilling(
+        _screens(("complete", []), ("partial", [FILING]), ("partial", [LAUNCHES, FILING])),
+        window,
+        TODAY,
+    )
+    assert result.status is StepStatus.SUCCEEDED and result.reason is None
+    assert [(c["name"], c["status"]) for c in result.checks] == [("backfilling", "WARN")] * 2
+    assert result.result["screens"][1]["status"] == "partial"  # the run stays PARTIAL
+
+
+@pytest.mark.parametrize(
+    ("jobs", "until"),
+    [
+        ((("partial", [FILING]), ("failed", [])), "2026-11-03"),  # a failed job
+        ((("partial", [FILING, "rollups/instrument/price_stats@v2"]),), "2026-11-03"),  # other
+        ((("partial", [FILING]),), "2026-10-19"),  # the entry lapsed
+        ((("partial", [LAUNCHES]),), "2026-11-03"),  # a table not declared
+        ((("partial", []),), "2026-11-03"),  # short with every table present
+    ],
+)
+def test_any_other_shortfall_still_fails_while_a_backfill_is_declared(
+    jobs: tuple[tuple[str, list[str]], ...], until: str
+) -> None:
+    window = _window(**{FILING: until})
+    assert screens_module.while_backfilling(_screens(*jobs), window, TODAY).status is (
+        StepStatus.FAILED
+    )

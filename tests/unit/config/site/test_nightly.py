@@ -1,7 +1,12 @@
 """The nightly's site config (``algotrade.config.site.nightly``): its history copy covers what the
 Explore history reads."""
 
-from algotrade.config.site.settings import load_nightly
+import tomllib
+
+import pytest
+
+from algotrade.config.site.settings import NightlySettings, load_nightly
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.features.registry import GROUPS
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
@@ -17,3 +22,24 @@ def test_the_history_copy_holds_every_instrument_table_a_feature_history_reads()
     )
     stored = {g.table for g in GROUPS.values() if g.entity == "instrument"}
     assert stored - copied == set(), "add these tables to [history_copy] instrument_tables"
+
+
+def test_every_declared_backfill_names_a_stored_rollup_table() -> None:
+    declared = load_nightly(FileConfigStore(REPO_ROOT / "config", local=False)).backfilling
+    stored = {g.table for g in GROUPS.values()}
+    assert declared, "nightly.toml declares the backfills under way"
+    assert set(declared) <= stored
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        '"bars/1d" = { until = "2026-11-03", reason = "x" }',  # not a rollup table
+        '"rollups/instrument/etf_launches@v1" = { reason = "x" }',  # no until
+        '"rollups/instrument/etf_launches@v1" = { until = "soon", reason = "x" }',
+        '"rollups/instrument/etf_launches@v1" = { until = "2026-11-03" }',  # no reason
+    ],
+)
+def test_a_malformed_backfill_entry_is_refused(entry: str) -> None:
+    with pytest.raises(ConfigurationError):
+        NightlySettings.from_document(tomllib.loads(f"[backfilling]\n{entry}\n"))
