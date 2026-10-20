@@ -21,7 +21,9 @@ the write time, is never before the window's close).
 Each night also recomputes the ``RECHECK`` window ends before it, reading delistings from the
 latest reference snapshot (``outcome_paths``: a delisting is stamped when the weekly build
 notices it). A re-run never retracts a row it no longer computes (runs merge); a row whose
-bars later vanish stays until a restating backfill.
+bars later vanish stays until a restating backfill. A night writes only the rows that are new or
+differ from the stored view (``changed_rows``, ADR 0078): a recheck that changes nothing writes no
+run, a delisting writes its one row; a backfill writes every row.
 
 A horizon above ``NIGHTLY_MAX_HORIZON`` (the 504-session edges) is computed only in a
 ``--from/--to`` backfill, so the nightly's bars read stays at the recheck window plus 252 sessions.
@@ -76,6 +78,8 @@ CHUNK = 40  # window ends whose bars are read at once in a backfill
 RECHECK = 10
 BOUNDED_HORIZON = 60  # sessions: up to here a return above ``max_bounded_return`` is a bad bar
 NIGHTLY_MAX_HORIZON = 252  # longer horizons are backfill-only: the nightly panel stays this deep
+KEY = ["instrument_id", "horizon_sessions", "benchmark"]  # a row's identity in a partition
+STAMPS = ("knowledge_ts", "run_id")  # set at write time: never part of "changed"
 SHOWN = 5  # reasons listed per window in the run stats
 SITE = FileConfigStore(config_dir())
 
@@ -194,18 +198,55 @@ def _one(
             out = out.assign(
                 ts=close_time(window.start), horizon_sessions=h, window_end=end
             ).sort_values(["instrument_id", "benchmark"], kind="stable")
-            if len(out):
-                run.write(TABLE, out.reset_index(drop=True), SOURCE, session=window.start)
+            fresh = out if not nightly else changed_rows(run.reader.table(TABLE, window.start), out)
+            if len(fresh):
+                run.write(TABLE, fresh.reset_index(drop=True), SOURCE, session=window.start)
             run.record_item(f"h{h}", f"OK: {len(out)} rows")
             run.stats[f"h{h}"] = {
                 "start": window.start.isoformat(),
                 "eligible": eligible,
-                "rows": len(out) // max(len(benchmarks), 1),
+                "rows": len(out) // max(len(benchmarks), 1),  # computed, not written
+                "written": len(fresh),
                 "reasons": len(reasons),
                 "examples": dict(sorted(reasons.items())[:SHOWN]),
                 "pre_snapshot": pre_snapshot,  # survivors only: no snapshot, no listing history
             }
     return run.record
+
+
+def changed_rows(stored: pd.DataFrame | None, out: pd.DataFrame) -> pd.DataFrame:
+    """The rows of ``out`` that are new, or differ in any column from the stored merged view of
+    the partition (ADR 0078 decision 6): the stamps (``knowledge_ts``, ``run_id``) are not
+    compared, NaN equals NaN, and dates compare as instants. A recheck that changes nothing then
+    writes no run; the stored row keeps its first-known stamp."""
+    if stored is None or stored.empty or out.empty:
+        return out
+    cols = [c for c in out.columns if c in stored.columns and c not in STAMPS]
+    if not set(KEY) <= set(cols):
+        return out
+    old = stored[cols].drop_duplicates(KEY, keep="last")
+    both = out.reset_index(drop=True).merge(
+        old, on=KEY, how="left", suffixes=("", "_old"), indicator=True
+    )
+    same = both["_merge"].eq("both")
+    for col in cols:
+        if col in KEY:
+            continue
+        new, was = _comparable(both[col], both[f"{col}_old"])
+        same &= (new == was) | (new.isna() & was.isna())
+    return out.reset_index(drop=True)[~same.to_numpy()]
+
+
+def _comparable(new: pd.Series, was: pd.Series) -> tuple[pd.Series, pd.Series]:
+    """Both series in one comparable dtype: instants (UTC) for dates and datetimes."""
+
+    def instant(s: pd.Series) -> bool:
+        kind = s.dtype.kind in "Mm" or isinstance(s.dtype, pd.DatetimeTZDtype)
+        return kind or (s.dtype == object and isinstance(next(iter(s.dropna()), None), date))
+
+    if instant(new) or instant(was):
+        return pd.to_datetime(new, utc=True), pd.to_datetime(was, utc=True)
+    return new, was
 
 
 def universe_ids(reader: StoreReader, start: date, backfill: bool = False) -> tuple[set[str], bool]:
