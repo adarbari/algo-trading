@@ -7,6 +7,7 @@ What is searched, per kind (``guide_entries``, the one list of the Guide's entri
 
 - a field (every catalogue field of the caller): its name; its theme and intents (the field
   guide's); its prose (how to read it, the caveats, the catalogue description);
+- a screener category (a family of ``sections.toml``): its id and title; its purpose and intro;
 - a screener: its id and name; its prose (line, summary, hit, not checked, before acting, asks;
   source markers left out);
 - a situation: its slug and name; its signs and what to do;
@@ -39,6 +40,7 @@ from dataclasses import dataclass
 from algotrade.config.site.guide.glossary import load_guide_glossary
 from algotrade.config.site.guide.mechanisms import load_guide_mechanisms
 from algotrade.config.site.guide.screeners import load_guide_screeners
+from algotrade.config.site.guide.sections import load_guide_sections
 from algotrade.config.site.guide.sources import plain
 from algotrade.config.site.guide.start import ENTRY_KINDS, load_guide_start
 from algotrade.config.site.regime.cards import load_cards
@@ -229,6 +231,13 @@ def _guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
         )
         for e in site_edges(ctx)
     )  # fmt: skip
+    categories = tuple(
+        GuideEntryText(
+            "screener_category", f.id, f.title, (f.id,), (f.title,), (), (f.purpose, f.intro),
+            f.purpose,
+        )
+        for f in load_guide_sections(ctx.configs).families
+    )  # fmt: skip
     screeners = []
     for p in screeners_of(ctx):
         written = prose.get(p.id)
@@ -252,8 +261,8 @@ def _guide_entries(ctx: Stores) -> tuple[GuideEntryText, ...]:
         for t in load_guide_glossary(ctx.configs).terms
     )
     return (
-        *pages, *indicators, *episodes, *mechanisms, *edges, *screeners, *fields, *situations,
-        *terms,
+        *pages, *indicators, *episodes, *mechanisms, *edges, *categories, *screeners, *fields,
+        *situations, *terms,
     )  # fmt: skip
 
 

@@ -7,6 +7,7 @@ import time
 
 import pytest
 
+from algotrade.config.site.guide.sections import load_guide_sections
 from algotrade.config.site.guide.start import ENTRY_KINDS
 from algotrade.services.read.context import StoreContext
 from algotrade.services.read.guide.search import (
@@ -121,3 +122,20 @@ def test_the_shipped_guide(site: StoreContext) -> None:
     start = time.perf_counter()
     load_guide_search(site, "earnings", 5)
     assert time.perf_counter() - start < 2.0  # computed per request, no stored index
+
+
+def test_a_screener_category_is_found_by_name_and_description(site: StoreContext) -> None:
+    families = load_guide_sections(site.configs).families
+    assert families
+    entries = {e.id: e for e in guide_entries(site) if e.kind == "screener_category"}
+    assert set(entries) == {f.id for f in families}
+    for family in families:
+        by_title = load_guide_search(site, family.title, 5)
+        (group,) = [g for g in by_title.groups if g.kind == "screener_category"]
+        assert family.id in {h.id for h in group.hits}
+        assert entries[family.id].title == family.title
+    first = families[0]
+    word = first.purpose.split()[0].lower()
+    by_prose = load_guide_search(site, word, 50)
+    (group,) = [g for g in by_prose.groups if g.kind == "screener_category"]
+    assert first.id in {h.id for h in group.hits}

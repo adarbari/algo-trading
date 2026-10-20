@@ -153,6 +153,33 @@ describe('Guide search', () => {
     expect(edges.getByRole('link')).toHaveAttribute('href', '/guide/edges/pead');
   });
 
+  it('shows a screener category as a Screener categories result linking to its page', async () => {
+    GQL.mockResolvedValue({
+      guideSearch: {
+        query: 'income',
+        groups: [
+          {
+            kind: 'screener_category',
+            hits: [
+              {
+                kind: 'screener_category',
+                id: 'income',
+                title: 'Income',
+                snippet: 'Screens that pay you to wait.',
+              },
+            ],
+          },
+        ],
+      },
+    });
+    setup();
+    const user = userEvent.setup();
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(await screen.findByRole('searchbox', BOX), 'income');
+    const group = within(await screen.findByRole('region', { name: 'Screener categories' }));
+    expect(group.getByRole('link')).toHaveAttribute('href', '/guide/screeners/c/income');
+  });
+
   it('opens the first result on Enter and the focused one after the arrows, under /guide', async () => {
     const { navigate } = setup();
     const user = userEvent.setup();
