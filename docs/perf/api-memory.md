@@ -133,6 +133,28 @@ ingestion-only changes (`src/algotrade/workflows`, `libs/sources/.../vendors`, `
   (`arrow_memory.use_system_pool`, PR #756). The ADR 0077 warm process and release build need it
   too. Measured on the home warm (newest-run prototype): footprint after `ideas` 0.98 GB vs 2.26 GB.
 
+## Second architect review of P1 (2026-10-20): approve with changes
+
+Design: `TableStore.read_latest_runs(table, day, group=("user_id","config_id"), columns,
+instruments, own_run, upto)` reading only each group's newest run inside one pinned read; same
+answer as today for every consumer (each takes the newest `run_id` via `last_run_rows`; each run
+file holds one (user, config); `partition()` never passes `as_of`, so the method has none).
+Required changes before it lands:
+1. The fallback path (restating run, file with two groups, missing statistics) also keeps only each
+   group's newest run, so the result never depends on whether footer statistics exist.
+2. A `TableSpec` flag "each run's file holds its group's whole result" on both rule_screen tables;
+   the method raises `ValueError` without it, and the nightly fitness test refuses flagged tables
+   in `[compaction]` (ADR 0078 keeps only changed rows, so a compacted newest file is a delta).
+3. `FileNotFoundError` from footer or file reads becomes `StaleSnapshotError`; take `upto` so
+   `StoreReader.pinned(seq)` (ADR 0077) can pass it. Check every row group's min/max.
+4. A `StoreReader` method overridden in the recording reader (`readers.py`) so it logs rows
+   (ADR 0063).
+5. Memory backend parity; contract tests: one run per group, a newer run with fewer instruments,
+   interleaved groups, a `knowledge_ts` tie, pending `own_run`, the three fallbacks, column pruning
+   keeps group and stamp columns, empty `instruments` match gives an empty frame, a commit during
+   the read retries.
+6. A short amendment to ADR 0029 (read rule noted at `schemas/results.py:115-118`).
+
 ## Guards so it cannot regress
 
 1. **Footprint budget in `make doctor`**: reads the footprint of the process on :8000
