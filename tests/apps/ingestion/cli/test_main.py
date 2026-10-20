@@ -661,9 +661,9 @@ def test_the_nightly_refuses_to_start_on_a_nearly_full_disk(
 
     usage = namedtuple("usage", "total used free")
     monkeypatch.setattr(cli, "require_free_disk", disk.require_free_disk)
-    monkeypatch.setattr(disk.shutil, "disk_usage", lambda _p: usage(500e9, 490e9, 9.4e9))
+    monkeypatch.setattr(disk.shutil, "disk_usage", lambda _p: usage(500e9, 496e9, 4.0e9))
     assert cli.main(["nightly", "--date", DAY, "--workers", "1"]) == 2
-    assert "9.4 GB free" in capsys.readouterr().err
+    assert "4.0 GB free" in capsys.readouterr().err  # under the floor whether it is 6 or 15
 
 
 def test_ingestion_caps_arrow_threads_from_the_site_config(
