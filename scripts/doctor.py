@@ -168,6 +168,8 @@ def _in_main(path: str, main: Path) -> bool:
     not under ``.claude/worktrees/`` (Claude agent worktrees nest there) and with no ``.git``
     (a worktree's marker) between it and ``main``."""
     target = Path(path)
+    if target.is_relative_to(main / "var" / "release"):
+        return True  # a release tree (ADR 0079): a worktree by design, the API's code
     if not target.is_relative_to(main) or target.is_relative_to(main / ".claude" / "worktrees"):
         return False
     return not any(
@@ -293,6 +295,9 @@ def check_web_dist(p: Probes) -> Result:
     )
 
 
+_API_TREE = "checkout (the release tree when the API runs from one)"
+
+
 def check_api_build(p: Probes) -> Result:
     """The API keeps the code and GraphQL schema it started with, the web is read from disk on
     every request: a ``make web-build`` or a pull after the start serves a web the API cannot
@@ -304,7 +309,9 @@ def check_api_build(p: Probes) -> Result:
     if found is None:
         return Result(INFO, "api build", f"no API answering at {API_URL}")
     if not found:
-        return Result(OK, "api build", "the running API matches its checkout and the served web")
+        return Result(
+            OK, "api build", "the running API matches its " + _API_TREE + " and the served web"
+        )
     return Result(WARN, "api build", "; ".join(found), "the restart or rebuild named above")
 
 
@@ -524,6 +531,93 @@ def check_main_checkout(p: Probes) -> list[Result]:
     return out
 
 
+def _short(p: Probes, tree: Path, ref: str = "HEAD") -> str:
+    rc, out = p.run(["git", "-C", str(tree), "rev-parse", ref])
+    return out[:9] if rc == 0 and out else ""
+
+
+def _behind(p: Probes, tree: Path, target: str) -> str:
+    """How many commits ``tree``'s HEAD is behind ``target`` (a ref of the same repo)."""
+    rc, out = p.run(["git", "-C", str(tree), "rev-list", "--count", f"HEAD..{target}"])
+    return out if rc == 0 and out.isdigit() else "?"
+
+
+def check_release_tree(p: Probes) -> list[Result]:
+    """The release tree (ADR 0079): its slots against ``refs/deploy/main``, the ingest code lag
+    of the main checkout (decision 6), a blocked ingest-tree sync, and the disk it needs.
+    Nothing before ``deploy.sh --init-release`` made ``var/release``."""
+    main = p.main()
+    root = main / "var" / "release"
+    if not root.is_dir():
+        return []
+    target = _short(p, main, "refs/deploy/main")
+    out = []
+    for slot in sorted(x for x in root.iterdir() if x.is_dir() and not x.is_symlink()):
+        sha = _short(p, slot)
+        if not target or not sha:
+            out.append(
+                Result(INFO, f"release {slot.name}", f"at {sha or '?'} (refs/deploy/main unknown)")
+            )
+        elif sha == target:
+            out.append(Result(OK, f"release {slot.name}", f"at {sha}, refs/deploy/main"))
+        else:
+            n = _behind(p, slot, "refs/deploy/main")
+            out.append(
+                Result(
+                    INFO, f"release {slot.name}", f"at {sha}, {n} behind refs/deploy/main {target}"
+                )
+            )
+    current = root / "current"
+    if current.is_symlink():
+        out.append(Result(OK, "release current", f"-> {current.readlink()!s}"))
+    else:
+        out.append(
+            Result(
+                WARN,
+                "release current",
+                "var/release/current is missing",
+                "scripts/ops/deploy.sh --init-release",
+            )
+        )
+    ingest = _short(p, main)
+    if ingest and target:
+        lag = _behind(p, main, "refs/deploy/main")
+        out.append(
+            Result(INFO, "ingest code", f"main checkout at {ingest}, {lag} behind refs/deploy/main")
+        )
+    try:
+        blocked = (main / "var" / "deploy" / "ingest_sync_blocked").read_text().strip()
+    except OSError:
+        blocked = ""
+    if blocked:
+        out.append(
+            Result(
+                WARN,
+                "ingest sync",
+                f"blocked: {blocked}",
+                "see docs/hosting.md; clears on the next successful sync",
+            )
+        )
+    rc, du = p.run(["du", "-sk", str(root)])
+    size_gb = (
+        int(du.split()[0]) * 1024 / 1e9
+        if rc == 0 and du.split()[:1] and du.split()[0].isdigit()
+        else 0.0
+    )
+    need = max(5.0, 3 * size_gb)
+    free = p.free_bytes(main) / 1e9
+    if free < need:
+        out.append(
+            Result(
+                WARN,
+                "release disk",
+                f"{free:.1f} GB free, under {need:.1f} GB (3x the {size_gb:.1f} GB tree)",
+                f"{p.repo}/scripts/worktree.sh --prune-merged",
+            )
+        )
+    return out
+
+
 def check_running_checks(p: Probes) -> Result:
     """Other `make check` runs on this machine (each takes 30-40 min; two at once time out)."""
     rc, out = p.run(["pgrep", "-f", "check_lock.sh"])  # once per run, not make + make check-gates
@@ -564,6 +658,7 @@ def run_checks(p: Probes) -> list[Result]:
         check_api_build(p),
         check_llm(p),
         *check_main_checkout(p),
+        *check_release_tree(p),
         check_running_checks(p),
         *check_agents(p),
     ]
