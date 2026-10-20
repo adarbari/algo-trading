@@ -448,14 +448,19 @@ class LocalTables:
             return report
         for run, name in fresh.items():
             atomic_write(directory / name, encoded[run])
+        swapped: bool | None = None  # None: a kept file vanished before the verify read
         try:
-            written = {
-                r: _read_file(directory / run_file(r, e), None, None) for r, e in kept.items()
-            }
-            verify_plan(table, expected, sources, kept, written, budget)
-            swapped = self.commits.swap_runs(
-                directory, expected, kept, self.swap_grace_s, refuse=self.root / table / HISTORY
-            )
+            try:
+                written = {
+                    r: _read_file(directory / run_file(r, e), None, None) for r, e in kept.items()
+                }
+            except FileNotFoundError:  # a commit or purge dropped a kept file since the plan
+                written = None
+            if written is not None:
+                verify_plan(table, expected, sources, kept, written, budget)
+                swapped = self.commits.swap_runs(
+                    directory, expected, kept, self.swap_grace_s, refuse=self.root / table / HISTORY
+                )
         except BaseException:
             self._discard(directory, fresh.values())
             raise
@@ -464,6 +469,8 @@ class LocalTables:
         self._discard(directory, fresh.values())
         copied = (self.root / table / HISTORY).exists()
         reason = "the table has a history copy" if copied else "the index moved"
+        if swapped is None:
+            reason = "the partition changed while verifying"
         return CompactionReport(before, before, size_before, size_before, 0, reason)
 
     @staticmethod

@@ -186,13 +186,14 @@ detect = [{ call = "raw.put" }]
 
 [[responsibility]]
 id = "run-compaction"
-description = "Replace one merge partition's runs by the rows that matter, value-exact at every as_of and pinned sequence (scheme E2, ADR 0078): the pure plan and its verification (run_compaction.py), then a compare-and-swap of the partition's index that is never a commit and never writes seq (Commits.swap_runs, TableStore.compact_runs); superseded files are left for sweep_orphans after a grace"
+description = "Replace one merge partition's runs by the rows that matter, value-exact at every as_of and pinned sequence (scheme E2, ADR 0078): the pure plan and its verification (run_compaction.py), then a compare-and-swap of the partition's index that is never a commit and never writes seq (Commits.swap_runs, TableStore.compact_runs); superseded files are left for sweep_orphans after a grace (SWAP_GRACE_S, 30 s); a journal another process wrote is re-read when it changes, and a swap naming a missing file is refused"
 owner = ["src/algotrade/storage/backends/run_compaction.py", "src/algotrade/storage/backends/local_index.py"]
 allowed = [
     "src/algotrade/storage/backends/local.py",  # LocalTables.compact_runs: writes the kept rows, verifies, swaps
     "src/algotrade/storage/backends/memory.py",  # MemoryTables.compact_runs: the same under its one lock
     "src/algotrade/storage/tables/writers.py",  # StoreWriter.compact_runs: the facade only ingestion may use
-    "apps/ingestion/algotrade_ingestion/tasks/maintenance/compact_runs.py",  # the compact-runs job: the one caller (ADR 0078 decision 5)
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/compaction/pool.py",  # the compact-runs workers: the one caller of compact_runs (ADR 0078 decision 5)
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/compaction/sweep.py",  # the rolling sweep: the one caller of sweep_orphans for it
 ]
 section = "docs/adr/0078-outcomes-run-compaction.md#decision"
 detect = [{ call = "plan_compaction" }, { call = "swap_runs" }, { call = "compact_runs" }]

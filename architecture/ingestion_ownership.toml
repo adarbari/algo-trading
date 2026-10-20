@@ -45,8 +45,13 @@ detect = [{ call = "bad_bars" }]
 
 [[responsibility]]
 id = "compact-runs-job"
-description = "The compact-runs job (ADR 0078 decision 5): walks one allow-listed merge table's partitions (nightly.toml [compaction] tables, no history copy: a fitness test) oldest first under the ingest lock taken per partition without waiting, at background priority with a pause, a free-space floor plus one partition of scratch and a per-partition time slice, calls StoreWriter.compact_runs, waits out a batch's swap grace once and sweeps it with sweep_orphans; resumable, --dry-run reports files, bytes and the saving and writes nothing; publishes no table"
-owner = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/compact_runs.py"]
+description = "The compact-runs job (ADR 0078 decisions 4 and 5, amendment 2026-10-20): walks one allow-listed merge table's partitions (nightly.toml [compaction] tables, no history copy: a fitness test) oldest first with W spawn worker processes (no lock in a worker; the parent holds the ingest-tree lock and probes the ingest lock before each dispatch and sweep unless --beside-ingest), at background priority, a free-space floor plus one partition of scratch per worker and a per-partition time slice, calls StoreWriter.compact_runs, sweeps each swapped partition with sweep_orphans 30 s + 1 s after its swap, as the run goes; resumable, --dry-run reports files, bytes and the saving and writes nothing; publishes no table"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/compaction/task.py",
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/compaction/pool.py",
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/compaction/sweep.py",
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/compaction/report.py",
+]
 allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/entries_ops.py",  # the registry entry
 ]
