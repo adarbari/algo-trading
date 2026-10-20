@@ -470,6 +470,34 @@ def test_a_web_build_without_the_supabase_url_is_never_swapped_in(site: Site) ->
     assert (live / "index.html").read_text() == "old"
 
 
+def test_a_crlf_and_commented_env_line_is_read_as_the_bare_url(site: Site) -> None:
+    web_dir = site.repo / "apps" / "web"
+    web_dir.mkdir(parents=True)
+    (web_dir / ".env.local").write_bytes(b'VITE_SUPABASE_URL="https://x.supabase.co" # prod\r\n')
+    site.seed()
+    _advance(site.repo, "apps/web/src/a.ts")
+    assert site.run("--auto", STUB_PLAN="web").returncode == 0  # not false-blocked
+    assert not site.state("blocked").exists()
+
+
+def test_no_env_local_in_main_means_no_check(site: Site) -> None:
+    site.seed()
+    _advance(site.repo, "apps/web/src/a.ts")
+    out = site.run("--auto", STUB_PLAN="web", STUB_MAKE_NO_ENV="1")
+    assert out.returncode == 0 and not site.state("blocked").exists()
+
+
+def test_init_release_also_refuses_a_key_less_web_build(site: Site) -> None:
+    _git(site.repo, "worktree", "remove", "--force", str(site.tree))
+    (site.tree.parent / "current").unlink()
+    web_dir = site.repo / "apps" / "web"
+    web_dir.mkdir(parents=True)
+    (web_dir / ".env.local").write_text("VITE_SUPABASE_URL=https://x.supabase.co\n")
+    out = site.run("--init-release", STUB_MAKE_NO_ENV="1")
+    assert out.returncode != 0 and "lacks VITE_SUPABASE_URL" in out.stderr
+    assert not site.tree.exists()
+
+
 def test_every_ignored_apps_web_env_file_is_in_the_overlay_list() -> None:
     """Whatever apps/web/.gitignore (and the root .gitignore) ignores that Vite reads is linked."""
     root = SCRIPT.parents[2]

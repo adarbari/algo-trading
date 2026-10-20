@@ -214,7 +214,7 @@ link_one() {  # link_one <source> <link>: create once, check every cycle
 }
 
 slot_links() {
-  local root_dir=$root f pat
+  local root_dir=$root f pat pats
   if [ "$dry" = 1 ]; then echo "[dry-run] link var, .env, config/users, config/site/*.local.toml, apps/web/{$WEB_ENV_OVERLAY} into $tree"; return 0; fi
   link_one "$root_dir/var" "$tree/var" || return 1
   if [ -e "$root_dir/.env" ]; then link_one "$root_dir/.env" "$tree/.env" || return 1; fi
@@ -223,8 +223,9 @@ slot_links() {
   for f in "$root_dir"/config/site/*.local.toml; do
     if [ -e "$f" ]; then link_one "$f" "$tree/config/site/$(basename "$f")" || return 1; fi
   done
-  for pat in $WEB_ENV_OVERLAY; do  # the web build's own env: without it VITE_SUPABASE_* is baked out
-    for f in "$root_dir"/apps/web/$pat; do
+  set -f; pats=($WEB_ENV_OVERLAY); set +f  # split without globbing against the cwd
+  for pat in "${pats[@]}"; do  # the web build's own env: without it VITE_SUPABASE_* is baked out
+    for f in "$root_dir"/apps/web/$pat; do  # the glob applies inside apps/web only
       if [ -e "$f" ]; then link_one "$f" "$tree/apps/web/$(basename "$f")" || return 1; fi
     done
   done
@@ -236,12 +237,17 @@ slot_links() {
 # Fail closed: a build made without the Supabase URL the main checkout's apps/web/.env.local
 # holds would swap in a sign-in page that says "not set up". Checked on the finished build.
 web_env_check() {
-  local dist=$1 url
+  local dist=$1 url="" f
   [ "$dry" = 0 ] || return 0
-  [ -f "$root/apps/web/.env.local" ] || return 0
-  url=$(grep -E '^VITE_SUPABASE_URL=' "$root/apps/web/.env.local" | tail -1 | cut -d= -f2- | tr -d "\"' ")
+  # Vite's production order: the first file that sets it wins
+  for f in .env.production.local .env.local .env.production .env; do
+    [ -f "$root/apps/web/$f" ] || continue
+    url=$(grep -E '^VITE_SUPABASE_URL=' "$root/apps/web/$f" | tail -1 | cut -d= -f2- \
+      | tr -d '\r' | sed -e 's/[[:space:]]#.*$//' | tr -d "\"' ")
+    if [ -n "$url" ]; then break; fi
+  done
   if [ -n "$url" ] && ! grep -rqF -- "$url" "$dist"; then
-    block "the web build lacks VITE_SUPABASE_URL from apps/web/.env.local (is it linked into the release tree?)"
+    block "the web build lacks VITE_SUPABASE_URL from apps/web/$f (is it linked into the release tree?)"
     return 1
   fi
 }
