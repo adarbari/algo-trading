@@ -7,8 +7,8 @@ its code on that machine.
 | Workflow / job | When |
 |---|---|
 | CI: changed areas | every run (seconds): decides which jobs a pull request needs |
-| CI: lint, types, boundaries, ownership, dupes, file length, strategy evaluation | Python changes |
-| CI: tests, five shards (`unit-a`, `unit-b`, `unit-c` by subfolder, the rollup groups spread over the first two; `apps`, `libs`, `contract`, `architecture`; the slow rest: property, integration, e2e, scripts, reconciliation) per Python version (3.12 on PRs; 3.12 + 3.13 on main) | Python changes; web-only and docs-only PRs run `tests/architecture` only (the layout rules, the ADR index, links, the roadmap cap) |
+| CI: lint (types, boundaries, ownership, dupes, file length) and strategy evaluation, two parallel jobs; `quality` is the protected gate over both | Python changes |
+| CI: tests, six shards (`unit-a`, `unit-b`, `unit-c` by subfolder, the rollup groups spread over the first two; `apps`: `apps`, `libs`, `contract`; `arch`: `tests/architecture`, the one shard with a full-history checkout; the slow rest: property, integration, e2e, scripts, reconciliation), the big ones sliced by pytest-split (`unit-c` 3, `apps` 4, `rest` 2: the matrix `cell` is `<shard>-<group>of<splits>`), Python 3.12 only | Python changes; web-only and docs-only PRs run `tests/architecture` only (the layout rules, the ADR index, links, the roadmap cap) |
 | CI: tests (the gate: fails on a failed shard; combines the shards' coverage, 90 %) | every run |
 | CI: web static (generated files fresh, ds:check, lint, types, unit) | web changes |
 | CI: web e2e (production build, Playwright, in the Playwright image) | web changes |
@@ -18,7 +18,7 @@ its code on that machine.
 | CI: web (the gate: passes when the five web jobs passed or were skipped) | every run |
 | CI: real app smoke (Vite dev server + the real API, empty and golden stores) | Python or web changes |
 | Auto-merge sweeps | after every CI run and every 30 minutes |
-| Nightly evaluation | daily |
+| Nightly evaluation, and the whole suite on Python 3.13 (a failure opens an issue) | daily |
 | Release | version tags |
 
 A pull request runs only what its changes can break; skipped jobs count as passed for

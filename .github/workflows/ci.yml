@@ -55,8 +55,8 @@ jobs:
           echo "web=$web" >> "$GITHUB_OUTPUT"
           echo "web_deps=$web_deps" >> "$GITHUB_OUTPUT"
 
-  quality:
-    name: Lint, types, boundaries, ownership, duplicates, file length, strategy evaluation
+  lint:
+    name: Lint, types, boundaries, ownership, duplicates, file length
     needs: [changes]
     if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
@@ -74,6 +74,18 @@ jobs:
       - run: make filelen
       - run: make numbering
       - run: make datasets-verify
+
+  # The strategy scorecard (3 min) beside the lint job instead of after it.
+  evaluate:
+    name: Strategy evaluation vs the golden baseline
+    needs: [changes]
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with: { python-version: "3.12", enable-cache: true }
+      - run: uv sync --all-packages --locked
       - name: Run every strategy on every golden dataset vs the baseline
         run: make evaluate
       - name: Publish scorecard
@@ -83,25 +95,53 @@ jobs:
         if: always()
         with: { name: scorecard, path: scorecard.md, if-no-files-found: ignore }
 
-  # The suite as three parallel shards (Makefile TEST_SHARD_*), each with its coverage data;
+  # The protected check (its name is the branch-protection context; the two jobs above can change
+  # without touching the repo settings). Passes when both passed or were skipped (a web-only or
+  # docs-only change); fails on any failure.
+  quality:
+    name: Lint, types, boundaries, ownership, duplicates, file length, strategy evaluation
+    needs: [lint, evaluate]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "quality jobs: $RESULTS"
+          case " $RESULTS " in *" failure "* | *" cancelled "*) exit 1 ;; esac
+
+  # The suite as parallel shards (Makefile TEST_SHARD_*), the big ones sliced by pytest-split
+  # (`cell` = <shard>-<group>of<splits>), each with its coverage data;
   # the `tests` job below combines them under the protected name "Tests (py3.12)".
   test:
-    name: Tests (py${{ matrix.python }}, ${{ matrix.shard }})
+    name: Tests (py${{ matrix.python }}, ${{ matrix.cell }})
     needs: [changes]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # PRs test the primary version; every push to main (and the post-merge re-test) runs both.
-        python: ${{ fromJSON(github.event_name == 'pull_request' && '["3.12"]' || '["3.12", "3.13"]') }}
-        shard: [unit-a, unit-b, unit-c, apps, rest]
+        # Python 3.13 runs nightly (nightly.yml), not here.
+        python: ["3.12"]
+        cell:
+          - unit-a-1of1
+          - unit-b-1of1
+          - unit-c-1of3
+          - unit-c-2of3
+          - unit-c-3of3
+          - apps-1of4
+          - apps-2of4
+          - apps-3of4
+          - apps-4of4
+          - arch-1of1
+          - rest-1of2
+          - rest-2of2
     steps:
-      # Full history only on the shard that runs tests/architecture: `apps` on a Python change,
-      # `rest` (architecture tests only) otherwise. tests/architecture/drafting/test_golden_unrecorded.py
-      # dates the adding commit of a golden case and FAILS in a shallow clone in CI. The depth is
-      # a quoted string: a bare 0 is falsy in an expression and would fall through to 1.
+      # Full history only on the `arch` shard, the one that runs tests/architecture:
+      # tests/architecture/drafting/test_golden_unrecorded.py dates the adding commit of a golden
+      # case and FAILS in a shallow clone in CI. The depth is a quoted string: a bare 0 is falsy
+      # in an expression and would fall through to 1.
       - uses: actions/checkout@v7
-        with: { fetch-depth: "${{ ((matrix.shard == 'apps' && needs.changes.outputs.python == 'true') || (matrix.shard == 'rest' && needs.changes.outputs.python != 'true')) && '0' || '1' }}" }
+        with: { fetch-depth: "${{ startsWith(matrix.cell, 'arch-') && '0' || '1' }}" }
       - uses: astral-sh/setup-uv@v7
         with: { python-version: "${{ matrix.python }}", enable-cache: true }
       - uses: actions/cache@v6
@@ -114,21 +154,30 @@ jobs:
         if: needs.changes.outputs.python == 'true'
         with:
           path: .hypothesis
-          key: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ matrix.shard }}-${{ github.run_id }}
-          restore-keys: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ matrix.shard }}-
+          key: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ matrix.cell }}-${{ github.run_id }}
+          restore-keys: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ matrix.cell }}-
+      - name: Parse the cell (<shard>-<group>of<splits>)
+        id: cell
+        env:
+          CELL: ${{ matrix.cell }}
+        run: |
+          part=${CELL##*-}
+          echo "shard=${CELL%-*}" >> "$GITHUB_OUTPUT"
+          echo "group=${part%of*}" >> "$GITHUB_OUTPUT"
+          echo "splits=${part#*of}" >> "$GITHUB_OUTPUT"
       - name: Unit + architecture + property + integration + e2e, this shard (coverage data, no gate yet)
         if: needs.changes.outputs.python == 'true'
-        run: make test-shard SHARD=${{ matrix.shard }}
+        run: make test-shard SHARD=${{ steps.cell.outputs.shard }} GROUP=${{ steps.cell.outputs.group }} SPLITS=${{ steps.cell.outputs.splits }}
       # A web-only or docs-only change still answers to the fitness tests: the web layout rules
       # (architecture/web_layout.toml [[web_dir]]), the ADR index, the roadmap cap, the links.
       - name: Architecture tests only (the change is web-only or docs-only)
-        if: needs.changes.outputs.python != 'true' && matrix.shard == 'rest'
+        if: needs.changes.outputs.python != 'true' && steps.cell.outputs.shard == 'arch'
         run: .venv/bin/python -m pytest -q -n auto tests/architecture
       - uses: actions/upload-artifact@v7
         if: needs.changes.outputs.python == 'true'
         with:
-          name: coverage-py${{ matrix.python }}-${{ matrix.shard }}
-          path: .coverage.${{ matrix.shard }}
+          name: coverage-py${{ matrix.python }}-${{ matrix.cell }}
+          path: .coverage.${{ steps.cell.outputs.shard }}-${{ steps.cell.outputs.group }}
           include-hidden-files: true
           retention-days: 1
           if-no-files-found: error
@@ -145,7 +194,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ${{ fromJSON(github.event_name == 'pull_request' && '["3.12"]' || '["3.12", "3.13"]') }}
+        python: ["3.12"]
     steps:
       - env:
           RESULT: ${{ needs.test.result }}
