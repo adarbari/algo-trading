@@ -145,6 +145,11 @@ def work(day: date) -> Outcome:
         report = CompactionReport(skipped="a pending run is writing the partition")
     except CompactionVerificationError as exc:  # nothing swapped, new files discarded
         report = CompactionReport(skipped=f"verification failed: {exc}")
+    except SystemExit:
+        # SIGTERM: the partition already discarded its fresh files (``_compact_runs`` catches
+        # BaseException). The pool's own loop would catch this and wait for more work, so the
+        # process ends here, as a SIGTERM would (128 + 15).
+        os._exit(143)
     return Outcome(day, report, monotonic() - started, f"{os.getpid()}:{threading.get_ident()}")
 
 

@@ -437,3 +437,25 @@ def test_a_run_pending_at_the_swap_raises_and_leaves_no_fresh_file(
         local.tables.compact_runs(TABLE, DAY)
     assert files(tmp_path) == sorted([*seen, "run=busy.parquet"])  # the fresh files were removed
     assert view(local) == before
+
+
+def test_a_kept_file_gone_before_the_verify_read_skips_and_leaves_no_fresh_file(
+    local: LocalBackend, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    history(local)
+    seen, before = files(tmp_path), view(local)
+    real = local_module._read_file
+    state = {"after_write": False}
+
+    def vanish(path: Path, *args: object, **kwargs: object) -> object:
+        if "~" in path.name:  # first read of a fresh (kept) file: the verify read
+            state["after_write"] = True
+        if state["after_write"]:
+            raise FileNotFoundError(path)
+        return real(path, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(local_module, "_read_file", vanish)
+    report = local.tables.compact_runs(TABLE, DAY)
+    assert report.skipped == "the partition changed while verifying"
+    monkeypatch.setattr(local_module, "_read_file", real)
+    assert files(tmp_path) == seen and view(local) == before

@@ -101,7 +101,8 @@ the rest of the ADR stands.
 - **Decision 5 (the job).** `[compaction] workers` (default 4, `--workers N`) `spawn` processes, each
   with its own backend (opened from the data URL), `lower_priority` (the disk policy is per process),
   one Arrow thread (`worker_arrow_threads`), SIGINT ignored, SIGTERM turned into `SystemExit` (the
-  partition in flight discards its files), exiting when its parent does. **A worker takes no
+  partition in flight discards its files, then the worker calls `os._exit(143)`: the pool loop would
+  otherwise catch it and wait for more work), exiting when its parent does. **A worker takes no
   lock**: `swap_runs` (a compare-and-swap under the commit lock) and `PartitionBusyError` already
   protect a partition from a writer (a commit after the plan or between verify and swap: "the index
   moved"; a pending run at the swap: `PartitionBusyError`; a run staged after the swap merges on

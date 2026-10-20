@@ -35,6 +35,7 @@ from tests.helpers.compaction.store import (
     BASE,
     SESSION,
     TABLE,
+    busy_worker,
     context,
     days_from,
     die_before_the_swap,
@@ -352,3 +353,21 @@ def test_the_default_executor_is_a_spawn_pool_that_ends_with_the_run(
     fill(backend, DAYS[:2])
     stats = job(context(backend), make_executor=spawn_executor, workers=2)
     assert stats["compacted"] == 2 and "stopped" not in stats
+
+
+def test_a_sigtermed_busy_worker_exits_by_itself_with_143(backend: LocalBackend) -> None:
+    """The pool's own loop would catch the ``SystemExit`` and wait for more work (then a SIGKILL
+    after a grace); the worker ends the process itself."""
+    spawn = multiprocessing.get_context("spawn")
+    ready = spawn.Event()
+    child = spawn.Process(target=busy_worker, args=(str(backend.root), ready))
+    child.start()
+    try:
+        assert ready.wait(120)
+        assert child.pid is not None
+        os.kill(child.pid, signal.SIGTERM)
+        child.join(30)
+        assert child.exitcode == 143  # not -9: nothing had to kill it
+    finally:
+        if child.is_alive():
+            child.kill()

@@ -4,6 +4,7 @@ start in another process (a function a ``spawn`` child can import)."""
 
 import os
 import signal
+import time
 from dataclasses import replace
 from datetime import date, timedelta
 from pathlib import Path
@@ -15,7 +16,7 @@ from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.run import TaskContext
-from algotrade_ingestion.tasks.maintenance.compaction import task
+from algotrade_ingestion.tasks.maintenance.compaction import pool, task
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import T0, stamped
 
@@ -92,3 +93,17 @@ def run_job(root: str, workers: int, started: Any) -> None:
             started.set()
 
     task.compact(ctx, SESSION, TABLE, workers=workers, progress=progress, swap_grace_s=0.0)
+
+
+def busy_worker(root: str, ready: Any) -> None:
+    """A child process: a worker (signals installed) stuck in one partition; ``ready`` is set
+    once it is inside the storage call."""
+    plan = pool.Plan(f"file://{root}", TABLE, 1, 300.0, 0, 1, 0.0)
+    pool.init_worker(plan, os.getppid(), True)
+
+    def stuck(*args: object, **kwargs: object) -> None:
+        ready.set()
+        time.sleep(60)
+
+    pool._state["worker"][1].compact_runs = stuck  # type: ignore[method-assign,assignment]
+    pool.work(days_from(1)[0])
