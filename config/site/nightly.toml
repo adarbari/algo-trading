@@ -124,3 +124,11 @@ recent_years = 2                 # calendar years kept: the session's and the on
 budget_gb = 2.6                  # the instrument tables' copies together (1.8 GB measured 2026-10-17, ~2.0 by year end); the step skips (WARN) a table
                                  # whose copy would not fit. Add a table only after measuring its size
 free_disk_floor_gb = 10.0        # no build when the disk has less free (WARN): a rebuilt year exists twice
+
+[compaction]                     # the compact-runs job (ADR 0078): `algotrade-ingest run compact-runs --table T`, run by hand
+tables = ["outcomes/instrument/forward_returns@v2"]   # merge-mode tables with no history copy only (test_nightly.py); anything else is refused
+nice = 10                        # CPU niceness the job takes on, so the API's reads win
+batch_size = 20                  # partitions compacted, then one wait out of the swap grace and one sweep of the batch
+pause_seconds = 1.0              # sleep between partitions: bounded disk I/O
+partition_seconds = 300.0        # a partition slower than this stops the run (the disk is struggling)
+sweep_grace_seconds = 125.0      # the swap spares the old files for 120 s; the batch waits out the rest before sweeping

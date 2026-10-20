@@ -4,6 +4,7 @@ Explore history reads."""
 from algotrade.config.site.settings import load_nightly
 from algotrade.features.registry import GROUPS
 from algotrade.storage.configs.files import FileConfigStore
+from algotrade.storage.tables.schemas.registry import spec_for
 from tests.conftest import REPO_ROOT
 
 
@@ -17,3 +18,15 @@ def test_the_history_copy_holds_every_instrument_table_a_feature_history_reads()
     )
     stored = {g.table for g in GROUPS.values() if g.entity == "instrument"}
     assert stored - copied == set(), "add these tables to [history_copy] instrument_tables"
+
+
+def test_compaction_lists_only_merge_tables_without_a_history_copy() -> None:
+    # ADR 0078: the history copy signs the index (inode, mtime, size), so a swap would void it;
+    # a snapshot table keeps one run, so there is nothing to merge
+    nightly = load_nightly(FileConfigStore(REPO_ROOT / "config", local=False))
+    copied = nightly.history_copy
+    assert nightly.compaction.tables == ("outcomes/instrument/forward_returns@v2",)
+    for table in nightly.compaction.tables:
+        assert spec_for(table).runs == "merge", f"{table} is not a merge-mode table"
+        assert table not in copied.instrument_tables, f"{table} has a history copy declared"
+        assert not (copied.market_prefix and table.startswith(copied.market_prefix)), table

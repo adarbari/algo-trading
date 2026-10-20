@@ -100,6 +100,10 @@ new or purged partition) reads the partitions, with the same frame. An all-instr
 under 180 days does too. One-session reads (ADR 0036) never use it; the memory backend has none.
 Deleting `_history/` loses nothing. The nightly's `history-copy` step builds the copies (`nightly.toml [history_copy]`: market tables in full, the listed instrument tables for the last two years, within a disk budget and above a free-disk floor).
 
+### Run compaction (ADR 0078)
+
+A merge table's old partitions hold redundant runs (value-identical rewrites). `algotrade-ingest run compact-runs --table T [--from D --to D] [--limit N] [--dry-run]` replaces them value-exactly (no sequence moves, so no web cache key changes); the commands and safety limits are in the README, "Long runs".
+
 ### Retention
 
 Tables (except `live/option_quotes`, below) and run records are kept forever. The rest is removed by `purge-raw` (the nightly's

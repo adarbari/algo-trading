@@ -44,6 +44,16 @@ section = "docs/adr/0061-bad-bar-flags.md#decision"
 detect = [{ call = "bad_bars" }]
 
 [[responsibility]]
+id = "compact-runs-job"
+description = "The compact-runs job (ADR 0078 decision 5): walks one allow-listed merge table's partitions (nightly.toml [compaction] tables, no history copy: a fitness test) oldest first under the ingest lock taken per partition without waiting, at background priority with a pause, a free-space floor plus one partition of scratch and a per-partition time slice, calls StoreWriter.compact_runs, waits out a batch's swap grace once and sweeps it with sweep_orphans; resumable, --dry-run reports files, bytes and the saving and writes nothing; publishes no table"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/compact_runs.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/entries_ops.py",  # the registry entry
+]
+section = "docs/adr/0078-outcomes-run-compaction.md#decision"
+detect = [{ call = "lower_priority" }]
+
+[[responsibility]]
 id = "coverage-acceptance"
 description = "Per key feature and tier, the share of the instruments it applies to (Feature.applies_to) that have a value for the session, graded against [quality.coverage.*] (minimum per tier, day-over-day drop, WARN or FAIL): the acceptance check of the rollups step and a quality check (ADR 0043)"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py"]

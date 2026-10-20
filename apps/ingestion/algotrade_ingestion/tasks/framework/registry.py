@@ -46,6 +46,7 @@ from algotrade_ingestion.tasks.macro import calendar as macro_calendar
 from algotrade_ingestion.tasks.macro import series as macro_series
 from algotrade_ingestion.tasks.maintenance import (
     bar_quality,
+    compact_runs,
     golden,
     migrate_ids,
     purge,
@@ -745,6 +746,28 @@ TASKS: dict[str, Task] = {
             settings="nightly.toml [history_copy]",
             params=(SESSION,),
             skip=history_copy.skip_reason,
+        ),
+        Task(
+            "compact-runs",
+            "compact a merge table's per-partition run files value-exactly (ADR 0078)",
+            compact_runs,
+            (),  # rewrites a table's run files in place; publishes nothing, no sequence moves
+            entries_ops.run_compact_runs,
+            settings="nightly.toml [compaction] and [resources] min_free_gb",
+            params=(
+                SESSION,
+                Param(
+                    "table",
+                    ("--table",),
+                    str,
+                    "table to compact (a [compaction] one)",
+                    required=True,
+                ),
+                FROM,
+                TO,
+                Param("limit", ("--limit",), int, "stop after N partitions were compacted"),
+                Param("dry_run", ("--dry-run",), None, "report the saving only; write nothing"),
+            ),
         ),
         Task(
             "purge-raw",
