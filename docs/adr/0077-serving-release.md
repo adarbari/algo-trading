@@ -71,7 +71,10 @@ requests use. The owner accepts data up to a day stale and wants fast loads alwa
    (the disk is at 94-96%).
 7. **Which session is served (amends 0062).** The default session is the current release's
    session, not the latest complete one (else S+1 is complete but unreleased and pages
-   disagree). `Session.newer` gains `PUBLISHING` (complete, release not yet promoted; disclosed only after 15 minutes, owner decision 2026-10-19) with a
+   disagree). `Session.newer` gains `PUBLISHING` (complete, release not yet promoted; disclosed only after `serving.publishing_delay_minutes` (site config, default 15; owner decision
+   2026-10-19), counted from the `finished_at` of the run record that made S complete; the
+   server computes a `publishing` flag with a time bucket in the key so the cached answer
+   flips, never the browser, ADR 0038) with a
    Guide term (ADR 0051). `newer` and `complete` stay live from the nightly and post-session
    run records through a new `workflow_generation` (excludes job checkpoints); only
    `StatusStrip` and `SessionDate` key on it, and `served_token` leaves every other key.
@@ -98,7 +101,8 @@ requests use. The owner accepts data up to a day stale and wants fast loads alwa
     127.0.0.1:8000 (Funnel's fixed target, 0044, unchanged), forwarding to the blue or green API
     agent on its own port; the deploy starts the idle colour, warms and probes it, flips the
     proxy's target atomically, drains the old colour, then stops it; a failed probe never flips.
-    `SO_REUSEPORT` is rejected (BSD semantics, no control over when traffic moves); warm-before-
+    The proxy and colour plists are written by code and installed by the owner (0044); stopping
+    a KeepAlive agent uses `launchctl bootout`. `SO_REUSEPORT` is rejected (BSD semantics, no control over when traffic moves); warm-before-
     restart is rejected as the end state (a gap, no probe-gated rollback). The proxy is a single
     point of failure kept alive by launchd, with no logic beyond forwarding and the flip.
 12. **The warmer is a separate process** (it warms shared role keys only, never per-user or admin-cause answers, 0056) (`algotrade-api warm`) writing the persisted cache the
@@ -124,11 +128,11 @@ fitness test requires release inputs to be stored tables, never `own_run`.
 
 ## Consequences
 - Page reads stop depending on ingestion commits; a night of ingestion changes no key.
-- A page can show data a day old, and shows `PUBLISHING` between COMPLETE and promotion.
+- A page can show data a day old, and shows `PUBLISHING` when promotion is later than the delay after COMPLETE.
 - A new derived artifact (50-250 MB, three kept, about 1% of the store) and a new job to run.
 - Risks: a pinned history-copy read leaking a later version (decision 2); missing data cast to
   zero in Arrow (tests with a missing table); non-deterministic row order (sort before write).
 - Owner decisions 2026-10-19: r2 is promoted after post-session; ceiling 300 MB and floor
-  max(5 GB, 3x the last release); blue/green through a front proxy. `PUBLISHING` is shown only after about 15 minutes
+  max(5 GB, 3x the last release); blue/green through a front proxy. `PUBLISHING` is shown only after the configured delay (default 15 minutes)
   without promotion, in a neutral tone (the exact words are Guide content, ADR 0051). No
   owner decision is open.

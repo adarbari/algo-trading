@@ -64,4 +64,4 @@ without a bad deploy silently taking the site down.
   tests (stub tools in a temp git repo); the real script is never run against the checkout there.
 
 ## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
-See [0077](0077-serving-release.md): the deploy gate checks release format compatibility (rebuilds or holds) and deploys blue/green after a health and latency probe.
+See [0077](0077-serving-release.md): the deploy gate checks release format compatibility (rebuilds or holds) and deploys blue/green after a health and latency probe, replacing decision 6's restart (plists written by code, installed by the owner).
