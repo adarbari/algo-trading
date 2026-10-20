@@ -89,6 +89,7 @@ class Probes:
     port_open: Callable[[int], bool] = _port_open
     store_facts: Callable[[], tuple[str, str, str]] = _store_facts
     api_build: Callable[[str], tuple[str, ...] | None] = _api_build
+    repo: Path = REPO
     logs: Path = field(default_factory=lambda: REPO / "var" / "logs")
     golden_cases: Path = field(
         default_factory=lambda: REPO / "tests" / "fixtures" / "drafting" / "golden" / "cases"
@@ -160,7 +161,7 @@ def api_build(p: Probes) -> list[str]:
     if found is None:
         return [f"API build: {port} open but /health does not answer"]
     if not found:
-        return ["API build: in step with its checkout and the served web"]
+        return ["API build: in step with its checkout or release tree and the served web"]
     return ["API build: OUT OF STEP", *(f"  {m}" for m in found)]
 
 
@@ -184,9 +185,50 @@ def unrecorded_cases(p: Probes) -> list[str]:
     ]
 
 
+def release(p: Probes) -> list[str]:
+    """The release tree (ADR 0079): each slot and the ingest checkout against refs/deploy/main,
+    ``current``, and a blocked ingest sync; nothing before ``deploy.sh --init-release``."""
+    root = p.repo / "var" / "release"
+    if not root.is_dir():
+        return []
+
+    def sha(tree: Path, ref: str = "HEAD") -> str:
+        rc, out = p.run(["git", "-C", str(tree), "rev-parse", ref])
+        return out[:9] if rc == 0 and out else "?"
+
+    def behind(tree: Path) -> str:
+        rc, out = p.run(["git", "-C", str(tree), "rev-list", "--count", "HEAD..refs/deploy/main"])
+        return out if rc == 0 and out.isdigit() else "?"
+
+    target = sha(p.repo, "refs/deploy/main")
+    slots = [x for x in sorted(root.iterdir()) if x.is_dir() and not x.is_symlink()]
+    current = root / "current"
+    where = str(current.readlink()) if current.is_symlink() else "missing"
+    lines = [
+        f"Release: deploy target {target}; current -> {where}; "
+        + ", ".join(f"{s.name} {sha(s)} ({behind(s)} behind)" for s in slots),
+        f"  ingest checkout {sha(p.repo)} ({behind(p.repo)} behind refs/deploy/main)",
+    ]
+    try:
+        blocked = (p.repo / "var" / "deploy" / "ingest_sync_blocked").read_text().strip()
+    except OSError:
+        blocked = ""
+    if blocked:
+        lines.append(f"  ingest sync BLOCKED: {blocked}")
+    return lines
+
+
 def report(p: Probes) -> str:
     return "\n".join(
-        [*prs(p), *jobs(p), *store(p), *servers(p), *api_build(p), *unrecorded_cases(p)]
+        [
+            *prs(p),
+            *jobs(p),
+            *store(p),
+            *servers(p),
+            *release(p),
+            *api_build(p),
+            *unrecorded_cases(p),
+        ]
     )
 
 

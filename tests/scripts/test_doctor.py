@@ -441,3 +441,59 @@ def test_the_disk_floor_is_the_nightlys_configured_one(tmp_path: Path) -> None:
     p = probes(tmp_path, {}, main=lambda: tmp_path, free_bytes=lambda path: 30 * 10**9)
     assert doctor.check_disk(p).level == doctor.WARN  # 30 GB: fine at the default 15, not at 40
     assert "40 GB" in doctor.check_disk(p).detail
+
+
+def _release_probes(tmp_path: Path, free_gb: float = 100.0, du_kb: int = 2_000_000):
+    def run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str]:
+        if cmd[0] == "du":
+            return 0, f"{du_kb}\t{cmd[-1]}"
+        if cmd[3] == "rev-list":
+            return 0, "3"
+        where = cmd[2]
+        ref = cmd[-1]
+        if ref == "refs/deploy/main":
+            return 0, "aaaaaaaaaaaa"
+        return 0, ("aaaaaaaaaaaa" if where.endswith("blue") else "bbbbbbbbbbbb")
+
+    return probes(
+        tmp_path, {}, main=lambda: tmp_path, run=run, free_bytes=lambda path: int(free_gb * 1e9)
+    )
+
+
+def test_release_tree_is_silent_before_init_release(tmp_path: Path) -> None:
+    assert doctor.check_release_tree(_release_probes(tmp_path)) == []
+
+
+def test_release_tree_reports_slots_current_lag_and_blocked_sync(tmp_path: Path) -> None:
+    root = tmp_path / "var" / "release"
+    (root / "blue").mkdir(parents=True)
+    (root / "green").mkdir()
+    (root / "current").symlink_to(root / "blue")
+    (tmp_path / "var" / "deploy").mkdir()
+    (tmp_path / "var" / "deploy" / "ingest_sync_blocked").write_text(
+        "2026-10-20T01:00Z ingest busy\n"
+    )
+    res = {r.name: r for r in doctor.check_release_tree(_release_probes(tmp_path))}
+    assert res["release blue"].level == doctor.OK
+    assert "3 behind" in res["release green"].detail
+    assert res["release current"].detail.endswith("blue")
+    assert "3 behind refs/deploy/main" in res["ingest code"].detail
+    assert "release disk" not in res
+
+
+def test_release_tree_warns_without_current_and_on_low_disk(tmp_path: Path) -> None:
+    (tmp_path / "var" / "release" / "blue").mkdir(parents=True)
+    res = {
+        r.name: r
+        for r in doctor.check_release_tree(_release_probes(tmp_path, free_gb=8, du_kb=4_000_000))
+    }
+    assert res["release current"].level == doctor.WARN
+    assert res["release disk"].level == doctor.WARN  # 3 x 4.1 GB = 12.3 GB > 8 GB free
+
+
+def test_a_release_tree_counts_as_the_main_checkouts_code(tmp_path: Path) -> None:
+    tree = tmp_path / "var" / "release" / "blue"
+    (tree / ".venv" / "bin").mkdir(parents=True)
+    (tree / ".git").write_text("gitdir: x")
+    assert doctor._in_main(str(tree / ".venv" / "bin" / "python"), tmp_path)
+    assert not doctor._in_main(str(tmp_path / ".claude" / "worktrees" / "a"), tmp_path)
