@@ -93,40 +93,58 @@ This machine's own site values (the LLM provider, `enabled = true`) live in the 
 The agent binds `127.0.0.1` only; Funnel is the one way in from outside. Without the agent,
 `.venv/bin/algotrade-api` in a terminal serves the same.
 
-### Auto-deploy (launchd, ADR 0057)
+### Auto-deploy (launchd, ADRs 0057 and 0079)
 
-The fourth agent, `com.algotrade.deploy`, runs `scripts/ops/deploy.sh --auto` at load and every
-5 minutes: it fetches `origin/main` and, when it moved, deploys only what the changed files need
-(dependencies: `uv sync` + restart; `apps/web`, Makefile: web build; `schema.graphql`: both;
-`apps/api`, `src`, `libs`, `config/site`: restart; ingestion, docs, tests: merge only). Nothing
-moved: it exits at once and logs nothing. Install it (written, never installed by code; it
-needs `uv`, `npm`, `node`, `git` on the PATH it is written with):
+The API serves from a **release tree**, a detached git worktree at `var/release/<slot>` (the slot
+`blue`; `var/release/current` links the active one) with its own `.venv` and web build
+(`var/release/<slot>.web`, outside every git path). The main checkout and its venv belong to
+ingestion, the nightly and the other agents; serving never touches them. The git-ignored overlay
+(`var/`, `.env`, `config/users/`, `config/site/*.local.toml`) is symlinked into the tree from the
+main checkout by the deployer, so `var/` (data, logs, deploy state) is still one place.
+
+The fourth agent, `com.algotrade.deploy`, runs `var/release/current/scripts/ops/deploy.sh --auto`
+at load and every 5 minutes: it fetches `main` into the private ref `refs/deploy/main` (never
+`refs/remotes/origin/main`, which other sessions fetch too) and, when it moved, deploys only what
+the changed files need to the release tree (dependencies: `uv sync` + restart; `apps/web`,
+Makefile: web build; `schema.graphql`: both; `apps/api`, `src`, `libs`, `config/site`: restart;
+ingestion, docs, tests: the tree moves, nothing runs). Nothing moved: it exits at once and logs
+nothing. It needs `uv`, `npm`, `node`, `git` on the PATH it is written with.
+
+**Owner actions, once** (written by code, installed by the owner; nothing below is run by a
+script):
 
 ```bash
-.venv/bin/algotrade-api schedule --agent deploy   # writes var/com.algotrade.deploy.plist; prints the commands
-mkdir -p var/logs
-cp var/com.algotrade.deploy.plist ~/Library/LaunchAgents/
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.algotrade.deploy.plist
+# 1. create the release tree (fetches main, builds the venv and the web, carries var/web's assets)
+git -C ~/workspace/algo-trading fetch --refmap= -q origin +main:refs/deploy/main
+git -C ~/workspace/algo-trading show refs/deploy/main:scripts/ops/deploy.sh > /tmp/deploy.sh
+(cd ~/workspace/algo-trading && bash /tmp/deploy.sh --init-release)   # prints the next commands
+# 2. stop the old deploy agent first (it would keep swapping a var/web nothing serves)
+launchctl bootout gui/$(id -u)/com.algotrade.deploy
+# 3. write both agents from the tree and install them together (each prints its commands)
+var/release/blue/.venv/bin/algotrade-api schedule --tree var/release/blue
+var/release/blue/.venv/bin/algotrade-api schedule --agent deploy --tree var/release/blue
 ```
 
 - **Log:** `var/logs/deploy.log`, one line per acting cycle (`deployed <sha> (restart web)`,
-  `skipped: ingest/deploy running`, `BLOCKED: <reason>`). State: `var/deploy/` (`last_sha`, the
-  web build in `web.next` / `web.prev`).
-- **Blocked:** a failed sync, web build, restart or health check, a main checkout that is dirty,
-  off `main` or diverged from `origin/main`, a missing tool, or 12 failed fetches in a row write
-  `var/deploy/blocked`, show one macOS notification and stop. Nothing is rolled back; the site
-  stays as the failure left it. Fix the cause, then `scripts/ops/deploy.sh --clear` (prints the
-  reason and lets the agent run again); a manual `scripts/ops/deploy.sh` that succeeds clears it too.
-- **Ingest:** a deploy takes the `deploy` lock, and the ingest run lock too when the change
-  touches anything a running ingest loads (anything but web, API, docs, tests, `.claude`,
-  `.github`, root `*.md`; a dependency change always does), without waiting, so
-  it never runs over an ingest it could disturb (the cycle logs "skipped" and retries in 5
-  minutes); a web-only deploy goes ahead during a backfill. While it holds them, a nightly that finds the lock busy is rerun by its watchdog, and a manual
-  `algotrade-ingest` exits busy like any second run.
-- **Plists:** when a launchd plist writer changed, the cycle regenerates the agents into
-  `var/deploy/plists/`, compares them with `~/Library/LaunchAgents/` and notifies
+  `skipped: deploy running`, `BLOCKED: <reason>`). State: `var/deploy/` (`last_sha`, `blocked`);
+  the web build is `var/release/<slot>.web` (`.next` while building, `.prev` after the swap).
+- **Blocked:** a failed sync, web build, restart or health check, a missing release tree, a tree
+  whose links point elsewhere or that has its own `var`, free disk under the larger of 5 GB and
+  3x the tree, a missing tool, or 12 failed fetches in a row write `var/deploy/blocked`, show one
+  macOS notification and stop. Nothing is rolled back; the site stays as the failure left it. Fix
+  the cause, then `scripts/ops/deploy.sh --clear` (prints the reason and lets the agent run again);
+  a manual `scripts/ops/deploy.sh` that succeeds clears it too. The main checkout being dirty,
+  off `main` or diverged no longer blocks serving.
+- **Ingest:** a serving deploy takes the `deploy` lock alone, without waiting, and never the
+  ingest run lock: an ingest never loads the release tree, so a backfill does not delay a deploy
+  (the cycle logs "skipped: deploy running" only when another deploy holds the lock). The ingest
+  checkout is brought forward separately (ADR 0079 step 5, a later phase) and may lag the served
+  code; a fact the older ingest did not store is UNKNOWN with a reason.
+- **Plists:** when a launchd plist writer changed, the cycle regenerates the agents (with
+  `--tree`) into `var/deploy/plists/`, compares them with `~/Library/LaunchAgents/` and notifies
   "reinstall"; it never installs or blocks. Reinstall with the commands each `schedule` prints.
-- The manual `scripts/ops/deploy.sh` (and `--dry-run`) still does everything: sync, web, restart.
+- The manual `scripts/ops/deploy.sh` (and `--dry-run`) deploys the release tree completely: sync,
+  web, restart.
 
 ### The monthly Tiingo history fill (launchd)
 

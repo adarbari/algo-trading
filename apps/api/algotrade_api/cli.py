@@ -187,11 +187,20 @@ def _parser() -> argparse.ArgumentParser:
     sc.add_argument("--port", type=int, default=DEFAULT_PORT, dest="agent_port")
     sc.add_argument("--out", type=Path, default=None, help="default var/<label>.plist")
     sc.add_argument("--agent", choices=("api", "deploy"), default="api")
+    sc.add_argument(
+        "--tree",
+        type=Path,
+        default=None,
+        help="serve from this release tree (var/release/<slot>, ADR 0079); default: this checkout",
+    )
     dp = sub.add_parser("deploy-plan", help="what a deploy of the commits A..B must run")
     dp.add_argument("--since", required=True)
     dp.add_argument("--to", required=True)
     dp.add_argument(
-        "--locks", action="store_true", help="print `ingest` if the deploy needs the ingest lock"
+        "--ingest-sync",
+        action="store_true",
+        help="print `ingest` if the change touches what a running ingest loads (a log hint for "
+        "the ingest-tree sync; it never decides a serving deploy, ADR 0079)",
     )
     dv = sub.add_parser("deploy-verify", help="wait until the running site is at a commit")
     dv.add_argument("--expect", required=True)
@@ -400,13 +409,19 @@ def golden_run(args: argparse.Namespace) -> int:
         wiring.close()
 
 
-def write_deploy_schedule(out: Path | None) -> dict[str, object]:
+def _tree(tree: Path | None) -> Path | None:
+    """The release tree ``--tree`` names, absolute (relative to the working directory)."""
+    return None if tree is None else (Path.cwd() / tree).resolve()
+
+
+def write_deploy_schedule(out: Path | None, tree: Path | None = None) -> dict[str, object]:
     """Write the auto-deploy agent for the checkout in the working directory, with this
-    process's PATH (the one that finds uv, npm and git); what to run to install it."""
+    process's PATH (the one that finds uv, npm and git); what to run to install it. ``tree``:
+    the agent runs the script of the release tree's ``current`` slot (ADR 0079)."""
     repo = Path.cwd().resolve()
     out = out or Path("var") / f"{DEPLOY_LABEL}.plist"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(deploy_plist(repo, os.pathsep.join(os.get_exec_path())))
+    out.write_bytes(deploy_plist(repo, os.pathsep.join(os.get_exec_path()), tree=_tree(tree)))
     target = Path.home() / "Library" / "LaunchAgents" / f"{DEPLOY_LABEL}.plist"
     return {
         "written": str(out),
@@ -433,12 +448,13 @@ def changed_paths(since: str, to: str) -> list[str]:
     return done.stdout.split()
 
 
-def write_schedule(out: Path | None, port: int) -> dict[str, object]:
-    """Write the agent for the checkout in the working directory; what to run to install it."""
+def write_schedule(out: Path | None, port: int, tree: Path | None = None) -> dict[str, object]:
+    """Write the agent for the checkout in the working directory (``tree``: serving from that
+    release tree, ADR 0079); what to run to install it."""
     repo = Path.cwd().resolve()
     out = out or Path("var") / f"{LABEL}.plist"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(api_plist(repo, port))
+    out.write_bytes(api_plist(repo, port, tree=_tree(tree)))
     target = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
     plan: dict[str, object] = {
         "written": str(out),
@@ -482,9 +498,9 @@ def main(argv: list[str] | None = None) -> None:
     load_dotenv()
     if args.command == "schedule":
         plan = (
-            write_deploy_schedule(args.out)
+            write_deploy_schedule(args.out, args.tree)
             if args.agent == "deploy"
-            else write_schedule(args.out, args.agent_port)
+            else write_schedule(args.out, args.agent_port, args.tree)
         )
         print(json.dumps(plan, indent=2))
         return
@@ -499,7 +515,7 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(feedback_run(args))
     if args.command == "deploy-plan":
         paths = changed_paths(args.since, args.to)
-        if args.locks:
+        if args.ingest_sync:
             print("ingest" if holds_ingest(paths) else "")
         else:
             print(" ".join(a.value for a in actions(paths)))

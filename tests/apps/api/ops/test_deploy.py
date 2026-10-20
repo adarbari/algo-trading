@@ -189,7 +189,7 @@ def test_holds_ingest_only_for_what_a_running_ingest_loads(
     assert holds_ingest(paths) is expected
 
 
-def test_deploy_plan_locks_prints_ingest_only_when_it_is_held(
+def test_deploy_plan_ingest_sync_hints_ingest_only_when_an_ingest_loads_the_change(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
@@ -198,11 +198,11 @@ def test_deploy_plan_locks_prints_ingest_only_when_it_is_held(
     src = _commit(tmp_path, "src/algotrade/a.py")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(cli, "load_dotenv", lambda: None)
-    cli.main(["deploy-plan", "--locks", "--since", first, "--to", web])
+    cli.main(["deploy-plan", "--ingest-sync", "--since", first, "--to", web])
     assert capsys.readouterr().out.strip() == ""
-    cli.main(["deploy-plan", "--locks", "--since", first, "--to", src])
+    cli.main(["deploy-plan", "--ingest-sync", "--since", first, "--to", src])
     assert capsys.readouterr().out.strip() == "ingest"
-    cli.main(["deploy-plan", "--locks", "--since", src, "--to", src])
+    cli.main(["deploy-plan", "--ingest-sync", "--since", src, "--to", src])
     assert capsys.readouterr().out.strip() == ""
 
 
