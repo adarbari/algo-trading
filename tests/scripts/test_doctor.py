@@ -395,9 +395,23 @@ def test_main_checkout_off_main_names_the_deploy_block_and_last_blocked_line(
     p = probes(tmp_path, {}, main=lambda: tmp_path, run=_git_probe("feat/x", "a", "a", ""))
     (r,) = doctor.check_main_checkout(p)
     assert (
-        "auto-deploy is blocked" in r.detail
+        "cannot bring it forward" in r.detail
         and "t2 BLOCKED: main checkout is on feat/x" in r.detail
     )
+
+
+def test_ingest_sync_warns_with_the_reason_when_the_deployer_could_not_sync(
+    tmp_path: Path,
+) -> None:
+    p = probes(tmp_path, {}, main=lambda: tmp_path)
+    assert doctor.check_ingest_sync(p).level == doctor.OK
+    (tmp_path / "var" / "deploy").mkdir(parents=True)
+    (tmp_path / "var" / "deploy" / "ingest_sync_blocked").write_text(
+        "2026-10-20T10:00:00Z the ingest checkout /x has uncommitted changes\n"
+    )
+    r = doctor.check_ingest_sync(p)
+    assert r.level == doctor.WARN and "has uncommitted changes" in r.detail
+    assert "2026-10-20" not in r.detail and "serving is not affected" in r.detail
 
 
 def test_running_checks_lists_other_runs_with_their_directory(tmp_path: Path) -> None:
