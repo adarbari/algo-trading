@@ -185,6 +185,18 @@ section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-
 detect = [{ call = "raw.put" }]
 
 [[responsibility]]
+id = "run-compaction"
+description = "Replace one merge partition's runs by the rows that matter, value-exact at every as_of and pinned sequence (scheme E2, ADR 0078): the pure plan and its verification (run_compaction.py), then a compare-and-swap of the partition's index that is never a commit and never writes seq (Commits.swap_runs, TableStore.compact_runs); superseded files are left for sweep_orphans after a grace"
+owner = ["src/algotrade/storage/backends/run_compaction.py", "src/algotrade/storage/backends/local_index.py"]
+allowed = [
+    "src/algotrade/storage/backends/local.py",  # LocalTables.compact_runs: writes the kept rows, verifies, swaps
+    "src/algotrade/storage/backends/memory.py",  # MemoryTables.compact_runs: the same under its one lock
+    "src/algotrade/storage/tables/writers.py",  # StoreWriter.compact_runs: the facade only ingestion may use
+]
+section = "docs/adr/0078-outcomes-run-compaction.md#decision"
+detect = [{ call = "plan_compaction" }, { call = "swap_runs" }, { call = "compact_runs" }]
+
+[[responsibility]]
 id = "run-publish"
 description = "Atomic publication of a run's table writes (ADR 0022): pending writes, one commit for every table at once (or abort), commit sequence for readers, crash recovery; driven by IngestRun for ingestion and ResultWriter.publishing for services"
 owner = [
@@ -215,6 +227,7 @@ allowed = [
     "src/algotrade/storage/backends/local.py",  # applies the selection to its _runs.json index
     "src/algotrade/storage/backends/local_index.py",  # parses _runs.json entries into RunEntry
     "src/algotrade/storage/backends/memory.py",  # applies the selection to its in-memory runs
+    "src/algotrade/storage/backends/run_compaction.py",  # verifies a compaction with the owner's select_runs / merge_rows (ADR 0078)
 ]
 section = "docs/adr/0007-point-in-time-data.md#how-runs-combine"
 detect = [{ call = "select_runs" }, { call = "merge_rows" }, { call = "RunEntry" }]
