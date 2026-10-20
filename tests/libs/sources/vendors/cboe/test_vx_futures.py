@@ -94,3 +94,14 @@ def test_a_never_listed_expiry_is_s3_access_denied_which_the_registry_calls_miss
     denied = HttpError(403, body=b"<Error><Code>AccessDenied</Code></Error>")
     assert missing_chain(denied)
     assert not missing_chain(HttpError(403, body=b"<html>Cloudflare</html>"))
+
+
+def test_a_repeated_trade_date_keeps_one_row() -> None:
+    """The 2020-03-25 file repeats two trade dates (identical rows): the table key
+    (id, session_date, known_from) failed ``duplicate rows`` on the 2013-2026 backfill."""
+    row = b"2020-02-27,H (Mar 2020),1,1,1,1,1,0,1,0,1\n"
+    payload = (
+        files.VX_HEADER.encode() + b"\n" + row + row + row.replace(b"2020-02-27", b"2020-02-28")
+    )
+    frame = parse_vx(date(2020, 3, 25), payload)
+    assert frame["session_date"].tolist() == [date(2020, 2, 27), date(2020, 2, 28)]

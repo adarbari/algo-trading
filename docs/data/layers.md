@@ -257,7 +257,7 @@ A rollup is a **feature group** (ADR 0023): a versioned, pure definition, `<name
 as `rollups/instrument/<name>@v<N>` with one row per instrument per session (phase 2b.2). Each
 stored column is a **feature** with a kind, type, unit, description, null meaning and valid
 range; every feature is listed in the generated **[feature catalogue](features.md)**
-(`make features-doc`).
+(`make features-doc`). A coverage ledger input (no content, today `filings/read`) is served whole to every session, exempt from the runner's point-in-time check (`UNBOUNDED_INPUTS`, ADR 0007 amendment); content never is.
 
 - **Declaration** (`features/framework/declaration.py`, `FeatureGroup`): name, version, inputs
   (each a table plus a lookback in exchange sessions, required or optional; or only some of its

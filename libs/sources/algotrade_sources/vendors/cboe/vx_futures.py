@@ -57,8 +57,8 @@ def _refused(expiry: date, why: str, payload: bytes) -> TransientFetchError:
 
 def parse_vx(expiry: date, payload: bytes) -> pd.DataFrame:
     """The ``COLUMNS`` rows of one contract's file: a zero price is null, a row whose trade
-    date does not read is dropped. A body that is not the table raises
-    ``TransientFetchError`` (an HTML block page is never an empty contract)."""
+    date does not read is dropped, a repeated trade date keeps its last row. A body that is not
+    the table raises ``TransientFetchError`` (an HTML block page is never an empty contract)."""
     if payload.lstrip(b"\xef\xbb\xbf \t\r\n").startswith(b"<"):
         raise _refused(expiry, "an HTML page, not the table", payload)
     try:
@@ -86,6 +86,9 @@ def parse_vx(expiry: date, payload: bytes) -> pd.DataFrame:
     frame["change"] = pd.to_numeric(raw["Change"], errors="coerce").astype("float64")
     for column, name in COUNTS.items():
         frame[name] = pd.to_numeric(raw[column], errors="coerce").astype("Int64")
+    # A file may repeat a trade date's row (2020-03-25 holds each of two days twice, identical):
+    # one row per trade date, the later one if they differ.
+    frame = frame.drop_duplicates("session_date", keep="last")
     return frame.sort_values("session_date", kind="stable").reset_index(drop=True)[list(COLUMNS)]
 
 
