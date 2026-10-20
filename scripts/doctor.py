@@ -479,8 +479,9 @@ def _last_blocked(main: Path) -> str:
 
 def check_main_checkout(p: Probes) -> list[Result]:
     """The main checkout is what the API and the nightly run: it belongs on ``main`` at
-    ``origin/main`` (`scripts/ops/deploy.sh` moves it), and its committed site config is clean
-    (a machine's own values go in the git-ignored ``config/site/<name>.local.toml``)."""
+    ``origin/main`` (`scripts/ops/deploy.sh` moves it when no ingest runs), and its committed
+    site config is clean (a machine's own values go in the git-ignored
+    ``config/site/<name>.local.toml``)."""
     main = p.main()
     git = ["git", "-C", str(main)]
     _, branch = p.run([*git, "rev-parse", "--abbrev-ref", "HEAD"])
@@ -493,8 +494,8 @@ def check_main_checkout(p: Probes) -> list[Result]:
                 WARN,
                 "main checkout",
                 f"on {branch or 'an unknown branch'}, not main (the API and the nightly run it; "
-                "deploy.sh refuses while it is off main, so auto-deploy is blocked)"
-                + _last_blocked(main),
+                "the deployer cannot bring it forward while it is off main; "
+                "serving is not affected)" + _last_blocked(main),
                 f"cd {main} && git switch main",
             )
         )
@@ -522,6 +523,24 @@ def check_main_checkout(p: Probes) -> list[Result]:
             )
         )
     return out
+
+
+def check_ingest_sync(p: Probes) -> Result:
+    """Whether the deployer could bring the main checkout (what ingestion runs) forward to
+    ``origin/main`` (ADR 0079 step 5): ``var/deploy/ingest_sync_blocked`` names why it could not.
+    Serving is unaffected either way."""
+    marker = p.main() / "var" / "deploy" / "ingest_sync_blocked"
+    try:
+        reason = marker.read_text().strip().split(" ", 1)[-1]
+    except OSError:
+        return Result(OK, "ingest checkout", "the deployer brings it forward (no sync blocked)")
+    return Result(
+        WARN,
+        "ingest checkout",
+        f"the deployer cannot sync it: {reason} (serving is not affected)",
+        f"fix it in {p.main()} (git switch main, commit or restore, reconcile with origin/main);"
+        " the next deploy cycle retries and clears the marker",
+    )
 
 
 def check_running_checks(p: Probes) -> Result:
@@ -564,6 +583,7 @@ def run_checks(p: Probes) -> list[Result]:
         check_api_build(p),
         check_llm(p),
         *check_main_checkout(p),
+        check_ingest_sync(p),
         check_running_checks(p),
         *check_agents(p),
     ]

@@ -14,7 +14,11 @@ SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "ops" / "deploy.sh"
 API_STUB = """#!/bin/sh
 echo "api $*" >> "$STUB_LOG"
 case "$1" in
-  deploy-plan) echo "${STUB_PLAN:-restart}" ;;
+  deploy-plan)
+    case " $* " in
+      *" --ingest-sync "*) echo "${STUB_HINT-}" ;;
+      *) echo "${STUB_PLAN:-restart}" ;;
+    esac ;;
   deploy-verify) exit "${STUB_VERIFY_RC:-0}" ;;
   schedule)
     while [ $# -gt 0 ]; do
@@ -42,6 +46,10 @@ for a in "$@"; do
                 echo new > "$d/assets/new.js" ;;
   esac
 done
+"""
+UV_STUB = """#!/bin/sh
+echo "uv $* (cwd=$PWD)" >> "$STUB_LOG"
+if [ -n "$STUB_UV_MAIN_FAIL" ] && [ "$PWD" = "$STUB_MAIN" ]; then exit 1; fi
 """
 LOGGING_STUB = '#!/bin/sh\necho "$(basename "$0") $*" >> "$STUB_LOG"\n'
 
@@ -106,7 +114,8 @@ class Site:
             "notify": LOGGING_STUB,
         }.items():
             self._stub(name, body)
-        for name in ("uv", "npm", "node", "curl", "launchctl"):
+        self._stub("uv", UV_STUB)
+        for name in ("npm", "node", "curl", "launchctl"):
             self._stub(name, LOGGING_STUB)
         self.agents = tmp_path / "agents"
         self.agents.mkdir()
@@ -122,6 +131,7 @@ class Site:
             "ALGOTRADE_DEPLOY_INGEST": str(self.bin / "algotrade-ingest"),
             "ALGOTRADE_DEPLOY_NOTIFY": str(self.bin / "notify"),
             "ALGOTRADE_DEPLOY_AGENTS": str(self.agents),
+            "STUB_MAIN": str(self.repo.resolve()),
             "ALGOTRADE_DEPLOY_FREE_KB": "100000000",  # 100 GB: the floor test lowers it
         }
 
@@ -199,6 +209,7 @@ def test_dry_run_prints_the_whole_plan_and_runs_nothing(site: Site) -> None:
     heads = [x.split()[1] for x in plan]
     assert [Path(h).name for h in heads] == [
         "link", "git", "git", "uv", "make", "launchctl", "algotrade-api", "swap", "algotrade-api",
+        "ingest",
     ]  # fmt: skip
     assert "checkout -q --force --detach" in plan[1] and "reset -q --hard" in plan[2]
     assert "sync --all-packages --locked" in plan[3]
@@ -210,14 +221,13 @@ def test_dry_run_prints_the_whole_plan_and_runs_nothing(site: Site) -> None:
 
 def test_a_manual_deploy_does_everything_and_records_the_commit(site: Site) -> None:
     sha = _advance(site.repo, "src/algotrade/x.py")
-    main_head = _git(site.repo, "rev-parse", "HEAD")
     out = site.run()
     assert out.returncode == 0, out.stdout + out.stderr
     assert site.called()[0].startswith("ingest deploy-hold --deploy-only -- bash ")
     assert any(c.startswith("uv sync --all-packages --locked") for c in site.called())
     assert site.state("last_sha").read_text().strip() == sha
     assert site.served() == sha  # the release tree moved
-    assert _git(site.repo, "rev-parse", "HEAD") == main_head  # the main checkout did not
+    assert _git(site.repo, "rev-parse", "HEAD") == sha  # and so did the ingest checkout (R2)
     assert (site.web / "index.html").read_text().strip() == "new"
 
 
@@ -368,8 +378,9 @@ def test_a_deploy_during_a_held_ingest_lock_deploys(site: Site) -> None:
     assert out.returncode == 0, out.stdout + out.stderr
     assert "skipped" not in site.log() and f"deployed {sha[:9]}" in site.log()
     assert site.served() == sha and site.state("last_sha").read_text().strip() == sha
-    holds = [c for c in site.called() if c.startswith("ingest deploy-hold")]
-    assert holds and all("--deploy-only" in c for c in holds)  # never the ingest run lock
+    holds = [c for c in site.called() if c.startswith("ingest deploy-hold --deploy-only")]
+    assert holds and "--ingest-apply" not in holds[0]  # serving: the deploy lock alone
+    assert _git(site.repo, "rev-parse", "HEAD") != sha  # the busy ingest lock kept main back
     assert not any("--locks" in c for c in site.called())  # the plan no longer decides locks
 
 
@@ -563,6 +574,118 @@ def test_init_release_removes_a_half_made_tree_when_the_build_fails(site: Site) 
     out = site.run("--init-release")
     assert out.returncode != 0 and "removing the half-made tree" in out.stderr
     assert not site.tree.exists()
+
+
+# ---- the ingest checkout's own sync (ADR 0079 step 5) -----------------------------------------
+
+
+def _main_head(site: Site) -> str:
+    return _git(site.repo, "rev-parse", "HEAD")
+
+
+def test_the_ingest_checkout_is_fast_forwarded_under_both_locks_after_a_deploy(site: Site) -> None:
+    site.seed()
+    sha = _advance(site.repo, "apps/ingestion/algotrade_ingestion/a.py")
+    out = site.run("--auto", STUB_HINT="ingest")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert _main_head(site) == sha and site.served() == sha
+    both = [c for c in site.called() if "--ingest-apply" in c]
+    assert both and "--deploy-only" not in both[0] and both[0].startswith("ingest deploy-hold -- ")
+    assert "ingest checkout moved" in site.log() and "ingest code changed" in site.log()
+    assert not any("(cwd=" + str(site.repo.resolve()) + ")" in c for c in site.called())  # no sync
+
+
+def test_a_busy_lock_skips_the_ingest_sync_silently_and_an_idle_cycle_applies_it(
+    site: Site,
+) -> None:
+    before = site.seed()
+    _advance(site.repo, "src/a.py")
+    sha = _advance(site.repo, "src/b.py")
+    out = site.run("--auto", STUB_INGEST_HELD="1")  # a run holds the ingest lock
+    assert out.returncode == 0 and site.served() == sha
+    assert _main_head(site) == before and site.notices() == []
+    assert "ingest" not in site.log().replace("deployed", "")  # nothing logged for the skip
+    sha2 = _advance(site.repo, "docs/x.md")  # a later cycle with its own, smaller range
+    assert site.run("--auto", STUB_INGEST_HELD="1").returncode == 0 and _main_head(site) == before
+    assert site.run("--auto").returncode == 0  # the lock is free: HEAD..target spans all three
+    assert _main_head(site) == sha2 and site.notices() == []
+    idle = site.run("--auto")  # nothing left: no lock is even tried
+    assert idle.returncode == 0
+    assert sum("--ingest-apply" in c for c in site.called()) == 3
+
+
+def test_a_change_made_while_busy_is_applied_by_a_cycle_with_nothing_to_serve(site: Site) -> None:
+    site.seed()
+    sha = _advance(site.repo, "src/a.py")
+    assert site.run("--auto", STUB_INGEST_HELD="1").returncode == 0
+    assert site.state("last_sha").read_text().strip() == sha
+    assert _main_head(site) != sha
+    assert site.run("--auto").returncode == 0 and _main_head(site) == sha  # idle cycle
+
+
+def test_a_dependency_change_syncs_the_ingest_venv_only_then(site: Site) -> None:
+    site.seed()
+    _advance(site.repo, "src/a.py")
+    assert site.run("--auto", STUB_PLAN="restart").returncode == 0
+    main_cwd = f"(cwd={site.repo.resolve()})"
+    assert not any(c.startswith("uv sync") and c.endswith(main_cwd) for c in site.called())
+    _advance(site.repo, "uv.lock")
+    assert site.run("--auto", STUB_PLAN="sync restart").returncode == 0
+    assert any(c.startswith("uv sync --all-packages --locked") and c.endswith(main_cwd)
+               for c in site.called())  # fmt: skip
+
+
+def test_a_failed_ingest_sync_is_rolled_back_and_never_blocks_serving(site: Site) -> None:
+    before = site.seed()
+    sha = _advance(site.repo, "uv.lock")
+    out = site.run("--auto", STUB_PLAN="sync restart", STUB_UV_MAIN_FAIL="1")
+    assert out.returncode == 0 and site.served() == sha and not site.state("blocked").exists()
+    assert _main_head(site) == before  # not left half-synced: retried next cycle
+    assert "uv sync failed in the ingest checkout" in site.state("ingest_sync_blocked").read_text()
+    assert len(site.notices()) == 1
+
+
+@pytest.mark.parametrize("fault", ["dirty", "off-main", "diverged"])
+def test_a_main_checkout_that_cannot_sync_notifies_once_per_reason_and_serving_goes_on(
+    site: Site, fault: str
+) -> None:
+    site.seed()
+    if fault == "dirty":
+        (site.repo / "a.txt").write_text("edited\n")
+    elif fault == "off-main":
+        _git(site.repo, "switch", "-qc", "feat/x")
+    else:
+        (site.repo / "b.txt").write_text("b\n")
+        _git(site.repo, "add", "b.txt")
+        _git(site.repo, "commit", "-qm", "local only")
+    first = _advance(site.repo, "src/a.py")
+    assert site.run("--auto").returncode == 0 and site.served() == first
+    assert not site.state("blocked").exists()  # serving is untouched
+    (notice,) = site.notices()
+    assert "the ingest checkout cannot sync" in notice
+    assert site.state("ingest_sync_blocked").exists()
+    second = _advance(site.repo, "src/b.py")
+    assert site.run("--auto").returncode == 0 and site.served() == second
+    assert len(site.notices()) == 1  # the same reason: no second notification
+
+
+def test_the_ingest_block_is_cleared_by_the_next_successful_sync(site: Site) -> None:
+    site.seed()
+    (site.repo / "a.txt").write_text("edited\n")
+    _advance(site.repo, "src/a.py")
+    assert site.run("--auto").returncode == 0 and site.state("ingest_sync_blocked").exists()
+    _git(site.repo, "checkout", "--", "a.txt")
+    sha = _advance(site.repo, "src/b.py")
+    assert site.run("--auto").returncode == 0
+    assert _main_head(site) == sha and not site.state("ingest_sync_blocked").exists()
+
+
+def test_the_dry_run_names_the_ingest_sync_and_moves_nothing(site: Site) -> None:
+    before = _main_head(site)
+    _advance(site.repo, "src/a.py")
+    out = site.run("--dry-run")
+    assert "[dry-run] ingest checkout: fast-forward" in out.stdout
+    assert _main_head(site) == before and site.called() == []
 
 
 def test_clear_prints_the_reason_and_lets_it_run_again(site: Site) -> None:

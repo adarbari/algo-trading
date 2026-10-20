@@ -137,9 +137,19 @@ var/release/blue/.venv/bin/algotrade-api schedule --agent deploy --tree var/rele
   off `main` or diverged no longer blocks serving.
 - **Ingest:** a serving deploy takes the `deploy` lock alone, without waiting, and never the
   ingest run lock: an ingest never loads the release tree, so a backfill does not delay a deploy
-  (the cycle logs "skipped: deploy running" only when another deploy holds the lock). The ingest
-  checkout is brought forward separately (ADR 0079 step 5, a later phase) and may lag the served
-  code; a fact the older ingest did not store is UNKNOWN with a reason.
+  (the cycle logs "skipped: deploy running" only when another deploy holds the lock).
+- **The ingest checkout** (the main checkout: ingestion, the nightly and the other agents run
+  from it) is brought forward separately, after a serving deploy and on cycles with nothing to
+  serve: the deployer tries both locks without waiting; busy means silence and the next cycle
+  retries, so ingestion picks up new code in the next gap between runs and a run is never
+  rewritten under itself. It fast-forwards main `HEAD..target` (never `last_sha..target`, so a
+  change that arrived in a busy cycle is still applied) and runs `uv sync` only on a dependency
+  change (a failed sync resets the checkout, retried next cycle). It may lag the served code; a
+  fact the older ingest did not store is UNKNOWN with a reason. A main checkout that is dirty,
+  off `main` or diverged never blocks serving: one macOS notification per reason ("the ingest
+  checkout cannot sync: ...") and `var/deploy/ingest_sync_blocked`, cleared by the next
+  successful sync; `make doctor` shows it. Fix the checkout (`git switch main`, commit or restore
+  files, reconcile with `origin/main`) and the next cycle retries.
 - **Plists:** when a launchd plist writer changed, the cycle regenerates the agents (with
   `--tree`) into `var/deploy/plists/`, compares them with `~/Library/LaunchAgents/` and notifies
   "reinstall"; it never installs or blocks. Reinstall with the commands each `schedule` prints.

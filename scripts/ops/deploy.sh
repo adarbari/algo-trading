@@ -29,7 +29,7 @@ PRIVATE_REF=refs/deploy/main
 MIN_FREE_KB=5242880  # 5 GB: the floor of the free-space check (else 3x the tree)
 
 main() {
-  local dry=0 mode=manual clear=0 apply=0 init=0 slot="${ALGOTRADE_DEPLOY_SLOT:-}"
+  local dry=0 mode=manual clear=0 apply=0 iapply=0 init=0 slot="${ALGOTRADE_DEPLOY_SLOT:-}"
   local script
   script="$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")"  # physical: a flip of `current` never moves it
   while [ $# -gt 0 ]; do
@@ -40,12 +40,13 @@ main() {
       --init-release) init=1 ;;
       --slot) slot="$2"; shift ;;
       --apply) apply=1; mode="$2"; shift ;;
+      --ingest-apply) iapply=1; mode="$2"; shift ;;
       -h | --help) sed -n '2,22p' "$0"; return 0 ;;
       *) break ;;
     esac
     shift
   done
-  if [ $# -gt 0 ] && [ "$apply" = 0 ]; then
+  if [ $# -gt 0 ] && [ "$apply" = 0 ] && [ "$iapply" = 0 ]; then
     echo "usage: var/release/current/scripts/ops/deploy.sh [--dry-run | --auto | --clear | --init-release] [--slot NAME]" >&2
     return 2
   fi
@@ -59,7 +60,8 @@ main() {
   local state=var/deploy log=var/logs/deploy.log
   local tree="$root/var/release/$slot" webdir="$root/var/release/$slot.web"
   local api="${ALGOTRADE_DEPLOY_API:-$tree/.venv/bin/algotrade-api}"
-  local ingest="${ALGOTRADE_DEPLOY_INGEST:-$root/.venv/bin/algotrade-ingest}"
+  # deploy-hold runs from the tree's venv: the ingest sync below may `uv sync` the main venv
+  local ingest="${ALGOTRADE_DEPLOY_INGEST:-$tree/.venv/bin/algotrade-ingest}"
   mkdir -p "$state" var/logs
 
   if [ "$clear" = 1 ]; then
@@ -73,6 +75,7 @@ main() {
 
   if [ "$init" = 1 ]; then init_release "$script" "$slot"; return $?; fi
   if [ "$apply" = 1 ]; then apply_phase "$mode" "$@"; return $?; fi
+  if [ "$iapply" = 1 ]; then ingest_apply "$1"; return $?; fi
 
   # ---- phase A: guards, fetch, plan (no lock) ----------------------------------------------
   if [ "$mode" = auto ] && [ -f "$state/blocked" ]; then return 0; fi
@@ -102,7 +105,7 @@ main() {
       block "the last deployed commit ${last:0:9} is not an ancestor of origin/main ${target:0:9}"
       return 1
     fi
-    if [ "$target" = "$last" ]; then return 0; fi
+    if [ "$target" = "$last" ]; then ingest_sync "$script" "$slot" "$target"; return 0; fi
     acts=$("$api" deploy-plan --since "$last" --to "$target") \
       || { block "deploy-plan failed"; return 1; }
   else
@@ -112,8 +115,10 @@ main() {
   # A serving deploy takes the deploy lock alone: nothing it touches is loaded by an ingest.
   if [ "$dry" = 1 ]; then
     echo "locks (dry-run): deploy"
-    apply_phase "$mode" "$target" $acts
-    return $?
+    local drc=0
+    apply_phase "$mode" "$target" $acts || drc=$?
+    ingest_sync "$script" "$slot" "$target"
+    return "$drc"
   fi
   local rc=0
   "$ingest" deploy-hold --deploy-only -- bash "$script" --slot "$slot" --apply "$mode" "$target" $acts || rc=$?
@@ -128,6 +133,7 @@ main() {
       return "$rc"
       ;;
   esac
+  if [ "$rc" = 0 ]; then ingest_sync "$script" "$slot" "$target"; fi
   return 0
 }
 
@@ -329,6 +335,69 @@ plists_check() {
     say "launchd plists differ from the installed agents:$differs"
     notify "reinstall the launchd agents:$differs (docs/hosting.md)"
   fi
+}
+
+# ---- the ingest checkout, brought forward separately (ADR 0079 step 5) --------------------------
+# After a serving deploy and on idle cycles: when the main checkout lacks the target, try BOTH locks
+# without waiting; busy means silence and the next cycle retries. Never blocks serving: a main
+# checkout that is dirty, off main or diverged posts one notification per reason and writes
+# var/deploy/ingest_sync_blocked, cleared by the next successful sync.
+ingest_sync() {
+  local script=$1 slot=$2 target=$3 rc=0
+  if [ "$dry" = 1 ]; then
+    echo "[dry-run] ingest checkout: fast-forward $root to ${target:0:9} under both locks when it lacks it"
+    return 0
+  fi
+  if git merge-base --is-ancestor "$target" HEAD 2> /dev/null; then  # nothing to bring forward
+    rm -f "$state/ingest_sync_blocked"; return 0
+  fi
+  "$ingest" deploy-hold -- bash "$script" --slot "$slot" --ingest-apply "$mode" "$target" || rc=$?
+  case "$rc" in
+    0 | 75) ;;  # 75: an ingest or a deploy holds a lock; retry next cycle, say nothing
+    *) say "ingest sync: deploy-hold exited $rc" ;;
+  esac
+  return 0
+}
+
+ingest_block() {  # one notification per reason; the file holds the current one
+  local reason=$1
+  if [ -f "$state/ingest_sync_blocked" ] && [ "$(cut -d' ' -f2- "$state/ingest_sync_blocked")" = "$reason" ]; then
+    return 0
+  fi
+  printf '%s %s\n' "$(stamp)" "$reason" > "$state/ingest_sync_blocked"
+  say "ingest sync: $reason"
+  notify "the ingest checkout cannot sync: $reason"
+}
+
+ingest_apply() {  # under both locks: HEAD..target, never last_sha..target
+  local target=$1 head hint=""
+  if [ "$(git rev-parse --abbrev-ref HEAD)" != main ]; then
+    ingest_block "the ingest checkout $root is on '$(git rev-parse --abbrev-ref HEAD)', not main"; return 0
+  fi
+  if [ -n "$(git status --porcelain -uno --ignore-submodules)" ]; then
+    ingest_block "the ingest checkout $root has uncommitted changes"; return 0
+  fi
+  head=$(git rev-parse HEAD)
+  if git merge-base --is-ancestor "$target" "$head"; then rm -f "$state/ingest_sync_blocked"; return 0; fi
+  if ! git merge-base --is-ancestor "$head" "$target"; then
+    ingest_block "the ingest checkout $root has commits that are not on origin/main (diverged)"; return 0
+  fi
+  local plan
+  plan=$("$api" deploy-plan --since "$head" --to "$target" 2> /dev/null) || plan=""
+  if [ -n "$("$api" deploy-plan --ingest-sync --since "$head" --to "$target" 2> /dev/null || true)" ]; then
+    hint=", ingest code changed"
+  fi
+  if ! git merge --ff-only -q "$target"; then ingest_block "the fast-forward of $root to ${target:0:9} failed"; return 0; fi
+  case " $plan " in
+    *" sync "*)
+      if ! uv sync --all-packages --locked; then
+        git reset -q --hard "$head"  # retried next cycle, not left half-synced
+        ingest_block "uv sync failed in the ingest checkout $root"; return 0
+      fi
+      ;;
+  esac
+  rm -f "$state/ingest_sync_blocked"
+  say "ingest checkout moved ${head:0:9} -> ${target:0:9}$hint"
 }
 
 # ---- --init-release: owner-run once -----------------------------------------------------------
