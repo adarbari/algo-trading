@@ -22,3 +22,6 @@ If several apps write data, nobody owns its quality and backtests stop being rep
 ## Consequences
 - Data lineage is simple: every market or feature row traces back to an ingestion run.
 - The API and backtest apps can run with read-only storage credentials when hosted.
+
+## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
+See [0077](0077-serving-release.md): ingestion writes serving releases (`serve-release` job); a persisted response cache is an API write, through `storage/backends`.
