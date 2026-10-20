@@ -427,20 +427,29 @@ class LocalTables:
                 r: _read_file(directory / run_file(r, e), None, None) for r, e in kept.items()
             }
             verify_plan(table, expected, sources, kept, written)
-            swapped = self.commits.swap_runs(directory, expected, kept, self.swap_grace_s)
+            swapped = self.commits.swap_runs(
+                directory, expected, kept, self.swap_grace_s, refuse=self.root / table / HISTORY
+            )
         except BaseException:
             self._discard(directory, fresh.values())
             raise
         if swapped:
             return report
         self._discard(directory, fresh.values())
-        return CompactionReport(before, before, size_before, size_before, 0, "the index moved")
+        copied = (self.root / table / HISTORY).exists()
+        reason = "the table has a history copy" if copied else "the index moved"
+        return CompactionReport(before, before, size_before, size_before, 0, reason)
 
     @staticmethod
+    @staticmethod
     def _discard(directory: Path, names: Collection[str]) -> None:
-        """Delete files written for a swap that did not happen (nothing names them)."""
+        """Delete files written for a swap that did not happen, but never one the index names
+        (whatever raised may have come after the index was written)."""
+        named = {run_file(r, e) for r, e in read_index(directory).items()}
+        named |= {run_file(r, e.prev) for r, e in read_index(directory).items() if e.prev}
         for name in names:
-            (directory / name).unlink(missing_ok=True)
+            if name not in named:
+                (directory / name).unlink(missing_ok=True)
 
     @staticmethod
     def _remove(days: list[Path]) -> None:

@@ -25,7 +25,14 @@ import pandas as pd
 import pyarrow as pa
 
 from algotrade.storage.backends.arrow import concat, table_spec
-from algotrade.storage.backends.run_selection import RunEntry, merge_rows, run_mode, select_runs
+from algotrade.storage.backends.run_selection import (
+    RunEntry,
+    StaleSnapshotError,
+    merge_rows,
+    run_mode,
+    select_runs,
+    visible_entries,
+)
 from algotrade.storage.tables.schemas import table_key
 
 STAMPS = frozenset({"knowledge_ts", "run_id"})
@@ -113,7 +120,8 @@ def plan_compaction(
                 changed.append(n)
             state[k] = dict(zip(merged_columns, row, strict=True))
         new_columns = bool(set(data.column_names) - kept_columns)
-        if not (changed or new_columns or i == len(order) - 1):
+        # a run with an older version stays: a read pinned before it must retry, not mix
+        if not (changed or new_columns or i == len(order) - 1 or entries[run].prev is not None):
             dropped.append(run)
             continue
         kept[run] = data.take(pa.array(changed, pa.int64()))
@@ -170,9 +178,18 @@ def verify_plan(
     cuts: list[pd.Timestamp | None] = [None]
     for entry in entries.values():
         cuts += [entry.visible_from, entry.visible_from - pd.Timedelta(microseconds=1)]
-    for cut in cuts:
-        old = _merged(table, select_runs(entries, cut, "merge"), sources)
-        new = _merged(table, select_runs(kept_entries, cut, "merge"), kept_tables)
+    views = [(entries, kept_entries, cut) for cut in cuts]
+    for upto in sorted({e.seq for e in entries.values() if e.seq is not None}):
+        old_seen = visible_entries(entries, upto)
+        if any(old_seen[r] is not entries[r] for r in old_seen):
+            continue  # an older version of a run is involved: its rows are not loaded here
+        try:
+            views.append((old_seen, visible_entries(kept_entries, upto), None))
+        except StaleSnapshotError:
+            continue  # the read retries at a fresh sequence: it never mixes
+    for old_entries, new_entries, cut in views:
+        old = _merged(table, select_runs(old_entries, cut, "merge"), sources)
+        new = _merged(table, select_runs(new_entries, cut, "merge"), kept_tables)
         old_cols = [] if old is None else old.column_names
         new_cols = [] if new is None else new.column_names
         if set(old_cols) != set(new_cols):

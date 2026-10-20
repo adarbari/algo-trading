@@ -376,6 +376,7 @@ class Commits:
         replacement: dict[str, RunEntry],
         grace_s: float = SWAP_GRACE_S,
         clock: Callable[[], float] = time.time,
+        refuse: Path | None = None,
     ) -> bool:
         """Compare-and-swap one partition's index (ADR 0078): ``replacement`` becomes the index
         only if it still equals ``expected``; -> whether it was swapped. Not a commit: the
@@ -384,7 +385,8 @@ class Commits:
         commit lock and recovers first; ``PartitionBusyError`` when a pending run wrote to the
         partition. The files only ``expected`` named get a modification time that ``sweep`` spares
         for ``grace_s`` from now (a read that resolved them finishes on them): the caller deletes
-        nothing."""
+        nothing. ``refuse``: a path that must not exist (a history copy made since the plan): the
+        swap is not done. The index write is the last step and nothing after it can raise."""
         with held(self._commit_lock()):
             self._recover()
             busy = {
@@ -395,13 +397,15 @@ class Commits:
             if directory in busy:
                 raise PartitionBusyError(str(directory))
             with held(index_lock(directory)):
-                if read_index(directory) != expected:
+                if read_index(directory) != expected or (refuse is not None and refuse.exists()):
                     return False
+                stamp = (
+                    clock() + grace_s - ORPHAN_GRACE_S
+                )  # sweep deletes below now - ORPHAN_GRACE_S
+                for name in _named(expected) - _named(replacement):  # before the swap, best effort
+                    with contextlib.suppress(OSError):
+                        os.utime(directory / name, (stamp, stamp))
                 write_index(directory, replacement)
-            stamp = clock() + grace_s - ORPHAN_GRACE_S  # sweep deletes below now - ORPHAN_GRACE_S
-            for name in _named(expected) - _named(replacement):
-                with contextlib.suppress(FileNotFoundError):
-                    os.utime(directory / name, (stamp, stamp))
             return True
 
     def _forget(self, run_id: str) -> None:
