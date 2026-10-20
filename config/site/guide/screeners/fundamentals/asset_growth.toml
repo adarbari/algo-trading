@@ -27,8 +27,9 @@ url = "https://doi.org/10.1111/j.1540-6261.2008.01370.x"
 note = "Firms with high asset growth earn lower later returns than firms with low asset growth, in large and small stocks alike."
 
 [[sources]]
-title = "Cooper, Gulen and Ion, The Use and Misuse of Investment Measures"
-note = "A working paper on how different investment measures are built and misread."
+title = "Cooper, Gulen and Ion, The Use of Asset Growth in Empirical Asset Pricing Models (2024)"
+url = "https://doi.org/10.1016/j.jfineco.2023.103746"
+note = "Finds most of the asset-growth factor's pricing information sits in inventory and receivables growth, not in capital spending, and ties its strength to shocks to equity financing costs."
 
 [asks]
 security_type = "A common stock or ADR"

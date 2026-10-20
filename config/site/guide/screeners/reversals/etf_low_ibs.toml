@@ -17,10 +17,12 @@ related = [
 
 [[sources]]
 title = "Pagonidis, The IBS Effect: Mean Reversion in Equity ETFs (2013)"
+url = "https://naaim.org/whitepaper/the-ibs-effect-mean-reversion-in-equity-etfs/"
 note = "Reports that ETFs closing near the low of the day tended to rise the next day."
 
 [[sources]]
 title = "Connors and Alvarez, Short Term Trading Strategies That Work (2009)"
+url = "https://openlibrary.org/works/OL19901979W"
 note = "Backtests short-term mean-reversion rules, including buying after a one-day weak close."
 
 [asks]

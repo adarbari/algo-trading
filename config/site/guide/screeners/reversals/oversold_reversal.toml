@@ -31,10 +31,12 @@ note = "Introduces the RSI and the 30 line as the oversold level."
 
 [[sources]]
 title = "Connors and Alvarez, Short Term Trading Strategies That Work"
+url = "https://openlibrary.org/works/OL19901979W"
 note = "Backtests buying oversold pullbacks in stocks that stay above their 200-day average."
 
 [[sources]]
 title = "Raschke and Connors, Street Smarts"
+url = "https://openlibrary.org/works/OL16920438W"
 note = "Describes climax reversals on heavy volume."
 
 [asks]
