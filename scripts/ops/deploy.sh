@@ -2,6 +2,8 @@
 # Update the running site from its release tree (docs/hosting.md, ADRs 0057 and 0079).
 #
 #   var/release/current/scripts/ops/deploy.sh [--dry-run]   manual (the entry point; the main checkout's copy lags): fetch main and do everything (sync, web, restart)
+#   var/release/current/scripts/ops/deploy.sh --only web   manual: only rebuild and swap the web
+#                                       (no uv sync, no API restart)
 #   scripts/ops/deploy.sh --auto        the launchd agent com.algotrade.deploy (every 5 minutes):
 #                                       deploy only what origin/main changed since the last deploy
 #   scripts/ops/deploy.sh --clear       print why auto-deploy is blocked and let it run again
@@ -32,7 +34,7 @@ WEB_ENV_OVERLAY=".env .env.local .env.*.local"
 MIN_FREE_KB=5242880  # 5 GB: the floor of the free-space check (else 3x the tree)
 
 main() {
-  local dry=0 mode=manual clear=0 apply=0 iapply=0 init=0 slot="${ALGOTRADE_DEPLOY_SLOT:-}"
+  local dry=0 mode=manual clear=0 apply=0 iapply=0 init=0 only="" slot="${ALGOTRADE_DEPLOY_SLOT:-}"
   local script
   script="$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")"  # physical: a flip of `current` never moves it
   while [ $# -gt 0 ]; do
@@ -42,15 +44,19 @@ main() {
       --clear) clear=1 ;;
       --init-release) init=1 ;;
       --slot) slot="$2"; shift ;;
+      --only) only="$2"; shift ;;
       --apply) apply=1; mode="$2"; shift ;;
       --ingest-apply) iapply=1; mode="$2"; shift ;;
-      -h | --help) sed -n '2,22p' "$0"; return 0 ;;
+      -h | --help) sed -n '2,24p' "$0"; return 0 ;;
       *) break ;;
     esac
     shift
   done
+  if [ -n "$only" ] && { [ "$only" != web ] || [ "$mode" = auto ]; }; then
+    echo "usage: --only web is the one scoped manual deploy (not with --auto)" >&2; return 2
+  fi
   if [ $# -gt 0 ] && [ "$apply" = 0 ] && [ "$iapply" = 0 ]; then
-    echo "usage: var/release/current/scripts/ops/deploy.sh [--dry-run | --auto | --clear | --init-release] [--slot NAME]" >&2
+    echo "usage: var/release/current/scripts/ops/deploy.sh [--dry-run | --auto | --clear | --init-release | --only web] [--slot NAME]" >&2
     return 2
   fi
 
@@ -118,6 +124,7 @@ main() {
       || { block "deploy-plan failed"; return 1; }
   else
     acts="sync web restart"
+    if [ "$only" = web ]; then acts="web"; fi  # a web rebuild: no sync, no API restart
   fi
 
   # A serving deploy takes the deploy lock alone: nothing it touches is loaded by an ingest.

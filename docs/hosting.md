@@ -157,6 +157,10 @@ var/release/blue/.venv/bin/algotrade-api schedule --agent deploy --tree var/rele
 - **Plists:** when a launchd plist writer changed, the cycle regenerates the agents (with
   `--tree`) into `var/deploy/plists/`, compares them with `~/Library/LaunchAgents/` and notifies
   "reinstall"; it never installs or blocks. Reinstall with the commands each `schedule` prints.
+- `var/release/current/scripts/ops/deploy.sh --only web` is the scoped manual deploy: it moves the
+  tree to the target and rebuilds and swaps only the web (env overlay and bundle check included),
+  with no `uv sync` and no API restart; the web is verified and `last_sha` written. Use it when a
+  diff the auto cycle maps to nothing (scripts, docs) still needs a rebuild.
 - The manual entry point is `var/release/current/scripts/ops/deploy.sh` (the main checkout's copy lags; `--dry-run`, `--clear` too); it deploys the release tree completely: sync,
   web, restart.
 

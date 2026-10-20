@@ -247,6 +247,25 @@ def test_a_manual_deploy_does_everything_and_records_the_commit(site: Site) -> N
     assert (site.web / "index.html").read_text().strip() == "new"
 
 
+def test_only_web_rebuilds_the_web_without_a_sync_or_a_restart(site: Site) -> None:
+    sha = _advance(site.repo, "docs/x.md")  # a diff the auto plan maps to nothing
+    out = site.run("--only", "web")
+    assert out.returncode == 0, out.stdout + out.stderr
+    calls = site.called()
+    assert any(c.startswith("make -C") and "web-build" in c for c in calls)
+    assert not any(c.startswith(("uv sync", "launchctl")) for c in calls)
+    assert any(f"deploy-verify --expect {sha} --check web" in c for c in calls)
+    assert not any("--check api" in c or "--check full" in c for c in calls)
+    assert site.state("last_sha").read_text().strip() == sha and site.served() == sha
+    assert (site.web / "index.html").read_text().strip() == "new"
+    assert site.called()[0].startswith("ingest deploy-hold --deploy-only -- bash ")
+
+
+def test_only_is_manual_and_web_only(site: Site) -> None:
+    assert site.run("--only", "restart").returncode == 2
+    assert site.run("--auto", "--only", "web").returncode == 2
+
+
 def test_a_manual_deploy_that_works_clears_the_block(site: Site) -> None:
     site.state("blocked").parent.mkdir(parents=True)
     site.state("blocked").write_text("old reason\n")
