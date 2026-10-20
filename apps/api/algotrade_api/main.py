@@ -58,6 +58,7 @@ from algotrade.services.read.context import (
     open_context,
     open_stores,
     served_session,
+    use_system_pool,
 )
 from algotrade.services.text_model.model import TextModel
 from algotrade_api import __version__
@@ -90,6 +91,8 @@ ARROW_IO_THREADS = 4
 limit_threads(
     ARROW_CPU_THREADS, ARROW_IO_THREADS
 )  # at import: the process that serves imports this
+# Freed Arrow memory goes back to the OS (mimalloc kept every read's peak: docs/perf/api-memory.md).
+use_system_pool()
 
 
 def _not_found(request: Request, exc: Exception) -> JSONResponse:

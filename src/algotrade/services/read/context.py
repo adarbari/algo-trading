@@ -37,7 +37,7 @@ from algotrade.services.licences import held_by
 from algotrade.services.read.availability.cause import UnavailableKind, table_cause
 from algotrade.services.read.session import Grain, NotFoundError, Session, grain_of, resolve_session
 from algotrade.services.read.values import KIND_OF_CODE, Unknown, UnknownCode
-from algotrade.storage.backends.arrow_memory import limit_threads, release_unused
+from algotrade.storage.backends.arrow_memory import limit_threads, release_unused, use_system_pool
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.runs import RunRecord
@@ -62,6 +62,7 @@ __all__ = [
     "served_session",
     "snapshot_on",
     "stored_dates",
+    "use_system_pool",
 ]
 
 
