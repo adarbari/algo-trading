@@ -46,7 +46,7 @@ const index = {
     { id: 'start', title: 'Start here', purpose: 'p', entries: 4 },
     { id: 'regime', title: 'Market regime', purpose: 'p', entries: 3 },
     { id: 'edges', title: 'Edges', purpose: 'p', entries: 2 },
-    { id: 'playbooks', title: 'Playbooks', purpose: 'p', entries: 3 },
+    { id: 'screeners', title: 'Screeners', purpose: 'p', entries: 3 },
     { id: 'fields', title: 'Fields', purpose: 'p', entries: 11 },
     { id: 'situations', title: 'Situations', purpose: 'p', entries: 2 },
     { id: 'glossary', title: 'Glossary', purpose: 'p', entries: 28 },
@@ -59,12 +59,12 @@ const index = {
     {
       id: 'breakouts',
       title: 'Breakouts',
-      playbooks: [
+      screeners: [
         { id: 'range_breakout', name: 'Range breakout' },
         { id: 'breakout', name: 'Breakout' },
       ],
     },
-    { id: 'income', title: 'Option income', playbooks: [{ id: 'vrp_scanner', name: 'VRP' }] },
+    { id: 'income', title: 'Option income', screeners: [{ id: 'vrp_scanner', name: 'VRP' }] },
   ],
   situations: [
     { name: 'Pending takeover', fields: 12, slug: 'pending-takeover' },
@@ -123,14 +123,14 @@ describe('GuideRail', () => {
       .getAllByRole('link')
       .map((l) => l.textContent)
       .filter((t) =>
-        /^(Overview|Start here|Market regime|Edges|Playbooks|Fields|Situations|Glossary)/.test(t),
+        /^(Overview|Start here|Market regime|Edges|Screeners|Fields|Situations|Glossary)/.test(t),
       );
     expect(top).toEqual([
       'Overview',
       'Start here4',
       'Market regime3',
       'Edges2',
-      'Playbooks3',
+      'Screeners3',
       'Fields11',
       'Situations2',
       'Glossary28',
@@ -162,23 +162,35 @@ describe('GuideRail', () => {
     expect(within(nav).queryByRole('link', { name: /^Slow to update/ })).toBeNull();
   });
 
-  it('opens the playbooks in family order, marking the current one', () => {
-    render(<GuideRail page="playbook" playbook="breakout" />);
+  it('opens the categories in order and the open screener’s category, marking the current one', () => {
+    render(<GuideRail page="screener" screener="breakout" />);
     const nav = screen.getByRole('navigation', { name: 'Guide' });
     expect(
       within(nav)
         .getAllByRole('link')
         .map((l) => l.getAttribute('href'))
-        .filter((h) => h?.startsWith('/guide/playbooks/')),
+        .filter((h) => h?.startsWith('/guide/screeners/')),
     ).toEqual([
-      '/guide/playbooks/range_breakout',
-      '/guide/playbooks/breakout',
-      '/guide/playbooks/vrp_scanner',
+      '/guide/screeners/c/breakouts',
+      '/guide/screeners/range_breakout',
+      '/guide/screeners/breakout',
+      '/guide/screeners/c/income',
     ]);
     expect(within(nav).getByRole('link', { name: 'Breakout' })).toHaveAttribute(
       'aria-current',
       'page',
     );
+  });
+
+  it('marks the open category and lists its screeners, the others stay folded', () => {
+    render(<GuideRail page="screener_category" category="income" />);
+    const nav = screen.getByRole('navigation', { name: 'Guide' });
+    expect(within(nav).getByRole('link', { name: /^Option income/ })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(nav).getByRole('link', { name: 'VRP' })).toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: 'Range breakout' })).toBeNull();
   });
 
   it('opens the indicators then the market falls under Market regime, marking the current one', () => {

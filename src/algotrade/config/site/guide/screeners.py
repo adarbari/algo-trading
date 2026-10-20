@@ -1,0 +1,147 @@
+"""The Guide's screener prose (``config/site/guide/screeners/<family>/<id>.toml``, ADR 0051; spec
+``docs/ui/guide.md`` "The screener page"): one file per site rule-screen preset, kept apart
+from the preset because a preset version is immutable and its explanation is not. Keys:
+``id`` (the file's name), ``version`` (the preset version the prose was written for: a new
+preset version fails a fitness test until the prose is re-read and the number raised),
+``line`` (what the screen asks, in one line: its row on the family's page),
+``summary`` (the page's hero), ``hit`` (what a hit looks like),
+``not_checked`` (what it does not check), ``before_acting`` (the caveats, one string each),
+``related`` (``{id, reason}``: other screeners), ``[[sources]]`` (``title``, ``url``, ``note``;
+``sources.py``) and the ``[asks]`` table (each criterion of the preset's latest version in a
+few plain words, for the criteria table). A text cites a source with the marker ``[^n]``
+(``sources.py``). The family is ``sections.toml``'s and is never repeated here.
+
+The loader checks shape only: known keys, non-empty text, the id matching its file, no related
+id twice or naming itself, every marker naming a source, no secrets. That every site preset has
+exactly one screener, that ``asks`` names exactly the latest version's criteria, that every
+related id exists and that every catalogue name in the prose exists are fitness tests over the
+shipped files."""
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any, Protocol
+
+from algotrade.config.site.fields import Table, reject_secrets
+from algotrade.config.site.guide.sources import GuideSource, check_markers, sources_of
+from algotrade.core.model.errors import ConfigurationError
+
+FOLDER = "guide_screeners"  # the config store's kind: site/guide/screeners/<family>/<id>.toml
+KEYS = (
+    "id",
+    "version",
+    "line",
+    "summary",
+    "hit",
+    "not_checked",
+    "before_acting",
+    "related",
+    "sources",
+    "asks",
+)
+TEXTS = ("summary", "hit", "not_checked")
+RELATED_KEYS = ("id", "reason")
+
+
+class Documents(Protocol):
+    """What the loader needs from a config store (``ConfigStore``)."""
+
+    def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None: ...
+
+    def names(self, scope: str, kind: str) -> list[str]: ...
+
+
+@dataclass(frozen=True)
+class RelatedScreener:
+    """Another screener worth reading next, and why (a few words)."""
+
+    id: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class ScreenerProse:
+    """One screener's prose (module docstring); ``asks`` in file order."""
+
+    id: str
+    version: int
+    line: str
+    summary: str
+    hit: str
+    not_checked: str
+    before_acting: tuple[str, ...]
+    related: tuple[RelatedScreener, ...]
+    sources: tuple[GuideSource, ...]
+    asks: tuple[tuple[str, str], ...]
+
+    def ask(self, criterion: str) -> str | None:
+        """What ``criterion`` asks, in words (``None``: not written)."""
+        return dict(self.asks).get(criterion)
+
+    @classmethod
+    def from_document(cls, name: str, doc: Mapping[str, Any] | None) -> "ScreenerProse":
+        where = f"guide/screeners/<family>/{name}.toml"
+        reject_secrets(doc or {}, where)
+        t = Table(doc, where)
+        t.only(KEYS)
+        if t.line("id") != name:
+            raise ConfigurationError(f"{where} id: expected {name!r} (the file's name)")
+        if t.raw("version") is None:
+            raise ConfigurationError(f"{where} version: required (the preset version written for)")
+        version = t.integer("version", 1, minimum=1)
+        related = tuple(_related(t, name))
+        ids = [r.id for r in related]
+        if len(ids) != len(set(ids)):
+            raise ConfigurationError(f"{where} related: an id listed more than once: {ids}")
+        asks = t.table("asks", t.raw("asks") or {})
+        prose = cls(
+            id=name,
+            version=version,
+            line=t.line("line"),
+            summary=t.line("summary"),
+            hit=t.line("hit"),
+            not_checked=t.line("not_checked"),
+            before_acting=t.lines("before_acting"),
+            related=related,
+            sources=sources_of(t),
+            asks=tuple((key, asks.line(key)) for key in asks.names()),
+        )
+        check_markers(where, prose.texts, len(prose.sources))
+        return prose
+
+    @property
+    def texts(self) -> tuple[str, ...]:
+        """The texts a marker may stand in: summary, hit, not checked and the caveats."""
+        return (self.summary, self.hit, self.not_checked, *self.before_acting)
+
+
+@dataclass(frozen=True)
+class GuideScreeners:
+    """Every screener file, by id (none without files)."""
+
+    screeners: tuple[ScreenerProse, ...] = ()
+
+    def get(self, screener_id: str) -> ScreenerProse | None:
+        return next((p for p in self.screeners if p.id == screener_id), None)
+
+
+def load_guide_screeners(configs: Documents) -> GuideScreeners:
+    """``config/site/guide/screeners/<family>/*.toml`` in file-name order."""
+    names = configs.names("site", FOLDER)
+    return GuideScreeners(
+        tuple(ScreenerProse.from_document(n, configs.load("site", FOLDER, n)) for n in names)
+    )
+
+
+def _related(t: Table, name: str) -> list[RelatedScreener]:
+    raw = t.raw("related") or []
+    if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
+        raise ConfigurationError(f"{t.where} related: expected a list of {{id, reason}} tables")
+    found = []
+    for i, entry in enumerate(raw):
+        row = Table(entry, f"{t.where} related[{i}]")
+        row.only(RELATED_KEYS)
+        related = RelatedScreener(row.line("id"), row.line("reason"))
+        if related.id == name:
+            raise ConfigurationError(f"{row.where} id: a screener is not related to itself")
+        found.append(related)
+    return found

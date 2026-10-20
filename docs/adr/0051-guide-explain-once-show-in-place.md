@@ -45,6 +45,10 @@ its first paragraph where the user is.
    links its explanations to the Guide; the regime explanation written by the text model stays
    where it is (it is about the session's data), with the facts it cites opening their drawers.
 
+## Amendment 2026-10-19
+Playbooks renamed Screeners (section, routes, config folder, GraphQL fields); rename only, no
+decision changed.
+
 ## Consequences
 - The Explore "Field guide" tab becomes a redirect to `/guide/fields` for one release.
 - New work that needs to explain something adds or extends a Guide entry first

@@ -48,8 +48,8 @@ export interface ScreenerDetailProps {
   onDelete: (id: string) => void;
   /** Duplicate one of your screeners, or copy a preset to edit it. */
   onDuplicate: (row: ListRow) => void;
-  /** The link to the preset's playbook, made by the list (a preset's row only). */
-  playbook?: ReactNode;
+  /** The link to the preset's screener, made by the list (a preset's row only). */
+  screener?: ReactNode;
 }
 
 function CriteriaFacts({
@@ -102,7 +102,7 @@ export function ScreenerDetail({
   onOpenEdge,
   onDelete,
   onDuplicate,
-  playbook,
+  screener,
 }: ScreenerDetailProps) {
   const run = summary?.latestRun ?? null;
   const hits = useScreenerResults(
@@ -151,7 +151,7 @@ export function ScreenerDetail({
               {row.kind === 'mine' ? 'Duplicate' : 'Duplicate to edit'}
             </Button>
           )}
-          {row.kind === 'preset' && row.rules && playbook}
+          {row.kind === 'preset' && row.rules && screener}
           {row.kind === 'mine' && (
             <Button
               size="sm"

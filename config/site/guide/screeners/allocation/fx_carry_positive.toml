@@ -1,0 +1,28 @@
+# L3 site setting: the Guide's screener for the site preset fx_carry_positive (ADR 0051; docs/ui/guide.md
+# "The screener page"). Keys and tests as in screeners/trend/momentum_own_trend.toml.
+id = "fx_carry_positive"
+version = 1  # the preset version this prose was written for
+line = "Currency funds whose currency pays higher short-term interest than the dollar."
+summary = "Lists currency ETFs whose currency pays more than the dollar on a 3-month rate, the largest carry first. It is the carry leg of the currency edge."
+hit = "An unleveraged currency fund whose 3-month interbank rate is above the US rate. Only the yen, Australian dollar, Canadian dollar and Swiss franc have a fresh series; the rest are absent."
+not_checked = "It does not test trend, the fund's deposit yield or the forward discount. The euro and pound funds have no rate in the registry yet."
+before_acting = [
+  "Carry pays until a crash. High-yield currencies fall fastest in a risk-off week, so read credit stress beside it.[^1]",
+  "At most four funds can pass, so a list here is a thin choice and not a ranking of the major currencies.",
+  "A list with no names means every carry is negative or missing. The edge holds cash then, which is not an error.",
+]
+related = [
+  { id = "trend_positive_6m", reason = "the momentum leg held beside it" },
+]
+
+[[sources]]
+title = "Menkhoff, Sarno, Schmeling and Schrimpf, Carry trades and global foreign exchange volatility (2012)"
+url = "https://openaccess.city.ac.uk/id/eprint/3391/"
+note = "High-interest currencies lose when global currency volatility jumps, so carry returns pay for that risk."
+
+[asks]
+security_type = "An ETF"
+status = "Still listed and trading"
+not_leveraged = "Not a leveraged fund"
+not_inverse = "Not an inverse fund"
+carry = "A 3-month rate above the US one"

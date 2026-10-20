@@ -10,8 +10,8 @@ description: Add an end-of-day screener (options or equities) that filters and r
 versioned site preset `config/site/presets/screeners/<id>/v<N>.toml` (model it on
 `vrp_scanner/v2.toml`; a missing field is SKIPPED, never a pass) and its sha256 line in
 `architecture/preset_versions.toml` (versions are immutable: change = add `v<N+1>.toml`).
-A new preset goes in a family of `config/site/guide/sections.toml` and gets its playbook
-`config/site/guide/playbooks/<family>/<id>.toml`; a new version updates that file's `[asks]` to its
+A new preset goes in a family of `config/site/guide/sections.toml` and gets its screener
+`config/site/guide/screeners/<family>/<id>.toml`; a new version updates that file's `[asks]` to its
 criteria (`add-guide-content`; fitness tests fail otherwise). A formula the criteria need is an expression feature (`add-feature`). Check it with
 `algotrade-backtest config validate <id>`; a test goes with it. Write a **Python screener**
 (steps below) only when the rules cannot express it; say why in the PR.
@@ -62,7 +62,7 @@ Owners are listed in `architecture/*_ownership.toml`.
 - **Every new feature column ships its field-guide entry**, whether or not a screen reads it
   (`scripts/features_doc.py` lists unguided fields).
 - **Guide text**: sentences under 30 words, no banned words (`tests/unit/config/site/guide/test_style.py`,
-  not mapped by `make changed`: run it); a playbook folder holds at most 12 files.
+  not mapped by `make changed`: run it); a screener folder holds at most 12 files.
 - **After a merge of main**: recount preset and screener test totals as the SUM; on a
   `benchmarks/baseline.json` conflict take main's, then `make baseline`, never hand-edit. Run
   `git fetch origin main` before every merge, never merge a local copy.

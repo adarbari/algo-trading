@@ -1,0 +1,42 @@
+# L3 site setting: the Guide's screener for the site preset momentum_pullback_entry (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other screeners), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "momentum_pullback_entry"
+version = 1  # the preset version this prose was written for
+line = "Past-year winners in an uptrend that dipped slightly below their 20-day average."
+summary = "Finds past-year winners in a stacked uptrend that have dipped one to two ATRs under their 20-day average, ranked by 12-1 momentum.[^1] It tests whether a dip is a better entry into momentum than the month-end ranking alone."
+hit = "The name closes above $5, trades at least $50M a day, has positive 12-1 momentum, sits in an UPTREND with the EMAs stacked BULL, and its close is between 1 and 2 ATRs below its 20-day average."
+not_checked = "It does not check why the name dipped, earnings dates or market breadth, and it does not confirm that the dip has ended. It is momentum with an entry timing rule, not a new signal.[^2]"
+before_acting = [
+  "A dip after a gap down reads as a pullback while the ATR widens: check rollup.price_moves@v1.one_day_move.",
+  "A dip one to two ATRs deep can be the start of a larger turn; read feature.dist_to_support_atr before assuming a floor.",
+  "Few names pass on any one day, so the month-end test sees a small list; judge the result by its count of sessions.",
+]
+related = [
+  { id = "pullback", reason = "the chart-based pullback screen" },
+  { id = "momentum_12_1", reason = "the ranking this times" },
+]
+
+[[sources]]
+title = "Connors and Alvarez, Short Term Trading Strategies That Work (2009)"
+note = "Backtests short-term mean-reversion rules, including buying after a one-day weak close."
+
+[[sources]]
+title = "Han, Zhou and Zhu, A Trend Factor (2016)"
+url = "https://ideas.repec.org/a/eee/jfinec/v122y2016i2p352-375.html"
+note = "Builds a trend factor from moving averages of several lengths and finds it adds to momentum."
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+mom_12_1 = "A past-year winner: positive 12-1 momentum"
+trend = "In an uptrend"
+ema_stack = "Averages stacked in uptrend order"
+pulled_back = "1 to 2 ATR below its 20-day average"

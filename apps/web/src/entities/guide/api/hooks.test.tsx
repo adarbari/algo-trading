@@ -5,8 +5,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { gql } from '@/shared/api';
 
-import { useGuideField, useGuideIndex, useGuidePlaybook, useGuideSituation } from './hooks';
+import { useGuideField, useGuideIndex, useGuideScreener, useGuideSituation } from './hooks';
 import { useGuideEdge, useGuideEdgeIndex, useGuideMechanism } from './edges';
+import { useGuideScreenerCategory, useGuideScreenerIndex } from './screeners';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -69,10 +70,36 @@ describe('guide hooks', () => {
     expect(result.current.mechanism.data?.id).toBe('m');
   });
 
+  it('reads the Screeners lead page and a family’s page by id, each in its own query', async () => {
+    GQL.mockClear();
+    GQL.mockResolvedValue({
+      guideScreenerIndex: { count: 3, categories: [] },
+      guideScreenerCategory: { id: 'trend', screeners: [] },
+    });
+    const { result } = renderHook(
+      () => ({ index: useGuideScreenerIndex(), category: useGuideScreenerCategory('trend') }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.index.isSuccess && result.current.category.isSuccess).toBe(true);
+    });
+    const asked = GQL.mock.calls.map(([document, variables]) => [String(document), variables]);
+    expect(asked.some(([d]) => String(d).includes('query GuideScreenerIndex'))).toBe(true);
+    expect(
+      asked.some(
+        ([d, v]) =>
+          String(d).includes('query GuideScreenerCategory') &&
+          JSON.stringify(v) === '{"id":"trend"}',
+      ),
+    ).toBe(true);
+    expect(result.current.index.data?.count).toBe(3);
+    expect(result.current.category.data?.id).toBe('trend');
+  });
+
   it('reads a field’s derived parts by name, and nothing without one', async () => {
     GQL.mockClear();
     GQL.mockResolvedValue({
-      guideField: { related: ['feature.y'], playbooks: [], situations: [] },
+      guideField: { related: ['feature.y'], screeners: [], situations: [] },
     });
     const idle = renderHook(() => useGuideField(null), { wrapper });
     expect(idle.result.current.fetchStatus).toBe('idle');
@@ -86,16 +113,16 @@ describe('guide hooks', () => {
     expect(variables).toEqual({ name: 'feature.x' });
   });
 
-  it('reads a playbook by its preset id', async () => {
+  it('reads a screener by its preset id', async () => {
     GQL.mockClear();
-    GQL.mockResolvedValue({ guidePlaybook: { id: 'breakout', criteria: [] } });
-    const { result } = renderHook(() => useGuidePlaybook('breakout'), { wrapper });
+    GQL.mockResolvedValue({ guideScreener: { id: 'breakout', criteria: [] } });
+    const { result } = renderHook(() => useGuideScreener('breakout'), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
     expect(result.current.data?.id).toBe('breakout');
     const [document, variables] = GQL.mock.calls[0] ?? [];
-    expect(String(document)).toContain('query GuidePlaybook');
+    expect(String(document)).toContain('query GuideScreener');
     expect(variables).toEqual({ id: 'breakout' });
   });
 

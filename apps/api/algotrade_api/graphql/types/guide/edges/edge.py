@@ -106,14 +106,14 @@ class GuideEdgeFact:
         return cls(key=d.key, title=d.title, text=d.text, term=d.term)
 
 
-@strawberry.type(description="A site playbook among an edge's screeners: id, name and family")
-class GuideEdgePlaybook:
+@strawberry.type(description="A site screener among an edge's screeners: id, name and family")
+class GuideEdgeScreener:
     id: str
     name: str
     family: str | None
 
     @classmethod
-    def of(cls, d: edge.GuideEdgePlaybook) -> Self:
+    def of(cls, d: edge.GuideEdgeScreener) -> Self:
         return cls(id=d.id, name=d.name, family=d.family)
 
 
@@ -135,7 +135,7 @@ class GuideEdgeSource:
     description="A site edge's Guide page (ADR 0051), from its document alone: `summary` (the "
     "row), the mechanism page, the thesis, who is on `otherSide`, why it `lasts`, the `research` "
     "figure with its planning haircut (null: the document has none), how it is tested "
-    "(`tests`), how it is built (the site `playbooks` among its screeners and the catalogue "
+    "(`tests`), how it is built (the site `screeners` among its screeners and the catalogue "
     "`fields` their criteria read), what fools it (`failureModes`, `decoys`, `rejection`: why a "
     "rejected or blocked edge is), what it costs to trade (`capacity`), `sources`, `related` "
     "edges and the mechanism's glossary terms (`seeAlso`). Null text: not written"
@@ -148,7 +148,7 @@ class GuideEdgeEntry:
     lasts: GuideProse
     research: GuideEdgeResearch | None
     tests: list[GuideEdgeFact]
-    playbooks: list[GuideEdgePlaybook]
+    screeners: list[GuideEdgeScreener]
     fields: list[str]
     failure_modes: GuideProse | None
     decoys: GuideProse | None
@@ -168,7 +168,7 @@ class GuideEdgeEntry:
             lasts=GuideProse.of(d.lasts),
             research=GuideEdgeResearch.of(d.research) if d.research is not None else None,
             tests=[GuideEdgeFact.of(f) for f in d.tests],
-            playbooks=[GuideEdgePlaybook.of(p) for p in d.playbooks],
+            screeners=[GuideEdgeScreener.of(p) for p in d.screeners],
             fields=list(d.fields),
             failure_modes=_prose(d.failure_modes),
             decoys=_prose(d.decoys),

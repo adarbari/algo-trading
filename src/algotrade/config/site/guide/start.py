@@ -26,7 +26,7 @@ FOLDER = "guide"  # the config store's kind: site/guide/start.toml
 NAME = "start"
 ID = re.compile(r"^[a-z0-9_]+$")  # a written entry's id: snake_case, as every Guide id
 ENTRY_KINDS = (
-    "start", "indicator", "episode", "mechanism", "edge", "playbook", "field", "situation",
+    "start", "indicator", "episode", "mechanism", "edge", "screener", "field", "situation",
     "term",
 )  # fmt: skip
 PAGE_KEYS = ("id", "order", "title", "summary", "section", "links")

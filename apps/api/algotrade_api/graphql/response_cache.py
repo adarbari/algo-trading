@@ -67,7 +67,9 @@ SHARED_OPERATIONS: frozenset[str] = frozenset(
         "GuideIndex",
         "GuideMechanism",
         "GuideMechanisms",
-        "GuidePlaybookEdges",
+        "GuideScreenerEdges",
+        "GuideScreenerIndex",  # site presets and Guide files: the same for every caller
+        "GuideScreenerCategory",
         "GuideEdge",
         "GuideEdgeIndex",  # site edge documents and mechanism files: the same for every caller
         "InstrumentPrices",
@@ -99,7 +101,7 @@ USER_OPERATIONS: frozenset[str] = frozenset(
         "GuideField",
         "GuideHelpField",
         "GuideIndicator",
-        "GuidePlaybook",
+        "GuideScreener",
         "GuideSituation",
         "GuideStartPage",
         "GuideTerm",

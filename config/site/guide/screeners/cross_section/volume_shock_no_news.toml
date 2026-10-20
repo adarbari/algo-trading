@@ -1,0 +1,33 @@
+# L3 site setting: the Guide's screener for the site preset volume_shock_no_news (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other screeners), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "volume_shock_no_news"
+version = 1  # the preset version this prose was written for
+line = "Unusually heavy trading with no filing or earnings report to explain it."
+summary = "Finds liquid stocks with unusually high volume and no filing or earnings report to explain it, biggest shock first.[^1] The idea is that volume with no public reason is informed accumulation, and it is a hypothesis, not a published rule."
+hit = "The name is a listed stock closing above $5 that trades at least $50M a day, with volume at least two standard deviations above its last 20 sessions, no 8-K or 8-K/A filed through the previous session in the last 5, and no earnings report touching them."
+not_checked = "It sees only filings and earnings: press news, analyst calls and index changes are invisible. It is unknown for names the filings walk or a full backfill read of the company's filings has not covered."
+before_acting = [
+  "The no-news flag is unknown until a filings walk or the filings backfill's read of the company covers the session: a name without it never passes.",
+  "Press headlines are not stored, so a news-driven shock still passes if no filing came with it.",
+]
+related = [
+  { id = "volume_shock", reason = "every volume shock, news or not" },
+]
+
+[[sources]]
+title = "Gervais, Kaniel and Mingelgrin, The High-Volume Return Premium (2001)"
+url = "https://ideas.repec.org/a/bla/jfinan/v56y2001i3p877-919.html"
+note = "Stocks with unusually high trading volume over a day or week tend to rise over the next month."
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+volume_shock_no_news = "A volume shock with no 8-K and no earnings report in the last 5 sessions"

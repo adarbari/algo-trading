@@ -1,5 +1,5 @@
 """``Query.guideIndex`` over the repo's site configs (ADR 0051): the sections in the spec's
-order with their entry counts, the theme groups, intents, situations, playbooks by family and
+order with their entry counts, the theme groups, intents, situations, screeners by family and
 the regime indicators and episodes."""
 
 from typing import Any
@@ -11,7 +11,7 @@ INDEX = """{ guideIndex {
   themeGroups { id title themes { theme fields } }
   intents { intent fields }
   situations { name fields }
-  families { id title playbooks { id name } }
+  families { id title screeners { id name } }
   indicators { key plainName }
   episodes { key name }
 } }"""
@@ -27,7 +27,7 @@ def _index(graph: Graph) -> dict[str, Any]:
 def test_the_guide_index_in_the_spec_order(graph: Graph) -> None:
     index = _index(graph)
     assert [s["id"] for s in index["sections"]] == [
-        "start", "regime", "edges", "playbooks", "fields", "situations", "glossary",
+        "start", "regime", "edges", "screeners", "fields", "situations", "glossary",
     ]  # fmt: skip
     counts = {s["id"]: s["entries"] for s in index["sections"]}
     assert counts["fields"] == sum(t["fields"] for g in index["themeGroups"] for t in g["themes"])
@@ -35,7 +35,7 @@ def test_the_guide_index_in_the_spec_order(graph: Graph) -> None:
     assert counts["regime"] == len(index["indicators"]) + len(index["episodes"])
     assert [g["id"] for g in index["themeGroups"]] == ["tradeable", "chart", "options", "company"]
     trend = index["families"][0]
-    assert (trend["title"], [p["id"] for p in trend["playbooks"]]) == (
+    assert (trend["title"], [p["id"] for p in trend["screeners"]]) == (
         "Trend", ["trend_continuation", "pullback", "momentum_12_1", "size_small", "ivol_high",
                   "max_ret_high", "amihud_illiquid", "beta_low", "etf_flow_pressure",
                   "momentum_own_trend", "momentum_pullback_entry", "momentum_volume_confirmed"],

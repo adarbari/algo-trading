@@ -167,7 +167,7 @@ const EDGE = {
     { key: 'outcome', title: 'Outcome', text: 'Excess return over SPY', term: 'unknown' },
     { key: 'universe', title: 'Universe', text: 'Common stocks above $5', term: null },
   ],
-  playbooks: [{ id: 'vrp_scanner', name: 'VRP scanner', family: 'Option income' }],
+  screeners: [{ id: 'vrp_scanner', name: 'VRP scanner', family: 'Option income' }],
   fields: ['rollup.iv30@v1.iv30'],
   failureModes: prose('A fiscal-year change looks like news and is not.'),
   decoys: prose('Plain momentum or size.'),
@@ -184,7 +184,7 @@ const EDGE = {
   seeAlso: ['unknown'],
 };
 
-/** The edges a playbook implements (`GuidePlaybookDetail.edges`). */
+/** The edges a screener implements (`GuideScreenerDetail.edges`). */
 export const VRP_EDGES = [
   {
     id: 'earnings_date_advance',
@@ -209,7 +209,7 @@ export function guideEdge(id: string): Json {
   return { data: { guideEdge: id === row()['id'] ? EDGE : null } };
 }
 
-/** `Query.guidePlaybook(id) { edges }`. */
-export function guidePlaybookEdges(id: string): Json {
-  return { data: { guidePlaybook: { edges: id === 'vrp_scanner' ? VRP_EDGES : [] } } };
+/** `Query.guideScreener(id) { edges }`. */
+export function guideScreenerEdges(id: string): Json {
+  return { data: { guideScreener: { edges: id === 'vrp_scanner' ? VRP_EDGES : [] } } };
 }

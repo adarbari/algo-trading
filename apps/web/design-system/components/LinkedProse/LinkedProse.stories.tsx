@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { Stack } from '../../primitives/Stack';
+import { narrow } from '../../testing';
 import { LinkedProse, type LinkedProsePart } from './LinkedProse';
 
 const CAVEAT: LinkedProsePart[] = [
@@ -38,7 +39,7 @@ export const SansLinks: Story = {
     monoLinks: false,
     parts: [
       { text: 'Whether the break holds is the job of ' },
-      { text: 'Failed breakout', href: '/guide/playbooks/failed_breakout' },
+      { text: 'Failed breakout', href: '/guide/screeners/failed_breakout' },
       { text: '.' },
     ],
   },
@@ -48,6 +49,22 @@ export const SansLinks: Story = {
 export const NoLinks: Story = {
   args: { parts: [{ text: 'The guide names no field here.' }], tone: 'secondary', size: 'sm' },
 };
+
+/** A source marker is a small raised number that points at its entry in the page's source list. */
+export const SourceMarkers: Story = {
+  args: {
+    parts: [
+      { text: 'Winners kept winning for months in every market tested.' },
+      { text: '[1]', href: '#s1', cite: true },
+      { text: ' The effect is weaker after costs.' },
+      { text: '[2]', href: '#s2', cite: true },
+      { text: '[3]', href: '#s3', cite: true },
+    ],
+  },
+};
+
+/** At phone width the markers wrap with the paragraph. */
+export const Narrow: Story = { ...SourceMarkers, decorators: [narrow] };
 
 /** A list of short caveats at the small size. */
 export const Dense: Story = {

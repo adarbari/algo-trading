@@ -1,0 +1,34 @@
+# L3 site setting: the Guide's screener for the site preset beta_low (ADR 0051; docs/ui/guide.md
+# "The screener page"). A decoy of the edge harness's battery (verdict.toml [decoys], ADR 0053
+# amendment 2026-10-18): a yardstick, not a trade idea. Keys as size_small.toml.
+id = "beta_low"
+version = 1  # the preset version this prose was written for
+line = "Stocks ranked by market beta, lowest first, as a yardstick for other screens."
+summary = "Ranks every tradeable stock by its market beta, lowest first (the low-beta anomaly).[^1][^2] It is a yardstick, not a trade idea: an edge whose picks are defensive names must do better than simply buying the lowest-beta stocks."
+hit = "The name is a listed common stock or ADR closing above $3 that trades at least $2M a day, and the four-factor regression ran for it. Every such name qualifies; the order is the point, lowest beta first."
+not_checked = "It does not check downside behaviour, quality or valuation. It is a decoy of the edge harness's battery, not a trade signal."
+before_acting = [
+  "A low beta is average co-movement, not safety: a low-beta name can fall as much as the market in a panic.",
+  "The low-beta group is mostly utilities and staples: check the sector mix before crediting the edge with anything else.",
+]
+related = [
+  { id = "ivol_high", reason = "the idiosyncratic-volatility decoy" },
+  { id = "size_small", reason = "another decoy every edge is compared with" },
+]
+
+[[sources]]
+title = "Black, Jensen and Scholes, The Capital Asset Pricing Model: Some Empirical Tests (1972)"
+url = "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=908569"
+note = "Tests the market model on NYSE stocks from 1926 to 1965 and finds low-beta stocks earned more than it predicts."
+
+[[sources]]
+title = "Frazzini and Pedersen, Betting Against Beta (2014)"
+url = "https://doi.org/10.1016/j.jfineco.2013.10.005"
+note = "Shows high-beta assets earned lower risk-adjusted returns, which it ties to investors who cannot borrow to leverage."
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $3"
+adv = "Trades at least $2M a day"
+beta = "Has a four-factor market beta"

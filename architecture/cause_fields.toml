@@ -86,8 +86,12 @@ name = "Episode.notes"
 reason = "reference-episode prose written by the owner (site config)"
 
 [[fact]]
-name = "GuideRelatedPlaybook.reason"
-reason = "why the Guide relates a playbook to a field (site config prose)"
+name = "GuideRelatedScreener.reason"
+reason = "why the Guide relates a screener to a field (site config prose)"
+
+[[fact]]
+name = "GuideScreenerSource.note"
+reason = "what a cited source shows, Guide prose written by the owner (site config)"
 
 [[fact]]
 name = "Backtest.metrics"

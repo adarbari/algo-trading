@@ -3,7 +3,7 @@
  * server ranks), and under it the sections with their entry counts from the server, in the
  * spec's order (Start here first, Glossary last); Fields expands to its themes, and the theme of
  * the current field to its fields; Start here, Market regime (indicators, then market falls),
- * Playbooks (in family order) and Situations list their pages while one of theirs is open;
+ * Screeners (the categories in order, the open category's screeners under it) and Situations list their pages while one of theirs is open;
  * Edges lists the mechanisms and, after them, the ideas not built on its pages.
  */
 import { NavList, Stack, type NavListItem } from '@algotrade/ui';
@@ -24,13 +24,14 @@ import {
   GUIDE_FIELDS_PATH,
   GUIDE_GLOSSARY_PATH,
   GUIDE_PATH,
-  GUIDE_PLAYBOOKS_PATH,
+  GUIDE_SCREENERS_PATH,
   GUIDE_REGIME_PATH,
   GUIDE_SITUATIONS_PATH,
   GUIDE_START_PATH,
   indicatorPath,
   mechanismPath,
-  playbookPath,
+  screenerCategoryPath,
+  screenerPath,
   situationPath,
   startPath,
   themeTitle,
@@ -49,8 +50,9 @@ export interface GuideRailProps {
     | 'home'
     | 'fields'
     | 'field'
-    | 'playbooks'
-    | 'playbook'
+    | 'screeners'
+    | 'screener_category'
+    | 'screener'
     | 'situations'
     | 'situation'
     | 'regime'
@@ -67,8 +69,10 @@ export interface GuideRailProps {
   theme?: string | undefined;
   /** The field whose page is open (catalogue name). */
   field?: string | undefined;
-  /** The playbook whose page is open (the preset id). */
-  playbook?: string | undefined;
+  /** The screener family whose page is open (its id). */
+  category?: string | undefined;
+  /** The screener whose page is open (the preset id). */
+  screener?: string | undefined;
   /** The situation whose page is open (its slug). */
   situation?: string | undefined;
   /** The regime indicator whose page is open (its key). */
@@ -85,7 +89,8 @@ export function GuideRail({
   page,
   theme,
   field,
-  playbook,
+  category,
+  screener,
   situation,
   indicator,
   episode,
@@ -138,21 +143,36 @@ export function GuideRail({
       }),
   });
 
-  const playbooksSection = (s: { title: string; entries: number }): NavListItem => ({
-    href: GUIDE_PLAYBOOKS_PATH,
+  const onScreeners = page === 'screeners' || page === 'screener_category' || page === 'screener';
+  // The open category: the page's own, or the family of the open screener.
+  const openCategory =
+    page === 'screener'
+      ? index.data?.families.find((f) => f.screeners.some((p) => p.id === screener))?.id
+      : category;
+
+  const screenersSection = (s: { title: string; entries: number }): NavListItem => ({
+    href: GUIDE_SCREENERS_PATH,
     label: s.title,
     count: s.entries,
-    current: page === 'playbooks',
-    children:
-      page === 'playbooks' || page === 'playbook'
-        ? (index.data?.families ?? [])
-            .flatMap((f) => f.playbooks)
-            .map((p) => ({
-              href: playbookPath(p.id),
-              label: p.name,
-              current: page === 'playbook' && p.id === playbook,
-            }))
-        : [],
+    current: page === 'screeners',
+    children: onScreeners
+      ? (index.data?.families ?? [])
+          .filter((f) => f.screeners.length > 0)
+          .map((f) => ({
+            href: screenerCategoryPath(f.id),
+            label: f.title,
+            count: f.screeners.length,
+            current: page === 'screener_category' && f.id === category,
+            children:
+              f.id === openCategory
+                ? f.screeners.map((p) => ({
+                    href: screenerPath(p.id),
+                    label: p.name,
+                    current: page === 'screener' && p.id === screener,
+                  }))
+                : [],
+          }))
+      : [],
   });
 
   const situationsSection = (s: { title: string; entries: number }): NavListItem => ({
@@ -239,7 +259,7 @@ export function GuideRail({
     glossary: glossarySection,
     regime: regimeSection,
     edges: edgesSection,
-    playbooks: playbooksSection,
+    screeners: screenersSection,
     fields: fieldsSection,
     situations: situationsSection,
   };

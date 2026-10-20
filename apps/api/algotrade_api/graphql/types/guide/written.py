@@ -39,7 +39,7 @@ class GuideStartSection:
 
 
 @strawberry.type(
-    description="A Guide entry a page links to: `kind` (start, indicator, episode, playbook, "
+    description="A Guide entry a page links to: `kind` (start, indicator, episode, screener, "
     "field, situation or term), `id` (its page's key: a field's catalogue name, a situation's "
     "slug) and its title"
 )

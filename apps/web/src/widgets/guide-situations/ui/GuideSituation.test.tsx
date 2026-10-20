@@ -28,7 +28,7 @@ const situation = {
     ],
   },
   affects: [volume, 'feature.atr_ratio_5_20'],
-  playbooks: [{ id: 'breakout', name: 'Breakout', fields: [volume] }],
+  screeners: [{ id: 'breakout', name: 'Breakout', fields: [volume] }],
 };
 
 const index = {
@@ -65,18 +65,18 @@ describe('GuideSituation', () => {
     ]);
   });
 
-  it('links the playbooks it affects, with the fields they read', () => {
+  it('links the screeners it affects, with the fields they read', () => {
     render(<GuideSituation slug="earnings-gap" />);
-    const playbooks = within(screen.getByRole('region', { name: 'Playbooks it affects' }));
-    expect(playbooks.getByRole('link', { name: 'Breakout' })).toHaveAttribute(
+    const screeners = within(screen.getByRole('region', { name: 'Screeners it affects' }));
+    expect(screeners.getByRole('link', { name: 'Breakout' })).toHaveAttribute(
       'href',
-      '/guide/playbooks/breakout',
+      '/guide/screeners/breakout',
     );
-    expect(playbooks.getByText(`reads ${volume}`)).toBeInTheDocument();
+    expect(screeners.getByText(`reads ${volume}`)).toBeInTheDocument();
   });
 
   it('says so when no site screen reads a field it fools', () => {
-    hooks.useGuideSituation.mockReturnValue(fakeQuery({ ...situation, playbooks: [] }));
+    hooks.useGuideSituation.mockReturnValue(fakeQuery({ ...situation, screeners: [] }));
     render(<GuideSituation slug="earnings-gap" />);
     expect(screen.getByText('No site screen reads a field it fools.')).toBeInTheDocument();
   });

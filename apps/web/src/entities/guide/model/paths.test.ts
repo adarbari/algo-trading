@@ -12,7 +12,8 @@ import {
   indicatorPath,
   mechanismPath,
   parseFieldsSearch,
-  playbookPath,
+  screenerCategoryPath,
+  screenerPath,
   screenerBuilderPath,
   screenerResultsPath,
   situationPath,
@@ -22,8 +23,9 @@ import {
 } from './paths';
 
 describe('guide paths', () => {
-  it('builds the playbook, situation and screener paths, encoding what is in them', () => {
-    expect(playbookPath('breakout')).toBe('/guide/playbooks/breakout');
+  it('builds the screener, situation and screener paths, encoding what is in them', () => {
+    expect(screenerPath('breakout')).toBe('/guide/screeners/breakout');
+    expect(screenerCategoryPath('options_signals')).toBe('/guide/screeners/c/options_signals');
     expect(situationPath('earnings-gap')).toBe('/guide/situations/earnings-gap');
     expect(screenerResultsPath('my screen')).toBe('/screeners/my%20screen');
     expect(screenerBuilderPath('breakout')).toBe('/screeners/breakout/edit');
@@ -47,7 +49,7 @@ describe('guide paths', () => {
       'start',
       'regime',
       'edges',
-      'playbooks',
+      'screeners',
       'fields',
       'situations',
       'glossary',
@@ -63,7 +65,7 @@ describe('guide paths', () => {
     expect(guideEntryPath('start', 'how_the_app_thinks')).toBe('/guide/start/how_the_app_thinks');
     expect(guideEntryPath('term', 'session')).toBe('/guide/glossary/session');
     expect(guideEntryPath('field', 'a@v1.b')).toBe('/guide/fields/a%40v1.b');
-    expect(guideEntryPath('playbook', 'breakout')).toBe('/guide/playbooks/breakout');
+    expect(guideEntryPath('screener', 'breakout')).toBe('/guide/screeners/breakout');
     expect(guideEntryPath('situation', 'earnings-gap')).toBe('/guide/situations/earnings-gap');
     expect(guideEntryPath('indicator', 'k')).toBe('/guide/regime/indicators/k');
     expect(guideEntryPath('episode', 'gfc')).toBe('/guide/regime/episodes/gfc');

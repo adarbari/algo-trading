@@ -1,0 +1,36 @@
+# L3 site setting: the Guide's screener for the site preset momentum_x_quality_interaction (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Typed by src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "momentum_x_quality_interaction"
+version = 1  # the preset version this prose was written for
+line = "Last year's winners among companies with above-median quality, best gain first."
+summary = "Ranks the names with an above-median quality score by their 12-1 return,[^1] momentum screened for quality as practitioners combine them.[^2] It keeps out the weak balance sheets that drive momentum crashes. It is a candidate edge under test."
+hit = "The name is a listed stock, ADR or ETF closing above $5 that trades at least $50M a day, has a quality score of at least 0.5, and has a 12-1 momentum value. The strongest momentum ranks first."
+not_checked = "It does not check value, and it leaves out every name without enough statements for a quality score (new listings, many banks and funds). The harness measures whether the combination pays."
+before_acting = [
+  "The quality score, rollup.mispricing@v1.quality_score, averages six percentile ranks: a 0.5 is the middle of the market, not a good business.",
+  "Quality names that lead are often the crowded winners of the year; check the size and the sector before acting.",
+]
+related = [
+  { id = "momentum_12_1", reason = "the same ranking with no quality filter" },
+]
+
+[[sources]]
+title = "Asness, Moskowitz and Pedersen, Value and Momentum Everywhere (2013)"
+url = "https://pages.stern.nyu.edu/~lpederse/papers/ValMomEverywhere.pdf"
+note = "Value and momentum premia appear in eight markets and asset classes, and the two are negatively correlated."
+
+[[sources]]
+title = "Asness, Frazzini and Pedersen, Quality Minus Junk (2019)"
+url = "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2312432"
+note = "High-quality stocks, meaning profitable, growing and safe, earn higher risk-adjusted returns than low-quality stocks."
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+quality = "Has a quality score of at least 0.5 (above the median)"
+mom_12_1 = "Has a 12-1 momentum value"

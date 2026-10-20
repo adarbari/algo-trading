@@ -158,7 +158,7 @@ const derived = {
     },
   ],
   related: [SQUEEZE],
-  playbooks: [
+  screeners: [
     {
       id: 'breakout',
       name: 'Breakout',
@@ -306,16 +306,16 @@ describe('GuideField sections', () => {
     expect(within(sources).getByText('Bollinger (2001)')).toBeInTheDocument();
   });
 
-  it('links related fields and the playbooks that use it to their pages', () => {
+  it('links related fields and the screeners that use it to their pages', () => {
     setup();
-    const related = screen.getByRole('region', { name: 'Related fields and playbooks' });
+    const related = screen.getByRole('region', { name: 'Related fields and screeners' });
     expect(within(related).getByRole('link', { name: SQUEEZE })).toHaveAttribute(
       'href',
       `/guide/fields/${encodeURIComponent(SQUEEZE)}`,
     );
     expect(within(related).getByRole('link', { name: 'Breakout' })).toHaveAttribute(
       'href',
-      '/guide/playbooks/breakout',
+      '/guide/screeners/breakout',
     );
     expect(within(related).getByText('lte 0.1 soft')).toBeInTheDocument();
   });
@@ -364,7 +364,7 @@ describe('GuideField sections', () => {
         readsLinked: null,
         caveatsLinked: [],
         related: [],
-        playbooks: [],
+        screeners: [],
         situations: [],
       }),
     );

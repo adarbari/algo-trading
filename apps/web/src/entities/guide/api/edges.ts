@@ -67,16 +67,16 @@ export function useGuideMechanisms() {
   });
 }
 
-/** The site edges a playbook implements (empty for an unknown playbook). */
-export function useGuidePlaybookEdges(id: string) {
+/** The site edges a screener implements (empty for an unknown screener). */
+export function useGuideScreenerEdges(id: string) {
   const variables = { id };
   return useQuery({
-    queryKey: queryKeys.gql('GuidePlaybookEdges', variables),
+    queryKey: queryKeys.gql('GuideScreenerEdges', variables),
     queryFn: async () => {
-      const { GuidePlaybookEdgesQuery } = await import('./edges-doc');
-      return gql(GuidePlaybookEdgesQuery, variables);
+      const { GuideScreenerEdgesQuery } = await import('./edges-doc');
+      return gql(GuideScreenerEdgesQuery, variables);
     },
-    select: (data) => data.guidePlaybook?.edges ?? [],
+    select: (data) => data.guideScreener?.edges ?? [],
     staleTime: GUIDE_STALE_MS,
   });
 }

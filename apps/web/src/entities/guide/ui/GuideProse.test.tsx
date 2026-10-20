@@ -34,6 +34,24 @@ describe('GuideProse', () => {
     );
   });
 
+  it('turns a source marker into a raised [n] linking to that source of the page', () => {
+    const cited = {
+      segments: [
+        { text: 'Winners persist.' },
+        { text: '[^2]', source: 2 },
+        { text: ' Costs bite.', field: null, source: null },
+      ],
+    };
+    expect(proseParts(cited)).toEqual([
+      { text: 'Winners persist.' },
+      { text: '[2]', href: '#s2', cite: true },
+      { text: ' Costs bite.' },
+    ]);
+    const { container } = render(<GuideProse prose={cited} />);
+    expect(container.textContent).toBe('Winners persist.[2] Costs bite.');
+    expect(screen.getByRole('link', { name: '[2]' })).toHaveAttribute('href', '#s2');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(<GuideProse prose={PROSE} size="sm" tone="secondary" />);
     await expectNoA11yViolations(container);

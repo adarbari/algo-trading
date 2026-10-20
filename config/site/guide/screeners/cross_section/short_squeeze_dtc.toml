@@ -1,0 +1,37 @@
+# L3 site setting: the Guide's screener for the site preset short_squeeze_dtc (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys as in tender_offer_filed.toml; typed by src/algotrade/config/site/guide/screeners.py.
+id = "short_squeeze_dtc"
+version = 1  # the preset version this prose was written for
+line = "Stocks with many shares sold short and several days of trading to cover."
+summary = "Finds liquid stocks with a crowded short: 5% or more of the shares sold short and three or more days of volume to cover. Studies find these names lag the market.[^1][^2] It is a candidate edge under test."
+hit = "The name is a common stock closing above $5 that trades at least $5M a day, with 5% or more of its shares outstanding short and FINRA's days to cover at 3 or more. The highest days to cover ranks last."
+not_checked = "It does not know the borrow cost or whether shares can be borrowed, the float, or a catalyst. It does not see a squeeze already under way, and the figure is about two weeks old."
+before_acting = [
+  "The short interest is as of a settlement date about two weeks before it became public: read rollup.short_interest@v1.short_interest_date.",
+  "A crowded short can rise sharply when shorts cover; the studies' average lag hides that tail, and most such names are costly to borrow.",
+  "The ratio divides by shares outstanding of every class, not the float, so it understates crowding where few shares trade.",
+]
+related = [
+  { id = "ivol_high", reason = "another list of stocks that tend to lag" },
+  { id = "size_small", reason = "the size baseline the edge is compared with" },
+]
+
+[[sources]]
+title = "Hong, Li, Ni, Scheinkman and Yan, Days to Cover and Stock Returns (2015)"
+url = "https://www.nber.org/papers/w21166"
+note = "Short interest divided by average turnover predicts poor returns better than the short ratio alone."
+
+[[sources]]
+title = "Boehmer, Huszar and Jordan, The good news in short interest (2010)"
+url = "https://ideas.repec.org/a/eee/jfinec/v96y2010i1p80-97.html"
+note = "Heavily shorted stocks earn negative abnormal returns, and heavily traded stocks with little short interest earn positive ones."
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $5M a day"
+short_ratio = "5% or more of the shares outstanding are sold short"
+days_to_cover = "Three or more days of volume to cover the short position"

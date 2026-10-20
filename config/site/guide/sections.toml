@@ -1,6 +1,6 @@
 # L3 site setting: the Guide's order and grouping (ADR 0051, docs/ui/guide.md section 3).
 # The Guide's sections in order, from the market down to one number; the field themes
-# grouped in the order a screen uses them; the playbooks (one per site rule-screen preset)
+# grouped in the order a screen uses them; the screeners (one per site rule-screen preset)
 # by family, ordered within it; the two groups of the Edges section beside its mechanisms. Typed by src/algotrade/config/site/guide/sections.py. Fitness
 # tests (tests/unit/config/site/guide/test_sections.py): every field-guide theme is in exactly
 # one group, every site preset in exactly one family, and every listed preset exists.
@@ -21,8 +21,8 @@ title = "Edges"
 purpose = "Why an edge should work: the nine mechanisms, each edge under its mechanism, the ideas checked and set aside, and the ones researched but not built."
 
 [[section]]
-id = "playbooks"
-title = "Playbooks"
+id = "screeners"
+title = "Screeners"
 purpose = "One page per site screen: the setup it looks for, what it checks and what it leaves to you."
 
 [[section]]
@@ -73,6 +73,8 @@ themes = ["events", "fundamentals", "statements", "analyst"]
 [[family]]
 id = "trend"
 title = "Trend"
+purpose = "Shares that are already rising, and the measures of trend and momentum behind them."
+intro = "These screens start from the chart: shares in an established uptrend, buying the dip inside one, and the published momentum ranking. The group also holds some single-measure yardsticks, such as size and volatility, that other screens and edges are built on."
 presets = [
   "trend_continuation", "pullback", "momentum_12_1", "size_small", "ivol_high", "max_ret_high",
   "amihud_illiquid", "beta_low", "etf_flow_pressure",
@@ -82,42 +84,58 @@ presets = [
 [[family]]
 id = "breakouts"
 title = "Breakouts"
+purpose = "Shares that squeeze into a narrow range and then leave it, or fail to."
+intro = "A breakout is a close above a price ceiling that held for weeks. These screens find the quiet range before the move, the break itself, and the break that failed and fell back, which is the setup that traps late buyers."
 presets = ["range_breakout", "breakout", "failed_breakout", "momentum_squeeze_entry"]
 
 [[family]]
 id = "reversals"
 title = "Reversals"
+purpose = "Shares that fell hard and show the first sign of turning back up."
+intro = "These screens look for a drop that has gone far enough to bounce: stopping at a price level, closing up after a bad week, or falling alone with no news behind it. Each reads how far the share has fallen and what else was happening."
 presets = ["support_reversal", "oversold_reversal", "exhaustion", "residual_reversal", "sector_reversal", "etf_low_ibs", "news_free_residual_reversal", "december_losers"]
 
 [[family]]
 id = "income"
 title = "Option income"
+purpose = "Option names where the market charges more for movement than the share delivers."
+intro = "Selling options earns money when implied volatility, the movement the options price in, runs above the movement the share then delivers. These screens rank optionable names by that gap and by where implied volatility sits in its own year."
 presets = ["vrp_scanner", "vrp_iv_hv", "vrp_cross_section", "iv_rank_high"]
 
 [[family]]
 id = "events"
 title = "Earnings events"
+purpose = "Shares around an earnings report: the run-up, the jump and what follows."
+intro = "A report moves a share more than almost any other day. These screens look before it (the date and the run-up), at the jump itself, and after it, where the price tends to keep drifting the same way for weeks."
 presets = ["pead_small_cap", "eap_all", "eap_volume", "earnings_date_early", "pre_earnings_runup", "earnings_gap_volume", "earnings_gap_only", "pre_earnings_reversal", "earnings_neutral_reversal", "earnings_vwap_overhang"]
 
 [[family]]
 id = "filings"
 title = "Filings and index changes"
+purpose = "Shares that filed something the market is slow to price: a notice, an insider purchase, an index change."
+intro = "Company filings arrive as dated documents with a known time. These screens read them: adverse notices to avoid, insider buying, tender offers, index deletions, reverse splits, the end of an IPO lock-up and a year-on-year change in a company's annual report."
 presets = ["eight_k_adverse_items", "nt_late_filer", "tender_offer_filed", "sp500_deletion", "insider_cluster_buys", "reverse_split_recent", "ipo_lockup_ahead", "lazy_prices_similar", "risk_factor_unchanged"]
 
 [[family]]
 id = "options_signals"
 title = "Option-implied signals"
+purpose = "What option prices say about the share, ranked across the market."
+intro = "Option traders often know something before the share moves. These screens rank names by the shape of their option prices (calls against puts, the smirk, a rise in implied volatility) and by how heavily the options trade against the stock."
 presets = ["cp_iv_spread", "cp_iv_spread_rise", "iv_smirk", "iv_change_call", "iv_change_ibkr", "option_stock_volume", "retail_option_attention", "lottery_max"]
 
 [[family]]
 id = "cross_section"
 title = "Cross-section ranks"
+purpose = "One ranked list of the whole market on a single measure, with no setup around it."
+intro = "Each screen here ranks every liquid name on one published measure, such as a volume shock, a short squeeze setup or a calendar effect, and some list ETFs on a trend rule. They are the raw rankings the edges test."
 presets = ["volume_shock", "volume_shock_no_news", "dividend_month", "mispricing_composite", "short_term_momentum_turnover", "short_squeeze_dtc",
   "trend_positive_3m", "trend_positive_6m", "trend_positive_12m", "etf_above_200d", "dual_class_cheap_leg"]
 
 [[family]]
 id = "allocation"
 title = "ETF allocation"
+purpose = "ETFs that stand for an asset class, listed when a macro rule says to hold them."
+intro = "These screens list a handful of funds, bonds, credit, countries or currencies, only while a macro rule holds, such as a positive yield-curve slope or a tight credit spread. They feed the edges that rotate between asset classes."
 presets = [
   "etf_priced", "credit_spread_below_ma200", "bond_curve_trend_3m", "bond_curve_trend_2y",
   "country_cape_cheapest", "fx_carry_positive", "etf_launch_recent",
@@ -126,6 +144,8 @@ presets = [
 [[family]]
 id = "factors"
 title = "Factors"
+purpose = "The published factors that rank the whole market: momentum variants, low risk and the 52-week high."
+intro = "A factor is a measure that has ranked future returns across many markets and years. Each screen ranks every tradeable name on one factor, so the top of the list is the names the research favours."
 presets = [
   "residual_momentum", "volatility_scaled_momentum", "frog_in_the_pan",
   "momentum_x_quality_interaction", "fifty_two_week_high", "industry_momentum", "low_beta",
@@ -135,4 +155,10 @@ presets = [
 [[family]]
 id = "fundamentals"
 title = "Quality and value"
+purpose = "Quality, value, financing and analyst measures from company statements and estimates."
+intro = "These screens rank names on what a company reports and what analysts expect: profit per dollar of assets, cheapness, share issuance, distress risk, discounts on funds and revisions to estimates. They change slowly, so a name stays on a list for months."
 presets = ["cash_op_profitability", "composite_value", "qmj", "net_share_issuance", "asset_growth", "distress_ohlson", "bdc_price_to_nav", "cef_discount_zscore", "eps_revision_up", "target_upside_high"]
+
+[screeners_page]
+what = "A screener is a saved rule screen: a list of checks run each night over the whole universe, and the names that pass are its hits. Each page here shows the checks, what a hit looks like, and what the screen leaves for you to check."
+versus_edge = "An edge is a claim that a behaviour keeps paying, with a thesis and a test. A screener is how the app finds the names that behave that way today. Several screeners can implement one edge, and a screener can exist with no edge behind it."

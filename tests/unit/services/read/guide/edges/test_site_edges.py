@@ -1,5 +1,5 @@
 """``site_edges``: every site edge once, in Guide order, never a user's; the tags the Guide
-derives (asset class, side, holding band) and the playbook links both ways."""
+derives (asset class, side, holding band) and the screener links both ways."""
 
 from dataclasses import replace
 
@@ -10,8 +10,8 @@ from algotrade.config.edges.loading import load_edges
 from algotrade.services.read.context import StoreContext
 from algotrade.services.read.guide.edges.schedule import BANDS
 from algotrade.services.read.guide.edges.site_edges import (
-    edges_of_playbook,
-    playbooks_of,
+    edges_of_screener,
+    screeners_of,
     site_edges,
 )
 from algotrade.services.read.guide.edges.universe import ASSETS, asset_of, universe_of
@@ -76,14 +76,14 @@ def test_side_holding_and_band(site: StoreContext) -> None:
     assert (short.holding, short.band) == ((20,), "medium")
 
 
-def test_every_playbook_link_round_trips(site: StoreContext) -> None:
-    ids = {p.id for p in playbooks_of(site)}
+def test_every_screener_link_round_trips(site: StoreContext) -> None:
+    ids = {p.id for p in screeners_of(site)}
     for e in site_edges(site):
-        assert set(e.playbooks) <= ids
-        assert set(e.playbooks) <= set(e.edge.screeners)
-        for playbook in e.playbooks:
-            assert e.edge.id in [x.edge.id for x in edges_of_playbook(site, playbook)]
-    for playbook in ids:
-        for e in edges_of_playbook(site, playbook):
-            assert playbook in e.edge.screeners
-    assert any(edges_of_playbook(site, p) for p in ids)  # some playbook implements an edge
+        assert set(e.screeners) <= ids
+        assert set(e.screeners) <= set(e.edge.screeners)
+        for screener in e.screeners:
+            assert e.edge.id in [x.edge.id for x in edges_of_screener(site, screener)]
+    for screener in ids:
+        for e in edges_of_screener(site, screener):
+            assert screener in e.edge.screeners
+    assert any(edges_of_screener(site, p) for p in ids)  # some screener implements an edge

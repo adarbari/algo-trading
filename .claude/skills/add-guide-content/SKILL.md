@@ -32,7 +32,7 @@ an item, then delete its baseline line.
    | field (a catalogue feature) | `config/site/field_guide/<group>/<file>.toml` `[[field]]` (`<group>` a theme group of `sections.toml`; a file under 900 lines, else the `-2` part) | `add-feature` ships it with the feature |
    | situation (fools many fields at once) | `config/site/field_guide/tradeable/instrument-2.toml` `[[situation]]` | |
    | regime indicator, episode | `config/site/regime/cards.toml`, `episodes.toml` | |
-   | playbook (one per site preset screen) | `config/site/guide/playbooks/<family>/<id>.toml` (`[asks]`: one line per criterion of the latest version) | `add-screener` for a site preset |
+   | screener (one per site preset screen) | `config/site/guide/screeners/<family>/<id>.toml` (`[asks]`: one line per criterion of the latest version) | `add-screener` for a site preset |
    | glossary term, how-to page | `config/site/guide/glossary/<theme>.toml` `[[term]]`, `start.toml` `[[page]]`; the button takes `{ kind: 'term' | 'start', id }` | |
 
    A kind the table does not have yet: stop and add it through `add-responsibility` (an owner,
@@ -47,7 +47,7 @@ an item, then delete its baseline line.
 3. **Write the entry for someone who does not follow markets**: what it is, how to read it from
    low to high (thresholds with units), what to use it for, when it lies, sources. Name other
    fields by their catalogue name so the server can link them; never derive in the browser
-   what a field page lists (related fields, playbooks that use it: the server computes them,
+   what a field page lists (related fields, screeners that use it: the server computes them,
    ADR 0038). Fields: `make features-doc` and the field-guide fitness tests.
    The bar (customer-praised trading sites and Stripe's docs; `docs/ui/guide-quality.md`):
    - `short` is one sentence of at most 25 words; body sentences at most 30, active voice.

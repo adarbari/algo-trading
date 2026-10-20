@@ -1,9 +1,9 @@
 /**
  * The Guide reads (ADR 0051, ADR 0037): `Query.guideIndex` (the sections with their entry
- * counts, the field theme groups, the intents, the playbook families, the situations),
+ * counts, the field theme groups, the intents, the screener families, the situations),
  * `Query.guideField` (what the server derives for one field's page: its reads and caveats split
- * at the names they mention, related fields, the playbooks that use it, the situations that
- * fool it), `Query.guidePlaybook`, `Query.guideSituation`, `Query.guideIndicator` and
+ * at the names they mention, related fields, the screeners that use it, the situations that
+ * fool it), `Query.guideScreener`, `Query.guideSituation`, `Query.guideIndicator` and
  * `Query.guideEpisode` (the market regime's indicators and reference falls), `Query.guideTerm`
  * and `Query.guideStartPage` (the glossary and the Start here how-tos); the six entry reads
  * (term, start page, indicator, episode, mechanism, edge) go through the page's one `Query.guideEntries` batch
@@ -43,7 +43,7 @@ const GuideIndexQuery = graphql(`
       families {
         id
         title
-        playbooks {
+        screeners {
           id
           name
         }
@@ -93,7 +93,7 @@ const GuideFieldQuery = graphql(`
         }
       }
       related
-      playbooks {
+      screeners {
         id
         name
         family
@@ -111,65 +111,6 @@ const GuideFieldQuery = graphql(`
             field
           }
         }
-      }
-    }
-  }
-`);
-
-const GuidePlaybookQuery = graphql(`
-  query GuidePlaybook($id: String!) {
-    guidePlaybook(id: $id) {
-      id
-      name
-      family
-      familyTitle
-      version
-      prose {
-        summary {
-          segments {
-            text
-            field
-          }
-        }
-        hit {
-          segments {
-            text
-            field
-          }
-        }
-        notChecked {
-          segments {
-            text
-            field
-          }
-        }
-        beforeActing {
-          segments {
-            text
-            field
-          }
-        }
-        sources
-      }
-      criteria {
-        name
-        asks
-        field
-        rule
-        mode
-        onMiss
-      }
-      tieBreak
-      tieBreakDescending
-      related {
-        id
-        name
-        reason
-      }
-      situations {
-        slug
-        name
-        fields
       }
     }
   }
@@ -193,7 +134,7 @@ const GuideSituationQuery = graphql(`
         }
       }
       affects
-      playbooks {
+      screeners {
         id
         name
         fields
@@ -258,13 +199,16 @@ export function useGuideField(name: string | null) {
   });
 }
 
-/** One site playbook's page (null data: no such playbook). */
-export function useGuidePlaybook(id: string) {
+/** One site screener's page (null data: no such screener). */
+export function useGuideScreener(id: string) {
   const variables = { id };
   return useQuery({
-    queryKey: queryKeys.gql('GuidePlaybook', variables),
-    queryFn: () => gql(GuidePlaybookQuery, variables),
-    select: (data) => data.guidePlaybook,
+    queryKey: queryKeys.gql('GuideScreener', variables),
+    queryFn: async () => {
+      const { GuideScreenerQuery } = await import('./screeners-doc');
+      return gql(GuideScreenerQuery, variables);
+    },
+    select: (data) => data.guideScreener,
     staleTime: GUIDE_STALE_MS,
   });
 }

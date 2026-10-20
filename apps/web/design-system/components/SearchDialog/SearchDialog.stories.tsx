@@ -18,9 +18,9 @@ const meta = {
     onSelect: () => undefined,
     onQueryChange: () => undefined,
     title: 'Search the Guide',
-    placeholder: 'Search fields, playbooks, terms',
+    placeholder: 'Search fields, screeners, terms',
     query: 'volume',
-    hint: 'Type a field name, a playbook or a word the app uses.',
+    hint: 'Type a field name, a screener or a word the app uses.',
     groups: [
       {
         id: 'field',

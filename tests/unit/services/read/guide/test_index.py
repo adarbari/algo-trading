@@ -1,13 +1,13 @@
 """``load_guide_index``: sections in the file's order with their entry counts, theme groups
 with guided-field counts, intents by field count, situations with the fields they fool, the
-playbooks by family; the regime indicators and episodes as the shipped config holds them."""
+screeners by family; the regime indicators and episodes as the shipped config holds them."""
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.services.read.guide.index import (
     GuideIntent,
-    GuidePlaybook,
+    GuideScreener,
     GuideSituationEntry,
     GuideTheme,
     load_guide_index,
@@ -21,7 +21,7 @@ from tests.unit.services.read.guide.conftest import stores
 def test_the_index_counts_what_the_guide_holds(ctx: StoreContext) -> None:
     index = load_guide_index(ctx)
     assert [(s.id, s.entries) for s in index.sections] == [
-        ("fields", 2), ("playbooks", 2), ("glossary", 0),
+        ("fields", 2), ("screeners", 2), ("glossary", 0),
     ]  # fmt: skip
     assert index.sections[0].title == "Fields" and index.sections[0].purpose == "Every field."
     tradeable, chart = index.theme_groups
@@ -31,11 +31,12 @@ def test_the_index_counts_what_the_guide_holds(ctx: StoreContext) -> None:
     assert index.intents == (GuideIntent("liquid", 2), GuideIntent("very liquid", 1))
     assert index.situations == (GuideSituationEntry("thin name", 2, "thin-name"),
                                 GuideSituationEntry("takeover", 1, "takeover"))  # fmt: skip
-    (trend,) = index.families
-    assert (trend.id, trend.title, trend.playbooks) == (
+    trend, empty = index.families  # a family that lists no existing preset is still listed
+    assert (empty.id, empty.screeners) == ("empty", ())
+    assert (trend.id, trend.title, trend.screeners) == (
         "trend",
         "Trend",
-        (GuidePlaybook("alpha", "Alpha"),),
+        (GuideScreener("alpha", "Alpha"),),
     )
     assert index.indicators == () and index.episodes == ()  # no regime files here
 
@@ -51,8 +52,8 @@ def test_the_shipped_index() -> None:
     index = load_guide_index(shipped)
     counts = {s.id: s.entries for s in index.sections}
     assert counts["regime"] == len(index.indicators) + len(index.episodes) > 0
-    assert counts["playbooks"] == sum(len(f.playbooks) for f in index.families)
-    assert counts["playbooks"] == len(configs.names("site", "screeners"))
+    assert counts["screeners"] == sum(len(f.screeners) for f in index.families)
+    assert counts["screeners"] == len(configs.names("site", "screeners"))
     assert index.indicators[0].key == "curve_10y3m" and index.indicators[0].plain_name
     assert all(e.key and e.name for e in index.episodes)
     assert [i.fields for i in index.intents] == sorted(

@@ -841,7 +841,7 @@
     "kind": "graphql",
     "op": "GuideIndex",
     "variables": {},
-    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      screeners {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
@@ -875,7 +875,7 @@
     "kind": "graphql",
     "op": "GuideIndex",
     "variables": {},
-    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      screeners {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
@@ -909,7 +909,7 @@
     "kind": "graphql",
     "op": "GuideIndex",
     "variables": {},
-    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      screeners {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
@@ -943,7 +943,7 @@
     "kind": "graphql",
     "op": "GuideIndex",
     "variables": {},
-    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      screeners {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
@@ -952,7 +952,7 @@
     "query": "\n    query FeatureCatalogue {\n  catalogue {\n    name\n    kind\n    source\n    dtype\n    format\n    description\n    nullMeaning\n    version\n    group\n    key\n    inputs\n    unit\n    range\n    categories\n    scope\n    owner\n    licence\n    guide {\n      theme\n      reads\n      summary\n    }\n  }\n}\n    "
    }
   ],
-  "/guide/playbooks": [
+  "/guide/screeners": [
    {
     "kind": "graphql",
     "op": "Viewer",
@@ -977,7 +977,7 @@
     "kind": "graphql",
     "op": "GuideIndex",
     "variables": {},
-    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      screeners {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
@@ -987,123 +987,123 @@
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "trend_continuation"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "pullback"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "momentum_12_1"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "size_small"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "range_breakout"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "breakout"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "failed_breakout"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "support_reversal"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "oversold_reversal"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "exhaustion"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "vrp_scanner"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "vrp_iv_hv"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "pead_small_cap"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "eap_all"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
-    "op": "GuidePlaybook",
+    "op": "GuideScreener",
     "variables": {
      "id": "eap_volume"
     },
-    "query": "\n    query GuidePlaybook($id: String!) {\n  guidePlaybook(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
+    "query": "\n    query GuideScreener($id: String!) {\n  guideScreener(id: $id) {\n    id\n    name\n    family\n    familyTitle\n    version\n    prose {\n      summary {\n        segments {\n          text\n          field\n        }\n      }\n      hit {\n        segments {\n          text\n          field\n        }\n      }\n      notChecked {\n        segments {\n          text\n          field\n        }\n      }\n      beforeActing {\n        segments {\n          text\n          field\n        }\n      }\n      sources\n    }\n    criteria {\n      name\n      asks\n      field\n      rule\n      mode\n      onMiss\n    }\n    tieBreak\n    tieBreakDescending\n    related {\n      id\n      name\n      reason\n    }\n    situations {\n      slug\n      name\n      fields\n    }\n  }\n}\n    "
    }
   ],
   "/guide/situations": [
@@ -1131,7 +1131,7 @@
     "kind": "graphql",
     "op": "GuideIndex",
     "variables": {},
-    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      screeners {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",
@@ -1165,7 +1165,7 @@
     "kind": "graphql",
     "op": "GuideIndex",
     "variables": {},
-    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      playbooks {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
+    "query": "\n    query GuideIndex {\n  guideIndex {\n    sections {\n      id\n      title\n      purpose\n      entries\n    }\n    themeGroups {\n      id\n      title\n      themes {\n        theme\n        fields\n      }\n    }\n    intents {\n      intent\n      fields\n    }\n    families {\n      id\n      title\n      screeners {\n        id\n        name\n      }\n    }\n    situations {\n      name\n      fields\n      slug\n    }\n    indicators {\n      key\n      plainName\n      pace\n    }\n    episodes {\n      key\n      name\n    }\n    startPages {\n      id\n      order\n      title\n      summary\n    }\n    terms {\n      id\n      term\n      short\n    }\n  }\n}\n    "
    },
    {
     "kind": "graphql",

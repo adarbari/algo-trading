@@ -1,0 +1,35 @@
+# L3 site setting: the Guide's screener for the site preset ipo_lockup_ahead (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other screeners), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "ipo_lockup_ahead"
+version = 1  # the preset version this prose was written for
+line = "Stocks whose IPO lock-up ends within the next 11 sessions."
+summary = "Finds liquid stocks whose IPO lock-up ends within the next 11 sessions: an avoid list for longs and the short side of the lock-up edge.[^1] It is a candidate edge under test, not a proven trade."
+hit = "The name is a common stock that trades at least $5M a day and whose IPO prospectus puts the lock-up expiry between today and 11 sessions ahead. The most liquid ranks first."
+not_checked = "It does not know who holds the locked shares (venture funds sell, buyout owners often do not) or whether part of the lock-up already ended early. It is the screen of the lock-up edge, which the harness is still testing."
+before_acting = [
+  "Check rollup.ipo_lockups@v1.lockup_release_terms: an early_release term lets part of the lock-up end before the stated date.",
+  "The date comes from prospectus text, so a name with no value is unknown, not free of a lock-up.",
+  "Shorting a fresh issue is often impossible; for most people the use is not to buy the name into its expiry.",
+]
+related = [
+  { id = "reverse_split_recent", reason = "another avoid list on a known corporate event" },
+  { id = "size_small", reason = "the size baseline the edge is compared with" },
+]
+
+[[sources]]
+title = "Field and Hanka, The expiration of IPO share lockups (2001)"
+url = "https://ideas.repec.org/a/bla/jfinan/v56y2001i2p471-500.html"
+note = "Finds a price drop of about 1.5% and a lasting rise in volume when IPO lock-ups expire."
+
+[asks]
+security_type = "A common stock"
+status = "Still listed and trading"
+adv = "Trades at least $5M a day"
+lockup_not_over = "Its lock-up has not ended yet"
+lockup_soon = "The lock-up ends within 11 sessions"

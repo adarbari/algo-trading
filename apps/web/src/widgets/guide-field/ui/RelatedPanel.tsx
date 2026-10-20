@@ -1,12 +1,12 @@
 /**
- * Related fields (links to their pages) and the playbooks that use the field, both derived by
- * the server (ADR 0038); a playbook links to its page.
+ * Related fields (links to their pages) and the screeners that use the field, both derived by
+ * the server (ADR 0038); a screener links to its page.
  */
 import { Grid, Heading, Mono, Panel, Stack, Text, TextLink } from '@algotrade/ui';
 
-import { fieldPath, playbookPath } from '@/entities/guide';
+import { fieldPath, screenerPath } from '@/entities/guide';
 
-export interface RelatedPlaybook {
+export interface RelatedScreener {
   id: string;
   name: string;
   rules: readonly string[];
@@ -14,18 +14,18 @@ export interface RelatedPlaybook {
 
 export interface RelatedPanelProps {
   related: readonly string[];
-  playbooks: readonly RelatedPlaybook[];
+  screeners: readonly RelatedScreener[];
   state: 'loading' | 'error' | 'ready';
   onRetry: () => void;
 }
 
-export function RelatedPanel({ related, playbooks, state, onRetry }: RelatedPanelProps) {
+export function RelatedPanel({ related, screeners, state, onRetry }: RelatedPanelProps) {
   return (
     <Panel
-      title="Related fields and playbooks"
+      title="Related fields and screeners"
       state={state}
       loadingLabel="Loading related fields"
-      errorMessage="Related fields and playbooks failed to load."
+      errorMessage="Related fields and screeners failed to load."
       onRetry={onRetry}
     >
       <Grid columns={2} gap={4} collapse="md" align="start">
@@ -43,19 +43,19 @@ export function RelatedPanel({ related, playbooks, state, onRetry }: RelatedPane
             ))
           )}
         </Stack>
-        <Stack gap={2} as="section" aria-label="Playbooks that use it">
-          <Heading level={3}>Playbooks that use it</Heading>
-          {playbooks.length === 0 ? (
+        <Stack gap={2} as="section" aria-label="Screeners that use it">
+          <Heading level={3}>Screeners that use it</Heading>
+          {screeners.length === 0 ? (
             <Text size="sm" tone="muted">
               No site screen uses this field.
             </Text>
           ) : (
-            playbooks.map((playbook) => (
-              <Stack key={playbook.id} gap={0}>
-                <TextLink href={playbookPath(playbook.id)} size="sm">
-                  {playbook.name}
+            screeners.map((screener) => (
+              <Stack key={screener.id} gap={0}>
+                <TextLink href={screenerPath(screener.id)} size="sm">
+                  {screener.name}
                 </TextLink>
-                {playbook.rules.map((rule) => (
+                {screener.rules.map((rule) => (
                   <Mono key={rule} size="sm" tone="muted">
                     {rule}
                   </Mono>

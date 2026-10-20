@@ -1,7 +1,7 @@
 /**
  * The Guide's home: one block per section, in the spec's order (Start here first, Glossary
  * last). Start here lists its numbered pages with their summaries, the Glossary its terms. Each block is the section's title and purpose as the server gives
- * them; Market regime lists the warning signs and the market falls, Playbooks lists the families with their playbooks, Fields the theme groups in the order
+ * them; Market regime lists the warning signs and the market falls, Screeners lists the families with their screeners, Fields the theme groups in the order
  * a screen uses them (with the field count of every theme, and links to the by-intent and A to Z
  * views), Situations the situations with how many fields each fools, Edges the mechanisms with
  * how many edges rest on each.
@@ -23,13 +23,13 @@ import {
   fieldsPath,
   GUIDE_EDGES_PATH,
   GUIDE_GLOSSARY_PATH,
-  GUIDE_PLAYBOOKS_PATH,
+  GUIDE_SCREENERS_PATH,
   GUIDE_REGIME_PATH,
   GUIDE_SITUATIONS_PATH,
   GUIDE_START_PATH,
   indicatorPath,
   mechanismPath,
-  playbookPath,
+  screenerPath,
   situationPath,
   startPath,
   termPath,
@@ -88,8 +88,8 @@ export function GuideHome() {
                   Why an edge should work
                 </TextLink>
               )}
-              {section.id === 'playbooks' && (
-                <TextLink href={GUIDE_PLAYBOOKS_PATH} size="sm">
+              {section.id === 'screeners' && (
+                <TextLink href={GUIDE_SCREENERS_PATH} size="sm">
                   What each one says
                 </TextLink>
               )}
@@ -171,15 +171,15 @@ export function GuideHome() {
                 ))}
               </Grid>
             )}
-            {section.id === 'playbooks' && (
+            {section.id === 'screeners' && (
               <Grid columns={2} gap={5} collapse="md" align="start">
                 {families.map((family) => (
                   <Stack key={family.id} gap={2} as="section" aria-label={family.title}>
                     <Heading level={3} tone="muted">
                       {family.title}
                     </Heading>
-                    {family.playbooks.map((p) => (
-                      <TextLink key={p.id} href={playbookPath(p.id)}>
+                    {family.screeners.map((p) => (
+                      <TextLink key={p.id} href={screenerPath(p.id)}>
                         {p.name}
                       </TextLink>
                     ))}

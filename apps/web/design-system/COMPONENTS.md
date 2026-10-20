@@ -955,7 +955,7 @@ Source: `design-system/components/LinkCard`
 
 ### LinkedProse
 
-LinkedProse: a paragraph given as parts, some of them links to pages of this app (a field's Guide page inside a caveat): a part with an `href` is a TextLink (the app's router link, so the design system stays router-free), the rest is plain Text in the chosen tone and size. The parts come split from the server (it cuts the sentence at the names it mentions); the caller maps each part to an address. Links to other sites are LinkedText's.
+LinkedProse: a paragraph given as parts, some of them links to pages of this app (a field's Guide page inside a caveat): a part with an `href` is a TextLink (the app's router link, so the design system stays router-free), the rest is plain Text in the chosen tone and size. The parts come split from the server (it cuts the sentence at the names it mentions); the caller maps each part to an address. A `cite` part is a source marker: its `href` (an anchor, "#s2", an item of a SourceList) set as a small raised link, the way a footnote number reads in a printed page. Links to other sites are LinkedText's.
 
 Source: `design-system/components/LinkedProse`
 
@@ -1414,7 +1414,7 @@ Source: `design-system/components/SourceLine`
 
 ### SourceList
 
-SourceList: a numbered reading list: per source a kind label ("Academic paper"), the title as an ExternalLink and a one-line "why read it". Each item carries its `id`, so a citation in the text ("[3]") links to it with `#<id>`. Where SourceLine names one figure's source in a line, this is the page's bibliography.
+SourceList: a numbered reading list: per source a kind label ("Academic paper"), the title as an ExternalLink (plain text when no page is verified) and a one-line "why read it". Each item carries its `id`, so a citation in the text ("[3]") links to it with `#<id>`. Where SourceLine names one figure's source in a line, this is the page's bibliography.
 
 Source: `design-system/components/SourceList`
 

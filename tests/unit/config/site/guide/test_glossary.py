@@ -32,7 +32,7 @@ WHERE = "config/site/guide/glossary/*.toml"  # and edges/*.toml (kind guide_glos
 SPEC_TERMS = {
     "session", "knowledge_time", "unknown", "not_run", "run", "selection", "draft", "op",
     "mode", "hard", "soft", "score_mode", "tolerance", "on_miss", "watch", "liquidity_risk",
-    "event_risk", "paused", "gating_criterion", "near_miss", "preset", "playbook",
+    "event_risk", "paused", "gating_criterion", "near_miss", "preset", "screener",
 }  # fmt: skip
 # A sentence ends at ., ! or ? followed by a space and a capital (not "e.g. a" or "$5.50").
 SENTENCE_BREAK = re.compile(r"[.!?] +[A-Z]")

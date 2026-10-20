@@ -316,9 +316,9 @@ describe('ScreenerList', () => {
     await openRow(/^Name of vrp_scanner/);
     expect(screen.queryByRole('button', { name: 'Edit criteria' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Playbook' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Screener' })).toHaveAttribute(
       'href',
-      '/guide/playbooks/vrp_scanner',
+      '/guide/screeners/vrp_scanner',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Duplicate to edit' }));
     await userEvent.click(screen.getByRole('button', { name: 'finish copy of vrp_scanner' }));

@@ -20,8 +20,8 @@ site/guide/mechanisms/<id>.toml            L3 Guide mechanism pages, one per edg
                                            (kind ``guide_mechanisms``)
 site/guide/ideas/<family>.toml            L3 Guide's researched-not-built ideas, one file per
                                            family (kind ``guide_ideas``)
-site/guide/playbooks/<family>/<id>.toml    L3 Guide playbook prose, one folder per family (kind
-                                           ``guide_playbooks``; the name is the id)
+site/guide/screeners/<family>/<id>.toml    L3 Guide screener prose, one folder per family (kind
+                                           ``guide_screeners``; the name is the id)
 site/edges/<id>/edge.toml                  L3 edge documents, one folder per edge (kind ``edges``,
                                            ADR 0053; the folder is the edge's home for its notes)
 site/presets/strategies/<id>.toml          L3 shared strategy / screener configs
@@ -54,7 +54,7 @@ from algotrade.storage.configs.store import KINDS, split_version
 
 SITE = "site"
 SCREENERS = "screeners"
-PLAYBOOKS = "guide_playbooks"
+GUIDE_SCREENERS = "guide_screeners"
 USER_FILES = ("preferences", "identity")  # one document per user, never the site's
 # site/<folder>/<name>.toml by kind (the folder is the kind's name unless given)
 SITE_FOLDERS = {
@@ -64,7 +64,7 @@ SITE_FOLDERS = {
     "events": "events",
     "studies": "studies",
     "guide": "guide",
-    "guide_playbooks": "guide/playbooks",
+    "guide_screeners": "guide/screeners",
     "guide_mechanisms": "guide/mechanisms",
     "guide_glossary": "guide/glossary",
     "guide_glossary_edges": "guide/glossary/edges",
@@ -72,13 +72,13 @@ SITE_FOLDERS = {
     "edges": "edges",
 }
 NESTED = (
-    PLAYBOOKS,
+    GUIDE_SCREENERS,
     "features",
     "field_guide",
 )  # site kinds filed in one level of subfolders, by name
 SITE_ONLY = (  # never a user's
     "defaults", "settings", "field_guide", "regime", "events", "studies", "guide",
-    "guide_playbooks", "guide_glossary", "guide_glossary_edges", "guide_mechanisms", "guide_ideas",
+    "guide_screeners", "guide_glossary", "guide_glossary_edges", "guide_mechanisms", "guide_ideas",
 )  # fmt: skip
 DRAFT = "draft.toml"
 EDGE_FILE = "edge.toml"  # site/edges/<id>/edge.toml
@@ -155,7 +155,7 @@ class FileConfigStore:
         return self._nested_path(path) if kind in NESTED else path
 
     def _nested_path(self, flat: Path) -> Path:
-        """``site/guide/playbooks/<family>/<id>.toml``, ``site/features/<kind>/<theme>.toml``:
+        """``site/guide/screeners/<family>/<id>.toml``, ``site/features/<kind>/<theme>.toml``:
         the subfolder that holds the file."""
         return next(iter(sorted(flat.parent.glob(f"*/{flat.name}"))), flat)
 
@@ -233,7 +233,7 @@ class FileConfigStore:
             return ["defaults"] if scope == SITE and self._path(SITE, kind, "x").exists() else []
         if kind == SCREENERS:
             return [n for n in self.screen_folders(scope) if self.screen_versions(scope, n)]
-        if kind in NESTED and (scope == SITE or kind == PLAYBOOKS):  # a user's features: flat
+        if kind in NESTED and (scope == SITE or kind == GUIDE_SCREENERS):  # a user's features: flat
             base = self.root / SITE / SITE_FOLDERS[kind]
             return sorted(p.stem for p in base.glob("*/*.toml")) if scope == SITE else []
         return self._file_names(scope, kind)

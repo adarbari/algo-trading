@@ -76,10 +76,10 @@ def test_results_group_by_kind_best_group_first_with_a_limit_per_kind() -> None:
     ctx = stores(DOCUMENTS)
     found = load_guide_search(ctx, "  ALPHA ", limit=5)
     assert found.query == "  ALPHA "
-    # "alpha": the playbook's id (exact) comes before the field whose prose has no "alpha".
-    assert found.groups[0].kind == "playbook"
+    # "alpha": the screener's id (exact) comes before the field whose prose has no "alpha".
+    assert found.groups[0].kind == "screener"
     assert found.groups[0].hits[0] == GuideSearchHit(
-        "playbook", "alpha", "Alpha", "Finds dips; read feature.pullback_atr_20d first."
+        "screener", "alpha", "Alpha", "Finds dips; read feature.pullback_atr_20d first."
     )
     liquid = load_guide_search(ctx, "liquid", limit=1)
     (fields,) = [g for g in liquid.groups if g.kind == "field"]

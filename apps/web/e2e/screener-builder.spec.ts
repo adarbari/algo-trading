@@ -66,9 +66,9 @@ test('a row opens in place, one at a time, with its criteria, hits and actions',
   await expect(page.getByRole('heading', { level: 3, name: 'Criteria' })).toBeVisible();
   await expect(page.getByRole('heading', { level: 3, name: 'Top hits' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Duplicate to edit' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Playbook' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Screener', exact: true })).toHaveAttribute(
     'href',
-    '/guide/playbooks/vrp_scanner',
+    '/guide/screeners/vrp_scanner',
   );
   await list.getByRole('button', { name: /^my-vrp Mine/ }).click();
   await expect(preset).toHaveAttribute('aria-expanded', 'false');
@@ -79,16 +79,16 @@ test('a row opens in place, one at a time, with its criteria, hits and actions',
   await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
 });
 
-test('the list’s Playbook link and the Builder header’s link open the preset’s playbook', async ({
+test('the list’s Screener link and the Builder header’s link open the preset’s screener', async ({
   page,
 }) => {
   await page.goto('/screeners');
   await page.getByRole('button', { name: /^vrp_scanner Preset/ }).click();
-  await page.getByRole('link', { name: 'Playbook' }).click();
-  await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
+  await page.getByRole('link', { name: 'Screener', exact: true }).click();
+  await expect(page).toHaveURL(/\/guide\/screeners\/vrp_scanner$/);
   await page.goto('/screeners/vrp_scanner/edit');
-  await page.getByRole('link', { name: 'Playbook' }).click();
-  await expect(page).toHaveURL(/\/guide\/playbooks\/vrp_scanner$/);
+  await page.getByRole('link', { name: 'Screener', exact: true }).click();
+  await expect(page).toHaveURL(/\/guide\/screeners\/vrp_scanner$/);
 });
 
 for (const width of [800, 1024, 1280]) {

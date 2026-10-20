@@ -35,7 +35,7 @@ the product?
 1. **Three kinds of content, kept apart but linked**: *reference* (one page per indicator or
    metric: thinkorswim Studies Library, Koyfin Data Dictionary, Finviz filter list),
    *concepts and how-to* (TradingView Help Center, Linear docs, Stripe guides) and *courses /
-   playbooks* (tastylive, IBKR Academy). Nobody mixes them in one list; everyone cross-links.
+   screeners* (tastylive, IBKR Academy). Nobody mixes them in one list; everyone cross-links.
 2. **The reference entry has a fixed template** and the same order everywhere: definition
    with the low-to-high reading, formula / inputs, how to read it (thresholds), example,
    limitations ("when it lies": Investopedia's Limitations section, our caveats), related
@@ -53,7 +53,7 @@ the product?
    weak (Fidelity has none; TradingView has only "Launch Supercharts"). The ones that work
    are precise: thinkorswim "Related Studies", Stripe's Dashboard deep links, Finviz's
    one-to-one naming between the help page and the screener form.
-7. **Playbooks are strategies, not fields**: tastylive's Concepts & Strategies (Iron Condor
+7. **Screeners are strategies, not fields**: tastylive's Concepts & Strategies (Iron Condor
    with its rules), IBKR courses with quizzes. A strategy page names its fields and the
    criteria, i.e. exactly what the eight preset screens already encode.
 
@@ -74,7 +74,7 @@ for depth. The original recommendation (a TRADER section after Explore) was supe
 
 1. **Start here** (how-to, numbered): how the app thinks about a day (session, knowledge time,
    UNKNOWN), read a screen's result (pass, near miss, reject, WATCH, LIQUIDITY_RISK, score),
-   build a screen (from a playbook, criteria from a field page, preview), draft a screen from a
+   build a screen (from a screener, criteria from a field page, preview), draft a screen from a
    sentence; later: read Explore, read the Regime page.
 2. **Market regime**: the eight indicators as their plain-language questions
    (`config/site/regime/cards.toml`), then the reference episodes (`episodes.toml`); a link to
@@ -84,7 +84,7 @@ for depth. The original recommendation (a TRADER section after Explore) was supe
    over the same config loaders as the Regime page (GD5a).
 3. **Edges**: why an edge should work, from the nine mechanisms down to each site edge (the
    section "Edges" below).
-4. **Playbooks**, one per site preset screen, grouped by family and ordered within it: Trend
+4. **Screeners**, one per site preset screen, grouped by family and ordered within it: Trend
    (Trend continuation, Pullback), Breakouts in lifecycle order (Range breakout, Breakout,
    Failed breakout), Reversals (Support reversal, Oversold reversal, Exhaustion), Option
    income (VRP).
@@ -113,31 +113,52 @@ its themes or families); the content is the hero (the reading paragraph at 18 px
 5. **When it lies**: the caveats, fields they name linked; **Situations that fool it**.
 6. **How it is computed**: the formula (expression features) or the inputs (rollup
    parameters), null meaning.
-7. **Related fields** and **Playbooks that use it** (derived by the server, ADR 0038).
+7. **Related fields** and **Screeners that use it** (derived by the server, ADR 0038).
 8. **See it on a ticker**: opens Explore with this field's history.
 9. Sources.
 
-### The playbook page
+### Screeners: three levels
+
+`/guide/screeners` is the lead page: what a screener is and how it differs from an edge
+(`[screeners_page]` of `sections.toml`) and a card per family with its screener count
+(`Query.guideScreenerIndex`). `/guide/screeners/c/<family>` is the category page: the family's
+`purpose` and `intro` (`sections.toml`) and its screeners as rows: name, `line` (what it asks, in
+one line, from the screener file) and the edges that use it (`Query.guideScreenerCategory`).
+`/guide/screeners/<id>` is the screener page below, linking up to its category. The names of
+the 11 families are the owner's (2026-10-18). Old `/guide/playbooks` paths redirect.
+
+### Sources in the text
+
+A prose string cites a source with `[^n]`, `n` the 1-based position in the same file's
+`[[sources]]` (`title`, an https `url` that may be left out when no verified page exists, `note`).
+The server cuts the marker into its own segment (`GuideProseSegment.source`, `link_prose(...,
+sources=count)`; without a count a marker is plain text) and the browser sets a raised `[n]`
+linking to `#s<n>`, the source's entry in the page's list. A literal `[^n]` therefore cannot be
+written in screener text: the server always reads it as a marker. Fitness tests: every marker names a
+source, every source is cited at least once, every url is https. Screeners use it first; the
+Edges prose adopts it next.
+
+### The screener page
 
 Header (preset id and version, the plain summary as the hero), **See today's hits** and **Open
 in Builder** with the last run; "What a hit looks like" beside "What it does not check"; the
 criteria table (what it asks in words, the field linked, the rule, what a miss does; the base
 gates as one line); "Before you act on a hit" (the caveats of its fields, each attributed) and
-the situations; related playbooks. The prose is a Guide source of its own,
-`config/site/guide/playbooks/<family>/<id>.toml`, because a preset version is immutable: `version` (the
+the situations; related screeners. The prose is a Guide source of its own,
+`config/site/guide/screeners/<family>/<id>.toml`, because a preset version is immutable: `version` (the
 preset version it was written for; a new preset version fails a fitness test until the prose
-is re-read), `summary` (the hero), `hit`, `not_checked`, `before_acting` (caveats naming catalogue fields), `related`
-(`{id, reason}`), `sources` and `[asks]` (each criterion of the latest version in a few plain
+is re-read), `line` (one line for its row on the category page), `summary` (the hero), `hit`, `not_checked`, `before_acting` (caveats naming catalogue fields), `related`
+(`{id, reason}`), `[[sources]]` and `[asks]` (each criterion of the latest version in a few plain
 words). The family stays in `sections.toml` (one owner). Fitness tests: one file per site
 preset and none more, `asks` names exactly the latest version's criteria, every related id
 exists, every catalogue name in the prose exists. The presets mark the base gates only with a
-TOML comment, so the read (`Query.guidePlaybook`, GD4a) lists the criteria in file order (base
+TOML comment, so the read (`Query.guideScreener`, GD4a) lists the criteria in file order (base
 gates first in every site preset); prose comes split at catalogue names (`GuideProse`).
 
 ### Edges
 
 The Edges section answers one question at three levels: why should anything like this work
-(the mechanism), what do we test (an edge), and how is it built (its playbooks and fields). It
+(the mechanism), what do we test (an edge), and how is it built (its screeners and fields). It
 is session-free like every Guide page: it shows no win rate, lift, curve, verdict or run, only
 what the documents say (the Edges page and the evidence pages hold the live figures).
 
@@ -158,14 +179,14 @@ what the documents say (the Edges page and the evidence pages hold the live figu
   its leg, labelled as a planning figure, only where the document has one); **how we test it**
   (outcome, horizon, trigger, entry, universe, picks, cost, baselines, frozen period as
   structured facts, each with the glossary term for its help button); **how it is built** (the
-  site playbooks among its screeners and the catalogue fields they read, each linked);
+  site screeners among its screeners and the catalogue fields they read, each linked);
   **what fools it** (the quality bar's failure modes and decoys; for a rejected or blocked edge,
   why); **can you trade it** (capacity and costs); the sources; related edges.
 - **Sources**: the site edge documents only, through `config.edges.loading.load_edges` as the
   `site` user, so a user's copy or draft never appears; the mechanism files; the glossary. The
   server never reads the document's `notes`, `expected_size` answer, `[evidence]` or any run.
-- **Playbook backlinks**: a playbook page lists the edges whose screeners include it
-  (`GuidePlaybookDetail.edges`), one derivation for both directions (`site_edges.py`).
+- **Screener backlinks**: a screener page lists the edges whose screeners include it
+  (`GuideScreenerDetail.edges`), one derivation for both directions (`site_edges.py`).
 - **Two drawer kinds**: `mechanism` and `edge` join the entry kinds (`ENTRY_KINDS`,
   `GuideEntryKind.MECHANISM` and `EDGE`, the batched `Query.guideEntries`) so a help button
   anywhere opens a mechanism or an edge in the drawer beside the terms; search indexes both
@@ -186,7 +207,7 @@ and drafter reasons all resolve to the same entries.
 
 ### Search
 
-One search over all kinds (name, display name, theme, reads, intent, playbook and situation
+One search over all kinds (name, display name, theme, reads, intent, screener and situation
 names, glossary terms), results grouped by kind, ranked exact name, display name, intent, then
 prose; every result is a URL under `/guide`. ⌘K anywhere; the rail's box on Guide pages.
 
@@ -211,7 +232,7 @@ Inventory of 2026-10-07. Each row moves in the phase named; the PR that moves it
 | Explore "Field guide" tab and its panels (`widgets/field-guide`, `pages/trader-explore`) | `/guide/fields`, `/guide/fields/<name>`; the tab redirects for one release | 1 (done in GD3b: the panels live in `widgets/guide-field`, the route redirects `tab=guide`; remove the redirect and the tab one release later; done: both removed, and the Features tab's rows carry `GuideHelp`) |
 | Feature table column headers (`widgets/feature-table`, column factories in `entities/feature`), Ideas columns | `InfoButton` in every field header, opening the field's drawer | 1 |
 | Builder "How to read it" Disclosure (`features/screener-builder/ui/FieldGuideHelp.tsx`) | `InfoButton` beside the criterion's field; the drawer's "Use this" fills the row | 2 (done in GD4c: the widget gives `CriterionRow` the drawer through `renderFieldHelp`; the picker's options show the guide's `summary`) |
-| Preset descriptions in TOML comments; Screeners list rows, the Builder header of a preset | playbook pages; a "Playbook" link on every preset | 2 (done in GD4b: the Screeners list rows of a rule-screen preset and the Builder header of a preset or its copy link to `/guide/playbooks/<id>`; the TOML comments are not removed here) |
+| Preset descriptions in TOML comments; Screeners list rows, the Builder header of a preset | screener pages; a "Screener" link on every preset | 2 (done in GD4b: the Screeners list rows of a rule-screen preset and the Builder header of a preset or its copy link to `/guide/screeners/<id>`; the TOML comments are not removed here) |
 | Drafter "Left out ... (reason)" lines (`features/screener-describe`) | the field name opens its drawer, a kept criterion its intent card | 2 (done in GD4c: a left-out field in the catalogue and every kept criterion's field carry the help button; an intent card per kept criterion is not built) |
 | Regime cards' "Why it matters, what it did before" Disclosure (`widgets/regime-indicators`), the reading list (`widgets/reading-list`) | indicator pages; `InfoButton` on each card opening its drawer (text stays in `cards.toml`, written once) | 2 (done in GD5b: `/guide/regime/indicators/<key>`, the card's Disclosure and `widgets/reading-list` removed; the reading list is each indicator page's sources; the card keeps its live value, meter, history and the on-request explanation) |
 | Regime "Market falls we compare with" (`widgets/regime-episodes`) | episode pages; a row opens its drawer; the table of live drawdowns stays | 2 (done in GD5b: `/guide/regime/episodes/<key>`, a Guide button in each row of the table, which still sets the charts' window) |
@@ -231,7 +252,7 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
   finds explanatory prose and explainer Disclosures in `apps/web/src` against the shrink-only
   baseline `architecture/web_prose.toml`.
 - **Coverage**: fitness tests that every Guide reference in the web code and in config resolves,
-  that every site preset has a playbook, every regime card and episode a page, and (existing)
+  that every site preset has a screener, every regime card and episode a page, and (existing)
   every phrased or site-screened field a field-guide entry.
 - **New functionality** (owner 2026-10-10): `tests/architecture/guide/test_guide_coverage.py`
   over the declared mapping `architecture/guide_coverage.toml`: (1) every GraphQL `enum`, and
@@ -244,12 +265,12 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
   web names (`GuideHelp`, the exported term helper, the Edge Builder's `help`) resolves. The
   gaps of 2026-10-10 are shrink-only baselines in the same file.
 - **Sources**: Guide-only sources live under `config/site/guide/`: `sections.toml` (the
-  section order, the theme groups, the playbook families), one
-  `config/site/guide/playbooks/<family>/<id>.toml` per site preset (the playbook prose above, GD4),
+  section order, the theme groups, the screener families), one
+  `config/site/guide/screeners/<family>/<id>.toml` per site preset (the screener prose above, GD4),
   `glossary/<theme>.toml` (GD6a: one `[[term]]` each, `id, term, short` (one sentence, the hover),
   `body`, `see_also` (term ids); read as `Query.guideTerm(id)`) and `start.toml` (GD6a: one
   `[[page]]` each, `id, order, title, summary`, `[[page.section]]` (`title, body`) and `links`
-  (`{kind, id}`, kind one of start, indicator, episode, playbook, field, situation, term); read
+  (`{kind, id}`, kind one of start, indicator, episode, screener, field, situation, term); read
   as `Query.guideStartPage(id)`; the index lists both). Fitness tests: every term the spec
   lists is written, `see_also` and links resolve to an entry of their kind, `short` is one
   sentence, every catalogue name in the prose exists. The Regime page's chart key (the legend
@@ -269,10 +290,10 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
 - **GD2**: `InfoButton` and `HelpDrawer` in `@algotrade/ui` (`add-ui-component`, stories for
   every state, axe, light and dark screenshots).
 - **GD3**: the Guide read model (one loader, `add-domain-object`) with related fields,
-  playbooks that use a field and the situations that fool it computed server-side
+  screeners that use a field and the situations that fool it computed server-side
   (`add-graphql-field`); the top-bar link and `/guide`, `/guide/fields`, `/guide/fields/<name>`
   (`add-web-page`); the Explore tab redirect; the drawer on feature-table headers.
-- **GD4**: playbooks (`config/site/guide/playbooks/<family>/`, pages, preset links), situations, the Builder
+- **GD4**: screeners (`config/site/guide/screeners/<family>/`, pages, preset links), situations, the Builder
   and drafter hooks.
 - **GD5**: market regime pages (indicators, episodes) and the Regime page's drawers.
 - **GD6**: Start here, glossary, grouped search behind ⌘K, the remaining migrations, the

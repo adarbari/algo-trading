@@ -29,7 +29,7 @@ START = {
             "section": [{"title": "Gate", "body": f"Gate on {ADV} first."}],
             "links": [
                 {"kind": "term", "id": "near_miss"},
-                {"kind": "playbook", "id": "alpha"},
+                {"kind": "screener", "id": "alpha"},
                 {"kind": "field", "id": ADV},
                 {"kind": "situation", "id": "no-such-situation"},
             ],
@@ -62,7 +62,7 @@ def test_a_start_page() -> None:
     assert section.title == "Gate" and section.body.fields == (ADV,)
     assert page.links == (
         GuideLink("term", "near_miss", "Near miss"),
-        GuideLink("playbook", "alpha", "Alpha"),
+        GuideLink("screener", "alpha", "Alpha"),
         GuideLink("field", ADV, ADV),
     )  # the unknown situation is left out
     assert load_guide_start_page(stores(WRITTEN), "nope") is None

@@ -1,8 +1,8 @@
 /**
  * The Guide (ADR 0051): `/guide` (home), `/guide/fields` (the field index; `view`, `theme` and
  * `intent` in the search params, so every view is a link) and `/guide/fields/$name` (a field's
- * page; the name is the catalogue name), `/guide/playbooks` and `/guide/playbooks/$id` (a site
- * preset's playbook; its buttons open that screener's results and Builder) and
+ * page; the name is the catalogue name), `/guide/screeners`, `/guide/screeners/c/$category` (a family) and `/guide/screeners/$id` (a site
+ * preset's screener; its buttons open that screener's results and Builder) and
  * `/guide/situations` and `/guide/situations/$slug`, `/guide/regime`, `/guide/regime/indicators/$key`
  * and `/guide/regime/episodes/$key` (the market regime's indicators and reference falls),
  * `/guide/start` and `/guide/start/$id` (the how-tos in order) and `/guide/glossary` and
@@ -11,7 +11,7 @@
  * viewer) and no workspace: the layout shows the top bar of the workspace the user came from
  * (`GuideLayout`), so an admin stays in ADMIN.
  */
-import { createRoute, useNavigate } from '@tanstack/react-router';
+import { createRoute, redirect, useNavigate } from '@tanstack/react-router';
 
 import type * as GuidePages from '@/pages/guide';
 
@@ -33,8 +33,9 @@ const GuideFieldsPage = lazyPage(guidePages, 'GuideFieldsPage');
 const GuideGlossaryPage = lazyPage(guidePages, 'GuideGlossaryPage');
 const GuideHomePage = lazyPage(guidePages, 'GuideHomePage');
 const GuideIndicatorPage = lazyPage(guidePages, 'GuideIndicatorPage');
-const GuidePlaybookPage = lazyPage(guidePages, 'GuidePlaybookPage');
-const GuidePlaybooksPage = lazyPage(guidePages, 'GuidePlaybooksPage');
+const GuideScreenerCategoryPage = lazyPage(guidePages, 'GuideScreenerCategoryPage');
+const GuideScreenerPage = lazyPage(guidePages, 'GuideScreenerPage');
+const GuideScreenersPage = lazyPage(guidePages, 'GuideScreenersPage');
 const GuideRegimePage = lazyPage(guidePages, 'GuideRegimePage');
 const GuideSituationPage = lazyPage(guidePages, 'GuideSituationPage');
 const GuideSituationsPage = lazyPage(guidePages, 'GuideSituationsPage');
@@ -107,18 +108,30 @@ const fieldRoute = createRoute({
   component: FieldRoute,
 });
 
-const playbooksRoute = createRoute({
+const screenersRoute = createRoute({
   getParentRoute: () => guideRoute,
-  ...guideLoading(GuidePlaybooksPage),
-  path: 'playbooks',
-  component: GuidePlaybooksPage,
+  ...guideLoading(GuideScreenersPage),
+  path: 'screeners',
+  component: GuideScreenersPage,
 });
 
-function PlaybookRoute() {
-  const { id } = playbookRoute.useParams();
+function ScreenerCategoryRoute() {
+  const { category } = screenerCategoryRoute.useParams();
+  return <GuideScreenerCategoryPage id={category} />;
+}
+
+const screenerCategoryRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  ...guideLoading(GuideScreenerCategoryPage),
+  path: 'screeners/c/$category',
+  component: ScreenerCategoryRoute,
+});
+
+function ScreenerRoute() {
+  const { id } = screenerRoute.useParams();
   const navigate = useNavigate();
   return (
-    <GuidePlaybookPage
+    <GuideScreenerPage
       id={id}
       onSeeHits={() => void navigate({ to: '/screeners/$id', params: { id } })}
       onOpenBuilder={() => void navigate({ to: '/screeners/$id/edit', params: { id } })}
@@ -126,11 +139,35 @@ function PlaybookRoute() {
   );
 }
 
-const playbookRoute = createRoute({
+const screenerRoute = createRoute({
   getParentRoute: () => guideRoute,
-  ...guideLoading(GuidePlaybookPage),
+  ...guideLoading(GuideScreenerPage),
+  path: 'screeners/$id',
+  component: ScreenerRoute,
+});
+
+// The section was called Playbooks: old links and bookmarks land on the Screeners pages.
+const legacyPlaybooksRoute = createRoute({
+  getParentRoute: () => guideRoute,
+  path: 'playbooks',
+  beforeLoad: ({ search, location }) => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+    throw redirect({ to: '/guide/screeners', search, hash: location.hash });
+  },
+});
+
+const legacyPlaybookRoute = createRoute({
+  getParentRoute: () => guideRoute,
   path: 'playbooks/$id',
-  component: PlaybookRoute,
+  beforeLoad: ({ params, search, location }) => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol
+    throw redirect({
+      to: '/guide/screeners/$id',
+      params: { id: params.id },
+      search,
+      hash: location.hash,
+    });
+  },
 });
 
 const situationsRoute = createRoute({
@@ -234,8 +271,11 @@ export const guideRoutes = guideRoute.addChildren([
   startRoute,
   fieldsRoute,
   fieldRoute,
-  playbooksRoute,
-  playbookRoute,
+  screenersRoute,
+  screenerCategoryRoute,
+  screenerRoute,
+  legacyPlaybooksRoute,
+  legacyPlaybookRoute,
   situationsRoute,
   situationRoute,
   edgesRoute,

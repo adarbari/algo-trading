@@ -21,7 +21,7 @@ const index = {
   startPages: [
     { id: 'how_the_app_thinks', order: 1, title: 'How the app thinks', summary: 'A day.' },
     { id: 'read_a_result', order: 2, title: 'Read a result', summary: 'Hits and misses.' },
-    { id: 'build_a_screen', order: 3, title: 'Build a screen', summary: 'From a playbook.' },
+    { id: 'build_a_screen', order: 3, title: 'Build a screen', summary: 'From a screener.' },
   ],
 };
 const page = {
@@ -38,7 +38,7 @@ const page = {
   links: [
     { kind: 'term', id: 'not_run', title: 'NOT_RUN' },
     { kind: 'field', id: volume, title: volume },
-    { kind: 'playbook', id: 'breakout', title: 'Breakout' },
+    { kind: 'screener', id: 'breakout', title: 'Breakout' },
   ],
 };
 
@@ -55,7 +55,7 @@ describe('GuideStartIndex', () => {
     expect(list.getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       '1How the app thinksA day.',
       '2Read a resultHits and misses.',
-      '3Build a screenFrom a playbook.',
+      '3Build a screenFrom a screener.',
     ]);
     expect(list.getByRole('link', { name: 'Read a result' })).toHaveAttribute(
       'href',
@@ -93,9 +93,9 @@ describe('GuideStart', () => {
     );
     expect(next.getByRole('link', { name: 'Breakout' })).toHaveAttribute(
       'href',
-      '/guide/playbooks/breakout',
+      '/guide/screeners/breakout',
     );
-    expect(next.getByText('Playbooks')).toBeInTheDocument();
+    expect(next.getByText('Screeners')).toBeInTheDocument();
     expect(
       within(screen.getByRole('navigation', { name: 'Next page' })).getByRole('link'),
     ).toHaveAttribute('href', '/guide/start/build_a_screen');

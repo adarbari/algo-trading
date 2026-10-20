@@ -334,7 +334,7 @@ export type GuideEdgeQueryVariables = Exact<{
 }>;
 
 
-export type GuideEdgeQuery = { guideEdge: { fields: Array<string>, seeAlso: Array<string>, summary: { id: string, name: string, thesis: string, mechanism: string | null, asset: string, assetText: string, side: string, sideTerm: string, holdingSessions: Array<number>, holdingText: string, holdingBand: string, status: string }, mechanism: { id: string, title: string } | null, thesis: { segments: Array<{ text: string, field: string | null }> }, otherSide: { segments: Array<{ text: string, field: string | null }> }, lasts: { segments: Array<{ text: string, field: string | null }> }, research: { measure: string, figure: string, expect: string, haircut: string, horizonText: string, leg: string, sample: string | null, source: string, terms: Array<string> } | null, tests: Array<{ key: string, title: string, text: string, term: string | null }>, playbooks: Array<{ id: string, name: string, family: string | null }>, failureModes: { segments: Array<{ text: string, field: string | null }> } | null, decoys: { segments: Array<{ text: string, field: string | null }> } | null, rejection: { segments: Array<{ text: string, field: string | null }> } | null, capacity: { segments: Array<{ text: string, field: string | null }> } | null, sources: Array<{ title: string, url: string | null, form: string }>, related: Array<{ id: string, name: string, thesis: string, mechanism: string | null, asset: string, assetText: string, side: string, sideTerm: string, holdingSessions: Array<number>, holdingText: string, holdingBand: string, status: string }> } | null };
+export type GuideEdgeQuery = { guideEdge: { fields: Array<string>, seeAlso: Array<string>, summary: { id: string, name: string, thesis: string, mechanism: string | null, asset: string, assetText: string, side: string, sideTerm: string, holdingSessions: Array<number>, holdingText: string, holdingBand: string, status: string }, mechanism: { id: string, title: string } | null, thesis: { segments: Array<{ text: string, field: string | null }> }, otherSide: { segments: Array<{ text: string, field: string | null }> }, lasts: { segments: Array<{ text: string, field: string | null }> }, research: { measure: string, figure: string, expect: string, haircut: string, horizonText: string, leg: string, sample: string | null, source: string, terms: Array<string> } | null, tests: Array<{ key: string, title: string, text: string, term: string | null }>, screeners: Array<{ id: string, name: string, family: string | null }>, failureModes: { segments: Array<{ text: string, field: string | null }> } | null, decoys: { segments: Array<{ text: string, field: string | null }> } | null, rejection: { segments: Array<{ text: string, field: string | null }> } | null, capacity: { segments: Array<{ text: string, field: string | null }> } | null, sources: Array<{ title: string, url: string | null, form: string }>, related: Array<{ id: string, name: string, thesis: string, mechanism: string | null, asset: string, assetText: string, side: string, sideTerm: string, holdingSessions: Array<number>, holdingText: string, holdingBand: string, status: string }> } | null };
 
 export type GuideEdgeIndexQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -346,38 +346,50 @@ export type GuideMechanismsQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type GuideMechanismsQuery = { guideIndex: { mechanisms: Array<{ id: string, title: string, count: number }> } | null };
 
-export type GuidePlaybookEdgesQueryVariables = Exact<{
+export type GuideScreenerEdgesQueryVariables = Exact<{
   id: string;
 }>;
 
 
-export type GuidePlaybookEdgesQuery = { guidePlaybook: { edges: Array<{ id: string, name: string, thesis: string, status: string }> } | null };
+export type GuideScreenerEdgesQuery = { guideScreener: { edges: Array<{ id: string, name: string, thesis: string, status: string }> } | null };
 
 export type GuideIndexQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GuideIndexQuery = { guideIndex: { sections: Array<{ id: string, title: string, purpose: string, entries: number }>, themeGroups: Array<{ id: string, title: string, themes: Array<{ theme: string, fields: number }> }>, intents: Array<{ intent: string, fields: number }>, families: Array<{ id: string, title: string, playbooks: Array<{ id: string, name: string }> }>, situations: Array<{ name: string, fields: number, slug: string }>, indicators: Array<{ key: string, plainName: string, pace: string }>, episodes: Array<{ key: string, name: string }>, startPages: Array<{ id: string, order: number, title: string, summary: string }>, terms: Array<{ id: string, term: string, short: string }> } | null };
+export type GuideIndexQuery = { guideIndex: { sections: Array<{ id: string, title: string, purpose: string, entries: number }>, themeGroups: Array<{ id: string, title: string, themes: Array<{ theme: string, fields: number }> }>, intents: Array<{ intent: string, fields: number }>, families: Array<{ id: string, title: string, screeners: Array<{ id: string, name: string }> }>, situations: Array<{ name: string, fields: number, slug: string }>, indicators: Array<{ key: string, plainName: string, pace: string }>, episodes: Array<{ key: string, name: string }>, startPages: Array<{ id: string, order: number, title: string, summary: string }>, terms: Array<{ id: string, term: string, short: string }> } | null };
 
 export type GuideFieldQueryVariables = Exact<{
   name: string;
 }>;
 
 
-export type GuideFieldQuery = { guideField: { related: Array<string>, readsLinked: { segments: Array<{ text: string, field: string | null }> } | null, caveatsLinked: Array<{ segments: Array<{ text: string, field: string | null }> }>, playbooks: Array<{ id: string, name: string, family: string | null, rules: Array<string>, column: boolean, rank: boolean, flag: boolean }>, situations: Array<{ name: string, slug: string, signsLinked: { segments: Array<{ text: string, field: string | null }> } }> } | null };
-
-export type GuidePlaybookQueryVariables = Exact<{
-  id: string;
-}>;
-
-
-export type GuidePlaybookQuery = { guidePlaybook: { id: string, name: string, family: string | null, familyTitle: string | null, version: number | null, tieBreak: string | null, tieBreakDescending: boolean, prose: { sources: Array<string>, summary: { segments: Array<{ text: string, field: string | null }> }, hit: { segments: Array<{ text: string, field: string | null }> }, notChecked: { segments: Array<{ text: string, field: string | null }> }, beforeActing: Array<{ segments: Array<{ text: string, field: string | null }> }> } | null, criteria: Array<{ name: string, asks: string | null, field: string, rule: string, mode: string, onMiss: string | null }>, related: Array<{ id: string, name: string, reason: string }>, situations: Array<{ slug: string, name: string, fields: Array<string> }> } | null };
+export type GuideFieldQuery = { guideField: { related: Array<string>, readsLinked: { segments: Array<{ text: string, field: string | null }> } | null, caveatsLinked: Array<{ segments: Array<{ text: string, field: string | null }> }>, screeners: Array<{ id: string, name: string, family: string | null, rules: Array<string>, column: boolean, rank: boolean, flag: boolean }>, situations: Array<{ name: string, slug: string, signsLinked: { segments: Array<{ text: string, field: string | null }> } }> } | null };
 
 export type GuideSituationQueryVariables = Exact<{
   slug: string;
 }>;
 
 
-export type GuideSituationQuery = { guideSituation: { slug: string, name: string, affects: Array<string>, signs: { segments: Array<{ text: string, field: string | null }> }, do: { segments: Array<{ text: string, field: string | null }> }, playbooks: Array<{ id: string, name: string, fields: Array<string> }> } | null };
+export type GuideSituationQuery = { guideSituation: { slug: string, name: string, affects: Array<string>, signs: { segments: Array<{ text: string, field: string | null }> }, do: { segments: Array<{ text: string, field: string | null }> }, screeners: Array<{ id: string, name: string, fields: Array<string> }> } | null };
+
+export type GuideScreenerIndexQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GuideScreenerIndexQuery = { guideScreenerIndex: { what: string, versusEdge: string, count: number, categories: Array<{ id: string, title: string, purpose: string, count: number }> } | null };
+
+export type GuideScreenerCategoryQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type GuideScreenerCategoryQuery = { guideScreenerCategory: { id: string, title: string, purpose: string, intro: string, screeners: Array<{ id: string, name: string, line: string, edges: Array<{ id: string, name: string, status: string }> }> } | null };
+
+export type GuideScreenerQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type GuideScreenerQuery = { guideScreener: { id: string, name: string, family: string | null, familyTitle: string | null, version: number | null, tieBreak: string | null, tieBreakDescending: boolean, prose: { summary: { segments: Array<{ text: string, field: string | null, source: number | null }> }, hit: { segments: Array<{ text: string, field: string | null, source: number | null }> }, notChecked: { segments: Array<{ text: string, field: string | null, source: number | null }> }, beforeActing: Array<{ segments: Array<{ text: string, field: string | null, source: number | null }> }>, sources: Array<{ title: string, url: string | null, note: string }> } | null, criteria: Array<{ name: string, asks: string | null, field: string, rule: string, mode: string, onMiss: string | null }>, related: Array<{ id: string, name: string, reason: string }>, situations: Array<{ slug: string, name: string, fields: Array<string> }> } | null };
 
 export type HarnessRunsQueryVariables = Exact<{
   limit: number;
@@ -2151,7 +2163,7 @@ export const GuideEdgeDocument = new TypedDocumentString(`
       text
       term
     }
-    playbooks {
+    screeners {
       id
       name
       family
@@ -2301,9 +2313,9 @@ export const GuideMechanismsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideMechanismsQuery, GuideMechanismsQueryVariables>;
-export const GuidePlaybookEdgesDocument = new TypedDocumentString(`
-    query GuidePlaybookEdges($id: String!) {
-  guidePlaybook(id: $id) {
+export const GuideScreenerEdgesDocument = new TypedDocumentString(`
+    query GuideScreenerEdges($id: String!) {
+  guideScreener(id: $id) {
     edges {
       id
       name
@@ -2312,7 +2324,7 @@ export const GuidePlaybookEdgesDocument = new TypedDocumentString(`
     }
   }
 }
-    `) as unknown as TypedDocumentString<GuidePlaybookEdgesQuery, GuidePlaybookEdgesQueryVariables>;
+    `) as unknown as TypedDocumentString<GuideScreenerEdgesQuery, GuideScreenerEdgesQueryVariables>;
 export const GuideIndexDocument = new TypedDocumentString(`
     query GuideIndex {
   guideIndex {
@@ -2337,7 +2349,7 @@ export const GuideIndexDocument = new TypedDocumentString(`
     families {
       id
       title
-      playbooks {
+      screeners {
         id
         name
       }
@@ -2386,7 +2398,7 @@ export const GuideFieldDocument = new TypedDocumentString(`
       }
     }
     related
-    playbooks {
+    screeners {
       id
       name
       family
@@ -2408,9 +2420,70 @@ export const GuideFieldDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<GuideFieldQuery, GuideFieldQueryVariables>;
-export const GuidePlaybookDocument = new TypedDocumentString(`
-    query GuidePlaybook($id: String!) {
-  guidePlaybook(id: $id) {
+export const GuideSituationDocument = new TypedDocumentString(`
+    query GuideSituation($slug: String!) {
+  guideSituation(slug: $slug) {
+    slug
+    name
+    signs {
+      segments {
+        text
+        field
+      }
+    }
+    do {
+      segments {
+        text
+        field
+      }
+    }
+    affects
+    screeners {
+      id
+      name
+      fields
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideSituationQuery, GuideSituationQueryVariables>;
+export const GuideScreenerIndexDocument = new TypedDocumentString(`
+    query GuideScreenerIndex {
+  guideScreenerIndex {
+    what
+    versusEdge
+    count
+    categories {
+      id
+      title
+      purpose
+      count
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideScreenerIndexQuery, GuideScreenerIndexQueryVariables>;
+export const GuideScreenerCategoryDocument = new TypedDocumentString(`
+    query GuideScreenerCategory($id: String!) {
+  guideScreenerCategory(id: $id) {
+    id
+    title
+    purpose
+    intro
+    screeners {
+      id
+      name
+      line
+      edges {
+        id
+        name
+        status
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideScreenerCategoryQuery, GuideScreenerCategoryQueryVariables>;
+export const GuideScreenerDocument = new TypedDocumentString(`
+    query GuideScreener($id: String!) {
+  guideScreener(id: $id) {
     id
     name
     family
@@ -2421,27 +2494,35 @@ export const GuidePlaybookDocument = new TypedDocumentString(`
         segments {
           text
           field
+          source
         }
       }
       hit {
         segments {
           text
           field
+          source
         }
       }
       notChecked {
         segments {
           text
           field
+          source
         }
       }
       beforeActing {
         segments {
           text
           field
+          source
         }
       }
-      sources
+      sources {
+        title
+        url
+        note
+      }
     }
     criteria {
       name
@@ -2465,33 +2546,7 @@ export const GuidePlaybookDocument = new TypedDocumentString(`
     }
   }
 }
-    `) as unknown as TypedDocumentString<GuidePlaybookQuery, GuidePlaybookQueryVariables>;
-export const GuideSituationDocument = new TypedDocumentString(`
-    query GuideSituation($slug: String!) {
-  guideSituation(slug: $slug) {
-    slug
-    name
-    signs {
-      segments {
-        text
-        field
-      }
-    }
-    do {
-      segments {
-        text
-        field
-      }
-    }
-    affects
-    playbooks {
-      id
-      name
-      fields
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<GuideSituationQuery, GuideSituationQueryVariables>;
+    `) as unknown as TypedDocumentString<GuideScreenerQuery, GuideScreenerQueryVariables>;
 export const HarnessRunsDocument = new TypedDocumentString(`
     query HarnessRuns($limit: Int!) {
   harnessRuns(limit: $limit) {

@@ -1,6 +1,6 @@
 """``Query.guideEdgeIndex``, ``guideMechanism``, ``guideEdge`` over the repo's site configs (ADR
 0051), and the mechanism and edge kinds of ``guideEntries``, the Guide index's rail and a
-playbook's edges: the shapes the web reads; null for an unknown id; no user's edge."""
+screener's edges: the shapes the web reads; null for an unknown id; no user's edge."""
 
 from typing import Any
 
@@ -34,7 +34,7 @@ EDGE = f"""query E($id: String!) {{
     summary {{ {ROW} }} mechanism {{ id title }}
     thesis {{ text }} otherSide {{ text segments {{ text field }} }} lasts {{ text }}
     research {{ measure figure expect haircut horizonText leg sample source terms }}
-    tests {{ key title text term }} playbooks {{ id name family }} fields
+    tests {{ key title text term }} screeners {{ id name family }} fields
     failureModes {{ text }} decoys {{ text }} rejection {{ text }} capacity {{ text }}
     sources {{ title url form }} related {{ id name }} seeAlso
   }}
@@ -44,7 +44,7 @@ ENTRIES = """query N($refs: [GuideRef!]!) {
     mechanisms { id title } edges { summary { id name } }
   }
 }"""
-PLAYBOOK = "query P($id: String!) { guidePlaybook(id: $id) { id edges { id name status } } }"
+SCREENER = "query P($id: String!) { guideScreener(id: $id) { id edges { id name status } } }"
 
 
 def _data(graph: Graph, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -83,7 +83,7 @@ def test_an_edge_page(graph: Graph) -> None:
     assert page["research"]["haircut"].endswith("planning haircut")
     keys = [t["key"] for t in page["tests"]]
     assert keys[:3] == ["outcome", "horizon", "trigger"]
-    assert page["playbooks"][0]["id"] == "momentum_12_1" and page["fields"]
+    assert page["screeners"][0]["id"] == "momentum_12_1" and page["fields"]
     assert page["sources"] and page["related"] and page["seeAlso"]
 
 
@@ -100,7 +100,7 @@ def test_unknown_ids_are_null(graph: Graph) -> None:
     assert _data(graph, EDGE, {"id": "nope"})["guideEdge"] is None
 
 
-def test_the_batched_entries_and_the_playbook_backlink(graph: Graph) -> None:
+def test_the_batched_entries_and_the_screener_backlink(graph: Graph) -> None:
     refs = [
         {"kind": "EDGE", "id": "momentum_12_1"},
         {"kind": "MECHANISM", "id": "forced_flows"},
@@ -109,8 +109,8 @@ def test_the_batched_entries_and_the_playbook_backlink(graph: Graph) -> None:
     found = _data(graph, ENTRIES, {"refs": refs})["guideEntries"]
     assert [e["summary"]["id"] for e in found["edges"]] == ["momentum_12_1"]
     assert [m["id"] for m in found["mechanisms"]] == ["forced_flows"]
-    playbook = _data(graph, PLAYBOOK, {"id": "momentum_12_1"})["guidePlaybook"]
-    assert "momentum_12_1" in [e["id"] for e in playbook["edges"]]
+    screener = _data(graph, SCREENER, {"id": "momentum_12_1"})["guideScreener"]
+    assert "momentum_12_1" in [e["id"] for e in screener["edges"]]
 
 
 def test_the_guide_index_lists_the_mechanisms(graph: Graph) -> None:

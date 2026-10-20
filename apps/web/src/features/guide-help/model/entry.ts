@@ -3,7 +3,7 @@
  * the catalogue name), `indicator` (a regime card's key) and `episode` (a reference market
  * fall's slug), `term` (a glossary term's id), `start` (a Start here page's id), `mechanism` and
  * `edge` (a mechanism's or a site edge's id in the Edges section); the others
- * (situation, playbook) join this union as their drawers ship (docs/ui/guide.md section 4).
+ * (situation, screener) join this union as their drawers ship (docs/ui/guide.md section 4).
  */
 import {
   edgeGuidePath,

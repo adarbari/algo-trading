@@ -1,0 +1,38 @@
+# L3 site setting: the Guide's screener for the site preset asset_growth (ADR 0051; docs/ui/guide.md
+# "The screener page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other screeners), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/screeners.py; fitness tests in
+# tests/unit/config/site/guide/test_screeners.py.
+id = "asset_growth"
+version = 1  # the preset version this prose was written for
+line = "Stocks ranked by how fast their total assets grew in a year."
+summary = "Ranks every tradeable stock by how fast its total assets grew over the past year, from the slowest and shrinking up to the fastest builders. Fast asset growth has been followed by low returns in the research;[^1] the fastest growers at the bottom are the avoid list. A candidate edge under test."
+hit = "The name is a listed common stock or ADR closing above $5 that trades at least $50M a day, and it has a year of asset growth. Every such name qualifies; the order is the point, the lowest asset growth first."
+not_checked = "It does not know whether the growth was organic, an acquisition or an issue of shares or debt, and it does not check price, quality or size."
+before_acting = [
+  "Total assets include cash raised and not yet spent: compare rollup.mispricing@v1.asset_growth with feature.net_issuance_pct_12m, since a recent offering lifts both.[^2]",
+  "A shrinking balance sheet can be distress, not discipline: rollup.mispricing@v1.ohlson_o shows which shrinkers are also weak.",
+  "The year-ago balance sheet is the one within 40 days of a year back: a company that changed its fiscal year-end can have a gap, and the value is then missing rather than guessed.",
+]
+related = [
+  { id = "net_share_issuance", reason = "the financing side of the same growth" },
+]
+
+[[sources]]
+title = "Cooper, Gulen and Schill, Asset Growth and the Cross-Section of Stock Returns (2008)"
+url = "https://doi.org/10.1111/j.1540-6261.2008.01370.x"
+note = "Firms with high asset growth earn lower later returns than firms with low asset growth, in large and small stocks alike."
+
+[[sources]]
+title = "Cooper, Gulen and Ion, The Use and Misuse of Investment Measures"
+note = "A working paper on how different investment measures are built and misread."
+
+[asks]
+security_type = "A common stock or ADR"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+growth = "Has a year of asset growth"

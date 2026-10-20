@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from algotrade.config.strategy.regime import REGIME_LABELS
 from algotrade.config.strategy.resolve import ResolvedConfig
-from algotrade.config.strategy.schema import RULE_IMPLS
+from algotrade.config.strategy.schema import RULE_IMPLS, SCREENER
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.predicates import RuleValue
@@ -20,7 +20,6 @@ from algotrade.services.configs import config_ids, resolve_config
 from algotrade.services.read.context import ReadContext, catalogue_key
 from algotrade.strategies.screeners.rules.groups import plan
 
-SCREENER = "screener"
 SITE_SCOPE = "site"
 
 

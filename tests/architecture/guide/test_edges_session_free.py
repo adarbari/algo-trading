@@ -1,8 +1,8 @@
-"""The Guide's Edges read objects are session-free and show no harness result (ADR 0051;
-docs/ui/guide.md, "Edges"): ``services/read/guide/edges`` reads the edge documents and the site
-configs only, so it never imports the session, a store, the evaluation read model or the
-outcomes, and never touches ``ctx.session`` or ``ctx.reader``. A live number on a Guide page
-would make it depend on the day it is read."""
+"""The Guide's Edges and Screeners read objects are session-free and show no harness result
+(ADR 0051; docs/ui/guide.md, "Edges", "Screeners"): ``services/read/guide/edges`` and
+``.../screeners`` read the edge documents and the site configs only, so they never import the
+session, a store, the evaluation read model or the outcomes, and never touch ``ctx.session`` or
+``ctx.reader``. A live number on a Guide page would make it depend on the day it is read."""
 
 import ast
 from pathlib import Path
@@ -11,7 +11,8 @@ import pytest
 
 from tests.conftest import REPO_ROOT
 
-FOLDER = REPO_ROOT / "src" / "algotrade" / "services" / "read" / "guide" / "edges"
+GUIDE = REPO_ROOT / "src" / "algotrade" / "services" / "read" / "guide"
+FOLDERS = (GUIDE / "edges", GUIDE / "screeners")
 FORBIDDEN_IMPORTS = (
     "algotrade.services.read.session",
     "algotrade.services.read.evaluation",
@@ -30,7 +31,7 @@ FORBIDDEN_ATTRIBUTES = ("session", "reader")  # ctx.session, ctx.reader
 
 
 def _files() -> list[Path]:
-    return sorted(FOLDER.glob("*.py"))
+    return sorted(p for folder in FOLDERS for p in folder.glob("*.py"))
 
 
 def _imports(tree: ast.AST) -> list[str]:
@@ -44,14 +45,14 @@ def _imports(tree: ast.AST) -> list[str]:
 
 
 @pytest.mark.parametrize("path", _files(), ids=lambda p: p.name)
-def test_the_edges_folder_imports_no_session_store_or_result(path: Path) -> None:
+def test_the_guide_folders_import_no_session_store_or_result(path: Path) -> None:
     tree = ast.parse(path.read_text())
     bad = [i for i in _imports(tree) if i.startswith(FORBIDDEN_IMPORTS)]
     assert bad == [], f"{path.name}: the Guide shows no live number; it imports {bad}"
 
 
 @pytest.mark.parametrize("path", _files(), ids=lambda p: p.name)
-def test_the_edges_folder_reads_no_session_or_reader_attribute(path: Path) -> None:
+def test_the_guide_folders_read_no_session_or_reader_attribute(path: Path) -> None:
     tree = ast.parse(path.read_text())
     bad = sorted(
         {
@@ -67,4 +68,5 @@ def test_the_edges_folder_reads_no_session_or_reader_attribute(path: Path) -> No
 
 
 def test_the_folder_is_not_empty() -> None:
-    assert len(_files()) >= 5
+    assert len(list(FOLDERS[0].glob("*.py"))) >= 5
+    assert len(list(FOLDERS[1].glob("*.py"))) >= 4
