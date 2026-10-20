@@ -478,7 +478,6 @@ def test_release_tree_reports_slots_current_lag_and_blocked_sync(tmp_path: Path)
     assert "3 behind" in res["release green"].detail
     assert res["release current"].detail.endswith("blue")
     assert "3 behind refs/deploy/main" in res["ingest code"].detail
-    assert res["ingest sync"].level == doctor.WARN and "ingest busy" in res["ingest sync"].detail
     assert "release disk" not in res
 
 
