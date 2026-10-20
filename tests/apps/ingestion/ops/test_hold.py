@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from algotrade.services.jobs import INGEST_LOCK
+from algotrade.services.jobs.exclusive import INGEST_TREE_LOCK
 from algotrade.storage.backends.local import LocalBackend
 from algotrade_ingestion.cli import main as cli
 from algotrade_ingestion.ops.hold import BUSY, DEPLOY_LOCK, hold
@@ -15,7 +16,7 @@ def test_hold_runs_when_nothing_is_taken(tmp_path: Path) -> None:
     assert hold(LocalBackend(tmp_path), lambda: 7) == 7
 
 
-@pytest.mark.parametrize("name", [INGEST_LOCK, DEPLOY_LOCK])
+@pytest.mark.parametrize("name", [INGEST_LOCK, DEPLOY_LOCK, INGEST_TREE_LOCK])
 def test_hold_is_busy_while_another_process_holds_a_lock(tmp_path: Path, name: str) -> None:
     other = LocalBackend(tmp_path).lock(name)  # another FileLock on the same file, as a process
     assert other.acquire(wait=False)
@@ -83,3 +84,13 @@ def test_the_cli_deploy_only_flag_skips_the_ingest_lock(
         assert cli.main(["deploy-hold", "--deploy-only", "--", "sh", "-c", "exit 3"]) == 3
     finally:
         held.release()
+
+
+def test_deploy_only_hold_ignores_the_ingest_tree_lock(tmp_path: Path) -> None:
+    # a serving deploy must run while compact-runs holds the ingest-tree lock (ADR 0079)
+    other = LocalBackend(tmp_path).lock(INGEST_TREE_LOCK)
+    assert other.acquire(wait=False)
+    try:
+        assert hold(LocalBackend(tmp_path), lambda: 3, ingest=False) == 3
+    finally:
+        other.release()
