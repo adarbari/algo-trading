@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Update the running site from its release tree (docs/hosting.md, ADRs 0057 and 0079).
 #
-#   scripts/ops/deploy.sh [--dry-run]   manual: fetch main and do everything (sync, web, restart)
+#   var/release/current/scripts/ops/deploy.sh [--dry-run]   manual (the entry point; the main checkout's copy lags): fetch main and do everything (sync, web, restart)
 #   scripts/ops/deploy.sh --auto        the launchd agent com.algotrade.deploy (every 5 minutes):
 #                                       deploy only what origin/main changed since the last deploy
 #   scripts/ops/deploy.sh --clear       print why auto-deploy is blocked and let it run again
@@ -29,7 +29,7 @@ PRIVATE_REF=refs/deploy/main
 MIN_FREE_KB=5242880  # 5 GB: the floor of the free-space check (else 3x the tree)
 
 main() {
-  local dry=0 mode=manual clear=0 apply=0 init=0 slot="${ALGOTRADE_DEPLOY_SLOT:-blue}"
+  local dry=0 mode=manual clear=0 apply=0 init=0 slot="${ALGOTRADE_DEPLOY_SLOT:-}"
   local script
   script="$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")"  # physical: a flip of `current` never moves it
   while [ $# -gt 0 ]; do
@@ -46,13 +46,16 @@ main() {
     shift
   done
   if [ $# -gt 0 ] && [ "$apply" = 0 ]; then
-    echo "usage: scripts/ops/deploy.sh [--dry-run | --auto | --clear | --init-release] [--slot NAME]" >&2
+    echo "usage: var/release/current/scripts/ops/deploy.sh [--dry-run | --auto | --clear | --init-release] [--slot NAME]" >&2
     return 2
   fi
 
   local root
   root=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
   cd "$root"
+  if [ -z "$slot" ]; then  # the active slot, else the first one
+    if [ -L var/release/current ]; then slot=$(basename "$(readlink var/release/current)"); else slot=blue; fi
+  fi
   local state=var/deploy log=var/logs/deploy.log
   local tree="$root/var/release/$slot" webdir="$root/var/release/$slot.web"
   local api="${ALGOTRADE_DEPLOY_API:-$tree/.venv/bin/algotrade-api}"
@@ -201,7 +204,8 @@ slot_links() {
   if [ "$dry" = 1 ]; then echo "[dry-run] link var, .env, config/users, config/site/*.local.toml into $tree"; return 0; fi
   link_one "$root_dir/var" "$tree/var" || return 1
   if [ -e "$root_dir/.env" ]; then link_one "$root_dir/.env" "$tree/.env" || return 1; fi
-  if [ -d "$root_dir/config/users" ]; then link_one "$root_dir/config/users" "$tree/config/users" || return 1; fi
+  mkdir -p "$root_dir/config/users"  # always linked: a first user-config write must not make a real dir in the tree
+  link_one "$root_dir/config/users" "$tree/config/users" || return 1
   for f in "$root_dir"/config/site/*.local.toml; do
     if [ -e "$f" ]; then link_one "$f" "$tree/config/site/$(basename "$f")" || return 1; fi
   done
@@ -229,7 +233,7 @@ slot_prepare() {
 
 slot_update() {  # move the tree to the target, then sync and build what the plan says
   local target=$1
-  run git -C "$tree" checkout -q --detach "$target" || { block "checkout of ${target:0:9} in the release tree failed"; return 1; }
+  run git -C "$tree" checkout -q --force --detach "$target" || { block "checkout of ${target:0:9} in the release tree failed"; return 1; }
   run git -C "$tree" reset -q --hard "$target" || { block "reset of the release tree to ${target:0:9} failed"; return 1; }
   if [ "$dry" = 0 ] && [ -n "$(git -C "$tree" status --porcelain -uno --ignore-submodules)" ]; then
     block "the release tree is not clean at ${target:0:9}"; return 1
@@ -274,6 +278,9 @@ apply_phase() {
   shift 2
   local acts=" $* " before
   before=$(git -C "$tree" rev-parse HEAD)
+  # a later manual deploy must not be rewound by an earlier-planned cycle
+  git merge-base --is-ancestor "$before" "$target" \
+    || { say "skipped: tree already past ${target:0:9}"; return 0; }
   slot_prepare || return 1
   slot_update "$target" || return 1
   slot_activate "$target" || return 1
@@ -338,6 +345,10 @@ init_release() {
   fi
   fetch_private || { echo "refusing: git fetch failed" >&2; return 1; }
   target=$(git rev-parse "$PRIVATE_REF")
+  if [ -L "$root/var/release/current" ] && [ "$(basename "$(readlink "$root/var/release/current")")" != "$slot" ]; then
+    echo "refusing: var/release/current points at $(readlink "$root/var/release/current"), not $slot (only the blue/green flip moves it)" >&2
+    return 1
+  fi
   if [ -z "${ALGOTRADE_DEPLOY_REEXEC:-}" ] && [ "$dry" = 0 ] \
     && git cat-file -e "$target:scripts/ops/deploy.sh" 2> /dev/null \
     && ! git show "$target:scripts/ops/deploy.sh" | cmp -s - "$script"; then
@@ -361,7 +372,7 @@ init_release() {
     fi
     return "$rc"
   fi
-  if [ "$dry" = 0 ]; then ln -sfn "$slot" "$root/var/release/current"; fi
+  if [ "$dry" = 0 ] && [ ! -L "$root/var/release/current" ]; then ln -s "$slot" "$root/var/release/current"; fi
   say "init-release: $tree at ${target:0:9}"
   init_next "$slot"
 }

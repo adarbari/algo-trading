@@ -114,12 +114,12 @@ nothing. It needs `uv`, `npm`, `node`, `git` on the PATH it is written with.
 script):
 
 ```bash
-# 1. create the release tree (fetches main, builds the venv and the web, carries var/web's assets)
+# 1. stop the old deploy agent FIRST (it would keep swapping a var/web nothing serves)
+launchctl bootout gui/$(id -u)/com.algotrade.deploy
+# 2. create the release tree (fetches main, builds the venv and the web, carries var/web's assets)
 git -C ~/workspace/algo-trading fetch --refmap= -q origin +main:refs/deploy/main
 git -C ~/workspace/algo-trading show refs/deploy/main:scripts/ops/deploy.sh > /tmp/deploy.sh
 (cd ~/workspace/algo-trading && bash /tmp/deploy.sh --init-release)   # prints the next commands
-# 2. stop the old deploy agent first (it would keep swapping a var/web nothing serves)
-launchctl bootout gui/$(id -u)/com.algotrade.deploy
 # 3. write both agents from the tree and install them together (each prints its commands)
 var/release/blue/.venv/bin/algotrade-api schedule --tree var/release/blue
 var/release/blue/.venv/bin/algotrade-api schedule --agent deploy --tree var/release/blue
@@ -143,7 +143,7 @@ var/release/blue/.venv/bin/algotrade-api schedule --agent deploy --tree var/rele
 - **Plists:** when a launchd plist writer changed, the cycle regenerates the agents (with
   `--tree`) into `var/deploy/plists/`, compares them with `~/Library/LaunchAgents/` and notifies
   "reinstall"; it never installs or blocks. Reinstall with the commands each `schedule` prints.
-- The manual `scripts/ops/deploy.sh` (and `--dry-run`) deploys the release tree completely: sync,
+- The manual entry point is `var/release/current/scripts/ops/deploy.sh` (the main checkout's copy lags; `--dry-run`, `--clear` too); it deploys the release tree completely: sync,
   web, restart.
 
 ### The monthly Tiingo history fill (launchd)

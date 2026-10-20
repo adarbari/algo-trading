@@ -200,7 +200,7 @@ def test_dry_run_prints_the_whole_plan_and_runs_nothing(site: Site) -> None:
     assert [Path(h).name for h in heads] == [
         "link", "git", "git", "uv", "make", "launchctl", "algotrade-api", "swap", "algotrade-api",
     ]  # fmt: skip
-    assert "checkout -q --detach" in plan[1] and "reset -q --hard" in plan[2]
+    assert "checkout -q --force --detach" in plan[1] and "reset -q --hard" in plan[2]
     assert "sync --all-packages --locked" in plan[3]
     assert "web-build" in plan[4] and "kickstart -k" in plan[5]
     assert "--check api" in plan[6] and "--check web" in plan[8]
@@ -430,9 +430,50 @@ def test_too_little_free_disk_blocks_before_anything_moves(site: Site) -> None:
 def test_a_dirty_release_tree_is_reset_to_the_target(site: Site) -> None:
     site.seed()
     (site.tree / "a.txt").write_text("edited in the deployer's tree\n")
-    sha = _advance(site.repo, "src/algotrade/x.py")
+    sha = _advance(site.repo, "a.txt")  # the target changes the very file that is dirty
     assert site.run("--auto").returncode == 0
     assert _git(site.tree, "status", "--porcelain", "-uno") == "" and site.served() == sha
+    assert (site.tree / "a.txt").read_text() == "a.txt"
+
+
+def test_an_earlier_planned_cycle_does_not_rewind_a_later_deploy(site: Site) -> None:
+    site.seed()
+    old = _advance(site.repo, "src/a.py")
+    new = _advance(site.repo, "src/b.py")
+    assert site.run("--auto").returncode == 0 and site.served() == new
+    out = site.run("--slot", "blue", "--apply", "auto", old, "restart")
+    assert out.returncode == 0 and site.served() == new
+    assert site.state("last_sha").read_text().strip() == new
+    assert f"skipped: tree already past {old[:9]}" in site.log()
+
+
+def test_config_users_is_always_linked(site: Site) -> None:
+    site.seed()
+    _advance(site.repo, "src/a.py")
+    assert site.run("--auto").returncode == 0
+    assert (site.tree / "config" / "users").is_symlink()
+    assert (site.repo / "config" / "users").is_dir()
+
+
+def test_the_default_slot_follows_current(site: Site) -> None:
+    green = site.repo / "var" / "release" / "green"
+    _git(site.repo, "worktree", "add", "-q", "--detach", str(green))
+    (site.tree.parent / "current").unlink()
+    (site.tree.parent / "current").symlink_to("green")
+    site.seed()
+    sha = _advance(site.repo, "src/a.py")
+    assert site.run("--auto").returncode == 0
+    assert _git(green, "rev-parse", "HEAD") == sha and site.served() != sha
+
+
+def test_init_release_never_repoints_current(site: Site) -> None:
+    _git(site.repo, "worktree", "remove", "--force", str(site.tree))
+    (site.tree.parent / "current").unlink()
+    (site.tree.parent / "current").symlink_to("green")
+    out = site.run("--init-release", "--slot", "blue")
+    assert out.returncode == 1 and "only the blue/green flip" in out.stderr
+    assert not site.tree.exists()
+    assert (site.tree.parent / "current").readlink() == Path("green")
 
 
 def test_a_failed_verify_blocks_notifies_and_keeps_last_sha(site: Site) -> None:
