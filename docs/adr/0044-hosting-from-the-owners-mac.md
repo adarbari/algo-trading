@@ -75,3 +75,6 @@ a new API.
 
 ## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
 See [0077](0077-serving-release.md): the API warms a second process on another port and swaps after a probe; a front proxy on the fixed Funnel target flips between blue and green (decided 2026-10-19).
+
+## Amendment 2026-10-20: the release tree (proposed, ADR 0079)
+See [0079](0079-release-tree-deploy.md): the API agent runs from `var/release/<slot>` (own venv, own web build) instead of the main checkout.
