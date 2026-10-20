@@ -66,7 +66,7 @@ from algotrade.storage.backends.local_index import (
     safe,
     write_index,
 )
-from algotrade.storage.backends.run_compaction import plan_compaction, verify_plan
+from algotrade.storage.backends.run_compaction import kept_entries, plan_compaction, verify_plan
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     StaleSnapshotError,
@@ -414,15 +414,7 @@ class LocalTables:
         if plan.skipped or plan.noop:
             return CompactionReport(before, before, size_before, size_before, 0, plan.skipped)
         fresh = {r: f"run={r}~{secrets.token_hex(4)}.parquet" for r in plan.rewritten}
-        kept = {
-            r: replace(
-                expected[r],
-                ref=fresh.get(r, expected[r].ref),
-                prev=None,
-                dropped=expected[r].dropped or expected[r].prev is not None,
-            )
-            for r in plan.kept
-        }
+        kept = kept_entries(expected, plan, fresh)
         encoded = {r: parquet_bytes(plan.kept[r]) for r in plan.rewritten}
         size_after = sum(len(encoded[r]) if r in encoded else sizes[r] for r in plan.kept)
         report = CompactionReport(before, len(kept), size_before, size_after, len(plan.dropped))

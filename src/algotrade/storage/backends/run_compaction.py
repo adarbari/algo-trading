@@ -18,7 +18,7 @@ the result before a backend swaps it in (``Commits.swap_runs`` locally).
 import math
 from collections import Counter
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import pairwise
 
 import pandas as pd
@@ -121,6 +121,23 @@ def plan_compaction(
         if len(changed) < data.num_rows:
             rewritten.append(run)
     return CompactionPlan(kept, tuple(dropped), tuple(rewritten))
+
+
+def kept_entries(
+    entries: Mapping[str, RunEntry], plan: CompactionPlan, fresh: Mapping[str, str]
+) -> dict[str, RunEntry]:
+    """The index of the compacted partition: each kept run's entry as it was (``knowledge_ts``,
+    ``visible_at``, ``seq`` and ``restates`` unchanged) with ``fresh[run]`` as the new reference of
+    a rewritten run, and its older version forgotten (a read pinned before it retries)."""
+    return {
+        r: replace(
+            entries[r],
+            ref=fresh.get(r, entries[r].ref),
+            prev=None,
+            dropped=entries[r].dropped or entries[r].prev is not None,
+        )
+        for r in plan.kept
+    }
 
 
 def _merged(table: str, runs: list[str], tables: Mapping[str, pa.Table]) -> pa.Table | None:

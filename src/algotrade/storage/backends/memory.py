@@ -9,7 +9,6 @@ A commit (ADR 0022) happens under that lock, so it is atomic and never left half
 import secrets
 import threading
 from collections.abc import Collection, Sequence
-from dataclasses import replace
 from datetime import UTC, date, datetime
 
 import pandas as pd
@@ -23,7 +22,7 @@ from algotrade.storage.backends.arrow import (
     to_frame,
 )
 from algotrade.storage.backends.local_index import safe
-from algotrade.storage.backends.run_compaction import plan_compaction, verify_plan
+from algotrade.storage.backends.run_compaction import kept_entries, plan_compaction, verify_plan
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     committed,
@@ -296,15 +295,7 @@ class MemoryTables:
             if plan.skipped or plan.noop:
                 return CompactionReport(before, before, size_before, size_before, 0, plan.skipped)
             fresh = {r: f"{expected[r].ref or ''}~{secrets.token_hex(4)}" for r in plan.rewritten}
-            kept = {
-                r: replace(
-                    expected[r],
-                    ref=fresh.get(r, expected[r].ref),
-                    prev=None,
-                    dropped=expected[r].dropped or expected[r].prev is not None,
-                )
-                for r in plan.kept
-            }
+            kept = kept_entries(expected, plan, fresh)
             size_after = sum(
                 len(parquet_bytes(plan.kept[r])) if r in fresh else size[r] for r in kept
             )
