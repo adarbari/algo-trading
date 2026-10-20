@@ -40,6 +40,10 @@ def run_universe_build(ctx: TaskContext, p: Params) -> RunRecord:
     if p.get("review_out"):
         universe_build.write_review(ctx.reader, session_of(p), p["review_out"])
         record.stats["review_out"] = str(p["review_out"])
+    if p.get("etf_review_out"):
+        path = Path(p["etf_review_out"])
+        rows = universe_build.write_etf_review(ctx.reader, session_of(p), path)
+        record.stats["etf_review_out"] = {"path": str(path), "rows": rows}
     if p.get("figi_review_out"):
         path = Path(p["figi_review_out"])
         rows = universe_build.write_figi_review(ctx.reader, session_of(p), path)

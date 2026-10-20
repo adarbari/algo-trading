@@ -1,0 +1,1243 @@
+symbol,category,theme,notes
+# Curated ETF category (ADR 0076): thematic or sector or broad or excluded. Built 2026-10-19 by an Opus review of the keyword rules output (universe.toml etf_category).
+# A row here wins over the keyword rules. Names the review could not settle are left out (UNKNOWN). Keep notes free of commas.
+AAAC,excluded,bond,CLO
+AAAP,excluded,bond,CLO
+AADR,broad,,ADR momentum
+AAPW,excluded,single_stock,AAPL
+AAPY,excluded,single_stock,AAPL options
+AAVM,broad,,global factor
+AAXJ,broad,,Asia ex Japan
+ABFL,broad,,FCF leaders
+ABI,excluded,bond,asset-based income
+ABLD,thematic,natural_resources,real assets
+ACHP,sector,technology,semiconductor industry fund
+ACKY,excluded,option_income,activist holdings distribution
+ACLO,excluded,bond,CLO
+ACSI,broad,,customer satisfaction factor
+ACSM,broad,,SMID active
+ACVF,thematic,esg_values,conservative values
+ACWV,broad,,min vol
+ADDS,broad,,index addition strategy
+ADME,excluded,option_income,drawdown managed with options
+ADPV,broad,,quant select
+AHBM,thematic,technology,Asia memory chips
+AIA,broad,,Asia 50
+AIEQ,broad,,diversified equity; no theme
+AIFR,sector,technology,semiconductor foundries
+AINP,excluded,bond,income plus
+AIQ,thematic,technology,agrees with rule; AI
+AIQU,excluded,leveraged,leveraged product
+AIRR,thematic,demographic_other,industrial renaissance reshoring story
+AIUP,broad,,AI used for stock picking
+AIVC,thematic,technology,AI value chain
+AIVI,broad,,AI-enhanced value
+AIVL,broad,,AI-enhanced value
+AIX,thematic,technology,AI tech
+AKRE,broad,,focus active
+ALLW,excluded,allocation,all weather
+ALTY,excluded,allocation,alternative income
+AMDW,excluded,single_stock,AMD
+AMEI,thematic,esg_values,Islamic equity income
+AMMO,thematic,demographic_other,defense supercycle or defense tech story
+AMOM,broad,,AI momentum
+AMYY,excluded,single_stock,AMD
+AMZP,excluded,single_stock,AMZN
+AMZW,excluded,single_stock,AMZN
+AOTG,thematic,technology,concentrated innovation growth
+APOC,excluded,option_income,defined protection
+ARCM,excluded,bond,reserve cash
+ARKK,thematic,technology,agrees with rule; active innovation theme
+ARMH,excluded,single_stock,ADR hedged
+ARMS,excluded,bond,multi-sector income
+ARMW,excluded,single_stock,ARM
+ARMY,thematic,demographic_other,defense
+ASEA,broad,,Southeast Asia
+ASHR,broad,,broad China fund
+ASHS,broad,,China A small cap
+ASMH,excluded,single_stock,ADR hedged
+ATFV,broad,,concentrated growth
+AUSF,broad,,factor
+AVGE,broad,,all equity
+AVGW,excluded,single_stock,AVGO
+AVOS,broad,,global equities
+AVSD,broad,,diversified ESG screen
+AVSE,broad,,diversified ESG screen
+AVSU,broad,,diversified ESG screen
+AVTM,broad,,total equity
+AVXC,broad,,EM ex China
+AZYY,excluded,single_stock,AMZN
+BABW,excluded,single_stock,BABA
+BAFE,broad,,flexible equity
+BAGX,broad,,aggressive investors
+BAI,thematic,technology,AI
+BALT,excluded,option_income,defined wealth shield
+BAMY,excluded,allocation,yield fund of funds
+BASG,broad,,diversified sustainable growth
+BASV,broad,,diversified sustainable value
+BAVA,excluded,commodity_fx,spot crypto
+BAY,thematic,regional_niche,Bay Area companies
+BBAX,broad,,diversified region fund
+BBB,excluded,allocation,S&P plus bitcoin
+BBC,sector,health_care,biotech industry index; paper calls IBB sector
+BBCA,broad,,Canada
+BBEU,broad,,Europe
+BBH,sector,health_care,biotech industry index; paper calls IBB sector
+BBJP,broad,,single large-country broad fund
+BBLU,broad,,diversified equity; no theme
+BBP,sector,health_care,biotech industry index; paper calls IBB sector
+BBYY,excluded,single_stock,BABA
+BCGD,broad,,global durable
+BCGS,broad,,global select
+BCHP,broad,,diversified equity; no theme
+BCSM,broad,,SMID
+BDRY,excluded,commodity_fx,futures or physical commodity; not equity
+BEEX,broad,,active US equity
+BESO,excluded,commodity_fx,spot crypto basket
+BFAP,excluded,option_income,FT Vest defined-outcome or target-income options
+BFJA,excluded,option_income,FT Vest defined-outcome or target-income options
+BFJL,excluded,option_income,FT Vest defined-outcome or target-income options
+BFOC,excluded,option_income,FT Vest defined-outcome or target-income options
+BFOR,broad,,Barrons 400
+BHYP,excluded,commodity_fx,spot crypto
+BIBL,thematic,esg_values,biblical values
+BILT,thematic,demographic_other,infrastructure
+BIOY,excluded,option_income,YieldBOOST put-selling income fund
+BITS,excluded,allocation,equity plus futures blend
+BITW,excluded,commodity_fx,spot crypto index
+BIZD,sector,financials,BDCs
+BKF,broad,,Brazil India China
+BLCK,thematic,crypto,crypto and digital asset equities
+BLES,thematic,esg_values,biblical values
+BLOK,thematic,crypto,agrees with rule; blockchain equities
+BLOX,excluded,option_income,crypto options income
+BLUI,excluded,allocation,diversified income
+BMED,thematic,health,health innovation
+BMSI,excluded,bond,multi-sector income
+BNDD,excluded,bond,rates options
+BNGE,thematic,consumer,streaming and gaming consumer theme
+BOAT,sector,industrials,shipping equities; transport industry
+BOTZ,thematic,technology,agrees with rule; robotics AI
+BOXX,excluded,bond,box spread cash
+BPAY,thematic,technology,fintech
+BPH,excluded,single_stock,ADR hedged
+BRAZ,broad,,single country broad
+BREW,thematic,consumer,coffee and energy drinks; not energy sector
+BRF,broad,,single country small cap
+BRKW,excluded,single_stock,BRKB
+BRNY,broad,,factor rotation
+BUG,thematic,technology,agrees with rule; cybersecurity
+BUIL,thematic,demographic_other,rebuild America infrastructure
+BUSM,broad,,ultra small
+BUYO,broad,,buyout beta
+BWET,excluded,commodity_fx,futures or physical commodity; not equity
+BWTG,broad,,TopGun index
+BYRE,sector,real_estate,active real estate
+CAAA,excluded,bond,CMBS
+CAML,broad,,large cap growth
+CANQ,excluded,option_income,equity and options income
+CAOS,excluded,volatility,tail risk
+CAPE,broad,,CAPE sector rotation
+CARY,excluded,bond,income
+CAS,excluded,option_income,China A exposure plus option income overlay
+CATH,thematic,esg_values,Catholic values
+CBOX,excluded,bond,box spread collateral
+CBSE,broad,,select equity
+CCEF,excluded,allocation,CEF arbitrage
+CCML,thematic,technology,MLCC components
+CCNR,thematic,natural_resources,natural resource equities not futures
+CCSO,thematic,clean_energy,climate solutions
+CDC,broad,,vol weighted income
+CDEI,thematic,esg_values,diversity
+CEFA,thematic,esg_values,Catholic values
+CEFS,excluded,allocation,closed-end funds
+CFA,broad,,vol weighted
+CFO,broad,,vol weighted
+CGCV,broad,,conservative equity
+CGFS,broad,,flagship equity
+CGMS,excluded,bond,multi-sector income
+CGNG,broad,,new geography equity
+CGRO,broad,,Greater China growth
+CHGX,broad,,diversified ESG or climate-tilted broad equity
+CHNL,excluded,commodity_fx,spot crypto
+CHPS,sector,technology,semiconductor industry fund
+CHRI,thematic,esg_values,Christian values
+CIBR,thematic,technology,agrees with rule; cybersecurity
+CLNK,excluded,commodity_fx,spot crypto
+CLOB,excluded,bond,CLO
+CLOC,excluded,bond,CLO
+CLOI,excluded,bond,CLO
+CLOX,excluded,bond,CLO
+CLOZ,excluded,bond,CLO
+CLSM,excluded,allocation,target sector moderate
+CLUB,broad,,billionaire holdings replication
+CMAG,thematic,technology,Mag 7
+CMBO,excluded,bond,interest rate
+CNRG,thematic,clean_energy,clean power
+CNXT,thematic,technology,China ChiNext innovators
+CNYA,broad,,broad China fund
+COIW,excluded,single_stock,COIN
+COPA,thematic,natural_resources,copper miners; resources not clean energy
+COPJ,thematic,natural_resources,copper miners; resources not clean energy
+COPP,thematic,natural_resources,copper miners; resources not clean energy
+COPX,thematic,natural_resources,copper miners; resources not clean energy
+COPY,broad,,insider value strategy
+COSW,excluded,single_stock,COST
+COYY,excluded,single_stock,COIN
+CPAI,broad,,quant equity
+CPII,excluded,bond,inflation protection
+CPU,sector,technology,semiconductor industry fund
+CRAK,sector,energy,oil refiners
+CRBN,broad,,diversified low carbon tilt
+CRDD,excluded,commodity_fx,spot crypto
+CRDT,excluded,bond,opportunistic income
+CRPT,thematic,crypto,crypto and digital asset equities
+CRTC,thematic,technology,critical technologies
+CRY,excluded,single_stock,CRCL
+CSD,broad,,event or insider factor strategy
+CSEN,thematic,clean_energy,future of energy
+CSIO,thematic,demographic_other,infrastructure
+CSMD,broad,,smid growth
+CSNR,thematic,natural_resources,natural resources
+CSRE,sector,real_estate,REITs
+CSTK,broad,,contrarian equity
+CTEF,broad,,targeted equity
+CVAR,broad,,value
+CVIE,broad,,diversified responsible index
+CVLC,broad,,diversified responsible index
+CVMC,broad,,diversified responsible index
+CWY,excluded,single_stock,CRWV
+CXSE,broad,,broad China fund
+DABS,excluded,bond,ABS
+DADS,excluded,bond,debt fund
+DALI,excluded,allocation,asset class rotation
+DANA,broad,,limited volatility
+DAPP,thematic,crypto,crypto and digital asset equities
+DAX,broad,,Germany
+DBA,excluded,commodity_fx,futures or physical commodity; not equity
+DBAR,excluded,allocation,absolute return
+DBB,excluded,commodity_fx,futures or physical commodity; not equity
+DBE,excluded,commodity_fx,futures or physical commodity; not equity
+DBJP,broad,,currency-hedged Japan equity
+DBP,excluded,commodity_fx,futures or physical commodity; not equity
+DCRE,excluded,bond,debt fund
+DECO,thematic,crypto,crypto and digital asset equities
+DEED,excluded,bond,securitized
+DEXC,broad,,EM ex China
+DFII,excluded,option_income,FT Vest defined-outcome or target-income options
+DFIP,excluded,bond,TIPS
+DFJ,broad,,Japan small cap
+DFSE,broad,,diversified sustainability core
+DFSI,broad,,diversified sustainability core
+DFSU,broad,,diversified sustainability core
+DGLO,thematic,demographic_other,deglobalization
+DGT,broad,,Global Dow
+DIA,broad,,Dow 30
+DICE,thematic,demographic_other,trading and prediction markets
+DIME,excluded,commodity_fx,spot altcoins
+DISK,thematic,technology,memory
+DIVP,excluded,option_income,enhanced equity income
+DJD,broad,,Dow dividend
+DLUX,excluded,bond,ultrashort
+DMX,excluded,bond,multi-sector
+DMXF,broad,,diversified ESG EAFE
+DOCK,sector,industrials,ports rail freight
+DOGG,excluded,option_income,target income
+DOJE,excluded,commodity_fx,spot crypto
+DRAM,thematic,technology,memory
+DRES,thematic,demographic_other,domestic resilience
+DRIV,thematic,technology,agrees with rule; EV autonomous
+DRKY,excluded,option_income,target distribution
+DRMP,excluded,option_income,income
+DRMY,excluded,option_income,income
+DRSK,excluded,allocation,bonds plus options
+DRUP,thematic,technology,disruptors
+DSI,broad,,diversified ESG or climate-tilted broad equity
+DSMC,broad,,cash flow
+DUKH,excluded,bond,high income
+DUKQ,excluded,allocation,tactical fund of ETFs
+DUKZ,excluded,allocation,diversified income
+DUNK,broad,,unconstrained equity
+DVQQ,excluded,other,volatility targeted exposure
+DVSP,excluded,other,volatility targeted exposure
+DWLD,broad,,worldwide
+DXJ,broad,,currency-hedged Japan equity
+DXUV,broad,,vector equity
+DYLD,excluded,bond,dynamic yield
+EAGL,broad,,select equity
+EART,thematic,natural_resources,rare earth and strategic metals miners
+ECNS,broad,,China small cap
+ECON,broad,,emerging economies
+EDEN,broad,,Denmark
+EDGH,excluded,allocation,hard assets dynamic
+EDGX,excluded,option_income,income edge
+EFAS,broad,,superdividend EAFE
+EFIV,broad,,S&P 500 ESG
+EFNL,broad,,Finland
+EFRA,thematic,clean_energy,environmental solutions theme
+EGGS,excluded,option_income,guard
+EGGY,excluded,option_income,dynamic income
+EGUS,broad,,diversified ESG growth
+EINC,thematic,natural_resources,midstream or energy-independence story
+EIPX,thematic,natural_resources,midstream or energy-independence story
+EIRL,broad,,Ireland
+EKG,thematic,health,health innovation theme
+ELM,excluded,allocation,market navigator
+EMCR,broad,,diversified EM carbon tilt
+EMET,thematic,natural_resources,copper miners; resources not clean energy
+EMIF,thematic,demographic_other,EM infrastructure
+EMLP,thematic,natural_resources,midstream energy infrastructure
+EMM,broad,,EM ex China
+EMNT,excluded,bond,short maturity bond
+EMPB,excluded,allocation,stacked portfolio
+EMQQ,thematic,technology,EM internet
+EMSF,broad,,diversified EM sustainable active
+EMTY,excluded,leveraged,inverse retail short fund
+EMXC,broad,,EM ex China
+EMXF,broad,,diversified ESG or climate-tilted broad equity
+ENFR,thematic,natural_resources,midstream energy infrastructure
+ENOR,broad,,Norway
+ENRG,thematic,natural_resources,midstream or energy-independence story
+ENZL,broad,,New Zealand
+EPI,broad,,broad India fund
+EPP,broad,,diversified region fund
+EQL,broad,,equal sector weight
+EQRR,broad,,rising rates factor
+ERET,sector,real_estate,diversified real estate with ESG screen
+ERTH,thematic,clean_energy,environmental solutions theme
+ESG,broad,,diversified ESG or climate-tilted broad equity
+ESGD,broad,,diversified ESG
+ESGE,broad,,diversified ESG or climate-tilted broad equity
+ESGG,broad,,diversified ESG or climate-tilted broad equity
+ESGU,broad,,diversified ESG or climate-tilted broad equity
+ESGV,broad,,diversified ESG
+ESML,broad,,diversified ESG small cap
+ESMV,broad,,diversified ESG or climate-tilted broad equity
+ESN,broad,,40 stocks
+ESUM,thematic,esg_values,faith-based
+ETEC,thematic,clean_energy,environmental solutions theme
+ETFT,broad,,Fundsmith quality
+ETHO,broad,,diversified ESG or climate-tilted broad equity
+EVLN,excluded,bond,floating rate
+EVNT,excluded,allocation,event driven
+EVUS,broad,,diversified ESG value
+EVX,sector,industrials,waste and environmental services industry
+EWA,broad,,Australia
+EWC,broad,,Canada
+EWD,broad,,Sweden
+EWG,broad,,Germany
+EWH,broad,,single large-country broad fund
+EWI,broad,,Italy
+EWJ,broad,,single large-country broad fund
+EWJV,broad,,Japan value
+EWK,broad,,Belgium
+EWL,broad,,Switzerland
+EWN,broad,,Netherlands
+EWO,broad,,Austria
+EWP,broad,,Spain
+EWQ,broad,,France
+EWS,broad,,Singapore
+EWT,broad,,single large-country broad fund
+EWU,broad,,UK
+EWW,broad,,single large-country broad fund
+EWY,broad,,single large-country broad fund
+EWZ,broad,,single large-country broad fund
+EWZS,broad,,Brazil small cap
+EYES,thematic,technology,data and surveillance
+EYLD,broad,,shareholder yield
+EZA,broad,,single large-country broad fund
+EZPZ,excluded,commodity_fx,spot crypto
+EZU,broad,,Eurozone
+FAAA,excluded,bond,CLO
+FAAR,excluded,allocation,absolute return
+FARX,excluded,allocation,absolute return strategy
+FBCG,broad,,blue chip growth
+FBCV,broad,,blue chip value
+FBDC,sector,financials,BDCs
+FBT,sector,health_care,biotech industry index; paper calls IBB sector
+FBYY,excluded,single_stock,META
+FCA,broad,,broad China fund
+FCLO,excluded,bond,CLO
+FCPI,broad,,inflation stocks factor
+FCTR,broad,,factor rotation
+FDIF,thematic,technology,disruptors
+FDIG,thematic,crypto,crypto and digital asset equities
+FDL,broad,,dividend
+FDLS,thematic,esg_values,biblical multi factor
+FDND,excluded,option_income,FT Vest defined-outcome or target-income options
+FDNI,thematic,technology,international internet
+FDRS,broad,,founder-led
+FEDM,broad,,diversified ESG climate
+FEOE,broad,,overseas
+FEP,broad,,Europe
+FEUS,broad,,diversified ESG climate
+FEUZ,broad,,Eurozone
+FFF,broad,,founder companies
+FFLX,excluded,bond,flexible income
+FFTY,broad,,IBD 50
+FGM,broad,,Germany
+FGSM,broad,,global small cap
+FINA,broad,,North America
+FINT,broad,,international equity
+FINY,excluded,option_income,YieldBOOST put-selling income fund
+FITZ,broad,,concentrated active
+FIZY,excluded,option_income,options overlay
+FJP,broad,,single large-country broad fund
+FKU,broad,,UK
+FLAU,broad,,Australia
+FLAX,broad,,diversified region fund
+FLBR,broad,,single large-country broad fund
+FLCA,broad,,Canada
+FLCE,broad,,US large cap
+FLCH,broad,,broad China fund
+FLEE,broad,,Europe
+FLEU,broad,,Eurozone
+FLGB,broad,,UK
+FLGR,broad,,Germany
+FLIN,broad,,broad India fund
+FLJH,broad,,single large-country broad fund
+FLJP,broad,,single large-country broad fund
+FLKR,broad,,single large-country broad fund
+FLLA,broad,,diversified region fund
+FLMX,broad,,single large-country broad fund
+FLN,broad,,diversified region fund
+FLOW,broad,,cash flow
+FLSA,broad,,single large-country broad fund
+FLSW,broad,,Switzerland
+FLTW,broad,,single large-country broad fund
+FLXI,excluded,bond,flexible income
+FLXN,excluded,bond,flexible income
+FLXR,excluded,bond,flexible income
+FMAG,broad,,Magellan
+FMCE,broad,,compounders
+FMCX,broad,,focus equity
+FMED,thematic,health,health innovation theme
+FMKT,thematic,demographic_other,free market policy
+FMTL,thematic,natural_resources,critical metals miners theme
+FOTO,thematic,technology,photonics
+FPA,broad,,diversified region fund
+FPWR,thematic,clean_energy,power solutions
+FRUT,thematic,technology,mega cap tech
+FSCS,broad,,capital strength
+FSZ,broad,,Switzerland
+FTAG,thematic,natural_resources,agribusiness producers theme
+FTCS,broad,,capital strength
+FTIF,thematic,natural_resources,inflation sensitive real assets
+FTSM,excluded,bond,short maturity
+FTXG,sector,consumer_staples,food and beverage industry
+FTXL,sector,technology,semiconductor industry fund
+FUSI,excluded,bond,ultrashort
+FV,broad,,sector rotation
+FVC,excluded,allocation,can rotate to bonds
+FWD,thematic,technology,disruptors
+FXD,sector,consumer_discretionary,AlphaDEX sector
+FXG,sector,consumer_staples,AlphaDEX sector
+FXI,broad,,China large cap
+FYEE,excluded,option_income,yield enhanced
+FYLD,broad,,shareholder yield
+GABF,sector,financials,financial services
+GAIQ,thematic,technology,global innovators
+GANZ,thematic,demographic_other,multi-theme
+GARA,thematic,natural_resources,real assets
+GASZ,thematic,clean_energy,gas power turbines
+GAVA,excluded,commodity_fx,spot crypto
+GBHI,excluded,bond,high income
+GBUG,thematic,natural_resources,gold silver miners
+GDE,excluded,allocation,gold futures plus equity
+GDLC,excluded,commodity_fx,spot crypto
+GDMN,excluded,allocation,equity plus futures blend
+GDOC,thematic,health,health innovation theme
+GDOG,excluded,commodity_fx,spot crypto
+GDXW,excluded,leveraged,leveraged product
+GEEQ,excluded,option_income,enhanced income
+GEQ,broad,,global equal weight
+GEW,broad,,global equal weight
+GFGF,broad,,guru holdings
+GGTL,sector,technology,plain tech sector fund
+GINC,excluded,bond,income
+GIND,broad,,broad India fund
+GINN,thematic,technology,innovation
+GINX,excluded,option_income,enhanced income
+GISC,excluded,bond,securitized
+GK,broad,,active growth
+GLCR,thematic,regional_niche,Iceland
+GLDB,excluded,commodity_fx,gold and crypto
+GLDM,excluded,commodity_fx,spot gold
+GLDN,excluded,option_income,gold income
+GLDW,excluded,option_income,gold weekly pay
+GLIN,broad,,India growth
+GLNK,excluded,commodity_fx,spot crypto
+GLTR,excluded,commodity_fx,futures or physical commodity; not equity
+GMF,broad,,EM Asia Pacific
+GMMA,excluded,allocation,market navigation
+GOIB,excluded,single_stock,GOOGL
+GOLI,excluded,option_income,gold options
+GOLS,thematic,consumer,live events and sports
+GOLY,excluded,option_income,gold yield
+GOOP,excluded,single_stock,GOOGL
+GOOW,excluded,single_stock,GOOGL
+GPT,broad,,AI-managed
+GPZ,sector,financials,alternative asset managers
+GQRE,sector,real_estate,global REITs
+GRID,thematic,clean_energy,agrees with rule; smart grid
+GSEU,broad,,Europe
+GSIB,sector,financials,banks or listed private equity; financials
+GSJY,broad,,single large-country broad fund
+GSKH,excluded,single_stock,ADR hedged
+GSPY,broad,,enhanced 500
+GSUI,excluded,commodity_fx,spot crypto
+GTOP,sector,technology,active tech
+GTPE,broad,,public equities replicating PE returns
+GTR,excluded,allocation,target range
+GURU,broad,,guru holdings
+GUSA,broad,,US 1000
+GVIP,broad,,hedge fund holdings
+GXC,broad,,broad China fund
+GXDW,thematic,demographic_other,rotates thematic ETFs
+GXLC,broad,,US 500
+GYLD,excluded,allocation,global yield multi-asset
+HACK,thematic,technology,agrees with rule; cybersecurity
+HALX,thematic,demographic_other,heavy assets
+HAUZ,sector,real_estate,international real estate
+HBR,excluded,commodity_fx,spot crypto
+HDG,excluded,allocation,hedge replication
+HEAL,thematic,health,healthtech
+HECO,thematic,crypto,crypto and digital asset equities
+HEFT,thematic,demographic_other,fourth turning
+HELS,broad,,130/30 equity
+HEWJ,broad,,currency-hedged Japan equity
+HFND,excluded,allocation,multi-strategy tracker
+HFSI,excluded,bond,strategic income
+HIAI,broad,,AI-managed US equity
+HIDE,excluded,allocation,inflation deflation hedge
+HIPS,excluded,allocation,high income vehicles
+HISF,excluded,bond,high income
+HMYY,excluded,single_stock,HIMS
+HNDL,excluded,allocation,7HANDL
+HOOW,excluded,single_stock,HOOD
+HOYY,excluded,single_stock,HOOD
+HRSK,excluded,allocation,hedged risk
+HRTS,thematic,health,heart health
+HSBH,excluded,single_stock,ADR hedged
+HSMV,broad,,managed volatility
+HTEC,thematic,health,health innovation theme
+HULL,sector,industrials,shipping equities; transport industry
+HUSV,broad,,managed volatility
+HXA,excluded,allocation,corporate arbitrage
+HXE,excluded,allocation,hedge index replication
+HYBL,excluded,bond,high income
+HYPG,excluded,commodity_fx,spot crypto
+IAUI,excluded,option_income,gold income
+IBAT,thematic,clean_energy,energy storage theme
+IBB,sector,health_care,biotech industry index; paper calls IBB sector
+IBBQ,sector,health_care,biotech industry index; paper calls IBB sector
+IBRN,thematic,health,neuroscience theme
+ICLN,thematic,clean_energy,agrees with rule; clean energy
+ICPY,broad,,international insider value
+IDEF,thematic,demographic_other,defense
+IEV,broad,,Europe
+IEZ,sector,energy,oil equipment services
+IFED,broad,,Fed-timed equity ETN
+IFGL,sector,real_estate,international REITs
+IFLN,excluded,bond,fallen angels
+IGLD,excluded,option_income,gold target income
+IGV,sector,technology,software industry fund
+IHI,sector,health_care,medical devices industry
+ILF,broad,,diversified region fund
+IMTG,excluded,bond,MBS
+IMVP,broad,,broad India fund
+INCE,excluded,option_income,equity linked income
+INCM,excluded,allocation,income
+IND,broad,,broad India fund
+INDA,broad,,broad India fund
+INDE,broad,,India
+INDH,broad,,currency-hedged India equity
+INDQ,broad,,India quality
+INDS,sector,real_estate,industrial REITs
+INDY,broad,,broad India fund
+INDZ,broad,,broad India fund
+INFL,thematic,natural_resources,inflation beneficiaries
+ION,thematic,clean_energy,battery metals
+IOO,broad,,global 100
+IOPP,broad,,India
+IOYY,excluded,single_stock,IONQ
+IPB,excluded,bond,trust certificates
+IPOS,thematic,demographic_other,IPOs
+IQHI,excluded,bond,high income
+IQM,thematic,technology,intelligent machines
+IQSZ,broad,,diversified net zero
+IRTR,excluded,allocation,target retirement
+IRVH,excluded,bond,rate volatility hedge
+ISTM,thematic,natural_resources,critical metals miners theme
+ISWN,excluded,allocation,treasuries plus options
+ITB,sector,consumer_discretionary,homebuilders industry
+IUS,broad,,RAFI
+IVOL,excluded,bond,rate volatility hedge
+IVSS,broad,,SMID
+IWL,broad,,top 200
+IWMY,excluded,option_income,weekly distribution
+IXP,sector,communication,global comms
+IYRI,excluded,option_income,NEOS option-income fund
+JA,excluded,bond,CLO
+JAAA,excluded,bond,CLO
+JABS,excluded,bond,ABS
+JAJL,excluded,option_income,defined protection
+JAPN,broad,,single large-country broad fund
+JBBB,excluded,bond,CLO
+JCHI,broad,,China active
+JELH,excluded,option_income,equity linked income
+JELM,excluded,option_income,equity linked income
+JETS,sector,industrials,airlines
+JFLI,excluded,bond,flexible income
+JFLX,excluded,bond,flexible debt
+JGLO,broad,,global select
+JIII,excluded,bond,income
+JOYT,excluded,option_income,equity and options
+JPAN,broad,,Japan active
+JPEF,broad,,equity focus
+JPIE,excluded,bond,income
+JPRF,excluded,bond,preferreds
+JPXN,broad,,Japan
+JPY,broad,,Japan
+JSI,excluded,bond,securitized
+JTEK,sector,technology,plain tech sector fund
+JUCY,excluded,option_income,enhanced yield options
+JXX,thematic,technology,transformational growth
+KAT,broad,,active equity
+KBA,broad,,broad China fund
+KBWD,sector,financials,financial dividend
+KCAI,broad,,broad China fund
+KCCA,excluded,commodity_fx,carbon allowances
+KEMQ,thematic,technology,EM internet and tech
+KEMX,broad,,EM ex China
+KLMN,broad,,diversified ESG or climate-tilted broad equity
+KLMT,broad,,diversified ESG or climate-tilted broad equity
+KMCA,thematic,regional_niche,Korea manufacturing alliance
+KMEM,thematic,technology,memory
+KNO,broad,,knowledge leaders
+KNOW,broad,,fundamentals equity
+KOKU,broad,,world ex Japan
+KOMP,thematic,technology,new economies
+KONG,broad,,quality fortress
+KOOL,broad,,equity rotation
+KPHO,thematic,regional_niche,Vietnam
+KRBN,excluded,commodity_fx,carbon allowances
+KRYP,excluded,commodity_fx,spot crypto index
+KSA,broad,,single large-country broad fund
+KTEC,thematic,technology,China tech country x theme
+KURE,thematic,health,China health care
+KWEB,thematic,technology,agrees with rule; China internet country x theme
+KWIN,excluded,allocation,alternative income
+KWT,thematic,regional_niche,Kuwait
+KYLD,excluded,option_income,high income
+LADM,excluded,option_income,SOS laddered
+LALT,excluded,allocation,alternatives
+LATR,thematic,technology,buy now pay later
+LAZR,thematic,technology,photonics
+LBO,sector,financials,banks or listed private equity; financials
+LBOX,excluded,bond,box spreads
+LCTD,broad,,diversified carbon transition
+LCTU,broad,,diversified carbon transition
+LDEM,broad,,diversified ESG or climate-tilted broad equity
+LDRC,excluded,bond,corporate ladder
+LDRX,excluded,option_income,enhanced leaders
+LENS,thematic,demographic_other,multi-theme
+LFDR,excluded,allocation,longevity income
+LFSC,thematic,health,health innovation theme
+LGH,excluded,allocation,defender tactical
+LGHT,thematic,health,healthtech
+LIT,thematic,clean_energy,agrees with rule; lithium battery
+LLMA,thematic,technology,LLM
+LOGO,thematic,consumer,consumer brands
+LOHA,thematic,demographic_other,heavy assets low obsolescence
+LOPP,thematic,esg_values,planet and people
+LOUP,thematic,technology,frontier tech or space theme
+LQ,excluded,allocation,alternatives
+LQAI,broad,,AI-managed core
+LQID,excluded,bond,short maturity
+LST,broad,,select industries rotation
+LTAX,excluded,bond,muni
+LTCC,excluded,commodity_fx,spot crypto
+LUMA,thematic,technology,photonics
+LUNC,broad,,compounders
+LYTE,thematic,technology,photonics
+MAAY,excluded,single_stock,MARA
+MADE,thematic,demographic_other,US manufacturing reshoring
+MAGA,thematic,demographic_other,political America First
+MAMB,excluded,allocation,income index
+MAUG,excluded,option_income,SOS
+MAXI,excluded,commodity_fx,futures or physical commodity; not equity
+MBB,excluded,bond,MBS
+MBCE,broad,,diversified equity; no theme
+MBSX,excluded,bond,MBS
+MCH,broad,,China active
+MCHI,broad,,broad China fund
+MCHS,thematic,technology,China innovators
+MDCR,excluded,option_income,SOS
+MDEV,sector,health_care,medical devices industry
+MDST,excluded,option_income,Westwood Salient enhanced covered-call income
+MEIB,excluded,single_stock,META
+MEMX,broad,,EM ex China
+MEMY,excluded,option_income,Tuttle income blast option fund
+METL,thematic,natural_resources,metals miners
+METW,excluded,single_stock,META
+MFEB,excluded,option_income,SOS
+MFIG,broad,,growth active
+MFUL,excluded,allocation,conservative
+MGC,broad,,mega cap
+MGIN,thematic,demographic_other,infrastructure
+MJ,thematic,consumer,cannabis
+MJSC,broad,,Japan small cap
+MJUN,excluded,option_income,SOS
+MKOR,broad,,Korea
+MLCC,thematic,technology,MLCC components
+MLPI,excluded,option_income,NEOS option-income fund
+MLRG,broad,,MSCI USA
+MMAR,excluded,option_income,SOS
+MMAY,excluded,option_income,SOS
+MN,thematic,technology,MANGOS mega tech
+MNVR,excluded,option_income,SOS
+MNZL,thematic,esg_values,halal
+MODL,broad,,sector rotation
+MORT,sector,financials,mortgage REIT equities
+MOTO,thematic,technology,smart transportation tech theme
+MPDB,excluded,option_income,dynabuffer
+MPLY,broad,,monopoly moat stocks
+MPRO,excluded,allocation,tactical
+MRGR,excluded,allocation,merger arbitrage
+MRSK,excluded,allocation,managed risk
+MSEP,excluded,option_income,SOS
+MSFW,excluded,single_stock,MSFT
+MSFY,excluded,single_stock,MSFT
+MSMR,excluded,allocation,managed risk
+MSSS,broad,,subsector rotation
+MSTI,excluded,bond,short income
+MSTW,excluded,single_stock,MSTR
+MTBA,excluded,bond,MBS
+MTYY,excluded,single_stock,MSTR
+MUIB,excluded,single_stock,MU
+MULT,excluded,bond,multisector
+MUSQ,thematic,consumer,music industry
+MUYY,excluded,single_stock,MU
+MVFG,broad,,global rotation
+MWHS,excluded,commodity_fx,electricity futures
+NATO,sector,industrials,defense industry index
+NBCE,broad,,broad China fund
+NBDS,thematic,technology,disrupters
+NBJP,broad,,single large-country broad fund
+NBOS,excluded,option_income,option strategy
+NCIQ,excluded,commodity_fx,spot crypto index
+NCLD,thematic,technology,neocloud
+NCLO,excluded,bond,CLO
+NDIA,broad,,India
+NELS,broad,,select equity
+NEWZ,broad,,AI sentiment all cap
+NFLP,excluded,single_stock,NFLX
+NFLW,excluded,single_stock,NFLX
+NFRA,thematic,demographic_other,infrastructure
+NFRX,thematic,demographic_other,infrastructure
+NFTY,broad,,India Nifty 50
+NITE,broad,,concentrated active
+NIXT,broad,,index deletions
+NODE,thematic,crypto,onchain economy
+NORW,broad,,Norway
+NPFI,excluded,bond,preferreds
+NRR,excluded,commodity_fx,spot crypto
+NRSH,thematic,demographic_other,nearshoring
+NSCI,excluded,bond,securitized
+NSI,broad,,EM ex adversary nations
+NUDM,broad,,diversified ESG
+NUDV,broad,,diversified ESG dividend
+NUEM,broad,,diversified ESG
+NUGY,excluded,option_income,YieldBOOST put-selling income fund
+NULC,broad,,diversified ESG
+NULG,broad,,diversified ESG
+NULV,broad,,diversified ESG
+NUMG,broad,,diversified ESG
+NUMV,broad,,diversified ESG
+NUSC,broad,,diversified ESG
+NVDW,excluded,single_stock,NVDA
+NVIB,excluded,single_stock,NVDA
+NVOH,excluded,single_stock,ADR hedged
+NVPS,thematic,technology,Nvidia ecosystem
+NVYY,excluded,single_stock,NVDA
+NXTE,thematic,clean_energy,green economy
+NXTG,thematic,technology,5G NextG
+NYNY,thematic,regional_niche,NYC companies
+NYSX,broad,,NYSE 100
+NYYY,excluded,single_stock,NVDA
+NZAC,broad,,diversified Paris aligned
+OAIW,thematic,technology,OpenAI ecosystem
+OBOR,thematic,demographic_other,Belt and Road infrastructure
+OCIO,excluded,allocation,multi-asset
+OEF,broad,,S&P 100
+OILT,sector,energy,Texas oil
+OMAH,excluded,option_income,target income
+ONEH,excluded,allocation,equity hedge
+ONEQ,broad,,Nasdaq composite
+ONOF,excluded,allocation,risk on off
+OPER,excluded,bond,ultra short
+OPPJ,broad,,Japan
+OPTO,excluded,option_income,income blast
+OPTZ,broad,,optimize strategy
+OTAX,broad,,tax managed
+OVF,excluded,option_income,options overlay
+OWN,broad,,inside ownership
+OWNS,excluded,bond,debt fund
+PAAA,excluded,bond,CLO
+PABD,broad,,diversified Paris aligned
+PABU,broad,,diversified ESG or climate-tilted broad equity
+PAVE,thematic,demographic_other,agrees with rule; US infrastructure story
+PBCS,sector,consumer_staples,world staples
+PBDC,sector,financials,BDCs
+PBJ,sector,consumer_staples,food and beverage industry
+PBL,excluded,allocation,portfolio ballast
+PBPH,sector,health_care,pharma biotech
+PBUS,broad,,MSCI USA
+PBWN,sector,industrials,world industrials
+PCEF,excluded,allocation,closed-end funds
+PCHI,excluded,bond,high income
+PCLN,thematic,clean_energy,cleaner planet
+PCPC,sector,financials,P&C insurers not real estate
+PCPP,broad,,newsletter portfolio
+PEJ,sector,consumer_discretionary,leisure industry
+PEMX,broad,,EM ex China
+PEPS,excluded,option_income,options overlay
+PEPT,thematic,health,peptides
+PEVC,thematic,demographic_other,PE VC
+PEX,sector,financials,banks or listed private equity; financials
+PEXL,broad,,export leaders
+PFF,excluded,bond,preferreds
+PFFD,excluded,bond,preferreds
+PFFR,excluded,bond,preferred securities; fixed income
+PFFV,excluded,bond,preferreds
+PFI,sector,financials,financials momentum
+PFIX,excluded,bond,rate hedge
+PFRX,broad,,focused research
+PGF,excluded,bond,preferred securities; fixed income
+PGX,excluded,bond,preferreds
+PICK,sector,materials,diversified metals and mining industry
+PINC,excluded,bond,securitized
+PLIB,excluded,single_stock,PLTR
+PLTW,excluded,single_stock,PLTR
+PLYY,excluded,single_stock,PLTR
+PMTL,thematic,natural_resources,precious metals miners
+POWA,broad,,pricing power
+PPI,thematic,natural_resources,real assets
+PQDI,excluded,bond,preferreds
+PQNT,broad,,AI-enhanced international
+PQUS,broad,,AI-enhanced US
+PRAB,excluded,bond,ABS
+PRAE,excluded,allocation,equity plus alternatives
+PRAM,thematic,technology,memory and photonics
+PRF,broad,,RAFI
+PRFZ,broad,,RAFI small mid
+PRN,sector,industrials,industrials momentum
+PRXG,thematic,esg_values,faith-based impact
+PRXI,thematic,esg_values,faith-based impact
+PRXV,thematic,esg_values,faith-based impact
+PSCC,sector,consumer_staples,small cap sector
+PSCD,sector,consumer_discretionary,small cap sector
+PSCE,sector,energy,small cap sector
+PSCF,sector,financials,small cap sector
+PSCH,sector,health_care,small cap sector
+PSCI,sector,industrials,small cap sector
+PSCJ,excluded,option_income,SOS
+PSCM,sector,materials,small cap sector
+PSCQ,excluded,option_income,SOS
+PSCT,sector,technology,small cap sector
+PSCU,sector,utilities,small cap utilities and comms
+PSCW,excluded,option_income,SOS
+PSCX,excluded,option_income,SOS
+PSFD,excluded,option_income,SOS
+PSFJ,excluded,option_income,SOS
+PSFM,excluded,option_income,SOS
+PSFO,excluded,option_income,SOS
+PSI,sector,technology,semiconductor industry fund
+PSL,sector,consumer_staples,staples momentum
+PSMD,excluded,option_income,SOS
+PSMJ,excluded,option_income,SOS
+PSMO,excluded,option_income,SOS
+PSMR,excluded,option_income,SOS
+PSOX,thematic,technology,MLCC and power semis
+PSP,sector,financials,banks or listed private equity; financials
+PSQA,excluded,bond,CLO
+PSR,sector,real_estate,active real estate
+PSTR,broad,,sector rotation
+PTEU,excluded,allocation,trend pilot
+PTF,sector,technology,tech momentum
+PTH,sector,health_care,health care momentum
+PTL,thematic,esg_values,biblical values
+PTNQ,excluded,allocation,trend pilot
+PTNT,thematic,demographic_other,IP royalties
+PUI,sector,utilities,utilities momentum
+PVEX,excluded,option_income,convex protect
+PWRD,thematic,technology,transform systems
+PWRX,excluded,option_income,Westwood Salient enhanced covered-call income
+PWS,excluded,allocation,wealth shield tactical
+PXI,sector,energy,energy momentum
+PYZ,sector,materials,materials momentum
+QAI,excluded,allocation,hedge multi-strategy
+QALT,excluded,allocation,multi-strategy
+QAT,thematic,regional_niche,Qatar
+QBER,excluded,option_income,bear hedge
+QBIG,broad,,top QQQ
+QBUL,excluded,option_income,bull hedge
+QBY,excluded,single_stock,QBTS
+QCLN,thematic,clean_energy,clean energy theme not energy sector
+QFF,broad,,focus fund
+QIS,excluded,allocation,QIS alternatives
+QQA,excluded,option_income,QQQ income
+QQH,excluded,allocation,defender tactical
+QQHG,excluded,option_income,QQQ hedged
+QQMG,broad,,ESG Nasdaq 100
+QQQ,broad,,Nasdaq 100
+QQQJ,broad,,diversified equity; no theme
+QQQS,broad,,diversified equity; no theme
+QQXT,broad,,Nasdaq 100 ex tech
+QTEC,sector,technology,Nasdaq 100 tech
+QTOP,broad,,Nasdaq top 30
+QTPI,excluded,bond,preferreds
+QUS,broad,,strategic factors
+RAAA,excluded,bond,CLO
+RAAR,excluded,bond,CLO
+RAAX,thematic,natural_resources,real assets
+RAAY,excluded,bond,CLO
+RAFE,broad,,diversified ESG or climate-tilted broad equity
+RANK,broad,,analyst ratings
+RAUS,broad,,US equity
+RCGE,thematic,esg_values,gender equality
+RCLO,excluded,bond,CLO
+RCLR,excluded,bond,CLO
+RCLY,excluded,bond,CLO
+RDOG,sector,real_estate,REITs
+REIT,sector,real_estate,REITs
+REM,sector,financials,mortgage REIT equities
+REMX,thematic,natural_resources,rare earth and strategic metals miners
+REXC,thematic,natural_resources,rare earth and strategic metals miners
+RGYY,excluded,single_stock,RGTI
+RIGS,excluded,bond,strategic income
+RINF,excluded,bond,inflation expectations
+RISR,excluded,bond,rate hedge income
+RIZE,excluded,bond,inflation protection
+RJVI,excluded,option_income,vertical income
+RMHY,excluded,bond,managed yield
+RND,broad,,R&D leaders
+RNIN,broad,,SMID
+ROCQ,excluded,option_income,premium yield
+ROCY,excluded,option_income,premium yield
+ROKT,thematic,technology,frontier tech or space theme
+RONB,broad,,Baron growth
+RSEE,broad,,systematic equity
+RSMV,excluded,allocation,managed vol rotation
+RSPC,sector,communication,equal weight sector
+RSPD,sector,consumer_discretionary,equal weight sector
+RSPE,broad,,ESG equal weight S&P
+RSPF,sector,financials,equal weight sector
+RSPG,sector,energy,equal weight sector
+RSPH,sector,health_care,equal weight sector
+RSPM,sector,materials,equal weight sector
+RSPN,sector,industrials,equal weight sector
+RSPR,sector,real_estate,equal weight sector
+RSPS,sector,consumer_staples,equal weight sector
+RSPT,sector,technology,equal weight sector
+RSPU,sector,utilities,equal weight sector
+RTAI,excluded,bond,tax advantaged income
+RTYY,excluded,single_stock,RIOT
+RVER,broad,,concentrated active
+RW,broad,,active equity
+RWX,sector,real_estate,international real estate
+SAPH,excluded,single_stock,ADR hedged
+SCAP,broad,,small cap income
+SCHK,broad,,Schwab 1000
+SCJ,broad,,single large-country broad fund
+SCMC,excluded,allocation,multi-strategy income
+SDIV,broad,,superdividend
+SDUR,excluded,bond,short income
+SEA,sector,industrials,shipping and air cargo
+SECR,excluded,bond,securitized
+SECT,broad,,sector rotation
+SEMY,excluded,option_income,YieldBOOST put-selling income fund
+SETM,thematic,natural_resources,critical metals miners theme
+SFTY,excluded,allocation,managed risk
+SFY,broad,,select 500
+SFYF,thematic,demographic_other,social sentiment
+SFYI,excluded,option_income,income
+SHEH,excluded,single_stock,ADR hedged
+SHOC,sector,technology,semiconductor industry fund
+SHRY,broad,,shareholder yield
+SIFI,excluded,bond,multi-sector income
+SIMS,thematic,technology,intelligent structures
+SIO,excluded,bond,strategic income
+SIOO,excluded,option_income,target distribution
+SIXA,broad,,mega cap
+SIXL,broad,,low beta
+SIZE,broad,,size factor
+SKYY,thematic,technology,agrees with rule; cloud
+SLVI,excluded,option_income,silver income
+SLVR,thematic,natural_resources,mostly silver miners plus some bullion
+SLVX,excluded,option_income,silver income
+SLVY,excluded,option_income,silver target income
+SMH,sector,technology,semiconductor industry fund
+SMHX,sector,technology,semiconductor industry fund
+SMIN,broad,,India small cap
+SMMD,broad,,Russell 2500
+SMRZ,thematic,clean_energy,small modular reactors
+SMYY,excluded,single_stock,SMCI
+SNAV,broad,,sector rotation
+SNTH,excluded,other,synthetic equity
+SOFR,excluded,bond,SOFR cash
+SOVF,thematic,esg_values,faith-based
+SOXQ,sector,technology,semiconductor industry fund
+SOXX,sector,technology,semiconductor industry fund
+SPAQ,thematic,demographic_other,SPACs
+SPBC,excluded,allocation,S&P plus bitcoin futures
+SPCI,excluded,option_income,Tuttle income blast option fund
+SPDF,excluded,allocation,risk adaptive
+SPEU,broad,,Europe
+SPFF,excluded,bond,preferreds
+SPIT,broad,,special situations
+SPRX,thematic,technology,disruptive tech
+SPSK,excluded,bond,sukuk
+SPUS,thematic,esg_values,sharia
+SPXE,broad,,S&P ex sector
+SPXN,broad,,S&P ex sector
+SPXT,broad,,S&P ex sector
+SPXV,broad,,S&P ex sector
+SPYA,excluded,allocation,endure
+SROI,broad,,diversified ESG or climate-tilted broad equity
+SSK,excluded,commodity_fx,spot crypto
+SSUS,broad,,sector rotation
+STAX,excluded,bond,muni
+STBQ,thematic,crypto,crypto and digital asset equities
+STCE,thematic,crypto,crypto equities
+STHH,excluded,single_stock,ADR hedged
+STNC,broad,,diversified ESG or climate-tilted broad equity
+STXE,broad,,EM ex China
+STXF,broad,,500
+STYL,thematic,consumer,lifestyle brands
+SUIS,excluded,commodity_fx,spot crypto
+SURE,broad,,event or insider factor strategy
+SUSA,broad,,diversified ESG or climate-tilted broad equity
+SUSL,broad,,diversified ESG or climate-tilted broad equity
+SVOL,excluded,volatility,vol premium
+SYLD,broad,,shareholder yield
+TAGS,excluded,commodity_fx,futures or physical commodity; not equity
+TAIL,excluded,volatility,tail risk
+TAN,thematic,clean_energy,agrees with rule; solar
+TAX,broad,,tax aware equity
+TAXM,excluded,bond,muni
+TBFC,excluded,allocation,conservative
+TCAN,excluded,commodity_fx,spot crypto
+TCHP,broad,,blue chip growth
+TDAQ,excluded,option_income,Nasdaq 100 plus daily options income
+TDAX,excluded,option_income,lift on income fund
+TDIV,sector,technology,tech dividend
+TDNA,sector,health_care,biotech industry index; paper calls IBB sector
+TDOG,excluded,commodity_fx,spot crypto
+TDOT,excluded,commodity_fx,spot crypto
+TDSB,excluded,allocation,target beta
+TDSC,excluded,allocation,target drawdown
+TDV,sector,technology,tech dividend
+TDVI,excluded,option_income,target income options
+TEC,thematic,technology,transformative tech
+TECB,thematic,technology,tech breakthrough or nanotech story
+TECY,excluded,option_income,YieldBOOST put-selling income fund
+TEK,sector,technology,active tech
+TEKX,thematic,technology,tech breakthrough or nanotech story
+TEMX,broad,,EM ex China growth
+TEQI,broad,,equity income
+TESL,excluded,single_stock,TSLA concentrated
+TEXN,thematic,regional_niche,Texas
+TEXX,thematic,regional_niche,Texas
+THIR,excluded,allocation,index rotation to cash
+THMR,excluded,allocation,adaptive risk
+THMZ,thematic,demographic_other,megatrends
+THNR,thematic,health,weight loss drugs
+THTA,excluded,option_income,enhanced yield
+THYP,excluded,commodity_fx,spot crypto
+TIH,broad,,active equity
+TILL,excluded,commodity_fx,futures or physical commodity; not equity
+TILT,broad,,factor tilt
+TINY,thematic,technology,tech breakthrough or nanotech story
+TIZE,excluded,bond,securitized
+TKNQ,thematic,crypto,crypto and digital asset equities
+TLIE,broad,,income equity
+TMFC,broad,,Motley Fool 100
+TMFE,broad,,capital efficiency
+TMFX,broad,,next index
+TMGN,excluded,option_income,mega cap plus daily options income
+TMH,excluded,single_stock,ADR hedged
+TMSF,excluded,bond,multi-sector
+TMYY,excluded,single_stock,TSM
+TOAK,excluded,allocation,absolute return
+TOGA,broad,,global active
+TOK,broad,,Kokusai
+TOLL,broad,,monopolies and oligopolies
+TOPW,excluded,option_income,weekly pay basket
+TORK,thematic,technology,actuators robotics
+TOS,excluded,allocation,strategic solutions
+TOTR,excluded,bond,total return
+TOV,thematic,esg_values,Jewish advocacy
+TPRY,excluded,option_income,target distribution
+TPYP,thematic,natural_resources,pipelines midstream
+TQQY,excluded,option_income,QQQ yield
+TRBF,excluded,bond,total return
+TRFM,thematic,technology,transformers
+TRIL,thematic,technology,trillion dollar companies
+TRPA,excluded,bond,CLO
+TRTY,excluded,allocation,trinity
+TRXS,excluded,commodity_fx,spot crypto
+TSCZ,excluded,bond,securitized
+TSEC,excluded,bond,securitized
+TSIB,excluded,single_stock,TSLA
+TSIC,thematic,demographic_other,political American icons
+TSLP,excluded,single_stock,TSLA
+TSLW,excluded,single_stock,TSLA
+TSNF,thematic,technology,frontier tech or space theme
+TSUI,excluded,commodity_fx,spot crypto
+TSYX,excluded,option_income,lift on income fund
+TSYY,excluded,single_stock,TSLA
+TTOP,excluded,commodity_fx,spot crypto index
+TXBC,excluded,commodity_fx,spot crypto index
+TXS,thematic,regional_niche,Texas
+TYYY,excluded,single_stock,TSLA
+UAE,thematic,regional_niche,UAE
+UBEW,excluded,single_stock,UBER
+UBIQ,thematic,technology,ubiquitous tech
+UCBG,excluded,allocation,endowment 90/10
+UDN,excluded,commodity_fx,USD
+UFOD,thematic,technology,UFO aerospace
+ULTI,excluded,option_income,option strategy
+UMMA,thematic,esg_values,Islamic
+UNHW,excluded,single_stock,UNH
+UPGD,broad,,analyst upgrades
+URA,thematic,clean_energy,agrees with rule; uranium nuclear
+USAI,thematic,natural_resources,midstream energy infrastructure
+USCA,broad,,diversified ESG or climate-tilted broad equity
+USCL,broad,,diversified ESG or climate-tilted broad equity
+USEW,broad,,US equal weight
+USG,excluded,commodity_fx,gold strategy
+USL,excluded,commodity_fx,oil futures
+USMC,broad,,mega cap
+USMV,broad,,min vol
+USNG,thematic,natural_resources,midstream energy infrastructure
+USNZ,broad,,diversified Paris aligned
+USOY,excluded,option_income,oil options
+USRT,sector,real_estate,REITs
+USSE,broad,,select equity
+USSG,broad,,diversified ESG selection
+USXF,broad,,diversified ESG or climate-tilted broad equity
+UUP,excluded,commodity_fx,USD
+UUPP,excluded,bond,CLO
+UYLD,excluded,bond,ultrashort
+VABS,excluded,bond,ABS MBS
+VAVX,excluded,commodity_fx,spot crypto
+VBNB,excluded,commodity_fx,spot crypto
+VCR,sector,consumer_discretionary,Vanguard sector
+VEEM,broad,,EM analyst sentiment
+VEGI,thematic,natural_resources,agribusiness producers theme
+VEGN,thematic,esg_values,vegan values screen
+VEGX,thematic,esg_values,vegan climate
+VEXC,broad,,EM ex China
+VGK,broad,,Europe
+VGSR,sector,real_estate,diversified real estate with ESG screen
+VIG,broad,,dividend growth
+VMSB,excluded,bond,multi-sector
+VNSE,broad,,select equity
+VOTE,broad,,engagement 500
+VPFF,excluded,bond,preferreds
+VPL,broad,,Pacific
+VRAI,thematic,natural_resources,real asset income
+VRP,excluded,bond,preferreds
+VSGX,broad,,diversified ESG
+VSS,broad,,world ex US small cap
+VTIP,excluded,bond,TIPS
+VTP,excluded,bond,TIPS
+VXF,broad,,extended market
+WAGN,broad,,value
+WAMA,excluded,allocation,moving average to treasuries
+WAR,thematic,demographic_other,defense supercycle or defense tech story
+WBIG,excluded,allocation,bull bear
+WCAP,broad,,unconstrained equity
+WCLD,thematic,technology,agrees with rule; cloud
+WDE,excluded,bond,securitized
+WDIG,thematic,natural_resources,rare earth and strategic metals miners
+WDNA,thematic,health,biorevolution
+WEEI,excluded,option_income,Westwood Salient enhanced covered-call income
+WGMI,thematic,crypto,crypto and digital asset equities
+WINN,broad,,long term growers
+WR,thematic,demographic_other,defense war machine
+WRTH,excluded,option_income,options income
+WTBN,excluded,bond,total return
+WTIB,excluded,commodity_fx,futures or physical commodity; not equity
+WTIP,excluded,bond,inflation plus
+WUGI,thematic,technology,NextG economy
+WZRD,excluded,allocation,opportunistic trader
+XAIW,thematic,technology,SpaceX xAI ecosystem
+XBI,sector,health_care,biotech industry index; paper calls IBB sector
+XCEM,broad,,EM ex China
+XCNY,broad,,EM ex China
+XCOR,broad,,fund of equity ETFs
+XCSH,excluded,bond,box spreads
+XDAT,thematic,technology,data
+XEML,broad,,Europe leaders
+XFLX,excluded,allocation,flexible
+XIGV,sector,technology,plain tech sector fund
+XJH,broad,,ESG screened mid cap
+XJR,broad,,ESG screened small cap
+XLEM,sector,energy,market sector SPDR
+XLK,sector,technology,agrees with rule; sector technology
+XLKM,sector,technology,market sector SPDR
+XLPM,sector,consumer_staples,market sector SPDR
+XLSR,broad,,sector rotation
+XLYM,sector,consumer_discretionary,market sector SPDR
+XME,sector,materials,diversified metals and mining industry
+XNAV,broad,,fund of equity ETFs
+XOEX,broad,,S&P 100 ex top 20
+XOVR,thematic,demographic_other,private public crossover
+XRLX,excluded,allocation,conservative
+XSD,sector,technology,semiconductor industry fund
+XSW,sector,technology,software industry fund
+XV,excluded,option_income,target distribution
+XVAD,excluded,single_stock,AMD target income
+XVAP,excluded,single_stock,AAPL target income
+XVAZ,excluded,single_stock,AMZN target income
+XVGL,excluded,single_stock,GOOG target income
+XVMS,excluded,single_stock,MSFT target income
+XVMT,excluded,single_stock,META target income
+XVNV,excluded,single_stock,NVDA target income
+XVPT,excluded,single_stock,PLTR target income
+XVSP,excluded,single_stock,SPCX target income
+XVTS,excluded,single_stock,TSLA target income
+XVV,broad,,ESG screened S&P 500
+XXV,excluded,option_income,target distribution
+YALL,thematic,demographic_other,political patriotic values
+YBST,excluded,option_income,yieldboost basket
+YBTY,excluded,option_income,yieldboost basket
+YCLO,excluded,bond,CLO
+YGLD,excluded,commodity_fx,gold strategy
+YSPY,excluded,option_income,SPY yield
+YYY,excluded,allocation,CEF income
+ZAPR,excluded,option_income,defined protection
+ZAUG,excluded,option_income,defined protection
+ZCSH,excluded,commodity_fx,spot crypto
+ZDEK,excluded,option_income,defined protection
+ZECP,broad,,earnings consistent
+ZFEB,excluded,option_income,defined protection
+ZHDG,excluded,option_income,buy and hedge
+ZHOG,excluded,bond,opportunistic income
+ZIG,broad,,acquirers value
+ZINN,thematic,technology,innovative growth
+ZJAN,excluded,option_income,defined protection
+ZJUL,excluded,option_income,defined protection
+ZJUN,excluded,option_income,defined protection
+ZMAR,excluded,option_income,defined protection
+ZMAY,excluded,option_income,defined protection
+ZNOV,excluded,option_income,defined protection
+ZOCT,excluded,option_income,defined protection
+ZSB,excluded,commodity_fx,futures or physical commodity; not equity
+ZSEP,excluded,option_income,defined protection
+ZVOL,excluded,volatility,volatility premium
+ZZZTE,excluded,other,exchange test symbol
+ZZZTT,excluded,other,exchange test symbol

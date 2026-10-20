@@ -86,6 +86,7 @@ owner = [
     "src/algotrade/config/site/nightly.py",
     "src/algotrade/config/site/field_guide.py",
     "src/algotrade/config/site/regime/*",
+    "src/algotrade/config/site/universe/*",
     "src/algotrade/config/site/guide/*",
     "src/algotrade/config/site/events/*",
     "src/algotrade/config/site/drafting/*",
