@@ -188,3 +188,10 @@ def test_here_makes_the_current_worktree_ready_without_a_branch_or_npm() -> None
     assert "PYTHONPATH=" in out.stdout and "worktree add" not in out.stdout
     assert "[dry-run] npm" not in out.stdout
     assert _run("--here", "x").returncode == 2
+
+
+def test_script_clones_node_modules_when_the_lockfile_matches_main() -> None:
+    # A per-worktree `npm ci` cost 400 MB each (2026-10-19); a copy-on-write clone costs ~0 and,
+    # being a real directory, keeps `npm ci` in the worktree away from main's install.
+    text = SCRIPT.read_text()
+    assert "cp -cR" in text and "cmp -s" in text and "npm ci --prefix" in text
