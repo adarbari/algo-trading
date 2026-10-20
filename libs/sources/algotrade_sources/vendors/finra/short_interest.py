@@ -10,7 +10,8 @@ published (or never held) answers nothing, so ``fetch`` is ``None`` and the task
 ADR 0018): ``ts`` the settlement date at midnight UTC; the task adds ``published`` and
 ``known_from`` (``tasks/shorting/schedule.py``). FINRA keeps only the latest revision of a
 settlement date (``revision_flag`` marks a restated row), so the task never refetches a stored
-date: the first-seen value is the point-in-time one.
+date in a normal run; ``known_from`` is the schedule's date, and a flagged or changed row only the
+session after the fetch (ADR 0050 amendment 2026-10-20).
 """
 
 from datetime import UTC, date, datetime
