@@ -18,6 +18,8 @@ lib/
 lib64/
 /parts/
 sdist/
+# /var without a trailing slash also matches the release tree's symlinked var (ADR 0079)
+/var
 var/
 wheels/
 share/python-wheels/
@@ -226,6 +228,7 @@ coverage.xml
 datasets/golden/store/
 
 # L4 user configs are local (a database later)
+/config/users
 config/users/
 
 # per-worktree PYTHONPATH written by scripts/worktree.sh

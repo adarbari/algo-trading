@@ -12,6 +12,12 @@ is the one way to name the restart (printed, never run, by the build-identity ch
 ``deploy_plist`` is the second agent (ADR 0057): every five minutes it runs
 ``scripts/ops/deploy.sh --auto`` from the checkout, which deploys what origin/main gained.
 
+Both take a release ``tree`` (ADR 0079, ``var/release/<slot>``): the API agent then runs the
+tree's own venv with the tree as working directory and its web build (``<tree>.web``, outside
+every git path) as ``ALGOTRADE_WEB_DIST``; the deploy agent runs the script of the ``current``
+slot beside it (a symlink, so a slot change never needs a reinstall). Logs stay in the main
+checkout's ``var/logs``. Without a tree both run from the checkout, as before.
+
 ``OPEN_FILES`` is the API agent's file-descriptor limit: launchd's default soft limit is 256,
 and every open connection is a descriptor, so a burst of slow requests (a swapping Mac) filled
 it and ``accept()`` failed with ``EMFILE`` (2026-10-08). ``MAX_CONNECTIONS`` caps the
@@ -27,6 +33,7 @@ from pathlib import Path
 LABEL = "com.algotrade.api"
 DEPLOY_LABEL = "com.algotrade.deploy"
 DEPLOY_INTERVAL_S = 300
+CURRENT = "current"  # the release tree's symlink to the active slot (ADR 0079)
 DEPLOY_TOOLS = ("uv", "npm", "git")  # the deploy runs these; launchd's PATH has none of them
 HOST = "127.0.0.1"  # loopback only: Funnel (or a browser on this Mac) is the way in
 DEFAULT_PORT = 8000
@@ -34,21 +41,28 @@ OPEN_FILES = 8192  # launchd's default soft limit is 256; macOS refuses more tha
 MAX_CONNECTIONS = 1024  # served at once (uvicorn limit_concurrency); the rest are 503
 
 
-def api_plist(repo: Path, port: int = DEFAULT_PORT) -> bytes:
-    """The agent for the checkout at ``repo`` serving on ``127.0.0.1:port``."""
+def web_dist(tree: Path) -> Path:
+    """The web build of release tree ``tree``: beside it, never inside a git path."""
+    return tree.with_name(tree.name + ".web")
+
+
+def api_plist(repo: Path, port: int = DEFAULT_PORT, tree: Path | None = None) -> bytes:
+    """The agent for the checkout at ``repo`` serving on ``127.0.0.1:port``; from the release
+    ``tree`` when given (its venv, working directory and web build)."""
     if not 0 < port < 65536:
         raise ValueError(f"invalid port {port}")
     logs = repo / "var" / "logs"
+    run_from = tree or repo
     agent: dict[str, object] = {
         "Label": LABEL,
         "ProgramArguments": [
-            str(repo / ".venv" / "bin" / "algotrade-api"),
+            str(run_from / ".venv" / "bin" / "algotrade-api"),
             "--host",
             HOST,
             "--port",
             str(port),
         ],
-        "WorkingDirectory": str(repo),  # the CLI loads this checkout's .env
+        "WorkingDirectory": str(run_from),  # the CLI loads this tree's .env
         "RunAtLoad": True,  # at login / boot
         "ProcessType": "Interactive",  # serves people: never throttled behind the nightly's writes
         "KeepAlive": True,  # restarted whenever it exits (launchd throttles a crash loop)
@@ -57,22 +71,32 @@ def api_plist(repo: Path, port: int = DEFAULT_PORT) -> bytes:
         "SoftResourceLimits": {"NumberOfFiles": OPEN_FILES},  # launchd's default is 256
         "HardResourceLimits": {"NumberOfFiles": OPEN_FILES},
     }
+    if tree is not None:
+        agent["EnvironmentVariables"] = {"ALGOTRADE_WEB_DIST": str(web_dist(tree))}
     return plistlib.dumps(agent)
 
 
-def deploy_plist(repo: Path, path: str, interval_s: int = DEPLOY_INTERVAL_S) -> bytes:
+def deploy_plist(
+    repo: Path, path: str, interval_s: int = DEPLOY_INTERVAL_S, tree: Path | None = None
+) -> bytes:
     """The deploy agent for the checkout at ``repo``: ``deploy.sh --auto`` every ``interval_s``
-    seconds (and at load) with ``path`` as its PATH. Refuses a PATH without uv, npm and git."""
+    seconds (and at load) with ``path`` as its PATH; with a release ``tree``, the script of the
+    ``current`` slot beside it. Refuses a PATH without uv, npm and git."""
     if interval_s < 1:
         raise ValueError(f"invalid interval {interval_s}")
     missing = [t for t in DEPLOY_TOOLS if shutil.which(t, path=path) is None]
     if missing:
         raise ValueError(f"{', '.join(missing)} not found on PATH {path!r}: the deploy needs them")
     log = repo / "var" / "logs" / "deploy.log"
+    run_from = tree.parent / CURRENT if tree is not None else repo
     agent: dict[str, object] = {
         "Label": DEPLOY_LABEL,
-        "ProgramArguments": ["/bin/bash", str(repo / "scripts" / "ops" / "deploy.sh"), "--auto"],
-        "WorkingDirectory": str(repo),
+        "ProgramArguments": [
+            "/bin/bash",
+            str(run_from / "scripts" / "ops" / "deploy.sh"),
+            "--auto",
+        ],
+        "WorkingDirectory": str(run_from),
         "RunAtLoad": True,
         "StartInterval": interval_s,
         "StandardOutPath": str(log),

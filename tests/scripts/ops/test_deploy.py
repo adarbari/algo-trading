@@ -1,5 +1,6 @@
-"""`scripts/ops/deploy.sh`: the manual deploy and the launchd cycle (`--auto`, ADR 0057), run
-against a temp git repo with stub tools on PATH (no network, no launchctl, no real build)."""
+"""`scripts/ops/deploy.sh`: the manual deploy and the launchd cycle (`--auto`, ADR 0057) onto a
+release tree (ADR 0079), run against a temp git repo (the main checkout, state root) with a
+`var/release/blue` worktree and stub tools on PATH (no network, no launchctl, no real build)."""
 
 import os
 import shutil
@@ -13,11 +14,7 @@ SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "ops" / "deploy.sh"
 API_STUB = """#!/bin/sh
 echo "api $*" >> "$STUB_LOG"
 case "$1" in
-  deploy-plan)
-    case " $* " in
-      *" --locks "*) echo "${STUB_LOCKS-ingest}" ;;
-      *) echo "${STUB_PLAN:-restart}" ;;
-    esac ;;
+  deploy-plan) echo "${STUB_PLAN:-restart}" ;;
   deploy-verify) exit "${STUB_VERIFY_RC:-0}" ;;
   schedule)
     while [ $# -gt 0 ]; do
@@ -28,7 +25,12 @@ esac
 """
 INGEST_STUB = """#!/bin/sh
 echo "ingest $*" >> "$STUB_LOG"
-shift; [ "$1" = --deploy-only ] && shift; [ "$1" = -- ] && shift
+shift
+case " $* " in
+  *" --deploy-only "*) ;;
+  *) if [ -n "$STUB_INGEST_HELD" ]; then exit 75; fi ;;  # an ingest run holds its lock
+esac
+[ "$1" = --deploy-only ] && shift; [ "$1" = -- ] && shift
 if [ -n "$STUB_BUSY" ]; then exit 75; fi
 exec "$@"
 """
@@ -66,7 +68,7 @@ def _repo(tmp_path: Path) -> Path:
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
     _git(repo, "init", "-q", "-b", "main")
     _git(repo, "remote", "add", "origin", str(origin))
-    (repo / ".gitignore").write_text("*.local.toml\nvar/\n")
+    (repo / ".gitignore").write_text("*.local.toml\n/var\nvar/\n/config/users\n.env\n")
     (repo / "a.txt").write_text("a\n")
     _git(repo, "add", ".")
     _git(repo, "commit", "-qm", "init")
@@ -108,6 +110,10 @@ class Site:
             self._stub(name, LOGGING_STUB)
         self.agents = tmp_path / "agents"
         self.agents.mkdir()
+        self.tree = self.repo / "var" / "release" / "blue"
+        self.tree.parent.mkdir(parents=True)
+        _git(self.repo, "worktree", "add", "-q", "--detach", str(self.tree))
+        (self.tree.parent / "current").symlink_to("blue")
         self.env = {
             "PATH": f"{self.bin}:{os.environ['PATH']}",
             "HOME": str(tmp_path),
@@ -116,6 +122,7 @@ class Site:
             "ALGOTRADE_DEPLOY_INGEST": str(self.bin / "algotrade-ingest"),
             "ALGOTRADE_DEPLOY_NOTIFY": str(self.bin / "notify"),
             "ALGOTRADE_DEPLOY_AGENTS": str(self.agents),
+            "ALGOTRADE_DEPLOY_FREE_KB": "100000000",  # 100 GB: the floor test lowers it
         }
 
     def _stub(self, name: str, body: str) -> None:
@@ -141,11 +148,19 @@ class Site:
     def state(self, name: str) -> Path:
         return self.repo / "var" / "deploy" / name
 
+    def served(self) -> str:
+        """The commit the release tree is at."""
+        return _git(self.tree, "rev-parse", "HEAD")
+
     def seed(self) -> str:
         sha = _git(self.repo, "rev-parse", "HEAD")
         self.state("last_sha").parent.mkdir(parents=True, exist_ok=True)
         self.state("last_sha").write_text(sha + "\n")
         return sha
+
+    @property
+    def web(self) -> Path:
+        return self.repo / "var" / "release" / "blue.web"
 
     def log(self) -> str:
         path = self.repo / "var" / "logs" / "deploy.log"
@@ -157,29 +172,24 @@ def site(tmp_path: Path) -> Site:
     return Site(tmp_path)
 
 
-# ---- the manual deploy (unchanged guards) ---------------------------------------------------
+# ---- the manual deploy -----------------------------------------------------------------------
 
 
-def test_refuses_off_main(site: Site) -> None:
+def test_the_main_checkout_never_blocks_serving(site: Site) -> None:
+    """ADR 0079: off main, dirty or diverged, the main checkout is the ingest's, not serving's."""
     _git(site.repo, "switch", "-qc", "feat/x")
-    out = site.run("--dry-run")
-    assert out.returncode == 1 and "not main" in out.stderr
-
-
-def test_refuses_a_dirty_tree_but_not_the_ignored_overlay(site: Site) -> None:
-    (site.repo / "llm.local.toml").write_text("enabled = true\n")  # git-ignored overlay
-    assert site.run("--dry-run").returncode == 0
     (site.repo / "a.txt").write_text("changed\n")
-    out = site.run("--dry-run")
-    assert out.returncode == 1 and "uncommitted" in out.stderr
-
-
-def test_refuses_unpushed_local_commits(site: Site) -> None:
     (site.repo / "b.txt").write_text("b\n")
-    _git(site.repo, "add", ".")
+    _git(site.repo, "add", "b.txt")
     _git(site.repo, "commit", "-qm", "local only")
     out = site.run("--dry-run")
-    assert out.returncode == 1 and "not on origin/main" in out.stderr
+    assert out.returncode == 0, out.stderr
+
+
+def test_a_missing_release_tree_refuses_and_names_init_release(site: Site) -> None:
+    _git(site.repo, "worktree", "remove", "--force", str(site.tree))
+    out = site.run("--dry-run")
+    assert out.returncode == 1 and "--init-release" in out.stderr
 
 
 def test_dry_run_prints_the_whole_plan_and_runs_nothing(site: Site) -> None:
@@ -188,23 +198,27 @@ def test_dry_run_prints_the_whole_plan_and_runs_nothing(site: Site) -> None:
     plan = [x for x in out.stdout.splitlines() if x.startswith("[dry-run]")]
     heads = [x.split()[1] for x in plan]
     assert [Path(h).name for h in heads] == [
-        "git", "uv", "make", "launchctl", "algotrade-api", "swap", "algotrade-api",
+        "link", "git", "git", "uv", "make", "launchctl", "algotrade-api", "swap", "algotrade-api",
     ]  # fmt: skip
-    assert "merge --ff-only" in plan[0] and "sync --all-packages --locked" in plan[1]
-    assert "web-build" in plan[2] and "kickstart -k" in plan[3]
-    assert "--check api" in plan[4] and "--check web" in plan[6]
+    assert "checkout -q --force --detach" in plan[1] and "reset -q --hard" in plan[2]
+    assert "sync --all-packages --locked" in plan[3]
+    assert "web-build" in plan[4] and "kickstart -k" in plan[5]
+    assert "--check api" in plan[6] and "--check web" in plan[8]
+    assert "locks (dry-run): deploy\n" in out.stdout
     assert site.called() == [] and not site.state("last_sha").exists()
 
 
 def test_a_manual_deploy_does_everything_and_records_the_commit(site: Site) -> None:
     sha = _advance(site.repo, "src/algotrade/x.py")
+    main_head = _git(site.repo, "rev-parse", "HEAD")
     out = site.run()
     assert out.returncode == 0, out.stdout + out.stderr
-    assert site.called()[0].startswith("ingest deploy-hold -- bash ")  # through the locks
+    assert site.called()[0].startswith("ingest deploy-hold --deploy-only -- bash ")
     assert any(c.startswith("uv sync --all-packages --locked") for c in site.called())
     assert site.state("last_sha").read_text().strip() == sha
-    assert _git(site.repo, "rev-parse", "HEAD") == sha
-    assert (site.repo / "var" / "web" / "index.html").read_text().strip() == "new"
+    assert site.served() == sha  # the release tree moved
+    assert _git(site.repo, "rev-parse", "HEAD") == main_head  # the main checkout did not
+    assert (site.web / "index.html").read_text().strip() == "new"
 
 
 def test_a_manual_deploy_that_works_clears_the_block(site: Site) -> None:
@@ -238,8 +252,8 @@ def test_nothing_moved_exits_at_once_and_logs_nothing(site: Site) -> None:
     assert site.called() == [] and site.log() == ""
 
 
-def test_the_first_run_seeds_last_sha_from_head(site: Site) -> None:
-    head = _git(site.repo, "rev-parse", "HEAD")
+def test_the_first_run_seeds_last_sha_from_the_release_tree(site: Site) -> None:
+    head = site.served()
     assert site.run("--auto").returncode == 0
     assert site.state("last_sha").read_text().strip() == head
     assert "seeded last_sha" in site.log() and site.called() == []
@@ -263,43 +277,13 @@ def test_an_auto_dry_run_does_not_seed_or_block(site: Site) -> None:
     assert not site.state("last_sha").exists() and site.log() == ""
 
 
-def test_a_running_deploy_makes_auto_skip_instead_of_blocking_on_its_dirty_tree(site: Site) -> None:
-    sleeper = subprocess.Popen(["sleep", "30"])
-    try:
-        site.state("applying").parent.mkdir(parents=True)
-        site.state("applying").write_text(f"{sleeper.pid}\n")
-        (site.repo / "a.txt").write_text("mid-merge\n")
-        out = site.run("--auto")
-        assert out.returncode == 0 and not site.state("blocked").exists()
-        assert "skipped: deploy running" in site.log() and site.notices() == []
-    finally:
-        sleeper.kill()
-        sleeper.wait()
-    stale = site.run("--auto")  # the pid is gone: the marker no longer excuses the dirty tree
-    assert stale.returncode == 1 and site.state("blocked").exists()
-
-
-def test_the_applying_marker_is_removed_when_a_deploy_ends(site: Site) -> None:
-    _advance(site.repo, "src/x.py")
-    assert site.run().returncode == 0
-    assert not site.state("applying").exists()
-
-
-def test_a_dirty_tree_blocks_and_notifies_once(site: Site) -> None:
-    (site.repo / "a.txt").write_text("changed\n")
+def test_a_missing_release_tree_blocks_and_notifies_once(site: Site) -> None:
+    _git(site.repo, "worktree", "remove", "--force", str(site.tree))
     out = site.run("--auto")
-    assert out.returncode == 1 and "uncommitted" in site.state("blocked").read_text()
+    assert out.returncode == 1 and "--init-release" in site.state("blocked").read_text()
     assert len(site.notices()) == 1 and "--clear" in site.notices()[0]
     again = site.run("--auto")
     assert again.returncode == 0 and len(site.notices()) == 1  # stopped until cleared
-
-
-def test_a_diverged_main_blocks(site: Site) -> None:
-    (site.repo / "b.txt").write_text("b\n")
-    _git(site.repo, "add", ".")
-    _git(site.repo, "commit", "-qm", "local only")
-    assert site.run("--auto").returncode == 1
-    assert "not on origin/main" in site.state("blocked").read_text()
 
 
 def test_a_last_sha_off_main_blocks(site: Site) -> None:
@@ -330,13 +314,13 @@ def test_only_what_changed_is_deployed(site: Site) -> None:
     assert any(f"deploy-verify --expect {sha} --check full" in c for c in calls)
     assert not any(c.startswith(("make", "uv")) for c in calls)  # no web build, no sync
     assert site.state("last_sha").read_text().strip() == sha
-    assert _git(site.repo, "rev-parse", "HEAD") == sha
+    assert site.served() == sha
     assert f"deployed {sha[:9]} (restart)" in site.log()
 
 
 def test_a_web_change_is_built_aside_and_swapped_in_keeping_old_assets(site: Site) -> None:
     site.seed()
-    web = site.repo / "var" / "web"
+    web = site.web
     (web / "assets").mkdir(parents=True)
     (web / "index.html").write_text('<script src="/assets/old.js"></script>')
     (web / "assets" / "old.js").write_text("old")
@@ -347,9 +331,9 @@ def test_a_web_change_is_built_aside_and_swapped_in_keeping_old_assets(site: Sit
     assert (web / "index.html").read_text().strip() == "new"
     assert (web / "assets" / "new.js").exists() and (web / "assets" / "old.js").exists()
     assert not (web / "assets" / "ancient.js").exists()  # only the previous build's own files
-    assert "old.js" in (site.repo / "var" / "deploy" / "web.prev" / "index.html").read_text()
+    assert "old.js" in (site.repo / "var" / "release" / "blue.web.prev" / "index.html").read_text()
     calls = site.called()
-    assert any("make web-build WEB_DIST=var/deploy/web.next" in c for c in calls)
+    assert any(f"make -C {site.tree} web-build WEB_DIST={web}.next" in c for c in calls)
     assert any(f"deploy-verify --expect {sha} --check web" in c for c in calls)
     assert not any(c.startswith("launchctl") for c in calls)
 
@@ -367,51 +351,140 @@ def test_busy_skips_without_touching_anything(site: Site) -> None:
     _advance(site.repo, "src/x.py")
     out = site.run("--auto", STUB_BUSY="1")
     assert out.returncode == 0
-    assert "skipped: ingest/deploy running" in site.log()
+    assert "skipped: deploy running" in site.log()
     assert site.state("last_sha").read_text().strip() == before
     assert not site.state("blocked").exists() and site.notices() == []
-    assert _git(site.repo, "rev-parse", "HEAD") == before
+    assert site.served() == before
 
 
-def test_a_web_only_plan_holds_the_deploy_lock_alone(site: Site) -> None:
+def test_a_deploy_during_a_held_ingest_lock_deploys(site: Site) -> None:
+    """The regression (2026-10-20): back-to-back backfills held the ingest lock and a diff
+    touching apps/ingestion and config/site made every cycle skip for hours. A serving deploy
+    takes the deploy lock alone, so it goes ahead whatever the ingest is doing."""
     site.seed()
-    _advance(site.repo, "apps/web/src/a.ts")
-    out = site.run("--auto", STUB_PLAN="web", STUB_LOCKS="")
+    _advance(site.repo, "apps/ingestion/algotrade_ingestion/a.py")
+    sha = _advance(site.repo, "config/site/sources.toml")
+    out = site.run("--auto", STUB_PLAN="restart", STUB_INGEST_HELD="1")
     assert out.returncode == 0, out.stdout + out.stderr
-    assert any(c.startswith("ingest deploy-hold --deploy-only -- bash ") for c in site.called())
-
-
-def test_a_plan_that_touches_the_ingest_keeps_both_locks(site: Site) -> None:
-    site.seed()
-    _advance(site.repo, "src/algotrade/x.py")
-    assert site.run("--auto", STUB_PLAN="restart").returncode == 0
+    assert "skipped" not in site.log() and f"deployed {sha[:9]}" in site.log()
+    assert site.served() == sha and site.state("last_sha").read_text().strip() == sha
     holds = [c for c in site.called() if c.startswith("ingest deploy-hold")]
-    assert holds and all("--deploy-only" not in c for c in holds)
+    assert holds and all("--deploy-only" in c for c in holds)  # never the ingest run lock
+    assert not any("--locks" in c for c in site.called())  # the plan no longer decides locks
 
 
-def test_a_deploy_only_skip_names_the_deploy_alone(site: Site) -> None:
+def test_a_busy_deploy_lock_skips_and_names_the_deploy(site: Site) -> None:
     site.seed()
     _advance(site.repo, "apps/web/src/a.ts")
-    assert site.run("--auto", STUB_PLAN="web", STUB_LOCKS="", STUB_BUSY="1").returncode == 0
+    assert site.run("--auto", STUB_PLAN="web", STUB_BUSY="1").returncode == 0
     assert "skipped: deploy running" in site.log()
     assert "ingest/deploy" not in site.log()
 
 
-def test_a_failed_locks_plan_blocks_and_runs_no_hold(site: Site) -> None:
-    site._stub(
-        "algotrade-api",
-        API_STUB.replace('*" --locks "*) echo', '*" --locks "*) exit 1; echo'),
-    )
+def test_the_private_ref_is_fetched_and_origin_main_is_left_alone(site: Site) -> None:
+    """ADR 0079 step 4: `--refmap=` keeps the deployer from writing refs/remotes/origin/main,
+    which sessions sharing the object store fetch too (`cannot lock ref`)."""
     site.seed()
-    _advance(site.repo, "apps/web/src/a.ts")
-    out = site.run("--auto", STUB_PLAN="web")
-    assert out.returncode == 1 and "deploy-plan failed" in site.state("blocked").read_text()
-    assert not any(c.startswith("ingest") for c in site.called())
+    before = _git(site.repo, "rev-parse", "refs/remotes/origin/main")
+    sha = _advance(site.repo, "src/algotrade/x.py")
+    assert site.run("--auto").returncode == 0
+    assert _git(site.repo, "rev-parse", "refs/remotes/origin/main") == before
+    assert _git(site.repo, "rev-parse", "refs/deploy/main") == sha
 
 
-def test_the_dry_run_says_which_locks_it_would_take(site: Site) -> None:
-    out = site.run("--dry-run")
-    assert "locks (dry-run): deploy, ingest" in out.stdout
+def test_the_release_tree_is_clean_and_the_overlay_links_stay_out_of_git_status(
+    site: Site,
+) -> None:
+    (site.repo / "llm.local.toml").write_text("enabled = true\n")
+    (site.repo / "config" / "site").mkdir(parents=True)
+    (site.repo / "config" / "site" / "llm.local.toml").write_text("enabled = true\n")
+    (site.repo / "config" / "users").mkdir()
+    (site.repo / ".env").write_text("X=1\n")
+    site.seed()
+    _advance(site.repo, "src/algotrade/x.py")
+    assert site.run("--auto").returncode == 0
+    assert _git(site.tree, "status", "--porcelain") == ""  # untracked and ignored: nothing at all
+    assert _git(site.tree, "status", "--porcelain", "-uno") == ""
+    for name in ("var", ".env", "config/users", "config/site/llm.local.toml"):
+        assert (site.tree / name).is_symlink(), name
+    assert (site.tree / "var").resolve() == (site.repo / "var").resolve()
+    assert site.run("--auto").returncode == 0  # the links are checked each cycle, not recreated
+
+
+def test_a_release_tree_with_its_own_var_blocks(site: Site) -> None:
+    site.seed()
+    (site.tree / "var").mkdir()
+    _advance(site.repo, "src/algotrade/x.py")
+    assert site.run("--auto").returncode == 1
+    assert "its own" in site.state("blocked").read_text()
+
+
+def test_too_little_free_disk_blocks_before_anything_moves(site: Site) -> None:
+    before = site.seed()
+    _advance(site.repo, "src/algotrade/x.py")
+    out = site.run("--auto", ALGOTRADE_DEPLOY_FREE_KB="1000000")  # 1 GB < the 5 GB floor
+    assert out.returncode == 1 and "MB free" in site.state("blocked").read_text()
+    assert site.served() == before and not any(c.startswith("launchctl") for c in site.called())
+
+
+def test_a_dirty_release_tree_is_reset_to_the_target(site: Site) -> None:
+    site.seed()
+    (site.tree / "a.txt").write_text("edited in the deployer's tree\n")
+    sha = _advance(site.repo, "a.txt")  # the target changes the very file that is dirty
+    assert site.run("--auto").returncode == 0
+    assert _git(site.tree, "status", "--porcelain", "-uno") == "" and site.served() == sha
+    assert (site.tree / "a.txt").read_text() == "a.txt"
+
+
+def test_an_earlier_planned_cycle_does_not_rewind_a_later_deploy(site: Site) -> None:
+    site.seed()
+    old = _advance(site.repo, "src/a.py")
+    new = _advance(site.repo, "src/b.py")
+    assert site.run("--auto").returncode == 0 and site.served() == new
+    out = site.run("--slot", "blue", "--apply", "auto", old, "restart")
+    assert out.returncode == 0 and site.served() == new
+    assert site.state("last_sha").read_text().strip() == new
+    assert f"skipped: tree already past {old[:9]}" in site.log()
+
+
+def test_a_release_tree_that_diverged_from_the_target_blocks(site: Site) -> None:
+    site.seed()
+    (site.tree / "z.txt").write_text("z\n")
+    _git(site.tree, "add", "z.txt")
+    _git(site.tree, "commit", "-qm", "stray commit in the deployer's tree")
+    sha = _advance(site.repo, "src/a.py")
+    out = site.run("--auto")
+    assert out.returncode == 1 and "has diverged from" in site.state("blocked").read_text()
+    assert site.state("last_sha").read_text().strip() != sha
+
+
+def test_config_users_is_always_linked(site: Site) -> None:
+    site.seed()
+    _advance(site.repo, "src/a.py")
+    assert site.run("--auto").returncode == 0
+    assert (site.tree / "config" / "users").is_symlink()
+    assert (site.repo / "config" / "users").is_dir()
+
+
+def test_the_default_slot_follows_current(site: Site) -> None:
+    green = site.repo / "var" / "release" / "green"
+    _git(site.repo, "worktree", "add", "-q", "--detach", str(green))
+    (site.tree.parent / "current").unlink()
+    (site.tree.parent / "current").symlink_to("green")
+    site.seed()
+    sha = _advance(site.repo, "src/a.py")
+    assert site.run("--auto").returncode == 0
+    assert _git(green, "rev-parse", "HEAD") == sha and site.served() != sha
+
+
+def test_init_release_never_repoints_current(site: Site) -> None:
+    _git(site.repo, "worktree", "remove", "--force", str(site.tree))
+    (site.tree.parent / "current").unlink()
+    (site.tree.parent / "current").symlink_to("green")
+    out = site.run("--init-release", "--slot", "blue")
+    assert out.returncode == 1 and "only the blue/green flip" in out.stderr
+    assert not site.tree.exists()
+    assert (site.tree.parent / "current").readlink() == Path("green")
 
 
 def test_a_failed_verify_blocks_notifies_and_keeps_last_sha(site: Site) -> None:
@@ -428,7 +501,7 @@ def test_a_failed_verify_blocks_notifies_and_keeps_last_sha(site: Site) -> None:
 def test_a_failed_web_build_blocks_before_anything_is_restarted_or_swapped(site: Site) -> None:
     site.seed()
     site._stub("make", "#!/bin/sh\nexit 2\n")
-    web = site.repo / "var" / "web"
+    web = site.web
     web.mkdir(parents=True)
     (web / "index.html").write_text("old")
     _advance(site.repo, "apps/web/src/a.ts")
@@ -447,8 +520,60 @@ def test_a_changed_plist_writer_notifies_and_never_blocks(site: Site) -> None:
     assert out.returncode == 0, out.stdout + out.stderr
     (notice,) = site.notices()
     assert "reinstall" in notice and "com.algotrade.api" in notice and "nightly" in notice
+    schedules = [c for c in site.called() if c.startswith("api schedule")]
+    assert schedules and all(f"--tree {site.tree}" in c for c in schedules)  # compared as installed
     assert "com.algotrade.deploy " not in notice and not site.state("blocked").exists()
     assert not any(c.startswith("launchctl") for c in site.called())  # never installs
+
+
+# ---- --init-release ---------------------------------------------------------------------------
+
+
+def _uninitialised(site: Site) -> None:
+    _git(site.repo, "worktree", "remove", "--force", str(site.tree))
+    (site.tree.parent / "current").unlink()
+
+
+def test_init_release_builds_the_tree_carries_assets_and_installs_nothing(site: Site) -> None:
+    _uninitialised(site)
+    old = site.repo / "var" / "web"
+    (old / "assets").mkdir(parents=True)
+    (old / "index.html").write_text('<script src="/assets/old.js"></script>')
+    (old / "assets" / "old.js").write_text("old")
+    sha = _advance(site.repo, "src/algotrade/x.py")
+    out = site.run("--init-release")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert site.served() == sha and (site.tree.parent / "current").resolve() == site.tree.resolve()
+    assert (site.tree / "var").is_symlink() and (site.web / "assets" / "old.js").exists()
+    assert (site.web / "assets" / "new.js").exists() and not site.state("last_sha").exists()
+    calls = site.called()
+    assert any(c.startswith("uv sync --all-packages --locked") for c in calls)
+    assert not any(c.startswith(("launchctl", "ingest")) for c in calls)  # installs nothing
+    assert "launchctl bootout" in out.stdout and "schedule --agent deploy --tree" in out.stdout
+    assert "already exists" in site.run("--init-release").stdout  # once only
+
+
+def test_init_release_runs_from_the_targets_own_script_when_it_differs(site: Site) -> None:
+    _uninitialised(site)
+    clone = site.repo.parent / "other"
+    _advance(site.repo, "x.txt")
+    (clone / "scripts" / "ops").mkdir(parents=True)
+    (clone / "scripts" / "ops" / "deploy.sh").write_text(SCRIPT.read_text() + "\n# newer\n")
+    _git(clone, "add", ".")
+    _git(clone, "commit", "-qm", "R1 lands")
+    _git(clone, "push", "-q", "origin", "main")
+    out = site.run("--init-release")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "from a temporary worktree" in site.log() and site.tree.exists()
+    assert _git(site.repo, "worktree", "list").count("\n") == 1  # the temporary one is gone
+
+
+def test_init_release_removes_a_half_made_tree_when_the_build_fails(site: Site) -> None:
+    _uninitialised(site)
+    site._stub("make", "#!/bin/sh\nexit 2\n")
+    out = site.run("--init-release")
+    assert out.returncode != 0 and "removing the half-made tree" in out.stderr
+    assert not site.tree.exists()
 
 
 def test_clear_prints_the_reason_and_lets_it_run_again(site: Site) -> None:

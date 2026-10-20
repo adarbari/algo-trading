@@ -5,9 +5,11 @@ matches the commit just deployed.
 what bash should not decide: ``actions`` maps the changed paths to what must run, ``verify``
 polls the running API's ``/health`` until it serves the deployed commit with no mismatch
 (``ops/build.py``). The locks it runs under are the ingestion app's
-(``algotrade-ingest deploy-hold``); ``holds_ingest`` says whether a change needs the ingest
-run lock too (only when it touches something a running ingest loads). Nothing here installs
-or restarts an agent: the script does, and the launchd plists are written by ``ops/schedule.py``.
+(``algotrade-ingest deploy-hold``). A serving deploy takes the ``deploy`` lock alone, because it
+runs from a release tree no ingest loads (ADR 0079); ``holds_ingest`` only says whether a change
+touches something a running ingest loads, the hint the ingest-tree sync logs. Nothing here
+installs or restarts an agent: the script does, and the launchd plists are written by
+``ops/schedule.py``.
 """
 
 import json
@@ -85,7 +87,8 @@ def _ingest_free(path: str) -> bool:
 
 
 def holds_ingest(paths: Iterable[str]) -> bool:
-    """Whether a deploy of the changed ``paths`` must also take the ingest run lock: ``True``
+    """Whether the changed ``paths`` touch what a running ingest loads (not a serving deploy's
+    lock since ADR 0079; the ingest-tree sync's hint): ``True``
     unless every path is one a running ingest never loads (web, API, docs, tests, harness,
     root ``*.md``); a dependency change, an unknown path or a new folder holds it. An empty
     diff holds nothing."""

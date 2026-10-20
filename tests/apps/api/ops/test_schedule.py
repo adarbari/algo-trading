@@ -124,3 +124,42 @@ def test_the_api_agent_is_interactive_and_never_niced() -> None:
     agent = plistlib.loads(api_plist(Path("/repo"), 8000))
     assert agent["ProcessType"] == "Interactive"
     assert "Nice" not in agent and "LowPriorityIO" not in agent  # the readers outrank the writer
+
+
+def test_the_api_agent_serves_from_a_release_tree_and_its_web_build() -> None:
+    """ADR 0079: the tree's venv and working directory, its web build beside it, logs in main."""
+    tree = Path("/repo/var/release/blue")
+    agent = plistlib.loads(api_plist(Path("/repo"), 8000, tree=tree))
+    assert agent["ProgramArguments"][0] == "/repo/var/release/blue/.venv/bin/algotrade-api"
+    assert agent["WorkingDirectory"] == str(tree)
+    assert agent["EnvironmentVariables"] == {"ALGOTRADE_WEB_DIST": "/repo/var/release/blue.web"}
+    assert agent["StandardOutPath"] == "/repo/var/logs/api.log"  # state stays in the main var
+    plain = plistlib.loads(api_plist(Path("/repo"), 8000))
+    assert "EnvironmentVariables" not in plain  # no tree: today's agent, unchanged
+
+
+def test_the_deploy_agent_runs_the_current_slots_script(tmp_path: Path) -> None:
+    path = _tools(tmp_path, "uv", "npm", "git")
+    tree = Path("/repo/var/release/blue")
+    agent = plistlib.loads(deploy_plist(Path("/repo"), path, tree=tree))
+    script = "/repo/var/release/current/scripts/ops/deploy.sh"
+    assert agent["ProgramArguments"] == ["/bin/bash", script, "--auto"]
+    assert agent["WorkingDirectory"] == "/repo/var/release/current"
+    assert agent["StandardOutPath"] == "/repo/var/logs/deploy.log"
+
+
+def test_schedule_tree_flag_reaches_both_agents(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "load_dotenv", lambda: None)
+    monkeypatch.setenv("ALGOTRADE_AUTH", "supabase")
+    monkeypatch.setenv("PATH", _tools(tmp_path, "uv", "npm", "git"))
+    root = tmp_path.resolve()
+    cli.main(["schedule", "--tree", "var/release/blue"])
+    api = plistlib.loads((tmp_path / "var" / f"{LABEL}.plist").read_bytes())
+    assert api["WorkingDirectory"] == f"{root}/var/release/blue"
+    cli.main(["schedule", "--agent", "deploy", "--tree", "var/release/blue"])
+    deploy = plistlib.loads((tmp_path / "var" / f"{DEPLOY_LABEL}.plist").read_bytes())
+    assert deploy["ProgramArguments"][1] == f"{root}/var/release/current/scripts/ops/deploy.sh"
+    capsys.readouterr()
