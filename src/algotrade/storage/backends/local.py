@@ -441,7 +441,6 @@ class LocalTables:
         return CompactionReport(before, before, size_before, size_before, 0, reason)
 
     @staticmethod
-    @staticmethod
     def _discard(directory: Path, names: Collection[str]) -> None:
         """Delete files written for a swap that did not happen, but never one the index names
         (whatever raised may have come after the index was written)."""
