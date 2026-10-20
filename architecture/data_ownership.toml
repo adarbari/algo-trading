@@ -227,6 +227,7 @@ allowed = [
     "src/algotrade/storage/backends/local.py",  # applies the selection to its _runs.json index
     "src/algotrade/storage/backends/local_index.py",  # parses _runs.json entries into RunEntry
     "src/algotrade/storage/backends/memory.py",  # applies the selection to its in-memory runs
+    "src/algotrade/storage/backends/run_compaction.py",  # verifies a compaction with the owner's select_runs / merge_rows (ADR 0078)
 ]
 section = "docs/adr/0007-point-in-time-data.md#how-runs-combine"
 detect = [{ call = "select_runs" }, { call = "merge_rows" }, { call = "RunEntry" }]
