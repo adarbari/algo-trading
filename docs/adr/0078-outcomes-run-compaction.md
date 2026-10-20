@@ -1,6 +1,6 @@
 # ADR 0078: Outcomes run compaction: a value-exact index swap that moves no sequence
 
-**Status:** proposed (2026-10-19; waits on the owner, decisions 1 and 2 below). Amends
+**Status:** accepted (2026-10-19; the owner chose E2 and accepted decision 2 below). Amends
 [0022](0022-atomic-run-publication.md) (an index rewrite that changes no value at any `as_of` or
 `upto` keeps the sequence) and [0053](0053-edges-hypotheses-outcomes-and-one-harness.md) (what an
 outcome row's `knowledge_ts` means). Measurements: `docs/perf/outcomes-compaction-measurement.md`.
