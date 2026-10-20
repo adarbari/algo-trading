@@ -94,9 +94,13 @@ requests use. The owner accepts data up to a day stale and wants fast loads alwa
     `deploy-hold`, or holds; it never rolls back. Blue/green: the new process warms from the
     current release on a second port and takes traffic only after a health and latency probe;
     the old one stays if the probe fails. The same warm-before-swap applies on promotion.
-    Funnel forwards to a fixed 127.0.0.1:8000 (0044): the mechanism (SO_REUSEPORT, unverified
-    on macOS, else a stable front proxy, else warm-before-restart) is an owner decision after
-    a spike.
+    **Mechanism (owner decision 2026-10-19): a small front proxy**, its own launchd agent on
+    127.0.0.1:8000 (Funnel's fixed target, 0044, unchanged), forwarding to the blue or green API
+    agent on its own port; the deploy starts the idle colour, warms and probes it, flips the
+    proxy's target atomically, drains the old colour, then stops it; a failed probe never flips.
+    `SO_REUSEPORT` is rejected (BSD semantics, no control over when traffic moves); warm-before-
+    restart is rejected as the end state (a gap, no probe-gated rollback). The proxy is a single
+    point of failure kept alive by launchd, with no logic beyond forwarding and the flip.
 12. **The warmer is a separate process** (it warms shared role keys only, never per-user or admin-cause answers, 0056) (`algotrade-api warm`) writing the persisted cache the
     API reads (*correction*: a separate process cannot fill the API's in-memory LRU, so it
     only helps with the persisted cache). Until then a dedicated one-thread warm pool outside
@@ -113,7 +117,7 @@ seal, promote, current, open, prune, free_bytes), `serving-release-read` (`data/
 `serving-release-build` (`services/serving/`, pure shapers over the existing `services/read`
 loaders at a pinned context: no second implementation of a page), `serve-release-job`
 (`workflows/serve_release/`; an import-linter contract keeps `services/serving` off
-`data/outcomes`, ADR 0053: edge-desk data only through the `services/read` loaders), the API's `serving/` folder (persisted cache, warm process);
+`data/outcomes`, ADR 0053: edge-desk data only through the `services/read` loaders), the API's `serving/` folder (persisted cache, warm process, `front-proxy`);
 extend `session-resolution`. Five folders declared in `architecture/layout*.toml` with test
 mirrors. No `tables.toml` entry: a release is not a stored table, as `_history` is not; a
 fitness test requires release inputs to be stored tables, never `own_run`.
@@ -124,5 +128,6 @@ fitness test requires release inputs to be stored tables, never `own_run`.
 - A new derived artifact (50-250 MB, three kept, about 1% of the store) and a new job to run.
 - Risks: a pinned history-copy read leaking a later version (decision 2); missing data cast to
   zero in Arrow (tests with a missing table); non-deterministic row order (sort before write).
-- Open owner decisions: promote r2 after post-session (recommended yes); the floor and
-  ceiling; the blue/green mechanism; the wording of `PUBLISHING`.
+- Owner decisions 2026-10-19: r2 is promoted after post-session; ceiling 300 MB and floor
+  max(5 GB, 3x the last release); blue/green through a front proxy. Open: the wording of
+  `PUBLISHING` (proposed: shown only after about 15 minutes, neutral tone).

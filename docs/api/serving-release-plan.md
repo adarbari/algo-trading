@@ -50,14 +50,14 @@ pinning, locks, deploys).
 - Files: `apps/api/algotrade_api/serving/` (persisted cache, `algotrade-api warm` process),
   `ops/deploy.py` (format gate, `--rebuild`, blue/green).
 - The warmer warms shared role keys only (0056); the admin lane's thread cap is set here.
-- Order: persisted cache and warmer; warm-before-swap on promotion; format gate; then
-  blue/green after a SO_REUSEPORT spike (Fable if outside research is needed; else a stable
-  front proxy or warm-before-restart; retargeting Funnel is an owner action).
+- Order: persisted cache and warmer; warm-before-swap on promotion; format gate; then the
+  front proxy (its own launchd agent on 8000, blue and green API agents on two ports, flip after
+  a health and latency probe, drain, stop; `docs/hosting.md` runbook; retargeting nothing in
+  Funnel).
 - Acceptance: tests in `tests/apps/api/ops/` (the format gate holds, a failed probe keeps the
   old process, the deploy plan); `make load` during a simulated promotion.
 
-## Open owner decisions
-1. Promote a second release (r2) after post-session (recommended) or let the edge desk wait a day.
-2. Size ceiling 300 MB and free-space floor max(5 GB, 3x the last release).
-3. Blue/green mechanism after the spike.
-4. Wording of `PUBLISHING` (Guide entry).
+## Owner decisions
+Decided 2026-10-19: r2 after post-session; size ceiling 300 MB and free-space floor
+max(5 GB, 3x the last release); blue/green through a front proxy. Open: the wording of
+`PUBLISHING` (proposed: shown only after about 15 minutes, neutral tone).

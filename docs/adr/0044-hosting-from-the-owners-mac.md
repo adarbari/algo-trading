@@ -74,4 +74,4 @@ a new API.
    deploys `origin/main` by itself under the ingest lock; code still never installs an agent.
 
 ## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
-See [0077](0077-serving-release.md): the API warms a second process on another port and swaps after a probe; the Funnel target mechanism is an owner decision after a spike.
+See [0077](0077-serving-release.md): the API warms a second process on another port and swaps after a probe; a front proxy on the fixed Funnel target flips between blue and green (decided 2026-10-19).
