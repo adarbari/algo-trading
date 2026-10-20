@@ -3,6 +3,9 @@ partition and sweeps what the swap superseded without a read noticing; it stops 
 lock is held or the disk is under the floor, skips a partition it cannot compact exactly with the
 reason, is a no-op the second time, and refuses a table the config does not list."""
 
+import ctypes
+import os
+import sys
 from dataclasses import replace
 from datetime import date, timedelta
 from pathlib import Path
@@ -14,7 +17,7 @@ import pytest
 from algotrade.config.site.nightly import CompactionSettings
 from algotrade.config.site.settings import load_nightly
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.jobs.exclusive import INGEST_LOCK
+from algotrade.services.jobs.exclusive import DEPLOY_LOCK, INGEST_LOCK
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.locks import held
@@ -22,7 +25,7 @@ from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework import registry
 from algotrade_ingestion.tasks.framework.run import TaskContext
-from algotrade_ingestion.tasks.maintenance.compact_runs import compact
+from algotrade_ingestion.tasks.maintenance.compact_runs import compact, lower_priority
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import T0, stamped
 
@@ -158,3 +161,44 @@ def test_the_task_is_registered_with_its_flags() -> None:
     spec = registry.TASKS["compact-runs"]
     assert {p.name for p in spec.params} >= {"table", "start", "end", "limit", "dry_run"}
     assert next(p for p in spec.params if p.name == "table").required
+
+
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_the_task_saves_no_run_and_moves_no_cache_key(ctx: TaskContext, dry_run: bool) -> None:
+    # a saved run record moves runs_generation, which every GraphQL response key holds
+    seq, runs = ctx.reader.visible_seq(), ctx.reader.runs_generation()
+    assert _run(ctx, dry_run=dry_run)["compacted"] == 2
+    assert (ctx.reader.visible_seq(), ctx.reader.runs_generation()) == (seq, runs)
+
+
+def test_a_held_deploy_lock_stops_the_run_before_any_change(ctx: TaskContext) -> None:
+    before = _files(ctx)
+    with held(ctx.writer.backend.lock(DEPLOY_LOCK)):
+        record = compact(ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None)
+    assert "deploy lock is held" in record.stats["stopped"] and _files(ctx) == before
+
+
+def test_the_deploy_lock_is_held_while_a_partition_is_compacted(ctx: TaskContext) -> None:
+    seen: list[bool] = []
+
+    def pause(_: float) -> None:
+        with held(ctx.writer.backend.lock(DEPLOY_LOCK), wait=False) as taken:
+            seen.append(taken)
+
+    compact(ctx, SESSION, TABLE, sleep=pause, prioritise=lambda n: None)
+    assert seen and not any(seen)  # a deploy cannot start in the pauses
+
+
+def test_lower_priority_never_raises_and_asks_for_the_cpu_nice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    niced: list[int] = []
+    monkeypatch.setattr(os, "nice", niced.append)
+    monkeypatch.setattr(sys, "platform", "linux")
+    lower_priority(10)
+    assert niced == [10]
+    monkeypatch.setattr(os, "nice", lambda n: (_ for _ in ()).throw(OSError("no")))
+    lower_priority(10)  # swallowed
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(ctypes, "CDLL", lambda *a, **k: (_ for _ in ()).throw(OSError("no libc")))
+    lower_priority(0)  # the disk policy failing is swallowed too

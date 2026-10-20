@@ -13,9 +13,9 @@ owns the ingest lock, so the hold lives here and ``algotrade-ingest deploy-hold`
 from collections.abc import Callable
 
 from algotrade.services.jobs import RunLockedError, exclusive_run
+from algotrade.services.jobs.exclusive import DEPLOY_LOCK
 from algotrade.storage.tables.interfaces import Backend
 
-DEPLOY_LOCK = "deploy"
 BUSY = 75  # exit code when a lock is taken (EX_TEMPFAIL)
 
 

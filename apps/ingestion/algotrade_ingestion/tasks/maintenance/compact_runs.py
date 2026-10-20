@@ -21,11 +21,16 @@ caller:
 
 ``--limit N`` stops after N partitions were compacted. ``--dry-run`` writes nothing, takes no
 lock, and reports per-partition files and bytes before and after, the runs dropped, the
-partitions it would skip and why, and the estimated saving. The run record holds the report; no
-table is published.
+partitions it would skip and why, and the estimated saving. The report is the task's printed
+summary; no run record is saved (it would move ``runs_generation`` and evict every cached
+page) and no table is published. The ``deploy`` lock is held for the whole run (ADR 0057),
+never waited for.
 """
 
+import contextlib
+import ctypes
 import os
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
@@ -35,7 +40,12 @@ from time import sleep as nap
 from algotrade.config.site.nightly import CompactionSettings, NightlySettings
 from algotrade.config.site.settings import load_nightly
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.jobs.exclusive import INGEST_LOCK
+from algotrade.services.jobs.exclusive import (
+    DEPLOY_LOCK,
+    INGEST_LOCK,
+    RunLockedError,
+    exclusive_run,
+)
 from algotrade.storage.locks import held
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.interfaces import CompactionReport, PartitionBusyError
@@ -53,10 +63,19 @@ def settings_of(ctx: TaskContext) -> tuple[CompactionSettings, float]:
     return nightly.compaction, nightly.min_free_gb
 
 
+IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE = 1, 0, 3  # <sys/resource.h> (darwin)
+
+
 def lower_priority(nice: int) -> None:
-    """Take on background CPU priority for the rest of this process (the CLI's)."""
-    if nice > 0:
-        os.nice(nice)
+    """Take on background CPU and (darwin) disk priority for the rest of this process (the
+    CLI's); never raises: a platform without the calls just runs at normal priority."""
+    with contextlib.suppress(OSError):
+        if nice > 0:
+            os.nice(nice)
+    if sys.platform == "darwin":
+        with contextlib.suppress(OSError, AttributeError):
+            libc = ctypes.CDLL(None, use_errno=True)
+            libc.setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)
 
 
 @dataclass
@@ -238,14 +257,19 @@ def compact(
         for d in sorted(ctx.reader.dates(table))
         if (start is None or d >= start) and (end is None or d <= end)
     ]
-    with IngestRun(ctx, TASK, session) as run:
+    with IngestRun(ctx, TASK, session, save=False) as run:  # no run record: a saved one would
+        # move runs_generation and evict every cached page (ADR 0078 decisions 1 and 5)
         run.stats.update(table=table, dry_run=dry_run, partitions_in_range=len(days))
         if dry_run:
             totals = dry_run_report(ctx, table, days, limit)
         else:
             prioritise(cfg.nice)
             job = Compactor(ctx, table, cfg, min_free_gb * GB, sleep, clock)
-            job.run(days, limit)
+            try:  # a deploy must not run between partitions (ADR 0057): hold its lock throughout
+                with exclusive_run(ctx.writer.backend, DEPLOY_LOCK, wait=False):
+                    job.run(days, limit)
+            except RunLockedError:
+                job.stopped = "a deploy is running (the deploy lock is held)"
             totals = job.totals
             if job.stopped:
                 run.stats["stopped"] = job.stopped
