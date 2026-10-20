@@ -203,15 +203,21 @@ def _multiset_gap(
     n_right = 0 if right is None else right.num_rows
     if not names or not n_left or not n_right:
         return n_left > n_right if subset else n_left != n_right
-    both = pa.concat_tables(
-        [
-            _comparable(left, names, n_left).append_column(_LEFT, pa.array([1] * n_left)),
-            _comparable(right, names, n_right).append_column(_LEFT, pa.array([0] * n_right)),
-        ],
-        promote_options="permissive",
-    )
-    both = both.append_column(_RIGHT, pc.subtract(1, both.column(_LEFT)))
-    sums = both.group_by(names, use_threads=False).aggregate([(_LEFT, "sum"), (_RIGHT, "sum")])
+    left_side, right_side = _comparable(left, names, n_left), _comparable(right, names, n_right)
+    if left_side.schema.types != right_side.schema.types:
+        return True  # a column that changed type (int64 -> float64) does not read as it did
+    try:
+        both = pa.concat_tables(
+            [
+                left_side.append_column(_LEFT, pa.array([1] * n_left)),
+                right_side.append_column(_LEFT, pa.array([0] * n_right)),
+            ],
+            promote_options="none",
+        )
+        both = both.append_column(_RIGHT, pc.subtract(1, both.column(_LEFT)))
+        sums = both.group_by(names, use_threads=False).aggregate([(_LEFT, "sum"), (_RIGHT, "sum")])
+    except (pa.ArrowInvalid, pa.ArrowTypeError, pa.ArrowNotImplementedError) as exc:
+        raise CompactionVerificationError(f"rows cannot be compared: {exc}") from exc
     a, b = sums.column(f"{_LEFT}_sum"), sums.column(f"{_RIGHT}_sum")
     return bool(pc.any(pc.greater(a, b) if subset else pc.not_equal(a, b)).as_py())
 
@@ -262,6 +268,20 @@ def verify_plan(
     unchanged in its source run. A view whose selected runs (old and kept) were already compared
     is not compared again (only its cut is added to the stamp check). ``budget`` raises
     ``CompactionOverBudgetError`` when spent."""
+    try:
+        _verify(table, entries, sources, kept_entries, kept_tables, budget)
+    except (pa.ArrowInvalid, pa.ArrowTypeError, pa.ArrowNotImplementedError) as exc:
+        raise CompactionVerificationError(f"rows cannot be compared: {exc}") from exc
+
+
+def _verify(
+    table: str,
+    entries: Mapping[str, RunEntry],
+    sources: Mapping[str, pa.Table],
+    kept_entries: Mapping[str, RunEntry],
+    kept_tables: Mapping[str, pa.Table],
+    budget: Budget | None,
+) -> None:
     _check_sources(kept_tables, sources, budget)
     seen: dict[tuple[tuple[str, ...], tuple[str, ...]], list[pd.Timestamp | None]] = {}
     for old_entries, new_entries, cut in _views(entries, kept_entries):

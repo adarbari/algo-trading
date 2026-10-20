@@ -54,7 +54,7 @@ from algotrade.services.jobs.exclusive import (
     RunLockedError,
     exclusive_run,
 )
-from algotrade.storage.backends.run_compaction import OVER_BUDGET
+from algotrade.storage.backends.run_compaction import OVER_BUDGET, CompactionVerificationError
 from algotrade.storage.locks import held
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.interfaces import CompactionReport, PartitionBusyError
@@ -209,6 +209,8 @@ class Compactor:
                 report = writer.compact_runs(self.table, day, budget_s=self.cfg.partition_seconds)
             except PartitionBusyError:
                 report = CompactionReport(skipped="a pending run is writing the partition")
+            except CompactionVerificationError as exc:  # nothing swapped, new files discarded
+                report = CompactionReport(skipped=f"verification failed: {exc}")
             self.scratch = max(self.scratch, report.bytes_before)
             if self.totals.add(day, report):
                 self.swapped.append(day)

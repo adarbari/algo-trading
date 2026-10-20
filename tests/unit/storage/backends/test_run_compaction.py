@@ -308,3 +308,45 @@ def test_verifying_twenty_runs_of_a_hundred_thousand_rows_takes_seconds() -> Non
     started = time.monotonic()
     verify_plan(TABLE, entries, sources, entries, kept)
     assert time.monotonic() - started < 60
+
+
+def test_a_change_only_a_view_shows_is_rejected_though_every_kept_row_is_in_its_source() -> None:
+    nan = float("nan")
+    runs = {"r1": run(1, {"A": nan}), "r2": run(2, {"A": None})}  # r2 revises NaN to null
+    entries = {r: entry(int(r[1:])) for r in runs}
+    dropped = {"r1": runs["r1"], "r2": runs["r2"].slice(0, 0)}  # an empty subset of its source
+    assert not _accepts(entries, runs, dropped)
+    assert not _slow_reference(entries, runs, entries, dropped)
+
+
+def test_a_column_that_changed_type_is_rejected() -> None:
+    runs = {"r1": run(1, {"A": 1.0}), "r2": run(2, {"A": 2.0})}
+    entries = {r: entry(int(r[1:])) for r in runs}
+    drifted = {
+        "r1": runs["r1"].set_column(2, "cash_amount", pa.array([1], pa.int64())),
+        "r2": runs["r2"],
+    }
+    assert not _accepts(entries, runs, drifted)
+    assert not _slow_reference(entries, runs, entries, drifted)
+
+
+def test_a_type_pair_arrow_cannot_merge_is_a_verification_error() -> None:
+    runs = {"r1": run(1, {"A": 1.0}), "r2": run(2, {"A": 2.0})}
+    entries = {r: entry(int(r[1:])) for r in runs}
+    naive = pa.array([pd.Timestamp("2026-10-02")], pa.timestamp("us"))
+    odd = {"r1": runs["r1"].set_column(1, "ts", naive), "r2": runs["r2"]}
+    assert not _accepts(entries, runs, odd)
+
+
+def test_a_difference_visible_only_at_a_pinned_sequence_is_rejected() -> None:
+    known = pd.Timestamp(T0)
+    same_view = known + pd.Timedelta(days=1)  # every run visible at once: only `upto` splits them
+    runs = {f"r{k}": run(k, {"A": float(k)}) for k in (1, 2, 3)}
+    entries = {
+        f"r{k}": RunEntry(pd.Timestamp(T0 + timedelta(hours=k)), False, same_view, k)
+        for k in (1, 2, 3)
+    }
+    dropped = {"r1": runs["r1"], "r2": runs["r2"].slice(0, 0), "r3": runs["r3"]}
+    # the full read (and every cut) agrees: r3 overwrites A; the prefix r1..r2 does not
+    assert not _accepts(entries, runs, dropped)
+    assert _accepts(entries, runs, runs)

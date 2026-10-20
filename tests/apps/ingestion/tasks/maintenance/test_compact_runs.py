@@ -20,7 +20,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.jobs.exclusive import DEPLOY_LOCK, INGEST_LOCK, INGEST_TREE_LOCK
 from algotrade.storage.backends import local
 from algotrade.storage.backends.local import LocalBackend
-from algotrade.storage.backends.run_compaction import Budget
+from algotrade.storage.backends.run_compaction import Budget, CompactionVerificationError
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.locks import held
 from algotrade.storage.runs import RunStatus
@@ -329,3 +329,27 @@ def test_a_budget_spent_during_verification_discards_the_files_it_wrote(
     stats = _run(ctx)
     assert stats["skipped"] == {"verification over budget": 2} and stats["compacted"] == 0
     assert _files(ctx) == before and _reads(ctx) == reads
+
+
+def test_a_verification_error_skips_that_partition_and_the_run_continues(
+    ctx: TaskContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original, seen = local.verify_plan, []
+
+    def flaky(*args: Any, **kw: Any) -> None:
+        seen.append(1)
+        if len(seen) == 1:
+            raise CompactionVerificationError("values differ at None")
+        original(*args, **kw)
+
+    monkeypatch.setattr(local, "verify_plan", flaky)
+    before = _files(ctx)
+    lines: list[str] = []
+    stats = compact(
+        ctx, SESSION, TABLE, sleep=lambda s: None, prioritise=lambda n: None, progress=lines.append
+    ).stats
+    assert stats["compacted"] == 1 and "stopped" not in stats
+    assert list(stats["skipped"]) == ["verification failed: values differ at None"]
+    assert any("verification failed" in line for line in lines)
+    after = {n for n, _ in _files(ctx)}
+    assert {n for n, _ in before if DAYS[0].strftime("%d") in n} <= after  # first day untouched
