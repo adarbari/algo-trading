@@ -18,7 +18,9 @@
 # The worktree is ../algo-trading-<branch-slug> (slash -> dash) next to the main checkout.
 # Create: symlinks .venv to the main checkout's (so pre-commit hooks work; never --no-verify
 # or SKIP=), writes worktree.env (git-ignored) with the absolute PYTHONPATH of THIS worktree
-# (so layout / import-linter resolve it, not main), and runs its own `npm ci` in apps/web.
+# (so layout / import-linter resolve it, not main), and gives apps/web its own node_modules: an APFS copy-on-write clone of the
+# main checkout's (`cp -c`, near-zero disk, a real directory so `npm ci` in the worktree never touches
+# main's) when package-lock.json is identical, else its own `npm ci` (a 400 MB install per worktree).
 # Never `uv sync` / `make install` in it: through the link that rewrites main's venv (which
 # the nightly and API run) to this worktree's code; `make install` refuses, `make doctor`
 # flags it. Never symlink node_modules: `make check` runs `npm ci`, which through a link
@@ -180,6 +182,13 @@ else
   printf 'export PYTHONPATH=%s\nexport ALGOTRADE_PORT_BASE=%s\n' "$pp" "$port_base" >"$wt/worktree.env"
 fi
 
-run npm ci --prefix "$wt/apps/web"
+lock=apps/web/package-lock.json
+if [ "$dry" != 1 ] && [ -d "$main/apps/web/node_modules" ] && cmp -s "$main/$lock" "$wt/$lock" \
+  && cp -cR "$main/apps/web/node_modules" "$wt/apps/web/node_modules" 2>/dev/null; then
+  echo "node_modules: cloned from main (copy-on-write)"
+else
+  rm -rf "$wt/apps/web/node_modules"
+  run npm ci --prefix "$wt/apps/web"
+fi
 
 echo "ready: source $wt/worktree.env && cd $wt"
