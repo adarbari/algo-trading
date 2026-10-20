@@ -72,3 +72,6 @@ a new API.
 6. *Amendment 2026-10-08 ([0057](0057-auto-deploy-from-origin-main.md)):* `scripts/ops/deploy.sh --auto`,
    run by a second launchd agent (`com.algotrade.deploy`, written never installed), now
    deploys `origin/main` by itself under the ingest lock; code still never installs an agent.
+
+## Amendment 2026-10-19: the serving release (proposed, ADR 0077)
+See [0077](0077-serving-release.md): the API warms a second process on another port and swaps after a probe; a front proxy on the fixed Funnel target flips between blue and green (decided 2026-10-19).
