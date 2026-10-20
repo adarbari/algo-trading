@@ -118,3 +118,9 @@ def test_schedule_agent_deploy_writes_its_own_plist(
         tmp_path / "var" / f"{LABEL}.plist"
     ).exists()
     assert any(line.startswith("launchctl bootstrap") for line in plan["install"])
+
+
+def test_the_api_agent_is_interactive_and_never_niced() -> None:
+    agent = plistlib.loads(api_plist(Path("/repo"), 8000))
+    assert agent["ProcessType"] == "Interactive"
+    assert "Nice" not in agent and "LowPriorityIO" not in agent  # the readers outrank the writer

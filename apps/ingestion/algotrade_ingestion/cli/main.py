@@ -69,6 +69,7 @@ from algotrade.core.time.calendar import last_closed_session
 from algotrade.data import StoreReader
 from algotrade.services.configs import default_user
 from algotrade.services.jobs import RunLockedError, exclusive_run
+from algotrade.storage.backends.arrow_memory import limit_threads
 from algotrade.storage.factory import open_backend
 from algotrade.storage.runs import done_sessions
 from algotrade.storage.tables.interfaces import Backend
@@ -84,6 +85,7 @@ from algotrade_ingestion.cli.commands import (
     run_task_command,
 )
 from algotrade_ingestion.ops.checkout import ensure_main_checkout
+from algotrade_ingestion.ops.disk import require_free_disk
 from algotrade_ingestion.ops.hold import hold
 from algotrade_ingestion.ops.schedule import (
     DEFAULT_TIME,
@@ -143,6 +145,12 @@ def writes(args: argparse.Namespace) -> bool:
     ):  # post-session: own locks
         return False
     return not (args.command == "golden" and args.action in ("build", "verify"))
+
+
+def local_data_dir() -> Path | None:
+    """The folder of the local store (``file://`` URLs), else ``None`` (a remote store)."""
+    url = data_url()
+    return Path(url.removeprefix("file://")) if url.startswith("file://") else None
 
 
 def default_session(args: argparse.Namespace, now: datetime) -> date:
@@ -432,6 +440,9 @@ def nightly(
     through = ingested_through(args, writer, datetime.now(UTC)) if auto else None
     if through is not None and not args.force:
         return nothing_to_do(through)  # finished by another run since main() checked
+    data_dir = local_data_dir()
+    if data_dir is not None:
+        require_free_disk(data_dir, load_nightly(config_store(args)).min_free_gb)
     params = {
         "session": session.isoformat(),
         # No --date: also the sessions missed since the last run. --force when nothing is
@@ -474,6 +485,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             ingest=not args.deploy_only,
         )
     try:
+        resources = load_nightly(config_store(args))  # the Mac also serves the web: stay modest
+        limit_threads(resources.arrow_cpu_threads, resources.arrow_io_threads)
         if args.command in ("nightly", "post-session"):  # never a branch against the real store
             ensure_main_checkout()
         if not writes(args):

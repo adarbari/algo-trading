@@ -388,3 +388,16 @@ def test_the_check_names_chronically_stale_chains_among_the_fetch_failures() -> 
     assert fetch.status == "FAIL"
     assert "STALE_DATA 0" in fetch.detail
     assert "fetch failures 3 (3 STALE_CHRONIC: stale over 5 sessions)" in fetch.detail
+
+
+def test_every_ingestion_agent_runs_at_background_priority() -> None:
+    """2026-10-19: the website crawled while the nightly ran; the writer must yield."""
+    repo = Path("/repo")
+    for blob in (
+        nightly_plist(repo, 15, 0),
+        post_session_plist(repo),
+        monthly_fill_plist(repo),
+    ):
+        agent = plistlib.loads(blob)
+        assert agent["Nice"] == 10 and agent["ProcessType"] == "Background"
+        assert agent["LowPriorityIO"] is True

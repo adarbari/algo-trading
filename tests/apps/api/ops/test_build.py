@@ -147,3 +147,15 @@ def test_running_mismatches_reads_a_running_api() -> None:
     assert running_mismatches("http://x", refused) is None
     (old,) = running_mismatches("http://x", lambda url: b'{"status": "ok"}') or ()
     assert "predates" in old and "kickstart" in old
+
+
+def test_checkout_moved_names_a_checkout_ahead_of_the_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = Stamp("a" * 40, "h")
+    monkeypatch.setattr(build, "git_sha", lambda repo: "b" * 40)
+    assert "bbbbbbbbb" in (build.checkout_moved(api) or "")
+    monkeypatch.setattr(build, "git_sha", lambda repo: "a" * 40)
+    assert build.checkout_moved(api) is None
+    monkeypatch.setattr(build, "git_sha", lambda repo: UNKNOWN)
+    assert build.checkout_moved(api) is None  # not a git checkout: nothing to compare

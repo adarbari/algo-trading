@@ -24,6 +24,9 @@ watchdog start ``algotrade-ingest post-session``, which does nothing until the l
 done nightly and no post-session record yet (``workflows/post_session/``), then runs descriptions,
 verify and edge-eval for it. It is written, never installed, like the others.
 
+All three run at background priority (``BACKGROUND``: nice 10, ``ProcessType`` Background, low IO
+priority) so the API on the same Mac keeps its pages fast while they write.
+
 The command runs under ``caffeinate -i -s`` so the Mac stays awake until the nightly exits: on
 2026-10-15 it slept on battery mid-run, the chains step crawled through maintenance wakes and the
 run never finished. ``-i`` holds off idle sleep (battery too), ``-s`` system sleep on AC; neither
@@ -39,6 +42,15 @@ DEFAULT_WATCHDOG_MINUTES = 60
 # The owner's optional wake (run by them, never by this code): powers the Mac on / wakes it
 # five minutes before the scheduled run on weekdays.
 WAKE_COMMAND = "sudo pmset repeat wakeorpoweron MTWRF 14:55:00"
+# Background work on a Mac that also serves the web (2026-10-19: pages crawled during the nightly):
+# nice 10 loses CPU contests to the API, ProcessType Background lowers its scheduling class and
+# IO priority is throttled, so the writer yields to the readers.
+BACKGROUND: dict[str, object] = {
+    "Nice": 10,
+    "ProcessType": "Background",
+    "LowPriorityIO": True,
+    "LowPriorityBackgroundIO": True,
+}
 CAFFEINATE = ["/usr/bin/caffeinate", "-i", "-s"]  # keep the Mac awake while the nightly runs
 
 
@@ -67,6 +79,7 @@ def nightly_plist(
         ],
         "StandardOutPath": str(logs / "nightly.log"),
         "StandardErrorPath": str(logs / "nightly.err.log"),
+        **BACKGROUND,
     }
     if watchdog_s:
         agent["StartInterval"] = watchdog_s
@@ -97,6 +110,7 @@ def post_session_plist(repo: Path, watchdog_s: int = POST_WATCHDOG_MINUTES * 60)
         "StartInterval": watchdog_s,
         "StandardOutPath": str(logs / "post-session.log"),
         "StandardErrorPath": str(logs / "post-session.err.log"),
+        **BACKGROUND,
     }
     return plistlib.dumps(agent)
 
@@ -136,5 +150,6 @@ def monthly_fill_plist(
         "StartCalendarInterval": {"Day": day, "Hour": hour, "Minute": minute},
         "StandardOutPath": str(logs / "bars-history-monthly.log"),
         "StandardErrorPath": str(logs / "bars-history-monthly.err.log"),
+        **BACKGROUND,
     }
     return plistlib.dumps(agent)

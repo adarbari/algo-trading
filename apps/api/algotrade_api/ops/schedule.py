@@ -50,6 +50,7 @@ def api_plist(repo: Path, port: int = DEFAULT_PORT) -> bytes:
         ],
         "WorkingDirectory": str(repo),  # the CLI loads this checkout's .env
         "RunAtLoad": True,  # at login / boot
+        "ProcessType": "Interactive",  # serves people: never throttled behind the nightly's writes
         "KeepAlive": True,  # restarted whenever it exits (launchd throttles a crash loop)
         "StandardOutPath": str(logs / "api.log"),
         "StandardErrorPath": str(logs / "api.err.log"),

@@ -210,10 +210,14 @@ limit). A resumable run only loses the batch in flight:
 
 ```bash
 mkdir -p var/logs
-nohup sh -c '.venv/bin/algotrade-ingest run ibkr-iv --from <2 years ago> --to <last session> --limit 1500 \
+nohup sh -c 'taskpolicy -b nice -n 10 .venv/bin/algotrade-ingest run ibkr-iv --from <2 years ago> --to <last session> --limit 1500 \
   > var/logs/ibkr-iv.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/ibkr-iv.status' >/dev/null 2>&1 &
 cat var/logs/ibkr-iv.status   # appears when the run ends; tail var/logs/ibkr-iv.log meanwhile
 ```
+
+A detached run goes through `taskpolicy -b nice -n 10` (background CPU and IO priority, like the
+launchd nightly) so the website on the same Mac stays fast; put the same prefix before any other
+long backfill below.
 
 The nightly step continues the backfill on its own, `[ibkr] iv_backfill_per_night = 100`
 names a night (~17 min), so new names fill in without a command; the email's `ibkr-iv` line

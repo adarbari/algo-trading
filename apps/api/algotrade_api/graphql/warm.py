@@ -132,7 +132,10 @@ class CacheWarmer:
         every_s: float = WARM_EVERY_S,
         extra: ExtraSteps | None = None,
         replay: Callable[[], Awaitable[int]] | None = None,
+        stale: Callable[[], str | None] | None = None,
     ):
+        self._stale = stale
+        self._stale_logged: str | None = None
         self._replay = replay
         self._open_ctx = open_ctx
         self._extra = extra
@@ -159,6 +162,12 @@ class CacheWarmer:
     def begin(self) -> tuple[ReadContext, Hashable] | None:
         """When the session or the published state moved since the last warm, read the home
         steps and return what ``finish`` needs; else ``None``. Blocking: the store's reads."""
+        reason = self._stale() if self._stale is not None else None
+        if reason is not None:  # configs ahead of this process's code: warming would only fail
+            if reason != self._stale_logged:
+                log.warning("not warming the read cache until the restart: %s", reason)
+                self._stale_logged = reason
+            return None
         ctx = self._open_ctx()
         # the session moves with the nightly's run records too (ADR 0062), not only on a publish
         state = (ctx.session.date, ctx.session.newer, ctx.reader.visible_seq())

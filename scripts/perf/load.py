@@ -19,6 +19,15 @@ page load, no cookies or cache; server-side the same as warm for now), `stress` 
 think time) and `realistic` (warm; each virtual user waits an exponential think time, mean
 `--think` 10 s, between page loads; /health is polled and the run ends PASS or FAIL against
 `CRITERIA`). The load client's own CPU is reported per level.
+
+Writer mode (2026-10-19: pages crawled while the nightly ran on the same Mac): the readers are
+measured while a writer commits runs and/or a command burns CPU and IO, as the nightly does.
+``--writer-store URL`` publishes a one-row partition of ``loadtest/writer`` to that store every
+``--publish-every`` seconds (each commit raises ``visible_seq``, so the API drops its caches and
+re-warms, as on a nightly publish); give it the data URL of a THROWAWAY store the API under
+test serves, never the real one. ``--writer-cmd`` runs a command meanwhile (e.g.
+``taskpolicy -b nice -n 10 .venv/bin/algotrade-ingest run <task>``). Not a CI gate: it needs a
+running API and store (``make load``, by hand, like the rest of this script).
 """
 
 from __future__ import annotations
@@ -29,6 +38,7 @@ import contextlib
 import json
 import random
 import re
+import shlex
 import subprocess
 import sys
 import threading
@@ -230,6 +240,9 @@ def summarise(loads: list[PageLoad]) -> dict[str, dict]:
 def render_table(report: dict) -> str:
     """The printable table of a report: one block per concurrency level."""
     lines = [f"scenario {report['scenario']}, {report['seconds']}s per level, {report['url']}"]
+    if "writer" in report:
+        w = report["writer"]
+        lines.append(f"writer: {w['publishes']} publishes, cmd {w['cmd'] or 'none'}")
     for level in report["levels"]:
         res = level["resources"]
         lines.append(
@@ -480,6 +493,57 @@ async def run(args: argparse.Namespace, pid: int | None) -> dict:
     }
 
 
+def publish_loop(store_url: str, every: float, stop: threading.Event, into: list[int]) -> None:
+    """Commit a one-row run of ``loadtest/writer`` every ``every`` seconds until ``stop``;
+    ``into`` gets one entry per commit."""
+    import pandas as pd  # noqa: PLC0415  (only this mode needs the library)
+
+    from algotrade.storage.factory import open_backend  # noqa: PLC0415
+
+    backend = open_backend(store_url)
+    while not stop.is_set():
+        now = datetime.now(UTC)
+        run_id = f"loadtest-{now:%Y%m%dT%H%M%S%f}"
+        frame = pd.DataFrame(
+            {
+                "instrument_id": ["LOAD"],
+                "ts": [now],
+                "session_date": [now.date()],
+                "knowledge_ts": [now],
+                "value": [float(len(into))],
+            }
+        )
+        backend.tables.write("loadtest/writer", now.date(), run_id, frame, pending=True)
+        backend.tables.commit_run(run_id, now)
+        into.append(1)
+        stop.wait(every)
+
+
+@contextlib.contextmanager
+def concurrent_writer(args: argparse.Namespace):  # type: ignore[no-untyped-def]
+    """Run the writer the flags ask for while the readers are measured; yields its report."""
+    report: dict = {"publishes": 0, "cmd": args.writer_cmd, "store": args.writer_store}
+    stop, commits = threading.Event(), []
+    thread = proc = None
+    if args.writer_store:
+        thread = threading.Thread(
+            target=publish_loop, args=(args.writer_store, args.publish_every, stop, commits)
+        )
+        thread.start()
+    if args.writer_cmd:
+        proc = subprocess.Popen(shlex.split(args.writer_cmd), stdout=subprocess.DEVNULL)
+    try:
+        yield report
+    finally:
+        stop.set()
+        if thread:
+            thread.join()
+        if proc:
+            proc.terminate()
+            proc.wait(timeout=30)
+        report["publishes"] = len(commits)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     p.add_argument("--url", default="http://127.0.0.1:8011")
@@ -490,12 +554,20 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--seconds", type=int, default=30, help="per level")
     p.add_argument("--think", type=float, default=10.0, help="realistic: mean think time, s")
     p.add_argument("--pid", type=int, help="API process (default: the listener on the URL's port)")
+    p.add_argument(
+        "--writer-store", help="writer mode: data URL of a throwaway store to publish to"
+    )
+    p.add_argument("--publish-every", type=float, default=5.0, help="writer mode: seconds")
+    p.add_argument("--writer-cmd", help="writer mode: a command to run during the measurement")
     args = p.parse_args(argv)
     port = int(args.url.rsplit(":", 1)[-1].split("/")[0])
     pid = args.pid or pid_on_port(port)
     if pid is None:
         print("no API process found for the resource sample (pass --pid)", file=sys.stderr)
-    report = asyncio.run(run(args, pid))
+    with concurrent_writer(args) as writer:
+        report = asyncio.run(run(args, pid))
+    if args.writer_store or args.writer_cmd:
+        report["writer"] = writer
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
     out.write_text(json.dumps(report, indent=2))

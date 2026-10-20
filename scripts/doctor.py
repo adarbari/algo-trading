@@ -13,6 +13,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -23,7 +24,9 @@ REPO = Path(__file__).resolve().parents[1]
 CI_PYTHON = "3.12"
 NODE_MAJOR = "24"
 OK, FAIL, WARN, INFO = "ok", "FAIL", "warn", "info"
-LOW_DISK_GB = 10  # below this a full disk stops every agent and the nightly (2026-10-06)
+LOW_DISK_GB = (
+    15  # default of [resources] min_free_gb: below it the nightly refuses to start (2026-10-06)
+)
 MAX_MERGED_WORKTREES = 10  # leftover worktrees of merged PRs, each with its own node_modules
 
 
@@ -423,14 +426,25 @@ def check_agents(p: Probes) -> list[Result]:
     return out
 
 
+def disk_floor_gb(repo: Path) -> float:
+    """The nightly's free-space floor: ``[resources] min_free_gb`` in ``nightly.toml``."""
+    try:
+        doc = tomllib.loads((repo / "config" / "site" / "nightly.toml").read_text())
+        return float(doc["resources"]["min_free_gb"])
+    except (OSError, KeyError, ValueError, TypeError):
+        return float(LOW_DISK_GB)
+
+
 def check_disk(p: Probes) -> Result:
     free = p.free_bytes(p.main()) / 1e9
-    if free >= LOW_DISK_GB:
+    floor = disk_floor_gb(p.repo)
+    if free >= floor:
         return Result(OK, "disk", f"{free:.0f} GB free")
     return Result(
         WARN,
         "disk",
-        f"{free:.1f} GB free, under {LOW_DISK_GB} GB (a full disk stops agents and the nightly)",
+        f"{free:.1f} GB free, under {floor:g} GB (the nightly refuses to start; a full disk "
+        "stops every agent)",
         f"{p.repo}/scripts/worktree.sh --prune-merged  # then rm -rf the caches it did not cover",
     )
 

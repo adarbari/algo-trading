@@ -44,6 +44,15 @@ checks that `ALGOTRADE_WEB_DIST` holds a build and that the installed agent runs
 
 ## 3. Keep the API running (launchd)
 
+The Mac also runs the nightly, so the agents carry priorities (2026-10-19: pages crawled
+while the nightly wrote). The API agent is `ProcessType` Interactive. The nightly,
+post-session and monthly-fill agents are `Nice` 10, `ProcessType` Background and
+`LowPriorityIO`, and `algotrade-ingest` caps Arrow at 2 CPU / 4 IO threads like the API
+(`[resources]` in `config/site/nightly.toml`, with `min_free_gb`: the nightly refuses to
+start with less free on the data volume, and `make doctor` warns below it). The plists are
+written, never installed: after pulling this, rewrite and reload them as printed by
+`algotrade-api schedule` / `algotrade-ingest schedule`.
+
 ```bash
 .venv/bin/algotrade-api schedule   # writes var/com.algotrade.api.plist; prints the install commands
 ```

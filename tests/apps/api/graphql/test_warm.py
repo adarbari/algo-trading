@@ -9,9 +9,16 @@ from typing import Any, cast
 import pytest
 
 from algotrade.config.edges.document import MECHANISM_KINDS
+from algotrade.config.user import SITE_USER, UserContext
+from algotrade.data import StoreReader
+from algotrade.services.read.context import open_stores
+from algotrade.services.read.evaluation.edges import load_edges
+from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.configs.files import FileConfigStore
 from algotrade_api.graphql import warm
 from algotrade_api.graphql.warm import CacheWarmer
 from algotrade_api.main import _start_warming
+from tests.conftest import REPO_ROOT
 
 
 @dataclass
@@ -289,3 +296,30 @@ def test_it_warms_the_admin_ingestion_grid_after_the_home_steps_not_before_servi
     ran.clear()
     warm.warm(cast(Any, type("C", (), {"configs": None})()))
     assert ran.index("grid 1") < ran.index("load_ideas") < ran.index("grid 10")
+
+
+def test_it_does_not_warm_while_the_checkout_is_ahead_of_the_running_code(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """2026-10-19: between a deploy's merge and the API restart the old code read the new
+    configs and failed the edge desk warm hundreds of times (``unknown keys``)."""
+    reader, session = _Reader(), _Session(date(2026, 10, 8))
+    reason: list[str | None] = ["the checkout is at b, this process runs a"]
+    warmer = CacheWarmer(
+        lambda: _Ctx(session, reader),  # type: ignore[arg-type, return-value]
+        stale=lambda: reason[0],
+    )
+    with caplog.at_level("WARNING"):
+        assert warmer.begin() is None and warmer.begin() is None
+    assert [r.getMessage().count("until the restart") for r in caplog.records] == [1]  # logged once
+    reason[0] = None  # the restart: a new process, the same warmer logic with no skew
+    assert warmer.begin() is not None
+
+
+def test_every_shipped_edge_loads_through_the_warm_path() -> None:
+    """The edge desk warm loads every site ``edge.toml`` through ``load_edges``; a key the code
+    does not know raises there, so the shipped configs and the code must agree."""
+    store = FileConfigStore(REPO_ROOT / "config")
+    ctx = open_stores(StoreReader(MemoryBackend()), store, UserContext(SITE_USER))
+    shipped = {p.parent.name for p in (REPO_ROOT / "config/site/edges").glob("*/edge.toml")}
+    assert shipped and {e.id for e in load_edges(ctx)} == shipped
