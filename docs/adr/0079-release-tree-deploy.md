@@ -1,7 +1,8 @@
 # ADR 0079: A release tree for serving: a deploy never waits on an ingest
 
-**Status:** proposed (2026-10-20; owner chose option 2 the same day: the API and web serve from
-a separate release tree; the architect reviews before code). Amends
+**Status:** accepted (2026-10-20; owner chose option 2 the same day: the API and web serve from
+a separate release tree, then accepted this ADR as written, including both judgement calls below:
+the opportunistic ingest-tree sync and the symlinked `var`; the architect reviewed before code). Amends
 [0057](0057-auto-deploy-from-origin-main.md) (decision 4 and its 2026-10-09 amendment: the
 ingest lock leaves the serving deploy) and [0044](0044-hosting-from-the-owners-mac.md) (what the
 API agent runs and where the web build lives). Consistent with
@@ -160,6 +161,6 @@ touches any of them, and P4 builds on R1's slot functions.
 Architect review 2026-10-20: design sound; nine edits applied (refmap, rebuild constraint, ingest-sync range, two roots, plists, symlinks, bootstrap, proxy truth, lock wording). A re-review of R1 is required (locks, format and deploy lifecycle change there).
 
 ## Open decisions
-None for the owner: the choice of option 2 is the owner's. Judgement calls the architect should
-confirm: the opportunistic ingest-tree sync (step 5) instead of a sync at each nightly start, and
+None. The owner accepted the ADR as written on 2026-10-20, including the judgement calls the
+architect confirmed: the opportunistic ingest-tree sync (step 5) instead of a sync at each nightly start, and
 the symlinked `var`.
