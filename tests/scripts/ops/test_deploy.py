@@ -42,12 +42,19 @@ exec "$@"
 """
 MAKE_STUB = """#!/bin/sh
 echo "make $*" >> "$STUB_LOG"
+prev=""
 for a in "$@"; do
   case "$a" in
     WEB_DIST=*) d="${a#WEB_DIST=}"; mkdir -p "$d/assets"; echo new > "$d/index.html"
                 echo new > "$d/assets/new.js" ;;
   esac
+  if [ "$prev" = -C ]; then tree="$a"; fi
+  prev="$a"
 done
+# Vite bakes the VITE_* values of the tree's apps/web/.env.local into the bundle
+if [ -z "$STUB_MAKE_NO_ENV" ] && [ -n "$d" ] && [ -f "$tree/apps/web/.env.local" ]; then
+  cat "$tree/apps/web/.env.local" >> "$d/assets/new.js"
+fi
 """
 UV_STUB = """#!/bin/sh
 echo "uv $* (cwd=$PWD)" >> "$STUB_LOG"
@@ -83,7 +90,9 @@ def _repo(tmp_path: Path) -> Path:
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
     _git(repo, "init", "-q", "-b", "main")
     _git(repo, "remote", "add", "origin", str(origin))
-    (repo / ".gitignore").write_text("*.local.toml\n/var\nvar/\n/config/users\n.env\n")
+    (repo / ".gitignore").write_text(
+        "*.local.toml\n/var\nvar/\n/config/users\n.env\n.env.local\n.env.*.local\n"
+    )
     (repo / "a.txt").write_text("a\n")
     _git(repo, "add", ".")
     _git(repo, "commit", "-qm", "init")
@@ -236,6 +245,25 @@ def test_a_manual_deploy_does_everything_and_records_the_commit(site: Site) -> N
     assert site.served() == sha  # the release tree moved
     assert _git(site.repo, "rev-parse", "HEAD") == sha  # and so did the ingest checkout (R2)
     assert (site.web / "index.html").read_text().strip() == "new"
+
+
+def test_only_web_rebuilds_the_web_without_a_sync_or_a_restart(site: Site) -> None:
+    sha = _advance(site.repo, "docs/x.md")  # a diff the auto plan maps to nothing
+    out = site.run("--only", "web")
+    assert out.returncode == 0, out.stdout + out.stderr
+    calls = site.called()
+    assert any(c.startswith("make -C") and "web-build" in c for c in calls)
+    assert not any(c.startswith(("uv sync", "launchctl")) for c in calls)
+    assert any(f"deploy-verify --expect {sha} --check web" in c for c in calls)
+    assert not any("--check api" in c or "--check full" in c for c in calls)
+    assert site.state("last_sha").read_text().strip() == sha and site.served() == sha
+    assert (site.web / "index.html").read_text().strip() == "new"
+    assert site.called()[0].startswith("ingest deploy-hold --deploy-only -- bash ")
+
+
+def test_only_is_manual_and_web_only(site: Site) -> None:
+    assert site.run("--only", "restart").returncode == 2
+    assert site.run("--auto", "--only", "web").returncode == 2
 
 
 def test_a_manual_deploy_that_works_clears_the_block(site: Site) -> None:
@@ -427,6 +455,82 @@ def test_the_release_tree_is_clean_and_the_overlay_links_stay_out_of_git_status(
         assert (site.tree / name).is_symlink(), name
     assert (site.tree / "var").resolve() == (site.repo / "var").resolve()
     assert site.run("--auto").returncode == 0  # the links are checked each cycle, not recreated
+
+
+def test_a_deploy_builds_the_web_with_the_apps_web_env_files_visible(site: Site) -> None:
+    """Regression (2026-10-20): the web built in the release tree had no VITE_SUPABASE_*, because
+    the git-ignored apps/web/.env.local was not linked in: sign-in said "not set up"."""
+    web_dir = site.repo / "apps" / "web"
+    web_dir.mkdir(parents=True)
+    (web_dir / ".env.local").write_text("VITE_SUPABASE_URL=https://x.supabase.co\n")
+    (web_dir / ".env.production.local").write_text("VITE_SUPABASE_ANON_KEY=key\n")
+    site.seed()
+    _advance(site.repo, "apps/web/src/a.ts")
+    out = site.run("--auto", STUB_PLAN="web")
+    assert out.returncode == 0, out.stdout + out.stderr
+    bundle = (site.web / "assets" / "new.js").read_text()
+    assert "VITE_SUPABASE_URL=https://x.supabase.co" in bundle
+    for name in (".env.local", ".env.production.local"):
+        assert (site.tree / "apps" / "web" / name).is_symlink(), name
+    assert _git(site.tree, "status", "--porcelain") == ""  # the links stay out of git status
+
+
+def test_a_web_build_without_the_supabase_url_is_never_swapped_in(site: Site) -> None:
+    web_dir = site.repo / "apps" / "web"
+    web_dir.mkdir(parents=True)
+    (web_dir / ".env.local").write_text("VITE_SUPABASE_URL=https://x.supabase.co\n")
+    live = site.web
+    live.mkdir(parents=True)
+    (live / "index.html").write_text("old")
+    site.seed()
+    _advance(site.repo, "apps/web/src/a.ts")
+    out = site.run("--auto", STUB_PLAN="web", STUB_MAKE_NO_ENV="1")
+    assert out.returncode == 1 and "lacks VITE_SUPABASE_URL" in site.state("blocked").read_text()
+    assert (live / "index.html").read_text() == "old"
+
+
+def test_a_crlf_and_commented_env_line_is_read_as_the_bare_url(site: Site) -> None:
+    web_dir = site.repo / "apps" / "web"
+    web_dir.mkdir(parents=True)
+    (web_dir / ".env.local").write_bytes(b'VITE_SUPABASE_URL="https://x.supabase.co" # prod\r\n')
+    site.seed()
+    _advance(site.repo, "apps/web/src/a.ts")
+    assert site.run("--auto", STUB_PLAN="web").returncode == 0  # not false-blocked
+    assert not site.state("blocked").exists()
+
+
+def test_no_env_local_in_main_means_no_check(site: Site) -> None:
+    site.seed()
+    _advance(site.repo, "apps/web/src/a.ts")
+    out = site.run("--auto", STUB_PLAN="web", STUB_MAKE_NO_ENV="1")
+    assert out.returncode == 0 and not site.state("blocked").exists()
+
+
+def test_init_release_also_refuses_a_key_less_web_build(site: Site) -> None:
+    _git(site.repo, "worktree", "remove", "--force", str(site.tree))
+    (site.tree.parent / "current").unlink()
+    web_dir = site.repo / "apps" / "web"
+    web_dir.mkdir(parents=True)
+    (web_dir / ".env.local").write_text("VITE_SUPABASE_URL=https://x.supabase.co\n")
+    out = site.run("--init-release", STUB_MAKE_NO_ENV="1")
+    assert out.returncode != 0 and "lacks VITE_SUPABASE_URL" in out.stderr
+    assert not site.tree.exists()
+
+
+def test_every_ignored_apps_web_env_file_is_in_the_overlay_list() -> None:
+    """Whatever apps/web/.gitignore (and the root .gitignore) ignores that Vite reads is linked."""
+    root = SCRIPT.parents[2]
+    ignored = {
+        line.strip()
+        for line in [
+            *(root / "apps" / "web" / ".gitignore").read_text().splitlines(),
+            *(root / ".gitignore").read_text().splitlines(),
+        ]
+        if line.strip().startswith(".env") and line.strip() != ".envrc"
+    }
+    line = next(x for x in SCRIPT.read_text().splitlines() if x.startswith("WEB_ENV_OVERLAY="))
+    overlay = set(line.split("=", 1)[1].strip('"').split())
+    assert ignored and ignored <= overlay, ignored - overlay
 
 
 def test_a_release_tree_with_its_own_var_blocks(site: Site) -> None:

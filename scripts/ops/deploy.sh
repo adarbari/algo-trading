@@ -2,6 +2,8 @@
 # Update the running site from its release tree (docs/hosting.md, ADRs 0057 and 0079).
 #
 #   var/release/current/scripts/ops/deploy.sh [--dry-run]   manual (the entry point; the main checkout's copy lags): fetch main and do everything (sync, web, restart)
+#   var/release/current/scripts/ops/deploy.sh --only web   manual: only rebuild and swap the web
+#                                       (no uv sync, no API restart)
 #   scripts/ops/deploy.sh --auto        the launchd agent com.algotrade.deploy (every 5 minutes):
 #                                       deploy only what origin/main changed since the last deploy
 #   scripts/ops/deploy.sh --clear       print why auto-deploy is blocked and let it run again
@@ -26,10 +28,13 @@
 set -euo pipefail
 
 PRIVATE_REF=refs/deploy/main
+# The git-ignored env files Vite bakes into the web build (apps/web/.gitignore, the root .env);
+# linked into the tree beside the other overlay files (a test keeps this list in step).
+WEB_ENV_OVERLAY=".env .env.local .env.*.local"
 MIN_FREE_KB=5242880  # 5 GB: the floor of the free-space check (else 3x the tree)
 
 main() {
-  local dry=0 mode=manual clear=0 apply=0 iapply=0 init=0 slot="${ALGOTRADE_DEPLOY_SLOT:-}"
+  local dry=0 mode=manual clear=0 apply=0 iapply=0 init=0 only="" slot="${ALGOTRADE_DEPLOY_SLOT:-}"
   local script
   script="$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")"  # physical: a flip of `current` never moves it
   while [ $# -gt 0 ]; do
@@ -39,15 +44,19 @@ main() {
       --clear) clear=1 ;;
       --init-release) init=1 ;;
       --slot) slot="$2"; shift ;;
+      --only) only="$2"; shift ;;
       --apply) apply=1; mode="$2"; shift ;;
       --ingest-apply) iapply=1; mode="$2"; shift ;;
-      -h | --help) sed -n '2,22p' "$0"; return 0 ;;
+      -h | --help) sed -n '2,24p' "$0"; return 0 ;;
       *) break ;;
     esac
     shift
   done
+  if [ -n "$only" ] && { [ "$only" != web ] || [ "$mode" = auto ]; }; then
+    echo "usage: --only web is the one scoped manual deploy (not with --auto)" >&2; return 2
+  fi
   if [ $# -gt 0 ] && [ "$apply" = 0 ] && [ "$iapply" = 0 ]; then
-    echo "usage: var/release/current/scripts/ops/deploy.sh [--dry-run | --auto | --clear | --init-release] [--slot NAME]" >&2
+    echo "usage: var/release/current/scripts/ops/deploy.sh [--dry-run | --auto | --clear | --init-release | --only web] [--slot NAME]" >&2
     return 2
   fi
 
@@ -115,6 +124,7 @@ main() {
       || { block "deploy-plan failed"; return 1; }
   else
     acts="sync web restart"
+    if [ "$only" = web ]; then acts="web"; fi  # a web rebuild: no sync, no API restart
   fi
 
   # A serving deploy takes the deploy lock alone: nothing it touches is loaded by an ingest.
@@ -211,8 +221,8 @@ link_one() {  # link_one <source> <link>: create once, check every cycle
 }
 
 slot_links() {
-  local root_dir=$root f
-  if [ "$dry" = 1 ]; then echo "[dry-run] link var, .env, config/users, config/site/*.local.toml into $tree"; return 0; fi
+  local root_dir=$root f pat pats
+  if [ "$dry" = 1 ]; then echo "[dry-run] link var, .env, config/users, config/site/*.local.toml, apps/web/{$WEB_ENV_OVERLAY} into $tree"; return 0; fi
   link_one "$root_dir/var" "$tree/var" || return 1
   if [ -e "$root_dir/.env" ]; then link_one "$root_dir/.env" "$tree/.env" || return 1; fi
   mkdir -p "$root_dir/config/users"  # always linked: a first user-config write must not make a real dir in the tree
@@ -220,9 +230,33 @@ slot_links() {
   for f in "$root_dir"/config/site/*.local.toml; do
     if [ -e "$f" ]; then link_one "$f" "$tree/config/site/$(basename "$f")" || return 1; fi
   done
-  for f in "$tree"/config/site/*.local.toml; do  # a local file removed from main
+  set -f; pats=($WEB_ENV_OVERLAY); set +f  # split without globbing against the cwd
+  for pat in "${pats[@]}"; do  # the web build's own env: without it VITE_SUPABASE_* is baked out
+    for f in "$root_dir"/apps/web/$pat; do  # the glob applies inside apps/web only
+      if [ -e "$f" ]; then link_one "$f" "$tree/apps/web/$(basename "$f")" || return 1; fi
+    done
+  done
+  for f in "$tree"/config/site/*.local.toml "$tree"/apps/web/.env*; do  # a local file removed from main
     if [ -L "$f" ] && [ ! -e "$f" ]; then rm -f "$f"; fi
   done
+}
+
+# Fail closed: a build made without the Supabase URL the main checkout's apps/web/.env.local
+# holds would swap in a sign-in page that says "not set up". Checked on the finished build.
+web_env_check() {
+  local dist=$1 url="" f
+  [ "$dry" = 0 ] || return 0
+  # Vite's production order: the first file that sets it wins
+  for f in .env.production.local .env.local .env.production .env; do
+    [ -f "$root/apps/web/$f" ] || continue
+    url=$(grep -E '^VITE_SUPABASE_URL=' "$root/apps/web/$f" | tail -1 | cut -d= -f2- \
+      | tr -d '\r' | sed -e 's/[[:space:]]#.*$//' | tr -d "\"' ")
+    if [ -n "$url" ]; then break; fi
+  done
+  if [ -n "$url" ] && ! grep -rqF -- "$url" "$dist"; then
+    block "the web build lacks VITE_SUPABASE_URL from apps/web/$f (is it linked into the release tree?)"
+    return 1
+  fi
 }
 
 slot_space() {  # refuse under max(5 GB, 3x the tree): the volume runs near full (ADR 0079)
@@ -256,6 +290,7 @@ slot_update() {  # move the tree to the target, then sync and build what the pla
     # Built beside the live one, outside every git path; a changed package-lock.json is newer than node_modules, so make runs npm ci.
     if [ "$dry" = 0 ]; then rm -rf "$webdir.next"; fi
     run make -C "$tree" web-build WEB_DIST="$webdir.next" || { block "the web build failed"; return 1; }
+    web_env_check "$webdir.next" || return 1
   fi
 }
 
@@ -471,6 +506,7 @@ init_build() {
   run_in "$tree" uv sync --all-packages --locked || return 1
   if [ "$dry" = 0 ]; then rm -rf "$webdir.next"; fi
   run make -C "$tree" web-build WEB_DIST="$webdir.next" || return 1
+  web_env_check "$webdir.next" || return 1
   if [ "$dry" = 0 ]; then
     carry_assets "$root/var/web" "$webdir.next"  # tabs open on the old build keep their files
     rm -rf "$webdir"
