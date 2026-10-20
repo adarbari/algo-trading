@@ -150,6 +150,9 @@ var/release/blue/.venv/bin/algotrade-api schedule --agent deploy --tree var/rele
   checkout cannot sync: ...") and `var/deploy/ingest_sync_blocked`, cleared by the next
   successful sync; `make doctor` shows it. Fix the checkout (`git switch main`, commit or restore
   files, reconcile with `origin/main`) and the next cycle retries.
+  A `--wait` ingest run queued behind the sync that imported from the main venv before a
+  dependency `uv sync` runs mixed modules: restart it after a sync that changed dependencies. A
+  serving block (`var/deploy/blocked`) does not stop this sync, which uses the last fetched target.
 - **Plists:** when a launchd plist writer changed, the cycle regenerates the agents (with
   `--tree`) into `var/deploy/plists/`, compares them with `~/Library/LaunchAgents/` and notifies
   "reinstall"; it never installs or blocks. Reinstall with the commands each `schedule` prints.

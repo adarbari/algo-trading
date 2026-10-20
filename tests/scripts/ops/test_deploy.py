@@ -15,6 +15,8 @@ API_STUB = """#!/bin/sh
 echo "api $*" >> "$STUB_LOG"
 case "$1" in
   deploy-plan)
+    n=$(cat "$STUB_LOG.plans" 2>/dev/null || echo 0); echo $((n + 1)) > "$STUB_LOG.plans"
+    if [ -n "$STUB_PLAN_FAIL_SECOND" ] && [ "$n" -ge 1 ]; then exit 1; fi
     case " $* " in
       *" --ingest-sync "*) echo "${STUB_HINT-}" ;;
       *) echo "${STUB_PLAN:-restart}" ;;
@@ -49,7 +51,12 @@ done
 """
 UV_STUB = """#!/bin/sh
 echo "uv $* (cwd=$PWD)" >> "$STUB_LOG"
-if [ -n "$STUB_UV_MAIN_FAIL" ] && [ "$PWD" = "$STUB_MAIN" ]; then exit 1; fi
+if [ "$PWD" = "$STUB_MAIN" ]; then
+  if [ -n "$STUB_UV_MAIN_FAIL" ]; then exit 1; fi
+  if [ -n "$STUB_UV_MAIN_FAIL_ONCE" ] && [ ! -f "$STUB_LOG.uvfailed" ]; then
+    touch "$STUB_LOG.uvfailed"; exit 1
+  fi
+fi
 """
 LOGGING_STUB = '#!/bin/sh\necho "$(basename "$0") $*" >> "$STUB_LOG"\n'
 
@@ -652,8 +659,86 @@ def test_a_failed_ingest_sync_is_rolled_back_and_never_blocks_serving(site: Site
     out = site.run("--auto", STUB_PLAN="sync restart", STUB_UV_MAIN_FAIL="1")
     assert out.returncode == 0 and site.served() == sha and not site.state("blocked").exists()
     assert _main_head(site) == before  # not left half-synced: retried next cycle
-    assert "uv sync failed in the ingest checkout" in site.state("ingest_sync_blocked").read_text()
+    reason = site.state("ingest_sync_blocked").read_text()
+    assert "uv sync failed in the ingest checkout" in reason and "venv left inconsistent" in reason
+    main_syncs = [
+        c
+        for c in site.called()
+        if c.startswith("uv sync") and c.endswith("(cwd=" + str(site.repo.resolve()) + ")")
+    ]
+    assert len(main_syncs) == 2  # the failed one, then the old lock put back
     assert len(site.notices()) == 1
+
+
+def test_a_rolled_back_sync_that_restores_the_old_venv_says_so_plainly(site: Site) -> None:
+    before = site.seed()
+    _advance(site.repo, "uv.lock")
+    assert site.run("--auto", STUB_PLAN="sync restart", STUB_UV_MAIN_FAIL_ONCE="1").returncode == 0
+    assert _main_head(site) == before
+    reason = site.state("ingest_sync_blocked").read_text()
+    assert "uv sync failed" in reason and "inconsistent" not in reason
+
+
+def test_a_failed_plan_blocks_the_ingest_sync_before_any_merge(site: Site) -> None:
+    before = site.seed()
+    sha = _advance(site.repo, "uv.lock")
+    out = site.run("--auto", STUB_PLAN="sync restart", STUB_PLAN_FAIL_SECOND="1")
+    assert out.returncode == 0 and site.served() == sha  # serving unaffected
+    assert _main_head(site) == before
+    assert not any(
+        c.startswith("uv sync") and c.endswith("(cwd=" + str(site.repo.resolve()) + ")")
+        for c in site.called()
+    )
+    assert "deploy-plan failed" in site.state("ingest_sync_blocked").read_text()
+
+
+def test_a_reason_without_a_sha_notifies_once_across_new_targets(site: Site) -> None:
+    site.seed()
+    _advance(site.repo, "src/a.py")
+    (site.repo / "a.txt").write_text("edited\n")
+    site.run("--auto")
+    _advance(site.repo, "src/b.py")
+    site.run("--auto")
+    assert len(site.notices()) == 1
+
+
+def test_an_index_lock_on_the_ingest_checkout_is_busy_not_a_block(site: Site) -> None:
+    before = site.seed()
+    sha = _advance(site.repo, "src/a.py")
+    (site.repo / ".git" / "index.lock").write_text("")
+    out = site.run("--auto")
+    (site.repo / ".git" / "index.lock").unlink()
+    assert out.returncode == 0 and site.served() == sha
+    assert not site.state("ingest_sync_blocked").exists() and site.notices() == []
+    assert _main_head(site) == before
+    assert site.run("--auto").returncode == 0 and _main_head(site) == sha  # retried
+
+
+def test_a_serving_block_does_not_stall_the_ingest_checkout(site: Site) -> None:
+    site.seed()
+    sha = _advance(site.repo, "src/a.py")
+    before_main = _main_head(site)
+    assert site.run("--auto", STUB_VERIFY_RC="1").returncode == 1  # serving blocks
+    assert site.state("blocked").exists() and _main_head(site) == before_main
+    assert site.run("--auto").returncode == 0  # blocked cycle: still syncs the ingest checkout
+    assert _main_head(site) == sha and site.state("blocked").exists()
+
+
+def test_the_default_ingest_program_is_the_release_trees_own(site: Site) -> None:
+    site.seed()
+    tree_ingest = site.tree / ".venv" / "bin" / "algotrade-ingest"
+    tree_ingest.parent.mkdir(parents=True)
+    tree_ingest.write_text(
+        INGEST_STUB.replace(
+            '>> "$STUB_LOG"\n', '>> "$STUB_LOG"\necho from-tree-venv >> "$STUB_LOG"\n', 1
+        )
+    )
+    tree_ingest.chmod(0o755)
+    sha = _advance(site.repo, "src/a.py")
+    out = site.run("--auto", ALGOTRADE_DEPLOY_INGEST="")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert site.served() == sha and "from-tree-venv" in site.called()
+    assert _main_head(site) == sha  # the sync's hold came from the same program
 
 
 @pytest.mark.parametrize("fault", ["dirty", "off-main", "diverged"])

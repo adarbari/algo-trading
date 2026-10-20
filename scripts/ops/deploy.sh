@@ -78,7 +78,13 @@ main() {
   if [ "$iapply" = 1 ]; then ingest_apply "$1"; return $?; fi
 
   # ---- phase A: guards, fetch, plan (no lock) ----------------------------------------------
-  if [ "$mode" = auto ] && [ -f "$state/blocked" ]; then return 0; fi
+  if [ "$mode" = auto ] && [ -f "$state/blocked" ]; then
+    # a serving block must not stall the ingest checkout: bring it to the last fetched target
+    local held
+    held=$(git rev-parse -q --verify "$PRIVATE_REF" 2> /dev/null || true)
+    if [ -n "$held" ]; then ingest_sync "$script" "$slot" "$held"; fi
+    return 0
+  fi
   need_tools || return 1
   if [ ! -e "$tree/.git" ]; then
     block "no release tree at $tree (the owner runs scripts/ops/deploy.sh --init-release once)"
@@ -348,6 +354,7 @@ plists_check() {
 # var/deploy/ingest_sync_blocked, cleared by the next successful sync.
 ingest_sync() {
   local script=$1 slot=$2 target=$3 rc=0
+  if [ ! -x "$ingest" ] && [ "$dry" = 0 ]; then return 0; fi  # no tree venv yet: nothing to hold with
   if [ "$dry" = 1 ]; then
     echo "[dry-run] ingest checkout: fast-forward $root to ${target:0:9} under both locks when it lacks it"
     return 0
@@ -386,16 +393,25 @@ ingest_apply() {  # under both locks: HEAD..target, never last_sha..target
   if ! git merge-base --is-ancestor "$head" "$target"; then
     ingest_block "the ingest checkout $root has commits that are not on origin/main (diverged)"; return 0
   fi
-  local plan
-  plan=$("$api" deploy-plan --since "$head" --to "$target" 2> /dev/null) || plan=""
+  local plan merr
+  if ! plan=$("$api" deploy-plan --since "$head" --to "$target" 2> /dev/null); then
+    say "ingest sync: deploy-plan failed for ${head:0:9}..${target:0:9}"
+    ingest_block "deploy-plan failed for the ingest checkout's range"; return 0  # before any merge
+  fi
   if [ -n "$("$api" deploy-plan --ingest-sync --since "$head" --to "$target" 2> /dev/null || true)" ]; then
     hint=", ingest code changed"
   fi
-  if ! git merge --ff-only -q "$target"; then ingest_block "the fast-forward of $root to ${target:0:9} failed"; return 0; fi
+  if ! merr=$(git merge --ff-only -q "$target" 2>&1); then
+    case "$merr" in *index.lock*) return 0 ;; esac  # a git command of the owner's is running: busy
+    ingest_block "the fast-forward of $root to origin/main failed"; return 0
+  fi
   case " $plan " in
     *" sync "*)
       if ! uv sync --all-packages --locked; then
         git reset -q --hard "$head"  # retried next cycle, not left half-synced
+        if ! uv sync --all-packages --locked; then  # put the venv back on the old lock
+          ingest_block "uv sync failed in the ingest checkout $root (venv left inconsistent)"; return 0
+        fi
         ingest_block "uv sync failed in the ingest checkout $root"; return 0
       fi
       ;;
