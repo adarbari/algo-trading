@@ -7,6 +7,8 @@ factory gets the data URL, the source registry gets ``credential``.
 """
 
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 DATA_URL = "ALGOTRADE_DATA_URL"
@@ -198,3 +200,22 @@ def supabase_jwt_secret() -> str | None:
 def user_id(fallback: str) -> str:
     """``$ALGOTRADE_USER`` if set, else ``fallback`` (CLIs: ``local``; site screens: ``site``)."""
     return credential(USER) or fallback
+
+
+THREAD_LIMITS = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS")
+
+
+@contextmanager
+def thread_limits(threads: int) -> Iterator[None]:
+    """The thread counts of the processes spawned inside the block (BLAS, and Arrow's pool, which
+    honours ``OMP_NUM_THREADS``): set before they import numpy, restored after."""
+    before = {name: os.environ.get(name) for name in THREAD_LIMITS}
+    os.environ.update(dict.fromkeys(THREAD_LIMITS, str(threads)))
+    try:
+        yield
+    finally:
+        for name, value in before.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value

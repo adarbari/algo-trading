@@ -8,14 +8,14 @@ leg's rows are keyed by edge, so edges never share a row. Results come back in t
 
 import multiprocessing
 import os
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from algotrade.config.env import thread_limits
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.evaluation.cross_section.reads.screens import ScreenCache
@@ -64,7 +64,7 @@ def run_edge_evals(
     threads = max(1, (os.cpu_count() or 1) // jobs)  # each worker's share of the cores
     outcomes: list[EdgeOutcome] = []
     died = False
-    with _thread_env(threads), ProcessPoolExecutor(
+    with thread_limits(threads), ProcessPoolExecutor(
         max_workers=jobs, mp_context=multiprocessing.get_context("spawn"),
     ) as pool:  # fmt: skip
         futures = [pool.submit(_evaluate, settings, task) for task in tasks]
@@ -81,23 +81,6 @@ def run_edge_evals(
 
 def _describe(error: BaseException) -> str:
     return f"{type(error).__name__}: {error}"
-
-
-@contextmanager
-def _thread_env(threads: int) -> Iterator[None]:
-    """The thread counts the spawned workers start with, set before they import numpy (BLAS, and
-    Arrow's pool, which honours OMP_NUM_THREADS)."""
-    names = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS")
-    before = {n: os.environ.get(n) for n in names}
-    os.environ.update(dict.fromkeys(names, str(threads)))
-    try:
-        yield
-    finally:
-        for name, value in before.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
 
 
 def _fail_in_flight(settings: PoolSettings, tasks: Sequence[EdgeTask]) -> None:
