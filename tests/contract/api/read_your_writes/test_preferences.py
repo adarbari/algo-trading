@@ -1,6 +1,6 @@
 """Read-your-writes of the preference routes (ADR 0077 decision 16): the Ideas priority and a
 table's saved view show on the very next ``IdeasPage`` / ``TableView`` read (cached per user),
-and another user's view is untouched. Every test runs with and without the write epoch."""
+and another user's view is untouched."""
 
 from fastapi.testclient import TestClient
 

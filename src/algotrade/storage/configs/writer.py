@@ -311,7 +311,7 @@ class MemoryConfigWriter(MemoryConfigStore):
         return sorted(n for (u, n), v in self._versions.items() if u == scope and v)
 
     def users(self) -> list[str]:
-        return sorted({*super().users(), *(u for u, _ in self._versions)})
+        return sorted({*super().users(), *(u for u, _ in self._versions), *self._generations})
 
     def draft(self, user: str, name: str) -> dict[str, Any] | None:
         found = self._drafts.get(self._screen(user, name))

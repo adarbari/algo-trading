@@ -69,7 +69,7 @@ from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
 from algotrade_api.feedback import DraftMemory, feedback_sink, request_sink
 from algotrade_api.graphql.offload import OverloadedError, off_loop
-from algotrade_api.graphql.response_cache import CountWrites, OperationLog, WriteEpoch, served_token
+from algotrade_api.graphql.response_cache import OperationLog, served_token
 from algotrade_api.graphql.schema import CachingRouter, graphql_router, sdl
 from algotrade_api.graphql.warm import CacheWarmer, seed_operations
 from algotrade_api.live import no_live, open_live
@@ -178,8 +178,7 @@ def _mount_graphql(
     app: FastAPI,
     settings: ApiSettings,
     users: UsersSettings,
-    epoch: WriteEpoch,
-    config_generation: Callable[[str], int | None],
+    config_generation: Callable[[str, bool], int | None],
     caller: list[Any],
 ) -> tuple[Callable[[UserContext, date | None], ReadContext], CachingRouter]:
     """``POST /graphql`` over the app's store with one read-result cache and an operation log
@@ -194,7 +193,6 @@ def _mount_graphql(
         settings.debug,
         _stores(store, cache),
         store.reader.visible_seq,
-        epoch,
         runs=store.reader.runs_generation,
         served=_served(store, cache),
         log=operations,
@@ -325,8 +323,6 @@ def create_app(
     app.state.explain_limiter = RateLimiter()
     # Compress what is big (the bundle, GraphQL answers): the app is served over a remote link.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
-    # the writes served: part of every GraphQL response's cache key
-    app.add_middleware(CountWrites, epoch=(epoch := WriteEpoch()))
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -352,7 +348,7 @@ def create_app(
     for router in ROUTERS:
         app.include_router(router, dependencies=caller)
     reads, gql = _mount_graphql(
-        app, settings, users, epoch, config_generation_of(app.state.store.configs), caller
+        app, settings, users, config_generation_of(app.state.store.configs), caller
     )
     app.state.graphql = gql  # the lifespan cancels its background recomputes
     user = app.state.store.user

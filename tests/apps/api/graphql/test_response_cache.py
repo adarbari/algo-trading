@@ -36,7 +36,6 @@ from algotrade_api.graphql.response_cache import (
     TTL_S,
     USER_OPERATIONS,
     ResponseCache,
-    WriteEpoch,
     response_key,
     served_token,
 )
@@ -87,7 +86,6 @@ class Harness:
             debug: bool,
             stores: Any,
             seq: Any,
-            epoch: WriteEpoch,
             runs: Any,
             served: Any,
             log: Any = None,
@@ -99,14 +97,13 @@ class Harness:
                 debug,
                 stores,
                 lambda: self.seq,
-                epoch,
                 self.cache,
                 self.admission,
                 lambda: self.runs,
                 lambda: self.closed,
                 lambda: self.served,
                 log,
-                lambda user: self.generation,
+                lambda user, everyone: self.generation,
             )
             return self.router
 
@@ -177,10 +174,10 @@ def test_a_publish_makes_the_earlier_entries_unreachable(harness: Harness) -> No
     assert harness.opened > opened
 
 
-def test_a_write_route_makes_the_earlier_entries_unreachable(harness: Harness) -> None:
+def test_a_config_write_makes_the_earlier_entries_unreachable(harness: Harness) -> None:
     client = harness.client()
     _post(client, SESSION)
-    client.delete("/screeners/none/draft")  # a route of routes/authoring
+    harness.generation = 2  # what a write through ConfigWriter does (tests/contract/api)
     opened = harness.opened
     _post(client, SESSION)
     assert harness.opened > opened
@@ -301,7 +298,7 @@ def test_a_run_operation_is_still_keyed_on_publish_and_writes(harness: Harness) 
     _post(client, RUN_OP)
     assert harness.opened > opened
     opened = harness.opened
-    client.delete("/screeners/none/draft")  # a config write: the WriteEpoch
+    harness.generation = 2  # a config write: the caller's config generation
     _post(client, RUN_OP)
     assert harness.opened > opened
 
@@ -341,26 +338,24 @@ def test_the_app_keys_on_the_stores_own_runs_generation(harness: Harness) -> Non
 
 def test_the_key_holds_the_variables_and_the_document() -> None:
     who = UserRecord("ana", Role.ADMIN)
-    base = response_key(1, 0, who, "{ a }", {"x": 1, "y": 2}, None)
-    assert base == response_key(1, 0, who, "{ a }", {"y": 2, "x": 1}, None)  # order of keys
-    assert base != response_key(1, 0, who, "{ a }", {"x": 2, "y": 2}, None)
-    assert base != response_key(1, 0, who, "{ b }", {"x": 1, "y": 2}, None)
-    assert base != response_key(2, 0, who, "{ a }", {"x": 1, "y": 2}, None)
-    assert base != response_key(1, 1, who, "{ a }", {"x": 1, "y": 2}, None)
+    base = response_key(1, who, "{ a }", {"x": 1, "y": 2}, None)
+    assert base == response_key(1, who, "{ a }", {"y": 2, "x": 1}, None)  # order of keys
+    assert base != response_key(1, who, "{ a }", {"x": 2, "y": 2}, None)
+    assert base != response_key(1, who, "{ b }", {"x": 1, "y": 2}, None)
+    assert base != response_key(2, who, "{ a }", {"x": 1, "y": 2}, None)
+    assert base != response_key(1, who, "{ a }", {"x": 1, "y": 2}, None, generation=2)
     # the runs generation counts only for the run operations, the closed session only for the
     # operations that read the clock; every key holds the default session (ADR 0062)
-    assert base == response_key(1, 0, who, "{ a }", {"x": 1, "y": 2}, "Day", (1, 2))
-    assert base != response_key(1, 0, who, "{ a }", {"x": 1, "y": 2}, None, served="2026-10-09")
-    shared = response_key(1, 0, who, "{ a }", None, "RegimeBands", (1, 2))
-    assert shared == response_key(1, 0, who, "{ a }", None, "RegimeBands", (1, 3))
-    assert base == response_key(
-        1, 0, who, "{ a }", {"x": 1, "y": 2}, None, (0, 0), date(2026, 1, 1)
-    )
-    run = response_key(1, 0, who, "{ a }", None, "NightlyRuns", (1, 2))
-    assert run != response_key(1, 0, who, "{ a }", None, "NightlyRuns", (1, 3))
-    assert run == response_key(1, 0, who, "{ a }", None, "NightlyRuns", (1, 2), date(2026, 1, 1))
-    closed = response_key(1, 0, who, "{ a }", None, "StatusStrip", (1, 2), date(2026, 1, 1))
-    assert closed != response_key(1, 0, who, "{ a }", None, "StatusStrip", (1, 2), date(2026, 1, 2))
+    assert base == response_key(1, who, "{ a }", {"x": 1, "y": 2}, "Day", (1, 2))
+    assert base != response_key(1, who, "{ a }", {"x": 1, "y": 2}, None, served="2026-10-09")
+    shared = response_key(1, who, "{ a }", None, "RegimeBands", (1, 2))
+    assert shared == response_key(1, who, "{ a }", None, "RegimeBands", (1, 3))
+    assert base == response_key(1, who, "{ a }", {"x": 1, "y": 2}, None, (0, 0), date(2026, 1, 1))
+    run = response_key(1, who, "{ a }", None, "NightlyRuns", (1, 2))
+    assert run != response_key(1, who, "{ a }", None, "NightlyRuns", (1, 3))
+    assert run == response_key(1, who, "{ a }", None, "NightlyRuns", (1, 2), date(2026, 1, 1))
+    closed = response_key(1, who, "{ a }", None, "StatusStrip", (1, 2), date(2026, 1, 1))
+    assert closed != response_key(1, who, "{ a }", None, "StatusStrip", (1, 2), date(2026, 1, 2))
 
 
 def test_the_usage_page_is_kept_per_day_and_moves_with_a_publish(harness: Harness) -> None:
@@ -377,7 +372,7 @@ def test_the_usage_page_is_kept_per_day_and_moves_with_a_publish(harness: Harnes
     viewer = UserRecord("ana", Role.ADMIN)
 
     def key(day: date) -> str:
-        return response_key(1, 0, viewer, USAGE, None, "LlmUsage", today=day)
+        return response_key(1, viewer, USAGE, None, "LlmUsage", today=day)
 
     assert key(date(2026, 10, 8)) != key(date(2026, 10, 9))
 
@@ -432,7 +427,7 @@ def test_a_stale_entry_is_served_at_once_and_recomputed_behind_the_answer(
 
 def _key(harness: Harness) -> str:
     return response_key(
-        harness.seq, 0, UserRecord("ana", Role.ADMIN), SESSION, None, "Day",
+        harness.seq, UserRecord("ana", Role.ADMIN), SESSION, None, "Day",
         served=harness.served,
     )  # fmt: skip
 
@@ -572,7 +567,7 @@ def test_two_viewers_with_different_licence_sets_never_share_an_entry() -> None:
     a viewer without the licence."""
     holder = UserRecord("a", Role.TRADER, licences=("personal",))
     other = UserRecord("b", Role.TRADER)
-    args = (1, 0)
+    args = (1,)
     for name in ("MarketHistory", "FeatureTable"):
         held = response_key(*args, holder, "{ a }", None, name)
         assert held != response_key(*args, other, "{ a }", None, name)
@@ -596,7 +591,7 @@ def test_a_run_compaction_leaves_the_cache_key_unchanged(tmp_path: Path) -> None
 
     def key() -> str:
         return response_key(
-            reader.visible_seq(), 0, who, SESSION, None, "Day", reader.runs_generation()
+            reader.visible_seq(), who, SESSION, None, "Day", reader.runs_generation()
         )
 
     before = key()
