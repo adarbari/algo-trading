@@ -366,13 +366,13 @@ def test_a_version_file_removed_mid_read_restarts_the_read(
     assert opened[:2] == [local_index.default_file("resumed")] * 2
 
 
-def test_a_dropped_version_is_recorded_in_the_index(tmp_path: Path) -> None:
+def test_a_discarded_version_is_recorded_in_the_index(tmp_path: Path) -> None:
     backend = LocalBackend(tmp_path / "data")
     for k in (1, 2, 3):
         _commit_resumed(backend, k)
     directory = backend.root / "tables" / A / f"date={DAYS[0].isoformat()}"
     entry = local_index.read_index(directory)["resumed"]
-    assert entry.prev is not None and entry.prev.dropped and not entry.dropped
+    assert entry.prev is not None and entry.prev.gap is not None and not entry.dropped
     assert sorted(p.name for p in directory.glob("run=*.parquet")) == sorted(
         local_index.run_file("resumed", e) for e in (entry, entry.prev)
     )

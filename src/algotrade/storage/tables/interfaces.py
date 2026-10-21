@@ -61,12 +61,41 @@ class TableStore(Protocol):
         nothing else, so it is the cache-validity signal for readers (ADR 0022)."""
         ...
 
-    def partition_seq(self, table: str, start: date, end: date) -> dict[date, int]:
+    def partition_seq(
+        self, table: str, start: date, end: date, upto: int | None = None
+    ) -> dict[date, int]:
         """Per committed partition with ``start <= session_date <= end``, the highest commit
         sequence of any run in its index (a replaced version included; an entry with no
         sequence, from a direct write or before ADR 0022, counts 0). Pending writes are
         ignored. A partition's value rises when a run commits or restates it and the date
-        is absent once it is purged: the stamp ADR 0063 compares to know a read is unchanged."""
+        is absent once it is purged: the stamp ADR 0063 compares to know a read is unchanged.
+        ``upto``: as a reader pinned at that sequence sees the store (``read``): a partition
+        with no version at or below it is absent, a stamp is of the versions it sees."""
+        ...
+
+    def pin(self, name: str, seq: int) -> None:
+        """Retain the versions a read ``upto=seq`` sees, for every partition and run, until
+        ``unpin(name)`` (ADR 0077): a later commit keeps, besides the version it replaces, the
+        newest version at or below every pin, so such a read survives any number of recommits
+        (otherwise it raises ``StaleSnapshotError``). ``seq`` must not be above ``visible_seq``
+        (``ValueError``); a pin of the same name is replaced. Pins are durable and shared by
+        every process using the store. Nothing is protected from ``purge_before``, ``purge_runs``
+        or ``drop`` (see ``destructive_epoch``)."""
+        ...
+
+    def unpin(self, name: str) -> None:
+        """Release a pin (no error when there is none): later commits may discard its versions."""
+        ...
+
+    def pins(self) -> dict[str, int]:
+        """Every pin, name -> sequence."""
+        ...
+
+    def destructive_epoch(self) -> int:
+        """How many operations that delete committed rows (``purge_before`` that deleted,
+        ``purge_runs`` that deleted, ``drop``) the store has made, 0 before any; durable, rising
+        only. A derived artefact built at another epoch may hold rows the store no longer has
+        and is not trusted. An ordinary commit, restatement or compaction never changes it."""
         ...
 
     def abort_run(self, run_id: str) -> int:
@@ -93,7 +122,13 @@ class TableStore(Protocol):
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
         own_run: str | None = None,
-    ) -> pd.DataFrame | None: ...
+        upto: int | None = None,
+    ) -> pd.DataFrame | None:
+        """``upto``: the commit sequence to read at (a reader pinned there, ``StoreReader.pinned``):
+        the read is made once at it and a version that was discarded raises
+        ``StaleSnapshotError`` (never a retry at a fresh sequence, which would answer another
+        question). ``None``: a fresh one, retried as needed. Same for every read below."""
+        ...
 
     def read_range(
         self,
@@ -104,6 +139,7 @@ class TableStore(Protocol):
         instruments: Sequence[str] | None = None,
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
+        upto: int | None = None,
     ) -> pd.DataFrame | None:
         """All partitions with ``start <= session_date <= end``, each resolved point-in-time
         exactly as ``read`` would (runs merged per partition, not across partitions),
@@ -145,6 +181,7 @@ class TableStore(Protocol):
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
+        upto: int | None = None,
     ) -> pd.DataFrame | None:
         """One committed run's own rows of a partition (those stamped with its ``run_id``),
         whether or not it is the partition's latest run and without reading any other run's
@@ -176,7 +213,10 @@ class TableStore(Protocol):
         """Bytes free on the volume the store is on (the history build's disk floor)."""
         ...
 
-    def dates(self, table: str, own_run: str | None = None) -> list[date]: ...
+    def dates(self, table: str, own_run: str | None = None, upto: int | None = None) -> list[date]:
+        """The table's partition dates. ``upto``: only those with a version at or below that
+        sequence (a backfilled old date or a later session committed after it is not listed)."""
+        ...
 
     def names(self, own_run: str | None = None) -> list[str]:
         """Every table with at least one partition, sorted."""

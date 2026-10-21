@@ -78,14 +78,17 @@ from algotrade.storage.backends.run_compaction import (
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     StaleSnapshotError,
+    chain,
+    chain_needed,
     keep_newest_runs,
     max_seq,
     merge_rows,
     newest_run_per_group,
-    pinned_read,
+    read_at,
     run_mode,
     select_instruments,
     select_runs,
+    seq_at,
     visible_entries,
 )
 from algotrade.storage.locks import FileLock, held
@@ -130,6 +133,8 @@ class LocalTables:
         self.commits = Commits(self.root)
         self.history = HistoryCopy(self.root, self.commits.published, self.commits.no_commits)
         self.swap_grace_s = SWAP_GRACE_S  # tests shorten it
+        self._dates_memo: OrderedDict[tuple[str, int, int], frozenset[date]] = OrderedDict()
+        self._dates_lock = threading.Lock()
 
     def _dir(self, table: str, session_date: date) -> Path:
         return self.root / table / f"date={session_date.isoformat()}"
@@ -151,6 +156,7 @@ class LocalTables:
             if file is not None:
                 atomic_write(directory / file, data)
             return
+        self.commits.bump_epoch()  # no sequence: every pin sees it, so no release is trusted
         if known is not None:
             atomic_write(directory / default_file(safe(run_id)), data)
         with held(index_lock(directory)):
@@ -165,6 +171,18 @@ class LocalTables:
 
     def visible_seq(self) -> int:
         return self.commits.published()
+
+    def pin(self, name: str, seq: int) -> None:
+        self.commits.pin(name, seq)
+
+    def unpin(self, name: str) -> None:
+        self.commits.unpin(name)
+
+    def pins(self) -> dict[str, int]:
+        return self.commits.pins()
+
+    def destructive_epoch(self) -> int:
+        return self.commits.epoch()
 
     def abort_run(self, run_id: str) -> int:
         return self.commits.abort_run(run_id)
@@ -226,11 +244,13 @@ class LocalTables:
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
         own_run: str | None = None,
+        upto: int | None = None,
     ) -> pd.DataFrame | None:
-        data = pinned_read(
-            lambda upto: self._partition(table, session_date, as_of, instruments, own_run, upto),
+        data = read_at(
+            lambda seq: self._partition(table, session_date, as_of, instruments, own_run, seq),
             self.commits.published,
             self.commits.no_commits,
+            upto,
         )
         return None if data is None else select_instruments(to_frame(data), instruments)
 
@@ -252,9 +272,7 @@ class LocalTables:
         def at(seq: int) -> pd.DataFrame | None:
             return self._latest_runs(table, session_date, group, wanted, instruments, own_run, seq)
 
-        if upto is not None:
-            return at(upto)
-        return pinned_read(at, self.commits.published, self.commits.no_commits)
+        return read_at(at, self.commits.published, self.commits.no_commits, upto)
 
     def _latest_runs(
         self,
@@ -307,11 +325,12 @@ class LocalTables:
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
         instruments: Sequence[str] | None = None,
+        upto: int | None = None,
     ) -> pd.DataFrame | None:
         directory = self._dir(table, session_date)
 
-        def at(upto: int) -> pa.Table | None:
-            entries = visible_entries(read_index(directory), upto)
+        def at(seq: int) -> pa.Table | None:
+            entries = visible_entries(read_index(directory), seq)
             own = self._own(table, session_date, own_run)
             if own_run is not None and own is not None:
                 entries[own_run] = own
@@ -325,7 +344,7 @@ class LocalTables:
             except FileNotFoundError as gone:  # a commit replaced the version
                 raise StaleSnapshotError(f"{directory}: {gone.filename}") from gone
 
-        data = pinned_read(at, self.commits.published, self.commits.no_commits)
+        data = read_at(at, self.commits.published, self.commits.no_commits, upto)
         if data is None:
             return None
         frame = to_frame(concat(table, [data]))
@@ -340,12 +359,13 @@ class LocalTables:
         instruments: Sequence[str] | None = None,
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
+        upto: int | None = None,
     ) -> pd.DataFrame | None:
-        def at(upto: int) -> list[pa.Table]:  # one commit sequence for the whole range
+        def at(seq: int) -> list[pa.Table]:  # one commit sequence for the whole range
             by_year: dict[int, pa.Table] = {}
             if as_of is None and own_run is None:  # what the history copy holds (ADR 0060)
                 for year, copy in self.history.usable(
-                    table, start, end, instruments is not None, upto
+                    table, start, end, instruments is not None, seq
                 ).items():
                     low, high = max(start, date(year, 1, 1)), min(end, date(year, 12, 31))
                     rows = self.history.read_year(
@@ -357,12 +377,12 @@ class LocalTables:
             if any(y not in by_year for y in range(start.year, end.year + 1)):
                 for d in self._stored_days(table, start, end, own_run):
                     if d.year not in by_year:
-                        data = self._partition(table, d, as_of, instruments, own_run, upto, columns)
+                        data = self._partition(table, d, as_of, instruments, own_run, seq, columns)
                         if data is not None:
                             parts.setdefault(d.year, []).append(data)
             return [t for year in sorted(parts) for t in parts[year]]
 
-        parts = pinned_read(at, self.commits.published, self.commits.no_commits)
+        parts = read_at(at, self.commits.published, self.commits.no_commits, upto)
         if not parts:
             return None
         frame = to_frame(concat(table, parts))
@@ -406,18 +426,49 @@ class LocalTables:
         items = self.commits.journal(own_run).values()
         return {(i["table"], date.fromisoformat(i["date"])) for i in items}
 
-    def dates(self, table: str, own_run: str | None = None) -> list[date]:
-        base = self.root / table
+    def dates(self, table: str, own_run: str | None = None, upto: int | None = None) -> list[date]:
         found = {d for t, d in self._own_partitions(own_run) if t == table}
-        if base.exists():
-            found |= {
-                date.fromisoformat(p.name.removeprefix("date="))
-                for p in base.iterdir()
-                if p.name.startswith("date=") and (p / INDEX).exists()
-            }
+        found |= self._committed_dates(table) if upto is None else self._dates_at(table, upto)
         return sorted(found)
 
-    def partition_seq(self, table: str, start: date, end: date) -> dict[date, int]:
+    def _committed_dates(self, table: str) -> set[date]:
+        base = self.root / table
+        if not base.exists():
+            return set()
+        return {
+            date.fromisoformat(p.name.removeprefix("date="))
+            for p in base.iterdir()
+            if p.name.startswith("date=") and (p / INDEX).exists()
+        }
+
+    def _dates_at(self, table: str, upto: int) -> set[date]:
+        """The committed partitions with a version at or below ``upto``: one index read per
+        partition the first time, then kept per (table, ``upto``, destructive epoch) (a version
+        committed after ``upto`` cannot change the answer; a purge bumps the epoch). Not kept
+        for an ``upto`` the store has not published yet."""
+        key = (table, upto, self.commits.epoch())
+        with self._dates_lock:
+            held_ = self._dates_memo.get(key)
+            if held_ is not None:
+                self._dates_memo.move_to_end(key)
+        if held_ is not None:
+            return set(held_)
+        published = self.commits.published()
+        found = {
+            d
+            for d in self._committed_dates(table)
+            if visible_entries(read_index(self._dir(table, d)), upto)
+        }
+        if upto <= published:
+            with self._dates_lock:
+                self._dates_memo[key] = frozenset(found)
+                while len(self._dates_memo) > DATES_MEMO:
+                    self._dates_memo.popitem(last=False)
+        return found
+
+    def partition_seq(
+        self, table: str, start: date, end: date, upto: int | None = None
+    ) -> dict[date, int]:
         base = self.root / table
         out: dict[date, int] = {}
         published = self.commits.published()  # before the indexes: a later commit is not seen
@@ -431,8 +482,12 @@ class LocalTables:
                     if start <= when <= end:
                         wanted.append((when, base / entry.name))
         for when, day in sorted(wanted):
-            if (day / INDEX).exists():
+            if not (day / INDEX).exists():
+                continue
+            if upto is None:
                 out[when] = max_seq(read_index(day), published)
+            elif (stamp := seq_at(read_index(day), upto)) is not None:
+                out[when] = stamp
         return out
 
     def names(self, own_run: str | None = None) -> list[str]:
@@ -452,6 +507,7 @@ class LocalTables:
     def drop(self, table: str) -> int:
         base = self.root / table
         days = sorted(base.glob("date=*")) if base.exists() else []
+        self.commits.bump_epoch()  # before the files go: a release is never trusted over a hole
         self._remove(days)
         shutil.rmtree(base, ignore_errors=True)
         return len(days)
@@ -502,9 +558,10 @@ class LocalTables:
         nothing); ``budget_s`` bounds planning and verifying: over it the partition is skipped."""
         directory = self._dir(table, session_date)
         expected = read_index(directory)
-        if (self.root / table / HISTORY).exists() or not expected:
+        chained = chain_needed(expected, self.commits.pins().values())
+        if (self.root / table / HISTORY).exists() or not expected or chained:
             why = "the table has a history copy" if expected else "no such partition"
-            return CompactionReport(skipped=why)
+            return CompactionReport(skipped="a pinned version is retained here" if chained else why)
         before = len(expected)
         try:
             sizes = {r: (directory / run_file(r, e)).stat().st_size for r, e in expected.items()}
@@ -561,8 +618,7 @@ class LocalTables:
     def _discard(directory: Path, names: Collection[str]) -> None:
         """Delete files written for a swap that did not happen, but never one the index names
         (whatever raised may have come after the index was written)."""
-        named = {run_file(r, e) for r, e in read_index(directory).items()}
-        named |= {run_file(r, e.prev) for r, e in read_index(directory).items() if e.prev}
+        named = {run_file(r, v) for r, e in read_index(directory).items() for v in chain(e)}
         for name in names:
             if name not in named:
                 (directory / name).unlink(missing_ok=True)
@@ -721,6 +777,7 @@ class LocalStaging:
         return len(old)
 
 
+DATES_MEMO = 256  # (table, sequence, epoch) listings ``dates(upto=...)`` keeps
 PROBE_DAYS = 31  # a range this short probes its days instead of listing the table
 MAX_PARSED_BYTES = 64 * 1024 * 1024  # the run files ``LocalRuns`` keeps parsed, by file size
 
