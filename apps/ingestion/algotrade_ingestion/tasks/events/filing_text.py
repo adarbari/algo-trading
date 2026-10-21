@@ -417,12 +417,20 @@ def _blocking(exc: Exception) -> bool:
     return isinstance(exc, TransientFetchError) or hasattr(exc, "status")
 
 
+def _stops_fetch(exc: Exception) -> bool:
+    """A failure that stops the read-ahead: a block page or empty body (``TransientFetchError``)
+    or SEC's 403 / 429. One failing request (a 5xx given up on, a parse) fails its own CIK only."""
+    return isinstance(exc, TransientFetchError) or getattr(exc, "status", None) in (403, 429)
+
+
 def _hold_sec(ctx: TaskContext, run: IngestRun) -> None:
-    """SEC blocked us: hold the shared ``sec`` limiter (every thread and process) for a while."""
+    """SEC blocked us: count it as an error for the stepped governor and hold every ``sec``
+    limiter (every thread and process, the stepped one included) for a while."""
     run.stats.update(blocked_hold_s=BLOCK_HOLD_S)
-    limiter = ctx.pacing.get("sec")
-    if limiter is not None and hasattr(limiter, "hold"):
-        limiter.hold(BLOCK_HOLD_S)
+    for limiter in ctx.pacing.values():
+        if getattr(limiter, "key", None) == "sec" and hasattr(limiter, "hold"):
+            limiter.hold(BLOCK_HOLD_S)
+            limiter.record("error")  # type: ignore[attr-defined]  # a block page came back as 200
 
 
 def _document(text: Source, request: FilingTextRequest) -> pd.DataFrame:
@@ -634,7 +642,7 @@ def _prefetch(loop: Loop, todo: list[str], windows: dict[str, tuple[date, date]]
         getattr(loop.text, "parse"),  # noqa: B009
         threads=loop.threads,
         procs=loop.procs,
-        blocking=_blocking,
+        blocking=_stops_fetch,
         on_block=partial(_hold_sec, loop.ctx, run),
     )
 
@@ -733,6 +741,8 @@ def ingest_filing_text(
                 run.stats.update({WINDOW_KEY: _window(since, until), CIKS_KEY: found.ciks})
             if live_only:
                 live = set(_symbol_ciks(run, [])[1])
+                if not live:
+                    run.partial("--live-only: no operating company of the universe has a CIK")
                 candidates = [c for c in candidates if c in live]
         counts = Counts()
         plan = _select(run, candidates, runs, session, since, until, limit, force, tag)

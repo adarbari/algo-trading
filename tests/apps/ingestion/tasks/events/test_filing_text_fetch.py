@@ -6,15 +6,19 @@ everything not yet started and holds the limiter, and nothing is left running wh
 import threading
 from collections.abc import Sequence
 from datetime import date
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
 import pytest
 
 from algotrade.storage.runs import RunStatus
+from algotrade_ingestion.tasks.events import filing_text as task
 from algotrade_ingestion.tasks.events import filing_text_fetch as fetch
 from algotrade_sources.framework.base import TransientFetchError
-from algotrade_sources.framework.http import GaveUpError
+from algotrade_sources.framework.http import GaveUpError, HttpError
+from algotrade_sources.framework.limiter import StepLimiter
 from algotrade_sources.framework.series import FilingTextRequest
 from algotrade_sources.vendors.sec_text.filing_text import extract_payload
 from tests.apps.ingestion.tasks.events.test_filing_text import (
@@ -80,11 +84,11 @@ def test_the_loop_gets_each_listing_and_document_in_its_own_order() -> None:
     prefetch = pipeline(fakes, CIKS)
     try:
         assert prefetch.listing(CIKS[0]) == b"list:0000000001"
-        assert prefetch.document("a1") == b"parsed:a1:body-a1"
-        assert prefetch.document("a2") == b"parsed:a2:body-a2"
-        assert prefetch.document("gone") is None  # a 404 is None, as ``fetch`` says
+        assert prefetch.document(CIKS[0], "a1") == b"parsed:a1:body-a1"
+        assert prefetch.document(CIKS[0], "a2") == b"parsed:a2:body-a2"
+        assert prefetch.document(CIKS[0], "gone") is None  # a 404 is None, as ``fetch`` says
         assert prefetch.listing(CIKS[1]) == b"list:0000000002"
-        assert prefetch.document("b1") == b"parsed:b1:body-b1"
+        assert prefetch.document(CIKS[1], "b1") == b"parsed:b1:body-b1"
         assert prefetch.listing(CIKS[2]) == b"list:0000000003"
     finally:
         prefetch.close()
@@ -96,10 +100,10 @@ def test_a_failing_document_is_raised_when_the_loop_reaches_it_and_not_before() 
     prefetch = pipeline(fakes, CIKS[:1])
     try:
         prefetch.listing(CIKS[0])  # the loop lists a CIK before it asks for its documents
-        assert prefetch.document("a1") == b"parsed:a1:body-a1"
+        assert prefetch.document(CIKS[0], "a1") == b"parsed:a1:body-a1"
         with pytest.raises(LookupError, match="one bad document"):
-            prefetch.document("bad")
-        assert prefetch.document("a3") == b"parsed:a3:body-a3"  # the others are untouched
+            prefetch.document(CIKS[0], "bad")
+        assert prefetch.document(CIKS[0], "a3") == b"parsed:a3:body-a3"  # the others are untouched
     finally:
         prefetch.close()
 
@@ -123,7 +127,7 @@ def test_a_block_stops_what_has_not_started_holds_the_limiter_and_later_asks_rai
     prefetch = pipeline(fakes, CIKS, on_block=lambda: held.append(1))
     try:
         with pytest.raises(GaveUpError):
-            prefetch.document("a1") if prefetch.listing(CIKS[0]) else None
+            prefetch.document(CIKS[0], "a1") if prefetch.listing(CIKS[0]) else None
         for _ in range(200):  # the block has been seen: nothing new starts
             if held:
                 break
@@ -131,7 +135,7 @@ def test_a_block_stops_what_has_not_started_holds_the_limiter_and_later_asks_rai
         assert held == [1]  # the limiter is held once, not once per request in flight
         started = len(fakes.bodies)
         with pytest.raises((TransientFetchError, GaveUpError)):
-            prefetch.document("b2")
+            prefetch.document(CIKS[1], "b2")
         assert len(fakes.bodies) <= started + 3  # at most what was already running
     finally:
         prefetch.close()
@@ -160,7 +164,9 @@ def test_worker_processes_parse_exactly_what_the_task_parses_inline() -> None:
     )  # fmt: skip
     try:
         prefetch.listing(ALPHA)
-        assert prefetch.document(req.key) == extract_payload(TEN_K, req.key, "10-K", ("1A", "7"))
+        assert prefetch.document(ALPHA, req.key) == extract_payload(
+            TEN_K, req.key, "10-K", ("1A", "7")
+        )
     finally:
         prefetch.close()
 
@@ -220,3 +226,43 @@ def test_live_only_keeps_the_recorded_filer_list_whole_so_a_wider_run_can_follow
     wide = run(writer, feed(), **window)  # the window's list was recorded with every filer
     assert wide.stats["filers_cached"] is True and wide.stats["filers"] == 3
     assert set(wide.items) == {GONE}  # the live ones are covered by the first run
+
+
+def test_two_ciks_listing_the_same_accession_each_get_the_document() -> None:
+    """A combined filing is listed under a parent and its subsidiaries: both must read it."""
+    fakes = Fakes({CIKS[0]: ["shared"], CIKS[1]: ["shared"]})
+    prefetch = pipeline(fakes, CIKS[:2])
+    try:
+        prefetch.listing(CIKS[0])
+        prefetch.listing(CIKS[1])
+        assert prefetch.document(CIKS[0], "shared") == b"parsed:shared:body-shared"
+        assert prefetch.document(CIKS[1], "shared") == b"parsed:shared:body-shared"
+    finally:
+        prefetch.close()
+
+
+def test_only_a_block_page_a_403_or_a_429_stops_the_read_ahead() -> None:
+    assert task._stops_fetch(TransientFetchError("block page"))
+    assert task._stops_fetch(GaveUpError("giving up", 403))
+    assert task._stops_fetch(HttpError(429))
+    assert not task._stops_fetch(GaveUpError("giving up", 500))  # one bad request fails its CIK
+    assert not task._stops_fetch(LookupError("404"))
+
+
+def test_a_block_holds_the_stepped_limiter_and_counts_as_an_error(tmp_path: Path) -> None:
+    now, slept = [1000.0], []
+
+    def sleep(seconds: float) -> None:
+        slept.append(seconds)
+        now[0] += seconds
+
+    limiter = StepLimiter(
+        "sec", 8, 5, directory=tmp_path, sleep=sleep, clock=lambda: now[0]
+    )  # the explicit run stores it under "sec_stepped", not "sec"
+    ctx = SimpleNamespace(pacing={"sec_stepped": limiter})
+    run_ = SimpleNamespace(stats={})
+    task._hold_sec(ctx, run_)  # type: ignore[arg-type]
+    limiter.wait()
+    assert slept and slept[-1] >= task.BLOCK_HOLD_S - 1  # no request for the hold
+    assert limiter.rps == 7  # the block page came back as a 200: still one step down
+    assert run_.stats["blocked_hold_s"] == task.BLOCK_HOLD_S

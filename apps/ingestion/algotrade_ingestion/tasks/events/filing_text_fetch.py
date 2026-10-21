@@ -70,7 +70,7 @@ class Prefetch:
         self._stopped = threading.Event()
         self._lock = threading.Lock()
         self._lists: dict[str, Future[bytes | None]] = {}
-        self._docs: dict[str, Future[bytes | None]] = {}
+        self._docs: dict[tuple[str, str], Future[bytes | None]] = {}  # (cik, accession)
         self._next = 0  # the next CIK (index) not yet submitted
         self._procs: ProcessPoolExecutor | None = None
         if procs > 0:  # started before any thread: workers spawn clean, then are warm
@@ -92,10 +92,10 @@ class Prefetch:
             raise TransientFetchError("filing text fetch stopped: SEC is blocking us")
         return self._result(future)
 
-    def document(self, accession: str) -> bytes | None:
+    def document(self, cik: str, accession: str) -> bytes | None:
         """The extraction document of one filing (``None``: a 404); a failure re-raises."""
         with self._lock:
-            future = self._docs.pop(accession, None)
+            future = self._docs.pop((cik, accession), None)
         if future is None:
             if self._stopped.is_set():  # its CIK was listed, then the pipeline stopped
                 raise TransientFetchError("filing text fetch stopped: SEC is blocking us")
@@ -141,7 +141,7 @@ class Prefetch:
         with self._lock:
             if not self._stopped.is_set():
                 for request in requests:
-                    self._docs[request.key] = self._doc_pool.submit(self._doc, request)
+                    self._docs[(cik, request.key)] = self._doc_pool.submit(self._doc, request)
         return payload
 
     def _doc(self, request: FilingTextRequest) -> bytes | None:
@@ -196,7 +196,7 @@ class PrefetchedText:
         self.name, self.dataset = real.name, real.dataset
 
     def fetch(self, request: FetchRequest) -> bytes | None:
-        return self._prefetch.document(request.key)
+        return self._prefetch.document(getattr(request, "cik"), request.key)  # noqa: B009
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
         return self._real.normalize(request, payload)
