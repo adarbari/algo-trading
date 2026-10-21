@@ -1,7 +1,10 @@
 """The per-read memory budget of the screen rows (``docs/perf/api-memory.md``, guard 3): a session
 holds many reruns of many configs, and a read decodes only each config's newest run. Peak Arrow
 allocation is measured through a proxy of the default pool installed for the read, so what ran
-earlier in the process does not count."""
+earlier in the process does not count. The value readers are budgeted the same way: a run's values
+come from that run's own file and for its own picks, never from the session's every run (the
+union of every run's picks filtered all of them), and a run that is not its config's newest reads
+its own rows."""
 
 from collections.abc import Iterator
 from dataclasses import replace
@@ -234,7 +237,7 @@ def _runs_and_wanted(
     ctx = context(StoreReader(backend), user=user)
     keys = [("site", f"c{c}") for c in range(VR)]
     found = [lr.run for lr in load_latest_runs(ctx, keys).values() if lr.run is not None]
-    assert len(found) == CONFIGS
+    assert len(found) == VR
     picks = {  # each run picks its own three: the union of every run's is 60 instruments
         r.run_id: [f"EQ:S{n * PICKED + j}" for j in range(PICKED)] for n, r in enumerate(found)
     }
@@ -271,3 +274,13 @@ def test_the_fields_and_a_sort_key_of_a_run_that_is_not_the_newest_are_its_own(
     assert results._run_fields(ctx, older) == frozenset({"feature.f1"})
     keyed = results._stored_key(ctx, older, "criterion:k")
     assert keyed["EQ:S7"] == 7.0 and len(keyed) == VINST
+
+
+def test_the_values_of_a_run_that_is_not_the_newest_are_its_own(
+    values_store: LocalBackend,
+) -> None:
+    ctx, runs, _ = _runs_and_wanted(values_store, "me")
+    older = replace(runs[0], run_id="c0-r1")
+    found = _read_values(ctx, [older], None, {"c0-r1": ["EQ:S4"]})
+    assert list(found) == [("c0-r1", "EQ:S4")]
+    assert [row["field"] for row in found[("c0-r1", "EQ:S4")]] == ["feature.f1"]
