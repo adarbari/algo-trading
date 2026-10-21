@@ -30,6 +30,7 @@ from algotrade.services.evaluation.cross_section.picks import (
     SelectionReads,
     screen_variant,
 )
+from algotrade.services.evaluation.cross_section.reads.screens import CachedScreen, ScreenCache
 from algotrade.services.licences import HARNESS_ALL
 from algotrade.services.screening.regime import session_market
 from algotrade.services.selection import fields_view
@@ -61,8 +62,15 @@ class SessionReads:
     through a recording reader: what a session reads inside ``attribute(day)`` is logged against
     that day (``day_reads``, ADR 0063)."""
 
-    def __init__(self, reader: StoreReader, label_field: str):
+    def __init__(
+        self,
+        reader: StoreReader,
+        label_field: str,
+        screens: ScreenCache | None = None,
+        owner: str = "",
+    ):
         self._reader, self._label_field = reader.recording(), label_field
+        self._screens, self._owner = screens, owner
         self._selections = SelectionReads(self._reader)
         self._runs: dict[tuple[str, date], RankedRun | None] = {}
         self._eligible: dict[tuple[str, date], frozenset[str]] = {}  # (universe repr, D)
@@ -119,14 +127,25 @@ class SessionReads:
         return self._runs[variant.id, day]
 
     def _screen(self, variant: "Variant", day: date) -> RankedRun | None:
-        try:
-            found = screen_variant(self._reader, variant.config, day)
-        except MissingDataError as error:
-            if error.dataset in WIRING_DATASETS:  # not an input the screener lacks: a broken run
-                raise
-            self.lost[variant.id, day] = error.dataset
-            self.errors.setdefault(variant.id, error)
-            return None
+        digest = variant.config.hash
+        cached = self._screens.get(self._owner, digest, day) if self._screens is not None else None
+        if cached is not None:  # another edge of this run screened the config at this session
+            self._reader.replay(day, cached.reads)
+            found = cached.run
+        else:
+            try:
+                with self._reader.capture(day) as reads:
+                    found = screen_variant(self._reader, variant.config, day)
+            except MissingDataError as error:
+                if (
+                    error.dataset in WIRING_DATASETS
+                ):  # not an input the screener lacks: a broken run
+                    raise
+                self.lost[variant.id, day] = error.dataset
+                self.errors.setdefault(variant.id, error)
+                return None
+            if self._screens is not None:
+                self._screens.put(self._owner, digest, day, CachedScreen(found, reads))
         self._snapshots.add(found.snapshot)
         self._identity.note("screened", day, found.identity)
         return found
