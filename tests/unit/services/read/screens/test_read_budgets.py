@@ -9,6 +9,7 @@ its own rows."""
 import contextlib
 import gc
 import io
+import threading
 import weakref
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -23,7 +24,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from algotrade.data import StoreReader
-from algotrade.services.read.context import MAX_CACHE_BYTES, ReadContext, partition, weigh
+from algotrade.services.read.context import MAX_CACHE_BYTES, Held, ReadContext, partition, weigh
 from algotrade.services.read.screens import hits as hits_module
 from algotrade.services.read.screens import results, runs
 from algotrade.services.read.screens.hits import load_screener_hits
@@ -549,3 +550,46 @@ def test_the_new_dataclass_pricing_keeps_page_results_far_under_the_cache_bound(
     ctx = context(StoreReader(screens_store()))
     ideas = load_ideas(ctx, 500)
     assert weigh(ideas) < MAX_CACHE_BYTES // 100
+
+
+def test_a_read_that_raises_leaves_no_flight_behind() -> None:
+    held: Held[int] = Held()
+
+    def failing() -> int:
+        raise RuntimeError("no rows")
+
+    with pytest.raises(RuntimeError):
+        held.get_or_read("a", failing)
+    assert held._flights == {}
+    assert held.get_or_read("a", lambda: 7) == (7, True)  # the next caller reads it
+
+
+def test_a_flight_another_caller_started_is_not_removed_by_a_finished_one() -> None:
+    held: Held[int] = Held()
+    newer = threading.Lock()
+
+    def reading() -> int:
+        held._flights["a"] = newer  # a later caller's flight replaced ours while we read
+        return 1
+
+    held.get_or_read("a", reading)
+    assert held._flights["a"] is newer
+
+
+def test_the_hits_flight_of_a_newer_caller_stays_and_a_failed_build_leaves_none() -> None:
+    held = hits_module.HitsHeld()
+    newer = threading.Lock()
+
+    def build(ids: object) -> dict[str, tuple[()]]:
+        held._flights["EQ:A"] = newer
+        return {"EQ:A": ()}
+
+    held.get_or_build(["EQ:A"], build)  # type: ignore[arg-type]
+    assert held._flights == {"EQ:A": newer}
+
+    def failing(ids: object) -> dict[str, tuple[()]]:
+        raise RuntimeError("no rows")
+
+    with pytest.raises(RuntimeError):
+        held.get_or_build(["EQ:B"], failing)  # type: ignore[arg-type]
+    assert "EQ:B" not in held._flights

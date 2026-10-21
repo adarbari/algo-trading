@@ -147,17 +147,21 @@ class Held[T]:
             if key in self._items:
                 return self._items[key], False
             flight = self._flights.setdefault(key, threading.Lock())
-        with flight:
+        try:
+            with flight:
+                with self._lock:
+                    if key in self._items:
+                        return self._items[key], False
+                found = read()
+                weight = weigh(found)  # outside the lock: weighing a frame is not free
+                with self._lock:
+                    self._items[key] = found
+                    self._bytes += weight
+                return found, True
+        finally:
             with self._lock:
-                if key in self._items:
-                    return self._items[key], False
-            found = read()
-            weight = weigh(found)  # outside the lock: weighing a frame is not free
-            with self._lock:
-                self._items[key] = found
-                self._bytes += weight
-                self._flights.pop(key, None)
-            return found, True
+                if self._flights.get(key) is flight:  # not a newer caller's
+                    del self._flights[key]
 
     def weight_bytes(self) -> int:
         with self._lock:

@@ -131,8 +131,9 @@ class HitsHeld:
             out.update(built)
         finally:
             with self._lock:
-                for iid in missing:
-                    self._flights.pop(iid, None)
+                for iid, flight in zip(sorted(missing), flights, strict=True):
+                    if self._flights.get(iid) is flight:  # not a newer caller's
+                        del self._flights[iid]
             for flight in flights:
                 flight.release()
         return out, bool(todo)
