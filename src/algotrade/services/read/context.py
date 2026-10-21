@@ -18,7 +18,7 @@ derived."""
 import threading
 from collections import OrderedDict
 from collections.abc import Callable, Hashable, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, is_dataclass, replace
 from datetime import date
 from functools import cached_property
 from pathlib import Path
@@ -85,9 +85,13 @@ class Weighted(Protocol):
     def weight_bytes(self) -> int: ...
 
 
-def weigh(value: Any) -> int:
+WEIGH_DEPTH = 6  # how deep ``weigh`` follows containers and dataclasses (a cycle ends there)
+
+
+def weigh(value: Any, depth: int = WEIGH_DEPTH) -> int:
     """About how many bytes ``value`` holds: a DataFrame's buffers, a container's slots
     (``SLOT_BYTES`` each) and what they hold, a string's characters and header, a number; any
+    dataclass instance (a result record) its fields' weights, to a depth of ``WEIGH_DEPTH``; any
     other object weighs nothing (the cache's count bound covers it). Cheap: no deep walk of a
     frame's strings, an object column's cells are priced at ``STRING_CELL_BYTES``. Records (a
     dict per row) are priced too: a page's value rows held as records weighed nothing before."""
@@ -98,16 +102,27 @@ def weigh(value: Any) -> int:
         return int(value.memory_usage(index=True, deep=False).sum()) + (
             STRING_CELL_BYTES * len(value) * objects
         )
+    if depth <= 0:
+        return 0
     if isinstance(value, str):
         return STR_OVERHEAD_BYTES + len(value)
     if isinstance(value, float | int) and not isinstance(value, bool):
         return NUMBER_BYTES
+    return _weigh_nested(value, depth)
+
+
+def _weigh_nested(value: Any, depth: int) -> int:
+    """``weigh`` of a tuple, list, dict or dataclass (its fields), one level below ``depth``."""
+    below = depth - 1
     if isinstance(value, tuple | list):
-        return SLOT_BYTES * len(value) + sum(weigh(v) for v in value)
+        return SLOT_BYTES * len(value) + sum(weigh(v, below) for v in value)
     if isinstance(value, dict):
         # keys are the few column names every row shares: not priced per row
-        return (
-            DICT_BASE_BYTES + DICT_ENTRY_BYTES * len(value) + sum(weigh(v) for v in value.values())
+        held = sum(weigh(v, below) for v in value.values())
+        return DICT_BASE_BYTES + DICT_ENTRY_BYTES * len(value) + held
+    if is_dataclass(value) and not isinstance(value, type):
+        return DICT_BASE_BYTES + sum(
+            weigh(getattr(value, f.name), below) + SLOT_BYTES for f in fields(value)
         )
     return 0
 

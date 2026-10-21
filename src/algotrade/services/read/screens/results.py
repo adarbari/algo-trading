@@ -140,6 +140,25 @@ class RunChanges:
     by_instrument: Mapping[str, Change] = field(repr=False)
 
 
+def load_instrument_changes(ctx: ReadContext, run: ScreenerRun, ids: Sequence[str]) -> RunChanges:
+    """``run`` against the screener's run in the previous stored session for ``ids`` only (the
+    same ``Change`` as ``load_run_changes``; no counts): what one instrument's hits need, without
+    comparing every row of the run. Reads the two runs' cached light rows."""
+    previous = load_previous_run(ctx, run)
+    wanted = set(ids)
+    now = run_rows(ctx, run)
+    now = now[now["instrument_id"].isin(wanted)]
+    if previous is None:
+        return RunChanges(None, (), {})
+    before_rows = run_rows(at_session(ctx, previous.session), previous)
+    before_rows = before_rows[before_rows["instrument_id"].isin(wanted)]
+    before = {
+        str(i): str(d)
+        for i, d in zip(before_rows["instrument_id"], before_rows["decision"], strict=True)
+    }
+    return RunChanges(previous.session, (), _compare(now, before))
+
+
 @dataclass(frozen=True)
 class ResultQuery:
     """Which rows of a run a review table shows: ``decisions`` (none: all; any case),
