@@ -161,7 +161,7 @@ def load_episode_signals(ctx: ReadContext, episode_key: str) -> EpisodeSignals |
     personal-licence fields: a viewer without the licence reads them as unknown, ADR 0069): kept in
     ``ctx.cache`` (the regime page's History asks for every episode at once, 1.2 s)."""
     held = tuple(sorted(ctx.licences))
-    key = ("episode-signals", episode_key, ctx.session.date, held, ctx.reader.visible_seq())
+    key = ("episode-signals", episode_key, ctx.session.date, held, ctx.reader.version())
     cached: tuple[EpisodeSignals | None] = ctx.cache.get_or_compute(
         key, lambda: (_signals(ctx, episode_key),)
     )

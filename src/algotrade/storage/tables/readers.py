@@ -38,6 +38,11 @@ class StoreReader:
         """A reader of the same store and view that logs the reads of an attributed day."""
         return RecordingReader(self._backend, self.own_run, pin=self._pin)
 
+    @property
+    def pin(self) -> int | None:
+        """The commit sequence every read is made at (``pinned``), ``None`` for a live reader."""
+        return self._pin
+
     def pinned(self, seq: int) -> "StoreReader":
         """A reader of the same store whose every read is made as of commit sequence ``seq``:
         partitions and dates committed after it are invisible, a version the store no longer
@@ -126,6 +131,10 @@ class StoreReader:
     def visible_seq(self) -> int:
         """The latest committed publish sequence: changes exactly when a commit publishes."""
         return self._backend.tables.visible_seq()
+
+    def destructive_epoch(self) -> int:
+        """Operations that deleted committed rows so far (``TableStore.destructive_epoch``)."""
+        return self._backend.tables.destructive_epoch()
 
     def partition_seq(self, table: str, start: date, end: date) -> dict[date, int]:
         """Per committed partition in the range, its highest commit sequence (ADR 0063)."""

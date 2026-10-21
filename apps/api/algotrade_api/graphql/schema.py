@@ -24,7 +24,14 @@ from strawberry.types import ExecutionResult
 
 from algotrade.config.site.users import Role, UserRecord
 from algotrade.core.time.calendar import exchange_date, last_closed_session
-from algotrade_api.graphql.context import Opener, RequestContext, StoresOpener, context_getter
+from algotrade.services.read.serving.current import StaleSnapshotError
+from algotrade_api.graphql.context import (
+    Opener,
+    ReleaseReads,
+    RequestContext,
+    StoresOpener,
+    context_getter,
+)
 from algotrade_api.graphql.errors import response_of
 from algotrade_api.graphql.limits import EXTENSIONS
 from algotrade_api.graphql.offload import (
@@ -37,6 +44,7 @@ from algotrade_api.graphql.offload import (
 )
 from algotrade_api.graphql.response_cache import (
     CLOSED_SESSION_OPERATIONS,
+    RELEASE_SHARED_OPERATIONS,
     RUN_OPERATIONS,
     SHARED_OPERATIONS,
     TODAY_OPERATIONS,
@@ -85,10 +93,12 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         opener: Opener,
         stores: StoresOpener | None,
         log: OperationLog,
+        releases: ReleaseReads | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._opener, self._stores_opener, self._log = opener, stores, log
+        self._releases = releases
         self._revalidating: dict[str, asyncio.Task[None]] = {}
         self._seq, self._cache, self._admission = seq, cache, admission
         self._runs, self._closed, self._served = runs, closed, served
@@ -99,6 +109,8 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
     ) -> GraphQLHTTPResponse:
         viewer = getattr(request.state, "viewer", None)
         request.state.failed = bool(result.errors)  # a failed or partial answer is never kept
+        # a version the release's pinned reads needed was discarded: the router answers live
+        request.state.stale = _lost_a_version(result)
         return response_of(result, viewer is not None and viewer.role is Role.ADMIN)
 
     async def run(self, request: Any, *args: Any, **kwargs: Any) -> Any:
@@ -110,7 +122,9 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         if parsed is not None and viewer is not None and cacheable(parsed[0]):
             document, variables = parsed
             self._log.note(viewer, document, variables)
-            key = await self._key(viewer, document, variables)
+            release = await self._release_for(operation_name(document))
+            request.state.release = release  # the context pins its reads at the release
+            key = await self._key(viewer, document, variables, release)
             body = self._cache.get(key) if key is not None else None
             if body is not None:
                 return await _served(body, request)
@@ -118,11 +132,21 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
             if stale is not None and key is not None:  # stale-while-revalidate: answer now,
                 self._revalidate(key, Served(viewer, document, variables))  # recompute behind it
                 return await _served(stale, request)
+        else:
+            request.state.release = None
         inline = parsed is not None and only_inline(cast(Hashable, self.schema), parsed[0])
         if not inline:
             self._admission.admit()
         try:
             response = await super().run(request, *args, **kwargs)
+            if getattr(request.state, "release", None) is not None and getattr(
+                request.state, "stale", False
+            ):  # a pin was lost: today's live path, its answer not kept (ADR 0077 decision 23)
+                request.state.release, key = None, None
+                context = kwargs.get("context")
+                if isinstance(context, RequestContext):
+                    context.forget_reads()
+                response = await super().run(request, *args, **kwargs)
         finally:
             if not inline:
                 self._admission.release()
@@ -141,10 +165,24 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
             return 0
         return self._config_generation(viewer.user_id, viewer.role is Role.ADMIN)
 
-    async def _key(self, viewer: UserRecord, document: str, variables: Any) -> str | None:
+    async def _release_for(self, name: str | None) -> Any:
+        """The serving release an operation named ``name`` is answered from (a listed one, the
+        kill switch on, a current release that can be trusted), else ``None``: the live path."""
+        if self._releases is None or name not in RELEASE_SHARED_OPERATIONS:
+            return None
+        return await off_loop(self._releases.resolve)
+
+    async def _key(
+        self, viewer: UserRecord, document: str, variables: Any, release: Any = None
+    ) -> str | None:
         """The cache key of this operation for ``viewer`` now (``None``: not cacheable at this
-        moment); every state the answer depends on is read before it is computed (ADR 0022)."""
+        moment); every state the answer depends on is read before it is computed (ADR 0022).
+        From a serving release: the release's own key (``response_key``)."""
         name = operation_name(document)
+        if release is not None:
+            return response_key(0, viewer, document, variables, name, release=release.release_id)
+        if self._releases is not None and name in RELEASE_SHARED_OPERATIONS:
+            return None  # the fallback to the live path (no release to trust): never kept
         generation = self._generation(viewer, name)
         if generation is None:
             return None
@@ -189,12 +227,14 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         ran (the replay of the warmer and of a stale hit); with ``only_missing`` a fresh entry is
         left alone. False when it was skipped or refused (a busy pool), None when it failed (never
         kept)."""
-        key = await self._key(op.viewer, op.document, op.variables)
+        release = await self._release_for(operation_name(op.document))
+        key = await self._key(op.viewer, op.document, op.variables, release)
         if key is None:  # a write of the caller's is in flight: nothing to keep
             return False
         if only_missing and self._cache.get(key) is not None:
             return False
-        context = RequestContext(self._opener, op.viewer, self._stores_opener)
+        pinned = self._releases.pinned if self._releases is not None else None
+        context = RequestContext(self._opener, op.viewer, self._stores_opener, release, pinned)
         try:
             self._admission.admit()
         except OverloadedError:
@@ -272,6 +312,12 @@ async def _operation(request: Request) -> tuple[str, Any] | None:
     return data["query"], data.get("variables")
 
 
+def _lost_a_version(result: ExecutionResult) -> bool:
+    """Whether an error of ``result`` is a ``StaleSnapshotError``: a pinned read whose version
+    the store discarded (the release's pin was not held)."""
+    return any(isinstance(e.original_error, StaleSnapshotError) for e in result.errors or [])
+
+
 def graphql_router(
     opener: Opener,
     debug: bool = False,
@@ -284,6 +330,7 @@ def graphql_router(
     served: Callable[[], str] = lambda: "",
     log: OperationLog | None = None,
     config_generation: Callable[[str, bool], int | None] = lambda user, everyone: 0,
+    releases: ReleaseReads | None = None,
 ) -> CachingRouter:
     """``POST /graphql`` over the read contexts ``opener`` opens (one per requested session,
     per request) and the session-free one ``stores`` opens (configs, run records); the
@@ -292,13 +339,16 @@ def graphql_router(
     durable config counter (an admin's: every user's; ADR 0077 decision 15), ``runs`` the runs
     generation (``StoreReader.runs_generation``) and ``closed`` the last closed session, which
     the keys of the run-dependent operations hold; ``served`` the token of the default session
-    (``served_token``) every key holds (ADR 0062)."""
+    (``served_token``) every key holds (ADR 0062). ``releases``: how the listed operations are
+    answered from the current serving release (ADR 0077 decision 23; ``release.py``)."""
     router = CachingRouter(
         schema,
         path=PATH,
         graphql_ide="graphiql" if debug else None,
         allow_queries_via_get=False,
-        context_getter=context_getter(opener, stores),
+        context_getter=context_getter(
+            opener, stores, releases.pinned if releases is not None else None
+        ),
         tags=["graphql"],
         seq=seq,
         config_generation=config_generation,
@@ -310,6 +360,7 @@ def graphql_router(
         opener=opener,
         stores=stores,
         log=log if log is not None else OperationLog(),
+        releases=releases,
     )
     # No subscriptions: drop Strawberry's WebSocket route, which the caller guard (an HTTP
     # dependency, ADR 0040) cannot see; /graphql is served over HTTP POST only.

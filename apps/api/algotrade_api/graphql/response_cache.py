@@ -79,6 +79,20 @@ SHARED_OPERATIONS: frozenset[str] = frozenset(
         "SessionDate",
     }
 )
+# The SHARED_OPERATIONS read from the current serving release (ADR 0077 decision 23): stored
+# tables only, no run record, no catalogue. Listed with a reason and a test in
+# ``architecture/release_shared_ops.toml`` (``tests/architecture/api/test_release_reads.py``).
+RELEASE_SHARED_OPERATIONS: frozenset[str] = frozenset(
+    {
+        "InstrumentPrices",
+        "MarketHistory",
+        "InstrumentEvents",
+        "EtfHoldings",
+        "RegimeBands",
+        "RegimeSignals",
+        "RegimeEpisodes",
+    }
+)
 # Operations over published tables and configs that depend on the caller's catalogue or
 # configs (user features, the Guide's field entries): cached per user.
 USER_OPERATIONS: frozenset[str] = frozenset(
@@ -202,12 +216,23 @@ def response_key(
     served: str = "",
     today: date | None = None,
     generation: int = 0,
+    release: str | None = None,
 ) -> str:
     """The hex digest identifying one cacheable answer. ``runs`` (the runs generation) is part
     of a ``RUN_OPERATIONS`` key, ``closed`` of a ``CLOSED_SESSION_OPERATIONS`` one, ``served``
     (``served_token``: the default session) of every key (ADR 0062); ``generation`` is the
     viewer's config generation (``storage/configs/generation.py``, ADR 0077 decision 15), part of
-    every key that holds the user (a ``SHARED_OPERATIONS`` one does not)."""
+    every key that holds the user (a ``SHARED_OPERATIONS`` one does not). ``release`` (the id of
+    the serving release the answer is read from, ADR 0077 decision 23): the key of a
+    ``RELEASE_SHARED_OPERATIONS`` operation is then that id, the role, the document, the
+    variables and the licences alone: no sequence, no served session, no runs generation, so a
+    commit, a restatement or a saved run record does not evict it."""
+    if release is not None and name in RELEASE_SHARED_OPERATIONS:
+        text = json.dumps(variables, sort_keys=True, separators=(",", ":"), default=str)
+        licences = ",".join(sorted(viewer.licences))
+        document_hash = hashlib.sha256(document.encode()).hexdigest()
+        parts = ["release", release, viewer.role.value, document_hash, text, f"licences:{licences}"]
+        return hashlib.sha256("\x00".join(parts).encode()).hexdigest()
     who = (
         viewer.role.value if name in SHARED_OPERATIONS else f"{viewer.role.value}:{viewer.user_id}"
     )

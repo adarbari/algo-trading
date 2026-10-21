@@ -51,7 +51,7 @@ def test_no_reference_stored_is_no_instrument() -> None:
 
 def test_descriptions_are_read_once_per_publish(ctx: ReadContext, reader: StoreReader) -> None:
     load_instrument(ctx, "AAA")
-    key = ("descriptions", reader.visible_seq())
+    key = ("descriptions", reader.version())
     assert ctx.cache.get(key) is not None
 
 

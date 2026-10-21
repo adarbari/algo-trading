@@ -471,7 +471,7 @@ class LocalTables:
         found = {
             d
             for d in self._committed_dates(table)
-            if visible_entries(read_index(self._dir(table, d)), upto)
+            if not (held := read_index(self._dir(table, d))) or visible_entries(held, upto)
         }
         if upto <= published:
             with self._dates_lock:

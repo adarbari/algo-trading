@@ -169,7 +169,7 @@ def _pick_index(ctx: ReadContext) -> tuple[PickIndex, tuple[object, ...]]:
         ctx.user.user_id,
         ctx.session.date,
         ctx.reader.own_run,
-        ctx.reader.visible_seq(),
+        ctx.reader.version(),
         tuple(run.run_id for _, run in runs),
     )
     build: Callable[[], PickIndex] = lambda: _index(ctx, runs)  # noqa: E731

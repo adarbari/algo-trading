@@ -448,7 +448,7 @@ class MemoryTables:
             held = {
                 k
                 for k, entries in self._partitions.items()
-                if upto is None or visible_entries(entries, upto)
+                if upto is None or not entries or visible_entries(entries, upto)
             }
             keys = held | set(self._pending.get(own_run or "", {}))
         return sorted(d for (t, d) in keys if t == table)

@@ -243,3 +243,17 @@ def test_compaction_runs_under_a_pin_when_nothing_was_recommitted_after_it(
     backend.tables.pin("current", backend.tables.visible_seq())  # always present
     report = backend.tables.compact_runs("events/dividend", D1)
     assert report.skipped is None and report.runs_dropped == 1
+
+
+def test_a_partition_written_empty_is_listed_and_stamped_under_a_pin_as_it_is_live(
+    backend: Backend,
+) -> None:
+    """An empty frame leaves a partition with no run (a source with nothing today): live lists it
+    and stamps it 0, so a pinned read must too (the release's session record names the table)."""
+    x = commit(backend, "r1", D1, 1.0)
+    empty = stamped([{"instrument_id": "EQ:A", "value": 1.0}], D2, "empty").iloc[0:0]
+    backend.tables.write(TABLE, D2, "empty", empty)
+    assert D2 in backend.tables.dates(TABLE)
+    assert D2 in backend.tables.dates(TABLE, upto=x)
+    assert backend.tables.partition_seq(TABLE, D2, D2) == {D2: 0}
+    assert backend.tables.partition_seq(TABLE, D2, D2, upto=x) == {D2: 0}

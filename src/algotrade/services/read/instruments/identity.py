@@ -47,7 +47,7 @@ def _text(value: Any) -> str | None:
 def _descriptions(ctx: ReadContext) -> pd.DataFrame:
     """Every stored description with text: the table is read once per publish (a year of
     nightly increments is hundreds of small files, ~1 s), not once per page."""
-    key = ("descriptions", ctx.reader.visible_seq())  # read before computing (ADR 0022)
+    key = ("descriptions", ctx.reader.version())  # read before computing (ADR 0022)
     found = ctx.cache.get(key)
     if found is None:
         found = descriptions(ctx.reader)

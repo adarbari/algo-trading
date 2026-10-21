@@ -181,7 +181,7 @@ def load_completeness(
     # the cells are what is stored, the same for every caller until the next publish (in the
     # key, read before the partitions, ADR 0022): the status strip of every page asks for one
     # session, 430 partitions read (1.6 s a page)
-    key = ("completeness", tuple(days), ctx.reader.visible_seq())
+    key = ("completeness", tuple(days), ctx.reader.version())
     cells: tuple[Cell, ...] = ctx.cache.get_or_compute(key, lambda: _cells(ctx, days))
     closed = last_closed_session(now or datetime.now(UTC))
     return Completeness(tuple(days), tuple(d.name for d in DATASETS), cells, closed)

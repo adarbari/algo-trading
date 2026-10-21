@@ -71,7 +71,7 @@ def _records(ctx: ReadContext, jobs: frozenset[str], first: date, last: date) ->
         first,
         last,
         tuple(sorted(jobs)),
-        ctx.reader.visible_seq(),
+        ctx.reader.version(),
         ctx.reader.runs_generation(),
     )
     found: list[RunRecord] | None = ctx.cache.get(key)  # key read first (ADR 0022)

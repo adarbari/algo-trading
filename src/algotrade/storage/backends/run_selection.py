@@ -176,7 +176,10 @@ def chain_needed(entries: Mapping[str, RunEntry], pins: Collection[int]) -> bool
 def seq_at(entries: Mapping[str, RunEntry], upto: int) -> int | None:
     """The highest sequence among the versions a read at ``upto`` sees (``max_seq`` for a pinned
     read: raises ``StaleSnapshotError`` as ``visible_entries`` does); ``None``: no run of the
-    partition is visible at ``upto`` (it did not exist yet)."""
+    partition is visible at ``upto`` (it did not exist yet). A partition whose index holds no run
+    (an empty frame was written to it) is listed live and counts 0, as ``max_seq`` does."""
+    if not entries:
+        return 0
     return max((e.seq or 0 for e in visible_entries(entries, upto).values()), default=None)
 
 
