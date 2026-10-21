@@ -114,16 +114,19 @@ def config_ids(store: ConfigStore, scope: str) -> list[str]:
     return sorted({n for kind in CONFIG_KINDS for n in store.names(scope, kind)})
 
 
-def config_generation(configs: ConfigStore) -> Callable[[str], int | None]:
+def config_generation(configs: ConfigStore) -> Callable[[str, bool], int | None]:
     """A user's config generation for the response cache key (ADR 0077 decision 15): ``None``
     while a write of theirs is in flight (odd) or the counter cannot be read, so nothing is
-    cached under a half-written config."""
+    cached under a half-written config. ``everyone`` (an admin, who sees every user's screens,
+    edges and configs) sums every user's, and is ``None`` when any of them is in flight."""
 
-    def generation(user: str) -> int | None:
+    def generation(user: str, everyone: bool = False) -> int | None:
         try:
-            value = configs.generation(user)
+            values = [configs.generation(u) for u in (configs.users() if everyone else [user])]
+            if everyone:
+                values.append(configs.generation(user))  # a user with no folder yet
         except (OSError, AlgoTradeError):
             return None
-        return value if is_stable(value) else None
+        return sum(values) if all(is_stable(v) for v in values) else None
 
     return generation

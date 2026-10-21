@@ -1,39 +1,22 @@
 """The gate's harness: the real app with its real response cache over the authoring fixtures,
-a counter of the response cache's hits, and two modes of every test:
-``with_epoch`` (the app as served) and ``durable_only`` (the process-local ``WriteEpoch`` never
-moves, so only the durable config or runs generation can invalidate an answer)."""
+and a counter of the response cache's hits. Only the durable config generation and the runs
+generation can invalidate an answer (ADR 0077 decisions 15-17)."""
 
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
-from algotrade_api import main
 from algotrade_api.graphql.response_cache import ResponseCache
 from tests.apps.api.routes.authoring.conftest import root, trader_client, writer_client
 
 __all__ = ["Gate", "gate", "root", "trader_client", "writer_client"]
 
 
-EPOCHS: list[Any] = []
-
-
-class _NoCount:
-    """``CountWrites`` that counts nothing (the ``durable_only`` mode)."""
-
-    def __init__(self, app: Any, epoch: Any) -> None:
-        self.app = app
-        EPOCHS.append(epoch)  # the app's WriteEpoch, which nothing moves in this mode
-
-    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
-        await self.app(scope, receive, send)
-
-
 class Gate:
     """Reads a GraphQL operation through the real cache and tells a hit from a miss."""
 
-    def __init__(self, mode: str) -> None:
-        self.mode = mode
+    def __init__(self) -> None:
         self.hits = 0  # fresh entries the response cache served
 
     def read(self, client: TestClient, document: str, **variables: Any) -> Any:
@@ -56,16 +39,13 @@ class Gate:
         """Read once after a write: the earlier cached answer must not be served."""
         before = self.hits
         data = self.read(client, document, **variables)
-        if self.mode == "durable_only":
-            assert EPOCHS and all(e.value == 0 for e in EPOCHS), "the write epoch moved"
         assert self.hits == before, "the write left the earlier cached answer reachable"
         return data
 
 
-@pytest.fixture(params=["with_epoch", "durable_only"], autouse=True)
-def gate(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> Gate:
-    state = Gate(request.param)
-    EPOCHS.clear()
+@pytest.fixture(autouse=True)
+def gate(monkeypatch: pytest.MonkeyPatch) -> Gate:
+    state = Gate()
     real_get = ResponseCache.get
 
     def counting(self: ResponseCache, key: str) -> bytes | None:
@@ -74,6 +54,4 @@ def gate(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> Gat
         return found
 
     monkeypatch.setattr(ResponseCache, "get", counting)
-    if request.param == "durable_only":
-        monkeypatch.setattr(main, "CountWrites", _NoCount)
     return state

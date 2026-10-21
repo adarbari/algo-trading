@@ -11,9 +11,10 @@ configs: user features, the Guide's field entries), ``RUN_OPERATIONS`` (they als
 records or jobs: nightly runs, ingestion, screener runs and results, ideas, edges, status) and
 ``NEVER_CACHED`` (the Describe-it request ranking, which reads the clock, and the caller's
 identity). The
-key (``response_key``) is the published state (``StoreReader.visible_seq()``), the writes the
-API itself served since it started (``WriteEpoch``, moved by ``CountWrites`` after
-the routes that write: a config save changes the caller's next read without a publish), a hash
+key (``response_key``) is the published state (``StoreReader.visible_seq()``), the caller's
+config generation (``storage/configs/generation.py``, bumped inside every config write: a save
+changes the caller's next read without a publish, in any process; an admin's key holds every
+user's, ADR 0077 decision 15), a hash
 of the operation document, its variables and the caller's role. A ``RUN_OPERATIONS`` key also
 holds the runs generation (``StoreReader.runs_generation()``: it moves on every saved run
 record, a job's too, which a publish does not cover: a failed job's record, an on-request run),
@@ -49,7 +50,6 @@ from functools import lru_cache
 from typing import Any
 
 from graphql import GraphQLError, OperationDefinitionNode, parse
-from starlette.types import ASGIApp, Receive, Scope, Send
 
 from algotrade.config.site.users import UserRecord
 
@@ -169,13 +169,6 @@ CLOSED_SESSION_OPERATIONS: frozenset[str] = frozenset({"IngestionCompleteness", 
 NEVER_CACHED: frozenset[str] = frozenset(
     {"AcceptedFormulas", "FeatureRequests", "Viewer", "MyFeatureRequests"}
 )
-# The route packages whose endpoints write (configs, screen results, evaluations); a preview,
-# a draft or an explain POST writes nothing the cache keys on.
-WRITE_PACKAGES = (
-    "algotrade_api.routes.authoring",
-    "algotrade_api.routes.screens",
-    "algotrade_api.routes.edges",
-)
 
 
 @lru_cache(maxsize=256)
@@ -198,38 +191,8 @@ def cacheable(document: str) -> bool:
     return name in SHARED_OPERATIONS or name in USER_OPERATIONS or name in RUN_OPERATIONS
 
 
-class WriteEpoch:
-    """A counter of the writes this API served: ``CountWrites`` moves it, every cache key holds
-    it, so a user's save is never answered from before it."""
-
-    def __init__(self) -> None:
-        self.value = 0
-
-
-class CountWrites:
-    """ASGI middleware moving a ``WriteEpoch`` after every PUT, POST or DELETE that a route of
-    ``WRITE_PACKAGES`` served (the route is read from the scope once the router has matched
-    it). Counted after the write, so a read that raced it keeps a key nobody asks for again."""
-
-    def __init__(self, app: ASGIApp, epoch: WriteEpoch) -> None:
-        self.app = app
-        self.epoch = epoch
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope["method"] not in ("PUT", "POST", "DELETE"):
-            await self.app(scope, receive, send)
-            return
-        try:
-            await self.app(scope, receive, send)
-        finally:
-            module = getattr(getattr(scope.get("route"), "endpoint", None), "__module__", "")
-            if module.startswith(WRITE_PACKAGES):
-                self.epoch.value += 1
-
-
 def response_key(
     seq: int,
-    epoch: int,
     viewer: UserRecord,
     document: str,
     variables: Any,
@@ -250,7 +213,7 @@ def response_key(
     )
     text = json.dumps(variables, sort_keys=True, separators=(",", ":"), default=str)
     licences = ",".join(sorted(viewer.licences))  # what a viewer may see differs (ADR 0069)
-    parts = [str(seq), str(epoch), who, hashlib.sha256(document.encode()).hexdigest(), text]
+    parts = [str(seq), who, hashlib.sha256(document.encode()).hexdigest(), text]
     parts.append(f"licences:{licences}")
     if name not in SHARED_OPERATIONS:
         parts.append(f"config:{generation}")
