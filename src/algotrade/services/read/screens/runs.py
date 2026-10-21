@@ -13,7 +13,8 @@ compared with the screener's run in the previous stored session of ``results/rul
 (``load_previous_run``: that date is named explicitly through ``context.previous_session``,
 and the same latest-run rule applies there)."""
 
-from collections.abc import Mapping, Sequence
+import threading
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -22,15 +23,26 @@ import pandas as pd
 
 from algotrade.services.read.availability.cause import Unavailable, run_cause
 from algotrade.services.read.availability.unavailable import unavailable_tables
-from algotrade.services.read.context import ReadContext, at_session, partition, previous_session
+from algotrade.services.read.context import (
+    ReadContext,
+    at_session,
+    partition,
+    previous_session,
+    run_rows_of,
+)
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.storage.tables.schemas import result_table
 
 RULE_SCREEN = result_table("rule_screen")
-# Read column-pruned (the row key and the point-in-time columns come with them).
-ROW_COLUMNS = (
-    "user_id", "config_id", "config_version", "decision", "score", "rank", "tie_break", "flags",
-    "reasons", "regime", "size_multiplier",
+# ``screen_rows`` reads these (a ``ScreenerRun`` is built from them), column-pruned (the row key
+# and the point-in-time columns come with them); ``run_rows`` reads ``RUN_COLUMNS`` of one run's
+# own file, and ``load_results`` the heavier ``DETAIL_COLUMNS`` of the instruments a page asks for.
+ROW_COLUMNS = ("user_id", "config_id", "config_version", "decision", "regime")
+RUN_COLUMNS = ("user_id", "config_id", "config_version", "decision", "score", "rank", "tie_break",
+               "regime")  # fmt: skip
+DETAIL_COLUMNS = (
+    "user_id", "config_id", "decision", "score", "rank", "tie_break", "flags", "reasons",
+    "regime", "size_multiplier",
 )  # fmt: skip
 PAUSED = "PAUSED"  # the regime gate held the pick back (ADR 0049)
 EXCLUDED = "EXCLUDED"  # a stale chain the chains gate tolerated (ADR 0054): never a pick
@@ -209,35 +221,73 @@ def latest_run(ctx: ReadContext, owner: str, config_id: str) -> LatestRun:
     return load_latest_runs(ctx, [(owner, config_id)])[(owner, config_id)]
 
 
+class RunRows:
+    """One publish's run rows (``run_rows``): each run's own rows, read when first asked for, in
+    rank order. One container per (session, view, publish) in ``ctx.cache``, never one cache entry
+    per run (the cache holds 32); it weighs what its frames really take (``weight_bytes``) and is
+    put again whenever a run is added, so the cache's byte bound sees it grow."""
+
+    def __init__(self) -> None:
+        self._frames: dict[str, pd.DataFrame] = {}
+        self._lock = threading.Lock()
+        self._flights: dict[str, threading.Lock] = {}
+
+    def get_or_read(
+        self, run_id: str, read: Callable[[], pd.DataFrame]
+    ) -> tuple[pd.DataFrame, bool]:
+        """The run's rows, read once even when threads ask together; -> (rows, read just now)."""
+        with self._lock:
+            found = self._frames.get(run_id)
+            if found is not None:
+                return found, False
+            flight = self._flights.setdefault(run_id, threading.Lock())
+        with flight:
+            with self._lock:
+                found = self._frames.get(run_id)
+            if found is not None:
+                return found, False
+            found = read()
+            with self._lock:
+                self._frames[run_id] = found
+                self._flights.pop(run_id, None)
+            return found, True
+
+    def weight_bytes(self) -> int:
+        with self._lock:
+            frames = list(self._frames.values())
+        return int(sum(f.memory_usage(index=True, deep=True).sum() for f in frames))
+
+
 def run_rows(ctx: ReadContext, run: ScreenerRun) -> pd.DataFrame:
-    """The rows ``run`` stored (one per instrument), in rank order. Filtering the session's
-    whole partition for a run is the cost, and a page asks for each run's rows several times:
-    the partition is split by run once per request and kept in ``ctx.memo`` (read only by
-    callers; filtering it once per run and call took the Ideas page 0.2 s)."""
-    key = ("run_rows", ctx.session.date)
-    by_run: dict[tuple[str, str, str], pd.DataFrame] | None = ctx.memo.get(key)
-    if by_run is None:
-        stored = screen_rows(ctx)
-        ranked = (
-            None
-            if isinstance(stored, Unknown)
-            else stored.sort_values(["rank", "instrument_id"], kind="stable")
-        )
-        by_run = (
-            {}
-            if ranked is None
-            else {
-                (str(o), str(c), str(r)): rows.reset_index(drop=True)
-                for (o, c, r), rows in ranked.groupby(
-                    ["user_id", "config_id", "run_id"], sort=False
-                )
-            }
-        )
-        ctx.memo[key] = by_run
-    found = by_run.get((run.owner, run.config_id, run.run_id))
-    if found is None:  # pragma: no cover - the run was found in these rows
-        return pd.DataFrame(columns=["instrument_id", *ROW_COLUMNS])
-    return found
+    """The rows ``run`` stored (one per instrument; ``RUN_COLUMNS``), in rank order: read from the
+    run's own file alone (``run_rows_of``, ADR 0064), not cut out of the session's every run, and
+    sorted once per publish. They are kept in one ``RunRows`` in ``ctx.cache`` under the session,
+    the view (``own_run``) and the published state read before computing (ADR 0022), shared by
+    every request and only read by callers. The heavy columns (``reasons``, ``flags``) are read
+    for the instruments a page asks for (``load_results``)."""
+    key = ("run_rows", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+    held: RunRows = ctx.cache.get_or_compute(key, RunRows)
+
+    def read() -> pd.DataFrame:
+        stored = run_rows_of(ctx, RULE_SCREEN, run.run_id, RUN_COLUMNS)
+        mine = stored[(stored["user_id"] == run.owner) & (stored["config_id"] == run.config_id)]
+        return mine.sort_values(["rank", "instrument_id"], kind="stable").reset_index(drop=True)
+
+    rows, added = held.get_or_read(run.run_id, read)
+    if added:
+        ctx.cache.put(key, held)  # its weight changed: the cache bounds what it really holds
+    return rows
+
+
+def run_row_details(
+    ctx: ReadContext, run: ScreenerRun, instruments: Collection[str]
+) -> pd.DataFrame:
+    """``run``'s rows of ``instruments`` with every column a result shows (``DETAIL_COLUMNS``:
+    ``reasons`` and ``flags`` too), in rank order: read from the run's own file for those
+    instruments only, never kept (a page asks for a few dozen of a run's thousands)."""
+    stored = run_rows_of(ctx, RULE_SCREEN, run.run_id, DETAIL_COLUMNS, sorted(instruments))
+    mine = stored[(stored["user_id"] == run.owner) & (stored["config_id"] == run.config_id)]
+    return mine.sort_values(["rank", "instrument_id"], kind="stable").reset_index(drop=True)
 
 
 def load_previous_run(ctx: ReadContext, run: ScreenerRun) -> ScreenerRun | None:

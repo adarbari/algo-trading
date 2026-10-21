@@ -59,6 +59,7 @@ __all__ = [
     "partition_on",
     "previous_session",
     "run_partition",
+    "run_rows_of",
     "served_session",
     "snapshot_on",
     "stored_dates",

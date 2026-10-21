@@ -6,7 +6,8 @@ come from that run's own file and for its own picks, never from the session's ev
 union of every run's picks filtered all of them), and a run that is not its config's newest reads
 its own rows."""
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
@@ -20,10 +21,13 @@ from algotrade.services.read.context import ReadContext, partition
 from algotrade.services.read.screens import results
 from algotrade.services.read.screens.results import VALUE_COLUMNS, _read_values, run_withheld
 from algotrade.services.read.screens.runs import (
+    DETAIL_COLUMNS,
     ROW_COLUMNS,
     RULE_SCREEN,
+    RunRows,
     ScreenerRun,
     load_latest_runs,
+    run_rows,
     screen_rows,
 )
 from algotrade.services.read.values import Unknown
@@ -284,3 +288,70 @@ def test_the_values_of_a_run_that_is_not_the_newest_are_its_own(
     found = _read_values(ctx, [older], None, {"c0-r1": ["EQ:S4"]})
     assert list(found) == [("c0-r1", "EQ:S4")]
     assert [row["field"] for row in found[("c0-r1", "EQ:S4")]] == ["feature.f1"]
+
+
+def _held_bytes(ctx: ReadContext, runs: list[ScreenerRun]) -> int:
+    """What the asked runs' own rows weigh as frames (``RunRows.weight_bytes``)."""
+    held = RunRows()
+    for run in runs:
+        held.get_or_read(run.run_id, lambda run=run: run_rows(ctx, run))
+    return held.weight_bytes()
+
+
+def _arrow_total(work: Callable[[], object]) -> int:
+    """The Arrow bytes allocated, in all, while ``work`` runs."""
+    before = pa.default_memory_pool()
+    proxy = pa.proxy_memory_pool(before)
+    pa.set_memory_pool(proxy)
+    try:
+        work()
+        return proxy.total_bytes_allocated()
+    finally:
+        pa.set_memory_pool(before)
+
+
+def _runs(ctx: ReadContext) -> list[ScreenerRun]:
+    keys = [("site", f"c{c}") for c in range(CONFIGS)]
+    runs = [lr.run for lr in load_latest_runs(ctx, keys).values() if lr.run is not None]
+    assert len(runs) == CONFIGS
+    return runs
+
+
+def _all_run_rows_at_once(ctx: ReadContext, runs: list[ScreenerRun]) -> None:
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for rows in pool.map(lambda run: run_rows(ctx, run), runs):
+            assert len(rows) == INSTRUMENTS
+
+
+def _split_the_sessions_newest_rows(ctx: ReadContext) -> None:
+    """What ``run_rows`` did: every config's newest run, every column, sorted, split per run."""
+    stored = partition(ctx, RULE_SCREEN, (*DETAIL_COLUMNS, "config_version"), newest_runs=True)
+    assert isinstance(stored, pd.DataFrame)
+    ranked = stored.sort_values(["rank", "instrument_id"], kind="stable")
+    for _, rows in ranked.groupby(["user_id", "config_id", "run_id"], sort=False):
+        rows.reset_index(drop=True)
+
+
+# A run's own file is decoded (its columns), filtered to the run and conformed: about 3.4x the
+# frame it leaves (measured); the session-wide split decoded every column, about 9.6x.
+ARROW_BUDGET = 5
+
+
+def test_run_rows_of_every_run_at_once_read_the_runs_own_rows_only(
+    store: tuple[LocalBackend, int],
+) -> None:
+    backend, _ = store
+    runs = _runs(context(StoreReader(backend)))
+    held = _held_bytes(context(StoreReader(backend)), runs)
+    used = _arrow_total(lambda: _all_run_rows_at_once(context(StoreReader(backend)), runs))
+    assert used <= ARROW_BUDGET * held
+
+
+def test_the_budget_would_catch_cutting_the_runs_out_of_the_sessions_newest_rows(
+    store: tuple[LocalBackend, int],
+) -> None:
+    backend, _ = store
+    runs = _runs(context(StoreReader(backend)))
+    held = _held_bytes(context(StoreReader(backend)), runs)
+    used = _arrow_total(lambda: _split_the_sessions_newest_rows(context(StoreReader(backend))))
+    assert used > ARROW_BUDGET * held
