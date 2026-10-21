@@ -70,3 +70,24 @@ without the owner at a terminal. A run takes about a minute (`month_end`) to 30 
   by `job_name`. No new table. A run written before this has no trigger: the read model and
   GraphQL (`EdgeRun.trigger`, `EdgeRun.legacyOwner`) serve null, never an invented value.
 - Guide terms "Who may run what" and "Run trigger" explain both to users (ADR 0051).
+
+## Amendment 2026-10-20: the edges of one CLI run share their screens
+
+Profile of a full evaluation (`docs/perf/edge-eval-speed-spike.md`): 56-80% of an edge's CPU is
+screening, and the 70 edges name 195 screener and baseline slots over 79 distinct configs
+(`size_small` in 48 edges, `momentum_12_1` in 40). A screener's run at a session depends on its
+config and the session, not on the edge.
+
+- **A scratch cache of screens per CLI run** (`reads/screens.py`, `ScreenCache`). `evaluate-edges` over
+  more than one edge computes which (owner, config hash) pairs more than one edge uses
+  (`harness.screen_uses`) and keeps only those screens, one pickle per (owner, config, session)
+  in a temporary directory the command creates and deletes (`--no-screen-cache` opts out; none
+  with under 5 GB free). It is scratch, not a store (ADR 0005 is unchanged): written atomically,
+  read by no other process and never outliving the run.
+- **Leg reuse cannot tell a hit from a computed screen** (ADR 0063). The entry carries the reads
+  the screen logged and the commit sequence it started at; a hit replays them into the edge's own
+  recording reader (`RecordingReader.capture` / `replay`) and the day's `inputs_seq` becomes the
+  earlier of the edge's own and the entry's, so a partition committed between the first
+  computation and a hit is never read as unchanged. A session lost to a missing table is not
+  cached (it is recomputed and counted by each edge).
+- Memory does not grow with the range: entries live on disk, a hit reads one file.

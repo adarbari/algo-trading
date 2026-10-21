@@ -146,3 +146,52 @@ def test_a_filtered_read_records_the_committed_partitions_the_store_lists() -> N
         reader.table(A, D1, instruments=["EQ:A"])
         reader.table_range(A, D1, D1, T0 + timedelta(days=9))
     assert reader.reads(D1) == (ReadRecord(A, D1, D1, "rows", dates_digest([D1])),)
+
+
+def test_capture_logs_like_a_direct_read_and_replay_hands_it_to_another_reader() -> None:
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1)
+    reader, other = RecordingReader(backend), RecordingReader(backend)
+    start = backend.tables.visible_seq()
+    with reader.attribute(D1), reader.capture(D1) as got:
+        reader.table(A, D1)
+    assert got.seq == start and got.records == reader.reads(D1) and len(got.records) == 1
+    assert reader.inputs_seq(D1) == start
+    with other.attribute(D1):
+        other.replay(D1, got)
+    assert other.reads(D1) == reader.reads(D1) and other.inputs_seq(D1) == start
+
+
+def test_a_capture_that_reads_nothing_leaves_the_day_unregistered() -> None:
+    reader = RecordingReader(MemoryBackend())
+    with reader.attribute(D1), reader.capture(D1) as got:
+        pass
+    assert got.records == () and reader.reads(D1) == () and reader.inputs_seq(D1) is None
+    assert reader.attributed_days() == []
+    reader.replay(D1, got)  # nothing to hand over: still nothing registered
+    assert reader.attributed_days() == []
+
+
+def test_replay_takes_the_earlier_sequence_so_a_later_commit_is_never_unchanged() -> None:
+    """A partition committed after the capture started must not read as unchanged: the day's
+    sequence is the earlier of its own and the capture's (ADR 0063)."""
+    backend = MemoryBackend()
+    publish(backend, "r1", A, D1)
+    source, reader = RecordingReader(backend), RecordingReader(backend)
+    with source.attribute(D1), source.capture(D1) as got:
+        source.table(A, D1)
+    early = got.seq
+    publish(backend, "r2", A, D1)  # a commit lands between the two edges
+    with reader.attribute(D1):
+        reader.table(A, D1)  # the second edge's own read of the day: a newer sequence
+        assert reader.inputs_seq(D1) > early
+        reader.replay(D1, got)
+    assert reader.inputs_seq(D1) == early
+
+
+def test_capture_outside_the_attributed_day_is_refused() -> None:
+    reader = RecordingReader(MemoryBackend())
+    with pytest.raises(RuntimeError, match="capture"), reader.capture(D1):
+        pass
+    with reader.attribute(D2), pytest.raises(RuntimeError, match="capture"), reader.capture(D1):
+        pass

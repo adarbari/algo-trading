@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from algotrade_backtest.cli import build_parser, main
+from algotrade_backtest.commands import _screen_scratch
 from algotrade_ingestion.cli.main import main as ingest_main
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
 
@@ -240,6 +241,17 @@ def test_evaluate_edges_takes_a_split_flag_that_is_a_date(cli: Cli) -> None:
 def test_evaluate_edges_takes_a_full_flag_that_defaults_off() -> None:
     parse = build_parser().parse_args
     assert parse(["evaluate-edges", "--full"]).full and not parse(["evaluate-edges"]).full
+
+
+def test_evaluate_edges_screen_cache_is_off_for_one_edge_and_by_flag() -> None:
+    """The screen cache's scratch directory exists only for a multi-edge run that wants it."""
+    parse = build_parser().parse_args
+    two, one = ["a", "b"], ["a"]
+    assert _screen_scratch(parse(["evaluate-edges"]), None, one) is None
+    assert _screen_scratch(parse(["evaluate-edges", "--no-screen-cache"]), None, two) is None
+    scratch = _screen_scratch(parse(["evaluate-edges"]), None, two)
+    assert scratch is not None and scratch.is_dir()
+    scratch.rmdir()
 
 
 def test_study_winners_needs_the_stored_history_and_draft_edges_a_known_run(cli: Cli) -> None:
