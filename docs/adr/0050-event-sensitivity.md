@@ -188,7 +188,11 @@ backfilled events behind the storage stamp.
    the rule above to the stored rows locally, with no FINRA request (a `--force` refetch of both
    tables spent about 50 minutes, 90 % of it request latency). An unflagged row gets
    `min(stored, schedule)`; a flagged row, and a row whose partition holds an earlier run with other
-   values for its key (a restatement), keep their stamp. It restates the changed partitions in one
+   values for its key (a restatement), and a row absent from the partition's earliest run (FINRA
+   added it after publication and a later fetch stored it), keep their stamp. The refetch rule has
+   the mirror gap: `row_known_from` gives a never-stored key of an already stored partition the
+   schedule date although it was first seen at that fetch (disclosed here; a later fix may floor it).
+   The restating run makes the partition's earlier runs non-compactable (`run_compaction.py`). It restates the changed partitions in one
    run, under the ingest lock, and `--dry-run` counts only. `--force` stays for refreshing values.
    Then rerun the rollups `short_interest@v1` (one process from 2018-01-02) and the screens and edge
    evaluation of the sessions since. No feature version is bumped: no consumer read the empty

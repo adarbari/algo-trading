@@ -6,9 +6,10 @@ would repair them on a ``--force`` refetch, which re-downloads every date (about
 of it FINRA latency); the values are already stored, so this task applies the same rule to them
 locally: an unflagged row gets ``min(stored, schedule)``, a flagged row (``revision_flag``) keeps
 its stamp. Values are never touched. A row whose partition holds an earlier run with different
-values for its key was restated: its stamp is late on purpose, so it is kept, never washed out to
-the schedule date. One run restates every changed partition and publishes them together; the
-ingest lock the CLI holds covers the reads through the commit. ``dry_run`` counts only.
+values for its key was restated, and a row absent from the earliest run was added later: its stamp
+is late on purpose, so it is kept, never washed out to the schedule date. One run restates every
+changed partition and publishes them together; the ingest lock the CLI holds covers the reads
+through the commit. ``dry_run`` counts only.
 """
 
 from collections.abc import Callable
@@ -30,10 +31,15 @@ SCHEDULES: dict[str, Callable[[date], date]] = {
 
 
 def _restated(merged: pd.DataFrame, runs: list[pd.DataFrame]) -> pd.Series:
-    """True per row of ``merged`` whose key has, in any run of the partition, other values."""
+    """True per row of ``merged`` that was not in the partition's EARLIEST run as it is now (a
+    row FINRA added after publication, picked up by a later fetch, is known from that fetch) or
+    whose key has, in any run, other values (a restatement). ``runs``: oldest first, empty for a
+    one-run partition, where neither can happen."""
     values = [c for c in merged.columns if c not in META and c not in KEYS]
     keyed = merged.set_index(KEYS)[values]
     out = pd.Series(False, index=keyed.index)
+    if runs:
+        out |= ~keyed.index.isin(runs[0].set_index(KEYS).index)
     for run in runs:
         other = run.drop_duplicates(KEYS).set_index(KEYS)[values].reindex(keyed.index)
         seen = other.notna().any(axis=1)

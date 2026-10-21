@@ -17,7 +17,8 @@ SETTLE, TRADE = date(2026, 9, 30), date(2026, 10, 15)
 LATE, EARLY = date(2026, 10, 20), date(2026, 10, 1)
 SCHED = schedule.short_interest_known_from(SETTLE)
 T0 = datetime(2026, 10, 19, 12, tzinfo=UTC)
-T1 = datetime(2026, 10, 20, 12, tzinfo=UTC)
+T1 = datetime(2026, 10, 20, 12, tzinfo=UTC)  # the restamp run's clock
+TM = datetime(2026, 10, 20, 6, tzinfo=UTC)  # a refetch between the backfill and the restamp
 
 
 def _interest(sym: str, known: date, shorts: int, flag: str | None = None) -> dict:
@@ -62,7 +63,7 @@ def test_restamp_lowers_unflagged_and_keeps_flagged_earlier_and_restated() -> No
     ]
     _put(writer, table, SETTLE, first, "run-a", T0)
     # REST was restated by a later run (value 6): its late stamp is deliberate
-    _put(writer, table, SETTLE, [_interest("REST", LATE, 6)], "run-b", T1)
+    _put(writer, table, SETTLE, [_interest("REST", LATE, 6)], "run-b", TM)
     before = StoreReader(writer._backend).table(table, SETTLE)
     run_ = _run(writer)
     after = StoreReader(writer._backend).table(table, SETTLE)
@@ -104,3 +105,14 @@ def test_restamped_never_raises_a_stamp() -> None:
     frame = pd.DataFrame([_interest("A", EARLY, 5)])
     out = restamp.restamped(frame, schedule.short_interest_known_from, [])
     assert out["known_from"].tolist() == [EARLY]
+
+
+def test_a_row_added_by_a_later_run_keeps_its_fetch_stamp() -> None:
+    """The partition's earliest run lacks NEW: FINRA added it after publication and a refetch
+    stored it, so it is known from that fetch (LATE), not from the schedule date."""
+    writer = StoreWriter(MemoryBackend())
+    table = short_interest.TABLE
+    _put(writer, table, SETTLE, [_interest("OLD", LATE, 5)], "run-a", T0)
+    _put(writer, table, SETTLE, [_interest("OLD", LATE, 5), _interest("NEW", LATE, 7)], "run-b", TM)
+    _run(writer)
+    assert _stamps(writer, table, SETTLE) == {"EQ:OLD": SCHED, "EQ:NEW": LATE}
