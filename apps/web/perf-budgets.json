@@ -141,5 +141,42 @@
       "wire_gzip_bytes": 374400,
       "settled_ms": 3200
     }
+  },
+  "network": {
+    "/ideas": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 369700,
+      "settled_ms": 3200
+    },
+    "/screeners": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 339000,
+      "settled_ms": 3100
+    },
+    "/edges": {
+      "round_trip_depth": 6,
+      "wire_gzip_bytes": 369400,
+      "settled_ms": 3400
+    },
+    "/regime": {
+      "round_trip_depth": 7,
+      "wire_gzip_bytes": 455600,
+      "settled_ms": 3900
+    },
+    "/calendar": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 334800,
+      "settled_ms": 3000
+    },
+    "/explore": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 386200,
+      "settled_ms": 3100
+    },
+    "/admin/ingestion": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 374400,
+      "settled_ms": 3200
+    }
   }
 }
