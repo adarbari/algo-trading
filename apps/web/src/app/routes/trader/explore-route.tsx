@@ -41,10 +41,8 @@ export const exploreRoute = createRoute({
   validateSearch: parseExploreSearch,
   // the tab the URL opens on loads its chunk and starts its reads here, not when it mounts
   loaderDeps: ({ search }) => search,
-  ...pageRoute(
-    ExplorePage,
-    (page, client, search: ExploreSearch) => page.prefetchExploreReads(client, search),
-    true,
+  ...pageRoute(ExplorePage, (page, client, search: ExploreSearch) =>
+    page.prefetchExploreReads(client, search),
   ),
   component: ExploreRoute,
 });

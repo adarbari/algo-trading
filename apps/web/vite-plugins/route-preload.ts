@@ -78,6 +78,16 @@ export function preloadScript(table: Record<string, string[]>, base: string): st
   return `(function(){var t=${JSON.stringify(table)},l=t[location.pathname.replace(/\\/$/,'')];if(!l)return;l.forEach(function(f){var k=document.createElement('link'),e=f.split('.').pop();if(e=='css'||e=='woff2'){k.rel='preload';k.setAttribute('as',e=='css'?'style':'font');if(e=='woff2')k.crossOrigin=''}else k.rel='modulepreload';k.onload=k.onerror=function(){k.remove()};k.href=${JSON.stringify(base)}+f;document.head.appendChild(k)})})();`;
 }
 
+/** Whether the bundle is the app's (it has a listed page): the Storybook build carries none. */
+export function hasPages(bundle: Bundle, pages: Record<string, string[]> = ROUTE_PAGES): boolean {
+  const sources = Object.values(pages).flat();
+  return Object.values(bundle).some(
+    (c) =>
+      c.type === 'chunk' &&
+      sources.some((source) => c.facadeModuleId?.replaceAll('\\', '/').endsWith(`/${source}`)),
+  );
+}
+
 export function routePreload(): Plugin {
   let base = '/';
   return {
@@ -89,8 +99,8 @@ export function routePreload(): Plugin {
     transformIndexHtml: {
       order: 'post',
       handler(_html, ctx) {
-        if (!ctx.bundle) return undefined;
-        const table = preloadTable(ctx.bundle as unknown as Bundle);
+        if (!ctx.bundle || !hasPages(ctx.bundle)) return undefined;
+        const table = preloadTable(ctx.bundle);
         return [{ tag: 'script', children: preloadScript(table, base), injectTo: 'head-prepend' }];
       },
     },

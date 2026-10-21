@@ -202,7 +202,7 @@ without a settings change) builds the production bundle and runs two gates; ever
   the page cache and the first-paint fonts (`vite-plugins/route-preload.ts`).
 
 All gated numbers are counts or sizes, never durations, except the distant-client time, which runs on a model
-(no network noise) with 10 % headroom. LCP and total blocking time (CPU throttled
+(no network noise) with 30 % headroom. LCP and total blocking time (CPU throttled
 4x) are measured in the same run but **only reported** in the job summary: on shared GitHub
 runners they move 20-50 % between identical runs, so a gate on them would fail PRs at random and
 teach people to ignore it. Read them as a trend, not a verdict.

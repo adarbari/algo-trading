@@ -23,8 +23,6 @@ declare module '@tanstack/react-router' {
   interface StaticDataRouteOption {
     /** Fetches the route's page chunk; the router calls it for the URL's routes at start-up. */
     preload?: () => Promise<void>;
-    /** The route's loader may run at start-up, beside the viewer's round trip (`startEarlyReads`). */
-    early?: boolean;
   }
 }
 
@@ -38,17 +36,11 @@ const restored = (client: QueryClient) =>
 /**
  * A page route's options: the `loader` (chunk, then the page's reads, then the saved page cache)
  * and the static `preload`, so the chunk starts downloading at start-up beside the viewer's
- * round trip instead of after it (the guard runs before any loader). `early` (a trader page, which
- * any signed-in viewer may open) also lets the router run the loader at start-up, so the page's
- * reads leave with the viewer's instead of after it (router.ts `startEarlyReads`).
+ * round trip instead of after it (the guard runs before any loader).
  */
-export function pageRoute<M, D = undefined>(
-  page: PageModule<M>,
-  prefetch?: Prefetch<M, D>,
-  early = false,
-) {
+export function pageRoute<M, D = undefined>(page: PageModule<M>, prefetch?: Prefetch<M, D>) {
   return {
-    staticData: { preload: page.preload, early },
+    staticData: { preload: page.preload },
     // `context` is untyped here: the admin routes are built over any parent route.
     loader: async ({ context, deps }: { context: unknown; deps?: unknown }): Promise<void> => {
       const { queryClient } = context as RouterContext;

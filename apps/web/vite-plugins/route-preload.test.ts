@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { preloadScript, preloadTable, ROUTE_PAGES, type ChunkInfo } from './route-preload';
+import {
+  hasPages,
+  preloadScript,
+  preloadTable,
+  ROUTE_PAGES,
+  type ChunkInfo,
+} from './route-preload';
 
 const chunk = (fileName: string, over: Partial<ChunkInfo> = {}): ChunkInfo => ({
   type: 'chunk',
@@ -29,6 +35,12 @@ const bundle = {
     facadeModuleId: '/repo/apps/web/src/widgets/edge-signals/index.ts',
   }),
 };
+
+/** Runs the generated inline script as the browser would. */
+function runScript(script: string): () => void {
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval -- the script under test
+  return new Function(script) as () => void;
+}
 
 describe('preloadTable', () => {
   it("lists a page's closure and stylesheets, minus the files the entry already loads", () => {
@@ -62,18 +74,25 @@ describe('preloadTable', () => {
   });
 });
 
+describe('hasPages', () => {
+  it("is true for the app's bundle and false for one with no listed page (Storybook)", () => {
+    expect(hasPages(bundle, { '/ideas': ['src/pages/trader-ideas/index.ts'] })).toBe(true);
+    expect(hasPages({ 'assets/index.js': bundle['assets/index.js'] })).toBe(false);
+  });
+});
+
 describe('preloadScript', () => {
   it('is one line of valid JavaScript carrying the table and the base', () => {
     const script = preloadScript({ '/ideas': ['assets/a.js'] }, '/');
     expect(script).not.toContain('\n');
     expect(script).toContain('"/ideas":["assets/a.js"]');
-    expect(() => new Function(script)).not.toThrow();
+    expect(() => runScript(script)).not.toThrow();
   });
 
   it('adds modulepreload links for scripts and preload-as-style links for stylesheets', () => {
     window.history.replaceState({}, '', '/ideas');
     document.head.innerHTML = '';
-    new Function(
+    runScript(
       preloadScript({ '/ideas': ['assets/a.js', 'assets/a.css', 'assets/f.woff2'] }, '/'),
     )();
     const links = Array.from(document.head.querySelectorAll('link')).map((l) => [
@@ -91,7 +110,7 @@ describe('preloadScript', () => {
   it('preloads nothing for a path it does not know', () => {
     window.history.replaceState({}, '', '/guide');
     document.head.innerHTML = '';
-    new Function(preloadScript({ '/ideas': ['assets/a.js'] }, '/'))();
+    runScript(preloadScript({ '/ideas': ['assets/a.js'] }, '/'))();
     expect(document.head.querySelectorAll('link')).toHaveLength(0);
   });
 });

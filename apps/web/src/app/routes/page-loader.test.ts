@@ -49,12 +49,6 @@ describe('pageRoute', () => {
     await options.loader({ context: { queryClient: new QueryClient() } });
     expect(prefetch).toHaveBeenCalledWith({ x: 1 }, expect.any(QueryClient), undefined);
     expect(options.staticData.preload).toBe(page.preload);
-    expect(options.staticData.early).toBe(false);
-  });
-
-  it('marks a page early only when asked', () => {
-    const page = { load: () => Promise.resolve({}), preload: () => Promise.resolve() };
-    expect(pageRoute(page, undefined, true).staticData.early).toBe(true);
   });
 
   it('waits for the saved page cache at most RESTORE_WAIT_MS', () => {

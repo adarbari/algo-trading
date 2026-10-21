@@ -37,11 +37,6 @@ function prefetchLayoutReads(queryClient: QueryClient, viewer: Viewer): void {
   prefetchStatusStrip(queryClient, canEnter(viewer, 'admin'));
 }
 
-/** The read of them that does not depend on the viewer, before the viewer is known (start-up). */
-export function prefetchLayoutReadsEarly(queryClient: QueryClient): void {
-  prefetchRegime(queryClient);
-}
-
 /** Redirect to `/login` (with the reason when there is one) or to a workspace home. */
 function go(to: string, reason?: LoginReason): never {
   // eslint-disable-next-line @typescript-eslint/only-throw-error -- the router's redirect protocol

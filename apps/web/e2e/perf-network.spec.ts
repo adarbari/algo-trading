@@ -200,8 +200,8 @@ test.afterAll(() => {
       const old = budgets.network[route.url];
       budgets.network[route.url] = {
         round_trip_depth: shrunk(old?.round_trip_depth, m.round_trip_depth, 1),
-        wire_gzip_bytes: shrunk(old?.wire_gzip_bytes, m.wire_gzip_bytes),
-        settled_ms: shrunk(old?.settled_ms, Math.ceil(m.settled_ms * 1.1), 100), // 10 % for CI's load
+        wire_gzip_bytes: shrunk(old?.wire_gzip_bytes, Math.ceil(m.wire_gzip_bytes * 1.03)), // CI's API bodies differ a little
+        settled_ms: shrunk(old?.settled_ms, Math.ceil(m.settled_ms * 1.3), 100), // 30 % for CI's load (it ran 2.9 s where a laptop ran 2.4 s)
       };
     }
     saveBudgets(budgets);

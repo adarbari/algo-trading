@@ -178,12 +178,12 @@ describe('startQueryPersistence', () => {
     const key = queryKeys.gql('IdeasPage', {});
     let finish: (rows: unknown) => void = () => undefined;
     const queryFn = vi.fn(() => new Promise((resolve) => (finish = resolve)));
-    const early = client.fetchQuery({ queryKey: key, queryFn });
+    const early = client.query({ queryKey: key, queryFn });
     answer('s2');
     await vi.advanceTimersByTimeAsync(0);
     // the other session's rows are gone, the read is still the one in flight, not reset to idle
     expect(client.getQueryData(key)).toBeUndefined();
-    const loader = client.fetchQuery({ queryKey: key, queryFn });
+    const loader = client.query({ queryKey: key, queryFn });
     finish({ rows: ['new'] });
     await Promise.all([early, loader]);
     expect(queryFn).toHaveBeenCalledTimes(1);
