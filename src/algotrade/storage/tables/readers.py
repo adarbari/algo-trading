@@ -65,9 +65,31 @@ class StoreReader:
         tables = self._backend.tables
         return tables.read_range(table, start, end, as_of, instruments, self.own_run, columns)
 
-    def read_run(self, table: str, session_date: date, run_id: str) -> pd.DataFrame | None:
+    def read_run(
+        self,
+        table: str,
+        session_date: date,
+        run_id: str,
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
         """One committed run's own rows of a partition (``TableStore.read_run``)."""
-        return self._backend.tables.read_run(table, session_date, run_id, self.own_run)
+        tables = self._backend.tables
+        return tables.read_run(table, session_date, run_id, self.own_run, columns, instruments)
+
+    def read_latest_runs(
+        self,
+        table: str,
+        session_date: date,
+        group: Sequence[str] = ("user_id", "config_id"),
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
+        """Each group's newest run of a partition (``TableStore.read_latest_runs``)."""
+        tables = self._backend.tables
+        return tables.read_latest_runs(
+            table, session_date, group, columns, instruments, self.own_run
+        )
 
     def visible_seq(self) -> int:
         """The latest committed publish sequence: changes exactly when a commit publishes."""
@@ -231,9 +253,30 @@ class RecordingReader(StoreReader):
             self._log_rows(table, start, end)
         return frame
 
-    def read_run(self, table: str, session_date: date, run_id: str) -> pd.DataFrame | None:
+    def read_run(
+        self,
+        table: str,
+        session_date: date,
+        run_id: str,
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
         recording = self._open()
-        frame = super().read_run(table, session_date, run_id)
+        frame = super().read_run(table, session_date, run_id, columns, instruments)
+        if recording:
+            self._log_rows(table, session_date, session_date)
+        return frame
+
+    def read_latest_runs(
+        self,
+        table: str,
+        session_date: date,
+        group: Sequence[str] = ("user_id", "config_id"),
+        columns: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
+        recording = self._open()
+        frame = super().read_latest_runs(table, session_date, group, columns, instruments)
         if recording:
             self._log_rows(table, session_date, session_date)
         return frame
