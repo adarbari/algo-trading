@@ -260,6 +260,17 @@ def test_evaluate_edges_screen_cache_is_off_for_one_edge_by_flag_and_on_a_full_d
     assert _screen_scratch(parse(["evaluate-edges"]), None, two) is None  # under 5 GB free
 
 
+def test_evaluate_edges_jobs_is_a_positive_number_over_a_file_store(cli: Cli) -> None:
+    parse = build_parser().parse_args
+    assert (
+        parse(["evaluate-edges"]).jobs == 1 and parse(["evaluate-edges", "--jobs", "4"]).jobs == 4
+    )
+    zero = cli("evaluate-edges", "--jobs", "0")
+    assert zero.returncode == 2 and "--jobs" in zero.stderr
+    memory = cli("--data-url", "memory://", "evaluate-edges", "--jobs", "2")
+    assert memory.returncode == 2 and "file:// store" in memory.stderr
+
+
 def test_study_winners_needs_the_stored_history_and_draft_edges_a_known_run(cli: Cli) -> None:
     study = cli("study-winners")  # the golden store has no outcomes or listing history
     assert study.returncode == 2 and "error:" in study.stderr

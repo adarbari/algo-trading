@@ -5,6 +5,7 @@ import json
 import shutil
 import sys
 import tempfile
+from contextlib import ExitStack
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -43,7 +44,12 @@ from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
 from algotrade.services.evaluation.training.render import merge_scorers
 from algotrade.services.features import check_user_features
 from algotrade.services.jobs import JobStatus, run_job
-from algotrade.services.jobs.exclusive import EdgeEvalBusyError, run_edge_eval_claimed
+from algotrade.services.jobs.edge_pool import EdgeTask, PoolSettings, run_edge_evals
+from algotrade.services.jobs.exclusive import (
+    EdgeEvalBusyError,
+    claim_edge_eval,
+    run_edge_eval_claimed,
+)
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -246,6 +252,7 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
     on a difference); ``--update-baseline`` (from ``make baseline``) rewrites that section."""
     if args.update_baseline and not args.baseline:
         raise ConfigurationError("--update-baseline needs --baseline FILE")
+    jobs = _check_jobs(args)
     backend = open_backend(data_url(args.data_url))
     reader = StoreReader(backend)
     if args.user:
@@ -275,9 +282,20 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
     if scratch is not None:
         resources["screens"] = ScreenCache(scratch, shared_screens(screen_uses(configs, edges)))
     try:
-        reports, failed, metrics = _evaluate_edges_each(
-            backend, resources, edges, args, start.isoformat(), end.isoformat(), as_of
-        )
+        if jobs > 1 and len(edges) > 1:
+            shared = shared_screens(screen_uses(configs, edges))
+            reports, failed, metrics = _evaluate_edges_pooled(
+                backend,
+                edges,
+                args,
+                (start.isoformat(), end.isoformat(), as_of),
+                scratch,
+                tuple(sorted(shared)),
+            )
+        else:
+            reports, failed, metrics = _evaluate_edges_each(
+                backend, resources, edges, args, start.isoformat(), end.isoformat(), as_of
+            )
     finally:
         if scratch is not None:
             shutil.rmtree(scratch, ignore_errors=True)
@@ -288,6 +306,26 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
     if failed:
         return 2
     return _edge_baseline(args, {e.id for e in edges}, metrics) if args.baseline else 0
+
+
+def _check_jobs(args: argparse.Namespace) -> int:
+    """``--jobs``: at least 1, and above 1 a ``file://`` store (workers open it themselves)."""
+    jobs: int = getattr(args, "jobs", 1)
+    if jobs < 1 or (jobs > 1 and not data_url(args.data_url).startswith("file://")):
+        raise ConfigurationError("--jobs needs a number >= 1 and, above 1, a file:// store")
+    return jobs
+
+
+def _edge_params(
+    edge: Any, args: argparse.Namespace, start: str, end: str, as_of: datetime
+) -> dict[str, Any]:
+    return {
+        "edge": edge.id, "start": start, "end": end,
+        "as_of": as_of.isoformat(), "iv_field": args.iv_field,
+        "extra_baselines": list(args.extra_baseline), "trigger": "cli",
+        "split_from": args.split_from.isoformat() if args.split_from else None,
+        "mode": "full" if args.full else "incremental",
+    }  # fmt: skip
 
 
 def _evaluate_edges_each(
@@ -303,13 +341,7 @@ def _evaluate_edges_each(
     reports: list[str] = []
     failed, metrics = False, {}
     for edge in edges:
-        params = {
-            "edge": edge.id, "start": start, "end": end,
-            "as_of": as_of.isoformat(), "iv_field": args.iv_field,
-            "extra_baselines": list(args.extra_baseline), "trigger": "cli",
-            "split_from": args.split_from.isoformat() if args.split_from else None,
-            "mode": "full" if args.full else "incremental",
-        }  # fmt: skip
+        params = _edge_params(edge, args, start, end, as_of)
         owner = UserContext(edge.owner)
         try:
             job = run_edge_eval_claimed(backend, resources, params, owner)
@@ -323,6 +355,38 @@ def _evaluate_edges_each(
             continue
         reports.append(render_edge_report(job.result))
         metrics.update(edge_metrics(job.result))
+    return reports, failed, metrics
+
+
+def _evaluate_edges_pooled(
+    backend: Any,
+    edges: list[Any],
+    args: argparse.Namespace,
+    window: tuple[str, str, datetime],
+    scratch: Path | None,
+    shared: tuple[tuple[str, str], ...],
+) -> tuple[list[str], bool, dict[str, dict[str, float]]]:
+    """The edges on ``--jobs`` worker processes under the owners' claims, held here for the whole
+    run (``services/jobs/edge_pool.py``); the reports and measures as the serial path gives them."""
+    start, end, as_of = window
+    settings = PoolSettings(
+        data_url(args.data_url), str(config_dir(args.config_dir)),
+        None if scratch is None else str(scratch), shared,
+    )  # fmt: skip
+    tasks = [EdgeTask(e.id, e.owner, _edge_params(e, args, start, end, as_of)) for e in edges]
+    with ExitStack() as claims:
+        for owner in sorted({e.owner for e in edges}):
+            claims.enter_context(claim_edge_eval(backend, owner))
+        outcomes = run_edge_evals(settings, tasks, args.jobs)
+    reports: list[str] = []
+    failed, metrics = False, {}
+    for done in outcomes:
+        if not done.ok:
+            print(f"error: {done.edge} ({done.owner}): {done.error}", file=sys.stderr)
+            failed = True
+            continue
+        reports.append(render_edge_report(done.result))
+        metrics.update(edge_metrics(done.result))
     return reports, failed, metrics
 
 
