@@ -2,7 +2,12 @@
 
 import pyarrow as pa
 
-from algotrade.storage.backends.arrow_memory import limit_threads, release_unused
+from algotrade.storage.backends.arrow_memory import (
+    limit_threads,
+    pool_backend,
+    release_unused,
+    use_system_pool,
+)
 
 
 def test_limit_threads_sets_both_pools() -> None:
@@ -16,3 +21,12 @@ def test_limit_threads_sets_both_pools() -> None:
 
 def test_release_unused_runs_on_an_idle_pool() -> None:
     release_unused()
+
+
+def test_use_system_pool_replaces_the_retaining_default() -> None:
+    before = pa.default_memory_pool()
+    try:
+        use_system_pool()
+        assert pool_backend() == "system"
+    finally:
+        pa.set_memory_pool(before)

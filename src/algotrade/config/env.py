@@ -105,6 +105,13 @@ def load_dotenv(path: Path = Path(".env")) -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
+def arrow_system_pool() -> None:
+    """Keep Arrow's default memory pool off mimalloc, which holds every read's peak resident
+    (``docs/perf/api-memory.md``): ``ARROW_DEFAULT_MEMORY_POOL=system`` unless set. Arrow reads it
+    when ``pyarrow`` is first imported, so a process calls this before anything imports it."""
+    os.environ.setdefault("ARROW_DEFAULT_MEMORY_POOL", "system")
+
+
 def port_base(default: int) -> int:
     """``$ALGOTRADE_PORT_BASE`` (a worktree's ports, ``scripts/worktree.sh``), else ``default``."""
     raw = credential(PORT_BASE) or ""

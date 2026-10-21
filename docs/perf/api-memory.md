@@ -113,6 +113,24 @@ ingestion-only changes (`src/algotrade/workflows`, `libs/sources/.../vendors`, `
 `config/site/edges`...) restart it and re-balloon it. Narrow it to the API's import closure
 (computed by a test, deny by default like `_INGEST_FREE`): a follow-up PR.
 
+## Result after P1, P1b, P1c (PR #758), measured 2026-10-20
+
+Full home warm + market frames on the real store, system allocator, footprint after each step:
+start 0.31 GB; screen rows 0.87 (1.7 s); completeness 0.30; regime 0.50; ideas 1.73; screener hits
+2.09 (was over 5.7 GB, guard-stopped); ingestion grid 1.88; market frames 1.95 GB. Two more
+fan-outs surfaced after P1: `_run_fields` / `_stored_key` decoded the whole values partition once
+per run (P1b: read the run's own file), and `_read_values` filtered every run's file by the union
+of all runs' picked instruments (P1c: each run's own file, its own instruments). `rule_screen_values`
+is 146.7 M rows in 940 files (about 15 M in the newest runs).
+
+What the ResultCache holds after that warm (real bytes): `screener-hits` index 331 MB (weighed
+1.1 MB: `weigh` cannot see it), screen-values 98 MB (before P1c), market `series-frame` x7 14.5 MB,
+`stored-dates` 8.2 MB, descriptions 3.4 MB, completeness 0.3 MB; total about 125-360 MB. The
+cache is 9-20% of the footprint; the rest is interpreter (0.3 GB), per-request `run_rows` copies
+(0.4-0.5 GB of Arrow) and loader temporaries (the `ideas` step adds 1.2 GB of footprint while the
+cache grows by 94 MB). Next (P2): byte-true cache weights, `run_rows` split once per frame, and a
+`tracemalloc` of `ideas`.
+
 ## Architect review (2026-10-20) folded in
 
 - **P1 is sound but needs guards**: a restating run (`migrate_ids`, `IngestRun.rewrite`)
@@ -159,8 +177,9 @@ Required changes before it lands:
 
 1. **Footprint budget in `make doctor`**: reads the footprint of the process on :8000
    (`footprint -p`, read-only) and warns above 2 GB, with the number.
-2. **Warm ceiling**: the warmer stops between steps when the process footprint passes a ceiling
-   (`[serving] warm_ceiling_mb`, default 3000) and logs which step; a test with a fake probe.
+2. **Per-step footprint log, no ceiling** (owner decision 2026-10-20: a ceiling would degrade the
+   first page): the warm logs `warmed <step> in N s, footprint N MB`, so the spend is always
+   visible (PR #757).
 3. **Per-read budget test** (with P1): a store with 10 runs x 20 configs in one session; the
    screen-rows read's peak Arrow allocation (`pa.default_memory_pool().max_memory()`) stays within
    2x the newest-run bytes. This is the test that would have caught the fan-out.
