@@ -135,3 +135,27 @@ cold, <= 200 ms warm for ~10k instruments x <= 25 fields.
 - The API is no longer strictly read-only: the write surface is one package, user-scoped,
   and validated fail-closed; it gains auth checks when identity arrives (phase 4).
 - The preview cache is per process (one API process assumed).
+
+## Amendment 2026-10-20: a screen's results are read by their newest run per config
+
+`results/rule_screen` and `results/rule_screen_values` hold one file per run, and a session's
+partition accumulates every rerun and backfill of every config (940 files, 12.6 million rows on
+2026-10-19). Every reader already takes only a config's rows of its **newest run** (`last_run_rows`,
+the rule in the `RULE_SCREEN` comment: "a later run never removes rows an earlier one wrote"), so
+the merge decoded the other nine tenths for nothing (`docs/perf/api-memory.md`: 8 GB peak per read).
+
+- `TableSpec.whole_per_group` marks a table whose run file holds its (user, config) group's whole
+  result: set on both tables. `TableStore.read_latest_runs(table, day, group, columns,
+  instruments, own_run, upto)` reads, inside one pinned sequence, only each group's newest run
+  (latest by `knowledge_ts`, then run id, among the runs `select_runs` chooses, a pending `own_run`
+  included; no `as_of`), the group being named by the files' footer statistics. A restating run
+  among them, or a file whose statistics do not name exactly one group, reads the whole merge and
+  keeps each group's newest run, so the answer never depends on the statistics. The newest run is
+  chosen before `instruments` filters it. `ValueError` for any other table.
+- The screen read model (`services/read/screens`) reads both tables through it (`partition(...,
+  newest_runs=True)`); the readers of one run's values (`_run_fields`, `_stored_key`) read only that
+  run's own file (`read_run(..., columns, instruments)`, `run_rows_of`), and `_read_values` reads each
+  run's own file for the instruments that run is asked for, never the union of every run's picks. Nothing else changes: the same rows
+  reach every page.
+- Such a table is never listed in `[compaction]` (ADR 0078 keeps only changed rows, so its newest
+  file would be a delta): a fitness test (`tests/unit/config/site/test_nightly.py`) refuses it.

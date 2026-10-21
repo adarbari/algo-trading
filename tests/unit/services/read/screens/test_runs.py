@@ -156,13 +156,13 @@ def test_pick_ids_read_the_run_rows_only_in_rank_order(
     run = latest_run(ctx, "site", "alpha").run
     assert run is not None
     read: list[str] = []
-    real = results.partition
+    real = results.run_rows_of
 
-    def counting(c: ReadContext, table: str, *args: Any) -> Any:
+    def counting(c: ReadContext, table: str, *args: Any, **kwargs: Any) -> Any:
         read.append(table)
-        return real(c, table, *args)
+        return real(c, table, *args, **kwargs)
 
-    monkeypatch.setattr(results, "partition", counting)
+    monkeypatch.setattr(results, "run_rows_of", counting)
     found = runs.load_pick_ids(ctx, run, 100)
     assert read == []  # no results/rule_screen_values read
     rows = runs.run_rows(ctx, run)

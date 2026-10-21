@@ -2,8 +2,12 @@
 
 import argparse
 import json
+import shutil
 import sys
+import tempfile
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 from algotrade.analytics.report import markdown_table
 from algotrade.config.edges.document import CLOSED
@@ -28,7 +32,8 @@ from algotrade.services.evaluation.baseline import (
     save_baseline,
     save_edge_baseline,
 )
-from algotrade.services.evaluation.cross_section.harness import stored_outcome_sessions
+from algotrade.services.evaluation.cross_section.harness import screen_uses, stored_outcome_sessions
+from algotrade.services.evaluation.cross_section.reads.screens import ScreenCache, shared_screens
 from algotrade.services.evaluation.cross_section.reporting.report import render_edge_report
 from algotrade.services.evaluation.discovery.drafts import DEFAULT_DIR, write_draft
 from algotrade.services.evaluation.overlay import compare_overlay, overlay_report
@@ -261,11 +266,45 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
         raise ConfigurationError("no outcomes stored: run `algotrade-ingest run outcomes`")
     start, end = args.start or stored[0], args.end or stored[-1]
     as_of = args.as_of or datetime.now(UTC)
-    resources = {"reader": reader, "writer": ResultWriter(backend), "configs": configs}
-    reports, failed, metrics = [], False, {}
+    resources: dict[str, Any] = {
+        "reader": reader,
+        "writer": ResultWriter(backend),
+        "configs": configs,
+    }
+    scratch = _screen_scratch(args, configs, edges)
+    if scratch is not None:
+        resources["screens"] = ScreenCache(scratch, shared_screens(screen_uses(configs, edges)))
+    try:
+        reports, failed, metrics = _evaluate_edges_each(
+            backend, resources, edges, args, start.isoformat(), end.isoformat(), as_of
+        )
+    finally:
+        if scratch is not None:
+            shutil.rmtree(scratch, ignore_errors=True)
+    text = "\n".join(reports)
+    print(text, end="")
+    if args.report:
+        args.report.write_text(text)
+    if failed:
+        return 2
+    return _edge_baseline(args, {e.id for e in edges}, metrics) if args.baseline else 0
+
+
+def _evaluate_edges_each(
+    backend: Any,
+    resources: dict[str, Any],
+    edges: list[Any],
+    args: argparse.Namespace,
+    start: str,
+    end: str,
+    as_of: datetime,
+) -> tuple[list[str], bool, dict[str, dict[str, float]]]:
+    """Each edge as one claimed job, in order: the reports, whether any failed, their measures."""
+    reports: list[str] = []
+    failed, metrics = False, {}
     for edge in edges:
         params = {
-            "edge": edge.id, "start": start.isoformat(), "end": end.isoformat(),
+            "edge": edge.id, "start": start, "end": end,
             "as_of": as_of.isoformat(), "iv_field": args.iv_field,
             "extra_baselines": list(args.extra_baseline), "trigger": "cli",
             "split_from": args.split_from.isoformat() if args.split_from else None,
@@ -284,13 +323,23 @@ def cmd_evaluate_edges(args: argparse.Namespace) -> int:
             continue
         reports.append(render_edge_report(job.result))
         metrics.update(edge_metrics(job.result))
-    text = "\n".join(reports)
-    print(text, end="")
-    if args.report:
-        args.report.write_text(text)
-    if failed:
-        return 2
-    return _edge_baseline(args, {e.id for e in edges}, metrics) if args.baseline else 0
+    return reports, failed, metrics
+
+
+SCREEN_CACHE_MIN_FREE = (
+    5 * 1024**3
+)  # the screen cache is scratch: it never starts on a nearly full disk
+
+
+def _screen_scratch(args: argparse.Namespace, configs: Any, edges: list[Any]) -> Path | None:
+    """The scratch directory of a multi-edge run's screen cache (``reads/screens.py``), None for
+    one edge, ``--no-screen-cache`` or a disk with under 5 GB free; the caller deletes it."""
+    if len(edges) < 2 or getattr(args, "no_screen_cache", False):
+        return None
+    if shutil.disk_usage(tempfile.gettempdir()).free < SCREEN_CACHE_MIN_FREE:
+        print("note: under 5 GB free: no screen cache for this run", file=sys.stderr)
+        return None
+    return Path(tempfile.mkdtemp(prefix="algotrade-screens-"))
 
 
 def _edge_baseline(

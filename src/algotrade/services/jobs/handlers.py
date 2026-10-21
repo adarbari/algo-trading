@@ -177,6 +177,7 @@ def edge_eval_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, An
         split_from=date.fromisoformat(params["split_from"]) if params.get("split_from") else None,
         random_draws=int(params.get("random_draws") or DEFAULT_DRAWS),
         full=_edge_eval_mode(params) != "incremental",  # an audit recomputes every leg
+        screens=ctx.resources.get("screens"),  # the CLI's multi-edge run (ADR 0059 amendment)
     )
     # ``mode`` ``audit`` (the nightly's run on a week's first session, ADR 0063): the run above is
     # the full recompute; only the legs that differ from the stored ones are published, and the
