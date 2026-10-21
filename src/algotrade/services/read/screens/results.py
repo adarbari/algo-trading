@@ -31,6 +31,7 @@ from algotrade.services.licences import ALL_LICENCES, hidden_stored
 from algotrade.services.read.availability.cause import Unavailable, UnavailableKind
 from algotrade.services.read.availability.unavailable import unavailable_tables
 from algotrade.services.read.context import (
+    Held,
     ReadContext,
     at_session,
     catalogue_key,
@@ -140,6 +141,25 @@ class RunChanges:
     by_instrument: Mapping[str, Change] = field(repr=False)
 
 
+def load_instrument_changes(ctx: ReadContext, run: ScreenerRun, ids: Sequence[str]) -> RunChanges:
+    """``run`` against the screener's run in the previous stored session for ``ids`` only (the
+    same ``Change`` as ``load_run_changes``; no counts): what one instrument's hits need, without
+    comparing every row of the run. Reads the two runs' cached light rows."""
+    previous = load_previous_run(ctx, run)
+    wanted = set(ids)
+    now = run_rows(ctx, run)
+    now = now[now["instrument_id"].isin(wanted)]
+    if previous is None:
+        return RunChanges(None, (), {})
+    before_rows = run_rows(at_session(ctx, previous.session), previous)
+    before_rows = before_rows[before_rows["instrument_id"].isin(wanted)]
+    before = {
+        str(i): str(d)
+        for i, d in zip(before_rows["instrument_id"], before_rows["decision"], strict=True)
+    }
+    return RunChanges(previous.session, (), _compare(now, before))
+
+
 @dataclass(frozen=True)
 class ResultQuery:
     """Which rows of a run a review table shows: ``decisions`` (none: all; any case),
@@ -196,6 +216,7 @@ def _values(
     runs: Sequence[ScreenerRun],
     ids: Sequence[str] | None,
     wanted: Mapping[str, Sequence[str]] | None = None,
+    keep: bool = True,
 ) -> dict[ResultKey, list[Mapping[str, Any]]]:
     """The stored value rows of ``ids`` (None: every instrument) in each run, by (run id,
     instrument id). ``wanted`` (``{run id: instrument ids}``): a run's rows only for the
@@ -204,7 +225,10 @@ def _values(
     next publish: the answer is kept in ``ctx.cache`` under the runs and instruments asked for
     and the published state (read first, ADR 0022), so a page asked again (the Ideas page's
     read of the session's 4.9 million value rows took 0.75 s) reads nothing. The rows are only
-    read by callers."""
+    read by callers. ``keep=False``: read, not cached (a caller that keeps its own result, the
+    hits of one instrument, must not push the pages' entries out of the 32)."""
+    if not keep:
+        return _read_values(ctx, runs, ids, wanted)
     asked = tuple(
         (r.run_id, None if wanted is None else tuple(sorted(wanted.get(r.run_id) or ())))
         for r in runs
@@ -324,20 +348,24 @@ def _groups(values: Sequence[Mapping[str, Any]], hidden: frozenset[str]) -> tupl
 
 
 def _run_fields(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
-    """The catalogue fields ``run``'s stored criteria and columns read (cached per run); empty
-    when its values are not readable."""
-    key = ("screen_run_fields", run.run_id, ctx.session.date, ctx.reader.visible_seq())
+    """The catalogue fields ``run``'s stored criteria and columns read; empty when its values are
+    not readable. Read from the run's own values file once per publish and kept with every other
+    run's in one container (``Held``), not an entry per run in ``ctx.cache``."""
+    key = ("screen_run_fields", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+    held: Held[tuple[str, ...]] = ctx.cache.get_or_compute(key, Held)
 
-    def read() -> frozenset[str]:
+    def read() -> tuple[str, ...]:
         stored = run_rows_of(ctx, RULE_SCREEN_VALUES, run.run_id, VALUE_COLUMNS)
         if stored.empty:
-            return frozenset()
+            return ()
         mine = stored[(stored["user_id"] == run.owner) & (stored["config_id"] == run.config_id)]
         read = mine[~mine["mode"].map(is_group_row).astype(bool)]  # a group's field is its kind
-        return frozenset(str(f) for f in read["field"].dropna().unique())
+        return tuple(sorted(str(f) for f in read["field"].dropna().unique()))
 
-    found: frozenset[str] = ctx.cache.get_or_compute(key, read)
-    return found
+    fields, added = held.get_or_read(run.run_id, read)
+    if added:
+        ctx.cache.put(key, held)  # its weight changed
+    return frozenset(fields)
 
 
 UNREADABLE = "*"  # in ``run_withheld``: the run has rows but no stored values to tell its fields
@@ -434,14 +462,16 @@ def load_results(
     wanted: Mapping[str, Sequence[str]],
     runs: Sequence[ScreenerRun],
     changes: Mapping[str, RunChanges] | None = None,
+    keep: bool = True,
 ) -> dict[ResultKey, ScreenResult]:
     """The results of ``wanted`` (``{run id: instrument ids}``) among ``runs``, by (run id,
     instrument id); an instrument the run has no row for is left out. ``changes``: each run's
-    comparison with its previous run, by run id (absent: not compared)."""
+    comparison with its previous run, by run id (absent: not compared). ``keep=False``: the
+    stored values are read, not cached (``_values``)."""
     ids = sorted({i for found in wanted.values() for i in found})
     if not ids:
         return {}
-    values = _values(ctx, runs, ids, wanted)
+    values = _values(ctx, runs, ids, wanted, keep)
     # The licence gate on stored values: a run recorded under a licence the viewer does not
     # hold (the scheduled site run holds every one, or a user lost one since) never serves
     # those fields' values, score, tie-break or reasons (the stored rows are shared in the

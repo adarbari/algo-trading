@@ -104,6 +104,11 @@ def _values(writer: StoreWriter) -> None:
 
 @pytest.fixture
 def backend() -> MemoryBackend:
+    return screens_store()
+
+
+def screens_store() -> MemoryBackend:
+    """The small store of this folder's tests (also built by the warm-path test)."""
     store = MemoryBackend()
     w = StoreWriter(store)
     write_reference(w, D0, {s: f"EQ:{s}" for s in SYMBOLS})
