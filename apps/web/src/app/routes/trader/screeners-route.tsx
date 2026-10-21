@@ -60,9 +60,13 @@ function ScreenerResultsRoute() {
 const indexRoute = createRoute({
   getParentRoute: () => screenersRoute,
   path: '/',
-  ...pageRoute(ScreenersPage, (page, client) => {
-    page.prefetchScreenersReads(client);
-  }),
+  ...pageRoute(
+    ScreenersPage,
+    (page, client) => {
+      page.prefetchScreenersReads(client);
+    },
+    true,
+  ),
   component: ScreenersIndex,
 });
 const newRoute = createRoute({

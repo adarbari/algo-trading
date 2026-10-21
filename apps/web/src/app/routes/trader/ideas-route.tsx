@@ -17,10 +17,14 @@ const IdeasPage = lazyPage(() => import('@/pages/trader-ideas'), 'IdeasPage');
 
 /** The page's chunks load in the loader (so the page renders unsuspended) and its reads start
  * with them, not when the widgets mount; the hooks join the requests in flight. */
-const loading = pageRoute(IdeasPage, (page, client) => {
-  page.prefetchIdeasReads(client);
-  return page.preloadEdgeSignals();
-});
+const loading = pageRoute(
+  IdeasPage,
+  (page, client) => {
+    page.prefetchIdeasReads(client);
+    return page.preloadEdgeSignals();
+  },
+  true,
+);
 
 /** The search params after a patch: `undefined` removes a key. */
 function patched(previous: IdeasSearch, patch: IdeasSearchPatch): IdeasSearch {

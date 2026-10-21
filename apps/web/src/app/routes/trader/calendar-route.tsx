@@ -10,8 +10,12 @@ const CalendarPage = lazyPage(() => import('@/pages/trader-calendar'), 'Calendar
 export const calendarRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'calendar',
-  ...pageRoute(CalendarPage, (page, client) => {
-    page.prefetchCalendarReads(client);
-  }),
+  ...pageRoute(
+    CalendarPage,
+    (page, client) => {
+      page.prefetchCalendarReads(client);
+    },
+    true,
+  ),
   component: CalendarPage,
 });

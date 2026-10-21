@@ -6,11 +6,15 @@ import { TermHelpProvider } from '@/entities/availability';
 import { GuideHelp, GuideHelpProvider } from '@/features/guide-help';
 
 import { AppProviders, createQueryClient } from './providers';
-import { router } from './router';
+import { router, startEarlyReads } from './router';
 
 export function App() {
   // One query client for the providers and, through the router context, the route guards.
-  const [queryClient] = useState(createQueryClient);
+  const [queryClient] = useState(() => {
+    const client = createQueryClient();
+    startEarlyReads(client);
+    return client;
+  });
   return (
     <AppProviders queryClient={queryClient}>
       <GuideHelpProvider

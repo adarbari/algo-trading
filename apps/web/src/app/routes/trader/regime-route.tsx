@@ -10,8 +10,12 @@ const RegimePage = lazyPage(() => import('@/pages/trader-regime'), 'RegimePage')
 export const regimeRoute = createRoute({
   getParentRoute: () => traderRoute,
   path: 'regime',
-  ...pageRoute(RegimePage, (page, client) => {
-    page.prefetchRegimeReads(client);
-  }),
+  ...pageRoute(
+    RegimePage,
+    (page, client) => {
+      page.prefetchRegimeReads(client);
+    },
+    true,
+  ),
   component: RegimePage,
 });

@@ -1,2 +1,2 @@
 /** Routing: the router instance (only src/app imports the router library). */
-export { router } from './router';
+export { router, startEarlyReads } from './router';

@@ -104,5 +104,42 @@
       "max": 196190,
       "log": "2026-10-18 | Guide Edges web PR (#712) | Entry-static-imports waiver and trader-ideas budget"
     }
+  },
+  "network": {
+    "/ideas": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 357100,
+      "settled_ms": 2700
+    },
+    "/screeners": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 327400,
+      "settled_ms": 2600
+    },
+    "/edges": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 356800,
+      "settled_ms": 2600
+    },
+    "/regime": {
+      "round_trip_depth": 6,
+      "wire_gzip_bytes": 441600,
+      "settled_ms": 3100
+    },
+    "/calendar": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 323200,
+      "settled_ms": 2600
+    },
+    "/explore": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 373200,
+      "settled_ms": 2600
+    },
+    "/admin/ingestion": {
+      "round_trip_depth": 5,
+      "wire_gzip_bytes": 361700,
+      "settled_ms": 2600
+    }
   }
 }

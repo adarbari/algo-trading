@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 import { perModuleDocuments } from './vite-plugins/graphql-documents.ts';
+import { routePreload } from './vite-plugins/route-preload.ts';
 
 // Unit test files listed as `skipped` in quarantine.json do not run (docs/ci.md "Flaky specs").
 const quarantine = JSON.parse(
@@ -28,7 +29,7 @@ const port = (offset: number, fallback: number): number =>
   base === undefined ? fallback : Number(base) + offset;
 
 export default defineConfig({
-  plugins: [perModuleDocuments(), react()],
+  plugins: [perModuleDocuments(), react(), routePreload()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
