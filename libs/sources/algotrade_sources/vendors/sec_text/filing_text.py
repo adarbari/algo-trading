@@ -80,33 +80,50 @@ def parse_payload(payload: bytes) -> pd.DataFrame:
     return frame.astype({"char_count": "int64", "parser_version": "int64"}).reset_index(drop=True)
 
 
+def extract_payload(body: bytes, accession: str, form: str, items: tuple[str, ...]) -> bytes:
+    """The extraction document of one downloaded filing (module doc): pure, so a worker process
+    can run it; ``fetch`` is ``fetch_body`` then this."""
+    text = html_to_text(body)
+    rows = extract_text(text, form, items_for(form, items))
+    document = {
+        "accession": accession,
+        "form": form,
+        "parser_version": PARSER_VERSION,
+        "document_bytes": len(body),
+        "items": rows,
+    }
+    return json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
 class SecFilingText:
     """Implements ``sources.base.Source``. Request: a ``FilingTextRequest`` (``key`` = the
     accession, ``cik``, ``form``, ``primary_document``, the ``items`` kept)."""
 
     name = SOURCE
     dataset = DATASET
+    parse = staticmethod(extract_payload)  # the pure half of ``fetch``, runnable in a worker
 
     def __init__(self, http: Http) -> None:
         self._http = http  # paced by the shared ``sec`` limiter; sets the User-Agent itself
 
-    def fetch(self, request: FetchRequest) -> bytes | None:
+    def fetch_body(self, request: FetchRequest) -> bytes | None:
+        """The primary document as SEC serves it (``None``: a 404); an empty body or a block
+        page raises. The download half of ``fetch``, for a caller that parses elsewhere (a
+        process pool: ``extract_payload`` is pure and takes only plain values)."""
         wanted = filing_text_request(request)
         body = self._http.get(document_url(wanted))
         if body is None:
             return None
         if not body.strip() or any(mark in body[:20_000] for mark in _BLOCKED):
             raise TransientFetchError(f"SEC document {wanted.key}: empty or a block page")
-        text = html_to_text(body)
-        rows = extract_text(text, wanted.form, items_for(wanted.form, wanted.items))
-        document = {
-            "accession": wanted.key,
-            "form": wanted.form,
-            "parser_version": PARSER_VERSION,
-            "document_bytes": len(body),
-            "items": rows,
-        }
-        return json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        return body
+
+    def fetch(self, request: FetchRequest) -> bytes | None:
+        wanted = filing_text_request(request)
+        body = self.fetch_body(wanted)
+        if body is None:
+            return None
+        return extract_payload(body, wanted.key, wanted.form, wanted.items)
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
         return Normalized(

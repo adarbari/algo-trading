@@ -37,6 +37,7 @@ class Task:
     run: Callable[[TaskContext, Params], RunRecord]
     sources: tuple[str, ...] = ()  # required, by name in ``TaskContext.sources``
     optional_sources: tuple[str, ...] = ()
+    stepped: tuple[str, ...] = ()  # of ``sources``: the ones that take the stepped SEC limiter
     settings: str | None = None  # the config/site section it reads
     params: tuple[Param, ...] = ()
     # Workflows (nightly) skip the task when this returns a reason; explicit runs ignore it.

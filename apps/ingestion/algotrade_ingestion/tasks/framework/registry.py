@@ -453,6 +453,7 @@ TASKS: dict[str, Task] = {
             (filing_text.TABLE,),
             entries_market.run_filing_text,
             sources=("sec_filings", "sec_filing_text", "sec_daily_index"),
+            stepped=("sec_filings", "sec_filing_text", "sec_daily_index"),
             settings="sources.toml [sec_edgar]",
             params=(
                 SESSION,
@@ -469,6 +470,20 @@ TASKS: dict[str, Task] = {
                     "limit", ("--limit",), int, "backfill: at most N CIKs this run (default 100)"
                 ),
                 Param("items", ("--items",), str, "item ids kept, comma list (1A,7 / I-2,II-1A)"),
+                Param(
+                    "threads",
+                    ("--threads",),
+                    int,
+                    "documents downloaded at once (default 10; 0: one at a time)",
+                ),
+                Param("procs", ("--procs",), int, "parse worker processes (default 4)"),
+                Param(
+                    "live_only",
+                    ("--live-only",),
+                    None,
+                    "backfill only the filers that are operating companies of the session's "
+                    "universe (the recorded filer list stays every filer)",
+                ),
                 Param("force", ("--force",), None, "fetch filings and CIKs already read again"),
                 Param(
                     "allow_gap",

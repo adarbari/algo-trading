@@ -197,3 +197,31 @@ backfilled events behind the storage stamp.
    Then rerun the rollups `short_interest@v1` (one process from 2018-01-02) and the screens and edge
    evaluation of the sessions since. No feature version is bumped: no consumer read the empty
    history.
+
+## Amendment 2026-10-21: the filing-text backfill reads ahead, and may be limited to live companies
+
+Measured on a scratch store (30 large filers, 654 filings): the loop read one CIK and one
+document at a time, 1.1 s a document (0.9 documents a second), 6x under the 5 requests a second
+floor; the HTML parse was a third of it and the pacing wait 2.5%. Window `2021-01-01` (no `--to`)
+walked the 1,513-day form index again in every run (1,180 s each), because a list is cached only
+for a window that ended before the run's session.
+
+1. **Read-ahead, no change to what is stored.** `filing-text` lists and downloads documents in
+   threads (`--threads`, default 10) and parses them in worker processes (`--procs`, default 4;
+   `spawn`), a few CIKs ahead of the unchanged loop (`tasks/events/filing_text_fetch.py`). The loop,
+   `text_rows` and its `known_from` rule (this ADR, amendment 2026-10-18), the staging and the
+   failure items are untouched; the same 30 filers stored byte-identical rows. The rate is still the
+   shared `sec` limiter's. A request that fails like a block (a 403 block page, an outage) stops
+   every request not yet started, holds the limiter for 10 minutes and ends the run PARTIAL through
+   `STOP_AFTER_FAILED`; the pipeline is closed before the run releases the ingest lock.
+2. **The index walk is concurrent** (6 threads, same limiter); a failed day cancels the rest.
+3. **`--live-only`** (backfill): ask only the filers that are operating companies of the session's
+   universe (`instruments/company` CIKs); the recorded filer list stays every filer, so a later run
+   without the flag reads the rest (`read_done` skips the CIKs already read). This amends D10b for
+   the owner's 2026-10-21 backfill: delisted filers' text is read later or never; neither edge
+   (`lazy_prices_10k_change`, `risk_factor_change`) reads a company with no instrument. A missing
+   delisted text must never be read as "no recent filing" by a future survivorship study: its
+   consumer checks the table's coverage first.
+4. **Pacing** (the stepped SEC limiter, `docs/configuration.md` "Vendor pacing"): 8 requests a
+   second at most for this task's three sources, one step down on an error, to a floor of 5, one
+   step up after 15 minutes without one; every other SEC source stays at 5.

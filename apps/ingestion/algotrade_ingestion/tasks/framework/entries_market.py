@@ -130,6 +130,14 @@ def run_ipo_lockups(ctx: TaskContext, p: Params) -> RunRecord:
     )
 
 
+FETCH_THREADS = 10  # filing-text: documents downloaded at once (the SEC limiter sets the rate)
+PARSE_PROCS = 4  # filing-text: worker processes parsing the HTML (pure Python, CPU)
+
+
+def _default(value: int | None, fallback: int) -> int:
+    return fallback if value is None else int(value)
+
+
 def run_filing_text(ctx: TaskContext, p: Params) -> RunRecord:
     return filing_text.ingest_filing_text(
         ctx,
@@ -144,6 +152,9 @@ def run_filing_text(ctx: TaskContext, p: Params) -> RunRecord:
         symbols(p, "items"),
         bool(p.get("force")),
         symbols(p, "allow_gap"),
+        _default(p.get("threads"), FETCH_THREADS),
+        _default(p.get("procs"), PARSE_PROCS),
+        bool(p.get("live_only")),
     )
 
 

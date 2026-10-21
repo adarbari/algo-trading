@@ -496,6 +496,22 @@ hold multiplies the interval). The adaptive state lives in the lock file; a key 
 minutes (`IDLE_RESET_S`) starts again from `start_interval_s`, so in practice **each run starts
 fresh** and concurrent processes share what the vendor told either of them.
 
+### Stepped SEC pace (filing-text run)
+
+A filing-text run opts its SEC sources (`sec_filing_text`, `sec_filings`, `sec_daily_index`) into a
+stepped governor, `build_sources(stepped=...)` (`StepLimiter`, same `sec` lock file; the nightly and
+every other SEC source stay at the floor, 5/s). Whole requests a second: start at `max_rps`; an
+error (429 included) steps down 1 req/s, not below `min_rps`; after `recover_s` with no error or
+step, one step up, again every `recover_s`, until `max_rps`. Its stats appear under
+`stats.pacing.sec_stepped` (`error_rate_slowdowns` = steps down, `speedups` = steps up).
+
+| Key | Where | Default | Meaning |
+|---|---|---|---|
+| `filing_text_max_rps` | `[sec_edgar]` | 8 | start and ceiling, integer, <= 10 (SEC's published cap) |
+| `filing_text_min_rps` | `[sec_edgar]` | 5 | floor of the step-down, 1 <= min <= max |
+| `filing_text_recover_s` | `[sec_edgar]` | 900 | quiet seconds before each step up, > 0 |
+| `filing_text_error_cooldown_s` | `[sec_edgar]` | 30 | errors within this of a step down count once, > 0 |
+
 ### Pacing stats
 
 Every ingest run records, under `stats.pacing.<limiter key>` (only keys that sent requests
