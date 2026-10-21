@@ -5,7 +5,8 @@ the regime page's charts slice a cached frame instead of reading 14 000 partitio
 request (20 s a table cold), and the status strip's one-session completeness grid and the
 session's regime that every page shows (3 to 5 s on the first page after a publish), the Ideas
 table and the edge desk (the home page), the Admin Ingestion page's 10-session grid, the
-session's stored screen rows that every screener page and the Builder's preview read (1.6 s on
+session's run summaries (the stored screen rows, counted once) that every screener page and the
+Builder's preview read (1.6 s on
 the first one after a publish), the Builder's first preview of every screen on the Screeners
 list (its field frame and the picks of its saved run), and the signal timing of every
 reference episode (the regime page's History).
@@ -43,7 +44,7 @@ from algotrade.services.read.regime.regime import load_regime
 from algotrade.services.read.regime.timeline import load_episode_signals
 from algotrade.services.read.screens.hits import load_screener_hits
 from algotrade.services.read.screens.ideas import load_ideas
-from algotrade.services.read.screens.runs import screen_rows
+from algotrade.services.read.screens.runs import run_summaries
 from algotrade.services.read.screens.screeners import load_screeners
 from algotrade_api.graphql.offload import off_loop
 from algotrade_api.ops.footprint import OwnFootprint
@@ -85,7 +86,10 @@ def home_steps(ctx: ReadContext) -> list[Step]:
         ("guide", lambda: warm_guide(ctx)),  # the Guide's index, Edges index and mechanisms
         # the resolved screeners (18 TOML configs): the regime strip, status strip and Ideas read it
         ("screeners", lambda: load_screeners(ctx)),
-        ("screen rows", lambda: screen_rows(ctx)),  # the screener pages' and the preview's runs
+        (
+            "run summaries",
+            lambda: run_summaries(ctx),
+        ),  # every screener page's and the preview's runs
         ("completeness", lambda: load_completeness(ctx, 1)),  # the status strip's grid
         ("regime", lambda: load_regime(ctx)),
         ("ideas", lambda: load_ideas(ctx, IDEAS_LIMIT)),  # the Ideas page, home of every login

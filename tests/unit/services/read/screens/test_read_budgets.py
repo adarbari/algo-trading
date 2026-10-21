@@ -6,6 +6,7 @@ come from that run's own file and for its own picks, never from the session's ev
 union of every run's picks filtered all of them), and a run that is not its config's newest reads
 its own rows."""
 
+import gc
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
@@ -17,7 +18,7 @@ import pyarrow as pa
 import pytest
 
 from algotrade.data import StoreReader
-from algotrade.services.read.context import ReadContext, partition, weigh
+from algotrade.services.read.context import MAX_CACHE_BYTES, ReadContext, partition, weigh
 from algotrade.services.read.screens import results
 from algotrade.services.read.screens.results import VALUE_COLUMNS, _read_values, run_withheld
 from algotrade.services.read.screens.runs import (
@@ -25,12 +26,12 @@ from algotrade.services.read.screens.runs import (
     ROW_COLUMNS,
     RULE_SCREEN,
     RunRows,
+    RunSummaries,
     ScreenerRun,
     load_latest_runs,
     run_rows,
-    screen_rows,
+    run_summaries,
 )
-from algotrade.services.read.values import Unknown
 from algotrade.storage.backends.arrow import to_arrow
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.tables.schemas import result_table
@@ -84,15 +85,28 @@ def proxy() -> Iterator[pa.ProxyMemoryPool]:
         pa.set_memory_pool(before)
 
 
-def test_the_screen_rows_read_stays_within_twice_the_newest_runs_bytes(
+def test_the_run_summaries_read_stays_within_twice_the_newest_runs_bytes(
     store: tuple[LocalBackend, int], proxy: pa.ProxyMemoryPool
 ) -> None:
     backend, newest = store
     ctx = context(StoreReader(backend))
-    found = screen_rows(ctx)
-    assert not isinstance(found, Unknown) and len(found) == CONFIGS * INSTRUMENTS
-    assert found["run_id"].str.endswith(f"r{RUNS - 1}").all()
+    found = run_summaries(ctx)
+    assert isinstance(found, RunSummaries) and len(found.by_key) == CONFIGS
+    assert all(s.run_id.endswith(f"r{RUNS - 1}") for s in found.by_key.values())
     assert proxy.max_memory() <= 2 * newest
+
+
+def test_the_summaries_keep_no_frame_after_they_are_built(
+    store: tuple[LocalBackend, int], proxy: pa.ProxyMemoryPool
+) -> None:
+    backend, newest = store
+    ctx = context(StoreReader(backend))
+    run_summaries(ctx)
+    gc.collect()
+    assert proxy.bytes_allocated() < newest // 20  # no decoded rows are still referenced
+    key = ("run_summaries", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+    assert 0 < ctx.cache._weights[key] < 100_000  # about a hundred bytes a screener, not a frame
+    assert max(ctx.cache._weights.values()) <= MAX_CACHE_BYTES // 2
 
 
 def test_the_budget_would_catch_the_merge_of_every_run(

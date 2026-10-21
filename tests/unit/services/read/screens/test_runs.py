@@ -245,3 +245,59 @@ def test_a_run_that_is_not_the_newest_reads_its_own_rows(either: Backend) -> Non
     assert own is not None
     pd.testing.assert_frame_equal(_wanted(run_rows(ctx, old)), _wanted(own))
     assert len(run_rows(ctx, old)) == 4 and len(run_rows(ctx, run)) == 2
+
+
+def _before_summaries(reader: StoreReader, owner: str, config: str) -> tuple[Any, ...] | None:
+    """What the run's frame-derived fields were when every config's rows were held whole: the
+    merged partition cut to the config, by the latest-run rule."""
+    merged = reader.table("results/rule_screen", D1)
+    assert merged is not None
+    rows = merged[(merged["user_id"] == owner) & (merged["config_id"] == config)]
+    if rows.empty:
+        return None
+    last, mine = last_run_rows(rows)
+    counts = mine["decision"].astype(str).value_counts()
+    ordered = sorted(counts.items(), key=lambda dn: (-int(dn[1]), str(dn[0])))
+    regime = mine["regime"].dropna() if "regime" in mine.columns else pd.Series(dtype=str)
+    return (
+        str(last["run_id"]),
+        pd.Timestamp(last["knowledge_ts"]).to_pydatetime(),
+        int(last["config_version"]),
+        tuple((str(d), int(n)) for d, n in ordered),
+        sum(int(n) for d, n in counts.items() if is_picked(str(d))),
+        int(counts.get(runs.PAUSED, 0)),
+        str(regime.iloc[0]) if not regime.empty else None,
+    )
+
+
+@pytest.mark.parametrize("view", ["committed", "own", "restated"])
+def test_the_run_summaries_are_what_the_whole_rows_gave(either: Backend, view: str) -> None:
+    if view == "restated":  # a run that rewrites the partition: the merge starts from it
+        frame = stamped(
+            [{"instrument_id": "EQ:AAA", "user_id": "site", "config_id": "alpha",
+              "config_version": 1, "config_hash": "h", "decision": "WATCH", "score": 1.0,
+              "rank": 1, "tie_break": None, "flags": "", "reasons": "", "failed": "",
+              "near_missed": "", "missing": "", "regime": "CALM"}],
+            D1, "rr", T + timedelta(hours=3),
+        )  # fmt: skip
+        either.tables.write("results/rule_screen", D1, "rr", frame, restates=True)
+    reader = StoreReader(either).including("r9") if view == "own" else StoreReader(either)
+    ctx = open_context(reader, MemoryConfigStore({}), UserContext("me"), D1)
+    keys = [("site", "alpha"), ("me", "beta"), ("site", "beta")]
+    found = load_latest_runs(ctx, keys)
+    for owner, config in keys:
+        want = _before_summaries(reader, owner, config)
+        run = found[(owner, config)].run
+        if want is None:
+            assert run is None
+            continue
+        assert run is not None
+        assert (
+            run.run_id,
+            run.knowledge_ts,
+            run.config_version,
+            tuple((d.decision, d.count) for d in run.decisions),
+            run.picked,
+            run.paused,
+            run.regime,
+        ) == want
