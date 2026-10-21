@@ -275,5 +275,5 @@ code PRs is refined (21 stands):
     `release_id` (which survives restarts) may remove most of the need, and the deploy planner
     stops restarting the API for changes it does not load. Each is then decided on the numbers.
 
-Owner decisions 2026-10-21: the order above is the implementer's design under the owner's
-standing instruction to proceed; the deferral in 24 is revisited with the load-test numbers.
+Owner decision 2026-10-21 (logged in `docs/decisions/log.md`): "try the pin first approach and
+measure the impact"; the deferral in 24 is revisited with the load-test numbers.
