@@ -12,7 +12,9 @@
 
 import ast
 import fnmatch
+import functools
 import importlib.util
+import os
 import re
 import subprocess
 import sys
@@ -77,12 +79,21 @@ TYPED_SETTINGS = (
 KNOWN_UNREAD: set[str] = set()
 
 
-def _paths_matching(pattern: str) -> list[Path]:
-    return [
-        p
-        for p in REPO_ROOT.joinpath(*Path(pattern).parts[:1]).rglob("*")
-        if p.is_file() and fnmatch.fnmatch(p.relative_to(REPO_ROOT).as_posix(), pattern)
-    ]
+@functools.cache
+def _files_under(top: str) -> list[str]:
+    """Every file under one top-level folder as a repo-relative path, walked once per run;
+    vendored trees (``node_modules``, ``.venv``) are pruned, no owner glob names them."""
+    found = []
+    for dirpath, dirnames, filenames in os.walk(REPO_ROOT / top):
+        dirnames[:] = [d for d in dirnames if d not in {"node_modules", ".venv"}]
+        found += [(Path(dirpath) / f).relative_to(REPO_ROOT).as_posix() for f in filenames]
+    return found
+
+
+def _paths_matching(pattern: str) -> list[str]:
+    if not any(c in pattern for c in "*?["):
+        return [pattern] if (REPO_ROOT / pattern).is_file() else []
+    return [p for p in _files_under(Path(pattern).parts[0]) if fnmatch.fnmatch(p, pattern)]
 
 
 def _slugs(markdown: str) -> set[str]:
