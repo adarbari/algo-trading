@@ -11,6 +11,8 @@ list (its field frame and the picks of its saved run), and the signal timing of 
 reference episode (the regime page's History).
 The read runs in the read pool (``off_loop``) like any request's, taking one of its threads;
 a failing step is logged and the others still run; the next publish tries again.
+Each step's log line carries the process footprint (``ops/footprint.py``), so a step that grows
+the API shows up in the log (one warm once took it to 36 GB, docs/perf/api-memory.md).
 
 The read model's loaders are not the pages' answers: a page's first request still runs its
 resolvers (a second or two for Ideas, the screener results, the catalogue). So after the home
@@ -44,12 +46,14 @@ from algotrade.services.read.screens.ideas import load_ideas
 from algotrade.services.read.screens.runs import screen_rows
 from algotrade.services.read.screens.screeners import load_screeners
 from algotrade_api.graphql.offload import off_loop
+from algotrade_api.ops.footprint import OwnFootprint
 
 WARM_EVERY_S = 60.0
 IDEAS_LIMIT = 200  # the Ideas page's request (entities/idea IDEAS_LIMIT)
 INGESTION_SESSIONS = 10  # the Admin Ingestion grid's window (entities/ingestion SESSIONS)
 
 log = logging.getLogger(__name__)
+_footprint = OwnFootprint()  # MB of this process, re-read at most every few seconds
 
 
 type Step = tuple[str, Callable[[], object]]
@@ -64,7 +68,12 @@ def _run(steps: list[Step]) -> None:
         except Exception:
             log.exception("warming the read cache: %s failed", name)
         else:
-            log.info("warmed %s in %.1f s", name, time.monotonic() - started)
+            mb = _footprint()
+            seconds = time.monotonic() - started
+            if mb is None:  # the probe warns once; the line stays without the figure
+                log.info("warmed %s in %.1f s", name, seconds)
+            else:
+                log.info("warmed %s in %.1f s, footprint %.0f MB", name, seconds, mb)
 
 
 def home_steps(ctx: ReadContext) -> list[Step]:
