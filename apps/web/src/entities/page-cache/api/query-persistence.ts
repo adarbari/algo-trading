@@ -11,7 +11,7 @@
  * exceeds the byte cap (least recently used queries go first) and storage failures only switch
  * saving off: the page cache is an optimisation and must never hurt the browser.
  */
-import { dehydrate, hashKey, hydrate, type QueryClient } from '@tanstack/react-query';
+import { dehydrate, hashKey, hydrate, type Query, type QueryClient } from '@tanstack/react-query';
 import { createStore, del, get, set } from 'idb-keyval';
 
 import { queryKeys } from '@/shared/api';
@@ -156,8 +156,17 @@ export function startQueryPersistence(
     void safe(() => store.del(CACHE_KEY));
     // Reset only the queries still holding the restored data (not refetched since): mounted
     // ones read again at once, so no page keeps showing another session's rows.
+    const restoredData = (query: Query) =>
+      stamps.get(query.queryHash) === query.state.dataUpdatedAt;
+    // A read already in flight (the router's early start) is not reset to idle: the loader would
+    // then fetch it a second time. Its restored rows are dropped and its own answer replaces them.
+    for (const query of client.getQueryCache().findAll({ predicate: restoredData })) {
+      if (query.state.fetchStatus === 'fetching') {
+        query.setState({ data: undefined, dataUpdatedAt: 0, status: 'pending' });
+      }
+    }
     void client.resetQueries({
-      predicate: (query) => stamps.get(query.queryHash) === query.state.dataUpdatedAt,
+      predicate: (query) => restoredData(query) && query.state.fetchStatus !== 'fetching',
     });
   };
 

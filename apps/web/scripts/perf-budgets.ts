@@ -23,6 +23,16 @@ export interface Waiver {
   log: string;
 }
 
+/** A route's first load on the distant-client link model (e2e/perf-network.spec.ts). */
+export interface NetworkBudget {
+  /** Serial round trips: the deepest chain of requests, each starting after the last finished. */
+  round_trip_depth: number;
+  /** Gzip bytes on the wire of everything the first load transfers (static files and API). */
+  wire_gzip_bytes: number;
+  /** Milliseconds from navigation to the page's heading and its last request done, rounded up. */
+  settled_ms: number;
+}
+
 export interface Budgets {
   bundle: {
     /** The entry chunk's own JS + CSS, gzip: what every first visit downloads before any route. */
@@ -36,6 +46,8 @@ export interface Budgets {
   };
   /** Per URL, as the Playwright budgets (e2e/perf.spec.ts) measure it on the phone project. */
   e2e: Record<string, RouteBudget>;
+  /** Per URL, as the distant-client link model measures it (e2e/perf-network.spec.ts). */
+  network?: Record<string, NetworkBudget>;
   /**
    * Why a budget was raised: budget path (`bundle.routes.<page>`, `e2e.<url>.requests`, ...) ->
    * "YYYY-MM-DD #PR what the owner asked for". Never read by the checks; kept by every update.
@@ -69,6 +81,11 @@ export function flatten(budgets: Budgets): Record<string, number> {
   for (const [url, b] of Object.entries(budgets.e2e)) {
     for (const key of ['first_load_js_gzip_bytes', 'requests', 'dom_nodes'] as const) {
       out[`e2e.${url}.${key}`] = b[key];
+    }
+  }
+  for (const [url, b] of Object.entries(budgets.network ?? {})) {
+    for (const key of ['round_trip_depth', 'wire_gzip_bytes', 'settled_ms'] as const) {
+      out[`network.${url}.${key}`] = b[key];
     }
   }
   return out;

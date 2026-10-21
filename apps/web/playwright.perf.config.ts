@@ -13,7 +13,7 @@ const previewPort =
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /perf\.spec\.ts/,
+  testMatch: /perf(-network)?\.spec\.ts/,
   workers: 1,
   forbidOnly: Boolean(process.env['CI']),
   retries: 0, // a count over budget is not a flake

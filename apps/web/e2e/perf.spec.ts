@@ -80,8 +80,17 @@ async function observeTimings(page: Page): Promise<void> {
 /** Gzip bytes of every script the page loads, whatever the preview server's own encoding. */
 function trackScripts(page: Page): { done: () => Promise<number>; requests: () => number } {
   const bodies: Promise<number>[] = [];
+  // Routing turns the browser's HTTP cache off, so a file the page preloads and then uses (the
+  // route-preload plugin) is asked for twice here and once in a real browser: a GET counts once.
+  const seen = new Set<string>();
   let requests = 0;
-  page.on('request', () => (requests += 1));
+  page.on('request', (request) => {
+    if (request.method() === 'GET') {
+      if (seen.has(request.url())) return;
+      seen.add(request.url());
+    }
+    requests += 1;
+  });
   page.on('response', (response: Response) => {
     if (response.request().resourceType() !== 'script') return;
     bodies.push(

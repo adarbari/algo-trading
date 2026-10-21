@@ -230,6 +230,7 @@ web-perf: $(WEB)/node_modules/.package-lock.json  ## web performance budgets: bu
 	cd $(WEB) && VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=e2e-anon-key npx vite build
 	cd $(WEB) && $(NPM) run perf:bundle
 	cd $(WEB) && $(NPM) run perf:e2e
+	cd $(WEB) && $(NPM) run perf:network
 
 web-real: $(WEB)/node_modules/.package-lock.json golden-store ## real-app smoke: Vite dev + the real API, empty and golden stores, every route
 	cd $(WEB) && ALGOTRADE_PY=$(abspath $(PY)) npx playwright test -c playwright.real.config.ts
