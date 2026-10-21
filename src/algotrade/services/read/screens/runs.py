@@ -29,6 +29,7 @@ from algotrade.services.read.context import (
     partition,
     previous_session,
     run_rows_of,
+    weigh,
 )
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.storage.tables.schemas import result_table
@@ -229,6 +230,7 @@ class RunRows:
 
     def __init__(self) -> None:
         self._frames: dict[str, pd.DataFrame] = {}
+        self._bytes = 0  # what the frames weigh (``weigh``): only grows
         self._lock = threading.Lock()
         self._flights: dict[str, threading.Lock] = {}
 
@@ -249,13 +251,13 @@ class RunRows:
             found = read()
             with self._lock:
                 self._frames[run_id] = found
+                self._bytes += weigh(found)
                 self._flights.pop(run_id, None)
             return found, True
 
     def weight_bytes(self) -> int:
         with self._lock:
-            frames = list(self._frames.values())
-        return int(sum(f.memory_usage(index=True, deep=True).sum() for f in frames))
+            return self._bytes
 
 
 def run_rows(ctx: ReadContext, run: ScreenerRun) -> pd.DataFrame:

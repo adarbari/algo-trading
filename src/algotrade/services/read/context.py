@@ -162,8 +162,10 @@ class ResultCache:
             return self._items[key]
 
     def put(self, key: Hashable, value: Any) -> None:
-        weight = value.weight_bytes() if isinstance(value, Weighted) else weigh(value)
         with self._lock:
+            # weighed under the lock: a container two threads add to is put by both, and the
+            # later put must not record the older (smaller) weight
+            weight = value.weight_bytes() if isinstance(value, Weighted) else weigh(value)
             self._held -= self._weights.pop(key, 0)
             self._items[key] = value
             self._items.move_to_end(key)

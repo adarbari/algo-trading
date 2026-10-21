@@ -17,7 +17,7 @@ import pyarrow as pa
 import pytest
 
 from algotrade.data import StoreReader
-from algotrade.services.read.context import ReadContext, partition
+from algotrade.services.read.context import ReadContext, partition, weigh
 from algotrade.services.read.screens import results
 from algotrade.services.read.screens.results import VALUE_COLUMNS, _read_values, run_withheld
 from algotrade.services.read.screens.runs import (
@@ -355,3 +355,26 @@ def test_the_budget_would_catch_cutting_the_runs_out_of_the_sessions_newest_rows
     held = _held_bytes(context(StoreReader(backend)), runs)
     used = _arrow_total(lambda: _split_the_sessions_newest_rows(context(StoreReader(backend))))
     assert used > ARROW_BUDGET * held
+
+
+def test_the_cache_holds_exactly_what_the_run_rows_container_weighs(
+    store: tuple[LocalBackend, int],
+) -> None:
+    ctx = context(StoreReader(store[0]))
+    runs = _runs(ctx)
+    run_rows(ctx, runs[0])
+    run_rows(ctx, runs[1])
+    key = ("run_rows", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+    held: RunRows = ctx.cache.get(key)
+    assert held.weight_bytes() > 0 and ctx.cache._weights[key] == held.weight_bytes()
+    assert held.weight_bytes() >= 2 * weigh(run_rows(ctx, runs[0])) * 0.9  # both runs counted
+
+
+def test_threads_adding_runs_together_leave_the_full_weight_in_the_cache(
+    store: tuple[LocalBackend, int],
+) -> None:
+    ctx = context(StoreReader(store[0]))
+    runs = _runs(ctx)
+    _all_run_rows_at_once(ctx, runs)
+    key = ("run_rows", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+    assert ctx.cache._weights[key] == ctx.cache.get(key).weight_bytes()
