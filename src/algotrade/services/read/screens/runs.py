@@ -13,8 +13,7 @@ compared with the screener's run in the previous stored session of ``results/rul
 (``load_previous_run``: that date is named explicitly through ``context.previous_session``,
 and the same latest-run rule applies there)."""
 
-import threading
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -27,6 +26,7 @@ from algotrade.services.read.context import (
     DICT_BASE_BYTES,
     DICT_ENTRY_BYTES,
     NUMBER_BYTES,
+    Held,
     ReadContext,
     at_session,
     partition,
@@ -280,42 +280,7 @@ def latest_run(ctx: ReadContext, owner: str, config_id: str) -> LatestRun:
     return load_latest_runs(ctx, [(owner, config_id)])[(owner, config_id)]
 
 
-class RunRows:
-    """One publish's run rows (``run_rows``): each run's own rows, read when first asked for, in
-    rank order. One container per (session, view, publish) in ``ctx.cache``, never one cache entry
-    per run (the cache holds 32); it weighs what its frames really take (``weight_bytes``) and is
-    put again whenever a run is added, so the cache's byte bound sees it grow."""
-
-    def __init__(self) -> None:
-        self._frames: dict[str, pd.DataFrame] = {}
-        self._bytes = 0  # what the frames weigh (``weigh``): only grows
-        self._lock = threading.Lock()
-        self._flights: dict[str, threading.Lock] = {}
-
-    def get_or_read(
-        self, run_id: str, read: Callable[[], pd.DataFrame]
-    ) -> tuple[pd.DataFrame, bool]:
-        """The run's rows, read once even when threads ask together; -> (rows, read just now)."""
-        with self._lock:
-            found = self._frames.get(run_id)
-            if found is not None:
-                return found, False
-            flight = self._flights.setdefault(run_id, threading.Lock())
-        with flight:
-            with self._lock:
-                found = self._frames.get(run_id)
-            if found is not None:
-                return found, False
-            found = read()
-            with self._lock:
-                self._frames[run_id] = found
-                self._bytes += weigh(found)
-                self._flights.pop(run_id, None)
-            return found, True
-
-    def weight_bytes(self) -> int:
-        with self._lock:
-            return self._bytes
+RunRows = Held[pd.DataFrame]  # one publish's run rows (``run_rows``), a container per publish
 
 
 def run_rows(ctx: ReadContext, run: ScreenerRun) -> pd.DataFrame:

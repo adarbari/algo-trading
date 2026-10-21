@@ -65,30 +65,81 @@ class PickIndex:
 class HitsHeld:
     """The hits built so far for the instruments asked, one container per publish in
     ``ctx.cache`` (a cache entry per instrument would push every other entry out of its 32):
-    bounded to ``MAX_HELD_INSTRUMENTS``, weighing what the results really take, put again when
-    it grows."""
+    bounded to ``MAX_HELD_INSTRUMENTS`` (the oldest asked go first), built once per instrument
+    even when threads ask together (a lock per instrument), weighing what the results take as a
+    running total (weighed outside the cache's lock, subtracted on eviction)."""
 
     def __init__(self) -> None:
         self._hits: OrderedDict[str, tuple[ScreenerHit, ...]] = OrderedDict()
+        self._weights: dict[str, int] = {}
+        self._bytes = 0
         self._lock = Lock()
+        self._flights: dict[str, Lock] = {}
 
-    def get(self, iid: str) -> tuple[ScreenerHit, ...] | None:
+    def _get(self, iid: str) -> tuple[ScreenerHit, ...] | None:
         with self._lock:
             found = self._hits.get(iid)
             if found is not None:
                 self._hits.move_to_end(iid)
             return found
 
-    def add(self, found: dict[str, tuple[ScreenerHit, ...]]) -> None:
+    def _split(
+        self, instruments: Sequence[str]
+    ) -> tuple[dict[str, tuple[ScreenerHit, ...]], list[str]]:
+        """(the hits held for ``instruments``, the instruments not held)."""
+        out: dict[str, tuple[ScreenerHit, ...]] = {}
+        missing: list[str] = []
+        for iid in instruments:
+            found = self._get(iid)
+            if found is None:
+                missing.append(iid)
+            else:
+                out[iid] = found
+        return out, missing
+
+    def _store(self, built: dict[str, tuple[ScreenerHit, ...]]) -> None:
+        """Keep ``built`` (weighed outside the lock), evicting the oldest past the bound."""
+        weights = {i: sum(weigh(h.result) + SLOT_BYTES for h in hits) for i, hits in built.items()}
         with self._lock:
-            self._hits.update(found)
+            for iid, hits in built.items():
+                self._bytes += weights[iid] - self._weights.get(iid, 0)
+                self._hits[iid] = hits
+                self._weights[iid] = weights[iid]
             while len(self._hits) > MAX_HELD_INSTRUMENTS:
-                self._hits.popitem(last=False)
+                old, _ = self._hits.popitem(last=False)
+                self._bytes -= self._weights.pop(old, 0)
+
+    def get_or_build(
+        self,
+        instruments: Sequence[str],
+        build: Callable[[Sequence[str]], dict[str, tuple[ScreenerHit, ...]]],
+    ) -> tuple[dict[str, tuple[ScreenerHit, ...]], bool]:
+        """The hits of ``instruments``; the ones not held are built together by ``build`` (one
+        thread builds an instrument, the others wait for it); -> (hits, any built just now)."""
+        out, missing = self._split(instruments)
+        if not missing:
+            return out, False
+        with self._lock:
+            flights = [self._flights.setdefault(i, Lock()) for i in sorted(missing)]
+        for flight in flights:  # in one order: two callers never wait on each other
+            flight.acquire()
+        try:
+            held, todo = self._split(missing)  # another thread may have built some meanwhile
+            built = build(todo) if todo else {}
+            self._store(built)
+            out.update(held)
+            out.update(built)
+        finally:
+            with self._lock:
+                for iid in missing:
+                    self._flights.pop(iid, None)
+            for flight in flights:
+                flight.release()
+        return out, bool(todo)
 
     def weight_bytes(self) -> int:
         with self._lock:
-            held = list(self._hits.values())
-        return sum(weigh(hit.result) + SLOT_BYTES for hits in held for hit in hits)
+            return self._bytes
 
 
 def load_screener_hits(
@@ -100,14 +151,10 @@ def load_screener_hits(
     index, key = _pick_index(ctx)
     held: HitsHeld = ctx.cache.get_or_compute((*key, "held"), HitsHeld)
     asked = list(dict.fromkeys(instrument_ids))
-    out = {i: held.get(i) for i in asked}
-    missing = [i for i in asked if out[i] is None]
-    if missing:
-        built = _build(ctx, index, missing)
-        held.add(built)
+    found, grew = held.get_or_build(asked, lambda ids: _build(ctx, index, ids))
+    if grew:
         ctx.cache.put((*key, "held"), held)  # its weight changed
-        out.update(built)
-    return {i: hits if hits is not None else () for i, hits in out.items()}
+    return {i: found[i] for i in asked}
 
 
 def _pick_index(ctx: ReadContext) -> tuple[PickIndex, tuple[object, ...]]:
@@ -150,7 +197,7 @@ def _build(
             wanted.setdefault(index.runs[n][1].run_id, []).append(iid)
     runs = [run for _, run in index.runs if run.run_id in wanted]
     changes = {run.run_id: load_instrument_changes(ctx, run, wanted[run.run_id]) for run in runs}
-    found = load_results(ctx, wanted, runs, changes)
+    found = load_results(ctx, wanted, runs, changes, keep=False)  # ``HitsHeld`` is the cache
     out: dict[str, list[ScreenerHit]] = {i: [] for i in instruments}
     for iid in instruments:
         for n in index.picked_by.get(iid, ()):

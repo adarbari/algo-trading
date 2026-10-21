@@ -44,6 +44,7 @@ from algotrade.storage.runs import RunRecord
 
 __all__ = [
     "ConfigStore",
+    "Held",
     "NotFoundError",
     "ReadContext",
     "ResultCache",
@@ -114,7 +115,7 @@ def weigh(value: Any, depth: int = WEIGH_DEPTH) -> int:
 def _weigh_nested(value: Any, depth: int) -> int:
     """``weigh`` of a tuple, list, dict or dataclass (its fields), one level below ``depth``."""
     below = depth - 1
-    if isinstance(value, tuple | list):
+    if isinstance(value, tuple | list | set | frozenset):
         return SLOT_BYTES * len(value) + sum(weigh(v, below) for v in value)
     if isinstance(value, dict):
         # keys are the few column names every row shares: not priced per row
@@ -125,6 +126,42 @@ def _weigh_nested(value: Any, depth: int) -> int:
             weigh(getattr(value, f.name), below) + SLOT_BYTES for f in fields(value)
         )
     return 0
+
+
+class Held[T]:
+    """Results of one publish, read when first asked for and kept together: one container per
+    (session, view, publish) in ``ctx.cache``, never an entry per item (the cache holds 32). Each
+    item is read once even when threads ask together (a lock per item); the container weighs what
+    its items really take (a running total, ``weigh``) and its owner puts it into the cache again
+    whenever ``get_or_read`` says it grew, so the cache's byte bound sees it."""
+
+    def __init__(self) -> None:
+        self._items: dict[Hashable, T] = {}
+        self._bytes = 0  # what the items weigh: only grows
+        self._lock = threading.Lock()
+        self._flights: dict[Hashable, threading.Lock] = {}
+
+    def get_or_read(self, key: Hashable, read: Callable[[], T]) -> tuple[T, bool]:
+        """The item under ``key``, read once; -> (item, read just now)."""
+        with self._lock:
+            if key in self._items:
+                return self._items[key], False
+            flight = self._flights.setdefault(key, threading.Lock())
+        with flight:
+            with self._lock:
+                if key in self._items:
+                    return self._items[key], False
+            found = read()
+            weight = weigh(found)  # outside the lock: weighing a frame is not free
+            with self._lock:
+                self._items[key] = found
+                self._bytes += weight
+                self._flights.pop(key, None)
+            return found, True
+
+    def weight_bytes(self) -> int:
+        with self._lock:
+            return self._bytes
 
 
 class ResultCache:

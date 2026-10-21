@@ -24,9 +24,17 @@ import pytest
 
 from algotrade.data import StoreReader
 from algotrade.services.read.context import MAX_CACHE_BYTES, ReadContext, partition, weigh
+from algotrade.services.read.screens import hits as hits_module
 from algotrade.services.read.screens import results, runs
 from algotrade.services.read.screens.hits import load_screener_hits
-from algotrade.services.read.screens.results import VALUE_COLUMNS, _read_values, run_withheld
+from algotrade.services.read.screens.ideas import load_ideas
+from algotrade.services.read.screens.results import (
+    VALUE_COLUMNS,
+    ChangeCount,
+    RunChanges,
+    _read_values,
+    run_withheld,
+)
 from algotrade.services.read.screens.runs import (
     DETAIL_COLUMNS,
     ROW_COLUMNS,
@@ -488,3 +496,56 @@ def test_no_cache_entry_of_the_warm_path_weighs_more_than_half_the_cache() -> No
     weights = ctx.cache._weights
     assert any(k[0] == "run_summaries" for k in weights)
     assert max(weights.values()) <= MAX_CACHE_BYTES // 2
+
+
+def test_a_ticker_opened_adds_no_entry_per_run_or_per_value_read_to_the_cache(
+    hits_store: LocalBackend,
+) -> None:
+    ctx = _hits_context(hits_store)
+    load_screener_hits(ctx, [])
+    before = set(ctx.cache._weights)
+    for iid in ("EQ:S1", "EQ:S2", "EQ:S3"):
+        load_screener_hits(ctx, [iid])
+    added = set(ctx.cache._weights) - before
+    assert not [k for k in added if k[0] == "screen-values"]  # never an entry per ticker
+    assert len([k for k in added if k[0] == "screen_run_fields"]) <= 1  # one for every run
+
+
+def test_threads_asking_for_one_ticker_build_it_once(
+    hits_store: LocalBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _hits_context(hits_store)
+    load_screener_hits(ctx, [])
+    built: list[object] = []
+    real = hits_module._build
+
+    def counting(*args: Any) -> Any:
+        built.append(args[2])
+        return real(*args)
+
+    monkeypatch.setattr(hits_module, "_build", counting)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        list(pool.map(lambda _: load_screener_hits(ctx, ["EQ:S5"]), range(6)))
+    assert built == [["EQ:S5"]]
+
+
+def test_the_held_hits_weigh_a_running_total_of_what_they_hold(hits_store: LocalBackend) -> None:
+    ctx = _hits_context(hits_store)
+    for iid in ("EQ:S1", "EQ:S2"):
+        found = load_screener_hits(ctx, [iid])
+        assert len(found[iid]) == HC
+    key = next(k for k in ctx.cache._weights if k[-1] == "held")
+    held = ctx.cache.get(key)
+    expected = sum(weigh(h.result) + 8 for hits in held._hits.values() for h in hits)
+    assert held.weight_bytes() == expected == ctx.cache._weights[key]
+
+
+def test_the_new_dataclass_pricing_keeps_page_results_far_under_the_cache_bound() -> None:
+    # a run's change per instrument (5,000 names), and a screen result per row of a page
+    moved = {f"EQ:S{i}": ("new" if i % 3 else None, "REJECT") for i in range(5_000)}
+    changes = RunChanges(D1, (ChangeCount("new", 3_000),), moved)
+    assert 0 < weigh(changes) < MAX_CACHE_BYTES // 100
+    assert weigh([changes] * 32) < MAX_CACHE_BYTES // 2  # a cache full of them
+    ctx = context(StoreReader(screens_store()))
+    ideas = load_ideas(ctx, 500)
+    assert weigh(ideas) < MAX_CACHE_BYTES // 100
