@@ -14,8 +14,11 @@ request's forms (default ``FORMS``) as ``parsed["daily_index"]`` (``DAILY_INDEX_
 A day without a published index (a weekend, a federal holiday, or a day SEC has not published
 yet) is answered 403 with S3's ``AccessDenied`` XML (measured 2026-10-07; 404 is handled as
 missing too): ``fetch`` returns ``None``, which the task reads as "no index (yet)", never as an
-empty day. A block (HTML) stays an error. Same pacing, ``User-Agent`` and ``sec`` limiter as
-the other SEC sources (``[sec_edgar]``).
+empty day. The 403 is ambiguous: S3 also answers it transiently for a file that exists
+(2026-10-21: ``form.20110701.idx`` gave 403, then the content on a re-read), so a caller that
+must not miss a day re-reads one that is no holiday before it calls it missing
+(``filing_text_filers.walk_index``). A block (HTML) stays an error. Same pacing, ``User-Agent``
+and ``sec`` limiter as the other SEC sources (``[sec_edgar]``).
 """
 
 import functools

@@ -17,10 +17,11 @@ of walking the days again (a backfill is many runs of ``--limit`` CIKs). A windo
 recording run's own session is walked again.
 """
 
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, timedelta
+from time import sleep as nap  # a re-read pause, not vendor pacing (the limiter owns that)
 
 from algotrade.core.time.calendar import is_weekend, nth_weekday
 from algotrade.storage.runs import RunRecord
@@ -54,6 +55,7 @@ SPECIAL_CLOSURES = frozenset(
     }
 )
 WALK_THREADS = 6  # daily index files in flight (the shared SEC limiter sets the rate)
+INDEX_RETRY_BACKOFF = (2.0, 4.0, 8.0, 16.0)  # seconds before each re-read of a day that said no
 WINDOW_KEY = "filers_window"
 CIKS_KEY = "filer_ciks"
 
@@ -125,8 +127,13 @@ def walk_index(
     since: date,
     until: date,
     allowed: Collection[date] = (),
+    *,
+    sleep: Callable[[float], None] | None = None,
 ) -> Filers:
     """The filers of ``since..until`` read from the daily index, a weekday at a time (module doc).
+    SEC's 403 is ambiguous (no index, or a transient S3 refusal of a file that exists), so a
+    weekday that is no holiday is re-read ``INDEX_RETRY_BACKOFF`` times, sleeping between reads,
+    before it counts as missing.
     A block or a failing day raises, so does a weekday with no index that is no SEC holiday (the
     run's own day may not be published yet) unless an operator verified it and listed it in
     ``allowed`` (``--allow-gap``): the list is never a partial one."""
@@ -157,6 +164,15 @@ def walk_index(
                         closed.append(day)
                         continue
                     if day >= run.session:  # today's index comes after the close
+                        continue
+                    again: frozenset[str] | None = None
+                    for pause in INDEX_RETRY_BACKOFF:
+                        (sleep or nap)(pause)
+                        again = read(day)
+                        if again is not None:
+                            break
+                    if again is not None:
+                        ciks.update(again)
                         continue
                     raise IndexGapError(
                         f"no daily index for {day}, a weekday that is no SEC holiday: if SEC was "

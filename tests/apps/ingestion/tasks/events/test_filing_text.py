@@ -28,6 +28,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.events import filing_text as task
+from algotrade_ingestion.tasks.events import filing_text_filers as filers
 from algotrade_ingestion.tasks.events.filing_text_filers import IndexGapError, sec_holidays
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_sources.framework.http import GaveUpError, HttpError, RetryPolicy
@@ -358,6 +359,12 @@ SPECIAL = [
     date(2019, 12, 24), date(2020, 12, 24), date(2021, 1, 20), date(2024, 12, 24),
     date(2025, 1, 9), date(2025, 12, 24), date(2025, 12, 26),
 ]  # fmt: skip
+
+
+@pytest.fixture(autouse=True)
+def no_index_backoff(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A missing weekday is re-read after a pause (``walk_index``): the tests do not wait."""
+    monkeypatch.setattr(filers, "nap", lambda _s: None)
 
 
 @pytest.mark.parametrize("day", SPECIAL, ids=str)
