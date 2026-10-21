@@ -1,4 +1,6 @@
+from dataclasses import replace
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -12,6 +14,7 @@ from algotrade.services.read.screens.runs import (
     NOT_PICKED,
     DecisionCount,
     is_picked,
+    last_run_rows,
     latest_run,
     load_latest_runs,
     load_previous_run,
@@ -19,11 +22,21 @@ from algotrade.services.read.screens.runs import (
     run_rows,
 )
 from algotrade.services.read.values import UnknownCode
+from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.writers import StoreWriter
-from tests.unit.services.read.screens.conftest import D0, D1, T, context, write_gated
+from tests.helpers.stored_frames import stamped, write_reference
+from tests.unit.services.read.screens.conftest import (
+    D0,
+    D1,
+    T,
+    context,
+    write_gated,
+    write_run,
+)
 
 
 def _on(reader: StoreReader, day: date) -> ReadContext:
@@ -173,3 +186,62 @@ def test_pick_ids_read_the_run_rows_only_in_rank_order(
     ]
     assert found.instrument_ids == tuple(mine) and found.total == len(mine) > 0
     assert runs.load_pick_ids(ctx, run, 1) == runs.PickIds(tuple(mine[:1]), found.total)
+
+
+@pytest.fixture(params=["memory", "local"])
+def either(request: pytest.FixtureRequest, tmp_path: Path) -> Backend:
+    """A session of both backends: ``alpha`` ran twice (``r0``, then ``r1`` with fewer rows),
+    ``beta`` once for ``me`` and once for ``site``, and ``alpha`` has a pending run ``r9``."""
+    backend: Backend = MemoryBackend() if request.param == "memory" else LocalBackend(tmp_path)
+    w = StoreWriter(backend)
+    write_reference(w, D1, {s: f"EQ:{s}" for s in ("AAA", "BBB", "CCC", "DDD")})
+    bar = {"instrument_id": "EQ:AAA", "ts": pd.Timestamp(D1, tz="UTC"), "open": 1.0, "high": 1.0,
+           "low": 1.0, "close": 1.0, "volume": 1.0}  # fmt: skip
+    w.write_table("bars/1d", D1, "bars", stamped([bar], D1, "bars"))
+    first = [("AAA", "QUALIFIED", 5.0, None), ("BBB", "REJECT", 0.0, None),
+             ("CCC", "WATCH", 3.0, 1.0), ("DDD", "QUALIFIED", 9.0, None)]  # fmt: skip
+    write_run(w, D1, "r0", "site", "alpha", first)
+    write_run(w, D1, "r1", "site", "alpha", first[:2][::-1], knowledge=T + timedelta(hours=1))
+    write_run(w, D1, "rb", "me", "beta", first[2:])
+    write_run(w, D1, "rs", "site", "beta", first[:1])
+    for run_id in ("r1", "rb", "rs", "r0"):
+        w.save_run(RunRecord(run_id, "screen", D1, T).finish(T))
+    pending = [("DDD", "QUALIFIED", 1.0, None), ("AAA", "WATCH", 2.0, 0.5)]
+    write_run(w, D1, "r9", "site", "alpha", pending, T + timedelta(hours=2), pending=True)
+    return backend
+
+
+def _wanted(frame: pd.DataFrame) -> pd.DataFrame:
+    ordered = frame.sort_values(["rank", "instrument_id"], kind="stable").reset_index(drop=True)
+    return ordered[["instrument_id", "decision", "score", "rank", "tie_break", "config_version"]]
+
+
+@pytest.mark.parametrize("own", [None, "r9"])
+def test_the_run_rows_of_every_screener_are_what_the_merge_gave(
+    either: Backend, own: str | None
+) -> None:
+    reader = StoreReader(either) if own is None else StoreReader(either).including(own)
+    ctx = open_context(reader, MemoryConfigStore({}), UserContext("me"), D1)
+    merged = reader.table("results/rule_screen", D1)
+    assert merged is not None
+    keys = [("site", "alpha"), ("me", "beta"), ("site", "beta")]
+    found = load_latest_runs(ctx, keys)
+    assert found[("site", "alpha")].run is not None
+    assert found[("site", "alpha")].run.run_id == ("r9" if own else "r1")  # type: ignore[union-attr]
+    for (owner, config), latest in found.items():
+        run = latest.run
+        assert run is not None
+        rows = merged[(merged["user_id"] == owner) & (merged["config_id"] == config)]
+        _, want = last_run_rows(rows)
+        pd.testing.assert_frame_equal(_wanted(run_rows(ctx, run)), _wanted(want))
+
+
+def test_a_run_that_is_not_the_newest_reads_its_own_rows(either: Backend) -> None:
+    ctx = open_context(StoreReader(either), MemoryConfigStore({}), UserContext("me"), D1)
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None and run.run_id == "r1"
+    old = replace(run, run_id="r0")
+    own = either.tables.read_run("results/rule_screen", D1, "r0")
+    assert own is not None
+    pd.testing.assert_frame_equal(_wanted(run_rows(ctx, old)), _wanted(own))
+    assert len(run_rows(ctx, old)) == 4 and len(run_rows(ctx, run)) == 2

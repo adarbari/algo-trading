@@ -44,6 +44,7 @@ from algotrade.services.read.screens.runs import (
     ScreenerRun,
     is_picked,
     load_previous_run,
+    run_row_details,
     run_rows,
 )
 from algotrade.services.read.screens.screeners import ScreenGroup
@@ -453,8 +454,7 @@ def load_results(
             continue
         hidden = run_withheld(ctx, run)
         moved = changes[run.run_id].by_instrument if changes and run.run_id in changes else {}
-        rows: pd.DataFrame = run_rows(ctx, run)
-        for row in _records(rows[rows["instrument_id"].isin(asked)]):
+        for row in _records(run_row_details(ctx, run, asked)):
             iid = str(row["instrument_id"])
             found = values.get((run.run_id, iid), [])
             change = moved.get(iid, (None, None))
