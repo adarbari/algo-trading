@@ -1,5 +1,6 @@
 """``config/env.py``: the one reader of environment variables and ``.env``."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -110,3 +111,13 @@ def test_web_dist_comes_from_the_environment_else_none(monkeypatch: pytest.Monke
     assert env.web_dist() is None
     monkeypatch.setenv(env.WEB_DIST, " apps/web/dist ")
     assert env.web_dist() == Path("apps/web/dist")
+
+
+def test_thread_limits_are_set_inside_the_block_and_restored_after(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OMP_NUM_THREADS", "7")
+    monkeypatch.delenv("OPENBLAS_NUM_THREADS", raising=False)
+    with env.thread_limits(2):
+        assert os.environ["OMP_NUM_THREADS"] == os.environ["OPENBLAS_NUM_THREADS"] == "2"
+    assert os.environ["OMP_NUM_THREADS"] == "7" and "OPENBLAS_NUM_THREADS" not in os.environ

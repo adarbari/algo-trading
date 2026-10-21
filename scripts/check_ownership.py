@@ -192,15 +192,33 @@ def rule_hits(rule: Rule, node: ast.AST, docstrings: set[int]) -> bool:
     return False
 
 
+NODE_TYPES = {
+    "call": (ast.Call,),
+    "call_regex": (ast.Call,),
+    "attr": (ast.Attribute,),
+    "import": (ast.Import, ast.ImportFrom),
+    "string": (ast.Constant,),
+    "string_prefix": (ast.Constant,),
+}
+
+
 def scan_file(path: Path, rel: str, registry: list[Responsibility]) -> list[Hit]:
+    """Detect hits in one file; a responsibility that permits the file is skipped (its hits
+    would be dropped anyway), and each rule is tried only on the node types it can match."""
+    by_type: dict[type, list[tuple[Responsibility, Rule]]] = {}
+    for resp in registry:
+        if resp.permits(rel):
+            continue
+        for rule in resp.rules:
+            for node_type in NODE_TYPES[rule.kind]:
+                by_type.setdefault(node_type, []).append((resp, rule))
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
     docstrings = docstring_nodes(tree)
     hits = []
     for node in ast.walk(tree):
-        for resp in registry:
-            for rule in resp.rules:
-                if rule_hits(rule, node, docstrings):
-                    hits.append(Hit(rel, getattr(node, "lineno", 0), resp.id, rule))
+        for resp, rule in by_type.get(type(node), ()):
+            if rule_hits(rule, node, docstrings):
+                hits.append(Hit(rel, getattr(node, "lineno", 0), resp.id, rule))
     return hits
 
 
