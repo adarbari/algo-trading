@@ -5,6 +5,7 @@ everything not yet started and holds the limiter, and nothing is left running wh
 
 import threading
 from collections.abc import Sequence
+from concurrent.futures.process import BrokenProcessPool
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
@@ -245,6 +246,7 @@ def test_only_a_block_page_a_403_or_a_429_stops_the_read_ahead() -> None:
     assert task._stops_fetch(TransientFetchError("block page"))
     assert task._stops_fetch(GaveUpError("giving up", 403))
     assert task._stops_fetch(HttpError(429))
+    assert task._stops_fetch(BrokenProcessPool())  # a dead parse worker would fail every filing
     assert not task._stops_fetch(GaveUpError("giving up", 500))  # one bad request fails its CIK
     assert not task._stops_fetch(LookupError("404"))
 

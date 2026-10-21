@@ -90,6 +90,8 @@ class Prefetch:
         future = self._lists.get(cik)
         if future is None:  # never scheduled: the pipeline stopped first
             raise TransientFetchError("filing text fetch stopped: SEC is blocking us")
+        with self._lock:
+            self._lists.pop(cik, None)  # read once: the payload is not kept for the whole run
         return self._result(future)
 
     def document(self, cik: str, accession: str) -> bytes | None:

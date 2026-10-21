@@ -77,6 +77,7 @@ and ``pending`` CIKs left.
 import hashlib
 import shutil
 from collections.abc import Collection, Sequence
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import partial
@@ -420,7 +421,10 @@ def _blocking(exc: Exception) -> bool:
 def _stops_fetch(exc: Exception) -> bool:
     """A failure that stops the read-ahead: a block page or empty body (``TransientFetchError``)
     or SEC's 403 / 429. One failing request (a 5xx given up on, a parse) fails its own CIK only."""
-    return isinstance(exc, TransientFetchError) or getattr(exc, "status", None) in (403, 429)
+    return (
+        isinstance(exc, TransientFetchError | BrokenProcessPool)  # a dead parse worker too
+        or getattr(exc, "status", None) in (403, 429)
+    )
 
 
 def _hold_sec(ctx: TaskContext, run: IngestRun) -> None:
@@ -429,8 +433,8 @@ def _hold_sec(ctx: TaskContext, run: IngestRun) -> None:
     run.stats.update(blocked_hold_s=BLOCK_HOLD_S)
     for limiter in ctx.pacing.values():
         if getattr(limiter, "key", None) == "sec" and hasattr(limiter, "hold"):
-            limiter.hold(BLOCK_HOLD_S)
             limiter.record("error")  # type: ignore[attr-defined]  # a block page came back as 200
+            limiter.hold(BLOCK_HOLD_S)  # after the record: a hold makes the next wait sleep it
 
 
 def _document(text: Source, request: FilingTextRequest) -> pd.DataFrame:
