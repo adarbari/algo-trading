@@ -6,39 +6,48 @@
 # tests/architecture/api/test_release_reads.py: every name here is in
 # algotrade_api.graphql.response_cache.RELEASE_SHARED_OPERATIONS and the other way round, is a
 # SHARED_OPERATIONS name, and its `test` file exists and names it. An operation leaves this file
-# only with its reason removed here, in the same PR; the list never shrinks silently.
+# A document named like a listed operation that selects other fields than `fields` is answered live
+# and never kept (the key is role-wide: it may hold nothing of the caller).
+# An operation leaves this file only with its reason removed here, in the same PR; the list never shrinks silently.
 
 [[operation]]
 name = "InstrumentPrices"
+fields = ["instrument.instrumentId", "instrument.prices"]   # the root and root.child fields its document may select
 reason = "one name's stored bars from a start date: a function of bars/1d at the release's sequence"
 test = "tests/contract/api/release_reads/test_cache_survives_commits.py"
 
 [[operation]]
 name = "MarketHistory"
+fields = ["market.history"]   # the root and root.child fields its document may select
 reason = "stored market-field history for named fields: a function of the market rollups at the sequence, no run record"
 test = "tests/contract/api/release_reads/test_cache_survives_commits.py"
 
 [[operation]]
 name = "InstrumentEvents"
+fields = ["instrument.instrumentId", "instrument.events"]   # the root and root.child fields its document may select
 reason = "one name's stored events: a function of the events tables at the sequence"
 test = "tests/contract/api/release_reads/test_cache_survives_commits.py"
 
 [[operation]]
 name = "EtfHoldings"
+fields = ["instrument.instrumentId", "instrument.isEtf", "instrument.holdings"]   # the root and root.child fields its document may select
 reason = "an ETF's stored holdings snapshot: a function of the holdings partitions at the sequence"
 test = "tests/contract/api/release_reads/test_cache_survives_commits.py"
 
 [[operation]]
 name = "RegimeBands"
+fields = ["regime.bands"]   # the root and root.child fields its document may select
 reason = "the stored regime labels over a window: a function of the regime rollups at the sequence"
 test = "tests/contract/api/release_reads/test_cache_survives_commits.py"
 
 [[operation]]
 name = "RegimeSignals"
+fields = ["regime.episodes"]   # the root and root.child fields its document may select
 reason = "per-episode indicator signals from the stored market series and the site episode files"
 test = "tests/contract/api/release_reads/test_cache_survives_commits.py"
 
 [[operation]]
 name = "RegimeEpisodes"
+fields = ["regime.episodes", "regime.recessions"]   # the root and root.child fields its document may select
 reason = "the site's episode and recession files: the same for every release of one deploy"
 test = "tests/contract/api/release_reads/test_cache_survives_commits.py"

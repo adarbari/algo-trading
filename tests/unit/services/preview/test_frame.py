@@ -62,7 +62,7 @@ def test_a_frame_weighs_what_its_view_holds_and_the_cache_is_bounded_by_it(
     read = (view, SimpleNamespace(missing=(), pre_snapshot=False))
     monkeypatch.setattr(frames, "fields_view", lambda *a, **k: read)
     monkeypatch.setattr(frames, "load_universe", lambda *a, **k: universe)
-    reader = SimpleNamespace(visible_seq=lambda: 1)
+    reader = SimpleNamespace(version=lambda: ("live", 1))
     built, _ = field_frame(reader, ResultCache(4), DAY, ["a", "b"], None, (), held=HARNESS_ALL)  # type: ignore[arg-type]
     assert built.weight_bytes() == 100 * (frames.ROW_BYTES + 2 * frames.FIELD_BYTES)
     cache = ResultCache(size=24, max_bytes=2 * built.weight_bytes() + 1)
@@ -87,7 +87,7 @@ def test_a_frame_being_read_is_waited_for_not_read_twice(monkeypatch: pytest.Mon
 
     monkeypatch.setattr(frames, "fields_view", slow)
     monkeypatch.setattr(frames, "load_universe", lambda *a, **k: universe)
-    cache, reader = ResultCache(4), SimpleNamespace(visible_seq=lambda: 1)
+    cache, reader = ResultCache(4), SimpleNamespace(version=lambda: ("live", 1))
     got: list[bool] = []
 
     def ask() -> None:

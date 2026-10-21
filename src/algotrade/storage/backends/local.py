@@ -60,6 +60,7 @@ from algotrade.storage.backends.local_index import (
     TXN,
     Commits,
     atomic_write,
+    created_seq,
     default_file,
     drop_unreferenced,
     index_lock,
@@ -82,6 +83,7 @@ from algotrade.storage.backends.run_selection import (
     chain,
     chain_needed,
     keep_newest_runs,
+    listed_at,
     max_seq,
     merge_rows,
     newest_run_per_group,
@@ -471,7 +473,7 @@ class LocalTables:
         found = {
             d
             for d in self._committed_dates(table)
-            if not (held := read_index(self._dir(table, d))) or visible_entries(held, upto)
+            if listed_at(read_index(self._dir(table, d)), created_seq(self._dir(table, d)), upto)
         }
         if upto <= published:
             with self._dates_lock:
@@ -500,8 +502,8 @@ class LocalTables:
                 continue
             if upto is None:
                 out[when] = max_seq(read_index(day), published)
-            elif (stamp := seq_at(read_index(day), upto)) is not None:
-                out[when] = stamp
+            elif listed_at(index := read_index(day), created_seq(day), upto):
+                out[when] = seq_at(index, upto) or 0
         return out
 
     def names(self, own_run: str | None = None) -> list[str]:

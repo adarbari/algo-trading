@@ -226,7 +226,7 @@ def _sessions(
 
     if memo is None or as_of is not None or reader.own_run is not None:
         return read()
-    key = ("expression-sessions", table, start, end, reader.visible_seq())
+    key = ("expression-sessions", table, start, end, reader.version())
     found: frozenset[date] = memo(key, read)
     return found
 

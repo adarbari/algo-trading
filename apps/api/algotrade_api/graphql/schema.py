@@ -53,6 +53,7 @@ from algotrade_api.graphql.response_cache import (
     Served,
     cacheable,
     operation_name,
+    release_selects_only,
     response_key,
 )
 from algotrade_api.graphql.scalars import SCALARS
@@ -122,7 +123,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         if parsed is not None and viewer is not None and cacheable(parsed[0]):
             document, variables = parsed
             self._log.note(viewer, document, variables)
-            release = await self._release_for(operation_name(document))
+            release = await self._release_for(operation_name(document), document)
             request.state.release = release  # the context pins its reads at the release
             key = await self._key(viewer, document, variables, release)
             body = self._cache.get(key) if key is not None else None
@@ -165,10 +166,13 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
             return 0
         return self._config_generation(viewer.user_id, viewer.role is Role.ADMIN)
 
-    async def _release_for(self, name: str | None) -> Any:
-        """The serving release an operation named ``name`` is answered from (a listed one, the
-        kill switch on, a current release that can be trusted), else ``None``: the live path."""
+    async def _release_for(self, name: str | None, document: str) -> Any:
+        """The serving release an operation named ``name`` is answered from (a listed one whose
+        document selects only the fields it may, the kill switch on, a current release that can
+        be trusted), else ``None``: the live path. The name alone is not trusted."""
         if self._releases is None or name not in RELEASE_SHARED_OPERATIONS:
+            return None
+        if not release_selects_only(name, document):
             return None
         return await off_loop(self._releases.resolve)
 
@@ -227,7 +231,7 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
         ran (the replay of the warmer and of a stale hit); with ``only_missing`` a fresh entry is
         left alone. False when it was skipped or refused (a busy pool), None when it failed (never
         kept)."""
-        release = await self._release_for(operation_name(op.document))
+        release = await self._release_for(operation_name(op.document), op.document)
         key = await self._key(op.viewer, op.document, op.variables, release)
         if key is None:  # a write of the caller's is in flight: nothing to keep
             return False

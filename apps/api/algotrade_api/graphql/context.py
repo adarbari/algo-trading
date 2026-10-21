@@ -58,9 +58,9 @@ class ReleaseReads:
 
     def resolve(self) -> CurrentRelease | None:
         """The release this request follows, or ``None`` (the live path)."""
-        if not self.enabled():
-            return None
         try:
+            if not self.enabled():
+                return None
             return self.current()
         except Exception:
             return None
@@ -164,6 +164,9 @@ class RequestContext(BaseContext):
         with self._lock:
             if self._stores is None:
                 self._stores = self._open_stores(self._user)
+            release = self._following()
+            if release is not None:  # an admin's Cause chains (ADR 0056) read what the release read
+                return replace(self._stores, reader=self._stores.reader.pinned(release.seq))
             return self._stores
 
 

@@ -14,14 +14,17 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from algotrade.config.site.users import Role, UserRecord
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
-from algotrade.services.read.context import ResultCache
+from algotrade.services.read.context import Held, ResultCache
 from algotrade.services.serving.build import build_release
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.backends.release.memory import MemoryReleaseStore
 from algotrade.storage.backends.run_selection import StaleSnapshotError
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade_api.deps import ApiSettings
+from algotrade_api.graphql.context import RequestContext
 from algotrade_api.graphql.response_cache import RELEASE_SHARED_OPERATIONS, ResponseCache
 from algotrade_api.main import create_app
 from algotrade_sources.framework.base import FixtureSource
@@ -94,6 +97,7 @@ class Counts:
 def counts(monkeypatch: pytest.MonkeyPatch) -> Counts:
     seen = Counts()
     real_result, real_response = ResultCache.put, ResponseCache.put
+    real_held = Held.get_or_read
 
     def result_put(self: ResultCache, key: Any, value: Any) -> None:
         seen.results += 1
@@ -103,6 +107,12 @@ def counts(monkeypatch: pytest.MonkeyPatch) -> Counts:
         seen.responses += 1
         real_response(self, key, body)
 
+    def held_read(self: Held[Any], key: Any, read: Any) -> Any:
+        item, read_now = real_held(self, key, read)
+        seen.results += bool(read_now)  # a container's item read from the store is a recompute
+        return item, read_now
+
+    monkeypatch.setattr(Held, "get_or_read", held_read)
     monkeypatch.setattr(ResultCache, "put", result_put)
     monkeypatch.setattr(ResponseCache, "put", response_put)
     return seen
@@ -141,20 +151,30 @@ def world(golden_source: FixtureSource) -> Iterator[World]:
     yield World(golden_source)
 
 
-def five_commits(w: World) -> None:
-    """What the nightly, the post-session, a backfill and the owner do after a release is live."""
-    day = END
-    row = {"instrument_id": "EQ:AAA", "value": 1.0}
-    w.commit("next-session", "rollups/instrument/zzz@v1", day + timedelta(days=1), [row])  # S+1
+def bar_rows(day: Any) -> list[dict[str, Any]]:
     bar = {"open": 9.0, "high": 9.0, "low": 9.0, "close": 9.0, "volume": 9.0}
-    bars = [{"instrument_id": "EQ:AAA", "ts": pd.Timestamp(day, tz="UTC"), **bar}]
+    return [{"instrument_id": "EQ:AAA", "ts": pd.Timestamp(day, tz="UTC"), **bar}]
+
+
+def six_commits(w: World) -> None:
+    """What the nightly, the post-session, a backfill and the owner do after a release is live,
+    on tables the listed operations read."""
+    day = END
+    w.commit("next-session", "bars/1d", day + timedelta(days=1), bar_rows(day + timedelta(days=1)))
     first_run = w.backend.tables.partition_runs("bars/1d", day)[0]
-    w.commit(first_run, "bars/1d", day, bars)  # a same-run restatement of S
+    w.commit(first_run, "bars/1d", day, bar_rows(day))  # a same-run restatement of S
     started = datetime(day.year, day.month, day.day, 23, tzinfo=UTC)
     w.backend.runs.save(RunRecord("job:screen-1", "job:screen", day, started, RunStatus.RUNNING))
-    w.commit("filing-backfill", "rollups/instrument/zzz@v1", day - timedelta(days=400), [row])
+    before = day - timedelta(days=1)
+    old_run = w.backend.tables.partition_runs("bars/1d", before)[0]
+    w.commit(old_run, "bars/1d", before, bar_rows(before))  # an old-date restatement
+    market = [{"instrument_id": "MKT:US", "curve_10y3m": 0.5}]
+    w.commit("market-next", "rollups/market/regime_indicators@v1", day + timedelta(days=1), market)
     quote = {"instrument_id": "EQ:AAA", "ts": pd.Timestamp(day, tz="UTC"), "right": "C"}
     w.commit("unrelated", "live/option_quotes", day, [quote | {"strike": 100.0, "bid": 1.0}])
+
+
+five_commits = six_commits  # the name the equivalence test and the brief use
 
 
 def test_every_listed_operation_answers_without_errors_over_the_store(world: World) -> None:
@@ -164,7 +184,7 @@ def test_every_listed_operation_answers_without_errors_over_the_store(world: Wor
         assert "errors" not in body, (name, body.get("errors"))
 
 
-def test_once_warm_five_commits_recompute_nothing_and_change_no_byte(
+def test_once_warm_six_commits_recompute_nothing_and_change_no_byte(
     world: World, counts: Counts
 ) -> None:
     before = {n: world.post(*OPERATIONS[n]).content for n in OPERATIONS}
@@ -241,3 +261,48 @@ def test_a_pin_the_store_no_longer_holds_answers_live_and_is_not_kept(
     assert answer.status_code == 200 and "errors" not in answer.json()
     assert answer.json()["data"]["instrument"]["prices"]["bars"]
     assert counts.responses == 0  # the live answer after a lost pin is not cached
+
+
+def test_a_document_named_like_a_listed_operation_that_selects_more_goes_live_and_uncached(
+    world: World, counts: Counts
+) -> None:
+    """The name alone is not trusted: a role-wide key must hold nothing of the caller."""
+    document, variables = OPERATIONS["InstrumentPrices"]
+    sneaky = document.replace("{ instrument(key: $key)", "{ viewer { id } instrument(key: $key)")
+    assert sneaky != document
+    counts.reset()
+    answer = world.post(sneaky, variables)
+    assert answer.status_code == 200 and answer.json()["data"]["viewer"]["id"]
+    assert counts.responses == 0 and world.app.state.graphql._cache.held == 0
+    deeper = document.replace("bars {", "bars { open ").replace(
+        "prices(start: $start)", "prices(start: $start)"
+    )
+    assert world.post(deeper, variables).status_code == 200  # a deeper field of the listed one
+
+
+def test_a_malformed_kill_switch_config_is_the_live_path_not_a_500(
+    world: World, counts: Counts
+) -> None:
+    router = world.app.state.graphql
+
+    def boom() -> bool:
+        raise ConfigurationError("nightly.toml: [serving] is malformed")
+
+    router._releases = dataclasses.replace(router._releases, enabled=boom)
+    document, variables = OPERATIONS["InstrumentPrices"]
+    counts.reset()
+    assert world.post(document, variables).status_code == 200
+    assert counts.responses == 0
+
+
+def test_a_release_request_explains_causes_from_the_pinned_reader(world: World) -> None:
+    router = world.app.state.graphql
+    release = router._releases.resolve()
+    assert release is not None
+    viewer = UserRecord("ana", Role.ADMIN)
+    pinned = RequestContext(
+        router._opener, viewer, router._stores_opener, release, router._releases.pinned
+    )
+    live = RequestContext(router._opener, viewer, router._stores_opener)
+    assert pinned.stores().reader.pin == release.seq  # type: ignore[union-attr]
+    assert live.stores().reader.pin is None  # type: ignore[union-attr]

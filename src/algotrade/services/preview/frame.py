@@ -116,7 +116,7 @@ def field_frame(
     wanted = tuple(sorted(set(fields)))
     key = (
         PREVIEW, session, wanted, features_key(definitions), tuple(sorted(held)),
-        reader.visible_seq(),
+        reader.version(),
     )  # fmt: skip
     read = False
 

@@ -49,7 +49,7 @@ from datetime import date
 from functools import lru_cache
 from typing import Any
 
-from graphql import GraphQLError, OperationDefinitionNode, parse
+from graphql import FieldNode, GraphQLError, OperationDefinitionNode, parse
 
 from algotrade.config.site.users import UserRecord
 
@@ -93,6 +93,21 @@ RELEASE_SHARED_OPERATIONS: frozenset[str] = frozenset(
         "RegimeEpisodes",
     }
 )
+# The fields a release operation's document may select, as ``root`` or ``root.child`` paths (the
+# second level is what the root's fields give: a name's bars, a market's history). A document
+# named like a listed operation that selects anything else (``viewer``, a user's features) is
+# answered live and never kept: the key is role-wide, so it must hold nothing of the caller.
+RELEASE_FIELDS: dict[str, frozenset[str]] = {
+    "InstrumentPrices": frozenset({"instrument.instrumentId", "instrument.prices"}),
+    "MarketHistory": frozenset({"market.history"}),
+    "InstrumentEvents": frozenset({"instrument.instrumentId", "instrument.events"}),
+    "EtfHoldings": frozenset(
+        {"instrument.instrumentId", "instrument.isEtf", "instrument.holdings"}
+    ),
+    "RegimeBands": frozenset({"regime.bands"}),
+    "RegimeSignals": frozenset({"regime.episodes"}),
+    "RegimeEpisodes": frozenset({"regime.episodes", "regime.recessions"}),
+}
 # Operations over published tables and configs that depend on the caller's catalogue or
 # configs (user features, the Guide's field entries): cached per user.
 USER_OPERATIONS: frozenset[str] = frozenset(
@@ -197,6 +212,39 @@ def operation_name(document: str) -> str | None:
     except GraphQLError:
         return None
     return (names[0] or None) if len(names) == 1 else None
+
+
+def _plain_fields(selection_set: Any) -> list[FieldNode] | None:
+    """The fields of a selection set, ``None`` when it holds a fragment spread or an inline
+    fragment (not resolved here: such a document is not served from a release)."""
+    found = list(selection_set.selections) if selection_set is not None else []
+    return found if all(isinstance(f, FieldNode) for f in found) else None
+
+
+@lru_cache(maxsize=256)
+def release_selects_only(name: str, document: str) -> bool:
+    """Whether ``document`` (the operation ``name``) selects only the fields ``RELEASE_FIELDS``
+    allows it: its root fields and their direct children, all plain fields."""
+    allowed = RELEASE_FIELDS.get(name)
+    try:
+        operations = [
+            d for d in parse(document).definitions if isinstance(d, OperationDefinitionNode)
+        ]
+    except GraphQLError:
+        return False
+    roots = _plain_fields(operations[0].selection_set) if len(operations) == 1 else None
+    if allowed is None or not roots:
+        return False
+    for root in roots:
+        children = _plain_fields(root.selection_set)
+        paths = {f"{root.name.value}.{c.name.value}" for c in children or []}
+        if children is None or not paths <= allowed or (not paths and not _is_root(root, allowed)):
+            return False
+    return True
+
+
+def _is_root(root: FieldNode, allowed: frozenset[str]) -> bool:
+    return root.name.value in {path.split(".")[0] for path in allowed}
 
 
 def cacheable(document: str) -> bool:

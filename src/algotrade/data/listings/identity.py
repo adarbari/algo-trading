@@ -18,7 +18,7 @@ history the read raises ``MissingDataError`` (no silent fallback to today's name
 
 import threading
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -54,7 +54,7 @@ class HistoricalIdentity:
 _MEMO_SIZE = 8
 _lock = threading.Lock()  # the API's threads share the memo
 _memo: OrderedDict[
-    tuple[int, str | None, int, date, datetime | None],
+    tuple[int, str | None, Hashable, date, datetime | None],
     tuple[StoreReader, HistoricalIdentity | None],
 ] = OrderedDict()
 
@@ -72,7 +72,7 @@ def memoised_identity(
     reader with pending writes (``own_run``) is never memoised."""
     if reader.own_run is not None:  # a run's pending writes do not move ``visible_seq``
         return compute()
-    key = (id(reader), reader.own_run, reader.visible_seq(), session, as_of)  # read before
+    key = (id(reader), reader.own_run, reader.version(), session, as_of)  # read before
     with _lock:
         if key in _memo:
             _memo.move_to_end(key)
