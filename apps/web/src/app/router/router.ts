@@ -27,12 +27,17 @@ export function startEarlyReads(queryClient: QueryClient): void {
   const leaf = matched.at(-1);
   if (!leaf?.options.staticData?.early) return;
   prefetchLayoutReadsEarly(queryClient);
-  const { search } = router.latestLocation;
-  const validate = leaf.options.validateSearch as ((raw: unknown) => unknown) | undefined;
-  const loaderDeps = leaf.options.loaderDeps as ((a: { search: unknown }) => unknown) | undefined;
-  const deps = loaderDeps?.({ search: validate?.(search) ?? search });
-  const load = leaf.options.loader as (a: unknown) => Promise<void>;
-  void load({ context: { queryClient }, deps }).catch(() => undefined);
+  try {
+    const { search } = router.latestLocation;
+    const validate = leaf.options.validateSearch as ((raw: unknown) => unknown) | undefined;
+    const deps = (leaf.options.loaderDeps as ((a: { search: unknown }) => unknown) | undefined)?.({
+      search: validate?.(search) ?? search,
+    });
+    const load = leaf.options.loader as (a: unknown) => Promise<void>;
+    void load({ context: { queryClient }, deps }).catch(() => undefined);
+  } catch {
+    // a search the page cannot read: the router's own load shows its error, not a blank app
+  }
 }
 
 declare module '@tanstack/react-router' {

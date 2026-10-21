@@ -6,7 +6,8 @@ Nothing here was measured from another continent; the gate is a model (`docs/ci.
 ## Done (PR #771) and next
 - Gate: `apps/web/e2e/perf-network.spec.ts`, budgets `network` in `perf-budgets.json`.
 - index.html preloads the opened path's page files, page cache and fonts; a trader page's reads start at start-up beside the Viewer. Modelled: one round trip less on Ideas and Edges.
-- Measured on a spare API (loaded machine): IdeasPage 4.7 MB raw is 339 kB gzip on the wire. At 10 Mbit that is about 0.3 s of transfer plus slow-start rounds; the real cost is server time and the JSON parse. Next: window and project the Ideas payload (add-graphql-field; ADR 0036-0038), after the serving-release `config_generation` contract lands.
+- Measured on a spare API (2026-10-21, one request): IdeasPage is 4.8 MB raw, 339 kB gzip on the wire, for 200 of 9434 ideas. **88% of the gzip bytes are `picks`** (284 of 321 kB): 34 picks per idea on average (one per screener), each with `columns` (151 kB gz) and `criteria` (116 kB gz). Feature values (15 kB gz, the repeated `info` only 2 kB gz), `screeners` (6 kB) and the rest are small. So a client-only cut cannot help: the table needs every idea's best pick, the page filters over all 200, and `picks` has no argument to window it.
+- Proposal for the next PR (API + web, add-graphql-field, ADR 0036-0038; touches `services/read/screens/ideas.py`, where the API-memory session works, so coordinate first): serve the list with each idea's best pick plus a summary of the others (decision, score, outcomes), and the full `picks` of one ticker on demand when its row opens (a second operation on the Explore side). Expected: about 20-40 kB gz for the list. A smaller `limit` is the cheap alternative but changes what the chips filter over: an owner decision.
 - Later, once it lands: the client invalidates its page cache by `config_generation` after a write.
 
 ## Owner decisions (not implemented)
