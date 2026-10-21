@@ -29,55 +29,29 @@ from algotrade_api.graphql.response_cache import RELEASE_SHARED_OPERATIONS, Resp
 from algotrade_api.main import create_app
 from algotrade_sources.framework.base import FixtureSource
 from tests.conftest import REPO_ROOT  # noqa: F401
-from tests.helpers.api_store import END, api_store, as_user
+from tests.helpers.api_store import END, api_store, as_user, web_documents
 from tests.helpers.stored_frames import stamped
 
 START = "2022-01-03"
 
-# The web's own documents of the listed operations (``apps/web/src``), with variables that
-# answer from the API store (an ETF for the holdings, one name for the instrument reads).
+VARIABLES: dict[str, dict[str, Any]] = {
+    "InstrumentPrices": {"key": "AAA", "start": START},
+    "MarketHistory": {
+        "names": ["market.regime_indicators@v1.curve_10y3m"],
+        "start": START,
+        "end": END.isoformat(),
+        "points": 50,
+    },
+    "InstrumentEvents": {"key": "AAA"},
+    "EtfHoldings": {"key": "BULL", "top": 5},
+    "RegimeBands": {"start": START, "end": END.isoformat()},
+    "RegimeEpisodes": {},
+    "RegimeSignals": {},
+}
+# The web's own documents of the listed operations (gql.ts), with variables that answer from the
+# API store (an ETF for the holdings, one name for the instrument reads).
 OPERATIONS: dict[str, tuple[str, dict[str, Any]]] = {
-    "InstrumentPrices": (
-        "query InstrumentPrices($key: String!, $start: Date!) { instrument(key: $key) "
-        "{ instrumentId prices(start: $start) { start end bars { session close volume } } } }",
-        {"key": "AAA", "start": START},
-    ),
-    "MarketHistory": (
-        "query MarketHistory($names: [String!]!, $start: Date!, $end: Date!, $points: Int!) "
-        "{ market { history(names: $names, start: $start, end: $end, points: $points) "
-        "{ name bucketSessions points { session value } segments { start end value } } } }",
-        {
-            "names": ["market.regime_indicators@v1.curve_10y3m"],
-            "start": START,
-            "end": END.isoformat(),
-            "points": 50,
-        },
-    ),
-    "InstrumentEvents": (
-        "query InstrumentEvents($key: String!) { instrument(key: $key) "
-        "{ instrumentId events { table kind date ts values } } }",
-        {"key": "AAA"},
-    ),
-    "EtfHoldings": (
-        "query EtfHoldings($key: String!, $top: Int!) { instrument(key: $key) "
-        "{ instrumentId isEtf holdings(top: $top) { asOf source total "
-        "items { rank name symbol weight assetClass instrument { symbol } } } } }",
-        {"key": "BULL", "top": 5},
-    ),
-    "RegimeBands": (
-        "query RegimeBands($start: Date!, $end: Date!) "
-        "{ regime { bands(start: $start, end: $end) { start end label } } }",
-        {"start": START, "end": END.isoformat()},
-    ),
-    "RegimeEpisodes": (
-        "query RegimeEpisodes { regime { episodes { key name kind peak trough recovered } "
-        "recessions { start end } } }",
-        {},
-    ),
-    "RegimeSignals": (
-        "query RegimeSignals { regime { episodes { key signals { gate { indicator state } } } } }",
-        {},
-    ),
+    name: (web_documents()[name], variables) for name, variables in VARIABLES.items()
 }
 NOT_LISTED = "query Day { session { date } }"  # a USER_OPERATIONS name: keyed on the sequence
 
@@ -268,7 +242,7 @@ def test_a_document_named_like_a_listed_operation_that_selects_more_goes_live_an
 ) -> None:
     """The name alone is not trusted: a role-wide key must hold nothing of the caller."""
     document, variables = OPERATIONS["InstrumentPrices"]
-    sneaky = document.replace("{ instrument(key: $key)", "{ viewer { id } instrument(key: $key)")
+    sneaky = document.replace("instrument(key: $key) {", "viewer { id } instrument(key: $key) {")
     assert sneaky != document
     counts.reset()
     answer = world.post(sneaky, variables)
@@ -306,3 +280,45 @@ def test_a_release_request_explains_causes_from_the_pinned_reader(world: World) 
     live = RequestContext(router._opener, viewer, router._stores_opener)
     assert pinned.stores().reader.pin == release.seq  # type: ignore[union-attr]
     assert live.stores().reader.pin is None  # type: ignore[union-attr]
+
+
+NESTED = (
+    "query EtfHoldings($key: String!, $top: Int!) { instrument(key: $key) { instrumentId isEtf "
+    "holdings(top: $top) { asOf source total items { rank name symbol weight assetClass "
+    'instrument { symbol features(names: ["hv20_pct"]) { name value } } } } } }'
+)
+
+
+def test_a_caller_dependent_field_deep_in_a_listed_document_goes_live_and_uncached(
+    world: World, counts: Counts
+) -> None:
+    """``features(names: [<a user's expression feature>])`` below the checked depth: the role-wide
+    key would hold one user's answer for every user of the role. The whole tree is checked."""
+    variables = OPERATIONS["EtfHoldings"][1]
+    counts.reset()
+    answer = world.post(NESTED, variables)
+    assert answer.status_code == 200
+    assert counts.responses == 0 and world.app.state.graphql._cache.held == 0
+    again = world.post(NESTED, variables)
+    assert again.status_code == 200 and counts.responses == 0  # never kept, for anyone
+
+
+@pytest.mark.parametrize(
+    "tricky",
+    [
+        "query EtfHoldings($key: String!, $top: Int!) { instrument(key: $key) { ...F } } "
+        "fragment F on Instrument { instrumentId }",
+        "query EtfHoldings($key: String!, $top: Int!) "
+        "{ instrument(key: $key) { id: instrumentId } }",
+        "query EtfHoldings($key: String!, $top: Int!) { instrument(key: $key) "
+        "{ instrumentId @include(if: true) } }",
+        "query EtfHoldings($key: String!, $top: Int!) { instrument(key: $key) { instrumentId } "
+        "viewer { id } }",
+    ],
+)
+def test_a_fragment_an_alias_a_directive_or_an_extra_root_goes_live_and_uncached(
+    world: World, counts: Counts, tricky: str
+) -> None:
+    counts.reset()
+    assert world.post(tricky, OPERATIONS["EtfHoldings"][1]).status_code == 200
+    assert counts.responses == 0 and world.app.state.graphql._cache.held == 0

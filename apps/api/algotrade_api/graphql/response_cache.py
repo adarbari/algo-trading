@@ -93,20 +93,155 @@ RELEASE_SHARED_OPERATIONS: frozenset[str] = frozenset(
         "RegimeEpisodes",
     }
 )
-# The fields a release operation's document may select, as ``root`` or ``root.child`` paths (the
-# second level is what the root's fields give: a name's bars, a market's history). A document
-# named like a listed operation that selects anything else (``viewer``, a user's features) is
-# answered live and never kept: the key is role-wide, so it must hold nothing of the caller.
+# The field tree a release operation's document may select, every dotted path of the web's own
+# document (``apps/web/src/shared/api/generated/graphql/gql.ts``; a test keeps them equal). The
+# key of a release answer is role-wide, so it may hold nothing of the caller: a document named
+# like a listed operation that selects any field outside its tree (a ``viewer``, a user's
+# ``features``), or uses an alias, a directive or a fragment, is answered live and never kept.
 RELEASE_FIELDS: dict[str, frozenset[str]] = {
-    "InstrumentPrices": frozenset({"instrument.instrumentId", "instrument.prices"}),
-    "MarketHistory": frozenset({"market.history"}),
-    "InstrumentEvents": frozenset({"instrument.instrumentId", "instrument.events"}),
-    "EtfHoldings": frozenset(
-        {"instrument.instrumentId", "instrument.isEtf", "instrument.holdings"}
+    "InstrumentPrices": frozenset(
+        {
+            "instrument",
+            "instrument.instrumentId",
+            "instrument.prices",
+            "instrument.prices.bars",
+            "instrument.prices.bars.close",
+            "instrument.prices.bars.session",
+            "instrument.prices.bars.volume",
+            "instrument.prices.end",
+            "instrument.prices.start",
+        }
     ),
-    "RegimeBands": frozenset({"regime.bands"}),
-    "RegimeSignals": frozenset({"regime.episodes"}),
-    "RegimeEpisodes": frozenset({"regime.episodes", "regime.recessions"}),
+    "MarketHistory": frozenset(
+        {
+            "market",
+            "market.history",
+            "market.history.bucketSessions",
+            "market.history.name",
+            "market.history.points",
+            "market.history.points.session",
+            "market.history.points.value",
+            "market.history.segments",
+            "market.history.segments.end",
+            "market.history.segments.start",
+            "market.history.segments.value",
+        }
+    ),
+    "InstrumentEvents": frozenset(
+        {
+            "instrument",
+            "instrument.events",
+            "instrument.events.date",
+            "instrument.events.kind",
+            "instrument.events.table",
+            "instrument.events.ts",
+            "instrument.events.values",
+            "instrument.instrumentId",
+        }
+    ),
+    "EtfHoldings": frozenset(
+        {
+            "instrument",
+            "instrument.holdings",
+            "instrument.holdings.asOf",
+            "instrument.holdings.items",
+            "instrument.holdings.items.assetClass",
+            "instrument.holdings.items.instrument",
+            "instrument.holdings.items.instrument.symbol",
+            "instrument.holdings.items.name",
+            "instrument.holdings.items.rank",
+            "instrument.holdings.items.symbol",
+            "instrument.holdings.items.weight",
+            "instrument.holdings.source",
+            "instrument.holdings.total",
+            "instrument.instrumentId",
+            "instrument.isEtf",
+        }
+    ),
+    "RegimeBands": frozenset(
+        {
+            "regime",
+            "regime.bands",
+            "regime.bands.end",
+            "regime.bands.label",
+            "regime.bands.start",
+        }
+    ),
+    "RegimeSignals": frozenset(
+        {
+            "regime",
+            "regime.episodes",
+            "regime.episodes.key",
+            "regime.episodes.signals",
+            "regime.episodes.signals.gate",
+            "regime.episodes.signals.gate.clearedDay",
+            "regime.episodes.signals.gate.firstKnownDay",
+            "regime.episodes.signals.gate.flaggedDay",
+            "regime.episodes.signals.gate.flaggedDayFromTrough",
+            "regime.episodes.signals.gate.indicator",
+            "regime.episodes.signals.gate.kind",
+            "regime.episodes.signals.gate.neverFired",
+            "regime.episodes.signals.gate.state",
+            "regime.episodes.signals.gate.unknownReason",
+            "regime.episodes.signals.gate.unknownReason.cause",
+            "regime.episodes.signals.gate.unknownReason.cause.links",
+            "regime.episodes.signals.gate.unknownReason.cause.links.level",
+            "regime.episodes.signals.gate.unknownReason.cause.links.message",
+            "regime.episodes.signals.gate.unknownReason.cause.links.runId",
+            "regime.episodes.signals.gate.unknownReason.cause.links.status",
+            "regime.episodes.signals.gate.unknownReason.cause.links.subject",
+            "regime.episodes.signals.gate.unknownReason.code",
+            "regime.episodes.signals.gate.unknownReason.guideTerm",
+            "regime.episodes.signals.gate.unknownReason.kind",
+            "regime.episodes.signals.gate.unknownReason.kindText",
+            "regime.episodes.signals.indicators",
+            "regime.episodes.signals.indicators.clearedDay",
+            "regime.episodes.signals.indicators.firstKnownDay",
+            "regime.episodes.signals.indicators.flaggedDay",
+            "regime.episodes.signals.indicators.flaggedDayFromTrough",
+            "regime.episodes.signals.indicators.indicator",
+            "regime.episodes.signals.indicators.kind",
+            "regime.episodes.signals.indicators.neverFired",
+            "regime.episodes.signals.indicators.state",
+            "regime.episodes.signals.indicators.unknownReason",
+            "regime.episodes.signals.indicators.unknownReason.cause",
+            "regime.episodes.signals.indicators.unknownReason.cause.links",
+            "regime.episodes.signals.indicators.unknownReason.cause.links.level",
+            "regime.episodes.signals.indicators.unknownReason.cause.links.message",
+            "regime.episodes.signals.indicators.unknownReason.cause.links.runId",
+            "regime.episodes.signals.indicators.unknownReason.cause.links.status",
+            "regime.episodes.signals.indicators.unknownReason.cause.links.subject",
+            "regime.episodes.signals.indicators.unknownReason.code",
+            "regime.episodes.signals.indicators.unknownReason.guideTerm",
+            "regime.episodes.signals.indicators.unknownReason.kind",
+            "regime.episodes.signals.indicators.unknownReason.kindText",
+        }
+    ),
+    "RegimeEpisodes": frozenset(
+        {
+            "regime",
+            "regime.episodes",
+            "regime.episodes.cause",
+            "regime.episodes.key",
+            "regime.episodes.kind",
+            "regime.episodes.knownFrom",
+            "regime.episodes.name",
+            "regime.episodes.nasdaqDrawdown",
+            "regime.episodes.nberEnd",
+            "regime.episodes.nberStart",
+            "regime.episodes.notes",
+            "regime.episodes.peak",
+            "regime.episodes.recession",
+            "regime.episodes.recovered",
+            "regime.episodes.spxDrawdown",
+            "regime.episodes.trough",
+            "regime.recessions",
+            "regime.recessions.announcedEnd",
+            "regime.recessions.announcedStart",
+            "regime.recessions.end",
+            "regime.recessions.start",
+        }
+    ),
 }
 # Operations over published tables and configs that depend on the caller's catalogue or
 # configs (user features, the Guide's field entries): cached per user.
@@ -214,37 +349,33 @@ def operation_name(document: str) -> str | None:
     return (names[0] or None) if len(names) == 1 else None
 
 
-def _plain_fields(selection_set: Any) -> list[FieldNode] | None:
-    """The fields of a selection set, ``None`` when it holds a fragment spread or an inline
-    fragment (not resolved here: such a document is not served from a release)."""
-    found = list(selection_set.selections) if selection_set is not None else []
-    return found if all(isinstance(f, FieldNode) for f in found) else None
-
-
 @lru_cache(maxsize=256)
 def release_selects_only(name: str, document: str) -> bool:
-    """Whether ``document`` (the operation ``name``) selects only the fields ``RELEASE_FIELDS``
-    allows it: its root fields and their direct children, all plain fields."""
+    """Whether ``document`` (the operation ``name``) selects only the field tree
+    ``RELEASE_FIELDS`` allows it, at every depth, with no alias, directive or fragment, a single
+    query operation: deny by default (a field not in the tree is a caller-dependent field until
+    shown otherwise)."""
     allowed = RELEASE_FIELDS.get(name)
     try:
-        operations = [
-            d for d in parse(document).definitions if isinstance(d, OperationDefinitionNode)
-        ]
+        definitions = parse(document).definitions
     except GraphQLError:
         return False
-    roots = _plain_fields(operations[0].selection_set) if len(operations) == 1 else None
-    if allowed is None or not roots:
+    operations = [d for d in definitions if isinstance(d, OperationDefinitionNode)]
+    if allowed is None or len(operations) != 1 or len(definitions) != 1 or operations[0].directives:
         return False
-    for root in roots:
-        children = _plain_fields(root.selection_set)
-        paths = {f"{root.name.value}.{c.name.value}" for c in children or []}
-        if children is None or not paths <= allowed or (not paths and not _is_root(root, allowed)):
+    return _within(operations[0].selection_set, "", allowed)
+
+
+def _within(selections: Any, prefix: str, allowed: frozenset[str]) -> bool:
+    for node in selections.selections:
+        if not isinstance(node, FieldNode) or node.alias is not None or node.directives:
+            return False
+        path = prefix + node.name.value
+        if path not in allowed:
+            return False
+        if node.selection_set is not None and not _within(node.selection_set, path + ".", allowed):
             return False
     return True
-
-
-def _is_root(root: FieldNode, allowed: frozenset[str]) -> bool:
-    return root.name.value in {path.split(".")[0] for path in allowed}
 
 
 def cacheable(document: str) -> bool:

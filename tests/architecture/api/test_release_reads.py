@@ -11,6 +11,7 @@ from algotrade_api.graphql.response_cache import (
     SHARED_OPERATIONS,
 )
 from tests.conftest import REPO_ROOT
+from tests.helpers.api_store import field_paths, web_documents
 
 LISTED = "architecture/release_shared_ops.toml"
 BUILD = "src/algotrade/services/serving/build.py"
@@ -66,3 +67,14 @@ def test_the_selectable_fields_of_each_listed_operation_match_the_code() -> None
         for o in tomllib.loads((REPO_ROOT / LISTED).read_text())["operation"]
     }
     assert listed == RELEASE_FIELDS
+
+
+def test_the_allowed_field_tree_of_each_operation_is_the_web_documents() -> None:
+    """Deny by default: a field the web does not select is not in the tree. The tree is derived
+    from the web's own documents, so a web change that selects more fails here until the tree (and
+    the review of what it adds: nothing caller-dependent) is updated."""
+    documents = web_documents()
+    for name in RELEASE_SHARED_OPERATIONS:
+        assert RELEASE_FIELDS[name] == field_paths(documents[name]), (
+            f"{name}: the web's document selects other fields than RELEASE_FIELDS allows"
+        )
