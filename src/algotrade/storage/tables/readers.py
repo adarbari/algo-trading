@@ -30,6 +30,7 @@ class RollingRead:
     start: date | None = None
     end: date | None = None
     pin: int | None = None
+    epoch: int | None = None
     stamps: dict[date, int] = field(default_factory=dict)
 
 
@@ -117,7 +118,9 @@ class StoreReader:
         the kept rows before ``start`` are dropped and the new partitions appended. Any other
         change (an earlier start, a restated, purged or inserted partition, another pin, pending
         writes of ``own_run``) re-reads the whole range. The frame is shared with ``memo``: the
-        caller must not change it."""
+        caller must not change it. The kept rows and the appended partitions come from two reads:
+        harmless, since any stamp change re-reads everything."""
+        epoch = self._backend.tables.destructive_epoch()  # before the stamps and the reads
         stamps = self.partition_seq(memo.table, start, end)
         kept = memo.frame
         last = memo.end
@@ -128,6 +131,7 @@ class StoreReader:
             and memo.start <= start
             and last <= end
             and memo.pin == self._pin
+            and memo.epoch == epoch  # a purge or direct write moves no stamp
             and self.own_run is None
             and all(stamps.get(d) == v for d, v in memo.stamps.items() if d >= start)
             and not any(d <= last and d not in memo.stamps for d in stamps)

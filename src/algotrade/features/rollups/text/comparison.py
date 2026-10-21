@@ -185,7 +185,6 @@ def compare_filings(frame: pd.DataFrame, recent_from: date, session: date) -> li
     subjects = filings[[recent_from <= k <= session for k in filings["known_from"]]]
     subjects = subjects.sort_values(["cik", "form", "known_from", "accession"], kind="stable")
     subjects = subjects.drop_duplicates(["cik", "form"], keep="last")
-    positions = _rows_of(frame)
     by_company: dict[tuple[str, str], list[tuple[date | None, str]]] = {}
     for cik, form, report, accession in zip(
         filings["cik"], filings["form"], filings["report_date"], filings["accession"], strict=True
