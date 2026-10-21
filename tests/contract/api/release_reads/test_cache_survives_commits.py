@@ -275,7 +275,7 @@ def test_a_release_request_explains_causes_from_the_pinned_reader(world: World) 
     assert release is not None
     viewer = UserRecord("ana", Role.ADMIN)
     pinned = RequestContext(
-        router._opener, viewer, router._stores_opener, release, router._releases.pinned
+        router._opener, viewer, router._stores_opener, release, router._releases, None, True
     )
     live = RequestContext(router._opener, viewer, router._stores_opener)
     assert pinned.stores().reader.pin == release.seq  # type: ignore[union-attr]

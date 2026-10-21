@@ -1,6 +1,7 @@
 /**
  * The session notice (ADR 0062): the pages show the last complete session; `newer` is the later
- * one whose nightly workflow is still running or failing (the API serves its public kind only, never a step).
+ * one whose nightly workflow is still running or failing (the API serves its public kind only, never a step), or
+ * that is complete and being published (ADR 0077).
  * Plain data for the notice widget; the words and the term it opens are the widget's and the
  * Guide's.
  */
@@ -9,6 +10,6 @@ export interface SessionNotice {
   date: string;
   newer: {
     date: string;
-    state: 'IN_PROGRESS' | 'FAILED_RETRYING';
+    state: 'IN_PROGRESS' | 'FAILED_RETRYING' | 'PUBLISHING';
   } | null;
 }

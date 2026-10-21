@@ -31,7 +31,7 @@ from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.jobs.models import JobRecord, JobStatus
 from algotrade.services.jobs.runner import LocalJobRunner
 from algotrade.services.read.availability.cause import ADMIN_CAUSE, GENERIC
-from algotrade.services.read.session import NotFoundError, default_session
+from algotrade.services.read.session import NotFoundError, Serving, default_session
 from algotrade.services.screening.run import run_job_name
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend
@@ -84,8 +84,16 @@ class OnDemandScreens:
         ]
         return found[-1] if found else None
 
-    def request(self, config_id: str, user: UserContext, on: date | None = None) -> RunRequest:
-        """Run ``config_id`` for the default session (or ``on``) unless it has run."""
+    def request(
+        self,
+        config_id: str,
+        user: UserContext,
+        on: date | None = None,
+        serving: Serving | None = None,
+    ) -> RunRequest:
+        """Run ``config_id`` for the default session (or ``on``) unless it has run. The default is
+        the serving release's session while one is followed (ADR 0077 decision 7: the page the run
+        is for shows it), else the newest complete one."""
         try:
             config = resolve_config(self._configs, config_id, user)
         except ConfigurationError as exc:
@@ -94,7 +102,7 @@ class OnDemandScreens:
             raise
         if config.config.kind != "screener":
             raise NotFoundError(f"{config_id} is a {config.config.kind}, not a screener")
-        session = on or default_session(self._reader)
+        session = on or (serving.session if serving is not None else default_session(self._reader))
         if session is None:
             raise NotFoundError("no data is stored yet: nothing to screen")
         owner = self._owner(config_id, user)

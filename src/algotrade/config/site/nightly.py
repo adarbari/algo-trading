@@ -144,6 +144,9 @@ class NightlySettings:
     # [serving] release_reads: the API serves the listed operations from the current serving
     # release (ADR 0077); false: every read is live, as before the release existed (kill switch)
     release_reads: bool = True
+    # [serving] publishing_delay_minutes: how long a newer session may be complete before the pages
+    # say it is being published (ADR 0077 decision 7; counted from the run that completed it)
+    publishing_delay_minutes: int = 15
     # [backfilling]: tables still being filled; a screener short only of them warns until `until`
     backfilling: Mapping[str, Backfilling] = field(default_factory=dict)
 
@@ -174,7 +177,7 @@ class NightlySettings:
                 "serving",
             ]
         )
-        serving = root.table("serving", ["release_reads"])
+        serving = root.table("serving", ["release_reads", "publishing_delay_minutes"])
         schedule = root.table("schedule", ["data_deadline"])
         declared = root.raw("steps") or {}
         steps_table = root.table("steps", list(declared))
@@ -213,6 +216,9 @@ class NightlySettings:
             history_copy=history_copy,
             compaction=compaction,
             release_reads=serving.boolean("release_reads", d.release_reads),
+            publishing_delay_minutes=serving.integer(
+                "publishing_delay_minutes", d.publishing_delay_minutes, 0
+            ),
             arrow_cpu_threads=resources.integer("arrow_cpu_threads", d.arrow_cpu_threads, 1),
             nice=resources.integer("nice", d.nice, 0),
             arrow_io_threads=resources.integer("arrow_io_threads", d.arrow_io_threads, 1),

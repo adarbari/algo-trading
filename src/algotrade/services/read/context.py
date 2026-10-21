@@ -35,7 +35,16 @@ from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import catalogue
 from algotrade.services.licences import held_by
 from algotrade.services.read.availability.cause import UnavailableKind, table_cause
-from algotrade.services.read.session import Grain, NotFoundError, Session, grain_of, resolve_session
+from algotrade.services.read.session import (
+    Due,
+    Grain,
+    NotFoundError,
+    Serving,
+    Session,
+    grain_of,
+    publishing_due,
+    resolve_session,
+)
 from algotrade.services.read.values import KIND_OF_CODE, Unknown, UnknownCode
 from algotrade.storage.backends.arrow_memory import limit_threads, release_unused, use_system_pool
 from algotrade.storage.configs.store import ConfigStore
@@ -48,6 +57,7 @@ __all__ = [
     "NotFoundError",
     "ReadContext",
     "ResultCache",
+    "Serving",
     "StoreContext",
     "StoreReader",
     "Stores",
@@ -336,8 +346,10 @@ def open_context(
     user: UserContext,
     requested: date | None = None,
     cache: ResultCache | None = None,
+    serving: Serving | None = None,
 ) -> ReadContext:
-    """The context of one request for ``requested`` (None: the latest session): resolves the
+    """The context of one request for ``requested`` (None: the latest session; with ``serving``,
+    the serving release's, ADR 0077 decision 7): resolves the
     session once and reads ``user``'s catalogue once. ``NotFoundError`` on an empty store when
     no date is asked for. ``cache``: the long-lived cache to share (default: a fresh one); the
     resolved session is kept in it until the next publish (resolving lists every expected
@@ -347,13 +359,15 @@ def open_context(
         reader=reader,
         configs=configs,
         user=user,
-        session=_session(reader, requested, cache),
+        session=_session(reader, requested, cache, serving),
         features=catalogue(configs, user.user_id),
         cache=cache,
     )
 
 
-def _session(reader: StoreReader, requested: date | None, cache: ResultCache) -> Session:
+def _session(
+    reader: StoreReader, requested: date | None, cache: ResultCache, serving: Serving | None = None
+) -> Session:
     """The session ``requested`` resolves to, kept in ``cache`` until the next publish."""
     # Read before resolving (ADR 0022); a run's own pending writes do not move visible_seq.
     # the default session follows the nightly's run records (ADR 0062): a saved record moves
@@ -361,16 +375,45 @@ def _session(reader: StoreReader, requested: date | None, cache: ResultCache) ->
     # a pinned reader (a serving release) resolves a session that was complete at its sequence:
     # the records saved since (a job's checkpoint) cannot change it, so they are not in its key
     runs = None if reader.pin is not None else reader.runs_generation()
-    key = ("session", requested, reader.own_run, reader.version(), runs)
-    session: Session = cache.get_or_compute(key, lambda: resolve_session(reader, requested))
+    # under a serving release the default session is the release's and what is newer follows the
+    # publishing delay: the day and that flag are in the key (it flips with the clock, not a client)
+    follow = serving if requested is None else None
+    due: Due | None = None
+    if follow is not None:
+        # when the newer session is disclosed: asked of the run records once per publish and runs
+        # generation, never per request (a request only compares its clock with it)
+        found = cache.get_or_compute(
+            (
+                "publishing-due",
+                follow.session,
+                reader.version(),
+                reader.runs_generation(),
+                follow.publishing_delay,
+            ),
+            lambda: publishing_due(reader, follow.session, follow.publishing_delay) or (),
+        )
+        due = found or None
+    key: tuple[Hashable, ...] = ("session", requested, reader.own_run, reader.version(), runs)
+    if follow is not None:
+        key += (follow.key(due),)
+    session: Session = cache.get_or_compute(
+        key,
+        lambda: (
+            resolve_session(reader, requested)
+            if follow is None
+            else resolve_session(reader, requested, serving=follow, due=due)
+        ),
+    )
     return session
 
 
-def served_session(reader: StoreReader, cache: ResultCache) -> Session:
+def served_session(
+    reader: StoreReader, cache: ResultCache, serving: Serving | None = None
+) -> Session:
     """The session a read with no date serves now (resolved once per publish and saved run
     record, shared with ``open_context``); ``NotFoundError`` on an empty store. For the API's
-    response cache key (ADR 0062)."""
-    return _session(reader, None, cache)
+    response cache key (ADR 0062); ``serving``: the serving release's (ADR 0077 decision 7)."""
+    return _session(reader, None, cache, serving)
 
 
 def previous_session(ctx: ReadContext, table: str) -> date | None:

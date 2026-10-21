@@ -29,7 +29,20 @@ update completes, pages switch to the new day by themselves. Asking for a date e
 always shows that date, complete or not.
 """
 next = "Nothing is needed from you: pages move on by themselves, and a step that keeps failing is for the owner to fix."
-see_also = ["session", "not_run", "run"]
+see_also = ["session", "not_run", "run", "publishing_session"]
+
+[[term]]
+id = "publishing_session"
+term = "Being published"
+short = "A newer trading day is complete, and the pages are about to switch to it."
+body = """
+After the nightly update finishes, the app builds a snapshot of the new day. Every page reads
+that snapshot, so all of them show the same day at the same moment. Until it is ready, pages
+keep showing the previous day and say that the newer day is being published. This normally
+takes a few minutes. Asking for a date explicitly always shows that date.
+"""
+next = "Nothing is needed from you: if it lasts much longer than a few minutes, tell the owner."
+see_also = ["last_complete_session", "session"]
 
 [[term]]
 id = "knowledge_time"

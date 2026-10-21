@@ -3784,7 +3784,7 @@
             }
           },
           {
-            "description": "the session to read (default: the latest); live rows",
+            "description": "the session to read (default: the one the pages show); live rows",
             "in": "query",
             "name": "date",
             "required": false,
@@ -3798,7 +3798,7 @@
                   "type": "null"
                 }
               ],
-              "description": "the session to read (default: the latest); live rows",
+              "description": "the session to read (default: the one the pages show); live rows",
               "title": "Date"
             }
           }
@@ -4716,7 +4716,7 @@
             }
           },
           {
-            "description": "default: the latest session with data",
+            "description": "default: the session the pages show",
             "in": "query",
             "name": "date",
             "required": false,
@@ -4730,7 +4730,7 @@
                   "type": "null"
                 }
               ],
-              "description": "default: the latest session with data",
+              "description": "default: the session the pages show",
               "title": "Date"
             }
           },
