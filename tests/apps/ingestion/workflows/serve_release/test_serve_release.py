@@ -164,3 +164,23 @@ def test_any_exception_is_recorded_and_never_leaves_the_run_running(
     out = serve_release(backend, store, NOW, code_sha="abc")
     assert out.status is ServeStatus.FAILED and "a bug in the build" in out.reason
     assert [r.status for r in backend.runs.find(JOB)] == [RunStatus.FAILED]
+
+
+def test_a_table_that_arrives_for_the_session_after_the_build_ships_a_new_release(
+    world: tuple[MemoryBackend, StoreWriter, MemoryReleaseStore],
+) -> None:
+    """An expected table the release did not hold (an optional source through enrichment)
+    now has a partition for the session: stale, though every recorded input is unchanged."""
+    backend, writer, store = world
+    first = serve_release(backend, store, NOW, code_sha="abc")
+    assert "rollups/instrument/ibkr_iv@v1" not in {
+        i.table
+        for i in store.open(first.release_id).manifest.inputs  # type: ignore[union-attr]
+    }
+    frame = stamped([{"instrument_id": "EQ:AAA", "iv_rank": 0.5}], S1, "enrich")
+    backend.tables.write("rollups/instrument/ibkr_iv@v1", S1, "enrich", frame, pending=True)
+    backend.tables.commit_run("enrich", NOW)  # a commit: the sequence moves
+    assert writer is not None
+    second = serve_release(backend, store, NOW, code_sha="abc")
+    assert second.status is ServeStatus.PROMOTED and second.release_id != first.release_id
+    assert serve_release(backend, store, NOW, code_sha="abc").status is ServeStatus.CURRENT

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from algotrade.data import StoreReader
 from algotrade.services.jobs import RunLockedError, exclusive_run
-from algotrade.services.read.session import default_session
+from algotrade.services.read.session import EXPECTED_TABLES, default_session
 from algotrade.services.serving.build import build_release
 from algotrade.storage.backends.release.interfaces import ReleaseError, ReleaseStore
 from algotrade.storage.runs import RunStatus, start_run
@@ -79,9 +79,11 @@ def serve_release(
 
 
 def _serving_now(reader: StoreReader, releases: ReleaseStore) -> str | None:
-    """The release CURRENT serves when it is fresh: for the default session and every input
-    partition it was built from still has the stamp it recorded (a same-session restatement
-    ships; a backfill of an older date waits for the next session's release), else ``None``."""
+    """The release CURRENT serves when it is fresh: for the default session, every input
+    partition it was built from still has the stamp it recorded, and no expected table it did
+    not hold has since arrived for the session (a same-session restatement or a late optional
+    table ships; a backfill of an older date waits for the next session's release), else
+    ``None``."""
     day = default_session(reader)
     try:
         current = releases.current_release()
@@ -89,10 +91,13 @@ def _serving_now(reader: StoreReader, releases: ReleaseStore) -> str | None:
         return None
     if day is None or current is None or current.manifest.session != day.isoformat():
         return None
+    recorded = {item.table for item in current.manifest.inputs}
     for item in current.manifest.inputs:
         for held, stamp in item.partitions.items():
             if reader.partition_seq(item.table, held, held).get(held) != stamp:
                 return None
+    if any(day in reader.dates(table) for table in EXPECTED_TABLES if table not in recorded):
+        return None  # a table arrived for the session after the build (an optional source)
     return current.manifest.release_id
 
 
