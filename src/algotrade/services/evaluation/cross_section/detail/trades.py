@@ -26,6 +26,11 @@ from algotrade.services.evaluation.cross_section.hit import (
     MISSING_DRAWDOWN,
     MISSING_VALUE,
     NO_IMPLIED_VOL,
+    NO_SIBLING,
+    NO_SIBLING_ROW,
+    SIBLING_MISMATCH,
+    SIBLING_NOT_ELIGIBLE,
+    SIBLING_UNMEASURED,
     UNMEASURED,
 )
 from algotrade.services.evaluation.cross_section.measures import SCREENER, Pick
@@ -45,6 +50,11 @@ EXCLUDED_KINDS = {
     NO_IMPLIED_VOL: "NO_IMPLIED_VOL",
     INVALID_IMPLIED_VOL: "NO_IMPLIED_VOL",
     MISSING_DRAWDOWN: "MISSING_DRAWDOWN",
+    NO_SIBLING: "NO_PAIR",  # a pair_spread needs both legs; any way of not having them
+    SIBLING_NOT_ELIGIBLE: "NO_PAIR",
+    SIBLING_MISMATCH: "NO_PAIR",
+    NO_SIBLING_ROW: "NO_PAIR",
+    SIBLING_UNMEASURED: "UNMEASURED",
 }
 ORDER = ["variant", "horizon_sessions", "decision_session", "side", "rank"]
 

@@ -12,10 +12,12 @@ import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.core.time.calendar import next_session
+from algotrade.services.evaluation.cross_section import hit
 from algotrade.services.evaluation.cross_section.detail import trades
 from algotrade.services.evaluation.cross_section.detail.trades import trades_frame
 from algotrade.services.evaluation.cross_section.harness import EdgeEvaluation, evaluate_edge
 from algotrade.services.evaluation.cross_section.measures import Pick
+from algotrade.services.evaluation.cross_section.measuring import NO_ENTRY_BAR
 from algotrade.services.evaluation.cross_section.results import write_edge_eval
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.edge_schemas import EDGE_TRADES
@@ -102,8 +104,28 @@ def test_a_reason_without_a_public_kind_fails(world: World) -> None:
 
 def test_every_harness_reason_has_a_public_kind() -> None:
     assert set(trades.EXCLUDED_KINDS.values()) == {
-        "UNMEASURED", "MISSING_VALUE", "NO_ENTRY_BAR", "NO_IMPLIED_VOL", "MISSING_DRAWDOWN",
+        "UNMEASURED", "MISSING_VALUE", "NO_ENTRY_BAR", "NO_IMPLIED_VOL",
+        "MISSING_DRAWDOWN", "NO_PAIR",
     }  # fmt: skip
+
+
+def test_every_reason_the_harness_can_produce_maps_to_a_public_kind() -> None:
+    produced = {
+        hit.UNMEASURED, hit.MISSING_VALUE, hit.NO_IMPLIED_VOL, hit.INVALID_IMPLIED_VOL,
+        hit.MISSING_DRAWDOWN, NO_ENTRY_BAR, *hit.SIBLING_REASONS,
+    }  # fmt: skip
+    assert produced <= set(trades.EXCLUDED_KINDS)
+    constants = {
+        v for k, v in vars(hit).items()
+        if k.isupper() and isinstance(v, str) and v.islower() and "_" in v
+        and k not in {"IMPLIED_VOL_FIELD", "CHAIN_KIND"}
+    }  # fmt: skip
+    assert constants <= produced, constants - produced  # a new reason constant joins the list
+
+
+def test_a_dual_class_pick_with_an_ineligible_sibling_is_excluded_not_a_crash() -> None:
+    pick = Pick("EQ:D", 1, hit.SIBLING_NOT_ELIGIBLE)
+    assert trades._status(pick) == ("excluded", "NO_PAIR")
 
 
 def test_the_ledger_is_published_with_the_run_and_counted_on_its_record(world: World) -> None:

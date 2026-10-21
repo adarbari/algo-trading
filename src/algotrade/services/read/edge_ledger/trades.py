@@ -33,7 +33,8 @@ PAGE_SIZE = 50
 SKIPPED = "SKIPPED"  # the public reason of a live signal that was not traded
 STATUSES = ("won", "lost", "excluded", "open")  # open: a paper trade not settled by the session
 EXCLUDED_REASONS = (
-    "UNMEASURED", "MISSING_VALUE", "NO_ENTRY_BAR", "NO_IMPLIED_VOL", "MISSING_DRAWDOWN", SKIPPED,
+    "UNMEASURED", "MISSING_VALUE", "NO_ENTRY_BAR", "NO_IMPLIED_VOL", "MISSING_DRAWDOWN", "NO_PAIR",
+    SKIPPED,
 )  # fmt: skip
 
 

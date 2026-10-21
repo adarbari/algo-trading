@@ -40,12 +40,14 @@ see_also = ["trade_ledger", "trade_excluded_reason", "win_rate"]
 [[term]]
 id = "trade_excluded_reason"
 term = "Why a pick is excluded"
-short = "The public reason a pick has no counted outcome: no price, no value, no implied volatility or no drawdown."
+short = "The public reason a pick has no counted outcome: no price, no value, no implied volatility, no drawdown or no pair."
 body = """
 Unmeasured: the harness could not measure the pick. Missing value: the outcome's value was not
 stored. No entry bar: the name had no price on the day it would have been bought. No implied
 volatility: an option outcome needed an implied volatility that was not stored. Missing drawdown:
-the dip inside the window could not be computed. Skipped: a live signal that was not traded. An
+the dip inside the window could not be computed. No pair: a pair trade needs both share classes
+of an issuer, and this name's partner was missing, outside the universe that day or not naming it
+back. Skipped: a live signal that was not traded. An
 excluded pick takes no part in the win rate or the mean. A long list of one reason is a data
 problem, not a verdict on the edge. Example: many no-entry-bar rows around a holiday mean
 missing prices, not bad picks.
