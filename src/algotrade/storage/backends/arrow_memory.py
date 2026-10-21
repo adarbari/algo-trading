@@ -16,7 +16,8 @@ def use_system_pool() -> None:
     """Make the OS allocator the default of Python-level Arrow calls, a fallback only: Arrow's own
     C++ code (Parquet decode) keeps allocating from its default pool, which only
     ``ARROW_DEFAULT_MEMORY_POOL=system`` set before ``pyarrow`` is imported switches (the API does
-    it in ``algotrade_api/__init__.py``). The bundled mimalloc keeps freed pages: a read's peak
+    it in ``algotrade_api/__init__.py``; a pool a user sets there applies to the C++ side only).
+    The bundled mimalloc keeps freed pages: a read's peak
     stayed resident (811 MB of 811 MB on a sample) where the system pool hands them back (399 MB,
     183 after ``release_unused``; ``docs/perf/api-memory.md``)."""
     pa.set_memory_pool(pa.system_memory_pool())
