@@ -24,8 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from algotrade.config.site.nightly import NightlySettings
-from algotrade.config.site.settings import SiteDocuments, load_llm, load_nightly, load_users
+from algotrade.config.site.settings import load_llm, load_users
 from algotrade.config.site.users import Role, UserRecord, UsersSettings
 from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import (
@@ -70,10 +69,9 @@ from algotrade_api.feedback import DraftMemory, feedback_sink, request_sink
 from algotrade_api.graphql.offload import OverloadedError, off_loop
 from algotrade_api.graphql.response_cache import CountWrites, OperationLog, WriteEpoch, served_token
 from algotrade_api.graphql.schema import CachingRouter, graphql_router, sdl
-from algotrade_api.graphql.warm import CacheWarmer, Ceiling, seed_operations
+from algotrade_api.graphql.warm import CacheWarmer, seed_operations
 from algotrade_api.live import no_live, open_live
 from algotrade_api.ops.build import api_stamp, checkout_moved
-from algotrade_api.ops.footprint import OwnFootprint
 from algotrade_api.routes import PUBLIC_ROUTERS, ROUTERS
 from algotrade_api.text_model import OFF as TEXT_MODEL_OFF
 from algotrade_api.text_model import open_text_model
@@ -356,7 +354,6 @@ def create_app(
             extra=partial(warm_steps, app.state.store.preview_cache),
             replay=gql.replay,
             stale=lambda: checkout_moved(app.state.build),
-            ceiling=Ceiling(_warm_ceiling_mb(configs), OwnFootprint()),
         )
         if settings.live
         else None
@@ -364,15 +361,6 @@ def create_app(
     if settings.web_dist is not None:  # last: its catch-all GET must not shadow an API route
         app.include_router(web_router(settings.web_dist))
     return app
-
-
-def _warm_ceiling_mb(configs: SiteDocuments) -> int:
-    """``[serving] warm_ceiling_mb`` of nightly.toml; the default when that file does not load
-    (the API still starts, the nightly names the error)."""
-    try:
-        return load_nightly(configs).warm_ceiling_mb
-    except ConfigurationError:
-        return NightlySettings().warm_ceiling_mb
 
 
 # the warmed market tables (warm.py), the pages' entries and the Guide's built pages: frames

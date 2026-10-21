@@ -446,6 +446,23 @@ def test_an_api_footprint_over_2_gb_warns_with_the_number_and_the_doc(tmp_path: 
     assert doctor.check_api_footprint(probes(tmp_path, {})).level == doctor.INFO  # unreadable
 
 
+def test_the_footprint_probe_takes_the_largest_listener_and_the_port_of_api_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from algotrade_api.ops import footprint  # noqa: PLC0415
+
+    ports: list[int] = []
+
+    def pids(port: int) -> list[int]:
+        ports.append(port)
+        return [1, 2]  # a --reload parent and its child
+
+    monkeypatch.setattr(footprint, "listener_pids", pids)
+    monkeypatch.setattr(footprint, "process_footprint_mb", lambda pid: {1: 80.0, 2: 5000.0}[pid])
+    assert doctor._api_footprint() == 5000.0
+    assert ports == [8000]  # urlparse(API_URL).port
+
+
 def test_an_unusable_footprint_probe_is_info_not_a_crash(tmp_path: Path) -> None:
     def boom() -> float:
         raise ModuleNotFoundError("algotrade_api")

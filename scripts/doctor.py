@@ -66,11 +66,12 @@ API_FOOTPRINT_WARN_MB = 2048  # docs/perf/api-memory.md: the API settles near 1 
 
 
 def _api_footprint() -> float | None:
-    """MB of the process listening on the API's port (macOS ``footprint``); None: not readable."""
-    from algotrade_api.ops.footprint import listener_pid, process_footprint_mb  # noqa: PLC0415
+    """MB of the largest process listening on the API's port (macOS ``footprint``; ``--reload``
+    lists a parent and a child); None: nobody listens or it is not readable."""
+    from algotrade_api.ops.footprint import listener_pids, process_footprint_mb  # noqa: PLC0415
 
-    pid = listener_pid(8000)
-    return process_footprint_mb(pid) if pid is not None else None
+    sizes = [process_footprint_mb(pid) for pid in listener_pids(urlparse(API_URL).port or 8000)]
+    return max((s for s in sizes if s is not None), default=None)
 
 
 @dataclass

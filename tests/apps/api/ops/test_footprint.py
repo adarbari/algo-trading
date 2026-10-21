@@ -1,7 +1,9 @@
 """The footprint reader: ``footprint`` output in MB, the listener's pid, the cached own read."""
 
+import pytest
+
 from algotrade_api.ops import footprint
-from algotrade_api.ops.footprint import OwnFootprint, listener_pid, parse_footprint_mb
+from algotrade_api.ops.footprint import OwnFootprint, listener_pids, parse_footprint_mb
 
 OUT = "zsh [34186]: 64-bit    Footprint: 36 GB (16384 bytes per page)\n"
 
@@ -18,10 +20,19 @@ def test_an_unreadable_process_is_unknown_not_zero() -> None:
     assert footprint.process_footprint_mb(1, lambda cmd: (0, OUT)) == 36 * 1024
 
 
-def test_the_listener_pid_is_the_first_lsof_line() -> None:
-    assert listener_pid(8000, lambda cmd: (0, "4242\n4243\n")) == 4242
-    assert listener_pid(8000, lambda cmd: (1, "")) is None
-    assert listener_pid(8000, lambda cmd: (127, "no lsof")) is None
+def test_every_listener_pid_is_returned_for_a_reload_parent_and_child() -> None:
+    assert listener_pids(8000, lambda cmd: (0, "4242\n4243\n")) == [4242, 4243]
+    assert listener_pids(8000, lambda cmd: (1, "")) == []
+    assert listener_pids(8000, lambda cmd: (127, "no lsof")) == []
+
+
+def test_a_probe_that_reads_nothing_warns_once(caplog: pytest.LogCaptureFixture) -> None:
+    own = OwnFootprint(lambda cmd: (127, "no footprint"), lambda: 1e9)
+    with caplog.at_level("WARNING"):
+        assert own() is None
+        own._at = float("-inf")  # the cache window passed
+        assert own() is None
+    assert caplog.text.count("cannot read this process") == 1
 
 
 def test_the_own_footprint_is_read_once_per_cache_window() -> None:

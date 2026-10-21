@@ -11,9 +11,8 @@ list (its field frame and the picks of its saved run), and the signal timing of 
 reference episode (the regime page's History).
 The read runs in the read pool (``off_loop``) like any request's, taking one of its threads;
 a failing step is logged and the others still run; the next publish tries again.
-Between steps the warmer reads the process footprint (``ops/footprint.py``) and starts no new
-step above the ceiling (``[serving] warm_ceiling_mb``, ``Ceiling``), logging where it stopped:
-one warm once grew the API to 36 GB, and a warm is never worth the Mac (docs/perf/api-memory.md).
+Each step's log line carries the process footprint (``ops/footprint.py``), so a step that grows
+the API shows up in the log (one warm once took it to 36 GB, docs/perf/api-memory.md).
 
 The read model's loaders are not the pages' answers: a page's first request still runs its
 resolvers (a second or two for Ideas, the screener results, the catalogue). So after the home
@@ -27,7 +26,6 @@ import json
 import logging
 import time
 from collections.abc import Awaitable, Callable, Hashable
-from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -48,52 +46,34 @@ from algotrade.services.read.screens.ideas import load_ideas
 from algotrade.services.read.screens.runs import screen_rows
 from algotrade.services.read.screens.screeners import load_screeners
 from algotrade_api.graphql.offload import off_loop
+from algotrade_api.ops.footprint import OwnFootprint
 
 WARM_EVERY_S = 60.0
 IDEAS_LIMIT = 200  # the Ideas page's request (entities/idea IDEAS_LIMIT)
 INGESTION_SESSIONS = 10  # the Admin Ingestion grid's window (entities/ingestion SESSIONS)
 
 log = logging.getLogger(__name__)
+_footprint = OwnFootprint()  # MB of this process, re-read at most every few seconds
 
 
 type Step = tuple[str, Callable[[], object]]
 type ExtraSteps = Callable[[ReadContext], list[Step]]
 
 
-@dataclass(frozen=True)
-class Ceiling:
-    """The footprint (MB) above which the warmer starts no new step; ``footprint_mb`` is None
-    when it cannot be read (then nothing is stopped: unknown is not over)."""
-
-    limit_mb: float
-    footprint_mb: Callable[[], float | None]
-
-    def over(self) -> float | None:
-        """The footprint when it is above the limit, else None."""
-        mb = self.footprint_mb()
-        return mb if mb is not None and mb > self.limit_mb else None
-
-
-def _run(steps: list[Step], ceiling: Ceiling | None = None) -> bool:
-    """Run ``steps`` in order; False when the ``ceiling`` stopped it before the last one."""
+def _run(steps: list[Step]) -> None:
     for name, step in steps:  # one failing step does not stop (or repeat) the others
-        over = ceiling.over() if ceiling is not None else None
-        if over is not None and ceiling is not None:
-            log.warning(
-                "not warming further: footprint %.0f MB over ceiling %.0f MB (stopped before %s)",
-                over,
-                ceiling.limit_mb,
-                name,
-            )
-            return False
         started = time.monotonic()
         try:
             step()
         except Exception:
             log.exception("warming the read cache: %s failed", name)
         else:
-            log.info("warmed %s in %.1f s", name, time.monotonic() - started)
-    return True
+            mb = _footprint()
+            seconds = time.monotonic() - started
+            if mb is None:  # the probe warns once; the line stays without the figure
+                log.info("warmed %s in %.1f s", name, seconds)
+            else:
+                log.info("warmed %s in %.1f s, footprint %.0f MB", name, seconds, mb)
 
 
 def home_steps(ctx: ReadContext) -> list[Step]:
@@ -124,18 +104,12 @@ def warm_guide(ctx: ReadContext) -> None:
         load_guide_mechanism(ctx, kind)
 
 
-def warm(
-    ctx: ReadContext,
-    extra: ExtraSteps | None = None,
-    home: bool = True,
-    ceiling: Ceiling | None = None,
-) -> None:
+def warm(ctx: ReadContext, extra: ExtraSteps | None = None, home: bool = True) -> None:
     """Read what every page shares for ``ctx``'s session and published state (``home_steps``
     first, unless ``home`` is False because the caller read them already: seconds, not the
     market frames' minutes, stand between a publish and the home page), then the steps
     ``extra`` names for it (the Builder's first preview of each screen: the API wires them in,
-    this layer reads only the read model), the market frames and the episodes; none starts
-    once the process is over ``ceiling``."""
+    this layer reads only the read model), the market frames and the episodes."""
     steps = home_steps(ctx) if home else []
     # the Admin Ingestion page's 10-session grid (3 s cold: 4300 partitions): not a home step, the
     # start does not wait for it
@@ -153,7 +127,7 @@ def warm(
             )
     except Exception:
         log.exception("warming the read cache: the episodes failed")
-    _run(steps, ceiling)
+    _run(steps)
 
 
 class CacheWarmer:
@@ -168,9 +142,7 @@ class CacheWarmer:
         extra: ExtraSteps | None = None,
         replay: Callable[[], Awaitable[int]] | None = None,
         stale: Callable[[], str | None] | None = None,
-        ceiling: Ceiling | None = None,
     ):
-        self._ceiling = ceiling
         self._stale = stale
         self._stale_logged: str | None = None
         self._replay = replay
@@ -181,7 +153,7 @@ class CacheWarmer:
 
     def warm_home(self) -> None:
         """Read the home page's steps now (blocking): the app's start waits for it."""
-        _run(home_steps(self._open_ctx()), self._ceiling)
+        _run(home_steps(self._open_ctx()))
 
     async def replay_operations(self) -> None:
         """Replay the served operations into the response cache (``replay``), logged and never
@@ -210,13 +182,13 @@ class CacheWarmer:
         state = (ctx.session.date, ctx.session.newer, ctx.reader.visible_seq())
         if state == self._warmed:
             return None
-        _run(home_steps(ctx), self._ceiling)
+        _run(home_steps(ctx))
         return ctx, state
 
     def finish(self, pending: tuple[ReadContext, Hashable]) -> None:
         """The rest of the warm (``warm``) for what ``begin`` returned. Blocking."""
         ctx, state = pending
-        warm(ctx, self._extra, home=False, ceiling=self._ceiling)
+        warm(ctx, self._extra, home=False)
         self._warmed = state
 
     async def run(self) -> None:

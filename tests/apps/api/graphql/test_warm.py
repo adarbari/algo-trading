@@ -54,9 +54,7 @@ def test_it_warms_at_start_and_after_each_publish_or_new_session(
 ) -> None:
     warmed: list[tuple[date, int]] = []
     monkeypatch.setattr(
-        warm,
-        "warm",
-        lambda c, _f, home, ceiling=None: warmed.append((c.session.date, c.reader.seq)),
+        warm, "warm", lambda c, _f, home: warmed.append((c.session.date, c.reader.seq))
     )
     reader, session = _Reader(), _Session(date(2026, 10, 8))
     warmer = CacheWarmer(lambda: _Ctx(session, reader))  # type: ignore[arg-type, return-value]
@@ -73,7 +71,7 @@ def test_the_served_operations_are_replayed_between_the_home_steps_and_the_rest(
 ) -> None:
     order: list[str] = []
     monkeypatch.setattr(warm, "home_steps", lambda c: [("home", lambda: order.append("home"))])
-    monkeypatch.setattr(warm, "warm", lambda c, _f, home, ceiling=None: order.append("rest"))
+    monkeypatch.setattr(warm, "warm", lambda c, _f, home: order.append("rest"))
 
     async def replay() -> int:
         order.append("replay")
@@ -126,9 +124,7 @@ def test_it_warms_when_a_session_becomes_complete_without_a_publish(
 ) -> None:
     """ADR 0062: the nightly's record flipping the served session saves no table."""
     warmed: list[date] = []
-    monkeypatch.setattr(
-        warm, "warm", lambda c, _f, home, ceiling=None: warmed.append(c.session.date)
-    )
+    monkeypatch.setattr(warm, "warm", lambda c, _f, home: warmed.append(c.session.date))
     session = _Session(date(2026, 10, 8), newer="2026-10-09 failing")
     warmer = CacheWarmer(lambda: _Ctx(session, _Reader()))  # type: ignore[arg-type, return-value]
     assert _once(warmer) and not _once(warmer)
@@ -142,7 +138,7 @@ def test_a_failed_warm_is_logged_and_tried_again(
 ) -> None:
     calls: list[int] = []
 
-    def flaky(_ctx: Any, _frames: Any, home: bool, ceiling: Any = None) -> None:
+    def flaky(_ctx: Any, _frames: Any, home: bool) -> None:
         calls.append(1)
         if len(calls) == 1:
             raise OSError("a store mid-publish")
@@ -329,45 +325,22 @@ def test_every_shipped_edge_loads_through_the_warm_path() -> None:
     assert shipped and {e.id for e in load_edges(ctx)} == shipped
 
 
-def test_the_warm_stops_starting_steps_above_the_footprint_ceiling(
+def test_each_warmed_step_logs_the_process_footprint(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    # 2026-10-20: one warm took the API to 36 GB (market frames, episodes) with nothing to stop it.
-    ran: list[str] = []
-    monkeypatch.setattr(warm, "warm_market_frames", lambda c: ran.append("frames"))
-    monkeypatch.setattr(warm, "load_completeness", lambda c, n: ran.append("completeness"))
-    monkeypatch.setattr(
-        warm,
-        "load_episodes",
-        lambda configs: type("E", (), {"episodes": [type("X", (), {"key": "a"})]}),
-    )
-    monkeypatch.setattr(warm, "load_episode_signals", lambda c, k: ran.append(f"episode {k}"))
-    sizes = iter([500.0, 4000.0, 9000.0])  # MB read before each step
-    ceiling = warm.Ceiling(3000, lambda: next(sizes))
-    ctx = type("C", (), {"configs": None})()
-    with caplog.at_level("WARNING"):
-        warm.warm(ctx, home=False, ceiling=ceiling)  # type: ignore[arg-type]
-    assert ran == ["completeness"]  # the first step ran at 500 MB, then 4000 stopped it
-    assert "not warming further: footprint 4000 MB over ceiling" in caplog.text
-    assert "stopped before market frames" in caplog.text
+    # 2026-10-20: one warm took the API to 36 GB and no log line said which step grew it.
+    sizes = iter([1200.0, 36864.0])
+    monkeypatch.setattr(warm, "_footprint", lambda: next(sizes))
+    with caplog.at_level("INFO"):
+        warm._run([("small", lambda: None), ("market frames", lambda: None)])
+    assert "warmed small in" in caplog.text and "footprint 1200 MB" in caplog.text
+    assert "warmed market frames in" in caplog.text and "footprint 36864 MB" in caplog.text
 
 
-def test_an_unreadable_footprint_does_not_stop_the_warm() -> None:
-    ran: list[str] = []
-    steps: list[warm.Step] = [("a", lambda: ran.append("a")), ("b", lambda: ran.append("b"))]
-    assert warm._run(steps, warm.Ceiling(1, lambda: None)) is True
-    assert ran == ["a", "b"]
-
-
-def test_the_cache_warmer_passes_its_ceiling_to_every_step_it_starts(
+def test_a_step_logs_without_a_figure_when_the_probe_reads_nothing(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    ran: list[str] = []
-    monkeypatch.setattr(warm, "home_steps", lambda ctx: [("home", lambda: ran.append("home"))])
-    warmer = CacheWarmer(
-        type("C", (), {"configs": None}),  # type: ignore[arg-type]
-        ceiling=warm.Ceiling(3000, lambda: 5000.0),
-    )
-    with caplog.at_level("WARNING"):
-        warmer.warm_home()
-    assert ran == [] and "not warming further" in caplog.text
+    monkeypatch.setattr(warm, "_footprint", lambda: None)
+    with caplog.at_level("INFO"):
+        warm._run([("a", lambda: None)])
+    assert "warmed a in" in caplog.text and "footprint" not in caplog.text

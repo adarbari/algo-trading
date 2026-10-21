@@ -49,7 +49,7 @@ detect = [{ import = "fastapi" }, { import = "starlette" }, { import = "uvicorn"
 
 [[responsibility]]
 id = "process-footprint"
-description = "Read the memory footprint of a process on this Mac (macOS `footprint -p`, read-only, the Activity Monitor number, not the RSS): the pid listening on a port for make doctor's `api footprint` line, and the API's own footprint, cached a few seconds, for the cache warmer's ceiling (docs/perf/api-memory.md); None where the tool is absent"
+description = "Read the memory footprint of a process on this Mac (macOS `footprint -p`, read-only, the Activity Monitor number, not the RSS): the pid listening on a port for make doctor's `api footprint` line, and the API's own footprint, cached a few seconds, for the cache warmer's per-step log line (docs/perf/api-memory.md); None where the tool is absent"
 owner = ["apps/api/algotrade_api/ops/footprint.py"]
 section = "docs/adr/0044-hosting-from-the-owners-mac.md#decision"
 detect = [{ string = "--noCategories" }]

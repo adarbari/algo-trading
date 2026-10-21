@@ -140,8 +140,6 @@ class NightlySettings:
     arrow_cpu_threads: int = 2  # Arrow decode threads (the API caps itself at the same 2)
     arrow_io_threads: int = 4
     min_free_gb: float = 15.0  # the nightly refuses to start with less free on the data volume
-    # [serving]: the served API's own limit on what it takes from that Mac
-    warm_ceiling_mb: int = 3000  # the cache warmer starts no new step above this footprint
     # [backfilling]: tables still being filled; a screener short only of them warns until `until`
     backfilling: Mapping[str, Backfilling] = field(default_factory=dict)
 
@@ -168,7 +166,6 @@ class NightlySettings:
                 "compaction",
                 "post",
                 "resources",
-                "serving",
                 "backfilling",
             ]
         )
@@ -184,7 +181,6 @@ class NightlySettings:
         resources = root.table(
             "resources", ["arrow_cpu_threads", "arrow_io_threads", "min_free_gb"]
         )
-        serving = root.table("serving", ["warm_ceiling_mb"])
         history_copy = HistoryCopySettings.from_table(
             root.table(
                 "history_copy",
@@ -213,7 +209,6 @@ class NightlySettings:
             arrow_cpu_threads=resources.integer("arrow_cpu_threads", d.arrow_cpu_threads, 1),
             arrow_io_threads=resources.integer("arrow_io_threads", d.arrow_io_threads, 1),
             min_free_gb=resources.number("min_free_gb", d.min_free_gb, 0),
-            warm_ceiling_mb=serving.integer("warm_ceiling_mb", d.warm_ceiling_mb, 1),
             settle_minutes=sessions.integer("settle_minutes", d.settle_minutes, 0),
             max_catch_up=sessions.integer("max_catch_up", d.max_catch_up, 1),
             max_duration_minutes=alerts.number("max_duration_minutes", d.max_duration_minutes, 0),

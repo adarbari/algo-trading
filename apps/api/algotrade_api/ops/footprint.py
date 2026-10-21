@@ -1,15 +1,18 @@
 """The memory footprint of a process on this Mac, read-only: macOS ``footprint -p <pid>`` (the
 number Activity Monitor calls Memory, compressed pages included, not the RSS that hid the 36 GB
 warm, docs/perf/api-memory.md). Used by ``make doctor`` (the process listening on the API's
-port) and by the cache warmer (its own process, cached a few seconds). ``None`` wherever the
-tool is absent or its output unreadable (not macOS, no such process): callers treat that as
-unknown, never as small."""
+port) and by the cache warmer's per-step log line (its own process, cached a few seconds).
+``None`` wherever the tool is absent or its output unreadable (not macOS, no such process):
+callers treat that as unknown, never as small."""
 
+import logging
 import os
 import re
 import subprocess
 import time
 from collections.abc import Callable
+
+log = logging.getLogger(__name__)
 
 type Run = Callable[[list[str]], tuple[int, str]]
 
@@ -38,11 +41,11 @@ def process_footprint_mb(pid: int, run: Run = _run) -> float | None:
     return parse_footprint_mb(out) if rc == 0 else None
 
 
-def listener_pid(port: int, run: Run = _run) -> int | None:
-    """The pid listening on ``127.0.0.1:port`` (``lsof``), else None."""
+def listener_pids(port: int, run: Run = _run) -> list[int]:
+    """The pids listening on TCP ``port`` on any address (``lsof``); several under ``--reload``
+    (the parent holds the socket, a child serves)."""
     rc, out = run(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"])
-    first = out.split()[0] if rc == 0 and out.split() else ""
-    return int(first) if first.isdigit() else None
+    return [int(t) for t in out.split() if t.isdigit()] if rc == 0 else []
 
 
 class OwnFootprint:
@@ -52,10 +55,16 @@ class OwnFootprint:
         self._run, self._clock = run, clock
         self._at = float("-inf")
         self._mb: float | None = None
+        self._warned = False
 
     def __call__(self) -> float | None:
         now = self._clock()
         if now - self._at >= OWN_CACHE_S:
             self._mb = process_footprint_mb(os.getpid(), self._run)
+            if self._mb is None and not self._warned:  # a broken probe must not hide the guard
+                log.warning(
+                    "cannot read this process's footprint: warm steps are logged without it"
+                )
+                self._warned = True
             self._at = now
         return self._mb
