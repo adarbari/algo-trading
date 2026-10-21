@@ -773,6 +773,7 @@ def ingest_filing_text(
             filers_cached=found.cached if found else None,
             index_days=found.days if found else None,
             index_holidays=len(found.holidays) if found else None,
+            index_from_full=[d.isoformat() for d in found.from_full_index] if found else None,
             index_gaps_allowed=list(allow_gap),
             ciks=len(todo),
             skipped_covered=plan.skipped,
