@@ -46,7 +46,9 @@ SOURCE = "sec_edgar"
 DATASET = "filing_text"
 DOCUMENT_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{document}"
 _ACCESSION = re.compile(r"\d{10}-\d{2}-\d{6}")
-_DOCUMENT = re.compile(r"[A-Za-z0-9][\w.\-]*\.(?:htm|html|txt)")  # a file name, never a path
+_DOCUMENT = re.compile(
+    r"[A-Za-z0-9][\w.\-]*\.(?:htm|html|txt)", re.IGNORECASE
+)  # a file name, never a path; pre-2015 filings use ``.HTM``
 _BLOCKED = (b"Request Rate Threshold", b"Undeclared Automated Tool")  # SEC's 200-status block pages
 
 

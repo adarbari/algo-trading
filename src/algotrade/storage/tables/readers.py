@@ -18,6 +18,22 @@ from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.interfaces import Backend
 
 
+@dataclass
+class RollingRead:
+    """What ``StoreReader.table_range_rolling`` keeps of its last read of one table with one column
+    list: the frame, its window and each partition's commit stamp. One window at a time, the memory
+    of one read."""
+
+    table: str
+    columns: tuple[str, ...]
+    frame: pd.DataFrame | None = None
+    start: date | None = None
+    end: date | None = None
+    pin: int | None = None
+    epoch: int | None = None
+    stamps: dict[date, int] = field(default_factory=dict)
+
+
 class StoreReader:
     """``own_run``: also see that run's pending writes (the run reading what it wrote before
     it commits, ADR 0022); ``None`` (the default) sees committed data only. ``pin``: every read
@@ -99,6 +115,48 @@ class StoreReader:
         return tables.read_range(
             table, start, end, as_of, instruments, self.own_run, columns, self._pin
         )
+
+    def table_range_rolling(self, memo: RollingRead, start: date, end: date) -> pd.DataFrame | None:
+        """``table_range(memo.table, start, end, columns=memo.columns)``, identical rows and order,
+        re-reading only the partitions after the previous call's window when the window moved on
+        and every partition it still covers has the commit stamp it had (``partition_seq``): then
+        the kept rows before ``start`` are dropped and the new partitions appended. Any other
+        change (an earlier start, a restated, purged or inserted partition, another pin, pending
+        writes of ``own_run``) re-reads the whole range. The frame is shared with ``memo``: the
+        caller must not change it. The kept rows and the appended partitions come from two reads:
+        harmless, since any stamp change re-reads everything."""
+        epoch = self._backend.tables.destructive_epoch()  # before the stamps and the reads
+        stamps = self.partition_seq(memo.table, start, end)
+        kept = memo.frame
+        last = memo.end
+        reusable = (
+            kept is not None
+            and last is not None
+            and memo.start is not None
+            and memo.start <= start
+            and last <= end
+            and memo.pin == self._pin
+            and memo.epoch == epoch  # a purge or direct write moves no stamp
+            and self.own_run is None
+            and all(stamps.get(d) == v for d, v in memo.stamps.items() if d >= start)
+            and not any(d <= last and d not in memo.stamps for d in stamps)
+        )
+        if not reusable or kept is None or last is None:
+            frame = StoreReader.table_range(self, memo.table, start, end, None, None, memo.columns)
+        else:
+            if memo.start != start:
+                kept = kept[pd.to_datetime(kept["session_date"]) >= pd.Timestamp(start)]
+            fresh = [d for d in stamps if d > last]
+            added = (
+                StoreReader.table_range(self, memo.table, min(fresh), end, None, None, memo.columns)
+                if fresh
+                else None
+            )
+            frame = kept if added is None else pd.concat([kept, added], ignore_index=True)
+            frame = frame.reset_index(drop=True)
+        memo.frame, memo.start, memo.end = frame, start, end
+        memo.pin, memo.epoch, memo.stamps = self._pin, epoch, stamps
+        return frame
 
     def read_run(
         self,
@@ -369,6 +427,13 @@ class RecordingReader(StoreReader):
         frame = super().table_range(table, start, end, as_of, instruments, columns)
         if recording:
             self._log_rows(table, start, end)
+        return frame
+
+    def table_range_rolling(self, memo: RollingRead, start: date, end: date) -> pd.DataFrame | None:
+        recording = self._open()
+        frame = super().table_range_rolling(memo, start, end)
+        if recording:
+            self._log_rows(memo.table, start, end)  # the read it stands for, every partition
         return frame
 
     def read_run(

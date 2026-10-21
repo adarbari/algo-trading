@@ -4,7 +4,7 @@ with a recent filing, a company with no recent filing or no instrument at the se
 the view, amendments are left out, the id-fill versions of a filing are one filing, and the
 constants equal the group's (``comparison.py``)."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pandas as pd
 import pytest
@@ -119,3 +119,88 @@ def test_a_reparsed_old_filing_is_not_recent_news() -> None:
     assert recent.recent_filing_texts(reader, KNOWN) is None
     view = recent.recent_filing_texts(store(RECENT, (("EQ:AAA", "1"),)), KNOWN)
     assert view is not None and set(view["accepted_session"]) == {KNOWN, date(2025, 8, 6)}
+
+
+def _write(reader: StoreReader, rows: list[dict[str, object]], run: str) -> None:
+    """Commit ``rows`` into their acceptance-day partitions as run ``run`` (a commit sequence)."""
+    writer = StoreWriter(reader._backend)
+    by_day: dict[date, list[dict[str, object]]] = {}
+    for r in rows:
+        by_day.setdefault(pd.Timestamp(r["ts"]).date(), []).append(r)  # type: ignore[arg-type]
+    for day, part in by_day.items():
+        frame = stamped(part, day, run, T0)
+        writer.write_table(reading.TABLE, day, run, frame, pending=True)
+    reader._backend.tables.commit_run(run, datetime.now(UTC))  # a commit sequence per run
+
+
+def test_the_rolling_view_equals_the_fresh_view_over_a_run_of_sessions() -> None:
+    """The rolling light read changes no row: session after session (a filing leaving the
+    five-session window, a late-arriving filing in a new partition before the last session, a
+    restated old partition, a re-extraction known only from its stamp) every view equals
+    the stateless one, only the new partitions are read when nothing behind moved, and the read
+    log of each session is that of the full read."""
+    reader = store([], (("EQ:AAA", "1"), ("EQ:BBB", "2")))
+    _write(reader, RECENT, "first")
+    reads: list[tuple[date, date]] = []
+    real = StoreReader.table_range
+
+    def spy(self: StoreReader, table: str, start: date, end: date, *a: object) -> object:
+        reads.append((start, end))
+        return real(self, table, start, end, *a)  # type: ignore[arg-type]
+
+    StoreReader.table_range = spy  # type: ignore[method-assign]
+    try:
+        logging, fresh = reader.recording(), reader.recording()
+        rolling = recent.RecentFilings(logging)
+        sessions = [date(2026, 9, d) for d in (30,)] + [
+            date(2026, 10, d) for d in (1, 2, 5, 6, 7, 8, 9, 12)
+        ]
+        spans: list[list[tuple[date, date]]] = []
+        seen: list[bool] = []
+        for s in sessions:
+            if s == date(2026, 10, 6):  # a late filing lands in an earlier, new partition
+                late = filing(
+                    "LATE",
+                    "10-Q",
+                    pd.Timestamp("2026-10-02T15:00:00Z"),
+                    date(2026, 6, 30),
+                    cik="0000000002",
+                )
+                old = filing("LATEOLD", "10-Q", YEAR_AGO, date(2025, 6, 30), cik="0000000002")
+                _write(reader, late + old, "late")
+            if s == date(
+                2026, 10, 8
+            ):  # a restated partition: a re-extraction known only from its stamp
+                fix = [
+                    r
+                    | {
+                        "parser_version": 2,
+                        "known_from": date(2026, 10, 8),
+                        "text": body(words(150, 50), 600),
+                    }
+                    for r in filing("NEW", "10-Q", ACCEPTED, date(2026, 6, 30))
+                ]
+                _write(reader, fix, "fix")
+            reads.clear()
+            with logging.attribute(s):
+                got = rolling.at(s)
+            spans.append(list(reads))
+            reads.clear()
+            with fresh.attribute(s):
+                want = recent.recent_filing_texts(fresh, s)
+            assert logging.reads(s) == fresh.reads(s)  # the same dependencies are recorded
+            seen.append(got is not None)
+            if want is None:
+                assert got is None
+            else:
+                assert got is not None
+                pd.testing.assert_frame_equal(got, want, check_exact=True)
+    finally:
+        StoreReader.table_range = real  # type: ignore[method-assign]
+    assert any(seen) and not all(seen)  # filings enter and leave the view
+    long = [
+        s for s, r in zip(sessions, spans, strict=True) if any((b - a).days > 100 for a, b in r)
+    ]
+    # the long window is read whole on the first session and after a partition behind it moved
+    # (the late filing's new one, the restated one); every other session reads only what is new
+    assert long == [date(2026, 9, 30), date(2026, 10, 6), date(2026, 10, 8)]

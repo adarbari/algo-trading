@@ -135,6 +135,8 @@ class CachingRouter(GraphQLRouter[RequestContext, None]):
             if stale is not None and key is not None:  # stale-while-revalidate: answer now,
                 self._revalidate(key, Served(viewer, document, variables))  # recompute behind it
                 return await _served(stale, request)
+        else:
+            request.state.release = None
         inline = parsed is not None and only_inline(cast(Hashable, self.schema), parsed[0])
         if not inline:
             self._admission.admit()

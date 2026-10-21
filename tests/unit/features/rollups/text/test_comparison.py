@@ -217,3 +217,101 @@ def test_the_subject_date_does_not_depend_on_the_order_of_a_filings_item_rows() 
     for ordered in (rows, rows[::-1]):
         [c] = run(frame(ordered))
         assert c.known_from == date(2026, 9, 30)
+
+
+def _uncached(data: pd.DataFrame, recent_from: date, session: date) -> list[cmp.Comparison]:
+    """The comparison as it was before the memo: a boolean filter per subject, every filing
+    tokenised at every call (the reference the memoised path must equal)."""
+    filings = cmp._filings(data)
+    subjects = filings[[recent_from <= k <= session for k in filings["known_from"]]]
+    subjects = subjects.sort_values(["cik", "form", "known_from", "accession"], kind="stable")
+    subjects = subjects.drop_duplicates(["cik", "form"], keep="last")
+
+    def counts(cik: str, accession: str, form: str) -> dict[str, cmp.Counter[str]]:
+        rows = data[(data["cik"] == cik) & (data["accession"] == accession)]
+        out = {}
+        for item, quality, text in zip(rows["item"], rows["quality"], rows["text"], strict=True):
+            if (
+                item not in cmp.ITEMS[form]
+                or quality != cmp.OK_QUALITY
+                or not isinstance(text, str)
+            ):
+                continue
+            found = cmp.term_counts(text)
+            if sum(found.values()) >= cmp.MIN_ITEM_TOKENS:
+                out[str(item)] = found
+        return out
+
+    def comparator(all_filings: pd.DataFrame, subject: pd.Series) -> pd.Series | None:
+        report = subject["report_date"]
+        if report is None:
+            return None
+        low, high = (report - timedelta(days=d) for d in cmp.WINDOW_DAYS[::-1])
+        same = all_filings[
+            (all_filings["cik"] == subject["cik"]) & (all_filings["form"] == subject["form"])
+        ]
+        same = same[[r is not None and low <= r <= high for r in same["report_date"]]]
+        same = same[same["accession"] != subject["accession"]]
+        if same.empty:
+            return None
+        gap = [abs((report - r).days - cmp.YEAR_DAYS) for r in same["report_date"]]
+        best = same.assign(_gap=gap).sort_values(["_gap", "accession"], kind="stable").iloc[0]
+        return best  # type: ignore[no-any-return]
+
+    out = []
+    for _, s in subjects.iterrows():
+        base = {"cik": s["cik"], "accession": s["accession"], "form": s["form"],
+                "known_from": s["known_from"]}  # fmt: skip
+        prior = comparator(filings, s)
+        if prior is None:
+            out.append(cmp.Comparison(**base, prior_accession=None, status=cmp.NO_PRIOR))
+            continue
+        measured = cmp._measure(
+            counts(s["cik"], s["accession"], s["form"]),
+            counts(prior["cik"], prior["accession"], prior["form"]),
+            s["form"],
+        )
+        out.append(cmp.Comparison(**base, prior_accession=prior["accession"], **measured))
+    return out
+
+
+def test_the_memoised_comparison_equals_the_uncached_one_over_a_run_of_sessions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The memo changes no value: per session of a run (a filing leaving the five-session window,
+    a late-arriving filing, a filing whose text changed under the same accession, a 10-K with the
+    risk-factor pair) the frames are equal to the uncached path's, and each filing's words are
+    tokenised once across the window, not once per session."""
+    cmp._MEMO.clear()
+    year_ago, base_known = date(2025, 6, 30), date(2025, 8, 5)
+    k_items = {i: body(words(150, n), 600) for n, i in enumerate(("1", "1A", "3", "7"))}
+    k_new = {**k_items, "1A": body(words(150, 400), 700)}
+    full = frame(
+        ten_q("OLD1", year_ago, base_known),
+        ten_q("OLD2", year_ago, base_known, cik="0000000002", iid="EQ:BBB"),
+        filing("OLDK", "10-K", date(2025, 12, 31), date(2026, 2, 20), k_items),
+        ten_q("NEW1", REPORT, date(2026, 9, 29)),  # leaves the window after 5 sessions
+        ten_q("NEW2", REPORT, date(2026, 10, 1), cik="0000000002", iid="EQ:BBB"),  # a different
+        filing("NEWK", "10-K", date(2026, 12, 31), date(2026, 10, 5), k_new),
+        ten_q("LATE", REPORT, date(2026, 10, 6), cik="0000000003", iid="EQ:CCC"),
+    )  # fmt: skip
+    full.loc[full["accession"] == "NEW2", "text"] = body(words(150, 300), 600)  # reworded
+    sessions = [date(2026, 9, d) for d in (29, 30)]
+    sessions += [date(2026, 10, d) for d in (1, 2, 5, 6, 7, 8, 9)]
+    tokenised = []
+    real = cmp.term_counts
+    monkeypatch.setattr(cmp, "term_counts", lambda t: tokenised.append(t) or real(t))
+    got, want, per_session = {}, {}, {}
+    for s in sessions:
+        known = full[[k <= s for k in full["known_from"]]]  # the late filing is absent before
+        first = sessions[max(0, sessions.index(s) - 4)]
+        before = len(tokenised)
+        got[s] = compare_filings(known, first, s)
+        per_session[s] = len(tokenised) - before
+        assert compare_filings(known, first, s) == got[s]  # a repeat is a pure memo hit
+        assert len(tokenised) == before + per_session[s]
+        want[s] = _uncached(known, first, s)
+    assert got == want
+    assert got[date(2026, 10, 9)] != got[date(2026, 10, 2)]  # the fixture does move over time
+    assert any(c.status == cmp.OK for c in got[date(2026, 10, 9)])
+    assert sum(per_session.values()) <= 16  # 3 pairs, 2 + 2 + 4 + 8 texts: once each, all run
