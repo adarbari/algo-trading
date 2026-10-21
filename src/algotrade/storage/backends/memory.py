@@ -221,7 +221,12 @@ class MemoryTables:
         return pinned_read(at, lambda: self._seq, lambda: self._index_lock)
 
     def read_run(
-        self, table: str, session_date: date, run_id: str, own_run: str | None = None
+        self,
+        table: str,
+        session_date: date,
+        run_id: str,
+        own_run: str | None = None,
+        columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         def at(upto: int) -> pd.DataFrame | None:
             _, frames = self._view((table, session_date), own_run, upto)
@@ -229,7 +234,12 @@ class MemoryTables:
             if frame is None:
                 return None
             mine = frame[frame["run_id"] == run_id] if "run_id" in frame.columns else frame.copy()
-            return None if mine.empty else mine.reset_index(drop=True)
+            if mine.empty:
+                return None
+            if columns is not None:
+                keep = keep_columns(columns)
+                mine = mine[[c for c in mine.columns if c in keep]]
+            return mine.reset_index(drop=True)
 
         return pinned_read(at, lambda: self._seq, lambda: self._index_lock)
 

@@ -93,3 +93,14 @@ def test_the_local_backend_does_not_open_another_runs_file(tmp_path: Path) -> No
         path.write_bytes(b"not parquet")
     found = local.tables.read_run(TABLE, D1, "r1")
     assert found is not None and list(found["instrument_id"]) == ["EQ:A"]
+
+
+def test_columns_decode_only_those_and_the_stamps(backend: Backend) -> None:
+    frame = rows(D1, "r1", "EQ:A", "EQ:B")
+    frame["extra"] = "x"
+    publish(backend, "r1", frame)
+    found = backend.tables.read_run(TABLE, D1, "r1", columns=["value"])
+    assert found is not None and list(found["instrument_id"]) == ["EQ:A", "EQ:B"]
+    assert "extra" not in found.columns and {"value", "run_id", "knowledge_ts"} <= set(
+        found.columns
+    )

@@ -65,9 +65,11 @@ class StoreReader:
         tables = self._backend.tables
         return tables.read_range(table, start, end, as_of, instruments, self.own_run, columns)
 
-    def read_run(self, table: str, session_date: date, run_id: str) -> pd.DataFrame | None:
+    def read_run(
+        self, table: str, session_date: date, run_id: str, columns: Sequence[str] | None = None
+    ) -> pd.DataFrame | None:
         """One committed run's own rows of a partition (``TableStore.read_run``)."""
-        return self._backend.tables.read_run(table, session_date, run_id, self.own_run)
+        return self._backend.tables.read_run(table, session_date, run_id, self.own_run, columns)
 
     def read_latest_runs(
         self,
@@ -245,9 +247,11 @@ class RecordingReader(StoreReader):
             self._log_rows(table, start, end)
         return frame
 
-    def read_run(self, table: str, session_date: date, run_id: str) -> pd.DataFrame | None:
+    def read_run(
+        self, table: str, session_date: date, run_id: str, columns: Sequence[str] | None = None
+    ) -> pd.DataFrame | None:
         recording = self._open()
-        frame = super().read_run(table, session_date, run_id)
+        frame = super().read_run(table, session_date, run_id, columns)
         if recording:
             self._log_rows(table, session_date, session_date)
         return frame

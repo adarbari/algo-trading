@@ -366,6 +366,20 @@ def partition(
     return found
 
 
+def run_rows_of(
+    ctx: ReadContext, table: str, run_id: str, columns: Sequence[str] | None = None
+) -> pd.DataFrame:
+    """The rows run ``run_id`` stored in the session-grain ``table`` for ``ctx.session.date``,
+    reading only that run's file (``read_run``, ADR 0064): what one run's reader needs, not the
+    session's every run. An empty frame when the run has none there. ``ValueError`` for a table
+    that is not session grain."""
+    grain = grain_of(table)
+    if grain is not Grain.SESSION:
+        raise ValueError(f"{table} is {grain} grain: read it by its own rule, not run_rows_of()")
+    found = ctx.reader.read_run(table, ctx.session.date, run_id, columns)
+    return pd.DataFrame(columns=["instrument_id", *(columns or ())]) if found is None else found
+
+
 def run_partition(ctx: Stores, table: str, run: RunRecord) -> pd.DataFrame | None:
     """The rows ``run`` wrote to the session-grain ``table`` (a ``results/*`` table it
     publishes to its own end session), read as the run left them whatever later run shares

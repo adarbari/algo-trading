@@ -13,7 +13,13 @@ import pytest
 
 from algotrade.data import StoreReader
 from algotrade.services.read.context import partition
-from algotrade.services.read.screens.runs import ROW_COLUMNS, RULE_SCREEN, screen_rows
+from algotrade.services.read.screens.results import run_withheld
+from algotrade.services.read.screens.runs import (
+    ROW_COLUMNS,
+    RULE_SCREEN,
+    load_latest_runs,
+    screen_rows,
+)
 from algotrade.services.read.values import Unknown
 from algotrade.storage.backends.arrow import to_arrow
 from algotrade.storage.backends.local import LocalBackend
@@ -83,3 +89,45 @@ def test_the_budget_would_catch_the_merge_of_every_run(
     ctx = context(StoreReader(backend))
     partition(ctx, RULE_SCREEN, ROW_COLUMNS)  # the read before the newest-run rule
     assert proxy.max_memory() > 2 * newest
+
+
+def _values(config: int, run: int) -> pd.DataFrame:
+    rows: list[dict[str, object]] = [
+        {"instrument_id": f"EQ:S{i}", "user_id": "site", "config_id": f"c{config}",
+         "criterion_id": "k", "field": "feature.f", "mode": "hard", "value_num": 1.0,
+         "value_str": "v" * 100, "outcome": "PASS", "distance": None}
+        for i in range(INSTRUMENTS)
+    ]  # fmt: skip
+    return stamped(rows, D1, f"c{config}-r{run}", T + timedelta(hours=run))
+
+
+def test_the_withheld_fields_of_every_run_decode_one_runs_values_each(
+    store: tuple[LocalBackend, int],
+) -> None:
+    # the values partition holds every rerun of every config (146 million rows on the real
+    # store): reading it whole for each run's fields decoded it once per run
+    backend, _ = store
+    writer = StoreWriter(backend)
+    newest = 0
+    for run in range(RUNS):
+        for config in range(CONFIGS):
+            frame = _values(config, run)
+            writer.write_result("rule_screen_values", D1, frame["run_id"].iloc[0], frame)
+            if run == RUNS - 1:
+                newest += to_arrow("results/rule_screen_values", frame).nbytes
+    ctx = context(StoreReader(backend), user="trader")  # holds no licence: reads the values
+    keys = [("site", f"c{c}") for c in range(CONFIGS)]
+    found = [lr.run for lr in load_latest_runs(ctx, keys).values()]
+    assert all(run is not None for run in found)
+    before = pa.default_memory_pool()
+    proxy = pa.proxy_memory_pool(before)
+    pa.set_memory_pool(proxy)
+    try:
+        for run in found:
+            assert run is not None
+            run_withheld(ctx, run)
+    finally:
+        pa.set_memory_pool(before)
+    # each run decodes its own file once (about 2.7x its bytes with the filter's copy); reading
+    # the newest runs of every config per run was 20x
+    assert proxy.total_bytes_allocated() <= 4 * newest
