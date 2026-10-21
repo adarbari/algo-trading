@@ -61,6 +61,7 @@ class Harness:
     def __init__(self, store: ReadStore, monkeypatch: pytest.MonkeyPatch) -> None:
         self.store = store
         self.seq = 1
+        self.generation: int | None = 0  # the caller's config generation (None: a write in flight)
         self.runs = (7, 100)  # the runs generation
         self.closed = date(2026, 10, 8)  # the last closed session
         self.served = "2026-10-08"  # the default session's token (ADR 0062)
@@ -90,6 +91,7 @@ class Harness:
             runs: Any,
             served: Any,
             log: Any = None,
+            config_generation: Any = None,
         ) -> Any:
             self.wired, self.wired_served = runs, served
             self.router = graphql_router(
@@ -104,6 +106,7 @@ class Harness:
                 lambda: self.closed,
                 lambda: self.served,
                 log,
+                lambda user: self.generation,
             )
             return self.router
 
@@ -181,6 +184,28 @@ def test_a_write_route_makes_the_earlier_entries_unreachable(harness: Harness) -
     opened = harness.opened
     _post(client, SESSION)
     assert harness.opened > opened
+
+
+def test_a_config_generation_moves_only_the_keys_that_hold_the_user(harness: Harness) -> None:
+    """ADR 0077 decision 15: the durable counter, not the process, tells a write happened."""
+    client = harness.client()
+    _post(client, SESSION)
+    _post(client, SHARED)
+    harness.generation = 2
+    opened = harness.opened
+    _post(client, SHARED)
+    assert harness.opened == opened  # a shared answer holds no user state
+    _post(client, SESSION)
+    assert harness.opened > opened  # a user-keyed one is recomputed
+
+
+def test_nothing_is_cached_while_a_write_of_the_caller_is_in_flight(harness: Harness) -> None:
+    client = harness.client()
+    harness.generation = None  # odd: a write is in flight, or crashed
+    _post(client, SESSION)
+    opened = harness.opened
+    _post(client, SESSION)
+    assert harness.opened > opened and harness.cache.held == 0
 
 
 def test_a_probe_or_a_preview_post_leaves_the_cache_alone(harness: Harness) -> None:
