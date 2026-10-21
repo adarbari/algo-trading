@@ -82,7 +82,7 @@ purpose = "the storage contract: every table backend passes it"
 
 [[test_dir]]
 path = "tests/contract/storage/releases"
-purpose = "the contract of pinned reads and retention (ADR 0077): a pin keeps the versions a read at its sequence sees, dates and stamps hide later partitions, a destructive operation bumps the epoch, the history copy serves a pinned read only when it cannot leak; every table backend passes it"
+purpose = "the contract of pinned reads, retention and the serving release store (ADR 0077): a release is invisible until sealed and served only through an atomic CURRENT, prune unpins what no release holds; a pin keeps the versions a read at its sequence sees, dates and stamps hide later partitions, a destructive operation bumps the epoch, the history copy serves a pinned read only when it cannot leak; every table backend passes it"
 
 [[test_dir]]
 path = "tests/contract/storage/rewrites"

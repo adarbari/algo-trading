@@ -93,6 +93,9 @@ class Probes:
     api_build: Callable[[], tuple[str, ...] | None] = field(default=_api_build)
     api_footprint: Callable[[], float | None] = field(default=_api_footprint)
     history_stale: Callable[[], str | None] = field(default=lambda: None)  # see history_stale()
+    serving: Callable[[], Any] = field(
+        default=lambda: None
+    )  # a ReleaseReport, see serving_report()
 
 
 @dataclass(frozen=True)
@@ -389,6 +392,15 @@ def history_stale() -> str | None:
     return stale_history(reader, settings.instrument_tables) if settings.enabled else None
 
 
+def serving_report() -> Any:
+    """The serving releases, pins and the disk the pinned retained versions hold (ADR 0077),
+    through the store's own report; a path is never built here."""
+    from algotrade.config.env import data_url  # noqa: PLC0415 (venv may lack it)
+    from algotrade.storage.factory import release_report  # noqa: PLC0415
+
+    return release_report(data_url())
+
+
 def stale_history(reader: Any, tables: tuple[str, ...]) -> str | None:
     """Of ``tables``, the first whose copy misses the default session: the latest COMPLETE one
     (``default_session``, ADR 0062), never a newer incomplete session's partition."""
@@ -419,6 +431,40 @@ def check_history_copy(p: Probes) -> Result:
         f"{stale}: long reads are slow until it is built",
         "run `algotrade-ingest history-copy` (the nightly's history-copy step does it each night)",
     )
+
+
+PINNED_WARN_BYTES = 5 * 1024**3  # retained versions a release pins: a warning past this (ADR 0077)
+
+
+def check_serving(p: Probes) -> Result:
+    """Pins keep the store versions a release was built from; a pin no release or build holds
+    (a crashed build) keeps disk until ``serve-release`` prunes it. Reports the pins and what
+    the retained versions weighed at the serve job's last prune (never measured here)."""
+    try:
+        report = p.serving()
+    except Exception as exc:  # no store / no venv: store and library checks say so
+        return Result(INFO, "serving releases", f"not checked ({type(exc).__name__})")
+    if report is None:
+        return Result(INFO, "serving releases", "not checked")
+    held = set(report.releases)
+    orphans = sorted(n for n in report.pins if n.startswith("release-") and n[8:] not in held)
+    held_bytes = report.pinned_bytes
+    holding = "disk not measured yet (the serve job's prune records it)"
+    if held_bytes is not None:
+        holding = f"holding {held_bytes / 1024**3:.2f} GB of older versions as of the last prune"
+    detail = (
+        f"{len(report.releases)} releases, current {report.current or 'none'}, "
+        f"{len(report.pins)} pins {holding}"
+    )
+    if held_bytes is not None and held_bytes > PINNED_WARN_BYTES:
+        limit = f"over {PINNED_WARN_BYTES // 1024**3} GB"
+        fix = "prune old releases (`algotrade-ingest serve-release`) or unpin what is stale"
+        return Result(WARN, "serving releases", f"{detail}: {limit}", fix)
+    if orphans:
+        # a build in flight also shows here: wait for it, or prune once it is over
+        fix = "a build in flight shows here; a crashed one is unpinned by the next prune"
+        return Result(WARN, "serving releases", f"{detail}; no release for pin {orphans[0]}", fix)
+    return Result(OK, "serving releases", detail)
 
 
 # The launchd agents (``algotrade-ingest schedule``, ``algotrade-api schedule``): label -> the
@@ -693,6 +739,7 @@ def run_checks(p: Probes) -> list[Result]:
         check_load(p),
         check_store(p),
         check_history_copy(p),
+        check_serving(p),
         check_web_dist(p),
         check_api_build(p),
         check_api_footprint(p),
@@ -737,6 +784,7 @@ def main() -> int:
             web_dist=web_dist,
             llm_error=llm_error,
             history_stale=history_stale,
+            serving=serving_report,
         )
         extra = []
     text, code = render(run_checks(probes) + extra)

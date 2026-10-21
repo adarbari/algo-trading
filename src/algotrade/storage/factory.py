@@ -11,6 +11,9 @@ from urllib.parse import urlparse
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.backends.release.interfaces import ReleaseReport, ReleaseStore
+from algotrade.storage.backends.release.local import LocalReleaseStore
+from algotrade.storage.backends.release.memory import MemoryReleaseStore
 from algotrade.storage.backends.text_cache import LocalTextCache, MemoryTextCache
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.configs.store import ConfigStore
@@ -25,6 +28,24 @@ def open_backend(url: str) -> Backend:
     if parsed.scheme == "file":
         return LocalBackend(Path(parsed.netloc + parsed.path).expanduser())
     raise ConfigurationError(f"unsupported storage URL {url!r} (expected file:// or memory://)")
+
+
+def open_release_store(url: str, backend: Backend) -> ReleaseStore:
+    """The serving release store (ADR 0077) of the store at ``url``: ``serving/`` in the data root,
+    pinning through ``backend``'s tables (a memory store needs the backend it pins in)."""
+    parsed = urlparse(url)
+    if parsed.scheme == "memory":
+        return MemoryReleaseStore(backend.tables)
+    if parsed.scheme == "file":
+        return LocalReleaseStore(Path(parsed.netloc + parsed.path).expanduser(), backend.tables)
+    raise ConfigurationError(f"unsupported storage URL {url!r} (expected file:// or memory://)")
+
+
+def release_report(url: str, with_bytes: bool = False) -> ReleaseReport:
+    """The pins and releases of the store at ``url`` for ``make status`` and ``make doctor``
+    (read-only). ``pinned_bytes`` is what the serve job's last prune recorded; ``with_bytes``
+    measures it now (every partition index: not for a routine report)."""
+    return open_release_store(url, open_backend(url)).report(with_bytes)
 
 
 def open_text_cache(url: str) -> LocalTextCache | MemoryTextCache:

@@ -33,6 +33,7 @@ from algotrade.storage.backends.run_compaction import (
 )
 from algotrade.storage.backends.run_selection import (
     RunEntry,
+    chain,
     chain_needed,
     committed,
     concat_frames,
@@ -132,6 +133,19 @@ class MemoryTables:
     def destructive_epoch(self) -> int:
         with self._index_lock:
             return self._epoch
+
+    def pinned_bytes(self) -> int:
+        with self._index_lock:
+            if not self._pins:
+                return 0
+            old = [
+                (key[0], self._frames[(key, run, version.ref)])
+                for key, entries in self._partitions.items()
+                for run, entry in entries.items()
+                for version in list(chain(entry))[1:]
+                if (key, run, version.ref) in self._frames
+            ]
+        return sum(len(parquet_bytes(to_arrow(table, frame))) for table, frame in old)
 
     def abort_run(self, run_id: str) -> int:
         with self._index_lock:

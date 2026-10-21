@@ -75,6 +75,14 @@ def _store_facts() -> tuple[str, str, str]:
     return str(latest) if latest else "empty", last(nightly), last(post)
 
 
+def _serving() -> Any:
+    """The store's serving releases and pins (ADR 0077) through its own report."""
+    from algotrade.config.env import data_url  # noqa: PLC0415 (venv may lack it)
+    from algotrade.storage.factory import release_report  # noqa: PLC0415
+
+    return release_report(data_url())
+
+
 def _api_build(url: str) -> tuple[str, ...] | None:
     """What the API at ``url`` reports out of step (``algotrade_api.ops.build``); None: no API."""
     from algotrade_api.ops.build import running_mismatches  # noqa: PLC0415 (venv may lack it)
@@ -89,6 +97,7 @@ class Probes:
     port_open: Callable[[int], bool] = _port_open
     store_facts: Callable[[], tuple[str, str, str]] = _store_facts
     api_build: Callable[[str], tuple[str, ...] | None] = _api_build
+    serving: Callable[[], Any] = _serving  # a ReleaseReport (None: nothing to report)
     repo: Path = REPO
     logs: Path = field(default_factory=lambda: REPO / "var" / "logs")
     golden_cases: Path = field(
@@ -142,6 +151,19 @@ def store(p: Probes) -> list[str]:
     except Exception as exc:  # a missing store or venv must not crash a status report
         return [f"Store: unreadable ({type(exc).__name__}: {str(exc)[:60]})"]
     return [f"Store: latest session {latest}; last nightly {last}; last post-session {post}"]
+
+
+def serving(p: Probes) -> list[str]:
+    """One line: the current release and the pins (ADR 0077); nothing when there is none."""
+    try:
+        report = p.serving()
+    except Exception as exc:  # a missing store or venv must not crash a status report
+        return [f"Serving: unreadable ({type(exc).__name__})"]
+    if report is None or not (report.releases or report.pins):
+        return []
+    pins = ", ".join(f"{n.removeprefix('release-')}@{s}" for n, s in sorted(report.pins.items()))
+    current = report.current or "none"
+    return [f"Serving: current {current}; {len(report.releases)} releases; pins {pins or 'none'}"]
 
 
 def servers(p: Probes) -> list[str]:
@@ -224,6 +246,7 @@ def report(p: Probes) -> str:
             *prs(p),
             *jobs(p),
             *store(p),
+            *serving(p),
             *servers(p),
             *release(p),
             *api_build(p),

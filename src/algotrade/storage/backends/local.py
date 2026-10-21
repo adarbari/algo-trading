@@ -26,6 +26,7 @@ partition at once (threads or processes) are both indexed. A ``pending`` write i
 only when its run commits, in every partition at once (``local_index.py``).
 """
 
+import contextlib
 import glob
 import gzip
 import os
@@ -183,6 +184,19 @@ class LocalTables:
 
     def destructive_epoch(self) -> int:
         return self.commits.epoch()
+
+    def pinned_bytes(self) -> int:
+        if not self.commits.pins():
+            return 0
+        total = 0
+        for table in self.names():
+            for day in self._committed_dates(table):
+                directory = self._dir(table, day)
+                for run, entry in read_index(directory).items():
+                    for old in list(chain(entry))[1:]:
+                        with contextlib.suppress(FileNotFoundError):
+                            total += (directory / run_file(run, old)).stat().st_size
+        return total
 
     def abort_run(self, run_id: str) -> int:
         return self.commits.abort_run(run_id)
