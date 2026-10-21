@@ -174,13 +174,13 @@ def _snapshot_names(ctx: ReadContext, snap: date) -> Names:
             out[str(iid)] = (str(symbol), TradeText(text) if text else gap)
         return out
 
-    return ctx.cache.get_or_compute(("ledger-names", ctx.reader.visible_seq(), snap), read)  # type: ignore[no-any-return]
+    return ctx.cache.get_or_compute(("ledger-names", ctx.reader.version(), snap), read)  # type: ignore[no-any-return]
 
 
 def _listing_tickers(ctx: ReadContext) -> ListingTickers:
     """The listing history's tickers, read once per publish (like the snapshot maps)."""
     return ctx.cache.get_or_compute(  # type: ignore[no-any-return]
-        ("ledger-listing-tickers", ctx.reader.visible_seq()), lambda: listing_tickers(ctx.reader)
+        ("ledger-listing-tickers", ctx.reader.version()), lambda: listing_tickers(ctx.reader)
     )
 
 

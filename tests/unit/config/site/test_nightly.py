@@ -63,3 +63,13 @@ def test_compaction_never_lists_a_table_whose_runs_are_each_a_groups_whole_resul
     nightly = load_nightly(FileConfigStore(REPO_ROOT / "config", local=False))
     for table in nightly.compaction.tables:
         assert not spec_for(table).whole_per_group, f"{table} is read by its newest run alone"
+
+
+def test_release_reads_are_on_by_default_and_the_kill_switch_parses() -> None:
+    # ADR 0077 decision 23: the API serves the listed operations from the current serving release
+    assert NightlySettings.from_document({}).release_reads is True
+    off = NightlySettings.from_document({"serving": {"release_reads": False}})
+    assert off.release_reads is False
+    with pytest.raises(ConfigurationError, match="serving"):
+        NightlySettings.from_document({"serving": {"release_read": False}})
+    assert load_nightly(FileConfigStore(REPO_ROOT / "config", local=False)).release_reads is True

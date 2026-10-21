@@ -16,7 +16,7 @@ cached per query and published state. ``change`` compares the run with the scree
 the previous stored session (``runs.load_previous_run``): a ticker is *picked* when
 ``runs.is_picked`` says so (the Ideas rule)."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Hashable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -237,7 +237,7 @@ def _values(
         "screen-values",
         ctx.session.date,
         ctx.reader.own_run,
-        ctx.reader.visible_seq(),
+        ctx.reader.version(),
         None if ids is None else tuple(sorted(ids)),
         asked,
     )
@@ -351,7 +351,7 @@ def _run_fields(ctx: ReadContext, run: ScreenerRun) -> frozenset[str]:
     """The catalogue fields ``run``'s stored criteria and columns read; empty when its values are
     not readable. Read from the run's own values file once per publish and kept with every other
     run's in one container (``Held``), not an entry per run in ``ctx.cache``."""
-    key = ("screen_run_fields", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+    key = ("screen_run_fields", ctx.session.date, ctx.reader.own_run, ctx.reader.version())
     held: Held[tuple[str, ...]] = ctx.cache.get_or_compute(key, Held)
 
     def read() -> tuple[str, ...]:
@@ -505,7 +505,7 @@ def _compare(now: pd.DataFrame, before: Mapping[str, str]) -> dict[str, Change]:
 def load_run_changes(ctx: ReadContext, run: ScreenerRun) -> RunChanges:
     """``run`` against the screener's run in the previous stored session (cached per run and
     published state)."""
-    key = ("run_changes", run.run_id, ctx.session.date, ctx.reader.visible_seq())
+    key = ("run_changes", run.run_id, ctx.session.date, ctx.reader.version())
     found: RunChanges | None = ctx.cache.get(key)
     if found is not None:
         return found
@@ -560,7 +560,7 @@ def _stored_key(ctx: ReadContext, run: ScreenerRun, key: str) -> Mapping[str, Sc
         ctx.session.date,
         key,
         ctx.user.user_id,  # what a viewer may see differs by licence
-        ctx.reader.visible_seq(),
+        ctx.reader.version(),
     )
     found: Mapping[str, Scalar] | None = ctx.cache.get(cache_key)
     if found is not None:
@@ -598,7 +598,7 @@ def _sorted(ids: list[str], values: Mapping[str, Any], descending: bool) -> list
     return [i for i, _ in have] + lacking
 
 
-def _ordered(ctx: ReadContext, run: ScreenerRun, query: ResultQuery, seq: int) -> _Order:
+def _ordered(ctx: ReadContext, run: ScreenerRun, query: ResultQuery, seq: Hashable) -> _Order:
     user = (ctx.user.user_id, catalogue_key(ctx))  # a sort on an edited feature: a new order
     key = ("screen_results", run.run_id, ctx.session.date, query, user, seq)
     found: _Order | None = ctx.cache.get(key)
@@ -671,7 +671,7 @@ def load_result_page(
     wanted = list(dict.fromkeys(columns))
     infos = feature_infos(ctx.features, wanted)
     page, size = max(page, 1), max(size, 1)
-    seq = ctx.reader.visible_seq()  # read once, before computing (ADR 0022)
+    seq = ctx.reader.version()  # read once, before computing (ADR 0022)
     query = ResultQuery(
         tuple(sorted({d.casefold() for d in query.decisions})), query.change, query.q, query.sort
     )

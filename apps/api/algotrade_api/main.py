@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import date
@@ -24,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from algotrade.config.site.settings import load_llm, load_users
+from algotrade.config.site.settings import load_llm, load_nightly, load_users
 from algotrade.config.site.users import Role, UserRecord, UsersSettings
 from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import (
@@ -61,6 +62,7 @@ from algotrade.services.read.context import (
     served_session,
     use_system_pool,
 )
+from algotrade.services.read.serving.current import ReleaseStore, releases_at, resolve_current
 from algotrade.services.text_model.model import TextModel
 from algotrade_api import __version__
 from algotrade_api.auth.local import LocalAuthenticator
@@ -68,6 +70,7 @@ from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller, is_admin_request
 from algotrade_api.feedback import DraftMemory, feedback_sink, request_sink
+from algotrade_api.graphql.context import ReleaseReads
 from algotrade_api.graphql.offload import OverloadedError, off_loop
 from algotrade_api.graphql.response_cache import OperationLog, served_token
 from algotrade_api.graphql.schema import CachingRouter, graphql_router, sdl
@@ -180,10 +183,12 @@ def _mount_graphql(
     users: UsersSettings,
     config_generation: Callable[[str, bool], int | None],
     caller: list[Any],
+    releases: ReleaseStore | None = None,
 ) -> tuple[Callable[[UserContext, date | None], ReadContext], CachingRouter]:
     """``POST /graphql`` over the app's store with one read-result cache and an operation log
     (seeded for the configured user when served: the pages that user opens first); the read
-    opener and the router, whose ``replay`` the warmer runs."""
+    opener and the router, whose ``replay`` the warmer runs. ``releases``: the serving release
+    store the listed operations are answered from (ADR 0077)."""
     store = app.state.store
     cache = ResultCache(READ_CACHE_SIZE)
     reads = _reads(store, cache)
@@ -197,6 +202,7 @@ def _mount_graphql(
         served=_served(store, cache),
         log=operations,
         config_generation=config_generation,
+        releases=_release_reads(store, cache, releases),
     )
     app.include_router(gql, dependencies=caller)
     owner = users.get(settings.user)
@@ -204,6 +210,30 @@ def _mount_graphql(
         for document, variables in seed_operations(SEED_PAGES):
             operations.note(owner, document, variables)
     return reads, gql
+
+
+RELEASE_SWITCH_S = 10.0  # how long the kill switch's value is kept before the config is read again
+
+
+def _release_reads(
+    store: ReadStore, cache: ResultCache, releases: ReleaseStore | None
+) -> ReleaseReads | None:
+    """How the listed operations read the current serving release (ADR 0077 decision 23);
+    ``None`` without a release store (a memory store has none unless one is given)."""
+    if releases is None:
+        return None
+    switch: list[Any] = [0.0, True]  # (when read, value): read per request, kept for a few seconds
+
+    def enabled() -> bool:
+        now = time.monotonic()
+        if now - switch[0] > RELEASE_SWITCH_S or switch[0] == 0.0:
+            switch[0], switch[1] = now, load_nightly(store.configs).release_reads
+        return bool(switch[1])
+
+    def pinned(user: UserContext, day: date, seq: int) -> ReadContext:
+        return open_context(store.reader.pinned(seq), store.configs, user, day, cache)
+
+    return ReleaseReads(lambda: resolve_current(store.reader, releases), pinned, enabled)
 
 
 async def _warm_home(warmer: CacheWarmer) -> None:
@@ -239,6 +269,7 @@ def create_app(
     feedback: FeedbackSink | None = None,
     requests: FeedbackSink | None = None,
     part_cap: PartRedraftCap | None = None,
+    releases: ReleaseStore | None = None,
 ) -> FastAPI:
     """The API over ``store`` (default: the store and configs ``settings`` name); user
     configs are written through ``writer`` (default: the files under ``settings.config_dir``).
@@ -348,7 +379,12 @@ def create_app(
     for router in ROUTERS:
         app.include_router(router, dependencies=caller)
     reads, gql = _mount_graphql(
-        app, settings, users, config_generation_of(app.state.store.configs), caller
+        app,
+        settings,
+        users,
+        config_generation_of(app.state.store.configs),
+        caller,
+        releases if releases is not None else releases_at(settings.data_url),
     )
     app.state.graphql = gql  # the lifespan cancels its background recomputes
     user = app.state.store.user

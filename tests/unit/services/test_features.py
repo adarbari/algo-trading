@@ -150,3 +150,22 @@ def test_the_selection_catalogue_follows_the_store() -> None:
     assert site_features() is site_features()  # built once
     with pytest.raises(ConfigurationError, match="superseded feature group"):
         field_catalog().check_field("rollup.dividends@v1.div_yield", "x")
+
+
+def test_the_expression_sessions_memo_is_keyed_on_the_readers_version() -> None:
+    """A pinned reader and a live reader at the same sequence must not share an entry (ADR 0077
+    decision 23): a release answer is the store as of its pin, a live one the store as of now."""
+    keys: list[object] = []
+
+    def memo(key: object, read: object) -> frozenset[date]:
+        keys.append(key)
+        return frozenset()
+
+    live = StoreReader(MemoryBackend())
+    start = date(2026, 10, 1)
+    services_features._sessions(live, "rollups/instrument/a@v1", start, start, None, memo)  # type: ignore[arg-type]
+    services_features._sessions(  # type: ignore[arg-type]
+        live.pinned(live.visible_seq()), "rollups/instrument/a@v1", start, start, None, memo
+    )
+    assert keys[0] != keys[1]
+    assert keys[0][-1][0] == "live" and keys[1][-1][0] == "pin"  # type: ignore[index]

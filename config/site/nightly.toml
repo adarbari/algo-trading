@@ -43,6 +43,9 @@ min_free_gb = 6                  # TEMPORARY 2026-10-20 (owner): lowered from 15
 "rollups/instrument/etf_launches@v1" = { until = "2026-11-03", reason = "etf_launches backfill (etf_launch_recent) in progress" }
 "rollups/instrument/short_interest@v1" = { until = "2026-11-03", reason = "short-interest backfill stamped known_from 2026-10-20: no session before it reads it until restamped (ADR 0050 amendment)" }
 
+[serving]                        # the serving release (ADR 0077)
+release_reads = true             # false: the API reads live for every operation (kill switch, no restart: read per request)
+
 [history_copy]                   # the history-copy step (ADR 0060): a read-optimised copy of long reads
 enabled = true                   # false: the nightly skips the step (the copies already built still serve)
 market_prefix = "rollups/market/"   # every table under it is copied, all years (a few MB each)

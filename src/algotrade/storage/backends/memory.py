@@ -38,6 +38,7 @@ from algotrade.storage.backends.run_selection import (
     committed,
     concat_frames,
     keep_newest_runs,
+    listed_at,
     max_seq,
     merge_rows,
     newest_run_per_group,
@@ -67,6 +68,7 @@ class MemoryTables:
         self._pending: dict[str, dict[Key, tuple[pd.DataFrame, bool]]] = {}
         self._touched: dict[str, datetime] = {}  # a pending run's last write (retention)
         self._seq = 0
+        self._created: dict[Key, int] = {}  # a partition made empty by a commit: its sequence
         self._pins: dict[str, int] = {}  # name -> a sequence whose versions are retained
         self._epoch = 0  # destructive operations so far (purge, remove_runs, drop)
         self._index_lock = threading.RLock()  # re-entered by a read that waits out commits
@@ -104,6 +106,8 @@ class MemoryTables:
             for key, (frame, restates) in writes.items():
                 entries = self._partitions.setdefault(key, {})
                 if frame.empty:
+                    if not entries:
+                        self._created.setdefault(key, self._seq)
                     continue
                 known = frame["knowledge_ts"].max()
                 entries[run_id] = committed(
@@ -332,6 +336,7 @@ class MemoryTables:
             self._epoch += 1
             for key in keys:
                 del self._partitions[key]
+                self._created.pop(key, None)
             for frame_key in [k for k in self._frames if k[0][0] == table]:
                 del self._frames[frame_key]
             return len(keys)
@@ -348,6 +353,7 @@ class MemoryTables:
             ]
             for key in keys:
                 del self._partitions[key]
+                self._created.pop(key, None)
                 for frame_key in [f for f in self._frames if f[0] == key]:
                     del self._frames[frame_key]
             if keys:
@@ -448,7 +454,7 @@ class MemoryTables:
             held = {
                 k
                 for k, entries in self._partitions.items()
-                if upto is None or visible_entries(entries, upto)
+                if upto is None or listed_at(entries, self._created.get(k), upto)
             }
             keys = held | set(self._pending.get(own_run or "", {}))
         return sorted(d for (t, d) in keys if t == table)
@@ -463,8 +469,8 @@ class MemoryTables:
                     continue
                 if upto is None:
                     out[d] = max_seq(entries, self._seq)
-                elif (stamp := seq_at(entries, upto)) is not None:
-                    out[d] = stamp
+                elif listed_at(entries, self._created.get((t, d)), upto):
+                    out[d] = seq_at(entries, upto) or 0
             return out
 
     def names(self, own_run: str | None = None) -> list[str]:

@@ -176,8 +176,24 @@ def chain_needed(entries: Mapping[str, RunEntry], pins: Collection[int]) -> bool
 def seq_at(entries: Mapping[str, RunEntry], upto: int) -> int | None:
     """The highest sequence among the versions a read at ``upto`` sees (``max_seq`` for a pinned
     read: raises ``StaleSnapshotError`` as ``visible_entries`` does); ``None``: no run of the
-    partition is visible at ``upto`` (it did not exist yet)."""
+    partition is visible at ``upto`` (it did not exist yet). A partition whose index holds no run
+    (an empty frame was written to it) is listed live and counts 0, as ``max_seq`` does."""
+    if not entries:
+        return 0
     return max((e.seq or 0 for e in visible_entries(entries, upto).values()), default=None)
+
+
+def listed_at(entries: Mapping[str, RunEntry], created: int | None, upto: int) -> bool:
+    """Whether a read at ``upto`` lists a partition. ``created``: the sequence of the commit that
+    made the partition exist with no run (an empty frame: nothing today), ``None`` when it was
+    never stamped (a direct write, 0). A partition that existed by then is listed whatever it
+    holds now; one with runs is listed when a version of one is visible; an unstamped partition
+    with no run is always listed (it counts 0, as ``max_seq`` does)."""
+    if created is not None and created <= upto:
+        return True
+    if not entries:
+        return created is None
+    return bool(visible_entries(entries, upto))
 
 
 def visible_entries(entries: Mapping[str, RunEntry], upto: int | None) -> dict[str, RunEntry]:

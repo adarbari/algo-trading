@@ -240,7 +240,7 @@ def saved_picks(ctx: ReadContext, who: UserContext, screener_id: str, session: d
     and its rows sort it, a cost every preview paid again (1.6 s cold, 0.2 s warm) for a set
     that only a publish changes."""
     key = ("preview.saved_picks", who.user_id, screener_id, session, ctx.reader.own_run,
-           ctx.reader.visible_seq())  # fmt: skip
+           ctx.reader.version())  # fmt: skip
     found: SavedPicks | None = ctx.cache.get(key)
     if found is None:
         mine = open_context(ctx.reader, ctx.configs, who, session, ctx.cache)

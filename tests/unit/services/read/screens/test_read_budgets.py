@@ -139,7 +139,7 @@ def test_the_summaries_keep_no_frame_after_they_are_built(
     run_summaries(ctx)
     gc.collect()
     assert len(seen) == 1 and seen[0]() is None  # the rows are gone once they are counted
-    key = ("run_summaries", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+    key = ("run_summaries", ctx.session.date, ctx.reader.own_run, ctx.reader.version())
     # the guard: about a hundred bytes a screener in the cache, not a frame
     assert 0 < ctx.cache._weights[key] < 100_000
     assert max(ctx.cache._weights.values()) <= MAX_CACHE_BYTES // 2
@@ -414,7 +414,7 @@ def test_the_cache_holds_exactly_what_the_run_rows_container_weighs(
     runs = _runs(ctx)
     run_rows(ctx, runs[0])
     run_rows(ctx, runs[1])
-    key = ("run_rows", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+    key = ("run_rows", ctx.session.date, ctx.reader.own_run, ctx.reader.version())
     held: RunRows = ctx.cache.get(key)
     assert held.weight_bytes() > 0 and ctx.cache._weights[key] == held.weight_bytes()
     assert held.weight_bytes() >= 2 * weigh(run_rows(ctx, runs[0])) * 0.9  # both runs counted
@@ -426,7 +426,7 @@ def test_threads_adding_runs_together_leave_the_full_weight_in_the_cache(
     ctx = context(StoreReader(store[0]))
     runs = _runs(ctx)
     _all_run_rows_at_once(ctx, runs)
-    key = ("run_rows", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+    key = ("run_rows", ctx.session.date, ctx.reader.own_run, ctx.reader.version())
     assert ctx.cache._weights[key] == ctx.cache.get(key).weight_bytes()
 
 

@@ -51,6 +51,7 @@ from algotrade.storage.tables.interfaces import PartitionBusyError
 
 INDEX = "_runs.json"
 INDEX_LOCK = ".runs.lock"
+CREATED = "_created"  # the sequence of the commit that made a partition exist with no run
 TXN = "_txn"
 PINS = "pins"  # tables/_txn/pins/<name>.json: {"seq": N}, one per retained serving release
 EPOCH = "epoch"  # tables/_txn/epoch: the count of destructive operations (see ``Commits``)
@@ -138,6 +139,15 @@ def read_index(directory: Path) -> dict[str, RunEntry]:
 def write_index(directory: Path, entries: dict[str, RunEntry]) -> None:
     data = {run: _value(entry) for run, entry in entries.items()}
     atomic_write(directory / INDEX, json.dumps(data, indent=2, sort_keys=True).encode())
+
+
+def created_seq(directory: Path) -> int | None:
+    """The sequence of the commit that created ``directory``'s partition empty, ``None``: none
+    recorded (it never was created empty by a commit)."""
+    try:
+        return int((directory / CREATED).read_text())
+    except (FileNotFoundError, ValueError):
+        return None
 
 
 def index_lock(directory: Path) -> FileLock:
@@ -531,6 +541,8 @@ class Commits:
                     entries[run_id] = committed(
                         known, bool(item["restates"]), at, seq, ref, previous, pins
                     )
+                elif not entries and created_seq(directory) is None:  # an empty partition is born
+                    atomic_write(directory / CREATED, str(seq).encode())
                 write_index(directory, entries)
         if seq > self.published():
             atomic_write(self.base / "seq", str(seq).encode())  # the visibility point

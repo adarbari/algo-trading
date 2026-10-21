@@ -161,7 +161,7 @@ def run_summaries(ctx: ReadContext) -> RunSummaries | Unknown:
     ``ctx.cache`` (read first, ADR 0022): the rows it is counted from (``ROW_COLUMNS`` of every
     config's newest run, millions of rows on the real store) are dropped as soon as they are, so
     the cache holds a summary per screener, not a frame. ``Unknown``: no partition."""
-    key = ("run_summaries", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+    key = ("run_summaries", ctx.session.date, ctx.reader.own_run, ctx.reader.version())
 
     def build() -> RunSummaries | Unknown:
         stored = partition(ctx, RULE_SCREEN, ROW_COLUMNS, newest_runs=True)
@@ -290,7 +290,7 @@ def run_rows(ctx: ReadContext, run: ScreenerRun) -> pd.DataFrame:
     the view (``own_run``) and the published state read before computing (ADR 0022), shared by
     every request and only read by callers. The heavy columns (``reasons``, ``flags``) are read
     for the instruments a page asks for (``load_results``)."""
-    key = ("run_rows", ctx.session.date, ctx.reader.own_run, ctx.reader.visible_seq())
+    key = ("run_rows", ctx.session.date, ctx.reader.own_run, ctx.reader.version())
     held: RunRows = ctx.cache.get_or_compute(key, RunRows)
 
     def read() -> pd.DataFrame:

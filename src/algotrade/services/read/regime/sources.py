@@ -127,7 +127,7 @@ def _provenance(
 ) -> tuple[Mapping[str, Provenance], Mapping[str, date]]:
     """Per instrument id: the latest observation ``ctx.session`` knew, and the earliest ALFRED
     vintage stored (cached per publish; the caller drops one later than the session)."""
-    seq, day = ctx.reader.visible_seq(), ctx.session.date
+    seq, day = ctx.reader.version(), ctx.session.date
     latest_key = ("regime-source-latest", ids, day, seq)  # ADR 0022
     first_key = ("regime-source-first-vintage", ids, seq)
     latest, first = ctx.cache.get(latest_key), ctx.cache.get(first_key)

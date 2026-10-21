@@ -82,7 +82,7 @@ def _rows(ctx: ReadContext, underlying_ids: Sequence[str]) -> pd.DataFrame:
     """The session's stored quotes of the chains of ``underlying_ids`` (empty: none). Kept in
     the result cache until the next publish, so the chain and its quotes read it once."""
     wanted = tuple(sorted(set(underlying_ids)))
-    key = ("chain-rows", ctx.session.date, wanted, ctx.reader.visible_seq())  # ADR 0022
+    key = ("chain-rows", ctx.session.date, wanted, ctx.reader.version())  # ADR 0022
     found = ctx.cache.get(key)
     if found is None:
         frame = partition(ctx, OPTION_QUOTES)

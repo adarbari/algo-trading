@@ -12,8 +12,9 @@ from) is ``None``: the fields are null, not an error (ADR 0036)."""
 
 import threading
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import date
+from typing import Any
 
 from fastapi import Request
 from strawberry.dataloader import DataLoader
@@ -24,6 +25,7 @@ from algotrade.config.user import UserContext
 from algotrade.services.read.availability.cause import Cause
 from algotrade.services.read.availability.explain import explain
 from algotrade.services.read.context import NotFoundError, ReadContext, Stores
+from algotrade.services.read.serving.current import CurrentRelease
 from algotrade_api.deps import Caller
 from algotrade_api.graphql.loaders import Loaders
 from algotrade_api.graphql.offload import off_loop
@@ -35,15 +37,53 @@ Opener = Callable[[UserContext, date | None], ReadContext]
 StoresOpener = Callable[[UserContext], Stores]
 
 
+# Opens a read context for a user and a day over a reader pinned at a commit sequence.
+PinnedOpener = Callable[[UserContext, date, int], ReadContext]
+
+
+@dataclass(frozen=True)
+class ReleaseReads:
+    """Reads from the current serving release (ADR 0077 decision 23): what the router needs to
+    answer the listed operations (``response_cache.RELEASE_SHARED_OPERATIONS``) from it.
+
+    ``resolve`` is the one decision per request: the current release (verified:
+    ``services.read.serving.current``) when the kill switch (``serving.release_reads``, site
+    config) is on, else ``None``, and a ``None`` is today's live path exactly, its answer never
+    cached. ``pinned`` opens a read context for a day over a reader pinned at the release's commit
+    sequence, so every read of the request is the store as of the build and S+1 is invisible."""
+
+    current: Callable[[], CurrentRelease | None]
+    pinned: PinnedOpener
+    enabled: Callable[[], bool] = lambda: True
+
+    def resolve(self) -> CurrentRelease | None:
+        """The release this request follows, or ``None`` (the live path)."""
+        try:
+            if not self.enabled():
+                return None
+            return self.current()
+        except Exception:
+            return None
+
+
 class RequestContext(BaseContext):
     """What a resolver reads through (``info.context``) during one request: every read is
     for ``viewer``, the request's caller."""
 
     def __init__(
-        self, opener: Opener, viewer: UserRecord, stores: StoresOpener | None = None
+        self,
+        opener: Opener,
+        viewer: UserRecord,
+        stores: StoresOpener | None = None,
+        release: CurrentRelease | None = None,
+        pinned: PinnedOpener | None = None,
+        state: Any = None,
     ) -> None:
         super().__init__()
         self.viewer = viewer
+        # a request answered from a serving release (ADR 0077): every read context is pinned at
+        # the release's sequence and the default session is the release's
+        self._release, self._pinned, self._state = release, pinned, state
         self._user = UserContext(viewer.user_id)
         self._open = opener
         self._open_stores = stores
@@ -52,6 +92,20 @@ class RequestContext(BaseContext):
         self._contexts: dict[date | None, ReadContext | None] = {}
         self._stores: Stores | None = None
         self._causes: DataLoader[Cause, Cause] = DataLoader(load_fn=self._explain_all)
+
+    def _following(self) -> CurrentRelease | None:
+        """The serving release this request reads (given, or what the router put on the
+        request after this context was made: the context is a dependency, resolved before the
+        router decides)."""
+        if self._release is not None:
+            return self._release
+        return getattr(self._state, "release", None)
+
+    def forget_reads(self) -> None:
+        """Drop the read contexts opened so far (the router answers this request live after a
+        pinned read lost its version: the next ``read`` opens them again, un-pinned)."""
+        with self._lock:
+            self._contexts.clear()
 
     async def _explain_all(self, leaves: list[Cause]) -> list[Cause]:
         """``explain`` of each distinct leaf: one read of the run records each, off the loop."""
@@ -71,7 +125,11 @@ class RequestContext(BaseContext):
         with self._lock:
             if requested not in self._contexts:
                 try:
-                    ctx = self._open(self._user, requested)
+                    release = self._following()
+                    if release is not None and self._pinned is not None:
+                        ctx = self._pinned(self._user, requested or release.session, release.seq)
+                    else:
+                        ctx = self._open(self._user, requested)
                 except NotFoundError:
                     self._contexts[requested] = None
                 else:
@@ -106,17 +164,22 @@ class RequestContext(BaseContext):
         with self._lock:
             if self._stores is None:
                 self._stores = self._open_stores(self._user)
+            release = self._following()
+            if release is not None:  # an admin's Cause chains (ADR 0056) read what the release read
+                return replace(self._stores, reader=self._stores.reader.pinned(release.seq))
             return self._stores
 
 
 def context_getter(
-    opener: Opener, stores: StoresOpener | None = None
+    opener: Opener, stores: StoresOpener | None = None, pinned: PinnedOpener | None = None
 ) -> Callable[[UserRecord, Request], RequestContext]:
     """The router's ``context_getter``: a fresh ``RequestContext`` per request, for the caller
-    (a FastAPI dependency: Strawberry resolves it, sharing the request's one resolution)."""
+    (a FastAPI dependency: Strawberry resolves it, sharing the request's one resolution).
+    ``request.state.release`` (set by the router, after this runs, for an operation answered
+    from a serving release) pins the request's reads when they are first opened."""
 
     def get_context(caller: Caller, request: Request) -> RequestContext:
         request.state.viewer = caller  # ``errors.response_of`` words an error by the role
-        return RequestContext(opener, caller, stores)
+        return RequestContext(opener, caller, stores, None, pinned, request.state)
 
     return get_context

@@ -49,7 +49,7 @@ def _nightly(
     """The run id and recorded steps of the session's latest nightly record (none: no record), with
     the steps of its latest post-session record added (each carrying its own ``run_id``); read once
     per published state of the store when a ``cache`` is given."""
-    key = ("nightly-steps", session, reader.visible_seq())
+    key = ("nightly-steps", session, reader.version())
     hit = cache.get(key) if cache is not None else None
     if hit is not None:
         found: tuple[str | None, Steps] = hit

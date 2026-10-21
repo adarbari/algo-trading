@@ -16,7 +16,7 @@ Sort keys are the column ids of the web's factories: ``symbol`` (the ticker) or 
 name; a ``-`` prefix sorts descending; missing values sort last, ties by symbol. Without a
 sort the universe is in symbol order and ``keys`` in the order asked."""
 
-from collections.abc import Sequence
+from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -111,7 +111,7 @@ class _Order:
     missing: tuple[str, ...]
 
 
-def _universe(ctx: ReadContext, seq: int) -> _Population:
+def _universe(ctx: ReadContext, seq: Hashable) -> _Population:
     """The universe snapshot the session sees (cached per published state ``seq``)."""
     key = ("universe", ctx.session.date, seq)
     found = ctx.cache.get(key)
@@ -209,7 +209,7 @@ def _ordered(
     f: UniverseFilter,
     sort: str | None,
     keyed: bool,
-    seq: int,
+    seq: Hashable,
 ) -> _Order:
     """The population's ids that pass ``f``, in ``sort`` order, and the tables those read
     with nothing for the session (cached per query and published state ``seq``)."""
@@ -268,7 +268,7 @@ def load_table(
     if order is not None and order.removeprefix("-") != SYMBOL:
         feature_infos(ctx.features, [order.removeprefix("-")])
     page, size = max(page, 1), max(size, 1)
-    seq = ctx.reader.visible_seq()  # read once, before computing (ADR 0022)
+    seq = ctx.reader.version()  # read once, before computing (ADR 0022)
     if ctx.session.reference_snapshot is None:  # nothing stored says who anything is
         population = _Population((), None, False)
     else:

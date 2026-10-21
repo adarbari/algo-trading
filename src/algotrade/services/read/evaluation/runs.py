@@ -296,7 +296,7 @@ def load_site_trials(ctx: Stores) -> int:
     site = {e.id: (e.status, e.frozen_from) for e in load_site_edges(ctx.configs)}
     key = (
         "site-trials",
-        ctx.reader.visible_seq(),
+        ctx.reader.version(),
         ctx.reader.runs_generation(),
         tuple(sorted(site.items(), key=lambda kv: kv[0])),
     )
