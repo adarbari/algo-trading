@@ -8,8 +8,9 @@ of who filed: one request a business day (the existing ``sec_daily_index`` sourc
 its closure days (``sec_holidays``: the federal holidays, observed on the weekday before or after
 a weekend one, and the two national days of mourning since 2018; Columbus and Veterans Day are
 open on the exchange but closed at SEC, Good Friday the reverse). A weekday with no index that is
-none of those is a failure, never an empty day of filers: the list is built whole or the run
-fails, and only a whole list is recorded.
+none of those is read from the quarter's full index (SEC has no daily file for some quarters,
+all of 2011 Q3) and is a failure, never an empty day of filers, only if that has no row for it
+either: the list is built whole or the run fails, and only a whole list is recorded.
 
 The list of a window in the past is final, so a run records it in its stats
 (``filers_window``, ``filer_ciks``) and a later run of the same window reads it from there instead
@@ -19,9 +20,11 @@ recording run's own session is walked again.
 
 from collections.abc import Callable, Collection, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from time import sleep as nap  # a re-read pause, not vendor pacing (the limiter owns that)
+
+import pandas as pd
 
 from algotrade.core.time.calendar import is_weekend, nth_weekday
 from algotrade.storage.runs import RunRecord
@@ -54,8 +57,9 @@ SPECIAL_CLOSURES = frozenset(
         date(2021, 1, 20),
     }
 )
+_NO_ROWS = pd.DataFrame({"cik": [], "filing_date": pd.Series([], dtype="datetime64[ns]")})
 WALK_THREADS = 6  # daily index files in flight (the shared SEC limiter sets the rate)
-INDEX_RETRY_BACKOFF = (2.0, 4.0, 8.0, 16.0)  # seconds before each re-read of a day that said no
+INDEX_RETRY_BACKOFF = (2.0, 4.0)  # seconds before each re-read of a day that said no
 WINDOW_KEY = "filers_window"
 CIKS_KEY = "filer_ciks"
 
@@ -104,6 +108,7 @@ class Filers:
     cached: bool
     days: int
     holidays: list[date]
+    from_full_index: list[date] = field(default_factory=list)  # days the daily index lacks
 
 
 def window_label(since: date, until: date) -> str:
@@ -133,18 +138,22 @@ def walk_index(
     """The filers of ``since..until`` read from the daily index, a weekday at a time (module doc).
     SEC's 403 is ambiguous (no index, or a transient S3 refusal of a file that exists), so a
     weekday that is no holiday is re-read ``INDEX_RETRY_BACKOFF`` times, sleeping between reads,
-    before it counts as missing.
+    before it counts as missing; then the quarter's full index (one read per quarter) is asked,
+    for SEC has no daily file for some quarters (all of 2011 Q3); a day with no row there either
+    is a gap.
     A block or a failing day raises, so does a weekday with no index that is no SEC holiday (the
     run's own day may not be published yet) unless an operator verified it and listed it in
     ``allowed`` (``--allow-gap``): the list is never a partial one."""
     ciks: set[str] = set()
     closed: list[date] = []
+    from_full: list[date] = []
+    quarters: dict[tuple[int, int], pd.DataFrame] = {}
     days = 0
     walk = list(filing_days(since, min(until, run.session)))
 
-    def read(day: date) -> frozenset[str] | None:
+    def read(day: date, full: bool = False) -> frozenset[str] | None:
         request = DailyIndexRequest(
-            key=day.isoformat(), session_date=run.session, day=day, forms=PERIODIC_FORMS
+            key=day.isoformat(), session_date=run.session, day=day, forms=PERIODIC_FORMS, full=full
         )
         payload = index.fetch(request)  # no raw copy: the day's file is every form
         if payload is None:
@@ -152,6 +161,25 @@ def walk_index(
         normalized = index.normalize(request, payload)
         assert normalized is not None
         return frozenset(str(c) for c in normalized.parsed[DAILY_INDEX_FRAME]["cik"])
+
+    def from_quarter(day: date) -> frozenset[str]:
+        """The filers of ``day`` in its quarter's full index (read once per walk)."""
+        quarter = (day.year, (day.month - 1) // 3 + 1)
+        if quarter not in quarters:
+            request = DailyIndexRequest(
+                key=f"{quarter[0]}Q{quarter[1]}",
+                session_date=run.session,
+                day=day,
+                forms=PERIODIC_FORMS,
+                full=True,
+            )
+            payload = index.fetch(request)
+            normalized = index.normalize(request, payload) if payload is not None else None
+            quarters[quarter] = (
+                normalized.parsed[DAILY_INDEX_FRAME] if normalized is not None else _NO_ROWS
+            )
+        frame = quarters[quarter]
+        return frozenset(str(c) for c in frame.loc[frame["filing_date"].dt.date == day, "cik"])
 
     with ThreadPoolExecutor(WALK_THREADS, thread_name_prefix="ft-index") as pool:
         futures = [pool.submit(read, day) for day in walk]  # the shared limiter sets the rate
@@ -171,6 +199,9 @@ def walk_index(
                         again = read(day)
                         if again is not None:
                             break
+                    if again is None and (listed := from_quarter(day)):
+                        again = listed
+                        from_full.append(day)
                     if again is not None:
                         ciks.update(again)
                         continue
@@ -183,7 +214,7 @@ def walk_index(
             for future in futures:
                 future.cancel()  # a failed walk sends no more requests
             raise
-    return Filers(sorted(ciks), False, days, closed)
+    return Filers(sorted(ciks), False, days, closed, from_full)
 
 
 def discover(

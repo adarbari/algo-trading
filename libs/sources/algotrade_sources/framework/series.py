@@ -203,6 +203,7 @@ class DailyIndexRequest(FetchRequest):
 
     day: date
     forms: tuple[str, ...] = FILING_FORMS
+    full: bool = False  # the quarter's full index (every day of it) instead of the day's file
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -17,7 +17,9 @@ missing too): ``fetch`` returns ``None``, which the task reads as "no index (yet
 empty day. The 403 is ambiguous: S3 also answers it transiently for a file that exists
 (2026-10-21: ``form.20110701.idx`` gave 403, then the content on a re-read), so a caller that
 must not miss a day re-reads one that is no holiday before it calls it missing
-(``filing_text_filers.walk_index``). A block (HTML) stays an error. Same pacing, ``User-Agent``
+(``filing_text_filers.walk_index``), and when the day stays missing (2011 Q3 has no daily files
+at all) it asks for the quarter's full index (``DailyIndexRequest.full``, ``form.idx``, lines
+dated ``YYYY-MM-DD``). A block (HTML) stays an error. Same pacing, ``User-Agent``
 and ``sec`` limiter as the other SEC sources (``[sec_edgar]``).
 """
 
@@ -40,20 +42,25 @@ from algotrade_sources.vendors.sec.submissions import FORMS
 SOURCE = "sec_edgar"
 DATASET = "daily_index"
 INDEX_URL = "https://www.sec.gov/Archives/edgar/daily-index/{year}/QTR{quarter}/form.{day}.idx"
+FULL_INDEX_URL = "https://www.sec.gov/Archives/edgar/full-index/{year}/QTR{quarter}/form.idx"
 
 
 @functools.cache
-def line_patterns(forms: tuple[str, ...]) -> tuple[re.Pattern[str], re.Pattern[str]]:
+def line_patterns(
+    forms: tuple[str, ...], full: bool = False
+) -> tuple[re.Pattern[str], re.Pattern[str]]:
     """The patterns of the start of a line of ``forms`` and of the whole line. A form type can
     hold a space ("NT 10-K"), so the line starts with a known form, longest first (``25`` is
     not ``25-NSE``, ``4`` is not ``424B4``, ``SC TO-I`` is not its amendment): the type then
-    ends at whitespace."""
+    ends at whitespace. The full index dates its lines ``YYYY-MM-DD``, the daily one
+    ``YYYYMMDD``."""
+    filed = r"\d{4}-\d{2}-\d{2}" if full else r"\d{8}"
     alternatives = "|".join(re.escape(f) for f in sorted(forms, key=len, reverse=True))
     return (
         re.compile(rf"^(?:{alternatives})(?=\s)"),
         re.compile(
             rf"^(?P<form>{alternatives})\s+(?P<name>.+?)\s+(?P<cik>\d+)\s+"
-            r"(?P<filed>\d{8})\s+edgar/data/\d+/(?P<accession>[\w-]+)\.txt\s*$"
+            rf"(?P<filed>{filed})\s+edgar/data/\d+/(?P<accession>[\w-]+)\.txt\s*$"
         ),
     )
 
@@ -70,6 +77,12 @@ def index_url(day: date) -> str:
     return INDEX_URL.format(year=day.year, quarter=quarter, day=day.strftime("%Y%m%d"))
 
 
+def full_index_url(day: date) -> str:
+    """The URL of the full form index of ``day``'s quarter: it lists days the daily index has no
+    file for (the whole of 2011 Q3 at least, measured 2026-10-21)."""
+    return FULL_INDEX_URL.format(year=day.year, quarter=(day.month - 1) // 3 + 1)
+
+
 def daily_index_request(request: FetchRequest) -> DailyIndexRequest:
     """``request`` as a ``DailyIndexRequest`` (this source takes no other kind)."""
     if not isinstance(request, DailyIndexRequest):
@@ -77,13 +90,14 @@ def daily_index_request(request: FetchRequest) -> DailyIndexRequest:
     return request
 
 
-def parse_index(payload: bytes, forms: tuple[str, ...] = FORMS) -> pd.DataFrame:
-    """The ``forms`` lines of one form index (``DAILY_INDEX_COLUMNS``), sorted by accession.
+def parse_index(payload: bytes, forms: tuple[str, ...] = FORMS, full: bool = False) -> pd.DataFrame:
+    """The ``forms`` lines of one form index (``DAILY_INDEX_COLUMNS``), sorted by accession; a
+    full (quarter) index when ``full``, whose ``filing_date`` differs line to line.
 
     A line of those forms that does not match the layout is an error: a silently skipped line
     would be a filer the nightly never asks about."""
     rows = []
-    start, whole = line_patterns(forms)
+    start, whole = line_patterns(forms, full)
     for line in payload.decode("latin-1").splitlines():
         if start.match(line) is None:
             continue
@@ -95,7 +109,9 @@ def parse_index(payload: bytes, forms: tuple[str, ...] = FORMS) -> pd.DataFrame:
                 "cik": pad_cik(match["cik"]),
                 "form": match["form"],
                 "accession": match["accession"],
-                "filing_date": pd.to_datetime(match["filed"], format="%Y%m%d"),
+                "filing_date": pd.to_datetime(
+                    match["filed"], format="%Y-%m-%d" if full else "%Y%m%d"
+                ),
             }
         )
     frame = pd.DataFrame(rows, columns=list(DAILY_INDEX_COLUMNS))
@@ -113,8 +129,10 @@ class SecDailyIndex:
         self._http = http  # paced by the shared ``sec`` limiter; sets the User-Agent itself
 
     def fetch(self, request: FetchRequest) -> bytes | None:
-        return self._http.get(index_url(daily_index_request(request).day))
+        asked = daily_index_request(request)
+        return self._http.get(full_index_url(asked.day) if asked.full else index_url(asked.day))
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
-        frame = parse_index(payload, daily_index_request(request).forms)
+        asked = daily_index_request(request)
+        frame = parse_index(payload, asked.forms, asked.full)
         return Normalized(session_date=None, tables={}, parsed={DAILY_INDEX_FRAME: frame})

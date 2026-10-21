@@ -140,6 +140,8 @@ class Feed:
 
     def __call__(self, url: str) -> bytes:
         self.urls.append(url)
+        if "/full-index/" in url:  # the fallback for a day with no daily file: not served here
+            raise HttpError(403, body=DENIED)
         if "/daily-index/" in url:
             return self.index(url)
         name = url.rsplit("/", 1)[-1]
