@@ -44,7 +44,7 @@ values = { CALM = "term:regime", CAUTION = "term:regime", STRESS = "term:regime"
 
 [[enum]]
 source = "graphql:NewerState"
-values = { IN_PROGRESS = "term:last_complete_session", FAILED_RETRYING = "term:last_complete_session" }
+values = { IN_PROGRESS = "term:last_complete_session", FAILED_RETRYING = "term:last_complete_session", PUBLISHING = "term:publishing_session" }
 
 [[enum]]
 source = "graphql:UnavailableKind"

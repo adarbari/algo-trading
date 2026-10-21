@@ -2159,7 +2159,7 @@ export interface operations {
     trades_csv_files_edges__edge_id__trades_csv_get: {
         parameters: {
             query?: {
-                /** @description the session to read (default: the latest); live rows */
+                /** @description the session to read (default: the one the pages show); live rows */
                 date?: string | null;
                 /** @description which trades: in_sample, out_of_sample, live or all */
                 period?: components["schemas"]["Period"];
@@ -2735,7 +2735,7 @@ export interface operations {
     run_screens__config_id__run_post: {
         parameters: {
             query?: {
-                /** @description default: the latest session with data */
+                /** @description default: the session the pages show */
                 date?: string | null;
             };
             header?: {

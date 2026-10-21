@@ -16,7 +16,7 @@ from algotrade.services.read.context import open_context
 from algotrade.services.read.edge_ledger import trades
 from algotrade.services.read.edge_ledger.trades_csv import csv_lines
 from algotrade.services.read.evaluation.edges import load_edge
-from algotrade_api.deps import Caller, Store
+from algotrade_api.deps import Caller, Followed, Store
 
 router = APIRouter(prefix="/files/edges", tags=["files"])
 
@@ -25,16 +25,23 @@ router = APIRouter(prefix="/files/edges", tags=["files"])
 def trades_csv(
     store: Store,
     caller: Caller,
+    serving: Followed,
     edge_id: str,
     period: Annotated[
         trades.Period, Query(description="which trades: in_sample, out_of_sample, live or all")
     ] = trades.Period.ALL,
     date: Annotated[
-        dt.date | None, Query(description="the session to read (default: the latest); live rows")
+        dt.date | None,
+        Query(description="the session to read (default: the one the pages show); live rows"),
     ] = None,
 ) -> StreamingResponse:
     ctx = open_context(
-        store.reader, store.configs, UserContext(caller.user_id), date, cache=store.cache
+        store.reader,
+        store.configs,
+        UserContext(caller.user_id),
+        date,
+        cache=store.cache,
+        serving=serving,
     )
     edge = load_edge(ctx, edge_id)
     if edge is None:

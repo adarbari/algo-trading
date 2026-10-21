@@ -19,6 +19,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 from algotrade.core.model.errors import AlgoTradeError
 from algotrade.core.model.fields import COMPANY_TABLE, DESCRIPTION_TABLE, REFERENCE_TABLE
@@ -112,6 +113,50 @@ class NewerState(StrEnum):
 
     IN_PROGRESS = "IN_PROGRESS"  # bars or a run record exist: running, or waiting for a source
     FAILED_RETRYING = "FAILED_RETRYING"  # a critical step failed; the hourly nightly retries it
+    # complete, but the serving release that makes it the default is not promoted yet (ADR 0077
+    # decision 7); disclosed only once the configured delay has passed since it completed
+    PUBLISHING = "PUBLISHING"
+
+
+Due = tuple[dt.date, dt.datetime]  # (the newer complete session, when it is to be disclosed)
+_UNREAD: Any = object()  # "not read yet" for ``resolve_session`` (``None`` is a real answer)
+
+
+def publishing_due(reader: StoreReader, day: dt.date, delay: dt.timedelta) -> Due | None:
+    """The newest complete session after ``day`` (a nightly done by ``done_sessions`` and with
+    bars, as ``completeness`` counts it) and the instant it is disclosed as publishing: ``delay``
+    after the run that completed it finished. ``None``: no such session. Reads the run records
+    (and the bar days): the caller keeps the answer (``context._session`` does, per runs
+    generation) instead of asking per request."""
+    records = reader.runs(NIGHTLY)
+    newer = sorted(d for d in done_sessions(records) & set(reader.dates(BARS)) if d > day)
+    if not newer:
+        return None
+    finished = session_cutoff(records, newer[-1])
+    return None if finished is None else (newer[-1], finished + delay)
+
+
+@dataclass(frozen=True)
+class Serving:
+    """The serving release the default session follows (ADR 0077 decision 7): ``session`` is the
+    release's, ``now`` the request's clock (read once per request) and ``publishing_delay`` how
+    long a newer session may be complete before it is disclosed as ``PUBLISHING``."""
+
+    session: dt.date
+    now: dt.datetime
+    publishing_delay: dt.timedelta
+
+    def key(self, due: Due | None) -> tuple[dt.date, bool]:
+        """What a cached ``Session`` under this serving depends on besides the store: the day and
+        whether the instant the newer session is disclosed has passed (the flag flips the cached
+        answer, so a client never supplies the clock)."""
+        return self.session, due is not None and self.now >= due[1]
+
+    def publishing(self, due: Due | None) -> "NewerSession | None":
+        """The complete session after ``session``, once its disclosure instant has passed."""
+        if due is None or self.now < due[1]:
+            return None
+        return NewerSession(due[0], NewerState.PUBLISHING)
 
 
 @dataclass(frozen=True)
@@ -248,6 +293,14 @@ def completeness(reader: StoreReader) -> Completeness:
     return Completeness(done, last, _newer(later[-1], latest.get(later[-1])) if later else None)
 
 
+def _after_release(found: Completeness, serving: Serving, due: Due | None) -> NewerSession | None:
+    """What is newer than the released session: a complete one (``PUBLISHING`` after the delay),
+    else what ``completeness`` says is still processing or failing after the newest complete."""
+    if found.last is not None and found.last > serving.session:
+        return serving.publishing(due)
+    return found.newer
+
+
 def default_session(reader: StoreReader) -> dt.date | None:
     """The session a read or an on-request run with no date serves: the latest complete one
     (ADR 0062); none complete: the latest ``bars/1d`` partition, else the latest reference
@@ -256,14 +309,26 @@ def default_session(reader: StoreReader) -> dt.date | None:
 
 
 def resolve_session(
-    reader: StoreReader, requested: dt.date | None, expected: Sequence[str] = EXPECTED_TABLES
+    reader: StoreReader,
+    requested: dt.date | None,
+    expected: Sequence[str] = EXPECTED_TABLES,
+    serving: Serving | None = None,
+    due: Due | None = _UNREAD,
 ) -> Session:
     """The session a read for ``requested`` serves (see the module docstring). ``expected``:
-    the session-grain tables checked for ``present`` / ``missing`` (tests pass their own)."""
+    the session-grain tables checked for ``present`` / ``missing`` (tests pass their own).
+    ``serving``: a read with no date serves the serving release's session, not the newest complete
+    one (ADR 0077 decision 7): a newer complete session is ``newer`` as ``PUBLISHING`` once the
+    delay has passed, one still processing or failing as before; ``None``: ADR 0062 unchanged."""
     bars = snapshot(reader, BARS)
     found = completeness(reader)
     default = found.last or latest_session(reader)
     newer = found.newer
+    if serving is not None and requested is None:
+        default = serving.session
+        if due is _UNREAD:
+            due = publishing_due(reader, serving.session, serving.publishing_delay)
+        newer = _after_release(found, serving, due)
     if requested is not None:
         day, newer = requested, None
     elif default is not None:

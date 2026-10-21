@@ -75,9 +75,9 @@ class Harness:
         def reads(store: ReadStore, cache: Any) -> Callable[..., Any]:
             inner = real_reads(store, cache)
 
-            def counting(*args: Any) -> Any:
+            def counting(*args: Any, **kwargs: Any) -> Any:
                 self.opened += 1
-                return inner(*args)
+                return inner(*args, **kwargs)
 
             return counting
 
