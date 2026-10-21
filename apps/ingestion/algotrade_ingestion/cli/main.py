@@ -69,6 +69,7 @@ from algotrade.core.time.calendar import last_closed_session
 from algotrade.data import StoreReader
 from algotrade.services.configs import default_user
 from algotrade.services.jobs import RunLockedError, exclusive_run
+from algotrade.services.jobs.priority import lower_priority
 from algotrade.storage.backends.arrow_memory import limit_threads
 from algotrade.storage.factory import open_backend
 from algotrade.storage.runs import done_sessions
@@ -490,6 +491,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         resources = load_nightly(config_store(args))  # the Mac also serves the web: stay modest
         limit_threads(resources.arrow_cpu_threads, resources.arrow_io_threads)
+        lower_priority(resources.nice)  # every ingest command, and the workers it spawns
         if args.command in ("nightly", "post-session"):  # never a branch against the real store
             ensure_main_checkout()
         if not writes(args):

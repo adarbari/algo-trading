@@ -24,7 +24,6 @@ pool. While the pool lives the parent's ``__main__`` is hidden from multiprocess
 """
 
 import contextlib
-import ctypes
 import os
 import signal
 import sys
@@ -50,6 +49,7 @@ from types import FrameType
 from typing import Any
 
 from algotrade.services.jobs.exclusive import INGEST_LOCK
+from algotrade.services.jobs.priority import lower_priority
 from algotrade.storage.backends.arrow_memory import limit_threads
 from algotrade.storage.backends.run_compaction import OVER_BUDGET, CompactionVerificationError
 from algotrade.storage.factory import open_backend
@@ -63,7 +63,6 @@ LOCK_HELD = "the ingest lock is held (a nightly or a backfill is running)"
 SILENT_EXTRA_S = 60.0  # a worker silent this long past ``partition_seconds`` is dead or stuck
 POLL_S = 0.5  # how often the parent looks at the clock, the signals and the lock
 SUMMARY_S = 60.0
-IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE = 1, 0, 3  # <sys/resource.h> (darwin)
 
 
 @contextmanager
@@ -81,18 +80,6 @@ def main_hidden() -> Iterator[None]:
     finally:
         for name, value in saved.items():
             setattr(main, name, value)
-
-
-def lower_priority(nice: int) -> None:
-    """Take on background CPU and (darwin) disk priority for the rest of this process; never
-    raises: a platform without the calls just runs at normal priority."""
-    with contextlib.suppress(OSError):
-        if nice > 0:
-            os.nice(nice)
-    if sys.platform == "darwin":
-        with contextlib.suppress(OSError, AttributeError):
-            libc = ctypes.CDLL(None, use_errno=True)
-            libc.setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)
 
 
 @dataclass(frozen=True)
