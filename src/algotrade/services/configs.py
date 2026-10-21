@@ -1,6 +1,6 @@
 """Use case: resolve configs from the ``ConfigStore`` and find the screeners that run nightly."""
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from algotrade.config.env import user_id
@@ -9,13 +9,12 @@ from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.resolve import CONFIG_KINDS, ResolvedConfig, resolve
 from algotrade.config.strategy.schema import RULE_IMPLS, Selection
 from algotrade.config.user import SITE_USER, UserContext
-from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, is_feature_field
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.registry import catalogue_columns
 from algotrade.services.features import catalogue
 from algotrade.storage.configs.files import SCREENERS
-from algotrade.storage.configs.generation import is_stable
 from algotrade.storage.configs.store import ConfigStore, OverlayConfigStore
 
 
@@ -112,18 +111,3 @@ def config_ids(store: ConfigStore, scope: str) -> list[str]:
     """Every strategy / screener config id in ``scope`` (``CONFIG_KINDS``; a user's rule
     screens count once finalised), sorted and unique."""
     return sorted({n for kind in CONFIG_KINDS for n in store.names(scope, kind)})
-
-
-def config_generation(configs: ConfigStore) -> Callable[[str], int | None]:
-    """A user's config generation for the response cache key (ADR 0077 decision 15): ``None``
-    while a write of theirs is in flight (odd) or the counter cannot be read, so nothing is
-    cached under a half-written config."""
-
-    def generation(user: str) -> int | None:
-        try:
-            value = configs.generation(user)
-        except (OSError, AlgoTradeError):
-            return None
-        return value if is_stable(value) else None
-
-    return generation

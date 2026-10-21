@@ -40,16 +40,6 @@ section = "docs/adr/0061-bad-bar-flags.md#decision"
 detect = [{ string = "events/bar_flag" }]
 
 [[responsibility]]
-id = "config-generation"
-description = "The per-user config generation: a durable seqlock counter (users/<u>/.generation: odd while a write of the user's configs is in flight or crashed, even once its last file is in place) bumped by every FileConfigWriter / MemoryConfigWriter write, read by the response cache key so a user's answer is never served from before their write (ADR 0077 decisions 14-15); nothing else writes the file (fitness test)"
-owner = ["src/algotrade/storage/configs/generation.py"]
-allowed = [
-    "src/algotrade/storage/configs/files.py",  # the read side of FileConfigStore.generation
-]
-section = "docs/adr/0077-serving-release.md#amendment-2026-10-21-stale-is-never-an-option-slow-is"
-detect = [{ call = "read_generation" }]
-
-[[responsibility]]
 id = "feature-input-loading"
 description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows (rollups/instrument/ and rollups/market/) with this run's rows winning, the session's universe snapshot (the population; none before the first) and the symbol -> id map of its reference snapshot (instruments/symbol_ids, a lookup only; ADR 0047), the sector, industry and SIC of the company snapshot on or before the session (instruments/company; none before the first), the statement lines filed on or before the session (instruments/statements, ADR 0067: statement_facts), the leveraged and inverse funds' latest holdings (holdings/etf, ADR 0050), bars narrowed to the ids of a group's tickers (Input.symbols), coverage ledgers served whole to every session (UNBOUNDED_INPUTS: filings/read; no content, ADR 0007 amendment); features never read storage or a domain reader"
 owner = ["src/algotrade/data/feature_inputs.py"]

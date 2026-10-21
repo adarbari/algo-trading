@@ -50,7 +50,6 @@ from typing import Any
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
-from algotrade.storage.configs.generation import read_generation
 from algotrade.storage.configs.store import KINDS, split_version
 
 SITE = "site"
@@ -251,9 +250,6 @@ class FileConfigStore:
         base = self.root / "users"
         return sorted(p.name for p in base.iterdir() if p.is_dir()) if base.exists() else []
 
-    def generation(self, user: str) -> int:
-        return read_generation(self.root / "users" / validate_id("user", user))
-
     def overrides(self, name: str) -> list[dict[str, str]]:
         path = self.root / SITE / "overrides" / f"{validate_id('override', name)}.csv"
         if not path.exists():
@@ -313,6 +309,3 @@ class MemoryConfigStore:
 
     def users(self) -> list[str]:
         return sorted({s for (s, _, _) in self._docs if s != SITE})
-
-    def generation(self, user: str) -> int:
-        return 0  # a read-only store never changes; ``MemoryConfigWriter`` counts its writes

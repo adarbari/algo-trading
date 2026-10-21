@@ -15,13 +15,11 @@ The memory writer has the same semantics for tests; a DB backend can replace bot
 protocol later.
 """
 
-import functools
 import os
 import re
 import tempfile
-import threading
 import tomllib
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
@@ -37,7 +35,6 @@ from algotrade.storage.configs.files import (
     valid_version,
     version_file,
 )
-from algotrade.storage.configs.generation import writing
 from algotrade.storage.configs.store import ConfigStore, split_version
 from algotrade.storage.configs.toml_text import toml_text
 
@@ -127,19 +124,6 @@ def _document_id(kind: str, name: str) -> str:
 
 
 # ----------------------------------------------------------------------------- files
-def _generation[**P, R](method: Callable[..., R]) -> Callable[..., R]:
-    """A write of ``FileConfigWriter``: the user's config generation is odd while it runs and
-    even once its last file is in place (``generation.py``, ADR 0077 decision 15). ``user`` is
-    the first argument after ``self``."""
-
-    @functools.wraps(method)
-    def wrapped(self: "FileConfigWriter", user: str, *args: Any, **kwargs: Any) -> R:
-        with writing(self.root / "users" / _user(user)):
-            return method(self, user, *args, **kwargs)
-
-    return wrapped
-
-
 class FileConfigWriter(FileConfigStore):
     """The TOML files under the config root (layout: ``storage/configs/files.py``)."""
 
@@ -170,11 +154,9 @@ class FileConfigWriter(FileConfigStore):
         finally:
             tmp.unlink(missing_ok=True)
 
-    @_generation
     def save_draft(self, user: str, name: str, document: Mapping[str, Any]) -> None:
         self._write(user, self.screen_dir(_user(user), name) / DRAFT, toml_text(document))
 
-    @_generation
     def discard_draft(self, user: str, name: str) -> bool:
         path = self._inside_user(user, self.screen_dir(_user(user), name) / DRAFT)
         try:
@@ -183,12 +165,10 @@ class FileConfigWriter(FileConfigStore):
             return False
         return True
 
-    @_generation
     def add_version(self, user: str, name: str, version: int, document: Mapping[str, Any]) -> None:
         path = self.screen_dir(_user(user), name) / version_file(valid_version(version))
         self._write(user, path, toml_text(document), exclusive=True)
 
-    @_generation
     def delete_screen(self, user: str, name: str, at: datetime) -> bool:
         scope = _user(user)
         source = self._inside_user(user, self.screen_dir(scope, name))
@@ -206,14 +186,12 @@ class FileConfigWriter(FileConfigStore):
         pattern = _archived_as(name)
         return base.is_dir() and any(pattern.fullmatch(p.name) for p in base.iterdir())
 
-    @_generation
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
         path = (
             self.root / "users" / _user(user) / "features" / f"{validate_id('theme', theme)}.toml"
         )
         self._write(user, path, toml_text(document))
 
-    @_generation
     def save_preferences(self, user: str, document: Mapping[str, Any]) -> None:
         path = self.root / "users" / _user(user) / "preferences.toml"
         self._write(user, path, toml_text(document))
@@ -222,13 +200,11 @@ class FileConfigWriter(FileConfigStore):
         folder = self.root / "users" / _user(user) / _document_kind(kind)
         return folder / f"{_document_id(kind, name)}.toml"
 
-    @_generation
     def save_user_document(
         self, user: str, kind: str, name: str, document: Mapping[str, Any]
     ) -> None:
         self._write(user, self._document_path(user, kind, name), toml_text(document))
 
-    @_generation
     def archive_user_document(self, user: str, kind: str, name: str, at: datetime) -> bool:
         current = self._inside_user(user, self._document_path(user, kind, name))
         if not current.is_file():
@@ -252,24 +228,6 @@ def _copy(document: Mapping[str, Any]) -> dict[str, Any]:
     return tomllib.loads(toml_text(document))  # what a file round trip would give back
 
 
-def _memory_generation[**P, R](method: Callable[..., R]) -> Callable[..., R]:
-    """A write of ``MemoryConfigWriter``: the same odd-then-even counter as the file one."""
-
-    @functools.wraps(method)
-    def wrapped(self: "MemoryConfigWriter", user: str, *args: Any, **kwargs: Any) -> R:
-        with self._lock:
-            who = _user(user)
-            before = self._generations.get(who, 0)
-            odd = before + 1 if before % 2 == 0 else before + 2
-            self._generations[who] = odd
-            try:
-                return method(self, user, *args, **kwargs)
-            finally:
-                self._generations[who] = odd + 1
-
-    return wrapped
-
-
 class MemoryConfigWriter(MemoryConfigStore):
     """The memory store plus drafts and versions (tests)."""
 
@@ -280,16 +238,11 @@ class MemoryConfigWriter(MemoryConfigStore):
     ) -> None:
         super().__init__(documents or {}, overrides)
         self._drafts: dict[tuple[str, str], dict[str, Any]] = {}
-        self._generations: dict[str, int] = {}
-        self._lock = threading.Lock()
         self._versions: dict[tuple[str, str], dict[int, dict[str, Any]]] = {}
         # (user, archive name) -> (draft, versions) of a deleted screen
         self.archived: dict[tuple[str, str], tuple[dict[str, Any] | None, dict[int, Any]]] = {}
         # (user, kind, archive name) -> a document archived by archive_user_document
         self.archived_documents: dict[tuple[str, str, str], dict[str, Any]] = {}
-
-    def generation(self, user: str) -> int:
-        return self._generations.get(_user(user), 0)
 
     def _screen(self, user: str, name: str) -> tuple[str, str]:
         return _user(user), validate_id("screener", name)
@@ -317,11 +270,9 @@ class MemoryConfigWriter(MemoryConfigStore):
         found = self._drafts.get(self._screen(user, name))
         return None if found is None else _copy(found)
 
-    @_memory_generation
     def save_draft(self, user: str, name: str, document: Mapping[str, Any]) -> None:
         self._drafts[self._screen(user, name)] = _copy(document)
 
-    @_memory_generation
     def discard_draft(self, user: str, name: str) -> bool:
         return self._drafts.pop(self._screen(user, name), None) is not None
 
@@ -335,14 +286,12 @@ class MemoryConfigWriter(MemoryConfigStore):
         found = self._versions.get(self._screen(user, name), {}).get(valid_version(version))
         return None if found is None else _copy(found)
 
-    @_memory_generation
     def add_version(self, user: str, name: str, version: int, document: Mapping[str, Any]) -> None:
         versions = self._versions.setdefault(self._screen(user, name), {})
         if valid_version(version) in versions:
             raise VersionExistsError(f"v{version} exists: versions are immutable")
         versions[version] = _copy(document)
 
-    @_memory_generation
     def delete_screen(self, user: str, name: str, at: datetime) -> bool:
         key = self._screen(user, name)
         draft, versions = self._drafts.pop(key, None), self._versions.pop(key, {})
@@ -355,21 +304,17 @@ class MemoryConfigWriter(MemoryConfigStore):
         pattern = _archived_as(name)
         return any(u == _user(user) and pattern.fullmatch(n) for u, n in self.archived)
 
-    @_memory_generation
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
         self._docs[(_user(user), "features", validate_id("theme", theme))] = _copy(document)
 
-    @_memory_generation
     def save_preferences(self, user: str, document: Mapping[str, Any]) -> None:
         self._docs[(_user(user), "preferences", "preferences")] = _copy(document)
 
-    @_memory_generation
     def save_user_document(
         self, user: str, kind: str, name: str, document: Mapping[str, Any]
     ) -> None:
         self._docs[(_user(user), _document_kind(kind), _document_id(kind, name))] = _copy(document)
 
-    @_memory_generation
     def archive_user_document(self, user: str, kind: str, name: str, at: datetime) -> bool:
         key = (_user(user), _document_kind(kind), _document_id(kind, name))
         found = self._docs.pop(key, None)
