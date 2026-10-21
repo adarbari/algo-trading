@@ -23,6 +23,7 @@ from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     ibkr_contracts,
 )
+from algotrade_ingestion.tasks.shorting import restamp
 from algotrade_ingestion.tasks.verification import verify
 from algotrade_sources.framework.base import (
     FixtureSource,
@@ -122,6 +123,10 @@ def run_golden_load(ctx: TaskContext, p: Params) -> RunRecord:
     if not isinstance(source, FixtureSource):
         raise TypeError("synthetic must be a FixtureSource (the golden CSVs)")
     return golden.load_golden(ctx, source)
+
+
+def run_restamp_known_from(ctx: TaskContext, p: Params) -> RunRecord:
+    return restamp.restamp(ctx, session_of(p), dry_run=bool(p.get("dry_run")))
 
 
 def run_compact_runs(ctx: TaskContext, p: Params) -> RunRecord:
